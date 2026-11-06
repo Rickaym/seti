@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Seti</string>
+
+    <string name="pair_title">Pair with Seti</string>
+    <string name="pair_intro">In Seti on another screen, open Settings, Sign-in and show a pairing code. Scan its QR code here, or paste the pairing link or type the Seti URL and the code. The app then opens your Seti and its widgets read your agents.</string>
+    <string name="pair_repair">Seti no longer accepts this phone. Pair it again to refresh the widgets.</string>
+    <string name="pair_scan">Scan QR code</string>
+    <string name="pair_url">Seti URL or pairing link</string>
+    <string name="pair_switch">Paired with %1$s. Pair with a code from this Seti or from another one to switch.</string>
+    <string name="pair_url_hint">https://seti.example.com</string>
+    <string name="pair_code">Pairing code</string>
+    <string name="pair_submit">Pair</string>
+    <string name="pair_open">Open Seti</string>
+    <string name="pair_error_url">Enter an https URL for Seti.</string>
+    <string name="pair_error_code">Enter the pairing code.</string>
+    <string name="pair_error_qr">That QR code is not a Seti pairing link.</string>
+    <string name="pair_error_rejected">Seti rejected the code. It may have expired; show a new one.</string>
+    <string name="pair_error_network">Could not reach Seti. Check the URL and your connection.</string>
+    <string name="pair_error_key">Could not create a device key on this phone.</string>
+    <string name="pair_error_scanner">The QR scanner is not available. Enter the URL and code instead.</string>
+    <string name="pair_error_scanner_detail">The QR scanner failed: %1$s. Enter the URL and code instead.</string>
+    <string name="pair_scan_preparing">Getting the scanner ready</string>
+
+    <string name="crash_title">The app crashed last time</string>
+    <string name="crash_body">Copy the details and include them when you report the problem.</string>
+    <string name="crash_copy">Copy</string>
+    <string name="crash_copied">Copied</string>
+    <string name="crash_dismiss">Dismiss</string>
+
+    <string name="shortcut_pair_short">Pair again</string>
+    <string name="shortcut_pair_long">Pair again or switch Seti</string>
+
+    <string name="widget_needs_you">Needs you</string>
+    <string name="widget_needs_you_description">Agents waiting for you, why and for how long</string>
+    <string name="widget_agents">Agents</string>
+    <string name="widget_agents_description">What each agent is doing: its step, subagents and PR</string>
+    <string name="widget_running_count">%1$d running</string>
+    <string name="widget_waiting_count">%1$d waiting</string>
+    <string name="widget_cost_today">%1$s today</string>
+    <string name="widget_new_agent">New agent</string>
+    <string name="widget_call_ea">Call EA</string>
+    <string name="widget_all_clear">All clear</string>
+    <string name="widget_no_agents">No agent ran recently.</string>
+    <string name="widget_using_tool">Using %1$s</string>
+    <string name="widget_said_tool">%1$s \u00b7 %2$s</string>
+    <string name="widget_working">Working</string>
+    <string name="widget_failed_turn">Failed</string>
+    <string name="widget_done">Done</string>
+    <string name="widget_idle_activity">Idle</string>
+    <string name="widget_pr">PR</string>
+    <string name="widget_pr_failing">CI failed</string>
+    <string name="widget_pr_pending">CI running</string>
+    <string name="widget_pr_passing">CI passed</string>
+    <string name="widget_pr_open">open</string>
+    <string name="widget_pr_merged">merged</string>
+    <string name="widget_pr_closed">closed</string>
+    <plurals name="widget_pr_reviews">
+        <item quantity="one">%d unresolved thread</item>
+        <item quantity="other">%d unresolved threads</item>
+    </plurals>
+    <plurals name="widget_more_waiting">
+        <item quantity="one">+%d more waiting</item>
+        <item quantity="other">+%d more waiting</item>
+    </plurals>
+    <plurals name="widget_more_agents">
+        <item quantity="one">+%d more agent</item>
+        <item quantity="other">+%d more agents</item>
+    </plurals>
+    <plurals name="widget_more_subagents">
+        <item quantity="one">+%d more subagent</item>
+        <item quantity="other">+%d more subagents</item>
+    </plurals>
+    <string name="widget_refresh">Refresh</string>
+    <string name="widget_nothing_waits">Nothing waits for you.</string>
+    <string name="widget_pair">Not paired. Tap to pair with Seti.</string>
+    <string name="widget_repair">%1$s. Tap to pair again.</string>
+    <string name="widget_just_now">just now</string>
+    <string name="widget_updated">Updated %1$s</string>
+    <string name="widget_stale">Stale, updated %1$s</string>
+    <string name="widget_never">Not updated yet</string>
+    <string name="widget_updating">Updating\u2026</string>
+    <string name="widget_failed">%1$s, updated %2$s</string>
+    <string name="widget_problem_unreachable">Can\'t reach Seti</string>
+    <string name="widget_problem_redirected">Blocked by a proxy</string>
+    <string name="widget_problem_bad_reply">Unexpected reply</string>
+    <string name="widget_problem_status">Seti answered %1$d</string>
+    <string name="widget_problem_signed_out">Sign-in expired</string>
+    <string name="widget_problem_key_lost">Device key lost</string>
+</resources>

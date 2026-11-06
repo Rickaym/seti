@@ -1,0 +1,26 @@
+{
+  "id": "html-preview",
+  "name": "HTML preview",
+  "version": "1.0.0",
+  "seti": "^1.2",
+  "description": "Shows HTML files as sandboxed pages, with scripts off until you turn them on.",
+  "author": "Seti",
+  "icon": "code-xml",
+  "categories": ["viewers"],
+  "securitySensitive": true,
+  "defaultEnabled": true,
+  "contributes": {
+    "fileViewers": [
+      {
+        "id": "page",
+        "title": "Page",
+        "extensions": ["html", "htm"],
+        "text": true,
+        "page": true,
+        "source": true,
+        "phone": true,
+        "maxBytes": 20971520
+      }
+    ]
+  }
+}

@@ -1,0 +1,157 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Hostile</title>
+  </head>
+  <body>
+    <ul id="out"></ul>
+    <p id="violations"></p>
+    <button id="flood" type="button">Flood</button>
+    <button id="big" type="button">Big</button>
+    <button id="odd" type="button">Odd</button>
+    <button id="api" type="button">Leave to API</button>
+    <button id="web" type="button">Leave to web</button>
+    <form id="form" action="https://example.test/form" method="post"><input name="d" value="1" /></form>
+    <script>
+      var seen = []
+      document.addEventListener('securitypolicyviolation', function (e) {
+        seen.push(e.effectiveDirective)
+        document.getElementById('violations').textContent = 'Violations ' + seen.join(' ')
+      })
+      function report(name, value) {
+        var li = document.createElement('li')
+        li.textContent = name + ': ' + value
+        document.getElementById('out').appendChild(li)
+      }
+      function settle(promise) {
+        return Promise.race([
+          promise,
+          new Promise(function (_ok, no) {
+            setTimeout(no, 1500)
+          }),
+        ])
+      }
+      function attempt(name, fn) {
+        try {
+          var result = fn()
+          if (result && typeof result.then === 'function') {
+            settle(result).then(
+              function () {
+                report(name, 'reached')
+              },
+              function () {
+                report(name, 'blocked')
+              },
+            )
+          } else {
+            report(name, String(result))
+          }
+        } catch (e) {
+          report(name, 'blocked')
+        }
+      }
+      function opened(target) {
+        return new Promise(function (ok, no) {
+          target.onopen = ok
+          target.onload = ok
+          target.onerror = no
+        })
+      }
+      report('kept before load', String(localStorage.getItem('k')))
+      attempt('fetch', function () {
+        return fetch('/api/tasks')
+      })
+      attempt('xhr', function () {
+        var x = new XMLHttpRequest()
+        x.open('GET', '/api/tasks')
+        x.send()
+        return opened(x)
+      })
+      attempt('websocket', function () {
+        return opened(new WebSocket('wss://example.test/socket'))
+      })
+      attempt('eventsource', function () {
+        return opened(new EventSource('/api/tasks'))
+      })
+      attempt('image', function () {
+        var i = new Image()
+        i.src = 'https://example.test/pixel.png'
+        return opened(i)
+      })
+      attempt('beacon', function () {
+        return navigator.sendBeacon('https://example.test/beacon', 'd') ? 'queued' : 'blocked'
+      })
+      attempt('popup', function () {
+        return window.open('https://example.test/popup') === null ? 'blocked' : 'opened'
+      })
+      attempt('top', function () {
+        top.location.href = 'https://example.test/top'
+        return 'navigated'
+      })
+      attempt('parent', function () {
+        return parent.document.title
+      })
+      attempt('cookie', function () {
+        return document.cookie === '' ? 'empty' : 'read'
+      })
+      attempt('storage', function () {
+        localStorage.setItem('k', 'v')
+        return localStorage.getItem('k')
+      })
+      attempt('webrtc', function () {
+        return typeof RTCPeerConnection + ' ' + typeof RTCDataChannel + ' ' + typeof webkitRTCPeerConnection
+      })
+      attempt('injected', function () {
+        var d = document.createElement('div')
+        d.innerHTML = '<img src="data:," onerror="window.injected = 1; seti.storage.set(\'injected\', 1)">'
+        document.body.appendChild(d)
+        return new Promise(function (ok, no) {
+          setTimeout(function () {
+            window.injected === 1 ? ok() : no()
+          }, 300)
+        })
+      })
+      attempt('forged', function () {
+        parent.postMessage({ t: 'call', id: 1, op: 'storage.set', key: 'forged', value: 1 }, '*')
+        return 'posted'
+      })
+      attempt('form', function () {
+        document.getElementById('form').requestSubmit()
+        return 'submitted'
+      })
+      seti.run('palette-only', {}).then(
+        function () {
+          report('palette only', 'ran')
+        },
+        function (e) {
+          report('palette only', 'refused ' + e.code)
+        },
+      )
+      document.getElementById('flood').addEventListener('click', function () {
+        for (var i = 0; i < 100; i++) {
+          seti.settings.get()
+        }
+      })
+      document.getElementById('big').addEventListener('click', function () {
+        seti.storage.set('big', 'x'.repeat(70000))
+        seti.settings.get().then(function () {
+          report('after big', 'answered')
+        })
+      })
+      document.getElementById('odd').addEventListener('click', function () {
+        seti.open('javascript:alert(1)')
+        seti.settings.get().then(function () {
+          report('after odd', 'answered')
+        })
+      })
+      document.getElementById('api').addEventListener('click', function () {
+        location.href = '/api/tasks'
+      })
+      document.getElementById('web').addEventListener('click', function () {
+        location.href = 'https://example.test/?d=1'
+      })
+      seti.ready()
+    </script>
+  </body>
+</html>

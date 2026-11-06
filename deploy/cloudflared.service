@@ -1,0 +1,14 @@
+[Unit]
+Description=Cloudflare Tunnel publishing Seti through Cloudflare Access
+After=network-online.target seti.service
+Wants=network-online.target
+
+[Service]
+LoadCredential=tunnel-token:%h/.seti/credentials/tunnel-token
+ExecStart=%h/.local/bin/cloudflared tunnel --no-autoupdate run --token-file ${CREDENTIALS_DIRECTORY}/tunnel-token
+NoNewPrivileges=true
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target

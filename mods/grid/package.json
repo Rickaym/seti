@@ -1,0 +1,26 @@
+{
+  "name": "@seti/mod-grid",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "exports": {
+    "./panels.css": "./panels.css",
+    "./server": "./server.ts",
+    "./ui": "./ui.tsx"
+  },
+  "scripts": {
+    "check-types": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@seti/mod-api": "workspace:*",
+    "lucide-react": "^1.66.0",
+    "react": "^19.3.1",
+    "react-grid-layout": "^2.3.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.3.0",
+    "typescript": "~6.0.3",
+    "vitest": "^5.0.5"
+  }
+}

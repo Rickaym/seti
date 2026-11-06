@@ -1,0 +1,14 @@
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Secret-shaped test inputs for Seti's own redaction, and demo ids"
+paths = [
+  '''(^|/)ea/tests/test_redact\.py$''',
+  '''(^|/)server/src/scrub\.test\.ts$''',
+  '''(^|/)server/src/file-handoff\.test\.ts$''',
+  '''(^|/)server/src/mods/ops/net\.test\.ts$''',
+]
+regexes = [
+  '''[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}''',
+]

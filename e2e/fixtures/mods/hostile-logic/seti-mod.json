@@ -1,0 +1,21 @@
+{
+  "id": "hostile-logic",
+  "name": "Hostile logic",
+  "version": "1.0.0",
+  "seti": "^1.8",
+  "author": "Seti tests",
+  "description": "Tries every way out of the logic sandbox and past its grants, so Seti's tests can watch each fail.",
+  "main": "logic.js",
+  "capabilities": [
+    { "name": "storage" },
+    { "name": "net.fetch", "hosts": ["api.sink.test"] },
+    { "name": "tasks.manage", "actions": ["rename"] },
+    { "name": "chat.post", "public": true },
+    { "name": "notify" }
+  ],
+  "activation": ["onCommand"],
+  "contributes": {
+    "commands": [{ "id": "escape", "title": "Try every escape", "for": ["palette"], "changes": false }],
+    "notifications": [{ "id": "own", "title": "Its own kind" }]
+  }
+}

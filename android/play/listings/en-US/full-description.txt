@@ -1,0 +1,24 @@
+Seti runs a team of coding agents on your own machine. This app puts them on your phone: two home screen widgets that show what your agents are doing, and the full Seti workspace one tap away.
+
+You need your own Seti server. Seti is free, open source software (Apache-2.0) that you install on a machine that holds your repositories. This app does nothing until you pair it with that server.
+
+HOME SCREEN WIDGETS
+- Needs you: the agents that wait on a permission, ask a question or stopped on an error, newest first. Tap one to open it.
+- Agents: how many agents are running and idle, what they cost today, and shortcuts to open Seti, start a new agent or call your executive assistant agent.
+- The widgets refresh on their own every 15 minutes and whenever you tap refresh, and say plainly why when they cannot reach your server.
+
+PAIR WITH A QR CODE
+- In Seti, open Settings, Sign-in and show a pairing code. Tap Scan QR code in the app and point the camera at it. On the same phone, copy the pairing link and paste it into the app instead.
+- The scanner runs on the phone and needs no camera permission.
+- Pair again at any time to switch to another Seti server.
+
+HARDWARE-BACKED DEVICE KEYS
+- Pairing creates a P-256 key in Android Keystore, in StrongBox on phones that have it. The key cannot be exported: it never leaves the phone.
+- Every widget request carries a fresh signature bound to that request, so a copied request is useless. Revoke the phone in Seti and its key stops working at once.
+
+THE FULL SETI WORKSPACE
+- The app opens your Seti full screen with your existing sign-in, so you answer permission requests, read transcripts and pull requests, and steer agents from anywhere.
+- Turn on Seti's notifications to hear when an agent needs you.
+
+PRIVATE BY DESIGN
+- The app talks only to the Seti server you pair it with. It has no account with us, no ads and no analytics, and sends nothing to the developer. Google Play services, which runs the QR scanner, sends Google its own usage diagnostics; the privacy policy has the details.

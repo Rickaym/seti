@@ -1,0 +1,19 @@
+{
+  "name": "@seti/e2e",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "e2e": "playwright test",
+    "screenshots": "playwright test -c screenshots.config.ts",
+    "check-types": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@catppuccin/palette": "^1.8.0",
+    "@playwright/test": "^1.64.1",
+    "@seti/shared": "workspace:*",
+    "@types/node": "^24.19.1",
+    "typescript": "~6.0.3",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
+  }
+}

@@ -1,0 +1,76 @@
+{
+  "id": "grid",
+  "name": "Grid",
+  "version": "1.0.0",
+  "seti": "^1.14",
+  "description": "Shows agents and terminals side by side in panels you drag, resize and tidy, one layout per workspace.",
+  "author": "Seti",
+  "icon": "layout-grid",
+  "categories": ["agents"],
+  "defaultEnabled": true,
+  "capabilities": [{ "name": "workspaces.layout" }],
+  "contributes": {
+    "views": [{ "id": "grid", "title": "Grid", "icon": "layout-grid", "where": "agentsLayout", "phone": false }],
+    "commands": [
+      {
+        "id": "toggle",
+        "title": "Agent grid",
+        "icon": "layout-grid",
+        "description": "grid tile split several multiple agents side by side layout",
+        "for": ["palette"],
+        "chord": "Alt+G",
+        "changes": false
+      },
+      {
+        "id": "open",
+        "title": "Open in grid",
+        "icon": "layout-grid",
+        "description": "Show this agent beside others",
+        "args": { "task": { "type": "string" } },
+        "for": ["palette", "agentHeader"],
+        "changes": false
+      },
+      {
+        "id": "tidy",
+        "title": "Tidy grid",
+        "icon": "rows-3",
+        "description": "Lay the panels out evenly to fit the window",
+        "for": ["palette"],
+        "changes": false
+      },
+      {
+        "id": "lock",
+        "title": "Lock grid layout",
+        "icon": "lock",
+        "description": "grid layout freeze pin panels drag resize",
+        "for": ["palette"],
+        "changes": false
+      },
+      {
+        "id": "clear",
+        "title": "Clear grid",
+        "icon": "eraser",
+        "description": "Take every panel out; agents keep running",
+        "for": ["palette"],
+        "changes": false
+      },
+      {
+        "id": "arrange",
+        "title": "Arrange panel",
+        "icon": "move",
+        "description": "Move and resize the focused panel with arrow keys",
+        "for": ["palette"],
+        "changes": false
+      }
+    ],
+    "shortcuts": [
+      { "keys": "Alt+Arrows", "title": "Move between grid panels", "group": "agents" },
+      { "keys": "Alt+Shift+Arrows", "title": "Move the grid panel", "group": "agents" }
+    ],
+    "styles": [{ "id": "panels", "file": "panels.css" }],
+    "routes": [
+      { "method": "GET", "path": "/layouts", "demo": true },
+      { "method": "PUT", "path": "/layouts/:workspace_id", "demo": true }
+    ]
+  }
+}

@@ -1,0 +1,24 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Hostile file</title>
+  </head>
+  <body>
+    <pre id="text">Waiting for the file</pre>
+    <button id="tiny" type="button">Tiny</button>
+    <button id="huge" type="button">Huge</button>
+    <script>
+      seti.on('file', function (f) {
+        document.getElementById('text').textContent = f.name
+      })
+      document.getElementById('tiny').addEventListener('click', function () {
+        seti.resize(10)
+      })
+      document.getElementById('huge').addEventListener('click', function () {
+        seti.resize(5000)
+      })
+      seti.ready()
+    </script>
+  </body>
+</html>

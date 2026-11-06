@@ -1,0 +1,21 @@
+{
+  "id": "whats-new",
+  "name": "What's new",
+  "version": "1.0.0",
+  "seti": "^1.17",
+  "description": "Shows the Seti you run, whether a newer one waits, and what each deploy brought.",
+  "author": "Seti",
+  "icon": "sparkles",
+  "categories": ["other"],
+  "capabilities": [{ "name": "seti.version" }],
+  "required": true,
+  "contributes": {
+    "views": [{ "id": "changes", "title": "What's new", "icon": "sparkles", "where": "about", "phone": true }],
+    "routes": [
+      { "method": "GET", "path": "/changelog", "demo": true },
+      { "method": "GET", "path": "/status", "demo": true },
+      { "method": "GET", "path": "/update" },
+      { "method": "POST", "path": "/seen", "demo": true }
+    ]
+  }
+}

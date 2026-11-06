@@ -1,0 +1,11 @@
+{
+  "name": "__ID__",
+  "private": true,
+  "type": "module",
+  "devDependencies": {
+    "@seti/mod-api": "__SDK__",
+    "esbuild": "^0.28.2",
+    "typescript": "~6.0.3",
+    "vitest": "^5.0.5"
+  }
+}

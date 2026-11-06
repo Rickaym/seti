@@ -1,0 +1,27 @@
+{
+  "id": "poller-templates",
+  "name": "Poller templates",
+  "version": "1.0.0",
+  "seti": "^1.17",
+  "description": "Gives a new poller a script to start from: a JSON API or a feed.",
+  "author": "Seti",
+  "icon": "radar",
+  "categories": ["channels"],
+  "required": true,
+  "contributes": {
+    "channelSources": [
+      {
+        "id": "http_json",
+        "kind": "poller",
+        "title": "HTTP JSON",
+        "description": "A JSON API: set the URL, the path to the list, and the key and title fields."
+      },
+      {
+        "id": "feed",
+        "kind": "poller",
+        "title": "RSS/Atom feed",
+        "description": "A feed URL; each entry becomes an item keyed by its id or link."
+      }
+    ]
+  }
+}

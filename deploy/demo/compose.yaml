@@ -1,0 +1,51 @@
+name: seti-demo
+
+services:
+  demo:
+    build:
+      context: ../..
+      dockerfile: deploy/demo/Dockerfile
+    image: seti-demo
+    init: true
+    read_only: true
+    user: '10001:10001'
+    cap_drop: [ALL]
+    security_opt: ['no-new-privileges:true']
+    tmpfs:
+      - /data:size=768m,mode=0700,uid=10001,gid=10001
+      - /tmp:size=64m,mode=0700,uid=10001,gid=10001
+    mem_limit: 1g
+    cpus: 1.0
+    pids_limit: 256
+    environment:
+      SETI_DEMO_RESET_HOURS: ${SETI_DEMO_RESET_HOURS:-3}
+      SETI_PUBLIC_URL: ${SETI_PUBLIC_URL:-}
+    networks: [sealed]
+    restart: unless-stopped
+
+  edge:
+    image: caddy:2-alpine
+    command: ['caddy', 'reverse-proxy', '--from', ':8080', '--to', 'demo:3016']
+    read_only: true
+    user: '65534:65534'
+    cap_drop: [ALL]
+    cap_add: [NET_BIND_SERVICE]
+    security_opt: ['no-new-privileges:true']
+    environment:
+      XDG_DATA_HOME: /tmp/data
+      XDG_CONFIG_HOME: /tmp/config
+    tmpfs:
+      - /tmp:size=16m
+    mem_limit: 128m
+    cpus: 0.5
+    pids_limit: 64
+    ports:
+      - '${SETI_DEMO_BIND:-127.0.0.1:8080}:8080'
+    networks: [sealed, outside]
+    depends_on: [demo]
+    restart: unless-stopped
+
+networks:
+  sealed:
+    internal: true
+  outside: {}

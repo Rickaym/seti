@@ -1,0 +1,33 @@
+[Unit]
+Description=Redis cache for Seti, run as %i, on /run/seti-redis/redis.sock
+After=network.target
+
+[Service]
+Type=notify
+User=%i
+Group=%i
+ExecStart=/usr/bin/redis-server /etc/seti/redis.conf --supervised systemd --daemonize no
+RuntimeDirectory=seti-redis
+RuntimeDirectoryMode=0700
+UMask=0077
+Restart=always
+RestartSec=2
+TimeoutStopSec=10
+LimitNOFILE=65535
+PrivateTmp=true
+PrivateDevices=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/run/seti-redis
+NoNewPrivileges=true
+CapabilityBoundingSet=
+RestrictAddressFamilies=AF_UNIX
+LockPersonality=true
+MemoryDenyWriteExecute=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+MemoryMax=512M
+
+[Install]
+WantedBy=multi-user.target

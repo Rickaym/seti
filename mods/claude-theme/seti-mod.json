@@ -1,0 +1,25 @@
+{
+  "id": "claude-theme",
+  "name": "Claude theme",
+  "version": "1.0.0",
+  "seti": "^1.0",
+  "description": "Warm cream and charcoal with a terracotta accent, after the claude.ai palette.",
+  "author": "Seti",
+  "icon": "palette",
+  "categories": ["themes", "appearance"],
+  "defaultEnabled": true,
+  "contributes": {
+    "themes": [
+      {
+        "id": "claude",
+        "title": "Claude",
+        "description": "Inspired by the claude.ai palette: warm cream and charcoal with a terracotta accent",
+        "tokens": "tokens.css",
+        "swatch": {
+          "light": { "background": "#faf9f5", "primary": "#b1451e", "foreground": "#141413" },
+          "dark": { "background": "#262624", "primary": "#d97757", "foreground": "#faf9f5" }
+        }
+      }
+    ]
+  }
+}

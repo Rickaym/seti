@@ -1,0 +1,13 @@
+Twemoji graphics
+
+Copyright 2014-2021 Twitter, Inc and other contributors.
+Copyright 2022-present Jason Sofonia, Justine De Caires and other contributors.
+
+The Twemoji graphics are licensed under the Creative Commons Attribution 4.0
+International license (CC-BY 4.0): https://creativecommons.org/licenses/by/4.0/
+Source: https://github.com/jdecked/twemoji (v17.0.2)
+
+Changes: twemoji.woff2 is the COLRv0 colour font that
+https://github.com/Nerixyz/twemoji-colr-font (v0.0.2) builds from those graphics
+with nanoemoji, compressed to WOFF2. The other files in this folder are part of
+Seti and licensed under the Apache License 2.0.

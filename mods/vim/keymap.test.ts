@@ -1,0 +1,89 @@
+import { describe, expect, it } from 'vitest'
+import { readKey, SEQUENCE_MS, type KeyContext, type KeyStroke } from './keymap'
+import { vimActive } from './vim-store'
+
+const NORMAL: KeyContext = { enabled: true, typing: false, passthrough: false, overlay: false, finding: false }
+
+const stroke = (key: string, extra: Partial<KeyStroke> = {}): KeyStroke => ({
+  key,
+  ctrlKey: false,
+  altKey: false,
+  metaKey: false,
+  isComposing: false,
+  ...extra,
+})
+
+const read = (key: string, context: Partial<KeyContext> = {}, extra: Partial<KeyStroke> = {}) =>
+  readKey(stroke(key, extra), { ...NORMAL, ...context }, null, 0)
+
+describe('readKey', () => {
+  it('is off until turned on', () => {
+    expect(vimActive()).toBe(false)
+    for (const key of ['j', 'k', 'h', 'l', '/', '?', 'G', 'Escape']) {
+      expect(read(key, { enabled: false })).toEqual({ action: null, handled: false, pending: null })
+    }
+  })
+
+  it('scrolls, moves between panels and opens find in normal mode', () => {
+    expect(read('j').action).toEqual({ type: 'scroll', by: 'line', direction: 1 })
+    expect(read('k').action).toEqual({ type: 'scroll', by: 'line', direction: -1 })
+    expect(read('d', {}, { ctrlKey: true }).action).toEqual({ type: 'scroll', by: 'half', direction: 1 })
+    expect(read('u', {}, { ctrlKey: true }).action).toEqual({ type: 'scroll', by: 'half', direction: -1 })
+    expect(read('G').action).toEqual({ type: 'edge', to: 'bottom' })
+    expect(read('l').action).toEqual({ type: 'panel', to: 'next' })
+    expect(read('h').action).toEqual({ type: 'panel', to: 'previous' })
+    expect(read('J').action).toEqual({ type: 'panel', to: 'down' })
+    expect(read('3').action).toEqual({ type: 'panelAt', index: 2 })
+    expect(read('i').action).toEqual({ type: 'insert', at: 'keep' })
+    expect(read('/').action).toEqual({ type: 'find' })
+    expect(read('n').action).toEqual({ type: 'findStep', direction: 'next' })
+    expect(read('?').action).toEqual({ type: 'help' })
+    expect(read('l').handled).toBe(true)
+  })
+
+  it('leaves unbound keys and other modifiers to the page', () => {
+    for (const key of ['x', 'q', '0', 'Enter', ' ', 'Tab', 'ArrowDown']) {
+      expect(read(key).handled).toBe(false)
+    }
+    expect(read('j', {}, { altKey: true }).handled).toBe(false)
+    expect(read('j', {}, { metaKey: true }).handled).toBe(false)
+    expect(read('j', {}, { ctrlKey: true }).handled).toBe(false)
+    expect(read('f', {}, { ctrlKey: true }).handled).toBe(false)
+    expect(read('j', {}, { isComposing: true }).handled).toBe(false)
+  })
+
+  it('types in insert mode, where only Esc acts, to leave the field', () => {
+    for (const key of ['j', 'l', '/', '?', 'g', 'i']) {
+      expect(read(key, { typing: true }).handled).toBe(false)
+    }
+    expect(read('d', { typing: true }, { ctrlKey: true }).handled).toBe(false)
+    expect(read('Escape', { typing: true }).action).toEqual({ type: 'normal' })
+  })
+
+  it('takes Esc in normal mode only to close an open find bar', () => {
+    expect(read('Escape').handled).toBe(false)
+    expect(read('Escape', { finding: true }).action).toEqual({ type: 'closeFind' })
+  })
+
+  it('keeps every key, Esc included, away from terminals, frames and open dialogs', () => {
+    for (const context of [{ passthrough: true }, { overlay: true }]) {
+      for (const key of ['j', 'l', '/', 'G', 'Escape']) {
+        expect(read(key, context).handled).toBe(false)
+        expect(read(key, { ...context, typing: true }).handled).toBe(false)
+      }
+    }
+  })
+
+  it('reads gg, gf and gc within the timeout and lets other keys after g act as themselves', () => {
+    const first = readKey(stroke('g'), NORMAL, null, 1000)
+    expect(first).toEqual({ action: null, handled: true, pending: { key: 'g', at: 1000 } })
+    expect(readKey(stroke('g'), NORMAL, first.pending, 1500).action).toEqual({ type: 'edge', to: 'top' })
+    expect(readKey(stroke('f'), NORMAL, first.pending, 1500).action).toEqual({ type: 'files' })
+    expect(readKey(stroke('c'), NORMAL, first.pending, 1500).action).toEqual({ type: 'groupChat' })
+    const other = readKey(stroke('j'), NORMAL, first.pending, 1500)
+    expect(other).toEqual({ action: { type: 'scroll', by: 'line', direction: 1 }, handled: true, pending: null })
+    const late = readKey(stroke('g'), NORMAL, first.pending, 1000 + SEQUENCE_MS + 1)
+    expect(late).toEqual({ action: null, handled: true, pending: { key: 'g', at: 1000 + SEQUENCE_MS + 1 } })
+    expect(readKey(stroke('f'), NORMAL, first.pending, 1000 + SEQUENCE_MS + 1).handled).toBe(false)
+  })
+})

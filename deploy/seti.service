@@ -1,0 +1,18 @@
+[Unit]
+Description=Seti agent platform on 127.0.0.1:3006
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+WorkingDirectory=%h/seti-live
+EnvironmentFile=-%h/.seti/seti.env
+LoadCredential=secret-key:%h/.seti/credentials/secret-key
+LoadCredential=local-token-user:%h/.seti/credentials/local-token-user
+LoadCredential=local-token-ea:%h/.seti/credentials/local-token-ea
+LoadCredential=openai-api-key:%h/.seti/credentials/openai-api-key
+ExecStart=/usr/bin/zsh -ic 'source "$HOME/.nvm/nvm.sh" && nvm use 24 >/dev/null && exec pnpm --filter @seti/server start'
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target

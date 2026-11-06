@@ -1,0 +1,20 @@
+[Unit]
+Description=Seti Executive Assistant voice bot on 127.0.0.1:3007
+After=network-online.target seti.service
+Wants=network-online.target
+
+[Service]
+WorkingDirectory=%h/seti-live
+EnvironmentFile=-%h/.seti/ea.env
+LoadCredential=seti-api-token:%h/.seti/credentials/local-token-ea
+LoadCredential=deepgram-api-key:%h/.seti/credentials/deepgram-api-key
+LoadCredential=openai-api-key:%h/.seti/credentials/openai-api-key
+LoadCredential=elevenlabs-api-key:%h/.seti/credentials/elevenlabs-api-key
+LoadCredential=cloudflare-turn-key-id:%h/.seti/credentials/cloudflare-turn-key-id
+LoadCredential=cloudflare-turn-api-token:%h/.seti/credentials/cloudflare-turn-api-token
+ExecStart=%h/.local/bin/uv run --project ea --frozen python -m seti_ea
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target

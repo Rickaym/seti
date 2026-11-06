@@ -1,0 +1,31 @@
+name: setup
+description: Install the sandbox tools, Node, pnpm and workspace dependencies
+
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      env:
+        DEBIAN_FRONTEND: noninteractive
+      run: |
+        sudo apt-get update -qq
+        sudo apt-get install -y -qq --no-install-recommends bubblewrap socat openssh-server ripgrep
+        printf '%s\n' 'abi <abi/4.0>,' 'include <tunables/global>' \
+          'profile bwrap /usr/bin/bwrap flags=(unconfined) {' '  userns,' '  include if exists <local/bwrap>' '}' \
+          | sudo tee /etc/apparmor.d/bwrap >/dev/null
+        sudo apparmor_parser -r /etc/apparmor.d/bwrap
+        bwrap --unshare-user --unshare-pid --unshare-net --ro-bind / / --dev /dev --proc /proc true
+    - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413
+      with:
+        dest: ${{ runner.temp }}/setup-pnpm
+    - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+      with:
+        node-version-file: .nvmrc
+        cache: pnpm
+        cache-dependency-path: pnpm-lock.yaml
+    - shell: bash
+      run: command -v node-gyp >/dev/null || npm install -g node-gyp@11
+    - shell: bash
+      env:
+        SKIP_INSTALL_SIMPLE_GIT_HOOKS: '1'
+      run: pnpm install --frozen-lockfile

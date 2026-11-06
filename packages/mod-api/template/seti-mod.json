@@ -1,0 +1,16 @@
+{
+  "id": "__ID__",
+  "name": "__NAME__",
+  "version": "0.1.0",
+  "seti": "^1.10",
+  "description": "Says hello and counts how often.",
+  "icon": "sparkles",
+  "categories": ["other"],
+  "main": "logic.js",
+  "capabilities": [{ "name": "storage" }],
+  "activation": ["onCommand"],
+  "contributes": {
+    "settings": { "greeting": { "type": "string", "title": "Greeting", "default": "Hello" } },
+    "commands": [{ "id": "hello", "title": "Say hello", "for": ["palette", "view"] }]
+  }
+}

@@ -1,0 +1,7 @@
+packages:
+  - shared
+  - server
+  - ui
+  - e2e
+  - packages/*
+  - mods/*

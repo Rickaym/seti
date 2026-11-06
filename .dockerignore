@@ -1,0 +1,11 @@
+**/node_modules
+**/dist
+**/.venv
+.git
+.claude
+.impeccable
+android
+docs
+ea
+e2e/playwright-report
+e2e/test-results

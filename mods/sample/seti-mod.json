@@ -1,0 +1,101 @@
+{
+  "id": "sample",
+  "name": "Sample",
+  "version": "1.0.0",
+  "seti": "^1.3",
+  "description": "Uses every contribution point Seti takes from mods, so tests can turn it on and off.",
+  "author": "Seti",
+  "icon": "flask-conical",
+  "categories": ["other"],
+  "capabilities": [
+    {
+      "name": "storage"
+    },
+    {
+      "name": "notify"
+    }
+  ],
+  "contributes": {
+    "settings": {
+      "greeting": {
+        "type": "string",
+        "title": "Greeting",
+        "default": "Hello"
+      },
+      "loud": {
+        "type": "boolean",
+        "title": "Loud",
+        "default": false
+      }
+    },
+    "commands": [
+      {
+        "id": "count",
+        "title": "Count",
+        "icon": "plus",
+        "description": "Adds one to the sample's count and answers the new count.",
+        "for": ["palette", "agents", "ea"]
+      },
+      {
+        "id": "wave",
+        "title": "Wave",
+        "icon": "hand",
+        "description": "Waves at one agent, with an optional note.",
+        "args": {
+          "task": {
+            "type": "string",
+            "description": "The agent to wave at."
+          },
+          "note": {
+            "type": "string",
+            "description": "A note to wave with.",
+            "optional": true
+          }
+        },
+        "for": ["palette", "agents", "ea"],
+        "changes": false,
+        "level": "self"
+      }
+    ],
+    "slashCommands": [
+      {
+        "name": "sample",
+        "description": "Waves from the sample mod",
+        "argumentHint": "[note]",
+        "command": "wave"
+      }
+    ],
+    "fileViewers": [
+      {
+        "id": "notes",
+        "title": "Sample notes",
+        "extensions": ["samplenote"],
+        "text": true,
+        "source": true,
+        "phone": true
+      }
+    ],
+    "fenceRenderers": [{ "language": "sample" }],
+    "views": [{ "id": "home", "title": "Sample", "icon": "flask-conical", "where": "section", "phone": true }],
+    "statusBar": [{ "id": "count", "title": "Sample count" }],
+    "notifications": [{ "id": "hello", "title": "Sample hello", "description": "When the sample says hello" }],
+    "routes": [
+      {
+        "method": "GET",
+        "path": "/hello",
+        "demo": true
+      },
+      {
+        "method": "POST",
+        "path": "/count"
+      }
+    ],
+    "auditKinds": ["counted"],
+    "inputHooks": [
+      {
+        "id": "keys",
+        "title": "Sample keys"
+      }
+    ]
+  }
+}

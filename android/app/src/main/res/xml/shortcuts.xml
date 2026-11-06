@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutId="pair"
+        android:shortcutLongLabel="@string/shortcut_pair_long"
+        android:shortcutShortLabel="@string/shortcut_pair_short">
+        <intent
+            android:action="dev.seti.android.action.PAIR"
+            android:targetClass="dev.seti.android.MainActivity"
+            android:targetPackage="dev.seti.android" />
+    </shortcut>
+</shortcuts>

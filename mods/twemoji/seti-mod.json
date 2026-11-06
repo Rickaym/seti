@@ -1,0 +1,15 @@
+{
+  "id": "twemoji",
+  "name": "Twemoji",
+  "version": "1.0.0",
+  "seti": "^1.5",
+  "description": "Draws emoji in the Twemoji style on every device.",
+  "author": "Seti",
+  "icon": "smile",
+  "categories": ["appearance"],
+  "license": "CC-BY-4.0",
+  "defaultEnabled": true,
+  "contributes": {
+    "styles": [{ "id": "emoji", "file": "emoji.css" }]
+  }
+}

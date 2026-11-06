@@ -1,0 +1,17 @@
+{
+  "id": "pr-previews",
+  "name": "PR previews",
+  "version": "1.0.0",
+  "seti": "^1.6",
+  "description": "Links each PR's preview deployment and serves it on a seti.localhost subdomain.",
+  "author": "Seti",
+  "icon": "globe",
+  "categories": ["integrations", "agents"],
+  "defaultEnabled": true,
+  "securitySensitive": true,
+  "contributes": {
+    "prDecorators": [{ "id": "preview", "title": "Preview" }],
+    "hostProxies": [{ "id": "preview", "title": "PR preview hosts" }],
+    "prChips": [{ "id": "preview", "title": "Preview" }]
+  }
+}

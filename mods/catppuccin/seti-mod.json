@@ -1,0 +1,52 @@
+{
+  "id": "catppuccin",
+  "name": "Catppuccin",
+  "version": "1.0.0",
+  "seti": "^1.0",
+  "description": "The Catppuccin pastel theme, with four flavours and fourteen accents.",
+  "author": "Seti",
+  "icon": "palette",
+  "categories": ["themes", "appearance"],
+  "defaultEnabled": true,
+  "contributes": {
+    "themes": [
+      {
+        "id": "catppuccin",
+        "title": "Catppuccin",
+        "description": "Catppuccin pastels: Latte when light, a flavour of your choice when dark",
+        "tokens": "tokens.css",
+        "swatch": {
+          "light": { "background": "#eff1f5", "primary": "#802ce4", "foreground": "#4c4f69" },
+          "dark": { "background": "#1e1e2e", "primary": "#cba6f7", "foreground": "#cdd6f4" }
+        },
+        "flavours": {
+          "options": [
+            { "id": "frappe", "title": "Frappe", "swatch": "#303446" },
+            { "id": "macchiato", "title": "Macchiato", "swatch": "#24273a" },
+            { "id": "mocha", "title": "Mocha", "swatch": "#1e1e2e" }
+          ],
+          "fallback": "mocha"
+        },
+        "accents": {
+          "options": [
+            { "id": "rosewater", "title": "Rosewater", "swatch": "--ctp-rosewater" },
+            { "id": "flamingo", "title": "Flamingo", "swatch": "--ctp-flamingo" },
+            { "id": "pink", "title": "Pink", "swatch": "--ctp-pink" },
+            { "id": "mauve", "title": "Mauve", "swatch": "--ctp-mauve" },
+            { "id": "red", "title": "Red", "swatch": "--ctp-red" },
+            { "id": "maroon", "title": "Maroon", "swatch": "--ctp-maroon" },
+            { "id": "peach", "title": "Peach", "swatch": "--ctp-peach" },
+            { "id": "yellow", "title": "Yellow", "swatch": "--ctp-yellow" },
+            { "id": "green", "title": "Green", "swatch": "--ctp-green" },
+            { "id": "teal", "title": "Teal", "swatch": "--ctp-teal" },
+            { "id": "sky", "title": "Sky", "swatch": "--ctp-sky" },
+            { "id": "sapphire", "title": "Sapphire", "swatch": "--ctp-sapphire" },
+            { "id": "blue", "title": "Blue", "swatch": "--ctp-blue" },
+            { "id": "lavender", "title": "Lavender", "swatch": "--ctp-lavender" }
+          ],
+          "fallback": "mauve"
+        }
+      }
+    ]
+  }
+}

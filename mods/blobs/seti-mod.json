@@ -1,0 +1,65 @@
+{
+  "id": "blobs",
+  "name": "Blobs",
+  "displayName": "Blobs",
+  "version": "1.3.0",
+  "seti": "^1.16",
+  "description": "Draws each agent as a flat blob in its colour, with a face that shows its state.",
+  "author": "Seti",
+  "icon": "ghost",
+  "categories": ["appearance"],
+  "defaultEnabled": false,
+  "contributes": {
+    "settings": {
+      "size": {
+        "type": "string",
+        "title": "Size",
+        "description": "How big blobs are in agent rows; rows keep their height",
+        "default": "Medium",
+        "options": ["Small", "Medium", "Large"]
+      },
+      "animation": {
+        "type": "boolean",
+        "title": "Animation",
+        "description": "Running agents bob and blink; never with reduced motion",
+        "default": true
+      },
+      "list": {
+        "type": "boolean",
+        "title": "Agent list",
+        "description": "Blobs in place of the colour bar in agent rows",
+        "default": true
+      },
+      "needs-you": {
+        "type": "boolean",
+        "title": "Needs you",
+        "description": "Blobs on the rows in Needs you",
+        "default": true
+      },
+      "grid": {
+        "type": "boolean",
+        "title": "Grid panels",
+        "description": "Blobs as the status in paused grid panels and the grid agent picker",
+        "default": true
+      }
+    },
+    "statusMarkers": [
+      {
+        "id": "blobs",
+        "title": "Blobs"
+      }
+    ],
+    "agentAccents": [
+      {
+        "id": "blobs",
+        "title": "Blob bookmarks"
+      }
+    ],
+    "styles": [
+      {
+        "id": "blobs",
+        "file": "blobs.css"
+      }
+    ]
+  }
+}

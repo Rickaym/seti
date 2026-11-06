@@ -1,0 +1,10 @@
+{
+  "name": "@seti/mod-twemoji",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "exports": {
+    "./seti-mod.json": "./seti-mod.json",
+    "./emoji.css": "./emoji.css"
+  }
+}

@@ -1,0 +1,27 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Sink file</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 12px;
+        background: var(--background);
+        color: var(--foreground);
+      }
+    </style>
+  </head>
+  <body>
+    <pre id="text">Waiting for the file</pre>
+    <script>
+      seti.on('file', function (f) {
+        var lines = (f.text || '').split('\n').filter(function (line) {
+          return line !== ''
+        })
+        document.getElementById('text').textContent = f.name + ': ' + lines.length + ' sink lines'
+      })
+      seti.ready()
+    </script>
+  </body>
+</html>

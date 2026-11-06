@@ -1,0 +1,37 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "workspaces": {
+    ".": {
+      "entry": ["scripts/*.mjs"]
+    },
+    "server": {
+      "entry": [
+        "src/pollers/worker.ts",
+        "src/reminders/runner.ts",
+        "src/mods/logic/runner.ts",
+        "src/demo/main.ts",
+        "src/demo/agent.ts",
+        "src/demo/planner.ts"
+      ]
+    },
+    "shared": {},
+    "ui": {
+      "entry": ["sw/sw.ts"]
+    },
+    "e2e": {
+      "entry": [
+        "tests/support/fake-planner.ts",
+        "tests/support/fake-claude.ts",
+        "tests/support/fake-gh.ts",
+        "tests/support/fake-claude-cli.ts",
+        "screenshots/*.shot.ts",
+        "screenshots/server-clock.ts"
+      ],
+      "ignore": ["fixtures/**"]
+    },
+    "packages/mod-api": {
+      "ignore": ["template/**"]
+    }
+  },
+  "ignoreBinaries": ["nvm", "uv", "openssl"]
+}

@@ -1,0 +1,76 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Sink</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 12px;
+        font-family: system-ui, sans-serif;
+        background: var(--background);
+        color: var(--foreground);
+      }
+      button {
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        background: var(--primary);
+        color: var(--primary-foreground);
+        padding: 4px 10px;
+      }
+      li {
+        color: var(--muted-foreground);
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Sink</h1>
+    <p id="theme">Waiting for the theme</p>
+    <button id="run" type="button">Summarize</button>
+    <p id="result"></p>
+    <ul id="summaries"></ul>
+    <script>
+      var text = function (id, value) {
+        document.getElementById(id).textContent = value
+      }
+      function list() {
+        return seti.storage.keys('summary:').then(function (keys) {
+          return Promise.all(
+            keys.map(function (key) {
+              return seti.storage.get(key)
+            }),
+          ).then(function (values) {
+            var ul = document.getElementById('summaries')
+            ul.textContent = ''
+            values.forEach(function (value) {
+              var li = document.createElement('li')
+              li.textContent = value.title + ': ' + value.summary
+              ul.appendChild(li)
+            })
+          })
+        })
+      }
+      seti.on('theme', function (t) {
+        var bg = getComputedStyle(document.documentElement).getPropertyValue('--background').trim()
+        text('theme', 'Theme ' + t.scheme + ' ' + bg)
+      })
+      seti.on('storage', function () {
+        list()
+      })
+      document.getElementById('run').addEventListener('click', function () {
+        seti.run('summarize', {}).then(
+          function (value) {
+            text('result', 'Ran: ' + value.text)
+            list()
+          },
+          function (e) {
+            text('result', 'Refused ' + e.code + ': ' + e.message)
+          },
+        )
+      })
+      list().then(function () {
+        seti.ready()
+      })
+    </script>
+  </body>
+</html>

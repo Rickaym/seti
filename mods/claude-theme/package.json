@@ -1,0 +1,10 @@
+{
+  "name": "@seti/mod-claude-theme",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "exports": {
+    "./seti-mod.json": "./seti-mod.json",
+    "./tokens.css": "./tokens.css"
+  }
+}

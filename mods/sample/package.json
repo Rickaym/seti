@@ -1,0 +1,23 @@
+{
+  "name": "@seti/mod-sample",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "exports": {
+    "./seti-mod.json": "./seti-mod.json",
+    "./server": "./server.ts",
+    "./ui": "./ui.tsx"
+  },
+  "scripts": {
+    "check-types": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@seti/mod-api": "workspace:*",
+    "lucide-react": "^1.66.0",
+    "react": "^19.3.1"
+  },
+  "devDependencies": {
+    "typescript": "~6.0.3",
+    "@types/react": "^19.3.0"
+  }
+}

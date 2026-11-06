@@ -1,0 +1,36 @@
+{
+  "id": "github-webhooks",
+  "name": "GitHub webhooks",
+  "version": "1.0.0",
+  "seti": "^1.17",
+  "description": "Lets a webhook channel take GitHub's repository and organization events.",
+  "author": "Seti",
+  "icon": "webhook",
+  "categories": ["channels", "integrations"],
+  "required": true,
+  "contributes": {
+    "channelSources": [
+      {
+        "id": "github",
+        "kind": "webhook",
+        "title": "GitHub",
+        "description": "Repository or organization webhooks: workflow runs, deployments, pull requests, issues.",
+        "signature": { "header": "X-Hub-Signature-256", "prefix": "sha256=" },
+        "delivery": "X-GitHub-Delivery",
+        "secret": "generated",
+        "formPayload": true,
+        "kinds": [
+          "workflow_run",
+          "deployment_status",
+          "push",
+          "pull_request.opened",
+          "pull_request.closed",
+          "issues.opened",
+          "issues.closed",
+          "release.published"
+        ],
+        "setup": "In GitHub, add a webhook on the repository or organization with the URL, content type application/json and the secret, and pick the events to send, such as workflow runs, deployments and pull requests. GitHub signs with X-Hub-Signature-256."
+      }
+    ]
+  }
+}

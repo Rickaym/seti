@@ -1,0 +1,11 @@
+:root {
+  --swatch-default-background: oklch(0.99 0.003 250);
+  --swatch-default-primary: oklch(0.5 0.19 255);
+  --swatch-default-foreground: oklch(0.18 0.02 255);
+}
+
+.dark {
+  --swatch-default-background: oklch(0.155 0.015 255);
+  --swatch-default-primary: oklch(0.7 0.17 255);
+  --swatch-default-foreground: oklch(0.97 0.005 255);
+}

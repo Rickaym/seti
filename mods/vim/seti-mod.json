@@ -1,0 +1,15 @@
+{
+  "id": "vim",
+  "name": "Vim mode",
+  "version": "1.0.0",
+  "seti": "^1.4",
+  "description": "Single keys scroll and move between panels on a wide screen.",
+  "author": "Seti",
+  "icon": "keyboard",
+  "categories": ["keyboard"],
+  "defaultEnabled": false,
+  "contributes": {
+    "inputHooks": [{ "id": "keys", "title": "Vim keys" }],
+    "statusBar": [{ "id": "mode", "title": "Vim mode" }]
+  }
+}

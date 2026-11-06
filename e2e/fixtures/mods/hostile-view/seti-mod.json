@@ -1,0 +1,28 @@
+{
+  "id": "hostile-view",
+  "name": "Hostile view",
+  "version": "1.0.0",
+  "seti": "^1.8",
+  "author": "Seti tests",
+  "description": "Tries every way out of its sandboxed frame, so Seti's tests can watch each one fail.",
+  "main": "logic.js",
+  "capabilities": [{ "name": "storage" }],
+  "activation": ["onCommand"],
+  "contributes": {
+    "commands": [{ "id": "palette-only", "title": "Palette only", "for": ["palette"], "changes": false }],
+    "views": [
+      { "id": "hostile", "title": "Hostile", "where": "section", "phone": true, "entry": "views/hostile.html" },
+      { "id": "wide", "title": "Wide", "where": "sidePanel", "phone": false, "entry": "views/wide.html" }
+    ],
+    "fileViewers": [
+      {
+        "id": "viewer",
+        "title": "Hostile file",
+        "extensions": ["hostile"],
+        "text": true,
+        "phone": true,
+        "entry": "views/file.html"
+      }
+    ]
+  }
+}

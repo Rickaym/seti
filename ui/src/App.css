@@ -1,0 +1,518 @@
+@import 'tailwindcss';
+@import 'tw-animate-css';
+@import './styles/shadcn-tailwind.css';
+@import '@fontsource-variable/jetbrains-mono';
+@import './components/theme/themes/default.css';
+@import './components/theme/themes/swatches.css';
+
+@source '../../mods';
+
+@variant dark (&:where(.dark, .dark *));
+
+/* Phones in landscape are wide but short, so they get the one-pane phone layout too. */
+@custom-variant max-md {
+  @media (width < 48rem), (pointer: coarse) and (height < 30rem) {
+    @slot;
+  }
+}
+
+/* Set on <html> while a phone's keyboard is up for the agent view; see useTypingMode. */
+@custom-variant typing (&:where([data-typing] *));
+
+/* Set on <html> while the phone agent view shows and no keyboard is up; see useAgentRoom. */
+@custom-variant agent-room (&:where([data-agent-room]:not([data-typing]) *));
+
+@custom-variant md {
+  @media (width >= 48rem) and ((pointer: fine) or (height >= 30rem)) {
+    @slot;
+  }
+}
+
+/* The one size below text-xs, 11px, for labels and meta; touch screens get 12px. */
+@theme {
+  --text-2xs: 0.6875rem;
+}
+
+@media (width < 48rem), (pointer: coarse) {
+  :root {
+    --text-2xs: 0.75rem;
+  }
+}
+
+@theme inline {
+  --font-heading: var(--font-mono);
+  /* Seti Emoji is the family a mod's style may declare to draw emoji; without it the platform's do. */
+  --font-mono: 'JetBrains Mono Variable', 'Seti Emoji', monospace;
+  --font-sans:
+    ui-sans-serif, system-ui, 'Seti Emoji', sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol',
+    'Noto Color Emoji';
+  --color-actor-user: var(--actor-user);
+  --color-actor-agent: var(--actor-agent);
+  --color-shell: var(--shell);
+  --color-queued: var(--queued);
+  --color-voice-user: var(--voice-user);
+  --color-voice-bot: var(--voice-bot);
+  --color-diff-add: var(--diff-add);
+  --color-diff-del: var(--diff-del);
+  --color-code: var(--code);
+  --color-overlay: var(--overlay);
+  --color-preview-canvas: var(--preview-canvas);
+  --color-media-backdrop: var(--media-backdrop);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-warning-fill: var(--warning-fill);
+  --color-warning-text: var(--warning-text);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --color-foreground: var(--foreground);
+  --color-background: var(--background);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+
+  html {
+    @apply font-mono;
+    overflow-wrap: break-word;
+  }
+
+  /* Ligatures redraw -> and => under the caret while typing; fields show what was typed. */
+  input,
+  textarea,
+  [contenteditable='true'] {
+    font-variant-ligatures: none;
+    font-feature-settings:
+      'calt' 0,
+      'liga' 0;
+  }
+
+  ::selection {
+    background-color: color-mix(in oklch, var(--primary) 28%, transparent);
+  }
+
+  .bg-primary::selection,
+  .bg-primary ::selection {
+    background-color: color-mix(in oklch, var(--primary-foreground) 35%, transparent);
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  ::-webkit-scrollbar-track,
+  ::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background-color: var(--border);
+    background-clip: padding-box;
+    border: 1px solid transparent;
+    border-radius: 0;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: var(--muted-foreground);
+  }
+
+  @supports not selector(::-webkit-scrollbar) {
+    * {
+      scrollbar-width: thin;
+      scrollbar-color: var(--border) transparent;
+    }
+  }
+}
+
+html[data-titlebar='overlay'] {
+  --titlebar-left: env(titlebar-area-x, var(--titlebar-area-x));
+  --titlebar-top: env(titlebar-area-y, var(--titlebar-area-y));
+  --titlebar-right: calc(100vw - var(--titlebar-left) - env(titlebar-area-width, var(--titlebar-area-width)));
+  --titlebar-height: env(titlebar-area-height, var(--titlebar-area-height));
+}
+
+/* The header keeps its full height from the top edge, so the sky runs under the title bar. */
+html[data-titlebar='overlay'] [data-slot='app-header'] {
+  box-sizing: border-box;
+  height: max(3rem, calc(var(--titlebar-top) + var(--titlebar-height) + 0.75rem));
+  padding: var(--titlebar-top) calc(var(--titlebar-right) + 0.5rem) 0 calc(var(--titlebar-left) + 1rem);
+  -webkit-app-region: drag;
+  app-region: drag;
+}
+
+html[data-titlebar='overlay']
+  :is(
+    [data-slot='app-header'] :is(a, button, input, select, [role='button'], [data-slot='app-logo']),
+    [data-slot='dialog-overlay'],
+    [data-slot='dialog-content'],
+    [data-slot='sheet-overlay'],
+    [data-slot='sheet-content'],
+    [data-slot='popover-content'],
+    [data-slot='select-content']
+  ) {
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+}
+
+[data-slot='scroll-fade'][data-fade-end] {
+  mask-image: linear-gradient(to right, #000 calc(100% - 1.5rem), transparent);
+}
+
+[data-slot='scroll-fade'][data-fade-start] {
+  mask-image: linear-gradient(to left, #000 calc(100% - 1.5rem), transparent);
+}
+
+[data-slot='scroll-fade'][data-fade-start][data-fade-end] {
+  mask-image: linear-gradient(to right, transparent, #000 1.5rem, #000 calc(100% - 1.5rem), transparent);
+}
+
+/* The header logo spells out SETI on hover; these rules are the reduced-motion version. */
+.wordmark-logo {
+  transition: opacity 180ms;
+}
+
+.wordmark[data-open='true'] .wordmark-logo {
+  opacity: 0;
+}
+
+.wordmark:focus-visible :is(.wordmark-logo, .wordmark-text) {
+  outline: 2px solid var(--ring);
+  outline-offset: 4px;
+  border-radius: 2px;
+}
+
+.wordmark-panel {
+  position: absolute;
+  inset-block: 0;
+  left: -0.5rem;
+  display: flex;
+  align-items: center;
+  max-width: calc(100vw - 7.5rem);
+  overflow: hidden;
+  padding: 0 3rem 0 0.5rem;
+  white-space: pre;
+  mask-image: linear-gradient(to right, #000 calc(100% - 3rem), transparent);
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity 180ms,
+    visibility 0s 180ms;
+}
+
+.wordmark[data-open='true'] .wordmark-panel {
+  opacity: 1;
+  visibility: visible;
+  transition: opacity 180ms;
+}
+
+.wordmark-backdrop {
+  position: absolute;
+  inset: 0;
+  background: var(--card);
+}
+
+.wordmark-text {
+  position: relative;
+  font-variant-ligatures: none;
+  -webkit-font-smoothing: antialiased;
+}
+
+.wordmark-cap {
+  display: inline-block;
+}
+
+.wordmark-char {
+  position: relative;
+}
+
+.wordmark-link {
+  opacity: 0.55;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .wordmark-logo {
+    transition: opacity 0s 180ms;
+  }
+
+  .wordmark[data-open='true'] .wordmark-logo {
+    transition: none;
+  }
+
+  .wordmark-panel {
+    opacity: 1;
+    transition: visibility 0s 180ms;
+  }
+
+  .wordmark[data-open='true'] .wordmark-panel {
+    transition: none;
+  }
+
+  .wordmark-backdrop {
+    opacity: 0;
+    transition: opacity 180ms ease-in;
+  }
+
+  .wordmark[data-open='true'] .wordmark-backdrop {
+    opacity: 1;
+    transition: opacity 160ms ease-out;
+  }
+
+  .wordmark-cap {
+    transform: translateX(var(--from));
+    transition: transform 180ms cubic-bezier(0.5, 0, 0.75, 0);
+  }
+
+  .wordmark[data-open='true'] .wordmark-cap {
+    transform: none;
+    transition: transform 560ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  :is(.wordmark-letter, .wordmark-link) {
+    opacity: 0;
+    transition: opacity 80ms ease-out;
+  }
+
+  .wordmark-char::after {
+    content: attr(data-noise);
+    position: absolute;
+    inset: 0;
+    text-align: center;
+    opacity: 0;
+    transition: opacity 80ms ease-out;
+  }
+
+  .wordmark[data-open='true'] .wordmark-char[data-state='noise']::after {
+    opacity: 0.3;
+    transition: opacity 90ms ease-out;
+  }
+
+  .wordmark[data-open='true'] .wordmark-char[data-state='lock'] .wordmark-letter {
+    opacity: 1;
+    transition: opacity 180ms ease-out;
+  }
+
+  .wordmark[data-open='true'] .wordmark-char[data-state='lock']::after {
+    transition: opacity 60ms linear;
+  }
+
+  .wordmark[data-open='true'] .wordmark-link {
+    opacity: 0.55;
+    transition: opacity 240ms ease-out 260ms;
+  }
+}
+
+/* An agent's colour; lib/agent-color-sheet.ts sets --agent-stripe and --agent-tint per theme. */
+.agent-stripe[data-agent-color] {
+  background-image: linear-gradient(to right, var(--agent-stripe) 4px, transparent 4px);
+}
+
+/* A mod's agent accent stands in for the bar and the status marker; the marker stays for readers. */
+.agent-stripe:has(> [data-agent-accent] > :not([data-accent-blank])) {
+  background-image: none;
+}
+
+[data-agent-accent]:empty {
+  display: none;
+}
+
+[data-agent-accent]:has(> :not([data-accent-blank])) ~ [data-status-light] {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+[data-agent-accent]:has(> :not([data-accent-blank])) ~ [data-status-light] > * {
+  display: none;
+}
+
+/* A mod's status marker that draws nothing gives way to Seti's shape. */
+[data-mod-marker]:not(:empty) + [data-marker-fallback] {
+  display: none;
+}
+
+.agent-tint[data-agent-color],
+[data-agent-color] .agent-tint {
+  background-color: var(--agent-tint);
+}
+
+.agent-rule[data-agent-color],
+[data-agent-color] .agent-rule {
+  border-bottom-color: var(--agent-stripe);
+}
+
+[data-agent-color] .agent-focus {
+  --ring: var(--agent-stripe);
+  caret-color: var(--agent-stripe);
+}
+
+.agent-mark[data-agent-color]::before {
+  content: '';
+  display: inline-block;
+  width: 3px;
+  height: 0.8em;
+  margin-right: 0.3em;
+  vertical-align: -0.05em;
+  background: var(--agent-stripe);
+}
+
+/* Find in a chat: every match, the matches in the current hit, and a ring round that hit. */
+::highlight(seti-find) {
+  background-color: color-mix(in oklab, var(--warning) 30%, transparent);
+}
+
+::highlight(seti-find-current) {
+  background-color: var(--warning);
+  color: var(--warning-foreground);
+}
+
+[data-find-current] {
+  outline: 2px solid var(--warning);
+  outline-offset: 2px;
+}
+
+/* A message of yours that a step just landed on. */
+[data-own-flash] {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+  animation: own-flash 1.6s ease-out forwards;
+}
+
+@keyframes own-flash {
+  70% {
+    outline-color: var(--primary);
+  }
+  100% {
+    outline-color: transparent;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-own-flash] {
+    animation-timing-function: steps(1, end);
+  }
+}
+
+@media (pointer: coarse) {
+  body {
+    overscroll-behavior-y: none;
+  }
+
+  [data-variant][data-size],
+  button[role='combobox'],
+  select,
+  input:not([type='checkbox'], [type='radio'], [type='range']) {
+    min-height: 2.75rem;
+  }
+
+  [data-variant][data-size^='icon'] {
+    min-width: 2.75rem;
+  }
+
+  /* iOS Safari zooms the page into fields set below 16px. */
+  input,
+  textarea,
+  select {
+    font-size: 16px;
+  }
+}
+
+[data-landed]:focus {
+  outline: none;
+}
+
+/* A modal sheet turns off pointer events on the page; an Undo toast over it must still take taps. */
+[data-sonner-toast] {
+  pointer-events: auto;
+}
+
+/* Sonner sets its own font stack; this one adds Seti Emoji to it. */
+:root [data-sonner-toaster] {
+  @apply font-sans;
+}
+
+/* While a splitter drags, nothing selects text and frames cannot swallow the pointer. */
+html[data-resizing] {
+  user-select: none;
+}
+
+html[data-resizing='vertical'] * {
+  cursor: col-resize !important;
+}
+
+html[data-resizing='horizontal'] * {
+  cursor: row-resize !important;
+}
+
+html[data-resizing] iframe {
+  pointer-events: none;
+}
+
+/* Panel focus from Vim mode shows as its quiet outline instead of the focus ring. */
+[data-panel]:focus-visible {
+  outline: none;
+}
+
+[data-panel-active]:not([data-panel-focused='true']) {
+  outline: 1px solid color-mix(in oklch, var(--ring) 45%, transparent);
+  outline-offset: -1px;
+}
+
+/* Syntax tokens of the script editor and of highlighted code blocks. */
+.tok-keyword {
+  color: var(--syntax-keyword);
+}
+.tok-string {
+  color: var(--syntax-string);
+}
+.tok-literal {
+  color: var(--syntax-literal);
+}
+.tok-function {
+  color: var(--syntax-function);
+}
+.tok-comment {
+  color: var(--muted-foreground);
+  font-style: italic;
+}
+.tok-inserted {
+  color: var(--diff-add);
+}
+.tok-deleted {
+  color: var(--diff-del);
+}
+.tok-meta {
+  color: var(--syntax-function);
+}

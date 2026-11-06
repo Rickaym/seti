@@ -1,0 +1,144 @@
+.seti-blob {
+  --blob-skin: var(--agent-stripe, currentColor);
+  position: relative;
+  display: block;
+  flex: none;
+  width: 0.875rem;
+  height: 0.875rem;
+  margin: -0.0625rem;
+}
+
+.seti-blob[data-tinted='false'] {
+  --agent-stripe: initial;
+}
+
+/* A stopped agent's body leans toward the muted text colour, which keeps its face readable. */
+.seti-blob[data-faded='true'] {
+  --blob-skin: color-mix(in oklab, var(--agent-stripe, currentColor) 40%, var(--muted-foreground));
+}
+
+.seti-blob-bookmark,
+.seti-blob-blank {
+  --blob-side: 1.75rem;
+  display: block;
+  flex: none;
+  width: var(--blob-side);
+  height: var(--blob-side);
+  margin: 0;
+}
+
+.seti-blob-blank {
+  height: 0;
+}
+
+[data-blob-size='Small']:is(.seti-blob-bookmark, .seti-blob-blank) {
+  --blob-side: 1.25rem;
+}
+
+[data-blob-size='Large']:is(.seti-blob-bookmark, .seti-blob-blank) {
+  --blob-side: 2.125rem;
+}
+
+@media (pointer: coarse) {
+  .seti-blob-bookmark,
+  .seti-blob-blank {
+    --blob-side: 2rem;
+  }
+
+  [data-blob-size='Small']:is(.seti-blob-bookmark, .seti-blob-blank) {
+    --blob-side: 1.5rem;
+  }
+
+  [data-blob-size='Large']:is(.seti-blob-bookmark, .seti-blob-blank) {
+    --blob-side: 2.5rem;
+  }
+}
+
+.seti-blob-squash,
+.seti-blob-look,
+.seti-blob svg {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+/* The blinking eyes span only the band they sit in, so each running blob composites less. */
+.seti-blob .seti-blob-look {
+  top: 25%;
+  height: 50%;
+  transform-origin: 50% 40%;
+}
+
+.seti-blob-bookmark .seti-blob-look {
+  transform-origin: 50% 54%;
+}
+
+.seti-blob .skin {
+  fill: var(--blob-skin);
+}
+
+.seti-blob .fill {
+  fill: var(--background);
+}
+
+.seti-blob .line {
+  fill: none;
+  stroke: var(--background);
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.seti-blob .mark-line {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.seti-blob .mark-fill {
+  fill: currentColor;
+}
+
+.seti-blob .mark-line.sleep {
+  stroke: var(--muted-foreground);
+  stroke-width: 1.3;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .seti-blob[data-animate='true'][data-expression='happy'] .seti-blob-squash {
+    animation: seti-blob-bob 4.8s ease-in-out var(--blob-delay, 0s) infinite;
+  }
+
+  .seti-blob[data-animate='true'][data-expression='happy'] .seti-blob-look {
+    animation: seti-blob-blink 4.8s linear var(--blob-delay, 0s) infinite;
+  }
+}
+
+@keyframes seti-blob-bob {
+  0%,
+  50%,
+  100% {
+    transform: translateY(0);
+  }
+  25%,
+  75% {
+    transform: translateY(-5%);
+  }
+}
+
+@keyframes seti-blob-blink {
+  0%,
+  76%,
+  81%,
+  100% {
+    transform: scaleY(1);
+  }
+  78.5% {
+    transform: scaleY(0.1);
+  }
+}

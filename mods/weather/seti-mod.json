@@ -1,0 +1,38 @@
+{
+  "id": "weather",
+  "name": "Weather",
+  "version": "1.0.0",
+  "seti": "^1.0",
+  "description": "Draws today's sky across the header: the sun, the moon and the weather where you are.",
+  "author": "Seti",
+  "icon": "cloud-sun",
+  "categories": ["appearance"],
+  "capabilities": [{ "name": "net.fetch", "hosts": ["api.open-meteo.com"] }, { "name": "storage" }],
+  "defaultEnabled": true,
+  "contributes": {
+    "settings": {
+      "weather": {
+        "type": "boolean",
+        "title": "Weather",
+        "description": "Draws clouds, rain and snow in the band, looked up near you every ten minutes",
+        "default": true
+      },
+      "units": {
+        "type": "string",
+        "title": "Units",
+        "description": "How the band names the temperature",
+        "default": "Celsius",
+        "options": ["Celsius", "Fahrenheit"]
+      },
+      "location": {
+        "type": "string",
+        "title": "Location",
+        "description": "Latitude and longitude, such as 52.5, 13.4; empty uses your time zone's city",
+        "default": "",
+        "maxLength": 40
+      }
+    },
+    "views": [{ "id": "band", "title": "Daylight", "icon": "cloud-sun", "where": "header", "phone": true }],
+    "routes": [{ "method": "GET", "path": "/forecast", "demo": true }]
+  }
+}

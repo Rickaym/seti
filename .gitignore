@@ -1,0 +1,15 @@
+node_modules/
+dist/
+.env
+*.log
+*.tsbuildinfo
+.claude/
+test-results/
+playwright-report/
+.venv/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+android/.gradle/
+android/.kotlin/
+android/**/build/

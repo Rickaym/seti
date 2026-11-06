@@ -1,0 +1,223 @@
+import { z } from 'zod'
+import { routeKey, type DemoAllowlist, type DemoRoute } from './guard.js'
+
+const open: DemoRoute = {}
+
+/** Only these fields, so a request cannot point an agent at a path or turn on access. */
+const only = (shape: z.ZodRawShape): DemoRoute => ({ body: z.strictObject(shape) })
+
+const clientId = z.string().optional()
+
+/**
+ * Middleware every request passes: security headers, sign-in, the API's own checks, the archived
+ * agent guard and each area's EA refusal. They decide nothing on their own; a route still must be
+ * listed below to answer.
+ */
+const MIDDLEWARE = [
+  'ALL /*',
+  'ALL /api/*',
+  'ALL /api/tasks/:id',
+  'ALL /api/tasks/:id/*',
+  'ALL /api/tasks/:id/files/*',
+  'ALL /api/auth/*',
+  'ALL /api/devices/*',
+  'ALL /api/permissions/*',
+  'ALL /api/credentials/*',
+  'ALL /api/secrets/*',
+  'ALL /api/sandbox/*',
+  'ALL /api/ssh/*',
+]
+
+/** Reads of the demo database, its data folder and the in-process fakes; none runs a program. */
+const READS = [
+  '/api/ping',
+  '/api/system',
+  '/api/access',
+  '/api/account',
+  '/api/archive/settings',
+  '/api/audit',
+  '/api/audit/status',
+  '/api/attention',
+  '/api/auth',
+  '/api/auth/passkeys',
+  '/api/auth/settings',
+  '/api/capabilities',
+  '/api/capabilities/summary',
+  '/api/channels',
+  '/api/channels/summary',
+  '/api/channels/:id/subscriptions',
+  '/api/commands',
+  '/api/compact',
+  '/api/connections',
+  '/api/context/files',
+  '/api/context/files/:key',
+  '/api/context/packs',
+  '/api/context/packs/:id',
+  '/api/context/packs/:id/links',
+  '/api/credential-profiles',
+  '/api/credentials',
+  '/api/devices',
+  '/api/devices/android',
+  '/api/ea/channels',
+  '/api/ea/context',
+  '/api/ea/context-packs',
+  '/api/ea/followups',
+  '/api/ea/health',
+  '/api/ea/history',
+  '/api/ea/inbox/unread',
+  '/api/ea/replies',
+  '/api/ea/settings',
+  '/api/ea/usage',
+  '/api/ea/watches',
+  '/api/files/resolve',
+  '/api/history/activity',
+  '/api/home',
+  '/api/history/tasks/:id',
+  '/api/mcp/selection',
+  '/api/mod-asks',
+  '/api/mods',
+  '/api/mods/:id',
+  '/api/notifications',
+  '/api/permissions',
+  '/api/permissions/requests',
+  '/api/plugins',
+  '/api/plugins/defaults',
+  '/api/prs',
+  '/api/prs/by-url',
+  '/api/repos',
+  '/api/resources',
+  '/api/resources/cpu',
+  '/api/resources/memory',
+  '/api/resources/summary',
+  '/api/revisions',
+  '/api/revisions/unseen',
+  '/api/sandbox',
+  '/api/secrets',
+  '/api/ssh',
+  '/api/tasks',
+  '/api/tasks/archived',
+  '/api/tasks/:id',
+  '/api/tasks/:id/access',
+  '/api/tasks/:id/change-requests',
+  '/api/tasks/:id/channels',
+  '/api/tasks/:id/commands',
+  '/api/tasks/:id/compact',
+  '/api/tasks/:id/context-packs',
+  '/api/tasks/:id/cpu',
+  '/api/tasks/:id/digest',
+  '/api/tasks/:id/files/list',
+  '/api/tasks/:id/files/raw',
+  '/api/tasks/:id/files/recent',
+  '/api/tasks/:id/files/resolve',
+  '/api/tasks/:id/files/roots',
+  '/api/tasks/:id/files/stat',
+  '/api/tasks/:id/files/text',
+  '/api/tasks/:id/inputs',
+  '/api/tasks/:id/mcp',
+  '/api/tasks/:id/memory',
+  '/api/tasks/:id/messages',
+  '/api/tasks/:id/messages/:message_id',
+  '/api/tasks/:id/own-message',
+  '/api/tasks/:id/permission-requests',
+  '/api/tasks/:id/permissions',
+  '/api/tasks/:id/processes',
+  '/api/tasks/:id/rewinds',
+  '/api/tasks/:id/search',
+  '/api/tasks/:id/stream',
+  '/api/tasks/:id/subtasks',
+  '/api/tasks/:id/subtasks/:tool_use_id',
+  '/api/tasks/:id/subtasks/:tool_use_id/messages',
+  '/api/team/members',
+  '/api/team/members/:taskId',
+  '/api/team/messages',
+  '/api/team/search',
+  '/api/team/stream',
+  '/api/user',
+  '/api/widget/summary',
+  '/api/workspaces',
+  '/.well-known/assetlinks.json',
+  '/pair',
+  '/agent/:id',
+  '/*',
+]
+
+/**
+ * Writes that drive the scripted agents, the fake EA and the fake GitHub, or change only what
+ * a visitor sees. Each changes the demo database alone, which the next reset throws away.
+ */
+const WRITES: [string, DemoRoute][] = [
+  ['POST /api/attention/brief/seen', open],
+  ['POST /api/auth/signout', open],
+  ['POST /api/devices/pair', open],
+  ['POST /api/devices/pairing', open],
+  ['PATCH /api/devices/:id', open],
+  ['DELETE /api/devices/:id', open],
+  ['POST /api/ea/chat', open],
+  ['POST /api/ea/inbox/read', open],
+  ['POST /api/ea/replies/seen', open],
+  ['POST /api/prs/lookup', open],
+  ['POST /api/revisions/seen', open],
+  [
+    'POST /api/tasks/start',
+    only({
+      prompt: z.string(),
+      title: z.string().optional(),
+      repo_ids: z.array(z.string()).optional(),
+      worktree: z.literal(false).optional(),
+      workspace_id: z.string().optional(),
+      notify_when_done: z.boolean().optional(),
+      client_id: clientId,
+    }),
+  ],
+  [
+    'PATCH /api/tasks/:id',
+    only({
+      title: z.string().optional(),
+      pinned: z.boolean().optional(),
+      color: z.string().nullable().optional(),
+      input_mode: z.string().optional(),
+      notifications_muted: z.boolean().optional(),
+      workspace_id: z.string().optional(),
+    }),
+  ],
+  ['POST /api/tasks/:id/inputs/deliver', open],
+  ['POST /api/tasks/:id/inputs/dismiss', open],
+  [
+    'POST /api/tasks/:id/messages',
+    only({
+      prompt: z.string(),
+      interrupt: z.boolean().optional(),
+      attachments: z.array(z.never()).optional(),
+      notify_when_done: z.boolean().optional(),
+      client_id: clientId,
+    }),
+  ],
+  [
+    'POST /api/tasks/:id/permission-requests/:request_id',
+    only({
+      decision: z.enum(['allow', 'deny']),
+      scope: z.string().optional(),
+      message: z.string().optional(),
+    }),
+  ],
+  ['DELETE /api/tasks/:id/queue/:message_id', open],
+  ['POST /api/tasks/:id/retry', open],
+  ['POST /api/tasks/:id/seen', open],
+  ['POST /api/tasks/:id/session/end', open],
+  ['POST /api/tasks/:id/session/restart', open],
+  ['POST /api/tasks/:id/stop', open],
+  ['POST /api/team/messages', open],
+  ['POST /api/workspaces', open],
+  ['PATCH /api/workspaces/:id', open],
+]
+
+/** The demo's own route: a visitor entering the demo. */
+const DEMO_ROUTES = ['POST /demo/session']
+
+/** Everything the demo answers; a route missing here is refused, whatever it does. */
+export const DEMO_ALLOWLIST: DemoAllowlist = new Map<string, DemoRoute>([
+  ...MIDDLEWARE.map((key): [string, DemoRoute] => [key, open]),
+  ...READS.map((path): [string, DemoRoute] => [routeKey('GET', path), open]),
+  ...WRITES,
+  ...DEMO_ROUTES.map((key): [string, DemoRoute] => [key, open]),
+])

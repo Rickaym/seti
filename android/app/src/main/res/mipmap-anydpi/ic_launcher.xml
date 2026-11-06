@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@color/seti_night" />
+    <foreground>
+        <inset
+            android:drawable="@drawable/seti_moon"
+            android:inset="12%" />
+    </foreground>
+    <monochrome>
+        <inset
+            android:drawable="@drawable/ic_seti"
+            android:inset="25%" />
+    </monochrome>
+</adaptive-icon>

@@ -1,0 +1,18 @@
+:root[data-theme='kitchen-sink.sink'] {
+  --sink-slate: #0f172a;
+  --sink-mist: #f4f6f8;
+  --sink-teal: #0f766e;
+  --background: var(--sink-mist);
+  --foreground: var(--sink-slate);
+  --primary: var(--sink-teal);
+  --primary-foreground: #ffffff;
+  --border: color-mix(in srgb, var(--sink-slate) 15%, transparent);
+}
+
+:root[data-theme='kitchen-sink.sink'].dark {
+  --background: #0f172a;
+  --foreground: #f1f5f9;
+  --primary: #2dd4bf;
+  --primary-foreground: #0f172a;
+  --border: color-mix(in srgb, #f1f5f9 15%, transparent);
+}

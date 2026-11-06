@@ -1,0 +1,86 @@
+{
+  "id": "kitchen-sink",
+  "name": "Kitchen sink",
+  "version": "1.0.0",
+  "seti": "^1.8",
+  "author": "Seti tests",
+  "description": "Exercises every capability a third-party mod can hold.",
+  "main": "logic.js",
+  "capabilities": [
+    { "name": "tasks.read", "agents": ["sink-builder"] },
+    { "name": "tasks.manage", "actions": ["rename", "pin", "link_pr", "start"] },
+    { "name": "chat.post", "public": true, "direct": true },
+    { "name": "files.read", "agents": ["sink-builder"], "paths": ["notes/**/*.md"] },
+    { "name": "net.fetch", "hosts": ["api.sink.test"] },
+    { "name": "connection", "variable": "SINK_TOKEN", "hosts": ["api.sink.test"] },
+    { "name": "storage" },
+    { "name": "notify" },
+    { "name": "agents.context", "agents": ["sink-builder"] }
+  ],
+  "activation": ["onCommand", "onWebhook", "onSchedule", "onTaskEvent"],
+  "contributes": {
+    "settings": { "team": { "type": "string", "title": "Team", "default": "core" } },
+    "commands": [
+      {
+        "id": "summarize",
+        "title": "Summarize",
+        "icon": "list",
+        "description": "Summarizes an agent the mod may read",
+        "args": { "task": { "type": "string", "optional": true }, "note": { "type": "string", "optional": true } },
+        "for": ["palette", "agents", "ea", "view"],
+        "changes": true
+      },
+      {
+        "id": "ask-start",
+        "title": "Ask to start a helper",
+        "for": ["palette"],
+        "changes": true
+      }
+    ],
+    "slashCommands": [{ "name": "sink", "description": "Summarize this agent", "command": "summarize" }],
+    "channelSources": [
+      {
+        "id": "sink",
+        "kind": "webhook",
+        "title": "Sink",
+        "description": "Events from the sink service",
+        "signature": { "header": "X-Sink-Signature", "prefix": "sha256=" },
+        "secret": "generated",
+        "setup": "Point the sink service at the URL and sign each body with the secret."
+      }
+    ],
+    "schedules": [{ "id": "digest", "every": "15m" }],
+    "taskEvents": ["turn_finished", "pr_linked"],
+    "statusBar": [{ "id": "count", "title": "Sink count", "command": "summarize" }],
+    "notifications": [{ "id": "digest", "title": "Sink digest" }],
+    "views": [
+      { "id": "board", "title": "Sink", "icon": "list", "where": "section", "phone": true, "entry": "views/board.html" }
+    ],
+    "fileViewers": [
+      {
+        "id": "sinkfile",
+        "title": "Sink file",
+        "extensions": ["sink"],
+        "text": true,
+        "phone": true,
+        "entry": "views/sinkfile.html"
+      }
+    ],
+    "themes": [
+      {
+        "id": "sink",
+        "title": "Sink",
+        "description": "Slate with a teal accent",
+        "tokens": "tokens.css",
+        "swatch": {
+          "light": { "background": "#f4f6f8", "primary": "#0f766e", "foreground": "#0f172a" },
+          "dark": { "background": "#0f172a", "primary": "#2dd4bf", "foreground": "#f1f5f9" }
+        }
+      }
+    ],
+    "contextProviders": [
+      { "id": "house", "title": "House rules", "text": "Team {{settings.team}} writes tests first." }
+    ],
+    "auditKinds": ["summarized"]
+  }
+}

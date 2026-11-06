@@ -1,0 +1,11 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2023", "WebWorker"],
+    "module": "Preserve",
+    "moduleResolution": "bundler",
+    "types": [],
+    "moduleDetection": "force"
+  },
+  "include": ["*.ts"]
+}

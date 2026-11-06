@@ -1,0 +1,68 @@
+{
+  "id": "previews",
+  "name": "Previews",
+  "displayName": "Previews",
+  "version": "1.0.0",
+  "seti": "^1.17",
+  "description": "Shows PDFs page by page, CSV files and workbooks as tables, and Mermaid diagrams, each format behind its own switch.",
+  "author": "Seti",
+  "icon": "eye",
+  "categories": ["viewers"],
+  "capabilities": [],
+  "required": true,
+  "contributes": {
+    "settings": {
+      "pdf": {
+        "type": "boolean",
+        "title": "PDF",
+        "description": "Shows a PDF one page at a time, fitted to the width and zoomable. Off, a PDF offers its download.",
+        "default": true
+      },
+      "sheets": {
+        "type": "boolean",
+        "title": "Spreadsheets and CSV",
+        "description": "Shows CSV and TSV files and Excel and OpenDocument workbooks as tables you can filter and copy from. Off, a CSV opens as text and a workbook offers its download.",
+        "default": true
+      },
+      "mermaid": {
+        "type": "boolean",
+        "title": "Mermaid",
+        "description": "Draws .mmd and .mermaid files and mermaid fences as diagrams. Off, they show as text and code.",
+        "default": true
+      }
+    },
+    "fileViewers": [
+      { "id": "pages", "title": "Pages", "kinds": ["pdf"], "text": false, "phone": true, "setting": "pdf" },
+      {
+        "id": "table",
+        "title": "Table",
+        "kinds": ["csv"],
+        "text": true,
+        "source": true,
+        "phone": true,
+        "maxBytes": 20971520,
+        "setting": "sheets"
+      },
+      {
+        "id": "workbook",
+        "title": "Workbook",
+        "kinds": ["spreadsheet"],
+        "text": false,
+        "phone": true,
+        "maxBytes": 20971520,
+        "setting": "sheets"
+      },
+      {
+        "id": "diagram",
+        "title": "Diagram",
+        "kinds": ["mermaid"],
+        "text": true,
+        "phone": true,
+        "source": true,
+        "whileEditing": true,
+        "setting": "mermaid"
+      }
+    ],
+    "fenceRenderers": [{ "language": "mermaid", "setting": "mermaid" }]
+  }
+}

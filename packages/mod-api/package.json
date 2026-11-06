@@ -1,0 +1,27 @@
+{
+  "name": "@seti/mod-api",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./vitest": "./src/vitest.ts",
+    "./logic": "./src/logic.ts",
+    "./view": "./src/view.ts",
+    "./testing": "./src/testing.ts"
+  },
+  "scripts": {
+    "check-types": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@seti/shared": "workspace:*"
+  },
+  "peerDependencies": {
+    "@types/react": "^19.3.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.3.0",
+    "typescript": "~6.0.3",
+    "vitest": "^5.0.5"
+  }
+}

@@ -1,0 +1,69 @@
+{
+  "id": "side-chat",
+  "name": "Side chat",
+  "version": "1.0.0",
+  "seti": "^1.15",
+  "description": "Ask an agent about its work with /btw, without interrupting it or reaching its transcript.",
+  "author": "Seti",
+  "icon": "message-circle-question-mark",
+  "categories": ["agents"],
+  "defaultEnabled": true,
+  "capabilities": [
+    {
+      "name": "tasks.ask"
+    }
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "id": "ask",
+        "title": "Ask aside",
+        "icon": "message-circle-question-mark",
+        "description": "Asks an agent's context, as a side chat: the answer comes from everything it saw, never interrupts it and never reaches its transcript. Use it for why an agent did something or what it found. It can take a few minutes and costs a model call charged to that agent.",
+        "args": {
+          "task": {
+            "type": "string",
+            "description": "The agent to ask."
+          },
+          "question": {
+            "type": "string",
+            "description": "The question for its context, such as why it chose an approach.",
+            "optional": true
+          }
+        },
+        "for": ["palette", "agentMenu", "agents", "ea"],
+        "changes": false,
+        "timeoutSeconds": 330
+      }
+    ],
+    "slashCommands": [
+      {
+        "name": "btw",
+        "description": "Ask a side question; the agent is not interrupted",
+        "argumentHint": "[question]",
+        "command": "ask"
+      }
+    ],
+    "views": [
+      {
+        "id": "chat",
+        "title": "Side chat",
+        "icon": "message-circle-question-mark",
+        "description": "Stays out of the agent's chat",
+        "where": "agentDock",
+        "phone": true
+      }
+    ],
+    "routes": [
+      {
+        "method": "POST",
+        "path": "/tasks/:task",
+        "stream": true
+      },
+      {
+        "method": "DELETE",
+        "path": "/tasks/:task/chats/:chat"
+      }
+    ]
+  }
+}

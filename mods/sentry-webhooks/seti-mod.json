@@ -1,0 +1,26 @@
+{
+  "id": "sentry-webhooks",
+  "name": "Sentry webhooks",
+  "version": "1.0.0",
+  "seti": "^1.0",
+  "description": "Lets a webhook channel take Sentry's issue, uptime and alert events.",
+  "author": "Seti",
+  "icon": "siren",
+  "categories": ["channels", "integrations"],
+  "defaultEnabled": true,
+  "contributes": {
+    "channelSources": [
+      {
+        "id": "sentry",
+        "kind": "webhook",
+        "title": "Sentry",
+        "description": "Integration platform webhooks: issues (uptime included), issue and metric alerts.",
+        "signature": { "header": "Sentry-Hook-Signature" },
+        "delivery": "Request-ID",
+        "secret": "sender",
+        "kinds": ["issue.created", "issue.unresolved", "issue.resolved", "event_alert", "metric_alert", "error"],
+        "setup": "In Sentry, set the URL as the webhook URL of an internal integration and turn on the issue and alert events. Sentry signs with Sentry-Hook-Signature, using the client secret it issues."
+      }
+    ]
+  }
+}

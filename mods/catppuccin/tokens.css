@@ -1,0 +1,361 @@
+:root[data-theme='catppuccin.catppuccin'] {
+  --ctp-rosewater: #dc8a78;
+  --ctp-flamingo: #dd7878;
+  --ctp-pink: #ea76cb;
+  --ctp-mauve: #8839ef;
+  --ctp-red: #d20f39;
+  --ctp-maroon: #e64553;
+  --ctp-peach: #fe640b;
+  --ctp-yellow: #df8e1d;
+  --ctp-green: #40a02b;
+  --ctp-teal: #179299;
+  --ctp-sky: #04a5e5;
+  --ctp-sapphire: #209fb5;
+  --ctp-blue: #1e66f5;
+  --ctp-lavender: #7287fd;
+  --ctp-text: #4c4f69;
+  --ctp-subtext1: #5c5f77;
+  --ctp-subtext0: #6c6f85;
+  --ctp-overlay2: #7c7f93;
+  --ctp-overlay1: #8c8fa1;
+  --ctp-overlay0: #9ca0b0;
+  --ctp-surface2: #acb0be;
+  --ctp-surface1: #bcc0cc;
+  --ctp-surface0: #ccd0da;
+  --ctp-base: #eff1f5;
+  --ctp-mantle: #e6e9ef;
+  --ctp-crust: #dce0e8;
+  /* Latte accents darkened in OKLCH, hue kept, so accent text and fills pass AA on every surface. */
+  --ctp-rosewater-deep: #974b3c;
+  --ctp-flamingo-deep: #a24346;
+  --ctp-pink-deep: #a33389;
+  --ctp-mauve-deep: #802ce4;
+  --ctp-red-deep: #c40433;
+  --ctp-maroon-deep: #c01935;
+  --ctp-peach-deep: #aa4002;
+  --ctp-yellow-deep: #8b5501;
+  --ctp-green-deep: #1c7101;
+  --ctp-teal-deep: #036d73;
+  --ctp-sky-deep: #006994;
+  --ctp-sapphire-deep: #026c7c;
+  --ctp-blue-deep: #0b55e3;
+  --ctp-lavender-deep: #4755c6;
+  --ctp-accent: var(--ctp-mauve);
+  --ctp-accent-deep: var(--ctp-mauve-deep);
+  --background: var(--ctp-base);
+  --foreground: var(--ctp-text);
+  --card: var(--ctp-mantle);
+  --card-foreground: var(--ctp-text);
+  --popover: var(--ctp-base);
+  --popover-foreground: var(--ctp-text);
+  --primary: var(--ctp-accent-deep);
+  --primary-foreground: var(--ctp-base);
+  --secondary: var(--ctp-crust);
+  --secondary-foreground: var(--ctp-text);
+  --muted: var(--ctp-crust);
+  --muted-foreground: var(--ctp-subtext1);
+  --accent: var(--ctp-crust);
+  --accent-foreground: var(--ctp-text);
+  --destructive: color-mix(in srgb, var(--ctp-red) 90%, var(--ctp-text));
+  --success: var(--ctp-green);
+  --success-foreground: var(--ctp-base);
+  --warning: color-mix(in srgb, var(--ctp-yellow) 60%, var(--ctp-text));
+  --warning-foreground: var(--ctp-text);
+  --warning-fill: color-mix(in srgb, var(--ctp-yellow) 50%, var(--ctp-base));
+  --warning-text: color-mix(in srgb, var(--ctp-peach) 35%, var(--ctp-text));
+  --border: var(--ctp-surface0);
+  --input: var(--ctp-surface1);
+  --ring: var(--ctp-accent-deep);
+  --daylight-night: color-mix(in srgb, var(--ctp-lavender) 30%, var(--ctp-base));
+  --daylight-twilight: color-mix(in srgb, var(--ctp-mauve) 22%, var(--ctp-base));
+  --daylight-dawn: color-mix(in srgb, var(--ctp-peach) 25%, var(--ctp-base));
+  --daylight-day: color-mix(in srgb, var(--ctp-sky) 18%, var(--ctp-base));
+  --daylight-noon: color-mix(in srgb, var(--ctp-sky) 10%, var(--ctp-base));
+  --daylight-dusk: color-mix(in srgb, var(--ctp-flamingo) 30%, var(--ctp-base));
+  --daylight-zenith: color-mix(in srgb, var(--ctp-overlay2) 12%, transparent);
+  --daylight-haze: color-mix(in srgb, var(--ctp-base) 35%, transparent);
+  --daylight-ground-near: color-mix(in srgb, var(--ctp-mantle) 55%, transparent);
+  --daylight-ground-far: color-mix(in srgb, var(--ctp-mantle) 85%, transparent);
+  --daylight-line: color-mix(in srgb, var(--ctp-text) 14%, transparent);
+  --daylight-path: color-mix(in srgb, var(--ctp-text) 28%, transparent);
+  --daylight-path-past: color-mix(in srgb, var(--ctp-text) 40%, transparent);
+  --daylight-star: var(--ctp-base);
+  --daylight-moon: var(--ctp-base);
+  --daylight-moon-shade: color-mix(in srgb, var(--ctp-overlay1) 35%, transparent);
+  --daylight-moon-rim: color-mix(in srgb, var(--ctp-overlay2) 35%, transparent);
+  --daylight-sun: var(--ctp-yellow);
+  --daylight-sun-low: var(--ctp-peach);
+  --weather-cloud: var(--ctp-base);
+  --weather-cloud-shade: var(--ctp-overlay0);
+  --weather-cloud-night: color-mix(in srgb, var(--ctp-lavender) 25%, var(--ctp-overlay0));
+  --weather-rain: var(--ctp-sapphire);
+  --weather-snow: var(--ctp-base);
+  --weather-fog: var(--ctp-mantle);
+  --weather-lightning: color-mix(in srgb, var(--ctp-lavender) 12%, var(--ctp-base));
+  --weather-meteor: var(--ctp-base);
+  --actor-user: var(--ctp-blue);
+  --actor-agent: var(--ctp-mauve);
+  --shell: color-mix(in srgb, var(--ctp-green) 80%, var(--ctp-text));
+  --queued: var(--ctp-teal);
+  --voice-user: var(--ctp-teal);
+  --voice-bot: var(--primary);
+  --diff-add: var(--success);
+  --diff-del: var(--destructive);
+  --code: var(--muted);
+  --overlay: color-mix(in srgb, var(--ctp-overlay2) 25%, transparent);
+  --preview-canvas: var(--ctp-base);
+  --media-backdrop: var(--ctp-surface1);
+  --syntax-keyword: var(--ctp-mauve-deep);
+  --syntax-string: var(--ctp-green-deep);
+  --syntax-literal: var(--ctp-peach-deep);
+  --syntax-function: var(--ctp-blue-deep);
+  --toast-success-bg: color-mix(in srgb, var(--ctp-green) 10%, var(--ctp-base));
+  --toast-success-border: color-mix(in srgb, var(--ctp-green) 30%, var(--ctp-base));
+  --toast-success-text: color-mix(in srgb, var(--ctp-green) 40%, var(--ctp-text));
+  --toast-info-bg: color-mix(in srgb, var(--ctp-blue) 10%, var(--ctp-base));
+  --toast-info-border: color-mix(in srgb, var(--ctp-blue) 30%, var(--ctp-base));
+  --toast-info-text: color-mix(in srgb, var(--ctp-blue) 40%, var(--ctp-text));
+  --toast-warning-bg: color-mix(in srgb, var(--ctp-peach) 10%, var(--ctp-base));
+  --toast-warning-border: color-mix(in srgb, var(--ctp-peach) 30%, var(--ctp-base));
+  --toast-warning-text: color-mix(in srgb, var(--ctp-peach) 40%, var(--ctp-text));
+  --toast-error-bg: color-mix(in srgb, var(--ctp-red) 10%, var(--ctp-base));
+  --toast-error-border: color-mix(in srgb, var(--ctp-red) 30%, var(--ctp-base));
+  --toast-error-text: color-mix(in srgb, var(--ctp-red) 40%, var(--ctp-text));
+}
+
+:root[data-theme='catppuccin.catppuccin'].dark {
+  --ctp-rosewater: #f5e0dc;
+  --ctp-flamingo: #f2cdcd;
+  --ctp-pink: #f5c2e7;
+  --ctp-mauve: #cba6f7;
+  --ctp-red: #f38ba8;
+  --ctp-maroon: #eba0ac;
+  --ctp-peach: #fab387;
+  --ctp-yellow: #f9e2af;
+  --ctp-green: #a6e3a1;
+  --ctp-teal: #94e2d5;
+  --ctp-sky: #89dceb;
+  --ctp-sapphire: #74c7ec;
+  --ctp-blue: #89b4fa;
+  --ctp-lavender: #b4befe;
+  --ctp-text: #cdd6f4;
+  --ctp-subtext1: #bac2de;
+  --ctp-subtext0: #a6adc8;
+  --ctp-overlay2: #9399b2;
+  --ctp-overlay1: #7f849c;
+  --ctp-overlay0: #6c7086;
+  --ctp-surface2: #585b70;
+  --ctp-surface1: #45475a;
+  --ctp-surface0: #313244;
+  --ctp-base: #1e1e2e;
+  --ctp-mantle: #181825;
+  --ctp-crust: #11111b;
+  --background: var(--ctp-base);
+  --foreground: var(--ctp-text);
+  --card: var(--ctp-mantle);
+  --card-foreground: var(--ctp-text);
+  --popover: var(--ctp-mantle);
+  --popover-foreground: var(--ctp-text);
+  --primary: var(--ctp-accent);
+  --primary-foreground: var(--ctp-base);
+  --secondary: var(--ctp-surface0);
+  --secondary-foreground: var(--ctp-text);
+  --muted: var(--ctp-crust);
+  --muted-foreground: var(--ctp-subtext0);
+  --accent: color-mix(in srgb, var(--ctp-surface0) 80%, var(--ctp-base));
+  --accent-foreground: var(--ctp-text);
+  --destructive: var(--ctp-red);
+  --success: var(--ctp-green);
+  --success-foreground: var(--ctp-base);
+  --warning: var(--ctp-yellow);
+  --warning-foreground: var(--ctp-base);
+  --warning-fill: var(--warning);
+  --warning-text: var(--warning);
+  --border: var(--ctp-surface0);
+  --input: var(--ctp-surface1);
+  --ring: var(--ctp-accent);
+  --daylight-night: color-mix(in srgb, var(--ctp-lavender) 8%, var(--ctp-crust));
+  --daylight-twilight: color-mix(in srgb, var(--ctp-mauve) 22%, var(--ctp-base));
+  --daylight-dawn: color-mix(in srgb, var(--ctp-peach) 25%, var(--ctp-base));
+  --daylight-day: color-mix(in srgb, var(--ctp-sapphire) 22%, var(--ctp-base));
+  --daylight-noon: color-mix(in srgb, var(--ctp-sky) 28%, var(--ctp-base));
+  --daylight-dusk: color-mix(in srgb, var(--ctp-maroon) 28%, var(--ctp-base));
+  --daylight-zenith: color-mix(in srgb, var(--ctp-crust) 35%, transparent);
+  --daylight-haze: color-mix(in srgb, var(--ctp-text) 4%, transparent);
+  --daylight-ground-near: color-mix(in srgb, var(--ctp-mantle) 55%, transparent);
+  --daylight-ground-far: color-mix(in srgb, var(--ctp-mantle) 85%, transparent);
+  --daylight-line: color-mix(in srgb, var(--ctp-text) 12%, transparent);
+  --daylight-path: color-mix(in srgb, var(--ctp-text) 22%, transparent);
+  --daylight-path-past: color-mix(in srgb, var(--ctp-text) 40%, transparent);
+  --daylight-star: var(--ctp-text);
+  --daylight-moon: var(--ctp-rosewater);
+  --daylight-moon-shade: color-mix(in srgb, var(--ctp-text) 8%, transparent);
+  --daylight-moon-rim: transparent;
+  --daylight-sun: var(--ctp-yellow);
+  --daylight-sun-low: var(--ctp-peach);
+  --weather-cloud: var(--ctp-overlay1);
+  --weather-cloud-shade: var(--ctp-surface0);
+  --weather-cloud-night: var(--ctp-surface1);
+  --weather-rain: var(--ctp-sky);
+  --weather-snow: var(--ctp-text);
+  --weather-fog: var(--ctp-overlay0);
+  --weather-lightning: var(--ctp-lavender);
+  --weather-meteor: var(--ctp-text);
+  --actor-user: var(--ctp-blue);
+  --actor-agent: var(--ctp-mauve);
+  --shell: var(--ctp-green);
+  --queued: var(--ctp-teal);
+  --voice-user: var(--ctp-teal);
+  --voice-bot: var(--primary);
+  --diff-add: var(--success);
+  --diff-del: var(--destructive);
+  --code: var(--muted);
+  --overlay: color-mix(in srgb, var(--ctp-crust) 60%, transparent);
+  --preview-canvas: var(--ctp-text);
+  --media-backdrop: var(--ctp-surface2);
+  --syntax-keyword: var(--ctp-mauve);
+  --syntax-string: var(--ctp-green);
+  --syntax-literal: var(--ctp-peach);
+  --syntax-function: var(--ctp-blue);
+  --toast-success-bg: color-mix(in srgb, var(--ctp-green) 10%, var(--ctp-crust));
+  --toast-success-border: color-mix(in srgb, var(--ctp-green) 25%, var(--ctp-crust));
+  --toast-success-text: var(--ctp-green);
+  --toast-info-bg: color-mix(in srgb, var(--ctp-blue) 10%, var(--ctp-crust));
+  --toast-info-border: color-mix(in srgb, var(--ctp-blue) 25%, var(--ctp-crust));
+  --toast-info-text: var(--ctp-blue);
+  --toast-warning-bg: color-mix(in srgb, var(--ctp-yellow) 10%, var(--ctp-crust));
+  --toast-warning-border: color-mix(in srgb, var(--ctp-yellow) 25%, var(--ctp-crust));
+  --toast-warning-text: var(--ctp-yellow);
+  --toast-error-bg: color-mix(in srgb, var(--ctp-red) 10%, var(--ctp-crust));
+  --toast-error-border: color-mix(in srgb, var(--ctp-red) 25%, var(--ctp-crust));
+  --toast-error-text: var(--ctp-red);
+}
+
+:root[data-theme='catppuccin.catppuccin'].dark[data-flavour='frappe'] {
+  --ctp-rosewater: #f2d5cf;
+  --ctp-flamingo: #eebebe;
+  --ctp-pink: #f4b8e4;
+  --ctp-mauve: #ca9ee6;
+  --ctp-red: #e78284;
+  --ctp-maroon: #ea999c;
+  --ctp-peach: #ef9f76;
+  --ctp-yellow: #e5c890;
+  --ctp-green: #a6d189;
+  --ctp-teal: #81c8be;
+  --ctp-sky: #99d1db;
+  --ctp-sapphire: #85c1dc;
+  --ctp-blue: #8caaee;
+  --ctp-lavender: #babbf1;
+  --ctp-text: #c6d0f5;
+  --ctp-subtext1: #b5bfe2;
+  --ctp-subtext0: #a5adce;
+  --ctp-overlay2: #949cbb;
+  --ctp-overlay1: #838ba7;
+  --ctp-overlay0: #737994;
+  --ctp-surface2: #626880;
+  --ctp-surface1: #51576d;
+  --ctp-surface0: #414559;
+  --ctp-base: #303446;
+  --ctp-mantle: #292c3c;
+  --ctp-crust: #232634;
+  --muted-foreground: var(--ctp-subtext1);
+}
+
+:root[data-theme='catppuccin.catppuccin'].dark[data-flavour='macchiato'] {
+  --ctp-rosewater: #f4dbd6;
+  --ctp-flamingo: #f0c6c6;
+  --ctp-pink: #f5bde6;
+  --ctp-mauve: #c6a0f6;
+  --ctp-red: #ed8796;
+  --ctp-maroon: #ee99a0;
+  --ctp-peach: #f5a97f;
+  --ctp-yellow: #eed49f;
+  --ctp-green: #a6da95;
+  --ctp-teal: #8bd5ca;
+  --ctp-sky: #91d7e3;
+  --ctp-sapphire: #7dc4e4;
+  --ctp-blue: #8aadf4;
+  --ctp-lavender: #b7bdf8;
+  --ctp-text: #cad3f5;
+  --ctp-subtext1: #b8c0e0;
+  --ctp-subtext0: #a5adcb;
+  --ctp-overlay2: #939ab7;
+  --ctp-overlay1: #8087a2;
+  --ctp-overlay0: #6e738d;
+  --ctp-surface2: #5b6078;
+  --ctp-surface1: #494d64;
+  --ctp-surface0: #363a4f;
+  --ctp-base: #24273a;
+  --ctp-mantle: #1e2030;
+  --ctp-crust: #181926;
+}
+
+:root[data-theme='catppuccin.catppuccin'][data-accent='rosewater'] {
+  --ctp-accent: var(--ctp-rosewater);
+  --ctp-accent-deep: var(--ctp-rosewater-deep);
+}
+
+:root[data-theme='catppuccin.catppuccin'][data-accent='flamingo'] {
+  --ctp-accent: var(--ctp-flamingo);
+  --ctp-accent-deep: var(--ctp-flamingo-deep);
+}
+
+:root[data-theme='catppuccin.catppuccin'][data-accent='pink'] {
+  --ctp-accent: var(--ctp-pink);
+  --ctp-accent-deep: var(--ctp-pink-deep);
+}
+
+:root[data-theme='catppuccin.catppuccin'][data-accent='mauve'] {
+  --ctp-accent: var(--ctp-mauve);
+  --ctp-accent-deep: var(--ctp-mauve-deep);
+}
+
+:root[data-theme='catppuccin.catppuccin'][data-accent='red'] {
+  --ctp-accent: var(--ctp-red);
+  --ctp-accent-deep: var(--ctp-red-deep);
+}
+
+:root[data-theme='catppuccin.catppuccin'][data-accent='maroon'] {
+  --ctp-accent: var(--ctp-maroon);
+  --ctp-accent-deep: var(--ctp-maroon-deep);
+}
+
+:root[data-theme='catppuccin.catppuccin'][data-accent='peach'] {
+  --ctp-accent: var(--ctp-peach);
+  --ctp-accent-deep: var(--ctp-peach-deep);
+}
+
+:root[data-theme='catppuccin.catppuccin'][data-accent='yellow'] {
+  --ctp-accent: var(--ctp-yellow);
+  --ctp-accent-deep: var(--ctp-yellow-deep);
+}
+
+:root[data-theme='catppuccin.catppuccin'][data-accent='green'] {
+  --ctp-accent: var(--ctp-green);
+  --ctp-accent-deep: var(--ctp-green-deep);
+}
+
+:root[data-theme='catppuccin.catppuccin'][data-accent='teal'] {
+  --ctp-accent: var(--ctp-teal);
+  --ctp-accent-deep: var(--ctp-teal-deep);
+}
+
+:root[data-theme='catppuccin.catppuccin'][data-accent='sky'] {
+  --ctp-accent: var(--ctp-sky);
+  --ctp-accent-deep: var(--ctp-sky-deep);
+}
+
+:root[data-theme='catppuccin.catppuccin'][data-accent='sapphire'] {
+  --ctp-accent: var(--ctp-sapphire);
+  --ctp-accent-deep: var(--ctp-sapphire-deep);
+}
+
+:root[data-theme='catppuccin.catppuccin'][data-accent='blue'] {
+  --ctp-accent: var(--ctp-blue);
+  --ctp-accent-deep: var(--ctp-blue-deep);
+}
+
+:root[data-theme='catppuccin.catppuccin'][data-accent='lavender'] {
+  --ctp-accent: var(--ctp-lavender);
+  --ctp-accent-deep: var(--ctp-lavender-deep);
+}
