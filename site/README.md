@@ -14,9 +14,11 @@ License (`fonts/OFL.txt`).
 - `_headers` and `_redirects`: Cloudflare Pages headers (a strict CSP with no script) and the
   redirects from `/` and `/seti` to `/seti/`.
 
-To change a screenshot, edit its `<picture>` in `index.html`; the build copies whatever the page
-references, so a renamed or new file in `docs/screenshots/` needs no other change. The dark
-variant goes in the `<source>`, the light one in the `<img>`.
+The page reads its screenshots from `docs/screenshots/`, so a retaken screenshot reaches it on the
+next build. To add, rename or remove one, edit its `<picture>` in `index.html`: the dark variant
+goes in the `<source>`, the light one in the `<img>`. The build fails and names the file when the
+page references a screenshot that does not exist, and `pnpm check` and CI run it as
+`pnpm check:site`, so a screenshot change that breaks the page fails its PR.
 
 ## Preview locally
 

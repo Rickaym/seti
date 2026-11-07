@@ -894,16 +894,9 @@ main {
 
 .msg.post .body > .plate,
 .msg.post .body > .phones,
-.msg.post .body > .split,
+.msg.post .body > .guards,
 .msg.post .body > .rows {
   margin-top: 1.5rem;
-}
-
-.split {
-  display: grid;
-  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
-  gap: 1.5rem;
-  align-items: start;
 }
 
 .rows.more {
@@ -930,7 +923,7 @@ main {
 
 .phones {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: clamp(0.75rem, 2vw, 1.5rem);
 }
 
@@ -1189,10 +1182,6 @@ main {
   .hero .panel {
     max-width: 34rem;
   }
-
-  .split {
-    grid-template-columns: minmax(0, 1fr);
-  }
 }
 
 @media (width < 48rem) {
@@ -1241,7 +1230,7 @@ main {
 
   .phones,
   .phones.two {
-    grid-template-columns: repeat(var(--count, 3), 70%);
+    grid-template-columns: repeat(var(--count, 4), 70%);
     max-width: none;
     overflow-x: auto;
     scroll-snap-type: x mandatory;

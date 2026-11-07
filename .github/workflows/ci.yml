@@ -84,6 +84,7 @@ jobs:
       - uses: ./.github/actions/setup
       - run: pnpm format:check
       - run: pnpm check:text
+      - run: pnpm check:site
       - run: pnpm typecheck
         if: needs.changes.outputs.node == 'true'
       - run: pnpm lint
