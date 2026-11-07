@@ -83,7 +83,9 @@ a push. Never skip them with `--no-verify`.
 one process per project keeps the peak at the largest project instead of the sum of all of them.
 
 CI adds `pnpm audit`, a gitleaks scan of the PR's commits, the whole e2e suite in four shards, and
-the Android build when `android/` changes. A PR merges only when all of it passes.
+the Android build when `android/` changes. A PR merges only when all of it passes. On CI a failed
+e2e spec runs once more; one that passes on that retry is reported as flaky, so fix it rather than
+leave it.
 
 The lint rules that surprise people most:
 

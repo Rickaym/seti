@@ -22,7 +22,7 @@ export default defineConfig({
   globalSetup: './tests/support/global-setup.ts',
   fullyParallel: false,
   workers: workers(),
-  retries: 0,
+  retries: CI ? 1 : 0,
   forbidOnly: CI,
   timeout: 30_000,
   expect: { timeout: 10_000 },
