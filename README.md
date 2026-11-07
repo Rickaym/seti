@@ -8,10 +8,11 @@
 
 <a href="LICENSE"><img alt="Apache-2.0" src="https://img.shields.io/badge/license-Apache--2.0-blue"></a> <img alt="Node 24" src="https://img.shields.io/badge/node-24-3c873a"> <img alt="Linux" src="https://img.shields.io/badge/platform-Linux-555">
 
-**Run a team of Claude Code agents on your own machine, and steer them from any browser.**
+**Talk to your coding agents.**
 
-Seti is a self-hosted web app for Claude Code. Agents work on the machine that holds your repos,
-each in its own sandbox, and keep going after you close the tab.
+Seti is a self-hosted control room for Claude Code. Say "Hey Seti" and steer every agent by voice,
+from your phone or any browser. Agents run sandboxed on your machine and keep working after you
+close the tab.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/agents-grid-dark.webp">
