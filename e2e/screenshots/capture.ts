@@ -56,7 +56,7 @@ export async function openContext(
     timezoneId: 'Europe/Berlin',
     serviceWorkers: 'block',
     baseURL,
-    ...(signedIn ? { extraHTTPHeaders: USER_HEADERS } : {}),
+    ...(signedIn ? { extraHTTPHeaders: USER_HEADERS, permissions: ['microphone'] } : {}),
   })
   await context.clock.setFixedTime(NOW)
   await context.addInitScript(quietBrowser)
