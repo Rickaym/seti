@@ -39,7 +39,7 @@ export async function closeDatabase(): Promise<void> {
 
 /** Runs `fn` in one transaction on one connection; a throw rolls every write back. */
 export async function transaction<T>(fn: (tx: Db) => Promise<T>): Promise<T> {
-  return (await sql.begin(fn)) as T
+  return sql.begin(fn)
 }
 
 export const now = () => new Date().toISOString()
