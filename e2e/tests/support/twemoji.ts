@@ -57,6 +57,9 @@ const subtree = (node: CdpNode): CdpNode[] => [
   ...[...(node.children ?? []), ...(node.shadowRoots ?? [])].flatMap(subtree),
 ]
 
+/** A render between the DOM snapshot and the font query drops nodes; the next poll reads again. */
+const STALE_NODE = 'Could not find node with given id'
+
 /** The fonts Chromium drew an element's text with, a field's shadow text included. */
 async function drawnFonts(page: Page, target: Locator): Promise<string[]> {
   const marker = randomUUID()
@@ -81,6 +84,11 @@ async function drawnFonts(page: Page, target: Locator): Promise<string[]> {
       }
     }
     return [...families]
+  } catch (e) {
+    if (e instanceof Error && e.message.includes(STALE_NODE)) {
+      return []
+    }
+    throw e
   } finally {
     await cdp.detach()
   }

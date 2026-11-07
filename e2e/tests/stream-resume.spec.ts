@@ -9,7 +9,11 @@ import { FAKE_CLAUDE_ENV } from './support/processes.js'
 import { startSessionAgent } from './support/restart.js'
 import { seedLoadingTask } from './support/transcript-loading.js'
 
-test.use({ serverEnv: FAKE_CLAUDE_ENV })
+/** The network drop spec goes offline, so a poll that falls in that window fails to load. */
+test.use({
+  serverEnv: FAKE_CLAUDE_ENV,
+  allowedConsoleErrors: [/^Failed to load resource: net::ERR_INTERNET_DISCONNECTED$/],
+})
 
 const update = (title: string) => ({
   source: 'pr',
