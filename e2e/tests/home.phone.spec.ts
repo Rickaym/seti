@@ -1,9 +1,6 @@
 import { expect, test } from './support/fixtures.js'
 import { findNode, seedShipped } from './support/home.js'
 
-/** The docked card covers the bottom of the graph, so taps search the part above it. */
-const ABOVE_CARD = 0.6
-
 test('a phone taps a node for its card and opens the agent from it', async ({ page }) => {
   test.slow()
   const agent = await seedShipped('Phone home')
@@ -11,7 +8,7 @@ test('a phone taps a node for its card and opens the agent from it', async ({ pa
   await page.goto('/')
   await expect(page.getByRole('main').getByRole('heading', { name: 'Home' })).toBeVisible()
   await expect(page.getByRole('complementary', { name: 'Metrics' }).getByText(agent.title)).toBeAttached()
-  const found = await findNode(page, agent.title, async (x, y) => page.touchscreen.tap(x, y), ABOVE_CARD)
+  const found = await findNode(page, agent.title, async (x, y) => page.touchscreen.tap(x, y))
   expect(found).not.toBeNull()
   const card = page.getByTestId('home-card')
   await expect(card).toContainText('Merged 30d')

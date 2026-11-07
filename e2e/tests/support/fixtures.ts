@@ -118,6 +118,7 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
         await loadAssetsThroughNode(context, setiServer.baseURL)
       }
       await use(undefined)
+      await context.unrouteAll({ behavior: 'ignoreErrors' })
     },
     { auto: true },
   ],
