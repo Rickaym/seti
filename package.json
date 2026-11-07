@@ -22,6 +22,7 @@
     "format:check": "prettier --check .",
     "knip": "knip",
     "check:text": "node scripts/check-text.mjs",
+    "check:site": "bash site/build.sh",
     "check:ea": "cd ea && uv sync --locked --quiet && uv run ruff format --check . && uv run ruff check . && uv run pyright && uv run pytest -q",
     "banner": "node scripts/banner.mjs",
     "android:release": "node scripts/android-release.mjs",
@@ -30,7 +31,7 @@
     "screenshots": "pnpm build && pnpm --filter @seti/e2e screenshots",
     "build:demo": "node scripts/build-demo.mjs",
     "demo": "pnpm build && pnpm build:demo && bash scripts/demo.sh",
-    "check": "pnpm format:check && pnpm check:text && pnpm typecheck && pnpm lint && pnpm knip && pnpm test && pnpm check:ea && pnpm build",
+    "check": "pnpm format:check && pnpm check:text && pnpm check:site && pnpm typecheck && pnpm lint && pnpm knip && pnpm test && pnpm check:ea && pnpm build",
     "prepare": "simple-git-hooks"
   },
   "devDependencies": {

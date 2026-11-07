@@ -73,10 +73,10 @@ and leave out notes addressed to reviewers or to yourself: the description is pa
 ## Gates
 
 `pnpm check` runs every gate CI runs on Node code, in this order: Prettier, the ASCII and YAML text
-check, TypeScript, ESLint with zero warnings, knip, the unit tests, the EA's ruff, pyright and
-pytest, and the UI build. The git hooks run a fast subset: Prettier, ESLint and the text check on
-staged files before a commit, commitlint on the message, and `pnpm typecheck` and `pnpm knip` before
-a push. Never skip them with `--no-verify`.
+check, the landing page build (`pnpm check:site`), TypeScript, ESLint with zero warnings, knip,
+the unit tests, the EA's ruff, pyright and pytest, and the UI build. The git hooks run a fast
+subset: Prettier, ESLint and the text check on staged files before a commit, commitlint on the
+message, and `pnpm typecheck` and `pnpm knip` before a push. Never skip them with `--no-verify`.
 
 `pnpm lint` runs ESLint once per TypeScript project, each directory with a `tsconfig.json`, through
 `scripts/lint.mjs`. Typed linting keeps every project it opens in memory until the process ends, so
