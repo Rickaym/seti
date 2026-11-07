@@ -17,12 +17,12 @@
     "migrate-from-sqlite": "tsx src/migrate-from-sqlite.ts"
   },
   "dependencies": {
-    "@anthropic-ai/claude-agent-sdk": "^0.3.316",
+    "@anthropic-ai/claude-agent-sdk": "^0.3.318",
     "@aws-sdk/client-sts": "^3.1161.0",
     "@hono/node-server": "^2.1.6",
     "@hono/zod-validator": "^0.9.1",
     "@jitl/quickjs-wasmfile-release-sync": "^0.32.0",
-    "@redis/client": "^6.3.0",
+    "@redis/client": "^6.3.1",
     "@seti/mod-api": "workspace:*",
     "@seti/mod-blobs": "workspace:*",
     "@seti/mod-catppuccin": "workspace:*",
@@ -42,8 +42,8 @@
     "@seti/mod-whats-new": "workspace:*",
     "@seti/shared": "workspace:*",
     "@simplewebauthn/server": "^14.0.3",
-    "acorn": "^8.18.0",
-    "fast-xml-parser": "^5.11.2",
+    "acorn": "^8.19.0",
+    "fast-xml-parser": "^5.12.0",
     "hono": "^4.13.16",
     "jose": "^6.2.15",
     "marked": "^16.4.2",
@@ -53,7 +53,7 @@
     "quickjs-emscripten-core": "^0.32.0",
     "tsx": "^4.23.15",
     "web-push": "^3.6.7",
-    "ws": "^8.22.0",
+    "ws": "^8.22.1",
     "zod": "^4.6.7"
   },
   "devDependencies": {
@@ -61,6 +61,6 @@
     "@types/web-push": "^3.6.4",
     "@types/ws": "^8.18.2",
     "typescript": "~6.0.3",
-    "vitest": "^5.0.5"
+    "vitest": "^5.1.0"
   }
 }
