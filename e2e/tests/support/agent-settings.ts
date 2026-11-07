@@ -30,8 +30,9 @@ export async function openAgentSettings(
   section: SettingsSection = 'General',
   scope: Locator = page.getByRole('main'),
 ): Promise<Locator> {
-  await scope.getByRole('button', { name: 'Agent settings' }).first().click()
   const dialog = settingsDialog(page)
+  await expect(dialog, 'the agent settings closed before they open again').toHaveCount(0)
+  await scope.getByRole('button', { name: 'Agent settings' }).first().click()
   await expect(dialog).toBeVisible()
   await showSection(dialog, section)
   return dialog
