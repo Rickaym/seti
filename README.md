@@ -15,38 +15,63 @@ each in its own sandbox, and keep going after you close the tab.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/agents-grid-dark.webp">
-  <img alt="Four agents side by side: one with a green pull request, one with a finished subagent, one waiting on a permission, one asking a question" src="docs/screenshots/agents-grid-light.webp">
+  <img alt="Three agents and a terminal in the grid: one agent with a green pull request, one waiting on a permission, one asking a question, and a shell showing the git log of the first agent's branch" src="docs/screenshots/agents-grid-light.webp">
 </picture>
+
+<table>
+  <tr>
+    <td align="center" valign="top" width="25%">
+      <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/phone-agents-dark.webp"><img alt="The agent list on a phone, with two agents under Needs you" src="docs/screenshots/phone-agents-light.webp" width="100%"></picture>
+      <br><sub>Needs you first</sub>
+    </td>
+    <td align="center" valign="top" width="25%">
+      <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/phone-permission-dark.webp"><img alt="A permission request for terraform apply on a phone, with Allow, Always and Deny" src="docs/screenshots/phone-permission-light.webp" width="100%"></picture>
+      <br><sub>Allow from the phone</sub>
+    </td>
+    <td align="center" valign="top" width="25%">
+      <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/phone-terminal-dark.webp"><img alt="A terminal on a phone showing git status and git log, with the Esc, Tab, Ctrl, Alt and arrow key row" src="docs/screenshots/phone-terminal-light.webp" width="100%"></picture>
+      <br><sub>Terminal with a key row</sub>
+    </td>
+    <td align="center" valign="top" width="25%">
+      <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/phone-share-dark.webp"><img alt="A Markdown migration guide opened from a share link on a phone" src="docs/screenshots/phone-share-light.webp" width="100%"></picture>
+      <br><sub>Share links</sub>
+    </td>
+  </tr>
+  <tr>
+    <td align="center" valign="top" colspan="2" width="50%">
+      <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/ea-listening-dark.webp"><img alt="The EA page on a call, listening and captioning a question as it forms" src="docs/screenshots/ea-listening-light.webp" width="100%"></picture>
+      <br><sub>Call the EA</sub>
+    </td>
+    <td align="center" valign="top" width="25%">
+      <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/phone-ea-speaking-dark.webp"><img alt="The EA answering aloud on a phone, with captions and the list_prs tool call it made" src="docs/screenshots/phone-ea-speaking-light.webp" width="100%"></picture>
+      <br><sub>Captions as it speaks</sub>
+    </td>
+    <td align="center" valign="top" width="25%">
+      <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/phone-ea-asleep-dark.webp"><img alt="The EA call sheet on a phone, asleep until the wake phrase Hey Seti" src="docs/screenshots/phone-ea-asleep-light.webp" width="100%"></picture>
+      <br><sub>Asleep until its wake word</sub>
+    </td>
+  </tr>
+  <tr>
+    <td align="center" valign="top" colspan="2" width="50%">
+      <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/home-dark.webp"><img alt="Home: a graph of agents linked to their repos and MCP servers, a merge streak and the agents ranked by PRs merged" src="docs/screenshots/home-light.webp" width="100%"></picture>
+      <br><sub>Home</sub>
+    </td>
+    <td align="center" valign="top" colspan="2" width="50%">
+      <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/channels-dark.webp"><img alt="A payments status poller with its schedule, subscribers, runs and a changed component routed to the EA and an agent" src="docs/screenshots/channels-light.webp" width="100%"></picture>
+      <br><sub>Channels</sub>
+    </td>
+  </tr>
+</table>
 
 ## Highlights
 
 **Answer from your phone.** Agents that wait on a permission or ask a question go to the top of
 the list; you answer them, or ask the EA what needs you, in a tap.
 
-<p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/phone-agents-dark.webp">
-    <img alt="The agent list on a phone, with two agents under Needs you" src="docs/screenshots/phone-agents-light.webp" width="31%">
-  </picture>
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/phone-permission-dark.webp">
-    <img alt="A permission request for terraform apply on a phone, with Allow, Always and Deny" src="docs/screenshots/phone-permission-light.webp" width="31%">
-  </picture>
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/phone-ea-dark.webp">
-    <img alt="The EA on a phone, summarising which agents need you" src="docs/screenshots/phone-ea-light.webp" width="31%">
-  </picture>
-</p>
-
 **See the whole team at once.** Seti opens on Home, a live graph of every agent in its colour,
 linked to its repos, the MCP servers it calls and the subagents it runs, with the agents that need
 you in a strip above it. Beside it: the merge streak, PRs merged this week and month, and turns,
 time and cost per agent.
-
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/home-dark.webp">
-  <img alt="Home: a graph of agents linked to their repos and MCP servers, two agents that need you, a merge streak and the agents ranked by PRs merged" src="docs/screenshots/home-light.webp">
-</picture>
 
 **An assistant that knows what can wait.** The Executive Assistant (EA) takes voice and chat and
 acts through Seti's own API. Every event goes to one place by its tier: what needs you reaches you
@@ -57,38 +82,11 @@ waits; and when you come back, one since-you-left brief says what needs you and 
 one stream; a poller turns a service without webhooks into events with a small script, a reminder
 speaks up on an interval or a cron schedule, and each event can wake an agent or the EA.
 
-<p>
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/channels-dark.webp">
-    <img alt="A payments status poller with its schedule, subscribers, runs and a changed component routed to the EA and an agent" src="docs/screenshots/channels-light.webp" width="70%">
-  </picture>
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/phone-channels-dark.webp">
-    <img alt="Creating a channel on a phone: webhook, poller or reminder" src="docs/screenshots/phone-channels-light.webp" width="26%">
-  </picture>
-</p>
-
 **Pull requests come back to the agent.** The PR an agent opens sits in its header with CI,
 preview and review threads, and new reviews and failed checks reach the agent as input.
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/pull-request-dark.webp">
-  <img alt="An agent's transcript with a diff, and its pull request with CI passing, a preview and two review threads" src="docs/screenshots/pull-request-light.webp">
-</picture>
-
 **Files and share links.** Read and edit what an agent wrote, then share a frozen copy that
 renders Markdown, PDFs, tables and code.
-
-<p>
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/files-dark.webp">
-    <img alt="An agent's Files panel showing a Markdown migration guide" src="docs/screenshots/files-light.webp" width="70%">
-  </picture>
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/phone-share-dark.webp">
-    <img alt="The same guide opened from a share link on a phone" src="docs/screenshots/phone-share-light.webp" width="26%">
-  </picture>
-</p>
 
 **Ask aside.** Type `/btw` and a question to ask an agent why it did something while it works:
 the answer comes from its context in a side chat that never interrupts the turn or lands in its
@@ -98,11 +96,6 @@ transcript.
 mid-turn. The EA and agents can also send one member a direct message, which only the two of them
 and you see.
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/group-chat-dark.webp">
-  <img alt="Two agents and the user agreeing on an API change in the group chat" src="docs/screenshots/group-chat-light.webp">
-</picture>
-
 **Restarts do not stop the work.** An upgrade or a reboot restarts Seti, and each agent it cut off
 mid-turn picks up on its own, checking what finished before it carries on.
 
@@ -111,11 +104,6 @@ ships its own: the agent grid, side chat, file previews, Blobs (agents drawn as 
 weather, Vim mode, What's new, webhook sources and themes. Third-party mods install with Developer
 mode on and run sandboxed with only the access you grant; [Mods](docs/mods.md) shows how to build
 one.
-
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/mods-dark.webp">
-  <img alt="The Mods page listing Seti's bundled mods with their switches" src="docs/screenshots/mods-light.webp">
-</picture>
 
 ## Security
 
@@ -136,11 +124,6 @@ Agents run code on your machine, so Seti treats every agent as untrusted.
 - **Shares are copies.** A share link serves a frozen copy from the database, with no script and
   no route to the file system.
 - **Audited.** Every action lands in an audit log kept as a hash chain that Seti verifies.
-
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/security-dark.webp">
-  <img alt="Sandbox settings: agents sandboxed, Claude and GitHub tokens added by the proxy, and the allowed hosts" src="docs/screenshots/security-light.webp">
-</picture>
 
 [Security](docs/security.md) has the full model, where each secret lives, and rotation. To report a vulnerability, see [SECURITY.md](SECURITY.md).
 
