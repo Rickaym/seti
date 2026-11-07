@@ -8,11 +8,10 @@
 
 <a href="LICENSE"><img alt="Apache-2.0" src="https://img.shields.io/badge/license-Apache--2.0-blue"></a> <img alt="Node 24" src="https://img.shields.io/badge/node-24-3c873a"> <img alt="Linux" src="https://img.shields.io/badge/platform-Linux-555">
 
-**Talk to your coding agents.**
+**Talk to your coding agents. Seti runs them on your machine and answers you by voice.**
 
-Seti is a self-hosted control room for Claude Code. Say "Hey Seti" and steer every agent by voice,
-from your phone or any browser. Agents run sandboxed on your machine and keep working after you
-close the tab.
+A self-hosted control room for Claude Code. Say "Hey Seti" from your phone or any browser to hear
+what needs you, while each agent works in its own sandbox.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/agents-grid-dark.webp">
