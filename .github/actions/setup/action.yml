@@ -1,5 +1,5 @@
 name: setup
-description: Install the sandbox tools, Node, pnpm and workspace dependencies
+description: Install the sandbox and share preview tools, Node, pnpm and workspace dependencies
 
 runs:
   using: composite
@@ -8,8 +8,18 @@ runs:
       env:
         DEBIAN_FRONTEND: noninteractive
       run: |
+        source <(sed -n '/^APT_PREVIEW=(/,/)$/p' scripts/install.sh)
+        sudo rm -f /var/lib/man-db/auto-update
         sudo apt-get update -qq
-        sudo apt-get install -y -qq --no-install-recommends bubblewrap socat openssh-server ripgrep
+        previews=()
+        for pkg in "${APT_PREVIEW[@]}"; do
+          policy="$(apt-cache policy "$pkg")"
+          if [[ $policy == *'Candidate: '* && $policy != *'Candidate: (none)'* ]]; then
+            previews+=("$pkg")
+          fi
+        done
+        printf 'share preview packages: %s\n' "${previews[*]}"
+        sudo apt-get install -y -qq --no-install-recommends bubblewrap socat openssh-server ripgrep "${previews[@]}"
         printf '%s\n' 'abi <abi/4.0>,' 'include <tunables/global>' \
           'profile bwrap /usr/bin/bwrap flags=(unconfined) {' '  userns,' '  include if exists <local/bwrap>' '}' \
           | sudo tee /etc/apparmor.d/bwrap >/dev/null
