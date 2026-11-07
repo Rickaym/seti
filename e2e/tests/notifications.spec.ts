@@ -59,14 +59,27 @@ async function sendAndFinish(request: APIRequestContext, id: string): Promise<vo
     .toBe(true)
 }
 
+interface FocusReport {
+  agents: string[]
+  active: boolean
+}
+
+/** Waits until the server answered a focus report that `matches`. */
+async function focusReported(page: Page, matches: (report: FocusReport) => boolean): Promise<void> {
+  await page.waitForResponse((res) => {
+    const req = res.request()
+    return req.url().endsWith('/api/notifications/focus') && matches(req.postDataJSON() as FocusReport)
+  })
+}
+
 /** Hides the page as switching apps does, so it stops reporting and pushes reach this device. */
 async function hidePage(page: Page): Promise<void> {
-  const left = page.waitForRequest((req) => req.url().endsWith('/api/notifications/focus'))
+  const left = focusReported(page, (report) => !report.active && report.agents.length === 0)
   await page.evaluate(() => {
     Object.defineProperty(document, 'visibilityState', { value: 'hidden', configurable: true })
     document.dispatchEvent(new Event('visibilitychange'))
   })
-  expect((await left).postDataJSON()).toMatchObject({ agents: [], active: false })
+  await left
 }
 
 test('push turns on with permission, a test arrives, and settings stick', async ({ page }) => {
@@ -114,8 +127,10 @@ test('a finished turn off screen toasts its closing line, and pushes once the pa
   await expect(toast).not.toContainText('Finished')
   expect(pushesFor(shown)).toEqual([])
 
+  const viewing = focusReported(page, (report) => report.agents.includes(shown))
   await toast.getByRole('button', { name: 'Open' }).click()
   await expect(page).toHaveURL(new RegExp(`#agents/${shown}$`))
+  await viewing
 
   await hidePage(page)
   const away = await finishAgent(request, unique('Push finished'))

@@ -45,7 +45,6 @@ export async function findNode(
   page: Page,
   title: string,
   act: (x: number, y: number) => Promise<void>,
-  reach = 1,
 ): Promise<{ x: number; y: number } | null> {
   const box = await page.getByTestId('home-graph').boundingBox()
   if (box === null) {
@@ -53,7 +52,7 @@ export async function findNode(
   }
   const card = page.getByTestId('home-card').getByRole('heading', { name: title })
   const other = page.getByTestId('home-card').getByRole('button', { name: 'Close' })
-  for (let y = box.y + STEP / 2; y < box.y + box.height * reach; y += STEP) {
+  for (let y = box.y + STEP / 2; y < box.y + box.height; y += STEP) {
     for (let x = box.x + STEP / 2; x < box.x + box.width; x += STEP) {
       await act(x, y)
       if ((await card.count()) > 0) {
