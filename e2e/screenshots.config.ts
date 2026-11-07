@@ -19,7 +19,13 @@ export default defineConfig({
     actionTimeout: 15_000,
     trace: 'retain-on-failure',
     launchOptions: {
-      args: ['--force-color-profile=srgb', '--disable-lcd-text', '--disable-font-subpixel-positioning'],
+      args: [
+        '--force-color-profile=srgb',
+        '--disable-lcd-text',
+        '--disable-font-subpixel-positioning',
+        '--use-fake-ui-for-media-stream',
+        '--use-fake-device-for-media-stream',
+      ],
     },
   },
 })
