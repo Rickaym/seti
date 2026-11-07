@@ -3,10 +3,10 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <title>Seti - a self-hosted control room for Claude Code agents</title>
+    <title>Seti - talk to your coding agents</title>
     <meta
       name="description"
-      content="Seti runs a team of Claude Code agents on your own machine, each in its own sandbox, and puts the ones that need you first so you can steer them from a phone."
+      content="A self-hosted control room for Claude Code. Steer every agent by voice, from your phone."
     />
     <link rel="canonical" href="https://rickaym.dev/seti/" />
     <meta name="color-scheme" content="light dark" />
@@ -19,10 +19,10 @@
     <link rel="stylesheet" href="style.css" />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Seti" />
-    <meta property="og:title" content="Seti - a control room for your Claude Code agents" />
+    <meta property="og:title" content="Seti - talk to your coding agents" />
     <meta
       property="og:description"
-      content="Self-hosted. Agents run sandboxed on the machine that holds your repos, and the ones that need you come first, on any browser or your phone."
+      content="A self-hosted control room for Claude Code. Steer every agent by voice, from your phone."
     />
     <meta property="og:url" content="https://rickaym.dev/seti/" />
     <meta property="og:image" content="https://rickaym.dev/seti/og.png" />
@@ -30,18 +30,18 @@
     <meta property="og:image:height" content="630" />
     <meta
       property="og:image:alt"
-      content="Seti's agent list with two agents under Needs you, beside the install command"
+      content="Talk to your coding agents: Seti's agent list with two agents under Needs you"
     />
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="Seti - a control room for your Claude Code agents" />
+    <meta name="twitter:title" content="Seti - talk to your coding agents" />
     <meta
       name="twitter:description"
-      content="Self-hosted. Agents run sandboxed on the machine that holds your repos, and the ones that need you come first."
+      content="A self-hosted control room for Claude Code. Steer every agent by voice, from your phone."
     />
     <meta name="twitter:image" content="https://rickaym.dev/seti/og.png" />
     <meta
       name="twitter:image:alt"
-      content="Seti's agent list with two agents under Needs you, beside the install command"
+      content="Talk to your coding agents: Seti's agent list with two agents under Needs you"
     />
   </head>
   <body>
@@ -137,13 +137,6 @@
         <path d="M13 6h3a2 2 0 0 1 2 2v7" />
         <path d="M6 9v12" />
       </symbol>
-      <symbol id="i-radio" viewBox="0 0 24 24">
-        <path d="M4.9 19.1C1 15.2 1 8.8 4.9 4.9" />
-        <path d="M7.8 16.2c-2.3-2.3-2.3-6.1 0-8.5" />
-        <circle cx="12" cy="12" r="2" />
-        <path d="M16.2 7.8c2.3 2.3 2.3 6.1 0 8.5" />
-        <path d="M19.1 4.9C23 8.8 23 15.1 19.1 19" />
-      </symbol>
       <symbol id="i-file" viewBox="0 0 24 24">
         <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7z" />
         <path d="M14 2v4a2 2 0 0 0 2 2h4" />
@@ -216,8 +209,8 @@
             >
           </li>
           <li>
-            <a href="#ea"
-              ><svg class="icon" aria-hidden="true"><use href="#i-headphones" /></svg><span class="tip">EA</span></a
+            <a href="#voice"
+              ><svg class="icon" aria-hidden="true"><use href="#i-headphones" /></svg><span class="tip">Voice</span></a
             >
           </li>
           <li>
@@ -253,12 +246,8 @@
       <main id="main">
         <section class="hero" aria-labelledby="hero-title">
           <div>
-            <h1 id="hero-title">A control room for the Claude Code agents on your repos.</h1>
-            <p class="lead">
-              Seti is self-hosted. Agents work on the machine that holds your repos, each in its own sandbox, and keep
-              going after you close the tab. The ones that need you come first, so you can steer the whole team from a
-              phone.
-            </p>
+            <h1 id="hero-title">Talk to your coding agents.</h1>
+            <p class="lead">A self-hosted control room for Claude Code. Steer every agent by voice, from your phone.</p>
             <div class="install" id="get">
               <div class="install-head">
                 <span
@@ -343,13 +332,77 @@
           </div>
         </section>
 
+        <section class="section voice" id="voice" aria-labelledby="voice-title">
+          <div class="section-head">
+            <h2 id="voice-title">Say "Hey Seti".</h2>
+            <p>
+              Call the EA and ask what needs you. It checks your agents, answers aloud with captions, and holds news
+              until you finish speaking.
+            </p>
+          </div>
+          <div class="voice-proof">
+            <figure class="plate">
+              <picture>
+                <source media="(prefers-color-scheme: dark)" srcset="screenshots/ea-listening-dark.webp" />
+                <img
+                  src="screenshots/ea-listening-light.webp"
+                  width="2880"
+                  height="1800"
+                  loading="lazy"
+                  alt="The EA page on a call, listening and captioning a question as it forms"
+                />
+              </picture>
+              <figcaption>
+                <span>On a call</span><span>captions as you speak</span
+                ><a class="light-only" href="screenshots/ea-listening-light.webp">Full size</a
+                ><a class="dark-only" href="screenshots/ea-listening-dark.webp">Full size</a>
+              </figcaption>
+            </figure>
+            <figure class="phone">
+              <a class="light-only" href="screenshots/phone-ea-speaking-light.webp"
+                ><img
+                  src="screenshots/phone-ea-speaking-light.webp"
+                  width="942"
+                  height="1642"
+                  loading="lazy"
+                  alt="The EA answering aloud on a phone, with captions and the list_prs tool call it made"
+              /></a>
+              <a class="dark-only" href="screenshots/phone-ea-speaking-dark.webp"
+                ><img
+                  src="screenshots/phone-ea-speaking-dark.webp"
+                  width="942"
+                  height="1642"
+                  loading="lazy"
+                  alt="The EA answering aloud on a phone, with captions and the list_prs tool call it made"
+              /></a>
+              <figcaption>Answering aloud</figcaption>
+            </figure>
+            <figure class="phone">
+              <a class="light-only" href="screenshots/phone-ea-asleep-light.webp"
+                ><img
+                  src="screenshots/phone-ea-asleep-light.webp"
+                  width="942"
+                  height="1642"
+                  loading="lazy"
+                  alt="The EA call sheet on a phone, asleep until the wake phrase Hey Seti"
+              /></a>
+              <a class="dark-only" href="screenshots/phone-ea-asleep-dark.webp"
+                ><img
+                  src="screenshots/phone-ea-asleep-dark.webp"
+                  width="942"
+                  height="1642"
+                  loading="lazy"
+                  alt="The EA call sheet on a phone, asleep until the wake phrase Hey Seti"
+              /></a>
+              <figcaption>Asleep until Hey Seti</figcaption>
+            </figure>
+          </div>
+        </section>
+
         <section class="section" id="how" aria-labelledby="how-title">
           <div class="section-head">
             <h2 id="how-title">How it works</h2>
-            <p>
-              You install Seti once, point it at your repos and start agents. From then on the work comes to you: a
-              question, a permission, a pull request. Here is one afternoon in the group chat.
-            </p>
+            <p>Install once and start agents. Then the work comes to you.</p>
           </div>
           <div class="thread">
             <div class="thread-head"><span>Group chat</span><span class="online" aria-hidden="true"></span></div>
@@ -358,20 +411,14 @@
                 <div class="step">Install</div>
                 <div class="body">
                   <div class="sender"><span class="chip you">You</span><span>52m ago</span></div>
-                  <p>
-                    Installed Seti on the box with the repos. It runs as a systemd service on loopback, and I signed in
-                    with a passkey.
-                  </p>
+                  <p>Installed Seti on the box with my repos and signed in with a passkey.</p>
                 </div>
               </li>
               <li class="msg">
                 <div class="step">Start</div>
                 <div class="body">
                   <div class="sender"><span class="chip you">You</span><span>48m ago</span></div>
-                  <p>
-                    Added <code>storefront</code> in Settings, Repos, and started an agent:
-                    <span class="mention">@cart-test</span> the cart test flakes. Find out why.
-                  </p>
+                  <p><span class="mention">@cart-test</span> the cart test flakes. Find out why.</p>
                 </div>
               </li>
               <li class="msg">
@@ -388,8 +435,8 @@
                     ><span class="chip agent a-violet">@cart-test</span><span>21m ago</span>
                   </div>
                   <p>
-                    The price badge renders before the currency loads, so the assertion races it. Two fixes work: wait
-                    in the test, or render the badge once the currency is known. Which do you want?
+                    The price badge renders before the currency loads. Wait in the test, or render the badge once the
+                    currency is known?
                   </p>
                 </div>
               </li>
@@ -397,14 +444,14 @@
                 <div class="step">You hear</div>
                 <div class="body">
                   <div class="sender"><span class="chip ea">EA</span><span>21m ago</span></div>
-                  <p>One agent needs you: cart-test asks which fix to take. The other three are still working.</p>
+                  <p>One agent needs you: cart-test asks which fix to take.</p>
                 </div>
               </li>
               <li class="msg">
                 <div class="step">You answer</div>
                 <div class="body">
-                  <div class="sender"><span class="chip you">You</span><span>18m ago, from a phone</span></div>
-                  <p><span class="mention">@cart-test</span> render the badge once the currency is known.</p>
+                  <div class="sender"><span class="chip you">You</span><span>18m ago, on a call</span></div>
+                  <p>Tell cart-test to render the badge once the currency is known.</p>
                 </div>
               </li>
               <li class="msg">
@@ -417,7 +464,7 @@
                       <path class="line" d="M9.3 14.8Q12 17.9 14.7 14.8" /></svg
                     ><span class="chip agent a-violet">@cart-test</span><span>3m ago</span>
                   </div>
-                  <p>Opened a pull request. CI passes, and new review threads come back to me as input.</p>
+                  <p>Opened a pull request. CI passes.</p>
                 </div>
               </li>
             </ol>
@@ -427,7 +474,7 @@
         <section class="section" id="features" aria-labelledby="features-title">
           <div class="section-head">
             <h2 id="features-title">Everything in one room</h2>
-            <p>Each part of Seti, in the words of the member of the team who owns it.</p>
+            <p>Each part of Seti, told by its owner.</p>
           </div>
           <div class="thread room">
             <div class="thread-head"><span>Group chat</span><span class="online" aria-hidden="true"></span></div>
@@ -445,11 +492,7 @@
                 </div>
                 <div class="body">
                   <h3 id="needs-you-title">What needs you comes first</h3>
-                  <p>
-                    Agents that wait on a permission or ask a question go to the top of the list. Answer them in a tap
-                    and the rest keep working. <strong>Restarts do not stop the work:</strong> an agent cut off mid-turn
-                    picks up on its own.
-                  </p>
+                  <p>Agents that wait on you rise to the top. Answer in a tap; the rest keep working.</p>
                   <figure class="plate">
                     <picture>
                       <source media="(prefers-color-scheme: dark)" srcset="screenshots/agents-grid-dark.webp" />
@@ -467,10 +510,7 @@
                       ><a class="dark-only" href="screenshots/agents-grid-dark.webp">Full size</a>
                     </figcaption>
                   </figure>
-                  <p>
-                    Home is a live graph of every agent in its colour, linked to its repos, the MCP servers it calls and
-                    the subagents it runs, with the merge streak and the cost per agent beside it.
-                  </p>
+                  <p>Home maps every agent to its repos, MCP servers and subagents.</p>
                   <figure class="plate">
                     <picture>
                       <source media="(prefers-color-scheme: dark)" srcset="screenshots/home-dark.webp" />
@@ -497,72 +537,11 @@
                   ><span class="chip ea">EA</span>
                 </div>
                 <div class="body">
-                  <h3 id="ea-title">An assistant that knows what can wait</h3>
+                  <h3 id="ea-title">It knows what can wait</h3>
+                  <p>What needs you reaches you at once. Routine news waits for one since-you-left brief.</p>
                   <p>
-                    The EA takes voice and chat and acts through Seti's own API. What needs you reaches you at once: on
-                    a live call, as a toast or as a phone push. Routine news waits, and when you come back one brief
-                    says what needs you and what changed.
-                  </p>
-                  <figure class="plate">
-                    <picture>
-                      <source media="(prefers-color-scheme: dark)" srcset="screenshots/ea-listening-dark.webp" />
-                      <img
-                        src="screenshots/ea-listening-light.webp"
-                        width="2880"
-                        height="1800"
-                        loading="lazy"
-                        alt="The EA page on a call, listening and captioning a question as it forms"
-                      />
-                    </picture>
-                    <figcaption>
-                      <span>EA</span><span>on a call, captioning as you speak</span
-                      ><a class="light-only" href="screenshots/ea-listening-light.webp">Full size</a
-                      ><a class="dark-only" href="screenshots/ea-listening-dark.webp">Full size</a>
-                    </figcaption>
-                  </figure>
-                  <div class="phones two">
-                    <figure class="phone">
-                      <a class="light-only" href="screenshots/phone-ea-speaking-light.webp"
-                        ><img
-                          src="screenshots/phone-ea-speaking-light.webp"
-                          width="942"
-                          height="1642"
-                          loading="lazy"
-                          alt="The EA answering aloud on a phone, with captions and the list_prs tool call it made"
-                      /></a>
-                      <a class="dark-only" href="screenshots/phone-ea-speaking-dark.webp"
-                        ><img
-                          src="screenshots/phone-ea-speaking-dark.webp"
-                          width="942"
-                          height="1642"
-                          loading="lazy"
-                          alt="The EA answering aloud on a phone, with captions and the list_prs tool call it made"
-                      /></a>
-                      <figcaption>Answering aloud</figcaption>
-                    </figure>
-                    <figure class="phone">
-                      <a class="light-only" href="screenshots/phone-ea-asleep-light.webp"
-                        ><img
-                          src="screenshots/phone-ea-asleep-light.webp"
-                          width="942"
-                          height="1642"
-                          loading="lazy"
-                          alt="The EA call sheet on a phone, asleep until the wake phrase Hey Seti"
-                      /></a>
-                      <a class="dark-only" href="screenshots/phone-ea-asleep-dark.webp"
-                        ><img
-                          src="screenshots/phone-ea-asleep-dark.webp"
-                          width="942"
-                          height="1642"
-                          loading="lazy"
-                          alt="The EA call sheet on a phone, asleep until the wake phrase Hey Seti"
-                      /></a>
-                      <figcaption>Asleep until Hey Seti</figcaption>
-                    </figure>
-                  </div>
-                  <p>
-                    <strong>Channels</strong> feed it: signed webhooks, reminders and pollers turn any service into
-                    events that can wake an agent or the EA.
+                    <strong>Channels</strong> turn webhooks, pollers and reminders into events that wake an agent or the
+                    EA.
                   </p>
                   <figure class="plate">
                     <picture>
@@ -597,12 +576,8 @@
                   ><span class="chip agent a-green">@orders</span>
                 </div>
                 <div class="body">
-                  <h3 id="chat-title">One chat for you, the EA and every agent</h3>
-                  <p>
-                    An @mention reaches an agent mid-turn. The EA and agents can also send one member a direct message,
-                    which only the two of them and you see. Type <code>/btw</code> and a question to ask an agent why it
-                    did something; the answer comes in a side chat that never interrupts the turn.
-                  </p>
+                  <h3 id="chat-title">One chat for the whole team</h3>
+                  <p>An @mention reaches an agent mid-turn. <code>/btw</code> asks one why, without interrupting it.</p>
                 </div>
               </article>
               <article class="msg post" id="mods" aria-labelledby="mods-title">
@@ -614,12 +589,10 @@
                   ><span class="chip agent a-teal">Blobs</span>
                 </div>
                 <div class="body">
-                  <h3 id="mods-title">Mods you turn on and off</h3>
+                  <h3 id="mods-title">Mods you switch on and off</h3>
                   <p>
-                    Seti ships its own: the agent grid, side chat, file previews, Blobs, weather, Vim mode, What's new,
-                    webhook sources and themes. The Mods page shows what each one may reach. Third-party mods install
-                    with Developer mode on and run sandboxed with only the access you grant.
-                    <a href="https://github.com/rickaym/seti/blob/main/docs/mods.md">Build one</a>.
+                    Seti ships its own, from the agent grid to themes. Third-party mods run sandboxed with only the
+                    access you grant. <a href="https://github.com/rickaym/seti/blob/main/docs/mods.md">Build one</a>.
                   </p>
                   <ul class="blobs" aria-label="Blobs draws each agent as a face that shows its state">
                     <li>
@@ -685,61 +658,41 @@
                 <div class="body">
                   <h3 id="security-title">Every agent is untrusted</h3>
                   <p>
-                    Agents run code on your machine, so least privilege is the normal state and new access starts off.
-                    Only you can change it.
-                    <a href="https://github.com/rickaym/seti/blob/main/docs/security.md">The security model</a> covers
-                    where each secret lives.
+                    Least privilege is the default, and only you can change it.
+                    <a href="https://github.com/rickaym/seti/blob/main/docs/security.md">The security model</a>.
                   </p>
                   <ul class="guards">
                     <li>
                       <svg class="icon" aria-hidden="true"><use href="#i-check" /></svg>
-                      <div>
-                        <strong>Sandboxed</strong
-                        ><span
-                          >Each agent runs in bubblewrap, sees only its own folders, and reaches listed hosts
-                          only.</span
-                        >
-                      </div>
+                      <div><strong>Sandboxed</strong><span>Bubblewrap, its own folders, listed hosts only.</span></div>
+                    </li>
+                    <li>
+                      <svg class="icon" aria-hidden="true"><use href="#i-check" /></svg>
+                      <div><strong>No keys inside</strong><span>A proxy adds tokens on the way out.</span></div>
                     </li>
                     <li>
                       <svg class="icon" aria-hidden="true"><use href="#i-check" /></svg>
                       <div>
-                        <strong>No keys inside</strong
-                        ><span
-                          >Agents hold placeholders; a proxy adds tokens on the way out, on allowed hosts only.</span
-                        >
-                      </div>
-                    </li>
-                    <li>
-                      <svg class="icon" aria-hidden="true"><use href="#i-check" /></svg>
-                      <div>
-                        <strong>Guards that always hold</strong
-                        ><span>A shell guard and your deny rules hold even in Bypass, which is off by default.</span>
+                        <strong>Guards that always hold</strong><span>Even in Bypass, which is off by default.</span>
                       </div>
                     </li>
                     <li>
                       <svg class="icon" aria-hidden="true"><use href="#i-check" /></svg>
                       <div>
                         <strong>Yours alone</strong
-                        ><span>The EA and agents cannot change security settings or read secrets.</span>
+                        ><span>The EA and agents cannot touch security settings or secrets.</span>
                       </div>
                     </li>
                     <li>
                       <svg class="icon" aria-hidden="true"><use href="#i-check" /></svg>
                       <div>
                         <strong>Closed by default</strong
-                        ><span
-                          >Seti listens on loopback; every call needs a passkey, the local token or Cloudflare
-                          Access.</span
-                        >
+                        ><span>Loopback only, behind a passkey, a token or Cloudflare Access.</span>
                       </div>
                     </li>
                     <li>
                       <svg class="icon" aria-hidden="true"><use href="#i-check" /></svg>
-                      <div>
-                        <strong>Audited</strong
-                        ><span>Every action lands in an audit log kept as a hash chain that Seti verifies.</span>
-                      </div>
+                      <div><strong>Audited</strong><span>Every action lands in a verified hash chain.</span></div>
                     </li>
                   </ul>
                 </div>
@@ -753,9 +706,8 @@
                 <div class="body">
                   <h3 id="phone-title">The whole room fits in your pocket</h3>
                   <p>
-                    Every flow works on a phone, configuration included, down to a terminal with an Esc, Tab, Ctrl, Alt
-                    and arrow key row. On iPhone and iPad Seti installs to the Home Screen.
-                    <a href="https://github.com/rickaym/seti/blob/main/docs/ios.md">iPhone and iPad setup</a>.
+                    Every flow works on a phone, down to a terminal with its own key row.
+                    <a href="https://github.com/rickaym/seti/blob/main/docs/ios.md">Add it to your Home Screen</a>.
                   </p>
                   <div class="phones">
                     <figure class="phone">
@@ -850,46 +802,28 @@
                       <svg class="icon" aria-hidden="true"><use href="#i-terminal" /></svg
                       ><span class="name"
                         ><strong>Terminals</strong>
-                        <span class="why"
-                          >Open a shell beside the agents, alone or as a grid tile; an agent's shell runs in its
-                          sandbox.</span
-                        ></span
+                        <span class="why">Shells beside your agents; an agent's runs in its sandbox.</span></span
                       >
                     </li>
                     <li class="row a-green">
                       <svg class="icon" aria-hidden="true"><use href="#i-pr" /></svg
                       ><span class="name"
                         ><strong>Pull requests come back</strong>
-                        <span class="why"
-                          >The PR an agent opens sits in its header with CI, preview and review threads.</span
-                        ></span
-                      >
-                    </li>
-                    <li class="row a-blue">
-                      <svg class="icon" aria-hidden="true"><use href="#i-radio" /></svg
-                      ><span class="name"
-                        ><strong>Channels</strong>
-                        <span class="why"
-                          >Webhooks, pollers and reminders on an interval or a cron schedule.</span
-                        ></span
+                        <span class="why">CI, previews and reviews reach the agent that opened it.</span></span
                       >
                     </li>
                     <li class="row a-pink">
                       <svg class="icon" aria-hidden="true"><use href="#i-file" /></svg
                       ><span class="name"
                         ><strong>Files and share links</strong>
-                        <span class="why"
-                          >Edit what an agent wrote, then share a frozen copy with no script in it.</span
-                        ></span
+                        <span class="why">Edit what an agent wrote; share a frozen copy.</span></span
                       >
                     </li>
                     <li class="row a-violet">
                       <svg class="icon" aria-hidden="true"><use href="#i-rotate" /></svg
                       ><span class="name"
                         ><strong>Restarts resume</strong>
-                        <span class="why"
-                          >After an upgrade or a reboot, each agent checks what finished and carries on.</span
-                        ></span
+                        <span class="why">Agents cut off mid-turn pick up on their own.</span></span
                       >
                     </li>
                   </ul>
@@ -902,10 +836,7 @@
         <section class="section install-section" id="install" aria-labelledby="install-title">
           <div class="section-head">
             <h2 id="install-title">Install in one line</h2>
-            <p>
-              Seti runs on Linux with systemd, with Ubuntu 24.04 as the reference. Start as a user with sudo; the
-              installer asks before each step that needs it.
-            </p>
+            <p>Linux with systemd; Ubuntu 24.04 is the reference. Run it as a user with sudo.</p>
           </div>
           <div class="install">
             <div class="install-head">
@@ -916,8 +847,8 @@
             </div>
             <pre><span class="prompt">$ </span><code>curl -fsSL https://<wbr />raw.githubusercontent.com/<wbr />rickaym/<wbr />seti/<wbr />main/<wbr />scripts/<wbr />install.sh <wbr />| bash -s <span class="flag">-- --with-redis</span> <span class="flag">--with-ea</span></code></pre>
             <p class="install-note">
-              Leave out <code>--with-redis</code> and <code>--with-ea</code> for the smallest install. The EA's chat
-              needs an OpenAI key; voice also needs Deepgram and ElevenLabs keys.
+              Drop <code>--with-redis</code> and <code>--with-ea</code> for the smallest install. Voice needs OpenAI,
+              Deepgram and ElevenLabs keys.
             </p>
           </div>
           <ol class="next">

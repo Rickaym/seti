@@ -401,7 +401,7 @@ main {
 }
 
 .hero h1 {
-  font-size: clamp(2rem, 4.1vw, 3.5rem);
+  font-size: clamp(2.5rem, 5.4vw, 4.75rem);
   letter-spacing: -0.035em;
 }
 
@@ -409,7 +409,7 @@ main {
   max-width: 38rem;
   margin-top: 1.25rem;
   color: var(--muted-foreground);
-  font-size: 1rem;
+  font-size: 1.125rem;
 }
 
 .install {
@@ -686,6 +686,17 @@ main {
 
 .sprite {
   position: absolute;
+}
+
+.voice-proof {
+  display: grid;
+  grid-template-columns: minmax(0, 2.79fr) minmax(0, 1fr) minmax(0, 1fr);
+  gap: clamp(0.75rem, 2vw, 1.5rem);
+  align-items: start;
+}
+
+.voice-proof .phone figcaption {
+  margin-top: 0.45rem;
 }
 
 .thread {
@@ -1181,6 +1192,14 @@ main {
 
   .hero .panel {
     max-width: 34rem;
+  }
+
+  .voice-proof {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .voice-proof .plate {
+    grid-column: 1 / -1;
   }
 }
 
