@@ -347,10 +347,6 @@ export const messages = {
     const read = readBody({ task_id: taskId, id }, body.kind, scrubValue(body.payload))
     return { ...read, id, task_id: taskId, outward, created_at }
   },
-  after: async (taskId: string, afterId: number) =>
-    (
-      await sql<MessageRecord[]>`SELECT * FROM task_message WHERE task_id = ${taskId} AND id > ${afterId} ORDER BY id`
-    ).map(toMessage),
   /** The first `limit` of the task's rows after `afterId`, own or not. */
   firstAfter: async (taskId: string, afterId: number, limit: number) =>
     (
