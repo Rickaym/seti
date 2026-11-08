@@ -57,3 +57,8 @@ async def test_the_prompt_follows_the_form_of_address_in_seti(fake_seti: FakeSet
     assert await packs.system_prompt() == base_prompt("sir")
     fake_seti.fail[("GET", "/api/ea/context-packs/prompt")] = (503, {"title": "Down"})
     assert await packs.system_prompt() == base_prompt("sir")
+
+
+def test_the_prompt_asks_agents_aside_instead_of_messaging_them() -> None:
+    assert "side chat mod's ask action" in SYSTEM_PROMPT
+    assert "never interrupts it" in SYSTEM_PROMPT
