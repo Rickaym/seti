@@ -25,13 +25,21 @@ const TOKEN = `ghp_${'a1B2c3D4e5'.repeat(4).slice(0, 36)}`
 /** The agent's turns say what they were asked; a fork answers its question, then its cost. */
 const sdk = await vi.hoisted(async () => {
   const { FakeSdk, aborted, fakeAssistant, fakeMessage, fakeResult } = await import('../fake-sdk.js')
-  const state = { forkTotal: 0.05, forkReply: (text: string) => `Because: ${text}`, forkHold: false }
+  const state = {
+    forkTotal: 0.05,
+    forkReply: (text: string) => `Because: ${text}`,
+    forkHold: false,
+    forkNotice: false,
+  }
   const fake = new FakeSdk(async function* ({ text, signal, session }) {
     if (session.options.forkSession === true && state.forkHold) {
       await aborted(signal)
       return
     }
     if (session.options.forkSession === true) {
+      if (state.forkNotice) {
+        yield { ...fakeResult(), session_id: 'fork-session', num_turns: 0, result: '' }
+      }
       const reply = state.forkReply(text)
       const delta = { type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text: reply } }
       yield fakeMessage('stream_event', { parent_tool_use_id: null, event: delta })
@@ -158,6 +166,17 @@ describe('side chat', () => {
     expect(options.plugins).toBeUndefined()
     expect(options.canUseTool).toBeUndefined()
     expect(await agentState(id)).toEqual(before)
+  })
+
+  it('answers after the zero-turn result a waiting background notice makes', async () => {
+    const id = await newAgent()
+    sdk.state.forkNotice = true
+    try {
+      const { events } = await ask(id, 'what is the latest?')
+      expect(doneOf(events)).toMatchObject({ text: 'Because: what is the latest?', cost_usd: 0.05 })
+    } finally {
+      sdk.state.forkNotice = false
+    }
   })
 
   it('answers while the agent works, without touching its turn', async () => {
