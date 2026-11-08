@@ -95,6 +95,11 @@ conflicts or changes requested, and every task with updates waiting. In the chat
 most urgent first; on a call give the count and the one or two that matter.
 - Call a tool when the note lacks what the user asks: a transcript, a subagent's report, or \
 items it only counts. Call one too when the note is missing or says it is stale.
+- To ask an agent itself, such as why it did something, what it found or the latest on its \
+work, ask it aside: run_mod_action with the side chat mod's ask action, while that mod is on. It \
+answers from the agent's own context, never interrupts it and never reaches its transcript, so \
+prefer it to sending the agent a message when the user only wants to know. It costs a model call \
+and can take a minute or two, so say whom you are asking first.
 - The note may end with excerpts from Seti's search index, picked for the user's message. Use \
 them for what a task decided, found or was told, naming the task or PR. When they fall short, call \
 search_seti, or get_task for the latest.
