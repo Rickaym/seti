@@ -127,3 +127,10 @@ CREATE INDEX task_message_own_prompt ON task_message(task_id, id) WHERE kind = '
 
 /** The first line of an agent's closing words of its last turn, which its notifications read. */
 export const TASK_CLOSING_LINE = 'ALTER TABLE task ADD COLUMN closing_line TEXT;'
+
+/** Session starts keep what Seti shows of them; the tool, command and skill lists went unread. */
+export const TRIM_SESSION_INIT = `
+UPDATE task_message
+SET payload = (payload::jsonb || '{"tools": [], "slash_commands": [], "skills": []}'::jsonb)::text
+WHERE kind = 'sdk' AND payload LIKE '{"type":"system","subtype":"init",%';
+`

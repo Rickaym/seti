@@ -50,6 +50,7 @@ import {
   TASK_SETI_CONTROL,
   TASK_SETI_LEVEL,
   TASK_WORKTREE_BACKFILL,
+  TRIM_SESSION_INIT,
 } from './schema-tasks.js'
 import { EA_DOC_NO_DIRECT, TEAM_CHAT, TEAM_DIRECT, TEAM_MESSAGE_SELF_HEADERS } from './schema-team.js'
 import { DROP_ESLINTCACHE_DEFAULT, WARM_CACHES } from './schema-warm-caches.js'
@@ -421,4 +422,5 @@ export const MIGRATIONS: readonly Migration[] = [
   { version: 93, name: 'restart_resume', sql: RESTART_RESUME },
   { version: 94, name: 'blobs_one_style', sql: BLOBS_ONE_STYLE },
   { version: 95, name: 'ea_form_of_address', sql: EA_FORM_OF_ADDRESS },
+  { version: 96, name: 'trim_session_init', sql: TRIM_SESSION_INIT },
 ]

@@ -20,7 +20,7 @@ import { checkSend } from './send-check.js'
 import { moveSessionTo } from './session-files.js'
 import { sessionOpening } from './session-hooks.js'
 import { sessionStart, setupKey } from './session-options.js'
-import { recordSessionStart } from './session-start.js'
+import { recordSessionStart, storedForm } from './session-start.js'
 import { withTurnCost } from './store/cost.js'
 import { rewinds } from './store/rewinds.js'
 import { hadRunningSubtask } from './subtask-cache.js'
@@ -255,7 +255,7 @@ function openSession(taskId: string, previous: LiveSession | undefined, backlog:
 async function record(taskId: string, m: SDKMessage): Promise<string | null> {
   const outward = outwardToolUses(m)
   trackToolCalls(taskId, m)
-  await appendMessage(taskId, { kind: 'sdk', payload: await withTurnCost(taskId, m) }, outward)
+  await appendMessage(taskId, { kind: 'sdk', payload: storedForm(await withTurnCost(taskId, m)) }, outward)
   await audit.outwardCalls(taskId, m, outward)
   await audit.classifierDenial(taskId, m)
   if (outward.length > 0) {
