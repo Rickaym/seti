@@ -1,6 +1,6 @@
 import type { SDKAssistantMessage, SDKMessage, SDKUserMessage } from '@anthropic-ai/claude-agent-sdk'
 import type { BackgroundShell, BackgroundShellStatus, MessageRow, ShellStopCause } from '@seti/shared'
-import { messages } from './db.js'
+import { eachMessageAfter } from './message-pages.js'
 import { redactSecrets } from './scrub.js'
 
 type SystemMessage = Extract<SDKMessage, { type: 'system' }>
@@ -270,9 +270,9 @@ export async function shellIndex(taskId: string): Promise<ShellIndex> {
   const index = indexes.get(taskId) ?? new ShellIndex()
   indexes.set(taskId, index)
   const run = async () => {
-    for (const row of await messages.after(taskId, index.lastId)) {
+    await eachMessageAfter(taskId, index.lastId, (row) => {
       index.apply(row)
-    }
+    })
     return index
   }
   const next = (catchUps.get(taskId) ?? Promise.resolve(index)).then(run, run)

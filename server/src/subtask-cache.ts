@@ -1,6 +1,6 @@
 import type { AgentTodo, MessagePage, Subtask, SubtaskBrief } from '@seti/shared'
 import { forgetShells } from './background-shells.js'
-import { messages } from './db.js'
+import { eachMessageAfter } from './message-pages.js'
 import { subtaskMessages, subtaskPrs } from './store/subtasks.js'
 import { SubtaskIndex } from './subtasks.js'
 import { TodoIndex } from './todos.js'
@@ -27,10 +27,10 @@ const catchUps = new Map<string, Promise<FoldChanges>>()
 async function catchUp(taskId: string, index: Folded): Promise<FoldChanges> {
   const run = async () => {
     const changed = { ...UNCHANGED }
-    for (const row of await messages.after(taskId, index.subtasks.lastId)) {
+    await eachMessageAfter(taskId, index.subtasks.lastId, (row) => {
       changed.subtasks = index.subtasks.apply(row) || changed.subtasks
       changed.todos = index.todos.apply(row) || changed.todos
-    }
+    })
     return changed
   }
   const next = (catchUps.get(taskId) ?? Promise.resolve(UNCHANGED)).then(run, run)
