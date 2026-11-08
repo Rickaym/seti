@@ -47,12 +47,15 @@ export function svgSize(text: string): { width: number; height: number } | null 
   return box.length === 4 && boxWidth > 0 && boxHeight > 0 ? { width: boxWidth, height: boxHeight } : null
 }
 
-/** The pixel box a drawing renders into: twice its size, inside the cap. */
-export function renderBox(size: { width: number; height: number } | null): { width: number; height: number } {
+/** The pixel box a drawing renders into: `scale` times its size, inside the cap. */
+export function renderBox(
+  size: { width: number; height: number } | null,
+  { scale: wanted = SCALE, sideMax = SVG_SIDE_MAX } = {},
+): { width: number; height: number } {
   if (size === null) {
     return { width: FALLBACK_SIDE, height: FALLBACK_SIDE }
   }
-  const scale = Math.min(SCALE, SVG_SIDE_MAX / size.width, SVG_SIDE_MAX / size.height)
+  const scale = Math.min(wanted, sideMax / size.width, sideMax / size.height)
   return { width: Math.max(1, Math.round(size.width * scale)), height: Math.max(1, Math.round(size.height * scale)) }
 }
 
@@ -63,15 +66,22 @@ const fontArgs = () => [
   'DejaVu Sans',
 ]
 
-/** Rasterizes an SVG to PNG in the sandbox: resvg when the host has it, else rsvg-convert. */
-export async function rasterizeSvg(svg: Buffer, box: { width: number; height: number }) {
-  const [width, height] = [String(box.width), String(box.height)]
+/** A colour the converters take as a background: a hex value and nothing else. */
+const HEX = /^#[0-9a-f]{6}$/i
+
+/**
+ * Rasterizes an SVG to PNG in the sandbox: resvg when the host has it, else rsvg-convert. A
+ * background fills what the drawing leaves transparent.
+ */
+export async function rasterizeSvg(svg: Buffer, box: { width: number; height: number }, background?: string) {
+  const dims = ['-w', String(box.width), '-h', String(box.height)]
   const resvg = converterPath('resvg') !== null
+  const fill = background !== undefined && HEX.test(background) ? [background] : []
   const result = await runConverter({
     program: resvg ? 'resvg' : 'rsvg-convert',
     args: resvg
-      ? [...fontArgs(), '-w', width, '-h', height, '/in/input.svg', '/out/out.png']
-      : ['-w', width, '-h', height, '-a', '-o', '/out/out.png', '/in/input.svg'],
+      ? [...fontArgs(), ...fill.flatMap((hex) => ['--background', hex]), ...dims, '/in/input.svg', '/out/out.png']
+      : [...dims, '-a', ...fill.flatMap((hex) => ['-b', hex]), '-o', '/out/out.png', '/in/input.svg'],
     inputs: new Map([['input.svg', svg]]),
     limits: LIMITS,
   })

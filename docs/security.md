@@ -246,6 +246,16 @@ refused on every share route, and none of them has a tool for it.
   every browser (MP4 with H.264 and AAC, WebM, MP3, WAV, Ogg, FLAC, M4A), else the poster, length
   and download; other text numbered. Every image the page shows is stored with it and served from
   its image path; the page itself is at most 4 MB and its images 20 MB.
+- Diagrams are drawn by the user's browser, since the page runs no script. When the user shares a
+  Markdown file or a `.mmd` file, the share dialog asks the mod that draws the fence's language
+  (Previews, for Mermaid) for a light and a dark SVG of each fence, and sends them with the
+  request: at most 16, each SVG up to 1 MB and all of them 6 MB, checked by zod. The server uses a
+  drawing only where a fence has exactly its language and text, rasterizes it to PNG in the
+  converter sandbox (resvg, as for SVG files) on the page's own background, and shows it in a
+  `<picture>` that picks the light or dark image by the viewer's scheme. Browser SVG never reaches
+  the page or a response. Zoom is three radio buttons and CSS (Fit, 100% and 200%) with a link to
+  the full-size image. A fence without a drawing, a drawing that fails to convert, or a share made
+  with the mod's Mermaid switch off shows the code.
 - PDFs, Office files, audio, video, SVGs, link cards and BMP, TIFF, AVIF and ICO images go through
   poppler, LibreOffice, ffprobe, ffmpeg and resvg, which parse the file, so each run is sandboxed:
   bwrap with every namespace unshared (no network), no capabilities, `/usr` and the font and

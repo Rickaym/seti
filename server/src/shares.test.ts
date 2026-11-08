@@ -138,6 +138,7 @@ describe('who shares', () => {
       expires_in_days: 7 as const,
       allow_findings: false,
       link_preview: true,
+      diagrams: [],
     }
     await expect(asAgent(agent, async () => createShare(TASK, input, 'https://x.test'))).rejects.toThrow(
       'Agents cannot share files outside Seti',

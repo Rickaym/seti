@@ -127,7 +127,7 @@ describe('file viewers', () => {
 
 describe('fence renderers', () => {
   it('find the renderer of a fence language, and none for other languages', () => {
-    const mermaid: FenceRendererEntry = { language: 'mermaid', view: View }
+    const mermaid: FenceRendererEntry = { language: 'mermaid', view: View, snapshot: null }
     expect(rendererFor('mermaid', [mermaid])).toBe(mermaid)
     expect(rendererFor('python', [mermaid])).toBeUndefined()
     expect(rendererFor(null, [mermaid])).toBeUndefined()

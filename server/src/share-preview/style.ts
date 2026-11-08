@@ -1,9 +1,28 @@
+/** The page's background in each scheme, which diagrams are drawn on so they blend in. */
+export const PAGE_BACKGROUND = { light: '#fbfbfa', dark: '#0f1115' } as const
+
+/** Diagrams: zoom radios before the frame they size, so the page needs no script to zoom. */
+const DIAGRAM_STYLE = `
+figure.diagram{position:relative;display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:16px 0}
+.diagram input{position:absolute;top:0;left:0;width:1px;height:1px;margin:0;opacity:0;pointer-events:none}
+.diagram label,.diagram .full{border:1px solid var(--line);border-radius:6px;padding:4px 12px;font-size:13px;line-height:22px;color:var(--fg);text-decoration:none;cursor:pointer;user-select:none;-webkit-user-select:none}
+.diagram input:checked+label{background:var(--code);border-color:var(--muted);font-weight:600}
+.diagram input:focus-visible+label{outline:2px solid var(--link);outline-offset:1px}
+.diagram .full{margin-left:auto}
+.diagram .full.dark{display:none}
+.diagram .frame{flex:1 1 100%;overflow:auto;max-height:85vh;border:1px solid var(--line);border-radius:6px}
+.diagram img{display:block;margin:0 auto;max-width:100%;height:auto}
+.diagram .z-1:checked~.frame img{width:var(--w);max-width:none}
+.diagram .z-2:checked~.frame img{width:calc(var(--w) * 2);max-width:none}
+@media (prefers-color-scheme:dark){.diagram .full.light{display:none}.diagram .full.dark{display:inline-block}}
+`
+
 /** The share page's only styles: inline, light and dark by the viewer's scheme, no script. */
 export const SHARE_STYLE = `
-:root{color-scheme:light dark;--bg:#fbfbfa;--fg:#1f2328;--muted:#656d76;--line:#d0d7de;--code:#f2f3f5;--link:#0969da;
+:root{color-scheme:light dark;--bg:${PAGE_BACKGROUND.light};--fg:#1f2328;--muted:#656d76;--line:#d0d7de;--code:#f2f3f5;--link:#0969da;
 --kw:oklch(0.5 0.2 310);--str:oklch(0.5 0.13 150);--lit:oklch(0.54 0.15 50);--fn:oklch(0.5 0.17 255);--add:#1a7f37;--del:#cf222e;
 --page:#ffffff;--flag:#9a6700}
-@media (prefers-color-scheme:dark){:root{--bg:#0f1115;--fg:#e6e8eb;--muted:#9aa4b1;--line:#30363d;--code:#171a21;--link:#58a6ff;
+@media (prefers-color-scheme:dark){:root{--bg:${PAGE_BACKGROUND.dark};--fg:#e6e8eb;--muted:#9aa4b1;--line:#30363d;--code:#171a21;--link:#58a6ff;
 --kw:oklch(0.76 0.14 310);--str:oklch(0.78 0.13 150);--lit:oklch(0.8 0.12 60);--fn:oklch(0.76 0.12 245);--add:#3fb950;--del:#f85149;
 --page:#e6e8eb;--flag:#d29922}}
 *{box-sizing:border-box}
@@ -72,4 +91,4 @@ details pre{margin:8px 0 0;white-space:pre-wrap;overflow-wrap:anywhere}
 video.media{display:block;width:100%;height:auto;max-height:80vh;background:#000;border-radius:6px}
 audio.media{display:block;width:100%;max-width:640px}
 img.poster{display:block;max-width:100%;height:auto;max-height:80vh;border-radius:6px;border:1px solid var(--line)}
-`
+${DIAGRAM_STYLE}`

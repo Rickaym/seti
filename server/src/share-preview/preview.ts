@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto'
-import type { FileKind } from '@seti/shared'
+import type { FileKind, ShareDiagramInput } from '@seti/shared'
 import { escapeHtml } from '../share-markdown.js'
 
 /** An image a preview shows from the share's own image path, such as a PDF page. */
@@ -19,6 +19,8 @@ export interface PreviewInput {
   content: Buffer
   /** A Markdown file's snapshotted raster images, by the link the file names each with. */
   images: ReadonlyMap<string, { mime: string; bytes: Buffer }>
+  /** Fences the browser drew for the page; a fence without one shows as code. */
+  diagrams?: readonly ShareDiagramInput[]
 }
 
 /** What a renderer makes of a file; the page body is stored and served as it is. */
@@ -49,24 +51,28 @@ export interface ImageSlots {
   readonly raw: string
   /** The src for the image, or null when the share holds no more images. */
   add: (image: PreviewImage) => string | null
+  /** The srcs for all the images, or null and none stored when they do not all fit. */
+  addAll: (images: readonly PreviewImage[]) => string[] | null
 }
 
 export function imageSlots(): ImageSlots {
   const key = randomBytes(16).toString('hex')
   const images: PreviewImage[] = []
   let bytes = 0
+  const fits = (more: readonly PreviewImage[]) =>
+    images.length + more.length <= IMAGES_MAX &&
+    bytes + more.reduce((sum, image) => sum + image.bytes.length, 0) <= IMAGE_BYTES_MAX
+  const store = (image: PreviewImage) => {
+    images.push(image)
+    bytes += image.bytes.length
+    return `${key}-${String(images.length)}`
+  }
   return {
     key,
     images,
     raw: `${key}.raw`,
-    add: (image) => {
-      if (images.length >= IMAGES_MAX || bytes + image.bytes.length > IMAGE_BYTES_MAX) {
-        return null
-      }
-      images.push(image)
-      bytes += image.bytes.length
-      return `${key}-${String(images.length)}`
-    },
+    add: (image) => (fits([image]) ? store(image) : null),
+    addAll: (more) => (fits(more) ? more.map(store) : null),
   }
 }
 

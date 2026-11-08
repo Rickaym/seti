@@ -1,4 +1,4 @@
-import type { ModFenceProps } from '@seti/mod-api'
+import type { ModFenceProps, ModFenceSnapshot } from '@seti/mod-api'
 import { Registry } from '@seti/shared'
 import { useSyncExternalStore, type ComponentType } from 'react'
 
@@ -6,6 +6,8 @@ import { useSyncExternalStore, type ComponentType } from 'react'
 export interface FenceRendererEntry {
   language: string
   view: ComponentType<ModFenceProps>
+  /** Draws a fence for a share page; null when the mod offers none. */
+  snapshot: ModFenceSnapshot | null
 }
 
 export const fenceRenderers = new Registry<FenceRendererEntry>('fence renderer', (entry) => entry.language)

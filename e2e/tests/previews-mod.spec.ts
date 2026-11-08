@@ -103,3 +103,31 @@ test('a format switched off falls back alone, and its line opens the Previews se
   await page.getByRole('button', { name: 'Files', exact: true }).click()
   await expectAllPreviews(page)
 })
+
+test('a mermaid fence in Markdown zooms in and out, scrolls in its frame and fits back', async ({ page }) => {
+  const id = await seedWithPdf()
+  await openAgentFiles(page, id)
+  await openViewerFile(page, 'rollout.md')
+  const figure = filesPanel(page).getByRole('figure', { name: 'Mermaid diagram' })
+  const diagram = figure.getByRole('img', { name: 'Diagram' })
+  await expect(diagram.locator('svg')).toBeVisible()
+  const fitted = (await diagram.boundingBox())?.width ?? 0
+  const level = figure.getByText(/^\d+%$/)
+  const fit = await level.innerText()
+  await figure.getByRole('button', { name: 'Zoom in' }).click()
+  await expect(level).not.toHaveText(fit)
+  await expect.poll(async () => (await diagram.boundingBox())?.width ?? 0).toBeCloseTo(fitted * 1.25, 0)
+  const frame = figure.getByTestId('diagram-frame')
+  await figure.getByRole('button', { name: 'Zoom in' }).click()
+  await figure.getByRole('button', { name: 'Zoom in' }).click()
+  expect(await frame.evaluate((el) => el.scrollWidth > el.clientWidth)).toBe(true)
+  for (let n = 0; n < 4; n += 1) {
+    await figure.getByRole('button', { name: 'Zoom out' }).click()
+  }
+  await expect.poll(async () => (await diagram.boundingBox())?.width ?? 0).toBeCloseTo(fitted / 1.25, 0)
+  await figure.getByRole('button', { name: 'Fit to width' }).click()
+  await expect(level).toHaveText(fit)
+  await figure.getByRole('button', { name: 'Source' }).click()
+  await expect(figure.locator('pre')).toContainText('sequenceDiagram')
+  await expect(figure.getByRole('button', { name: 'Zoom in' })).toHaveCount(0)
+})

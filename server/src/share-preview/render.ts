@@ -1,8 +1,10 @@
-import { extensionOf, languageOfPath, type CodeLanguage } from '@seti/shared'
-import { escapeHtml, renderMarkdown } from '../share-markdown.js'
+import { extensionOf, languageOfPath, type CodeLanguage, type ShareDiagramInput } from '@seti/shared'
+import { fenceKey, markdownFences } from '@seti/shared/markdown-fences'
+import { escapeHtml, renderMarkdown, type FenceView } from '../share-markdown.js'
 import { archivePreview, inflateHead, tarListing, zipListing } from './archive.js'
 import { numberedText } from './code.js'
 import { DATA_FORMATS, dataPreview } from './data.js'
+import { diagramFigure, diagramFile, drawDiagrams } from './diagram.js'
 import { CONVERTED_IMAGES, convertedImage, rasterPreview, rasterSize, rasterType } from './image.js'
 import { MEDIA_EXTENSIONS } from './media-probe.js'
 import { mediaPreview } from './media.js'
@@ -104,11 +106,33 @@ function markdownImages(input: PreviewInput, slots: ImageSlots): Map<string, str
   return sources
 }
 
-/** Text formats by name: Markdown, tables, notebooks, data, and code or plain text. */
+/** Markdown with its images, and the fences the browser drew as diagrams with zoom. */
+async function markdownPreview(input: PreviewInput, diagrams: readonly ShareDiagramInput[], slots: ImageSlots) {
+  const text = input.content.toString('utf8')
+  const images = markdownImages(input, slots)
+  const fences = diagrams.length === 0 ? [] : markdownFences(text)
+  const drawn = await drawDiagrams(diagrams, fences, slots)
+  let figures = 0
+  const fence: FenceView = (language, source) => {
+    const diagram = drawn.get(fenceKey(language, source))
+    if (diagram === undefined) {
+      return null
+    }
+    figures += 1
+    return diagramFigure(diagram, figures, `${language} diagram`)
+  }
+  return preview(`<article class="md">${renderMarkdown(text, images, fence)}</article>`, 'Markdown')
+}
+
+/** Text formats by name: Markdown, diagrams, tables, notebooks, data, and code or plain text. */
 async function textByType(input: PreviewInput, extension: string, slots: ImageSlots) {
+  const diagrams = input.diagrams ?? []
   if (rendersMarkdown(input.kind, input.content.length)) {
-    const html = renderMarkdown(input.content.toString('utf8'), markdownImages(input, slots))
-    return preview(`<article class="md">${html}</article>`, 'Markdown')
+    return markdownPreview(input, diagrams, slots)
+  }
+  const diagram = await diagramFile(input, diagrams, slots)
+  if (diagram !== null) {
+    return diagram
   }
   if (input.kind === 'csv') {
     return tablePreview(input.name, input.content)

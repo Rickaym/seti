@@ -22,6 +22,7 @@ import { useBusy } from '@/hooks/useBusy'
 import { useNow } from '@/hooks/useNow'
 import { durationLabel } from '@/lib/time'
 import { LinkPreviewSwitch, PreviewFact, ShareLinkPreview, UnfurlFact } from './SharePreview'
+import { shareDiagrams } from './share-diagrams'
 
 interface ShareTarget {
   taskId: string
@@ -31,6 +32,8 @@ interface ShareTarget {
 }
 
 const MINUTE_MS = 60_000
+/** How long the browser may take to read the file and draw its diagrams for the page. */
+const DRAW_MS = 30_000
 
 const EXPIRY_LABEL: Record<ShareExpiryDays, string> = { 1: '1 day', 7: '7 days', 30: '30 days' }
 
@@ -149,8 +152,10 @@ function SharedActions({ share, onChange, onSettings }: Shared) {
   const { busy, run } = useBusy()
   const [findings, setFindings] = useState<ShareFinding[] | null>(null)
   const update = async (anyway: boolean) => {
+    const target = { taskId: share.task_id, root: share.root, path: share.path, name: share.name }
+    const diagrams = await shareDiagrams(target, AbortSignal.timeout(DRAW_MS))
     try {
-      onChange(await apiPost<Share>(`/shares/${share.id}/update`, { allow_findings: anyway }))
+      onChange(await apiPost<Share>(`/shares/${share.id}/update`, { allow_findings: anyway, diagrams }))
       setFindings(null)
     } catch (e) {
       const found = findingsOf(e)
@@ -222,6 +227,7 @@ function CreateShare({ target, onCreated }: { target: ShareTarget; onCreated: (m
       expires_in_days: days,
       allow_findings: anyway,
       link_preview: linkPreview,
+      diagrams: await shareDiagrams(target, AbortSignal.timeout(DRAW_MS)),
     }
     try {
       onCreated(await apiPost<ShareLink>(`/tasks/${target.taskId}/shares`, body))

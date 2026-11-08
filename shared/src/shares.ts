@@ -16,9 +16,51 @@ const sharePath = {
   path: z.string().min(1).max(4096),
 }
 
+/** The most diagrams one share draws, each in a light and a dark image. */
+export const SHARE_DIAGRAMS_MAX = 16
+/** The longest fence source a share draws as a diagram. */
+export const SHARE_DIAGRAM_SOURCE_MAX = 64 * 1024
+/** The largest drawing of one diagram the browser may send. */
+export const SHARE_DIAGRAM_SVG_MAX = 1024 * 1024
+/** The most every drawing of one request may take together. */
+export const SHARE_DIAGRAMS_BYTES_MAX = 6 * 1024 * 1024
+
+const drawing = z
+  .string()
+  .max(SHARE_DIAGRAM_SVG_MAX)
+  .regex(/^\s*(?:<\?xml[^>]*>\s*)?<svg[\s>]/, 'A drawing is an SVG document')
+
+/**
+ * A fence the browser drew with the mod that draws its language, for a share page that runs no
+ * script. The server rasterizes each drawing and uses it only where a fence has this exact text.
+ */
+export const shareDiagramInput = z
+  .object({
+    language: z
+      .string()
+      .max(32)
+      .regex(/^[a-z][a-z0-9+#-]*$/),
+    source: z.string().min(1).max(SHARE_DIAGRAM_SOURCE_MAX),
+    light: drawing,
+    dark: drawing,
+  })
+  .strict()
+export type ShareDiagramInput = z.infer<typeof shareDiagramInput>
+
+const shareDiagrams = z
+  .array(shareDiagramInput)
+  .max(SHARE_DIAGRAMS_MAX)
+  .refine(
+    (diagrams) => diagrams.reduce((sum, d) => sum + d.light.length + d.dark.length, 0) <= SHARE_DIAGRAMS_BYTES_MAX,
+    'The drawings are larger than a share takes',
+  )
+  .default([])
+
 export const createShareInput = z
   .object({
     ...sharePath,
+    /** Diagrams drawn for the page; a fence without one shows as code. */
+    diagrams: shareDiagrams,
     expires_in_days: z.union([z.literal(1), z.literal(7), z.literal(30)]).default(7),
     /** Shares a file the secret scan flagged; the share records that it was overridden. */
     allow_findings: z.boolean().default(false),
@@ -28,7 +70,9 @@ export const createShareInput = z
   .strict()
 export type CreateShareInput = z.input<typeof createShareInput>
 
-export const updateShareInput = z.object({ allow_findings: z.boolean().default(false) }).strict()
+export const updateShareInput = z
+  .object({ allow_findings: z.boolean().default(false), diagrams: shareDiagrams })
+  .strict()
 export type UpdateShareInput = z.input<typeof updateShareInput>
 
 export const shareLinkPreviewInput = z.object({ link_preview: z.boolean() }).strict()

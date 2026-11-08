@@ -417,7 +417,8 @@ Settings, Mods shows it with a Core badge and a lock in place of its switch, and
 is part of Seti. Only a bundled mod may be required; Check refuses a third-party manifest that sets
 it, and a theme mod cannot set it either.
 
-This Seti offers mod API 1.17.0, which added `required`; 1.16.0 added agent accents; 1.15.0 added agent docks, streaming
+This Seti offers mod API 1.18.0, which added fence snapshots for share pages; 1.17.0 added
+`required`; 1.16.0 added agent accents; 1.15.0 added agent docks, streaming
 routes, menu commands and `tasks.ask`; 1.14.0 added `api.app.every`, `api.keys.label` and `aria`, `api.terminals.useOwn`
 and `api.agents.open()` without an id; 1.13.0 opened commands, slash commands, webhook sources,
 status items, context text, themes, schedules and task events to third-party mods; 1.12.0 added
@@ -666,6 +667,14 @@ api.registerFileViewer({ id: 'pages', load: async () => import('./PdfView').then
 api.registerFenceRenderer({ language: 'mermaid', load: async () => import('./Fence').then((m) => m.fence(api.kit)) })
 ```
 
+A fence renderer may also give `snapshot`, which draws a fence as a standalone SVG for a share
+page in the `light` or `dark` scheme, or answers null. A share page runs no script, so when the
+user shares a Markdown file the share dialog calls it for each fence of that language and the
+server rasterizes the drawings into the page; a file whose kind is the fence's language, such as
+a `.mmd` file, is drawn whole. The drawing should use colours for a plain page and SVG text in a
+common sans font, since the server draws text with DejaVu and Liberation fonts. Without
+`snapshot`, or with the renderer switched off, a shared fence shows as code.
+
 A viewer gets the file's name, kind, size, change time, `url`, `download`, `page`, `text`, the
 `line` a search opened it at, whether the user is `editing` it, and the `theme`, whose `key`
 changes with the theme; `load` makes the viewer its own chunk, fetched the first time a file opens.
@@ -689,7 +698,9 @@ Mermaid diagrams, each format behind its own switch (`pdf`, `sheets` and `mermai
 its own chunk the first time such a file opens, so pdf.js, SheetJS and Mermaid load only for a file
 that needs them. It holds the `mermaid` kind, so `.mmd` and `.mermaid` files open as diagrams, and
 draws `mermaid` fences in Markdown files and transcripts; with Mermaid off those files open as
-text and the fences as code, and a share of a diagram file shows its numbered source either way.
+text and the fences as code. A share made while Mermaid is on shows each fence and a diagram
+file as a light and dark image with Fit, 100% and 200% zoom; made while it is off, the share shows
+the code.
 It reads workbooks in a Web Worker it starts with
 `new Worker(new URL('./sheet-worker.ts', import.meta.url))`. Vite builds the worker as a file of
 its own, and `ON_DEMAND_ASSET` in `ui/vite.config.ts` keeps it out of the precache by name.

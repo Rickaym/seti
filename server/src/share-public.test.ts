@@ -62,6 +62,9 @@ const NOTE = [
   '',
 ].join('\n')
 const PAGE = '<html><body><script>alert(document.cookie)</script></body></html>\n'
+const FLOW = 'graph TD\n  A --> B'
+const DRAWING =
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 60"><rect width="60" height="30" fill="#369"/></svg>'
 const SVG = '<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>\n'
 
 const scratch = fs.mkdtempSync(path.join(path.dirname(SETI_HOME), 'share-public-'))
@@ -81,11 +84,11 @@ const tokenOf = (name: string) => {
   return link.url.slice(link.url.lastIndexOf('/') + 1)
 }
 
-async function share(file: string): Promise<void> {
+async function share(file: string, extra: Record<string, unknown> = {}): Promise<void> {
   const res = await app.request(`/api/tasks/${TASK}/shares`, {
     method: 'POST',
     headers: { ...LOOPBACK, 'content-type': 'application/json' },
-    body: JSON.stringify({ root: 'cwd', path: file }),
+    body: JSON.stringify({ root: 'cwd', path: file, ...extra }),
   })
   expect(res.status, await res.clone().text()).toBe(200)
   links.set(file, ((await res.json()) as { data: ShareLink }).data)
@@ -112,6 +115,7 @@ beforeAll(async () => {
   fs.writeFileSync(path.join(cwd, 'blob.bin'), Buffer.from([0, 1, 2, 3, 255]))
   fs.writeFileSync(path.join(cwd, 'plain.txt'), 'hello\n')
   fs.writeFileSync(path.join(cwd, 'big.md'), '- item <b>x</b>\n\n'.repeat(80_000))
+  fs.writeFileSync(path.join(cwd, 'flow.md'), `# Flow\n\n\`\`\`mermaid\n${FLOW}\n\`\`\`\n`)
   await tasks.insert({ id: TASK, title: 'Publisher', repo_id: null, cwd, worktree: false, pr_urls: [] })
   expect((await setSharing(true)).status).toBe(200)
   for (const file of ['notes.md', 'page.html', 'logo.svg', 'dot.png', 'blob.bin', 'plain.txt', 'big.md']) {
@@ -397,6 +401,37 @@ describe('share responses', () => {
       expect(raw.headers.get('content-disposition')).toBe(`attachment; filename*=UTF-8''${file}`)
       expect(await raw.text()).toBe(source)
     }
+  })
+
+  it('show a fence the browser drew as PNG images with zoom under the same policy, and audit it', async () => {
+    const diagrams = [{ language: 'mermaid', source: FLOW, light: DRAWING, dark: DRAWING }]
+    await share('flow.md', { diagrams })
+    const token = tokenOf('flow.md')
+    const res = await publicGet(`/share/${token}`)
+    expectShareHeaders(res, imagesOf(token))
+    const html = await res.text()
+    expect(html).not.toMatch(/<svg|<script|<form|\son\w+="/i)
+    expect(html).toContain(`<source media="(prefers-color-scheme: dark)" srcset="${token}/p/2">`)
+    expect(html).toContain('<label for="seti-d1-1">100%</label>')
+    const image = await publicGet(`/share/${token}/p/1`)
+    expect(image.headers.get('content-type')).toBe('image/png')
+    expect(links.get('flow.md')?.share.preview).toMatchObject({ label: 'Markdown', images: 2 })
+    expect((await auditEvents.latest('task.file_shared'))?.summary).toContain('Shared flow.md')
+
+    const id = links.get('flow.md')?.share.id ?? ''
+    const update = async (body: unknown) =>
+      app.request(`/api/shares/${id}/update`, {
+        method: 'POST',
+        headers: { ...LOOPBACK, 'content-type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+    expect((await update({ diagrams: [{ language: 'mermaid', source: FLOW, light: 'x', dark: 'x' }] })).status).toBe(
+      400,
+    )
+    expect((await update({})).status).toBe(200)
+    const plain = await (await publicGet(`/share/${token}`)).text()
+    expect(plain).toContain('<code class="language-mermaid">graph TD')
+    expect(plain).not.toContain('<figure')
   })
 
   it('show Markdown over 1 MB as its source text', async () => {

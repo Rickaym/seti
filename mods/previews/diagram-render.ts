@@ -7,6 +7,8 @@ export interface DiagramTheme {
   dark: boolean
   font: string
   variables: Record<string, string>
+  /** One of Mermaid's own themes in place of the variables, for a page outside Seti. */
+  preset?: 'default' | 'dark'
 }
 
 export interface DiagramError {
@@ -50,7 +52,7 @@ const configOf = (theme: DiagramTheme): MermaidConfig => ({
   securityLevel: 'strict',
   suppressErrorRendering: true,
   htmlLabels: false,
-  theme: 'base',
+  theme: theme.preset ?? 'base',
   darkMode: theme.dark,
   fontFamily: theme.font,
   themeVariables: { ...theme.variables, darkMode: theme.dark, fontFamily: theme.font },

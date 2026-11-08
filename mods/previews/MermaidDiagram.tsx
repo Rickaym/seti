@@ -1,15 +1,11 @@
 import type { ModFileViewProps, ModKit } from '@seti/mod-api'
-import { Copy, FileDown, ImageDown, Maximize, ZoomIn, ZoomOut, type LucideIcon } from 'lucide-react'
-import { useEffect, useRef, useState, type PointerEvent } from 'react'
+import { Copy, FileDown, ImageDown } from 'lucide-react'
 import { pngOf, saveFile, standaloneSvg } from './diagram-export'
 import type { DiagramError } from './diagram-render'
+import { ToolButton, ZoomTools } from './diagram-zoom'
 import { useKit } from './kit'
 import { MONO, useRendered, type Drawn } from './use-rendered'
-
-const ZOOM_STEP = 1.25
-const ZOOM_MIN = 0.1
-const ZOOM_MAX = 8
-const FRAME_PADDING = 24
+import { useZoom } from './use-zoom'
 
 function ErrorPanel({ error, source }: { error: DiagramError; source: string }) {
   const { cn } = useKit()
@@ -32,27 +28,6 @@ function ErrorPanel({ error, source }: { error: DiagramError; source: string }) 
         ))}
       </ol>
     </div>
-  )
-}
-
-function ToolButton({
-  label,
-  icon: Icon,
-  onClick,
-  disabled,
-}: {
-  label: string
-  icon: LucideIcon
-  onClick: () => void
-  disabled?: boolean
-}) {
-  const { Hint, Button } = useKit()
-  return (
-    <Hint text={label}>
-      <Button variant="ghost" size="icon-xs" aria-label={label} disabled={disabled} onClick={onClick}>
-        <Icon />
-      </Button>
-    </Hint>
   )
 }
 
@@ -87,107 +62,28 @@ function exportActions(drawn: Drawn, name: string, background: string, { succeed
   }
 }
 
-/** Mouse drags scroll the frame; touch keeps its native scrolling. */
-function usePan() {
-  const drag = useRef<{ x: number; y: number; left: number; top: number } | null>(null)
-  return {
-    onPointerDown: (e: PointerEvent<HTMLDivElement>) => {
-      if (e.pointerType !== 'mouse' || e.button !== 0) {
-        return
-      }
-      const frame = e.currentTarget
-      drag.current = { x: e.clientX, y: e.clientY, left: frame.scrollLeft, top: frame.scrollTop }
-      frame.setPointerCapture(e.pointerId)
-    },
-    onPointerMove: (e: PointerEvent<HTMLDivElement>) => {
-      const from = drag.current
-      if (from !== null) {
-        e.currentTarget.scrollTo(from.left - (e.clientX - from.x), from.top - (e.clientY - from.y))
-      }
-    },
-    onPointerUp: () => {
-      drag.current = null
-    },
-    onPointerCancel: () => {
-      drag.current = null
-    },
-  }
-}
-
-function useFrameWidth() {
-  const [frame, setFrame] = useState<HTMLDivElement | null>(null)
-  const [width, setWidth] = useState(0)
-  useEffect(() => {
-    if (frame === null) {
-      return undefined
-    }
-    const observer = new ResizeObserver(() => {
-      setWidth(frame.clientWidth)
-    })
-    observer.observe(frame)
-    return () => {
-      observer.disconnect()
-    }
-  }, [frame])
-  return { setFrame, width }
-}
-
 /** A diagram file: fitted to the width at first, with zoom, drag to pan, and SVG or PNG export. */
 export function MermaidDiagram({ text, name, theme: viewTheme }: ModFileViewProps) {
   const kit = useKit()
   const source = text ?? ''
   const { drawn, error, theme } = useRendered(source, viewTheme, 0)
-  const [zoom, setZoom] = useState<number | null>(null)
-  const { setFrame, width: frameWidth } = useFrameWidth()
-  const pan = usePan()
-  const fit =
-    drawn === null || drawn.width === 0
-      ? 1
-      : Math.min(1, Math.max(ZOOM_MIN, (frameWidth - FRAME_PADDING) / drawn.width))
-  const scale = zoom ?? fit
+  const zoom = useZoom(drawn)
   const actions = drawn === null ? null : exportActions(drawn, name, theme.background, kit)
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex shrink-0 items-center gap-1 border-b border-border px-3 py-1.5 text-xs">
-        <span className="tabular-nums text-muted-foreground">
-          {drawn === null ? '' : `${String(Math.round(scale * 100))}%`}
-        </span>
-        <ToolButton
-          label="Zoom out"
-          icon={ZoomOut}
-          disabled={drawn === null || scale <= ZOOM_MIN}
-          onClick={() => {
-            setZoom(Math.max(ZOOM_MIN, scale / ZOOM_STEP))
-          }}
-        />
-        <ToolButton
-          label="Zoom in"
-          icon={ZoomIn}
-          disabled={drawn === null || scale >= ZOOM_MAX}
-          onClick={() => {
-            setZoom(Math.min(ZOOM_MAX, scale * ZOOM_STEP))
-          }}
-        />
-        <ToolButton
-          label="Fit to width"
-          icon={Maximize}
-          disabled={drawn === null}
-          onClick={() => {
-            setZoom(null)
-          }}
-        />
+        <ZoomTools zoom={zoom} drawn={drawn !== null} />
         <span className="ml-auto" />
         <ToolButton label="Copy SVG" icon={Copy} disabled={actions === null} onClick={() => actions?.copy()} />
         <ToolButton label="Download SVG" icon={FileDown} disabled={actions === null} onClick={() => actions?.svg()} />
         <ToolButton label="Download PNG" icon={ImageDown} disabled={actions === null} onClick={() => actions?.png()} />
       </div>
       <div
-        ref={setFrame}
+        {...zoom.frame}
         className={kit.cn(
           'min-h-0 flex-1 overflow-auto bg-muted/40 p-3',
           drawn !== null && 'cursor-grab active:cursor-grabbing',
         )}
-        {...pan}
       >
         {error !== null && <ErrorPanel error={error} source={source} />}
         {error === null && drawn === null && <p className="text-sm text-muted-foreground">Drawing the diagram...</p>}
@@ -196,7 +92,7 @@ export function MermaidDiagram({ text, name, theme: viewTheme }: ModFileViewProp
             role="img"
             aria-label={`Diagram of ${name}`}
             className="mx-auto [&>svg]:block [&>svg]:size-full [&>svg]:max-w-none!"
-            style={{ width: drawn.width * scale, height: drawn.height * scale }}
+            style={zoom.size ?? undefined}
             dangerouslySetInnerHTML={{ __html: drawn.svg }}
           />
         )}

@@ -1,5 +1,13 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto'
-import type { createShareInput, FileShare, Share, ShareLink, ShareList, ShareScanRefusal } from '@seti/shared'
+import type {
+  createShareInput,
+  FileShare,
+  Share,
+  ShareDiagramInput,
+  ShareLink,
+  ShareList,
+  ShareScanRefusal,
+} from '@seti/shared'
 import type { z } from 'zod'
 import { audit } from './audit.js'
 import { now } from './db.js'
@@ -116,8 +124,8 @@ async function shareOf(id: string): Promise<Share> {
 const THUMB_MAX = 4 * 1024 * 1024
 
 /** Renders the page, its images and the link card, once, for the share tables to serve. */
-async function renderShare(snapshot: Snapshot): Promise<ShareContent> {
-  const preview = await renderPreview(snapshot)
+async function renderShare(snapshot: Snapshot, diagrams: readonly ShareDiagramInput[]): Promise<ShareContent> {
+  const preview = await renderPreview({ ...snapshot, diagrams })
   const thumb = preview.thumb !== null && preview.thumb.bytes.length <= THUMB_MAX ? preview.thumb : null
   const card = await renderCard({
     name: snapshot.name,
@@ -183,7 +191,7 @@ export async function createShare(
     throw new HttpError(409, `${snapshot.rel} is already shared; update it or make a new link`)
   }
   const override = checked(snapshot, input.allow_findings)
-  const body = await renderShare(snapshot)
+  const body = await renderShare(snapshot, input.diagrams)
   if ((await shareRows.openFor(taskId, input.root, snapshot.rel, now())) !== undefined) {
     throw new HttpError(409, `${snapshot.rel} is already shared; update it or make a new link`)
   }
@@ -226,7 +234,11 @@ export async function createShare(
 }
 
 /** Republishes the same link with the file's content now, through every check again. */
-export async function updateShare(id: string, allowFindings: boolean): Promise<Share> {
+export async function updateShare(
+  id: string,
+  allowFindings: boolean,
+  diagrams: readonly ShareDiagramInput[] = [],
+): Promise<Share> {
   await requireSharing()
   const row = await openShare(id)
   const snapshot = takeSnapshot(await fileContext(row.task_id), row.root, row.path)
@@ -235,7 +247,7 @@ export async function updateShare(id: string, allowFindings: boolean): Promise<S
   }
   const override = checked(snapshot, allowFindings)
   const fields = { name: snapshot.name, kind: snapshot.kind, mime: snapshot.mime, scan_override: override }
-  const body = await renderShare(snapshot)
+  const body = await renderShare(snapshot, diagrams)
   if (!(await shareRows.replace(id, fields, body, now()))) {
     throw new HttpError(404, 'This share has ended; share the file again')
   }

@@ -1,3 +1,4 @@
+import { fenceLanguage } from '@seti/shared/markdown-fences'
 import { Marked, type Token } from 'marked'
 
 const ESCAPES: Record<string, string> = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }
@@ -33,16 +34,26 @@ export function markdownImages(text: string): string[] {
 /** An image without a snapshot shows its alt text in brackets, or nothing. */
 const altOnly = (alt: string) => (alt === '' ? '' : escapeHtml(`[${alt}]`))
 
+/** The HTML a fenced block shows in place of its code, such as a drawn diagram; null for code. */
+export type FenceView = (language: string, source: string) => string | null
+
 /**
  * Markdown as HTML with no way to run anything: raw HTML shows as text, links go only to the web
- * and mail, and an image shows only as its snapshot's inline data, else as its alt text.
+ * and mail, an image shows only as its snapshot's inline data, else as its alt text, and a fence
+ * shows as code unless `fence` gives it a view.
  */
-export function renderMarkdown(text: string, images: ReadonlyMap<string, string>): string {
+export function renderMarkdown(
+  text: string,
+  images: ReadonlyMap<string, string>,
+  fence: FenceView = () => null,
+): string {
   const marked = new Marked({
     gfm: true,
     async: false,
     renderer: {
       html: ({ text: raw }) => escapeHtml(raw),
+      code: ({ text: source, lang, codeBlockStyle }) =>
+        (codeBlockStyle === 'indented' ? null : fence(fenceLanguage(lang), source)) ?? false,
       link({ href, tokens }) {
         const inner = this.parser.parseInline(tokens)
         return SAFE_HREF.test(href) ? `<a href="${escapeHtml(href)}" rel="${REL}">${inner}</a>` : inner
