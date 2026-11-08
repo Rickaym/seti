@@ -5,6 +5,7 @@ import { expandColors, openAgentSettings } from './support/agent-settings.js'
 import { openSeedDb } from './support/db.js'
 import { paths } from './support/env.js'
 import { apiData, expect, test, unique } from './support/fixtures.js'
+import { tapMoreAction } from './support/phone-agent.js'
 import { SEEDS, seedTask } from './support/subtasks.js'
 
 const TARGET_PX = 44
@@ -46,19 +47,18 @@ test('a phone colours an agent with a preset or a typed hex and the header takes
   await expect(header).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)')
 })
 
-test('a phone opens the subagents from the header button with touch-sized rows', async ({ page }) => {
+test('a phone opens the subagents from the More sheet with touch-sized rows', async ({ page }) => {
   const id = await seedTask(unique('Phone fan out'), paths.checkout, SEEDS.fanOut())
   await page.goto(`/#agents/${id}`)
   await expect(page.getByRole('main').getByRole('region', { name: 'Subagents' })).toHaveCount(0)
-  const button = page.getByTestId('agent-header').getByRole('button', { name: '4 subagents, 1 failed' })
-  await button.click()
-  const popover = page.getByTestId('subagents-popover')
-  const rows = popover.getByTestId('subagent-row')
+  await tapMoreAction(page, 'Subagents')
+  const sheet = page.getByTestId('subagents-sheet')
+  const rows = sheet.getByTestId('subagent-row')
   await expect(rows).toHaveCount(4)
-  await popover.evaluate(async (el) => Promise.all(el.getAnimations().map(async (run) => run.finished)))
+  await sheet.evaluate(async (el) => Promise.all(el.getAnimations().map(async (run) => run.finished)))
   expect((await rows.first().boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(TARGET_PX)
   const width = page.viewportSize()?.width ?? 0
-  expect((await popover.boundingBox())?.width ?? 0).toBeGreaterThan(width - 32)
+  expect((await sheet.boundingBox())?.width ?? 0).toBeGreaterThan(width - 32)
   await rows.first().click()
   await expect(page).toHaveURL(new RegExp(`#agents/${id}/sub/`))
 })
