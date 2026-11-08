@@ -76,6 +76,12 @@ function failureOf(m: SDKResultMessage): string | null {
   return said.trim() === '' ? `The side chat stopped: ${m.subtype}` : clipped(said)
 }
 
+/**
+ * A result no model turn made before the answer began: a resumed session first closes the
+ * background task notices it was left with, and the question is answered in the turn after.
+ */
+const isWaitingNotice = (m: SDKResultMessage, stream: AnswerStream) => m.num_turns === 0 && stream.text === ''
+
 interface Outcome {
   text: string
   cost: number | null
@@ -102,16 +108,26 @@ async function runFork(task: Task, fork: ForkPoint, prompt: string, run: Running
   const options = await sideChatOptions(task, fork, { reads: run.reads, abortController: run.abort })
   const query = startQuery({ prompt: once(prompt), options })
   const stream = new AnswerStream()
+  const outcome = async (m: SDKResultMessage): Promise<Outcome> => {
+    const cost = await countCost(task, m, Math.max(saved, savedTotal(file)))
+    return { text: stream.text, cost, error: failureOf(m) }
+  }
+  let skipped: SDKResultMessage | null = null
   try {
     for await (const m of query) {
-      if (m.type === 'result') {
-        const cost = await countCost(task, m, Math.max(saved, savedTotal(file)))
-        return { text: stream.text, cost, error: failureOf(m) }
+      if (m.type === 'result' && isWaitingNotice(m, stream)) {
+        skipped = m
+      } else if (m.type === 'result') {
+        return await outcome(m)
+      } else {
+        const event = stream.next(m)
+        if (event !== null) {
+          await run.emit(event)
+        }
       }
-      const event = stream.next(m)
-      if (event !== null) {
-        await run.emit(event)
-      }
+    }
+    if (skipped !== null) {
+      return await outcome(skipped)
     }
     return { text: stream.text, cost: null, error: 'The side chat ended without an answer' }
   } catch (e) {
