@@ -5,6 +5,7 @@ import { CountBadge } from '@/components/CountBadge'
 import { Hint } from '@/components/Hint'
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet'
 import { useNow } from '@/hooks/useNow'
 import { navigate } from '@/lib/route'
 import {
@@ -225,5 +226,45 @@ export function SubagentsButton({ taskId, subtasks, compact = false }: Subagents
         />
       </PopoverContent>
     </Popover>
+  )
+}
+
+interface SubagentsSheetProps {
+  taskId: string
+  subtasks: readonly SubtaskBrief[]
+  onClose: () => void
+}
+
+/** The agent's subagents in a bottom sheet, which the phone's actions menu opens. */
+export function SubagentsSheet({ taskId, subtasks, onClose }: SubagentsSheetProps) {
+  return (
+    <Sheet
+      open
+      onOpenChange={(open) => {
+        if (!open) {
+          onClose()
+        }
+      }}
+    >
+      <SheetContent
+        side="bottom"
+        showCloseButton={false}
+        aria-describedby={undefined}
+        className="gap-0 p-0"
+        data-testid="subagents-sheet"
+      >
+        <SheetTitle className="sr-only">Subagents</SheetTitle>
+        <div className="flex min-h-11 items-center gap-1.5 border-b border-border/60 px-3 text-xs text-muted-foreground">
+          <SubagentCounts subtasks={subtasks} />
+        </div>
+        <SubagentList
+          taskId={taskId}
+          subtasks={subtasks}
+          selected={null}
+          className="max-h-[60dvh] [&_button]:px-3"
+          onPick={onClose}
+        />
+      </SheetContent>
+    </Sheet>
   )
 }

@@ -112,7 +112,7 @@ test('the busiest agent header keeps one 44px row on a 360px phone with its titl
   const header = page.getByTestId('agent-header')
   await expect(header.getByRole('heading', { name: TITLE, level: 2 })).toBeVisible()
   await expect(header.getByRole('img', { name: 'running' })).toBeVisible()
-  await expect(header.getByTestId('subagents-button')).toBeVisible()
+  await expect(header.getByTestId('prs-button')).toBeVisible()
   expect(await page.evaluate(headerOverflow)).toEqual([])
   await expectFitsPhone(page, 'busiest agent header at 360px')
   expect((await edgesAtRest(page, header)).height).toBe(HEADER_PX)

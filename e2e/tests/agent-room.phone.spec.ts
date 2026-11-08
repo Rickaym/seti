@@ -116,7 +116,6 @@ test('the More sheet keeps search, the group chat and the agent tools in reach',
   await expect(actions).toBeVisible()
   await settled(page)
   for (const name of [
-    'Pull requests',
     'Find in this chat',
     'Files',
     'Processes',
