@@ -37,6 +37,7 @@ export const previewsUi = defineMod({
     api.registerFenceRenderer({
       language: 'mermaid',
       load: async () => import('./MermaidBlock').then((m) => withKit(kit, m.MermaidBlock)),
+      snapshot: async (source, scheme) => import('./share-snapshot').then(async (m) => m.shareSnapshot(source, scheme)),
     })
   },
 })

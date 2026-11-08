@@ -49,6 +49,19 @@ export async function seedShareAgent(): Promise<{ id: string; dir: string; title
   return { id, dir, title }
 }
 
+/** A diagram wider than a phone at 200%, so zooming it scrolls inside its frame. */
+const WIDE_FLOW =
+  'flowchart LR\n  Start[Collect laptops] --> Wipe[Wipe the disks] --> Pack[Pack the boxes]\n' +
+  '  Pack --> Ship[Ship to office] --> Done[Hand them out]\n'
+
+/** A Markdown file with a mermaid fence and a code fence, and the same diagram as a .mmd file. */
+export function seedShareDiagrams(dir: string): void {
+  const fence = ['```mermaid', WIDE_FLOW.trimEnd(), '```']
+  const note = ['# Rollout', '', ...fence, '', '```js', 'ship()', '```', ''].join('\n')
+  fs.writeFileSync(path.join(dir, 'docs', 'diagrams.md'), note)
+  fs.writeFileSync(path.join(dir, 'docs', 'flow.mmd'), WIDE_FLOW)
+}
+
 /** A one second test-pattern MP4 and a one second MP3 tone, beside the agent's other docs. */
 export function seedShareMedia(dir: string): void {
   fs.copyFileSync(path.join(MEDIA, 'clip.mp4'), path.join(dir, 'docs', 'clip.mp4'))

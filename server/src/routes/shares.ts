@@ -81,7 +81,10 @@ export const shareRoutes = (access: PublicAccess | null) =>
     .post('/revoke-all', validJson(emptyShareInput), async (c) => ok(c, { revoked: await revokeAllShares() }))
     .post('/:id/update', validJson(updateShareInput), async (c) => {
       const input = c.req.valid('json')
-      return reply(c, await scanRefused(c, async () => updateShare(c.req.param('id'), input.allow_findings)))
+      return reply(
+        c,
+        await scanRefused(c, async () => updateShare(c.req.param('id'), input.allow_findings, input.diagrams)),
+      )
     })
     .post('/:id/rotate', validJson(emptyShareInput), async (c) =>
       ok(c, await rotateShare(c.req.param('id'), originOf(c, access))),

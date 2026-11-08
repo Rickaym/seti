@@ -50,6 +50,16 @@ export interface ModFenceProps {
   theme: ModViewTheme
 }
 
+/** The colour scheme of a share page's viewer. */
+export type ModColorScheme = 'light' | 'dark'
+
+/**
+ * Draws a fence as a standalone SVG for a share page, which runs no script: in colours for a
+ * plain page of the scheme, with text as SVG text in a common sans font, since the server
+ * rasterizes it. Null when the fence cannot be drawn, which leaves it as code.
+ */
+export type ModFenceSnapshot = (source: string, scheme: ModColorScheme) => Promise<string | null>
+
 /** What a PR chip gets: the open PR it sits beside, in an agent's PR row. */
 export interface ModPrChipProps {
   pr: PullRequest
@@ -397,8 +407,13 @@ export interface UiModApi {
   registerStatusBarItem: (item: { id: string; view: ComponentType }) => Disposer
   /** The component of a file viewer the manifest declares; it wins over Seti's own viewer. */
   registerFileViewer: (viewer: { id: string } & ModLazyView<ModFileViewProps>) => Disposer
-  /** The component that draws Markdown fences of a language the manifest declares. */
-  registerFenceRenderer: (renderer: { language: string } & ModLazyView<ModFenceProps>) => Disposer
+  /**
+   * The component that draws Markdown fences of a language the manifest declares, and how to
+   * draw one for a share page; without `snapshot` a shared fence shows as code.
+   */
+  registerFenceRenderer: (
+    renderer: { language: string; snapshot?: ModFenceSnapshot } & ModLazyView<ModFenceProps>,
+  ) => Disposer
   /** A way to show several agents at once, for a view the manifest places in `agentsLayout`. */
   registerAgentsLayout: (layout: ModAgentsLayout) => Disposer
   /** Terminals the mod keeps, listed beside the device's own in the terminal switcher. */

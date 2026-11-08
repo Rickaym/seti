@@ -70,3 +70,22 @@ test('on a phone a format switched off falls back alone, and its line opens the 
   await expect(panel.getByRole('grid').getByRole('columnheader', { name: 'city' })).toBeVisible()
   await expect(note).toHaveCount(0)
 })
+
+test('on a phone a mermaid fence in Markdown zooms inside its frame and fits back', async ({ page }) => {
+  const { id } = await seedViewerAgent(10)
+  await page.goto(`/#agents/${id}`)
+  await openFiles(page)
+  await openViewerFile(page, 'rollout.md')
+  const figure = filesPanel(page).getByRole('figure', { name: 'Mermaid diagram' })
+  const diagram = figure.getByRole('img', { name: 'Diagram' })
+  await expect(diagram.locator('svg')).toBeVisible()
+  const fitted = (await diagram.boundingBox())?.width ?? 0
+  await figure.getByRole('button', { name: 'Zoom in' }).tap()
+  await figure.getByRole('button', { name: 'Zoom in' }).tap()
+  await expect.poll(async () => (await diagram.boundingBox())?.width ?? 0).toBeGreaterThan(fitted * 1.4)
+  const frame = figure.getByTestId('diagram-frame')
+  expect(await frame.evaluate((el) => el.scrollWidth > el.clientWidth)).toBe(true)
+  await expectFitsPhone(page, 'a zoomed diagram in Markdown')
+  await figure.getByRole('button', { name: 'Fit to width' }).tap()
+  await expect.poll(async () => (await diagram.boundingBox())?.width ?? 0).toBeCloseTo(fitted, 0)
+})

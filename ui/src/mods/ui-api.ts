@@ -169,8 +169,8 @@ export function uiApi(manifest: ModManifest, { track, ownPage, switches }: UiApi
     },
     registerFenceRenderer: (given) => {
       const { language, setting } = declaredFence(contributes.fenceRenderers, given.language, manifest)
-      const view = lazyView(given)
-      return switched(setting, () => fenceRenderers.register({ language, view }))
+      const entry = { language, view: lazyView(given), snapshot: given.snapshot ?? null }
+      return switched(setting, () => fenceRenderers.register(entry))
     },
     registerPrChip: ({ id: chip, view }) => {
       const { title } = declared(contributes.prChips, chip, manifest)
