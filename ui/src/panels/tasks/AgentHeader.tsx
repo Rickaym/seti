@@ -118,7 +118,7 @@ export function AgentHeader(props: AgentHeaderProps) {
         task={task}
         title={compactTitle}
         light={props.light}
-        subagents={<SubagentsButton taskId={task.id} subtasks={subtasks} />}
+        subtasks={subtasks}
         settings={settings()}
         running={running}
         on={on}

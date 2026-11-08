@@ -1,20 +1,16 @@
-import type { TaskListEntry } from '@seti/shared'
-import { EllipsisVertical, GitPullRequest, MessagesSquare, Package, Terminal, TextSearch } from 'lucide-react'
+import type { SubtaskBrief, TaskListEntry } from '@seti/shared'
+import { EllipsisVertical, MessagesSquare, Network, Package, Terminal, TextSearch } from 'lucide-react'
 import { useRef, useState } from 'react'
 import { openPalette } from '@/components/palette/palette-store'
 import { useTeamChat, useTeamChatStore } from '@/components/team/team-context'
 import { unreadCount } from '@/components/team/team-store'
 import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet'
-import { refreshTasks } from '@/hooks/useTasks'
+import { subagentsLabel } from '@/lib/subtasks'
 import { agentTabs, showFrame, usePlacedFrames } from '@/mods/frame-places'
 import { useModAgentActions } from '@/mods/useModCommands'
-import { AgentPrsSheet } from '@/panels/tasks/LinkedPrList'
-import { PrPicker } from '@/panels/tasks/PrPicker'
+import { SubagentsSheet } from '@/panels/tasks/SubagentStrip'
 import { agentActions, type ActionHandlers, type AgentAction, type Running } from '@/panels/tasks/agent-actions'
-import { orderLinkedPrs } from '@/panels/tasks/linked-prs'
-import { prsPath } from '@/panels/tasks/pr-links'
-import { usePrStatuses } from '@/panels/tasks/usePrStatuses'
 import { useOpenTerminal } from '@/panels/terminal/useOpenTerminal'
 
 /** Mod views placed beside agents, which the desktop header shows as icons, as rows. */
@@ -61,36 +57,6 @@ function useAppActions(): AgentAction[] {
   return [terminal, search, chat]
 }
 
-/** The agent's linked PRs with their live status, in a sheet that unmounts on close. */
-function LinkedPrs({ task, onClose }: { task: TaskListEntry; onClose: () => void }) {
-  const { statuses } = usePrStatuses(task.pr_urls)
-  const prs = orderLinkedPrs(task.pr_urls, statuses, task.pr_states.by_url, task.repo_slug)
-  const path = prsPath(task.id)
-  return (
-    <AgentPrsSheet
-      prs={prs}
-      path={path}
-      open
-      onOpenChange={(open) => {
-        if (!open) {
-          onClose()
-        }
-      }}
-      picker={(done) => (
-        <PrPicker
-          task={task}
-          path={path}
-          linked={task.pr_urls}
-          onLinked={() => {
-            done()
-            refreshTasks()
-          }}
-        />
-      )}
-    />
-  )
-}
-
 function ActionRow({ action, onChosen }: { action: AgentAction; onChosen: () => void }) {
   const Icon = action.icon
   return (
@@ -114,29 +80,32 @@ function ActionRow({ action, onChosen }: { action: AgentAction; onChosen: () => 
 
 interface PhoneActionsProps {
   task: TaskListEntry
+  subtasks: readonly SubtaskBrief[]
   running: Running
   on: ActionHandlers
 }
 
 /** The overflow button and its bottom sheet of labeled rows; the badge counts running processes. */
-export function PhoneActions({ task, running, on }: PhoneActionsProps) {
+export function PhoneActions({ task, subtasks, running, on }: PhoneActionsProps) {
   const [open, setOpen] = useState(false)
-  const [prsOpen, setPrsOpen] = useState(false)
+  const [subagentsOpen, setSubagentsOpen] = useState(false)
   const chosen = useRef(false)
   const mods = useModAgentActions(task.id)
-  const linked = task.pr_urls.length
-  const prs: AgentAction = {
-    label: 'Pull requests',
-    icon: GitPullRequest,
-    onSelect: () => {
-      setPrsOpen(true)
-    },
-  }
-  if (linked > 0) {
-    prs.detail = String(linked)
-    prs.ariaLabel = `Pull requests, ${String(linked)} linked`
-  }
-  const agent = [...useModTabActions(task.id), prs, ...agentActions(task, running, on, mods)]
+  const subagents: AgentAction[] =
+    subtasks.length === 0
+      ? []
+      : [
+          {
+            label: 'Subagents',
+            icon: Network,
+            detail: String(subtasks.length),
+            ariaLabel: `Subagents, ${subagentsLabel(subtasks)}`,
+            onSelect: () => {
+              setSubagentsOpen(true)
+            },
+          },
+        ]
+  const agent = [...useModTabActions(task.id), ...subagents, ...agentActions(task, running, on, mods)]
   const app = useAppActions()
   const badge = running.processes
   const row = (action: AgentAction) => (
@@ -194,11 +163,12 @@ export function PhoneActions({ task, running, on }: PhoneActionsProps) {
           {app.map(row)}
         </SheetContent>
       </Sheet>
-      {prsOpen && (
-        <LinkedPrs
-          task={task}
+      {subagentsOpen && (
+        <SubagentsSheet
+          taskId={task.id}
+          subtasks={subtasks}
           onClose={() => {
-            setPrsOpen(false)
+            setSubagentsOpen(false)
           }}
         />
       )}

@@ -23,5 +23,4 @@ test("a phone shows the agent's todos full width under its header", async ({ pag
     .poll(async () => labels(rows.getByRole('img')))
     .toEqual(['in progress; the agent is idle', 'pending', 'completed'])
   await expect(rows.last().getByText('Read the code')).toHaveCSS('text-decoration-line', 'line-through')
-  await expect(page.getByTestId('agent-header').getByTestId('subagents-button')).toHaveText('')
 })

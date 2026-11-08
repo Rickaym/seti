@@ -13,9 +13,9 @@ export async function tapMoreAction(page: Page, name: string): Promise<void> {
   await moreRow(page, name).tap()
 }
 
-/** Opens the phone agent's linked PRs from its More sheet. */
+/** Opens the phone agent's linked PRs from the PR button in its header. */
 export async function openAgentPrs(page: Page): Promise<Locator> {
-  await tapMoreAction(page, 'Pull requests')
+  await page.getByTestId('agent-header').getByTestId('prs-button').tap()
   const sheet = page.getByRole('dialog', { name: /^Linked PRs/ })
   await expect(sheet).toBeVisible()
   return sheet
