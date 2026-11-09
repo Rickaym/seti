@@ -32,6 +32,7 @@ import { turnAsks } from './turn-asking.js'
 import { promptFor } from './turn-prompt.js'
 import { keepUnstarted, sessionError, takeUnstarted } from './unstarted.js'
 import { userContent, type UserContent } from './user-content.js'
+import { restoreMissingWorktrees } from './worktree-restore.js'
 
 export { agentEnv, registerContextProvider, registerSessionMcpServers } from './session-options.js'
 export { publish, subscribe } from './task-events.js'
@@ -128,6 +129,7 @@ export function autoQueueBlocker(taskId: string): string | null {
 
 /** Starts the session's process; a pending rewind makes it resume from the rewind point. */
 async function sessionMessages(session: LiveSession, task: Task): Promise<AsyncIterable<SDKMessage>> {
+  await restoreMissingWorktrees(task, async (error) => appendMessage(task.id, { kind: 'seti', payload: { error } }))
   const { key, options } = await sessionStart(task, session.controller)
   session.startWith(key)
   if (task.session_id !== null) {
