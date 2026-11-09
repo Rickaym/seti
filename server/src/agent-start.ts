@@ -25,14 +25,19 @@ async function firstTurnWait(notify: boolean) {
 }
 
 /**
- * Plans what the caller did not pin, then starts the agent sandboxed on the default profile. An
- * agent starting another passes its cap: the new one gets nothing it lacks and grants nothing.
+ * Plans what the caller did not pin, then starts the agent on the default profile, sandboxed
+ * unless the user turned that off. An agent starting another passes its cap: the new one is
+ * sandboxed, gets nothing its starter lacks and grants nothing.
  */
 export async function startAgent(input: StartAgentRequest, cap?: AccessCap): Promise<Task> {
-  return sendOnce(sendKey('task_start', 'new', input.client_id), async () => startPlanned(input, cap), {
-    save: (task) => task.id,
-    load: requireTask,
-  })
+  return sendOnce(
+    sendKey('task_start', 'new', input.client_id),
+    async () => startPlanned(cap === undefined ? input : { ...input, sandbox: true }, cap),
+    {
+      save: (task) => task.id,
+      load: requireTask,
+    },
+  )
 }
 
 async function startPlanned(input: StartAgentRequest, cap?: AccessCap): Promise<Task> {
@@ -62,7 +67,7 @@ async function startPlanned(input: StartAgentRequest, cap?: AccessCap): Promise<
       disabled_plugin_ids: capped?.disabled_plugin_ids ?? [],
       mcp_enabled: plan.mcp_enabled.filter((name) => cap === undefined || cap.mcp.has(name)),
       mcp_disabled: [...mcpOff],
-      sandbox: true,
+      sandbox: input.sandbox,
       access: [...plan.access, ...(capped?.access ?? [])],
       profile_id: cap?.profile_id ?? DEFAULT_PROFILE_ID,
       seti_control: DEFAULT_SETI_CONTROL,

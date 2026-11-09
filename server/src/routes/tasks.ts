@@ -118,7 +118,13 @@ export const taskRoutes = new Hono()
     )
     return refusal ?? ok(c, await createTask(input))
   })
-  .post('/start', validJson(startAgentInput), async (c) => ok(c, await startAgent(c.req.valid('json'))))
+  .post('/start', validJson(startAgentInput), async (c) => {
+    const input = c.req.valid('json')
+    if (fromEa() && !input.sandbox) {
+      return refuseEa(c, 'start an agent outside the sandbox')
+    }
+    return ok(c, await startAgent(input))
+  })
   .get('/:id', async (c) => ok(c, await requireTask(c.req.param('id'))))
   .patch('/:id', validJson(updateTaskInput), async (c) => {
     const input = c.req.valid('json')

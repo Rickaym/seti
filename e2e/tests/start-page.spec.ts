@@ -90,6 +90,20 @@ test('an agent starts straight from the agents page, in a preset colour', async 
   await remove(page, id)
 })
 
+test('the Sandbox switch starts one agent outside the sandbox, then turns back on', async ({ page, request }) => {
+  await page.goto('/#agents')
+  const sandbox = main(page).getByRole('button', { name: 'Sandbox', exact: true })
+  await expect(sandbox).toHaveAttribute('aria-pressed', 'true')
+  await sandbox.click()
+  await expect(sandbox).toHaveAttribute('aria-pressed', 'false')
+  await expect(main(page).getByText('Starts outside the sandbox')).toBeVisible()
+  const id = await start(page, 'planner down: check the vpn from the host')
+  expect((await apiData<Task>(request, `/tasks/${id}`)).sandbox).toBe(false)
+  await page.goto('/#agents')
+  await expect(main(page).getByRole('button', { name: 'Sandbox', exact: true })).toHaveAttribute('aria-pressed', 'true')
+  await remove(page, id)
+})
+
 test('the name comes from Settings, General', async ({ page, request }) => {
   await page.goto('/#settings/general')
   const name = main(page).getByLabel('Your name')

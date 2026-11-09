@@ -29,6 +29,8 @@ export const startAgentInput = z
     attachments: attachmentRefs,
     /** Left out, the agent joins its parent's workspace when an agent starts it, else the first. */
     workspace_id: workspaceId.optional(),
+    /** Off starts it outside the sandbox, which only the user may; agents' starts stay sandboxed. */
+    sandbox: z.boolean().default(true),
     /** Tells the agent or EA that starts it when its first turn ends, as an update. */
     notify_when_done: z.boolean().default(false),
     client_id: clientSendId,
