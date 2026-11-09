@@ -1,4 +1,4 @@
-/** How long the first key of `gg` or `gf` waits for the second. */
+/** How long the first key of `gg`, `gf` or `Ctrl+\ n` waits for the second. */
 export const SEQUENCE_MS = 800
 
 /** What a key asks of the active panel or the app; none of them destroys anything. */
@@ -26,6 +26,8 @@ export interface KeyContext {
   typing: boolean
   /** Focus is in a terminal, frame or media player, which takes every key untouched. */
   passthrough: boolean
+  /** The key comes from a terminal, which lends Vim mode only `Ctrl+\ n` to leave it. */
+  terminal: boolean
   /** A dialog, popover or menu is open and owns the keys. */
   overlay: boolean
   /** The active panel's find bar is open. */
@@ -36,11 +38,11 @@ export type KeyStroke = Pick<KeyboardEvent, 'key' | 'ctrlKey' | 'altKey' | 'meta
 
 /** The first key of a sequence and when it came. */
 export interface Pending {
-  key: 'g'
+  key: 'g' | 'Ctrl+\\'
   at: number
 }
 
-interface KeyResult {
+export interface KeyResult {
   action: VimAction | null
   /** The key belongs to Vim mode, so the page and browser must not see it. */
   handled: boolean
@@ -81,6 +83,24 @@ const CTRL: Record<string, VimAction> = {
   u: { type: 'scroll', by: 'half', direction: -1 },
 }
 
+const MODIFIERS = new Set(['Control', 'Shift', 'Alt', 'Meta'])
+
+/** Ctrl+\ waits for n or Ctrl+n to leave the terminal; any other second key goes to the shell. */
+function terminalKey(stroke: KeyStroke, pending: Pending | null, now: number): KeyResult {
+  if (MODIFIERS.has(stroke.key)) {
+    return { action: null, handled: false, pending }
+  }
+  if (stroke.altKey || stroke.metaKey) {
+    return PASS
+  }
+  if (pending?.key === 'Ctrl+\\' && now - pending.at <= SEQUENCE_MS) {
+    return stroke.key === 'n' ? act({ type: 'normal' }) : PASS
+  }
+  return stroke.ctrlKey && stroke.key === '\\'
+    ? { action: null, handled: true, pending: { key: 'Ctrl+\\', at: now } }
+    : PASS
+}
+
 function escape(context: KeyContext): KeyResult {
   if (context.typing) {
     return act({ type: 'normal' })
@@ -116,18 +136,25 @@ function modifiedKey(stroke: KeyStroke, context: KeyContext): KeyResult | null {
 
 /**
  * Turns one key press into a Vim mode action. Keys act only in normal mode: Vim mode on, focus
- * outside fields, terminals and frames, and no dialog or menu open. Esc in a field leaves insert
- * mode. A `g` waits `SEQUENCE_MS` for its second key; any other key then acts as itself.
+ * outside fields, terminals and frames, and no dialog or menu open. Esc in a field and `Ctrl+\ n`
+ * in a terminal leave insert mode. A `g` waits `SEQUENCE_MS` for its second key; any other key
+ * then acts as itself.
  */
 export function readKey(stroke: KeyStroke, context: KeyContext, pending: Pending | null, now: number): KeyResult {
-  if (!context.enabled || context.passthrough || context.overlay || stroke.isComposing || stroke.altKey) {
+  if (!context.enabled || context.overlay || stroke.isComposing) {
+    return PASS
+  }
+  if (context.terminal) {
+    return terminalKey(stroke, pending, now)
+  }
+  if (context.passthrough || stroke.altKey) {
     return PASS
   }
   const modified = modifiedKey(stroke, context)
   if (modified !== null) {
     return modified
   }
-  const second = pending !== null && now - pending.at <= SEQUENCE_MS ? AFTER_G[stroke.key] : undefined
+  const second = pending?.key === 'g' && now - pending.at <= SEQUENCE_MS ? AFTER_G[stroke.key] : undefined
   if (second !== undefined) {
     return act(second)
   }
@@ -147,7 +174,8 @@ export const BINDINGS: readonly { heading: string; rows: readonly Binding[] }[] 
     heading: 'Modes',
     rows: [
       { keys: 'Esc', action: 'Leave a field for the panel (normal mode)' },
-      { keys: 'i', action: 'Write in the panel (insert mode)' },
+      { keys: 'Ctrl+\\ n', action: 'Leave a terminal for its panel' },
+      { keys: 'i', action: 'Write in the panel or its terminal (insert mode)' },
       { keys: 'a', action: 'Write at the end of the draft' },
     ],
   },

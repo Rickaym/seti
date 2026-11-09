@@ -32,8 +32,8 @@ const capabilityError = (input: unknown) => {
 }
 
 describe('the mod API version', () => {
-  it('is 1.18.0, which bundled ^1.0 manifests still match', () => {
-    expect(MOD_API_VERSION).toBe('1.18.0')
+  it('is 1.19.0, which bundled ^1.0 manifests still match', () => {
+    expect(MOD_API_VERSION).toBe('1.19.0')
     expect(manifestProblem(modManifest.parse({ ...base, seti: '^1.0' }), 'bundled')).toBeNull()
   })
 })

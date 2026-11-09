@@ -118,7 +118,6 @@ export const TerminalCell = memo(function TerminalCellView({
       data-grid-focused={focused}
       data-grid-terminal=""
       {...seti().panels.markers.PANEL}
-      {...seti().panels.markers.PANEL_PASSTHROUGH}
       {...seti().panels.markers.focused(focused)}
       tabIndex={-1}
       className={cn(

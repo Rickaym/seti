@@ -3,7 +3,7 @@ import { useEffect, useLayoutEffect, useRef, type RefObject } from 'react'
 /** Marks an element as a panel that keyboard focus moves between, as Vim mode does. */
 export const PANEL = { 'data-panel': '' } as const
 
-/** Marks a panel whose keys all belong to what it holds, such as a terminal. */
+/** Marks an element whose keys all belong to what it holds; a terminal counts without it. */
 export const PANEL_PASSTHROUGH = { 'data-panel-passthrough': '' } as const
 
 /** The attribute on the panel keyboard focus is in, while a mod such as Vim mode marks it. */
@@ -169,15 +169,15 @@ export function scrollToBottom(scroller: HTMLElement): void {
   }
 }
 
-/** The panel's reply box, else its first field. */
+const usable = (field: HTMLTextAreaElement | HTMLInputElement) => shown(field) && !field.disabled
+
+/** The panel's reply box or terminal, else its first field outside a terminal or frame. */
 export function composerOf(panel: HTMLElement): HTMLTextAreaElement | HTMLInputElement | null {
-  const fields = [
-    ...panel.querySelectorAll<HTMLTextAreaElement | HTMLInputElement>(PRIMARY_INPUT),
-    ...panel.querySelectorAll<HTMLTextAreaElement | HTMLInputElement>(
-      'textarea, input:not([type="checkbox"], [type="radio"], [type="button"], [type="submit"], [type="hidden"])',
-    ),
-  ]
-  return fields.find((field) => shown(field) && !field.disabled && !isPassthrough(field)) ?? null
+  const primary = [...panel.querySelectorAll<HTMLTextAreaElement | HTMLInputElement>(PRIMARY_INPUT)].find(usable)
+  const fields = panel.querySelectorAll<HTMLTextAreaElement | HTMLInputElement>(
+    'textarea, input:not([type="checkbox"], [type="radio"], [type="button"], [type="submit"], [type="hidden"])',
+  )
+  return primary ?? [...fields].find((field) => usable(field) && !isPassthrough(field)) ?? null
 }
 
 /** The panel's own search field, for panels without a chat find, such as Files. */

@@ -301,6 +301,8 @@ export interface ModInputHook {
   onKeyDown?: (e: KeyboardEvent) => void
   /** True when this Esc is the hook's, so Seti's own Esc, such as stopping an agent, skips it. */
   takesEscape?: (e: KeyboardEvent) => boolean
+  /** True when a key typed in a terminal is the hook's, not the shell's; it then reaches onKeyDown. */
+  takesTerminalKey?: (e: KeyboardEvent) => boolean
   /** Enter in a chat's find field; true when the hook took it instead of stepping to the match. */
   onFindEnter?: (field: HTMLElement, e: { shiftKey: boolean }) => boolean
   /** Drawn above the page while the hook is registered, such as a dialog that lists its keys. */
@@ -326,7 +328,7 @@ export interface ModPanels {
   /** The panel's scroll area, and how to move it to its newest content. */
   scrollerOf: (panel: HTMLElement) => HTMLElement | null
   scrollToBottom: (scroller: HTMLElement) => void
-  /** The panel's reply box, else its first field; and its own search field. */
+  /** The panel's reply box or terminal, else its first field; and its own search field. */
   composerOf: (panel: HTMLElement) => HTMLTextAreaElement | HTMLInputElement | null
   searchFieldOf: (panel: HTMLElement) => HTMLInputElement | null
   /** What the panel offers beyond scrolling, such as opening its Files. */
@@ -351,7 +353,7 @@ export interface ModPanels {
 export interface ModPanelMarkers {
   /** A panel focus moves between. */
   PANEL: Readonly<Record<string, string>>
-  /** A panel whose keys all belong to what it holds, such as a terminal. */
+  /** An element whose keys all belong to what it holds; a terminal counts without it. */
   PANEL_PASSTHROUGH: Readonly<Record<string, string>>
   /** Marks the panel a layout of several holds as focused. */
   focused: (focused: boolean) => Readonly<Record<string, boolean>>

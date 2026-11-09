@@ -417,7 +417,8 @@ Settings, Mods shows it with a Core badge and a lock in place of its switch, and
 is part of Seti. Only a bundled mod may be required; Check refuses a third-party manifest that sets
 it, and a theme mod cannot set it either.
 
-This Seti offers mod API 1.18.0, which added fence snapshots for share pages; 1.17.0 added
+This Seti offers mod API 1.19.0, which added `takesTerminalKey` to input hooks; 1.18.0 added fence
+snapshots for share pages; 1.17.0 added
 `required`; 1.16.0 added agent accents; 1.15.0 added agent docks, streaming
 routes, menu commands and `tasks.ask`; 1.14.0 added `api.app.every`, `api.keys.label` and `aria`, `api.terminals.useOwn`
 and `api.agents.open()` without an id; 1.13.0 opened commands, slash commands, webhook sources,
@@ -525,13 +526,16 @@ puts their row in the guide.
 ### Input hooks
 
 A bundled mod adds keyboard behaviour with an `inputHooks` entry and
-`api.registerInputHook({ id, onKeyDown, takesEscape, onFindEnter, overlay })`; `overlay` is drawn
-above the page while the hook is registered, such as a dialog that lists its keys. `api.panels`
-finds Seti's panels, their scroll areas, reply boxes and find bars, and marks the active one;
-`api.app` opens the palette and the group chat, keeps focus where a key put it, and says through
-`narrow` when the layout shows one pane, as on a phone. Hooks see every key, so third-party mods
-never get them. `mods/vim/` is the example: it binds single keys only while it is on and the
-screen is wide, so a mod that binds single keys ships with `defaultEnabled: false`.
+`api.registerInputHook({ id, onKeyDown, takesEscape, takesTerminalKey, onFindEnter, overlay })`;
+`overlay` is drawn above the page while the hook is registered, such as a dialog that lists its
+keys. A terminal keeps every key for its shell unless `takesTerminalKey` says the key is the
+hook's; the terminal then leaves it alone and it reaches `onKeyDown`, which is how Vim mode's
+Ctrl+\ n leaves a terminal. `api.panels` finds Seti's panels, their scroll areas, reply boxes,
+terminals and find bars, and marks the active one; `api.app` opens the palette and the group chat,
+keeps focus where a key put it, and says through `narrow` when the layout shows one pane, as on a
+phone. Hooks see every key, so third-party mods never get them. `mods/vim/` is the example: it
+binds single keys only while it is on and the screen is wide, so a mod that binds single keys
+ships with `defaultEnabled: false`.
 
 ### PR decorators, host proxies and PR chips
 
