@@ -2,7 +2,18 @@ import { describe, expect, it } from 'vitest'
 import { readKey, SEQUENCE_MS, type KeyContext, type KeyStroke } from './keymap'
 import { vimActive } from './vim-store'
 
-const NORMAL: KeyContext = { enabled: true, typing: false, passthrough: false, overlay: false, finding: false }
+const NORMAL: KeyContext = {
+  enabled: true,
+  typing: false,
+  passthrough: false,
+  terminal: false,
+  overlay: false,
+  finding: false,
+}
+
+const TERMINAL: KeyContext = { ...NORMAL, typing: true, passthrough: true, terminal: true }
+
+const LEADER = { key: 'Ctrl+\\', at: 1000 } as const
 
 const stroke = (key: string, extra: Partial<KeyStroke> = {}): KeyStroke => ({
   key,
@@ -85,5 +96,47 @@ describe('readKey', () => {
     const late = readKey(stroke('g'), NORMAL, first.pending, 1000 + SEQUENCE_MS + 1)
     expect(late).toEqual({ action: null, handled: true, pending: { key: 'g', at: 1000 + SEQUENCE_MS + 1 } })
     expect(readKey(stroke('f'), NORMAL, first.pending, 1000 + SEQUENCE_MS + 1).handled).toBe(false)
+  })
+
+  it('leaves a terminal for normal mode on Ctrl+\\ then n or Ctrl+n', () => {
+    const first = readKey(stroke('\\', { ctrlKey: true }), TERMINAL, null, 1000)
+    expect(first).toEqual({ action: null, handled: true, pending: LEADER })
+    expect(readKey(stroke('Control', { ctrlKey: true }), TERMINAL, first.pending, 1200)).toEqual({
+      action: null,
+      handled: false,
+      pending: LEADER,
+    })
+    for (const extra of [{}, { ctrlKey: true }]) {
+      const leave = readKey(stroke('n', extra), TERMINAL, first.pending, 1500)
+      expect(leave).toEqual({ action: { type: 'normal' }, handled: true, pending: null })
+    }
+  })
+
+  it('passes every other terminal key to the shell, and a second Ctrl+\\ too', () => {
+    for (const key of ['j', 'l', 'n', 'i', '/', ':', 'Escape', 'g']) {
+      expect(readKey(stroke(key), TERMINAL, null, 1500).handled).toBe(false)
+    }
+    for (const key of ['x', 'Escape', 'c', 'N']) {
+      expect(readKey(stroke(key, { ctrlKey: key === 'c' }), TERMINAL, LEADER, 1500)).toEqual({
+        action: null,
+        handled: false,
+        pending: null,
+      })
+    }
+    const twice = readKey(stroke('\\', { ctrlKey: true }), TERMINAL, LEADER, 1200)
+    expect(twice).toEqual({ action: null, handled: false, pending: null })
+    expect(readKey(stroke('n'), TERMINAL, LEADER, 1000 + SEQUENCE_MS + 1).handled).toBe(false)
+    expect(readKey(stroke('n', { altKey: true }), TERMINAL, LEADER, 1500).handled).toBe(false)
+    expect(readKey(stroke('\\', { ctrlKey: true, altKey: true }), TERMINAL, null, 1500).handled).toBe(false)
+  })
+
+  it('takes no terminal key while off or under a dialog, and Ctrl+\\ waits only in a terminal', () => {
+    for (const context of [{ enabled: false }, { overlay: true }]) {
+      const leader = readKey(stroke('\\', { ctrlKey: true }), { ...TERMINAL, ...context }, null, 1000)
+      expect(leader).toEqual({ action: null, handled: false, pending: null })
+      expect(readKey(stroke('n'), { ...TERMINAL, ...context }, LEADER, 1500).handled).toBe(false)
+    }
+    expect(readKey(stroke('g'), NORMAL, LEADER, 1500).pending).toEqual({ key: 'g', at: 1500 })
+    expect(readKey(stroke('n', { ctrlKey: true }), NORMAL, LEADER, 1500).handled).toBe(false)
   })
 })

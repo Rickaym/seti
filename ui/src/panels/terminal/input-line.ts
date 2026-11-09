@@ -1,5 +1,5 @@
 import { DEL, lineKeys, pressSequence, splitLines, withModifiers, type Held } from './terminal-keys'
-import { isTerminalShortcut, keepKeys } from './terminal-shortcut'
+import { keepKeys, leavesTerminal } from './terminal-shortcut'
 
 /** What the input line needs from the terminal it types into. */
 export interface LineTarget {
@@ -124,7 +124,7 @@ export function bindInputLine(field: HTMLTextAreaElement, target: LineTarget): I
   }
   const onKeyDown = (event: KeyboardEvent) => {
     keepKeys(event)
-    if (event.isComposing || IME_KEYS.has(event.key) || isTerminalShortcut(event)) {
+    if (event.isComposing || IME_KEYS.has(event.key) || leavesTerminal(event)) {
       return
     }
     const held = target.held()

@@ -5,7 +5,7 @@ import { apiData, expect, test, unique } from './support/fixtures.js'
 import { focusedPanel, panelOf, rectOf, startAgent } from './support/grid.js'
 import { modToggle, setModEnabled } from './support/mods.js'
 import { FAKE_CLAUDE_ENV } from './support/processes.js'
-import { run, screenOf, terminalButton, tileIn } from './support/terminal.js'
+import { run, screenOf, terminalButton, tileIn, typedInput } from './support/terminal.js'
 
 test.use({ serverEnv: FAKE_CLAUDE_ENV })
 
@@ -175,6 +175,71 @@ test('Vim mode moves the active grid panel with h and l and leaves terminals eve
   await expect(typed).toBeFocused()
   await expect(mode(page)).toHaveText('INSERT')
   await expect(cheatSheet(page)).toBeHidden()
+})
+
+test('Vim mode stops on a terminal panel, i enters its shell and Ctrl+\\ n leaves it', async ({ page, request }) => {
+  test.setTimeout(60_000)
+  const title = unique('Vim beside a shell')
+  const id = await startAgent(request, title)
+  await setModEnabled(request, 'vim', true)
+  await page.goto(`/#agents/${id}`)
+  await page.getByRole('button', { name: 'Open in grid' }).click()
+  await expect.poll(async () => rectOf(panelOf(page, title))).toEqual([0, 0, 12, 24])
+  const sent = typedInput(page)
+  await terminalButton(page).click()
+  const tile = tileIn(page)
+  await run(tile, 'echo vim-shell-ready')
+  await expect(screenOf(tile)).toContainText('vim-shell-ready')
+  const typed = tile.locator('.xterm-helper-textarea')
+  const since = (mark: number) => sent.slice(mark).join('')
+  let mark = sent.length
+
+  await panelOf(page, title).getByRole('combobox', { name: 'Reply' }).click()
+  await page.keyboard.press('Escape')
+  await expect(mode(page)).toHaveText('NORMAL')
+  await page.keyboard.press('l')
+  await expect(focusedPanel(page)).toHaveAttribute('data-grid-terminal', '')
+  await expect(tile).toBeFocused()
+  await expect(page.locator('[data-panel-active]')).toHaveAttribute('data-grid-terminal', '')
+  await expect(mode(page)).toHaveText('NORMAL')
+  await page.keyboard.press('j')
+  await page.keyboard.press('k')
+  await expect(typed).not.toBeFocused()
+
+  await page.keyboard.press('i')
+  await expect(typed).toBeFocused()
+  await expect(mode(page)).toHaveText('INSERT')
+  await page.keyboard.type('echo inside-$((3+4))')
+  await page.keyboard.press('Enter')
+  await expect(screenOf(tile)).toContainText('inside-7')
+  expect(since(mark)).toBe('echo inside-$((3+4))\r')
+
+  await page.keyboard.type('sleep 30; echo woke-$((2+3))')
+  await page.keyboard.press('Enter')
+  await expect(screenOf(tile)).toContainText('sleep 30; echo woke-')
+  mark = sent.length
+  await page.keyboard.press('Control+Backslash')
+  await page.keyboard.press('Control+Backslash')
+  await expect(screenOf(tile)).toContainText('woke-5')
+  expect(since(mark)).toBe('\x1c')
+  await expect(typed).toBeFocused()
+
+  await page.keyboard.press('Control+Backslash')
+  await page.keyboard.press('n')
+  await expect(typed).not.toBeFocused()
+  await expect(tile).toBeFocused()
+  await expect(mode(page)).toHaveText('NORMAL')
+
+  await page.keyboard.press('h')
+  await expect(focusedPanel(page)).toContainText(title)
+  await expect(page.locator('[data-panel-active]')).toContainText(title)
+  await page.keyboard.press('l')
+  await page.keyboard.press('a')
+  await expect(typed).toBeFocused()
+  await page.keyboard.type('echo again-$((4+4))')
+  await page.keyboard.press('Enter')
+  await expect(screenOf(tile)).toContainText('again-8')
+  expect(since(mark)).toBe('\x1cecho again-$((4+4))\r')
 })
 
 test('turning the Vim mode mod off leaves no single key, and on again brings them back', async ({ page }) => {

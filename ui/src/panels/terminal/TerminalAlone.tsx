@@ -13,7 +13,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { useNarrow } from '@/hooks/useMedia'
-import { PANEL, PANEL_PASSTHROUGH } from '@/lib/panels'
+import { PANEL } from '@/lib/panels'
 import { navigate } from '@/lib/route'
 import { setLayoutActive, useLayouts, type AgentsLayout } from '@/panels/tasks/agents-layouts'
 import { TerminalName } from './TerminalName'
@@ -159,12 +159,7 @@ function TerminalAlone({ id }: { id: string }) {
     setRun((n) => n + 1)
   }
   return (
-    <section
-      aria-label="Terminal"
-      {...PANEL}
-      {...PANEL_PASSTHROUGH}
-      className="flex h-full min-h-0 flex-col bg-background"
-    >
+    <section aria-label="Terminal" {...PANEL} className="flex h-full min-h-0 flex-col bg-background">
       <DetailBar className="typing:not-focus-within:hidden">
         <BackButton section="agents" label="agents" />
         <TerminalIcon aria-hidden className="size-4 shrink-0 text-muted-foreground" />

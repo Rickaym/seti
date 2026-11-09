@@ -26,7 +26,8 @@ export const cheatSheet = ({ Dialog }: ModKit) =>
             </section>
           ))}
           <p className="text-muted-foreground">
-            Terminals take every key, Esc included; Alt+Arrows leave one. Keys rest while you type in a field.
+            A terminal takes every other key, Esc included; Ctrl+\ twice sends one Ctrl+\. Keys rest while you type in a
+            field.
           </p>
         </div>
       </Dialog>

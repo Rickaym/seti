@@ -32,6 +32,7 @@ export const vimUi = defineMod({
       id: 'keys',
       onKeyDown: keys.onKeyDown,
       takesEscape: keys.takesEscape,
+      takesTerminalKey: keys.takesTerminalKey,
       onFindEnter: keys.onFindEnter,
       overlay: cheatSheet(api.kit),
     })

@@ -16,7 +16,7 @@ import { FIND_EVENT, findKeys } from './terminal-find'
 import { fontKeys, terminalFont } from './terminal-font'
 import { isOneChar, newlineKeys, withModifiers } from './terminal-keys'
 import { copyFromPrograms } from './terminal-osc52'
-import { isTerminalShortcut, keepKeys } from './terminal-shortcut'
+import { keepKeys, leavesTerminal } from './terminal-shortcut'
 import { terminalTheme } from './terminal-theme'
 import { pinchToZoom } from './touch-pinch'
 import { scrollByTouch } from './touch-scroll'
@@ -70,7 +70,7 @@ function useXterm(themeKey: string): { ref: RefCallback<HTMLDivElement>; term: T
     searches.set(created, search)
     created.attachCustomKeyEventHandler(
       (event) =>
-        !isTerminalShortcut(event) &&
+        !leavesTerminal(event) &&
         findKeys(created, event) &&
         fontKeys(event) &&
         clipboardKeys(created, event) &&

@@ -1,5 +1,5 @@
 import type { Disposer, UiModApi } from '@seti/mod-api'
-import { readKey, type KeyContext, type Pending, type VimAction } from './keymap'
+import { readKey, type KeyContext, type KeyResult, type Pending, type VimAction } from './keymap'
 import { setVimActive, setVimHelpOpen, setVimMode, vimActive } from './vim-store'
 
 const LINE_PX = 60
@@ -73,6 +73,8 @@ export class VimKeys {
   /** The panel that last held focus, which stays active while focus rests on the page itself. */
   private lastPanel: HTMLElement | null = null
   private pending: Pending | null = null
+  /** The last key a terminal asked about, read once however often it asks. */
+  private terminalRead: { event: KeyboardEvent; result: KeyResult } | null = null
   private readonly api: UiModApi
 
   constructor(api: UiModApi) {
@@ -91,20 +93,13 @@ export class VimKeys {
     return panels.selected() ?? panels.visible()[0] ?? null
   }
 
-  /** Moves focus to a panel without scrolling; a terminal panel hands it to its terminal. */
+  /** Moves focus to a panel without scrolling, in normal mode even when it holds a terminal. */
   private focusPanel(panel: HTMLElement): void {
     this.lastPanel = panel
-    const terminal = this.api.panels.isPassthrough(panel)
-      ? panel.querySelector<HTMLElement>('[data-primary-input="true"]')
-      : null
-    if (terminal === null) {
-      if (!panel.hasAttribute('tabindex')) {
-        panel.setAttribute('tabindex', '-1')
-      }
-      panel.focus({ preventScroll: true })
-    } else {
-      terminal.focus({ preventScroll: true })
+    if (!panel.hasAttribute('tabindex')) {
+      panel.setAttribute('tabindex', '-1')
     }
+    panel.focus({ preventScroll: true })
     panel.scrollIntoView({ block: 'nearest', inline: 'nearest' })
     this.api.panels.markActive(panel)
     this.api.app.holdFocus()
@@ -190,6 +185,7 @@ export class VimKeys {
       enabled: vimActive(),
       typing,
       passthrough: this.api.panels.isPassthrough(target),
+      terminal: false,
       overlay: this.api.panels.overlayOpen(),
       finding: !typing && panel !== null && this.api.panels.findOf(panel)?.isOpen() === true,
     }
@@ -200,7 +196,10 @@ export class VimKeys {
       return
     }
     const panel = this.activePanel()
-    const result = readKey(e, this.contextFor(e.target, panel), this.pending, e.timeStamp)
+    const result =
+      this.terminalRead?.event === e
+        ? this.terminalRead.result
+        : readKey(e, this.contextFor(e.target, panel), this.pending, e.timeStamp)
     this.pending = result.pending
     if (!result.handled) {
       return
@@ -217,6 +216,20 @@ export class VimKeys {
       return false
     }
     return readKey(e, this.contextFor(e.target, this.activePanel()), null, e.timeStamp).handled
+  }
+
+  /** Whether a terminal key is Vim mode's, as Ctrl+\ then n is; it then reaches onKeyDown. */
+  readonly takesTerminalKey = (e: KeyboardEvent): boolean => {
+    if (e.type !== 'keydown' || !vimActive()) {
+      return false
+    }
+    if (this.terminalRead?.event !== e) {
+      const context = { ...this.contextFor(e.target, null), terminal: true }
+      const result = readKey(e, context, this.pending, e.timeStamp)
+      this.terminalRead = { event: e, result }
+      this.pending = result.pending
+    }
+    return this.terminalRead.result.handled
   }
 
   /** Enter in a chat's find field leaves it for the panel, so n and N step through matches. */
@@ -261,6 +274,7 @@ export class VimKeys {
       setVimActive(false)
       setVimHelpOpen(false)
       this.pending = null
+      this.terminalRead = null
       this.api.panels.markActive(null)
     }
   }

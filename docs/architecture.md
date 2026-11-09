@@ -350,7 +350,7 @@ caller, and the EA asks the user first, as for its own tools that change things.
 Keyboard behaviour goes through one core focus API: `PANEL` in `ui/src/lib/panels.ts` marks the
 panels focus moves between (`data-panel`), with `data-panel-scroll`, `data-panel-passthrough`,
 `data-panel-active` and `data-panel-focused` (the panel a layout of several holds as focused), and
-`inputHooks` hands every key to each registered hook, asks hooks whether an Esc or a find field's Enter is theirs, and draws what a hook overlays, such as a list of its
+`inputHooks` hands every key to each registered hook, asks hooks whether an Esc, a find field's Enter or a key typed in a terminal is theirs, and draws what a hook overlays, such as a list of its
 keys. Vim mode is the bundled mod `mods/vim/`, off until the user turns it on, so Seti itself binds
 no single key. Routes hot-toggle because one route,
 `/api/mods/:id/*`, hands each request to the entry an enabled mod registered, after the request
