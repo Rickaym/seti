@@ -1,7 +1,7 @@
 {
   "id": "grid",
   "name": "Grid",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "seti": "^1.14",
   "description": "Shows agents and terminals side by side in panels you drag, resize and tidy, one layout per workspace.",
   "author": "Seti",
@@ -63,10 +63,7 @@
         "changes": false
       }
     ],
-    "shortcuts": [
-      { "keys": "Alt+Arrows", "title": "Move between grid panels", "group": "agents" },
-      { "keys": "Alt+Shift+Arrows", "title": "Move the grid panel", "group": "agents" }
-    ],
+    "shortcuts": [{ "keys": "Alt+Shift+Arrows", "title": "Move the grid panel", "group": "agents" }],
     "styles": [{ "id": "panels", "file": "panels.css" }],
     "routes": [
       { "method": "GET", "path": "/layouts", "demo": true },

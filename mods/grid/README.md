@@ -11,7 +11,7 @@ its own layout, shared by every device; whether the grid is on is up to each dev
 - Drag a panel by its header and resize it by its edges; Lock keeps the layout still.
 - Tidy lays the panels out evenly, and the template picker sets how many fit one screen.
 - Terminal adds a shell as a panel of its own.
-- Alt+Arrows move between panels, and Alt+Shift+Arrows move the focused panel.
+- Alt+Shift+Arrows move the focused panel. To move between panels by keyboard, turn on Vim mode.
 
 Phones always show one agent at a time.
 

@@ -47,7 +47,6 @@ test('the sidebar button opens a guide that lists every chord and no bare letter
     'Esc Stop agent',
     'Esc Esc Rewind',
     '/btw Ask aside',
-    'Alt+Arrows Move between grid panels',
     'Alt+Shift+Arrows Move the grid panel',
   ])
   expect(await rows(guide(page).getByRole('region', { name: 'Terminal' }))).toEqual([

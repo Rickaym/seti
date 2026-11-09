@@ -161,12 +161,11 @@ test('an agent dragged from the list lands where it is dropped and both stream',
   }
 })
 
-test('the keyboard moves focus, moves and resizes panels, and announces each step', async ({ page, request }) => {
+test('the keyboard moves and resizes panels, and announces each step', async ({ page, request }) => {
   test.setTimeout(60_000)
-  const { left, right, leftId, rightId } = await twoSideBySide(page, request, 'Grid keys')
+  const { left, right, rightId } = await twoSideBySide(page, request, 'Grid keys')
 
-  await panelOf(page, left).getByRole('combobox', { name: 'Reply' }).focus()
-  await page.keyboard.press('Alt+ArrowRight')
+  await panelOf(page, right).getByRole('combobox', { name: 'Reply' }).focus()
   await expect(focusedPanel(page).getByRole('heading', { name: right })).toBeVisible()
   await expect(panelOf(page, right).getByRole('combobox', { name: 'Reply' })).toBeFocused()
   await expect(page).toHaveURL(new RegExp(`#agents/${rightId}$`))
@@ -200,7 +199,7 @@ test('the keyboard moves focus, moves and resizes panels, and announces each ste
   await expect(status(page)).toHaveText('Layout kept')
 
   await page.keyboard.press('Alt+ArrowLeft')
-  await expect(page).toHaveURL(new RegExp(`#agents/${leftId}$`))
+  await expect(page).toHaveURL(new RegExp(`#agents/${rightId}$`))
   await page.reload()
   await expect.poll(async () => rectOf(panelOf(page, right))).toEqual([6, 0, 6, 23])
 })
