@@ -1,8 +1,24 @@
 import { setTimeout as sleep } from 'node:timers/promises'
-import { describe, expect, it } from 'vitest'
-import { inLane, outsideLane } from './task-lane.js'
+import { describe, expect, it, vi } from 'vitest'
+import { inLane, outsideLane, SLOW_LANE_MS } from './task-lane.js'
 
 describe('task lanes', () => {
+  it('logs work that holds a lane too long, with where it joined the lane', async () => {
+    const warn = vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
+    vi.useFakeTimers({ toFake: ['Date'] })
+    try {
+      await inLane('slow', () => {
+        vi.setSystemTime(Date.now() + SLOW_LANE_MS + 2000)
+      })
+      await inLane('slow', () => undefined)
+      expect(warn).toHaveBeenCalledTimes(1)
+      expect(String(warn.mock.calls[0]?.[0])).toMatch(/^lane: task slow was held 12 s by .*task-lane\.test/)
+    } finally {
+      vi.useRealTimers()
+      warn.mockRestore()
+    }
+  })
+
   it('runs work of one task one piece at a time, in the order it came', async () => {
     const steps: string[] = []
     const work = (name: string, ms: number) => async () => {

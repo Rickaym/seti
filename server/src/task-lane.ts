@@ -9,18 +9,37 @@ interface Hold {
 const held = new AsyncLocalStorage<Hold>()
 const tails = new Map<string, Promise<unknown>>()
 
+/** Work that holds a task's lane longer than this is logged with where it came from. */
+export const SLOW_LANE_MS = 10_000
+
+/** The first frames outside this module of a stack captured where work joined the lane. */
+const callerOf = (stack: string | undefined) =>
+  (stack ?? '')
+    .split('\n')
+    .slice(1)
+    .filter((line) => !line.includes('/task-lane.ts:') && !line.includes('node_modules'))
+    .slice(0, 3)
+    .map((line) => line.trim())
+    .join(' < ')
+
 /** Runs `fn` after earlier work of the task, one at a time; work holding the lane runs in place. */
 export async function inLane<T>(taskId: string, fn: () => T | Promise<T>): Promise<T> {
   const current = held.getStore()
   if (current?.active === true && current.taskId === taskId) {
     return await fn()
   }
+  const stack = new Error('lane').stack
   const run = async () => {
     const hold: Hold = { taskId, active: true }
+    const started = Date.now()
     try {
       return await held.run(hold, fn)
     } finally {
       hold.active = false
+      const ms = Date.now() - started
+      if (ms > SLOW_LANE_MS) {
+        process.stderr.write(`lane: task ${taskId} was held ${String(Math.round(ms / 1000))} s by ${callerOf(stack)}\n`)
+      }
     }
   }
   const previous = tails.get(taskId) ?? Promise.resolve()
