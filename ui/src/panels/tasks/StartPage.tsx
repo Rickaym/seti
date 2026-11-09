@@ -1,5 +1,5 @@
 import { checkComposer, confirmationFor, type AttachmentRef, type StartAgentInput, type Task } from '@seti/shared'
-import { ArrowUp, GitPullRequest, Loader2, X } from 'lucide-react'
+import { ArrowUp, GitPullRequest, Loader2, ShieldCheck, ShieldOff, X } from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { apiSend, errorText } from '@/api'
@@ -12,6 +12,7 @@ import { RETRYING_LABEL, useClientSend } from '@/hooks/useClientSend'
 import { useCommandCatalog } from '@/hooks/useCommandCatalog'
 import { useDraft } from '@/hooks/useDraft'
 import { useCoarsePointer } from '@/hooks/useMedia'
+import { useSystem } from '@/hooks/useSystem'
 import { useTasks } from '@/hooks/useTasks'
 import { useUserName } from '@/hooks/useUserName'
 import { useCurrentWorkspace } from '@/hooks/useWorkspaces'
@@ -26,6 +27,7 @@ import { CommandField, ComposerStatus } from '@/panels/tasks/CommandField'
 const RECENT_REPOS = 4
 const HINT = 'Enter starts it, Ctrl+Enter adds a line. Seti picks the repos, context and tools.'
 const TOUCH_HINT = 'Seti picks the repos, context and tools; change them later.'
+const UNSANDBOXED = 'Starts outside the sandbox, with your access to every file, host and credential.'
 const SHELL_IN_PROMPT =
   'Shell commands only run in an existing agent, so the new agent gets this as a message. Start anyway?'
 
@@ -116,6 +118,50 @@ function request(message: Message, context: StartContext | null, picked: readonl
 const inWorkspace = (input: StartAgentInput, workspaceId: string | null): StartAgentInput =>
   workspaceId === null ? input : { ...input, workspace_id: workspaceId }
 
+/** What the composer says while idle: an unsandboxed start says so first. */
+function idleHint(sandboxed: boolean, touch: boolean): string {
+  if (!sandboxed) {
+    return UNSANDBOXED
+  }
+  return touch ? TOUCH_HINT : HINT
+}
+
+interface SandboxToggleProps {
+  on: boolean
+  onChange: (on: boolean) => void
+  disabled: boolean
+}
+
+/** The new agent's sandbox: on unless the user turns it off; hidden while off in settings. */
+function SandboxToggle({ on, onChange, disabled }: SandboxToggleProps) {
+  if (!(useSystem().data?.sandbox.enabled ?? true)) {
+    return null
+  }
+  return (
+    <Hint
+      text={
+        on
+          ? 'Sandboxed: it sees only its folders and reaches only the listed hosts. Click to start it without.'
+          : 'Unsandboxed: it runs on the host with your access. Click to sandbox it.'
+      }
+    >
+      <Button
+        variant="ghost"
+        size="icon-sm"
+        aria-label="Sandbox"
+        aria-pressed={on}
+        disabled={disabled}
+        className="shrink-0 aria-pressed:text-primary pointer-coarse:size-10"
+        onClick={() => {
+          onChange(!on)
+        }}
+      >
+        {on ? <ShieldCheck /> : <ShieldOff />}
+      </Button>
+    </Hint>
+  )
+}
+
 /** Older installs stored "there" when git had no name, so it greets nobody in particular. */
 function greeting(name: string | null): string {
   const named = name?.trim() ?? ''
@@ -135,6 +181,7 @@ export function StartPage() {
   const attachments = useAttachments(draftKey, prompt, setPrompt)
   const [picked, setPicked] = useState<string[]>([])
   const [starting, setStarting] = useState(false)
+  const [sandboxed, setSandboxed] = useState(true)
   const clientSend = useClientSend()
   const commands = useCommandCatalog('/commands', prompt.trimStart().startsWith('/'))
   const check = checkComposer(prompt, commands.commands)
@@ -154,12 +201,16 @@ export function StartPage() {
     }
     setStarting(true)
     try {
-      const body = inWorkspace(request(attachments.message(prompt), context, picked), currentId)
+      const body = {
+        ...inWorkspace(request(attachments.message(prompt), context, picked), currentId),
+        ...(sandboxed ? {} : { sandbox: false }),
+      }
       const task = await clientSend.run(JSON.stringify(body), async (clientId, options) =>
         apiSend<Task>('/tasks/start', { ...body, client_id: clientId }, options),
       )
       attachments.sent()
       setPrompt('')
+      setSandboxed(true)
       clearStartContext()
       refresh()
       navigate('agents', task.id, { force: true })
@@ -217,6 +268,7 @@ export function StartPage() {
                 />
               )}
               <div className="ml-auto flex shrink-0 items-center gap-1">
+                <SandboxToggle on={sandboxed} onChange={setSandboxed} disabled={starting} />
                 <AttachButton
                   disabled={starting}
                   onFiles={(chosen) => {
@@ -246,7 +298,7 @@ export function StartPage() {
               check={check}
               commands={commands}
               shellCwd={null}
-              idle={attachments.pending ?? (touch ? TOUCH_HINT : HINT)}
+              idle={attachments.pending ?? idleHint(sandboxed, touch)}
             />
           )}
         </div>

@@ -152,8 +152,9 @@ runs under bubblewrap with its own pid, network, IPC and UTS namespaces:
   keys of those logins, pinned per host with IdentitiesOnly. AWS gets
   short-lived credentials of the role in the task's credential from the proxy,
   never the host's own.
-- A task fails to start when the sandbox is unavailable. Unsandboxed tasks are a per-task choice,
-  badged in the UI and audited.
+- A task fails to start when the sandbox is unavailable. Unsandboxed tasks are a per-task choice
+  the user makes with the Sandbox switch on the start page, badged in the UI and audited. The EA
+  is refused, and an agent that starts another always starts it sandboxed.
 
 ## Each agent runs in a scope with memory and CPU caps
 

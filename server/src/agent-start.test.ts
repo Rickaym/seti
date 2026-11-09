@@ -111,6 +111,15 @@ describe('POST /api/tasks/start', () => {
     expect(created?.detail).toMatchObject({ planner: 'model', withheld: ['AWS: not configured'] })
   })
 
+  it('starts outside the sandbox when the user turns it off, and refuses that to the EA', async () => {
+    const { data: task } = await send<Task>('POST', '/tasks/start', { prompt: 'check the vpn', sandbox: false })
+    expect(task.sandbox).toBe(false)
+    const [created] = (await auditEvents.page(auditQuery.parse({ kind: 'task.created', limit: 1 }))).events
+    expect(created?.summary).toContain('unsandboxed')
+    const refused = await send<Task>('POST', '/tasks/start', { prompt: 'check the vpn', sandbox: false }, EA_AUTH)
+    expect(refused.status).toBe(403)
+  })
+
   it('falls back to a titled agent in a fresh folder when the planner fails', async () => {
     const { data: task } = await send<Task>('POST', '/tasks/start', { prompt: 'sketch a logo idea\nin blue' })
     expect(task.title).toBe('Sketch a logo idea')
