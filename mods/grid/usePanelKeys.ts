@@ -1,24 +1,8 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { announce, focusInto, panelElement } from './grid-dom'
-import {
-  COLS,
-  movePanel,
-  neighbour,
-  resizePanel,
-  samePanels,
-  type Direction,
-  type Metrics,
-  type Panel,
-} from './grid-layout'
+import { COLS, movePanel, resizePanel, samePanels, type Direction, type Metrics, type Panel } from './grid-layout'
 import { gridStore } from './grid-store'
 import { seti } from './seti'
-
-const FOCUS: { chord: string; direction: Direction }[] = [
-  { chord: 'Alt+Left', direction: 'left' },
-  { chord: 'Alt+Right', direction: 'right' },
-  { chord: 'Alt+Up', direction: 'up' },
-  { chord: 'Alt+Down', direction: 'down' },
-]
 
 const MOVE: { chord: string; direction: Direction }[] = [
   { chord: 'Alt+Shift+Left', direction: 'left' },
@@ -57,7 +41,7 @@ interface PanelKeysOptions {
   onFocusPanel: (id: string) => void
 }
 
-/** Alt+arrows between panels, Alt+Shift+arrows to move one, and arrange mode to resize too. */
+/** Alt+Shift+arrows move the focused panel, and arrange mode resizes it too. */
 export function usePanelKeys({ panels, metrics, locked, titleOf, onFocusPanel }: PanelKeysOptions) {
   const [arranging, setArranging] = useState<string | null>(null)
   const before = useRef<readonly Panel[]>([])
@@ -88,19 +72,6 @@ export function usePanelKeys({ panels, metrics, locked, titleOf, onFocusPanel }:
   }, [])
 
   seti().keys.useChords([
-    ...FOCUS.map(({ chord, direction }) => ({
-      chord,
-      run: () => {
-        const { focused } = gridStore.getSnapshot()
-        const next = focused === null ? null : neighbour(latest.current.panels, focused, direction)
-        if (next !== null) {
-          onFocusPanel(next.i)
-          requestAnimationFrame(() => {
-            focusInto(next.i)
-          })
-        }
-      },
-    })),
     ...MOVE.map(({ chord, direction }) => ({
       chord,
       run: () => {

@@ -1,7 +1,7 @@
 {
   "name": "@seti/mod-grid",
   "private": true,
-  "version": "1.0.1",
+  "version": "1.1.0",
   "type": "module",
   "exports": {
     "./panels.css": "./panels.css",

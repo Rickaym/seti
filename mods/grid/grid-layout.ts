@@ -141,8 +141,6 @@ function sharedSpan(a: Rect, b: Rect, direction: Direction): number {
     : Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x)
 }
 
-const centre = (r: Rect) => ({ x: r.x + r.w / 2, y: r.y + r.h / 2 })
-
 /** The panel beside `id` in `direction` that shares rows or columns with it, nearest first. */
 function adjacent(panels: readonly Panel[], id: string, direction: Direction): Panel | null {
   const from = panels.find((panel) => panel.i === id)
@@ -161,20 +159,6 @@ function adjacent(panels: readonly Panel[], id: string, direction: Direction): P
     return a.shared === b.shared ? byPosition(a.panel, b.panel) : b.shared - a.shared
   })
   return ranked[0]?.panel ?? null
-}
-
-/** Where focus goes from `id` in `direction`: the adjacent panel, else the nearest one that way. */
-export function neighbour(panels: readonly Panel[], id: string, direction: Direction): Panel | null {
-  const beside = adjacent(panels, id, direction)
-  const from = panels.find((panel) => panel.i === id)
-  if (beside !== null || from === undefined) {
-    return beside
-  }
-  const origin = centre(from)
-  const distance = (panel: Panel) => Math.hypot(centre(panel).x - origin.x, centre(panel).y - origin.y)
-  const ahead = panels.filter((panel) => panel.i !== id && gapTo(from, panel, direction) !== null)
-  ahead.sort((a, b) => distance(a) - distance(b))
-  return ahead[0] ?? null
 }
 
 function replaced(panels: readonly Panel[], changes: ReadonlyMap<string, Partial<Rect>>): Panel[] {

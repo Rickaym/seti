@@ -8,7 +8,6 @@ import {
   freeSpot,
   metrics,
   movePanel,
-  neighbour,
   nextSlot,
   prune,
   removePanel,
@@ -307,19 +306,6 @@ describe('rows of at most so many across', () => {
     const shape = (n: number) => rowsOf(tidy(mixed(n), LAPTOP), 0, Number.POSITIVE_INFINITY).map((row) => row.length)
     expect(shape(7)).toEqual([3, 2, 2])
     expect(shape(5)).toEqual([3, 2])
-  })
-})
-
-describe('neighbour', () => {
-  const grid = [panel('a', [0, 0, 6, 12]), panel('b', [6, 0, 6, 12]), panel('c', [0, 12, 12, 12])]
-
-  it('moves focus to the panel beside, or the nearest one that way', () => {
-    expect(neighbour(grid, 'a', 'right')?.i).toBe('b')
-    expect(neighbour(grid, 'b', 'down')?.i).toBe('c')
-    expect(neighbour(grid, 'c', 'up')?.i).toBe('a')
-    expect(neighbour(grid, 'a', 'left')).toBeNull()
-    const offset = [panel('a', [0, 0, 4, 6]), panel('b', [8, 8, 4, 6])]
-    expect(neighbour(offset, 'a', 'right')?.i).toBe('b')
   })
 })
 
