@@ -42,6 +42,10 @@ export const taskLocation = {
     ...(await sql<TaskWorktree[]>`SELECT w.dir, r.path AS repo_path FROM task_worktree w
       JOIN repo r ON r.id = w.repo_id WHERE w.task_id = ${taskId} ORDER BY w.dir`),
   ],
+  /** The task's worktrees with their repo and the base branch Seti checks a lost one out on. */
+  worktreeBases: async (taskId: string) =>
+    sql<(TaskWorktree & { base_branch: string })[]>`SELECT w.dir, r.path AS repo_path, r.base_branch
+      FROM task_worktree w JOIN repo r ON r.id = w.repo_id WHERE w.task_id = ${taskId} ORDER BY w.dir`,
   /** Every worktree directory Seti made, for any task. */
   allWorktreeDirs: async () => (await sql<{ dir: string }[]>`SELECT dir FROM task_worktree`).map((row) => row.dir),
   /** The worktree Seti made earlier for this task and repo, if any. */

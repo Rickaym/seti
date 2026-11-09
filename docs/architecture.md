@@ -451,6 +451,11 @@ request:
 | Dirty worktree | kept, its uncommitted changes saved as a patch in the bundle folder    | already there                     | `git worktree remove` |
 | Archive bundle | written                                                                | removed once every folder is back | removed               |
 
+A worktree that something outside Seti removed, such as a disk cleanup, is checked out again on its
+repo's base branch the next time the agent's process starts, because the sandbox cannot mount a
+missing folder. `server/src/worktree-restore.ts` does this, notes it in the transcript and audits it
+as `task.worktree_restored`. Commits on a branch survive; uncommitted changes from before do not.
+
 The bundle leaves out dependencies, virtual environments, build outputs and caches
 (`node_modules`, `.venv`, `dist`, `build`, `target`, `.cache` and the like), which a reinstall or
 build remakes. Each archiving gets its own bundle name, so a leftover bundle never stands in for a
