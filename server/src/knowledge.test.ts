@@ -113,7 +113,11 @@ describe('propose_knowledge', () => {
       { sources: [{ kind: 'command', ref: 'gh auth login --with-token ghp_abcdefghijklmnop' }] },
       'source 1 looks like it holds a secret',
     ],
-    ['an env line in the verify step', { verify: 'export API_TOKEN=abcdefgh12345678' }, 'verify step looks like'],
+    [
+      'an env line in the verify step',
+      { verify: `export API_TOKEN=${'ab12cd34'.repeat(2)}` },
+      'verify step looks like',
+    ],
   ])('refuses a secret: %s', async (_, extra, refusal) => {
     const task = await newTask()
     const title = `Secret ${randomUUID()}`
