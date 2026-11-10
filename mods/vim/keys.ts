@@ -9,7 +9,7 @@ type PanelMove = Extract<VimAction, { type: 'panel' }>['to']
 type Handlers = { [T in VimAction['type']]: (action: Extract<VimAction, { type: T }>, panel: HTMLElement) => void }
 
 /** Actions that need no active panel. */
-const PANEL_FREE = new Set<VimAction['type']>(['normal', 'help', 'palette', 'groupChat'])
+const PANEL_FREE = new Set<VimAction['type']>(['normal', 'help', 'palette', 'groupChat', 'ownStep'])
 
 /** The panel a move lands on, from the panels in reading order and where the active one sits. */
 function landing(to: PanelMove | number, panels: readonly HTMLElement[], from: HTMLElement | null, api: UiModApi) {
@@ -164,6 +164,9 @@ export class VimKeys {
       },
       files: (_action, panel) => {
         api.panels.actionsOf(panel).toggleFiles?.()
+      },
+      ownStep: (action) => {
+        api.app.stepOwnMessages(action.direction)
       },
       groupChat: () => {
         api.app.toggleGroupChat()

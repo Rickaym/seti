@@ -49,6 +49,8 @@ describe('readKey', () => {
     expect(read('/').action).toEqual({ type: 'find' })
     expect(read('n').action).toEqual({ type: 'findStep', direction: 'next' })
     expect(read('?').action).toEqual({ type: 'help' })
+    expect(read('{').action).toEqual({ type: 'ownStep', direction: 'back' })
+    expect(read('}').action).toEqual({ type: 'ownStep', direction: 'forward' })
     expect(read('l').handled).toBe(true)
   })
 

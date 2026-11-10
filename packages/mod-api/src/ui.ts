@@ -368,6 +368,8 @@ export interface ModApp {
   /** Opens the command palette at its commands. */
   openCommands: () => void
   toggleGroupChat: () => void
+  /** Steps to your previous or next own message in the transcript on screen, as Alt+[ and Alt+] do. */
+  stepOwnMessages: (direction: 'back' | 'forward') => void
   /** Keeps focus where a key just put it, instead of where the next page would put it. */
   holdFocus: () => void
   /** Runs `run` each interval, paused offline or while the page is hidden; returns the stop. */
