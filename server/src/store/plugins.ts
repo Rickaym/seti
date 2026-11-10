@@ -27,6 +27,12 @@ export const setiPlugins = {
         ${plugin.created_at})`
     return plugin
   },
+  /** Stores the version and description the plugin's folder now names. */
+  refreshManifest: async (id: string, fields: Pick<SetiPlugin, 'version' | 'description'>) =>
+    (
+      await sql`UPDATE seti_plugin SET version = ${fields.version}, description = ${fields.description}
+      WHERE id = ${id}`
+    ).count > 0,
   setEnabled: async (id: string, enabled: boolean) =>
     (await sql`UPDATE seti_plugin SET enabled = ${enabled ? 1 : 0} WHERE id = ${id}`).count > 0,
   remove: async (id: string) => (await sql`DELETE FROM seti_plugin WHERE id = ${id}`).count > 0,
