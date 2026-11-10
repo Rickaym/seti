@@ -6,7 +6,7 @@ import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createApp } from './app.js'
 import { tasks } from './db.js'
 import type { HttpError } from './http.js'
-import type { PluginCli } from './plugin-cli.js'
+import type { DetailsTarget, PluginCli } from './plugin-cli.js'
 import { readPluginFolder, resolvePluginPath } from './plugin-folder.js'
 import { pluginStateFiles, stateWatch } from './plugin-state.js'
 import { createPluginCatalog, retireBundledPlugins, sdkPlugins, taskPluginConfigs } from './plugins.js'
@@ -282,7 +282,7 @@ describe('plugin catalog', () => {
       installed: vi.fn(async () =>
         fail ? Promise.reject(new Error('claude not found')) : Promise.resolve([installed]),
       ),
-      components: vi.fn(async () => Promise.resolve(components)),
+      components: vi.fn(async (_target: DetailsTarget) => Promise.resolve(components)),
     }
     return cli satisfies Pick<PluginCli, 'installed' | 'components'>
   }
@@ -295,7 +295,12 @@ describe('plugin catalog', () => {
 
   it('lists defaults and installed plugins with components and caches them until refresh', async () => {
     const dir = makePlugin('listed')
-    const plugin = await setiPlugins.create({ name: 'listed', path: dir, version: '1.0.0', description: '' })
+    const plugin = await setiPlugins.create({
+      name: 'listed',
+      path: dir,
+      version: '1.0.0',
+      description: 'listed tools',
+    })
     const cli = fakeCli()
     const catalog = createPluginCatalog(cli)
 
@@ -314,6 +319,45 @@ describe('plugin catalog', () => {
     await catalog.list(true)
     expect(cli.installed).toHaveBeenCalledTimes(2)
     expect(cli.components).toHaveBeenCalledTimes(4)
+  })
+
+  it('follows a checkout that moved to a new version, reads its components again and audits it', async () => {
+    const dir = makePlugin('moving', { name: 'moving', version: '0.3.0', description: 'old' })
+    const plugin = await setiPlugins.create({ name: 'moving', path: dir, version: '0.3.0', description: 'old' })
+    const cli = fakeCli()
+    const catalog = createPluginCatalog(cli)
+    await catalog.list()
+    const manifest = { name: 'moving', version: '0.7.1', description: 'new' }
+    fs.writeFileSync(path.join(dir, '.claude-plugin', 'plugin.json'), JSON.stringify(manifest))
+
+    const [shown] = (await catalog.list()).defaults
+    expect(shown).toMatchObject({ version: '0.7.1', description: 'new', components, problem: null })
+    expect(await setiPlugins.get(plugin.id)).toMatchObject({ version: '0.7.1', description: 'new' })
+    expect(cli.components).toHaveBeenCalledTimes(3)
+    await auditEvents.settled()
+    const { events } = await auditEvents.page({ kind: 'plugin.default_refreshed', limit: 5 })
+    expect(events.find((event) => event.subject_id === plugin.id)?.summary).toBe(
+      'Seti default plugin moving is now 0.7.1 (was 0.3.0)',
+    )
+  })
+
+  it('reads components again after a failed read instead of keeping none', async () => {
+    const dir = makePlugin('flaky')
+    await setiPlugins.create({ name: 'flaky', path: dir, version: '1.0.0', description: 'flaky tools' })
+    const cli = fakeCli()
+    let failOnce = true
+    cli.components.mockImplementation(async (target: DetailsTarget) => {
+      if ('path' in target && failOnce) {
+        failOnce = false
+        return Promise.reject(new Error('timed out'))
+      }
+      return Promise.resolve(components)
+    })
+    const catalog = createPluginCatalog(cli)
+    expect((await catalog.list()).defaults[0]?.components).toBeNull()
+    await vi.waitFor(async () => {
+      expect((await catalog.list()).defaults[0]?.components).toEqual(components)
+    })
   })
 
   it('re-reads installed plugins once Claude Code rewrites its plugin files outside Seti', async () => {

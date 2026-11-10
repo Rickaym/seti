@@ -1,7 +1,8 @@
-import { Code, PencilLine, PencilOff, Save } from 'lucide-react'
+import { Code, PencilLine, PencilOff, Save, Search } from 'lucide-react'
 import { Hint } from '@/components/Hint'
 import { ToggleButton } from '@/components/ToggleButton'
 import { Button } from '@/components/ui/button'
+import { FILE_KEYS } from '@/panels/files/find/find-keys'
 
 /** Whether a diagram or table shows its text, and the switch between the two. */
 export interface SourceToggle {
@@ -15,14 +16,23 @@ interface EditActionsProps {
   dirty: boolean
   saving: boolean
   source: SourceToggle | null
+  /** Opens find in the file, or null where the view has no text to search. */
+  onFind: (() => void) | null
   onEdit: (editing: boolean) => void
   onSave: () => void
 }
 
-/** Edit, or Save and Stop editing while editing, plus the Source toggle, for the viewer header. */
-export function EditActions({ writable, editing, dirty, saving, source, onEdit, onSave }: EditActionsProps) {
+/** Find, Edit, or Save and Stop editing while editing, and the Source toggle, for the header. */
+export function EditActions({ writable, editing, dirty, saving, source, onFind, onEdit, onSave }: EditActionsProps) {
   return (
     <>
+      {onFind !== null && (
+        <Hint text={`Find in this file (${FILE_KEYS.find})`}>
+          <Button variant="outline" size="icon-sm" aria-label="Find in file" onClick={onFind}>
+            <Search />
+          </Button>
+        </Hint>
+      )}
       {source !== null && !editing && (
         <ToggleButton
           pressed={source.pressed}
@@ -35,10 +45,10 @@ export function EditActions({ writable, editing, dirty, saving, source, onEdit, 
       )}
       {dirty && <span className="text-xs text-muted-foreground max-sm:hidden">Unsaved changes</span>}
       {editing && (
-        <Hint text="Save (Ctrl+S)">
+        <Hint text={`Save (${FILE_KEYS.save})`}>
           <Button size="sm" disabled={!dirty || saving} onClick={onSave}>
             <Save />
-            {saving ? 'Saving...' : 'Save'}
+            <span className="max-sm:sr-only">{saving ? 'Saving...' : 'Save'}</span>
           </Button>
         </Hint>
       )}

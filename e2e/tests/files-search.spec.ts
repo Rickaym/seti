@@ -11,7 +11,8 @@ test('Files search finds names and text and opens what it finds', async ({ page 
   const panel = filesPanel(page)
   await expect(panel.getByRole('search')).toHaveCount(0)
   await panel.getByRole('button', { name: /notes\.md/ }).click()
-  await panel.getByRole('region', { name: 'File notes.md' }).click()
+  await expect(panel.getByRole('region', { name: 'File notes.md' })).toBeVisible()
+  await panel.getByTestId('viewer-header').getByText('notes.md', { exact: true }).click()
 
   await page.keyboard.press('Control+f')
   const names = panel.getByRole('textbox', { name: 'Search files by name' })

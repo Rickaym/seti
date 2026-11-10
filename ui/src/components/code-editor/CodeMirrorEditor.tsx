@@ -8,11 +8,13 @@ import {
   StreamLanguage,
   syntaxHighlighting,
 } from '@codemirror/language'
+import { selectNextOccurrence } from '@codemirror/search'
 import { Compartment, EditorState, type Extension } from '@codemirror/state'
-import { EditorView, highlightActiveLineGutter, keymap, lineNumbers } from '@codemirror/view'
+import { drawSelection, EditorView, highlightActiveLineGutter, keymap, lineNumbers } from '@codemirror/view'
 import type { CodeLanguage } from '@seti/shared'
 import { syntaxHighlighter } from '@seti/shared/highlight'
 import { useEffect, useLayoutEffect, useRef } from 'react'
+import { applyQuery, countMatches, editorFind, editorFindTarget, type EditorFind } from './editor-find'
 import { changeBetween, clampCaret, createEchoes, fromValue, isOwnEdit, type Caret } from './sync'
 
 const theme = EditorView.theme({
@@ -28,6 +30,15 @@ const theme = EditorView.theme({
   },
   '.cm-lineNumbers .cm-gutterElement': { padding: '0 0.5rem 0 0.625rem', minWidth: '2ch' },
   '.cm-activeLineGutter': { backgroundColor: 'transparent', color: 'var(--foreground)' },
+  '.cm-cursor, .cm-dropCursor': { borderLeftColor: 'var(--foreground)' },
+  '.cm-selectionBackground, &.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground': {
+    backgroundColor: 'color-mix(in oklch, var(--primary) 25%, transparent)',
+  },
+  '.cm-findMatch': { backgroundColor: 'color-mix(in oklab, var(--warning) 30%, transparent)' },
+  '.cm-findMatch-current': {
+    backgroundColor: 'color-mix(in oklab, var(--warning) 60%, transparent)',
+    outline: '1px solid var(--warning)',
+  },
   '&.cm-focused .cm-matchingBracket': {
     backgroundColor: 'color-mix(in oklch, var(--primary) 18%, transparent)',
     outline: '1px solid color-mix(in oklch, var(--primary) 45%, transparent)',
@@ -43,10 +54,18 @@ const BASE = [
   lineNumbers(),
   highlightActiveLineGutter(),
   history(),
+  drawSelection(),
+  EditorState.allowMultipleSelections.of(true),
+  editorFind,
   indentOnInput(),
   bracketMatching(),
   syntaxHighlighting(syntaxHighlighter),
-  keymap.of([...defaultKeymap, ...historyKeymap, indentWithTab]),
+  keymap.of([
+    ...defaultKeymap,
+    ...historyKeymap,
+    indentWithTab,
+    { key: 'Mod-d', run: selectNextOccurrence, preventDefault: true },
+  ]),
   EditorView.lineWrapping,
   theme,
 ]
@@ -82,6 +101,7 @@ interface CodeMirrorEditorProps {
   focusOnMount: boolean
   /** Ctrl+S or Cmd+S in the editor. */
   onSave: (() => void) | undefined
+  find: EditorFind | undefined
 }
 
 /** CodeMirror for code in one language, held in step with its value prop. */
@@ -95,16 +115,17 @@ export function CodeMirrorEditor({
   spellCheck,
   focusOnMount,
   onSave,
+  find,
 }: CodeMirrorEditorProps) {
   const host = useRef<HTMLDivElement>(null)
   const view = useRef<EditorView | null>(null)
-  const latest = useRef({ value, onChange, label, spellCheck, focusOnMount, onSave, language })
+  const latest = useRef({ value, onChange, label, spellCheck, focusOnMount, onSave, language, find })
   const echoes = useRef(createEchoes())
   const labelled = useRef(new Compartment())
   const grammar = useRef(new Compartment())
 
   useLayoutEffect(() => {
-    latest.current = { value, onChange, label, spellCheck, focusOnMount, onSave, language }
+    latest.current = { value, onChange, label, spellCheck, focusOnMount, onSave, language, find }
   })
 
   useLayoutEffect(() => {
@@ -139,11 +160,15 @@ export function CodeMirrorEditor({
               echoes.current.sent(text)
               latest.current.onChange(text)
             }
+            if (update.docChanged || update.selectionSet || update.transactions.some((tr) => tr.effects.length > 0)) {
+              latest.current.find?.onCount(countMatches(update.state))
+            }
           }),
         ],
       }),
     })
     view.current = created
+    const detach = latest.current.find?.attach(editorFindTarget(created))
     // Dialogs prevent Esc before CodeMirror sees it, so listen here, prevented or not.
     const escapeRoute = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
@@ -156,6 +181,7 @@ export function CodeMirrorEditor({
     }
     return () => {
       view.current = null
+      detach?.()
       created.dom.removeEventListener('keydown', escapeRoute)
       created.destroy()
     }
@@ -171,6 +197,13 @@ export function CodeMirrorEditor({
       current.dispatch({ changes, annotations: fromValue.of(true) })
     }
   }, [value])
+
+  const query = find?.query ?? null
+  useEffect(() => {
+    if (view.current !== null) {
+      applyQuery(view.current, query)
+    }
+  }, [query])
 
   useEffect(() => {
     view.current?.dispatch({ effects: labelled.current.reconfigure(fieldAttributes(label, spellCheck)) })

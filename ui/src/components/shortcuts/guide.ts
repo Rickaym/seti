@@ -5,6 +5,7 @@ import { chordLabel, CHORDS, sectionChord } from '@/components/shortcuts/chords'
 import { FIND_SHORTCUT } from '@/components/shortcuts/find'
 import { TEAM_SHORTCUT } from '@/components/team/team-context'
 import { lastSectionDigit } from '@/lib/sections'
+import { FILE_KEYS } from '@/panels/files/find/find-keys'
 import { TERMINAL_SHORTCUT } from '@/panels/terminal/terminal-shortcut'
 
 interface GuideRow {
@@ -13,7 +14,7 @@ interface GuideRow {
 }
 
 interface GuideGroup {
-  heading: 'Anywhere' | 'Agents' | 'Terminal'
+  heading: 'Anywhere' | 'Agents' | 'Files' | 'Terminal'
   rows: GuideRow[]
 }
 
@@ -44,6 +45,16 @@ const AGENTS: GuideRow[] = [
   { keys: 'Esc Esc', action: 'Rewind' },
 ]
 
+const FILES: GuideRow[] = [
+  { keys: FILE_KEYS.find, action: 'Find in file' },
+  { keys: `${FILE_KEYS.next}, ${FILE_KEYS.previous}`, action: 'Next or previous match' },
+  { keys: FILE_KEYS.replace, action: 'Replace while editing' },
+  { keys: FILE_KEYS.line, action: 'Go to line' },
+  { keys: FILE_KEYS.selectNext, action: 'Select next match' },
+  { keys: FILE_KEYS.save, action: 'Save' },
+  { keys: `${FILE_KEYS.undo}, ${FILE_KEYS.redo}`, action: 'Undo and redo' },
+]
+
 const TERMINAL: GuideRow[] = [{ keys: 'Shift+Enter', action: 'New line in Claude Code' }]
 
 /** A row a mod adds for keys its view binds, written with Alt or Ctrl as in its manifest. */
@@ -61,7 +72,7 @@ const deviceKeys = (keys: string) => keys.replace(/^Alt\+/u, `${LABEL_ALT}+`).re
  * added at the end of their group.
  */
 export function guideGroups(commands: readonly PaletteCommand[], mods: readonly ModGuideRow[] = []): GuideGroup[] {
-  const named = new Set([...ANYWHERE, ...AGENTS, ...TERMINAL].map((row) => row.keys))
+  const named = new Set([...ANYWHERE, ...AGENTS, ...FILES, ...TERMINAL].map((row) => row.keys))
   const extra = (agent: boolean): GuideRow[] =>
     commands.flatMap((command) =>
       command.shortcut !== undefined && !named.has(command.shortcut) && (command.group === 'Current agent') === agent
@@ -73,6 +84,7 @@ export function guideGroups(commands: readonly PaletteCommand[], mods: readonly 
   return [
     { heading: 'Anywhere', rows: [...ANYWHERE, ...extra(false), ...modRows('anywhere')] },
     { heading: 'Agents', rows: [...AGENTS, ...extra(true), ...modRows('agents')] },
+    { heading: 'Files', rows: FILES },
     { heading: 'Terminal', rows: TERMINAL },
   ]
 }

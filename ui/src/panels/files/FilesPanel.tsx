@@ -226,7 +226,7 @@ export function FilesPanel({ taskId, request, readOnly, onClose }: FilesPanelPro
   useEffect(() => {
     const element = section.current
     const onKeyDown = (e: KeyboardEvent) => {
-      if (isFindShortcut(e)) {
+      if (!e.defaultPrevented && isFindShortcut(e)) {
         e.preventDefault()
         openSearch()
       }

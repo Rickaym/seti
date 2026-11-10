@@ -126,6 +126,7 @@ export const AUDIT_KINDS = [
   'plugin.default_enabled',
   'plugin.default_disabled',
   'plugin.default_removed',
+  'plugin.default_refreshed',
   'plugin.installed',
   'plugin.uninstalled',
   'plugin.enabled',

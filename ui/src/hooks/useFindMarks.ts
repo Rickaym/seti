@@ -1,5 +1,6 @@
 import type { SearchMode } from '@seti/shared'
 import { createContext, useEffect, useLayoutEffect, useRef, type RefObject } from 'react'
+import { showFindRanges, type FindRanges } from '@/lib/find-highlights'
 
 /** What find marks in a chat's rows: the query's matches, and the message it stepped to. */
 export interface FindMarks {
@@ -49,27 +50,8 @@ function messageElement(root: ParentNode, id: number): HTMLElement | null {
   )
 }
 
-interface Marked {
-  all: Range[]
-  current: Range[]
-}
-
-/** Every chat with find open adds its ranges here; the two highlights show them all. */
-const marked = new Map<symbol, Marked>()
-
-function showMarks(): void {
-  const all = new Highlight()
-  const current = new Highlight()
-  for (const ranges of marked.values()) {
-    ranges.all.forEach((range) => all.add(range))
-    ranges.current.forEach((range) => current.add(range))
-  }
-  CSS.highlights.set('seti-find', all)
-  CSS.highlights.set('seti-find-current', current)
-}
-
-function markRanges(root: HTMLElement, pattern: RegExp, messagesOnly: boolean): Marked {
-  const ranges: Marked = { all: [], current: [] }
+function markRanges(root: HTMLElement, pattern: RegExp, messagesOnly: boolean): FindRanges {
+  const ranges: FindRanges = { all: [], current: [] }
   const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT)
   let count = 0
   for (let node = walker.nextNode(); node !== null && count < MAX_RANGES; node = walker.nextNode()) {
@@ -150,8 +132,7 @@ export function useFindMarks(
     let frame: number | null = null
     const paint = () => {
       frame = null
-      marked.set(owner, markRanges(element, pattern, messagesOnly))
-      showMarks()
+      showFindRanges(owner, markRanges(element, pattern, messagesOnly))
     }
     paint()
     const observer = new MutationObserver(() => {
@@ -169,8 +150,7 @@ export function useFindMarks(
       if (frame !== null) {
         cancelAnimationFrame(frame)
       }
-      marked.delete(owner)
-      showMarks()
+      showFindRanges(owner, null)
     }
   }, [root, query, mode, messagesOnly, active])
 }
