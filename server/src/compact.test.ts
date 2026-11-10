@@ -4,6 +4,7 @@ import path from 'node:path'
 import type { HookCallback, Options, SDKMessage } from '@anthropic-ai/claude-agent-sdk'
 import {
   COMPACT_DEFAULTS,
+  COMPACT_TEMPLATE,
   compactedAtPct,
   type CompactRule,
   type CompactSettings,
@@ -110,7 +111,7 @@ describe('the compaction rule of an agent', () => {
     expect(settingsOf(plain)).toMatchObject({ autoCompactEnabled: true })
     expect(settingsOf(plain)).not.toHaveProperty('autoCompactWindow')
     expect(plain.env).not.toHaveProperty('CLAUDE_AUTOCOMPACT_PCT_OVERRIDE')
-    expect(await preCompact(plain)).toEqual({})
+    expect(await preCompact(plain)).toEqual({ systemMessage: COMPACT_TEMPLATE })
 
     await send('PUT', `/tasks/${task.id}/compact`, { rule: RULE })
     const ruled = await sessionOptions(task, new AbortController())

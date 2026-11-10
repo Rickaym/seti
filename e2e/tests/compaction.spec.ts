@@ -34,7 +34,7 @@ test('an agent gets a compaction rule of its own from its settings, and the defa
   await page.goto(`/#agents/${id}`)
   await openAgentSettings(page, 'Session')
   const details = page.getByRole('dialog').getByLabel('Agent details')
-  await expect(details).toContainText('Auto (default)')
+  await expect(details).toContainText('Auto, with instructions (default)')
 
   await details.getByRole('button', { name: 'Change compaction' }).click()
   await details.getByRole('spinbutton', { name: 'Context window' }).fill('200')
@@ -53,6 +53,6 @@ test('an agent gets a compaction rule of its own from its settings, and the defa
 
   await details.getByRole('button', { name: 'Change compaction' }).click()
   await details.getByRole('button', { name: 'Default' }).click()
-  await expect(details).toContainText('Auto (default)')
+  await expect(details).toContainText('Auto, with instructions (default)')
   expect((await apiData<TaskCompactRule>(request, `/tasks/${id}/compact`)).override).toBeNull()
 })

@@ -40,8 +40,27 @@ export const compactRuleInput = z
 
 export type CompactRule = z.infer<typeof compactRuleInput>
 
-/** Claude Code's own behaviour: compact automatically, at the window and point it picks. */
-export const COMPACT_DEFAULTS: CompactRule = { auto: true, window_k: null, threshold_pct: null, instructions: null }
+/** What every summary keeps, in fixed sections, so an agent resumes knowing where it was. */
+export const COMPACT_TEMPLATE = [
+  'Write the summary in these sections, in this order, each kept short:',
+  '- Objective: what the user asked for, in their words where the wording matters.',
+  '- Requirements: constraints, preferences and rules the user set.',
+  '- Decisions: what was decided and why, and approaches ruled out.',
+  '- Work state: Completed; Active, with the exact next step of each; Blocked, and on what or whom.',
+  '- Next move: the single next action.',
+  '- Relevant files: at most 15 paths, each with why it matters.',
+  '- Open questions: what still needs the user.',
+  'Keep commands that worked and the exact names of branches, PRs, agents and tickets.',
+  'Drop raw tool output and logs.',
+].join('\n')
+
+/** Compact automatically, where Claude Code picks, into the sections of `COMPACT_TEMPLATE`. */
+export const COMPACT_DEFAULTS: CompactRule = {
+  auto: true,
+  window_k: null,
+  threshold_pct: null,
+  instructions: COMPACT_TEMPLATE,
+}
 
 /** A rule of its own for one agent, or null to go back to the default. */
 export const taskCompactInput = z.object({ rule: compactRuleInput.nullable() })
