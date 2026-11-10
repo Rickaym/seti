@@ -5,6 +5,7 @@ Single keys scroll and move between panels on a wide screen, as in Vim.
 ## Keys
 
 - j and k scroll the active panel; gg and G go to its top and bottom.
+- { and } step back and forward through your own messages, as Alt+[ and Alt+] do.
 - h and l move to the previous and next panel; 1 to 9 pick one by position.
 - : opens the command palette.
 - / opens the find bar, and ? lists every key.

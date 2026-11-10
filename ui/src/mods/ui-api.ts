@@ -39,6 +39,7 @@ import { modSettingsKey } from '@/panels/settings/mods/mod-settings-key'
 import { settingsPages } from '@/panels/settings/pages'
 import { agentDocks, closeAgentDock, openAgentDock } from '@/panels/tasks/agent-docks'
 import { agentsLayouts } from '@/panels/tasks/agents-layouts'
+import { stepOwnMessages } from '@/panels/tasks/own-steps'
 import { terminalSources } from '@/panels/terminal/terminal-sources'
 import { MOD_AGENTS, MOD_TERMINALS } from './agent-parts'
 import { callModAction, uiCommands } from './commands'
@@ -74,6 +75,7 @@ const APP: UiModApi['app'] = {
     openPalette(COMMAND_PREFIX)
   },
   toggleGroupChat,
+  stepOwnMessages,
   holdFocus: skipLanding,
   every: (run, intervalMs) => startPolling(run, intervalMs),
 }
