@@ -1,5 +1,12 @@
 import { randomUUID } from 'node:crypto'
-import { auditQuery, knowledgeFields, type KnowledgeFieldsInput, type SetiControlLevel, type Task } from '@seti/shared'
+import {
+  auditQuery,
+  knowledgeFields,
+  type KnowledgeFieldsInput,
+  type KnowledgeSource,
+  type SetiControlLevel,
+  type Task,
+} from '@seti/shared'
 import { describe, expect, it } from 'vitest'
 import { repos, tasks } from './db.js'
 import { approveKnowledge } from './knowledge-review.js'
@@ -95,7 +102,7 @@ describe('propose_knowledge', () => {
     expect((byId.json() as { notes: { title: string }[] }).notes).toMatchObject([{ title }])
   })
 
-  it.each([
+  it.each<[string, Partial<KnowledgeFieldsInput>, string]>([
     [
       'an AWS key in the body',
       { body: 'Use AKIAIOSFODNN7EXAMPLE for the bucket.' },
@@ -120,7 +127,8 @@ describe('propose_knowledge', () => {
   it("refuses sources that name private paths outside the agent's folders", async () => {
     const repo = await newRepo()
     const task = await newTask(repo)
-    const propose = async (source: object) => call(task, 'propose_knowledge', fields('Paths', { sources: [source] }))
+    const propose = async (source: KnowledgeSource) =>
+      call(task, 'propose_knowledge', fields('Paths', { sources: [source] }))
     expect((await propose({ kind: 'path', ref: '/etc/shadow' })).text).toContain('outside your own folders')
     expect((await propose({ kind: 'path', ref: `/srv/${repo}/../other/x` })).text).toContain('outside your own folders')
     expect((await propose({ kind: 'path', ref: '~/.ssh/config' })).text).toContain('home path')
@@ -132,7 +140,7 @@ describe('propose_knowledge', () => {
       { kind: 'path', ref: 'src/app.ts' },
       { kind: 'command', ref: 'pnpm test --dir=src' },
       { kind: 'url', ref: 'https://github.com/acme/web/pull/12' },
-    ]) {
+    ] satisfies KnowledgeSource[]) {
       expect((await propose(ok)).isError, JSON.stringify(ok)).toBe(false)
     }
   })

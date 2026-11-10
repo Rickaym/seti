@@ -65,6 +65,7 @@ export type KnowledgeFieldsInput = z.input<typeof knowledgeFields>
 /** Approve as proposed, or with the user's edits applied first. */
 export const approveKnowledgeInput = z.object({ edit: knowledgeFields.optional() }).strict()
 export type ApproveKnowledgeInput = z.input<typeof approveKnowledgeInput>
+export type ApproveKnowledge = z.output<typeof approveKnowledgeInput>
 
 export const rejectKnowledgeInput = z.object({ reason: z.string().trim().max(KNOWLEDGE_NOTE_MAX).optional() }).strict()
 

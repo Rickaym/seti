@@ -55,6 +55,7 @@ const SUBJECT_LINKS: Record<AuditEvent['subject_type'], ((id: string) => Subject
   pr: null,
   context_file: (id) => ({ href: `#context/${id}`, label: 'File' }),
   context_pack: (id) => ({ href: `#context/pack:${id}`, label: 'Pack' }),
+  knowledge_note: () => ({ href: '#context/knowledge:approved', label: 'Knowledge' }),
   repo: settingsLink('repos', 'Repos'),
   mcp_server: settingsLink('mcp', 'MCP servers'),
   plugin: settingsLink('plugins', 'Plugins'),

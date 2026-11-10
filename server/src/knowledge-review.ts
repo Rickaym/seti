@@ -1,7 +1,7 @@
 import {
   changedKeys,
   knowledgeFields,
-  type ApproveKnowledgeInput,
+  type ApproveKnowledge,
   type KnowledgeFields,
   type KnowledgeNote,
   type KnowledgeSource,
@@ -114,7 +114,7 @@ export async function editKnowledge(
  * Approves a proposal, or a stale note again, after the user's edits if any. A correction's
  * approval retires the note it corrects.
  */
-export async function approveKnowledge(id: string, input: ApproveKnowledgeInput): Promise<KnowledgeNote> {
+export async function approveKnowledge(id: string, input: ApproveKnowledge): Promise<KnowledgeNote> {
   refuseDelegateReview()
   const before = await requireNote(id)
   if (before.status !== 'proposed' && before.status !== 'stale') {

@@ -75,7 +75,7 @@ describe("knowledge approval is the user's alone", () => {
   it('refuses agents in the core functions, whatever their Seti control', async () => {
     const note = await proposal()
     const agent = await newTask(null, 'full')
-    const attempts = [
+    const attempts: (() => Promise<unknown>)[] = [
       async () => approveKnowledge(note.id, {}),
       async () => rejectKnowledge(note.id, undefined),
       async () => editKnowledge(note.id, fields('Agent edit')),
