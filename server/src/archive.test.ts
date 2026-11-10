@@ -512,6 +512,7 @@ describe('auto archive', () => {
       days: 3,
       delete_after_days: null,
       resume_after_restart: true,
+      repeat_guard: true,
       updated_at: null,
     })
     expect(status.preview).toEqual({ count: 1, tasks: [expect.objectContaining({ id: old, title: 'Old and done' })] })

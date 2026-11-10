@@ -112,6 +112,18 @@ private key off the host. The sandbox model is in [Architecture](architecture.md
   the EA cannot open an agent's `chat.md` or follow its transcript live, and a side question to an
   agent that holds direct messages the asker is not part of is refused. The user's own views show
   everything.
+- The repeat guard stops an agent that runs the same tool call again after two identical
+  results and waits for the user, as a permission request of kind `repeat` with its reason line,
+  so a loop an injected instruction starts costs at most two runs before someone looks. It keeps
+  SHA-256 hashes of each call and result in the memory of the agent's process, per thread, and no
+  copy of either; timings, temporary output paths and a Bash call's description are left out of
+  the comparison. It runs as a PreToolUse hook, so it asks in Bypass too, and it leaves a command
+  the shell guard refuses to that guard. Allow runs the call once, Always stops asking about that
+  exact call while the process runs, and Deny tells the agent. Each stop is audited as
+  `task.repeat_stopped` and each answer like any permission answer. The switch is on by default
+  in Settings, Lifecycle; the EA changes it only with the user's yes (`set_auto_archive`), and
+  agents' Seti tools and mods are refused (`refuseAgent` in `updateAutoArchive`), so an agent
+  cannot turn off the guard that stops it. A change is audited as `system.repeat_guard_changed`.
 - Agents at Self or Full propose security changes they need with `request_change`; nothing else
   applies them. A request names the exact change and the agent's reason: a host and port for the
   network allowlist (443 unless it names one), a connection's variable and hosts, or an MCP server
