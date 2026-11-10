@@ -23,7 +23,10 @@ let lastKey = Number.NEGATIVE_INFINITY
 const intents = new Map<LandingScope, Intent>()
 let landingArea: ((root: HTMLElement) => HTMLElement | null) | null = null
 
-/** Lets a view that splits the page, such as a layout of agents, name the part a landing goes to. */
+/**
+ * Lets a view that splits the page, such as a layout of agents, name the part a landing goes to.
+ * `resolve` returns null while that part has not rendered yet, and the landing waits for it.
+ */
 export function setLandingArea(resolve: ((root: HTMLElement) => HTMLElement | null) | null): void {
   landingArea = resolve
 }
@@ -148,7 +151,10 @@ function land(root: HTMLElement, scope: LandingScope, intent: Intent): () => voi
       finish()
       return
     }
-    const area = (scope === 'page' ? landingArea?.(root) : null) ?? root
+    const area = scope === 'page' && landingArea !== null ? landingArea(root) : root
+    if (area === null) {
+      return
+    }
     const input = touch ? null : primaryInput(area)
     if (input !== null && !input.disabled) {
       focusInput(input)

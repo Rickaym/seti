@@ -345,7 +345,7 @@ export interface ModPanels {
   findOf: (panel: HTMLElement) => ModChatFind | null
   /** The attributes that make an element one of these panels. */
   readonly markers: ModPanelMarkers
-  /** Where focus lands when the page opens: the element `resolve` picks inside the page, or null. */
+  /** Where focus lands when the page opens: the element `resolve` picks, or null to wait for it. */
   setLandingArea: (resolve: ((root: HTMLElement) => HTMLElement | null) | null) => void
 }
 
