@@ -20,7 +20,7 @@ export interface RoleContext {
 }
 
 /** Subagents and monitors keep a row of their own, so a running one is never folded away. */
-const foldable = (name: string) => !isAgentTool(name) && name !== 'Monitor'
+const foldable = (name: string) => !isAgentTool(name) && name !== 'Monitor' && name !== 'AskUserQuestion'
 
 export function rowRole(row: MessageRow, context: RoleContext): RowRole {
   if (context.notes.has(row.id) || row.kind !== 'sdk') {

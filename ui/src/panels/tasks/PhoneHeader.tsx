@@ -4,6 +4,7 @@ import type { ReactNode } from 'react'
 import { DetailBar, DetailBarActions } from '@/components/DetailBar'
 import { Button } from '@/components/ui/button'
 import { useAgentRoom } from '@/hooks/useAgentRoom'
+import { AgentQuestionsButton } from '@/panels/questions/QuestionsButton'
 import { PhoneActions } from '@/panels/tasks/PhoneActions'
 import { PhoneBack } from '@/panels/tasks/PhoneBack'
 import { PhonePrsButton } from '@/panels/tasks/PhonePrs'
@@ -31,6 +32,7 @@ export function PhoneHeader({ task, title, light, subtasks, settings, running, o
       {light}
       <div className="flex min-w-0 flex-1 items-center px-1 [&>h2]:text-sm">{title}</div>
       <DetailBarActions>
+        <AgentQuestionsButton taskId={task.id} compact />
         <PhonePrsButton task={task} />
         {running.busy && (
           <Button variant="ghost" size="icon-sm" aria-label="Stop" onClick={on.stop}>

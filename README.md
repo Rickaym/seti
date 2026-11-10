@@ -55,6 +55,8 @@ and review threads, so a red check or a new comment becomes their next turn, not
   that wake an agent or the EA.
 - **One group chat.** You, the EA and every agent, where an @mention reaches an agent mid-turn.
 - **Ask aside.** `/btw` asks an agent a question from its context without interrupting its turn.
+- **Questions in one place.** Agents ask you yes/no and multiple-choice questions that wait on one
+  Questions page, where one Submit all answers every agent at once.
 - **Shared knowledge.** Agents propose lessons for each other, and only the notes you approve reach
   them.
 - **Survives restarts.** An agent cut off by an upgrade or a reboot picks up where it stopped.

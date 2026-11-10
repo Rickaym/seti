@@ -29,6 +29,7 @@ import {
 } from '@/lib/transcript'
 import { FileLink } from '@/panels/files/FileLink'
 import { useFileLinks } from '@/panels/files/file-links'
+import { ASK_TOOL, QuestionCall } from '@/panels/questions/QuestionCall'
 import { InputEntry } from '@/panels/tasks/InputEntry'
 import { NoticeEntry } from '@/panels/tasks/NoticeEntry'
 import { PromptEntry } from '@/panels/tasks/PromptEntry'
@@ -117,6 +118,9 @@ function AssistantMessage({ props, message }: { props: RowProps; message: SDKAss
         const subtask = subtasks[call]
         const process = background[call]
         call++
+        if (block.name === ASK_TOOL) {
+          return <QuestionCall key={key} taskId={taskId} block={block} done={result !== undefined} />
+        }
         if (isAgentTool(block.name)) {
           return (
             <SubtaskCard

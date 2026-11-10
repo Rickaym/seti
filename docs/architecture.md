@@ -535,6 +535,48 @@ The Knowledge page sits in the Context section with Proposed, Approved and Stale
 Context section shows a count of waiting proposals. A proposal never holds an agent up, so it
 never shows in Needs you.
 
+## Questions wait as records, answered in one place
+
+An agent asks the user through Claude Code's own AskUserQuestion tool, never in prose that scrolls
+away. `canUseToolFor` in `server/src/permission-requests.ts` hands each call to `askQuestions` in
+`server/src/questions.ts`, which records its one to four questions as one group in the `question`
+table (`server/src/store/questions.ts`) and holds the tool call, as a permission request is held,
+until every question in the group is answered or dismissed. Each row keeps the agent, the subagent
+that asked if any, the tool use id, the header, the prompt, the options and their descriptions,
+whether it takes several answers, and the status: open, answered, dismissed or expired. Shapes and
+limits are in `shared/src/questions.ts`.
+
+There are two answer types, both from AskUserQuestion itself. A choice takes one option or, with
+`multiSelect`, any number; a question whose options are exactly a yes and a no is a `yes_no` and
+shows as Yes and No buttons. Every question also takes an answer in the user's own words, the
+tool's Other. Seti keeps no number or free-text type of its own and no question that does not
+wait: an agent that can go on without the answer has no reason to ask.
+
+`answerQuestions` in `server/src/question-answers.ts` takes answers and dismissals in one batch
+(`POST /api/questions/answers`), checks every answer against its options before it stores any,
+and leaves out questions that closed meanwhile. Once a group is settled it hands Claude Code the
+call's own input with `answers` added, keyed by each question's text: the label, the user's words
+or, for a multi-answer question, the list of both. Claude Code's host-answer check requires that
+shape: an unchanged input, keys that are question texts, and a list only for `multiSelect`. A
+dismissed question reads as dismissed; a group the user only dismissed is turned down with a note
+to go on with the agent's own judgment. A stopped turn or an ended session expires the group, and
+startup expires what a restart cut off.
+
+Open questions set the agent's reason line in Needs you through `server/src/task-blocked.ts`,
+such as `Asks 2 questions: Which checks should I run first?`, after a permission request and
+before a change request. `questionsContext`, registered with `registerContextProvider`, tells
+every agent to ask through AskUserQuestion instead of in its reply. The guess that a turn ended on
+a question (`server/src/turn-asking.ts`) reads only the prose after the last tool use, the
+fallback for an agent that asks in text.
+
+The Questions page (`#agents/questions`, from the button in the Agents list header and from an
+agent's header while it has questions) lists every open question by agent, oldest first, with the
+control its type takes, Dismiss per question, Skip per agent and one Submit all, and says what it
+sent. In the transcript an AskUserQuestion call shows each question and, once settled, its answer.
+The EA lists the open questions with `search_seti` in `questions`, reads them out by type and
+passes on the user's answer with `answer_question`, which calls the same route; its prompt holds it
+to what the user said.
+
 ## The EA acts through the same API as the user
 
 The EA is a separate Python process that shares a local token with Seti. It changes things only
@@ -743,19 +785,20 @@ last read, so a busy install pays for each message once.
 An agent that cannot go on without the user shows in Needs you with a reason line on its row, and
 its devices get a high-urgency push. Turn ends set three states: `error` (a failed turn, a rate
 limit, a lost login), `interrupted` (a restart cut the turn off) and `asking` (the turn ended on a
-question). An AskUserQuestion call is turned down with a note to ask in text, so it ends the turn
-asking. Everything that holds an agent up without ending its turn sets `task.blocked`, which
+question in its prose). An AskUserQuestion call waits as questions instead, as above. Everything
+that holds an agent up without ending its turn sets `task.blocked`, which
 `server/src/task-blocked.ts` keeps. It shows as the `blocked` status, which stays in Needs you
 while the agent is open, until it clears:
 
 | Stall                                                                                         | Reason line                                                              | Clears when                                 |
 | --------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ | ------------------------------------------- |
 | A tool call no rule allows, or ExitPlanMode                                                   | `Asks to use Bash: make deploy`, `Asks to approve its plan`              | the user answers, or the turn stops         |
+| An AskUserQuestion call                                                                       | `Asks 2 questions: Which checks should I run first?`                     | the user settles them, or the turn stops    |
 | A change the agent asked for with `request_change`                                            | `Asks for access to api.example.com:443`                                 | the user answers it, or it expires in a day |
 | An MCP server's sign-in tool                                                                  | `Sign in to the linear MCP server in Seti`                               | a sign-in finishes, or the next turn starts |
 | A running turn with no message for 20 minutes, not counting time a request waited on the user | `No output for 20 min while running`, or the API error it keeps retrying | the session speaks again, or the turn ends  |
 
-A permission request outranks a change request, which outranks a stall; the watchdog (`server/src/stall-watch.ts`) checks the
+A permission request outranks open questions, which outrank a change request, which outranks a stall; the watchdog (`server/src/stall-watch.ts`) checks the
 open sessions once a minute.
 
 ## Notifications follow the turn-end path

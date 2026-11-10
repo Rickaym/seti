@@ -4,7 +4,8 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { InProcessClient, type SdkServer } from './fake-mcp.js'
-import { askToDeploy, PERMISSION_INPUT, PERMISSION_PROMPT, type CanUseTool } from './fake-permission.js'
+import { actPermission, PERMISSION_PROMPT, type CanUseTool } from './fake-permission.js'
+import { actQuestions, QUESTION_PROMPT } from './fake-question.js'
 import { REPEAT_PROMPT, repeatBuild, type FakeHooks } from './fake-repeat.js'
 import { sideChatQuery } from './fake-side-chat.js'
 import { actSteps, gateOf, type StepActor } from './fake-steps.js'
@@ -294,17 +295,6 @@ class FakeClaude {
     })
   }
 
-  /** Asks Seti to run a command no rule allows, then runs it or says why it did not. */
-  private async askPermission(): Promise<void> {
-    const id = `toolu_perm_${randomUUID().slice(0, 8)}`
-    this.assistant([{ type: 'tool_use', id, name: 'Bash', input: PERMISSION_INPUT }])
-    const { result, reply } = await askToDeploy(this.options.canUseTool, id)
-    if (!this.outbox.ended) {
-      this.toolResult(id, result)
-      this.assistant([{ type: 'text', text: reply }])
-    }
-  }
-
   /** What a scripted turn uses to speak, return tool results and see the session end. */
   private actor(): StepActor {
     return {
@@ -376,7 +366,9 @@ class FakeClaude {
         this.outbox.fail(new Error(`Claude Code process exited with code 1: ${reason}`))
         return
       }
-      await (text(m).includes(PERMISSION_PROMPT) ? this.askPermission() : this.answer(text(m)))
+      await (text(m).includes(PERMISSION_PROMPT)
+        ? actPermission(this.options.canUseTool, this.actor())
+        : this.answer(text(m)))
       this.result()
     }
     this.close()
@@ -388,6 +380,8 @@ class FakeClaude {
     const gate = gateOf(prompt)
     if (seti?.[1] !== undefined && seti[2] !== undefined) {
       await this.callSeti(seti[1], seti[2], prompt.includes(HOLD_PROMPT))
+    } else if (prompt.includes(QUESTION_PROMPT)) {
+      await actQuestions(prompt, this.options.canUseTool, this.actor())
     } else if (prompt.includes(REPEAT_PROMPT)) {
       await repeatBuild(this.options.hooks, this.actor())
     } else if (prompt.includes(SHELL_PROMPT)) {

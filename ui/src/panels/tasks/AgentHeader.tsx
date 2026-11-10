@@ -12,6 +12,7 @@ import { FilesToggle } from '@/panels/files/FilesSplit'
 import type { FilesPane } from '@/panels/files/useFilesPane'
 import { ProcessesButton } from '@/panels/processes/ProcessesPanel'
 import type { AgentProcessesState } from '@/panels/processes/useAgentProcesses'
+import { AgentQuestionsButton } from '@/panels/questions/QuestionsButton'
 import { CompactAgentHeader } from '@/panels/tasks/CompactAgentHeader'
 import { PhoneHeader } from '@/panels/tasks/PhoneHeader'
 import { StatusLine } from '@/panels/tasks/StatusLine'
@@ -103,7 +104,12 @@ export function AgentHeader(props: AgentHeaderProps) {
         frame={frame}
         title={compactTitle}
         pill={pill}
-        subagents={<SubagentsButton taskId={task.id} subtasks={subtasks} compact />}
+        subagents={
+          <>
+            <AgentQuestionsButton taskId={task.id} compact />
+            <SubagentsButton taskId={task.id} subtasks={subtasks} compact />
+          </>
+        }
         settings={settings(true)}
         running={running}
         on={on}
@@ -143,6 +149,7 @@ export function AgentHeader(props: AgentHeaderProps) {
               Stop background work
             </Button>
           )}
+          <AgentQuestionsButton taskId={task.id} />
           <SubagentsButton taskId={task.id} subtasks={subtasks} />
           <FindButton onClick={on.find} />
           <ProcessesButton processes={props.processes} />
