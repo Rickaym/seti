@@ -11,14 +11,21 @@ test.beforeEach(async ({ context }) => {
   await context.grantPermissions(['clipboard-read', 'clipboard-write'])
 })
 
-test('Copy link gives a deep link that opens the file, and a pasted one shows as a card', async ({ page }) => {
+test('Copy contents copies the file, and the row menu copies a link that opens it and shows as a card', async ({
+  page,
+}) => {
   const { id } = await seedCodeAgent()
   await page.goto(`/#agents/${id}`)
   await page.getByRole('button', { name: 'Files', exact: true }).click()
   const panel = filesPanel(page)
   await openViewerFile(page, 'app.ts')
 
-  await panel.getByTestId('viewer-header').getByRole('button', { name: 'Copy link' }).click()
+  await panel.getByTestId('viewer-header').getByRole('button', { name: 'Copy contents' }).click()
+  await expect.poll(async () => clipboard(page)).toContain('export')
+  await expect(panel.getByTestId('viewer-header').getByRole('button', { name: 'Copy link' })).toHaveCount(0)
+  await panel.getByRole('button', { name: 'Back to the folder' }).click()
+  await panel.getByRole('button', { name: /app\.ts/ }).click({ button: 'right' })
+  await page.getByRole('menuitem', { name: 'Copy link' }).click()
   const origin = new URL(page.url()).origin
   await expect
     .poll(async () => clipboard(page))

@@ -193,7 +193,7 @@ export const TaskSettings = memo(function TaskSettingsView({
         <Row label="Credentials">
           <TaskCredentials task={task} onChanged={onChanged} />
         </Row>
-        <Row label="Can reach">
+        <Row label="Services">
           <AccessSummary
             taskId={task.id}
             onOpen={() => {

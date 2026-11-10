@@ -3,7 +3,7 @@ import { expect, test } from './support/fixtures.js'
 import { expectFitsPhone } from './support/phone-layout.js'
 import { filesPanel, openViewerFile } from './support/viewer-files.js'
 
-test('Copy link on a phone gives a link that reopens the file', async ({ page, context }) => {
+test('Copy contents on a phone copies the whole file with a touch-sized button', async ({ page, context }) => {
   await context.grantPermissions(['clipboard-read', 'clipboard-write'])
   const { id } = await seedCodeAgent()
   await page.goto(`/#agents/${id}`)
@@ -11,16 +11,12 @@ test('Copy link on a phone gives a link that reopens the file', async ({ page, c
   await page.getByRole('dialog', { name: 'Agent actions' }).getByRole('button', { name: 'Files' }).tap()
   await openViewerFile(page, 'data.json')
 
-  const copy = filesPanel(page).getByTestId('viewer-header').getByRole('button', { name: 'Copy link' })
+  const header = filesPanel(page).getByTestId('viewer-header')
+  await expect(header.getByRole('button', { name: 'Copy link' })).toHaveCount(0)
+  const copy = header.getByRole('button', { name: 'Copy contents' })
   expect((await copy.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(44)
-  await expectFitsPhone(page, 'the viewer header with Copy link')
+  await expectFitsPhone(page, 'the viewer header with Copy contents')
   await copy.tap()
   await expect(copy).toHaveAttribute('data-copied', '')
-  const link = await page.evaluate(async () => navigator.clipboard.readText())
-  expect(link).toMatch(/\/docs\/data\.json$/)
-
-  await page.goto('/#settings')
-  await page.goto(link)
-  await expect(page.getByRole('region', { name: 'File docs/data.json' })).toBeVisible()
-  await expect(page.locator('[data-code-file] .tok-function').first()).toHaveText('"name"')
+  expect(await page.evaluate(async () => navigator.clipboard.readText())).toContain('"name"')
 })
