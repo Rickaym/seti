@@ -71,7 +71,7 @@ test('the agent access keeps only its grants and links its credential to the Cre
   await page.goto(`/#agents/${id}`)
   const details = await openAgentSettings(page, 'Access')
   const access = details.getByRole('tabpanel', { name: 'Access' })
-  await expect(access.locator('dt')).toHaveText(['Credentials', 'Can reach', 'Isolation', 'Bypass', 'Rules'])
+  await expect(access.locator('dt')).toHaveText(['Credentials', 'Services', 'Isolation', 'Bypass', 'Rules'])
   await expect(access.getByRole('list', { name: 'What this agent gets' })).toHaveCount(0)
   await expect(access).not.toContainText('own keys')
 

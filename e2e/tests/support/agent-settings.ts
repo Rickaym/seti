@@ -7,7 +7,7 @@ export type SettingsSection = 'General' | 'Access' | 'Team' | 'Session'
 /** Each tab's rows for an idle agent with no model, PRs or channels. */
 const SECTIONS: readonly (readonly [SettingsSection, readonly string[]])[] = [
   ['General', ['Role', 'Workspace', 'Color', 'Notify', 'Directories']],
-  ['Access', ['Credentials', 'Can reach', 'Isolation', 'Bypass', 'Rules']],
+  ['Access', ['Credentials', 'Services', 'Isolation', 'Bypass', 'Rules']],
   ['Team', ['Group chat', 'Channels']],
   ['Session', ['Cost', 'Memory', 'CPU', 'Compaction']],
 ]

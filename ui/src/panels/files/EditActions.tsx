@@ -1,4 +1,5 @@
 import { Code, PencilLine, PencilOff, Save, Search } from 'lucide-react'
+import { CopyIconButton } from '@/components/CopyButton'
 import { Hint } from '@/components/Hint'
 import { ToggleButton } from '@/components/ToggleButton'
 import { Button } from '@/components/ui/button'
@@ -11,6 +12,8 @@ export interface SourceToggle {
 }
 
 interface EditActionsProps {
+  /** The text shown or being edited, which Copy contents copies. */
+  text: string
   writable: boolean
   editing: boolean
   dirty: boolean
@@ -23,9 +26,20 @@ interface EditActionsProps {
 }
 
 /** Find, Edit, or Save and Stop editing while editing, and the Source toggle, for the header. */
-export function EditActions({ writable, editing, dirty, saving, source, onFind, onEdit, onSave }: EditActionsProps) {
+export function EditActions({
+  text,
+  writable,
+  editing,
+  dirty,
+  saving,
+  source,
+  onFind,
+  onEdit,
+  onSave,
+}: EditActionsProps) {
   return (
     <>
+      <CopyIconButton text={text} label="Copy contents" variant="outline" />
       {onFind !== null && (
         <Hint text={`Find in this file (${FILE_KEYS.find})`}>
           <Button variant="outline" size="icon-sm" aria-label="Find in file" onClick={onFind}>
