@@ -2,7 +2,7 @@ import type { Question } from '@seti/shared'
 import { CHECKS_PROMPT, CHECKS_QUESTION, PUSH_PROMPT, PUSH_QUESTION, REPORT_QUESTION } from './support/fake-question.js'
 import { apiData, expect, test } from './support/fixtures.js'
 import { FAKE_CLAUDE_ENV } from './support/processes.js'
-import { agentQuestions, askingAgent, lastReply } from './support/questions.js'
+import { agentQuestions, askingAgent, lastReply, sentLine } from './support/questions.js'
 
 test.use({ serverEnv: FAKE_CLAUDE_ENV })
 
@@ -32,10 +32,10 @@ test('two agents ask through AskUserQuestion and one Submit all answers both', a
   await checks.getByRole('checkbox', { name: /Lint/ }).click()
   await checks.getByRole('textbox', { name: 'Other answer to Checks' }).fill('and the build')
   await checks.getByRole('textbox', { name: 'Other answer to Report' }).fill('Email me')
-  await expect(page.getByRole('status')).toHaveText('3 of 3 answered')
+  await expect(sentLine(page)).toHaveText('3 of 3 answered')
   await page.getByRole('button', { name: 'Submit all' }).click()
 
-  await expect(page.getByRole('status')).toContainText('Sent 3 answers. Going on:')
+  await expect(sentLine(page)).toContainText('Sent 3 answers. Going on:')
   await expect(page.getByText('No open questions.')).toBeVisible()
   await expect(page.getByRole('button', { name: /^Questions, / })).toHaveCount(0)
   await expect.poll(async () => lastReply(request, pusher.id)).toBe(`Got your answers. ${PUSH_QUESTION} Yes`)

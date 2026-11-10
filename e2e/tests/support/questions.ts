@@ -28,3 +28,6 @@ export async function lastReply(request: APIRequestContext, taskId: string): Pro
 /** The agent's questions on the Questions page. */
 export const agentQuestions = (page: Page, task: Task) =>
   page.getByRole('region', { name: `Questions from ${task.title}` })
+
+/** The Questions page's line saying how many are answered, then what Submit all sent. */
+export const sentLine = (page: Page) => page.getByRole('main').getByRole('status')
