@@ -486,6 +486,40 @@ remove`. The EA reaches both through `get_archive_settings` and `run_archive_swe
 `archive_agent` and `delete_agent` call the same routes as the UI, so they pack and remove the same
 folders.
 
+## Knowledge notes reach agents only after the user approves them
+
+Agents propose short, reusable notes (a how-to, a fact, a gotcha or how an environment is set
+up), each with a required verify step, up to five sources and an optional repo scope. Notes live
+in `knowledge_note` (`server/src/store/knowledge.ts`) with a status of proposed, approved,
+rejected or stale, a generated `tsvector` for full-text search, and the counts of passed and
+failed checks. Shapes and limits are in `shared/src/knowledge.ts`.
+
+Every proposal goes through `proposeKnowledge` in `server/src/knowledge.ts`, which refuses
+secrets and private paths, holds each agent to 10 waiting proposals and audits the proposal. The
+`propose_knowledge` Seti tool, the EA's `propose_knowledge` and Seti's own corrections all call
+it, and so should any later source of proposals, such as asking an agent for lessons as its task
+ends. Approval, rejection and edits are in `server/src/knowledge-review.ts` and refuse anyone but
+the user.
+
+Notes do not reuse context packs. A pack is user-written prose linked to agents and placed whole in
+their prompt; a note is a small record with a status, a verify step, sources and a check history,
+and only its title reaches the prompt. Notes do reuse revisions: approving a proposal records a
+`knowledge_note` revision, and each later edit of a published note records another, so the change
+history and revert work as they do for packs and CLAUDE.md files.
+
+`knowledgeContext` (`server/src/knowledge-index.ts`), registered with `registerContextProvider`,
+gives each agent at Seti control Self or Full a titles-only index of the approved notes for its
+repos plus global ones: the most recently verified first, then the most verified, cut to 1,500
+characters with a line counting the rest. Agents read a body with `search_knowledge`. A sweep at
+each index build and once an hour marks notes stale when their last passed check is older than 30
+days (fact, environment) or 90 days (how-to, gotcha); `verify_knowledge` records a check, and the
+third failure in a row marks the note stale and files one correction proposal. A pass brings a
+stale note back; so does the user's Approve.
+
+The Knowledge page sits in the Context section with Proposed, Approved and Stale views, and the
+Context section shows a count of waiting proposals. A proposal never holds an agent up, so it
+never shows in Needs you.
+
 ## The EA acts through the same API as the user
 
 The EA is a separate Python process that shares a local token with Seti. It changes things only

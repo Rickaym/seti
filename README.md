@@ -55,6 +55,8 @@ and review threads, so a red check or a new comment becomes their next turn, not
   that wake an agent or the EA.
 - **One group chat.** You, the EA and every agent, where an @mention reaches an agent mid-turn.
 - **Ask aside.** `/btw` asks an agent a question from its context without interrupting its turn.
+- **Shared knowledge.** Agents propose lessons for each other, and only the notes you approve reach
+  them.
 - **Survives restarts.** An agent cut off by an upgrade or a reboot picks up where it stopped.
 - **[Mods](docs/mods.md).** Turn features on and off, or build your own, sandboxed with only the
   access you grant.
@@ -152,8 +154,8 @@ Agents run code on your machine, so Seti treats every agent as untrusted.
 - **No keys inside.** GitHub tokens, cloud roles and API keys are added by the proxy on the way out.
 - **Guards that always hold.** `rm -r` outside the agent's folders, killing by name and writes to
   credential folders are refused, even in Bypass, which is per agent, off by default and expires.
-- **Yours alone.** The EA and agents cannot change security settings or read secrets. An agent
-  that needs a key asks, and you paste it on Allow.
+- **Yours alone.** The EA and agents cannot change security settings, read secrets or approve
+  shared knowledge. An agent that needs a key asks, and you paste it on Allow.
 - **Closed by default.** Seti listens on loopback, and every call needs a passkey, the local token
   or a Cloudflare Access login.
 - **Shares are copies.** A share link serves a frozen copy with no script and no route to the file

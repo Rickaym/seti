@@ -1,11 +1,14 @@
 import { Menu, X } from 'lucide-react'
 import { useEffect, useId, useMemo } from 'react'
 import { NewsDot } from '@/components/NewsDot'
+import { WaitingCount } from '@/components/WaitingCount'
 import { ShortcutGuideOpener } from '@/components/shortcuts/ShortcutGuide'
 import { ModeToggle } from '@/components/theme/mode-toggle'
 import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from '@/components/ui/sheet'
+import { useKnowledgeWaiting } from '@/hooks/useKnowledgeWaiting'
 import { useNarrow } from '@/hooks/useMedia'
+import { describedBy } from '@/lib/described-by'
 import { useNewsPages } from '@/lib/mod-views'
 import { useSectionGroups, type SectionKey } from '@/lib/sections'
 import { ownsSwipeRight, swipeTracker } from '@/lib/swipe'
@@ -48,6 +51,8 @@ export function NavDrawer({ active, onSelect, open, onOpenChange: setOpen }: Nav
   const news = useNewsPages().length > 0
   const newsId = useId()
   const settingsNewsId = useId()
+  const waitingId = useId()
+  const waiting = useKnowledgeWaiting()
   const groups = useSectionGroups()
   useSwipeToOpen(useNarrow() && !open, setOpen)
   const swipeClose = useMemo(
@@ -112,12 +117,13 @@ export function NavDrawer({ active, onSelect, open, onOpenChange: setOpen }: Nav
                   const Icon = item.icon
                   const current = active === item.key
                   const dot = news && item.key === 'settings'
+                  const count = item.key === 'context' ? waiting : 0
                   return (
                     <button
                       key={item.key}
                       type="button"
                       aria-current={current ? 'page' : undefined}
-                      aria-describedby={dot ? settingsNewsId : undefined}
+                      aria-describedby={describedBy(dot && settingsNewsId, count > 0 && waitingId)}
                       onClick={() => {
                         setOpen(false)
                         onSelect(item.key)
@@ -130,6 +136,7 @@ export function NavDrawer({ active, onSelect, open, onOpenChange: setOpen }: Nav
                       <Icon className="size-[18px] shrink-0" />
                       <span className="flex-1">{item.label}</span>
                       {dot && <NewsDot id={settingsNewsId} className={cn(current && 'bg-primary-foreground')} />}
+                      {count > 0 && <WaitingCount count={count} id={waitingId} className="static translate-x-0" />}
                     </button>
                   )
                 })}

@@ -21,6 +21,7 @@ import { setTaskProfile, setTaskSandbox, setTaskSetiControl } from '../tasks.js'
 import { ensureMember } from '../team.js'
 import { EA_AUTH, USER_AUTH } from '../test-auth.js'
 import { waitIdle } from '../wait-idle.js'
+import { KNOWLEDGE_TOOLS } from './knowledge.js'
 import { callSetiTool, sessionTools, setiToolsContext } from './server.js'
 
 const sdk = await vi.hoisted(async () => {
@@ -129,7 +130,7 @@ describe('the Seti control level', () => {
     await waitIdle(task.id)
     expect(sdk.fake.sessions).toHaveLength(sessions + 1)
     expect(sdk.fake.last?.options.mcpServers?.seti).toMatchObject({ type: 'sdk', name: 'seti' })
-    expect(on && sessionTools(on)).toHaveLength(SETI_TOOLS.length + 3)
+    expect(on && sessionTools(on)).toHaveLength(SETI_TOOLS.length + 3 + KNOWLEDGE_TOOLS.length)
   })
 
   it('tells the agent at its next turn that its seti tools came or went', async () => {

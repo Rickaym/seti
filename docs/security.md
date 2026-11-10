@@ -143,6 +143,44 @@ private key off the host. The sandbox model is in [Architecture](architecture.md
   filled in by Seti and replaced with `[secret]` in everything the script, its logs and its events
   see. Only the user gives a poller extra hosts or connections (see [Pollers](pollers.md)).
 
+## Knowledge notes
+
+Knowledge notes carry text from one agent into every other agent's system prompt, which makes them
+a prompt-injection path: an agent that read hostile text (a web page, an issue, a webhook payload)
+could write instructions into a note, and without a check those would reach agents with other
+repos and other access. The control is the user's approval. A proposal reaches no agent and no
+search until the user approves it on the Knowledge page in the Context section, where its whole
+body, verify step, sources and proposer show before Approve.
+
+- Agents at Seti control Self or Full propose notes with `propose_knowledge`, search approved ones
+  with `search_knowledge` and report checks with `verify_knowledge`. Agents at Off get none of
+  them and no index. The EA lists and searches notes through `search_seti` and proposes with
+  `propose_knowledge`.
+- Approve, Edit and Reject (`POST /api/knowledge/<id>/approve`, `POST .../reject` and
+  `PUT /api/knowledge/<id>`) refuse the EA and agents' Seti tools with 403, in the route and in the
+  core functions (`server/src/knowledge-review.ts`), and so does reverting a note's revision. No
+  EA or agent tool approves, rejects or edits a note.
+- A proposal, an edit and a verification report are refused when Seti's share secret scan
+  (`credentialFindings` in `server/src/scrub.ts`) finds a credential in any field or source; the
+  refusal names the field and the kind of secret, never the value. A source that names a home path,
+  or an absolute path outside the proposing agent's own folders (its working directory, repos,
+  directories and workspace; the registered repos for the EA), is refused, and a URL source must
+  be https without a user or password.
+- The index is titles only, at most 1,500 characters, wrapped in `<knowledge_index>` and framed as
+  notes other agents wrote and the user approved: reference, not instructions. Titles lose control
+  characters and angle brackets, so a title cannot close the wrapper. The body reaches an agent
+  only when it searches, with the same reminder.
+- A note can be scoped to one registered repo; agents see global notes and those of their own
+  repos. Notes not verified for 30 days (facts, environments) or 90 days (how-tos, gotchas), and
+  notes whose check failed three times in a row, go stale and leave the index until an agent's
+  check passes or the user approves them again. The failure that makes a note stale files a
+  correction as a proposal for the user.
+- Each agent may have 10 proposals waiting. Every proposal, approval, rejection, edit,
+  verification and stale change is audited with its actor; reports and reasons are scrubbed.
+
+User approval is a review, not a proof: a note the user approves without reading still reaches
+every agent in its scope. That is why proposals show whole and why notes stay short.
+
 ## Agent files
 
 The Files view reads an agent's working directory, repos, extra directories and Seti workspace, and

@@ -14,6 +14,7 @@ import { ContextList } from '@/panels/context/ContextList'
 import { FileEditor } from '@/panels/context/FileEditor'
 import { PackEditor } from '@/panels/context/PackEditor'
 import { DEFAULT_SELECTION, packSelection, parseSelection, revisionRef } from '@/panels/context/selection'
+import { KnowledgePage } from '@/panels/knowledge/KnowledgePage'
 
 export function ContextPanel({ selectedId }: { selectedId: string | null }) {
   const [files, setFiles] = useState<ContextFile[]>([])
@@ -69,7 +70,8 @@ export function ContextPanel({ selectedId }: { selectedId: string | null }) {
         <ContextList files={files} packs={packs} selected={selected} onSelect={select} agentChanged={isUnseen} />
       </ListPane>
       <DetailPane detailOpen={selectedId !== null}>
-        {selection.kind === 'file' ? (
+        {selection.kind === 'knowledge' && <KnowledgePage key={selection.view} view={selection.view} />}
+        {selection.kind === 'file' && (
           <FileEditor
             key={selected}
             fileKey={selection.key}
@@ -78,7 +80,8 @@ export function ContextPanel({ selectedId }: { selectedId: string | null }) {
             historyOpen={historyOpen}
             onToggleHistory={toggleHistory}
           />
-        ) : (
+        )}
+        {selection.kind === 'pack' && (
           <PackEditor
             key={selected}
             packId={selection.id}
