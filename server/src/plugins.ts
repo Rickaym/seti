@@ -5,7 +5,7 @@ import { audit } from './audit.js'
 import { refuseAgent } from './ea-guard.js'
 import { HttpError } from './http.js'
 import { cliErrorText, createPluginCli, type DetailsTarget, type PluginCli } from './plugin-cli.js'
-import { pluginFolderProblem, readPluginFolder, resolvePluginPath } from './plugin-folder.js'
+import { pluginStamp, readPluginFolder, resolvePluginPath, type PluginManifest } from './plugin-folder.js'
 import { pluginStateFiles, stateWatch } from './plugin-state.js'
 import { setiPlugins, taskPluginChoices } from './store/plugins.js'
 
@@ -51,6 +51,33 @@ async function mapLimited<T, R>(items: readonly T[], limit: number, fn: (item: T
   return results
 }
 
+function readFolder(folder: string): { manifest: PluginManifest } | { problem: string } {
+  try {
+    return { manifest: readPluginFolder(folder) }
+  } catch (e) {
+    return { problem: e instanceof Error ? e.message : String(e) }
+  }
+}
+
+/** The plugin with the version and description its folder names now, stored and audited if new. */
+async function withFolderManifest(plugin: SetiPlugin, manifest: PluginManifest): Promise<SetiPlugin> {
+  const { version, description } = manifest
+  if (version === plugin.version && description === plugin.description) {
+    return plugin
+  }
+  await setiPlugins.refreshManifest(plugin.id, { version, description })
+  const was = plugin.version ?? 'no version'
+  await audit.record({
+    actor: 'system',
+    kind: 'plugin.default_refreshed',
+    subject_type: 'plugin',
+    subject_id: plugin.id,
+    summary: `Seti default plugin ${plugin.name} is now ${version ?? 'without a version'} (was ${was})`,
+    detail: { name: plugin.name, path: plugin.path, version, was: plugin.version },
+  })
+  return { ...plugin, version, description }
+}
+
 /** Seti defaults and installed plugins; cached until refreshed, changed here or seen `changed`. */
 export function createPluginCatalog(
   cli: Pick<PluginCli, 'installed' | 'components'> = createPluginCli(),
@@ -66,6 +93,11 @@ export function createPluginCatalog(
     }
     const next = cli.components(target).catch(() => null)
     components.set(key, next)
+    void next.then((read) => {
+      if (read === null && components.get(key) === next) {
+        components.delete(key)
+      }
+    })
     return next
   }
 
@@ -77,11 +109,15 @@ export function createPluginCatalog(
     }))
   }
 
-  const defaultView = async (plugin: SetiPlugin): Promise<SetiPluginView> => {
-    const problem = pluginFolderProblem(plugin.path)
+  const defaultView = async (stored: SetiPlugin): Promise<SetiPluginView> => {
+    const read = readFolder(stored.path)
+    if ('problem' in read) {
+      return { ...stored, problem: read.problem, components: null }
+    }
+    const plugin = await withFolderManifest(stored, read.manifest)
     const target = { name: plugin.name, path: plugin.path }
-    const key = `seti:${plugin.path}@${plugin.version ?? ''}`
-    return { ...plugin, problem, components: problem === null ? await componentsOf(key, target) : null }
+    const key = `seti:${plugin.path}@${plugin.version ?? ''}@${pluginStamp(plugin.path)}`
+    return { ...plugin, problem: null, components: await componentsOf(key, target) }
   }
 
   const list = async (refresh = false): Promise<PluginListing> => {

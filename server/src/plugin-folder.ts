@@ -67,12 +67,13 @@ export function readPluginFolder(folder: string): PluginManifest {
   }
 }
 
-/** Why a saved plugin folder would not load now, or null when it still reads as a plugin. */
-export function pluginFolderProblem(folder: string): string | null {
-  try {
-    readPluginFolder(folder)
-    return null
-  } catch (e) {
-    return e instanceof Error ? e.message : String(e)
-  }
+/** Folders whose change times say a plugin's components may have changed, besides its manifest. */
+const COMPONENT_DIRS = ['skills', 'commands', 'agents', 'hooks']
+
+/** When the plugin's manifest and component folders last changed, to key what was read from them. */
+export function pluginStamp(folder: string): string {
+  const times = [MANIFEST, ...COMPONENT_DIRS].map(
+    (entry) => fs.statSync(path.join(folder, entry), { throwIfNoEntry: false })?.mtimeMs ?? 0,
+  )
+  return times.join(',')
 }
