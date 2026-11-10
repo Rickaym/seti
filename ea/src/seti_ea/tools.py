@@ -55,6 +55,7 @@ from seti_ea.metrics_tools import ea_usage_lines, metrics_lines
 from seti_ea.mod_tools import mods_text, themes_text
 from seti_ea.my_pack_tools import LIST_MY_PACKS_SPEC
 from seti_ea.process_tools import LIST_PROCESSES_SPEC
+from seti_ea.question_tools import list_questions
 from seti_ea.role_tools import role_lines
 from seti_ea.seti import SetiClient, SetiError
 from seti_ea.settings_tools import SETTINGS_SPECS, SettingsTools
@@ -323,7 +324,7 @@ TOOL_SPECS: list[ToolSpec] = [
         "PR descriptions, with the task or PR each excerpt came from. Use it for what a task decided, "
         "found or was told, which the live context does not hold. With in knowledge, search the "
         "approved knowledge notes agents share instead; with in proposals, list the notes waiting "
-        "for the user to approve.",
+        "for the user to approve; with in questions, list the questions agents wait on the user for.",
         {
             "query": {"type": "string", "description": "What to look for, in a few keywords."},
             "task": {
@@ -332,8 +333,9 @@ TOOL_SPECS: list[ToolSpec] = [
             },
             "in": {
                 "type": "string",
-                "enum": ["tasks", "knowledge", "proposals"],
-                "description": "tasks by default; knowledge for approved notes; proposals for waiting ones.",
+                "enum": ["tasks", "knowledge", "proposals", "questions"],
+                "description": "tasks by default; knowledge for approved notes; proposals for waiting "
+                "ones; questions for agents' open questions.",
             },
         },
         [],
@@ -1167,6 +1169,8 @@ class EaTools:
         scope = arg_str(args, "in", required=False)
         if scope == "proposals":
             return await list_proposals(self._seti, self._now())
+        if scope == "questions":
+            return await list_questions(self._seti, self._now())
         query = arg_str(args, "query")
         if scope == "knowledge":
             return await search_knowledge(self._seti, query, self._now())

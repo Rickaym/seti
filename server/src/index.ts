@@ -46,6 +46,7 @@ import { retireBundledPlugins } from './plugins.js'
 import { pollerScheduler } from './pollers/service.js'
 import { prDiscovery } from './pr-discovery.js'
 import { prInputs } from './pr-inputs.js'
+import { expireLeftoverQuestions } from './questions.js'
 import { cache } from './redis.js'
 import { reminderTicker } from './reminders/service.js'
 import { resourceSampler } from './resources.js'
@@ -156,6 +157,7 @@ relayTeamEvents()
 await auditEvents.sealPending()
 await stopLeftoverScopes()
 await dropLeftoverRequests()
+await expireLeftoverQuestions()
 await resumeBypass()
 startRequestExpiry()
 startKnowledgeSweep()

@@ -26,6 +26,8 @@ import { navigate } from '@/lib/route'
 import { openStartPage } from '@/lib/start-context'
 import { relativeTime } from '@/lib/time'
 import { cn } from '@/lib/utils'
+import { QUESTIONS_ROUTE } from '@/panels/questions/QuestionsButton'
+import { QuestionsPage } from '@/panels/questions/QuestionsPage'
 import { bytesLabel } from '@/panels/resources/format'
 import { AgentFilter } from '@/panels/tasks/AgentFilter'
 import { AgentView } from '@/panels/tasks/AgentView'
@@ -314,6 +316,9 @@ export function TasksPanel(props: { selectedId: string | null; subId: string | n
   const detail = () => {
     if (selectedId === NEW || (selectedId === null && layout === null)) {
       return <StartPage />
+    }
+    if (selectedId === QUESTIONS_ROUTE) {
+      return <QuestionsPage />
     }
     if (layout !== null && place.inLayout) {
       const Layout = layout.view

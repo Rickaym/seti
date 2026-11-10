@@ -38,6 +38,7 @@ const NOT_FOR_AGENTS: Record<string, string> = {
   add_plugin: 'A plugin folder an agent wrote would run its hooks in other agents, unsandboxed ones too.',
   set_plugin_enabled: 'It turns a plugin on for every new agent.',
   run_mod_action: 'Agents get one mod_<mod>_<command> tool per mod command offered to them.',
+  answer_question: "Passes on the user's own answer to an agent's question; agents never answer for the user.",
 }
 
 /** Agent tools the EA has no tool of the same name for, each with how the EA does the same. */

@@ -193,6 +193,24 @@ body, verify step, sources and proposer show before Approve.
 User approval is a review, not a proof: a note the user approves without reading still reaches
 every agent in its scope. That is why proposals show whole and why notes stay short.
 
+## Questions
+
+Agents' questions carry the user's words into an agent's context, so they follow the rules of a
+message, not of a security setting. The EA may relay answers; agents and mods may not.
+
+- Agents ask only through Claude Code's AskUserQuestion, which waits on the user. No Seti tool
+  asks or answers a question.
+- `POST /api/questions/answers` takes the user's answers and the EA's relayed ones; the EA's are
+  recorded as `answered_by: ea` and audited with `via: ea`. Agents' Seti tools and mods get 403 in
+  the core function (`answerQuestions` in `server/src/question-answers.ts`), not just the route.
+- An answer in the user's own words is refused with 422 when Seti's secret scan
+  (`credentialFindings` in `server/src/scrub.ts`) finds a credential in it, and nothing in the
+  batch is stored. A question that asks for a secret says on the Questions page to add it in
+  Settings, Credentials instead, and the EA's prompt says the same.
+- Question text and option descriptions are stored with secrets redacted. The audit log records
+  that a question was asked, answered, dismissed or expired, with who answered, the type, the
+  option labels picked and the length of the own-words answer, never its text.
+
 ## Agent files
 
 The Files view reads an agent's working directory, repos, extra directories and Seti workspace, and

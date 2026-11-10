@@ -23,6 +23,7 @@ ACTION_LINES = {
     "reply_team_chat": "Very good. Passing that on.",
     "send_file": "Of course. Handing the files over.",
     "propose_knowledge": "Of course. Proposing the note.",
+    "answer_question": "Very good. Passing your answer on.",
     "rename_agent": "Certainly. Renaming it now.",
     "pin_agent": "Certainly.",
     "set_agent_color": "Certainly. Changing its colour.",

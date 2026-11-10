@@ -689,6 +689,7 @@ class FakeSeti:
     live_context: dict[str, Any] | None = None
     search_hits: list[dict[str, Any]] = field(default_factory=list)
     knowledge: list[dict[str, Any]] = field(default_factory=list)
+    questions: list[dict[str, Any]] = field(default_factory=list)
     team: list[dict[str, Any]] = field(default_factory=list)
     chat_hits: list[dict[str, Any]] = field(default_factory=list)
     chat_more: bool = False
@@ -804,6 +805,26 @@ class FakeSeti:
             "max_chars": self.ea_pack_max,
             "form_of_address": self.form_of_address,
         }
+
+    def _answer_questions(self, body: dict[str, Any]) -> httpx.Response:
+        result: dict[str, Any] = {"answered": 0, "dismissed": 0, "skipped": 0, "resumed": []}
+        for item in body["items"]:
+            question = next(
+                (q for q in self.questions if q["id"] == item["id"] and q["status"] == "open"), None
+            )
+            if question is None:
+                result["skipped"] += 1
+                continue
+            if "ghp_" in (item.get("other") or ""):
+                return err(422, "Unprocessable", "That answer looks like a secret or credential")
+            question["status"] = "answered" if item["action"] == "answer" else "dismissed"
+            result["answered" if item["action"] == "answer" else "dismissed"] += 1
+            group = [q for q in self.questions if q["group_id"] == question["group_id"]]
+            if all(q["status"] != "open" for q in group):
+                result["resumed"].append(
+                    {"task_id": question["task_id"], "task_title": question["task_title"]}
+                )
+        return ok(result)
 
     def posts(self) -> list[tuple[str, Any]]:
         """Every POST but the gate's own bookkeeping of questions."""
@@ -1256,6 +1277,8 @@ class FakeSeti:
                 )
             case ["knowledge"]:
                 return ok([n for n in self.knowledge if n["status"] == params.get("status", "proposed")])
+            case ["questions"]:
+                return ok([q for q in self.questions if q["status"] == "open"])
             case ["ea", "search"]:
                 task = params.get("task")
                 hits = [h for h in self.search_hits if task is None or h.get("task_id") == task]
@@ -1499,6 +1522,8 @@ class FakeSeti:
                 return ok({"message": message, "deliveries": self.team_deliveries, "unknown": unknown})
             case ["team", "files"]:
                 return self._send_files(body)
+            case ["questions", "answers"]:
+                return self._answer_questions(body)
             case ["knowledge"]:
                 if "AKIA" in body["body"]:
                     return err(
