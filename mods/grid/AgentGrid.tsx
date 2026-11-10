@@ -81,7 +81,7 @@ export const AgentGrid = memo(function AgentGridView({
   useEffect(() => {
     seti().panels.setLandingArea((root) => {
       const id = gridStore.getSnapshot().focused
-      return id === null ? null : root.querySelector<HTMLElement>(`[data-grid-panel="${id}"]`)
+      return id === null ? root : root.querySelector<HTMLElement>(`[data-grid-panel="${id}"]`)
     })
     return () => {
       seti().panels.setLandingArea(null)
