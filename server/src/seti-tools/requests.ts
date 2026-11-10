@@ -1,6 +1,7 @@
-import { fileChangeInput, HTTPS_PORT, REQUEST_REASON_MAX } from '@seti/shared'
+import { askSecretInput, fileChangeInput, HTTPS_PORT, REQUEST_REASON_MAX } from '@seti/shared'
 import { z } from 'zod'
 import { fileChangeRequest, PENDING_MAX, REQUEST_TTL_MS } from '../change-requests.js'
+import { askSecret } from '../secret-questions.js'
 import { done, setiTool } from './tool.js'
 
 const HOURS = String(REQUEST_TTL_MS / 3_600_000)
@@ -39,5 +40,26 @@ const requestChange = setiTool({
   },
 })
 
+const askSecretTool = setiTool({
+  name: 'ask_secret',
+  description:
+    'Ask the user for a secret, token or password you need, such as an API key. The call waits until the ' +
+    'user enters it in Seti or dismisses it. The value never reaches you or your transcript: outside the ' +
+    "sandbox Seti writes it to a file only Seti's user reads and tells you its path; in the sandbox it goes " +
+    "to Seti's secret store and the proxy adds it on the hosts you name, so name them. Never ask for a " +
+    'secret in your reply or with AskUserQuestion.',
+  input: {
+    name: askSecretInput.shape.name.describe('The variable-style name, such as AZURE_SPEECH_KEY.'),
+    purpose: askSecretInput.shape.purpose.describe('What you need it for, in a sentence the user reads.'),
+    hosts: askSecretInput.shape.hosts.describe(
+      'The hosts that receive it, such as api.example.com; needed in the sandbox, ignored outside it.',
+    ),
+  },
+  run: async (args, ctx) => askSecret(ctx.caller, askSecretInput.parse(args), ctx.signal),
+})
+
 /** The tool every agent with Seti control gets for access only the user grants. */
 export const REQUEST_TOOLS = [requestChange]
+
+/** The secret analogue of AskUserQuestion, which every agent gets at any Seti control level. */
+export const SECRET_TOOLS = [askSecretTool]

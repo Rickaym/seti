@@ -4,9 +4,12 @@ import {
   answerItem,
   asksForSecret,
   byAgent,
+  draftOf,
   EMPTY_DRAFT,
+  initialDraft,
   isAnswered,
   sentSummary,
+  shownLabel,
   toggleOption,
   writeOther,
 } from '@/panels/questions/drafts'
@@ -27,6 +30,7 @@ const question = (extra: Partial<Question> = {}): Question => ({
     { label: 'Unit', description: null },
     { label: 'Lint', description: null },
   ],
+  secret: null,
   status: 'open',
   answer: null,
   answered_by: null,
@@ -71,6 +75,25 @@ describe('question drafts', () => {
     expect(sentSummary({ answered: 0, dismissed: 0, skipped: 2, resumed: [] })).toBe(
       'Nothing sent. 2 questions had closed already.',
     )
+  })
+
+  it('starts with the recommended option picked, by its exact label', () => {
+    const options = [
+      { label: 'Unit', description: null },
+      { label: 'Lint (Recommended)', description: null },
+      { label: 'E2E (recommended)', description: null },
+    ]
+    const single = question({ options })
+    expect(initialDraft(single)).toEqual({ selected: ['Lint (Recommended)'], other: '' })
+    expect(initialDraft(question({ options, multi: true })).selected).toEqual([
+      'Lint (Recommended)',
+      'E2E (recommended)',
+    ])
+    expect(initialDraft(question())).toEqual(EMPTY_DRAFT)
+    expect(isAnswered(draftOf({}, single))).toBe(true)
+    expect(answerItem(single, draftOf({}, single))).toMatchObject({ selected: ['Lint (Recommended)'] })
+    expect(draftOf({ [single.id]: EMPTY_DRAFT }, single)).toBe(EMPTY_DRAFT)
+    expect(shownLabel('Lint (Recommended)')).toBe('Lint')
   })
 
   it('spots a question that asks for a secret', () => {

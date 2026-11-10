@@ -1,15 +1,15 @@
-import type { AnswerQuestionsResult, Question, QuestionAnswerItem } from '@seti/shared'
+import type { Question, QuestionAnswerItem } from '@seti/shared'
 import { MessageCircleQuestion, Send, SkipForward } from 'lucide-react'
 import { useMemo, useState } from 'react'
-import { toast } from 'sonner'
-import { apiPost, errorText } from '@/api'
 import { Hint } from '@/components/Hint'
 import { BackButton, DetailHeader, DetailTitle } from '@/components/SplitPane'
 import { Button } from '@/components/ui/button'
-import { refreshQuestions, useOpenQuestions } from '@/hooks/useQuestions'
+import { useOpenQuestions } from '@/hooks/useQuestions'
 import { navigate } from '@/lib/route'
 import { QuestionField } from '@/panels/questions/QuestionField'
-import { answerItem, byAgent, EMPTY_DRAFT, isAnswered, sentSummary, type Draft } from '@/panels/questions/drafts'
+import { SecretField } from '@/panels/questions/SecretField'
+import { answerItem, byAgent, draftOf, isAnswered, type Draft } from '@/panels/questions/drafts'
+import { useSend, type SecretEntry } from '@/panels/questions/useSend'
 
 interface AgentQuestionsProps {
   taskId: string
@@ -17,11 +17,14 @@ interface AgentQuestionsProps {
   questions: readonly Question[]
   drafts: Readonly<Record<string, Draft>>
   onDraft: (id: string, draft: Draft) => void
+  secrets: Readonly<Record<string, string>>
+  onSecret: (id: string, value: string) => void
   onSend: (items: QuestionAnswerItem[]) => void
 }
 
 /** One agent's open questions, with Skip for all of them. */
-function AgentQuestions({ taskId, title, questions, drafts, onDraft, onSend }: AgentQuestionsProps) {
+function AgentQuestions(props: AgentQuestionsProps) {
+  const { taskId, title, questions, onSend } = props
   return (
     <section aria-label={`Questions from ${title}`} data-task-id={taskId} className="border border-border">
       <div className="flex items-center gap-2 border-b border-border bg-muted/40 px-3 py-1.5">
@@ -51,42 +54,58 @@ function AgentQuestions({ taskId, title, questions, drafts, onDraft, onSend }: A
       </div>
       <div className="divide-y divide-border px-3">
         {questions.map((question) => (
-          <QuestionField
-            key={question.id}
-            question={question}
-            draft={drafts[question.id] ?? EMPTY_DRAFT}
-            onDraft={(draft) => {
-              onDraft(question.id, draft)
-            }}
-            onDismiss={() => {
-              onSend([{ action: 'dismiss', id: question.id }])
-            }}
-          />
+          <OneQuestion key={question.id} question={question} {...props} />
         ))}
       </div>
     </section>
   )
 }
 
-/** Sends answers and dismissals, and says what went out. */
-function useSend(onSent: (ids: readonly string[]) => void) {
-  const [sending, setSending] = useState(false)
-  const [summary, setSummary] = useState<string | null>(null)
-  const send = (items: QuestionAnswerItem[]) => {
-    setSending(true)
-    apiPost<AnswerQuestionsResult>('/questions/answers', { items })
-      .then((result) => {
-        setSummary(sentSummary(result))
-        onSent(items.map((item) => item.id))
-      })
-      .catch((e: unknown) => toast.error(errorText(e)))
-      .finally(() => {
-        setSending(false)
-        refreshQuestions()
-      })
+/** A question with the field its kind takes: a masked one for a secret, else options. */
+function OneQuestion({
+  question,
+  drafts,
+  onDraft,
+  secrets,
+  onSecret,
+  onSend,
+}: AgentQuestionsProps & { question: Question }) {
+  const dismiss = () => {
+    onSend([{ action: 'dismiss', id: question.id }])
   }
-  return { send, sending, summary }
+  if (question.kind === 'secret') {
+    return (
+      <SecretField
+        question={question}
+        value={secrets[question.id] ?? ''}
+        onValue={(value) => {
+          onSecret(question.id, value)
+        }}
+        onDismiss={dismiss}
+      />
+    )
+  }
+  return (
+    <QuestionField
+      question={question}
+      draft={draftOf(drafts, question)}
+      onDraft={(draft) => {
+        onDraft(question.id, draft)
+      }}
+      onDismiss={dismiss}
+    />
+  )
 }
+
+const without = <T,>(record: Readonly<Record<string, T>>, ids: readonly string[]) =>
+  Object.fromEntries(Object.entries(record).filter(([id]) => !ids.includes(id)))
+
+/** Whether Submit all sends the question: a secret with a value, else a picked or written answer. */
+const isReady = (
+  question: Question,
+  drafts: Readonly<Record<string, Draft>>,
+  secrets: Readonly<Record<string, string>>,
+) => (question.kind === 'secret' ? (secrets[question.id] ?? '') !== '' : isAnswered(draftOf(drafts, question)))
 
 /**
  * Every agent's open questions in one place, oldest agent first. Each agent waits until all of
@@ -95,11 +114,21 @@ function useSend(onSent: (ids: readonly string[]) => void) {
 export function QuestionsPage() {
   const open = useOpenQuestions()
   const [drafts, setDrafts] = useState<Record<string, Draft>>({})
+  const [secrets, setSecrets] = useState<Record<string, string>>({})
   const groups = useMemo(() => byAgent(open), [open])
   const { send, sending, summary } = useSend((ids) => {
-    setDrafts((prev) => Object.fromEntries(Object.entries(prev).filter(([id]) => !ids.includes(id))))
+    setDrafts((prev) => without(prev, ids))
+    setSecrets((prev) => without(prev, ids))
   })
-  const ready = open.filter((question) => isAnswered(drafts[question.id]))
+  const ready = open.filter((question) => isReady(question, drafts, secrets))
+  const submitAll = () => {
+    const [secret, plain] = [ready.filter((q) => q.kind === 'secret'), ready.filter((q) => q.kind !== 'secret')]
+    const entries: SecretEntry[] = secret.map((question) => ({ id: question.id, value: secrets[question.id] ?? '' }))
+    send(
+      plain.map((question) => answerItem(question, draftOf(drafts, question))),
+      entries,
+    )
+  }
   return (
     <div className="flex h-full min-h-0 flex-col">
       <DetailHeader>
@@ -126,6 +155,10 @@ export function QuestionsPage() {
             onDraft={(id, draft) => {
               setDrafts((prev) => ({ ...prev, [id]: draft }))
             }}
+            secrets={secrets}
+            onSecret={(id, value) => {
+              setSecrets((prev) => ({ ...prev, [id]: value }))
+            }}
             onSend={send}
           />
         ))}
@@ -135,13 +168,7 @@ export function QuestionsPage() {
           {summary ?? `${String(ready.length)} of ${String(open.length)} answered`}
         </p>
         <Hint text="Send every answered question; agents with all their answers go on">
-          <Button
-            disabled={ready.length === 0 || sending}
-            className="pointer-coarse:min-h-11"
-            onClick={() => {
-              send(ready.map((question) => answerItem(question, drafts[question.id] ?? EMPTY_DRAFT)))
-            }}
-          >
+          <Button disabled={ready.length === 0 || sending} className="pointer-coarse:min-h-11" onClick={submitAll}>
             <Send />
             Submit all
           </Button>

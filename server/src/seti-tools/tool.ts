@@ -5,6 +5,8 @@ import { HttpError } from '../http.js'
 /** The agent that called a seti tool; tools act on Seti on its behalf. */
 export interface ToolContext {
   caller: Task
+  /** Aborts when Claude Code cancels the call or the session closes; tools that wait end then. */
+  signal?: AbortSignal
 }
 
 /** One seti tool: its name and description as the agent sees them, its input and what it does. */

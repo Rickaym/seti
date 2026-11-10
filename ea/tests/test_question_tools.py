@@ -88,6 +88,34 @@ async def test_answer_question_dismisses_and_reports_refused_secrets(
     assert missing.text.startswith("No open question matches deploy.")
 
 
+SECRET = question(
+    "7d7d7d7d-0000-4000-8000-000000000004",
+    "AZURE_SPEECH_KEY",
+    kind="secret",
+    options=[],
+    prompt="For the speech tests",
+    secret={"name": "AZURE_SPEECH_KEY", "hosts": [], "delivery": "file"},
+)
+
+
+async def test_a_secret_question_is_listed_but_only_the_user_answers_it(
+    tools: EaTools, fake_seti: FakeSeti
+) -> None:
+    fake_seti.questions = [dict(SECRET)]
+    listed = await tools.call("search_seti", {"in": "questions"})
+    assert listed.text.splitlines()[2] == (
+        "- [7d7d7d7d] secret AZURE_SPEECH_KEY (the user enters it in Seti, never through you): "
+        "For the speech tests"
+    )
+    refused = await tools.call("answer_question", {"question": "7d7d7d7d", "words": "anything"})
+    assert not refused.ok
+    assert refused.text.startswith("AZURE_SPEECH_KEY is a secret the agent asked for; only the user enters it")
+    assert fake_seti.posts() == []
+    dismissed = await tools.call("answer_question", {"question": "7d7d7d7d", "dismiss": True})
+    assert dismissed.ok
+    assert fake_seti.posts()[-1][1]["items"] == [{"action": "dismiss", "id": SECRET["id"]}]
+
+
 async def test_answer_question_names_the_matches_when_several_fit(
     tools: EaTools, fake_seti: FakeSeti
 ) -> None:

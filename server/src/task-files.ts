@@ -18,7 +18,7 @@ import { contentType } from './content-type.js'
 import { fromEa } from './ea-guard.js'
 import { HttpError } from './http.js'
 import { filesHiddenPaths, setiHomePaths, type SandboxContext } from './sandbox.js'
-import { CHAT, SETI_FILES, workspaceDir } from './workspace/dir.js'
+import { CHAT, SECRETS, SETI_FILES, workspaceDir } from './workspace/dir.js'
 
 /** What decides which paths of a task the Files view serves. */
 export interface FileRules {
@@ -84,6 +84,9 @@ export function pathProblem(real: string, rules: FileRules): string | null {
   }
   if (within(real, rules.claudeHome)) {
     return "is part of Claude Code's own data"
+  }
+  if (within(real, path.join(rules.workspace, SECRETS))) {
+    return 'holds secrets the user gave the agent, which Seti never serves'
   }
   if (fromEa() && real === path.join(rules.workspace, CHAT)) {
     return "is the agent's chat.md, which holds its direct messages; read the group chat instead"

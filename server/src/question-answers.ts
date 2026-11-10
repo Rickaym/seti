@@ -13,13 +13,14 @@ import { fromEa, refuseAgent } from './ea-guard.js'
 import { HttpError } from './http.js'
 import { expireGroup, resumeGroup, waiterOf } from './questions.js'
 import { credentialFindings } from './scrub.js'
+import { dismissSecret } from './secret-questions.js'
 import { questions } from './store/questions.js'
 import { refreshBlocked } from './task-blocked.js'
 
-/** The refusal of an answer that holds a secret, which goes through the user's Allow instead. */
+/** The refusal of an answer that holds a secret, which goes through a secret question instead. */
 export const SECRET_ANSWER =
-  'That answer looks like a secret or credential, which questions never carry. Add it in Settings, ' +
-  'Credentials, and approve the connection the agent asks for with its change request.'
+  'That answer looks like a secret or credential, which answers never carry. Dismiss the question and ' +
+  'tell the agent to ask with ask_secret, which keeps the value out of its transcript.'
 
 const DISMISSED_ONE = 'The user dismissed this question without answering. Decide yourself and say what you assumed.'
 
@@ -49,9 +50,14 @@ function answerProblem(question: Question, item: Extract<QuestionAnswerItem, { a
   return null
 }
 
+const SECRET_FIELD = 'enter it in its own field on the Questions page; answers never carry a secret'
+
 function checkItem(question: Question, item: QuestionAnswerItem): void {
   if (item.action === 'dismiss') {
     return
+  }
+  if (question.kind === 'secret') {
+    throw new HttpError(400, `${named(question)} asks for a secret: ${SECRET_FIELD}`)
   }
   const problem = answerProblem(question, item)
   if (problem !== null) {
@@ -119,6 +125,15 @@ function groupResult(group: readonly Question[], input: Record<string, unknown>)
   return { behavior: 'allow', updatedInput: { ...input, answers } }
 }
 
+/** Turns down the call of a dismissed secret question; true when an agent still waited on it. */
+async function deliverSecret(question: Question): Promise<boolean> {
+  if (dismissSecret(question.id)) {
+    return true
+  }
+  await expireGroup(question.group_id, 'no session waits on it')
+  return false
+}
+
 /** Hands a group back to its agent once every question in it is settled; true when it did. */
 async function deliverGroup(groupId: string): Promise<boolean> {
   const group = await questions.group(groupId)
@@ -127,6 +142,10 @@ async function deliverGroup(groupId: string): Promise<boolean> {
   }
   if (group.some((question) => question.status === 'expired')) {
     return false
+  }
+  const [first] = group
+  if (first?.kind === 'secret') {
+    return deliverSecret(first)
   }
   const waiter = waiterOf(groupId)
   if (waiter === undefined) {

@@ -37,7 +37,7 @@ const REFUSALS: Record<SetiControlLevel, (name: string) => string> = {
  * Runs one tool as the calling agent, as the agent's Seti control level at the time of the call
  * has it: a tool beyond that level is refused, and at Self the agent it acts on is the caller.
  */
-export async function callSetiTool(entry: SetiTool, taskId: string, args: unknown) {
+export async function callSetiTool(entry: SetiTool, taskId: string, args: unknown, signal?: AbortSignal) {
   try {
     const caller = await tasks.get(taskId)
     if (caller === undefined) {
@@ -47,7 +47,8 @@ export async function callSetiTool(entry: SetiTool, taskId: string, args: unknow
     if (current === undefined) {
       throw new Error(REFUSALS[caller.seti_control](entry.name))
     }
-    const result = await asAgent(caller, async () => current.call(args, { caller }))
+    const ctx = signal === undefined ? { caller } : { caller, signal }
+    const result = await asAgent(caller, async () => current.call(args, ctx))
     return { content: [{ type: 'text' as const, text: textOf(result) }] }
   } catch (e) {
     return { content: [{ type: 'text' as const, text: errorText(e) }], isError: true }
@@ -57,13 +58,21 @@ export async function callSetiTool(entry: SetiTool, taskId: string, args: unknow
 /** The seti tools a session gets at the agent's Seti control level. */
 export const sessionTools = (task: Pick<Task, 'seti_control'>): readonly SetiTool[] => toolsFor(task.seti_control)
 
+/** The abort signal of an MCP call, which fires when Claude Code cancels it or the session closes. */
+const signalOf = (extra: unknown): AbortSignal | undefined =>
+  typeof extra === 'object' && extra !== null && 'signal' in extra && extra.signal instanceof AbortSignal
+    ? extra.signal
+    : undefined
+
 /** The in-process seti MCP server of one agent's session; every call acts as that agent. */
 function setiMcpServer(task: Task): McpServerConfig {
   return createSdkMcpServer({
     name: SETI_SERVER,
     version: '1.0.0',
     tools: sessionTools(task).map((entry) =>
-      tool(entry.name, entry.description, entry.input, async (args) => callSetiTool(entry, task.id, args)),
+      tool(entry.name, entry.description, entry.input, async (args, extra: unknown) =>
+        callSetiTool(entry, task.id, args, signalOf(extra)),
+      ),
     ),
   })
 }

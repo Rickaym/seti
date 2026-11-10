@@ -120,7 +120,7 @@ describe('the Seti control level', () => {
     await runTurn(task.id, 'first')
     await waitIdle(task.id)
     expect(sdk.fake.last?.options.mcpServers?.seti).toMatchObject({ type: 'sdk', name: 'seti' })
-    expect(sessionTools(task).map((entry) => entry.name)).toEqual(['set_status', 'send_file'])
+    expect(sessionTools(task).map((entry) => entry.name)).toEqual(['set_status', 'send_file', 'ask_secret'])
     const before = await setupKey(task)
     await setTaskSetiControl(task, 'full')
     const on = await tasks.get(task.id)
@@ -130,7 +130,7 @@ describe('the Seti control level', () => {
     await waitIdle(task.id)
     expect(sdk.fake.sessions).toHaveLength(sessions + 1)
     expect(sdk.fake.last?.options.mcpServers?.seti).toMatchObject({ type: 'sdk', name: 'seti' })
-    expect(on && sessionTools(on)).toHaveLength(SETI_TOOLS.length + 3 + KNOWLEDGE_TOOLS.length)
+    expect(on && sessionTools(on)).toHaveLength(SETI_TOOLS.length + 4 + KNOWLEDGE_TOOLS.length)
   })
 
   it('tells the agent at its next turn that its seti tools came or went', async () => {
@@ -155,7 +155,9 @@ describe('the Seti control level', () => {
     await waitIdle(task.id)
     expect(sdk.fake.prompts.at(-1)).toContain('Seti control is now Self: your mcp__seti__* tools')
     expect((await request('PATCH', `/tasks/${task.id}`, { seti_control: 'off' })).status).toBe(200)
-    expect((await setiControlPreface(task.id))?.text).toContain('beyond set_status and send_file refuse calls')
+    expect((await setiControlPreface(task.id))?.text).toContain(
+      'beyond set_status, send_file and ask_secret refuse calls',
+    )
     await runTurn(task.id, 'fifth')
     await waitIdle(task.id)
     expect(sdk.fake.prompts.at(-1)).toContain('Seti control is now off: of the mcp__seti__* tools only')
