@@ -115,10 +115,23 @@ Bypass, in an agent's settings on the Access tab, runs that one agent in Claude 
 `bypassPermissions` mode for 2, 8 or 24 hours, so it never stops on the classifier or on Claude
 Code's shell safety asks. It is off for every agent by default, and only the user turns it on or
 off: the server refuses the EA and agents' Seti tools. Deny rules and the shell guard still refuse
-in bypass, ask rules no longer ask, and the credential deny rules and the sandbox stay as they are.
+in bypass, the repeat guard below still asks, ask rules no longer ask, and the credential deny
+rules and the sandbox stay as they are.
 A process gets Claude Code's bypass flag only while Bypass is on, so turning it on reaches a
 process that started without it at its next turn; turning it off, or its end, switches the running
 process back to `auto` at once. Each on, off and end goes to the audit log and the transcript.
+
+The repeat guard (`server/src/repeat-hooks.ts`) stops an agent that runs the same tool call again
+after two identical results, before the third run, and asks the user through the same permission
+request path, so the agent waits in Needs you with a reason line such as "Runs the same Bash
+command again after 2 identical results". It counts per thread, the agent and each subagent
+apart, from PreToolUse and PostToolUse hooks, and compares calls and results by hash only. A
+different result, a different call in between, or a message from the user starts the count again,
+so polling that makes progress never asks. Because it is a hook rather than a permission rule, it
+asks in Bypass too; a command the shell guard refuses is left to that guard. Allow runs the call
+once and starts the count again, Always stops asking about that exact call while the agent's
+process runs, and Deny tells the agent why. The switch, on by default, is under Repeats in
+Settings, Lifecycle.
 
 Settings shows the
 rules agents load from Claude Code's own settings files read-only. Sandboxed agents may edit any

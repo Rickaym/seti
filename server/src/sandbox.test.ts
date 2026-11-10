@@ -174,7 +174,7 @@ describe('sessionOptions', () => {
     const opts = await options(await newTask(true))
     expect(opts.spawnClaudeCodeProcess).toBeTypeOf('function')
     expect(opts.sandbox).toBeUndefined()
-    expect(opts.hooks?.PreToolUse?.map((hook) => hook.matcher)).toEqual(['Bash', 'WebFetch'])
+    expect(opts.hooks?.PreToolUse?.map((hook) => hook.matcher)).toEqual(['Bash', 'WebFetch', undefined])
     expect(denies(opts)).toContain('Edit(//**/.claude/settings.json)')
     expect(opts.permissionMode).toBe('auto')
     expect(opts.allowDangerouslySkipPermissions).toBeUndefined()
@@ -208,7 +208,7 @@ describe('sessionOptions', () => {
   it('runs a task that opted out without the sandbox, but still hides credentials', async () => {
     const opts = await options(await newTask(false))
     expect(opts.spawnClaudeCodeProcess).toBeUndefined()
-    expect(opts.hooks?.PreToolUse?.map((hook) => hook.matcher)).toEqual(['Bash'])
+    expect(opts.hooks?.PreToolUse?.map((hook) => hook.matcher)).toEqual(['Bash', undefined])
     expect(opts.env?.CLAUDE_CODE_OAUTH_TOKEN).toBeUndefined()
     expect(denies(opts)).toEqual(
       expect.arrayContaining([`Read(/${os.homedir()}/.ssh/**)`, `Edit(/${os.homedir()}/.config/**)`]),

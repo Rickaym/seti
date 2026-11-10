@@ -57,6 +57,7 @@ const PERMISSION: PermissionRequest = {
   id: 'perm-infra-1',
   task_id: AGENTS.infra,
   tool_name: 'Bash',
+  kind: 'tool',
   summary: INFRA_COMMAND,
   input: JSON.stringify({ command: INFRA_COMMAND, description: 'Apply the upgrade' }, null, 2),
   reason: 'No rule allows terraform apply',

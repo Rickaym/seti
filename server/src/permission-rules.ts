@@ -112,7 +112,11 @@ async function keepRules(task: Task, request: PermissionRequest, scope: Permissi
 
 async function auditAnswer(task: Task, request: PermissionRequest, input: AnswerPermissionInput): Promise<void> {
   const allow = input.decision !== 'deny'
-  const always = input.decision === 'always' ? ` and always allowed ${request.suggestions.join(', ')}` : ''
+  const kept =
+    request.kind === 'repeat'
+      ? ' and stopped asking about this repeat'
+      : ` and always allowed ${request.suggestions.join(', ')}`
+  const always = input.decision === 'always' ? kept : ''
   await audit.record({
     actor: 'user',
     kind: allow ? 'task.permission_allowed' : 'task.permission_denied',
@@ -124,13 +128,14 @@ async function auditAnswer(task: Task, request: PermissionRequest, input: Answer
       tool: request.tool_name,
       call: request.summary,
       decision: input.decision,
+      ...(request.kind === 'repeat' ? { repeat: true } : {}),
       ...(input.decision === 'always' ? { scope: input.scope ?? 'agent', rules: request.suggestions } : {}),
       ...(input.message === undefined || input.message === '' ? {} : { message: input.message }),
     },
   })
 }
 
-/** The user's answer to a request the agent waits on; Always allow also keeps its rules. */
+/** The user's answer to a request the agent waits on; Always allow also keeps its rules, if any. */
 export async function answerPermission(
   task: Task,
   requestId: string,
@@ -144,7 +149,7 @@ export async function answerPermission(
   if (request.state !== 'pending' || !waitsFor(request.id)) {
     throw new HttpError(409, 'The agent no longer waits on this request')
   }
-  if (input.decision === 'always' && request.suggestions.length === 0) {
+  if (input.decision === 'always' && request.suggestions.length === 0 && request.kind !== 'repeat') {
     throw new HttpError(409, 'This call has no rule to always allow; allow it once instead')
   }
   const message = input.decision === 'deny' ? (input.message ?? null) : null
@@ -156,8 +161,11 @@ export async function answerPermission(
     await keepRules(task, settled, input.scope ?? 'agent')
   }
   await auditAnswer(task, settled, input)
+  const always = input.decision === 'always'
   const result =
-    input.decision === 'deny' ? denied(message) : allowed(settled, waitingInput(settled.id), permissionModeOf(task))
+    input.decision === 'deny'
+      ? denied(message)
+      : allowed(settled, waitingInput(settled.id), permissionModeOf(task), always)
   await resolveRequest(settled, result)
   return settled
 }

@@ -26,10 +26,11 @@ import { tokenServers } from './mcp-sign-in.js'
 import { planScope } from './memory-cap.js'
 import { launch, type ScopePlan } from './memory-scope.js'
 import { memoryEnv } from './node-heap.js'
-import { bashGuard, type GuardScope } from './permission-guard.js'
+import { bashGuard, guardRefuses, type GuardScope } from './permission-guard.js'
 import { builtInRules, composeRules, type PermissionSettings } from './permission-policy.js'
 import { canUseToolFor } from './permission-requests.js'
 import { taskPluginConfigs } from './plugins.js'
+import { repeatHooks } from './repeat-hooks.js'
 import { mcpTargets, signedInServers } from './sandbox-mcp.js'
 import { sandboxHooks, secretDenyRules, setiHomePaths, unsandboxedHookRules, type SandboxContext } from './sandbox.js'
 import { redactSecrets } from './scrub.js'
@@ -321,15 +322,21 @@ const auditRefusal = (task: Task) => async (command: string, reason: string) => 
   })
 }
 
-/** Hooks of every task: the shell guard, and for a sandboxed one the WebFetch allowlist too. */
-function sessionHooks(task: Task, policy: SandboxPolicy | null): Partial<Record<HookEvent, HookCallbackMatcher[]>> {
-  const guard = bashGuard(guardScope(task, policy !== null), auditRefusal(task))
+/** Hooks of every task: the shell and repeat guards, and a sandboxed one's WebFetch allowlist. */
+function sessionHooks(
+  task: Task,
+  policy: SandboxPolicy | null,
+  session: AbortSignal,
+): Partial<Record<HookEvent, HookCallbackMatcher[]>> {
+  const scope = guardScope(task, policy !== null)
+  const guard = bashGuard(scope, auditRefusal(task))
   const sandbox = policy === null ? [] : (sandboxHooks(async () => allowedFor(task.id)).PreToolUse ?? [])
-  return { PreToolUse: [guard, ...sandbox] }
+  const repeat = repeatHooks({ task, session, refused: (tool, input) => guardRefuses(tool, input, scope) })
+  return { ...repeat, PreToolUse: [guard, ...sandbox, ...(repeat.PreToolUse ?? [])] }
 }
 
 /** Rules for every task, a sandbox's launcher and env, else the borrowed MCP servers. */
-async function sandboxOptions(task: Task) {
+async function sandboxOptions(task: Task, session: AbortSignal) {
   const policy = await sandboxPolicy.get()
   const settings = {
     ...deniedMcpSettings(await taskDeniedServers(task.id)),
@@ -341,7 +348,7 @@ async function sandboxOptions(task: Task) {
     const borrowed = (await taskBorrowedServers(task)) as Record<string, McpServerConfig>
     return {
       settings,
-      hooks: sessionHooks(task, null),
+      hooks: sessionHooks(task, null, session),
       env: { ...agentEnv(scope?.cap ?? null), ...connectionEnv(await taskConnections(task)) },
       ...(Object.keys(borrowed).length === 0 ? {} : { mcpServers: borrowed }),
       ...(scope === null ? {} : { spawnClaudeCodeProcess: spawnInScope(scope) }),
@@ -349,7 +356,7 @@ async function sandboxOptions(task: Task) {
   }
   return {
     settings,
-    hooks: sessionHooks(task, policy),
+    hooks: sessionHooks(task, policy, session),
     env: sandbox.env,
     spawnClaudeCodeProcess: spawnInSandbox(sandbox, task.id, scope),
   } satisfies Options
@@ -362,7 +369,7 @@ function withInProcessServers(task: Task, servers: Record<string, McpServerConfi
 }
 
 async function optionsOf(task: Task, abortController: AbortController, setup: SessionSetup): Promise<Options> {
-  const sandbox = await sandboxOptions(task)
+  const sandbox = await sandboxOptions(task, abortController.signal)
   const compact = compactSetup(await effectiveCompact(task.id))
   return {
     ...setup,

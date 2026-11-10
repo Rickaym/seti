@@ -417,7 +417,8 @@ Settings, Mods shows it with a Core badge and a lock in place of its switch, and
 is part of Seti. Only a bundled mod may be required; Check refuses a third-party manifest that sets
 it, and a theme mod cannot set it either.
 
-This Seti offers mod API 1.19.0, which added `takesTerminalKey` to input hooks; 1.18.0 added fence
+This Seti offers mod API 1.20.0, which added `api.app.stepOwnMessages`; 1.19.0 added
+`takesTerminalKey` to input hooks; 1.18.0 added fence
 snapshots for share pages; 1.17.0 added
 `required`; 1.16.0 added agent accents; 1.15.0 added agent docks, streaming
 routes, menu commands and `tasks.ask`; 1.14.0 added `api.app.every`, `api.keys.label` and `aria`, `api.terminals.useOwn`

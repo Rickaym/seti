@@ -15,7 +15,7 @@ import { modAgentEntry, modGlob } from './mod-scopes.js'
 import { thirdPartyProblem } from './mod-third-party.js'
 
 /** The version of the mod API this Seti offers; a manifest's `seti` range must match it. */
-export const MOD_API_VERSION = '1.19.0'
+export const MOD_API_VERSION = '1.20.0'
 
 /** A mod's id: lowercase words joined by -, so `<mod>.<name>` never reads two ways. */
 export const MOD_ID = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/
