@@ -1,11 +1,12 @@
 import type { ContextFile, ContextPack, RevisionObjectType } from '@seti/shared'
-import { Plus } from 'lucide-react'
+import { Lightbulb, Plus } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { AgentChangedMark } from '@/components/AgentChangedMark'
 import { Hint } from '@/components/Hint'
 import { Button } from '@/components/ui/button'
+import { useKnowledgeWaiting } from '@/hooks/useKnowledgeWaiting'
 import { cn } from '@/lib/utils'
-import { NEW_PACK, NEW_ROLE, packSelection } from '@/panels/context/selection'
+import { knowledgeSelection, NEW_PACK, NEW_ROLE, packSelection } from '@/panels/context/selection'
 
 function SectionHeader({ title, action }: { title: string; action?: ReactNode }) {
   return (
@@ -102,6 +103,39 @@ function groupFiles(files: readonly ContextFile[]): [string, ContextFile[]][] {
   return [...groups.entries()]
 }
 
+/** The way to the Knowledge page, with how many proposals wait for the user. */
+function KnowledgeItem({ selected, onSelect }: { selected: string; onSelect: (selection: string) => void }) {
+  const waiting = useKnowledgeWaiting()
+  return (
+    <section aria-label="Knowledge">
+      <SectionHeader title="Knowledge" />
+      <button
+        type="button"
+        onClick={() => {
+          onSelect(knowledgeSelection(waiting > 0 ? 'proposed' : 'approved'))
+        }}
+        className={cn(
+          'flex min-h-11 w-full items-center gap-2 border-b border-border px-3 py-2 text-left hover:bg-accent',
+          selected.startsWith('knowledge:') && 'bg-accent',
+        )}
+      >
+        <Lightbulb className="size-4 shrink-0 text-muted-foreground" />
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-sm font-medium">Notes</span>
+          <span className="block truncate text-2xs text-muted-foreground">
+            {waiting === 0 ? 'Lessons agents share' : `${String(waiting)} waiting for you`}
+          </span>
+        </span>
+        {waiting > 0 && (
+          <span className="rounded-full bg-primary px-1.5 text-2xs/4 font-semibold text-primary-foreground tabular-nums">
+            {waiting}
+          </span>
+        )}
+      </button>
+    </section>
+  )
+}
+
 export function ContextList({
   files,
   packs,
@@ -119,6 +153,7 @@ export function ContextList({
   const roles = packs.filter((pack) => pack.kind === 'role')
   return (
     <div className="min-h-0 flex-1 overflow-y-auto">
+      <KnowledgeItem selected={selected} onSelect={onSelect} />
       <SectionHeader title="Claude Code files" />
       {groupFiles(files).map(([group, groupFilesList]) => (
         <div key={group}>

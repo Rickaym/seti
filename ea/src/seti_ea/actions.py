@@ -18,6 +18,7 @@ from seti_ea.format import (
 )
 from seti_ea.gate import CONFIRMED, Confirmations, ask, gate_key
 from seti_ea.handoff_tools import SEND_FILE_SPEC, HandoffTools
+from seti_ea.knowledge_tools import PROPOSE_KNOWLEDGE_SPEC, KnowledgeTools
 from seti_ea.location_tools import LOCATION_SPECS, LocationTools
 from seti_ea.my_pack_tools import CHANGE_MY_PACKS_SPEC, MyPackTools
 from seti_ea.process_tools import STOP_PROCESS_SPEC, ProcessTools
@@ -428,6 +429,7 @@ ACTION_SPECS: list[ToolSpec] = [
     STOP_PROCESS_SPEC,
     *WORKSPACE_SPECS,
     SEND_FILE_SPEC,
+    PROPOSE_KNOWLEDGE_SPEC,
 ]
 
 # Destructive or outward tools: they act only on a call after the user's next turn.
@@ -526,6 +528,7 @@ class AgentActions:
         self.handlers.update(ProcessTools(seti, resolver.resolve_task, self.confirmations, now).handlers)
         self.handlers.update(WorkspaceTools(seti, resolver.match_tasks, self.confirmations).handlers)
         self.handlers.update(HandoffTools(seti, resolver.resolve_task).handlers)
+        self.handlers.update(KnowledgeTools(seti).handlers)
 
     async def _cleared(self, args: Mapping[str, Any], key: str) -> bool:
         return await self.confirmations.cleared(key, arg_bool(args, "confirmed"))

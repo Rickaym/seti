@@ -49,6 +49,7 @@ from seti_ea.format import (
 )
 from seti_ea.gate import ANSWER, GATE_CALL, GateCall, UserAnswer
 from seti_ea.history_tools import HISTORY_WINDOW, activity_result, window_transcript
+from seti_ea.knowledge_tools import list_proposals, search_knowledge
 from seti_ea.location_tools import location_lines
 from seti_ea.metrics_tools import ea_usage_lines, metrics_lines
 from seti_ea.mod_tools import mods_text, themes_text
@@ -320,15 +321,22 @@ TOOL_SPECS: list[ToolSpec] = [
         "search_seti",
         "Search what tasks, their subagents and PRs said: decisions, findings, reports, reviews and "
         "PR descriptions, with the task or PR each excerpt came from. Use it for what a task decided, "
-        "found or was told, which the live context does not hold.",
+        "found or was told, which the live context does not hold. With in knowledge, search the "
+        "approved knowledge notes agents share instead; with in proposals, list the notes waiting "
+        "for the user to approve.",
         {
             "query": {"type": "string", "description": "What to look for, in a few keywords."},
             "task": {
                 **TASK_REF,
                 "description": "Only this task, if the user named one; approximate titles work.",
             },
+            "in": {
+                "type": "string",
+                "enum": ["tasks", "knowledge", "proposals"],
+                "description": "tasks by default; knowledge for approved notes; proposals for waiting ones.",
+            },
         },
-        ["query"],
+        [],
     ),
     ToolSpec(
         "list_subtasks",
@@ -1156,7 +1164,12 @@ class EaTools:
         return ToolResult("\n".join(lines), f"Read agent {clip(title_of(task), 60)}")
 
     async def search_seti(self, args: Mapping[str, Any]) -> ToolResult:
+        scope = arg_str(args, "in", required=False)
+        if scope == "proposals":
+            return await list_proposals(self._seti, self._now())
         query = arg_str(args, "query")
+        if scope == "knowledge":
+            return await search_knowledge(self._seti, query, self._now())
         ref = arg_str(args, "task", required=False)
         params: dict[str, str | int] = {"q": query, "limit": SEARCH_LIMIT}
         task = await self.resolve_task(ref) if ref else None

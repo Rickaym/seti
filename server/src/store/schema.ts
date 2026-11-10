@@ -22,6 +22,7 @@ import {
   EA_REPLIES,
   EA_USAGE,
 } from './schema-ea.js'
+import { KNOWLEDGE } from './schema-knowledge.js'
 import { MEMORY_CAPS } from './schema-memory.js'
 import { MODS_RUNTIME } from './schema-mods-runtime.js'
 import { BLOBS_ONE_STYLE, MODS, PREVIEWS_MOD, REQUIRED_MODS, USER_THEME } from './schema-mods.js'
@@ -424,4 +425,5 @@ export const MIGRATIONS: readonly Migration[] = [
   { version: 95, name: 'ea_form_of_address', sql: EA_FORM_OF_ADDRESS },
   { version: 96, name: 'trim_session_init', sql: TRIM_SESSION_INIT },
   { version: 97, name: 'repeat_guard', sql: REPEAT_GUARD },
+  { version: 98, name: 'knowledge', sql: KNOWLEDGE },
 ]

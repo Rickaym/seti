@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { packState, requirePack, saveContextFile, updatePack } from './context-changes.js'
 import { readContextFile } from './context-files.js'
 import { describeIssues, HttpError } from './http.js'
+import { restoreKnowledge } from './knowledge-review.js'
 import { byUser, type ChangeSource } from './revisions.js'
 import { revisions } from './store/revisions.js'
 
@@ -44,6 +45,8 @@ async function restore(
       const { content } = parseState(fileState, before)
       return (await saveContextFile(id, content, (await readContextFile(id)).hash, source)).revision
     }
+    case 'knowledge_note':
+      return restoreKnowledge(id, before, fields, source)
   }
 }
 

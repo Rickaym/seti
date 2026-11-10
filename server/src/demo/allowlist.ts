@@ -30,6 +30,10 @@ const MIDDLEWARE = [
 
 /** Reads of the demo database, its data folder and the in-process fakes; none runs a program. */
 const READS = [
+  '/api/knowledge',
+  '/api/knowledge/search',
+  '/api/knowledge/summary',
+  '/api/knowledge/:id',
   '/api/ping',
   '/api/system',
   '/api/access',

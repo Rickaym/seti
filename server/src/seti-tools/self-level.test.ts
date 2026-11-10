@@ -3,6 +3,7 @@ import { auditQuery, channelCreateInput, type SetiControlLevel, type Task } from
 import { describe, expect, it } from 'vitest'
 import { asAgent } from '../access.js'
 import { createApp } from '../app.js'
+import { KNOWLEDGE_TOOLS } from './knowledge.js'
 import { EVERY_AGENT, ON_ONE_AGENT, READS_SETI, toolsFor } from './levels.js'
 import { createChannel, subscribeChannel } from '../channels/actions.js'
 import { createPack } from '../context-changes.js'
@@ -62,8 +63,9 @@ describe('the Self level', () => {
       expect.arrayContaining([...EVERY_AGENT.map((e) => e.name), ...Object.keys(ON_ONE_AGENT), ...READS_SETI]),
     )
     const own = Object.keys(ON_ONE_AGENT).length + READS_SETI.length
-    expect(names).toHaveLength(EVERY_AGENT.length + REQUEST_TOOLS.length + own)
+    expect(names).toHaveLength(EVERY_AGENT.length + REQUEST_TOOLS.length + KNOWLEDGE_TOOLS.length + own)
     expect(names).toContain('request_change')
+    expect(names).toContain('propose_knowledge')
     for (const name of ['start_task', 'post_team_chat', 'list_tasks', 'stop_task', 'create_channel', 'add_repo']) {
       expect(names).not.toContain(name)
     }

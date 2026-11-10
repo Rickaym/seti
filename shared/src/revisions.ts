@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-export const REVISION_OBJECT_TYPES = ['context_pack', 'context_file'] as const
+export const REVISION_OBJECT_TYPES = ['context_pack', 'context_file', 'knowledge_note'] as const
 export type RevisionObjectType = (typeof REVISION_OBJECT_TYPES)[number]
 
 export const REVISION_ACTORS = ['user', 'agent'] as const

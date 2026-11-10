@@ -688,6 +688,7 @@ class FakeSeti:
     inbox: list[dict[str, Any]] = field(default_factory=list)
     live_context: dict[str, Any] | None = None
     search_hits: list[dict[str, Any]] = field(default_factory=list)
+    knowledge: list[dict[str, Any]] = field(default_factory=list)
     team: list[dict[str, Any]] = field(default_factory=list)
     chat_hits: list[dict[str, Any]] = field(default_factory=list)
     chat_more: bool = False
@@ -1247,6 +1248,14 @@ class FakeSeti:
                 return ok(self.watches)
             case ["ea", "context"]:
                 return ok(self.live_context) if self.live_context else err(404, "Not Found")
+            case ["knowledge", "search"]:
+                words = params.get("q", "").lower().split()
+                found = [n for n in self.knowledge if n["status"] in ("approved", "stale")]
+                return ok(
+                    [n for n in found if all(w in n["title"].lower() + n["body"].lower() for w in words)]
+                )
+            case ["knowledge"]:
+                return ok([n for n in self.knowledge if n["status"] == params.get("status", "proposed")])
             case ["ea", "search"]:
                 task = params.get("task")
                 hits = [h for h in self.search_hits if task is None or h.get("task_id") == task]
@@ -1490,6 +1499,21 @@ class FakeSeti:
                 return ok({"message": message, "deliveries": self.team_deliveries, "unknown": unknown})
             case ["team", "files"]:
                 return self._send_files(body)
+            case ["knowledge"]:
+                if "AKIA" in body["body"]:
+                    return err(
+                        400,
+                        "Invalid request",
+                        "The body looks like it holds a secret (AWS access key, line 1)",
+                    )
+                note = {
+                    **body,
+                    "id": f"note-{len(self.knowledge) + 1}",
+                    "status": "proposed",
+                    "proposer": "ea",
+                }
+                self.knowledge.append(note)
+                return ok(note)
             case ["ea", "history", "summary"]:
                 if not any(e["id"] == body["through_id"] for e in self.ea_history):
                     return err(409, "The EA history changed")
