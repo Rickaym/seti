@@ -104,10 +104,10 @@ describe('agents asking the user', () => {
     expect(await asking(id)).toBe(false)
   })
 
-  it('marks a turn whose last tool use was AskUserQuestion', async () => {
+  it('does not mark a turn whose last tool use was AskUserQuestion, which waits as questions', async () => {
     const id = await newTask()
     await finishTurn(id, 'picker')
-    expect(await asking(id)).toBe(true)
+    expect(await asking(id)).toBe(false)
   })
 
   it('leaves a failed turn as an error, even when it ended on a question', async () => {

@@ -3,17 +3,11 @@ import type { CanUseTool, PermissionMode, PermissionResult, PermissionUpdate } f
 import type { PermissionRequest, PermissionRequestKind } from '@seti/shared'
 import { audit } from './audit.js'
 import { alwaysRules } from './permission-policy.js'
+import { ASK_TOOL, askQuestions } from './questions.js'
 import { redactSecrets, scrubValue } from './scrub.js'
 import { permissionRequests } from './store/permissions.js'
 import { setStall, refreshBlocked } from './task-blocked.js'
 import { publish } from './task-events.js'
-
-/** Claude Code's tool for asking the user to pick between options, which Seti shows as text. */
-const ASK_TOOL = 'AskUserQuestion'
-
-const ASK_IN_TEXT =
-  'Seti shows no question dialog. Write the question and its options as your reply and end your ' +
-  'turn; the user answers in the chat.'
 
 const SUMMARY_CHARS = 300
 const INPUT_CHARS = 8000
@@ -183,12 +177,12 @@ const signInMessage = (server: string) =>
   `The ${server} MCP server needs a sign-in, which only the user does, in Seti under Settings, MCP ` +
   'servers. Tell the user, carry on without it where you can, and end your turn if you cannot.'
 
-/** Decides each tool call Claude Code would ask about: the user does, through a request. */
+/** Decides each tool call Claude Code would ask about: the user answers a request or a question. */
 export const canUseToolFor =
   (taskId: string, session: AbortSignal): CanUseTool =>
   async (tool, input, options) => {
     if (tool === ASK_TOOL) {
-      return { behavior: 'deny', message: ASK_IN_TEXT }
+      return askQuestions(taskId, input, options, session)
     }
     const server = signInServer(tool)
     if (server !== null) {

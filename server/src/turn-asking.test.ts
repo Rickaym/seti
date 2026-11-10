@@ -42,10 +42,10 @@ describe('endsAsking', () => {
     expect(endsAsking([text('Which one?'), tool('Edit'), text('Picked the first one and fixed it.')])).toBe(false)
   })
 
-  it('counts a turn whose last tool use was AskUserQuestion, whatever it wrote after', () => {
-    expect(endsAsking([text('Let me ask.'), tool('AskUserQuestion')])).toBe(true)
-    expect(endsAsking([tool('AskUserQuestion'), text('I could not ask you here; tell me which database.')])).toBe(true)
-    expect(endsAsking([tool('AskUserQuestion'), tool('Bash'), text('Went with Postgres.')])).toBe(false)
+  it('reads only the prose after an AskUserQuestion call, whose questions wait on their own', () => {
+    expect(endsAsking([text('Let me ask.'), tool('AskUserQuestion')])).toBe(false)
+    expect(endsAsking([tool('AskUserQuestion'), text('Went with Postgres.')])).toBe(false)
+    expect(endsAsking([tool('AskUserQuestion'), text('The answer was cut off; which database?')])).toBe(true)
   })
 
   it('finds nothing in a turn without text', () => {
@@ -68,6 +68,6 @@ describe('turnBlocks', () => {
       { type: 'text', text: 'Checking.', name: undefined },
       { type: 'tool_use', text: undefined, name: 'AskUserQuestion' },
     ])
-    expect(endsAsking(blocks)).toBe(true)
+    expect(endsAsking(blocks)).toBe(false)
   })
 })

@@ -52,6 +52,7 @@ import { PAIR_PAGE } from './pair-page.js'
 import { defaultPluginConfigs } from './plugins.js'
 import { prDiscovery } from './pr-discovery.js'
 import { stoppedPreface } from './process-stop.js'
+import { questionsContext } from './questions.js'
 import { accessRoutes } from './routes/access.js'
 import { accountRoutes } from './routes/account.js'
 import { archivedGuard, archiveRoutes, taskArchiveRoutes } from './routes/archive.js'
@@ -90,6 +91,7 @@ import { permissionRoutes, taskPermissionRoutes } from './routes/permissions.js'
 import { pluginRoutes } from './routes/plugins.js'
 import { taskProcessRoutes } from './routes/processes.js'
 import { prRoutes } from './routes/prs.js'
+import { questionRoutes } from './routes/questions.js'
 import { repoRoutes } from './routes/repos.js'
 import { resourceRoutes } from './routes/resources.js'
 import { revisionRoutes } from './routes/revisions.js'
@@ -295,6 +297,7 @@ export function createApp(access: AccessGuardOptions = defaultAccess(), eaUrl: s
   app.route('/api/compact', compactRoutes)
   app.route('/api/context', contextRoutes)
   app.route('/api/knowledge', knowledgeRoutes)
+  app.route('/api/questions', questionRoutes)
   app.route('/api/ea', eaStateRoutes)
   app.route('/api/ea', eaUsageRoutes)
   app.route('/api/ea', eaChannelRoutes)
@@ -331,6 +334,7 @@ export function createApp(access: AccessGuardOptions = defaultAccess(), eaUrl: s
   registerContextProvider(cpuPrompt)
   registerContextProvider(setiToolsContext)
   registerContextProvider(knowledgeContext)
+  registerContextProvider(questionsContext)
   registerContextProvider(modContextPrompt)
   connectModLogic({ ops: logicOps(installedMods.manifest), host: modLogicHost })
   startModTaskEvents()

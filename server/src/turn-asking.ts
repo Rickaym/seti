@@ -34,9 +34,6 @@ function blocksOf(payload: string): TurnBlock[] {
 /** The content blocks of stored assistant messages, in order; unreadable ones are left out. */
 export const turnBlocks = (payloads: readonly string[]): TurnBlock[] => payloads.flatMap(blocksOf)
 
-/** Claude Code's tool for asking the user to pick between options. */
-const ASK_TOOL = 'AskUserQuestion'
-
 const FENCE = /^ {0,3}(`{3,}|~{3,})/
 
 /** The text with fenced code blocks taken out; an unclosed fence runs to the end. */
@@ -78,14 +75,12 @@ export function endsWithQuestion(text: string): boolean {
 }
 
 /**
- * Whether a turn ends by asking the user something: its last tool use was AskUserQuestion, or the
- * text it wrote after its last tool use ends with a question. Blocks come oldest first.
+ * Whether a turn ends by asking the user something in prose: the text it wrote after its last
+ * tool use ends with a question. AskUserQuestion calls wait as questions instead. Blocks come
+ * oldest first.
  */
 export function endsAsking(blocks: readonly TurnBlock[]): boolean {
   const lastTool = blocks.findLastIndex((block) => block.type === 'tool_use')
-  if (blocks[lastTool]?.name === ASK_TOOL) {
-    return true
-  }
   const closing = blocks
     .slice(lastTool + 1)
     .flatMap((block) => (block.type === 'text' && block.text !== undefined ? [block.text] : []))

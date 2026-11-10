@@ -259,7 +259,7 @@ describe('permission requests', () => {
     })
   })
 
-  it('tells the agent to ask its question as text instead of a picker', async () => {
+  it('turns down an AskUserQuestion call that holds no questions', async () => {
     const task = await newTask()
     await runTurn(task.id, 'pick')
     await waitIdle(task.id)

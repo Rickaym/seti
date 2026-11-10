@@ -1,8 +1,9 @@
-import { describeChange, type ChangeRequest, type PermissionRequest } from '@seti/shared'
+import { describeChange, type ChangeRequest, type PermissionRequest, type Question } from '@seti/shared'
 import { inBackground } from './background.js'
 import { tasks } from './db.js'
 import { changeRequests } from './store/change-requests.js'
 import { permissionRequests } from './store/permissions.js'
+import { questions } from './store/questions.js'
 import { onAnyTaskEvent, publish } from './task-events.js'
 
 const LINE_CHARS = 120
@@ -29,6 +30,16 @@ function permissionLine(pending: readonly PermissionRequest[]): string | null {
   return `${clip(line, LINE_CHARS)}${more}`
 }
 
+/** The reason line of the agent's open questions, with the first one's text. */
+function questionLine(open: readonly Question[]): string | null {
+  const [first] = open
+  if (first === undefined) {
+    return null
+  }
+  const count = open.length === 1 ? 'Asks a question' : `Asks ${String(open.length)} questions`
+  return clip(`${count}: ${first.prompt.replace(/\s+/g, ' ')}`, LINE_CHARS)
+}
+
 /** The reason line of the oldest change the agent asked for, with how many more wait. */
 function changeLine(pending: readonly ChangeRequest[]): string | null {
   const [first] = pending
@@ -52,6 +63,7 @@ const refreshing = new Map<string, Promise<string | null>>()
 async function refresh(taskId: string): Promise<string | null> {
   const blocked =
     permissionLine(await permissionRequests.pending(taskId)) ??
+    questionLine(await questions.openList(taskId)) ??
     changeLine(await changeRequests.pending(taskId)) ??
     stallLine(taskId)
   if (await tasks.setBlocked(taskId, blocked)) {
@@ -61,8 +73,8 @@ async function refresh(taskId: string): Promise<string | null> {
 }
 
 /**
- * Sets the task's reason line from what it waits on: a permission request first, then a change
- * the agent asked for, else a stall.
+ * Sets the task's reason line from what it waits on: a permission request first, then its open
+ * questions, then a change the agent asked for, else a stall.
  * A change tells the task's views, and a new reason pushes a needs-you notification.
  */
 export async function refreshBlocked(taskId: string): Promise<string | null> {
