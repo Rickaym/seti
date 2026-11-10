@@ -37,6 +37,7 @@ import { jsonEtag } from './etag.js'
 import { githubTokenMode } from './github-token.js'
 import { fail, HttpError, ok } from './http.js'
 import { inputPreface, wakeAfterTurn } from './inputs.js'
+import { knowledgeContext } from './knowledge-index.js'
 import { defaultLocalAuth } from './local-auth.js'
 import { forgetGoneServersLater } from './mcp-presence.js'
 import { memoryPrompt } from './memory-cap.js'
@@ -76,6 +77,7 @@ import { historyRoutes } from './routes/history.js'
 import { homeRoutes } from './routes/home.js'
 import { hookRoutes } from './routes/hooks.js'
 import { eaInboxRoutes } from './routes/inbox.js'
+import { knowledgeRoutes } from './routes/knowledge.js'
 import { localSessionRoutes } from './routes/local-session.js'
 import { mcpRoutes } from './routes/mcp.js'
 import { modAdminRoutes } from './routes/mod-admin.js'
@@ -292,6 +294,7 @@ export function createApp(access: AccessGuardOptions = defaultAccess(), eaUrl: s
   app.route('/api/commands', commandRoutes)
   app.route('/api/compact', compactRoutes)
   app.route('/api/context', contextRoutes)
+  app.route('/api/knowledge', knowledgeRoutes)
   app.route('/api/ea', eaStateRoutes)
   app.route('/api/ea', eaUsageRoutes)
   app.route('/api/ea', eaChannelRoutes)
@@ -327,6 +330,7 @@ export function createApp(access: AccessGuardOptions = defaultAccess(), eaUrl: s
   registerContextProvider(memoryPrompt)
   registerContextProvider(cpuPrompt)
   registerContextProvider(setiToolsContext)
+  registerContextProvider(knowledgeContext)
   registerContextProvider(modContextPrompt)
   connectModLogic({ ops: logicOps(installedMods.manifest), host: modLogicHost })
   startModTaskEvents()

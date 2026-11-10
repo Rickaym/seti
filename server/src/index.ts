@@ -32,6 +32,7 @@ import { startInboxSweeper } from './ea-deliver.js'
 import { startEaIndex } from './ea-index.js'
 import { importAgentTokenFile } from './github-token.js'
 import { wakeWaiting } from './inputs.js'
+import { startKnowledgeSweep } from './knowledge.js'
 import { readLocalTokens } from './local-auth.js'
 import { startMcpLoginKeeper } from './mcp-login-keeper.js'
 import { modHost } from './mods/bundled.js'
@@ -157,6 +158,7 @@ await stopLeftoverScopes()
 await dropLeftoverRequests()
 await resumeBypass()
 startRequestExpiry()
+startKnowledgeSweep()
 const interrupted = await markRestartCut()
 await retireBundledPlugins()
 audit.startRetention()

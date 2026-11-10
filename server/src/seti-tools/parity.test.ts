@@ -3,6 +3,7 @@ import path from 'node:path'
 import { AGENT_COLOR_ALIASES, AGENT_COLOR_PRESETS, modManifest, modToolName } from '@seti/shared'
 import { describe, expect, it } from 'vitest'
 import { SETI_TOOLS } from './catalog.js'
+import { KNOWLEDGE_TOOLS } from './knowledge.js'
 import { modActionTools } from './mod-actions.js'
 import { REQUEST_TOOLS } from './requests.js'
 import { HANDOFF_TOOLS } from './team.js'
@@ -12,7 +13,7 @@ import { modCommands } from '../mods/points.js'
 const EA_SOURCES = path.resolve(import.meta.dirname, '../../../ea/src/seti_ea')
 
 /** Seti control tools and the ones every agent gets. */
-const AGENT_SIDE = [...SETI_TOOLS, ...HANDOFF_TOOLS, ...REQUEST_TOOLS]
+const AGENT_SIDE = [...SETI_TOOLS, ...HANDOFF_TOOLS, ...REQUEST_TOOLS, ...KNOWLEDGE_TOOLS]
 
 /** EA tools agents do not get, each with the reason; everything else the EA has, agents have too. */
 const NOT_FOR_AGENTS: Record<string, string> = {
@@ -45,6 +46,8 @@ const ONLY_FOR_AGENTS: Record<string, string> = {
   await_agent: 'The EA waits with watch_task once, which keeps it under its tool cap.',
   agent_activity: 'The EA skims a time window with list_tasks active, which keeps it under its tool cap.',
   read_transcript: "The EA reads a time window with get_task's window, which keeps it under its tool cap.",
+  search_knowledge: "The EA searches notes with search_seti's knowledge scope, which keeps it under its tool cap.",
+  verify_knowledge: 'A check runs the verify step in a repo, which the EA has no shell for.',
 }
 
 /**
@@ -55,6 +58,7 @@ const USER_ONLY: Record<string, RegExp> = {
   'Permission requests and rules are security settings; only the user answers or changes them.':
     /permission|approve|allow_tool|deny_tool/,
   'Bypass is a security setting; only the user turns it on or off.': /bypass/,
+  'Approved notes reach every agent; only the user approves, rejects or edits them.': /approve|reject|edit_knowledge/,
   "Publishing data outside Seti is the user's call.": /share|publish/,
 }
 
