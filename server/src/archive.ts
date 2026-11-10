@@ -22,6 +22,7 @@ import { audit } from './audit.js'
 import { inBackground } from './background.js'
 import { capabilityCache } from './capabilities.js'
 import { tasks, toMessage } from './db.js'
+import { refuseAgent } from './ea-guard.js'
 import { HttpError } from './http.js'
 import { endSession, isRunning, publish, sessionState } from './runner.js'
 import { shellTurnGuard } from './shell-context.js'
@@ -356,15 +357,32 @@ function ruleWords(settings: AutoArchiveSettings, before: AutoArchiveSettings): 
 
 const SETTING_KEYS = ['enabled', 'days', 'delete_after_days', 'resume_after_restart'] as const
 
-/** Saves the fields the input carries and keeps the rest. */
+async function auditRepeatGuard(on: boolean): Promise<void> {
+  await audit.record({
+    actor: 'user',
+    kind: 'system.repeat_guard_changed',
+    subject_type: 'system',
+    summary: `Turned the repeat guard ${on ? 'on' : 'off'}`,
+    detail: { repeat_guard: on },
+  })
+}
+
+/** Saves the fields the input carries and keeps the rest; agents never turn off their own guard. */
 export async function updateAutoArchive(input: AutoArchiveInput): Promise<AutoArchiveSettings> {
   const before = await archiveSettings.get()
+  if (input.repeat_guard !== undefined && input.repeat_guard !== before.repeat_guard) {
+    refuseAgent('turn the repeat guard on or off')
+  }
   const after = await archiveSettings.set({
     enabled: input.enabled ?? before.enabled,
     days: input.days ?? before.days,
     delete_after_days: input.delete_after_days === undefined ? before.delete_after_days : input.delete_after_days,
     resume_after_restart: input.resume_after_restart ?? before.resume_after_restart,
+    repeat_guard: input.repeat_guard ?? before.repeat_guard,
   })
+  if (before.repeat_guard !== after.repeat_guard) {
+    await auditRepeatGuard(after.repeat_guard)
+  }
   if (SETTING_KEYS.some((key) => before[key] !== after[key])) {
     await audit.record({
       actor: 'user',

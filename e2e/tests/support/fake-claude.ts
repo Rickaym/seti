@@ -5,8 +5,9 @@ import os from 'node:os'
 import path from 'node:path'
 import { InProcessClient, type SdkServer } from './fake-mcp.js'
 import { askToDeploy, PERMISSION_INPUT, PERMISSION_PROMPT, type CanUseTool } from './fake-permission.js'
+import { REPEAT_PROMPT, repeatBuild, type FakeHooks } from './fake-repeat.js'
 import { sideChatQuery } from './fake-side-chat.js'
-import { actSteps, gateOf } from './fake-steps.js'
+import { actSteps, gateOf, type StepActor } from './fake-steps.js'
 
 /** What a prompt asks for to get a background shell from this fake. */
 export const SHELL_PROMPT = 'start a background shell'
@@ -65,6 +66,8 @@ interface SpawnOptions {
 interface Options {
   /** Seti's permission callback, which Claude Code calls for each call no rule allows. */
   canUseTool?: CanUseTool
+  /** Seti's hooks, which Claude Code calls around each tool call. */
+  hooks?: FakeHooks
   mcpServers?: Record<string, SdkServer>
   cwd?: string
   resume?: string
@@ -302,22 +305,17 @@ class FakeClaude {
     }
   }
 
-  /** Plays a turn held a step at a time, the burst of checks or the plan. */
-  private async stepped(prompt: string, gate: string): Promise<void> {
-    await actSteps(
-      prompt,
-      gate,
-      {
-        assistant: (content) => {
-          this.assistant(content)
-        },
-        toolResult: (id, content, output) => {
-          this.toolResult(id, content, output)
-        },
-        ended: () => this.outbox.ended,
+  /** What a scripted turn uses to speak, return tool results and see the session end. */
+  private actor(): StepActor {
+    return {
+      assistant: (content) => {
+        this.assistant(content)
       },
-      ASK_REPLY,
-    )
+      toolResult: (id, content, output) => {
+        this.toolResult(id, content, output)
+      },
+      ended: () => this.outbox.ended,
+    }
   }
 
   /** Calls a seti tool as Claude Code would, shows the call and its answer, then holds if asked. */
@@ -390,6 +388,8 @@ class FakeClaude {
     const gate = gateOf(prompt)
     if (seti?.[1] !== undefined && seti[2] !== undefined) {
       await this.callSeti(seti[1], seti[2], prompt.includes(HOLD_PROMPT))
+    } else if (prompt.includes(REPEAT_PROMPT)) {
+      await repeatBuild(this.options.hooks, this.actor())
     } else if (prompt.includes(SHELL_PROMPT)) {
       this.startShell()
     } else if (prompt.includes(LIMIT_PROMPT)) {
@@ -397,7 +397,7 @@ class FakeClaude {
         this.stopTask(shellId, LIMIT_SUMMARY)
       }
     } else if (gate !== undefined) {
-      await this.stepped(prompt, gate)
+      await actSteps(prompt, gate, this.actor(), ASK_REPLY)
     } else if (prompt.includes(HOLD_PROMPT)) {
       await this.hold()
     } else if (prompt.includes(SESSION_PROMPT)) {

@@ -762,6 +762,7 @@ async def test_archive_settings_sweep_and_list(tools: EaTools, fake: SettingsFak
         "Archived agents are kept until deleted by hand.",
         "Agents a Seti restart cuts off get one message to check their work and go on, unless they were "
         "waiting on the user.",
+        "An agent that runs the same call again after 2 identical results waits for the user to allow it.",
         "The rule would archive 1 agent: Old spike (idle since 7 days ago) now.",
         "The archive holds 4 agents in 2 MB, and their packed folders take 50 MB.",
     ]
@@ -782,6 +783,14 @@ async def test_archive_settings_sweep_and_list(tools: EaTools, fake: SettingsFak
     assert "Agents a Seti restart cuts off wait for the user to retry or reply." in asked.text
     assert fake.archive["resume_after_restart"] is False
     assert done.text.endswith("Agents a Seti restart cuts off wait for the user to retry or reply.")
+    off = "Agents may repeat a call that keeps giving the same result without asking."
+    asked, done = await confirm(tools, "set_auto_archive", {"repeat_guard": False})
+    assert f"What it would do: {off}" in asked.text
+    assert "restart" not in asked.text
+    assert fake.archive["repeat_guard"] is False
+    assert fake.archive["resume_after_restart"] is False
+    assert done.text.endswith(off)
+    assert "restart" not in done.text
     _, swept = await confirm(tools, "run_archive_sweep", {})
     assert swept.text == "Archived 1 agent: Old spike."
 

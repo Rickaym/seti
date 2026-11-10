@@ -167,13 +167,14 @@ interface SettingsRow {
   auto_days: number
   delete_after_days: number | null
   resume_after_restart: boolean
+  repeat_guard: boolean
   updated_at: string
 }
 
 export const archiveSettings = {
   get: async (): Promise<AutoArchiveSettings> => {
     const [row] = await sql<SettingsRow[]>`SELECT auto_enabled, auto_days, delete_after_days, resume_after_restart,
-      updated_at FROM archive_settings WHERE id = 1`
+      repeat_guard, updated_at FROM archive_settings WHERE id = 1`
     return row === undefined
       ? { ...AUTO_ARCHIVE_DEFAULTS, updated_at: null }
       : {
@@ -181,18 +182,19 @@ export const archiveSettings = {
           days: row.auto_days,
           delete_after_days: row.delete_after_days,
           resume_after_restart: row.resume_after_restart,
+          repeat_guard: row.repeat_guard,
           updated_at: row.updated_at,
         }
   },
   set: async (input: Omit<AutoArchiveSettings, 'updated_at'>): Promise<AutoArchiveSettings> => {
     const at = now()
     await sql`INSERT INTO archive_settings (id, auto_enabled, auto_days, delete_after_days, resume_after_restart,
-        updated_at)
+        repeat_guard, updated_at)
       VALUES (1, ${input.enabled ? 1 : 0}, ${input.days}, ${input.delete_after_days}, ${input.resume_after_restart},
-        ${at})
+        ${input.repeat_guard}, ${at})
       ON CONFLICT (id) DO UPDATE SET auto_enabled = excluded.auto_enabled, auto_days = excluded.auto_days,
         delete_after_days = excluded.delete_after_days, resume_after_restart = excluded.resume_after_restart,
-        updated_at = excluded.updated_at`
+        repeat_guard = excluded.repeat_guard, updated_at = excluded.updated_at`
     return { ...input, updated_at: at }
   },
 }

@@ -1,7 +1,7 @@
 import type { Db } from '../pg.js'
 import { ACCESS_DEFAULTS, CREDENTIAL_PROFILES, MCP_SELECTION } from './schema-access.js'
 import { AGENT_GUIDE, SETI_GUIDE_PACK } from './schema-agent-guide.js'
-import { ARCHIVE_FILES, RESTART_RESUME, TASK_ARCHIVE } from './schema-archive.js'
+import { ARCHIVE_FILES, REPEAT_GUARD, RESTART_RESUME, TASK_ARCHIVE } from './schema-archive.js'
 import { SETI_AUTH } from './schema-auth.js'
 import { CHANGE_REQUESTS } from './schema-change-requests.js'
 import { CHANGELOG } from './schema-changelog.js'
@@ -423,4 +423,5 @@ export const MIGRATIONS: readonly Migration[] = [
   { version: 94, name: 'blobs_one_style', sql: BLOBS_ONE_STYLE },
   { version: 95, name: 'ea_form_of_address', sql: EA_FORM_OF_ADDRESS },
   { version: 96, name: 'trim_session_init', sql: TRIM_SESSION_INIT },
+  { version: 97, name: 'repeat_guard', sql: REPEAT_GUARD },
 ]

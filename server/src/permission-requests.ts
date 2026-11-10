@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import type { CanUseTool, PermissionMode, PermissionResult, PermissionUpdate } from '@anthropic-ai/claude-agent-sdk'
-import type { PermissionRequest } from '@seti/shared'
+import type { PermissionRequest, PermissionRequestKind } from '@seti/shared'
 import { audit } from './audit.js'
 import { alwaysRules } from './permission-policy.js'
 import { redactSecrets, scrubValue } from './scrub.js'
@@ -114,11 +114,13 @@ export const allowed = (
   request: Pick<PermissionRequest, 'tool_name'>,
   input: Record<string, unknown>,
   mode: PermissionMode,
+  always = false,
 ) =>
   ({
     behavior: 'allow',
     updatedInput: input,
     ...(request.tool_name === 'ExitPlanMode' ? { updatedPermissions: planDone(mode) } : {}),
+    ...(always ? { decisionClassification: 'user_permanent' } : {}),
   }) satisfies PermissionResult
 
 /** What the agent gets for a denied call, with the user's words when they gave any. */
@@ -135,25 +137,30 @@ const inputs = new Map<string, Record<string, unknown>>()
 
 export const waitingInput = (requestId: string): Record<string, unknown> => inputs.get(requestId) ?? {}
 
+/** A call Seti asks the user about, why, and the rules Always allow would add. */
+interface Ask {
+  tool: string
+  input: Record<string, unknown>
+  kind: PermissionRequestKind
+  reason: string | null
+  suggestions: string[]
+}
+
 /** Records the call, shows it to the user, and waits for their answer. */
-async function askUser(
-  taskId: string,
-  call: { tool: string; input: Record<string, unknown> },
-  options: AskOptions,
-  session: AbortSignal,
-): Promise<PermissionResult> {
+async function askUser(taskId: string, ask: Ask, signals: readonly AbortSignal[]): Promise<PermissionResult> {
   const id = randomUUID()
-  inputs.set(id, call.input)
-  const answer = answerOf(id, [options.signal, session])
+  inputs.set(id, ask.input)
+  const answer = answerOf(id, signals)
   try {
     const request = await permissionRequests.open({
       id,
       task_id: taskId,
-      tool_name: call.tool,
-      summary: summarize(call.tool, call.input),
-      input: inputText(call.input),
-      reason: reasonOf(options),
-      suggestions: alwaysRules(call.tool, call.input, options),
+      tool_name: ask.tool,
+      kind: ask.kind,
+      summary: summarize(ask.tool, ask.input),
+      input: inputText(ask.input),
+      reason: ask.reason,
+      suggestions: ask.suggestions,
     })
     await (waiting.has(id) ? announce(request) : dropRequest(id))
     return await answer
@@ -188,8 +195,23 @@ export const canUseToolFor =
       await setStall(taskId, 'mcp', `Sign in to the ${server} MCP server in Seti`)
       return { behavior: 'deny', message: signInMessage(server) }
     }
-    return askUser(taskId, { tool, input }, options, session)
+    const ask: Ask = {
+      tool,
+      input,
+      kind: 'tool',
+      reason: reasonOf(options),
+      suggestions: alwaysRules(tool, input, options),
+    }
+    return askUser(taskId, ask, [options.signal, session])
   }
+
+/** Asks the user about a call the agent repeats with the same result; it offers no rules. */
+export const askAboutRepeat = async (
+  taskId: string,
+  call: { tool: string; input: Record<string, unknown> },
+  reason: string,
+  signals: readonly AbortSignal[],
+): Promise<PermissionResult> => askUser(taskId, { ...call, kind: 'repeat', reason, suggestions: [] }, signals)
 
 /** No process waits on a request a restart left pending; startup drops them. */
 export async function dropLeftoverRequests(): Promise<void> {
