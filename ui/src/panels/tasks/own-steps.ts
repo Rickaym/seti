@@ -43,6 +43,9 @@ function pick(): OwnStepper | undefined {
   return withOwn.find((stepper) => panel?.contains(stepper.root()) === true) ?? withOwn[0]
 }
 
+/** Steps the transcript on screen back or forward through your own messages. */
+export const stepOwnMessages = (direction: OwnDirection) => pick()?.step(direction)
+
 const BINDINGS = [
   { chord: CHORDS.ownBack, run: () => pick()?.step('back') },
   { chord: CHORDS.ownForward, run: () => pick()?.step('forward') },

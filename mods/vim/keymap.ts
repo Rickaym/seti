@@ -14,6 +14,8 @@ export type VimAction =
   | { type: 'palette' }
   | { type: 'files' }
   | { type: 'groupChat' }
+  /** Your previous or next own message in the transcript on screen. */
+  | { type: 'ownStep'; direction: 'back' | 'forward' }
   /** Esc in a field: leave it for the panel, which is normal mode. */
   | { type: 'normal' }
   /** Esc in normal mode while the active panel's find bar is open. */
@@ -70,6 +72,8 @@ const SINGLE: Record<string, VimAction> = {
   N: { type: 'findStep', direction: 'previous' },
   '?': { type: 'help' },
   ':': { type: 'palette' },
+  '{': { type: 'ownStep', direction: 'back' },
+  '}': { type: 'ownStep', direction: 'forward' },
 }
 
 const AFTER_G: Record<string, VimAction> = {
@@ -185,6 +189,7 @@ export const BINDINGS: readonly { heading: string; rows: readonly Binding[] }[] 
       { keys: 'j / k', action: 'Down / up a little' },
       { keys: 'Ctrl+d / Ctrl+u', action: 'Down / up half a page' },
       { keys: 'gg / G', action: 'Top / bottom, following new messages' },
+      { keys: '{ / }', action: 'Your previous / next message' },
     ],
   },
   {
