@@ -32,6 +32,7 @@ describe('guideGroups', () => {
     expect(groups.map((group) => group.rows.at(-1))).toEqual([
       { keys: 'Ctrl+=', action: 'Zoom' },
       { keys: 'Ctrl+Shift+C', action: 'Copy agent' },
+      { keys: 'Ctrl+Z, Ctrl+Y', action: 'Undo and redo' },
       { keys: 'Shift+Enter', action: 'New line in Claude Code' },
     ])
     expect(groups[0]?.rows.filter((row) => row.keys === 'Ctrl+Shift+L')).toEqual([
