@@ -24,3 +24,15 @@ export async function seedCodeAgent(): Promise<{ id: string; dir: string }> {
   await db.close()
   return { id, dir }
 }
+
+/** Sixty lines, with "needle" on lines 6, 26 and 46. */
+export const FIND_FILE = Array.from({ length: 60 }, (_, n) =>
+  n % 20 === 5 ? `const marker${String(n)} = 'needle'` : `const line${String(n)} = ${String(n)}`,
+).join('\n')
+
+/** A code agent whose docs folder also holds find.ts, the file the find specs search. */
+export async function seedFindAgent(): Promise<{ id: string; dir: string }> {
+  const agent = await seedCodeAgent()
+  fs.writeFileSync(path.join(agent.dir, 'docs', 'find.ts'), `${FIND_FILE}\n`)
+  return agent
+}

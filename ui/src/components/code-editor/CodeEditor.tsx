@@ -2,6 +2,7 @@ import type { CodeLanguage } from '@seti/shared'
 import { lazy, Suspense, useCallback, useRef } from 'react'
 import { Textarea } from '@/components/ui/textarea'
 import { cn } from '@/lib/utils'
+import type { EditorFind } from './editor-find'
 import type { Caret } from './sync'
 
 const CodeMirrorEditor = lazy(async () => import('./CodeMirrorEditor').then((m) => ({ default: m.CodeMirrorEditor })))
@@ -26,6 +27,7 @@ export function CodeEditor({
   spellCheck = false,
   focusOnMount = false,
   onSave,
+  find,
 }: {
   value: string
   onChange: (value: string) => void
@@ -40,6 +42,8 @@ export function CodeEditor({
   focusOnMount?: boolean
   /** Ctrl+S or Cmd+S in the field. */
   onSave?: () => void
+  /** The find bar this editor serves, if any. */
+  find?: EditorFind
 }) {
   const handoff = useRef<Caret | null>(null)
   const keepCaret = useCallback(
@@ -95,6 +99,7 @@ export function CodeEditor({
         spellCheck={spellCheck}
         focusOnMount={focusOnMount}
         onSave={onSave}
+        find={find}
       />
     </Suspense>
   )

@@ -352,7 +352,9 @@ panels focus moves between (`data-panel`), with `data-panel-scroll`, `data-panel
 `data-panel-active` and `data-panel-focused` (the panel a layout of several holds as focused), and
 `inputHooks` hands every key to each registered hook, asks hooks whether an Esc, a find field's Enter or a key typed in a terminal is theirs, and draws what a hook overlays, such as a list of its
 keys. Vim mode is the bundled mod `mods/vim/`, off until the user turns it on, so Seti itself binds
-no single key. Routes hot-toggle because one route,
+no single key. An open text file takes the editor keys (find, replace, go to line, F3) in its own
+box first (`ui/src/panels/files/find/`), and the Files search and the chat find skip a key it
+handled, so Ctrl+F finds in the file while it has focus. Routes hot-toggle because one route,
 `/api/mods/:id/*`, hands each request to the entry an enabled mod registered, after the request
 passed the same sign-in, origin and body checks as every other API route. A user's request to a
 mod's route stays the user's; only the mod's own calls through the mod API run as the mod. A route

@@ -1,32 +1,28 @@
-import {
-  type FileConflict,
-  type FileMeta,
-  type FileStamp,
-  type FileText,
-  languageOfPath,
-  type CodeLanguage,
-} from '@seti/shared'
-import { RefreshCw, TriangleAlert, Upload } from 'lucide-react'
-import { lazy, Suspense, useCallback, useEffect, useState } from 'react'
+import type { FileConflict, FileMeta, FileStamp, FileText } from '@seti/shared'
+import { useCallback, useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { toast } from 'sonner'
 import { apiGet, apiPut, errorText, RequestError } from '@/api'
-import { Hint } from '@/components/Hint'
-import { CodeEditor } from '@/components/code-editor/CodeEditor'
-import { Button } from '@/components/ui/button'
 import { useConfirm } from '@/components/ui/confirm-context'
 import { useLeaveGuard } from '@/hooks/useLeaveGuard'
-import { cn } from '@/lib/utils'
-import { CodeText } from '@/panels/files/CodeText'
+import { ConflictBanner } from '@/panels/files/ConflictBanner'
 import { EditActions, type SourceToggle } from '@/panels/files/EditActions'
-import { FileView, type ViewerFile } from '@/panels/files/FileView'
-import { MONO, PlainText } from '@/panels/files/PlainText'
-import { plainReason, type PlainReason } from '@/panels/files/code-lines'
+import type { ViewerFile } from '@/panels/files/FileView'
+import { TextBody } from '@/panels/files/TextBody'
 import type { FileViewerEntry } from '@/panels/files/file-viewers'
 import { filesPath, type FileTarget } from '@/panels/files/files-api'
+import { FileFindBar } from '@/panels/files/find/FileFindBar'
+import { useTextFind } from '@/panels/files/find/useTextFind'
 import { useFileWatch } from '@/panels/files/useFileWatch'
 
-const Markdown = lazy(async () => import('@/components/Markdown').then((m) => ({ default: m.Markdown })))
+/** The file on disk when a save found it changed, or null for any other failure. */
+const conflictOf = (e: unknown): FileStamp | null => {
+  if (!(e instanceof RequestError) || e.status !== 409) {
+    return null
+  }
+  const body = e.body as Partial<FileConflict> | null
+  return body?.current ?? null
+}
 
 /** What the editor saves against: the text it loaded and its hash, null for a file not made yet. */
 interface Base {
@@ -50,153 +46,6 @@ interface TextFileProps {
   actions: HTMLElement | null
   /** The file on disk changed or was saved, so its size and time are stale. */
   onChanged: () => void
-}
-
-const conflictOf = (e: unknown): FileStamp | null => {
-  if (!(e instanceof RequestError) || e.status !== 409) {
-    return null
-  }
-  const body = e.body as Partial<FileConflict> | null
-  return body?.current ?? null
-}
-
-function ConflictBanner({
-  stamp,
-  onReload,
-  onOverwrite,
-}: {
-  stamp: FileStamp
-  onReload: () => void
-  onOverwrite: () => void
-}) {
-  return (
-    <div
-      role="alert"
-      className="flex shrink-0 flex-wrap items-center gap-2 border-b border-warning/40 bg-warning/10 px-3 py-2 text-xs"
-    >
-      <TriangleAlert className="size-3.5 shrink-0 text-warning-text" />
-      <span className="min-w-0 flex-1">
-        {stamp.exists
-          ? 'Changed on disk since you opened it, probably by the agent.'
-          : 'Deleted on disk since you opened it.'}
-      </span>
-      {stamp.exists && (
-        <Hint text="Load the version on disk and drop your edits">
-          <Button variant="outline" size="xs" onClick={onReload}>
-            <RefreshCw />
-            Reload
-          </Button>
-        </Hint>
-      )}
-      <Hint text={stamp.exists ? 'Save your version over the one on disk' : 'Save your version again'}>
-        <Button variant="outline" size="xs" onClick={onOverwrite}>
-          <Upload />
-          Overwrite
-        </Button>
-      </Hint>
-    </div>
-  )
-}
-
-interface ViewProps {
-  text: string
-  viewer: FileViewerEntry | undefined
-  file: ViewerFile
-  markdown: boolean
-  /** The language to colour plain text as, or null for prose. */
-  language: CodeLanguage | null
-}
-
-const PLAIN_NOTES: Record<PlainReason, string> = {
-  size: 'Too large to colour; showing plain text.',
-  'long-line': 'A line is too long to colour; showing plain text.',
-}
-
-/** A note that a file stays plain and why, quiet enough to sit above its text. */
-function PlainNote({ reason }: { reason: PlainReason }) {
-  return (
-    <p className="shrink-0 border-b border-border px-4 py-1 text-2xs text-muted-foreground">{PLAIN_NOTES[reason]}</p>
-  )
-}
-
-function View({ text, viewer, file, markdown, language }: ViewProps) {
-  if (viewer !== undefined) {
-    return <FileView viewer={viewer} file={file} text={text} />
-  }
-  const line = file.line ?? undefined
-  if (!markdown && language !== null) {
-    const plain = plainReason(text)
-    return plain === null ? (
-      <CodeText text={text} language={language} line={line} />
-    ) : (
-      <>
-        <PlainNote reason={plain} />
-        <div className="min-h-0 flex-1 overflow-auto px-4 py-3">
-          <PlainText text={text} line={line} />
-        </div>
-      </>
-    )
-  }
-  return (
-    <div className="min-h-0 flex-1 overflow-auto px-4 py-3">
-      {markdown ? (
-        <Suspense fallback={<pre className={cn(MONO, 'whitespace-pre-wrap')}>{text}</pre>}>
-          <Markdown text={text} />
-        </Suspense>
-      ) : (
-        <PlainText text={text} line={line} />
-      )}
-    </div>
-  )
-}
-
-/** The file as its viewer shows it, or the editor; some viewers show the saved file under it. */
-function Body({
-  path,
-  draft,
-  onDraft,
-  onSave,
-  ...view
-}: Omit<ViewProps, 'language'> & {
-  path: string
-  draft: string | null
-  onDraft: (draft: string) => void
-  onSave: () => void
-}) {
-  const { viewer } = view
-  const language = languageOfPath(path)
-  if (draft === null) {
-    return <View {...view} language={language} />
-  }
-  const plain = plainReason(draft)
-  const fits = plain === null
-  const editor = (
-    <>
-      {language !== null && plain !== null && <PlainNote reason={plain} />}
-      <CodeEditor
-        label={`Edit ${path}`}
-        value={draft}
-        language={fits ? language : null}
-        spellCheck={view.markdown}
-        focusOnMount
-        onChange={onDraft}
-        onSave={onSave}
-        className="min-h-0 flex-1 resize-none border-0 focus-within:ring-0 md:text-xs"
-      />
-    </>
-  )
-  if (viewer?.whileEditing !== true) {
-    return editor
-  }
-  const region = `Saved ${viewer.title.toLowerCase()}`
-  return (
-    <>
-      {editor}
-      <div className="flex min-h-0 flex-1 flex-col border-t border-border" aria-label={region} role="region">
-        <FileView viewer={viewer} file={view.file} text={view.text} editing />
-      </div>
-    </>
-  )
 }
 
 /**
@@ -226,6 +75,13 @@ export function TextFile(props: TextFileProps) {
   const shown = useSourceToggle(viewer, file.line !== null)
   const dirty = draft !== null && draft !== base?.text
   useLeaveGuard(dirty)
+  const editing = draft !== null
+  const { find, readable, editorFind, rootRef, viewRef, line } = useTextFind({
+    editing,
+    viewer: shown.viewer,
+    markdown,
+    openedAt: file.line,
+  })
 
   const fetchText = useCallback(
     async () => apiGet<FileText>(filesPath(taskId, 'text', { root: target.root, path: target.path, dotfiles })),
@@ -312,8 +168,8 @@ export function TextFile(props: TextFileProps) {
     }
   }
 
-  const toggleEdit = async (editing: boolean) => {
-    if (editing) {
+  const toggleEdit = async (on: boolean) => {
+    if (on) {
       setDraft(base?.text ?? '')
       return
     }
@@ -331,16 +187,17 @@ export function TextFile(props: TextFileProps) {
     return <p className="p-4 text-sm text-muted-foreground">Loading...</p>
   }
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
+    <div ref={rootRef} className="flex min-h-0 flex-1 flex-col">
       {actions !== null &&
         createPortal(
           <EditActions
             writable={writable}
-            editing={draft !== null}
+            editing={editing}
             dirty={dirty}
             saving={saving}
             source={shown.toggle}
-            onEdit={(editing) => void toggleEdit(editing)}
+            onFind={readable ? find.openFind : null}
+            onEdit={(next) => void toggleEdit(next)}
             onSave={saveDraft}
           />,
           actions,
@@ -354,15 +211,18 @@ export function TextFile(props: TextFileProps) {
           }}
         />
       )}
-      <Body
+      {readable && <FileFindBar find={find} editable={editing} text={draft ?? base.text} />}
+      <TextBody
         path={target.path}
         text={base.text}
         draft={draft}
         viewer={shown.viewer}
-        file={file}
+        file={{ ...file, line }}
         markdown={markdown}
         onDraft={setDraft}
         onSave={saveDraft}
+        find={editorFind}
+        viewRef={viewRef}
       />
     </div>
   )
