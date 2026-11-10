@@ -93,7 +93,7 @@ const CORE_GROUPS: { group: SettingsGroup; pages: (Omit<SettingsPage, 'group'> &
         key: 'agents',
         label: 'Lifecycle',
         icon: BotMessageSquare,
-        keywords: 'agents compaction compact restart resume archive delete stale folders',
+        keywords: 'agents compaction compact restart resume repeat loop archive delete stale folders',
       },
       { key: 'repos', label: 'Repos', icon: FolderGit2, keywords: 'repositories checkouts warm caches' },
       { key: 'resources', label: 'Resources', icon: Gauge, keywords: 'memory cpu cap host usage' },

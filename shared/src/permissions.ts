@@ -80,18 +80,23 @@ export const taskPermissionRuleParams = z.object({ id: z.string().trim().min(1),
 export const PERMISSION_REQUEST_STATES = ['pending', 'allowed', 'denied', 'cancelled'] as const
 export type PermissionRequestState = (typeof PERMISSION_REQUEST_STATES)[number]
 
+/** Why Seti asks: a call no rule allows, or a call the agent repeats with the same result. */
+export const PERMISSION_REQUEST_KINDS = ['tool', 'repeat'] as const
+export type PermissionRequestKind = (typeof PERMISSION_REQUEST_KINDS)[number]
+
 /** A tool call the agent waits on the user to allow or deny. */
 export interface PermissionRequest {
   id: string
   task_id: string
   tool_name: string
+  kind: PermissionRequestKind
   /** One line of what the call does, such as its command or file. */
   summary: string
   /** The call's input with secrets redacted, cut to a size the page can show. */
   input: string
   /** Why Claude Code asked, such as a path outside the agent's directories. */
   reason: string | null
-  /** The rules Always allow adds; empty when the call has none or must not get one. */
+  /** The rules Always allow adds; empty when the call has none or must not get one, as a repeat. */
   suggestions: string[]
   state: PermissionRequestState
   /** What the user told the agent with a deny. */
@@ -125,6 +130,7 @@ export const permissionRequestSchema = z.object({
   id: z.string(),
   task_id: z.string(),
   tool_name: orDefault('tool_name', z.string(), 'tool'),
+  kind: orDefault<PermissionRequestKind>('kind', z.enum(PERMISSION_REQUEST_KINDS), 'tool'),
   summary: orDefault('summary', z.string(), ''),
   input: orDefault('input', z.string(), ''),
   reason: maybeText('reason'),
