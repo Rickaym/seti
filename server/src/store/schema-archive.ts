@@ -39,3 +39,9 @@ ALTER TABLE archive_settings ADD COLUMN delete_after_days INTEGER;
 export const RESTART_RESUME = `
 ALTER TABLE archive_settings ADD COLUMN resume_after_restart BOOLEAN NOT NULL DEFAULT true;
 `
+
+/** Requests Seti makes for a call the agent repeats with the same result, and the switch for them. */
+export const REPEAT_GUARD = `
+ALTER TABLE permission_request ADD COLUMN kind TEXT NOT NULL DEFAULT 'tool';
+ALTER TABLE archive_settings ADD COLUMN repeat_guard BOOLEAN NOT NULL DEFAULT true;
+`

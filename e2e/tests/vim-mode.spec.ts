@@ -4,6 +4,7 @@ import { seedLongTranscript } from './support/chat-search.js'
 import { apiData, expect, test, unique } from './support/fixtures.js'
 import { focusedPanel, panelOf, rectOf, startAgent } from './support/grid.js'
 import { modToggle, setModEnabled } from './support/mods.js'
+import { ask, seedOwnMessages } from './support/own-messages.js'
 import { FAKE_CLAUDE_ENV } from './support/processes.js'
 import { run, screenOf, terminalButton, tileIn, typedInput } from './support/terminal.js'
 
@@ -240,6 +241,26 @@ test('Vim mode stops on a terminal panel, i enters its shell and Ctrl+\\ n leave
   await page.keyboard.press('Enter')
   await expect(screenOf(tile)).toContainText('again-8')
   expect(since(mark)).toBe('\x1cecho again-$((4+4))\r')
+})
+
+test('Vim mode steps back and forward through your own messages with { and }', async ({ page }) => {
+  await switchVim(page, true)
+  const id = await seedOwnMessages(unique('Vim own steps'))
+  await page.goto(`/#agents/${id}`)
+  const own = (turn: number) =>
+    transcript(page)
+      .locator('[data-own-message]')
+      .filter({ hasText: ask(turn) })
+  await page.getByRole('combobox', { name: 'Reply' }).click()
+  await page.keyboard.press('Escape')
+  await expect(mode(page)).toHaveText('NORMAL')
+
+  await page.keyboard.press('{')
+  await expect(own(4)).toHaveAttribute('data-own-flash', '')
+  await page.keyboard.press('{')
+  await expect(own(3)).toHaveAttribute('data-own-flash', '')
+  await page.keyboard.press('}')
+  await expect(own(4)).toHaveAttribute('data-own-flash', '')
 })
 
 test('turning the Vim mode mod off leaves no single key, and on again brings them back', async ({ page }) => {

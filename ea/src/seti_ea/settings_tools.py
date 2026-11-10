@@ -294,8 +294,9 @@ SETTINGS_SPECS: list[ToolSpec] = [
     ToolSpec(
         "get_archive_settings",
         "The auto-archive rule (on or off, after how many idle days), after how many days archived "
-        "agents are deleted, whether agents a restart cut off resume on their own, which agents it "
-        "would archive now, and what the archive holds. With "
+        "agents are deleted, whether agents a restart cut off resume on their own, whether an agent "
+        "that repeats a call with the same result stops to ask the user, which agents it would "
+        "archive now, and what the archive holds. With "
         "stale_folders, also the folders in the scratch and worktree roots no agent owns, with sizes; "
         "listing them changes nothing.",
         {
@@ -309,8 +310,9 @@ SETTINGS_SPECS: list[ToolSpec] = [
     ToolSpec(
         "set_auto_archive",
         "Turn auto-archive on or off, change after how many idle days it archives complete agents, "
-        "after how many days in the archive agents are deleted with their files, or whether agents a "
-        "Seti restart cut off resume on their own. Needs the user's yes.",
+        "after how many days in the archive agents are deleted with their files, whether agents a "
+        "Seti restart cut off resume on their own, or whether an agent that repeats a call with the "
+        "same result stops to ask the user first. Needs the user's yes.",
         {
             "enabled": {"type": "boolean", "description": "true to turn it on, false to turn it off."},
             "days": {"type": "integer", "description": "Idle days before archiving, 1 to 365."},
@@ -322,6 +324,11 @@ SETTINGS_SPECS: list[ToolSpec] = [
                 "type": "boolean",
                 "description": "true to send agents a restart cut off one message to go on; false to "
                 "leave them for the user.",
+            },
+            "repeat_guard": {
+                "type": "boolean",
+                "description": "true to stop an agent that runs the same call again after 2 identical "
+                "results until the user allows it; false to let agents repeat calls without asking.",
             },
             "confirmed": CONFIRMED,
         },
@@ -1182,6 +1189,22 @@ class SettingsTools:
         )
 
     @staticmethod
+    def _guard_rule(settings: Mapping[str, Any]) -> str:
+        if settings.get("repeat_guard") is False:
+            return "Agents may repeat a call that keeps giving the same result without asking."
+        return (
+            "An agent that runs the same call again after 2 identical results waits for the user to allow it."
+        )
+
+    def _flag_changes(self, before: Mapping[str, Any], after: Mapping[str, Any]) -> list[str]:
+        rules = (("resume_after_restart", self._resume_rule), ("repeat_guard", self._guard_rule))
+        return [
+            rule(after)
+            for key, rule in rules
+            if (before.get(key) is not False) != (after.get(key) is not False)
+        ]
+
+    @staticmethod
     def _stale_words(report: Mapping[str, Any]) -> list[str]:
         folders = dicts(report.get("folders"))
         if not folders:
@@ -1226,6 +1249,7 @@ class SettingsTools:
             f"Auto-archive is {self._rule(settings)}.",
             self._delete_rule(settings),
             self._resume_rule(settings),
+            self._guard_rule(settings),
             f"The rule would archive {self._candidates(preview)} now.",
             f"The archive holds {plural(int(archived.get('count') or 0), 'agent')} in "
             f"{size_words(archived.get('stored_bytes'))}, and their packed folders take "
@@ -1251,19 +1275,22 @@ class SettingsTools:
         delete = was_delete if delete_arg is None else (delete_arg or None)
         if delete is not None and not 1 <= int(delete) <= 3650:
             raise ToolError("Delete days must be between 1 and 3650, or 0 to keep them.", "Bad days")
-        was_resume = settings.get("resume_after_restart") is not False
-        resume = arg_bool(args, "resume_after_restart") if "resume_after_restart" in args else was_resume
-        body = {"enabled": enabled, "days": days, "delete_after_days": delete, "resume_after_restart": resume}
+        flags = {
+            key: arg_bool(args, key) if key in args else settings.get(key) is not False
+            for key in ("resume_after_restart", "repeat_guard")
+        }
+        body = {"enabled": enabled, "days": days, "delete_after_days": delete, **flags}
         rule_same = enabled == (settings.get("enabled") is True) and days == settings.get("days")
-        if rule_same and delete == was_delete and resume == was_resume:
+        changed = self._flag_changes(settings, body)
+        if rule_same and delete == was_delete and not changed:
             raise ToolError(
                 f"Auto-archive is already {self._rule(settings)}. {self._delete_rule(settings)} "
-                f"{self._resume_rule(settings)}",
+                f"{self._resume_rule(settings)} {self._guard_rule(settings)}",
                 "Nothing to change",
             )
         if not await self._cleared(args, gate_key("set_auto_archive", body)):
             if rule_same and delete == was_delete:
-                effect = self._resume_rule(body)
+                effect = " ".join(changed)
             elif delete != was_delete:
                 effect = (
                     f"{self._delete_rule(body)} Deleting removes an agent's transcript, folders and "
@@ -1283,9 +1310,9 @@ class SettingsTools:
         saved = await self._refusable(self._seti.put("/archive/settings", body), "Not changed")
         after = saved.get("settings") if isinstance(saved, dict) else None
         now_set = after if isinstance(after, dict) else body
-        resumed = f" {self._resume_rule(now_set)}" if resume != was_resume else ""
+        flipped = "".join(f" {line}" for line in self._flag_changes(settings, now_set))
         return ToolResult(
-            f"Auto-archive is now {self._rule(now_set)}. {self._delete_rule(now_set)}{resumed}",
+            f"Auto-archive is now {self._rule(now_set)}. {self._delete_rule(now_set)}{flipped}",
             "Changed auto-archive",
         )
 
