@@ -27,6 +27,8 @@ function planText(request: PermissionRequest): string | null {
 
 const ACTION = 'pointer-coarse:h-11'
 
+const REPEAT_ALWAYS = "Always stops asking about this exact call while the agent's process runs"
+
 function Details({ request }: { request: PermissionRequest }) {
   const plan = isPlan(request) ? planText(request) : null
   return (
@@ -50,7 +52,10 @@ function PermissionCard({ request, onAnswered }: { request: PermissionRequest; o
   const noteId = useId()
   const scopeId = useId()
   const plan = isPlan(request)
-  const always = request.suggestions.length > 0
+  const rules = request.suggestions.length > 0
+  const repeat = request.kind === 'repeat'
+  const always = rules || repeat
+  const alwaysHint = repeat ? REPEAT_ALWAYS : `Adds ${request.suggestions.join(', ')}`
 
   const answer = async (decision: PermissionDecision) => {
     if (sending.current) {
@@ -117,7 +122,7 @@ function PermissionCard({ request, onAnswered }: { request: PermissionRequest; o
                 variant="outline"
                 className={ACTION}
                 disabled={busy}
-                title={`Adds ${request.suggestions.join(', ')}`}
+                title={alwaysHint}
                 onClick={() => void answer('always')}
               >
                 <CheckCheck />
@@ -128,18 +133,19 @@ function PermissionCard({ request, onAnswered }: { request: PermissionRequest; o
               <X />
               Deny
             </Button>
-            {always && (
+            {rules && (
               <span className="flex items-center gap-1.5 text-muted-foreground">
                 <Switch id={scopeId} size="sm" checked={everyAgent} onCheckedChange={setEveryAgent} />
                 <label htmlFor={scopeId}>All agents</label>
               </span>
             )}
           </div>
-          {always && (
+          {rules && (
             <p className="text-2xs text-muted-foreground">
               Always adds <span className="font-mono break-all">{request.suggestions.join(', ')}</span>
             </p>
           )}
+          {repeat && <p className="text-2xs text-muted-foreground">{REPEAT_ALWAYS}.</p>}
         </div>
       </div>
     </section>

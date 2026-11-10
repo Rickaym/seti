@@ -166,6 +166,12 @@ const commandOf = (input: unknown): string | null =>
     ? input.command
     : null
 
+/** True when the guard refuses the call, which then never runs. */
+export function guardRefuses(tool: string, input: unknown, scope: GuardScope): boolean {
+  const command = tool === 'Bash' ? commandOf(input) : null
+  return command !== null && guardCommand(command, scope) !== null
+}
+
 /** Called with each command the guard refuses and why. */
 type Refused = (command: string, reason: string) => Promise<void>
 

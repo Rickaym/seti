@@ -6,6 +6,7 @@ export const AUTO_ARCHIVE_DEFAULTS = {
   days: 3,
   delete_after_days: null,
   resume_after_restart: true,
+  repeat_guard: true,
 } as const
 export const AUTO_ARCHIVE_DAYS_MAX = 365
 export const ARCHIVE_DELETE_DAYS_MAX = 3650
@@ -34,6 +35,7 @@ export const autoArchiveInput = z.object({
   /** Archived agents older than this are deleted with their files; null is off, unset keeps it. */
   delete_after_days: z.number().int().min(1, 'at least 1 day').max(ARCHIVE_DELETE_DAYS_MAX).nullable().optional(),
   resume_after_restart: z.boolean().optional(),
+  repeat_guard: z.boolean().optional(),
 })
 export type AutoArchiveInput = z.input<typeof autoArchiveInput>
 
@@ -50,6 +52,8 @@ export interface AutoArchiveSettings {
   delete_after_days: number | null
   /** Agents a restart cut off get one message at startup to go on, instead of waiting on the user. */
   resume_after_restart: boolean
+  /** An agent that repeats a call with the same result each time waits for the user to allow it. */
+  repeat_guard: boolean
   /** Null while the defaults apply. */
   updated_at: string | null
 }

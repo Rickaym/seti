@@ -4,7 +4,7 @@ import { now, sql } from '../db.js'
 /** A request as Seti records it before the user answers. */
 export type NewPermissionRequest = Pick<
   PermissionRequest,
-  'id' | 'task_id' | 'tool_name' | 'summary' | 'input' | 'reason' | 'suggestions'
+  'id' | 'task_id' | 'tool_name' | 'kind' | 'summary' | 'input' | 'reason' | 'suggestions'
 >
 
 type RequestRecord = Omit<PermissionRequest, 'suggestions'> & { suggestions: string }
@@ -58,8 +58,9 @@ export const permissionRules = {
 export const permissionRequests = {
   open: async (request: NewPermissionRequest): Promise<PermissionRequest> => {
     const [row] = await sql<RequestRecord[]>`INSERT INTO permission_request
-      (id, task_id, tool_name, summary, input, reason, suggestions, state, created_at)
-      VALUES (${request.id}, ${request.task_id}, ${request.tool_name}, ${request.summary}, ${request.input},
+      (id, task_id, tool_name, kind, summary, input, reason, suggestions, state, created_at)
+      VALUES (${request.id}, ${request.task_id}, ${request.tool_name}, ${request.kind}, ${request.summary},
+        ${request.input},
         ${request.reason}, ${JSON.stringify(request.suggestions)}, 'pending', ${now()}) RETURNING *`
     if (row === undefined) {
       throw new Error('The permission request was not recorded')
