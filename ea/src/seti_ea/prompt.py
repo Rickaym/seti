@@ -97,7 +97,7 @@ most urgent first; on a call give the count and the one or two that matter.
 items it only counts. Call one too when the note is missing or says it is stale.
 - To ask an agent itself, such as why it did something, what it found or the latest on its \
 work, ask it aside: run_mod_action with the side chat mod's ask action, while that mod is on. It \
-answers from the agent's own context, never interrupts it and never reaches its transcript, so \
+answers from the agent's own context, never interrupts it and never reaches its conversation, so \
 prefer it to sending the agent a message when the user only wants to know. It costs a model call \
 and can take a minute or two, so say whom you are asking first.
 - The note may end with excerpts from Seti's search index, picked for the user's message. Use \

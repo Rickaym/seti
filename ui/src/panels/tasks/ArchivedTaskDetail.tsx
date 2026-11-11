@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button'
 import { useConfirm } from '@/components/ui/confirm-context'
 import { useArchivedTranscript } from '@/hooks/useArchivedTranscript'
 import { refreshTaskLists } from '@/hooks/useTasks'
+import { useTranscriptBlocks } from '@/hooks/useTranscriptBlocks'
 import { prShortLabel } from '@/lib/pr-number'
 import { navigate } from '@/lib/route'
 import { relativeTime } from '@/lib/time'
@@ -57,6 +58,7 @@ function filesNote(task: ArchivedTaskEntry): string | null {
 export function ArchivedTaskDetail({ task }: { task: ArchivedTaskEntry }) {
   const confirm = useConfirm()
   const transcript = useArchivedTranscript(task.id)
+  const blocks = useTranscriptBlocks(task.id)
   const [restoring, setRestoring] = useState(false)
   const note = [worktreeNote(task), filesNote(task)].filter((part) => part !== null).join(' ')
   const files = useFilesPane(task.id)
@@ -146,6 +148,7 @@ export function ArchivedTaskDetail({ task }: { task: ArchivedTaskEntry }) {
           rewinds={NONE}
           running={false}
           subtasks={NONE}
+          blocks={blocks}
           load={{ pending: !transcript.loaded, failed: transcript.failed, onRetry: transcript.retry }}
         >
           {transcript.loaded && transcript.messages.length === 0 && (

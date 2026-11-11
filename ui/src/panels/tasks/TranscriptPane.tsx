@@ -16,6 +16,7 @@ import { useLoadingPlaceholder } from '@/hooks/useLoadingPlaceholder'
 import type { OwnDirection } from '@/lib/own-messages'
 import { usePanelScroll } from '@/lib/panels'
 import { countNewer } from '@/lib/transcript'
+import type { TimedBlock } from '@/lib/transcript-blocks'
 import { cn } from '@/lib/utils'
 import { OwnMessageNav } from '@/panels/tasks/OwnMessageNav'
 import { Transcript } from '@/panels/tasks/Transcript'
@@ -207,6 +208,7 @@ export function TranscriptPane({
   find = null,
   empty,
   unsent,
+  blocks,
   children,
 }: {
   taskId: string
@@ -228,11 +230,14 @@ export function TranscriptPane({
   empty?: string
   /** Shown after the rows, as the rows they will become. */
   unsent?: PendingRows
+  /** Blocks mods draw among the rows by time, such as asides. */
+  blocks?: readonly TimedBlock[]
   children?: ReactNode
 }) {
   const { messages, hasOlder, loadingOlder, loadOlder } = stream
   const stretch = stream.stretch ?? ATTACHED
   const { detached, latestRequest } = stretch
+  const edges = useMemo(() => ({ hasOlder, hasNewer: stretch.hasNewer }), [hasOlder, stretch.hasNewer])
   const placeholder = usePlaceholder(load)
   // Before the skeleton's delay passes the pane stays blank, so nothing shows and then vanishes.
   const covered = placeholder !== null || load?.pending === true
@@ -423,6 +428,8 @@ export function TranscriptPane({
                   subtasks={subtasks}
                   subagentRows={subagentRows}
                   {...(marks === undefined ? {} : { marks })}
+                  blocks={blocks}
+                  edges={edges}
                 />
               </FindFocusContext>
               {stretch.hasNewer ? (

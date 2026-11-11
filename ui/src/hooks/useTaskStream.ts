@@ -18,6 +18,7 @@ import { noteMcpReport } from '@/lib/mcp-reports'
 import type { OwnDirection } from '@/lib/own-messages'
 import { mergeBriefs } from '@/lib/subtasks'
 import { mergeRows, replaceRow } from '@/lib/transcript'
+import { refreshTranscriptBlocks } from '@/lib/transcript-blocks'
 import { cachedTranscript, cacheTranscript, withBacklog, type LoadedRows as Loaded } from '@/lib/transcript-cache'
 import type { TranscriptWindow } from '@/panels/tasks/TranscriptPane'
 
@@ -164,6 +165,9 @@ export function useTaskStream(taskId: string): TaskStream {
             // Only a status the stream reported can be stale; otherwise the task list's stands.
             setStatus((prev) => (prev === null ? prev : now))
             setFresh(true)
+          },
+          blocks: (event) => {
+            refreshTranscriptBlocks(taskId, (JSON.parse(event.data) as { mod: string }).mod)
           },
           subtasks: (event) => {
             const next = JSON.parse(event.data) as SubtaskBrief[]

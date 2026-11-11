@@ -32,8 +32,8 @@ const capabilityError = (input: unknown) => {
 }
 
 describe('the mod API version', () => {
-  it('is 1.20.0, which bundled ^1.0 manifests still match', () => {
-    expect(MOD_API_VERSION).toBe('1.20.0')
+  it('is 1.21.0, which bundled ^1.0 manifests still match', () => {
+    expect(MOD_API_VERSION).toBe('1.21.0')
     expect(manifestProblem(modManifest.parse({ ...base, seti: '^1.0' }), 'bundled')).toBeNull()
   })
 })
@@ -71,6 +71,11 @@ describe('third-party manifest rules', () => {
     ['prDecorators', { contributes: { prDecorators: [{ id: 'pr', title: 'PR' }] } }, 'Only mods bundled with Seti'],
     ['statusMarkers', { contributes: { statusMarkers: [{ id: 'm', title: 'M' }] } }, 'Only mods bundled with Seti'],
     ['agentAccents', { contributes: { agentAccents: [{ id: 'a', title: 'A' }] } }, 'Only mods bundled with Seti'],
+    [
+      'transcriptBlocks',
+      { contributes: { transcriptBlocks: [{ id: 'b', title: 'B' }] } },
+      'Only mods bundled with Seti',
+    ],
     ['defaultEnabled', { defaultEnabled: true }, 'A third-party mod starts off until you turn it on'],
     ['required', { required: true }, 'Only mods bundled with Seti may be required'],
     ['onStartup', { activation: ['onStartup'] }, 'A third-party mod runs only when an event names it'],
@@ -167,6 +172,7 @@ describe('third-party manifest rules', () => {
         'shortcuts',
         'statusMarkers',
         'styles',
+        'transcriptBlocks',
       ].sort(byName),
     )
   })

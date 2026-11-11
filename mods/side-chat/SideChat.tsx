@@ -1,7 +1,18 @@
-import { SIDE_CHAT_TURNS, SIDE_QUESTION_MAX, type ModDockProps, type UiModApi } from '@seti/mod-api'
-import { AlertCircle, ArrowUp, Check, FileText, Forward, LoaderCircle } from 'lucide-react'
-import { useEffect, useRef, useState, useSyncExternalStore, type ComponentType, type KeyboardEvent } from 'react'
-import type { SideChats, SideExchange } from './chat-store'
+import { SIDE_QUESTION_MAX, type Aside, type ModDockProps, type UiModApi } from '@seti/mod-api'
+import { AlertCircle, ArrowUp, Check, FileText, Forward, LoaderCircle, MessageSquarePlus } from 'lucide-react'
+import {
+  Fragment,
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type ComponentType,
+  type KeyboardEvent,
+  type ReactNode,
+} from 'react'
+import { asideActions } from './aside-actions'
+import { askerLabel } from './asker'
+import type { AgentAsides, SideChats } from './chat-store'
 
 /** How the reply box and the dock name the side chat's command. */
 const ASK_COMMAND = '/btw'
@@ -16,23 +27,38 @@ const sideChatForward = (asked: string, answer: string): string =>
 interface AskFieldProps {
   /** An answer is streaming, so a question stays in the field with the reason. */
   busy: boolean
-  disabled: boolean
   /** Changes each time the field should take focus. */
   focus: number
   onAsk: (question: string) => void
 }
 
-/** The side chat's dock: questions to an agent's context, answered here and discarded on close. */
+interface ExchangeProps {
+  question: string
+  answer: string
+  reads: readonly string[]
+  /** Who asked, when it was not the user. */
+  label: string | null
+  answering: boolean
+  error: string | null
+  actions?: ReactNode
+}
+
+/** Asides of different chats, with a divider where a new chat starts. */
+const startsChat = (asides: readonly Aside[], index: number) =>
+  index > 0 && asides[index - 1]?.chat_id !== asides[index]?.chat_id
+
+/** The side chat's dock: questions to an agent's context, answered here and kept as asides. */
 export function sideChatView(api: UiModApi, chats: SideChats): ComponentType<ModDockProps> {
-  const { AgentText, Button, Hint, Line, Textarea } = api.kit
+  const { AgentText, Button, Hint, Line, Textarea, ToggleButton } = api.kit
+  const { DeleteButton, ClearButton } = asideActions(api, chats)
 
   /** Sends a side chat's question and answer to the agent as a normal message, once. */
-  function ForwardButton({ agent, exchange }: { agent: string; exchange: SideExchange }) {
+  function ForwardButton({ agent, aside }: { agent: string; aside: Aside }) {
     const [sent, setSent] = useState(false)
     const forward = async () => {
       setSent(true)
       try {
-        await api.agents.send(agent, sideChatForward(exchange.question, exchange.answer))
+        await api.agents.send(agent, sideChatForward(aside.question, aside.answer))
         api.kit.succeed('Sent to the agent')
       } catch (e) {
         setSent(false)
@@ -49,48 +75,44 @@ export function sideChatView(api: UiModApi, chats: SideChats): ComponentType<Mod
     )
   }
 
-  function Exchange({ agent, exchange }: { agent: string; exchange: SideExchange }) {
+  function Exchange({ question, answer, reads, label, answering, error, actions }: ExchangeProps) {
     return (
       <div className="space-y-2" data-testid="side-chat-exchange">
+        {label !== null && <p className="ml-6 text-2xs text-muted-foreground">{label}</p>}
         <div className="ml-6 border border-primary/30 bg-primary/10 px-3 py-2 text-sm whitespace-pre-wrap">
-          {exchange.question}
+          {question}
         </div>
-        {exchange.reads.map((read, i) => (
+        {reads.map((read, i) => (
           <Line key={`${String(i)}-${read}`} icon={FileText}>
             {read}
           </Line>
         ))}
-        {exchange.answer !== '' && <AgentText text={exchange.answer} />}
-        {exchange.state === 'answering' && exchange.answer === '' && (
+        {answer !== '' && <AgentText text={answer} />}
+        {answering && answer === '' && (
           <Line icon={LoaderCircle}>
             <span className="animate-pulse">Thinking</span>
           </Line>
         )}
-        {exchange.error !== null && (
+        {error !== null && (
           <Line icon={AlertCircle} error>
-            {exchange.error}
+            {error}
           </Line>
         )}
-        {exchange.state === 'done' && <ForwardButton agent={agent} exchange={exchange} />}
+        {actions !== undefined && <div className="flex items-center gap-1">{actions}</div>}
       </div>
     )
   }
 
   /** The question field: Enter asks, Shift+Enter or Ctrl+Enter adds a line. */
-  function AskField({ busy, disabled, focus, onAsk }: AskFieldProps) {
+  function AskField({ busy, focus, onAsk }: AskFieldProps) {
     const [text, setText] = useState('')
     const field = useRef<HTMLTextAreaElement>(null)
     useEffect(() => {
-      const el = field.current
-      if (el?.disabled === true) {
-        el.closest<HTMLElement>('[role="dialog"]')?.focus()
-      } else {
-        el?.focus()
-      }
+      field.current?.focus()
     }, [focus])
     const submit = () => {
       const question = text.trim()
-      if (question !== '' && !busy && !disabled) {
+      if (question !== '' && !busy) {
         onAsk(question)
         setText('')
       }
@@ -133,7 +155,7 @@ export function sideChatView(api: UiModApi, chats: SideChats): ComponentType<Mod
             type="submit"
             size="icon-sm"
             aria-label="Ask"
-            disabled={busy || disabled || text.trim() === ''}
+            disabled={busy || text.trim() === ''}
             className="pointer-coarse:size-11"
           >
             <ArrowUp />
@@ -143,38 +165,88 @@ export function sideChatView(api: UiModApi, chats: SideChats): ComponentType<Mod
     )
   }
 
+  /** New chat and Clear, above the asides once there are any. */
+  function Toolbar({ agent, chat }: { agent: ModDockProps['agent']; chat: AgentAsides }) {
+    return (
+      <div className="flex items-center justify-end gap-1 border-b border-border px-2 py-1">
+        <ToggleButton
+          pressed={chat.startNew}
+          onPressedChange={(pressed) => {
+            chats.setStartNew(agent.id, pressed)
+          }}
+          icon={<MessageSquarePlus />}
+          label="New chat"
+          hint="The next question starts a new side chat instead of following up the last one"
+        />
+        <ClearButton agent={agent.id} title={agent.title} count={chat.asides.length} />
+      </div>
+    )
+  }
+
+  function History({ agent, chat }: { agent: string; chat: AgentAsides }) {
+    return chat.asides.map((aside, index) => (
+      <Fragment key={aside.id}>
+        {startsChat(chat.asides, index) && (
+          <p className="text-center text-2xs tracking-wider text-muted-foreground uppercase">New chat</p>
+        )}
+        <Exchange
+          question={aside.question}
+          answer={aside.answer}
+          reads={chat.reads.get(aside.id) ?? []}
+          label={askerLabel(aside)}
+          answering={false}
+          error={null}
+          actions={
+            <>
+              <ForwardButton agent={agent} aside={aside} />
+              <DeleteButton agent={agent} id={aside.id} />
+            </>
+          }
+        />
+      </Fragment>
+    ))
+  }
+
   return function SideChat({ agent, focus }: ModDockProps) {
     const chat = useSyncExternalStore(chats.subscribe, () => chats.view(agent.id))
     const scroller = useRef<HTMLDivElement>(null)
+    useEffect(() => chats.watch(agent.id), [agent.id])
     useEffect(() => {
       const el = scroller.current
       if (el !== null) {
         el.scrollTop = el.scrollHeight
       }
-    }, [chat.exchanges])
-    const used = chat.turnsLeft === 0 && !chat.answering
+    }, [chat.asides, chat.pending])
+    const { pending } = chat
+    const empty = chat.asides.length === 0 && pending === null
     return (
       <>
+        {chat.asides.length > 0 && <Toolbar agent={agent} chat={chat} />}
         <div ref={scroller} className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-3 py-3">
-          {chat.exchanges.length === 0 && (
+          {empty && (
             <p className="text-sm text-muted-foreground">
               Ask {agent.title} about its work. It answers from what it has seen, without stopping, and never sees this
-              chat unless you send it an answer. Typing <code>{ASK_COMMAND}</code> and a question in the reply box asks
-              here too.
+              chat unless you send it an answer. Each answer stays in its transcript as an aside. Typing{' '}
+              <code>{ASK_COMMAND}</code> and a question in the reply box asks here too.
             </p>
           )}
-          {chat.exchanges.map((exchange) => (
-            <Exchange key={exchange.id} agent={agent.id} exchange={exchange} />
-          ))}
-          {used && (
-            <p className="text-xs text-muted-foreground">
-              This side chat took its {SIDE_CHAT_TURNS} questions. Close it to start a new one.
-            </p>
+          <History agent={agent.id} chat={chat} />
+          {chat.startNew && chat.asides.length > 0 && (
+            <p className="text-center text-2xs tracking-wider text-muted-foreground uppercase">New chat</p>
+          )}
+          {pending !== null && (
+            <Exchange
+              question={pending.question}
+              answer={pending.answer}
+              reads={pending.reads}
+              label={null}
+              answering={pending.state === 'answering'}
+              error={pending.error}
+            />
           )}
         </div>
         <AskField
           busy={chat.answering}
-          disabled={used}
           focus={focus}
           onAsk={(question) => {
             chats.ask(agent.id, question)

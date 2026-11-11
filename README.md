@@ -54,7 +54,8 @@ and review threads, so a red check or a new comment becomes their next turn, not
 - **[Channels](docs/pollers.md).** Webhooks, reminders and pollers turn any service into events
   that wake an agent or the EA.
 - **One group chat.** You, the EA and every agent, where an @mention reaches an agent mid-turn.
-- **Ask aside.** `/btw` asks an agent a question from its context without interrupting its turn.
+- **Ask aside.** `/btw` asks an agent a question from its context without interrupting its turn,
+  and the answer stays in its transcript as an aside.
 - **Questions in one place.** Agents ask you yes/no and multiple-choice questions that wait on one
   Questions page, where one Submit all answers every agent at once.
 - **Shared knowledge.** Agents propose lessons for each other, and only the notes you approve reach

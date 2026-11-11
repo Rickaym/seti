@@ -94,7 +94,9 @@ describe('the mod host', () => {
     expect(setiCommandRefusal('/btw why?')).toBe('/btw is a command of the Side chat mod and never goes to the agent')
     expect(modRouteEntries.list().map((route) => [route.method, route.path, route.stream])).toEqual([
       ['POST', '/tasks/:task', true],
-      ['DELETE', '/tasks/:task/chats/:chat', false],
+      ['GET', '/tasks/:task/asides', false],
+      ['DELETE', '/tasks/:task/asides/:aside', false],
+      ['DELETE', '/tasks/:task/asides', false],
     ])
     await host.setEnabled('side-chat', false)
     expect(snapshot()).toEqual(before)

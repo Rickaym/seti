@@ -1,9 +1,9 @@
 {
   "id": "side-chat",
   "name": "Side chat",
-  "version": "1.0.0",
-  "seti": "^1.15",
-  "description": "Ask an agent about its work with /btw, without interrupting it or reaching its transcript.",
+  "version": "1.1.0",
+  "seti": "^1.21",
+  "description": "Ask an agent about its work with /btw, without interrupting it; each answer stays in its transcript as an aside.",
   "author": "Seti",
   "icon": "message-circle-question-mark",
   "categories": ["agents"],
@@ -19,7 +19,7 @@
         "id": "ask",
         "title": "Ask aside",
         "icon": "message-circle-question-mark",
-        "description": "Asks an agent's context, as a side chat: the answer comes from everything it saw, never interrupts it and never reaches its transcript. Use it for why an agent did something or what it found. It can take a few minutes and costs a model call charged to that agent.",
+        "description": "Asks an agent's context, as a side chat: the answer comes from everything it saw and never interrupts it or reaches its conversation; Seti keeps it as an aside in the agent's transcript view. Use it for why an agent did something or what it found. It can take minutes and costs a model call.",
         "args": {
           "task": {
             "type": "string",
@@ -34,6 +34,39 @@
         "for": ["palette", "agentMenu", "agents", "ea"],
         "changes": false,
         "timeoutSeconds": 330
+      },
+      {
+        "id": "asides",
+        "title": "List asides",
+        "icon": "message-circle-question-mark",
+        "description": "Lists the newest side questions asked of an agent and their answers, with who asked each and its id.",
+        "args": {
+          "task": {
+            "type": "string",
+            "description": "The agent whose asides to list."
+          }
+        },
+        "for": ["ea"],
+        "changes": false
+      },
+      {
+        "id": "clear",
+        "title": "Clear asides",
+        "icon": "trash-2",
+        "description": "Deletes one aside of an agent by its id, or every aside of the agent without one. Deleted asides are gone for good.",
+        "args": {
+          "task": {
+            "type": "string",
+            "description": "The agent whose asides to delete."
+          },
+          "aside": {
+            "type": "string",
+            "description": "The id of one aside to delete; leave it out to delete them all.",
+            "optional": true
+          }
+        },
+        "for": ["ea"],
+        "changes": true
       }
     ],
     "slashCommands": [
@@ -61,8 +94,23 @@
         "stream": true
       },
       {
+        "method": "GET",
+        "path": "/tasks/:task/asides",
+        "demo": true
+      },
+      {
         "method": "DELETE",
-        "path": "/tasks/:task/chats/:chat"
+        "path": "/tasks/:task/asides"
+      },
+      {
+        "method": "DELETE",
+        "path": "/tasks/:task/asides/:aside"
+      }
+    ],
+    "transcriptBlocks": [
+      {
+        "id": "asides",
+        "title": "Asides"
       }
     ]
   }

@@ -438,6 +438,8 @@ export type TaskEvent =
   | { type: 'permission'; request: PermissionRequest; blocked: string | null }
   /** Why the agent waits on the user changed; null once nothing holds it up. */
   | { type: 'blocked'; blocked: string | null }
+  /** Blocks a mod draws in the task's transcript changed, such as a new aside. */
+  | { type: 'blocks'; mod: string }
 
 /** Shown in place of a status a newer server sends that this UI does not know. */
 const UNKNOWN_STATUS: TaskStatus = 'idle'

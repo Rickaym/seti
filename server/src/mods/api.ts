@@ -16,6 +16,7 @@ import { requireOp } from './capabilities.js'
 import { runModOp } from './ops/table.js'
 import { modCommands, modRouteEntries } from './points.js'
 import { hostProxyApi, prsApi } from './pr-api.js'
+import { transcriptApi } from './transcript.js'
 import { versionApi } from './version.js'
 import { workspacesApi } from './workspace-layouts.js'
 import { cache } from '../redis.js'
@@ -132,6 +133,7 @@ export function serverApi(target: ApiTarget): ServerModApi {
     streamRoute: (method, path, handle) =>
       target.track(modRouteEntries.register({ ...declaredRoute(manifest, method, path, true), stream: true, handle })),
     aside: asideApi(run, target.grants.includes('tasks.ask'), target.track),
+    transcript: transcriptApi(manifest, target.track),
     registerCommand: (id, handler) => {
       const command = manifest.contributes.commands.find((entry) => entry.id === id)
       if (command === undefined) {

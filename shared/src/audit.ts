@@ -49,6 +49,8 @@ export const AUDIT_KINDS = [
   'task.terminal_closed',
   'task.rewound',
   'task.side_chat',
+  'task.aside_deleted',
+  'task.asides_cleared',
   'task.input_mode_changed',
   'task.access_changed',
   'task.pinned_changed',

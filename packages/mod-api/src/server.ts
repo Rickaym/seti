@@ -1,4 +1,5 @@
 import type {
+  Aside,
   AuditDetail,
   ChannelState,
   Changelog,
@@ -190,9 +191,10 @@ export interface ModAsideAnswer {
 
 /**
  * Side questions to an agent, answered by Seti from a fork of the agent's session that never
- * interrupts it or reaches its transcript. Each runs as whoever asked the mod: the caller of its
- * route or command. Needs tasks.ask, which only bundled mods get; Seti closes every open chat
- * when the mod is turned off.
+ * interrupts it or reaches its conversation. Seti stores each answered question as an aside of
+ * the agent, redacted, until the agent is deleted. Each call runs as whoever asked the mod: the
+ * caller of its route or command. Needs tasks.ask, which only bundled mods get; Seti stops every
+ * answer being written when the mod is turned off.
  */
 export interface ModAsideApi {
   /**
@@ -205,10 +207,23 @@ export interface ModAsideApi {
     emit: (event: SideChatEvent) => Promise<void>,
     signal: AbortSignal,
   ) => Promise<void>
-  /** Asks one question and answers it whole; the chat closes after it. */
+  /** Asks one question in a chat of its own and answers it whole. */
   answer: (task: string, question: string) => Promise<ModAsideAnswer>
-  /** Closes one side chat and stops any answer it is writing. */
-  close: (task: string, chat: string) => Promise<void>
+  /** The agent's newest asides, oldest first, whoever asked them. */
+  list: (task: string) => Promise<Aside[]>
+  /** Deletes one aside of the agent; audited, without its question or answer. */
+  remove: (task: string, aside: string) => Promise<void>
+  /** Deletes every aside of the agent and says how many went; audited. */
+  clear: (task: string) => Promise<number>
+}
+
+/** Blocks a mod draws in agents' transcripts, for a mod whose manifest declares transcriptBlocks. */
+export interface ModTranscriptApi {
+  /**
+   * Tells the mod's UI half that its blocks in the agent's transcript changed, over the stream
+   * the transcript already reads; the UI half's source then refreshes from the mod's routes.
+   */
+  refresh: (task: string) => Promise<void>
 }
 
 /**
@@ -258,6 +273,8 @@ export interface ServerModApi {
   ) => Disposer
   /** Side questions to agents; needs the tasks.ask capability. */
   readonly aside: ModAsideApi
+  /** Its blocks in agents' transcripts; needs a transcriptBlocks entry. */
+  readonly transcript: ModTranscriptApi
   /** Runs a command its manifest declares, from the palette, the EA or an agent's seti tool. */
   registerCommand: (id: string, handler: ModCommandHandler) => Disposer
   /** Seti's open PRs and the fields a PR decorator the manifest declares fills in. */

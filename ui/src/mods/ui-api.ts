@@ -34,6 +34,7 @@ import { prChips } from '@/lib/pr-chips'
 import { sectionRegistry } from '@/lib/sections'
 import { readEvents } from '@/lib/sse'
 import { agentAccents, statusMarkers } from '@/lib/status-markers'
+import { transcriptBlockSources } from '@/lib/transcript-blocks'
 import { fileViewers, lazyView } from '@/panels/files/file-viewers'
 import { modSettingsKey } from '@/panels/settings/mods/mod-settings-key'
 import { settingsPages } from '@/panels/settings/pages'
@@ -185,6 +186,10 @@ export function uiApi(manifest: ModManifest, { track, ownPage, switches }: UiApi
     registerAgentAccent: ({ id: accent, view }) => {
       const { title } = declared(contributes.agentAccents, accent, manifest)
       return track(agentAccents.register({ key: modScoped(id, accent), name: title, view }))
+    },
+    registerTranscriptBlocks: (source) => {
+      const { title } = declared(contributes.transcriptBlocks, source.id, manifest)
+      return track(transcriptBlockSources.register({ key: modScoped(id, source.id), mod: id, name: title, source }))
     },
     registerCommand: ({ id: command, icon, run, when, title, waits, status }) => {
       declared(contributes.commands, command, manifest)

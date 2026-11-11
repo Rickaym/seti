@@ -2,6 +2,7 @@ import type { Db } from '../pg.js'
 import { ACCESS_DEFAULTS, CREDENTIAL_PROFILES, MCP_SELECTION } from './schema-access.js'
 import { AGENT_GUIDE, SETI_GUIDE_PACK } from './schema-agent-guide.js'
 import { ARCHIVE_FILES, REPEAT_GUARD, RESTART_RESUME, TASK_ARCHIVE } from './schema-archive.js'
+import { TASK_ASIDE } from './schema-asides.js'
 import { SETI_AUTH } from './schema-auth.js'
 import { CHANGE_REQUESTS } from './schema-change-requests.js'
 import { CHANGELOG } from './schema-changelog.js'
@@ -173,4 +174,5 @@ export const MIGRATIONS: readonly Migration[] = [
   { version: 98, name: 'knowledge', sql: KNOWLEDGE },
   { version: 99, name: 'questions', sql: QUESTIONS },
   { version: 100, name: 'question_secrets', sql: QUESTION_SECRETS },
+  { version: 101, name: 'task_aside', sql: TASK_ASIDE },
 ]
