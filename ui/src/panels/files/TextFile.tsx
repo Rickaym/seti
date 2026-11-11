@@ -186,11 +186,13 @@ export function TextFile(props: TextFileProps) {
   if (base === null) {
     return <p className="p-4 text-sm text-muted-foreground">Loading...</p>
   }
+  const current = draft ?? base.text
   return (
     <div ref={rootRef} className="flex min-h-0 flex-1 flex-col">
       {actions !== null &&
         createPortal(
           <EditActions
+            text={current}
             writable={writable}
             editing={editing}
             dirty={dirty}
@@ -207,11 +209,11 @@ export function TextFile(props: TextFileProps) {
           stamp={conflict}
           onReload={() => void reload(draft !== null)}
           onOverwrite={() => {
-            void save(draft ?? base.text, conflict.exists ? conflict.hash : null)
+            void save(current, conflict.exists ? conflict.hash : null)
           }}
         />
       )}
-      {readable && <FileFindBar find={find} editable={editing} text={draft ?? base.text} />}
+      {readable && <FileFindBar find={find} editable={editing} text={current} />}
       <TextBody
         path={target.path}
         text={base.text}

@@ -171,3 +171,25 @@ test('a hardware keyboard on a phone sends Ctrl, Alt and arrow keys', async ({ p
   await expect(screenOf(terminal)).toContainText('hard-6')
   await expect(screenOf(terminal)).not.toContainText('late-4')
 })
+
+test('a long line in the input bar scrolls sideways under a finger, so earlier text can be fixed', async ({ page }) => {
+  const { input } = await openTerminal(page)
+  await input.fill(`echo ${'abcdefghij'.repeat(12)}`)
+  const box = await input.boundingBox()
+  const widths = await input.evaluate((el) => ({ scroll: el.scrollWidth, client: el.clientWidth }))
+  expect(widths.scroll).toBeGreaterThan(widths.client)
+  await input.evaluate((el) => {
+    el.scrollTo({ left: el.scrollWidth })
+  })
+  const before = await input.evaluate((el) => el.scrollLeft)
+  expect(before).toBeGreaterThan(0)
+  const cdp = await page.context().newCDPSession(page)
+  const y = (box?.y ?? 0) + (box?.height ?? 0) / 2
+  const from = (box?.x ?? 0) + 20
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: from, y }] })
+  for (let step = 1; step <= 8; step++) {
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: from + step * 25, y }] })
+  }
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
+  await expect.poll(async () => input.evaluate((el) => el.scrollLeft)).toBeLessThan(before)
+})

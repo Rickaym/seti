@@ -165,14 +165,9 @@ export function AccessSummary({ taskId, onOpen }: { taskId: string; onOpen: () =
         </ul>
       )}
       <Hint text="Edit access">
-        <Button
-          size="icon-xs"
-          variant="ghost"
-          aria-label="Edit access"
-          className="-my-0.5 shrink-0 text-muted-foreground"
-          onClick={onOpen}
-        >
+        <Button size="sm" variant="outline" aria-label="Edit access" className="shrink-0" onClick={onOpen}>
           <Pencil />
+          Edit
         </Button>
       </Hint>
     </div>

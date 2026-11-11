@@ -83,7 +83,7 @@ test('on a phone the agent access has no Gets rows and its credentials link open
   await page.goto(`/#agents/${id}`)
   const details = await openAgentSettings(page, 'Access')
   const access = details.getByRole('tabpanel', { name: 'Access' })
-  await expect(access.locator('dt')).toHaveText(['Credentials', 'Can reach', 'Isolation', 'Bypass', 'Rules'])
+  await expect(access.locator('dt')).toHaveText(['Credentials', 'Services', 'Isolation', 'Bypass', 'Rules'])
   await expect(access.getByRole('list', { name: 'What this agent gets' })).toHaveCount(0)
   await expectFitsPhone(page, 'agent access')
 

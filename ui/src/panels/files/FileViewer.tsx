@@ -2,7 +2,6 @@ import { FILE_TEXT_MAX, isTextKind, kindByName, type FileMeta } from '@seti/shar
 import { ArrowLeft, Download } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import { apiGet, errorText } from '@/api'
-import { CopyIconButton } from '@/components/CopyButton'
 import { Hint } from '@/components/Hint'
 import { Button } from '@/components/ui/button'
 import { relativeTime } from '@/lib/time'
@@ -13,7 +12,7 @@ import { ShareButton } from '@/panels/files/ShareDialog'
 import { TextFile } from '@/panels/files/TextFile'
 import { Preview } from '@/panels/files/file-previews'
 import { useFileViewer } from '@/panels/files/file-viewers'
-import { filesLinkUrl, filesPath, nameOf, rawUrl, type FileTarget } from '@/panels/files/files-api'
+import { filesPath, nameOf, rawUrl, type FileTarget } from '@/panels/files/files-api'
 import { useFileWatch } from '@/panels/files/useFileWatch'
 import { ViewerActions } from '@/panels/files/viewer-actions'
 import { bytesLabel } from '@/panels/resources/format'
@@ -47,7 +46,6 @@ function ViewerHeader({
   meta,
   creating,
   download,
-  link,
   actionsRef,
   onBack,
 }: {
@@ -56,8 +54,6 @@ function ViewerHeader({
   meta: FileMeta | null
   creating: boolean
   download: string
-  /** The file's Files deep link, which Copy link copies. */
-  link: string
   /** Receives the spot where the open file puts its own actions, such as Edit and Save. */
   actionsRef: (element: HTMLElement | null) => void
   onBack: () => void
@@ -76,7 +72,6 @@ function ViewerHeader({
         </div>
         <div className="truncate text-2xs text-muted-foreground">{detail ?? (creating ? 'New file' : '')}</div>
       </div>
-      {meta !== null && <CopyIconButton text={link} label="Copy link" variant="outline" />}
       <div ref={actionsRef} className="flex shrink-0 items-center gap-1.5 empty:hidden" />
       {meta !== null && (
         <Hint text={`Download ${meta.name}`}>
@@ -199,7 +194,6 @@ export function FileViewer({ taskId, file, writable, dotfiles, onBack, onCreated
         meta={meta}
         creating={creating}
         download={raw(true)}
-        link={filesLinkUrl(taskId, { root: target.root, path: target.path, type: 'file' })}
         actionsRef={setActions}
         onBack={onBack}
       />

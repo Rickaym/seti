@@ -71,7 +71,7 @@ function TerminalLine({ ref, term, send, modifiers, primary }: TerminalLineProps
         autoComplete="off"
         enterKeyHint="enter"
         data-primary-input={primary}
-        className="field-sizing-fixed block h-11 min-h-0 resize-none overflow-hidden py-2.5 font-mono text-base leading-5.5 md:text-base"
+        className="field-sizing-fixed block h-11 min-h-0 resize-none overflow-x-auto overflow-y-hidden py-2.5 [scrollbar-width:none] font-mono text-base leading-5.5 md:text-base"
       />
     </div>
   )
