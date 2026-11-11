@@ -109,7 +109,9 @@ async def test_a_secret_question_is_listed_but_only_the_user_answers_it(
     )
     refused = await tools.call("answer_question", {"question": "7d7d7d7d", "words": "anything"})
     assert not refused.ok
-    assert refused.text.startswith("AZURE_SPEECH_KEY is a secret the agent asked for; only the user enters it")
+    assert refused.text.startswith(
+        "AZURE_SPEECH_KEY is a secret the agent asked for; only the user enters it"
+    )
     assert fake_seti.posts() == []
     dismissed = await tools.call("answer_question", {"question": "7d7d7d7d", "dismiss": True})
     assert dismissed.ok

@@ -62,7 +62,8 @@ def _question_line(question: Mapping[str, Any]) -> str:
     short = str(question.get("id", ""))[:ID_CHARS]
     prompt = clip(str(question.get("prompt", "")), PROMPT_CHARS)
     if question.get("kind") == "secret":
-        return f"- [{short}] secret {question.get('header')} (the user enters it in Seti, never through you): {prompt}"
+        header = question.get("header")
+        return f"- [{short}] secret {header} (the user enters it in Seti, never through you): {prompt}"
     return f"- [{short}] {question.get('header')} ({answer_type(question)}, or own words): {prompt}"
 
 
