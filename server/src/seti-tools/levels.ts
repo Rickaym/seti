@@ -2,13 +2,13 @@ import type { SetiControlLevel } from '@seti/shared'
 import { SETI_TOOLS } from './catalog.js'
 import { KNOWLEDGE_TOOLS } from './knowledge.js'
 import { modActionTools } from './mod-actions.js'
-import { REQUEST_TOOLS } from './requests.js'
+import { REQUEST_TOOLS, SECRET_TOOLS } from './requests.js'
 import { SELF_TOOLS } from './self.js'
 import { HANDOFF_TOOLS } from './team.js'
 import type { SetiTool } from './tool.js'
 
-/** Tools every agent gets at any level: its own status line and file handoffs. */
-export const EVERY_AGENT: readonly SetiTool[] = [...SELF_TOOLS, ...HANDOFF_TOOLS]
+/** Tools every agent gets at any level: its own status line, file handoffs and secret questions. */
+export const EVERY_AGENT: readonly SetiTool[] = [...SELF_TOOLS, ...HANDOFF_TOOLS, ...SECRET_TOOLS]
 
 /** Tools that act on one agent, by the argument that names it; at Self that agent is the caller. */
 export const ON_ONE_AGENT: Readonly<Record<string, string>> = {

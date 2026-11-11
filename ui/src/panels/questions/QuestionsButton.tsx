@@ -4,9 +4,7 @@ import { Hint } from '@/components/Hint'
 import { Button } from '@/components/ui/button'
 import { useAgentQuestionCount, useOpenQuestions } from '@/hooks/useQuestions'
 import { navigate } from '@/lib/route'
-
-/** The id in `#agents/questions` that opens the Questions page; agent ids are UUIDs. */
-export const QUESTIONS_ROUTE = 'questions'
+import { QUESTIONS_ROUTE } from '@/panels/questions/route'
 
 const openQuestions = () => {
   navigate('agents', QUESTIONS_ROUTE)

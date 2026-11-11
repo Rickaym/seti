@@ -13,6 +13,11 @@ export const MEMBERS = 'members.md'
 export const TASK = 'task.md'
 export const PACKS = 'packs'
 export const CONTEXT = 'context'
+/** The workspace folder holding secrets the user gave an unsandboxed agent, one file each. */
+export const SECRETS = 'secrets'
+
+/** The folder of an unsandboxed agent's secrets, which Seti never serves, shares or archives. */
+export const secretsDir = (taskId: string) => path.join(workspaceDir(taskId), SECRETS)
 
 /** What Seti writes at the top of each workspace from its data; the rest is the agent's. */
 export const SETI_FILES: readonly string[] = [CHAT, MEMBERS, TASK, PACKS, CONTEXT]

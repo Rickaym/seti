@@ -12,13 +12,14 @@ import { repos, sql, tasks } from './db.js'
 import { createWorktree } from './git.js'
 import { busyReason, removalRefusal, scratchDirOf } from './owned-dirs.js'
 import { sweepArchiveLifecycle } from './retention.js'
+import { writeSecretFile } from './secret-delivery.js'
 import { taskArchives } from './store/archive.js'
 import { auditEvents } from './store/audit.js'
 import { taskLocation } from './store/task-location.js'
 import { deleteTask } from './task-actions.js'
 import { createScratchDir } from './task-location.js'
 import { USER_AUTH } from './test-auth.js'
-import { workspaceDir } from './workspace/dir.js'
+import { secretsDir, workspaceDir } from './workspace/dir.js'
 
 const app = createApp()
 const HEADERS = { host: 'localhost', ...USER_AUTH, 'content-type': 'application/json' }
@@ -161,8 +162,10 @@ describe('folders Seti may remove', () => {
 })
 
 describe('archive bundle', () => {
-  it('packs the scratch folder and workspace without dependencies or builds, and restores them', async () => {
+  it('packs the scratch folder and workspace without dependencies, builds or secrets, and restores them', async () => {
     const { task, scratch } = await scratchTask('Pack me')
+    writeSecretFile(task.id, 'API_TOKEN', ['fixture', 'value', randomUUID()].join('-'))
+    write(path.join(scratch, 'secrets', 'kept.md'), 'kept\n')
 
     const files = await archived(task.id)
 
@@ -188,6 +191,8 @@ describe('archive bundle', () => {
     expect(fs.existsSync(path.join(scratch, 'node_modules'))).toBe(false)
     expect(fs.existsSync(path.join(scratch, '.venv'))).toBe(false)
     expect(fs.existsSync(path.join(scratch, 'pkg', 'dist'))).toBe(false)
+    expect(fs.existsSync(secretsDir(task.id))).toBe(false)
+    expect(fs.readFileSync(path.join(scratch, 'secrets', 'kept.md'), 'utf8')).toBe('kept\n')
     expect(fs.existsSync(bundleDir(task.id))).toBe(false)
   })
 

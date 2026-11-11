@@ -8,6 +8,28 @@ export interface Draft {
 
 export const EMPTY_DRAFT: Draft = { selected: [], other: '' }
 
+const MARK = '(recommended)'
+
+/** Whether the agent marked the option as its recommendation, as Claude Code's convention has it. */
+export const isRecommended = (label: string) => label.trimEnd().toLowerCase().endsWith(MARK)
+
+/** The option's label without the recommendation mark, which the page shows as a tag instead. */
+export const shownLabel = (label: string) =>
+  isRecommended(label) ? label.trimEnd().slice(0, -MARK.length).trimEnd() : label
+
+/**
+ * The draft a question starts with: its recommended option picked, or every recommended one on a
+ * multi-answer question; the exact labels, as AskUserQuestion takes them back.
+ */
+export function initialDraft(question: Question): Draft {
+  const recommended = question.options.map((option) => option.label).filter(isRecommended)
+  return { selected: question.multi ? recommended : recommended.slice(0, 1), other: '' }
+}
+
+/** The user's draft for the question, else the one it starts with. */
+export const draftOf = (drafts: Readonly<Record<string, Draft>>, question: Question) =>
+  drafts[question.id] ?? initialDraft(question)
+
 /** Picks or unpicks an option; a single-answer question keeps only the latest pick. */
 export function toggleOption(question: Question, draft: Draft, label: string): Draft {
   if (!question.multi) {

@@ -16,7 +16,7 @@ import { taskArchives } from './store/archive.js'
 import { taskLocation } from './store/task-location.js'
 import { inLane } from './task-lane.js'
 import { removeTaskSandbox } from './task-sandbox.js'
-import { releaseWorkspace, workspaceDir } from './workspace/dir.js'
+import { releaseWorkspace, SECRETS, workspaceDir } from './workspace/dir.js'
 
 /** Dependencies, virtualenvs, build outputs and caches, which a reinstall or build remakes. */
 const BUNDLE_EXCLUDES = [
@@ -155,7 +155,10 @@ async function runTar(args: string[], io: { input?: Readable[]; output?: Writabl
 const zstd = () => zlib.createZstdCompress({ params: { [zlib.constants.ZSTD_c_compressionLevel]: ZSTD_LEVEL } })
 
 async function pack(file: string, sources: readonly Source[]): Promise<void> {
-  const excludes = BUNDLE_EXCLUDES.map((name) => `--exclude=${name}`)
+  const secrets = sources.flatMap((source) =>
+    source.kind === 'workspace' ? [`--exclude=${path.basename(source.dir)}/${SECRETS}`] : [],
+  )
+  const excludes = [...BUNDLE_EXCLUDES.map((name) => `--exclude=${name}`), ...secrets]
   const members = sources.flatMap((source) => ['-C', path.dirname(source.dir), path.basename(source.dir)])
   await runTar(['-c', '-f', '-', ...excludes, ...members], {
     output: [zstd(), fs.createWriteStream(file, { mode: 0o600 })],

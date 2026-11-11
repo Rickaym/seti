@@ -25,3 +25,13 @@ CREATE INDEX question_open ON question (status, created_at);
 CREATE INDEX question_task ON question (task_id, created_at);
 CREATE INDEX question_group ON question (group_id, position);
 `
+
+/**
+ * Secret questions an agent asks with ask_secret: the kind, and what the secret is for and where
+ * it goes as JSON. The value itself is never stored here.
+ */
+export const QUESTION_SECRETS = `
+ALTER TABLE question DROP CONSTRAINT question_kind_check;
+ALTER TABLE question ADD CONSTRAINT question_kind_check CHECK (kind IN ('choice', 'yes_no', 'secret'));
+ALTER TABLE question ADD COLUMN secret TEXT;
+`

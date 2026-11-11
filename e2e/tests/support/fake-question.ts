@@ -6,10 +6,13 @@ import type { StepActor } from './fake-steps.js'
 export const QUESTION_PROMPT = 'ask me through the question tool'
 export const PUSH_PROMPT = `${QUESTION_PROMPT} about pushing`
 export const CHECKS_PROMPT = `${QUESTION_PROMPT} about the checks`
+export const MERGE_PROMPT = `${QUESTION_PROMPT} about the merge`
 
 export const PUSH_QUESTION = 'Should I push the fix to main?'
 export const CHECKS_QUESTION = 'Which checks should I run first?'
 export const REPORT_QUESTION = 'Where should the report go?'
+export const MERGE_QUESTION = 'How should I merge the PR?'
+export const MERGE_RECOMMENDED = 'Squash (Recommended)'
 
 const option = (label: string, description: string) => ({ label, description })
 
@@ -41,8 +44,24 @@ const CHECKS = {
   ],
 }
 
+const MERGE = {
+  questions: [
+    {
+      question: MERGE_QUESTION,
+      header: 'Merge',
+      multiSelect: false,
+      options: [option(MERGE_RECOMMENDED, 'One commit on main'), option('Merge', 'Keep every commit')],
+    },
+  ],
+}
+
 /** The AskUserQuestion input a question prompt sends. */
-const questionInput = (prompt: string) => (prompt.includes(CHECKS_PROMPT) ? CHECKS : PUSH)
+function questionInput(prompt: string) {
+  if (prompt.includes(MERGE_PROMPT)) {
+    return MERGE
+  }
+  return prompt.includes(CHECKS_PROMPT) ? CHECKS : PUSH
+}
 
 /** The reply an agent writes once its questions come back, one `question: answer` per question. */
 const answeredReply = (answers: Record<string, string | string[]>) =>

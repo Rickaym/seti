@@ -198,18 +198,52 @@ every agent in its scope. That is why proposals show whole and why notes stay sh
 Agents' questions carry the user's words into an agent's context, so they follow the rules of a
 message, not of a security setting. The EA may relay answers; agents and mods may not.
 
-- Agents ask only through Claude Code's AskUserQuestion, which waits on the user. No Seti tool
-  asks or answers a question.
+- Agents ask through Claude Code's AskUserQuestion, which waits on the user, and for a secret
+  through the `ask_secret` Seti tool (below). No Seti tool answers a question.
 - `POST /api/questions/answers` takes the user's answers and the EA's relayed ones; the EA's are
   recorded as `answered_by: ea` and audited with `via: ea`. Agents' Seti tools and mods get 403 in
   the core function (`answerQuestions` in `server/src/question-answers.ts`), not just the route.
 - An answer in the user's own words is refused with 422 when Seti's secret scan
   (`credentialFindings` in `server/src/scrub.ts`) finds a credential in it, and nothing in the
-  batch is stored. A question that asks for a secret says on the Questions page to add it in
-  Settings, Credentials instead, and the EA's prompt says the same.
+  batch is stored. An AskUserQuestion question that asks for a secret says on the Questions page
+  to dismiss it and have the agent ask with `ask_secret`.
 - Question text and option descriptions are stored with secrets redacted. The audit log records
   that a question was asked, answered, dismissed or expired, with who answered, the type, the
   option labels picked and the length of the own-words answer, never its text.
+
+### Secret questions
+
+An agent that needs a secret, token or password asks with `ask_secret`, which every agent has at
+any Seti control level, with a variable-style name (`connectionEnv`: capitals, digits and
+underscores, never a variable Seti sets), a short purpose and, in the sandbox, the hosts that
+receive it. The value never reaches the agent's context, its transcript, the question rows, the
+audit log, the server log or the EA.
+
+- The user enters the value on the Questions page in a masked field with show and hide. Submit all
+  sends it alone to `POST /api/questions/:id/secret`, never in the answers batch, and the page
+  drops it from memory once it is sent. The general answers route refuses an answer to a secret
+  question with 400.
+- `supplySecret` in `server/src/secret-questions.ts` refuses the EA, agents' Seti tools and mods in
+  the core function, and the route refuses the EA as well. The EA lists a secret question with its
+  name and purpose and tells the user to answer it in Seti; it may only dismiss it.
+- Outside the sandbox Seti writes the value to `secrets/<NAME>` in the agent's Seti workspace
+  (`~/.seti/workspace/<task id>`), through a new file of mode 0600 renamed over the old one in a
+  folder of mode 0700, and refuses a symlinked folder or a workspace inside a git checkout. The
+  agent's call returns only the path, with the instruction to use the file in the command or code
+  that needs it and never to open it with the Read tool, print, log or commit it, since any of those
+  would put the value in its transcript. The Files view, file handoffs and shares never serve the
+  folder (`pathProblem` in `server/src/task-files.ts`), archive bundles leave it out, and deleting
+  the agent removes it with the workspace.
+- In the sandbox the workspace is inside the sandbox, so a file would hand the agent the value.
+  Seti seals it in the secret store instead, as the connection for the name and hosts the agent
+  gave, in the agent's credential, through the same path as a key pasted on a change request's
+  Allow (`placeKeyRequest`). The agent gets a placeholder from its next turn and the egress proxy
+  adds the value on those hosts only. A call without hosts is refused with a note to name them.
+- The question row keeps the name, the hosts and where the value goes, never the value. The audit
+  log records `task.question_asked` with `secret: true` and the name, and `task.question_answered`
+  with `supplied: true`, the name and the delivery (`file` or `secret_store`).
+- A dismissal turns the agent's call down. A cancelled call or a closed session expires the
+  question, and a value sent after that is refused and kept nowhere.
 
 ## Agent files
 
@@ -694,6 +728,7 @@ learns what the user copied elsewhere.
 | SSH private keys for agents        | sealed rows                              | each task's ssh-agent       |
 | Webhook signing secrets            | sealed column                            | the webhook receiver        |
 | Connection values                  | sealed rows per connection and slot      | pollers, the egress proxy   |
+| Secrets an unsandboxed agent asked | 0600 file in the agent's workspace       | that agent                  |
 | Push notification key pair         | sealed row, made on first start          | the push sender             |
 
 Key files sit in `~/.seti/credentials` (0600 files in a 0700 directory). Each unit loads only its

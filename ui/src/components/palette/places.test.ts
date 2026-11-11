@@ -122,8 +122,17 @@ describe('other places', () => {
   it('offers every section, the group chat and every settings page', () => {
     const openChat = vi.fn()
     const sections = sectionPlaces(openChat)
-    expect(sections.map((p) => p.title)).toEqual(['EA', 'Home', 'Agents', 'Context', 'Settings', 'Group chat'])
-    const chat = sections.at(-1)?.target
+    expect(sections.map((p) => p.title)).toEqual([
+      'EA',
+      'Home',
+      'Agents',
+      'Context',
+      'Settings',
+      'Group chat',
+      'Questions',
+    ])
+    expect(sections.at(-1)?.target).toEqual({ section: 'agents', id: 'questions' })
+    const chat = sections.at(-2)?.target
     if (chat !== undefined && 'run' in chat) {
       chat.run()
     }

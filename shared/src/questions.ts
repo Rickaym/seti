@@ -1,7 +1,11 @@
 import { z } from 'zod'
+import { connectionEnv, connectionHost, connectionValue } from './connections.js'
 
-/** How a question is answered: a pick between options, or Yes/No buttons for a yes/no pair. */
-export const QUESTION_KINDS = ['choice', 'yes_no'] as const
+/**
+ * How a question is answered: a pick between options, Yes/No buttons for a yes/no pair, or a
+ * masked field for a secret an agent asked for with ask_secret.
+ */
+export const QUESTION_KINDS = ['choice', 'yes_no', 'secret'] as const
 export type QuestionKind = (typeof QUESTION_KINDS)[number]
 
 /** Open questions hold their agent's tool call; the rest are settled. */
@@ -33,7 +37,43 @@ export interface QuestionAnswer {
   other: string | null
 }
 
-/** One question an agent asked through AskUserQuestion; its group is the one tool call. */
+/** Where a secret goes: a file only Seti's user reads, or the secret store for a sandboxed agent. */
+export const SECRET_DELIVERIES = ['file', 'secret_store'] as const
+export type SecretDelivery = (typeof SECRET_DELIVERIES)[number]
+
+/** What a secret question asks for; the value itself is never stored with it. */
+export interface QuestionSecret {
+  /** The variable-style name, such as AZURE_SPEECH_KEY. */
+  name: string
+  /** The hosts the secret store sends it to; empty for a file. */
+  hosts: string[]
+  delivery: SecretDelivery
+}
+
+export const SECRET_PURPOSE_MAX = 300
+export const SECRET_HOSTS_MAX = 5
+
+/** What an agent's ask_secret call takes. */
+export const askSecretInput = z.object({
+  name: connectionEnv,
+  purpose: z.string().trim().min(1).max(SECRET_PURPOSE_MAX),
+  hosts: z.array(connectionHost).max(SECRET_HOSTS_MAX).default([]),
+})
+export type AskSecretInput = z.infer<typeof askSecretInput>
+
+/** The value the user enters for a secret question, sent to its own route only. */
+export const supplySecretInput = z.object({ value: connectionValue })
+export type SupplySecretInput = z.infer<typeof supplySecretInput>
+
+export const secretQuestionParams = z.object({ id: z.uuid() })
+
+/** The agent a supplied secret let go on. */
+export interface SupplySecretResult {
+  task_id: string
+  task_title: string
+}
+
+/** One question an agent asked through AskUserQuestion or ask_secret; its group is the one call. */
 export interface Question {
   id: string
   group_id: string
@@ -48,6 +88,8 @@ export interface Question {
   kind: QuestionKind
   multi: boolean
   options: QuestionOption[]
+  /** What a secret question asks for; null for every other kind. */
+  secret: QuestionSecret | null
   status: QuestionStatus
   answer: QuestionAnswer | null
   answered_by: QuestionAnswerer | null

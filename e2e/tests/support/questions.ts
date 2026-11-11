@@ -25,6 +25,23 @@ export async function lastReply(request: APIRequestContext, taskId: string): Pro
   return texts.at(-1) ?? ''
 }
 
+/** The text of the agent's latest tool result, as its transcript stored it. */
+export async function lastToolResult(request: APIRequestContext, taskId: string): Promise<string> {
+  const { messages } = await apiData<MessagePage>(request, `/tasks/${taskId}/messages?limit=50`)
+  const results = messages.flatMap((row) => {
+    if (row.kind !== 'sdk' || row.payload.type !== 'user') {
+      return []
+    }
+    const { content } = row.payload.message
+    return typeof content === 'string'
+      ? []
+      : content.flatMap((block) =>
+          block.type === 'tool_result' && typeof block.content === 'string' ? [block.content] : [],
+        )
+  })
+  return results.at(-1) ?? ''
+}
+
 /** The agent's questions on the Questions page. */
 export const agentQuestions = (page: Page, task: Task) =>
   page.getByRole('region', { name: `Questions from ${task.title}` })

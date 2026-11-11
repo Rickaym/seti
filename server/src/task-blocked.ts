@@ -37,7 +37,8 @@ function questionLine(open: readonly Question[]): string | null {
     return null
   }
   const count = open.length === 1 ? 'Asks a question' : `Asks ${String(open.length)} questions`
-  return clip(`${count}: ${first.prompt.replace(/\s+/g, ' ')}`, LINE_CHARS)
+  const what = first.kind === 'secret' ? `the secret ${first.header}, ${first.prompt}` : first.prompt
+  return clip(`${count}: ${what.replace(/\s+/g, ' ')}`, LINE_CHARS)
 }
 
 /** The reason line of the oldest change the agent asked for, with how many more wait. */

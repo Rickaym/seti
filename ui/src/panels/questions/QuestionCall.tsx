@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { useAgentQuestionCount } from '@/hooks/useQuestions'
 import { navigate } from '@/lib/route'
 import type { ToolUseBlock } from '@/lib/transcript'
-import { QUESTIONS_ROUTE } from '@/panels/questions/QuestionsButton'
+import { QUESTIONS_ROUTE } from '@/panels/questions/route'
 
 /** Claude Code's tool for asking the user, whose calls show as their questions and answers. */
 export const ASK_TOOL = 'AskUserQuestion'

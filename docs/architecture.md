@@ -569,13 +569,34 @@ every agent to ask through AskUserQuestion instead of in its reply. The guess th
 a question (`server/src/turn-asking.ts`) reads only the prose after the last tool use, the
 fallback for an agent that asks in text.
 
-The Questions page (`#agents/questions`, from the button in the Agents list header and from an
-agent's header while it has questions) lists every open question by agent, oldest first, with the
+The Questions page (`#agents/questions`, from Questions in the Agents list's More menu at any
+time, the Go to palette, and the buttons in the Agents list header and an agent's header while
+questions are open) lists every open question by agent, oldest first, with the
 control its type takes, Dismiss per question, Skip per agent and one Submit all, and says what it
 sent. In the transcript an AskUserQuestion call shows each question and, once settled, its answer.
 The EA lists the open questions with `search_seti` in `questions`, reads them out by type and
 passes on the user's answer with `answer_question`, which calls the same route; its prompt holds it
 to what the user said.
+
+A recommended option is picked from the start: Claude Code's convention ends its label with
+`(Recommended)`, and the page picks the first such option of a single-answer question, or each one
+of a multi-answer question, shows a Recommended tag, and sends the exact label on Submit all.
+`questionsContext` tells agents to put a recommendation first and mark it that way.
+
+### Secret questions hold the call inside the tool
+
+`ask_secret` (`server/src/seti-tools/requests.ts`) is a Seti tool, since AskUserQuestion's input is
+fixed. `askSecret` in `server/src/secret-questions.ts` records a `secret` question, one per group,
+whose row names the secret, the hosts and the delivery in its `secret` column, and holds the tool
+call until the user supplies the value or dismisses it. The hold is inside the tool's handler, not
+at the permission check: Seti's built-in rules allow every `mcp__seti` tool and agents run in auto
+mode, so a Seti tool never reaches `canUseTool`, and the in-process MCP server has no tool-call
+timeout. The MCP call's abort signal reaches the tool as `ctx.signal`, so a cancelled call or a
+closed session expires the question. `supplySecret` delivers the value
+(`server/src/secret-delivery.ts`): a file in the agent's workspace outside the sandbox, the secret
+store inside it. Then it resolves the waiting call with where the value went. A dismissal goes
+through the answers batch and `dismissSecret`. The reason line reads
+`Asks a question: the secret NAME, purpose`. [Security](security.md#secret-questions) has the rules.
 
 ## The EA acts through the same API as the user
 

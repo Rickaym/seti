@@ -29,7 +29,7 @@ import { MODS_RUNTIME } from './schema-mods-runtime.js'
 import { BLOBS_ONE_STYLE, MODS, PREVIEWS_MOD, REQUIRED_MODS, USER_THEME } from './schema-mods.js'
 import { NOTIFICATIONS } from './schema-notifications.js'
 import { CHANNEL_EVENT_ROUTING, CHANNEL_RUN_DUE, POLLER_CHANNELS } from './schema-pollers.js'
-import { QUESTIONS } from './schema-questions.js'
+import { QUESTION_SECRETS, QUESTIONS } from './schema-questions.js'
 import { DROP_ROUTINES, REMINDER_CHANNELS, REMINDER_CRON } from './schema-reminders.js'
 import { PACK_KIND, rolesToPacks } from './schema-roles.js'
 import { MESSAGE_SEARCH, MESSAGE_SEARCH_TALK, MESSAGE_TIME } from './schema-search.js'
@@ -172,4 +172,5 @@ export const MIGRATIONS: readonly Migration[] = [
   { version: 97, name: 'repeat_guard', sql: REPEAT_GUARD },
   { version: 98, name: 'knowledge', sql: KNOWLEDGE },
   { version: 99, name: 'questions', sql: QUESTIONS },
+  { version: 100, name: 'question_secrets', sql: QUESTION_SECRETS },
 ]

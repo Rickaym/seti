@@ -7,7 +7,14 @@ import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
-import { asksForSecret, toggleOption, writeOther, type Draft } from '@/panels/questions/drafts'
+import {
+  asksForSecret,
+  isRecommended,
+  shownLabel,
+  toggleOption,
+  writeOther,
+  type Draft,
+} from '@/panels/questions/drafts'
 
 interface FieldProps {
   question: Question
@@ -21,7 +28,14 @@ const OPTION =
 function OptionText({ option }: { option: QuestionOption }) {
   return (
     <span className="min-w-0 flex-1">
-      <span className="block font-medium">{option.label}</span>
+      <span className="flex flex-wrap items-center gap-1.5 font-medium">
+        {shownLabel(option.label)}
+        {isRecommended(option.label) && (
+          <span className="rounded-sm border border-border px-1 text-2xs font-normal text-muted-foreground">
+            Recommended
+          </span>
+        )}
+      </span>
       {option.description !== null && <span className="block text-xs text-muted-foreground">{option.description}</span>}
     </span>
   )
@@ -116,8 +130,8 @@ function SecretNote() {
     <p className="flex items-start gap-1.5 text-xs text-muted-foreground">
       <ShieldAlert aria-hidden className="mt-0.5 size-3.5 shrink-0" />
       <span>
-        This asks for a secret. Do not answer it here: add it in Settings, Credentials, and allow the change the agent
-        asks for.
+        This asks for a secret. Do not answer it here: dismiss it and tell the agent to ask with ask_secret, which keeps
+        the value out of its transcript.
       </span>
     </p>
   )

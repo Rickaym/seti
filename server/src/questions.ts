@@ -244,8 +244,10 @@ const ASKING =
   'answers. Give each question two to four short options, since the user can always answer in ' +
   'their own words instead; for a yes or no question make the options exactly Yes and No. Ask ' +
   'related questions together, up to four in one call. Write a question in your reply only when ' +
-  'you have finished the work and are only offering a next step. Never ask for a secret, token or ' +
-  'password this way; the user adds those in Seti, under Settings, Credentials.'
+  'you have finished the work and are only offering a next step. If you recommend an option, put ' +
+  'it first and end its label with (Recommended); Seti picks it for the user to confirm. To ask the ' +
+  'user for a secret, token or password, use ask_secret; never ask for one in your reply or with ' +
+  'AskUserQuestion.'
 
 /** Tells every agent to ask the user through AskUserQuestion, which Seti collects. */
 export const questionsContext = (): string => ASKING

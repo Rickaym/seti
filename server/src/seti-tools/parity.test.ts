@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 import { SETI_TOOLS } from './catalog.js'
 import { KNOWLEDGE_TOOLS } from './knowledge.js'
 import { modActionTools } from './mod-actions.js'
-import { REQUEST_TOOLS } from './requests.js'
+import { REQUEST_TOOLS, SECRET_TOOLS } from './requests.js'
 import { HANDOFF_TOOLS } from './team.js'
 import { BUNDLED_MODS, modHost, TEST_MODS } from '../mods/bundled.js'
 import { modCommands } from '../mods/points.js'
@@ -13,7 +13,7 @@ import { modCommands } from '../mods/points.js'
 const EA_SOURCES = path.resolve(import.meta.dirname, '../../../ea/src/seti_ea')
 
 /** Seti control tools and the ones every agent gets. */
-const AGENT_SIDE = [...SETI_TOOLS, ...HANDOFF_TOOLS, ...REQUEST_TOOLS, ...KNOWLEDGE_TOOLS]
+const AGENT_SIDE = [...SETI_TOOLS, ...HANDOFF_TOOLS, ...REQUEST_TOOLS, ...SECRET_TOOLS, ...KNOWLEDGE_TOOLS]
 
 /** EA tools agents do not get, each with the reason; everything else the EA has, agents have too. */
 const NOT_FOR_AGENTS: Record<string, string> = {
@@ -44,6 +44,7 @@ const NOT_FOR_AGENTS: Record<string, string> = {
 /** Agent tools the EA has no tool of the same name for, each with how the EA does the same. */
 const ONLY_FOR_AGENTS: Record<string, string> = {
   request_change: 'Agents ask the user for access they lack; the EA speaks for the user, who changes it directly.',
+  ask_secret: 'Agents ask the user for a secret; the EA never handles one, and the user enters it in Seti.',
   await_agent: 'The EA waits with watch_task once, which keeps it under its tool cap.',
   agent_activity: 'The EA skims a time window with list_tasks active, which keeps it under its tool cap.',
   read_transcript: "The EA reads a time window with get_task's window, which keeps it under its tool cap.",
