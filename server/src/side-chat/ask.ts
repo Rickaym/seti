@@ -3,6 +3,7 @@ import type { SDKResultMessage, SDKUserMessage } from '@anthropic-ai/claude-agen
 import type { SideAnswer, SideChatEvent, SideChatInput, Task } from '@seti/shared'
 import { refuseArchived } from '../archive-guard.js'
 import { CLAUDE_HOME } from '../config.js'
+import { now } from '../db.js'
 import { refuseOtherAgent } from '../ea-guard.js'
 import { HttpError } from '../http.js'
 import { sessionState } from '../runner.js'
@@ -13,7 +14,8 @@ import { addSideChatCost } from '../store/cost.js'
 import { rewinds } from '../store/rewinds.js'
 import { requireTask } from '../tasks.js'
 import { AnswerStream } from './answer.js'
-import { closeChat, followUp, openChat, turnsLeft, type SideChat } from './chats.js'
+import { done, followUp, openChat, type SideChat } from './chats.js'
+import { promptOf, storeAside } from './history.js'
 import { sideChatOptions, type ForkPoint } from './options.js'
 import { savedTotal, sessionFile } from './saved-cost.js'
 import { refuseHiddenDirect } from '../direct-privacy.js'
@@ -39,15 +41,6 @@ async function forkPoint(task: Task): Promise<ForkPoint> {
     throw new HttpError(409, NO_CONVERSATION)
   }
   return { session_id: task.session_id, at: pending?.resume_at ?? null }
-}
-
-/** The prompt the fork gets: the chat's earlier questions and answers, then the new question. */
-function promptOf(chat: SideChat, question: string): string {
-  if (chat.exchanges.length === 0) {
-    return question
-  }
-  const earlier = chat.exchanges.flatMap((e) => [`Question: ${e.question}`, `Answer: ${e.answer}`, ''])
-  return ['Earlier in this side chat:', '', ...earlier, 'New question:', question].join('\n')
 }
 
 async function* once(text: string): AsyncGenerator<SDKUserMessage> {
@@ -139,30 +132,37 @@ async function runFork(task: Task, fork: ForkPoint, prompt: string, run: Running
 }
 
 interface Running {
+  chat: SideChat
   reads: boolean
   abort: AbortController
   emit: Emit
-  /** Frees the chat for its next question. */
-  release: () => void
 }
 
-/** Answers one question of the chat, streaming the answer, and keeps it for follow-ups. */
-async function answer(task: Task, chat: SideChat, question: string, run: Running): Promise<void> {
+/** Answers one question of the chat, streaming the answer, and stores it as an aside. */
+async function answer(task: Task, question: string, run: Running): Promise<void> {
   const fork = await forkPoint(task)
-  const left = turnsLeft(chat)
-  await run.emit({ type: 'start', chat_id: chat.id, turns_left: left })
-  const outcome = await runFork(task, fork, promptOf(chat, question), run)
+  const askedAt = now()
+  await run.emit({ type: 'start', chat_id: run.chat.id })
+  const outcome = await runFork(task, fork, await promptOf(task.id, run.chat.id, question), run)
   if (outcome.error !== null) {
     await run.emit({ type: 'error', error: outcome.error })
     return
   }
-  chat.exchanges.push({ question, answer: outcome.text })
-  run.release()
-  await run.emit({ type: 'done', text: redactSecrets(outcome.text), cost_usd: outcome.cost, turns_left: left })
+  const text = redactSecrets(outcome.text)
+  const stored = await storeAside({
+    taskId: task.id,
+    chatId: run.chat.id,
+    question,
+    answer: text,
+    costUsd: outcome.cost,
+    askedAt,
+  })
+  done(run.chat)
+  await run.emit({ type: 'done', text, cost_usd: outcome.cost, aside: stored })
 }
 
 /**
- * Checks a side chat question and opens its chat, or takes up the open one for a follow-up.
+ * Checks a side chat question and opens its chat, or takes up a stored one for a follow-up.
  * Agents asking through their Seti tools get no tools in the fork, so they reach nothing more.
  */
 export async function prepareAsk(taskId: string, input: SideChatInput, reads: boolean): Promise<Ask> {
@@ -170,15 +170,8 @@ export async function prepareAsk(taskId: string, input: SideChatInput, reads: bo
   refuseArchived(task)
   await refuseHiddenDirect(task.id)
   await forkPoint(task)
-  const chat = input.chat_id === undefined ? await openChat(task, reads) : followUp(task.id, input.chat_id)
-  const abort = new AbortController()
-  chat.answering = abort
-  const release = () => {
-    if (chat.answering === abort) {
-      chat.answering = null
-    }
-    chat.usedAt = Date.now()
-  }
+  const chat = input.chat_id === undefined ? await openChat(task, reads) : await followUp(task.id, input.chat_id)
+  const { abort } = chat
   const run = async (emit: Emit, signal?: AbortSignal) => {
     const stop = () => {
       abort.abort()
@@ -186,19 +179,19 @@ export async function prepareAsk(taskId: string, input: SideChatInput, reads: bo
     signal?.addEventListener('abort', stop, { once: true })
     const timer = setTimeout(stop, ANSWER_MS)
     try {
-      await answer(task, chat, input.question.trim(), { reads, abort, emit, release })
+      await answer(task, input.question.trim(), { chat, reads, abort, emit })
     } catch (e) {
       await emit({ type: 'error', error: clipped(e instanceof Error ? e.message : String(e)) })
     } finally {
       clearTimeout(timer)
       signal?.removeEventListener('abort', stop)
-      release()
+      done(chat)
     }
   }
   return { chatId: chat.id, run }
 }
 
-/** Asks a one-off side question and returns the whole answer; the chat closes after it. */
+/** Asks a one-off side question in a chat of its own and returns the whole answer. */
 export async function askAside(taskId: string, question: string, reads: boolean): Promise<SideAnswer> {
   refuseOtherAgent(taskId)
   const ask = await prepareAsk(taskId, { question }, reads)
@@ -206,18 +199,14 @@ export async function askAside(taskId: string, question: string, reads: boolean)
     answer: null,
     error: 'The side chat ended without an answer',
   }
-  try {
-    await ask.run(async (event) => {
-      if (event.type === 'done') {
-        got.answer = { answer: event.text, cost_usd: event.cost_usd }
-      } else if (event.type === 'error') {
-        got.error = event.error
-      }
-      return Promise.resolve()
-    })
-  } finally {
-    closeChat(taskId, ask.chatId)
-  }
+  await ask.run(async (event) => {
+    if (event.type === 'done') {
+      got.answer = { answer: event.text, cost_usd: event.cost_usd }
+    } else if (event.type === 'error') {
+      got.error = event.error
+    }
+    return Promise.resolve()
+  })
   if (got.answer === null) {
     throw new HttpError(502, got.error)
   }

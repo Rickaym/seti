@@ -11,12 +11,15 @@ import type { FakeSession } from '../fake-sdk.js'
 import { modHost } from '../mods/bundled.js'
 import { isRunning, runTurn, stopTurn } from '../runner.js'
 import { modActionTools } from '../seti-tools/mod-actions.js'
+import { asides } from '../store/asides.js'
 import { auditEvents } from '../store/audit.js'
 import { costSince } from '../store/cost.js'
 import { EA_AUTH, USER_AUTH } from '../test-auth.js'
 import { withBundledMods } from '../test-mods.js'
 import { waitIdle } from '../wait-idle.js'
 import { prepareAsk, type Ask } from './ask.js'
+import { closeAllChats } from './chats.js'
+import { REPLAY_ANSWER_CHARS, REPLAY_EXCHANGES } from './history.js'
 import { READ_TOOLS } from './options.js'
 import { sessionFile } from './saved-cost.js'
 
@@ -128,10 +131,23 @@ const chatOf = (events: SideChatEvent[]) => {
   return start.chat_id
 }
 
-async function sideChatAudits(id: string) {
+async function sideChatAudits(
+  id: string,
+  kind: 'task.side_chat' | 'task.aside_deleted' | 'task.asides_cleared' = 'task.side_chat',
+) {
   await auditEvents.settled()
-  const { events } = await auditEvents.page({ kind: 'task.side_chat', limit: 50 })
+  const { events } = await auditEvents.page({ kind, limit: 50 })
   return events.filter((event) => event.subject_id === id)
+}
+
+async function remove(id: string, aside?: string) {
+  const url = aside === undefined ? `${ROUTES}/${id}/asides` : `${ROUTES}/${id}/asides/${aside}`
+  return app.request(url, { method: 'DELETE', headers: { host: 'localhost', ...USER_AUTH } })
+}
+
+async function listed(id: string) {
+  const res = await app.request(`${ROUTES}/${id}/asides`, { headers: { host: 'localhost', ...USER_AUTH } })
+  return ((await res.json()) as { data: { asides: { id: string; question: string; asked_by: string }[] } }).data.asides
 }
 
 /** What a side chat must leave alone: the agent's transcript, session and process. */
@@ -148,7 +164,15 @@ describe('side chat', () => {
     const { status, events } = await ask(id, 'why did you do that?')
     expect(status).toBe(200)
     expect(events.map((e) => e.type)).toEqual(['start', 'text', 'text', 'done'])
-    expect(doneOf(events)).toMatchObject({ text: 'Because: why did you do that?', turns_left: 7 })
+    expect(doneOf(events)).toMatchObject({
+      text: 'Because: why did you do that?',
+      aside: {
+        task_id: id,
+        question: 'why did you do that?',
+        answer: 'Because: why did you do that?',
+        asked_by: 'user',
+      },
+    })
     const options: Options = lastFork().options
     expect(options).toMatchObject({
       resume: 'agent-session',
@@ -193,21 +217,83 @@ describe('side chat', () => {
     await stopTurn(id)
   })
 
-  it('hands a follow-up the earlier exchange and forgets the chat once closed', async () => {
+  it('stores the exchange as an aside, never as a transcript row or in the session', async () => {
+    const id = await newAgent()
+    const before = await agentState(id)
+    const { events } = await ask(id, 'what did you find?')
+    const done = doneOf(events)
+    expect(await asides.list(id)).toEqual([done?.type === 'done' ? done.aside : null])
+    expect(await agentState(id)).toEqual(before)
+    const transcript = JSON.stringify((await messages.page(id, 500)).messages)
+    expect(transcript).not.toContain('what did you find?')
+    expect(lastFork().options).toMatchObject({ forkSession: true, persistSession: false })
+  })
+
+  it('hands a follow-up the earlier exchanges from the table, also after a restart', async () => {
     const id = await newAgent()
     const first = await ask(id, 'first question')
     const chatId = chatOf(first.events)
+    closeAllChats()
     const second = await ask(id, 'and then?', chatId)
-    expect(doneOf(second.events)).toMatchObject({ turns_left: 6 })
+    expect(chatOf(second.events)).toBe(chatId)
     expect(lastFork().prompts[0]).toContain('Question: first question')
     expect(lastFork().prompts[0]).toContain('Answer: Because: first question')
     expect(lastFork().prompts[0]).toMatch(/New question:\nand then\?$/)
-    const closed = await app.request(`${ROUTES}/${id}/chats/${chatId}`, {
-      method: 'DELETE',
-      headers: { host: 'localhost', ...USER_AUTH },
-    })
-    expect(closed.status).toBe(200)
-    expect((await ask(id, 'still there?', chatId)).status).toBe(404)
+    expect((await asides.chat(id, chatId, 10)).map((a) => a.question)).toEqual(['first question', 'and then?'])
+  })
+
+  it('replays only the newest exchanges of a long chat, each answer cut short', async () => {
+    const id = await newAgent()
+    const chatId = '00000000-0000-4000-8000-00000000c0de'
+    for (let i = 1; i <= REPLAY_EXCHANGES + 2; i++) {
+      await asides.add({
+        id: `00000000-0000-4000-8000-${String(i).padStart(12, '0')}`,
+        task_id: id,
+        chat_id: chatId,
+        question: `question ${String(i)}`,
+        answer: i === REPLAY_EXCHANGES + 2 ? 'x'.repeat(REPLAY_ANSWER_CHARS * 2) : `answer ${String(i)}`,
+        asked_by: 'user',
+        asker_id: null,
+        asker_title: null,
+        cost_usd: null,
+        asked_at: `2026-11-11T10:00:${String(i).padStart(2, '0')}.000Z`,
+        answered_at: `2026-11-11T10:00:${String(i).padStart(2, '0')}.500Z`,
+      })
+    }
+    await ask(id, 'what now?', chatId)
+    const prompt = lastFork().prompts[0] ?? ''
+    expect(prompt).not.toContain('Question: question 2\n')
+    expect(prompt).toContain('Question: question 3\n')
+    expect(prompt).toContain(`Answer: ${'x'.repeat(REPLAY_ANSWER_CHARS - 3)}...`)
+    expect(prompt).not.toContain('x'.repeat(REPLAY_ANSWER_CHARS))
+  })
+
+  it('refuses a follow-up in a chat whose asides were deleted', async () => {
+    const id = await newAgent()
+    const chatId = chatOf((await ask(id, 'first question')).events)
+    expect((await remove(id)).status).toBe(200)
+    const gone = await ask(id, 'still there?', chatId)
+    expect(gone.status).toBe(404)
+    expect(await gone.res.text()).toContain('That side chat is gone')
+  })
+
+  it('deletes one aside or all of them and audits each without the content', async () => {
+    const id = await newAgent()
+    await ask(id, 'secret plan one')
+    await ask(id, 'secret plan two')
+    await ask(id, 'secret plan three')
+    const [first] = await listed(id)
+    expect((await remove(id, first?.id)).status).toBe(200)
+    expect((await listed(id)).map((a) => a.question)).toEqual(['secret plan two', 'secret plan three'])
+    expect((await remove(id, first?.id)).status).toBe(404)
+    expect((await remove(id)).status).toBe(200)
+    expect(await listed(id)).toEqual([])
+    const deleted = await sideChatAudits(id, 'task.aside_deleted')
+    const cleared = await sideChatAudits(id, 'task.asides_cleared')
+    expect(deleted).toHaveLength(1)
+    expect(cleared[0]).toMatchObject({ summary: `Cleared 2 asides of agent "Side ${String(taskCount)}"` })
+    expect(cleared[0]?.detail).toMatchObject({ count: 2 })
+    expect(JSON.stringify([deleted, cleared])).not.toMatch(/secret plan|Because/)
   })
 
   it('takes a follow-up asked the moment the answer is done, and keeps it answering', async () => {
@@ -227,7 +313,7 @@ describe('side chat', () => {
       events.push(event)
       return Promise.resolve()
     })
-    expect(doneOf(events)).toMatchObject({ turns_left: 6 })
+    expect(doneOf(events)?.type).toBe('done')
   })
 
   it('audits the start of each chat once, without its content', async () => {
@@ -269,6 +355,9 @@ describe('side chat', () => {
     sdk.state.forkReply = (text) => `Because: ${text}`
     expect(JSON.stringify(events)).not.toContain(TOKEN)
     expect(doneOf(events)?.type).toBe('done')
+    const [stored] = await asides.list(id)
+    expect(stored?.answer).toContain('The token was')
+    expect(stored?.answer).not.toContain(TOKEN)
   })
 
   it('refuses an agent with no conversation yet', async () => {
@@ -279,7 +368,7 @@ describe('side chat', () => {
     expect(await res.text()).toContain('no conversation')
   })
 
-  it("answers the EA's run_mod_action in one piece, as the EA, and closes the chat", async () => {
+  it("answers the EA's run_mod_action in one piece, as the EA, and keeps it as the EA's aside", async () => {
     const id = await newAgent()
     const res = await app.request('/api/mods/side-chat/actions/ask', {
       method: 'POST',
@@ -292,6 +381,7 @@ describe('side chat', () => {
     expect(data.result).toMatchObject({ id, answer: 'Because: status?', cost_usd: 0.05 })
     const audited = await sideChatAudits(id)
     expect(audited[0]?.detail).toMatchObject({ via: 'ea', reads_files: true })
+    expect(await asides.list(id)).toMatchObject([{ question: 'status?', asked_by: 'ea', asker_id: null }])
   })
 
   it('gives agents asking with mod_side-chat_ask no tools in the fork, and refuses asking themselves', async () => {
@@ -311,6 +401,9 @@ describe('side chat', () => {
     expect(answer).toContain(`"id":"${id}"`)
     expect(answer).toContain('"answer":"Because: why?"')
     expect(lastFork().options).toMatchObject({ tools: [], allowedTools: [], maxTurns: 1 })
+    expect(await asides.list(id)).toMatchObject([
+      { asked_by: 'agent', asker_id: caller, asker_title: callerTask.title },
+    ])
     await expect(asked(caller)).rejects.toThrow(/yourself/)
   })
 

@@ -5,7 +5,8 @@ import { asAsker, currentRequestSource } from '../access.js'
 import { fromAgent } from '../ea-guard.js'
 import { describeIssues, HttpError } from '../http.js'
 import { askAside, prepareAsk } from '../side-chat/ask.js'
-import { closeAllChats, closeChat } from '../side-chat/chats.js'
+import { closeAllChats } from '../side-chat/chats.js'
+import { clearAsides, deleteAside, listAsides } from '../side-chat/history.js'
 import { requireTask } from '../tasks.js'
 import { requireOp } from './capabilities.js'
 
@@ -29,8 +30,8 @@ function refuseSelf(task: string): void {
 
 /**
  * The tasks.ask capability: side questions the core side chat engine answers, as whoever asked
- * the mod, so agents get no file reads and the audit names the asker. A mod that holds it closes
- * every open side chat when it is turned off.
+ * the mod, so agents get no file reads and the audit names the asker. A mod that holds it stops
+ * every answer being written when it is turned off; the stored asides stay.
  */
 export function asideApi(run: Run, holds: boolean, track: (dispose: Disposer) => Disposer): ModAsideApi {
   if (holds) {
@@ -59,12 +60,20 @@ export function asideApi(run: Run, holds: boolean, track: (dispose: Disposer) =>
         return { id, title, ...(await askAside(id, asked, !fromAgent())) }
       })
     },
-    close: async (task, chat) => {
+    list: async (task) => {
       await granted()
-      if (!SIDE_CHAT_ID.test(chat)) {
-        throw new HttpError(400, 'That is not a side chat id')
+      return asAsker(async () => listAsides(task))
+    },
+    remove: async (task, aside) => {
+      await granted()
+      if (!SIDE_CHAT_ID.test(aside)) {
+        throw new HttpError(400, 'That is not an aside id')
       }
-      closeChat(task, chat)
+      await asAsker(async () => deleteAside(task, aside))
+    },
+    clear: async (task) => {
+      await granted()
+      return asAsker(async () => clearAsides(task))
     },
   }
 }

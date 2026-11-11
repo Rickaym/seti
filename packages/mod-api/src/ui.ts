@@ -285,6 +285,36 @@ export interface ModDockProps {
   close: () => void
 }
 
+/** One block a mod draws in an agent's transcript, among the rows by the time it happened. */
+export interface ModTranscriptBlock {
+  /** Unique among the source's blocks for the agent, and the same on every update. */
+  id: string
+  /** When it happened, as an ISO time; Seti draws it after the rows that came before it. */
+  at: string
+}
+
+/** What a transcript block's view gets: the agent, and the id of the block to draw. */
+export interface ModTranscriptBlockProps {
+  agent: string
+  id: string
+}
+
+/**
+ * Blocks a mod draws inline in an agent's transcript, for a transcriptBlocks entry the manifest
+ * declares. Seti places them by time and draws each with `view`; the mod keeps their content.
+ */
+export interface ModTranscriptSource {
+  id: string
+  /** Seti calls it while the agent's transcript shows, and the stop it returns once it goes. */
+  watch: (agent: string) => () => void
+  /** The agent's blocks, oldest first; the same array until they change. */
+  blocks: (agent: string) => readonly ModTranscriptBlock[]
+  subscribe: (listener: () => void) => () => void
+  /** Runs when the mod's server half calls `api.transcript.refresh` for the agent. */
+  refresh: (agent: string) => void
+  view: ComponentType<ModTranscriptBlockProps>
+}
+
 /** A dock the manifest places in `agentDock`: Seti draws its frame, header and close button. */
 export interface ModDock {
   id: string
@@ -428,6 +458,8 @@ export interface UiModApi {
   registerStatusMarker: (marker: { id: string; view: ComponentType<ModStatusMarkerProps> }) => Disposer
   /** Draws an accent on each agent row's left edge in place of its colour bar; bundled only. */
   registerAgentAccent: (accent: { id: string; view: ComponentType<ModAgentAccentProps> }) => Disposer
+  /** Blocks drawn inline in agents' transcripts by time, for a transcriptBlocks entry; bundled. */
+  registerTranscriptBlocks: (source: ModTranscriptSource) => Disposer
   /** The icon of a command the manifest declares, and how the UI runs it, if not on the server. */
   registerCommand: (command: ModUiCommand) => Disposer
   /** Runs one of its commands as the user, as the palette does; answers the line Seti shows. */

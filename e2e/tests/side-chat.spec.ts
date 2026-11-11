@@ -28,7 +28,7 @@ async function ask(page: Page, question: string): Promise<void> {
   await field.press('Enter')
 }
 
-test("Ask answers from the agent's session in a dock, with follow-ups, and leaves its chat alone", async ({
+test("Ask answers from the agent's session in a dock, with follow-ups kept, and leaves its chat alone", async ({
   page,
   request,
 }) => {
@@ -67,11 +67,12 @@ test("Ask answers from the agent's session in a dock, with follow-ups, and leave
   await dock.getByRole('textbox', { name: 'Side question' }).press('Escape')
   await expect(dock).toHaveCount(0)
   await openAsk(page)
-  await expect(sideChat(page).getByTestId('side-chat-exchange')).toHaveCount(0)
+  await expect(sideChat(page).getByTestId('side-chat-exchange')).toHaveCount(2)
 
   await ask(page, 'what should I tell you?')
-  await sideChat(page).getByRole('button', { name: 'Send to agent' }).click()
-  await expect(sideChat(page).getByRole('button', { name: 'Sent' })).toBeDisabled()
+  const third = sideChat(page).getByTestId('side-chat-exchange').nth(2)
+  await third.getByRole('button', { name: 'Send to agent' }).click()
+  await expect(third.getByRole('button', { name: 'Sent' })).toBeDisabled()
   const transcript = page.getByRole('main').getByRole('region', { name: 'Transcript' })
   await expect(transcript.getByText('From a side chat about your work.')).toBeVisible()
 })
@@ -140,7 +141,7 @@ test('/btw alone opens the side chat empty with its field focused', async ({ pag
   expect(await rowIds(request, id)).toEqual(before)
 })
 
-test('a side chat answers mid-turn without stopping the agent, and closing stops the answer', async ({
+test('a side chat answers mid-turn without stopping the agent, and closing lets the answer finish', async ({
   page,
   request,
 }) => {
@@ -162,6 +163,11 @@ test('a side chat answers mid-turn without stopping the agent, and closing stops
   await expect(dock.getByTestId('side-chat-exchange')).toHaveCount(2)
   await dock.getByRole('button', { name: 'Close side chat' }).click()
   await expect(dock).toHaveCount(0)
+  const asides = page
+    .getByRole('main')
+    .getByRole('region', { name: 'Transcript' })
+    .getByRole('group', { name: 'Aside' })
+  await expect(asides.nth(1).getByRole('button', { name: 'Delete aside' })).toBeVisible({ timeout: 15_000 })
   expect((await apiData<Task>(request, `/tasks/${id}`)).status).toBe('running')
   await page.getByRole('main').getByRole('button', { name: 'Stop', exact: true }).click()
   await expect.poll(async () => (await apiData<Task>(request, `/tasks/${id}`)).status).not.toBe('running')
@@ -241,9 +247,11 @@ test("a grid panel's menu drops Ask aside while the side chat is off", async ({ 
   const title = unique('Side grid off')
   const id = await startAgent(request, title)
   await seedSession(id)
+  const asidesLoaded = page.waitForResponse((r) => r.url().endsWith(`/side-chat/tasks/${id}/asides`) && r.ok())
   await page.goto(`/#agents/${id}`)
   await page.getByRole('button', { name: 'Open in grid' }).click()
   const panel = panelOf(page, title)
+  await asidesLoaded
   try {
     await setModEnabled(request, 'side-chat', false)
     await reloadData(page)

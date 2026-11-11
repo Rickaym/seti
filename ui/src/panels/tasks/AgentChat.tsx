@@ -1,6 +1,7 @@
 import type { MessageRow, ShellProgress, Task } from '@seti/shared'
 import { useEffect, useMemo, type ComponentProps } from 'react'
 import { usePendingSends } from '@/hooks/usePendingSends'
+import { useTranscriptBlocks } from '@/hooks/useTranscriptBlocks'
 import { confirmedIds } from '@/lib/pending-sends'
 import { ChangeRequests } from '@/panels/tasks/ChangeRequests'
 import { CompactingNote } from '@/panels/tasks/CompactingNote'
@@ -59,12 +60,14 @@ export function AgentChat({
 }: AgentChatProps) {
   const running = status === 'running'
   const { store, unsent } = usePendingRows(task.id, transcript.stream.messages)
+  const blocks = useTranscriptBlocks(task.id)
   return (
     <>
       <TranscriptPane
         taskId={task.id}
         {...transcript}
         unsent={unsent}
+        blocks={blocks}
         running={running}
         empty="No messages yet. A reply below starts this agent's first turn."
       >

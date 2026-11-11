@@ -11,7 +11,7 @@ import { seedSession, sideChat } from './support/side-chat.js'
 
 test.use({ serverEnv: FAKE_CLAUDE_ENV })
 
-test('Ask aside opens a bottom sheet that answers, fits the phone and discards the chat on close', async ({
+test('Ask aside opens a bottom sheet that answers, fits the phone and keeps the chat on close', async ({
   page,
   request,
 }) => {
@@ -62,7 +62,7 @@ test('Ask aside opens a bottom sheet that answers, fits the phone and discards t
   await sheet.getByRole('button', { name: 'Close side chat' }).tap()
   await expect(sheet).toHaveCount(0)
   await openAsk()
-  await expect(sideChat(page).getByTestId('side-chat-exchange')).toHaveCount(0)
+  await expect(sideChat(page).getByTestId('side-chat-exchange')).toHaveCount(3)
 })
 
 test('/btw in the reply box asks mid-turn in the side chat sheet and sends nothing to the agent', async ({

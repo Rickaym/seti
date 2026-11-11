@@ -10,7 +10,7 @@ import { interruptedResultIds } from '@/lib/interruptions'
 import { transcriptItems } from '@/lib/rewind'
 import { openFailure } from '@/lib/seti-notes'
 import { isAgentTool } from '@/lib/subtasks'
-import { rowRole, transcriptViews, type RoleContext, type Segment } from '@/lib/tool-groups'
+import { rowRole, transcriptViews, type RoleContext, type Segment, type TranscriptView } from '@/lib/tool-groups'
 import { startsBackground } from '@/lib/tool-summary'
 import {
   indexTranscript,
@@ -27,6 +27,14 @@ import {
   type ToolResultRef,
   type ToolUseBlock,
 } from '@/lib/transcript'
+import {
+  anchorsOf,
+  NO_BLOCKS,
+  placeBlocks,
+  viewStart,
+  type LoadedEdges,
+  type TimedBlock,
+} from '@/lib/transcript-blocks'
 import { FileLink } from '@/panels/files/FileLink'
 import { useFileLinks } from '@/panels/files/file-links'
 import { ASK_TOOL, QuestionCall } from '@/panels/questions/QuestionCall'
@@ -39,6 +47,7 @@ import { ShellEntry } from '@/panels/tasks/ShellEntry'
 import { SubtaskCard } from '@/panels/tasks/SubtaskCard'
 import { OrphanResult, ToolCall } from '@/panels/tasks/ToolCall'
 import { ToolGroup } from '@/panels/tasks/ToolGroup'
+import { TranscriptBlocks } from '@/panels/tasks/TranscriptBlocks'
 import { CompactLine, InitLine, Line, ResultLine } from '@/panels/tasks/TranscriptLines'
 import { NoteLine, Spoken, type TranscriptMarks } from '@/panels/tasks/TranscriptMarks'
 
@@ -53,6 +62,7 @@ const NO_SUBTASKS: LinkedSubtasks = []
 const NO_BACKGROUND: LinkedBackground = []
 const NO_DELIVERIES = new Map<number, ShellDelivery>()
 const NO_MARKS: TranscriptMarks = { voice: new Set(), notes: new Map() }
+const ALL_LOADED: LoadedEdges = { hasOlder: false, hasNewer: false }
 
 export function AgentText({ text }: { text: string }) {
   const links = useFileLinks()
@@ -283,6 +293,8 @@ export const Transcript = memo(function TranscriptList({
   subtasks,
   subagentRows,
   marks = NO_MARKS,
+  blocks,
+  edges = ALL_LOADED,
 }: {
   taskId: string
   messages: readonly MessageRow[]
@@ -291,6 +303,10 @@ export const Transcript = memo(function TranscriptList({
   subtasks: readonly SubtaskBrief[]
   subagentRows: boolean
   marks?: TranscriptMarks
+  /** Blocks mods draw among the rows by time, such as asides. */
+  blocks?: readonly TimedBlock[] | undefined
+  /** What the loaded rows leave out, so a block outside them waits for its page. */
+  edges?: LoadedEdges
 }) {
   const [grouping] = useToolGrouping()
   const index = useMemo(() => indexTranscript(messages), [messages])
@@ -306,6 +322,10 @@ export const Transcript = memo(function TranscriptList({
     const context: RoleContext = { ...index, subagentRows, notes: marks.notes }
     return transcriptViews(items, grouping ? (row) => rowRole(row, context) : null)
   }, [items, index, subagentRows, marks.notes, grouping])
+  const placed = useMemo(
+    () => (blocks === undefined ? NO_BLOCKS : placeBlocks(anchorsOf(views), blocks, edges)),
+    [views, blocks, edges],
+  )
 
   const backgroundOf = (calls: readonly ToolUseBlock[]) =>
     calls.some(startsBackground)
@@ -367,27 +387,41 @@ export const Transcript = memo(function TranscriptList({
     )
   }
 
+  const renderView = (view: TranscriptView) => {
+    if (view.type === 'row' || view.type === 'tools') {
+      return renderSegment(view)
+    }
+    if (view.type === 'note') {
+      return <RewindNote key={`note-${String(view.rewind.id)}`} rewind={view.rewind} />
+    }
+    const first = view.rows[0]?.id ?? 0
+    return (
+      <RewoundGroup
+        key={`rewound-${String(view.rewind.id)}-${String(first)}`}
+        rewind={view.rewind}
+        rows={view.rows}
+        count={view.count}
+      >
+        {view.segments.map(renderSegment)}
+      </RewoundGroup>
+    )
+  }
+
   return (
     <div className="space-y-3">
       {views.map((view) => {
-        if (view.type === 'row' || view.type === 'tools') {
-          return renderSegment(view)
-        }
-        if (view.type === 'note') {
-          return <RewindNote key={`note-${String(view.rewind.id)}`} rewind={view.rewind} />
-        }
-        const first = view.rows[0]?.id ?? 0
-        return (
-          <RewoundGroup
-            key={`rewound-${String(view.rewind.id)}-${String(first)}`}
-            rewind={view.rewind}
-            rows={view.rows}
-            count={view.count}
-          >
-            {view.segments.map(renderSegment)}
-          </RewoundGroup>
+        const first = viewStart(view)?.id
+        const before = first === undefined ? undefined : placed.before.get(first)
+        return before === undefined ? (
+          renderView(view)
+        ) : (
+          <Fragment key={`blocks-${String(first)}`}>
+            <TranscriptBlocks agent={taskId} blocks={before} />
+            {renderView(view)}
+          </Fragment>
         )
       })}
+      <TranscriptBlocks agent={taskId} blocks={placed.after} />
     </div>
   )
 })

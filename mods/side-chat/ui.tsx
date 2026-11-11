@@ -1,21 +1,28 @@
 import { defineMod, textAt } from '@seti/mod-api'
 import { MessageCircleQuestionMark } from 'lucide-react'
+import { asideBlockView } from './AsideBlock'
 import { SIDE_BUSY, sideChatView } from './SideChat'
 import { sideChats } from './chat-store'
 import manifest from './seti-mod.json' with { type: 'json' }
 
 const DOCK = 'chat'
 
-/** The side chat's dock, and Ask aside from /btw, the palette and an agent's menu, which opens it. */
+/**
+ * The side chat's dock, its asides inline in the agent's transcript, and Ask aside from /btw,
+ * the palette and an agent's menu, which opens the dock.
+ */
 export const sideChatUi = defineMod({
   manifest,
   ui: (api) => {
     const chats = sideChats(api)
-    api.registerDock({
-      id: DOCK,
-      icon: MessageCircleQuestionMark,
-      view: sideChatView(api, chats),
-      onClose: chats.reset,
+    api.registerDock({ id: DOCK, icon: MessageCircleQuestionMark, view: sideChatView(api, chats) })
+    api.registerTranscriptBlocks({
+      id: 'asides',
+      watch: chats.watch,
+      blocks: (agent) => chats.view(agent).blocks,
+      subscribe: chats.subscribe,
+      refresh: chats.refresh,
+      view: asideBlockView(api, chats),
     })
     api.registerCommand({
       id: 'ask',

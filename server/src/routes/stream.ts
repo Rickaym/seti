@@ -64,6 +64,8 @@ function dataOf(event: OtherEvent): string {
       return JSON.stringify({ request: event.request, blocked: event.blocked })
     case 'blocked':
       return JSON.stringify({ blocked: event.blocked })
+    case 'blocks':
+      return JSON.stringify({ mod: event.mod })
   }
 }
 

@@ -417,7 +417,9 @@ Settings, Mods shows it with a Core badge and a lock in place of its switch, and
 is part of Seti. Only a bundled mod may be required; Check refuses a third-party manifest that sets
 it, and a theme mod cannot set it either.
 
-This Seti offers mod API 1.20.0, which added `api.app.stepOwnMessages`; 1.19.0 added
+This Seti offers mod API 1.21.0, which added transcript blocks, `api.transcript.refresh` and
+stored asides (`aside.list`, `remove` and `clear` in place of `close`, and `done` events that
+carry the stored aside instead of `turns_left`); 1.20.0 added `api.app.stepOwnMessages`; 1.19.0 added
 `takesTerminalKey` to input hooks; 1.18.0 added fence
 snapshots for share pages; 1.17.0 added
 `required`; 1.16.0 added agent accents; 1.15.0 added agent docks, streaming
@@ -482,8 +484,10 @@ Seti's changelog and update check with `seti.version`, `aside` for side question
 with `streamRoute` instead, writing server-sent events with `stream.send(event, data)` until the
 handler ends; `stream.signal` aborts when the caller leaves, and a throw before the first event is an
 ordinary refusal. `seti.version` and `tasks.ask` are for bundled mods only. `aside` acts as whoever
-asked the mod, the caller of its route or command, and Seti closes every open side chat when the mod
-is turned off. `env('URL')` reads the mod's own `SETI_<ID>_URL` and nothing else of the environment.
+asked the mod, the caller of its route or command. Seti stores each answered question as an aside
+of the agent, which `aside.list` reads and `aside.remove` and `aside.clear` delete, and stops every
+answer being written when the mod is turned off. `transcript.refresh(task)` tells the mod's UI half
+that its transcript blocks for the agent changed (see Transcript blocks below). `env('URL')` reads the mod's own `SETI_<ID>_URL` and nothing else of the environment.
 Registrations are undone when the mod is turned off; `api.onDispose` takes anything else to undo,
 such as a timer. A route marked `"demo": true` answers in the public demo, so a mod lists there
 exactly the routes the demo may use.
@@ -656,6 +660,35 @@ capability, and a route's `request.caller` says whether the user, the EA or an a
 side. With it off, every device shows one agent at a time, its chords and toggles are gone, and the
 saved layouts stay in Seti's table for when it is back. Views use Seti's theme tokens, never raw colours, and a
 view the manifest marks `phone` must work on a phone, with a phone spec beside its desktop spec.
+
+### Transcript blocks
+
+A bundled mod can draw blocks inline in an agent's transcript, among the agent's own rows, such as
+the side chat's asides. Declare a `transcriptBlocks` entry (`id`, `title`), then register a source
+with the same id:
+
+```tsx
+api.registerTranscriptBlocks({
+  id: 'asides',
+  watch: (agent) => store.watch(agent),
+  blocks: (agent) => store.view(agent).blocks,
+  subscribe: store.subscribe,
+  refresh: (agent) => store.reload(agent),
+  view: AsideBlock,
+})
+```
+
+Seti calls `watch` while the agent's transcript shows and the stop it returns once it goes, so the
+mod fetches its blocks from its own routes only then. `blocks` lists the agent's blocks as
+`{ id, at }`, oldest first and the same array until they change, and `subscribe` says when they
+do. Seti places each block before the first row stored after its `at`, or after the newest row,
+and draws it with `view`, which gets `{ agent, id }` and keeps its content in the mod; a block
+from before the loaded rows waits for the earlier page. Each block sits behind its own error
+boundary. The server half calls `api.transcript.refresh(task)` after it changes the agent's
+blocks: Seti sends a `blocks` event with the mod's id on the transcript's stream, and the UI calls
+that mod's `refresh` for the agent. The event carries no content, and a change made while the
+stream was away shows the next time the transcript opens. With the mod off its source is gone, so its blocks do not show and the
+transcript draws as before. `mods/side-chat/` is the example.
 
 ### File viewers
 

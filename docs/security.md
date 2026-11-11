@@ -427,7 +427,8 @@ changelog and update check; and with `workspaces.layout`, each workspace's panel
 core, which checks every layout and refuses a new terminal tile from the EA or an agent, as it does
 on Seti's own route; and with `tasks.ask`, side questions to agents through core's side chat
 engine, which forks the session itself, as whoever asked the mod: the caller of its route or its
-command, so an agent's question gets no file reads and the audit names the asker. A bundled mod holds the capabilities its manifest declares,
+command, so an agent's question gets no file reads, the audit names the asker and each stored
+aside says who asked it. A bundled mod holds the capabilities its manifest declares,
 since it is reviewed with Seti; a third-party mod holds only what the user granted.
 
 Only the user turns on a third-party mod or one whose manifest says `securitySensitive`. The EA,
@@ -807,6 +808,11 @@ The audit log records user, agent and system actions, including outward agent to
 such as pushes, and the calls Claude Code's auto mode classifier turned down. Each event stores the SHA-256 of its fields and of the event before it; the audit
 page verifies the chain, and Seti writes the chain head to the journal every day, which the Seti
 user cannot rewrite. Comparing the two shows whether events were removed or rewritten wholesale.
-A side chat is recorded as `task.side_chat` when it starts, without its questions or answers,
-which stay in the server's memory and are redacted before they reach the browser. It is recorded
-as whoever asked the side chat mod, never as the mod.
+A side chat is recorded as `task.side_chat` when it starts, without its questions or answers.
+Its answers are redacted before they reach the browser or `task_aside`, where Seti keeps each
+answered question as an aside of the agent until the user deletes it or the agent is deleted.
+Deleting one is recorded as `task.aside_deleted` and clearing them as `task.asides_cleared`, with
+who asked and how many, never the content. Each is recorded as whoever asked the side chat mod,
+never as the mod. Asides are read through the mod's routes under the same checks as asking: an
+agent at Seti control Self reads only its own, and an agent holding direct messages the reader is
+not part of is refused.

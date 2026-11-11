@@ -50,29 +50,50 @@ concurrent tasks. The path past that is runner workers that claim tasks from Pos
 one elected process, and per-task cgroup limits beyond the memory and CPU caps below. The storage split
 below exists so that path needs no further migration.
 
-## A side chat forks the session and keeps nothing
+## A side chat forks the session and keeps its answers as asides
 
 Ask aside answers a question from an agent's context without the agent seeing it. The bundled mod
 `mods/side-chat/` owns everything the user and the EA see of it: `/btw <question>` in the composer,
 Ask aside in the command palette and in the More actions menu on a phone or a panel of the grid,
-the dock the answers show in, its routes and the `ask` action. The engine that forks the session
-stays in core, in `server/src/side-chat/`, since no mod runs programs; the mod reaches it through
-the bundled-only `tasks.ask` capability. Seti handles `/btw` itself whether the mod is on or off:
-its catalog entry replaces any Claude Code or plugin command named `btw`, and the messages route
-refuses a `/btw` prompt, so the question never queues for or interrupts the agent. Each question
-starts a short-lived Claude Code process that resumes the
-agent's session with `forkSession` and `persistSession: false`, so it reads the conversation as last
-written to disk and writes nothing back: the agent's process, session file and transcript stay as
-they were, and a running turn goes on. A pending rewind forks at the rewind point with `resumeSessionAt`. The fork runs in the agent's
-sandbox, egress proxy and permission rules, with only Read, Glob and Grep, no MCP servers or hooks,
-and in a `side_chat` memory scope of its own (`server/src/side-chat/options.ts`).
+the dock the answers show in, the asides drawn in the agent's transcript, its routes and its
+`ask`, `asides` and `clear` actions. The engine that forks the session stays in core, in
+`server/src/side-chat/`, since no mod runs programs; the mod reaches it through the bundled-only
+`tasks.ask` capability. Seti handles `/btw` itself whether the mod is on or off: its catalog entry
+replaces any Claude Code or plugin command named `btw`, and the messages route refuses a `/btw`
+prompt, so the question never queues for or interrupts the agent. Each question starts a
+short-lived Claude Code process that resumes the agent's session with `forkSession` and
+`persistSession: false`, so it reads the conversation as last written to disk and writes nothing
+back: the agent's process, session file and transcript rows stay as they were, and a running turn
+goes on. A pending rewind forks at the rewind point with `resumeSessionAt`. The fork runs in the
+agent's sandbox, egress proxy and permission rules, with only Read, Glob and Grep, no MCP servers
+or hooks, and in a `side_chat` memory scope of its own (`server/src/side-chat/options.ts`).
 
-A side chat keeps its questions and answers in the server's memory only, for up to eight
-questions, and forgets them when the user closes it, after 30 idle minutes or on a restart. Its
-cost is the fork's total less the total the session file saved, added to the agent's cost and to
-today's. The audit log records that a side chat started, never what it asked or answered. The EA
-asks through `run_mod_action` and agents at Seti control Full through `mod_side-chat_ask`; an agent's
-fork gets no tools. Turning the mod off closes every open side chat and stops its answers.
+Like Claude Code's `/btw`, an answer stays in the agent's scrollback but never in the conversation
+the model sees. Seti stores each answered question as an aside in `task_aside`
+(`server/src/store/asides.ts`): the question, the answer redacted as it streams, who asked (the
+user, the EA or an agent, with that agent's id), when, what it cost and the chat it belongs to.
+`task_aside` is not `task_message`, so an aside never reaches the agent's session, its compaction
+or transcript search. A failed or stopped answer stores nothing. Asides stay until
+the user deletes them or the agent is deleted; archiving keeps them in the table rather than in
+the archive bundle, so a restored agent has them back and an archived one still shows them.
+
+A follow-up names its chat, and the engine reads that chat's earlier exchanges from the table, so
+a chat goes on after a reload or a restart. Only the newest six exchanges go into the follow-up's
+prompt, each answer cut at 3,000 characters (`REPLAY_EXCHANGES` and `REPLAY_ANSWER_CHARS` in
+`server/src/side-chat/history.ts`): the fork already reads the agent's whole session, so the
+replay only carries the side chat's thread, and the cap keeps every prompt a few thousand tokens
+however long the chat grows. The server's memory holds only the answers being written, at most
+four at once across every agent and one per chat. An answer's cost is the fork's total less the
+total the session file saved, added to the agent's cost and to today's.
+
+The audit log records that a side chat started, that an aside was deleted and how many a clear
+took, never a question or an answer. The EA asks through `run_mod_action` and agents at Seti
+control Full through `mod_side-chat_ask`; an agent's fork gets no tools, and its asides carry its
+name. The mod draws asides inline in the agent's transcript through the `transcriptBlocks` point:
+the UI places each block among the rows by the time it was asked, and the mod's server half calls
+`api.transcript.refresh`, which sends a `blocks` event on the agent's transcript stream, so a new
+or deleted aside shows at once. Turning the mod off stops every answer being written and hides the
+asides; the table keeps them for when it is back.
 
 ## PostgreSQL holds the truth, Redis only helps
 
@@ -311,38 +332,39 @@ once, so no mod can shadow core or another mod. Core registers its own entries t
 registries, so behaviour is unchanged while no mod is on. Names are scoped by the mod id as
 `<mod>.<name>`.
 
-| Point           | Registry                                                           | Takes effect    |
-| --------------- | ------------------------------------------------------------------ | --------------- |
-| Slash commands  | `slashCommands` in `server/src/mods/points.ts`                     | at once         |
-| Commands        | `modCommands`, run through `server/src/mods/commands.ts`           | at once         |
-| Input hooks     | `inputHooks` in `ui/src/lib/input-hooks.ts`                        | at once         |
-| Host proxies    | `hostProxies` in `server/src/subdomain-proxy.ts`                   | at once         |
-| PR decorators   | `prDecorators` in `server/src/pr-decorators.ts`                    | at once         |
-| PR chips        | `prChips` in `ui/src/lib/pr-chips.ts`                              | at once         |
-| Status markers  | `statusMarkers` in `ui/src/lib/status-markers.ts`                  | at once         |
-| Agent accents   | `agentAccents` in `ui/src/lib/status-markers.ts`                   | at once         |
-| Notifications   | `notifyKinds`, with the mod's `<mod>.<kind>`                       | at once         |
-| Audit kinds     | `modAuditKinds`, recorded as `mod.<id>.<kind>`                     | at once         |
-| File extensions | `extensionKinds` in `shared/src/files.ts`                          | at once         |
-| Kinds, pages    | `kindViewers`, `pageExtensions` in `shared/src/file-viewers.ts`    | at once         |
-| Routes          | `modRouteEntries`, under `/api/mods/<id>/`                         | at once         |
-| Demo routes     | a route's `demo` flag, which the demo guard asks                   | at once         |
-| Settings        | the manifest's schema, values in `mod_settings`                    | at once         |
-| Sections        | `sectionRegistry` in `ui/src/lib/sections.ts`                      | at once         |
-| Settings pages  | `settingsPages` in `ui/src/panels/settings/pages.ts`               | at once         |
-| Status bar      | `statusBarItems` in `ui/src/components/status-bar/items.ts`        | at once         |
-| Header band     | `headerViews` in `ui/src/lib/mod-views.ts`                         | at once         |
-| About parts     | `aboutParts`, with news dots in `newsEntries`                      | at once         |
-| File viewers    | `fileViewers` in `ui/src/panels/files/file-viewers.ts`             | at once         |
-| Fence renderers | `fenceRenderers` in `ui/src/lib/fence-renderers.ts`                | at once         |
-| Themes          | `themeRegistry` in `ui/src/components/theme/registry.ts`           | at once         |
-| Styles          | `MOD_STYLES` in `ui/src/mods/bundled.ts`, added to the page        | at once         |
-| Agents layouts  | `agentsLayouts` in `ui/src/panels/tasks/agents-layouts.ts`         | at once         |
-| Terminals       | `terminalSources` in `ui/src/panels/terminal/terminal-sources.ts`  | at once         |
-| Chords          | `modChords` in `ui/src/mods/mod-chords.ts`, checked against Seti's | at once         |
-| Agent docks     | `agentDocks` in `ui/src/panels/tasks/agent-docks.ts`               | at once         |
-| Context         | `modContexts` in `server/src/mods/ops/context.ts`                  | new sessions    |
-| Public paths    | not available yet                                                  | after a restart |
+| Point             | Registry                                                           | Takes effect    |
+| ----------------- | ------------------------------------------------------------------ | --------------- |
+| Slash commands    | `slashCommands` in `server/src/mods/points.ts`                     | at once         |
+| Commands          | `modCommands`, run through `server/src/mods/commands.ts`           | at once         |
+| Input hooks       | `inputHooks` in `ui/src/lib/input-hooks.ts`                        | at once         |
+| Host proxies      | `hostProxies` in `server/src/subdomain-proxy.ts`                   | at once         |
+| PR decorators     | `prDecorators` in `server/src/pr-decorators.ts`                    | at once         |
+| PR chips          | `prChips` in `ui/src/lib/pr-chips.ts`                              | at once         |
+| Status markers    | `statusMarkers` in `ui/src/lib/status-markers.ts`                  | at once         |
+| Agent accents     | `agentAccents` in `ui/src/lib/status-markers.ts`                   | at once         |
+| Transcript blocks | `transcriptBlockSources` in `ui/src/lib/transcript-blocks.ts`      | at once         |
+| Notifications     | `notifyKinds`, with the mod's `<mod>.<kind>`                       | at once         |
+| Audit kinds       | `modAuditKinds`, recorded as `mod.<id>.<kind>`                     | at once         |
+| File extensions   | `extensionKinds` in `shared/src/files.ts`                          | at once         |
+| Kinds, pages      | `kindViewers`, `pageExtensions` in `shared/src/file-viewers.ts`    | at once         |
+| Routes            | `modRouteEntries`, under `/api/mods/<id>/`                         | at once         |
+| Demo routes       | a route's `demo` flag, which the demo guard asks                   | at once         |
+| Settings          | the manifest's schema, values in `mod_settings`                    | at once         |
+| Sections          | `sectionRegistry` in `ui/src/lib/sections.ts`                      | at once         |
+| Settings pages    | `settingsPages` in `ui/src/panels/settings/pages.ts`               | at once         |
+| Status bar        | `statusBarItems` in `ui/src/components/status-bar/items.ts`        | at once         |
+| Header band       | `headerViews` in `ui/src/lib/mod-views.ts`                         | at once         |
+| About parts       | `aboutParts`, with news dots in `newsEntries`                      | at once         |
+| File viewers      | `fileViewers` in `ui/src/panels/files/file-viewers.ts`             | at once         |
+| Fence renderers   | `fenceRenderers` in `ui/src/lib/fence-renderers.ts`                | at once         |
+| Themes            | `themeRegistry` in `ui/src/components/theme/registry.ts`           | at once         |
+| Styles            | `MOD_STYLES` in `ui/src/mods/bundled.ts`, added to the page        | at once         |
+| Agents layouts    | `agentsLayouts` in `ui/src/panels/tasks/agents-layouts.ts`         | at once         |
+| Terminals         | `terminalSources` in `ui/src/panels/terminal/terminal-sources.ts`  | at once         |
+| Chords            | `modChords` in `ui/src/mods/mod-chords.ts`, checked against Seti's | at once         |
+| Agent docks       | `agentDocks` in `ui/src/panels/tasks/agent-docks.ts`               | at once         |
+| Context           | `modContexts` in `server/src/mods/ops/context.ts`                  | new sessions    |
+| Public paths      | not available yet                                                  | after a restart |
 
 Slash commands Seti answers itself never reach an agent: every mod's command, such as the side
 chat's `/btw`, is listed in an agent's composer and refused as a prompt. A slash command of a bundled mod that is off is
