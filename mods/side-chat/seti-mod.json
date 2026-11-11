@@ -95,7 +95,8 @@
       },
       {
         "method": "GET",
-        "path": "/tasks/:task/asides"
+        "path": "/tasks/:task/asides",
+        "demo": true
       },
       {
         "method": "DELETE",

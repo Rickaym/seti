@@ -18,8 +18,8 @@ import { startH2Proxy } from './support/h2-proxy.js'
 /** Seti is reached over HTTP/2 through its tunnel, so every panel streams; the cert is ad hoc. */
 test.use({ ignoreHTTPSErrors: true })
 
-/** Most requests a panel makes as it opens: its stream, its rewinds and one PR status lookup. */
-const PANEL_REQUESTS = 3
+/** Most requests a panel makes as it opens: its stream, rewinds, one PR lookup and its asides. */
+const PANEL_REQUESTS = 4
 
 /** Well above what a panel renders as the grid opens, and well below the cost it once had. */
 const PANEL_RENDERS = 1500
@@ -59,10 +59,13 @@ function openPr(url: string): PullRequest {
   }
 }
 
-/** API requests that belong to one agent: its own routes, and PR lookups for its PRs. */
+/** API requests that belong to one agent: its own routes, mods' routes for it and its PR lookups. */
 function agentOf(request: Request, ids: readonly string[]): string | null {
   const { pathname } = new URL(request.url())
-  const own = ids.find((id) => pathname.startsWith(`/api/tasks/${id}/`))
+  const own = ids.find(
+    (id) =>
+      pathname.startsWith(`/api/tasks/${id}/`) || /^\/api\/mods\/[^/]+\/tasks\/([^/]+)\//.exec(pathname)?.[1] === id,
+  )
   if (own !== undefined) {
     return own
   }

@@ -309,7 +309,8 @@ export interface ModTranscriptSource {
   watch: (agent: string) => () => void
   /** The agent's blocks, oldest first; the same array until they change. */
   blocks: (agent: string) => readonly ModTranscriptBlock[]
-  subscribe: (listener: () => void) => () => void
+  /** Calls `listener` when the agent's blocks may have changed, and for no other agent. */
+  subscribe: (agent: string, listener: () => void) => () => void
   /** Runs when the mod's server half calls `api.transcript.refresh` for the agent. */
   refresh: (agent: string) => void
   view: ComponentType<ModTranscriptBlockProps>

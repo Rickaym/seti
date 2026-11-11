@@ -152,6 +152,26 @@ describe('the side chats store', () => {
     expect(request).toHaveBeenCalledTimes(2)
   })
 
+  it('tells only the agent whose asides changed, and keeps its blocks when a load finds nothing new', async () => {
+    const { api } = fakeApi(answered, [])
+    const chats = sideChats(api)
+    const mine = vi.fn()
+    const theirs = vi.fn()
+    chats.subscribeAgent('t1', mine)
+    chats.subscribeAgent('t2', theirs)
+    const before = chats.view('t1').blocks
+    chats.watch('t1')
+    await vi.waitFor(() => {
+      expect(chats.view('t1').loaded).toBe(true)
+    })
+    expect(chats.view('t1').blocks).toBe(before)
+    expect(theirs).not.toHaveBeenCalled()
+    const calls = mine.mock.calls.length
+    chats.refresh('t1')
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(mine).toHaveBeenCalledTimes(calls)
+  })
+
   it('forgets everything without asking the server, as turning the mod off does', () => {
     const { api, request } = fakeApi(async (onEvent, signal) => {
       onEvent({ type: 'start', chat_id: CHAT })

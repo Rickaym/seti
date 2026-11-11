@@ -672,7 +672,7 @@ api.registerTranscriptBlocks({
   id: 'asides',
   watch: (agent) => store.watch(agent),
   blocks: (agent) => store.view(agent).blocks,
-  subscribe: store.subscribe,
+  subscribe: (agent, listener) => store.subscribe(agent, listener),
   refresh: (agent) => store.reload(agent),
   view: AsideBlock,
 })
@@ -681,7 +681,8 @@ api.registerTranscriptBlocks({
 Seti calls `watch` while the agent's transcript shows and the stop it returns once it goes, so the
 mod fetches its blocks from its own routes only then. `blocks` lists the agent's blocks as
 `{ id, at }`, oldest first and the same array until they change, and `subscribe` says when they
-do. Seti places each block before the first row stored after its `at`, or after the newest row,
+do for that agent alone, so one agent's change never redraws another's transcript; Seti redraws
+only when `blocks` hands over a new array. Seti places each block before the first row stored after its `at`, or after the newest row,
 and draws it with `view`, which gets `{ agent, id }` and keeps its content in the mod; a block
 from before the loaded rows waits for the earlier page. Each block sits behind its own error
 boundary. The server half calls `api.transcript.refresh(task)` after it changes the agent's

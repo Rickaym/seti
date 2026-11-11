@@ -20,7 +20,7 @@ export const sideChatUi = defineMod({
       id: 'asides',
       watch: chats.watch,
       blocks: (agent) => chats.view(agent).blocks,
-      subscribe: chats.subscribe,
+      subscribe: chats.subscribeAgent,
       refresh: chats.refresh,
       view: asideBlockView(api, chats),
     })

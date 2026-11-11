@@ -47,12 +47,20 @@ const EMPTY: AgentAsides = {
 }
 
 /** The state with its derived fields worked out again. */
-function settled(state: AgentState): AgentAsides {
+function settled(state: AgentState, before: AgentAsides): AgentAsides {
   const stored = state.asides.map((aside) => ({ id: aside.id, at: aside.asked_at }))
   const pending = state.pending?.state === 'answering' ? state.pending : null
   const live = pending === null ? [] : [{ id: PENDING, at: pending.asked_at }]
-  return { ...state, answering: pending !== null, blocks: [...stored, ...live] }
+  const next = [...stored, ...live]
+  const same = next.length === before.blocks.length && next.every((b, i) => sameBlock(b, before.blocks[i]))
+  return { ...state, answering: pending !== null, blocks: same ? before.blocks : next }
 }
+
+const sameBlock = (a: ModTranscriptBlock, b: ModTranscriptBlock | undefined) => a.id === b?.id && a.at === b.at
+
+/** The same asides by id and answer, so a load that found nothing new changes nothing. */
+const sameAsides = (a: readonly Aside[], b: readonly Aside[]) =>
+  a.length === b.length && a.every((aside, i) => aside.id === b[i]?.id && aside.answer === b[i].answer)
 
 /** The chat a question follows up: the newest aside's, unless the user started a new one. */
 const chatFor = (state: AgentAsides): string | null => (state.startNew ? null : (state.asides.at(-1)?.chat_id ?? null))
@@ -77,22 +85,29 @@ export function sideChats(api: Pick<UiModApi, 'request' | 'stream' | 'kit'>) {
   const watchers = new Map<string, number>()
   const inFlight = new Map<string, AbortController>()
   const listeners = new Set<() => void>()
-  const notify = () => {
-    for (const listener of listeners) {
+  const agentListeners = new Map<string, Set<() => void>>()
+  /** Tells every view, and the transcript of `agent` alone, or of every agent without one. */
+  const notify = (agent?: string) => {
+    const scoped = agent === undefined ? [...agentListeners.values()] : [agentListeners.get(agent) ?? new Set()]
+    for (const listener of [...listeners, ...scoped.flatMap((set) => [...set])]) {
       listener()
     }
   }
   const view = (agent: string): AgentAsides => states.get(agent) ?? EMPTY
   const change = (agent: string, next: (state: AgentAsides) => AgentState) => {
-    states.set(agent, settled(next(view(agent))))
-    notify()
+    const before = view(agent)
+    states.set(agent, settled(next(before), before))
+    notify(agent)
   }
 
   const reload = (agent: string) => {
     api
       .request<AsideList>('GET', path(agent, '/asides'))
       .then(({ asides }) => {
-        change(agent, (state) => ({ ...state, loaded: true, asides }))
+        const state = view(agent)
+        if (!state.loaded || !sameAsides(state.asides, asides)) {
+          change(agent, (current) => ({ ...current, loaded: true, asides }))
+        }
       })
       .catch(() => undefined)
   }
@@ -168,6 +183,17 @@ export function sideChats(api: Pick<UiModApi, 'request' | 'stream' | 'kit'>) {
       listeners.add(listener)
       return () => {
         listeners.delete(listener)
+      }
+    },
+    /** Like subscribe, for one agent's changes only, as the transcript reads them. */
+    subscribeAgent: (agent: string, listener: () => void) => {
+      const set = agentListeners.get(agent) ?? new Set()
+      agentListeners.set(agent, set.add(listener))
+      return () => {
+        set.delete(listener)
+        if (set.size === 0) {
+          agentListeners.delete(agent)
+        }
       }
     },
     view,
