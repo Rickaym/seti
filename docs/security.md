@@ -219,9 +219,9 @@ underscores, never a variable Seti sets), a short purpose and, in the sandbox, t
 receive it. The value never reaches the agent's context, its transcript, the question rows, the
 audit log, the server log or the EA.
 
-- The user enters the value on the Questions page in a masked field with show and hide. Submit all
-  sends it alone to `POST /api/questions/:id/secret`, never in the answers batch, and the page
-  drops it from memory once it is sent. The general answers route refuses an answer to a secret
+- The user enters the value on the Questions page or in the agent's Questions drawer, in a masked
+  field with show and hide. Submit sends it alone to `POST /api/questions/:id/secret`, never in
+  the answers batch, and the form drops it from memory once it is sent or the drawer closes. The general answers route refuses an answer to a secret
   question with 400.
 - `supplySecret` in `server/src/secret-questions.ts` refuses the EA, agents' Seti tools and mods in
   the core function, and the route refuses the EA as well. The EA lists a secret question with its

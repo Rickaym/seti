@@ -32,6 +32,7 @@ import { FilesSplit } from '@/panels/files/FilesSplit'
 import { useFilesPane } from '@/panels/files/useFilesPane'
 import { ProcessesSheet } from '@/panels/processes/ProcessesPanel'
 import { useAgentProcesses } from '@/panels/processes/useAgentProcesses'
+import { useQuestionsPane } from '@/panels/questions/useQuestionsPane'
 import { AgentChat } from '@/panels/tasks/AgentChat'
 import { AgentDockArea } from '@/panels/tasks/AgentDock'
 import { AgentHeader } from '@/panels/tasks/AgentHeader'
@@ -103,6 +104,7 @@ export function TaskDetail({ task, onChanged, onSubtasks }: TaskDetailProps) {
   const [draft, setDraft] = useDraft(taskDraftKey(task.id))
   const [rewinding, setRewinding] = useState(false)
   const filesPane = useFilesPane(task.id)
+  const questionsPane = useQuestionsPane(task.id, filesPane)
   const hasTerminal = useAgentHasTerminal(task.id)
   const narrow = useNarrow()
   const frame = useAgentFrame()
@@ -234,6 +236,7 @@ export function TaskDetail({ task, onChanged, onSubtasks }: TaskDetailProps) {
     processes: () => {
       processes.setOpen(true)
     },
+    questions: questionsPane.toggle,
     pin: (pinned) => void pin(pinned),
     rename: () => {
       setTitleDraft(task.title)
@@ -242,7 +245,7 @@ export function TaskDetail({ task, onChanged, onSubtasks }: TaskDetailProps) {
     endBackground: () => void endSession(),
   }
   return (
-    <FilesSplit taskId={task.id} pane={filesPane} readOnly={false}>
+    <FilesSplit taskId={task.id} pane={filesPane} questions={questionsPane} readOnly={false}>
       <div
         ref={root}
         {...agentColorAttr(task.color)}

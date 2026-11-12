@@ -34,20 +34,27 @@ export function QuestionsButton() {
   )
 }
 
-/** The agent's open questions in its header, which open the Questions page; hidden while none are. */
-export function AgentQuestionsButton({ taskId, compact = false }: { taskId: string; compact?: boolean }) {
+interface AgentQuestionsButtonProps {
+  taskId: string
+  /** Opens or closes the agent's Questions drawer. */
+  onToggle: () => void
+  compact?: boolean
+}
+
+/** The agent's open questions in its header, which open its drawer; hidden while none are. */
+export function AgentQuestionsButton({ taskId, onToggle, compact = false }: AgentQuestionsButtonProps) {
   const count = useAgentQuestionCount(taskId)
   if (count === 0) {
     return null
   }
   return (
-    <Hint text="Answer it on the Questions page, with every other agent's">
+    <Hint text="Answer this agent's questions beside it">
       <Button
         variant="outline"
         size={compact ? 'icon-sm' : 'sm'}
         className="relative"
         aria-label={`Answer ${questionCount(count)}`}
-        onClick={openQuestions}
+        onClick={onToggle}
       >
         <MessageCircleQuestion />
         {compact ? <CountBadge aria-hidden>{count}</CountBadge> : questionCount(count)}

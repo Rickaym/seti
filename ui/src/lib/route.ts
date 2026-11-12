@@ -37,10 +37,39 @@ let currentHash = window.location.hash
 /** The card a redirected old link points at, kept until the hash changes again. */
 let card: string | null = null
 
+const DEPTH_KEY = 'setiDepth'
+
+/** How many of Seti's own history entries lie behind the one whose state this is, if stamped. */
+function depthOf(state: unknown): number | null {
+  if (typeof state !== 'object' || state === null) {
+    return null
+  }
+  const depth = (state as Record<string, unknown>)[DEPTH_KEY]
+  return typeof depth === 'number' ? depth : null
+}
+
+function stampDepth(depth: number): void {
+  const state: unknown = window.history.state
+  const kept = typeof state === 'object' && state !== null ? state : {}
+  window.history.replaceState({ ...kept, [DEPTH_KEY]: depth }, '')
+}
+
+let depth = depthOf(window.history.state) ?? 0
+if (depthOf(window.history.state) === null) {
+  stampDepth(depth)
+}
+
 window.addEventListener('hashchange', () => {
   previousHash = currentHash
   currentHash = window.location.hash
   card = null
+  const stamped = depthOf(window.history.state)
+  if (stamped === null) {
+    depth += 1
+    stampDepth(depth)
+  } else {
+    depth = stamped
+  }
 })
 
 /** The id of the card an old link to a merged page meant, such as the SSH hosts card. */
@@ -172,6 +201,19 @@ export function goUp(section: SectionKey) {
     return
   }
   navigate(section)
+}
+
+/** Steps back to where the user was in Seti, or opens the section's list when Seti opened here. */
+export function goBack(section: SectionKey) {
+  if (depth === 0) {
+    navigate(section)
+    return
+  }
+  void mayLeave().then((ok) => {
+    if (ok) {
+      window.history.back()
+    }
+  })
 }
 
 /** Changes the hash after any leave guard agrees; `force` skips guards after a save or delete. */
