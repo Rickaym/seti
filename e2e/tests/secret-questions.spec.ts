@@ -1,7 +1,7 @@
 import { MERGE_PROMPT, MERGE_QUESTION, MERGE_RECOMMENDED } from './support/fake-question.js'
 import { expect, test } from './support/fixtures.js'
 import { FAKE_CLAUDE_ENV } from './support/processes.js'
-import { agentQuestions, askingAgent, lastReply, sentLine } from './support/questions.js'
+import { agentQuestions, askingAgent, lastReply, sentLine, sentToast } from './support/questions.js'
 import { expectKeptOut, fixtureValue, SECRET_NAME, SECRET_PURPOSE, secretAgent } from './support/secret-questions.js'
 
 test.use({ serverEnv: FAKE_CLAUDE_ENV })
@@ -35,8 +35,8 @@ test('an agent asks for a secret and gets only the path of the file the user fil
   await expect(sentLine(page)).toHaveText('2 of 2 answered')
   await page.getByRole('button', { name: 'Submit all' }).click()
 
-  await expect(sentLine(page)).toContainText('Sent 2 answers. Going on:')
-  await expect(page.getByText('No open questions.')).toBeVisible()
+  await expect(sentToast(page, 'Sent 2 answers. Going on:')).toBeVisible()
+  await expect(page).toHaveURL(/#agents$/)
   await expect
     .poll(async () => lastReply(request, merger.id))
     .toBe(`Got your answers. ${MERGE_QUESTION} ${MERGE_RECOMMENDED}`)

@@ -36,26 +36,35 @@ function merged(answers: AnswerQuestionsResult, secrets: number, resumed: readon
   return { ...answers, answered: answers.answered + secrets, resumed: agents }
 }
 
+/** What one send did: its summary line, or null when it failed, and the ids that went out. */
+interface SendResult {
+  summary: string | null
+  sent: readonly string[]
+}
+
 /** Sends secrets, answers and dismissals, and says what went out; `onSent` gets the ids that did. */
 export function useSend(onSent: (ids: readonly string[]) => void) {
   const [sending, setSending] = useState(false)
   const [summary, setSummary] = useState<string | null>(null)
-  const send = (items: QuestionAnswerItem[], secrets: readonly SecretEntry[] = []) => {
+  const send = async (items: QuestionAnswerItem[], secrets: readonly SecretEntry[] = []): Promise<SendResult> => {
     setSending(true)
     const sent: string[] = []
-    sendSecrets(secrets, sent)
-      .then(async (resumed) => {
-        const answers =
-          items.length === 0 ? NOTHING : await apiPost<AnswerQuestionsResult>('/questions/answers', { items })
-        sent.push(...items.map((item) => item.id))
-        setSummary(sentSummary(merged(answers, resumed.length, resumed)))
-      })
-      .catch((e: unknown) => toast.error(errorText(e)))
-      .finally(() => {
-        onSent(sent)
-        setSending(false)
-        refreshQuestions()
-      })
+    let line: string | null = null
+    try {
+      const resumed = await sendSecrets(secrets, sent)
+      const answers =
+        items.length === 0 ? NOTHING : await apiPost<AnswerQuestionsResult>('/questions/answers', { items })
+      sent.push(...items.map((item) => item.id))
+      line = sentSummary(merged(answers, resumed.length, resumed))
+      setSummary(line)
+    } catch (e) {
+      toast.error(errorText(e))
+    } finally {
+      onSent(sent)
+      setSending(false)
+      refreshQuestions()
+    }
+    return { summary: line, sent }
   }
   return { send, sending, summary }
 }

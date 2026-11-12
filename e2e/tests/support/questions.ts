@@ -1,7 +1,7 @@
 import type { APIRequestContext, Page } from '@playwright/test'
 import type { Envelope, MessagePage, Task } from '@seti/shared'
 import { paths } from './env.js'
-import { apiData, expect, unique } from './fixtures.js'
+import { apiData, expect, toasts, unique } from './fixtures.js'
 
 /** Starts an agent on a question prompt and waits until its questions hold it in Needs you. */
 export async function askingAgent(request: APIRequestContext, name: string, prompt: string): Promise<Task> {
@@ -48,3 +48,9 @@ export const agentQuestions = (page: Page, task: Task) =>
 
 /** The Questions page's line saying how many are answered, then what Submit all sent. */
 export const sentLine = (page: Page) => page.getByRole('main').getByRole('status')
+
+/** The Questions drawer beside an agent, which holds only that agent's questions. */
+export const questionsDrawer = (page: Page) => page.getByRole('region', { name: 'Agent questions' })
+
+/** The toast a send that settled every question shows as it closes the page or the drawer. */
+export const sentToast = (page: Page, text: string | RegExp) => toasts(page).filter({ hasText: text })

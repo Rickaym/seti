@@ -592,10 +592,22 @@ a question (`server/src/turn-asking.ts`) reads only the prose after the last too
 fallback for an agent that asks in text.
 
 The Questions page (`#agents/questions`, from Questions in the Agents list's More menu at any
-time, the Go to palette, and the buttons in the Agents list header and an agent's header while
-questions are open) lists every open question by agent, oldest first, with the
-control its type takes, Dismiss per question, Skip per agent and one Submit all, and says what it
-sent. In the transcript an AskUserQuestion call shows each question and, once settled, its answer.
+time, the Go to palette, and the Agents list header button while questions are open) lists every
+open question by agent, oldest first, with the control its type takes, Dismiss per question, Skip
+per agent and one Submit all. Its Back button steps back through Seti's own history, which
+`ui/src/lib/route.ts` counts in each entry's history state, or opens the Agents list when Seti
+opened on the page. Once a send leaves no question open, the page goes back the same way and says
+what it sent in a toast; while some stay open it says so on its status line.
+
+One agent's questions open in its Questions drawer, from "N questions" in the agent's header or
+Answer on an AskUserQuestion call in its transcript, with the same fields, Submit, Dismiss and
+Skip (`QuestionsForm`). The drawer shares the agent's side pane with Files, one at a time, so the
+chat keeps its width: opening one closes the other, after any unsaved note may go. It is docked
+and resizable beside the agent on a wide screen and covers the screen on a phone; in a layout such
+as the grid it opens in the shared dock Files uses. It closes itself once the agent has no
+question open, however they were settled. Opening an asking agent from Needs you opens its drawer
+straight away (`ui/src/panels/questions/open-questions.ts`, like a file handed to Files). In the
+transcript an AskUserQuestion call shows each question and, once settled, its answer.
 The EA lists the open questions with `search_seti` in `questions`, reads them out by type and
 passes on the user's answer with `answer_question`, which calls the same route; its prompt holds it
 to what the user said.

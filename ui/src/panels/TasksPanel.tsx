@@ -28,6 +28,7 @@ import { relativeTime } from '@/lib/time'
 import { cn } from '@/lib/utils'
 import { QuestionsPage } from '@/panels/questions/QuestionsPage'
 import { QUESTIONS_ROUTE } from '@/panels/questions/route'
+import { useOpenFromNeedsYou } from '@/panels/questions/useQuestionsPane'
 import { bytesLabel } from '@/panels/resources/format'
 import { AgentFilter } from '@/panels/tasks/AgentFilter'
 import { AgentView } from '@/panels/tasks/AgentView'
@@ -62,6 +63,11 @@ interface TaskButtonProps {
   /** A layout that takes agents shows, so the row drags onto it. */
   draggable: boolean
   place: 'list' | 'needsYou'
+  onOpen: (taskId: string) => void
+}
+
+const showAgent = (taskId: string) => {
+  navigate('agents', taskId)
 }
 
 /** How far the agent is through its todo list, shown only while items remain. */
@@ -83,7 +89,7 @@ function TodoCount({ todos }: { todos: readonly AgentTodo[] }) {
 }
 
 /** One agent as one line, the same height whatever it holds. */
-function TaskButton({ row, selected, draggable, place }: TaskButtonProps) {
+function TaskButton({ row, selected, draggable, place, onOpen }: TaskButtonProps) {
   const { task, running, status } = row
   const reason = reasonLine(task, status)
   return (
@@ -97,7 +103,7 @@ function TaskButton({ row, selected, draggable, place }: TaskButtonProps) {
         event.dataTransfer.setData('text/plain', task.title)
       }}
       onClick={() => {
-        navigate('agents', task.id)
+        onOpen(task.id)
       }}
       className={cn(ROW, 'agent-stripe', selected && (task.color === null ? 'bg-accent' : 'agent-tint'))}
     >
@@ -233,9 +239,16 @@ function ActiveList({
     [tasks, live, selectedId],
   )
   const { needsYou, others } = useMemo(() => groupAgents(filterAgents(rows, query)), [rows, query])
+  const fromNeedsYou = useOpenFromNeedsYou()
   const item = (place: 'list' | 'needsYou') => (row: AgentRow) => (
     <div key={row.task.id} data-task-id={row.task.id}>
-      <TaskButton row={row} selected={row.task.id === selectedId} draggable={draggable} place={place} />
+      <TaskButton
+        row={row}
+        selected={row.task.id === selectedId}
+        draggable={draggable}
+        place={place}
+        onOpen={place === 'needsYou' ? fromNeedsYou : showAgent}
+      />
     </div>
   )
   if (tasks.length === 0) {

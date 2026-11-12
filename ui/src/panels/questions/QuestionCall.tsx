@@ -4,9 +4,8 @@ import { useEffect, useState } from 'react'
 import { apiGet } from '@/api'
 import { Button } from '@/components/ui/button'
 import { useAgentQuestionCount } from '@/hooks/useQuestions'
-import { navigate } from '@/lib/route'
 import type { ToolUseBlock } from '@/lib/transcript'
-import { QUESTIONS_ROUTE } from '@/panels/questions/route'
+import { openQuestionsIn } from '@/panels/questions/open-questions'
 
 /** Claude Code's tool for asking the user, whose calls show as their questions and answers. */
 export const ASK_TOOL = 'AskUserQuestion'
@@ -87,7 +86,7 @@ export function QuestionCall({ taskId, block, done }: { taskId: string; block: T
           <Button
             size="xs"
             onClick={() => {
-              navigate('agents', QUESTIONS_ROUTE)
+              openQuestionsIn(taskId)
             }}
           >
             Answer

@@ -106,7 +106,7 @@ export function AgentHeader(props: AgentHeaderProps) {
         pill={pill}
         subagents={
           <>
-            <AgentQuestionsButton taskId={task.id} compact />
+            <AgentQuestionsButton taskId={task.id} onToggle={on.questions} compact />
             <SubagentsButton taskId={task.id} subtasks={subtasks} compact />
           </>
         }
@@ -149,7 +149,7 @@ export function AgentHeader(props: AgentHeaderProps) {
               Stop background work
             </Button>
           )}
-          <AgentQuestionsButton taskId={task.id} />
+          <AgentQuestionsButton taskId={task.id} onToggle={on.questions} />
           <SubagentsButton taskId={task.id} subtasks={subtasks} />
           <FindButton onClick={on.find} />
           <ProcessesButton processes={props.processes} />

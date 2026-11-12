@@ -2,7 +2,7 @@ import { listedStatus, waitsOnYou, type TaskListEntry } from '@seti/shared'
 import { CircleAlert } from 'lucide-react'
 import { useNeedsYou } from '@/hooks/useNeedsYou'
 import { agentColorAttr } from '@/lib/agent-color-sheet'
-import { navigate } from '@/lib/route'
+import { useOpenFromNeedsYou } from '@/panels/questions/useQuestionsPane'
 import { StatusLight } from '@/panels/tasks/StatusPill'
 import { reasonLine } from '@/panels/tasks/status-label'
 
@@ -11,6 +11,7 @@ const SHOWN = 3
 /** The agents that cannot go on without the user, first on the page; nothing when none wait. */
 export function NeedsYouStrip({ tasks }: { tasks: readonly TaskListEntry[] }) {
   const { open } = useNeedsYou()
+  const openAgent = useOpenFromNeedsYou()
   const waiting = tasks
     .map((task) => ({ task, status: listedStatus(task) }))
     .filter(({ task, status }) => waitsOnYou(task, status))
@@ -37,7 +38,7 @@ export function NeedsYouStrip({ tasks }: { tasks: readonly TaskListEntry[] }) {
           type="button"
           {...agentColorAttr(task.color)}
           onClick={() => {
-            navigate('agents', task.id)
+            openAgent(task.id)
           }}
           className="agent-stripe flex min-w-0 items-center gap-2 border border-border py-1 pr-2 pl-3 text-left outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring md:max-w-80"
         >

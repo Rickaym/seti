@@ -32,7 +32,7 @@ export function PhoneHeader({ task, title, light, subtasks, settings, running, o
       {light}
       <div className="flex min-w-0 flex-1 items-center px-1 [&>h2]:text-sm">{title}</div>
       <DetailBarActions>
-        <AgentQuestionsButton taskId={task.id} compact />
+        <AgentQuestionsButton taskId={task.id} onToggle={on.questions} compact />
         <PhonePrsButton task={task} />
         {running.busy && (
           <Button variant="ghost" size="icon-sm" aria-label="Stop" onClick={on.stop}>

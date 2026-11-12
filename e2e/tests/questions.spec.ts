@@ -2,7 +2,7 @@ import type { Question } from '@seti/shared'
 import { CHECKS_PROMPT, CHECKS_QUESTION, PUSH_PROMPT, PUSH_QUESTION, REPORT_QUESTION } from './support/fake-question.js'
 import { apiData, expect, test } from './support/fixtures.js'
 import { FAKE_CLAUDE_ENV } from './support/processes.js'
-import { agentQuestions, askingAgent, lastReply, sentLine } from './support/questions.js'
+import { agentQuestions, askingAgent, lastReply, sentLine, sentToast } from './support/questions.js'
 
 test.use({ serverEnv: FAKE_CLAUDE_ENV })
 
@@ -21,7 +21,7 @@ test('two agents ask through AskUserQuestion and one Submit all answers both', a
   await expect(call).toContainText('Asked you 2 questions')
   await expect(call).toContainText(`Checks: ${CHECKS_QUESTION}`)
   await expect(call).toContainText('Waiting for you')
-  await page.getByRole('button', { name: 'Answer 2 questions' }).click()
+  await page.getByRole('button', { name: /^Questions, \d+ questions open$/ }).click()
 
   await expect(page.getByRole('heading', { name: 'Questions' })).toBeVisible()
   const push = agentQuestions(page, pusher)
@@ -35,8 +35,9 @@ test('two agents ask through AskUserQuestion and one Submit all answers both', a
   await expect(sentLine(page)).toHaveText('3 of 3 answered')
   await page.getByRole('button', { name: 'Submit all' }).click()
 
-  await expect(sentLine(page)).toContainText('Sent 3 answers. Going on:')
-  await expect(page.getByText('No open questions.')).toBeVisible()
+  await expect(page).toHaveURL(new RegExp(`#agents/${checker.id}$`))
+  await expect(sentToast(page, /Sent 3 answers\. Going on:/)).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Questions' })).toHaveCount(0)
   await expect(page.getByRole('button', { name: /^Questions, / })).toHaveCount(0)
   await expect.poll(async () => lastReply(request, pusher.id)).toBe(`Got your answers. ${PUSH_QUESTION} Yes`)
   await expect
@@ -50,16 +51,51 @@ test('two agents ask through AskUserQuestion and one Submit all answers both', a
   await expect(page.getByRole('button', { name: 'Answer 2 questions' })).toHaveCount(0)
 })
 
-test("Skip dismisses an agent's questions and it goes on without answers", async ({ page, request }) => {
+test("Skip dismisses an agent's questions, it goes on, and the page opened directly closes to the list", async ({
+  page,
+  request,
+}) => {
   const skipped = await askingAgent(request, 'Skipped', PUSH_PROMPT)
   await page.goto('/#agents/questions')
   const group = agentQuestions(page, skipped)
   await group.getByRole('button', { name: `Skip ${skipped.title}` }).click()
   await expect(group).toHaveCount(0)
+  await expect(page).toHaveURL(/#agents$/)
+  await expect(sentToast(page, /dismissed 1 question/)).toBeVisible()
   await expect
     .poll(async () => lastReply(request, skipped.id))
     .toMatch(/^No answers: The user dismissed your questions/)
   await expect
     .poll(async () => (await apiData<{ blocked: string | null }>(request, `/tasks/${skipped.id}`)).blocked)
     .toBeNull()
+})
+
+test('the page stays while questions remain, and Back returns to where the user came from', async ({
+  page,
+  request,
+}) => {
+  const pusher = await askingAgent(request, 'Stayer', PUSH_PROMPT)
+  const checker = await askingAgent(request, 'Waiter', CHECKS_PROMPT)
+  await page.goto(`/#agents/${pusher.id}`)
+  await page.getByRole('button', { name: /^Questions, \d+ questions open$/ }).click()
+  await expect(page).toHaveURL(/#agents\/questions$/)
+  await agentQuestions(page, pusher).getByRole('radio', { name: 'No' }).click()
+  await page.getByRole('button', { name: 'Submit all' }).click()
+
+  await expect(sentLine(page)).toContainText('Sent 1 answer')
+  await expect(page).toHaveURL(/#agents\/questions$/)
+  await expect(agentQuestions(page, checker)).toBeVisible()
+  await expect(agentQuestions(page, pusher)).toHaveCount(0)
+  await page.getByRole('button', { name: 'Back', exact: true }).click()
+  await expect(page).toHaveURL(new RegExp(`#agents/${pusher.id}$`))
+
+  await page.goto('about:blank')
+  await page.goto('/#agents/questions')
+  await page.getByRole('button', { name: 'Back', exact: true }).click()
+  await expect(page).toHaveURL(/#agents$/)
+  await expect(page.getByRole('heading', { name: 'Questions' })).toHaveCount(0)
+  await page.goto('/#agents/questions')
+  await page.getByRole('button', { name: `Skip ${checker.title}` }).click()
+  await expect(page).toHaveURL(/#agents$/)
+  expect(await apiData<Question[]>(request, '/questions')).toEqual([])
 })
