@@ -591,13 +591,16 @@ every agent to ask through AskUserQuestion instead of in its reply. The guess th
 a question (`server/src/turn-asking.ts`) reads only the prose after the last tool use, the
 fallback for an agent that asks in text.
 
-The Questions page (`#agents/questions`, from Questions in the Agents list's More menu at any
-time, the Go to palette, and the Agents list header button while questions are open) lists every
-open question by agent, oldest first, with the control its type takes, Dismiss per question, Skip
-per agent and one Submit all. Its Back button steps back through Seti's own history, which
-`ui/src/lib/route.ts` counts in each entry's history state, or opens the Agents list when Seti
-opened on the page. Once a send leaves no question open, the page goes back the same way and says
-what it sent in a toast; while some stay open it says so on its status line.
+The Questions page (`#questions`, the Questions section in the sidebar's Work group below Agents,
+also in the Go to palette) lists every open question by agent, oldest first, with the control its
+type takes, Dismiss per question, Skip per agent and one Submit all. Its Back button steps back
+through Seti's own history, which `ui/src/lib/route.ts` counts in each entry's history state, or
+opens the Agents list when Seti opened on the page. Once a send leaves no question open, the page goes back the same way and says
+what it sent in a toast; while some stay open it says so on its status line. The section's row in
+the sidebar and in the phone menu shows how many questions are open, from the `badge` the section
+declares in `ui/src/lib/sections.ts`, as Context counts the knowledge proposals that wait. The
+section has no Alt digit, so Context and Settings keep Alt+4 and Alt+5. The old
+`#agents/questions` address redirects to `#questions`.
 
 One agent's questions open in its Questions drawer, from "N questions" in the agent's header or
 Answer on an AskUserQuestion call in its transcript, with the same fields, Submit, Dismiss and

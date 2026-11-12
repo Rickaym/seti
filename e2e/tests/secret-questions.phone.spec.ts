@@ -1,7 +1,7 @@
 import { expect, test } from './support/fixtures.js'
 import { expectFitsPhone } from './support/phone-layout.js'
 import { FAKE_CLAUDE_ENV } from './support/processes.js'
-import { agentQuestions, sentLine, sentToast } from './support/questions.js'
+import { agentQuestions, openQuestionsFromMenu, sentLine, sentToast } from './support/questions.js'
 import { expectKeptOut, fixtureValue, SECRET_NAME, secretAgent } from './support/secret-questions.js'
 
 test.use({ serverEnv: FAKE_CLAUDE_ENV })
@@ -12,9 +12,7 @@ test('on a phone the user enters a secret on the Questions page and the agent ge
 }) => {
   const asker = await secretAgent(request, 'Phone speech')
   await page.goto('/#agents')
-  const header = page.getByRole('heading', { name: 'Agents', level: 1 }).locator('..')
-  await header.getByRole('button', { name: 'More list actions' }).tap()
-  await page.getByRole('menuitem', { name: /^Questions/ }).tap()
+  await openQuestionsFromMenu(page)
   await expect(page.getByRole('heading', { name: 'Questions' })).toBeVisible()
   await expectFitsPhone(page, 'Questions with a secret')
 

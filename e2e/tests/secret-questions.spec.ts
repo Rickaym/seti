@@ -1,7 +1,15 @@
 import { MERGE_PROMPT, MERGE_QUESTION, MERGE_RECOMMENDED } from './support/fake-question.js'
 import { expect, test } from './support/fixtures.js'
 import { FAKE_CLAUDE_ENV } from './support/processes.js'
-import { agentQuestions, askingAgent, lastReply, sentLine, sentToast } from './support/questions.js'
+import {
+  agentQuestions,
+  askingAgent,
+  lastReply,
+  questionsSection,
+  sectionCount,
+  sentLine,
+  sentToast,
+} from './support/questions.js'
 import { expectKeptOut, fixtureValue, SECRET_NAME, SECRET_PURPOSE, secretAgent } from './support/secret-questions.js'
 
 test.use({ serverEnv: FAKE_CLAUDE_ENV })
@@ -12,8 +20,7 @@ test('an agent asks for a secret and gets only the path of the file the user fil
   expect(asker.blocked).toBe(`Asks a question: the secret ${SECRET_NAME}, ${SECRET_PURPOSE}`)
 
   await page.goto('/#agents')
-  await page.getByRole('main').getByRole('button', { name: 'More list actions' }).click()
-  await page.getByRole('menuitem', { name: /^Questions/ }).click()
+  await questionsSection(page).click()
   await expect(page.getByRole('heading', { name: 'Questions' })).toBeVisible()
 
   const secret = agentQuestions(page, asker)
@@ -43,10 +50,10 @@ test('an agent asks for a secret and gets only the path of the file the user fil
   await expectKeptOut(page, request, asker, value)
 })
 
-test('Questions stays in the list menu with nothing open, and the palette opens it', async ({ page }) => {
+test('Questions stays in the sidebar with nothing open, and the palette opens it', async ({ page }) => {
   await page.goto('/#agents')
-  await page.getByRole('main').getByRole('button', { name: 'More list actions' }).click()
-  await page.getByRole('menuitem', { name: /^Questions/ }).click()
+  await expect(sectionCount(questionsSection(page))).toHaveCount(0)
+  await questionsSection(page).click()
   await expect(page.getByRole('heading', { name: 'Questions' })).toBeVisible()
   await page.goto('/#home')
   await page.keyboard.press('Control+k')
@@ -54,6 +61,6 @@ test('Questions stays in the list menu with nothing open, and the palette opens 
   await expect(search).toBeFocused()
   await search.fill('Questions')
   await page.keyboard.press('Enter')
-  await expect(page).toHaveURL(/#agents\/questions$/)
+  await expect(page).toHaveURL(/#questions$/)
   await expect(page.getByRole('heading', { name: 'Questions' })).toBeVisible()
 })

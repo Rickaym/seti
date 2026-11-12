@@ -6,6 +6,7 @@ const panelHeading = (label: string) => (main: Locator) => main.getByRole('headi
 const SECTIONS = [
   { label: 'EA', hash: '#ea', title: panelHeading('EA') },
   { label: 'Home', hash: '#home', title: panelHeading('Home') },
+  { label: 'Questions', hash: '#questions', title: panelHeading('Questions') },
   { label: 'Context', hash: '#context', title: panelHeading('Context') },
   { label: 'Settings', hash: '#settings', title: panelHeading('Settings') },
   { label: 'Agents', hash: '#agents', title: panelHeading('Agents') },
@@ -34,6 +35,7 @@ test('Alt with a section digit opens it, numbered down the sidebar, and bare dig
     ['EA', 'Alt+1'],
     ['Home', 'Alt+2'],
     ['Agents', 'Alt+3'],
+    ['Questions', null],
     ['Context', 'Alt+4'],
     ['Settings', 'Alt+5'],
   ])

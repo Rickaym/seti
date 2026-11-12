@@ -17,7 +17,7 @@ test('on a phone the user finds proposals from the menu badge and approves or re
   await page.goto('/#agents')
   await page.getByRole('button', { name: 'Menu' }).click()
   const context = page.getByRole('navigation', { name: 'Sections' }).getByRole('button', { name: 'Context' })
-  await expect(context.locator('[data-knowledge-waiting]')).toBeVisible()
+  await expect(context.locator('[data-section-count]')).toBeVisible()
   await context.click()
   await page.getByRole('region', { name: 'Knowledge' }).getByRole('button').click()
   await expect(page.getByRole('heading', { name: 'Knowledge' })).toBeVisible()

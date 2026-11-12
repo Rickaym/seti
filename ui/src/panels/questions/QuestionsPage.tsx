@@ -1,7 +1,7 @@
 import { ArrowLeft } from 'lucide-react'
 import { toast } from 'sonner'
 import { Hint } from '@/components/Hint'
-import { DetailHeader, DetailTitle } from '@/components/SplitPane'
+import { DetailHeader } from '@/components/SplitPane'
 import { Button } from '@/components/ui/button'
 import { useOpenQuestions } from '@/hooks/useQuestions'
 import { goBack } from '@/lib/route'
@@ -23,7 +23,7 @@ export function QuestionsPage() {
               <ArrowLeft />
             </Button>
           </Hint>
-          <DetailTitle>Questions</DetailTitle>
+          <h1 className="truncate text-lg font-semibold max-md:text-base">Questions</h1>
         </div>
         <div className="text-xs text-muted-foreground">
           What your agents wait on you for. Each agent goes on once all its questions are answered or dismissed.

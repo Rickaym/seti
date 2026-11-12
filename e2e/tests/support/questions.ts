@@ -1,4 +1,4 @@
-import type { APIRequestContext, Page } from '@playwright/test'
+import type { APIRequestContext, Locator, Page } from '@playwright/test'
 import type { Envelope, MessagePage, Task } from '@seti/shared'
 import { paths } from './env.js'
 import { apiData, expect, toasts, unique } from './fixtures.js'
@@ -54,3 +54,16 @@ export const questionsDrawer = (page: Page) => page.getByRole('region', { name: 
 
 /** The toast a send that settled every question shows as it closes the page or the drawer. */
 export const sentToast = (page: Page, text: string | RegExp) => toasts(page).filter({ hasText: text })
+
+/** The Questions row in the sidebar, or in the phone menu while it is open. */
+export const questionsSection = (page: Page) =>
+  page.getByRole('navigation', { name: 'Sections' }).getByRole('button', { name: 'Questions', exact: true })
+
+/** The number a section's row shows, absent while it counts nothing. */
+export const sectionCount = (row: Locator) => row.locator('[data-section-count] > [aria-hidden="true"]')
+
+/** Opens the phone menu and taps Questions in it. */
+export async function openQuestionsFromMenu(page: Page): Promise<void> {
+  await page.getByRole('button', { name: 'Menu' }).tap()
+  await questionsSection(page).tap()
+}

@@ -9,6 +9,7 @@ const View = () => null
 describe('the registries mods add to', () => {
   it("hold Seti's own sections, and a mod's section joins the Mods group with no digit", () => {
     expect(sectionGroups().map((group) => group.group)).toEqual(['Work', 'Configure'])
+    expect(sectionGroups()[0]?.items.map((item) => item.key)).toEqual(['ea', 'home', 'agents', 'questions'])
     expect(digitSections()).toEqual([
       { key: 'ea', digit: 1 },
       { key: 'home', digit: 2 },
