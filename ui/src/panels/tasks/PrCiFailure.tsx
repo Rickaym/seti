@@ -1,27 +1,43 @@
-import type { PullRequest } from '@seti/shared'
+import type { PullRequest, TaskListEntry } from '@seti/shared'
 import { ExternalLink, Wrench } from 'lucide-react'
 import { useState, type ComponentProps } from 'react'
+import { toast } from 'sonner'
 import { Hint } from '@/components/Hint'
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { openStartPage } from '@/lib/start-context'
+import { sendAsUser } from '@/hooks/usePendingSends'
+import { navigate, parseHash } from '@/lib/route'
+import { useAgentFrame } from '@/panels/tasks/agent-frame'
 import { CheckIcon, CiBadge } from '@/panels/tasks/pr-badges'
-import { checkOutcome, failingChecks, fixCiPrompt } from '@/panels/tasks/pr-ci'
+import { checkOutcome, failingChecks, fixCiMessage } from '@/panels/tasks/pr-ci'
 
-function startFixCi(pr: PullRequest): void {
-  openStartPage({
-    label: `Fix CI on #${String(pr.number)} in ${pr.repo_slug}`,
-    prompt: fixCiPrompt(pr),
-    title: `Fix CI #${String(pr.number)}: ${pr.title}`,
-    repo_ids: [pr.repo_id],
-    ref: pr.head_ref,
-    pr_urls: [pr.url],
-  })
+/** The agent a PR belongs to: the one it is linked to, or the parent of the subagent it is. */
+export type PrAgent = Pick<TaskListEntry, 'id' | 'title'>
+
+const viewing = (agentId: string) => {
+  const route = parseHash()
+  return route.section === 'agents' && route.id === agentId && route.sub === null
 }
 
-/** Each failing check of a PR with how it ended and its log, then Fix CI. */
-export function FailingChecks({ pr, onStart }: { pr: PullRequest; onStart: () => void }) {
+interface FailingChecksProps {
+  pr: PullRequest
+  agent: PrAgent
+  /** Closes the popover or sheet the checks show in, once Fix CI has sent its message. */
+  onSent: () => void
+}
+
+/** Each failing check of a PR with how it ended and its log, then Fix CI, which tells its agent. */
+export function FailingChecks({ pr, agent, onSent }: FailingChecksProps) {
   const failing = failingChecks(pr)
+  const framed = useAgentFrame() !== null
+  const fix = () => {
+    sendAsUser(agent.id, fixCiMessage(pr))
+    onSent()
+    if (!framed && !viewing(agent.id)) {
+      navigate('agents', agent.id)
+    }
+    toast.success(`Asked ${agent.title} to fix CI on #${String(pr.number)}`)
+  }
   return (
     <div className="grid gap-1.5" data-testid="failing-checks">
       {failing.length > 0 && (
@@ -51,15 +67,8 @@ export function FailingChecks({ pr, onStart }: { pr: PullRequest; onStart: () =>
           ))}
         </ul>
       )}
-      <Hint text="Start an agent on this branch with the failing checks in its prompt">
-        <Button
-          size="xs"
-          className="justify-self-start pointer-coarse:min-h-11"
-          onClick={() => {
-            onStart()
-            startFixCi(pr)
-          }}
-        >
+      <Hint text="Ask the agent to fix the failing checks">
+        <Button size="xs" className="justify-self-start pointer-coarse:min-h-11" onClick={fix}>
           <Wrench />
           Fix CI
         </Button>
@@ -68,7 +77,6 @@ export function FailingChecks({ pr, onStart }: { pr: PullRequest; onStart: () =>
   )
 }
 
-/** The CI badge of a failing PR, opening its failing checks and Fix CI. */
 /** The failing CI badge as a button; the popover of failing checks opens from it. */
 export function FailingCiButton({ label, ...props }: { label: string } & ComponentProps<'button'>) {
   return (
@@ -83,7 +91,8 @@ export function FailingCiButton({ label, ...props }: { label: string } & Compone
   )
 }
 
-export function FailingCiBadge({ pr, label }: { pr: PullRequest; label: string }) {
+/** The CI badge of a failing PR, opening its failing checks and Fix CI. */
+export function FailingCiBadge({ pr, label, agent }: { pr: PullRequest; label: string; agent: PrAgent }) {
   const [open, setOpen] = useState(false)
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -96,7 +105,8 @@ export function FailingCiBadge({ pr, label }: { pr: PullRequest; label: string }
         <div className="mb-2 text-xs font-medium">Failing checks of {label}</div>
         <FailingChecks
           pr={pr}
-          onStart={() => {
+          agent={agent}
+          onSent={() => {
             setOpen(false)
           }}
         />

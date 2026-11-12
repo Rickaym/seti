@@ -243,9 +243,13 @@ const ASKING =
   "agent's questions in one Questions view; your call waits there and its result carries the " +
   'answers. Give each question two to four short options, since the user can always answer in ' +
   'their own words instead; for a yes or no question make the options exactly Yes and No. Ask ' +
-  'related questions together, up to four in one call. Write a question in your reply only when ' +
-  'you have finished the work and are only offering a next step. If you recommend an option, put ' +
-  'it first and end its label with (Recommended); Seti picks it for the user to confirm. To ask the ' +
+  'related questions together, up to four in one call. Ask the same way before an action that ' +
+  "needs the user's go-ahead, such as deploying, merging, changing shared or production systems, " +
+  'spending money or sending a message for them: one Yes or No question that says what you will ' +
+  'do, with any risk in the option description. Never end a turn with a question or a "should I" ' +
+  'offer in your reply; if you have a next step to offer, ask it with AskUserQuestion. If you ' +
+  'recommend an option, put it first and end its label with (Recommended); Seti picks it for the ' +
+  'user to confirm. To ask the ' +
   'user for a secret, token or password, use ask_secret; never ask for one in your reply or with ' +
   'AskUserQuestion.'
 
