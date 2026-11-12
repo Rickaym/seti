@@ -9,7 +9,7 @@ import { TOUCH_TARGET } from '@/lib/touch'
 import { cn } from '@/lib/utils'
 import { MoreLinkedPrs } from '@/panels/tasks/LinkedPrList'
 import { PrChips } from '@/panels/tasks/PrChips'
-import { FailingCiBadge, FailingCiButton } from '@/panels/tasks/PrCiFailure'
+import { FailingCiBadge, FailingCiButton, type PrAgent } from '@/panels/tasks/PrCiFailure'
 import { PrPicker } from '@/panels/tasks/PrPicker'
 import { orderLinkedPrs, type LinkedPr } from '@/panels/tasks/linked-prs'
 import { CiBadge, Tag, ThreadsBadge } from '@/panels/tasks/pr-badges'
@@ -24,6 +24,8 @@ interface ChipProps {
   path: string
   /** What unlinking detaches the PR from, for its hint. */
   owner: string
+  /** The agent that Fix CI asks. */
+  agent: PrAgent
   onChanged: () => void
   /** Same size, without hints or popovers, for the ruler that measures what fits. */
   bare?: boolean
@@ -36,7 +38,7 @@ const NO_STATUS: Record<LinkedPr['group'], string> = {
   closed: 'Closed',
 }
 
-function PrChip({ item, path, owner, onChanged, bare = false }: ChipProps) {
+function PrChip({ item, path, owner, agent, onChanged, bare = false }: ChipProps) {
   const { pr, label } = item
   const unlink = (
     <button
@@ -49,7 +51,7 @@ function PrChip({ item, path, owner, onChanged, bare = false }: ChipProps) {
     </button>
   )
   const failing = (open: PullRequest) =>
-    bare ? <FailingCiButton label={label} /> : <FailingCiBadge pr={open} label={label} />
+    bare ? <FailingCiButton label={label} /> : <FailingCiBadge pr={open} label={label} agent={agent} />
   return (
     <span
       className="flex min-w-0 shrink-0 items-center gap-1.5 last:shrink pointer-coarse:gap-0.5"
@@ -127,6 +129,7 @@ interface ChipRowProps {
   homeSlug: string | null
   path: string
   owner: string
+  agent: PrAgent
   /** Most chips the row shows; fewer when they do not fit on one line. */
   limit: number
   /** The control that links another PR, after the chips. */
@@ -136,16 +139,16 @@ interface ChipRowProps {
 }
 
 /** Linked PRs on one line, the most pressing first; the rest open from "+N more". */
-function PrChipRow({ urls, states, homeSlug, path, owner, limit, picker, className, testId }: ChipRowProps) {
+function PrChipRow({ urls, states, homeSlug, path, owner, agent, limit, picker, className, testId }: ChipRowProps) {
   const { statuses, reload } = usePrStatuses(urls)
   const ordered = useMemo(() => orderLinkedPrs(urls, statuses, states, homeSlug), [urls, statuses, states, homeSlug])
   const candidates = ordered.slice(0, limit)
   const { row, chips, mores, fit } = useFittedCount(candidates.length)
   const chip = (item: LinkedPr) => (
-    <PrChip key={item.url} item={item} path={path} owner={owner} onChanged={refreshTasks} />
+    <PrChip key={item.url} item={item} path={path} owner={owner} agent={agent} onChanged={refreshTasks} />
   )
   const measured = (item: LinkedPr) => (
-    <PrChip key={item.url} item={item} path={path} owner={owner} onChanged={refreshTasks} bare />
+    <PrChip key={item.url} item={item} path={path} owner={owner} agent={agent} onChanged={refreshTasks} bare />
   )
   const more = (shown: number, bare: boolean) => {
     const hidden = ordered.length - shown
@@ -161,6 +164,7 @@ function PrChipRow({ urls, states, homeSlug, path, owner, limit, picker, classNa
         toFix={ordered.slice(shown).filter((item) => item.group === 'fix').length}
         path={path}
         owner={owner}
+        agent={agent}
         onChanged={refreshTasks}
         onOpen={reload}
         bare={bare}
@@ -222,6 +226,7 @@ export const TaskPrs = memo(function TaskPrsView({ task, limit }: { task: TaskLi
       homeSlug={task.repo_slug}
       path={path}
       owner="this agent"
+      agent={task}
       limit={limit}
       picker={picker}
       className={task.pr_urls.length > 0 ? 'min-w-[min(50%,16rem)] flex-1' : 'shrink-0'}
@@ -267,6 +272,7 @@ export function SubtaskPrs({ task, subtask }: { task: TaskListEntry; subtask: Su
       homeSlug={task.repo_slug}
       path={path}
       owner="this subagent"
+      agent={task}
       limit={SUBTASK_SHOWN_PRS}
       picker={picker}
       className="text-xs text-muted-foreground"

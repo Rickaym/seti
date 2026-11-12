@@ -1,110 +1,50 @@
 import { randomUUID } from 'node:crypto'
-import type { Page } from '@playwright/test'
-import type { PrCheck, PrList, PullRequest, StartAgentInput } from '@seti/shared'
+import type { PrList } from '@seti/shared'
 import { openSeedDb } from './support/db.js'
 import { paths } from './support/env.js'
 import { expect, test } from './support/fixtures.js'
+import { startAgent } from './support/many-prs.js'
+import {
+  agentCount,
+  expectFixCiSent,
+  linkPrs,
+  LOG,
+  mockStatuses,
+  OPEN,
+  pr,
+  prUrl,
+  QUIET,
+  RED,
+  watchStarts,
+} from './support/pr-ci.js'
+import { FAKE_CLAUDE_ENV } from './support/processes.js'
+import { FANOUT, SEEDS } from './support/subtasks.js'
 
-const QUIET = 'e2e/quiet'
-const RED = 'e2e/red'
-const LOG = 'https://github.com/e2e/red/actions/runs/7/job/8'
-
-const prUrl = (slug: string, number: number) => `https://github.com/${slug}/pull/${String(number)}`
-
-function pr(slug: string, number: number, over: Partial<PullRequest> = {}): PullRequest {
-  const repo = slug.split('/').at(-1) ?? slug
-  return {
-    key: `${repo}-${String(number)}`,
-    repo_id: slug,
-    repo_slug: slug,
-    number,
-    title: `${repo} change ${String(number)}`,
-    url: prUrl(slug, number),
-    draft: false,
-    author: 'e2e',
-    head_ref: `feat/${repo}-${String(number)}`,
-    base_ref: 'main',
-    head_oid: 'abc1234def',
-    updated_at: `2026-10-03T0${String(number)}:00:00Z`,
-    review_decision: null,
-    mergeable: 'mergeable',
-    labels: [],
-    ci: 'success',
-    checks: [],
-    unresolved_threads: 0,
-    preview: { state: 'none', url: null, commit: null, stale: false },
-    preview_host: null,
-    tasks: [],
-    related: [],
-    ...over,
-  }
-}
-
-const check = (name: string, state: PrCheck['state'], detail: string, url: string | null): PrCheck => ({
-  name,
-  state,
-  detail,
-  url,
-})
-
-const FAILING = [
-  check('lint', 'success', 'success', null),
-  check('build', 'failure', 'failure', LOG),
-  check('e2e', 'failure', 'timed_out', null),
-]
-
-const OPEN = [pr(RED, 5, { ci: 'failure', checks: FAILING }), ...[1, 2, 3, 4, 6, 7].map((n) => pr(QUIET, n))]
+test.use({ serverEnv: FAKE_CLAUDE_ENV })
 
 /** An idle agent with the given PRs linked, so no agent ever runs. */
 async function seedAgent(title: string, urls: readonly string[]): Promise<string> {
   const db = openSeedDb()
   const id = randomUUID()
-  const at = new Date().toISOString()
-  await db.idleTask(id, title, paths.checkout, at)
-  for (const url of urls) {
-    await db.run(`INSERT INTO task_pr (task_id, pr_url, linked_at, source) VALUES (?, ?, ?, 'user')`, id, url, at)
-  }
+  await db.idleTask(id, title, paths.checkout, new Date().toISOString())
   await db.close()
+  await linkPrs(id, urls)
   return id
 }
 
-async function mockStatuses(page: Page): Promise<void> {
-  await page.route(/\/api\/prs\/lookup$/, async (route) => {
-    const asked = new Set((route.request().postDataJSON() as { urls: string[] }).urls)
-    await route.fulfill({ json: { data: OPEN.filter((item) => asked.has(item.url)), meta: {} } })
-  })
-}
-
-async function interceptStart(page: Page): Promise<StartAgentInput[]> {
-  const sent: StartAgentInput[] = []
-  await page.route('**/api/tasks/start', async (route) => {
-    sent.push(route.request().postDataJSON() as StartAgentInput)
-    await route.fulfill({ json: { data: { id: 'e2e-intercepted' }, meta: {} } })
-  })
-  return sent
-}
-
-async function expectFixCiStart(page: Page, sent: readonly StartAgentInput[]): Promise<void> {
-  const main = page.getByRole('main')
-  await expect(page).toHaveURL(/#agents\/new$/)
-  await expect(main.getByRole('button', { name: 'Drop Fix CI on #5 in e2e/red' })).toBeVisible()
-  const message = main.getByLabel('Message')
-  await expect(message).toHaveValue(/^Fix the failing CI on pull request #5 in e2e\/red: red change 5/)
-  await expect(message).toHaveValue(/Failing checks on abc1234:\n- build: failed \(https:.+\)\n- e2e: timed out\n/)
-  await message.press('Enter')
-  await expect(page).toHaveURL(/#agents\/e2e-intercepted$/)
-  expect(sent).toMatchObject([{ repo_ids: [RED], ref: 'feat/red-5', pr_urls: [prUrl(RED, 5)] }])
-}
-
-test('a failing chip shows how each check ended with its log, and Fix CI starts an agent on them', async ({ page }) => {
+test('a failing chip shows how each check ended with its log, and Fix CI asks its own agent', async ({
+  page,
+  request,
+}) => {
   await mockStatuses(page)
-  const id = await seedAgent('E2E fix CI chip', [prUrl(RED, 5), prUrl(QUIET, 1)])
-  const sent = await interceptStart(page)
-  await page.goto('/#agents')
-  await page.goto(`/#agents/${id}`)
+  const agent = await startAgent(request, 'E2E fix CI chip')
+  await linkPrs(agent.id, [prUrl(RED, 5), prUrl(QUIET, 1)])
+  const starts = watchStarts(page)
+  await page.goto(`/#agents/${agent.id}`)
   const main = page.getByRole('main')
   await expect(main.getByRole('group', { name: 'Pull request quiet#1' })).toContainText('ci pass')
   await expect(main.getByRole('button', { name: 'Failing checks of quiet#1' })).toHaveCount(0)
+  const before = await agentCount(request)
 
   await main.getByRole('button', { name: 'Failing checks of red#5' }).click()
   const checks = page.getByRole('dialog')
@@ -118,19 +58,20 @@ test('a failing chip shows how each check ended with its log, and Fix CI starts 
   await expect(failing.nth(1).getByRole('link')).toHaveCount(0)
   await checks.getByRole('button', { name: 'Fix CI' }).click()
   await expect(checks).toBeHidden()
-  await expectFixCiStart(page, sent)
-  await page.unroute('**/api/tasks/start')
-  await page.request.delete(`/api/tasks/${id}`)
+  await expectFixCiSent(page, agent)
+  expect(await agentCount(request)).toBe(before)
+  expect(starts).toEqual([])
 })
 
-test('Fix CI starts from the failing row of the linked PR list', async ({ page }) => {
+test('Fix CI on the failing row of the linked PR list asks the agent', async ({ page, request }) => {
   await mockStatuses(page)
-  const id = await seedAgent(
-    'E2E fix CI list',
+  const agent = await startAgent(request, 'E2E fix CI list')
+  await linkPrs(
+    agent.id,
     OPEN.map((item) => item.url),
   )
-  const sent = await interceptStart(page)
-  await page.goto(`/#agents/${id}`)
+  const starts = watchStarts(page)
+  await page.goto(`/#agents/${agent.id}`)
   await page
     .getByRole('main')
     .getByRole('button', { name: /^\+\d+ more/ })
@@ -143,11 +84,32 @@ test('Fix CI starts from the failing row of the linked PR list', async ({ page }
   await expect(list.getByRole('listitem', { name: 'Pull request quiet#1' }).getByTestId('failing-checks')).toHaveCount(
     0,
   )
+  const before = await agentCount(request)
   await row.getByRole('button', { name: 'Fix CI' }).click()
   await expect(list).toBeHidden()
-  await expectFixCiStart(page, sent)
-  await page.unroute('**/api/tasks/start')
-  await page.request.delete(`/api/tasks/${id}`)
+  await expectFixCiSent(page, agent)
+  expect(await agentCount(request)).toBe(before)
+  expect(starts).toEqual([])
+})
+
+test("Fix CI on a subagent's PR asks the parent agent and opens it", async ({ page, request }) => {
+  await mockStatuses(page)
+  const agent = await startAgent(request, 'E2E fix CI subagent')
+  const db = openSeedDb()
+  for (const [index, [kind, payload]] of SEEDS.fanOut().entries()) {
+    await db.message(agent.id, kind, JSON.stringify(payload), new Date(Date.now() + index).toISOString())
+  }
+  await db.close()
+  await linkPrs(agent.id, [prUrl(RED, 5)], FANOUT.agent.id)
+  const starts = watchStarts(page)
+  await page.goto(`/#agents/${agent.id}/sub/${FANOUT.agent.id}`)
+  const prs = page.getByRole('main').getByTestId('subtask-prs')
+  const before = await agentCount(request)
+  await prs.getByRole('button', { name: 'Failing checks of red#5' }).click()
+  await page.getByRole('dialog').getByRole('button', { name: 'Fix CI' }).click()
+  await expectFixCiSent(page, agent)
+  expect(await agentCount(request)).toBe(before)
+  expect(starts).toEqual([])
 })
 
 test('chips, list rows and palette rows open the PR on GitHub in a new tab', async ({ page }) => {

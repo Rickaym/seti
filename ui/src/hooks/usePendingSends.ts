@@ -36,6 +36,11 @@ function pendingStore(taskId: string): PendingStore {
   return store
 }
 
+/** Sends text to the task as the user's own message, as its reply box does, queued while it runs. */
+export function sendAsUser(taskId: string, text: string): void {
+  pendingStore(taskId).add({ text, prompt: text, attachments: [], files: [], interrupt: false })
+}
+
 export interface PendingSends extends PendingSnapshot {
   store: PendingStore
 }

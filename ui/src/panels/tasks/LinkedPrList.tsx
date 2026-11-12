@@ -12,7 +12,7 @@ import { relativeTime } from '@/lib/time'
 import { TOUCH_TARGET } from '@/lib/touch'
 import { cn } from '@/lib/utils'
 import { PrChips } from '@/panels/tasks/PrChips'
-import { FailingChecks } from '@/panels/tasks/PrCiFailure'
+import { FailingChecks, type PrAgent } from '@/panels/tasks/PrCiFailure'
 import { filterLinkedPrs, LINKED_PR_GROUPS, type LinkedPr, type LinkedPrGroup } from '@/panels/tasks/linked-prs'
 import { CiBadge, Tag, ThreadsBadge } from '@/panels/tasks/pr-badges'
 import { keepForToasts, unlinkWithUndo } from '@/panels/tasks/pr-links'
@@ -31,8 +31,9 @@ interface RowProps {
   item: LinkedPr
   path: string
   owner: string
+  agent: PrAgent
   onChanged: () => void
-  onStart: () => void
+  onSent: () => void
 }
 
 /** A row's second line: where the PR lives, its CI, threads, conflicts and last update. */
@@ -52,7 +53,7 @@ function RowMeta({ item: { pr, slug, number } }: { item: LinkedPr }) {
   )
 }
 
-function LinkedPrRow({ item, path, owner, onChanged, onStart }: RowProps) {
+function LinkedPrRow({ item, path, owner, agent, onChanged, onSent }: RowProps) {
   const { pr } = item
   const { icon: Icon, className, title } = GROUP[item.group]
   const draft = pr?.draft === true
@@ -92,7 +93,7 @@ function LinkedPrRow({ item, path, owner, onChanged, onStart }: RowProps) {
       </div>
       {pr?.ci === 'failure' && (
         <div className="pr-3 pb-2 pl-8">
-          <FailingChecks pr={pr} onStart={onStart} />
+          <FailingChecks pr={pr} agent={agent} onSent={onSent} />
         </div>
       )}
     </li>
@@ -121,15 +122,9 @@ function useBatches(total: number) {
   return { shown, sentinel }
 }
 
-interface RowsProps {
-  matches: readonly LinkedPr[]
-  path: string
-  owner: string
-  onChanged: () => void
-  onStart: () => void
-}
+type RowsProps = Omit<RowProps, 'item'> & { matches: readonly LinkedPr[] }
 
-function GroupedRows({ matches, path, owner, onChanged, onStart }: RowsProps) {
+function GroupedRows({ matches, ...shared }: RowsProps) {
   const { shown, sentinel } = useBatches(matches.length)
   const mounted = matches.slice(0, shown)
   const groups = LINKED_PR_GROUPS.map((group) => ({
@@ -147,14 +142,7 @@ function GroupedRows({ matches, path, owner, onChanged, onStart }: RowsProps) {
           </h3>
           <ul className="text-xs">
             {rows.map((item) => (
-              <LinkedPrRow
-                key={item.url}
-                item={item}
-                path={path}
-                owner={owner}
-                onChanged={onChanged}
-                onStart={onStart}
-              />
+              <LinkedPrRow key={item.url} item={item} {...shared} />
             ))}
           </ul>
         </section>
@@ -164,13 +152,7 @@ function GroupedRows({ matches, path, owner, onChanged, onStart }: RowsProps) {
   )
 }
 
-interface ListProps {
-  prs: readonly LinkedPr[]
-  path: string
-  owner: string
-  onChanged: () => void
-  onStart: () => void
-}
+type ListProps = Omit<RowProps, 'item'> & { prs: readonly LinkedPr[] }
 
 function LinkedPrList({ prs, ...rest }: ListProps) {
   const [query, setQuery] = useState('')
@@ -240,6 +222,7 @@ function LinkedPrsSheet({ title, open, onOpenChange, action, children }: SheetPr
 interface AgentPrsSheetProps {
   prs: readonly LinkedPr[]
   path: string
+  agent: PrAgent
   open: boolean
   onOpenChange: (open: boolean) => void
   /** The picker that links another PR; it calls `done` once one is linked. */
@@ -247,7 +230,7 @@ interface AgentPrsSheetProps {
 }
 
 /** Every PR linked to an agent as a phone sheet, to link, open, unlink or fix. */
-export function AgentPrsSheet({ prs, path, open, onOpenChange, picker }: AgentPrsSheetProps) {
+export function AgentPrsSheet({ prs, path, agent, open, onOpenChange, picker }: AgentPrsSheetProps) {
   const [linking, setLinking] = useState(false)
   const close = () => {
     onOpenChange(false)
@@ -275,7 +258,7 @@ export function AgentPrsSheet({ prs, path, open, onOpenChange, picker }: AgentPr
         </div>
       )}
       {prs.length > 0 && (
-        <LinkedPrList prs={prs} path={path} owner="this agent" onChanged={refreshTasks} onStart={close} />
+        <LinkedPrList prs={prs} path={path} owner="this agent" agent={agent} onChanged={refreshTasks} onSent={close} />
       )}
     </LinkedPrsSheet>
   )
@@ -291,6 +274,7 @@ interface MoreProps {
   toFix: number
   path: string
   owner: string
+  agent: PrAgent
   onChanged: () => void
   onOpen: () => void
   /** The button alone, for the ruler that measures what fits. */
@@ -298,7 +282,7 @@ interface MoreProps {
 }
 
 /** "+N more": every linked PR in a filterable list, a popover on desktop and a sheet on phones. */
-export function MoreLinkedPrs({ prs, hidden, shown, toFix, path, owner, onChanged, onOpen, bare = false }: MoreProps) {
+export function MoreLinkedPrs({ prs, hidden, shown, toFix, bare = false, onOpen, ...rest }: MoreProps) {
   const narrow = useNarrow()
   const [open, setOpen] = useState(false)
   const changeOpen = (next: boolean) => {
@@ -334,7 +318,7 @@ export function MoreLinkedPrs({ prs, hidden, shown, toFix, path, owner, onChange
   if (bare) {
     return trigger
   }
-  const list = <LinkedPrList prs={prs} path={path} owner={owner} onChanged={onChanged} onStart={close} />
+  const list = <LinkedPrList prs={prs} {...rest} onSent={close} />
 
   if (narrow) {
     return (
