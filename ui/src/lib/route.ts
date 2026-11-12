@@ -131,6 +131,9 @@ function settingsTarget(moved: string | Moved, tail: string[]): Target {
 /** Where an old `#tasks`, `#prs` or moved settings hash such as `#repos` lives now, or null. */
 function movedTarget(hash: string): Target | null {
   const [section = '', ...rest] = parts(hash)
+  if (section === 'agents' && rest[0] === 'questions') {
+    return { hash: 'questions', card: null }
+  }
   if (section === 'tasks') {
     return { hash: ['agents', ...rest].join('/'), card: null }
   }

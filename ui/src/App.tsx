@@ -49,6 +49,9 @@ import { TerminalCommands, TerminalNavButton } from '@/panels/terminal/TerminalN
 const HomePanel = lazy(async () => import('@/panels/HomePanel').then((m) => ({ default: m.HomePanel })))
 const EaPanel = lazy(async () => import('@/panels/EaPanel').then((m) => ({ default: m.EaPanel })))
 const TasksPanel = lazy(async () => import('@/panels/TasksPanel').then((m) => ({ default: m.TasksPanel })))
+const QuestionsPage = lazy(async () =>
+  import('@/panels/questions/QuestionsPage').then((m) => ({ default: m.QuestionsPage })),
+)
 const ContextPanel = lazy(async () => import('@/panels/ContextPanel').then((m) => ({ default: m.ContextPanel })))
 const SettingsPanel = lazy(async () => import('@/panels/SettingsPanel').then((m) => ({ default: m.SettingsPanel })))
 
@@ -58,6 +61,7 @@ function panelFor(route: Route): ReactNode {
     ea: () => <EaPanel />,
     home: () => <HomePanel />,
     agents: () => <TasksPanel selectedId={route.id} subId={route.sub} terminalId={route.terminal} />,
+    questions: () => <QuestionsPage />,
     context: () => <ContextPanel selectedId={route.id} />,
     settings: () => <SettingsPanel page={route.id} detail={route.detail} />,
   }

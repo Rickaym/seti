@@ -22,7 +22,7 @@ test('an agent proposes notes, the user approves one from the Knowledge page and
   const context = page
     .getByRole('navigation', { name: 'Sections' })
     .getByRole('button', { name: 'Context', exact: true })
-  await expect(context.locator('[data-knowledge-waiting]')).toBeVisible()
+  await expect(context.locator('[data-section-count]')).toBeVisible()
   await context.click()
   const notes = page.getByRole('region', { name: 'Knowledge' }).getByRole('button')
   await expect(notes).toContainText('waiting for you')

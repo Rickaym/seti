@@ -1,16 +1,15 @@
 import { Menu, X } from 'lucide-react'
 import { useEffect, useId, useMemo } from 'react'
 import { NewsDot } from '@/components/NewsDot'
-import { WaitingCount } from '@/components/WaitingCount'
+import { SectionCount } from '@/components/SectionCount'
 import { ShortcutGuideOpener } from '@/components/shortcuts/ShortcutGuide'
 import { ModeToggle } from '@/components/theme/mode-toggle'
 import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from '@/components/ui/sheet'
-import { useKnowledgeWaiting } from '@/hooks/useKnowledgeWaiting'
 import { useNarrow } from '@/hooks/useMedia'
 import { describedBy } from '@/lib/described-by'
 import { useNewsPages } from '@/lib/mod-views'
-import { useSectionGroups, type SectionKey } from '@/lib/sections'
+import { useSectionBadge, useSectionGroups, type SectionKey, type SidebarItem } from '@/lib/sections'
 import { ownsSwipeRight, swipeTracker } from '@/lib/swipe'
 import { cn } from '@/lib/utils'
 import { TerminalDrawerItem } from '@/panels/terminal/TerminalNavButton'
@@ -46,13 +45,42 @@ function useSwipeToOpen(enabled: boolean, setOpen: (open: boolean) => void) {
   }, [enabled, setOpen])
 }
 
+interface DrawerItemProps {
+  item: SidebarItem
+  current: boolean
+  /** Whether the row shows the news dot, as Settings does while What's new has something. */
+  dot: boolean
+  onSelect: () => void
+}
+
+function DrawerItem({ item, current, dot, onSelect }: DrawerItemProps) {
+  const newsId = useId()
+  const countId = useId()
+  const badge = useSectionBadge(item)
+  const Icon = item.icon
+  return (
+    <button
+      type="button"
+      aria-current={current ? 'page' : undefined}
+      aria-describedby={describedBy(dot && newsId, badge !== null && countId)}
+      onClick={onSelect}
+      className={cn(
+        'flex min-h-11 items-center gap-3 px-4 text-left text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring',
+        current ? 'bg-primary text-primary-foreground' : 'text-foreground/80 hover:bg-accent',
+      )}
+    >
+      <Icon className="size-[18px] shrink-0" />
+      <span className="flex-1">{item.label}</span>
+      {dot && <NewsDot id={newsId} className={cn(current && 'bg-primary-foreground')} />}
+      {badge !== null && <SectionCount {...badge} id={countId} className="static translate-x-0" />}
+    </button>
+  )
+}
+
 /** The sidebar below md: a menu button in the header opens the sections as a drawer. */
 export function NavDrawer({ active, onSelect, open, onOpenChange: setOpen }: NavDrawerProps) {
   const news = useNewsPages().length > 0
   const newsId = useId()
-  const settingsNewsId = useId()
-  const waitingId = useId()
-  const waiting = useKnowledgeWaiting()
   const groups = useSectionGroups()
   useSwipeToOpen(useNarrow() && !open, setOpen)
   const swipeClose = useMemo(
@@ -113,33 +141,18 @@ export function NavDrawer({ active, onSelect, open, onOpenChange: setOpen }: Nav
                 aria-label={group.group}
                 className={cn('flex flex-col', index > 0 && 'mt-2 border-t border-border pt-2')}
               >
-                {group.items.map((item) => {
-                  const Icon = item.icon
-                  const current = active === item.key
-                  const dot = news && item.key === 'settings'
-                  const count = item.key === 'context' ? waiting : 0
-                  return (
-                    <button
-                      key={item.key}
-                      type="button"
-                      aria-current={current ? 'page' : undefined}
-                      aria-describedby={describedBy(dot && settingsNewsId, count > 0 && waitingId)}
-                      onClick={() => {
-                        setOpen(false)
-                        onSelect(item.key)
-                      }}
-                      className={cn(
-                        'flex min-h-11 items-center gap-3 px-4 text-left text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring',
-                        current ? 'bg-primary text-primary-foreground' : 'text-foreground/80 hover:bg-accent',
-                      )}
-                    >
-                      <Icon className="size-[18px] shrink-0" />
-                      <span className="flex-1">{item.label}</span>
-                      {dot && <NewsDot id={settingsNewsId} className={cn(current && 'bg-primary-foreground')} />}
-                      {count > 0 && <WaitingCount count={count} id={waitingId} className="static translate-x-0" />}
-                    </button>
-                  )
-                })}
+                {group.items.map((item) => (
+                  <DrawerItem
+                    key={item.key}
+                    item={item}
+                    current={active === item.key}
+                    dot={news && item.key === 'settings'}
+                    onSelect={() => {
+                      setOpen(false)
+                      onSelect(item.key)
+                    }}
+                  />
+                ))}
               </div>
             ))}
           </nav>

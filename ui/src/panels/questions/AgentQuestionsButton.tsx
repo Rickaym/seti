@@ -2,37 +2,9 @@ import { MessageCircleQuestion } from 'lucide-react'
 import { CountBadge } from '@/components/CountBadge'
 import { Hint } from '@/components/Hint'
 import { Button } from '@/components/ui/button'
-import { useAgentQuestionCount, useOpenQuestions } from '@/hooks/useQuestions'
-import { navigate } from '@/lib/route'
-import { QUESTIONS_ROUTE } from '@/panels/questions/route'
-
-const openQuestions = () => {
-  navigate('agents', QUESTIONS_ROUTE)
-}
+import { useAgentQuestionCount } from '@/hooks/useQuestions'
 
 const questionCount = (count: number) => (count === 1 ? '1 question' : `${String(count)} questions`)
-
-/** Opens the Questions page from the Agents list with how many are open; hidden while none are. */
-export function QuestionsButton() {
-  const count = useOpenQuestions().length
-  if (count === 0) {
-    return null
-  }
-  return (
-    <Hint text={`Questions: ${questionCount(count)} wait on you`}>
-      <Button
-        variant="ghost"
-        size="icon-sm"
-        className="relative"
-        aria-label={`Questions, ${questionCount(count)} open`}
-        onClick={openQuestions}
-      >
-        <MessageCircleQuestion />
-        <CountBadge aria-hidden>{count}</CountBadge>
-      </Button>
-    </Hint>
-  )
-}
 
 interface AgentQuestionsButtonProps {
   taskId: string

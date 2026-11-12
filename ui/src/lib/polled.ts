@@ -105,3 +105,20 @@ export function createPolledResource<T>(
 
   return { subscribe, getSnapshot: () => state, refresh }
 }
+
+/** A number a section's row shows, as a store `useSyncExternalStore` reads. */
+export interface CountStore {
+  subscribe: (listener: () => void) => () => void
+  count: () => number
+}
+
+/** A count read from a polled resource, zero until its first answer. */
+export function polledCount<T>(resource: PolledResource<T>, count: (data: T) => number): CountStore {
+  return {
+    subscribe: resource.subscribe,
+    count: () => {
+      const { data } = resource.getSnapshot()
+      return data === undefined ? 0 : count(data)
+    },
+  }
+}

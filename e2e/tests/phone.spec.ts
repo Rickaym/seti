@@ -96,6 +96,7 @@ test('the sidebar is a drawer that closes on a section change', async ({ page })
     'EA',
     'Home',
     'Agents',
+    'Questions',
     'Context',
     'Settings',
   ])

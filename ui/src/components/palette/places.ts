@@ -9,23 +9,13 @@ import {
   type TaskDisplayStatus,
   type TaskListEntry,
 } from '@seti/shared'
-import {
-  Archive,
-  Bot,
-  FileText,
-  GitPullRequest,
-  GitPullRequestDraft,
-  Library,
-  MessageCircleQuestion,
-  MessagesSquare,
-} from 'lucide-react'
+import { Archive, Bot, FileText, GitPullRequest, GitPullRequestDraft, Library, MessagesSquare } from 'lucide-react'
 import type { ComponentType } from 'react'
 import { chordLabel, sectionChord } from '@/components/shortcuts/chords'
 import { TEAM_SHORTCUT } from '@/components/team/team-context'
 import { sectionGroups, type SectionKey } from '@/lib/sections'
 import { relativeTime } from '@/lib/time'
 import { packSelection } from '@/panels/context/selection'
-import { QUESTIONS_ROUTE } from '@/panels/questions/route'
 import { settingsGroups } from '@/panels/settings/pages'
 import { repoLabel, shortRepoLabel } from '@/panels/tasks/agent-list'
 
@@ -70,7 +60,7 @@ export function sectionPlaces(openGroupChat: () => void): Place[] {
       title: item.label,
       detail: '',
       icon: item.icon,
-      keywords: group,
+      keywords: item.keywords === undefined ? group : `${group} ${item.keywords}`,
       ...(item.digit === null ? {} : { shortcut: chordLabel(sectionChord(item.digit)) }),
       target: { section: item.key },
     }))
@@ -84,16 +74,7 @@ export function sectionPlaces(openGroupChat: () => void): Place[] {
     shortcut: TEAM_SHORTCUT,
     target: { run: openGroupChat },
   }
-  const questions: Place = {
-    id: 'section:questions',
-    kind: 'section',
-    title: 'Questions',
-    detail: 'What agents ask you',
-    icon: MessageCircleQuestion,
-    keywords: 'answer agents ask secrets',
-    target: { section: 'agents', id: QUESTIONS_ROUTE },
-  }
-  return [...routes, chat, questions]
+  return [...routes, chat]
 }
 
 /** Each settings page, under the name of its group; Mods is also found by the names of mods. */

@@ -1,7 +1,7 @@
 import type { Question } from '@seti/shared'
 import { useMemo } from 'react'
 import { usePolled } from '@/hooks/usePolled'
-import { createPolledResource } from '@/lib/polled'
+import { createPolledResource, polledCount } from '@/lib/polled'
 
 const open = createPolledResource<Question[]>('/questions', 5_000)
 
@@ -23,6 +23,9 @@ export function useAgentQuestions(taskId: string): { questions: readonly Questio
 export function useAgentQuestionCount(taskId: string): number {
   return useOpenQuestions().filter((question) => question.task_id === taskId).length
 }
+
+/** How many questions are open, as the Questions section's count. */
+export const openQuestionCount = polledCount(open, (questions) => questions.length)
 
 /** Reads the open questions again now, as after the user answered some. */
 export function refreshQuestions(): void {

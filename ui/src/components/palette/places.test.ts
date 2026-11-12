@@ -126,13 +126,16 @@ describe('other places', () => {
       'EA',
       'Home',
       'Agents',
+      'Questions',
       'Context',
       'Settings',
       'Group chat',
-      'Questions',
     ])
-    expect(sections.at(-1)?.target).toEqual({ section: 'agents', id: 'questions' })
-    const chat = sections.at(-2)?.target
+    expect(sections.find((p) => p.title === 'Questions')).toMatchObject({
+      target: { section: 'questions' },
+      keywords: 'Work answer agents ask secrets',
+    })
+    const chat = sections.at(-1)?.target
     if (chat !== undefined && 'run' in chat) {
       chat.run()
     }
