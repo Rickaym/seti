@@ -325,5 +325,7 @@ describe('leftover questions', () => {
 
   it('tells agents to ask through AskUserQuestion rather than in prose', () => {
     expect(questionsContext()).toMatch(/ask with the AskUserQuestion tool instead of writing the question/)
+    expect(questionsContext()).toContain("Ask the same way before an action that needs the user's go-ahead")
+    expect(questionsContext()).not.toContain('only offering a next step')
   })
 })
