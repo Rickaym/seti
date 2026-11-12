@@ -1,6 +1,6 @@
 import type { PrCheck, PullRequest } from '@seti/shared'
 import { describe, expect, it } from 'vitest'
-import { checkOutcome, fixCiPrompt, needsFix } from './pr-ci'
+import { checkOutcome, fixCiMessage, needsFix } from './pr-ci'
 
 function pr(number: number, over: Partial<PullRequest> = {}): PullRequest {
   return {
@@ -53,24 +53,41 @@ describe('checkOutcome', () => {
   })
 })
 
-describe('fixCiPrompt', () => {
-  it('names the PR, the push target and each failing check with its log', () => {
-    const prompt = fixCiPrompt(
-      pr(42, {
-        ci: 'failure',
-        checks: [
-          check('lint', 'success', 'success'),
-          check('build', 'failure', 'failure', 'https://github.com/e2e/web/runs/1'),
-          check('e2e', 'failure', 'timed_out'),
-        ],
-      }),
-    )
-    expect(prompt).toContain('Fix the failing CI on pull request #42 in e2e/web: change 42')
-    expect(prompt).toContain('git push origin HEAD:feat/42')
-    expect(prompt).toContain(
-      'Failing checks on abc1234:\n- build: failed (https://github.com/e2e/web/runs/1)\n- e2e: timed out\n',
-    )
-    expect(prompt).not.toContain('lint')
-    expect(prompt).toMatch(/Task: Read the logs of the failing checks \(gh pr checks 42 -R e2e\/web/)
+describe('fixCiMessage', () => {
+  const failing = pr(42, {
+    ci: 'failure',
+    checks: [
+      check('lint', 'success', 'success'),
+      check('build', 'failure', 'failure', 'https://github.com/e2e/web/runs/1'),
+      check('e2e', 'failure', 'timed_out'),
+    ],
+  })
+
+  it('names the PR, its commit and each failing check with its outcome and log', () => {
+    const message = fixCiMessage(failing)
+    expect(message.split('\n').slice(0, 7)).toEqual([
+      'CI is failing on your pull request #42 in e2e/web: change 42',
+      'https://github.com/e2e/web/pull/42',
+      'Commit abc1234 on feat/42',
+      '',
+      'Failing checks:',
+      '- build: failed (https://github.com/e2e/web/runs/1)',
+      '- e2e: timed out',
+    ])
+    expect(message).not.toContain('lint')
+  })
+
+  it('asks the agent to read the logs, fix the cause, check locally and push to the PR branch', () => {
+    const message = fixCiMessage(failing)
+    expect(message).toContain('gh pr checks 42 -R e2e/web, then gh run view --log-failed')
+    expect(message).toContain('find the cause and fix it')
+    expect(message).toContain('Run the same checks locally where you can, then push to the PR branch feat/42.')
+    expect(message).not.toContain('worktree')
+  })
+
+  it('leaves the check list out when no check failed', () => {
+    const message = fixCiMessage(pr(7, { ci: 'failure' }))
+    expect(message).not.toContain('Failing checks:')
+    expect(message).toContain('Commit abc1234 on feat/7')
   })
 })

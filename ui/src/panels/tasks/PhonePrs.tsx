@@ -19,6 +19,7 @@ function LinkedPrs({ task, onClose }: { task: TaskListEntry; onClose: () => void
     <AgentPrsSheet
       prs={prs}
       path={path}
+      agent={task}
       open
       onOpenChange={(open) => {
         if (!open) {

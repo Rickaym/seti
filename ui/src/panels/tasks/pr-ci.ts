@@ -19,22 +19,20 @@ export const checkOutcome = (check: Pick<PrCheck, 'detail'>) =>
 
 export const failingChecks = (pr: Pick<PullRequest, 'checks'>) => pr.checks.filter((check) => check.state === 'failure')
 
-/** The start prompt for an agent that fixes the PR's failing checks, with each check's outcome. */
-export function fixCiPrompt(pr: PullRequest): string {
+/** The message that asks a PR's own agent to fix its failing checks, with each check's outcome. */
+export function fixCiMessage(pr: PullRequest): string {
   const failing = failingChecks(pr).map((check) => {
     const log = check.url === null ? '' : ` (${check.url})`
     return `- ${check.name}: ${checkOutcome(check)}${log}`
   })
-  const commit = pr.head_oid.slice(0, 7)
+  const number = String(pr.number)
   return [
-    `Fix the failing CI on pull request #${String(pr.number)} in ${pr.repo_slug}: ${pr.title}`,
+    `CI is failing on your pull request #${number} in ${pr.repo_slug}: ${pr.title}`,
     pr.url,
+    `Commit ${pr.head_oid.slice(0, 7)} on ${pr.head_ref}`,
+    ...(failing.length > 0 ? ['', 'Failing checks:', ...failing] : []),
     '',
-    `You are in an isolated worktree checked out at origin/${pr.head_ref} (detached HEAD).`,
-    `The PR merges ${pr.head_ref} into ${pr.base_ref}.`,
-    `Commit your changes and push them to the PR branch with: git push origin HEAD:${pr.head_ref}`,
-    ...(failing.length > 0 ? ['', `Failing checks on ${commit}:`, ...failing] : []),
-    '',
-    `Task: Read the logs of the failing checks (gh pr checks ${String(pr.number)} -R ${pr.repo_slug}, then gh run view --log-failed), find the cause, fix it, run the same checks locally where you can, and push.`,
+    `Read the logs of the failing checks (gh pr checks ${number} -R ${pr.repo_slug}, then gh run view --log-failed), find the cause and fix it.`,
+    `Run the same checks locally where you can, then push to the PR branch ${pr.head_ref}.`,
   ].join('\n')
 }
