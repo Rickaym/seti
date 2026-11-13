@@ -56,7 +56,9 @@ mark, and the EA's live context says which model the agent runs on. Switch back 
 `/model <original model>` as the user's message once the turn has ended, since Claude Code refuses
 slash commands mid-turn; the EA and agents at Full ask for the same through `retry_agent_turn` with
 `switch_back_model`, which calls `POST /api/tasks/:id/model/switch-back`. The mark clears when a
-later session start reports a model other than the fallback. A notice with scope `local` covers
+later session start reports a model other than the fallback. Migration 102 marked the agents that
+were already on a fallback when it ran, from their latest session-wide notice, without auditing
+those notices again. A notice with scope `local` covers
 one subagent's response, so it is audited and shown but leaves the session model alone.
 
 Each open task costs a Claude Code process of about 300 MB, which caps one host at a few dozen
