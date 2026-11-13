@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { EditorFind } from '@/components/code-editor/editor-find'
+import { useFind, type FindState } from '@/components/find/useFind'
+import { useFindKeys } from '@/components/find/useFindKeys'
 import type { FindTarget } from '@/lib/text-find'
 import type { FileViewerEntry } from '@/panels/files/file-viewers'
-import { useFileFind, type FileFind } from '@/panels/files/find/useFileFind'
-import { useFileFindKeys } from '@/panels/files/find/useFileFindKeys'
 import { useViewFind } from '@/panels/files/find/useViewFind'
 
 interface TextFind {
-  find: FileFind
+  find: FindState
   /** The editor or the view shows text find can search; a rendered viewer such as a table does not. */
   readable: boolean
   /** What the editor serves while editing. */
@@ -37,7 +37,7 @@ interface Shown {
 
 /** Find, replace and go to line for one open text file, in its editor or its read-only view. */
 export function useTextFind({ editing, viewer, markdown, openedAt }: Shown): TextFind {
-  const find = useFileFind()
+  const find = useFind()
   const { query, target: targetRef, setCount } = find
   const readable = editing || viewer === undefined
   const offers = { find: readable, replace: editing, line: editing || (readable && !markdown) }
@@ -46,7 +46,7 @@ export function useTextFind({ editing, viewer, markdown, openedAt }: Shown): Tex
   const [jump, setJump] = useState<Jump | null>(null)
   const shown = editing ? null : view
   const { next, previous, selection } = useViewFind(shown, readable ? query : null, setCount)
-  useFileFindKeys(root, find, offers)
+  useFindKeys(root, find, offers)
 
   const viewTarget = useMemo<FindTarget | null>(
     () =>

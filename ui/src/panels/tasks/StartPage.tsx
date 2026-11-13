@@ -5,6 +5,9 @@ import { toast } from 'sonner'
 import { apiSend, errorText } from '@/api'
 import { Hint } from '@/components/Hint'
 import { BackButton } from '@/components/SplitPane'
+import { MessageFindBar } from '@/components/find/FindBar'
+import { FindButton } from '@/components/find/FindButton'
+import { useFind } from '@/components/find/useFind'
 import { Button } from '@/components/ui/button'
 import { useConfirm } from '@/components/ui/confirm-context'
 import { useAttachments } from '@/hooks/useAttachments'
@@ -179,6 +182,7 @@ export function StartPage() {
   const draftKey = context === null ? NEW_TASK_PROMPT : null
   const [prompt, setPrompt] = useDraft(draftKey, context?.prompt ?? '')
   const attachments = useAttachments(draftKey, prompt, setPrompt)
+  const find = useFind()
   const [picked, setPicked] = useState<string[]>([])
   const [starting, setStarting] = useState(false)
   const [sandboxed, setSandboxed] = useState(true)
@@ -240,6 +244,7 @@ export function StartPage() {
                 <DraftAttachments attachments={attachments} />
               </div>
             )}
+            <MessageFindBar find={find} editable={!starting} />
             <CommandField
               value={prompt}
               onChange={setPrompt}
@@ -253,6 +258,7 @@ export function StartPage() {
               onSubmit={() => void start()}
               enterSends={!touch}
               attach={{ text: attachments.addText, files: attachments.addFiles }}
+              find={find}
               className="min-h-20 border-0 px-3 py-3 text-sm focus-visible:ring-0 md:text-sm dark:bg-transparent"
             />
             <div className="flex items-end justify-between gap-3 px-2 pb-2">
@@ -269,6 +275,7 @@ export function StartPage() {
               )}
               <div className="ml-auto flex shrink-0 items-center gap-1">
                 <SandboxToggle on={sandboxed} onChange={setSandboxed} disabled={starting} />
+                {touch && <FindButton find={find} />}
                 <AttachButton
                   disabled={starting}
                   onFiles={(chosen) => {

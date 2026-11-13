@@ -1,7 +1,5 @@
 import type { FindQuery } from '@/lib/text-find'
-
-/** Enough to light every match on screen; a common one-letter query stops here. */
-const MAX_MATCHES = 1000
+import { MAX_MATCHES, queryPattern } from '@/lib/text-matches'
 
 /** The matches of one query in a view, where each starts in the view's text, and their ranges. */
 export interface ViewMatches {
@@ -9,12 +7,6 @@ export interface ViewMatches {
   ranges: Range[]
   capped: boolean
 }
-
-const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&')
-
-/** The query taken literally, in any case unless it asks for case. */
-const queryPattern = (query: FindQuery): RegExp =>
-  new RegExp(escapeRegExp(query.text), query.caseSensitive ? 'gu' : 'giu')
 
 /** The text nodes a reader sees, so line numbers and other hidden parts never match. */
 function shownText(root: HTMLElement): { nodes: Text[]; starts: number[]; text: string } {

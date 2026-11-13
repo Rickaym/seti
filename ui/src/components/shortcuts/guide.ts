@@ -1,11 +1,11 @@
 import { CALL_SHORTCUT } from '@/components/ea/call-status'
+import { TEXT_KEYS } from '@/components/find/find-keys'
 import { PALETTE_SHORTCUT } from '@/components/palette/palette-store'
 import type { PaletteCommand } from '@/components/palette/registry'
 import { chordLabel, CHORDS, sectionChord } from '@/components/shortcuts/chords'
 import { FIND_SHORTCUT } from '@/components/shortcuts/find'
 import { TEAM_SHORTCUT } from '@/components/team/team-context'
 import { lastSectionDigit } from '@/lib/sections'
-import { FILE_KEYS } from '@/panels/files/find/find-keys'
 import { TERMINAL_SHORTCUT } from '@/panels/terminal/terminal-shortcut'
 
 interface GuideRow {
@@ -14,7 +14,7 @@ interface GuideRow {
 }
 
 interface GuideGroup {
-  heading: 'Anywhere' | 'Agents' | 'Files' | 'Terminal'
+  heading: 'Anywhere' | 'Agents' | 'Message box' | 'Files' | 'Terminal'
   rows: GuideRow[]
 }
 
@@ -45,14 +45,22 @@ const AGENTS: GuideRow[] = [
   { keys: 'Esc Esc', action: 'Rewind' },
 ]
 
+const MESSAGE_BOX: GuideRow[] = [
+  { keys: TEXT_KEYS.find, action: 'Find in the message' },
+  { keys: `Enter, ${TEXT_KEYS.next}`, action: 'Next match' },
+  { keys: `Shift+Enter, ${TEXT_KEYS.previous}`, action: 'Previous match' },
+  { keys: TEXT_KEYS.replace, action: 'Replace in the message' },
+  { keys: 'Esc', action: 'Close find, keep the match selected' },
+]
+
 const FILES: GuideRow[] = [
-  { keys: FILE_KEYS.find, action: 'Find in file' },
-  { keys: `${FILE_KEYS.next}, ${FILE_KEYS.previous}`, action: 'Next or previous match' },
-  { keys: FILE_KEYS.replace, action: 'Replace while editing' },
-  { keys: FILE_KEYS.line, action: 'Go to line' },
-  { keys: FILE_KEYS.selectNext, action: 'Select next match' },
-  { keys: FILE_KEYS.save, action: 'Save' },
-  { keys: `${FILE_KEYS.undo}, ${FILE_KEYS.redo}`, action: 'Undo and redo' },
+  { keys: TEXT_KEYS.find, action: 'Find in file' },
+  { keys: `${TEXT_KEYS.next}, ${TEXT_KEYS.previous}`, action: 'Next or previous match' },
+  { keys: TEXT_KEYS.replace, action: 'Replace while editing' },
+  { keys: TEXT_KEYS.line, action: 'Go to line' },
+  { keys: TEXT_KEYS.selectNext, action: 'Select next match' },
+  { keys: TEXT_KEYS.save, action: 'Save' },
+  { keys: `${TEXT_KEYS.undo}, ${TEXT_KEYS.redo}`, action: 'Undo and redo' },
 ]
 
 const TERMINAL: GuideRow[] = [{ keys: 'Shift+Enter', action: 'New line in Claude Code' }]
@@ -72,7 +80,7 @@ const deviceKeys = (keys: string) => keys.replace(/^Alt\+/u, `${LABEL_ALT}+`).re
  * added at the end of their group.
  */
 export function guideGroups(commands: readonly PaletteCommand[], mods: readonly ModGuideRow[] = []): GuideGroup[] {
-  const named = new Set([...ANYWHERE, ...AGENTS, ...FILES, ...TERMINAL].map((row) => row.keys))
+  const named = new Set([...ANYWHERE, ...AGENTS, ...MESSAGE_BOX, ...FILES, ...TERMINAL].map((row) => row.keys))
   const extra = (agent: boolean): GuideRow[] =>
     commands.flatMap((command) =>
       command.shortcut !== undefined && !named.has(command.shortcut) && (command.group === 'Current agent') === agent
@@ -84,6 +92,7 @@ export function guideGroups(commands: readonly PaletteCommand[], mods: readonly 
   return [
     { heading: 'Anywhere', rows: [...ANYWHERE, ...extra(false), ...modRows('anywhere')] },
     { heading: 'Agents', rows: [...AGENTS, ...extra(true), ...modRows('agents')] },
+    { heading: 'Message box', rows: MESSAGE_BOX },
     { heading: 'Files', rows: FILES },
     { heading: 'Terminal', rows: TERMINAL },
   ]

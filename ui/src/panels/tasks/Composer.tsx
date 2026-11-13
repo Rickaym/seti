@@ -4,6 +4,9 @@ import { memo, useEffect, useEffectEvent, useLayoutEffect, useRef, useState, typ
 import { toast } from 'sonner'
 import { apiPost, errorText } from '@/api'
 import { Hint } from '@/components/Hint'
+import { MessageFindBar } from '@/components/find/FindBar'
+import { FindButton } from '@/components/find/FindButton'
+import { useFind } from '@/components/find/useFind'
 import { Button } from '@/components/ui/button'
 import { useConfirm } from '@/components/ui/confirm-context'
 import { useAttachments, type Attachments } from '@/hooks/useAttachments'
@@ -208,6 +211,7 @@ export const Composer = memo(function ComposerView({
   const touch = useCoarsePointer()
   const box = useRef<HTMLDivElement>(null)
   const roomy = useWiderThan(box, ROOMY_PX)
+  const find = useFind()
   const [sending, setSending] = useState(false)
   const latestDraft = useRef(draft)
   useLayoutEffect(() => {
@@ -293,6 +297,7 @@ export const Composer = memo(function ComposerView({
           action={slashUi.status}
         />
       )}
+      <MessageFindBar find={find} editable={!shellRunning} />
       <div className="flex items-end gap-2">
         <CommandField
           value={draft}
@@ -309,7 +314,9 @@ export const Composer = memo(function ComposerView({
           enterSends={!touch}
           onAltSubmit={agentRunning ? () => void send(true) : undefined}
           attach={{ text: attachments.addText, files: attachments.addFiles }}
+          find={find}
         />
+        {touch && <FindButton find={find} />}
         <AttachButton
           disabled={shellRunning}
           onFiles={(picked) => {

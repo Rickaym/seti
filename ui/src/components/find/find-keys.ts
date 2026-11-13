@@ -2,11 +2,11 @@ import { FIND_SHORTCUT, isFindShortcut } from '@/components/shortcuts/find'
 
 const APPLE = /Mac|iPhone|iPad/u.test(navigator.userAgent)
 
-/** What a key does in an open file: open find, replace or go to line, or step through matches. */
-export type FileFindKey = 'find' | 'replace' | 'line' | 'next' | 'previous'
+/** What a key does in a text: open find, replace or go to line, or step through matches. */
+export type TextFindKey = 'find' | 'replace' | 'line' | 'next' | 'previous'
 
-/** How the open file's keys read on this device. */
-export const FILE_KEYS = {
+/** How the find and edit keys read on this device. */
+export const TEXT_KEYS = {
   find: FIND_SHORTCUT,
   replace: APPLE ? 'Cmd+Opt+F' : 'Ctrl+H',
   line: 'Ctrl+G',
@@ -30,7 +30,7 @@ const isReplace = (e: Stroke, apple: boolean) =>
     : only(e, true, false, false) && !e.shiftKey && e.key.toLowerCase() === 'h'
 
 /** F3 steps, Shift+F3 steps back; Apple also takes Cmd+G and Cmd+Shift+G. */
-function stepOf(e: Stroke, apple: boolean): FileFindKey | null {
+function stepOf(e: Stroke, apple: boolean): TextFindKey | null {
   const f3 = e.key === 'F3' && only(e, false, false, false)
   const cmdG = apple && e.key.toLowerCase() === 'g' && only(e, false, true, false)
   if (!f3 && !cmdG) {
@@ -39,8 +39,8 @@ function stepOf(e: Stroke, apple: boolean): FileFindKey | null {
   return e.shiftKey ? 'previous' : 'next'
 }
 
-/** The find action a key stroke asks for in an open file, or null for any other key. */
-export function fileFindKey(e: Stroke, apple = APPLE): FileFindKey | null {
+/** The find action a key stroke asks for in a text, or null for any other key. */
+export function textFindKey(e: Stroke, apple = APPLE): TextFindKey | null {
   if (isFindShortcut(e, apple)) {
     return 'find'
   }

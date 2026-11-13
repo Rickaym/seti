@@ -1,6 +1,9 @@
 import { Send, Square } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { Hint } from '@/components/Hint'
+import { MessageFindBar } from '@/components/find/FindBar'
+import { FindButton } from '@/components/find/FindButton'
+import { useFind } from '@/components/find/useFind'
 import { Button } from '@/components/ui/button'
 import { RETRYING_LABEL } from '@/hooks/useClientSend'
 import { useCoarsePointer } from '@/hooks/useMedia'
@@ -37,6 +40,7 @@ export function EaComposer({
   actions?: ReactNode
 }) {
   const touch = useCoarsePointer()
+  const find = useFind()
   const blocked = replying || disabled !== null || draft.trim() === ''
   const send = () => {
     if (!blocked) {
@@ -45,6 +49,9 @@ export function EaComposer({
   }
   return (
     <div className="shrink-0 space-y-1 p-3 max-md:p-2">
+      <div className="mx-auto w-full max-w-3xl">
+        <MessageFindBar find={find} editable />
+      </div>
       <div className="mx-auto flex w-full max-w-3xl gap-2">
         <CommandField
           value={draft}
@@ -57,7 +64,9 @@ export function EaComposer({
           primary
           enterSends={!touch}
           onSubmit={send}
+          find={find}
         />
+        {touch && <FindButton find={find} />}
         {replying ? (
           <Hint text="Stop the reply (Esc)" side="top">
             <Button variant="outline" aria-label="Stop the reply" onClick={onStop}>

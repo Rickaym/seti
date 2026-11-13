@@ -12,15 +12,16 @@ export interface FindCount {
   capped: boolean
 }
 
-/** What the open file does for find; the editor and the read-only view each provide it. */
+/** What a text does for find: a file's editor or read-only view, or a message box. */
 export interface FindTarget {
   next: () => void
   previous: () => void
-  goToLine: (line: number) => void
+  /** Files offer it; a message box leaves it out. */
+  goToLine?: (line: number) => void
   /** The selected text, which find starts from when it fits on one line. */
   selection: () => string
   focus: () => void
-  /** Replacing needs the editor; the read-only view leaves these out. */
+  /** Replacing needs an editable text; the read-only view leaves these out. */
   replace?: (replacement: string) => void
   replaceAll?: (replacement: string) => void
 }

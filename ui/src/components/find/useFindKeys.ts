@@ -1,8 +1,8 @@
 import { useEffect, useLayoutEffect, useRef } from 'react'
-import { fileFindKey } from '@/panels/files/find/find-keys'
-import type { FileFind } from '@/panels/files/find/useFileFind'
+import { textFindKey } from '@/components/find/find-keys'
+import type { FindState } from '@/components/find/useFind'
 
-/** Which find actions the open file offers. */
+/** Which find actions the text offers. */
 export interface FindOffers {
   find: boolean
   replace: boolean
@@ -11,9 +11,9 @@ export interface FindOffers {
 
 /**
  * The editor keys for find in `root`: they run here before the Files search and the chat find,
- * which skip a key already handled. Keys the file does not offer pass through.
+ * which skip a key already handled. Keys the text does not offer pass through.
  */
-export function useFileFindKeys(root: HTMLElement | null, find: FileFind, offers: FindOffers): void {
+export function useFindKeys(root: HTMLElement | null, find: FindState, offers: FindOffers): void {
   const latest = useRef({ find, offers })
   useLayoutEffect(() => {
     latest.current = { find, offers }
@@ -32,7 +32,7 @@ export function useFileFindKeys(root: HTMLElement | null, find: FileFind, offers
         now.close()
         return
       }
-      const action = fileFindKey(e)
+      const action = textFindKey(e)
       if (action === null || !can.find || (action === 'replace' && !can.replace) || (action === 'line' && !can.line)) {
         return
       }
