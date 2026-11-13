@@ -3,8 +3,8 @@ import { FoldVertical } from 'lucide-react'
 import { useId } from 'react'
 import { Hint } from '@/components/Hint'
 import { ToggleButton } from '@/components/ToggleButton'
+import { FindableTextarea } from '@/components/find/FindableTextarea'
 import { Input } from '@/components/ui/input'
-import { Textarea } from '@/components/ui/textarea'
 import type { CompactForm } from './compact-form'
 
 const EXPLAIN = {
@@ -111,7 +111,7 @@ export function CompactFields({
       <p id={explained} className="text-2xs text-muted-foreground">
         {form.auto ? `${EXPLAIN.window} ${EXPLAIN.pct}` : EXPLAIN.off}
       </p>
-      <Textarea
+      <FindableTextarea
         aria-label="Compact instructions"
         placeholder="What each summary keeps, such as the files changed and open decisions"
         maxLength={COMPACT_INSTRUCTIONS_MAX}

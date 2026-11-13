@@ -13,10 +13,10 @@ import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { apiGet, apiPost, errorText } from '@/api'
 import { CrudEditDialog, Field } from '@/components/crud/CrudForm'
+import { FindableTextarea } from '@/components/find/FindableTextarea'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Textarea } from '@/components/ui/textarea'
 
 const HOME = '__home__'
 
@@ -212,7 +212,7 @@ function TransportFields({ form, set }: { form: Form; set: (patch: Partial<Form>
         />
       </Field>
       <Field label="Arguments" full>
-        <Textarea
+        <FindableTextarea
           aria-label="Arguments"
           rows={3}
           value={form.args}

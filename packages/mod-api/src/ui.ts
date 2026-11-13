@@ -137,6 +137,7 @@ export interface ModKit {
     }
   >
   Input: ComponentType<InputHTMLAttributes<HTMLInputElement>>
+  /** Seti's text field, where Ctrl+F finds and replaces in its text as in every other field. */
   Textarea: ComponentType<ComponentProps<'textarea'>>
   /** A tooltip on its one child, which says more than the child's one-or-two-word label. */
   Hint: ComponentType<{ text: ReactNode; children: ReactElement }>

@@ -1,6 +1,6 @@
 import type { Terminal } from '@xterm/xterm'
 import { useEffect, useImperativeHandle, useRef, type RefObject } from 'react'
-import { Textarea } from '@/components/ui/textarea'
+import { PlainTextarea } from '@/components/find/FindableTextarea'
 import { TerminalKeys } from './TerminalKeys'
 import { bindInputLine, type InputLine } from './input-line'
 import { pasteClipboard } from './terminal-clipboard'
@@ -61,7 +61,7 @@ function TerminalLine({ ref, term, send, modifiers, primary }: TerminalLineProps
 
   return (
     <div className="shrink-0 border-t border-border p-1">
-      <Textarea
+      <PlainTextarea
         ref={field}
         rows={1}
         wrap="off"

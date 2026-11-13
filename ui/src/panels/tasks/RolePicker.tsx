@@ -12,10 +12,10 @@ import { toast } from 'sonner'
 import { apiGet, apiPost, apiPut, errorText } from '@/api'
 import { Hint } from '@/components/Hint'
 import { CrudEditDialog, Field } from '@/components/crud/CrudForm'
+import { FindableTextarea } from '@/components/find/FindableTextarea'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
-import { Textarea } from '@/components/ui/textarea'
 import { navigate } from '@/lib/route'
 import { packSelection } from '@/panels/context/selection'
 
@@ -282,7 +282,7 @@ export function NewRoleDialog({
         </div>
       </Field>
       <Field label="Role" full>
-        <Textarea
+        <FindableTextarea
           aria-label="Role content"
           className="max-h-[50vh] min-h-40 font-mono"
           placeholder="What this agent owns, what it hands to others and how it reports. Its first line sums it up."

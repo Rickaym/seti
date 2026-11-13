@@ -10,6 +10,33 @@ export interface FindOffers {
 }
 
 /**
+ * Esc inside `element` closes an open find before anything else hears it, such as a dialog
+ * around it, which listens on the document while the key is still on its way down.
+ */
+export function useEscapeClosesFind(element: HTMLElement | null, find: FindState): void {
+  const latest = useRef(find)
+  useLayoutEffect(() => {
+    latest.current = find
+  })
+  useEffect(() => {
+    if (element === null) {
+      return undefined
+    }
+    const onKeyDown = (e: KeyboardEvent) => {
+      const inside = e.target instanceof Node && element.contains(e.target)
+      if (e.key === 'Escape' && !e.defaultPrevented && inside && latest.current.mode !== null) {
+        e.preventDefault()
+        latest.current.close()
+      }
+    }
+    window.addEventListener('keydown', onKeyDown, { capture: true })
+    return () => {
+      window.removeEventListener('keydown', onKeyDown, { capture: true })
+    }
+  }, [element])
+}
+
+/**
  * The editor keys for find in `root`: they run here before the Files search and the chat find,
  * which skip a key already handled. Keys the text does not offer pass through.
  */
@@ -18,6 +45,7 @@ export function useFindKeys(root: HTMLElement | null, find: FindState, offers: F
   useLayoutEffect(() => {
     latest.current = { find, offers }
   })
+  useEscapeClosesFind(root, find)
   useEffect(() => {
     if (root === null) {
       return undefined
@@ -27,11 +55,6 @@ export function useFindKeys(root: HTMLElement | null, find: FindState, offers: F
         return
       }
       const { find: now, offers: can } = latest.current
-      if (e.key === 'Escape' && now.mode !== null) {
-        e.preventDefault()
-        now.close()
-        return
-      }
       const action = textFindKey(e)
       if (action === null || !can.find || (action === 'replace' && !can.replace) || (action === 'line' && !can.line)) {
         return

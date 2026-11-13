@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { EditorFind } from '@/components/code-editor/editor-find'
+import { useEditorFind } from '@/components/find/useEditorFind'
 import { useFind, type FindState } from '@/components/find/useFind'
 import { useFindKeys } from '@/components/find/useFindKeys'
 import type { FindTarget } from '@/lib/text-find'
@@ -38,7 +39,8 @@ interface Shown {
 /** Find, replace and go to line for one open text file, in its editor or its read-only view. */
 export function useTextFind({ editing, viewer, markdown, openedAt }: Shown): TextFind {
   const find = useFind()
-  const { query, target: targetRef, setCount } = find
+  const { query, setCount } = find
+  const { attach, editorFind } = useEditorFind(find)
   const readable = editing || viewer === undefined
   const offers = { find: readable, replace: editing, line: editing || (readable && !markdown) }
   const [root, setRoot] = useState<HTMLElement | null>(null)
@@ -68,20 +70,7 @@ export function useTextFind({ editing, viewer, markdown, openedAt }: Shown): Tex
           },
     [shown, next, previous, selection, openedAt],
   )
-  const attach = useCallback(
-    (given: FindTarget) => {
-      targetRef.current = given
-      return () => {
-        if (targetRef.current === given) {
-          targetRef.current = null
-        }
-      }
-    },
-    [targetRef],
-  )
   useEffect(() => (viewTarget === null ? undefined : attach(viewTarget)), [viewTarget, attach])
-
-  const editorFind = useMemo(() => ({ query, attach, onCount: setCount }), [query, attach, setCount])
   return {
     find,
     readable,

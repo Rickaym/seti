@@ -1,9 +1,9 @@
 import { CLIENT_AUTHS, envFor } from '@seti/shared'
 import { Field } from '@/components/crud/CrudForm'
+import { FindableTextarea } from '@/components/find/FindableTextarea'
 import { Input } from '@/components/ui/input'
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 import { Switch } from '@/components/ui/switch'
-import { Textarea } from '@/components/ui/textarea'
 import type { ConnectionForm } from './connection-form'
 
 const AUTH_LABEL = {
@@ -142,7 +142,7 @@ function MintFields({ form, set }: { form: ConnectionForm; set: Patch }) {
       <TextInput label="Audience" field="audience" form={form} set={set} placeholder="Optional" />
       <TextInput label="Resource" field="resource" form={form} set={set} placeholder="Optional" />
       <Field label="Extra parameters" full>
-        <Textarea
+        <FindableTextarea
           aria-label="Extra parameters"
           className="font-mono"
           rows={2}

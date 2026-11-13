@@ -14,6 +14,7 @@ import { Hint } from '@/components/Hint'
 import { ToggleButton } from '@/components/ToggleButton'
 import { TEXT_KEYS, textFindKey } from '@/components/find/find-keys'
 import type { FindState } from '@/components/find/useFind'
+import { useEscapeClosesFind } from '@/components/find/useFindKeys'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { findCountLabel } from '@/lib/text-find'
@@ -82,9 +83,6 @@ function FindRow({ find, editable, label, testId }: { find: FindState; editable:
       } else {
         find.target.current?.next()
       }
-    } else if (e.key === 'Escape') {
-      e.preventDefault()
-      find.close()
     }
   }
   return (
@@ -176,9 +174,6 @@ function ReplaceRow({ find }: { find: FindState }) {
           if (e.key === 'Enter') {
             e.preventDefault()
             one()
-          } else if (e.key === 'Escape') {
-            e.preventDefault()
-            find.close()
           }
         }}
       />
@@ -234,9 +229,6 @@ function LineRow({ find, text }: { find: FindState; text: string }) {
           if (e.key === 'Enter') {
             e.preventDefault()
             go()
-          } else if (e.key === 'Escape') {
-            e.preventDefault()
-            find.close()
           }
         }}
       />
@@ -253,46 +245,43 @@ function LineRow({ find, text }: { find: FindState; text: string }) {
   )
 }
 
-/** Find keys and Esc pressed in the bar, for a bar that sits outside its text's box. */
+/** Find keys pressed in the bar, for a bar that sits outside its text's box. */
 function barKey(e: KeyboardEvent<HTMLDivElement>, find: FindState, editable: boolean): void {
   if (e.defaultPrevented) {
     return
   }
-  const action = e.key === 'Escape' ? 'close' : textFindKey(e.nativeEvent)
+  const action = textFindKey(e.nativeEvent)
   if (action === null || action === 'line' || (action === 'replace' && !editable)) {
     return
   }
   e.preventDefault()
-  if (action === 'close') {
-    find.close()
-  } else if (action === 'next' || action === 'previous') {
+  if (action === 'next' || action === 'previous') {
     find.target.current?.[action]()
   } else {
     find.open(action)
   }
 }
 
-/** Find, replace or go to line in a text, beside it while open. */
-export function FindBar({
-  find,
-  editable,
-  text = '',
-  label,
-  testId,
-  className,
-}: {
+interface FindBarProps extends Naming {
   find: FindState
   editable: boolean
   /** The text whose lines go to line reaches. */
-  text?: string
+  text?: string | undefined
   className?: string
-} & Naming) {
-  if (find.mode === null) {
-    return null
-  }
+}
+
+/** Find, replace or go to line in a text, beside it while open. */
+export function FindBar(props: FindBarProps) {
+  return props.find.mode === null ? null : <OpenBar {...props} />
+}
+
+function OpenBar({ find, editable, text = '', label, testId, className }: FindBarProps) {
+  const [bar, setBar] = useState<HTMLDivElement | null>(null)
+  useEscapeClosesFind(bar, find)
   return (
     // eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- keys from its fields
     <div
+      ref={setBar}
       role="search"
       data-testid={testId}
       className={cn('flex shrink-0 flex-col gap-1 border-border bg-card px-3 py-1.5', className)}
@@ -315,4 +304,18 @@ export function FindBar({
 /** Find and replace in a message box, laid across its composer above the box. */
 export function MessageFindBar({ find, editable }: { find: FindState; editable: boolean }) {
   return <FindBar find={find} editable={editable} label="Find in message" testId="message-find" className="border" />
+}
+
+/** Find and replace, and go to line where the text offers it, laid on top of a text field. */
+export function TextFindBar({ find, editable, text }: { find: FindState; editable: boolean; text?: string }) {
+  return (
+    <FindBar
+      find={find}
+      editable={editable}
+      text={text}
+      label="Find in text"
+      testId="text-find"
+      className="border border-b-0"
+    />
+  )
 }

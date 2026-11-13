@@ -3,8 +3,11 @@ import { Send } from 'lucide-react'
 import { useId, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import { toast } from 'sonner'
 import { apiSend, errorText } from '@/api'
+import { MessageFindBar } from '@/components/find/FindBar'
+import { FindButton } from '@/components/find/FindButton'
+import { FindableTextarea } from '@/components/find/FindableTextarea'
+import { useFind } from '@/components/find/useFind'
 import { Button } from '@/components/ui/button'
-import { Textarea } from '@/components/ui/textarea'
 import { RETRYING_LABEL, useClientSend } from '@/hooks/useClientSend'
 import { useDraft } from '@/hooks/useDraft'
 import { useCoarsePointer } from '@/hooks/useMedia'
@@ -59,6 +62,7 @@ export function TeamComposer({ members }: { members: readonly TeamMember[] }) {
   const [status, setStatus] = useState<string | null>(null)
   const clientSend = useClientSend()
   const box = useRef<HTMLTextAreaElement>(null)
+  const find = useFind()
   const listId = useId()
   const options = useMemo(() => optionsOf(members), [members])
   const typing = mentionAt(draft, caret)
@@ -128,10 +132,12 @@ export function TeamComposer({ members }: { members: readonly TeamMember[] }) {
 
   return (
     <div className="shrink-0 space-y-1 border-t border-border p-2">
+      <MessageFindBar find={find} editable />
       <div className="flex gap-2">
         <div className="relative min-w-0 flex-1">
-          <Textarea
+          <FindableTextarea
             ref={box}
+            find={find}
             rows={2}
             value={draft}
             aria-label="Message the group"
@@ -185,6 +191,7 @@ export function TeamComposer({ members }: { members: readonly TeamMember[] }) {
             </div>
           )}
         </div>
+        {touch && <FindButton find={find} />}
         {touch && (
           <Button aria-label="Send to the group" disabled={sending || draft.trim() === ''} onClick={() => void send()}>
             <Send className="size-4" />

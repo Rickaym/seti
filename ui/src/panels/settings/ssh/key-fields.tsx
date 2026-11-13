@@ -1,9 +1,9 @@
+import { PlainTextarea } from '@/components/find/FindableTextarea'
 import { Input } from '@/components/ui/input'
-import { Textarea } from '@/components/ui/textarea'
 
 export function PrivateKeyField({ value, onChange }: { value: string; onChange: (next: string) => void }) {
   return (
-    <Textarea
+    <PlainTextarea
       aria-label="Private key"
       autoComplete="off"
       spellCheck={false}

@@ -1,10 +1,7 @@
 import { parseComposer, pasteGoesToFile, rankCommands, type ComposerCheck, type ComposerCommand } from '@seti/shared'
-import { useCallback, useId, useState, type ClipboardEvent, type DragEvent, type KeyboardEvent } from 'react'
-import { FieldMarks } from '@/components/find/FieldMarks'
-import { useFieldFind } from '@/components/find/useFieldFind'
+import { useId, useState, type ClipboardEvent, type DragEvent, type KeyboardEvent } from 'react'
+import { FindableTextarea } from '@/components/find/FindableTextarea'
 import type { FindState } from '@/components/find/useFind'
-import { useFindKeys } from '@/components/find/useFindKeys'
-import { Textarea } from '@/components/ui/textarea'
 import { useEditorText } from '@/hooks/useEditorText'
 import type { CommandState } from '@/lib/command-catalog'
 import { handleWordDelete, insertText } from '@/lib/text-edit'
@@ -118,17 +115,6 @@ export function CommandField(props: CommandFieldProps) {
   const { value, onChange, commands, placement, onSubmit, onAltSubmit, attach, find, disabled = false } = props
   const { dropClass, ...attachInput } = useAttachInput(attach, disabled)
   const { ref: editorRef, ...editor } = useEditorText(value, onChange)
-  const [box, setBox] = useState<HTMLDivElement | null>(null)
-  const [textarea, setTextarea] = useState<HTMLTextAreaElement | null>(null)
-  const attachField = useCallback(
-    (element: HTMLTextAreaElement | null) => {
-      editorRef.current = element
-      setTextarea(element)
-    },
-    [editorRef],
-  )
-  const marks = useFieldFind(editorRef, find, value, !disabled)
-  useFindKeys(box, find, { find: true, replace: !disabled, line: false })
   const listId = useId()
   const [active, setActive] = useState(0)
   const [dismissedAt, setDismissedAt] = useState<string | null>(null)
@@ -179,9 +165,11 @@ export function CommandField(props: CommandFieldProps) {
   }
 
   return (
-    <div ref={setBox} className="relative min-w-0 flex-1">
-      <Textarea
-        ref={attachField}
+    <div className="relative min-w-0 flex-1">
+      <FindableTextarea
+        ref={editorRef}
+        find={find}
+        findText={value}
         rows={props.rows}
         disabled={disabled}
         aria-label={props.label}
@@ -214,7 +202,6 @@ export function CommandField(props: CommandFieldProps) {
         onKeyDown={onKeyDown}
         {...attachInput}
       />
-      <FieldMarks field={textarea} found={marks} />
       {open && (
         <SuggestionList
           listId={listId}
