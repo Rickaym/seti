@@ -88,68 +88,72 @@ function FindRow({ find, editable, label, testId }: { find: FindState; editable:
     }
   }
   return (
-    <div className="flex items-center gap-1">
-      <Search className="size-3.5 shrink-0 text-muted-foreground" />
-      <Input
-        ref={field}
-        type="search"
-        value={find.text}
-        placeholder={label}
-        aria-label={label}
-        className={FIELD}
-        onChange={(e) => {
-          find.setText(e.target.value)
-        }}
-        onKeyDown={onKeyDown}
-      />
-      <span
-        aria-live="polite"
-        data-testid={`${testId}-count`}
-        className="shrink-0 text-2xs text-muted-foreground tabular-nums"
-      >
-        {findCountLabel(find.text, find.count)}
-      </span>
-      <ToggleButton
-        pressed={find.caseSensitive}
-        onPressedChange={find.setCaseSensitive}
-        icon={CaseSensitive}
-        label="Match case"
-        iconOnly
-        variant="ghost"
-        hint="Match upper and lower case exactly"
-      />
-      <IconButton
-        hint={`Previous match (Shift+Enter, ${TEXT_KEYS.previous})`}
-        label="Previous match"
-        disabled={none}
-        onClick={() => find.target.current?.previous()}
-      >
-        <ChevronUp />
-      </IconButton>
-      <IconButton
-        hint={`Next match (Enter, ${TEXT_KEYS.next})`}
-        label="Next match"
-        disabled={none}
-        onClick={() => find.target.current?.next()}
-      >
-        <ChevronDown />
-      </IconButton>
-      {editable && (
-        <ToggleButton
-          pressed={find.mode === 'replace'}
-          onPressedChange={(on) => {
-            find.open(on ? 'replace' : 'find')
+    <div className="flex flex-wrap items-center gap-1">
+      <div className="flex min-w-40 flex-1 items-center gap-1">
+        <Search className="size-3.5 shrink-0 text-muted-foreground" />
+        <Input
+          ref={field}
+          type="search"
+          value={find.text}
+          placeholder={label}
+          aria-label={label}
+          className={FIELD}
+          onChange={(e) => {
+            find.setText(e.target.value)
           }}
-          icon={Replace}
-          label="Replace"
+          onKeyDown={onKeyDown}
+        />
+      </div>
+      <div className="ml-auto flex items-center gap-1">
+        <span
+          aria-live="polite"
+          data-testid={`${testId}-count`}
+          className="shrink-0 text-2xs text-muted-foreground tabular-nums"
+        >
+          {findCountLabel(find.text, find.count)}
+        </span>
+        <ToggleButton
+          pressed={find.caseSensitive}
+          onPressedChange={find.setCaseSensitive}
+          icon={CaseSensitive}
+          label="Match case"
           iconOnly
           variant="ghost"
-          hint={`Replace matches (${TEXT_KEYS.replace})`}
+          hint="Match upper and lower case exactly"
         />
-      )}
-      <IconButton hint="Close find (Esc)" label="Close find" onClick={find.close}>
-        <X />
-      </IconButton>
+        <IconButton
+          hint={`Previous match (Shift+Enter, ${TEXT_KEYS.previous})`}
+          label="Previous match"
+          disabled={none}
+          onClick={() => find.target.current?.previous()}
+        >
+          <ChevronUp />
+        </IconButton>
+        <IconButton
+          hint={`Next match (Enter, ${TEXT_KEYS.next})`}
+          label="Next match"
+          disabled={none}
+          onClick={() => find.target.current?.next()}
+        >
+          <ChevronDown />
+        </IconButton>
+        {editable && (
+          <ToggleButton
+            pressed={find.mode === 'replace'}
+            onPressedChange={(on) => {
+              find.open(on ? 'replace' : 'find')
+            }}
+            icon={Replace}
+            label="Replace"
+            iconOnly
+            variant="ghost"
+            hint={`Replace matches (${TEXT_KEYS.replace})`}
+          />
+        )}
+        <IconButton hint="Close find (Esc)" label="Close find" onClick={find.close}>
+          <X />
+        </IconButton>
+      </div>
     </div>
   )
 }
