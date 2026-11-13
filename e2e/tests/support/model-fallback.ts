@@ -8,7 +8,7 @@ import { CVP_URL, fallbackPrompt, MODEL_PROMPT } from './fake-fallback.js'
 import { releaseStep } from './fake-steps.js'
 import { expect, unique } from './fixtures.js'
 
-export const NOTICE_TEXT =
+const NOTICE_TEXT =
   'Claude Code switched this agent from Opus 5.5 to Opus 4.8 after a cyber safeguard flagged a request.'
 
 /** Starts an agent whose turn trips the cyber safeguard; the turn holds until `release` runs. */

@@ -5,10 +5,10 @@ const FALLBACK_PROMPT = 'trip the cyber safeguard'
 /** What a prompt asks for to have the session report its model in a session start. */
 export const MODEL_PROMPT = 'report your model'
 
-export const ORIGINAL_MODEL = 'claude-opus-5-5'
-export const FALLBACK_MODEL = 'claude-opus-4-8'
+const ORIGINAL_MODEL = 'claude-opus-5-5'
+const FALLBACK_MODEL = 'claude-opus-4-8'
 export const CVP_URL = 'https://support.claude.com/en/articles/14604842-cyber-verification-program'
-export const FALLBACK_EXPLANATION =
+const FALLBACK_EXPLANATION =
   'Cyber safeguards flagged this message. If this is legitimate security work, you can apply for the ' +
   `Cyber Verification Program: ${CVP_URL}`
 
