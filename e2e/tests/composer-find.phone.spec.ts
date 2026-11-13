@@ -26,7 +26,7 @@ test('the Find button opens find and replace in the message box on a phone and i
   const reply = main.getByRole('combobox', { name: 'Reply' })
   await reply.fill(PROMPT)
 
-  await main.getByRole('button', { name: 'Find in message' }).tap()
+  await main.getByRole('button', { name: 'Find', exact: true }).tap()
   const field = main.getByRole('searchbox', { name: 'Find in message' })
   await expect(field).toBeFocused()
   await field.fill('agent')

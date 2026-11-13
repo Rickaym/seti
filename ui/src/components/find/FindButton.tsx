@@ -10,7 +10,7 @@ export function FindButton({ find }: { find: FindState }) {
       <Button
         variant="ghost"
         size="icon-sm"
-        aria-label="Find in message"
+        aria-label="Find"
         className="shrink-0 pointer-coarse:size-10"
         onClick={find.openFind}
       >
