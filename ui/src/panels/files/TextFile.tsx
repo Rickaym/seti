@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { toast } from 'sonner'
 import { apiGet, apiPut, errorText, RequestError } from '@/api'
+import { FindBar } from '@/components/find/FindBar'
 import { useConfirm } from '@/components/ui/confirm-context'
 import { useLeaveGuard } from '@/hooks/useLeaveGuard'
 import { ConflictBanner } from '@/panels/files/ConflictBanner'
@@ -11,7 +12,6 @@ import type { ViewerFile } from '@/panels/files/FileView'
 import { TextBody } from '@/panels/files/TextBody'
 import type { FileViewerEntry } from '@/panels/files/file-viewers'
 import { filesPath, type FileTarget } from '@/panels/files/files-api'
-import { FileFindBar } from '@/panels/files/find/FileFindBar'
 import { useTextFind } from '@/panels/files/find/useTextFind'
 import { useFileWatch } from '@/panels/files/useFileWatch'
 
@@ -213,7 +213,16 @@ export function TextFile(props: TextFileProps) {
           }}
         />
       )}
-      {readable && <FileFindBar find={find} editable={editing} text={current} />}
+      {readable && (
+        <FindBar
+          find={find}
+          editable={editing}
+          text={current}
+          label="Find in file"
+          testId="file-find"
+          className="border-b"
+        />
+      )}
       <TextBody
         path={target.path}
         text={base.text}

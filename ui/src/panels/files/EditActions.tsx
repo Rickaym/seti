@@ -2,8 +2,8 @@ import { Code, PencilLine, PencilOff, Save, Search } from 'lucide-react'
 import { CopyIconButton } from '@/components/CopyButton'
 import { Hint } from '@/components/Hint'
 import { ToggleButton } from '@/components/ToggleButton'
+import { TEXT_KEYS } from '@/components/find/find-keys'
 import { Button } from '@/components/ui/button'
-import { FILE_KEYS } from '@/panels/files/find/find-keys'
 
 /** Whether a diagram or table shows its text, and the switch between the two. */
 export interface SourceToggle {
@@ -41,7 +41,7 @@ export function EditActions({
     <>
       <CopyIconButton text={text} label="Copy contents" variant="outline" />
       {onFind !== null && (
-        <Hint text={`Find in this file (${FILE_KEYS.find})`}>
+        <Hint text={`Find in this file (${TEXT_KEYS.find})`}>
           <Button variant="outline" size="icon-sm" aria-label="Find in file" onClick={onFind}>
             <Search />
           </Button>
@@ -59,7 +59,7 @@ export function EditActions({
       )}
       {dirty && <span className="text-xs text-muted-foreground max-sm:hidden">Unsaved changes</span>}
       {editing && (
-        <Hint text={`Save (${FILE_KEYS.save})`}>
+        <Hint text={`Save (${TEXT_KEYS.save})`}>
           <Button size="sm" disabled={!dirty || saving} onClick={onSave}>
             <Save />
             <span className="max-sm:sr-only">{saving ? 'Saving...' : 'Save'}</span>
