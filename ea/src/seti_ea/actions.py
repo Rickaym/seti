@@ -929,9 +929,7 @@ class AgentActions:
                 ) from e
             raise
         model = fallback.get("original_model")
-        return ToolResult(
-            f"Asked {title} to switch back to {model}.", clip(f"Switched {title} back", 70)
-        )
+        return ToolResult(f"Asked {title} to switch back to {model}.", clip(f"Switched {title} back", 70))
 
     async def stop_subagent(self, args: Mapping[str, Any]) -> ToolResult:
         task, title = await self._task_ref(args)
