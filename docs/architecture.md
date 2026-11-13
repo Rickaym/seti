@@ -404,11 +404,17 @@ panels focus moves between (`data-panel`), with `data-panel-scroll`, `data-panel
 `data-panel-active` and `data-panel-focused` (the panel a layout of several holds as focused), and
 `inputHooks` hands every key to each registered hook, asks hooks whether an Esc, a find field's Enter or a key typed in a terminal is theirs, and draws what a hook overlays, such as a list of its
 keys. Vim mode is the bundled mod `mods/vim/`, off until the user turns it on, so Seti itself binds
-no single key. An open text file and the message box take the editor keys (find, replace, F3, and
-go to line in a file) in their own box first, through the find bar and keys in
-`ui/src/components/find/`, and the Files search and the chat find skip a key they handled, so
-Ctrl+F finds in the file or the message while it has focus. A textarea paints no highlights, so the
-message box marks its matches on a see-through copy of its text laid over it. Routes hot-toggle because one route,
+no single key. Every multi-line text box and code editor takes the editor keys (find, replace, F3,
+and go to line in code) in its own box first, through the find bar and keys in
+`ui/src/components/find/`, and the Files search and the chat find skip a key it handled, so Ctrl+F
+finds in the text that has focus and in the chat from anywhere else. `FindableTextarea` is the one
+text field the UI and mods' kit use; a lint rule keeps the bare `Textarea` to `PlainTextarea`,
+which the terminal line and secret fields use so find never echoes a secret into its bar.
+`CodeEditor` shows its own bar unless a screen serves one, as Files does. Esc closes an open find
+before a dialog around it hears the key. A textarea paints no highlights, so the field marks its
+matches on a see-through copy of its text laid over it. On a touch screen message boxes have a
+Find button beside them, and a long field or script shows one in its top right corner while it has
+focus, so a short field and a form at rest stay uncluttered. Routes hot-toggle because one route,
 `/api/mods/:id/*`, hands each request to the entry an enabled mod registered, after the request
 passed the same sign-in, origin and body checks as every other API route. A user's request to a
 mod's route stays the user's; only the mod's own calls through the mod API run as the mod. A route

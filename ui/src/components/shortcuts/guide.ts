@@ -14,7 +14,7 @@ interface GuideRow {
 }
 
 interface GuideGroup {
-  heading: 'Anywhere' | 'Agents' | 'Message box' | 'Files' | 'Terminal'
+  heading: 'Anywhere' | 'Agents' | 'Text boxes' | 'Files' | 'Terminal'
   rows: GuideRow[]
 }
 
@@ -45,11 +45,12 @@ const AGENTS: GuideRow[] = [
   { keys: 'Esc Esc', action: 'Rewind' },
 ]
 
-const MESSAGE_BOX: GuideRow[] = [
-  { keys: TEXT_KEYS.find, action: 'Find in the message' },
+/** The find keys every multi-line text box takes: messages, editors, scripts and settings. */
+const TEXT_BOX: GuideRow[] = [
+  { keys: TEXT_KEYS.find, action: 'Find in any text box' },
   { keys: `Enter, ${TEXT_KEYS.next}`, action: 'Next match' },
   { keys: `Shift+Enter, ${TEXT_KEYS.previous}`, action: 'Previous match' },
-  { keys: TEXT_KEYS.replace, action: 'Replace in the message' },
+  { keys: TEXT_KEYS.replace, action: 'Replace in any text box' },
   { keys: 'Esc', action: 'Close find, keep the match selected' },
 ]
 
@@ -80,7 +81,7 @@ const deviceKeys = (keys: string) => keys.replace(/^Alt\+/u, `${LABEL_ALT}+`).re
  * added at the end of their group.
  */
 export function guideGroups(commands: readonly PaletteCommand[], mods: readonly ModGuideRow[] = []): GuideGroup[] {
-  const named = new Set([...ANYWHERE, ...AGENTS, ...MESSAGE_BOX, ...FILES, ...TERMINAL].map((row) => row.keys))
+  const named = new Set([...ANYWHERE, ...AGENTS, ...TEXT_BOX, ...FILES, ...TERMINAL].map((row) => row.keys))
   const extra = (agent: boolean): GuideRow[] =>
     commands.flatMap((command) =>
       command.shortcut !== undefined && !named.has(command.shortcut) && (command.group === 'Current agent') === agent
@@ -92,7 +93,7 @@ export function guideGroups(commands: readonly PaletteCommand[], mods: readonly 
   return [
     { heading: 'Anywhere', rows: [...ANYWHERE, ...extra(false), ...modRows('anywhere')] },
     { heading: 'Agents', rows: [...AGENTS, ...extra(true), ...modRows('agents')] },
-    { heading: 'Message box', rows: MESSAGE_BOX },
+    { heading: 'Text boxes', rows: TEXT_BOX },
     { heading: 'Files', rows: FILES },
     { heading: 'Terminal', rows: TERMINAL },
   ]

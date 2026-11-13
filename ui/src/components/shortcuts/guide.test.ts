@@ -41,13 +41,13 @@ describe('guideGroups', () => {
     ])
   })
 
-  it('lists find and replace in the message box', () => {
-    const box = guideGroups([]).find((group) => group.heading === 'Message box')
-    expect(box?.rows.slice(0, 4).map((row) => row.keys)).toEqual([
-      'Ctrl+F',
-      'Enter, F3',
-      'Shift+Enter, Shift+F3',
-      'Ctrl+H',
+  it('lists find and replace in any text box', () => {
+    const box = guideGroups([]).find((group) => group.heading === 'Text boxes')
+    expect(box?.rows.slice(0, 4)).toEqual([
+      { keys: 'Ctrl+F', action: 'Find in any text box' },
+      { keys: 'Enter, F3', action: 'Next match' },
+      { keys: 'Shift+Enter, Shift+F3', action: 'Previous match' },
+      { keys: 'Ctrl+H', action: 'Replace in any text box' },
     ])
   })
 })
