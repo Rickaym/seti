@@ -53,6 +53,7 @@ import {
   sendTaskMessage,
   stopSubtask,
   stopTask,
+  switchBackModel,
   takeBackQueued,
   taskDigest,
   taskListEntries,
@@ -241,6 +242,7 @@ export const taskRoutes = new Hono()
     ok(c, await sendTaskMessage(await taskIdOf(c.req.param('id')), c.req.valid('json'))),
   )
   .post('/:id/retry', async (c) => ok(c, await retryTask(await taskIdOf(c.req.param('id')))))
+  .post('/:id/model/switch-back', async (c) => ok(c, await switchBackModel(await taskIdOf(c.req.param('id')))))
   .post('/:id/seen', async (c) => {
     const id = await taskIdOf(c.req.param('id'))
     await tasks.markSeen(id)

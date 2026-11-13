@@ -2,6 +2,8 @@ import {
   listedSubtasks,
   prStates,
   sendMessageInput,
+  switchBackPrompt,
+  switchableModel,
   type SendMessageInput,
   type Subtask,
   type Task,
@@ -136,6 +138,22 @@ export async function retryTask(id: string): Promise<Task> {
   refuseOtherAgent(id)
   const { prompt, outcome } = await retryLastPrompt(id)
   await auditMessage(await requireTask(id), prompt, outcome, { retry: true })
+  return requireTask(id)
+}
+
+/**
+ * Sends /model with the model Claude Code fell back from, as the Switch back button does. Like a
+ * retry it takes no text, so the EA and agents may ask for it; a running turn refuses it.
+ */
+export async function switchBackModel(id: string): Promise<Task> {
+  refuseOtherAgent(id)
+  const fallback = (await requireTask(id)).model_fallback
+  if (fallback === null || !switchableModel(fallback.original_model)) {
+    throw new HttpError(409, 'The agent is not on a fallback model')
+  }
+  const prompt = switchBackPrompt(fallback.original_model)
+  const outcome = await runTurn(id, prompt)
+  await auditMessage(await requireTask(id), prompt, outcome, { switch_back: true })
   return requireTask(id)
 }
 

@@ -20,7 +20,7 @@ import { checkSend } from './send-check.js'
 import { moveSessionTo } from './session-files.js'
 import { sessionOpening } from './session-hooks.js'
 import { sessionStart, setupKey } from './session-options.js'
-import { recordSessionStart, storedForm } from './session-start.js'
+import { recordSessionStart, storedForm, unstored } from './session-start.js'
 import { withTurnCost } from './store/cost.js'
 import { rewinds } from './store/rewinds.js'
 import { hadRunningSubtask } from './subtask-cache.js'
@@ -338,8 +338,7 @@ async function follow(taskId: string, session: LiveSession, m: SDKMessage, error
 /** Records a message of the session and follows it; returns the error a result reports. */
 async function take(taskId: string, session: LiveSession, m: SDKMessage): Promise<string | null> {
   session.note(m)
-  // Thinking token estimates come many per turn and nothing shows them.
-  if ((m.type === 'system' && m.subtype === 'thinking_tokens') || (await followQueue(taskId, session, m))) {
+  if ((await unstored(taskId, m)) || (await followQueue(taskId, session, m))) {
     return null
   }
   const error = await record(taskId, await withContextWindow(m, async () => session.contextWindow()))

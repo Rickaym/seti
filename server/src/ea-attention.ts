@@ -61,16 +61,19 @@ export async function routeAttention(event: AttentionEvent, at = Date.now()): Pr
 
 /** Watch events that only record a link; the EA knows them, nothing shows. */
 const PASSIVE_EVENTS = new Set(['pr_linked'])
+/** Watch events worth a notice, though the agent works on. */
+const ACTIVE_EVENTS = new Set(['model_fallback'])
 
 /**
  * The tier of an inbox item. Urgent items stay urgent; a watched agent's routine news is digest;
- * what is addressed to the EA or the user, such as a reminder, a mention or an alert, is active.
+ * what is addressed to the EA or the user, such as a reminder, a mention, an alert or a switch
+ * to a fallback model, is active.
  */
 export function tierOfItem(item: Pick<EaInboxItem, 'kind' | 'event' | 'urgent'>): AttentionTier {
   if (item.urgent) {
     return 'urgent'
   }
-  if (item.kind !== 'watch_event') {
+  if (item.kind !== 'watch_event' || ACTIVE_EVENTS.has(item.event)) {
     return 'active'
   }
   return PASSIVE_EVENTS.has(item.event) ? 'passive' : 'digest'

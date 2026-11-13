@@ -3,28 +3,6 @@ import type { PermissionMode, SDKResultMessage } from '@anthropic-ai/claude-agen
 /** Separates the facts on one transcript line. */
 export const DOT = ' \u00b7 '
 
-const ONE_MILLION = /\[1m\]$/i
-
-/** A model id as people say it: claude-opus-5-5 reads "Opus 5.5"; an unknown shape stays as is. */
-export function modelLabel(id: string): string {
-  const start = id.indexOf('claude-')
-  if (start === -1) {
-    return id
-  }
-  const parts = id
-    .slice(start + 'claude-'.length)
-    .replace(ONE_MILLION, '')
-    .split('-')
-  const family = parts.find((part) => /^[a-z]+$/i.test(part))
-  if (family === undefined) {
-    return id
-  }
-  const version = parts.filter((part) => /^\d{1,2}$/.test(part)).join('.')
-  const name = `${family.charAt(0).toUpperCase()}${family.slice(1).toLowerCase()}`
-  const label = version === '' ? name : `${name} ${version}`
-  return ONE_MILLION.test(id) ? `${label} 1M` : label
-}
-
 const PERMISSION = new Map<string, string>([
   ['default', 'ask'],
   ['acceptEdits', 'accept edits'],

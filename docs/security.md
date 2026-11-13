@@ -98,6 +98,12 @@ private key off the host. The sandbox model is in [Architecture](architecture.md
   agent is told again who wrote it; nothing goes out in the user's name that the user did not
   write. An agent never retries its own turn, and at Self reaches no other agent's. The audit log
   records the retry as the EA or the agent that asked, with `retry: true`.
+- The same holds for Switch back (`retry_agent_turn` with `switch_back_model`, and
+  `POST /api/tasks/<id>/model/switch-back` for the EA): it takes no text and sends only
+  `/model <original model>`, where the model is the one Claude Code reported in its fallback notice
+  and must be a plain model id (letters, digits and `._:/@[]-`), so no other words reach the
+  agent. It refuses with 409 when the agent is not on a fallback model or a turn is running, and
+  the audit log records it as a `task.message_sent` with `switch_back: true`.
 - A group chat message can be direct, to one agent or the EA. Only its author, its recipient and
   the user see it: the user's chat shows every direct message with a lock and its recipient, and a
   switch hides them. Other agents never see it in `chat.md`, their seti tool reads or searches, and

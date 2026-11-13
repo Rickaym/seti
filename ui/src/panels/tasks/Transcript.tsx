@@ -1,5 +1,5 @@
 import type { SDKAssistantMessage } from '@anthropic-ai/claude-agent-sdk'
-import type { MessageRow, SubtaskBrief, TaskRewind } from '@seti/shared'
+import { modelFallbackOf, type MessageRow, type SubtaskBrief, type TaskRewind } from '@seti/shared'
 import { FoldVertical, Terminal } from 'lucide-react'
 import { Fragment, lazy, memo, Suspense, useMemo } from 'react'
 import { CopyReply } from '@/components/CopyReply'
@@ -39,6 +39,7 @@ import { FileLink } from '@/panels/files/FileLink'
 import { useFileLinks } from '@/panels/files/file-links'
 import { ASK_TOOL, QuestionCall } from '@/panels/questions/QuestionCall'
 import { InputEntry } from '@/panels/tasks/InputEntry'
+import { ModelFallbackNotice } from '@/panels/tasks/ModelFallbackNotice'
 import { NoticeEntry } from '@/panels/tasks/NoticeEntry'
 import { PromptEntry } from '@/panels/tasks/PromptEntry'
 import { RewindNote, RewoundGroup } from '@/panels/tasks/Rewound'
@@ -225,6 +226,10 @@ function RowBody(props: RowProps) {
   }
   if (payload.type === 'system' && payload.subtype === 'compact_boundary') {
     return <CompactLine message={payload} />
+  }
+  const fallback = payload.type === 'system' ? modelFallbackOf(payload) : null
+  if (fallback !== null) {
+    return <ModelFallbackNotice taskId={taskId} message={fallback} />
   }
   const failure = compactFailure(row)
   if (failure !== null) {

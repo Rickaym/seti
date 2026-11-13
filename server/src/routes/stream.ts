@@ -49,6 +49,7 @@ function dataOf(event: OtherEvent): string {
       return JSON.stringify(event.progress)
     case 'prs':
     case 'mcp':
+    case 'model':
       return ''
     case 'subtasks':
       return JSON.stringify(event.subtasks)

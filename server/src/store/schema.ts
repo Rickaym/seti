@@ -51,6 +51,7 @@ import {
   TASK_CLOSING_LINE,
   TASK_COLOR_HEX,
   TASK_DIRS,
+  TASK_MODEL_FALLBACK,
   TASK_SETI_CONTROL,
   TASK_SETI_LEVEL,
   TASK_WORKTREE_BACKFILL,
@@ -175,4 +176,5 @@ export const MIGRATIONS: readonly Migration[] = [
   { version: 99, name: 'questions', sql: QUESTIONS },
   { version: 100, name: 'question_secrets', sql: QUESTION_SECRETS },
   { version: 101, name: 'task_aside', sql: TASK_ASIDE },
+  { version: 102, name: 'task_model_fallback', sql: TASK_MODEL_FALLBACK },
 ]

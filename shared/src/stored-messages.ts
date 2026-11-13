@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { firstIssue } from './lenient.js'
+import { modelFallbackMessage } from './model-fallback.js'
 import { setiControlLevel } from './seti-control.js'
 import type { MessageBody } from './tasks.js'
 
@@ -61,6 +62,7 @@ const systemMessage = tagged(
       'task_notification',
       z.looseObject({ task_id: text, status: text, summary: text, output_file: text, usage: usage.optional() }),
     ],
+    ['model_refusal_fallback', modelFallbackMessage],
   ]),
 )
 

@@ -134,3 +134,33 @@ UPDATE task_message
 SET payload = (payload::jsonb || '{"tools": [], "slash_commands": [], "skills": []}'::jsonb)::text
 WHERE kind = 'sdk' AND payload LIKE '{"type":"system","subtype":"init",%';
 `
+
+/**
+ * The fallback model Claude Code moved an agent's session to after a refusal, as JSON. Agents
+ * whose latest session-wide fallback no later session start on another model ended get it marked
+ * from that notice, with the fields `server/src/model-fallback.ts` stores.
+ */
+export const TASK_MODEL_FALLBACK = String.raw`
+ALTER TABLE task ADD COLUMN model_fallback TEXT;
+WITH latest AS (
+  SELECT DISTINCT ON (m.task_id) m.task_id, m.id, m.created_at, m.payload::json AS p
+  FROM task_message m
+  WHERE m.kind = 'sdk' AND m.payload LIKE '%"model_refusal_fallback"%'
+    AND m.payload::json ->> 'subtype' = 'model_refusal_fallback'
+    AND COALESCE(m.payload::json ->> 'scope', 'session') <> 'local'
+  ORDER BY m.task_id, m.id DESC
+)
+UPDATE task t SET model_fallback = json_build_object(
+    'original_model', l.p ->> 'original_model',
+    'fallback_model', l.p ->> 'fallback_model',
+    'category', l.p ->> 'api_refusal_category',
+    'request_id', l.p ->> 'request_id',
+    'at', l.created_at)::text
+FROM latest l
+WHERE t.id = l.task_id AND l.p ->> 'original_model' IS NOT NULL AND l.p ->> 'fallback_model' IS NOT NULL
+  AND NOT EXISTS (SELECT 1 FROM task_message i
+    WHERE i.task_id = l.task_id AND i.id > l.id AND i.kind = 'sdk' AND i.payload LIKE '%"subtype":"init"%'
+      AND i.payload::json ->> 'subtype' = 'init'
+      AND regexp_replace(COALESCE(i.payload::json ->> 'model', ''), '\[1m\]$', '', 'i')
+        <> regexp_replace(l.p ->> 'fallback_model', '\[1m\]$', '', 'i'));
+`

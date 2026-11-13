@@ -60,6 +60,7 @@ const POSTGRES_ONLY: Readonly<Record<string, readonly string[]>> = {
     'blocked',
     'bypass_until',
     'closing_line',
+    'model_fallback',
   ],
   task_context_pack: ['linked'],
   ea_settings: ['join_on_open', 'form_of_address'],

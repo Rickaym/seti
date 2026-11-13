@@ -183,6 +183,7 @@ function shows(row: MessageRow): boolean {
   return (
     (payload.type === 'result' && !emptyNoticeTurn(payload)) ||
     (payload.type === 'system' && payload.subtype === 'compact_boundary') ||
+    (payload.type === 'system' && payload.subtype === 'model_refusal_fallback') ||
     compactFailure(row) !== null
   )
 }

@@ -1,10 +1,10 @@
 import type { SDKCompactBoundaryMessage, SDKResultMessage, SDKSystemMessage } from '@anthropic-ai/claude-agent-sdk'
-import { compactedAt, turnCostOf } from '@seti/shared'
+import { compactedAt, modelLabel, turnCostOf } from '@seti/shared'
 import { FoldVertical, Play, Terminal } from 'lucide-react'
 import type { ComponentType, ReactNode } from 'react'
 import { CopyIconButton } from '@/components/CopyButton'
 import { usd } from '@/lib/money'
-import { DOT, lastSegment, modelLabel, permissionLabel, plural, turnOutcome } from '@/lib/session-labels'
+import { DOT, lastSegment, permissionLabel, plural, turnOutcome } from '@/lib/session-labels'
 import { elapsedLabel } from '@/lib/time'
 import { cn } from '@/lib/utils'
 
