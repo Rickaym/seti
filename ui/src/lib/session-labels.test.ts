@@ -1,5 +1,6 @@
+import { modelLabel } from '@seti/shared'
 import { describe, expect, it } from 'vitest'
-import { lastSegment, modelLabel, permissionLabel, plural, turnOutcome } from '@/lib/session-labels'
+import { lastSegment, permissionLabel, plural, turnOutcome } from '@/lib/session-labels'
 
 describe('modelLabel', () => {
   it('names the family and version of a model id', () => {

@@ -37,6 +37,7 @@ import { AgentChat } from '@/panels/tasks/AgentChat'
 import { AgentDockArea } from '@/panels/tasks/AgentDock'
 import { AgentHeader } from '@/panels/tasks/AgentHeader'
 import { BypassBadge } from '@/panels/tasks/BypassToggle'
+import { FallbackMark } from '@/panels/tasks/FallbackMark'
 import { RewindDialog } from '@/panels/tasks/RewindDialog'
 import { StatusLight, StatusPill } from '@/panels/tasks/StatusPill'
 import { TaskSettings } from '@/panels/tasks/TaskSettings'
@@ -214,6 +215,7 @@ export function TaskDetail({ task, onChanged, onSubtasks }: TaskDetailProps) {
       <HeaderUnseenDot unseen={task.unseen} status={status} />
       <StatusPill status={shownStatus} subagents={runningSubagents} />
       <BypassBadge until={task.bypass_until} />
+      <FallbackMark fallback={task.model_fallback} />
     </>
   )
   const settings = (compact = false) => (

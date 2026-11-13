@@ -6,6 +6,7 @@ import {
   type MessageBody,
   type MessagePage,
   type MessageRow,
+  type ModelFallback,
   type PromptAttachment,
   type QueueState,
   type Repo,
@@ -44,8 +45,9 @@ export async function transaction<T>(fn: (tx: Db) => Promise<T>): Promise<T> {
 
 export const now = () => new Date().toISOString()
 
-type TaskRecord = Omit<Task, 'worktree' | 'sandbox' | 'repos' | 'setup' | 'seti_control'> & {
+type TaskRecord = Omit<Task, 'worktree' | 'sandbox' | 'repos' | 'setup' | 'seti_control' | 'model_fallback'> & {
   sandbox: number
+  model_fallback: string | null
   seti_level: SetiControlLevel
   /** The switch from before levels, cleared by the migration and kept only for a rollback. */
   seti_control: boolean
@@ -116,6 +118,7 @@ function toTask({ extra_repos, cwd_worktree, setup, seti_level, seti_control: _r
     seti_control: seti_level,
     repos,
     setup: setup === null ? null : (JSON.parse(setup) as TaskSetup),
+    model_fallback: r.model_fallback === null ? null : (JSON.parse(r.model_fallback) as ModelFallback),
     unseen: r.unseen && r.status !== 'running',
     asking: r.asking && r.status === 'idle',
     closing_line: r.status === 'running' ? null : r.closing_line,

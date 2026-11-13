@@ -46,7 +46,7 @@ const sleep = async (ms: number) =>
   })
 
 /** Waits for the test to release step n; false when the session ended meanwhile. */
-async function released(actor: StepActor, gate: string, n: number): Promise<boolean> {
+export async function released(actor: StepActor, gate: string, n: number): Promise<boolean> {
   while (!fs.existsSync(path.join(gate, String(n)))) {
     if (actor.ended()) {
       return false

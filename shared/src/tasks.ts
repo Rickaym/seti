@@ -11,6 +11,7 @@ import { INPUT_MODES, type InputMode, type TaskInput } from './inputs.js'
 import { lenientArray, opaque, orDefault, type ResponseSchema } from './lenient.js'
 import { mcpChoiceFields } from './mcp.js'
 import type { MemoryEvent } from './memory.js'
+import type { ModelFallback } from './model-fallback.js'
 import type { PermissionRequest } from './permissions.js'
 import { disabledPluginIds } from './plugins.js'
 import { prUrl } from './pr-url.js'
@@ -285,6 +286,8 @@ export interface Task {
   status: TaskStatus
   permission_mode: string | null
   model: string | null
+  /** The fallback model Claude Code moved the session to after a refusal; null while on its own. */
+  model_fallback: ModelFallback | null
   cost_usd: number
   outward_count: number
   last_error: string | null
@@ -440,6 +443,8 @@ export type TaskEvent =
   | { type: 'blocked'; blocked: string | null }
   /** Blocks a mod draws in the task's transcript changed, such as a new aside. */
   | { type: 'blocks'; mod: string }
+  /** The session moved to a fallback model or off it. */
+  | { type: 'model' }
 
 /** Shown in place of a status a newer server sends that this UI does not know. */
 const UNKNOWN_STATUS: TaskStatus = 'idle'
@@ -474,6 +479,7 @@ export const taskFields = {
   status: orDefault<TaskStatus>('status', z.enum(TASK_STATUSES), UNKNOWN_STATUS),
   permission_mode: maybeText('permission_mode'),
   model: maybeText('model'),
+  model_fallback: opaque<ModelFallback>('model_fallback'),
   cost_usd: amount('cost_usd'),
   outward_count: amount('outward_count'),
   last_error: maybeText('last_error'),

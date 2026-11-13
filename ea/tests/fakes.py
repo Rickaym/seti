@@ -1457,7 +1457,7 @@ class FakeSeti:
                 return err(409, "Conflict", "The agent has no open session")
             case ["tasks", task_id, "session", "restart"]:
                 return ok(self._task(task_id))
-            case ["tasks", task_id, "retry"]:
+            case ["tasks", task_id, "retry"] | ["tasks", task_id, "model", "switch-back"]:
                 return ok(self._task(task_id))
             case ["tasks", task_id, "rewind"]:
                 target = next(

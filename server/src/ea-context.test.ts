@@ -46,6 +46,7 @@ function task(id: string, title: string, status: TaskStatus, extra: Partial<Task
     status,
     permission_mode: null,
     model: null,
+    model_fallback: null,
     cost_usd: 0,
     outward_count: 0,
     last_error: null,
@@ -216,6 +217,18 @@ describe('renderContext', () => {
     )
     expect(text).toContain('"Release" (web) IDLE 1m; role "Lead"')
     expect(text.split('\n').find((line) => line.includes('"Docs"'))).not.toContain('role')
+  })
+
+  it('says when an agent runs on a fallback model after a safeguard refused a request', () => {
+    const model_fallback = {
+      original_model: 'claude-opus-5-5',
+      fallback_model: 'claude-opus-4-8',
+      category: 'cyber',
+      request_id: 'req_1',
+      at: ago(MIN),
+    }
+    const { text } = renderContext(input({ tasks: [task('a', 'Audit', 'running', { model_fallback })] }))
+    expect(text).toContain('on fallback model Opus 4.8 instead of Opus 5.5 since a cyber safeguard flagged a request')
   })
 
   it("sums up an agent's todo list with the item in progress", () => {

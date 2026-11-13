@@ -44,6 +44,21 @@ the last message. A message the EA or another agent wrote goes again marked with
 UI offers it under the transcript when a turn errored or a restart cut it off, and the EA and agents
 at Full can ask for it with `retry_agent_turn`.
 
+When a safeguard refuses a request, Claude Code retries it on a fallback model and sends a
+`model_refusal_fallback` system message. With scope `session` (or none, from older CLIs) the whole
+session stays on the fallback, and since Seti keeps resuming that session, so does the agent.
+`server/src/model-fallback.ts` audits each notice once as `task.model_fallback` with the actor
+`system` (models, category and request id, never the explanation), stores the fallback in
+`task.model_fallback`, and posts a `model_fallback` inbox item that routes on the active tier. A
+notice the stream repeats with a uuid Seti already stored is skipped. The transcript shows the
+notice with the explanation and its links, the header and the agent's settings show a Fallback
+mark, and the EA's live context says which model the agent runs on. Switch back sends
+`/model <original model>` as the user's message once the turn has ended, since Claude Code refuses
+slash commands mid-turn; the EA and agents at Full ask for the same through `retry_agent_turn` with
+`switch_back_model`, which calls `POST /api/tasks/:id/model/switch-back`. The mark clears when a
+later session start reports a model other than the fallback. A notice with scope `local` covers
+one subagent's response, so it is audited and shown but leaves the session model alone.
+
 Each open task costs a Claude Code process of about 300 MB, which caps one host at a few dozen
 concurrent tasks. The path past that is runner workers that claim tasks from Postgres
 (`FOR UPDATE SKIP LOCKED` with a lease), singletons such as the PR poller and reminder ticker on
@@ -733,7 +748,7 @@ focus (`server/src/presence.ts`), and how many pushes went out since the user wa
 | Tier    | What lands there                                                             | Default |
 | ------- | ---------------------------------------------------------------------------- | ------- |
 | urgent  | needs-you (asking, blocked, failed, cut off), failed CI, critical alerts     | push    |
-| active  | finished turns of agents the EA does not watch, reminders, mentions, alerts  | push    |
+| active  | unwatched agents' finished turns, reminders, mentions, alerts, fallbacks     | push    |
 | digest  | a watched agent's routine news: a finished turn, CI passed, a merge, updates | brief   |
 | passive | what only informs the EA, such as a linked PR                                | off     |
 

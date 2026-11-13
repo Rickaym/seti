@@ -154,6 +154,9 @@ export function useTaskStream(taskId: string): TaskStream {
             setPermissions((count) => count + 1)
             refreshTasks()
           },
+          model: () => {
+            refreshTasks()
+          },
           mcp: () => {
             noteMcpReport(taskId)
           },

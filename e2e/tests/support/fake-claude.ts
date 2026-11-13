@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import { FallbackPlayer } from './fake-fallback.js'
 import { InProcessClient, type SdkServer } from './fake-mcp.js'
 import { actPermission, PERMISSION_PROMPT, type CanUseTool } from './fake-permission.js'
 import { actQuestions, QUESTION_PROMPT } from './fake-question.js'
@@ -151,6 +152,7 @@ class FakeClaude {
   /** Query.interrupt cut the held turn short, so it ends as Claude Code's interrupted turns do. */
   private cut = false
   private seti: InProcessClient | null = null
+  private readonly fallback = new FallbackPlayer(this.sdk.bind(this))
 
   constructor(options: Options) {
     this.options = options
@@ -368,7 +370,7 @@ class FakeClaude {
       }
       await (text(m).includes(PERMISSION_PROMPT)
         ? actPermission(this.options.canUseTool, this.actor())
-        : this.answer(text(m)))
+        : (this.fallback.play(text(m), this.actor()) ?? this.answer(text(m))))
       this.result()
     }
     this.close()

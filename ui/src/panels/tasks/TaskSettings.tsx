@@ -1,4 +1,4 @@
-import { warmCacheNote, type Task } from '@seti/shared'
+import type { Task } from '@seti/shared'
 import {
   Activity,
   KeyRound,
@@ -26,16 +26,13 @@ import { BypassToggle } from '@/panels/tasks/BypassToggle'
 import { LifecycleActions } from '@/panels/tasks/LifecycleActions'
 import { NewRoleDialog, RolePicker, type RoleOwner } from '@/panels/tasks/RolePicker'
 import { SandboxToggle } from '@/panels/tasks/SandboxToggle'
+import { SessionFields } from '@/panels/tasks/SessionFields'
 import { Fields, Row } from '@/panels/tasks/SettingsFields'
-import { HeldBack, PlannerFallback, WarmCaches } from '@/panels/tasks/StartFacts'
+import { HeldBack } from '@/panels/tasks/StartFacts'
 import { TaskChannels } from '@/panels/tasks/TaskChannels'
 import { TaskColor } from '@/panels/tasks/TaskColor'
-import { TaskCompact } from '@/panels/tasks/TaskCompact'
-import { TaskCost } from '@/panels/tasks/TaskCost'
-import { TaskCpu } from '@/panels/tasks/TaskCpu'
 import { InputModeSelect } from '@/panels/tasks/TaskInputs'
 import { TaskLocation } from '@/panels/tasks/TaskLocation'
-import { TaskMemory } from '@/panels/tasks/TaskMemory'
 import { TaskNotify } from '@/panels/tasks/TaskNotify'
 import { TaskCredentials } from '@/panels/tasks/TaskProfile'
 import { TaskTeam } from '@/panels/tasks/TaskTeam'
@@ -234,38 +231,7 @@ export const TaskSettings = memo(function TaskSettingsView({
         )}
       </Fields>
     ),
-    session: (
-      <Fields>
-        {task.model !== null && <Row label="Model">{task.model}</Row>}
-        <Row label="Cost">
-          <TaskCost cost={task.cost_usd} />
-        </Row>
-        <Row label="Memory">
-          <TaskMemory taskId={task.id} />
-        </Row>
-        <Row label="CPU">
-          <TaskCpu taskId={task.id} />
-        </Row>
-        <Row label="Compaction">
-          <TaskCompact taskId={task.id} />
-        </Row>
-        {task.setup?.planner === 'fallback' && (
-          <Row label="Planner">
-            <PlannerFallback setup={task.setup} />
-          </Row>
-        )}
-        {warmCacheNote(task.warm_caches) !== null && (
-          <Row label="Warm caches">
-            <WarmCaches seeds={task.warm_caches} />
-          </Row>
-        )}
-        {task.source_session_id !== null && (
-          <Row label="Imported from">
-            <span className="font-mono">{task.source_session_id}</span>
-          </Row>
-        )}
-      </Fields>
-    ),
+    session: <SessionFields task={task} running={running} />,
   }
   const details = (
     <Tabs

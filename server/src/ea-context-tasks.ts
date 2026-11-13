@@ -1,6 +1,8 @@
 import type { SDKAssistantMessage } from '@anthropic-ai/claude-agent-sdk'
 import {
   displayStatus,
+  fallbackReason,
+  modelLabel,
   prStates,
   todoProgress,
   todoText,
@@ -315,6 +317,16 @@ function prsLine(view: TaskView, input: ContextInput, open: ReadonlyMap<string, 
   return `PRs ${shown.join(', ')}${more(urls.length, SHOWN_PRS)}`
 }
 
+/** The fallback model the agent's session runs on since a safeguard refused a request. */
+function fallbackLine(task: Task): string | null {
+  const f = task.model_fallback
+  if (f === null) {
+    return null
+  }
+  const [to, from] = [modelLabel(f.fallback_model), modelLabel(f.original_model)]
+  return `on fallback model ${to} instead of ${from} since ${fallbackReason(f.category)}`
+}
+
 function taskLine(view: TaskView, input: ContextInput, open: ReadonlyMap<string, OpenPrView>): string {
   const { task } = view
   const rows = input.activity.get(task.id) ?? []
@@ -326,6 +338,7 @@ function taskLine(view: TaskView, input: ContextInput, open: ReadonlyMap<string,
     `${quote(task.title)}${repo} ${statusTag(view, input.now)}`,
     role === null ? null : `role ${quote(role)}`,
     view.status === 'error' && task.last_error !== null ? `error: ${clip(task.last_error, 120)}` : null,
+    fallbackLine(task),
     activity !== null && running ? `now ${activity}` : activity,
     subagentLine(view.running_subagents, input.now),
     todoLine(input.todos.get(task.id) ?? []),

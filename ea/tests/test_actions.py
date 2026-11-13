@@ -369,6 +369,18 @@ async def test_retry_reports_a_refusal(tools: EaTools, fake_seti: FakeSeti) -> N
     assert result.text == "Could not retry Fix the logout button: The agent is working"
 
 
+async def test_switch_back_moves_an_agent_off_its_fallback_model(tools: EaTools, fake_seti: FakeSeti) -> None:
+    refused = await tools.call("retry_agent_turn", {"task": "logout", "switch_back_model": True})
+    assert not refused.ok
+    assert refused.text == "Fix the logout button is not on a fallback model."
+    task = next(t for t in fake_seti.tasks if t["id"] == TASK_LOGOUT)
+    task["model_fallback"] = {"original_model": "claude-opus-5-5", "fallback_model": "claude-opus-4-8"}
+    result = await tools.call("retry_agent_turn", {"task": "logout", "switch_back_model": True})
+    assert result.ok
+    assert result.text == "Asked Fix the logout button to switch back to claude-opus-5-5."
+    assert fake_seti.writes() == [("POST", f"{LOGOUT}/model/switch-back", {}, {})]
+
+
 async def test_group_chat_mute_and_handle(tools: EaTools, fake_seti: FakeSeti) -> None:
     muted = await tools.call("set_agent_group_chat", {"task": "login", "muted": True})
     assert "it is muted" in muted.text

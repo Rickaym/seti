@@ -28,6 +28,7 @@ import {
   retryTask,
   stopSubtask,
   stopTask,
+  switchBackModel,
   takeBackQueued,
   taskListEntries,
   transcriptPage,
@@ -305,12 +306,18 @@ const restartAgentSession = setiTool({
 const retryAgentTurn = setiTool({
   name: 'retry_agent_turn',
   description:
-    "Send another agent's last message again, unchanged, as after a turn that failed or that a Seti restart cut off.",
-  input: { task: taskRef },
-  run: async ({ task: ref }, ctx) => {
+    "Send another agent's last message again, unchanged, as after a turn that failed or that a Seti restart cut off. With switch_back_model, send /model with the model Claude Code switched away from after a safeguard refused a request, like the agent's Switch back button; it waits until the turn ends.",
+  input: {
+    task: taskRef,
+    switch_back_model: z
+      .boolean()
+      .optional()
+      .describe('true to move the agent off its fallback model instead of retrying'),
+  },
+  run: async ({ task: ref, switch_back_model: back }, ctx) => {
     const task = await liveTask(ref)
-    notSelf(ctx, task, 'retry the turn of')
-    return brief(await retryTask(task.id))
+    notSelf(ctx, task, back === true ? 'switch back the model of' : 'retry the turn of')
+    return brief(await (back === true ? switchBackModel(task.id) : retryTask(task.id)))
   },
 })
 

@@ -257,8 +257,16 @@ ACTION_SPECS: list[ToolSpec] = [
     ToolSpec(
         "retry_agent_turn",
         "Send an agent's last message again, as after a turn that failed or that a Seti restart cut "
-        "off, like the Retry turn button under its transcript.",
-        {"task": TASK_REF},
+        "off, like the Retry turn button under its transcript. With switch_back_model, instead send "
+        "/model with the model Claude Code switched the agent away from after a safeguard refused "
+        "a request, like its Switch back button; that waits until the agent's turn ends.",
+        {
+            "task": TASK_REF,
+            "switch_back_model": {
+                "type": "boolean",
+                "description": "true to move the agent off its fallback model instead of retrying.",
+            },
+        },
         ["task"],
     ),
     ToolSpec(
@@ -898,6 +906,8 @@ class AgentActions:
 
     async def retry_agent_turn(self, args: Mapping[str, Any]) -> ToolResult:
         task, title = await self._task_ref(args)
+        if arg_bool(args, "switch_back_model"):
+            return await self._switch_back_model(task, title)
         try:
             await self._seti.post(f"/tasks/{task.get('id')}/retry")
         except SetiError as e:
@@ -905,6 +915,23 @@ class AgentActions:
                 raise ToolError(f"Could not retry {title}: {e.detail or e.title}", "Not retried") from e
             raise
         return ToolResult(f"Sent the last message of {title} again.", clip(f"Retried {title}", 70))
+
+    async def _switch_back_model(self, task: Mapping[str, Any], title: str) -> ToolResult:
+        fallback = task.get("model_fallback")
+        if not isinstance(fallback, dict):
+            raise ToolError(f"{title} is not on a fallback model.", "Not on a fallback")
+        try:
+            await self._seti.post(f"/tasks/{task.get('id')}/model/switch-back")
+        except SetiError as e:
+            if e.status == 409:
+                raise ToolError(
+                    f"Could not switch {title} back: {e.detail or e.title}", "Not switched back"
+                ) from e
+            raise
+        model = fallback.get("original_model")
+        return ToolResult(
+            f"Asked {title} to switch back to {model}.", clip(f"Switched {title} back", 70)
+        )
 
     async def stop_subagent(self, args: Mapping[str, Any]) -> ToolResult:
         task, title = await self._task_ref(args)

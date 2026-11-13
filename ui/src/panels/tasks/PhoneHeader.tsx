@@ -5,6 +5,7 @@ import { DetailBar, DetailBarActions } from '@/components/DetailBar'
 import { Button } from '@/components/ui/button'
 import { useAgentRoom } from '@/hooks/useAgentRoom'
 import { AgentQuestionsButton } from '@/panels/questions/AgentQuestionsButton'
+import { FallbackMark } from '@/panels/tasks/FallbackMark'
 import { PhoneActions } from '@/panels/tasks/PhoneActions'
 import { PhoneBack } from '@/panels/tasks/PhoneBack'
 import { PhonePrsButton } from '@/panels/tasks/PhonePrs'
@@ -30,7 +31,10 @@ export function PhoneHeader({ task, title, light, subtasks, settings, running, o
     <DetailBar className="typing:hidden" data-testid="agent-header">
       <PhoneBack />
       {light}
-      <div className="flex min-w-0 flex-1 items-center px-1 [&>h2]:text-sm">{title}</div>
+      <div className="flex min-w-0 flex-1 items-center gap-1.5 px-1 [&>h2]:text-sm">
+        {title}
+        <FallbackMark fallback={task.model_fallback} />
+      </div>
       <DetailBarActions>
         <AgentQuestionsButton taskId={task.id} onToggle={on.questions} compact />
         <PhonePrsButton task={task} />

@@ -134,3 +134,6 @@ UPDATE task_message
 SET payload = (payload::jsonb || '{"tools": [], "slash_commands": [], "skills": []}'::jsonb)::text
 WHERE kind = 'sdk' AND payload LIKE '{"type":"system","subtype":"init",%';
 `
+
+/** The fallback model Claude Code moved an agent's session to after a refusal, as JSON. */
+export const TASK_MODEL_FALLBACK = 'ALTER TABLE task ADD COLUMN model_fallback TEXT;'

@@ -89,6 +89,7 @@ export const AUDIT_KINDS = [
   'task.notifications_changed',
   'task.permission_allowed',
   'task.permission_denied',
+  'task.model_fallback',
   'task.permission_rule_added',
   'task.permission_rule_removed',
   'task.bypass_on',

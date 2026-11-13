@@ -31,6 +31,7 @@ function task(id: string, extra: Partial<TaskListEntry> = {}): TaskListEntry {
     status: 'idle',
     permission_mode: null,
     model: null,
+    model_fallback: null,
     cost_usd: 0,
     outward_count: 0,
     last_error: null,
