@@ -32,11 +32,22 @@ describe('guideGroups', () => {
     expect(groups.map((group) => group.rows.at(-1))).toEqual([
       { keys: 'Ctrl+=', action: 'Zoom' },
       { keys: 'Ctrl+Shift+C', action: 'Copy agent' },
+      { keys: 'Esc', action: 'Close find, keep the match selected' },
       { keys: 'Ctrl+Z, Ctrl+Y', action: 'Undo and redo' },
       { keys: 'Shift+Enter', action: 'New line in Claude Code' },
     ])
     expect(groups[0]?.rows.filter((row) => row.keys === 'Ctrl+Shift+L')).toEqual([
       { keys: 'Ctrl+Shift+L', action: 'Group chat' },
+    ])
+  })
+
+  it('lists find and replace in the message box', () => {
+    const box = guideGroups([]).find((group) => group.heading === 'Message box')
+    expect(box?.rows.slice(0, 4).map((row) => row.keys)).toEqual([
+      'Ctrl+F',
+      'Enter, F3',
+      'Shift+Enter, Shift+F3',
+      'Ctrl+H',
     ])
   })
 })

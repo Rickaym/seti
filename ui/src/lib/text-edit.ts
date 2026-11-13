@@ -43,3 +43,17 @@ export function handleWordDelete(e: KeyboardEvent<HTMLTextAreaElement>): boolean
   deleteWord(e.currentTarget, e.key === 'Backspace' ? 'back' : 'forward')
   return true
 }
+
+/**
+ * Puts `insert` over `from` to `to` as typing would, so undo takes it back, then gives focus back
+ * to where it was, such as a find bar's field.
+ */
+export function replaceRange(el: HTMLTextAreaElement, from: number, to: number, insert: string): void {
+  const before = document.activeElement
+  el.focus({ preventScroll: true })
+  el.setSelectionRange(from, to)
+  insertText(el, insert)
+  if (before instanceof HTMLElement && before !== el) {
+    before.focus({ preventScroll: true })
+  }
+}

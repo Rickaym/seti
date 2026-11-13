@@ -12,11 +12,18 @@ import {
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react'
 import { Hint } from '@/components/Hint'
 import { ToggleButton } from '@/components/ToggleButton'
+import { TEXT_KEYS, textFindKey } from '@/components/find/find-keys'
+import type { FindState } from '@/components/find/useFind'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { findCountLabel } from '@/lib/text-find'
-import { FILE_KEYS } from '@/panels/files/find/find-keys'
-import type { FileFind } from '@/panels/files/find/useFileFind'
+import { cn } from '@/lib/utils'
+
+/** What the field is called and the test id of the bar; its count's id adds `-count`. */
+interface Naming {
+  label: string
+  testId: string
+}
 
 const FIELD = 'h-7 min-w-0 flex-1 border-none bg-transparent focus-visible:ring-0 dark:bg-transparent'
 
@@ -64,7 +71,7 @@ function useFocusField(focusRequest: number) {
   return field
 }
 
-function FindRow({ find, editable }: { find: FileFind; editable: boolean }) {
+function FindRow({ find, editable, label, testId }: { find: FindState; editable: boolean } & Naming) {
   const field = useFocusField(find.focusRequest)
   const none = find.count === null || find.count.total === 0
   const onKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
@@ -87,8 +94,8 @@ function FindRow({ find, editable }: { find: FileFind; editable: boolean }) {
         ref={field}
         type="search"
         value={find.text}
-        placeholder="Find in file"
-        aria-label="Find in file"
+        placeholder={label}
+        aria-label={label}
         className={FIELD}
         onChange={(e) => {
           find.setText(e.target.value)
@@ -97,7 +104,7 @@ function FindRow({ find, editable }: { find: FileFind; editable: boolean }) {
       />
       <span
         aria-live="polite"
-        data-testid="file-find-count"
+        data-testid={`${testId}-count`}
         className="shrink-0 text-2xs text-muted-foreground tabular-nums"
       >
         {findCountLabel(find.text, find.count)}
@@ -112,7 +119,7 @@ function FindRow({ find, editable }: { find: FileFind; editable: boolean }) {
         hint="Match upper and lower case exactly"
       />
       <IconButton
-        hint={`Previous match (Shift+Enter, ${FILE_KEYS.previous})`}
+        hint={`Previous match (Shift+Enter, ${TEXT_KEYS.previous})`}
         label="Previous match"
         disabled={none}
         onClick={() => find.target.current?.previous()}
@@ -120,7 +127,7 @@ function FindRow({ find, editable }: { find: FileFind; editable: boolean }) {
         <ChevronUp />
       </IconButton>
       <IconButton
-        hint={`Next match (Enter, ${FILE_KEYS.next})`}
+        hint={`Next match (Enter, ${TEXT_KEYS.next})`}
         label="Next match"
         disabled={none}
         onClick={() => find.target.current?.next()}
@@ -137,7 +144,7 @@ function FindRow({ find, editable }: { find: FileFind; editable: boolean }) {
           label="Replace"
           iconOnly
           variant="ghost"
-          hint={`Replace matches (${FILE_KEYS.replace})`}
+          hint={`Replace matches (${TEXT_KEYS.replace})`}
         />
       )}
       <IconButton hint="Close find (Esc)" label="Close find" onClick={find.close}>
@@ -147,7 +154,7 @@ function FindRow({ find, editable }: { find: FileFind; editable: boolean }) {
   )
 }
 
-function ReplaceRow({ find }: { find: FileFind }) {
+function ReplaceRow({ find }: { find: FindState }) {
   const none = find.count === null || find.count.total === 0
   const one = () => find.target.current?.replace?.(find.replacement)
   return (
@@ -193,7 +200,7 @@ function ReplaceRow({ find }: { find: FileFind }) {
   )
 }
 
-function LineRow({ find, text }: { find: FileFind; text: string }) {
+function LineRow({ find, text }: { find: FindState; text: string }) {
   const field = useFocusField(find.focusRequest)
   const lines = useMemo(() => text.split('\n').length, [text])
   const [value, setValue] = useState('')
@@ -201,7 +208,7 @@ function LineRow({ find, text }: { find: FileFind; text: string }) {
   const valid = /^\d+$/u.test(value) && line >= 1 && line <= lines
   const go = () => {
     if (valid) {
-      find.target.current?.goToLine(line)
+      find.target.current?.goToLine?.(line)
       find.close()
     }
   }
@@ -242,34 +249,66 @@ function LineRow({ find, text }: { find: FileFind; text: string }) {
   )
 }
 
-/** Find, replace or go to line in the open file, above its text while open. */
-export function FileFindBar({
+/** Find keys and Esc pressed in the bar, for a bar that sits outside its text's box. */
+function barKey(e: KeyboardEvent<HTMLDivElement>, find: FindState, editable: boolean): void {
+  if (e.defaultPrevented) {
+    return
+  }
+  const action = e.key === 'Escape' ? 'close' : textFindKey(e.nativeEvent)
+  if (action === null || action === 'line' || (action === 'replace' && !editable)) {
+    return
+  }
+  e.preventDefault()
+  if (action === 'close') {
+    find.close()
+  } else if (action === 'next' || action === 'previous') {
+    find.target.current?.[action]()
+  } else {
+    find.open(action)
+  }
+}
+
+/** Find, replace or go to line in a text, beside it while open. */
+export function FindBar({
   find,
   editable,
-  text,
+  text = '',
+  label,
+  testId,
+  className,
 }: {
-  find: FileFind
+  find: FindState
   editable: boolean
-  /** The file's text, whose lines go to line reaches. */
-  text: string
-}) {
+  /** The text whose lines go to line reaches. */
+  text?: string
+  className?: string
+} & Naming) {
   if (find.mode === null) {
     return null
   }
   return (
+    // eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- keys from its fields
     <div
       role="search"
-      data-testid="file-find"
-      className="flex shrink-0 flex-col gap-1 border-b border-border bg-card px-3 py-1.5"
+      data-testid={testId}
+      className={cn('flex shrink-0 flex-col gap-1 border-border bg-card px-3 py-1.5', className)}
+      onKeyDown={(e) => {
+        barKey(e, find, editable)
+      }}
     >
       {find.mode === 'line' ? (
         <LineRow find={find} text={text} />
       ) : (
         <>
-          <FindRow find={find} editable={editable} />
+          <FindRow find={find} editable={editable} label={label} testId={testId} />
           {editable && find.mode === 'replace' && <ReplaceRow find={find} />}
         </>
       )}
     </div>
   )
+}
+
+/** Find and replace in a message box, laid across its composer above the box. */
+export function MessageFindBar({ find, editable }: { find: FindState; editable: boolean }) {
+  return <FindBar find={find} editable={editable} label="Find in message" testId="message-find" className="border" />
 }

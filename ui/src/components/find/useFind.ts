@@ -4,7 +4,7 @@ import type { FindCount, FindQuery, FindTarget } from '@/lib/text-find'
 /** What the find bar shows: find, find with replace, or go to line. */
 type FindMode = 'find' | 'replace' | 'line'
 
-export interface FileFind {
+export interface FindState {
   mode: FindMode | null
   /** The query to mark, or null while find is closed or going to a line. */
   query: FindQuery | null
@@ -25,8 +25,8 @@ export interface FileFind {
   close: () => void
 }
 
-/** Find, replace and go to line in one open file, with the editor or view behind `target`. */
-export function useFileFind(): FileFind {
+/** Find, replace and go to line in one text, with the editor, view or box behind `target`. */
+export function useFind(): FindState {
   const [mode, setMode] = useState<FindMode | null>(null)
   const [text, setText] = useState('')
   const [caseSensitive, setCaseSensitive] = useState(false)
