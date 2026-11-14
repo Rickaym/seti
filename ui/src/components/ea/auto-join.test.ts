@@ -26,7 +26,7 @@ class FakeCall {
 
   readonly hangUp = async () => {
     this.hangUps += 1
-    this.act({ type: 'ended', at: 0, error: null })
+    this.act({ type: 'ended', at: 0, error: null, reason: 'hang-up', hidden: false })
     await Promise.resolve()
   }
 
@@ -148,29 +148,29 @@ describe('AutoJoin', () => {
     await settle()
     call.act({ type: 'connected', at: 1 })
     tick(10)
-    call.act({ type: 'ended', at: 2, error: 'The EA call dropped' })
+    call.act({ type: 'ended', at: 2, error: 'The EA call dropped', reason: 'hang-up', hidden: false })
     expect(timers.at(-1)?.ms).toBe(RETRY_MS[0])
     fire()
     await settle()
     expect(call.connects).toHaveLength(2)
-    call.act({ type: 'ended', at: 3, error: 'The EA is on a call' })
+    call.act({ type: 'ended', at: 3, error: 'The EA is on a call', reason: 'hang-up', hidden: false })
     expect(timers.at(-1)?.ms).toBe(RETRY_MS[1])
     for (const wait of RETRY_MS.slice(2)) {
       fire()
       await settle()
-      call.act({ type: 'ended', at: 4, error: 'The EA is on a call' })
+      call.act({ type: 'ended', at: 4, error: 'The EA is on a call', reason: 'hang-up', hidden: false })
       expect(timers.at(-1)?.ms).toBe(wait)
     }
     fire()
     await settle()
-    call.act({ type: 'ended', at: 5, error: 'The EA is on a call' })
+    call.act({ type: 'ended', at: 5, error: 'The EA is on a call', reason: 'hang-up', hidden: false })
     expect(timers.at(-1)?.ms).toBe(RETRY_MS.at(-1))
 
     fire()
     await settle()
     call.act({ type: 'connected', at: 6 })
     tick(STEADY_MS)
-    call.act({ type: 'ended', at: 7, error: 'The EA call dropped' })
+    call.act({ type: 'ended', at: 7, error: 'The EA call dropped', reason: 'hang-up', hidden: false })
     expect(timers.at(-1)?.ms).toBe(RETRY_MS[0])
   })
 

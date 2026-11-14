@@ -1,4 +1,6 @@
 import {
+  callEndSummary,
+  eaCallEndInput,
   eaHistoryAppendInput,
   eaHistoryQuery,
   eaSettingsInput,
@@ -11,6 +13,7 @@ import { Hono, type MiddlewareHandler } from 'hono'
 import { bodyLimit } from 'hono/body-limit'
 import { currentRequestSource } from '../access.js'
 import { audit } from '../audit.js'
+import { fromDelegate } from '../ea-guard.js'
 import { fail, HttpError, ok, valid, validJson } from '../http.js'
 import { eaHistory, eaSettings } from '../store/ea.js'
 
@@ -71,6 +74,20 @@ export const eaStateRoutes = new Hono()
       detail: { entries: cleared },
     })
     return ok(c, { cleared } satisfies EaHistoryCleared)
+  })
+  .put('/call-end', limit, validJson(eaCallEndInput), async (c) => {
+    if (fromDelegate()) {
+      throw new HttpError(403, 'Only the browser on the call reports how it ended')
+    }
+    const input = c.req.valid('json')
+    await audit.record({
+      actor: 'user',
+      kind: 'ea.call_ended',
+      subject_type: 'ea',
+      summary: callEndSummary(input),
+      detail: input,
+    })
+    return ok(c, { recorded: true })
   })
   .get('/settings', async (c) => ok(c, await eaSettings.get()))
   .put('/settings', validJson(eaSettingsInput), async (c) => {

@@ -63,6 +63,7 @@ function setup(overrides: Partial<CallDeps> = {}) {
     probeMicrophone: async () => Promise.resolve(null),
     requestData: () => ({ timezone: 'Asia/Singapore', localTime: '2026-09-27T22:30:00+08:00' }),
     now: () => 1,
+    hidden: () => false,
     mic: () => ({ echoCancellation: false }),
     ...overrides,
   }
@@ -166,7 +167,7 @@ describe('EaCallStore', () => {
     await settle()
     expect(calls[0]?.stopped).toBe(true)
     calls[0]?.handlers.dispatch({ type: 'bot-speaking', speaking: true, at: 2 })
-    calls[0]?.handlers.dropped('stale')
+    calls[0]?.handlers.dropped('stale', 'server-closed')
     calls[1]?.answer()
     calls[0]?.answer()
     await Promise.all([first, second])
@@ -187,9 +188,20 @@ describe('EaCallStore', () => {
     await settle()
     calls[1]?.answer()
     await again
-    calls[1]?.handlers.dropped('The EA hit an error.')
+    calls[1]?.handlers.dropped('The EA hit an error.', 'bot-error')
     expect(store.getSnapshot()).toMatchObject({ phase: 'error', error: 'The EA hit an error.' })
     expect(store.getSnapshot().failure).toEqual({ at: 1, dropped: true, auto: false })
+    expect(store.getSnapshot().lastEnd).toEqual({ reason: 'bot-error', at: 1, hidden: false })
+  })
+
+  it('records who ended a live call and whether the page was in the background', async () => {
+    const { store, calls } = setup({ hidden: () => true })
+    const connecting = store.connect()
+    await settle()
+    calls[0]?.answer()
+    await connecting
+    await store.hangUp('page-closed')
+    expect(store.getSnapshot().lastEnd).toEqual({ reason: 'page-closed', at: 1, hidden: true })
   })
 
   it('stops before creating a call when the page or the microphone cannot capture audio', async () => {

@@ -1,4 +1,4 @@
-import type { EaRequestData } from '@seti/shared'
+import type { EaCallEndReason, EaRequestData } from '@seti/shared'
 import { callReducer, initialCallState, type CallAction, type CallState } from './call-state'
 
 /** One peer connection to the bot, from the lazily loaded engine. */
@@ -17,8 +17,8 @@ export interface LiveCall {
 
 export interface CallHandlers {
   dispatch: (action: CallAction) => void
-  /** The call ended without a hang-up; `reason` says why when the engine knows. */
-  dropped: (reason: string | null) => void
+  /** The call ended without a hang-up; `error` says why when the engine knows, `reason` always. */
+  dropped: (error: string | null, reason: EaCallEndReason) => void
 }
 
 interface CallEngine {
@@ -35,6 +35,8 @@ export interface CallDeps {
   mic: () => MediaTrackConstraints
   requestData: () => EaRequestData
   now: () => number
+  /** Whether the page is in the background, recorded with each call end. */
+  hidden: () => boolean
 }
 
 const errorText = (e: unknown) => (e instanceof Error && e.message.trim() !== '' ? e.message : 'Could not connect.')
@@ -72,8 +74,8 @@ export class EaCallStore {
     }
   }
 
-  private end(error: string | null): void {
-    this.dispatch({ type: 'ended', at: this.deps.now(), error })
+  private end(error: string | null, reason: EaCallEndReason): void {
+    this.dispatch({ type: 'ended', at: this.deps.now(), error, reason, hidden: this.deps.hidden() })
   }
 
   private async release(): Promise<void> {
@@ -89,7 +91,7 @@ export class EaCallStore {
     const superseded = () => this.generation !== current
     const blocked = this.deps.preflight()
     if (blocked !== null) {
-      this.end(blocked)
+      this.end(blocked, 'hang-up')
       return
     }
     this.unlockAudio?.()
@@ -104,7 +106,7 @@ export class EaCallStore {
         return
       }
       if (micProblem !== null) {
-        this.end(micProblem)
+        this.end(micProblem, 'hang-up')
         return
       }
       live = engine.createCall(
@@ -115,10 +117,10 @@ export class EaCallStore {
               this.dispatch(action)
             }
           },
-          dropped: (reason) => {
+          dropped: (error, reason) => {
             if (!superseded()) {
               this.live = null
-              this.end(reason)
+              this.end(error, reason)
             }
           },
         },
@@ -136,7 +138,7 @@ export class EaCallStore {
       const message = live === null ? errorText(e) : await live.failure(e)
       await this.release()
       if (!superseded()) {
-        this.end(message)
+        this.end(message, 'server-closed')
       }
     }
   }
@@ -156,9 +158,10 @@ export class EaCallStore {
     this.unlockAudio?.()
   }
 
-  readonly hangUp = async (): Promise<void> => {
+  /** Ends the call; `reason` is recorded when Seti rather than the user ends it. */
+  readonly hangUp = async (reason: EaCallEndReason = 'hang-up'): Promise<void> => {
     this.generation += 1
-    this.end(null)
+    this.end(null, reason)
     await this.release()
   }
 

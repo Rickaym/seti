@@ -17,6 +17,7 @@ import { SetupCard } from '@/components/ea/SetupCard'
 import { UsageCard } from '@/components/ea/UsageCard'
 import { WakeSetting } from '@/components/ea/WakeSetting'
 import { useEaCall, useEaCallStore } from '@/components/ea/call-context'
+import { lastEndText } from '@/components/ea/call-end'
 import type { Latency } from '@/components/ea/call-state'
 import { CALL_SHORTCUT } from '@/components/ea/call-status'
 import { setupNeed, useEaHealth } from '@/components/ea/useEaHealth'
@@ -138,6 +139,9 @@ export function EaPage() {
           </SettingRow>
           <SettingRow label="Reply time" description="From you going quiet to the EA speaking, on the last call.">
             <span>{latencyText(call.signals.latency)}</span>
+          </SettingRow>
+          <SettingRow label="Last end" description="How the last call in this browser ended.">
+            <span data-testid="ea-last-end">{lastEndText(call.lastEnd)}</span>
           </SettingRow>
           <SettingRow label="Relay test" stack description="Checks that this browser can reach the relay.">
             <RelayCheck />

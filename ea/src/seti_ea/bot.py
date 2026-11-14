@@ -127,6 +127,9 @@ def action_message(tool: str, result: ToolResult) -> dict[str, Any]:
     return {"type": "ea-action", "tool": tool, "summary": result.summary, "ok": result.ok}
 
 
+IDLE_END_MESSAGE: dict[str, Any] = {"type": "ea-call-end", "reason": "bot-idle"}
+
+
 def keyterms(wake: WakeSettings) -> list[str]:
     """Deepgram keyterms: always Seti, and the wake phrase while the wake word is on."""
     terms = [SETI]
@@ -371,6 +374,7 @@ async def run_bot(
     async def on_idle_timeout(_worker: PipelineWorker) -> None:
         # Asleep, a call costs nothing and waits for its phrase; awake and idle, it sleeps or ends.
         if not wake.settings.enabled:
+            await rtvi.send_server_message(IDLE_END_MESSAGE)
             await worker.cancel()
         elif wake.awake:
             await fall_asleep()

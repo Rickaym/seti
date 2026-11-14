@@ -321,6 +321,15 @@ is the default. To add a key later, write it to its file and restart both servic
 systemctl --user restart seti.service seti-ea.service
 ```
 
+A call keeps going while Seti is in the background, as when you switch apps on a phone. The page
+pings the EA from a worker every second, since the EA drops its voice three seconds after the last
+ping and a background page slows its own timers. A network stall ends the call only once the
+browser declares the path failed, after about 30 seconds. While a call is live, the phone shows it
+as media with Mute and Hang up. Each call end goes to the audit log as `ea.call_ended`, with its
+reason, its length and whether Seti was in the background, but no audio or words; Settings, EA
+shows the last one. On Android, Chrome sends call audio to a Bluetooth headset only when Chrome may
+use Nearby devices (Android settings, Apps, Chrome, Permissions).
+
 ### Redis
 
 Without Redis every cache read misses and Seti still works; the installer writes

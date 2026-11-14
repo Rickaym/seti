@@ -257,3 +257,23 @@ describe('EA settings', () => {
     }
   })
 })
+
+describe('EA call ends', () => {
+  const end = { reason: 'ice-failed', auto: false, hidden: true, duration_s: 640, hidden_s: 95 }
+
+  it('audits how a call ended, with no audio or words', async () => {
+    expect(await data<{ recorded: boolean }>(await send('PUT', '/call-end', LOCAL, end))).toEqual({ recorded: true })
+    expect(await auditEvents.latest('ea.call_ended')).toMatchObject({
+      actor: 'user',
+      summary: 'EA call ended: The network path failed, in the background',
+      detail: end,
+    })
+  })
+
+  it('refuses the EA and reasons it does not know', async () => {
+    expect((await send('PUT', '/call-end', BOT, end)).status).toBe(403)
+    expect((await send('PUT', '/call-end', LOCAL, { ...end, reason: 'tired' })).status).toBe(400)
+    expect((await send('PUT', '/call-end', LOCAL, { ...end, transcript: 'hello' })).status).toBe(200)
+    expect((await auditEvents.latest('ea.call_ended'))?.detail).not.toHaveProperty('transcript')
+  })
+})

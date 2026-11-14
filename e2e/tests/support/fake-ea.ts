@@ -14,6 +14,8 @@ interface FakeBot {
   closed: boolean
   /** Types of the RTVI client messages the page sent. */
   received: string[]
+  /** When each keep-alive ping arrived, in ms since the epoch. */
+  pings: number[]
 }
 
 type FakeWindow = Window & { fakeEa?: FakeBot }
@@ -21,7 +23,7 @@ type FakeWindow = Window & { fakeEa?: FakeBot }
 /** Answers an offer from a peer connection inside the page that speaks just enough RTVI. */
 async function answerInPage(page: Page, offer: string): Promise<Answer> {
   return page.evaluate(async (sdp) => {
-    const bot: FakeBot = { channel: null, closed: false, received: [] }
+    const bot: FakeBot = { channel: null, closed: false, received: [], pings: [] }
     ;(window as FakeWindow).fakeEa = bot
     const pc = new RTCPeerConnection()
     pc.ondatachannel = ({ channel }) => {
@@ -31,6 +33,9 @@ async function answerInPage(page: Page, offer: string): Promise<Answer> {
       })
       channel.addEventListener('message', ({ data }) => {
         const text = String(data)
+        if (text.startsWith('ping')) {
+          bot.pings.push(Date.now())
+        }
         if (!text.startsWith('{')) {
           return
         }
@@ -102,6 +107,18 @@ export async function botSays(page: Page, type: string, data?: unknown): Promise
     },
     [type, data] as const,
   )
+}
+
+/** Leaves the call as the bot does when it ends one, with a signalling message. */
+export async function botLeaves(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    const left = { type: 'signalling', message: { type: 'peerLeft' } }
+    ;(window as FakeWindow).fakeEa?.channel?.send(JSON.stringify(left))
+  })
+}
+
+export async function botPings(page: Page): Promise<number[]> {
+  return page.evaluate(() => (window as FakeWindow).fakeEa?.pings ?? [])
 }
 
 export async function botClosed(page: Page): Promise<boolean> {
