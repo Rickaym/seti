@@ -2,8 +2,8 @@ import { Save } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { Hint } from '@/components/Hint'
 import { BackButton, DetailHeader, DetailTitle } from '@/components/SplitPane'
+import { FindableTextarea } from '@/components/find/FindableTextarea'
 import { Button } from '@/components/ui/button'
-import { Textarea } from '@/components/ui/textarea'
 import { useSaveShortcut } from '@/panels/context/useSaveShortcut'
 
 export function EditorFrame({
@@ -99,9 +99,10 @@ export function CodeArea({
   placeholder?: string
 }) {
   return (
-    <Textarea
+    <FindableTextarea
       aria-label={label}
       spellCheck={false}
+      boxClassName="min-h-0 flex-1"
       className="min-h-0 flex-1 resize-none font-mono text-xs leading-relaxed [field-sizing:fixed]"
       value={value}
       placeholder={placeholder}

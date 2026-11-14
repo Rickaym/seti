@@ -144,6 +144,13 @@ test('finds far back in the group chat while new messages wait, and leaves Ctrl+
   await expect(panel.getByText('Note 119 chatter')).toBeVisible()
   await panel.getByRole('combobox', { name: 'Message the group' }).click()
   await page.keyboard.press('Control+f')
+  await expect(panel.getByRole('searchbox', { name: 'Find in message' })).toBeFocused()
+  await expect(panel.getByTestId('chat-find')).toHaveCount(0)
+  await page.keyboard.press('Escape')
+  await expect(panel.getByTestId('message-find')).toHaveCount(0)
+
+  await panel.getByRole('log', { name: 'Group messages' }).click()
+  await page.keyboard.press('Control+f')
   await expect(panel.getByTestId('chat-find')).toBeVisible()
   await page.keyboard.type(needle)
   await expect(panel.getByTestId('chat-find-count')).toHaveText('1 of 2')

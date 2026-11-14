@@ -1,6 +1,6 @@
 import type { ConnectionSlot } from '@seti/shared'
+import { PlainTextarea } from '@/components/find/FindableTextarea'
 import { Input } from '@/components/ui/input'
-import { Textarea } from '@/components/ui/textarea'
 import { cn } from '@/lib/utils'
 import { MULTILINE, SLOT_LABEL } from './connection-form'
 
@@ -21,7 +21,7 @@ export function ValueInput({
   const label = SLOT_LABEL[slot]
   if (MULTILINE.has(slot)) {
     return (
-      <Textarea
+      <PlainTextarea
         aria-label={label}
         autoComplete="off"
         spellCheck={false}

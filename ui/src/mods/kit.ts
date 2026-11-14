@@ -6,6 +6,7 @@ import { Hint } from '@/components/Hint'
 import { Markdown } from '@/components/Markdown'
 import { NewsDot } from '@/components/NewsDot'
 import { ToggleButton } from '@/components/ToggleButton'
+import { FindableTextarea } from '@/components/find/FindableTextarea'
 import { ItemHint, StatusBarItem } from '@/components/status-bar/StatusBarItem'
 import { Button } from '@/components/ui/button'
 import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from '@/components/ui/command'
@@ -19,7 +20,6 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
-import { Textarea } from '@/components/ui/textarea'
 import { cn } from '@/lib/utils'
 import { ViewerActionsSlot } from '@/panels/files/ViewerActionsSlot'
 import { fetchRaw } from '@/panels/files/files-api'
@@ -32,7 +32,7 @@ import { KitDialog } from './KitDialog'
 export const MOD_KIT: ModKit = {
   Button,
   Input,
-  Textarea,
+  Textarea: FindableTextarea,
   Hint,
   ToggleButton,
   CopyButton,

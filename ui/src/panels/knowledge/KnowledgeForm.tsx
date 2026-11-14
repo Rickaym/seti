@@ -11,10 +11,10 @@ import { X } from 'lucide-react'
 import { useEffect, useState, type ReactNode } from 'react'
 import { apiGet } from '@/api'
 import { Field } from '@/components/crud/CrudForm'
+import { FindableTextarea } from '@/components/find/FindableTextarea'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
-import { Textarea } from '@/components/ui/textarea'
 
 const COMMAND_MARK = '$ '
 
@@ -145,7 +145,7 @@ export function KnowledgeForm({
         />
       </Field>
       <Field label="Note">
-        <Textarea
+        <FindableTextarea
           aria-label="Note"
           rows={5}
           value={draft.body}
@@ -164,7 +164,7 @@ export function KnowledgeForm({
         />
       </Field>
       <Field label="Sources, one per line; a command after $">
-        <Textarea
+        <FindableTextarea
           aria-label="Sources"
           rows={3}
           value={draft.sources}

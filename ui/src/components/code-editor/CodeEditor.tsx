@@ -1,6 +1,12 @@
 import type { CodeLanguage } from '@seti/shared'
-import { lazy, Suspense, useCallback, useRef } from 'react'
-import { Textarea } from '@/components/ui/textarea'
+import { lazy, Suspense, useCallback, useRef, useState } from 'react'
+import { TextFindBar } from '@/components/find/FindBar'
+import { FieldFindButton } from '@/components/find/FindButton'
+import { PlainTextarea } from '@/components/find/FindableTextarea'
+import { useEditorFind } from '@/components/find/useEditorFind'
+import { useFind } from '@/components/find/useFind'
+import { useFindKeys } from '@/components/find/useFindKeys'
+import { useCoarsePointer } from '@/hooks/useMedia'
 import { cn } from '@/lib/utils'
 import type { EditorFind } from './editor-find'
 import type { Caret } from './sync'
@@ -14,21 +20,7 @@ const FRAME =
 const isSaveKey = (e: { ctrlKey: boolean; metaKey: boolean; key: string }) =>
   (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's'
 
-/**
- * A code editor with highlighting, line numbers and bracket matching. CodeMirror loads on first
- * use; until then a plain textarea with the same value takes the typing.
- */
-export function CodeEditor({
-  value,
-  onChange,
-  label,
-  className,
-  language = 'javascript',
-  spellCheck = false,
-  focusOnMount = false,
-  onSave,
-  find,
-}: {
+interface CodeEditorProps {
   value: string
   onChange: (value: string) => void
   /** The accessible name of the text field. */
@@ -42,9 +34,49 @@ export function CodeEditor({
   focusOnMount?: boolean
   /** Ctrl+S or Cmd+S in the field. */
   onSave?: () => void
-  /** The find bar this editor serves, if any. */
+  /** The find bar the screen shows for this editor; without it the editor shows its own. */
   find?: EditorFind
-}) {
+}
+
+/**
+ * A code editor with highlighting, line numbers and bracket matching. Ctrl+F finds, Ctrl+H
+ * replaces and Ctrl+G goes to a line in it, with its own find bar unless the screen serves one
+ * through `find`.
+ */
+export function CodeEditor(props: CodeEditorProps) {
+  return props.find === undefined ? <FindableCodeEditor {...props} /> : <LazyCodeEditor {...props} />
+}
+
+/** The editor with its own find bar, and a Find button in its corner on a touch screen. */
+function FindableCodeEditor(props: CodeEditorProps) {
+  const find = useFind()
+  const { editorFind } = useEditorFind(find)
+  const touch = useCoarsePointer()
+  const [root, setRoot] = useState<HTMLDivElement | null>(null)
+  useFindKeys(root, find, { find: true, replace: true, line: true })
+  return (
+    <div ref={setRoot} className="group/find flex min-w-0 flex-col">
+      <TextFindBar find={find} editable text={props.value} />
+      <div className="relative flex min-h-0 flex-1 flex-col">
+        <LazyCodeEditor {...props} find={editorFind} />
+        {touch && find.mode === null && <FieldFindButton find={find} />}
+      </div>
+    </div>
+  )
+}
+
+/** CodeMirror loads on first use; a plain textarea with the same value takes typing until then. */
+function LazyCodeEditor({
+  value,
+  onChange,
+  label,
+  className,
+  language = 'javascript',
+  spellCheck = false,
+  focusOnMount = false,
+  onSave,
+  find,
+}: CodeEditorProps) {
   const handoff = useRef<Caret | null>(null)
   const keepCaret = useCallback(
     (field: HTMLTextAreaElement | null) => {
@@ -71,7 +103,7 @@ export function CodeEditor({
   return (
     <Suspense
       fallback={
-        <Textarea
+        <PlainTextarea
           ref={keepCaret}
           aria-label={label}
           spellCheck={spellCheck}

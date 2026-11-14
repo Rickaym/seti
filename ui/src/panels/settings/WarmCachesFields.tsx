@@ -1,9 +1,9 @@
 import type { WarmCacheStatus } from '@seti/shared'
 import { Flame, RotateCcw } from 'lucide-react'
+import { FindableTextarea } from '@/components/find/FindableTextarea'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
-import { Textarea } from '@/components/ui/textarea'
 import type { WarmCacheForm } from './warm-cache-form'
 
 /** The warm cache part of a repo's settings: on or off, which caches, and the size cap. */
@@ -56,7 +56,7 @@ export function WarmCachesFields({
             Defaults
           </Button>
         </div>
-        <Textarea
+        <FindableTextarea
           aria-label="Cache patterns"
           className="max-h-60 font-mono"
           rows={6}

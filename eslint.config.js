@@ -128,6 +128,23 @@ export default defineConfig(
     },
   },
   {
+    files: ['ui/src/**/*.{ts,tsx}'],
+    ignores: ['ui/src/components/find/**', 'ui/src/components/ui/**'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: '@/components/ui/textarea',
+              message: 'Use FindableTextarea, or PlainTextarea for a secret or the terminal line.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
     files: ['mods/*/ui.tsx'],
     rules: { 'react-refresh/only-export-components': 'off' },
   },

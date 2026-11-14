@@ -10,9 +10,9 @@ import { RotateCcw, Save } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { apiGet, apiPut, errorText } from '@/api'
+import { FindableTextarea } from '@/components/find/FindableTextarea'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
-import { Textarea } from '@/components/ui/textarea'
 import { useLeaveGuard } from '@/hooks/useLeaveGuard'
 import { refreshSystem } from '@/hooks/useSystem'
 import { SandboxMcpCard } from './SandboxMcpCard'
@@ -159,7 +159,7 @@ function SandboxForm({ status, onSaved }: { status: SandboxStatus; onSaved: (nex
           }
         >
           <div className="space-y-1.5 p-3">
-            <Textarea
+            <FindableTextarea
               aria-label="Allowed hosts"
               className="max-h-96 font-mono"
               rows={12}
@@ -176,7 +176,7 @@ function SandboxForm({ status, onSaved }: { status: SandboxStatus; onSaved: (nex
         <SandboxMcpCard servers={status.mcp_servers} />
         <SettingsCard title="Hidden paths">
           <div className="space-y-1.5 p-3">
-            <Textarea
+            <FindableTextarea
               aria-label="Hidden paths"
               className="max-h-40 font-mono"
               rows={4}

@@ -3,10 +3,10 @@ import { Save, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { apiPut } from '@/api'
+import { FindableTextarea } from '@/components/find/FindableTextarea'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
-import { Textarea } from '@/components/ui/textarea'
 import { useBusy } from '@/hooks/useBusy'
 import { SettingRow, SettingsCard } from './layout'
 
@@ -65,11 +65,12 @@ function SelfBuiltApp({
           />
         </SettingRow>
         <SettingRow label="Signing certificates" description="SHA-256 fingerprints, one per line." stack>
-          <Textarea
+          <FindableTextarea
             aria-label="Signing certificates"
             spellCheck={false}
             rows={3}
-            className="w-64 font-mono text-xs max-md:w-full"
+            boxClassName="w-64 max-md:w-full"
+            className="font-mono text-xs"
             value={prints}
             onChange={(event) => {
               setPrints(event.target.value)
