@@ -1,3 +1,6 @@
+import { deviceSystem } from '@/lib/device'
+import { isIosAgent } from '@/lib/ios'
+
 /** A device the user chose, with its label for when it is not connected. */
 export interface SavedDevice {
   id: string
@@ -173,3 +176,21 @@ export const canSetSink = (prototype: object | undefined): boolean =>
 /** The output picker needs sink support and a listed speaker; Firefox lists none without asking. */
 export const outputChoice = (sinkSupported: boolean, list: DeviceList): boolean =>
   sinkSupported && list.listed && list.speakers.length > 0
+
+/** A phone whose own system picks the audio output, which a web page cannot list or choose. */
+export type PhoneOutput = 'android' | 'ios'
+
+export function phoneOutput(ua: string, maxTouchPoints: number): PhoneOutput | null {
+  if (isIosAgent(ua, maxTouchPoints)) {
+    return 'ios'
+  }
+  return deviceSystem(ua) === 'Android' ? 'android' : null
+}
+
+/** Chrome on Android routes call audio to a Bluetooth headset only with Nearby devices allowed. */
+export const PHONE_OUTPUT_NOTES: Readonly<Record<PhoneOutput, string>> = {
+  android:
+    'Your phone picks the output. If a Bluetooth headset is not used, allow Nearby devices for Chrome ' +
+    'in Android settings, then reopen Seti.',
+  ios: 'Your phone picks the output; switch it from Control Center.',
+}

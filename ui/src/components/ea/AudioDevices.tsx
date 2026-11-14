@@ -5,7 +5,16 @@ import { ToggleButton } from '@/components/ToggleButton'
 import { Button } from '@/components/ui/button'
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 import { MeterBars } from './MeterBars'
-import { micConstraints, outputChoice, PROCESSING, type DeviceOption, type Processing } from './audio-prefs'
+import {
+  micConstraints,
+  outputChoice,
+  PHONE_OUTPUT_NOTES,
+  phoneOutput,
+  PROCESSING,
+  type DeviceOption,
+  type PhoneOutput,
+  type Processing,
+} from './audio-prefs'
 import type { AudioState } from './audio-store'
 import { useEaAudio, useEaAudioStore, useEaCall } from './call-context'
 import { callActive } from './call-state'
@@ -19,16 +28,19 @@ function DeviceSelect({
   value,
   options,
   onChange,
+  disabled = false,
 }: {
   label: string
   value: string | null
   options: readonly DeviceOption[]
   onChange: (id: string | null) => void
+  disabled?: boolean
 }) {
   return (
     <NativeSelect
       aria-label={label}
       size="sm"
+      disabled={disabled}
       value={value ?? SYSTEM_DEFAULT}
       onChange={(e) => {
         onChange(e.target.value === SYSTEM_DEFAULT ? null : e.target.value)
@@ -71,15 +83,25 @@ export function MicPicker() {
   return <DeviceSelect label="Microphone" value={audio.mic.id} options={audio.mics} onChange={store.chooseMic} />
 }
 
+const thisPhone = (): PhoneOutput | null => phoneOutput(navigator.userAgent, navigator.maxTouchPoints)
+
+/** Waiting for the microphone before speakers can be listed, which a phone never lists. */
+const awaitingList = (audio: AudioState, phone: PhoneOutput | null) =>
+  phone === null && audio.sinkSupported && !audio.listed
+
+/** The output picker, greyed out where the browser or the phone picks the output itself. */
 export function SpeakerPicker() {
   const audio = useEaAudio()
   const store = useEaAudioStore()
-  if (!outputChoice(audio.sinkSupported, audio)) {
+  if (outputChoice(audio.sinkSupported, audio)) {
+    return (
+      <DeviceSelect label="Speaker" value={audio.speaker.id} options={audio.speakers} onChange={store.chooseSpeaker} />
+    )
+  }
+  if (awaitingList(audio, thisPhone())) {
     return null
   }
-  return (
-    <DeviceSelect label="Speaker" value={audio.speaker.id} options={audio.speakers} onChange={store.chooseSpeaker} />
-  )
+  return <DeviceSelect label="Speaker" value={null} options={[]} onChange={store.chooseSpeaker} disabled />
 }
 
 /** Why there is no output picker, or null when there is one. */
@@ -87,7 +109,11 @@ function outputNote(audio: AudioState): string | null {
   if (outputChoice(audio.sinkSupported, audio)) {
     return null
   }
-  if (audio.sinkSupported && !audio.listed) {
+  const phone = thisPhone()
+  if (phone !== null) {
+    return PHONE_OUTPUT_NOTES[phone]
+  }
+  if (awaitingList(audio, phone)) {
     return 'Speakers are listed once the microphone is allowed.'
   }
   return 'This browser plays the EA on the system output.'
