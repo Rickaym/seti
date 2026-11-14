@@ -1,16 +1,14 @@
 import { Menu, X } from 'lucide-react'
-import { useEffect, useId, useMemo } from 'react'
+import { useId } from 'react'
 import { NewsDot } from '@/components/NewsDot'
 import { SectionCount } from '@/components/SectionCount'
 import { ShortcutGuideOpener } from '@/components/shortcuts/ShortcutGuide'
 import { ModeToggle } from '@/components/theme/mode-toggle'
 import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from '@/components/ui/sheet'
-import { useNarrow } from '@/hooks/useMedia'
 import { describedBy } from '@/lib/described-by'
 import { useNewsPages } from '@/lib/mod-views'
 import { useSectionBadge, useSectionGroups, type SectionKey, type SidebarItem } from '@/lib/sections'
-import { ownsSwipeRight, swipeTracker } from '@/lib/swipe'
 import { cn } from '@/lib/utils'
 import { TerminalDrawerItem } from '@/panels/terminal/TerminalNavButton'
 
@@ -19,30 +17,6 @@ interface NavDrawerProps {
   onSelect: (key: SectionKey) => void
   open: boolean
   onOpenChange: (open: boolean) => void
-}
-
-/** A swipe right on a narrow screen opens the drawer, unless the touch belongs to its target. */
-function useSwipeToOpen(enabled: boolean, setOpen: (open: boolean) => void) {
-  useEffect(() => {
-    if (!enabled) {
-      return
-    }
-    const tracker = swipeTracker(
-      'right',
-      () => {
-        setOpen(true)
-      },
-      (event) => document.body.hasAttribute('data-scroll-locked') || ownsSwipeRight(event.target),
-    )
-    document.addEventListener('touchstart', tracker.start, { passive: true })
-    document.addEventListener('touchend', tracker.end, { passive: true })
-    document.addEventListener('touchcancel', tracker.cancel, { passive: true })
-    return () => {
-      document.removeEventListener('touchstart', tracker.start)
-      document.removeEventListener('touchend', tracker.end)
-      document.removeEventListener('touchcancel', tracker.cancel)
-    }
-  }, [enabled, setOpen])
 }
 
 interface DrawerItemProps {
@@ -82,18 +56,6 @@ export function NavDrawer({ active, onSelect, open, onOpenChange: setOpen }: Nav
   const news = useNewsPages().length > 0
   const newsId = useId()
   const groups = useSectionGroups()
-  useSwipeToOpen(useNarrow() && !open, setOpen)
-  const swipeClose = useMemo(
-    () =>
-      swipeTracker(
-        'left',
-        () => {
-          setOpen(false)
-        },
-        () => false,
-      ),
-    [setOpen],
-  )
   return (
     <>
       <Button
@@ -111,14 +73,7 @@ export function NavDrawer({ active, onSelect, open, onOpenChange: setOpen }: Nav
         {news && <NewsDot id={newsId} className="absolute top-2 right-2" />}
       </Button>
       <Sheet open={open} onOpenChange={setOpen}>
-        <SheetContent
-          side="left"
-          showCloseButton={false}
-          className="w-64 gap-0"
-          onTouchStart={swipeClose.start}
-          onTouchEnd={swipeClose.end}
-          onTouchCancel={swipeClose.cancel}
-        >
+        <SheetContent side="left" showCloseButton={false} className="w-64 gap-0">
           <div className="flex h-12 shrink-0 items-center justify-between border-b border-border pr-2 pl-4">
             <SheetTitle className="text-sm font-semibold tracking-[0.3em]">SETI</SheetTitle>
             <SheetDescription className="sr-only">Sections</SheetDescription>
