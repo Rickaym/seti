@@ -2,6 +2,7 @@ import type { EaHistoryPage } from '@seti/shared'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { toast } from 'sonner'
 import { apiDelete, apiGet } from '@/api'
+import { CallSession } from './CallSession'
 import { browserPrefsStorage, canSetSink } from './audio-prefs'
 import { AudioDeviceStore, micKey } from './audio-store'
 import { AutoJoin, browserMicPermission, lockLead } from './auto-join'
@@ -13,6 +14,7 @@ import {
   useEaAudio,
   useEaCall,
 } from './call-context'
+import { pageHidden } from './call-end'
 import { callActive } from './call-state'
 import { EaCallStore } from './call-store'
 import { browserClock } from './clock'
@@ -41,6 +43,7 @@ function createStores() {
     mic: audio.micConstraints,
     requestData: () => browserClock(),
     now: Date.now,
+    hidden: pageHidden,
   })
   const autoJoin = new AutoJoin({
     call,
@@ -182,7 +185,7 @@ export function EaCallProvider({ children }: { children: ReactNode }) {
   const [history] = useState(createHistory)
   useEffect(
     () => () => {
-      void store.hangUp()
+      void store.hangUp('page-closed')
     },
     [store],
   )
@@ -194,6 +197,7 @@ export function EaCallProvider({ children }: { children: ReactNode }) {
         <EaAutoJoinContext value={autoJoin}>
           <EaHistoryContext value={history}>
             <BotAudio store={store} />
+            <CallSession store={store} />
             <FollowCalls history={history} />
             <FollowMic store={store} audio={audio} />
             {children}

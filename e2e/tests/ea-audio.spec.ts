@@ -57,6 +57,8 @@ test('settings list the devices, keep the choices across a reload and test the s
     'Fake Audio Output 1',
     'Fake Audio Output 2',
   ])
+  await expect(card.getByRole('combobox', { name: 'Speaker' })).toBeEnabled()
+  await expect(card.getByTestId('ea-speaker-note')).toHaveCount(0)
   await expect(chosen(page, 'Microphone')).toHaveText('System default')
   for (const name of ['Cancel echo', 'Denoise', 'Auto gain']) {
     await expect(card.getByRole('button', { name })).toHaveAttribute('aria-pressed', 'true')
@@ -168,19 +170,19 @@ test('an unplugged device falls back to the system default with one toast', asyn
   await expect(eaItem(page).getByTestId('ea-bar-status')).toHaveText('Listening')
 })
 
-test('without setSinkId the output picker hides and the system output plays', async ({ page }) => {
+test('without setSinkId the output picker greys out and the system output plays', async ({ page }) => {
   await spyOnAudio(page, { withoutSink: true })
   await mockEa(page)
   await page.goto('/#settings/ea')
   const card = audioCard(page)
   await expect(card.getByRole('combobox', { name: 'Microphone' })).toBeVisible()
-  await expect(card.getByRole('combobox', { name: 'Speaker' })).toHaveCount(0)
+  await expect(card.getByRole('combobox', { name: 'Speaker' })).toBeDisabled()
   await expect(card.getByTestId('ea-speaker-note')).toHaveText('This browser plays the EA on the system output.')
   await card.getByRole('button', { name: 'Test speaker' }).click()
   await expect.poll(async () => (await audioSpy(page)).tones).toEqual(['none'])
 
   await startCall(page)
-  await expect(card.getByRole('combobox', { name: 'Speaker' })).toHaveCount(0)
+  await expect(card.getByRole('combobox', { name: 'Speaker' })).toBeDisabled()
   await eaItem(page).getByTestId('ea-bar').hover()
   await expect(details(page).getByTestId('ea-status')).toHaveText('Listening')
   await expect(details(page).getByRole('combobox')).toHaveCount(0)

@@ -1,4 +1,4 @@
-import type { EaWake } from '@seti/shared'
+import type { EaCallEndReason, EaWake } from '@seti/shared'
 import { captionsReducer, initialCaptions, type CaptionEvent, type CaptionState, type SpeechItem } from './captions'
 
 export type CallPhase = 'idle' | 'connecting' | 'connected' | 'error'
@@ -28,6 +28,13 @@ interface CallFailure {
   auto: boolean
 }
 
+/** How the last connected call ended, and whether Seti was in the background then. */
+export interface CallEnd {
+  reason: EaCallEndReason
+  at: number
+  hidden: boolean
+}
+
 export interface CallState {
   phase: CallPhase
   error: string | null
@@ -46,12 +53,13 @@ export interface CallState {
   /** When the user last stopped speaking, to time how fast the EA answers. */
   userStoppedAt: number | null
   replies: { count: number; totalMs: number }
+  lastEnd: CallEnd | null
 }
 
 export type CallAction =
   | { type: 'connecting'; auto: boolean }
   | { type: 'connected'; at: number }
-  | { type: 'ended'; at: number; error: string | null }
+  | { type: 'ended'; at: number; error: string | null; reason: EaCallEndReason; hidden: boolean }
   | { type: 'caption'; event: CaptionEvent }
   | { type: 'user-speaking'; speaking: boolean; at: number }
   | { type: 'bot-speaking'; speaking: boolean; at: number }
@@ -80,6 +88,7 @@ export const initialCallState: CallState = {
   audioBlocked: false,
   userStoppedAt: null,
   replies: { count: 0, totalMs: 0 },
+  lastEnd: null,
 }
 
 const withCaption = (state: CallState, event: CaptionEvent): CallState => ({
@@ -87,15 +96,18 @@ const withCaption = (state: CallState, event: CaptionEvent): CallState => ({
   captions: captionsReducer(state.captions, event),
 })
 
-function ended(state: CallState, at: number, error: string | null): CallState {
+function ended(state: CallState, action: Extract<CallAction, { type: 'ended' }>): CallState {
+  const { at, error, reason, hidden } = action
   if (state.phase === 'idle' && error === null) {
     return state
   }
-  const marked = state.phase === 'connected' ? withCaption(state, { type: 'marker', text: 'Call ended', at }) : state
+  const live = state.phase === 'connected'
+  const marked = live ? withCaption(state, { type: 'marker', text: 'Call ended', at }) : state
   const signals = { ...QUIET, latency: state.signals.latency }
-  const failure = error === null ? null : { at, dropped: state.phase === 'connected', auto: state.auto }
+  const failure = error === null ? null : { at, dropped: live, auto: state.auto }
   const phase = error === null ? 'idle' : 'error'
-  return { ...marked, phase, error, failure, signals, tracks: NO_TRACKS, wake: null }
+  const lastEnd = live ? { reason, at, hidden } : state.lastEnd
+  return { ...marked, phase, error, failure, signals, tracks: NO_TRACKS, wake: null, lastEnd }
 }
 
 function botSpeaking(state: CallState, speaking: boolean, at: number): CallState {
@@ -131,7 +143,7 @@ export function callReducer(state: CallState, action: CallAction): CallState {
     case 'connected':
       return withCaption({ ...state, phase: 'connected' }, { type: 'marker', text: 'Call started', at: action.at })
     case 'ended':
-      return ended(state, action.at, action.error)
+      return ended(state, action)
     case 'caption':
       return withCaption(state, action.event)
     case 'user-speaking':

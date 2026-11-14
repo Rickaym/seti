@@ -37,9 +37,12 @@ const SYSTEMS: readonly [RegExp, string][] = [
 
 const match = (table: readonly [RegExp, string][], ua: string) => table.find(([test]) => test.test(ua))?.[1]
 
+/** The operating system a user agent names, such as Android, or undefined. */
+export const deviceSystem = (ua: string): string | undefined => match(SYSTEMS, ua)
+
 /** How the settings page names a device, such as Safari on iPhone. */
 export function deviceLabel(ua: string): string {
   const browser = match(BROWSERS, ua) ?? 'Browser'
-  const system = match(SYSTEMS, ua)
+  const system = deviceSystem(ua)
   return system === undefined ? browser : `${browser} on ${system}`
 }

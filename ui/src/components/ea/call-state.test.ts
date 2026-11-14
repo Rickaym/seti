@@ -11,7 +11,7 @@ const connected = run([
 
 describe('callReducer', () => {
   it('marks where a call started and ended', () => {
-    const state = run([{ type: 'ended', at: 9, error: null }], connected)
+    const state = run([{ type: 'ended', at: 9, error: null, reason: 'hang-up', hidden: false }], connected)
     expect(state.phase).toBe('idle')
     expect(state.captions.items.map((item) => (item.kind === 'marker' ? item.text : item.kind))).toEqual([
       'Call started',
@@ -22,7 +22,7 @@ describe('callReducer', () => {
   it('does not mark a call that never connected, and keeps the error', () => {
     const state = run([
       { type: 'connecting', auto: false },
-      { type: 'ended', at: 2, error: 'No microphone found.' },
+      { type: 'ended', at: 2, error: 'No microphone found.', reason: 'hang-up', hidden: false },
     ])
     expect(state.phase).toBe('error')
     expect(state.error).toBe('No microphone found.')
@@ -32,28 +32,47 @@ describe('callReducer', () => {
   it('records each failure and whether a live call dropped', () => {
     const refused = run([
       { type: 'connecting', auto: false },
-      { type: 'ended', at: 2, error: 'No microphone found.' },
+      { type: 'ended', at: 2, error: 'No microphone found.', reason: 'hang-up', hidden: false },
     ])
     expect(refused.failure).toEqual({ at: 2, dropped: false, auto: false })
-    const again = run([{ type: 'ended', at: 2, error: 'No microphone found.' }], refused)
+    const again = run(
+      [{ type: 'ended', at: 2, error: 'No microphone found.', reason: 'hang-up', hidden: false }],
+      refused,
+    )
     expect(again.failure).toEqual(refused.failure)
     expect(again.failure).not.toBe(refused.failure)
-    expect(run([{ type: 'ended', at: 5, error: 'The EA hit an error.' }], connected).failure).toEqual({
+    expect(
+      run([{ type: 'ended', at: 5, error: 'The EA hit an error.', reason: 'hang-up', hidden: false }], connected)
+        .failure,
+    ).toEqual({
       at: 5,
       dropped: true,
       auto: false,
     })
     const joined = run([
       { type: 'connecting', auto: true },
-      { type: 'ended', at: 7, error: 'Busy' },
+      { type: 'ended', at: 7, error: 'Busy', reason: 'hang-up', hidden: false },
     ])
     expect(joined.failure).toEqual({ at: 7, dropped: false, auto: true })
     expect(run([{ type: 'connecting', auto: false }], refused).failure).toBeNull()
-    expect(run([{ type: 'ended', at: 9, error: null }], connected).failure).toBeNull()
+    expect(run([{ type: 'ended', at: 9, error: null, reason: 'hang-up', hidden: false }], connected).failure).toBeNull()
+  })
+
+  it('keeps how the last connected call ended, but not a connect that failed', () => {
+    const dropped = run([{ type: 'ended', at: 9, error: 'Lost', reason: 'ice-failed', hidden: true }], connected)
+    expect(dropped.lastEnd).toEqual({ reason: 'ice-failed', at: 9, hidden: true })
+    const retried = run(
+      [
+        { type: 'connecting', auto: true },
+        { type: 'ended', at: 12, error: 'Busy', reason: 'bot-error', hidden: false },
+      ],
+      dropped,
+    )
+    expect(retried.lastEnd).toEqual(dropped.lastEnd)
   })
 
   it('ignores a hang-up when nothing is connected', () => {
-    expect(run([{ type: 'ended', at: 1, error: null }])).toBe(initialCallState)
+    expect(run([{ type: 'ended', at: 1, error: null, reason: 'hang-up', hidden: false }])).toBe(initialCallState)
   })
 
   it('times the reply from the user going quiet to the EA speaking', () => {
@@ -77,7 +96,7 @@ describe('callReducer', () => {
       [
         { type: 'bot-speaking', speaking: true, at: 2 },
         { type: 'mic-held', held: true },
-        { type: 'ended', at: 3, error: 'The EA hit an error.' },
+        { type: 'ended', at: 3, error: 'The EA hit an error.', reason: 'hang-up', hidden: false },
       ],
       connected,
     )
@@ -112,7 +131,7 @@ describe('callReducer', () => {
     expect(asleep(awake)).toBe(false)
     expect(barStatus(awake)).toBe('Listening')
     expect(asleep(run([{ type: 'wake', wake: { ...wake, enabled: false } }], sleeping))).toBe(false)
-    expect(run([{ type: 'ended', at: 5, error: null }], sleeping).wake).toBeNull()
+    expect(run([{ type: 'ended', at: 5, error: null, reason: 'hang-up', hidden: false }], sleeping).wake).toBeNull()
   })
 })
 

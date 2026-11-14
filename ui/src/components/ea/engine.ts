@@ -10,12 +10,19 @@ import {
   type UserInputData,
 } from '@pipecat-ai/client-js'
 import { SmallWebRTCTransport, WavMediaManager } from '@pipecat-ai/small-webrtc-transport'
-import { eaActionMessage, eaWakeMessage, type EaRequestData } from '@seti/shared'
+import {
+  eaActionMessage,
+  eaCallEndMessage,
+  eaWakeMessage,
+  type EaCallEndReason,
+  type EaRequestData,
+} from '@seti/shared'
 import { withMicDefaults } from './audio-prefs'
 import type { CallAction } from './call-state'
 import type { CallHandlers, LiveCall } from './call-store'
 import { responseError } from './ice'
 import { describeBotError } from './media'
+import { everySecond } from './ticker'
 
 const OFFER_PATH = '/api/ea/offer'
 
@@ -69,6 +76,7 @@ interface TransportInternals {
   buildTransportStartError: () => Error
   addUserMedia: () => Promise<void>
   pc: RTCPeerConnection | null
+  dc: RTCDataChannel | null
   _lastNegotiationError: unknown
 }
 
@@ -80,7 +88,11 @@ function sendLocalAudio(transport: SmallWebRTCTransport): void {
   }
 }
 
-/** A reconnect that recreates the peer connection would start a new bot session; end instead. */
+/**
+ * A reconnect that recreates the peer connection would start a new bot session, so the call ends
+ * instead. A path that is only disconnected, as in a short network stall, gets until the browser
+ * declares it failed, about 30 s, rather than the transport's 5 s.
+ */
 function buildTransport(iceServers: RTCIceServer[], onIceFailure: () => void): SmallWebRTCTransport {
   const transport = new SmallWebRTCTransport({
     iceServers,
@@ -92,6 +104,9 @@ function buildTransport(iceServers: RTCIceServer[], onIceFailure: () => void): S
   internals.attemptReconnection = async (recreate = false) => {
     if (!recreate) {
       await reconnect(false)
+      return
+    }
+    if (internals.pc?.iceConnectionState === 'disconnected') {
       return
     }
     if (internals._lastNegotiationError === null) {
@@ -191,7 +206,24 @@ function listen(client: PipecatClient, dispatch: (action: CallAction) => void): 
   })
 }
 
-/** A pipecat client over SmallWebRTC; errors the bot reports shortly before a drop explain it. */
+/** The bot drops the EA's voice 3 s after its last ping, and the transport pings on page timers. */
+function keepAlive(transport: SmallWebRTCTransport): () => void {
+  const internals = transport as unknown as TransportInternals
+  return everySecond(() => {
+    const channel = internals.dc
+    if (channel?.readyState === 'open') {
+      channel.send(`ping: ${String(Date.now())}`)
+    }
+  })
+}
+
+interface EndNote {
+  text: string | null
+  reason: EaCallEndReason
+  at: number
+}
+
+/** A pipecat client over SmallWebRTC; what happens shortly before a drop explains it. */
 export function createCall(
   iceServers: RTCIceServer[],
   { dispatch, dropped }: CallHandlers,
@@ -201,12 +233,14 @@ export function createCall(
   let systemDefault = false
   installMicDefaults(() => (systemDefault ? withoutDevice(mic()) : mic()))
   let stopping = false
-  let reason: { text: string; at: number } | null = null
-  const recentReason = () => (reason !== null && Date.now() - reason.at < BOT_ERROR_TTL_MS ? reason.text : null)
+  let note: EndNote | null = null
+  const recent = () => (note !== null && Date.now() - note.at < BOT_ERROR_TTL_MS ? note : null)
+  const recentReason = () => recent()?.text ?? null
   const transport = buildTransport(iceServers, () => {
-    reason = { text: ICE_FAILED, at: Date.now() }
+    note = { text: ICE_FAILED, reason: 'ice-failed', at: Date.now() }
   })
   let choseDevice = false
+  let stopPings: () => void = () => undefined
 
   const client = new PipecatClient({
     transport,
@@ -214,8 +248,9 @@ export function createCall(
     enableCam: false,
     callbacks: {
       onDisconnected: () => {
+        stopPings()
         if (!stopping) {
-          dropped(recentReason())
+          dropped(recentReason(), recent()?.reason ?? 'server-closed')
         }
       },
     },
@@ -223,7 +258,12 @@ export function createCall(
   client.on(RTVIEvent.Error, (message: RTVIMessage) => {
     const text = describeBotError(message.data)
     if (text !== null) {
-      reason = { text, at: Date.now() }
+      note = { text, reason: 'bot-error', at: Date.now() }
+    }
+  })
+  client.on(RTVIEvent.ServerMessage, (data: unknown) => {
+    if (eaCallEndMessage.safeParse(data).success) {
+      note = { text: null, reason: 'bot-idle', at: Date.now() }
     }
   })
   client.on(RTVIEvent.TrackStarted, (track: MediaStreamTrack, participant?: Participant) => {
@@ -243,10 +283,12 @@ export function createCall(
   return {
     connect: async (requestData: EaRequestData) => {
       await client.initDevices()
+      stopPings = keepAlive(transport)
       await client.connect({ webrtcRequestParams: { endpoint: OFFER_PATH, requestData } })
     },
     stop: async () => {
       stopping = true
+      stopPings()
       client.tracks().local.audio?.stop()
       await client.disconnect().catch(() => undefined)
     },

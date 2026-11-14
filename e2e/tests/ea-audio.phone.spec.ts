@@ -79,3 +79,33 @@ test('the settings page keeps the audio section within a phone screen', async ({
   await expect(card.getByRole('button', { name: 'Test speaker' })).toBeVisible()
   expect(await horizontalOverflow(page)).toBeLessThanOrEqual(0)
 })
+
+/** Android Chrome lists no outputs and iOS Safari has no setSinkId; the phone chooses. */
+async function phoneOutputs(page: Page, project: string) {
+  if (project === 'iphone-15') {
+    await spyOnAudio(page, { withoutSink: true })
+    return 'Your phone picks the output; switch it from Control Center.'
+  }
+  await page.addInitScript(() => {
+    const media = navigator.mediaDevices
+    const enumerate = media.enumerateDevices.bind(media)
+    media.enumerateDevices = async () => (await enumerate()).filter((device) => device.kind !== 'audiooutput')
+  })
+  return (
+    'Your phone picks the output. If a Bluetooth headset is not used, allow Nearby devices for Chrome ' +
+    'in Android settings, then reopen Seti.'
+  )
+}
+
+test('the speaker row is greyed out with a hint where the phone picks the output', async ({ page }, info) => {
+  const hint = await phoneOutputs(page, info.project.name)
+  await page.goto('/#settings/ea')
+  const card = page.getByRole('main').getByRole('region', { name: 'Audio' })
+  await expect(card.getByRole('combobox', { name: 'Microphone' })).toBeVisible()
+  const speaker = card.getByRole('combobox', { name: 'Speaker' })
+  await expect(speaker).toBeDisabled()
+  await expect(speaker.locator('option:checked')).toHaveText('System default')
+  await expect(card.getByTestId('ea-speaker-note')).toHaveText(hint)
+  await expect(card.getByRole('button', { name: 'Test speaker' })).toBeEnabled()
+  expect(await horizontalOverflow(page)).toBeLessThanOrEqual(0)
+})

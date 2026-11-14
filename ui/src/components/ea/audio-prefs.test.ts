@@ -7,6 +7,7 @@ import {
   micConstraints,
   outputChoice,
   parseAudioPrefs,
+  phoneOutput,
   resolveDevice,
   withMicDefaults,
 } from './audio-prefs'
@@ -155,5 +156,15 @@ describe('output choice', () => {
     expect(outputChoice(true, list)).toBe(true)
     expect(outputChoice(true, { ...list, speakers: [] })).toBe(false)
     expect(outputChoice(true, { ...list, listed: false })).toBe(false)
+  })
+
+  it('names the phones whose system picks the output', () => {
+    const pixel = 'Mozilla/5.0 (Linux; Android 14; Pixel 7) AppleWebKit/537.36 Chrome/131.0 Mobile Safari/537.36'
+    const iphone = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148'
+    const ipad = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 Version/18.0 Safari/605.1.15'
+    expect(phoneOutput(pixel, 5)).toBe('android')
+    expect(phoneOutput(iphone, 5)).toBe('ios')
+    expect(phoneOutput(ipad, 5)).toBe('ios')
+    expect(phoneOutput(ipad, 0)).toBeNull()
   })
 })
