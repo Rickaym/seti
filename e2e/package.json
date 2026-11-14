@@ -10,7 +10,7 @@
   },
   "devDependencies": {
     "@catppuccin/palette": "^1.8.0",
-    "@playwright/test": "^1.64.1",
+    "@playwright/test": "^1.65.0",
     "@seti/shared": "workspace:*",
     "@types/node": "^24.19.2",
     "typescript": "~6.0.3",
