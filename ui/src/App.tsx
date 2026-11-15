@@ -87,10 +87,7 @@ const sectionView = (route: Route): MainView => ({
 })
 
 /** Each arrival on `#share` mounts the page afresh, so it reads the share waiting now. */
-const shareView = (visit: number): MainView => ({ name: 'Share', key: 'share', view: <SharePage key={visit} /> })
-
-/** Counts arrivals on `#share`; null while elsewhere. */
-const nextShareVisit = (visit: number | null): number | null => (isShareHash() ? (visit ?? 0) + 1 : null)
+const shareView = (arrival: number): MainView => ({ name: 'Share', key: 'share', view: <SharePage key={arrival} /> })
 
 const SIDEBAR_KEY = 'seti.sidebar.hidden'
 
@@ -222,7 +219,7 @@ function settleHash(): Route {
 
 export function App() {
   const [route, setRoute] = useState<Route>(settleHash)
-  const [shareVisit, setShareVisit] = useState(() => nextShareVisit(null))
+  const [share, setShare] = useState(() => ({ open: isShareHash(), arrival: 0 }))
   useAppHeight()
   useTypingMode()
   const narrow = useNarrow()
@@ -254,7 +251,8 @@ export function App() {
     const onHash = () => {
       armLanding('page')
       setRoute(settleHash())
-      setShareVisit(nextShareVisit)
+      const open = isShareHash()
+      setShare((was) => ({ open, arrival: was.arrival + 1 }))
     }
     window.addEventListener('hashchange', onHash)
     return () => {
@@ -262,7 +260,7 @@ export function App() {
     }
   }, [])
 
-  const shown = shareVisit === null ? sectionView(route) : shareView(shareVisit)
+  const shown = share.open ? shareView(share.arrival) : sectionView(route)
 
   const select = (section: SectionKey) => {
     navigate(section)
