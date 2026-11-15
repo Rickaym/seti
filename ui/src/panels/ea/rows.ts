@@ -19,6 +19,8 @@ export interface LiveExchange {
   text: string
   at: string
   parts: LivePart[]
+  /** What a running think is doing, shown as a Thinking status line; null or absent when none runs. */
+  thinking?: string | null
   /** The stored entries of this exchange once the EA is done with it. */
   stored?: number[]
 }
@@ -256,8 +258,10 @@ export function applyEvent(live: LiveExchange, event: EaChatEvent): LiveExchange
       )
       return { ...live, parts }
     }
+    case 'thinking':
+      return { ...live, thinking: event.text }
     case 'done':
-      return { ...live, stored: event.ids }
+      return { ...live, stored: event.ids, thinking: null }
     case 'error':
       return live
   }

@@ -2,6 +2,7 @@ import type { EaUsageChannel, EaUsageRecord, EaUsageStats } from '@seti/shared'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { createApp } from '../app.js'
 import { sql } from '../db.js'
+import { auditEvents } from '../store/audit.js'
 import { eaUsage } from '../store/ea-usage.js'
 import { EA_AUTH, USER_AUTH } from '../test-auth.js'
 
@@ -52,24 +53,25 @@ describe('EA usage', () => {
       modelCall('voice', 800, [16_000, 12_000]),
       modelCall('chat', 1000, [14_000, 0], 1),
       modelCall('inbox', 3000, [10_000, 4000]),
+      { ...modelCall('think', 0, [9_000, 1000], 2), ttfb_ms: null },
       { kind: 'stt', channel: 'voice', model: 'nova-3', ttfb_ms: 300 },
       { kind: 'tts', channel: 'voice', model: null, ttfb_ms: 200 },
     ]
-    expect(await data(await send('POST', '/usage', BOT, { records }))).toEqual({ recorded: 6 })
+    expect(await data(await send('POST', '/usage', BOT, { records }))).toEqual({ recorded: 7 })
     await eaUsage.add([modelCall('chat', 9000, [50_000, 0])], ago(8))
 
     const stats = await data<EaUsageStats>(await send('GET', '/usage?zone=UTC', LOCAL))
     expect(stats).toMatchObject({
       zone: 'UTC',
       window_days: 7,
-      calls_today: 4,
-      calls_window: 4,
-      by_channel: { voice: 2, chat: 1, inbox: 1 },
+      calls_today: 5,
+      calls_window: 5,
+      by_channel: { voice: 2, chat: 1, inbox: 1, think: 1 },
       ttfb: { samples: 4, p50_ms: 900 },
-      avg_prompt_tokens: 14_000,
+      avg_prompt_tokens: 13_000,
       avg_completion_tokens: 40,
-      cached_share: 0.5,
-      tool_calls: 3,
+      cached_share: 0.446,
+      tool_calls: 5,
       models: ['gpt-4.1'],
       stt: { samples: 1, p50_ms: 300, p95_ms: 300 },
       tts: { samples: 1, p50_ms: 200, p95_ms: 200 },
@@ -107,5 +109,28 @@ describe('EA usage', () => {
     expect((await send('POST', '/usage', BOT, { records: prose })).status).toBe(400)
     expect((await send('POST', '/usage', BOT, { records: [] })).status).toBe(400)
     expect(await sql`SELECT 1 FROM ea_usage`).toHaveLength(0)
+  })
+
+  it('audits each think in numbers, never its question', async () => {
+    const thought = { channel: 'voice', outcome: 'answered', question_chars: 42, duration_ms: 23_400, tool_rounds: 2 }
+    expect(await data(await send('POST', '/thoughts', BOT, thought))).toEqual({ recorded: true })
+    expect(await auditEvents.latest('ea.thought')).toMatchObject({
+      actor: 'user',
+      subject_type: 'ea',
+      summary: 'EA thought a question through in 23 s with 2 rounds of reading: answered',
+      detail: { ...thought, via: 'ea' },
+    })
+    const cancelled = { ...thought, outcome: 'cancelled', tool_rounds: 1 }
+    await data(await send('POST', '/thoughts', BOT, cancelled))
+    expect((await auditEvents.latest('ea.thought'))?.summary).toBe(
+      'EA thought a question through in 23 s with 1 round of reading: was cancelled',
+    )
+  })
+
+  it('takes thinks only from the EA bot, without their text', async () => {
+    const thought = { channel: 'chat', outcome: 'failed', question_chars: 10, duration_ms: 900, tool_rounds: 0 }
+    expect((await send('POST', '/thoughts', LOCAL, thought)).status).toBe(403)
+    expect((await send('POST', '/thoughts', BOT, { ...thought, question: 'Which PR?' })).status).toBe(400)
+    expect((await send('POST', '/thoughts', BOT, { ...thought, outcome: 'maybe' })).status).toBe(400)
   })
 })

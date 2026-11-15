@@ -93,6 +93,13 @@ export const eaActionMessage = z.object({
 })
 export type EaAction = z.output<typeof eaActionMessage>
 
+/** The RTVI server message the bot sends as a running think reads Seti, such as its next step. */
+export const eaProgressMessage = z.object({
+  type: z.literal('ea-progress'),
+  tool: z.string(),
+  text: z.string(),
+})
+
 const CONTENT_MAX = 64 * 1024
 const TOOL_ID_MAX = 200
 
@@ -206,9 +213,13 @@ export const eaChatInput = z.object({
 })
 export type EaChatInput = z.input<typeof eaChatInput>
 
-/** The EA's typed reply as it streams: text as it is written, tool calls, then done or error. */
+/**
+ * The EA's typed reply as it streams: text as it is written, tool calls, then done or error.
+ * While a think runs, `thinking` carries its progress line, and null once it ends.
+ */
 export type EaChatEvent =
   | { type: 'text'; delta: string }
+  | { type: 'thinking'; text: string | null }
   | { type: 'tool'; id: string; name: string; arguments: Record<string, unknown> }
   | { type: 'tool_result'; id: string; name: string; summary: string; ok: boolean; text: string }
   /** The stored entries of this exchange, oldest first. */

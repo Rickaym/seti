@@ -228,6 +228,13 @@ class SilenceGate:
         self._awaiting_until = self._clock() + REPLY_WAIT_SECS
         self._touch()
 
+    def floor_free(self, secs: float) -> bool:
+        """Nobody speaks and no reply is due or under way, for `secs` now; tools may be running."""
+        now = self._clock()
+        awaiting = self._awaiting_until is not None and now < self._awaiting_until
+        busy = self._turn or self._voice or self._bot or self._replying or awaiting
+        return not busy and now - self._last >= secs
+
     def silent(self, secs: float) -> bool:
         """Nobody has spoken, replied or run a tool for `secs`, and no reply is due."""
         now = self._clock()

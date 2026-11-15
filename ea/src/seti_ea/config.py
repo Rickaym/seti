@@ -11,6 +11,8 @@ DEFAULT_MODEL = "gpt-6-sol"
 # GPT-6 Sol and Luna take function tools on Chat Completions only at reasoning effort none.
 DEFAULT_REASONING_EFFORT = "none"
 MODEL_DEFAULT_EFFORT = "default"
+# The think tool's reasoning model runs on the Responses API, where tools work at any effort.
+DEFAULT_THINK_EFFORT = "medium"
 DEFAULT_SETI_API = "http://127.0.0.1:3006"
 # ElevenLabs voice the user chose for the EA.
 DEFAULT_VOICE_ID = "Fahco4VZzobUeiPqni1S"
@@ -54,6 +56,8 @@ class Settings:
     seti_api_token: str = ""
     credentials_dir: Path | None = None
     reasoning_effort: str = DEFAULT_REASONING_EFFORT
+    think_model: str = DEFAULT_MODEL
+    think_effort: str = DEFAULT_THINK_EFFORT
 
     @property
     def keys_hint(self) -> str:
@@ -102,7 +106,8 @@ class Settings:
     def __repr__(self) -> str:
         return (
             f"Settings(model={self.model!r}, chat_model={self.chat_model!r}, "
-            f"reasoning_effort={self.reasoning_effort!r}, seti_api={self.seti_api!r}, "
+            f"reasoning_effort={self.reasoning_effort!r}, think_model={self.think_model!r}, "
+            f"think_effort={self.think_effort!r}, seti_api={self.seti_api!r}, "
             f"port={self.port}, missing={self.missing!r}, turn={self.turn})"
         )
 
@@ -181,6 +186,8 @@ def load_settings(environ: Mapping[str, str] | None = None) -> Settings:
         model=get("EA_MODEL", DEFAULT_MODEL),
         text_model=get("EA_TEXT_MODEL"),
         reasoning_effort=get("EA_REASONING_EFFORT", DEFAULT_REASONING_EFFORT),
+        think_model=get("EA_THINK_MODEL", DEFAULT_MODEL),
+        think_effort=get("EA_THINK_EFFORT", DEFAULT_THINK_EFFORT),
         turn_key_id=get("CLOUDFLARE_TURN_KEY_ID"),
         turn_api_token=get("CLOUDFLARE_TURN_API_TOKEN"),
         seti_api=get("SETI_API", DEFAULT_SETI_API).rstrip("/"),

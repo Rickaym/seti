@@ -286,6 +286,7 @@ The EA reads its key files first, then its environment, then `SETI_EA_ENV`
 | `EA_PORT`                                             | `3007`                    | Listen port on `127.0.0.1`                                 |
 | `EA_MODEL`, `EA_TEXT_MODEL`                           | `gpt-6-sol`, same         | Voice model, and the chat model when different             |
 | `EA_REASONING_EFFORT`                                 | `none`                    | `default` for a model without reasoning, such as `gpt-4.1` |
+| `EA_THINK_MODEL`, `EA_THINK_EFFORT`                   | `gpt-6-sol`, `medium`     | The reasoning model the think tool hands hard questions to |
 | `ELEVENLABS_VOICE_ID`, `ELEVENLABS_MODEL`             | a set voice, flash v2.5   | The voice                                                  |
 | `EA_HISTORY_MAX_TOKENS`                               | `8000`                    | Conversation kept per call, at least 200                   |
 | `EA_INBOX_POLL_SECS`                                  | `5`                       | How often the EA checks its inbox                          |

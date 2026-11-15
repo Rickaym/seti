@@ -97,6 +97,16 @@ describe('chatView', () => {
     expect(view.marks.notes.get(10)).toEqual({ text: SUMMARISED, detail: 'They asked.' })
   })
 
+  it('keeps what a think is doing apart from the reply, and clears it when the think ends', () => {
+    let live: LiveExchange = { text: 'Which PR first?', at: AT, parts: [] }
+    live = applyEvent(live, { type: 'tool', id: 't1', name: 'think', arguments: { question: 'Which PR first?' } })
+    live = applyEvent(live, { type: 'thinking', text: "I'm going through the open PRs." })
+    expect(live.thinking).toBe("I'm going through the open PRs.")
+    expect(liveRows(CONVERSATION, live).map(describeRow)).toEqual(['prompt Which PR first?', 'tool think'])
+    expect(applyEvent(live, { type: 'thinking', text: null }).thinking).toBeNull()
+    expect(applyEvent(live, { type: 'done', ids: [1] }).thinking).toBeNull()
+  })
+
   it('follows the stored rows with the reply in flight until the history has it', () => {
     let live: LiveExchange = { text: 'Plan my day', at: AT, parts: [] }
     const events: EaChatEvent[] = [
@@ -175,6 +185,7 @@ describe('chatView', () => {
 describe('reply stream', () => {
   it('parses server-sent events and skips pings and unknown ones', () => {
     expect(parseEvent('event: text\ndata: {"delta": "Hi"}')).toEqual({ type: 'text', delta: 'Hi' })
+    expect(parseEvent('event: thinking\ndata: {"text": null}')).toEqual({ type: 'thinking', text: null })
     expect(parseEvent(': ping')).toBeNull()
     expect(parseEvent('event: mystery\ndata: {}')).toBeNull()
     expect(parseEvent('event: done\ndata: not json')).toBeNull()

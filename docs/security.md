@@ -55,6 +55,11 @@ private key off the host. The sandbox model is in [Architecture](architecture.md
   unguessable id and its own signing secret, and every delivery must be signed. Share links are
   described below.
 - The EA answers only calls that carry its token, apart from `/health`.
+- The EA's think tool hands a question to a reasoning model with only the EA's read tools
+  (`THINK_TOOLS` in `ea/src/seti_ea/think.py`); it refuses any other tool, never asks Seti to probe
+  again and stores nothing at OpenAI. What it recommends goes back to the EA, so writes still wait
+  for the user's yes. `POST /api/ea/thoughts` takes only the bot's numbers for the `ea.thought`
+  audit event, never the question's text.
 - A question the EA asks before a destructive tool acts lives in `ea_ask` with the exact call.
   Only the EA bot records questions and reports the user's typed or spoken yes
   (`/api/ea/asks/confirm`), and Seti takes a yes only for an open question asked in an earlier

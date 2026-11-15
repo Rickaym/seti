@@ -166,6 +166,7 @@ export const AUDIT_KINDS = [
   'ea.ask_allowed',
   'ea.ask_denied',
   'ea.call_ended',
+  'ea.thought',
   'team.message_posted',
   'team.direct_posted',
   'team.message_delivered',

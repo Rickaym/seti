@@ -3,7 +3,7 @@
 import asyncio
 import contextlib
 import json
-from collections.abc import AsyncGenerator, Callable, Mapping
+from collections.abc import AsyncGenerator, Awaitable, Callable, Mapping
 from datetime import UTC, datetime
 from typing import Any, cast
 
@@ -47,6 +47,9 @@ from seti_ea.packs import CHAT_TIMEOUT_SECS, PackPrompt
 from seti_ea.promises import PromiseCheck
 from seti_ea.prompt import CHAT_NOTE_PREFIX, VOICE_NOTE, chat_inbox_note, chat_note
 from seti_ea.seti import SetiError
+from seti_ea.think import Ask, Thinker, responses_ask
+from seti_ea.think_speech import ShownProgress
+from seti_ea.think_tool import ThinkTool
 from seti_ea.toolkit import ToolResult
 from seti_ea.tools import DIRECT_ONLY, INBOX_ORIGIN, TOOL_SPECS, EaTools
 from seti_ea.usage import Channel, UsageObserver, UsageRecorder
@@ -67,11 +70,15 @@ ANSWER_NOTE = (
 )
 
 
+Report = Callable[[str, ToolResult, str], Awaitable[None]]
+
+
 async def _ignore(_tool: str, _result: ToolResult, _call_id: str) -> None:
     return None
 
 
 LlmFactory = Callable[[Settings, str], OpenAILLMService]
+AskFactory = Callable[[Settings], Ask]
 
 
 def chat_llm(settings: Settings, system: str) -> OpenAILLMService:
@@ -217,12 +224,15 @@ class TextChat:
         conversation: Conversation,
         *,
         llm: LlmFactory = chat_llm,
+        think: AskFactory = responses_ask,
         now: Callable[[], datetime] | None = None,
     ) -> None:
         self._settings = settings
         self._tools = tools
         self._conversation = conversation
         self._llm = llm
+        self._think = think
+        self._ask: Ask | None = None
         self._now = now or (lambda: datetime.now(UTC))
         self._turn = asyncio.Lock()
         self._noted: datetime | None = None
@@ -376,6 +386,13 @@ class TextChat:
                 ASKED.reset(asked_token)
                 CURRENT_CLOCK.reset(clock_token)
 
+    def _think_tool(self, report: Report, emit: Emit, usage: UsageRecorder) -> ThinkTool:
+        """The think tool for one typed reply, showing its progress as a Thinking status line."""
+        if self._ask is None:
+            self._ask = self._think(self._settings)
+        thinker = Thinker(self._tools, self._ask, usage)
+        return ThinkTool(thinker, self._tools.seti, "chat", report, ShownProgress(emit))
+
     async def _exchange(self, text: str, clock: UserClock, emit: Emit) -> None:
         async def report(tool: str, result: ToolResult, call_id: str) -> None:
             emit(
@@ -394,7 +411,10 @@ class TextChat:
         self._tools.user_turn()
         asked: list[int] = []
         ASKED.set(asked)
-        context = LLMContext(tools=ToolsSchema(standard_tools=tool_schemas(self._tools, report)))
+        thought_usage = UsageRecorder(self._tools.seti)
+        think = self._think_tool(report, emit, thought_usage)
+        schemas = [*tool_schemas(self._tools, report), think.schema()]
+        context = LLMContext(tools=ToolsSchema(standard_tools=schemas))
         history = HistorySync(self._tools.seti, context, lock=self._conversation.lock, kind="chat")
         try:
             await history.load()
@@ -420,4 +440,6 @@ class TextChat:
             logger.exception("EA chat failed")
             emit({"type": "error", "title": "The EA could not answer", "detail": str(e) or type(e).__name__})
         finally:
+            await thought_usage.flush()
+            await think.settle()
             self._turn.release()

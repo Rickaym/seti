@@ -10,10 +10,12 @@ from fakes import (
     make_task,
     subtask,
 )
+from pipecat.utils.async_tool_cancellation import cancel_tool_name
 
 from seti_ea.actions import ACTION_SPECS
 from seti_ea.seti import SetiClient
 from seti_ea.settings_tools import SETTINGS_SPECS
+from seti_ea.think import THINK_SPEC
 from seti_ea.tools import TOOL_SPECS, EaTools, queued_updates
 from seti_ea.wake import SLEEP_SPEC
 
@@ -348,7 +350,8 @@ async def test_tool_specs_are_valid_json_schema(tools: EaTools) -> None:
     assert names[len(names) - len(tail) :] == tail
     assert len(set(names)) == len(names)
     assert SLEEP_SPEC.name not in names
-    assert len([*names, SLEEP_SPEC.name]) <= 128, "a call adds go_to_sleep; the API takes 128 tools"
+    voice = [*names, SLEEP_SPEC.name, THINK_SPEC.name, cancel_tool_name(THINK_SPEC.name)]
+    assert len(voice) <= 128, "a call adds go_to_sleep, think and cancel_think; the API takes 128 tools"
     assert names[: len(names) - len(tail)] == [
         "list_tasks",
         "list_workspaces",
