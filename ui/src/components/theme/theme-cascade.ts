@@ -1,4 +1,4 @@
-import type { Rgb } from '@/lib/agent-color'
+import type { Rgb } from '@seti/shared'
 
 /** What <html> carries, for working out which token rules of a stylesheet apply. */
 export interface ThemeState {

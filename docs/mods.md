@@ -577,6 +577,12 @@ to Seti. The first marker registered draws them all, and turning its mod off bri
 back at once. `mods/blobs/` is the example: flat blobs in the agent's colour whose faces show the state,
 moving only while the agent runs and not at all with reduced motion.
 
+`agent.color` is the `#rrggbb` the user chose, the same in every theme, while `--agent-stripe` is
+that colour fitted to the current theme. A view that should look the same in light and dark mode
+draws with `agent.color` and works out the rest with the colour helpers `@seti/mod-api` exports:
+`oklch`, `rgbOfOklch`, `rgbOf`, `hexOf` and `contrast`. `mods/blobs/paint.ts` picks each face this
+way.
+
 ### Agent accents
 
 A bundled mod can draw an accent at the left edge of each row in the agent list, Needs you

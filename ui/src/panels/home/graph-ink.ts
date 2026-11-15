@@ -1,5 +1,4 @@
-import type { AgentColor } from '@seti/shared'
-import { hexOf } from '@/lib/agent-color'
+import { hexOf, type AgentColor } from '@seti/shared'
 import { agentStripe } from '@/lib/agent-color-sheet'
 import { readTokens } from '@/lib/theme-tokens'
 

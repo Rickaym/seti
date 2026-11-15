@@ -1,15 +1,10 @@
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
-import { AGENT_COLOR_PRESETS, DEFAULT_THEME } from '@seti/shared'
+import { AGENT_COLOR_PRESETS, contrast, DEFAULT_THEME, hexOf, labDistance, oklch as lchOf, rgbOf } from '@seti/shared'
 import { describe, expect, it } from 'vitest'
 import {
-  contrast,
   deriveAgentColor,
-  hexOf,
-  labDistance,
   NEUTRAL_CHROMA,
-  oklch as lchOf,
-  rgbOf,
   STATUS_DISTANCE,
   STRIPE_CONTRAST,
   themeInk,
