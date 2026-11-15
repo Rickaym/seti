@@ -271,6 +271,7 @@ Seti would refuse.
 | `SETI_EA_ENV`                                      | `SETI_HOME/ea.env`           | Env file Seti reads `OPENAI_API_KEY` from, as a fallback          |
 | `OPENAI_API_KEY`                                   | unset                        | Embeddings for EA search, when the `openai-api-key` file is empty |
 | `SETI_WEATHER_URL`                                 | Open-Meteo                   | Weather mod's forecast, on api.open-meteo.com; `off` disables     |
+| `SETI_MCP_REGISTRY_URL`                            | MCP Registry                 | Where Add server searches, registry.modelcontextprotocol.io       |
 | `SETI_SAFE_MODE`                                   | unset                        | `1` keeps every third-party mod off, whatever Settings, Mods says |
 | `NODE_ENV`                                         | unset                        | `development` makes a run create its own secrets (see below)      |
 | `SETI_DEV_CREDENTIALS_DIR`                         | `SETI_HOME/dev-credentials`  | Secrets of a development or test run                              |
@@ -440,6 +441,15 @@ Settings, MCP servers turns each server off or on by default for every agent wit
 choice, claude.ai connectors and plugin servers included. An agent can turn servers on or off for
 itself in the Access list of the New agent dialog or the agent's details. Seti passes the servers an agent leaves out to Claude Code as denied servers, and a
 sandboxed agent's proxy neither adds sign-in tokens for them nor reaches their connectors.
+
+Add server opens a catalog. Common connectors (Gmail, Slack, Supabase, Notion, Linear and other
+vendor-run servers) list first, and typing searches the
+[MCP Registry](https://registry.modelcontextprotocol.io) as well. Picking one fills the add form
+with its URL or package, the headers or variables it needs, and its config name; values stay
+yours to enter. Slack installs as the official Slack plugin. Google Workspace servers take your
+own OAuth client, so the form asks for its client ID and secret; Seti passes the secret to
+`claude mcp add` through `MCP_CLIENT_SECRET`, never on the command line. Servers that sign in with
+OAuth show Sign in once added.
 
 ### Plugins for agents
 

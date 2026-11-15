@@ -77,11 +77,27 @@ const common = {
   ...withRepo,
 }
 
+/** A pre-registered OAuth app for a server that offers no dynamic client registration. */
+export const mcpOAuthClient = z.object({
+  client_id: z
+    .string()
+    .trim()
+    .regex(/^[\w.:@-]{1,300}$/, 'client ID may not contain spaces or special characters'),
+  client_secret: z
+    .string()
+    .max(1000)
+    .refine((value) => !LINE_BREAK.test(value), 'client secret cannot contain line breaks')
+    .optional(),
+  callback_port: z.int('callback port must be a whole number').min(1024).max(65_535).optional(),
+})
+export type McpOAuthClient = z.infer<typeof mcpOAuthClient>
+
 const remote = z.object({
   ...common,
   transport: z.enum(['http', 'sse']),
   url: z.url({ protocol: /^https?$/, error: 'url must be an http or https URL' }),
   headers: z.array(pair(HEADER_NAME_PATTERN, 'Header')).default([]).refine(uniqueKeys, 'Header names must be unique'),
+  oauth: mcpOAuthClient.optional(),
 })
 
 const stdio = z.object({

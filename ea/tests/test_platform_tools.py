@@ -582,6 +582,21 @@ async def test_list_mcp_servers(tools: EaTools, fake_seti: FakeSeti) -> None:
     assert (await tools.call("list_mcp_servers", {})).text == "No MCP servers are configured."
 
 
+async def test_list_mcp_servers_finds_connectors_to_add(tools: EaTools) -> None:
+    gmail = await tools.call("list_mcp_servers", {"find": "gmail"})
+    assert gmail.text.splitlines()[:2] == [
+        "Connectors for gmail:",
+        "- Gmail (name gmail): HTTP https://gmail.example/mcp, needs your own OAuth app",
+    ]
+    assert gmail.summary == "Found 1 connector"
+    tracker = await tools.call("list_mcp_servers", {"find": "tracker"})
+    assert tracker.text.splitlines()[1] == (
+        "- Tracker (name tracker): local command npx -y tracker-mcp@1.0.0, needs TRACKER_KEY"
+    )
+    none = await tools.call("list_mcp_servers", {"find": "nothing"})
+    assert none.text == "No connector matches nothing."
+
+
 async def test_list_plugins(tools: EaTools, fake_seti: FakeSeti) -> None:
     result = await tools.call("list_plugins", {})
     assert result.text.splitlines() == [

@@ -653,6 +653,33 @@ def audit_page(events: list[dict[str, Any]], params: httpx.QueryParams) -> httpx
     return ok({"events": page, "next_before": page[-1]["id"] if len(rows) > limit else None})
 
 
+def connector_list(query: str) -> dict[str, Any]:
+    """Seti's connector search: a Gmail that takes an OAuth app and a registry server with a key."""
+    gmail = {
+        "name": "gmail",
+        "title": "Gmail",
+        "transport": "http",
+        "url": "https://gmail.example/mcp",
+        "fields": [],
+        "oauth": {"own_client": True, "callback_port": 8765},
+        "plugin": None,
+    }
+    tracker = {
+        "name": "tracker",
+        "title": "Tracker",
+        "transport": "stdio",
+        "command": "npx",
+        "args": ["-y", "tracker-mcp@1.0.0"],
+        "fields": [{"key": "TRACKER_KEY", "required": True}],
+        "oauth": None,
+        "plugin": None,
+    }
+    hits = [c for c in (gmail, tracker) if query.lower() in str(c["title"]).lower()]
+    common = [c for c in hits if c["name"] == "gmail"]
+    registry = [c for c in hits if c["name"] != "gmail"]
+    return {"common": common, "registry": registry, "next_cursor": None, "registry_error": None}
+
+
 @dataclass
 class FakeSeti:
     """An in-memory Seti API; records every request."""
@@ -1204,6 +1231,8 @@ class FakeSeti:
                 )
             case ["mcp", "selection"]:
                 return ok(self.mcp_selection())
+            case ["mcp", "connectors"]:
+                return ok(connector_list(params.get("q", "")))
             case ["tasks", task_id, "access"]:
                 return ok(self.access_view(task_id)) if self._task(task_id) else err(404, "Task not found")
             case ["credential-profiles"]:
