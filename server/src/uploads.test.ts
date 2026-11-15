@@ -249,6 +249,32 @@ describe('attachments on messages', () => {
     expect(JSON.stringify(event)).not.toContain('"a": 1')
   })
 
+  it('records that a message came from the share sheet, with file names and sizes only', async () => {
+    const id = await newTask()
+    const pdf = (await upload(new Uint8Array(PDF), 'shared.pdf')).data
+    const sent = await post(`/tasks/${id}/messages`, {
+      prompt: 'Look at this',
+      attachments: [{ id: pdf.id, token: '[shared.pdf]' }],
+      via: 'share',
+    })
+    expect(sent.status).toBe(200)
+    await waitIdle(id)
+    const page = await auditEvents.page(auditQuery.parse({ kind: 'task.message_sent' }))
+    const event = page.events.find((item) => item.subject_id === id)
+    expect(event?.detail).toMatchObject({ via: 'share', files: ['shared.pdf (36 B)'] })
+    expect(JSON.stringify(event)).not.toContain('%PDF')
+  })
+
+  it('sends a share that reached the server without its worker to the Share page, reading nothing', async () => {
+    const res = await app.request('/share-target', {
+      method: 'POST',
+      headers: { host: 'localhost', 'content-type': 'multipart/form-data; boundary=x' },
+      body: '--x--',
+    })
+    expect(res.status).toBe(303)
+    expect(res.headers.get('location')).toBe('/#share')
+  })
+
   it('names a second file of the same name apart, never over the first', async () => {
     const id = await newTask()
     for (let n = 0; n < 2; n += 1) {

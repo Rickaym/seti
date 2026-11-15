@@ -1,9 +1,12 @@
 import {
+  formatBytes,
   listedSubtasks,
   prStates,
   sendMessageInput,
   switchBackPrompt,
   switchableModel,
+  type AuditDetail,
+  type PromptAttachment,
   type SendMessageInput,
   type Subtask,
   type Task,
@@ -106,6 +109,10 @@ export async function sendTaskMessage(id: string, raw: SendMessageInput): Promis
   })
 }
 
+/** A shared message's origin and its files by name and size, never their contents. */
+const shareDetail = (via: 'share' | undefined, files: readonly PromptAttachment[]): AuditDetail =>
+  via === undefined ? {} : { via, files: files.map((file) => `${file.name} (${formatBytes(file.size)})`) }
+
 async function deliverMessage(id: string, input: z.output<typeof sendMessageInput>): Promise<Task> {
   const refusal = slashRefusal(input.prompt)
   if (refusal !== null) {
@@ -120,7 +127,7 @@ async function deliverMessage(id: string, input: z.output<typeof sendMessageInpu
       attachments,
       ...(input.client_id === undefined ? {} : { clientId: input.client_id }),
     })
-    await auditMessage(await requireTask(id), prompt, outcome)
+    await auditMessage(await requireTask(id), prompt, outcome, shareDetail(input.via, attachments))
   } catch (e) {
     if (wait !== null) {
       await dropWait(wait)

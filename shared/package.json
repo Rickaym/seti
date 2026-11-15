@@ -5,6 +5,7 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
+    "./attachment-limits": "./src/attachment-limits.ts",
     "./highlight": "./src/highlight.ts",
     "./markdown-fences": "./src/markdown-fences.ts"
   },

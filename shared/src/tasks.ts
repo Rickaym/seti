@@ -182,6 +182,8 @@ export const sendMessageInput = z.object({
   /** Tells the agent or EA that sends it when the turn that takes it ends, as an update. */
   notify_when_done: z.boolean().default(false),
   client_id: clientSendId,
+  /** The message came from the phone's share sheet, which the audit log records. */
+  via: z.literal('share').optional(),
 })
 export type SendMessageInput = z.input<typeof sendMessageInput>
 
