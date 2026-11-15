@@ -78,7 +78,7 @@ test('typing on a phone hands the transcript and reply box the room, then gives 
   await expect(transcript(page).getByText(`Typing step 29 of ${title}.`)).toBeVisible()
   const header = agentHeader(page)
   await expect(appHeader(page), 'the agent view keeps the app header').toBeVisible()
-  await expect(statusBar(page), 'and the status bar').toBeHidden()
+  await expect(statusBar(page), 'and the status bar').toBeVisible()
   await expect(header).toBeVisible()
 
   await reply(page).tap()
@@ -101,6 +101,7 @@ test('typing on a phone hands the transcript and reply box the room, then gives 
   await reply(page).blur()
   await expect(header.getByRole('button', { name: 'More actions' })).toBeVisible()
   await expect(appHeader(page)).toBeVisible()
+  await expect(statusBar(page), 'the status bar comes back with the chrome').toBeVisible()
   expect(typingRoom, 'the same viewport gives the transcript more room while typing').toBeGreaterThan(
     (await height(transcript(page))) + 40,
   )

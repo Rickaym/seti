@@ -242,7 +242,7 @@ export function App() {
   }
 
   return (
-    <div className="flex h-[var(--app-height,100dvh)] flex-col bg-background max-md:overflow-hidden pr-[env(safe-area-inset-right)] pl-[env(safe-area-inset-left)] typing:pt-[env(safe-area-inset-top)] agent-room:pb-[env(safe-area-inset-bottom)]">
+    <div className="flex h-[var(--app-height,100dvh)] flex-col bg-background max-md:overflow-hidden pr-[env(safe-area-inset-right)] pl-[env(safe-area-inset-left)] typing:pt-[env(safe-area-inset-top)]">
       <header
         data-slot="app-header"
         className="flex h-[calc(3rem+env(safe-area-inset-top))] shrink-0 items-center gap-6 border-b border-border bg-card px-4 pt-[env(safe-area-inset-top)] max-md:gap-3 typing:hidden"

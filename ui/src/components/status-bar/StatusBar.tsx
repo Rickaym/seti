@@ -52,7 +52,7 @@ export function StatusBar() {
     </>
   )
   return (
-    <footer className="box-content flex h-6 shrink-0 items-stretch justify-between border-t border-border bg-muted text-2xs select-none pointer-coarse:h-11 pointer-coarse:pb-[env(safe-area-inset-bottom)] pointer-coarse:text-xs max-md:overflow-hidden typing:hidden agent-room:hidden">
+    <footer className="box-content flex h-6 shrink-0 items-stretch justify-between border-t border-border bg-muted text-2xs select-none pointer-coarse:h-11 pointer-coarse:pb-[env(safe-area-inset-bottom)] pointer-coarse:text-xs max-md:overflow-hidden typing:hidden">
       {narrow ? (
         <ScrollFade className="flex min-w-0 flex-1 items-stretch justify-between gap-2 [scrollbar-width:none]">
           {items}

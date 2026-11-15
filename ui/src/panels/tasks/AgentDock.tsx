@@ -51,7 +51,7 @@ function DockFrame({ task, dock, focus, sheet, onClose }: DockFrameProps) {
       className={cn(
         'absolute z-30 flex flex-col border-border bg-popover outline-none text-popover-foreground shadow-lg',
         sheet
-          ? 'inset-x-0 bottom-0 max-h-[85%] border-t pb-[env(safe-area-inset-bottom)]'
+          ? 'inset-x-0 bottom-0 max-h-[85%] border-t'
           : 'top-2 right-2 max-h-[min(40rem,calc(100%-7rem))] w-[min(28rem,calc(100%-1rem))] border',
       )}
     >

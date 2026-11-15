@@ -19,9 +19,6 @@
 /* Set on <html> while a phone's keyboard is up for the agent view; see useTypingMode. */
 @custom-variant typing (&:where([data-typing] *));
 
-/* Set on <html> while the phone agent view shows and no keyboard is up; see useAgentRoom. */
-@custom-variant agent-room (&:where([data-agent-room]:not([data-typing]) *));
-
 @custom-variant md {
   @media (width >= 48rem) and ((pointer: fine) or (height >= 30rem)) {
     @slot;
