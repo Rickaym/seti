@@ -165,7 +165,7 @@ export function QuestionField({ question, draft, onDraft, onDismiss }: FieldProp
       <Control question={question} draft={draft} onDraft={onDraft} />
       <Input
         aria-label={`Other answer to ${question.header}`}
-        placeholder="Other: answer in your own words"
+        placeholder="Other: in your own words"
         value={draft.other}
         maxLength={QUESTION_OTHER_MAX}
         onChange={(event) => {
