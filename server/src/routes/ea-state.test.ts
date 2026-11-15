@@ -276,4 +276,12 @@ describe('EA call ends', () => {
     expect((await send('PUT', '/call-end', LOCAL, { ...end, transcript: 'hello' })).status).toBe(200)
     expect((await auditEvents.latest('ea.call_ended'))?.detail).not.toHaveProperty('transcript')
   })
+
+  it('audits the kinds of microphone a call used and its reroutes, never a device name', async () => {
+    const routed = { ...end, inputs: ['default', 'bluetooth'], reroutes: 2 }
+    expect((await send('PUT', '/call-end', LOCAL, routed)).status).toBe(200)
+    expect((await auditEvents.latest('ea.call_ended'))?.detail).toEqual(routed)
+    expect((await send('PUT', '/call-end', LOCAL, { ...end, inputs: ['Pixel Buds Pro'] })).status).toBe(400)
+    expect((await send('PUT', '/call-end', LOCAL, { ...end, reroutes: -1 })).status).toBe(400)
+  })
 })

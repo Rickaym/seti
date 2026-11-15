@@ -1,5 +1,6 @@
 import {
   deviceList,
+  headsetYield,
   lostDevices,
   micConstraints,
   parseAudioPrefs,
@@ -22,6 +23,8 @@ export interface AudioDeps {
   media: MediaDevicesLike | null
   storage: PrefsStorage
   sinkSupported: boolean
+  /** Chrome on Android, where the microphone choice also picks the output. */
+  android: boolean
   /** Whether a call uses the devices now, so that losing one deserves a toast. */
   inUse: () => boolean
   onLost: (message: string) => void
@@ -35,18 +38,29 @@ export interface AudioState extends DeviceList {
   sinkSupported: boolean
   /** Why the microphone could not be opened to list devices, or null. */
   blocked: string | null
+  /** The saved microphone's name while it gives way to a Bluetooth headset, or null. */
+  micYields: string | null
 }
 
 const EMPTY_LIST: DeviceList = { listed: false, mics: [], speakers: [] }
 
-function derive(list: DeviceList, prefs: AudioPrefs, sinkSupported: boolean, blocked: string | null): AudioState {
+/** What the browser can do, which stays the same for the page's life. */
+interface Fixed {
+  sinkSupported: boolean
+  android: boolean
+}
+
+function derive(list: DeviceList, prefs: AudioPrefs, fixed: Fixed, blocked: string | null): AudioState {
+  const saved = resolveDevice(prefs.mic, list.mics, list.listed)
+  const micYields = headsetYield(saved, list.mics, fixed.android)
   return {
     ...list,
     prefs,
-    mic: resolveDevice(prefs.mic, list.mics, list.listed),
+    mic: micYields === null ? saved : { id: null, missing: null },
     speaker: resolveDevice(prefs.speaker, list.speakers, list.listed),
-    sinkSupported,
+    sinkSupported: fixed.sinkSupported,
     blocked,
+    micYields,
   }
 }
 
@@ -59,11 +73,13 @@ export class AudioDeviceStore {
   private state: AudioState
   private readonly listeners = new Set<() => void>()
   private readonly deps: AudioDeps
+  private readonly fixed: Fixed
   private listing = 0
 
   constructor(deps: AudioDeps) {
     this.deps = deps
-    this.state = derive(EMPTY_LIST, parseAudioPrefs(deps.storage.read()), deps.sinkSupported, null)
+    this.fixed = { sinkSupported: deps.sinkSupported, android: deps.android }
+    this.state = derive(EMPTY_LIST, parseAudioPrefs(deps.storage.read()), this.fixed, null)
   }
 
   readonly subscribe = (listener: () => void): (() => void) => {
@@ -110,7 +126,7 @@ export class AudioDeviceStore {
       return
     }
     const before = this.state
-    const next = derive(deviceList(devices), before.prefs, before.sinkSupported, before.blocked)
+    const next = derive(deviceList(devices), before.prefs, this.fixed, before.blocked)
     const lost = lostDevices([before.mic, before.speaker], [next.mic, next.speaker])
     this.set(next)
     if (lost.length > 0 && this.deps.inUse()) {
@@ -140,8 +156,8 @@ export class AudioDeviceStore {
 
   private save(prefs: AudioPrefs): void {
     this.deps.storage.write(JSON.stringify(prefs))
-    const { listed, mics, speakers, sinkSupported, blocked } = this.state
-    this.set(derive({ listed, mics, speakers }, prefs, sinkSupported, blocked))
+    const { listed, mics, speakers, blocked } = this.state
+    this.set(derive({ listed, mics, speakers }, prefs, this.fixed, blocked))
   }
 
   private chosen(id: string | null, available: readonly { id: string; label: string }[]): SavedDevice | null {

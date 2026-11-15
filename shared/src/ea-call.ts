@@ -14,6 +14,13 @@ export const EA_CALL_END_TEXT: Readonly<Record<EaCallEndReason, string>> = {
   'page-closed': 'Seti closed during the call',
 }
 
+/** The kind of microphone a call used, from its name; the name never leaves the page. */
+const EA_INPUT_KINDS = ['default', 'bluetooth', 'built-in', 'wired', 'usb', 'other'] as const
+export type EaInputKind = (typeof EA_INPUT_KINDS)[number]
+
+/** A call records at most this many microphone kinds, in the order it used them. */
+export const EA_MAX_INPUTS = 8
+
 const DAY_SECONDS = 24 * 60 * 60
 const seconds = z.number().int().min(0).max(DAY_SECONDS).nullable()
 
@@ -28,6 +35,10 @@ export const eaCallEndInput = z.object({
   duration_s: seconds,
   /** Seconds the page had been in the background at the end; null when unknown or on screen. */
   hidden_s: seconds,
+  /** The kinds of microphone the call used, in order; empty from pages that predate it. */
+  inputs: z.array(z.enum(EA_INPUT_KINDS)).max(EA_MAX_INPUTS).default([]),
+  /** How often the call reopened the microphone for a headset; null when the page did not say. */
+  reroutes: z.number().int().min(0).max(10_000).nullable().default(null),
 })
 export type EaCallEndInput = z.input<typeof eaCallEndInput>
 

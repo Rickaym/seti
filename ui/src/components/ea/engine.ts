@@ -21,8 +21,10 @@ import {
 import { withMicDefaults } from './audio-prefs'
 import type { CallAction } from './call-state'
 import type { CallHandlers, LiveCall } from './call-store'
+import { inputKind } from './device-kind'
 import { responseError } from './ice'
 import { describeBotError } from './media'
+import { handOver, Rerouter, watchDevices } from './reroute'
 import { everySecond } from './ticker'
 
 const OFFER_PATH = '/api/ea/offer'
@@ -33,6 +35,8 @@ const BOT_ERROR_TTL_MS = 10_000
 
 interface MicManager {
   updateMic: (micId: string) => Promise<void>
+  readonly isMicEnabled: boolean
+  tracks: () => { local: { audio?: MediaStreamTrack } }
 }
 
 /** The package types this class against an unpublished module, so it reads as unresolved. */
@@ -76,6 +80,7 @@ interface TransportInternals {
   stop: (error?: Error) => Promise<void>
   buildTransportStartError: () => Error
   addUserMedia: () => Promise<void>
+  getAudioTransceiver: () => RTCRtpTransceiver | undefined
   pc: RTCPeerConnection | null
   dc: RTCDataChannel | null
   _lastNegotiationError: unknown
@@ -94,11 +99,15 @@ function sendLocalAudio(transport: SmallWebRTCTransport): void {
  * instead. A path that is only disconnected, as in a short network stall, gets until the browser
  * declares it failed, about 30 s, rather than the transport's 5 s.
  */
-function buildTransport(iceServers: RTCIceServer[], onIceFailure: () => void): SmallWebRTCTransport {
+function buildTransport(
+  iceServers: RTCIceServer[],
+  mediaManager: MicManager,
+  onIceFailure: () => void,
+): SmallWebRTCTransport {
   const transport = new SmallWebRTCTransport({
     iceServers,
     waitForICEGathering: true,
-    mediaManager: micManager(),
+    mediaManager,
   })
   const internals = transport as unknown as TransportInternals
   const reconnect = internals.attemptReconnection.bind(transport)
@@ -222,6 +231,36 @@ function keepAlive(transport: SmallWebRTCTransport): () => void {
   })
 }
 
+/** The sender that carries the microphone, once the peer connection exists. */
+function micSender(transport: SmallWebRTCTransport): RTCRtpSender | null {
+  const internals = transport as unknown as TransportInternals
+  return internals.pc === null ? null : (internals.getAudioTransceiver()?.sender ?? null)
+}
+
+/** Follows headsets mid-call, and reports the kind of each microphone the call opens. */
+function routeCall(manager: MicManager, transport: SmallWebRTCTransport, handlers: CallHandlers): Rerouter {
+  return new Rerouter({
+    run: async () =>
+      handOver({
+        reopen: async () => manager.updateMic(''),
+        micOn: () => manager.isMicEnabled,
+        track: () => manager.tracks().local.audio ?? null,
+        sender: () => micSender(transport),
+        reattach: handlers.reattach,
+      }),
+    later: (task, ms) => {
+      const timer = window.setTimeout(task, ms)
+      return () => {
+        window.clearTimeout(timer)
+      }
+    },
+    now: Date.now,
+    rerouted: () => {
+      handlers.dispatch({ type: 'route', event: { kind: 'rerouted' } })
+    },
+  })
+}
+
 interface EndNote {
   text: string | null
   reason: EaCallEndReason
@@ -231,21 +270,31 @@ interface EndNote {
 /** A pipecat client over SmallWebRTC; what happens shortly before a drop explains it. */
 export function createCall(
   iceServers: RTCIceServer[],
-  { dispatch, dropped }: CallHandlers,
+  handlers: CallHandlers,
   mic: () => MediaTrackConstraints,
 ): LiveCall {
+  const { dispatch, dropped } = handlers
   swallowTransportStartErrors()
   let systemDefault = false
-  installMicDefaults(() => (systemDefault ? withoutDevice(mic()) : mic()))
+  const opens = () => (systemDefault ? withoutDevice(mic()) : mic())
+  installMicDefaults(opens)
   let stopping = false
   let note: EndNote | null = null
   const recent = () => (note !== null && Date.now() - note.at < BOT_ERROR_TTL_MS ? note : null)
   const recentReason = () => recent()?.text ?? null
-  const transport = buildTransport(iceServers, () => {
+  const manager = micManager()
+  const transport = buildTransport(iceServers, manager, () => {
     note = { text: ICE_FAILED, reason: 'ice-failed', at: Date.now() }
   })
+  const rerouter = routeCall(manager, transport, handlers)
   let choseDevice = false
   let stopPings: () => void = () => undefined
+  let stopWatching: () => void = () => undefined
+  const release = () => {
+    stopPings()
+    stopWatching()
+    rerouter.stop()
+  }
 
   const client = new PipecatClient({
     transport,
@@ -253,7 +302,7 @@ export function createCall(
     enableCam: false,
     callbacks: {
       onDisconnected: () => {
-        stopPings()
+        release()
         if (!stopping) {
           dropped(recentReason(), recent()?.reason ?? 'server-closed')
         }
@@ -274,6 +323,8 @@ export function createCall(
   client.on(RTVIEvent.TrackStarted, (track: MediaStreamTrack, participant?: Participant) => {
     if (track.kind === 'audio' && participant?.local === true) {
       sendLocalAudio(transport)
+      const input = inputKind(track.label, opens().deviceId !== undefined)
+      dispatch({ type: 'route', event: { kind: 'input', input } })
     }
   })
   client.on(RTVIEvent.DeviceError, () => {
@@ -290,10 +341,13 @@ export function createCall(
       await client.initDevices()
       stopPings = keepAlive(transport)
       await client.connect({ webrtcRequestParams: { endpoint: OFFER_PATH, requestData } })
+      if (!stopping) {
+        stopWatching = watchDevices(navigator.mediaDevices, rerouter.devicesChanged)
+      }
     },
     stop: async () => {
       stopping = true
-      stopPings()
+      release()
       client.tracks().local.audio?.stop()
       await client.disconnect().catch(() => undefined)
     },
@@ -303,8 +357,10 @@ export function createCall(
     switchMic: (deviceId: string | null) => {
       choseDevice = deviceId !== null
       systemDefault = false
+      rerouter.switched()
       client.updateMic(deviceId ?? '')
     },
+    reroute: rerouter.reroute,
     send: (type: string) => {
       client.sendClientMessage(type)
     },

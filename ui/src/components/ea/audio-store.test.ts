@@ -36,7 +36,13 @@ const settle = async () =>
     setTimeout(resolve, 0)
   })
 
-function setup({ stored = null, inUse = true }: { stored?: string | null; inUse?: boolean } = {}) {
+interface Setup {
+  stored?: string | null
+  inUse?: boolean
+  android?: boolean
+}
+
+function setup({ stored = null, inUse = true, android = false }: Setup = {}) {
   const media = new FakeMedia()
   const saved: string[] = []
   const lost: string[] = []
@@ -49,6 +55,7 @@ function setup({ stored = null, inUse = true }: { stored?: string | null; inUse?
       },
     },
     sinkSupported: true,
+    android,
     inUse: () => inUse,
     onLost: (message) => {
       lost.push(message)
@@ -146,5 +153,33 @@ describe('AudioDeviceStore', () => {
     media.unplug('usb')
     await settle()
     expect(store.getSnapshot().mic.id).toBe('usb')
+  })
+
+  it('on Android, a saved built-in microphone gives way while a Bluetooth headset is listed', async () => {
+    const phone = JSON.stringify({ mic: { id: 'desk', label: 'Desk Mic' }, speaker: null })
+    const bluetooth: Info = { kind: 'audioinput', deviceId: 'bt', label: 'Bluetooth headset' }
+    const { store, media, lost } = setup({ stored: phone, android: true })
+    await settle()
+    expect(store.getSnapshot()).toMatchObject({ mic: { id: 'desk', missing: null }, micYields: null })
+    media.devices = [...media.devices, bluetooth]
+    media.dispatchEvent(new Event('devicechange'))
+    await settle()
+    expect(store.getSnapshot()).toMatchObject({ mic: { id: null, missing: null }, micYields: 'Desk Mic' })
+    expect(lost).toEqual([])
+    media.unplug('bt')
+    await settle()
+    expect(store.getSnapshot()).toMatchObject({ mic: { id: 'desk', missing: null }, micYields: null })
+  })
+
+  it('keeps a saved microphone pinned off Android, or when it is the Bluetooth one', async () => {
+    const bluetooth: Info = { kind: 'audioinput', deviceId: 'bt', label: 'Bluetooth headset' }
+    const desk = setup({ stored: JSON.stringify({ mic: { id: 'desk', label: 'Desk Mic' } }) })
+    desk.media.devices = [...desk.media.devices, bluetooth]
+    await desk.store.refresh()
+    expect(desk.store.getSnapshot().mic.id).toBe('desk')
+    const pinned = setup({ stored: JSON.stringify({ mic: { id: 'bt', label: 'Bluetooth headset' } }), android: true })
+    pinned.media.devices = [...pinned.media.devices, bluetooth]
+    await pinned.store.refresh()
+    expect(pinned.store.getSnapshot()).toMatchObject({ mic: { id: 'bt' }, micYields: null })
   })
 })

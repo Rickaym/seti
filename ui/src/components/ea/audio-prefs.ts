@@ -1,5 +1,6 @@
 import { deviceSystem } from '@/lib/device'
 import { isIosAgent } from '@/lib/ios'
+import { isBluetooth } from './device-kind'
 
 /** A device the user chose, with its label for when it is not connected. */
 export interface SavedDevice {
@@ -139,6 +140,22 @@ export function resolveDevice(
   return match === undefined ? { id: null, missing: saved } : { id: match.id, missing: null }
 }
 
+/**
+ * Chrome on Android plays call audio on the device its microphone belongs to, and only the system
+ * default follows a headset. So a saved microphone that is not Bluetooth gives way while a
+ * Bluetooth one is listed; returns the saved one's name when it does, else null.
+ */
+export function headsetYield(mic: Resolved, mics: readonly DeviceOption[], android: boolean): string | null {
+  if (!android || mic.id === null) {
+    return null
+  }
+  const current = mics.find((device) => device.id === mic.id)
+  if (current === undefined || isBluetooth(current.label)) {
+    return null
+  }
+  return mics.some((device) => isBluetooth(device.label)) ? current.label : null
+}
+
 /** Devices that were in use and are gone now, each named once. */
 export function lostDevices(before: readonly Resolved[], after: readonly Resolved[]): string[] {
   const labels = after.flatMap((now, i) => {
@@ -190,7 +207,7 @@ export function phoneOutput(ua: string, maxTouchPoints: number): PhoneOutput | n
 /** Chrome on Android routes call audio to a Bluetooth headset only with Nearby devices allowed. */
 export const PHONE_OUTPUT_NOTES: Readonly<Record<PhoneOutput, string>> = {
   android:
-    'Your phone picks the output. If a Bluetooth headset is not used, allow Nearby devices for Chrome ' +
-    'in Android settings, then reopen Seti.',
+    'Your phone picks the output. If a Bluetooth headset is not used, press Reroute in the call. ' +
+    'If it still is not, allow Nearby devices for Chrome in Android settings, then reopen Seti.',
   ios: 'Your phone picks the output; switch it from Control Center.',
 }

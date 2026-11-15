@@ -8,14 +8,17 @@ export interface AudioSpy {
   requests: MediaTrackConstraints[]
   /** The sink of each test tone as it started. */
   tones: string[]
+  /** How often a live stream, such as the EA's voice, started playing. */
+  voices: number
 }
 
 type SpyWindow = Window & { audioSpy?: AudioSpy }
 
 function installSpy(removeSink: boolean): void {
-  const spy: AudioSpy = { sent: [], requests: [], tones: [] }
+  const spy: AudioSpy = { sent: [], requests: [], tones: [], voices: 0 }
   ;(window as SpyWindow).audioSpy = spy
   const microphones = new WeakSet<MediaStreamTrack>()
+  const lastSent = new WeakMap<RTCRtpSender, MediaStreamTrack>()
   const media = navigator.mediaDevices
   const getUserMedia = media.getUserMedia.bind(media)
   media.getUserMedia = async (request) => {
@@ -30,7 +33,8 @@ function installSpy(removeSink: boolean): void {
   }
   const replaceTrack = Reflect.get(RTCRtpSender.prototype, 'replaceTrack')
   RTCRtpSender.prototype.replaceTrack = async function (track) {
-    if (track !== null && microphones.has(track)) {
+    if (track !== null && microphones.has(track) && lastSent.get(this) !== track) {
+      lastSent.set(this, track)
       spy.sent.push(track.getSettings().deviceId ?? '')
     }
     return replaceTrack.call(this, track)
@@ -40,6 +44,9 @@ function installSpy(removeSink: boolean): void {
   HTMLMediaElement.prototype.play = async function () {
     if (this.src.startsWith('blob:')) {
       spy.tones.push(canSetSink ? this.sinkId : 'none')
+    }
+    if (this.srcObject instanceof MediaStream) {
+      spy.voices += 1
     }
     return play.call(this)
   }
@@ -54,7 +61,7 @@ export async function spyOnAudio(page: Page, { withoutSink = false } = {}): Prom
 }
 
 export async function audioSpy(page: Page): Promise<AudioSpy> {
-  return page.evaluate(() => (window as SpyWindow).audioSpy ?? { sent: [], requests: [], tones: [] })
+  return page.evaluate(() => (window as SpyWindow).audioSpy ?? { sent: [], requests: [], tones: [], voices: 0 })
 }
 
 export async function deviceId(page: Page, label: string): Promise<string> {
@@ -76,4 +83,22 @@ export async function unplug(page: Page, id: string): Promise<void> {
 
 export async function announceDeviceChange(page: Page): Promise<void> {
   await page.evaluate(() => navigator.mediaDevices.dispatchEvent(new Event('devicechange')))
+}
+
+/** Lists a Bluetooth headset, as Chrome on Android does once one connects, and announces it. */
+export async function plugHeadset(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    const media = navigator.mediaDevices
+    const enumerate = media.enumerateDevices.bind(media)
+    const headset = (kind: MediaDeviceKind) =>
+      ({
+        deviceId: `bt-${kind}`,
+        groupId: 'bt',
+        kind,
+        label: 'Bluetooth headset',
+        toJSON: () => ({}),
+      }) as MediaDeviceInfo
+    media.enumerateDevices = async () => [...(await enumerate()), headset('audioinput'), headset('audiooutput')]
+    media.dispatchEvent(new Event('devicechange'))
+  })
 }

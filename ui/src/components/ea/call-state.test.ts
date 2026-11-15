@@ -71,6 +71,25 @@ describe('callReducer', () => {
     expect(retried.lastEnd).toEqual(dropped.lastEnd)
   })
 
+  it('lists each change of microphone kind and counts reroutes, until the next call', () => {
+    const input = (kind: 'default' | 'bluetooth'): CallAction => ({
+      type: 'route',
+      event: { kind: 'input', input: kind },
+    })
+    const rerouted: CallAction = { type: 'route', event: { kind: 'rerouted' } }
+    const state = run([input('default'), input('default'), rerouted, input('bluetooth'), rerouted], connected)
+    expect(state.route).toEqual({ inputs: ['default', 'bluetooth'], reroutes: 2 })
+    const flapping = run(
+      Array.from({ length: 20 }, (_, i) => input(i % 2 === 0 ? 'default' : 'bluetooth')),
+      connected,
+    )
+    expect(flapping.route.inputs).toHaveLength(8)
+    expect(run([input('default')], flapping)).toBe(flapping)
+    const ended = run([{ type: 'ended', at: 9, error: null, reason: 'hang-up', hidden: false }], state)
+    expect(ended.route).toEqual(state.route)
+    expect(run([{ type: 'connecting', auto: false }], ended).route).toEqual({ inputs: [], reroutes: 0 })
+  })
+
   it('ignores a hang-up when nothing is connected', () => {
     expect(run([{ type: 'ended', at: 1, error: null, reason: 'hang-up', hidden: false }])).toBe(initialCallState)
   })

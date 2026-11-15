@@ -207,7 +207,7 @@ test('a tap on EA opens a sheet whose call lasts across sections and the drawer'
   expect((await call.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(44)
   await call.tap()
   await expect(eaSheet(page).getByTestId('ea-status')).toHaveText('Listening')
-  for (const name of ['Mute', 'Sleep', 'Hang up']) {
+  for (const name of ['Mute', 'Sleep', 'Reroute', 'Hang up']) {
     const button = eaSheet(page).getByRole('button', { name, exact: true })
     expect((await button.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(44)
   }
