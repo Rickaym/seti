@@ -12,6 +12,7 @@ import { RETRYING_LABEL, useClientSend } from '@/hooks/useClientSend'
 import { useDraft } from '@/hooks/useDraft'
 import { useCoarsePointer } from '@/hooks/useMedia'
 import { TEAM_CHAT_DRAFT } from '@/lib/drafts'
+import { keepFocus } from '@/lib/keep-focus'
 import { insertMention, mentionAt, rankMentions, type MentionOption } from '@/lib/mentions'
 import { handleWordDelete } from '@/lib/text-edit'
 import { cn } from '@/lib/utils'
@@ -193,7 +194,12 @@ export function TeamComposer({ members }: { members: readonly TeamMember[] }) {
         </div>
         {touch && <FindButton find={find} />}
         {touch && (
-          <Button aria-label="Send to the group" disabled={sending || draft.trim() === ''} onClick={() => void send()}>
+          <Button
+            aria-label="Send to the group"
+            disabled={sending || draft.trim() === ''}
+            onMouseDown={keepFocus}
+            onClick={() => void send()}
+          >
             <Send className="size-4" />
           </Button>
         )}

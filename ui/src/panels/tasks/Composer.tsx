@@ -14,6 +14,7 @@ import { useCommandCatalog } from '@/hooks/useCommandCatalog'
 import { useCoarsePointer } from '@/hooks/useMedia'
 import { withTokens } from '@/lib/attachments'
 import { taskDraftKey } from '@/lib/drafts'
+import { keepFocus } from '@/lib/keep-focus'
 import type { PendingSend, PendingStore } from '@/lib/pending-sends'
 import { ModOffNotice } from '@/mods/ModOffNotice'
 import { runModCommand } from '@/mods/commands'
@@ -176,7 +177,7 @@ function SendButton({ mode, slash, ui, ...button }: SendButtonProps) {
   const command = slash?.kind === 'run' ? slash.command.title : null
   const Icon = (mode === 'action' ? ui.icon : null) ?? SEND_ICON[mode]
   return (
-    <Button aria-label={command ?? SEND_LABEL[mode]} className="min-h-11 min-w-11" {...button}>
+    <Button aria-label={command ?? SEND_LABEL[mode]} className="min-h-11 min-w-11" onMouseDown={keepFocus} {...button}>
       <Icon className="size-4" />
     </Button>
   )
@@ -330,6 +331,7 @@ export const Composer = memo(function ComposerView({
               variant="outline"
               aria-label="Interrupt and send"
               className="@max-[37.5rem]/composer:w-7 @max-[37.5rem]/composer:px-0 pointer-coarse:min-h-11 pointer-coarse:min-w-11"
+              onMouseDown={keepFocus}
               onClick={() => void send(true)}
               disabled={blocked || mode === 'action'}
             >
