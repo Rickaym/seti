@@ -57,7 +57,7 @@ test('a headset that connects mid-call reopens the microphone once and keeps the
   expect(ends[0]).toMatchObject({ reason: 'hang-up', inputs: ['default'], reroutes: 1 })
 })
 
-test('Reroute in the call details reopens the microphone and the voice on demand', async ({ page }) => {
+test('Audio in the call details reopens the microphone and the voice on demand', async ({ page }) => {
   await spyOnAudio(page)
   const { offers } = await mockEa(page)
   const ends = callEnds(page)
@@ -67,9 +67,9 @@ test('Reroute in the call details reopens the microphone and the voice on demand
 
   await eaItem(page).getByTestId('ea-bar').hover()
   const details = eaItem(page).getByRole('region', { name: 'EA call' })
-  await details.getByRole('button', { name: 'Reroute' }).hover()
+  await details.getByRole('button', { name: 'Audio' }).hover()
   await expect(page.getByText('Move the call to your headset or the output in use now')).toBeVisible()
-  await details.getByRole('button', { name: 'Reroute' }).click()
+  await details.getByRole('button', { name: 'Audio' }).click()
   await expect.poll(async () => sent(page)).toEqual(['default', 'default'])
   await expect.poll(async () => voices(page)).toBeGreaterThan(played)
   await expect(status(page)).toHaveText('Listening')

@@ -207,7 +207,7 @@ export function phoneOutput(ua: string, maxTouchPoints: number): PhoneOutput | n
 /** Chrome on Android routes call audio to a Bluetooth headset only with Nearby devices allowed. */
 export const PHONE_OUTPUT_NOTES: Readonly<Record<PhoneOutput, string>> = {
   android:
-    'Your phone picks the output. If a Bluetooth headset is not used, press Reroute in the call. ' +
+    'Your phone picks the output. If a Bluetooth headset is not used, press Audio in the call. ' +
     'If it still is not, allow Nearby devices for Chrome in Android settings, then reopen Seti.',
   ios: 'Your phone picks the output; switch it from Control Center.',
 }

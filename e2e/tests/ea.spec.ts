@@ -122,7 +122,7 @@ test('hovering the bar shows the call state, its level and the call buttons only
     popover
       .getByRole('button')
       .evaluateAll((buttons) => buttons.map((b) => b.getAttribute('aria-label') ?? b.textContent))
-  expect(await names()).toEqual(['EA settings', 'Mute', 'Sleep', 'Reroute', 'Hang up'])
+  expect(await names()).toEqual(['EA settings', 'Mute', 'Sleep', 'Audio', 'Hang up'])
   await expect(popover).not.toContainText('How is the build?')
   await expect(popover).not.toContainText('gpt-4.1-mini')
   await expect(popover.getByRole('list')).toHaveCount(0)

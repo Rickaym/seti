@@ -30,9 +30,7 @@ async function expectButtonsInside(page: Page) {
   expect(await horizontalOverflow(page)).toBeLessThanOrEqual(0)
 }
 
-test('a headset that connects and Reroute in the call sheet both move the call without a reconnect', async ({
-  page,
-}) => {
+test('a headset that connects and Audio in the call sheet both move the call without a reconnect', async ({ page }) => {
   await spyOnAudio(page)
   const { offers } = await mockEa(page)
   await page.goto('/#agents')
@@ -41,7 +39,7 @@ test('a headset that connects and Reroute in the call sheet both move the call w
   await expect(eaSheet(page).getByTestId('ea-status')).toHaveText('Listening')
   await expect.poll(async () => sent(page)).toEqual(['default'])
 
-  const reroute = eaSheet(page).getByRole('button', { name: 'Reroute', exact: true })
+  const reroute = eaSheet(page).getByRole('button', { name: 'Audio', exact: true })
   expect((await reroute.boundingBox())?.height).toBeGreaterThanOrEqual(44)
   await expectButtonsInside(page)
   const size = page.viewportSize()

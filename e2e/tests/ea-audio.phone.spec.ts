@@ -29,7 +29,7 @@ test('the call sheet holds only the call buttons, and the settings switch the mi
     eaSheet(page)
       .getByRole('button')
       .evaluateAll((buttons) => buttons.map((b) => b.getAttribute('aria-label') ?? b.textContent))
-  expect(await names()).toEqual(['EA settings', 'Close', 'Mute', 'Sleep', 'Reroute', 'Hang up'])
+  expect(await names()).toEqual(['EA settings', 'Close', 'Mute', 'Sleep', 'Audio', 'Hang up'])
   await expect(eaSheet(page).getByRole('combobox')).toHaveCount(0)
 
   await eaSheet(page).getByRole('button', { name: 'EA settings' }).tap()
@@ -92,7 +92,7 @@ async function phoneOutputs(page: Page, project: string) {
     media.enumerateDevices = async () => (await enumerate()).filter((device) => device.kind !== 'audiooutput')
   })
   return (
-    'Your phone picks the output. If a Bluetooth headset is not used, press Reroute in the call. ' +
+    'Your phone picks the output. If a Bluetooth headset is not used, press Audio in the call. ' +
     'If it still is not, allow Nearby devices for Chrome in Android settings, then reopen Seti.'
   )
 }
