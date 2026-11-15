@@ -69,17 +69,18 @@ and review threads, so a red check or a new comment becomes their next turn, not
 
 Every flow works on a phone, and the EA can do almost everything you can, except what stays yours.
 
-| What you do                              | Phone | Desktop | Voice (EA) |
-| :--------------------------------------- | :---: | :-----: | :--------: |
-| Start, stop and message agents           |  Yes  |   Yes   |    Yes     |
-| Answer an agent's question               |  Yes  |   Yes   |    Yes     |
-| Allow or deny a permission               |  Yes  |   Yes   |     No     |
-| See pull requests, CI and reviews        |  Yes  |   Yes   |    Yes     |
-| Post in the group chat                   |  Yes  |   Yes   |    Yes     |
-| Hear what changed while you were away    |  Yes  |   Yes   |    Yes     |
-| Open a terminal                          |  Yes  |   Yes   |     No     |
-| Read and edit files, share a frozen copy |  Yes  |   Yes   |     No     |
-| Change security settings and secrets     |  Yes  |   Yes   |     No     |
+| What you do                              |  Phone  | Desktop | Voice (EA) |
+| :--------------------------------------- | :-----: | :-----: | :--------: |
+| Start, stop and message agents           |   Yes   |   Yes   |    Yes     |
+| Answer an agent's question               |   Yes   |   Yes   |    Yes     |
+| Allow or deny a permission               |   Yes   |   Yes   |     No     |
+| See pull requests, CI and reviews        |   Yes   |   Yes   |    Yes     |
+| Post in the group chat                   |   Yes   |   Yes   |    Yes     |
+| Hear what changed while you were away    |   Yes   |   Yes   |    Yes     |
+| Open a terminal                          |   Yes   |   Yes   |     No     |
+| Read and edit files, share a frozen copy |   Yes   |   Yes   |     No     |
+| Send files and links from other apps     | Android |   No    |     No     |
+| Change security settings and secrets     |   Yes   |   Yes   |     No     |
 
 <table>
   <tr>
