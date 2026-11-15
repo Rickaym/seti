@@ -31,7 +31,7 @@ export const planningAgent = async (request: APIRequestContext, name: string) =>
 export const deployingAgent = async (request: APIRequestContext, name: string) =>
   blockedAgent(request, name, `Please ${PERMISSION_PROMPT}`, /^Asks to use Bash/)
 
-export const pendingRequests = async (request: APIRequestContext) => apiData<PendingRequests>(request, '/requests')
+const pendingRequests = async (request: APIRequestContext) => apiData<PendingRequests>(request, '/requests')
 
 /** How many requests of every kind wait, as the Requests row counts them. */
 export const pendingTotal = async (request: APIRequestContext) => requestCount(await pendingRequests(request))
