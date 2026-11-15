@@ -1,6 +1,6 @@
 import { clearShare, dropSharedFile, readShare, type Share } from '../../sw/share-inbox'
 
-export type { LeftFile, Share, SharedFile, ShareManifest } from '../../sw/share-inbox'
+export type { LeftFile, Share, ShareManifest } from '../../sw/share-inbox'
 
 /** The Cache API lives only in secure contexts, the only ones where the share sheet offers Seti. */
 const storage = (): CacheStorage | null => ('caches' in window ? window.caches : null)

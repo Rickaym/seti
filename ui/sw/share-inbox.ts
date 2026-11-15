@@ -11,7 +11,7 @@ export const SHARE_CACHE = 'seti-share-inbox'
 const MANIFEST = '/share-inbox/manifest'
 const fileKey = (index: number) => `/share-inbox/files/${String(index)}`
 
-export interface SharedFileInfo {
+interface SharedFileInfo {
   /** Where the file sits in the inbox. */
   index: number
   name: string
@@ -35,7 +35,7 @@ export interface ShareManifest {
   left: LeftFile[]
 }
 
-export interface SharedFile {
+interface SharedFile {
   info: SharedFileInfo
   file: File
 }
