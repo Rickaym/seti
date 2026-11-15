@@ -1,4 +1,4 @@
-import type { EaCallEndReason, EaWake } from '@seti/shared'
+import { EA_MAX_INPUTS, type EaCallEndReason, type EaInputKind, type EaWake } from '@seti/shared'
 import { captionsReducer, initialCaptions, type CaptionEvent, type CaptionState, type SpeechItem } from './captions'
 
 export type CallPhase = 'idle' | 'connecting' | 'connected' | 'error'
@@ -35,6 +35,14 @@ export interface CallEnd {
   hidden: boolean
 }
 
+/** The kinds of microphone a call used, in order, and how often it rerouted; for its audit record. */
+export interface CallRoute {
+  inputs: EaInputKind[]
+  reroutes: number
+}
+
+type RouteEvent = { kind: 'input'; input: EaInputKind } | { kind: 'rerouted' }
+
 export interface CallState {
   phase: CallPhase
   error: string | null
@@ -54,6 +62,7 @@ export interface CallState {
   userStoppedAt: number | null
   replies: { count: number; totalMs: number }
   lastEnd: CallEnd | null
+  route: CallRoute
 }
 
 export type CallAction =
@@ -70,6 +79,7 @@ export type CallAction =
   | { type: 'wake'; wake: EaWake }
   | { type: 'captions-cleared' }
   | { type: 'audio-blocked'; blocked: boolean }
+  | { type: 'route'; event: RouteEvent }
 
 const QUIET: CallSignals = { userSpeaking: false, botSpeaking: false, micHeld: false, latency: null }
 const NO_TRACKS: CallTracks = { local: null, bot: null }
@@ -89,6 +99,19 @@ export const initialCallState: CallState = {
   userStoppedAt: null,
   replies: { count: 0, totalMs: 0 },
   lastEnd: null,
+  route: { inputs: [], reroutes: 0 },
+}
+
+/** A kind joins the list when it differs from the last one, up to the cap. */
+function withRoute(route: CallRoute, event: RouteEvent): CallRoute {
+  if (event.kind === 'rerouted') {
+    return { ...route, reroutes: route.reroutes + 1 }
+  }
+  const { inputs } = route
+  if (inputs.at(-1) === event.input || inputs.length >= EA_MAX_INPUTS) {
+    return route
+  }
+  return { ...route, inputs: [...inputs, event.input] }
 }
 
 const withCaption = (state: CallState, event: CaptionEvent): CallState => ({
@@ -122,7 +145,31 @@ function botSpeaking(state: CallState, speaking: boolean, at: number): CallState
   return { ...captioned, signals: { ...state.signals, botSpeaking: true, latency }, userStoppedAt: null, replies }
 }
 
+const MEDIA_ACTIONS = new Set<CallAction['type']>(['mic', 'output-muted', 'audio-blocked', 'route'])
+type MediaAction = Extract<CallAction, { type: 'mic' | 'output-muted' | 'audio-blocked' | 'route' }>
+
+const isMedia = (action: CallAction): action is MediaAction => MEDIA_ACTIONS.has(action.type)
+
+/** The microphone, the EA's voice and the route the call takes. */
+function withMedia(state: CallState, action: MediaAction): CallState {
+  switch (action.type) {
+    case 'mic':
+      return { ...state, micOn: action.on }
+    case 'output-muted':
+      return { ...state, outputMuted: action.muted }
+    case 'audio-blocked':
+      return { ...state, audioBlocked: action.blocked }
+    case 'route': {
+      const route = withRoute(state.route, action.event)
+      return route === state.route ? state : { ...state, route }
+    }
+  }
+}
+
 export function callReducer(state: CallState, action: CallAction): CallState {
+  if (isMedia(action)) {
+    return withMedia(state, action)
+  }
   switch (action.type) {
     case 'connecting':
       return {
@@ -139,6 +186,7 @@ export function callReducer(state: CallState, action: CallAction): CallState {
         audioBlocked: false,
         userStoppedAt: null,
         replies: initialCallState.replies,
+        route: initialCallState.route,
       }
     case 'connected':
       return withCaption({ ...state, phase: 'connected' }, { type: 'marker', text: 'Call started', at: action.at })
@@ -158,16 +206,10 @@ export function callReducer(state: CallState, action: CallAction): CallState {
       return { ...state, signals: { ...state.signals, micHeld: action.held } }
     case 'tracks':
       return { ...state, tracks: action.tracks }
-    case 'mic':
-      return { ...state, micOn: action.on }
-    case 'output-muted':
-      return { ...state, outputMuted: action.muted }
     case 'wake':
       return { ...state, wake: action.wake }
     case 'captions-cleared':
       return { ...state, captions: initialCaptions }
-    case 'audio-blocked':
-      return { ...state, audioBlocked: action.blocked }
   }
 }
 

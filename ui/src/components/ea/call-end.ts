@@ -1,13 +1,17 @@
-import { EA_CALL_END_TEXT, type EaCallEndInput, type EaCallEndReason } from '@seti/shared'
+import { EA_CALL_END_TEXT, eaCallEndInput, type EaCallEndInput, type EaCallEndReason } from '@seti/shared'
+import type { CallRoute } from './call-state'
 
 const OPEN_KEY = 'seti-ea-call-open'
 
 /** The live call, kept in the tab's storage so a page that dies with it is reported next time. */
-interface OpenCall {
+interface OpenCall extends CallRoute {
   at: number
   auto: boolean
   hiddenAt: number | null
 }
+
+const NO_ROUTE: CallRoute = { inputs: [], reroutes: 0 }
+const storedRoute = eaCallEndInput.pick({ inputs: true, reroutes: true })
 
 export interface TabStorage {
   read: () => string | null
@@ -36,7 +40,10 @@ function parseOpen(raw: string | null): OpenCall | null {
     if (typeof at !== 'number' || typeof auto !== 'boolean') {
       return null
     }
-    return { at, auto, hiddenAt: typeof hiddenAt === 'number' ? hiddenAt : null }
+    const route = storedRoute.safeParse(value)
+    const inputs = route.success ? route.data.inputs : []
+    const reroutes = route.success ? (route.data.reroutes ?? 0) : 0
+    return { at, auto, hiddenAt: typeof hiddenAt === 'number' ? hiddenAt : null, inputs, reroutes }
   } catch {
     return null
   }
@@ -65,13 +72,23 @@ export class CallEndRecorder {
     this.deps.storage.remove()
     if (left !== null) {
       const hidden = left.hiddenAt !== null
-      this.deps.send({ reason: 'page-closed', auto: left.auto, hidden, duration_s: null, hidden_s: null })
+      const { auto, inputs, reroutes } = left
+      this.deps.send({ reason: 'page-closed', auto, hidden, duration_s: null, hidden_s: null, inputs, reroutes })
     }
   }
 
   readonly connected = (auto: boolean): void => {
     const now = this.deps.now()
-    this.open = { at: now, auto, hiddenAt: this.deps.hidden() ? now : null }
+    this.open = { at: now, auto, hiddenAt: this.deps.hidden() ? now : null, ...NO_ROUTE }
+    this.save()
+  }
+
+  /** Notes which microphones the call used and how often it rerouted. */
+  readonly route = ({ inputs, reroutes }: CallRoute): void => {
+    if (this.open === null) {
+      return
+    }
+    this.open = { ...this.open, inputs, reroutes }
     this.save()
   }
 
@@ -99,6 +116,8 @@ export class CallEndRecorder {
       hidden: open.hiddenAt !== null,
       duration_s: seconds(now - open.at),
       hidden_s: open.hiddenAt === null ? null : seconds(now - open.hiddenAt),
+      inputs: open.inputs,
+      reroutes: open.reroutes,
     })
   }
 }

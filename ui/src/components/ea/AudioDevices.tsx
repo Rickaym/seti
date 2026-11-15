@@ -120,6 +120,7 @@ function outputNote(audio: AudioState): string | null {
 }
 
 const missingNote = (label: string) => `${label} is not connected; the system default is used.`
+const yieldNote = (label: string) => `${label} gives way to the Bluetooth headset while it is connected.`
 
 /** Quiet notes about the devices: a saved one that is gone, or why none can be listed. */
 export function DeviceNotes({ kind }: { kind: 'mic' | 'speaker' }) {
@@ -143,6 +144,9 @@ export function DeviceNotes({ kind }: { kind: 'mic' | 'speaker' }) {
   }
   if (missing !== null) {
     lines.push(<span key="missing">{missingNote(missing.label)}</span>)
+  }
+  if (kind === 'mic' && audio.micYields !== null) {
+    lines.push(<span key="yields">{yieldNote(audio.micYields)}</span>)
   }
   if (lines.length === 0) {
     return null

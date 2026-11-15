@@ -3,7 +3,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { toast } from 'sonner'
 import { apiDelete, apiGet } from '@/api'
 import { CallSession } from './CallSession'
-import { browserPrefsStorage, canSetSink } from './audio-prefs'
+import { browserPrefsStorage, canSetSink, phoneOutput } from './audio-prefs'
 import { AudioDeviceStore, micKey } from './audio-store'
 import { AutoJoin, browserMicPermission, lockLead } from './auto-join'
 import {
@@ -29,6 +29,7 @@ function createStores() {
     media: 'mediaDevices' in navigator ? navigator.mediaDevices : null,
     storage: browserPrefsStorage,
     sinkSupported: canSetSink(typeof HTMLMediaElement === 'undefined' ? undefined : HTMLMediaElement.prototype),
+    android: phoneOutput(navigator.userAgent, navigator.maxTouchPoints) === 'android',
     inUse: () => call !== null && callActive(call.getSnapshot().phase),
     onLost: (message) => {
       toast.warning(message)
@@ -117,8 +118,21 @@ function BotAudio({ store }: { store: EaCallStore }) {
         play(element, store)
       }
     })
+    // Replaying the same stream makes Chrome open its output again on the route in use now.
+    store.setAudioReattach(() => {
+      const element = audio.current
+      const stream = element?.srcObject ?? null
+      if (element === null || stream === null) {
+        return
+      }
+      element.pause()
+      element.srcObject = null
+      element.srcObject = stream
+      play(element, store)
+    })
     return () => {
       store.setAudioUnlock(null)
+      store.setAudioReattach(null)
     }
   }, [store])
   useEffect(() => {
