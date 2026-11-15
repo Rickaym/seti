@@ -105,12 +105,13 @@ def _held_lines(pending: Mapping[str, Any]) -> list[str]:
         for r in dicts(pending.get("access"))
     ]
     for request in dicts(pending.get("permissions")):
-        what = (
-            "asks to approve its plan"
-            if request.get("tool_name") == "ExitPlanMode"
-            else f"asks to use {request.get('tool_name')}: "
-            f"{clip(str(request.get('summary', '')), PROMPT_CHARS)}"
-        )
+        summary = clip(str(request.get("summary", "")), PROMPT_CHARS)
+        if request.get("tool_name") == "ExitPlanMode":
+            what = "asks to approve its plan"
+        elif request.get("kind") == "review":
+            what = f"waits for you to review {request.get('tool_name')} before it runs: {summary}"
+        else:
+            what = f"asks to use {request.get('tool_name')}: {summary}"
         lines.append(f"- {request.get('task_title')} {what}")
     return lines
 

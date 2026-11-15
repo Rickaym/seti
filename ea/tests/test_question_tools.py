@@ -161,3 +161,21 @@ async def test_search_seti_lists_every_request_and_says_which_only_the_user_answ
     assert lines[5] == "1 knowledge note only the user approves, in Seti, Requests:"
     assert lines[6].startswith('- "Build first", proposed')
     assert result.summary == "4 requests waiting"
+
+
+async def test_search_seti_says_a_review_waits_for_the_user_before_the_call_runs(
+    tools: EaTools, fake_seti: FakeSeti
+) -> None:
+    fake_seti.permission_requests = [
+        {
+            "task_title": "Notifier",
+            "tool_name": "mcp__slack__send_message",
+            "kind": "review",
+            "summary": "Deploy is done",
+        }
+    ]
+    result = await tools.call("search_seti", {"in": "requests"})
+    assert (
+        "- Notifier waits for you to review mcp__slack__send_message before it runs: Deploy is done"
+        in result.text.splitlines()
+    )

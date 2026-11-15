@@ -120,7 +120,7 @@ const CORE_GROUPS: { group: SettingsGroup; pages: (Omit<SettingsPage, 'group'> &
         keywords: 'passkeys sessions devices phones pair android',
       },
       { key: 'sandbox', label: 'Sandbox', icon: ShieldCheck, keywords: 'allowed hosts hidden paths' },
-      { key: 'permissions', label: 'Permissions', icon: Hand, keywords: 'rules allow ask deny' },
+      { key: 'permissions', label: 'Permissions', icon: Hand, keywords: 'rules allow ask deny review mcp' },
       {
         key: 'connections',
         label: 'Connections',

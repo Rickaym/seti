@@ -13,7 +13,7 @@ import { callKey, repeatReason, RepeatTracker, resultKey } from './repeat-guard.
 import { archiveSettings } from './store/archive.js'
 
 /** How long the question may wait for the user, in seconds, as a permission request may. */
-const ASK_TIMEOUT_S = 7 * 24 * 60 * 60
+export const ASK_TIMEOUT_S = 7 * 24 * 60 * 60
 
 /** Calls whose start Seti saw and whose result has not come yet, at most this many. */
 const OPEN_MAX = 1000
@@ -28,7 +28,7 @@ export interface RepeatScope {
 
 const threadOf = (input: { agent_id?: string }) => input.agent_id ?? ''
 
-const asRecord = (input: unknown): Record<string, unknown> =>
+export const asRecord = (input: unknown): Record<string, unknown> =>
   typeof input === 'object' && input !== null ? Object.fromEntries(Object.entries(input)) : {}
 
 const deny = (reason: string): HookJSONOutput => ({

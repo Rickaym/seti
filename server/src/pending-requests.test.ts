@@ -63,6 +63,7 @@ async function seed(task: Task) {
     input: JSON.stringify({ plan: 'Fix the bug' }),
     reason: null,
     suggestions: [],
+    editable: false,
   })
   const note = await knowledge.insert({
     id: randomUUID(),

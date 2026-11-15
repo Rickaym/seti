@@ -4,7 +4,7 @@ import { now, sql } from '../db.js'
 /** A request as Seti records it before the user answers. */
 export type NewPermissionRequest = Pick<
   PermissionRequest,
-  'id' | 'task_id' | 'tool_name' | 'kind' | 'summary' | 'input' | 'reason' | 'suggestions'
+  'id' | 'task_id' | 'tool_name' | 'kind' | 'summary' | 'input' | 'reason' | 'suggestions' | 'editable'
 >
 
 type RequestRecord = Omit<PermissionRequest, 'suggestions'> & { suggestions: string }
@@ -58,10 +58,10 @@ export const permissionRules = {
 export const permissionRequests = {
   open: async (request: NewPermissionRequest): Promise<PermissionRequest> => {
     const [row] = await sql<RequestRecord[]>`INSERT INTO permission_request
-      (id, task_id, tool_name, kind, summary, input, reason, suggestions, state, created_at)
+      (id, task_id, tool_name, kind, summary, input, reason, suggestions, editable, state, created_at)
       VALUES (${request.id}, ${request.task_id}, ${request.tool_name}, ${request.kind}, ${request.summary},
-        ${request.input},
-        ${request.reason}, ${JSON.stringify(request.suggestions)}, 'pending', ${now()}) RETURNING *`
+        ${request.input}, ${request.reason}, ${JSON.stringify(request.suggestions)}, ${request.editable},
+        'pending', ${now()}) RETURNING *`
     if (row === undefined) {
       throw new Error('The permission request was not recorded')
     }
@@ -69,15 +69,19 @@ export const permissionRequests = {
   },
   get: async (id: string): Promise<PermissionRequest | undefined> =>
     requests(await sql<RequestRecord[]>`SELECT * FROM permission_request WHERE id = ${id}`).at(0),
-  /** Settles a pending request; undefined when it was not pending any more. */
+  /**
+   * Settles a pending request, with the input the call runs with when the user edited it;
+   * undefined when it was not pending any more.
+   */
   settle: async (
     id: string,
     state: Exclude<PermissionRequestState, 'pending'>,
     message: string | null,
+    input?: string,
   ): Promise<PermissionRequest | undefined> =>
     requests(
       await sql<RequestRecord[]>`UPDATE permission_request
-        SET state = ${state}, message = ${message}, decided_at = ${now()}
+        SET state = ${state}, message = ${message}, decided_at = ${now()}, input = COALESCE(${input ?? null}, input)
         WHERE id = ${id} AND state = 'pending' RETURNING *`,
     ).at(0),
   /** The agent's pending requests, oldest first. */

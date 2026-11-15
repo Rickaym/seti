@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto'
 import type { CanUseTool, PermissionMode, PermissionResult, PermissionUpdate } from '@anthropic-ai/claude-agent-sdk'
 import type { PermissionRequest, PermissionRequestKind } from '@seti/shared'
 import { audit } from './audit.js'
+import { INPUT_CHARS, isEditable } from './permission-edits.js'
 import { alwaysRules } from './permission-policy.js'
 import { ASK_TOOL, askQuestions } from './questions.js'
 import { redactSecrets, scrubValue } from './scrub.js'
@@ -10,7 +11,6 @@ import { setStall, refreshBlocked } from './task-blocked.js'
 import { publish } from './task-events.js'
 
 const SUMMARY_CHARS = 300
-const INPUT_CHARS = 8000
 
 const clip = (text: string, max: number) => (text.length > max ? `${text.slice(0, max - 3)}...` : text)
 
@@ -18,13 +18,14 @@ const firstText = (input: Record<string, unknown>, keys: readonly string[]) =>
   keys.map((key) => input[key]).find((value): value is string => typeof value === 'string' && value.trim() !== '')
 
 const SUMMARY_KEYS = ['command', 'file_path', 'notebook_path', 'url', 'query', 'path', 'pattern', 'description']
+const MESSAGE_KEYS = ['text', 'message', 'body', 'content', 'subject']
 
-/** One line of what the call does, such as its command, file or URL. */
+/** One line of what the call does, such as its command, file or URL, else its first text field. */
 function summarize(tool: string, input: Record<string, unknown>): string {
   if (tool === 'ExitPlanMode') {
     return 'Approve the plan and start on it'
   }
-  const text = firstText(input, SUMMARY_KEYS) ?? ''
+  const text = firstText(input, [...SUMMARY_KEYS, ...MESSAGE_KEYS, ...Object.keys(input)]) ?? ''
   return clip(redactSecrets(text.replace(/\s+/g, ' ').trim()), SUMMARY_CHARS)
 }
 
@@ -48,7 +49,8 @@ export async function resolveRequest(request: PermissionRequest, result: Permiss
   return resolve !== undefined
 }
 
-function inputText(input: Record<string, unknown>): string {
+/** The call's input as a request shows it: secrets redacted, cut to a size the page can show. */
+export function inputText(input: Record<string, unknown>): string {
   return clip(JSON.stringify(scrubValue(input), null, 2), INPUT_CHARS)
 }
 
@@ -155,6 +157,7 @@ async function askUser(taskId: string, ask: Ask, signals: readonly AbortSignal[]
       input: inputText(ask.input),
       reason: ask.reason,
       suggestions: ask.suggestions,
+      editable: ask.kind !== 'repeat' && isEditable(ask.tool, ask.input),
     })
     await (waiting.has(id) ? announce(request) : dropRequest(id))
     return await answer
@@ -206,6 +209,16 @@ export const askAboutRepeat = async (
   reason: string,
   signals: readonly AbortSignal[],
 ): Promise<PermissionResult> => askUser(taskId, { ...call, kind: 'repeat', reason, suggestions: [] }, signals)
+
+const REVIEW_REASON = 'A review rule holds this call for you to check, and edit, before it runs'
+
+/** Asks the user about an MCP call a review rule holds; no rules, as review asks each time. */
+export const askForReview = async (
+  taskId: string,
+  call: { tool: string; input: Record<string, unknown> },
+  signals: readonly AbortSignal[],
+): Promise<PermissionResult> =>
+  askUser(taskId, { ...call, kind: 'review', reason: REVIEW_REASON, suggestions: [] }, signals)
 
 /** No process waits on a request a restart left pending; startup drops them. */
 export async function dropLeftoverRequests(): Promise<void> {

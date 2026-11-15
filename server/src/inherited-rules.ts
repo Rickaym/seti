@@ -1,7 +1,7 @@
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { PERMISSION_BEHAVIORS, type InheritedRule } from '@seti/shared'
+import { CLAUDE_BEHAVIORS, type InheritedRule } from '@seti/shared'
 import { CLAUDE_HOME } from './config.js'
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -25,7 +25,7 @@ export function settingsRules(file: string, home = os.homedir()): InheritedRule[
     return []
   }
   const source = shown(file, home)
-  return PERMISSION_BEHAVIORS.flatMap((behavior) => {
+  return CLAUDE_BEHAVIORS.flatMap((behavior) => {
     const list = permissions[behavior]
     return Array.isArray(list)
       ? list.filter((rule): rule is string => typeof rule === 'string').map((rule) => ({ behavior, rule, source }))

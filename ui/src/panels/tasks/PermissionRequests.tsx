@@ -15,6 +15,8 @@ import { refreshRequests } from '@/hooks/useRequests'
 import { refreshTasks } from '@/hooks/useTasks'
 import { toolLabel } from '@/lib/tool-label'
 import { cn } from '@/lib/utils'
+import { CallFields, EditButton, EditedNote } from '@/panels/tasks/CallFields'
+import { useCallFields } from '@/panels/tasks/use-call-fields'
 
 const isPlan = (request: PermissionRequest) => request.tool_name === 'ExitPlanMode'
 
@@ -30,6 +32,13 @@ function planText(request: PermissionRequest): string | null {
 const ACTION = 'pointer-coarse:h-11'
 
 const REPEAT_ALWAYS = "Always stops asking about this exact call while the agent's process runs"
+
+function titleOf(request: PermissionRequest): string {
+  if (isPlan(request)) {
+    return 'Approve the plan?'
+  }
+  return request.kind === 'review' ? `Review ${toolLabel(request.tool_name)}` : `Allow ${toolLabel(request.tool_name)}?`
+}
 
 function Details({ request }: { request: PermissionRequest }) {
   const plan = isPlan(request) ? planText(request) : null
@@ -59,6 +68,9 @@ export function PermissionCard({ request, onAnswered, className }: CardProps) {
   const sending = useRef(false)
   const noteId = useId()
   const scopeId = useId()
+  const fields = useCallFields(request)
+  const [editing, setEditing] = useState(request.editable && request.kind === 'review')
+  const edited = Object.keys(fields.changed)
   const plan = isPlan(request)
   const rules = request.suggestions.length > 0
   const repeat = request.kind === 'repeat'
@@ -75,6 +87,7 @@ export function PermissionCard({ request, onAnswered, className }: CardProps) {
       decision,
       scope: everyAgent ? 'global' : 'agent',
       ...(decision === 'deny' && note.trim() !== '' ? { message: note.trim() } : {}),
+      ...(decision !== 'deny' && edited.length > 0 ? { fields: fields.changed } : {}),
     }
     try {
       await apiPost(`/tasks/${request.task_id}/permission-requests/${request.id}`, body)
@@ -97,15 +110,14 @@ export function PermissionCard({ request, onAnswered, className }: CardProps) {
       <div className="flex items-start gap-2">
         <Hand className="mt-px size-3.5 shrink-0 text-warning-text" aria-hidden />
         <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-          <p className="font-medium text-foreground">
-            {plan ? 'Approve the plan?' : `Allow ${toolLabel(request.tool_name)}?`}
-          </p>
+          <p className="font-medium text-foreground">{titleOf(request)}</p>
           {!plan && request.summary !== '' && (
             <code className="bg-muted px-1.5 py-1 font-mono text-2xs break-all whitespace-pre-wrap">
               {request.summary}
             </code>
           )}
           {request.reason !== null && <p className="text-muted-foreground">{request.reason}</p>}
+          <CallFields fields={fields} editing={editing} />
           <Details request={request} />
           <label htmlFor={noteId} className="sr-only">
             Note for the agent if you deny
@@ -142,6 +154,15 @@ export function PermissionCard({ request, onAnswered, className }: CardProps) {
               <X />
               Deny
             </Button>
+            <EditButton
+              editable={request.editable}
+              editing={editing}
+              busy={busy}
+              className={ACTION}
+              onEdit={() => {
+                setEditing(true)
+              }}
+            />
             {rules && (
               <span className="flex items-center gap-1.5 text-muted-foreground">
                 <Switch id={scopeId} size="sm" checked={everyAgent} onCheckedChange={setEveryAgent} />
@@ -155,6 +176,7 @@ export function PermissionCard({ request, onAnswered, className }: CardProps) {
             </p>
           )}
           {repeat && <p className="text-2xs text-muted-foreground">{REPEAT_ALWAYS}.</p>}
+          <EditedNote edited={edited} />
         </div>
       </div>
     </section>
