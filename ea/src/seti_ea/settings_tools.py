@@ -6,6 +6,7 @@ from typing import Any
 
 from seti_ea.format import ago, and_list, clip, plural, repo_name, size_words
 from seti_ea.gate import CONFIRMED, Confirmations, ask, gate_key
+from seti_ea.language import LANGUAGES, MULTI, find_language, language_of
 from seti_ea.memory_tools import MEMORY_SPECS, MemoryTools
 from seti_ea.mod_tools import MOD_SPECS, ModTools
 from seti_ea.poller_tools import POLLER_SPECS, PollerTools, poller_line
@@ -475,12 +476,14 @@ SETTINGS_SPECS: list[ToolSpec] = [
     ),
     ToolSpec(
         "get_ea_settings",
-        "Your own settings: the wake word, its phrase, how long you stay awake and how you address the user.",
+        "Your own settings: the wake word, its phrase, how long you stay awake, how you address the user "
+        "and the language you listen and speak in.",
     ),
     ToolSpec(
         "update_ea_settings",
         "Change your own settings: turn the wake word on or off, its phrase, how long you stay awake "
-        "after the last words, or how you address the user. Needs the user's yes.",
+        "after the last words, how you address the user, or the language you listen, speak and write "
+        "in. Needs the user's yes.",
         {
             "wake_enabled": {"type": "boolean", "description": "true to turn the wake word on."},
             "wake_phrase": {"type": "string", "description": "Two to four words, such as Hey Seti."},
@@ -489,6 +492,12 @@ SETTINGS_SPECS: list[ToolSpec] = [
                 "type": "string",
                 "description": "What you call the user now and then, such as a title or their name, "
                 "at most 20 characters; empty for no title.",
+            },
+            "language": {
+                "type": "string",
+                "enum": list(LANGUAGES),
+                "description": "The language you listen, speak and write in, as its code, such as tr "
+                "for Turkish; multi hears any of them and answers in the one the user last used.",
             },
             "confirmed": CONFIRMED,
         },
@@ -512,6 +521,16 @@ def form_of_address(args: Mapping[str, Any]) -> str:
     if len(address) > FORM_OF_ADDRESS_MAX:
         raise ToolError(f"Keep the form of address to {FORM_OF_ADDRESS_MAX} characters.", "Too long")
     return address
+
+
+def chosen_language(args: Mapping[str, Any]) -> str:
+    """The language the user asked for, given as its code or its English name."""
+    value = args.get("language")
+    code = find_language(value) if isinstance(value, str) else None
+    if code is None:
+        names = ", ".join(LANGUAGES.values())
+        raise ToolError(f"That is not a language you can speak. You can speak: {names}.", "Unknown language")
+    return code
 
 
 def field_dict(item: Mapping[str, Any], name: str) -> dict[str, Any]:
@@ -1914,8 +1933,16 @@ class SettingsTools:
             return "You address the user with no title."
         return f'You address the user as "{address}" now and then.'
 
+    @staticmethod
+    def _language_words(settings: Mapping[str, Any]) -> str:
+        code = language_of(settings)
+        if code == MULTI:
+            return "You listen in any of your languages and answer in the one the user last used."
+        return f"You listen and speak in {LANGUAGES[code]}."
+
     def _settings_words(self, settings: Mapping[str, Any]) -> str:
-        return f"{self._wake_words(settings)} {self._address_words(settings)}"
+        words = (self._wake_words(settings), self._address_words(settings), self._language_words(settings))
+        return " ".join(words)
 
     async def get_ea_settings(self, args: Mapping[str, Any]) -> ToolResult:
         text = self._settings_words(await self._ea_settings())
@@ -1930,7 +1957,9 @@ class SettingsTools:
             "wake_phrase": str(current.get("wake_phrase") or "Hey Seti"),
             "keep_awake_seconds": int(current.get("keep_awake_seconds") or 30),
             "form_of_address": str(current.get("form_of_address") or ""),
+            "language": language_of(current),
         }
+        before = dict(body)
         if "wake_enabled" in args:
             body["wake_enabled"] = arg_bool(args, "wake_enabled")
         phrase = arg_str(args, "wake_phrase", required=False)
@@ -1948,7 +1977,9 @@ class SettingsTools:
                 raise ToolError(f"Stay awake between {low} and {high} seconds.", "Bad seconds")
         if "form_of_address" in args:
             body["form_of_address"] = form_of_address(args)
-        if all(body[k] == current.get(k) for k in body):
+        if "language" in args:
+            body["language"] = chosen_language(args)
+        if body == before:
             raise ToolError("That changes nothing in your settings.", "Nothing to change")
         if not await self._cleared(args, gate_key("update_ea_settings", body)):
             effect = f"This changes your settings. Afterwards: {self._settings_words(body)}"

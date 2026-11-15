@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { clientSendId } from './client-send.js'
+import { EA_LANGUAGE_DEFAULT, eaLanguage, type EaLanguage } from './ea-language.js'
 
 /** Where the EA's keys live, one file per key, passed to it as systemd credentials. */
 export const EA_CREDENTIALS_DIR = '~/.seti/credentials'
@@ -256,11 +257,14 @@ export const eaSettingsInput = z.object({
     .max(FORM_OF_ADDRESS_MAX)
     .regex(FORM_OF_ADDRESS, 'Use letters, spaces, hyphens, full stops and apostrophes')
     .optional(),
+  /** The language the EA listens, speaks and writes in; omitted to keep it. */
+  language: eaLanguage.optional(),
 })
 export type EaSettingsInput = z.output<typeof eaSettingsInput>
 
-export interface EaSettings extends Omit<EaSettingsInput, 'form_of_address'> {
+export interface EaSettings extends Omit<EaSettingsInput, 'form_of_address' | 'language'> {
   form_of_address: string
+  language: EaLanguage
   updated_at: string | null
 }
 
@@ -270,6 +274,7 @@ export const EA_SETTINGS_DEFAULT: EaSettings = {
   keep_awake_seconds: 30,
   join_on_open: true,
   form_of_address: '',
+  language: EA_LANGUAGE_DEFAULT,
   updated_at: null,
 }
 

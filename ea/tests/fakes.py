@@ -684,6 +684,7 @@ class FakeSeti:
     asks: list[dict[str, Any]] = field(default_factory=list)
     ea_settings: dict[str, Any] | None = None
     form_of_address: str = ""
+    language: str = "en"
     followups: list[dict[str, Any]] = field(default_factory=list)
     watches: list[dict[str, Any]] = field(default_factory=list)
     inbox: list[dict[str, Any]] = field(default_factory=list)
@@ -807,6 +808,7 @@ class FakeSeti:
             "chars": len(text),
             "max_chars": self.ea_pack_max,
             "form_of_address": self.form_of_address,
+            "language": self.language,
         }
 
     def _answer_questions(self, body: dict[str, Any]) -> httpx.Response:

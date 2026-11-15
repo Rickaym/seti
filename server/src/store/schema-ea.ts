@@ -196,3 +196,8 @@ ALTER TABLE ea_inbox ADD COLUMN route TEXT;
 export const EA_FORM_OF_ADDRESS = `
 ALTER TABLE ea_settings ADD COLUMN form_of_address TEXT NOT NULL DEFAULT '';
 `
+
+/** The language the EA listens, speaks and writes in: a code from EA_LANGUAGES. */
+export const EA_LANGUAGE = `
+ALTER TABLE ea_settings ADD COLUMN language TEXT NOT NULL DEFAULT 'en';
+`

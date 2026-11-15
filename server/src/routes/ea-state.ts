@@ -3,6 +3,7 @@ import {
   eaCallEndInput,
   eaHistoryAppendInput,
   eaHistoryQuery,
+  eaLanguageName,
   eaSettingsInput,
   eaSummaryInput,
   type EaHistoryAppended,
@@ -19,8 +20,11 @@ import { eaHistory, eaSettings } from '../store/ea.js'
 
 const BODY_MAX = 1024 * 1024
 
-/** The change a person cares about: the form of address when it moved, else the wake word. */
+/** The change a person cares about: the language, else the form of address, else the wake word. */
 function settingsSummary(before: EaSettings, saved: EaSettings): string {
+  if (saved.language !== before.language) {
+    return `EA language set to ${eaLanguageName(saved.language)}`
+  }
   if (saved.form_of_address !== before.form_of_address) {
     return saved.form_of_address === ''
       ? 'EA addresses the user with no title'
@@ -93,7 +97,11 @@ export const eaStateRoutes = new Hono()
   .put('/settings', validJson(eaSettingsInput), async (c) => {
     const before = await eaSettings.get()
     const input = c.req.valid('json')
-    const saved = await eaSettings.save({ ...input, form_of_address: input.form_of_address ?? before.form_of_address })
+    const saved = await eaSettings.save({
+      ...input,
+      form_of_address: input.form_of_address ?? before.form_of_address,
+      language: input.language ?? before.language,
+    })
     await audit.record({
       actor: 'user',
       kind: 'ea.settings_changed',
@@ -105,8 +113,10 @@ export const eaStateRoutes = new Hono()
         keep_awake_seconds: saved.keep_awake_seconds,
         join_on_open: saved.join_on_open,
         form_of_address: saved.form_of_address,
+        language: saved.language,
         was_enabled: before.wake_enabled,
         was_form_of_address: before.form_of_address,
+        was_language: before.language,
       },
     })
     return ok(c, saved)

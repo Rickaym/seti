@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from typing import Any, Literal
 
 from loguru import logger
+from openai.types.responses import Response
 from pipecat.frames.frames import (
     FunctionCallsStartedFrame,
     LLMFullResponseEndFrame,
@@ -35,6 +36,23 @@ def label(name: str | None) -> str | None:
     if not name:
         return None
     return re.sub(r"[^\w.:/-]", "-", name.strip())[:LABEL_MAX] or None
+
+
+def response_record(response: Response, channel: str, tool_calls: int = 0) -> dict[str, Any] | None:
+    """The usage record of one Responses API call; None when the model reported no usage."""
+    usage = response.usage
+    if usage is None:
+        return None
+    return {
+        "kind": "llm",
+        "channel": channel,
+        "model": label(response.model) or UNNAMED,
+        "ttfb_ms": None,
+        "prompt_tokens": usage.input_tokens,
+        "cached_tokens": usage.input_tokens_details.cached_tokens,
+        "completion_tokens": usage.output_tokens,
+        "tool_calls": tool_calls,
+    }
 
 
 def millis(seconds: float) -> int:

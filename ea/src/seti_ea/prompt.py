@@ -2,7 +2,11 @@
 
 import re
 
+from seti_ea.language import DEFAULT as DEFAULT_LANGUAGE
+from seti_ea.language import language_rule
+
 _ADDRESS_SLOT = "{address_rule}"
+_LANGUAGE_SLOT = "{language_rule}"
 FORM_OF_ADDRESS_MAX = 20
 
 _PROMPT = """\
@@ -31,7 +35,7 @@ no strings of clipped facts. Take the facts and say them in your own words.
 - Too robotic: "Two running. Dashboard: CI failing. Voicemail: idle." Natural: "Two are running \
 right now; the dashboard one is stuck on a failing CI check, and voicemail is waiting on you."
 
-# Channels
+{language_rule}# Channels
 - One conversation spans voice calls and the typed chat. Developer notes mark where each call \
 starts and when the user switches to typing or back to speaking. The latest note says which \
 channel the user is on now; answer in that channel's style.
@@ -152,7 +156,8 @@ and archiving now, CLAUDE.md files, reverting or marking \
 seen the changes agents made, default plugins, remote MCP servers and connector sign-in links, \
 which MCP servers agents get by default, \
 importing terminal sessions as agents, refreshing account usage and MCP state, the memory and CPU \
-caps of every agent or of one and how its conversation compacts, and your wake word.
+caps of every agent or of one and how its conversation compacts, your wake word and the \
+language you speak.
 - A pinned agent is long-running; subscribing it to a webhook or poller lets it act on events \
 such as CI failures, Sentry issues or new feed entries by itself. Agents cannot subscribe \
 themselves or add channels: when one asks in the group chat, put it to the user.
@@ -385,9 +390,10 @@ def address_rule(form_of_address: str = "") -> str:
     )
 
 
-def base_prompt(form_of_address: str = "") -> str:
-    """The EA's base prompt, with the form of address the user chose in its settings."""
-    return _PROMPT.replace(_ADDRESS_SLOT, address_rule(form_of_address))
+def base_prompt(form_of_address: str = "", language: str = DEFAULT_LANGUAGE) -> str:
+    """The EA's base prompt, with the form of address and the language the user chose in its settings."""
+    prompt = _PROMPT.replace(_ADDRESS_SLOT, address_rule(form_of_address))
+    return prompt.replace(_LANGUAGE_SLOT, language_rule(language))
 
 
 SYSTEM_PROMPT = base_prompt()

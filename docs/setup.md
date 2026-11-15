@@ -312,7 +312,7 @@ The EA reads its key files first, then its environment, then `SETI_EA_ENV`
 | `EA_MODEL`, `EA_TEXT_MODEL`                           | `gpt-6-sol`, same         | Voice model, and the chat model when different             |
 | `EA_REASONING_EFFORT`                                 | `none`                    | `default` for a model without reasoning, such as `gpt-4.1` |
 | `EA_THINK_MODEL`, `EA_THINK_EFFORT`                   | `gpt-6-sol`, `medium`     | The reasoning model the think tool hands hard questions to |
-| `ELEVENLABS_VOICE_ID`, `ELEVENLABS_MODEL`             | a set voice, flash v2.5   | The voice                                                  |
+| `ELEVENLABS_VOICE_ID`, `ELEVENLABS_MODEL`             | a set voice, flash v2.5   | The voice; another model must speak the EA's language      |
 | `EA_HISTORY_MAX_TOKENS`                               | `8000`                    | Conversation kept per call, at least 200                   |
 | `EA_INBOX_POLL_SECS`                                  | `5`                       | How often the EA checks its inbox                          |
 | `SETI_EA_MODEL_DIR`                                   | `~/.cache/seti-ea/models` | Wake word model; `XDG_CACHE_HOME` moves the default        |
@@ -340,7 +340,16 @@ for the keys without echoing them, and starts `seti-ea.service`. The chat needs 
 key; calls also need Deepgram and ElevenLabs, and the TURN keys for calls from other networks.
 `GET /api/ea/health` lists missing keys, and Settings, EA holds the wake word, audio devices,
 models and Address as: the title or name the EA calls you now and then, empty for no title, which
-is the default. To add a key later, write it to its file and restart both services:
+is the default.
+
+Language on the same page sets what the EA listens, speaks and writes in: English by default, one
+of the 31 other languages that both Deepgram Nova-3 and ElevenLabs Flash v2.5 cover, or
+Multilingual, which hears any of them and answers in the one you last used. A change applies to a
+live call at once, and saying "speak Turkish" to the EA changes it too. The wake phrase stays in
+English words whatever the language, because the wake word model on the host only knows English
+sounds.
+
+To add a key later, write it to its file and restart both services:
 
 ```sh
 (umask 077; printf '%s\n' 'sk-...' > ~/.seti/credentials/openai-api-key)

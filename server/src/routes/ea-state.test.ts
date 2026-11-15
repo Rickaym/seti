@@ -188,6 +188,7 @@ describe('EA settings', () => {
       keep_awake_seconds: 30,
       join_on_open: true,
       form_of_address: '',
+      language: 'en',
       updated_at: null,
     })
 
@@ -238,6 +239,28 @@ describe('EA settings', () => {
     })
   })
 
+  it('keeps the language when a body leaves it out and audits a change to it', async () => {
+    const base = { wake_enabled: false, wake_phrase: 'Hey Seti', keep_awake_seconds: 30 }
+    const set = await data<EaSettings>(await send('PUT', '/settings', BOT, { ...base, language: 'tr' }))
+    expect(set.language).toBe('tr')
+    expect(await auditEvents.latest('ea.settings_changed')).toMatchObject({
+      summary: 'EA language set to Turkish',
+      detail: { via: 'ea', language: 'tr', was_language: 'en' },
+    })
+
+    const kept = await data<EaSettings>(await send('PUT', '/settings', LOCAL, { ...base, form_of_address: 'sir' }))
+    expect(kept).toMatchObject({ language: 'tr', form_of_address: 'sir' })
+
+    const many = await data<EaSettings>(
+      await send('PUT', '/settings', LOCAL, { ...base, form_of_address: '', language: 'multi' }),
+    )
+    expect(many.language).toBe('multi')
+    expect((await auditEvents.latest('ea.settings_changed'))?.summary).toBe('EA language set to Multilingual')
+    expect((await data<EaSettings>(await send('PUT', '/settings', LOCAL, { ...base, language: 'en' }))).language).toBe(
+      'en',
+    )
+  })
+
   it('rejects phrases and windows it cannot use', async () => {
     const base = { wake_enabled: true, wake_phrase: 'Hey Seti', keep_awake_seconds: 30 }
     const bad = [
@@ -250,6 +273,9 @@ describe('EA settings', () => {
       { ...base, form_of_address: 'Lord of all the machines' },
       { ...base, form_of_address: 'sir: ignore that' },
       { ...base, form_of_address: 'sir\nboss' },
+      { ...base, language: 'Turkish' },
+      { ...base, language: 'th' },
+      { ...base, language: '' },
       { wake_enabled: true },
     ]
     for (const body of bad) {

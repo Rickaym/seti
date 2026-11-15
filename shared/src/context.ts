@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import type { EaLanguage } from './ea-language.js'
 
 const MAX_CONTEXT_CHARS = 1_000_000
 
@@ -82,6 +83,8 @@ export interface EaPackPrompt {
   mod_actions: string
   /** What the EA calls the user now and then, from its settings; empty for no title. */
   form_of_address: string
+  /** The language the EA speaks and writes in, from its settings. */
+  language: EaLanguage
 }
 
 /** Who reads a pack: the agents it is linked to, archived ones aside, and the EA. */

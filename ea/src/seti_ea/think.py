@@ -19,7 +19,7 @@ from openai.types.responses.response_input_param import ResponseInputParam
 from seti_ea.config import Settings
 from seti_ea.toolkit import ToolSpec
 from seti_ea.tools import TOOL_SPECS, EaTools
-from seti_ea.usage import UNNAMED, UsageRecorder, label
+from seti_ea.usage import UsageRecorder, response_record
 
 THINK_TOOL = "think"
 THINK_SPEC = ToolSpec(
@@ -248,18 +248,6 @@ class Thinker:
         return result.text[:OUTPUT_MAX]
 
     async def _record(self, response: Response, tool_calls: int) -> None:
-        usage = response.usage
-        if usage is None:
-            return
-        await self._usage.add(
-            {
-                "kind": "llm",
-                "channel": "think",
-                "model": label(response.model) or UNNAMED,
-                "ttfb_ms": None,
-                "prompt_tokens": usage.input_tokens,
-                "cached_tokens": usage.input_tokens_details.cached_tokens,
-                "completion_tokens": usage.output_tokens,
-                "tool_calls": tool_calls,
-            }
-        )
+        record = response_record(response, "think", tool_calls)
+        if record is not None:
+            await self._usage.add(record)

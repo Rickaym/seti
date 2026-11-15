@@ -20,6 +20,8 @@ from pipecat.turns.user_start.wake_phrase_user_turn_start_strategy import (
 )
 
 from seti_ea.announce import SLEEP_TOOL
+from seti_ea.language import DEFAULT as DEFAULT_LANGUAGE
+from seti_ea.language import language_of
 from seti_ea.seti import SetiClient, SetiError
 from seti_ea.toolkit import ToolResult, ToolSpec
 
@@ -57,13 +59,14 @@ def parse_wake_settings(data: object) -> WakeSettings:
     )
 
 
-async def fetch_wake_settings(seti: SetiClient) -> WakeSettings:
-    """The current setting; off when Seti cannot say."""
+async def fetch_ea_settings(seti: SetiClient) -> tuple[WakeSettings, str]:
+    """The wake word setting and the EA's language; wake word off and English when Seti cannot say."""
     try:
-        return parse_wake_settings(await seti.get("/ea/settings"))
+        data = await seti.get("/ea/settings")
     except SetiError as e:
         logger.warning(f"EA settings not loaded, wake word off: {e}")
-        return WakeSettings()
+        return WakeSettings(), DEFAULT_LANGUAGE
+    return parse_wake_settings(data), language_of(data)
 
 
 def _words(phrase: str) -> list[str]:
