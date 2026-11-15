@@ -26,7 +26,7 @@ const on: ActionHandlers = {
   find: noop,
   files: noop,
   processes: noop,
-  questions: noop,
+  requests: noop,
   pin: noop,
   rename: noop,
   stop: noop,

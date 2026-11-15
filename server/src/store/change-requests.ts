@@ -49,6 +49,12 @@ export const changeRequests = {
       await sql<RequestRecord[]>`SELECT * FROM change_request
         WHERE task_id = ${taskId} AND state = 'pending' ORDER BY created_at, id`,
     ),
+  /** Every agent's pending requests that have not run out yet, oldest first. */
+  allPending: async (at: string): Promise<ChangeRequest[]> =>
+    requests(
+      await sql<RequestRecord[]>`SELECT * FROM change_request
+        WHERE state = 'pending' AND expires_at > ${at} ORDER BY created_at, id`,
+    ),
   /** Pending API key requests of agents on the credential for the variable. */
   pendingKeys: async (profileId: string, env: string): Promise<ChangeRequest[]> =>
     requests(

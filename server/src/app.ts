@@ -93,6 +93,7 @@ import { taskProcessRoutes } from './routes/processes.js'
 import { prRoutes } from './routes/prs.js'
 import { questionRoutes } from './routes/questions.js'
 import { repoRoutes } from './routes/repos.js'
+import { requestRoutes } from './routes/requests.js'
 import { resourceRoutes } from './routes/resources.js'
 import { revisionRoutes } from './routes/revisions.js'
 import { sandboxRoutes } from './routes/sandbox.js'
@@ -298,6 +299,7 @@ export function createApp(access: AccessGuardOptions = defaultAccess(), eaUrl: s
   app.route('/api/context', contextRoutes)
   app.route('/api/knowledge', knowledgeRoutes)
   app.route('/api/questions', questionRoutes)
+  app.route('/api/requests', requestRoutes)
   app.route('/api/ea', eaStateRoutes)
   app.route('/api/ea', eaUsageRoutes)
   app.route('/api/ea', eaChannelRoutes)

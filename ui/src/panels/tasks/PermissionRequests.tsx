@@ -11,8 +11,10 @@ import { apiGetValid, apiPost, errorText } from '@/api'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
+import { refreshRequests } from '@/hooks/useRequests'
 import { refreshTasks } from '@/hooks/useTasks'
 import { toolLabel } from '@/lib/tool-label'
+import { cn } from '@/lib/utils'
 
 const isPlan = (request: PermissionRequest) => request.tool_name === 'ExitPlanMode'
 
@@ -43,8 +45,14 @@ function Details({ request }: { request: PermissionRequest }) {
   )
 }
 
+interface CardProps {
+  request: PermissionRequest
+  onAnswered: () => void
+  className?: string
+}
+
 /** One tool call the agent waits on, with Allow, Always and Deny. */
-function PermissionCard({ request, onAnswered }: { request: PermissionRequest; onAnswered: () => void }) {
+export function PermissionCard({ request, onAnswered, className }: CardProps) {
   const [busy, setBusy] = useState(false)
   const [everyAgent, setEveryAgent] = useState(false)
   const [note, setNote] = useState('')
@@ -72,6 +80,7 @@ function PermissionCard({ request, onAnswered }: { request: PermissionRequest; o
       await apiPost(`/tasks/${request.task_id}/permission-requests/${request.id}`, body)
       onAnswered()
       refreshTasks()
+      refreshRequests()
     } catch (e) {
       toast.error(errorText(e))
     } finally {
@@ -83,7 +92,7 @@ function PermissionCard({ request, onAnswered }: { request: PermissionRequest; o
   return (
     <section
       aria-label={plan ? 'Plan approval' : `Permission request for ${toolLabel(request.tool_name)}`}
-      className="mt-3 border border-warning/60 bg-warning/5 px-3 py-2.5 text-xs"
+      className={cn('border border-warning/60 bg-warning/5 px-3 py-2.5 text-xs', className)}
     >
       <div className="flex items-start gap-2">
         <Hand className="mt-px size-3.5 shrink-0 text-warning-text" aria-hidden />
@@ -187,6 +196,7 @@ export function PermissionRequests({
     <PermissionCard
       key={request.id}
       request={request}
+      className="mt-3"
       onAnswered={() => {
         setPending((prev) => prev.filter((other) => other.id !== request.id))
       }}

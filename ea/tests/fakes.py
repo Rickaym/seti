@@ -691,6 +691,8 @@ class FakeSeti:
     search_hits: list[dict[str, Any]] = field(default_factory=list)
     knowledge: list[dict[str, Any]] = field(default_factory=list)
     questions: list[dict[str, Any]] = field(default_factory=list)
+    change_requests: list[dict[str, Any]] = field(default_factory=list)
+    permission_requests: list[dict[str, Any]] = field(default_factory=list)
     team: list[dict[str, Any]] = field(default_factory=list)
     chat_hits: list[dict[str, Any]] = field(default_factory=list)
     chat_more: bool = False
@@ -1280,6 +1282,15 @@ class FakeSeti:
                 return ok([n for n in self.knowledge if n["status"] == params.get("status", "proposed")])
             case ["questions"]:
                 return ok([q for q in self.questions if q["status"] == "open"])
+            case ["requests"]:
+                return ok(
+                    {
+                        "questions": [q for q in self.questions if q["status"] == "open"],
+                        "access": self.change_requests,
+                        "permissions": self.permission_requests,
+                        "notes": [n for n in self.knowledge if n["status"] == "proposed"],
+                    }
+                )
             case ["ea", "search"]:
                 task = params.get("task")
                 hits = [h for h in self.search_hits if task is None or h.get("task_id") == task]

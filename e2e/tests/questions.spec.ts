@@ -6,7 +6,7 @@ import {
   agentQuestions,
   askingAgent,
   lastReply,
-  questionsSection,
+  requestsSection,
   sectionCount,
   sentLine,
   sentToast,
@@ -21,7 +21,7 @@ test('two agents ask through AskUserQuestion and one Submit all answers both', a
   expect(checker.blocked).toBe(`Asks 2 questions: ${CHECKS_QUESTION}`)
 
   await page.goto('/#agents')
-  await expect(sectionCount(questionsSection(page))).toHaveText('3')
+  await expect(sectionCount(requestsSection(page))).toHaveText('3')
   await page.goto(`/#agents/${checker.id}`)
   const needsYou = page.getByRole('main').getByRole('region', { name: 'Needs you' })
   await expect(needsYou.locator(`[data-task-id="${checker.id}"]`)).toContainText('Asks 2 questions')
@@ -29,9 +29,9 @@ test('two agents ask through AskUserQuestion and one Submit all answers both', a
   await expect(call).toContainText('Asked you 2 questions')
   await expect(call).toContainText(`Checks: ${CHECKS_QUESTION}`)
   await expect(call).toContainText('Waiting for you')
-  await questionsSection(page).click()
+  await requestsSection(page).click()
 
-  await expect(page.getByRole('heading', { name: 'Questions' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Requests' })).toBeVisible()
   const push = agentQuestions(page, pusher)
   const checks = agentQuestions(page, checker)
   await expect(push.getByRole('radiogroup', { name: 'Push' }).getByRole('radio')).toHaveText(['Yes', 'No'])
@@ -45,9 +45,9 @@ test('two agents ask through AskUserQuestion and one Submit all answers both', a
 
   await expect(page).toHaveURL(new RegExp(`#agents/${checker.id}$`))
   await expect(sentToast(page, /Sent 3 answers\. Going on:/)).toBeVisible()
-  await expect(page.getByRole('heading', { name: 'Questions' })).toHaveCount(0)
-  await expect(questionsSection(page)).toBeVisible()
-  await expect(sectionCount(questionsSection(page))).toHaveCount(0)
+  await expect(page.getByRole('heading', { name: 'Requests' })).toHaveCount(0)
+  await expect(requestsSection(page)).toBeVisible()
+  await expect(sectionCount(requestsSection(page))).toHaveCount(0)
   await expect.poll(async () => lastReply(request, pusher.id)).toBe(`Got your answers. ${PUSH_QUESTION} Yes`)
   await expect
     .poll(async () => lastReply(request, checker.id))
@@ -57,7 +57,7 @@ test('two agents ask through AskUserQuestion and one Submit all answers both', a
   await page.goto(`/#agents/${checker.id}`)
   await expect(call).toContainText('Unit, Lint, and the build')
   await expect(call).toContainText('Email me')
-  await expect(page.getByRole('button', { name: 'Answer 2 questions' })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Answer 2 requests' })).toHaveCount(0)
 })
 
 test("Skip dismisses an agent's questions, it goes on, and the page opened directly closes to the list", async ({
@@ -65,7 +65,7 @@ test("Skip dismisses an agent's questions, it goes on, and the page opened direc
   request,
 }) => {
   const skipped = await askingAgent(request, 'Skipped', PUSH_PROMPT)
-  await page.goto('/#questions')
+  await page.goto('/#requests')
   const group = agentQuestions(page, skipped)
   await group.getByRole('button', { name: `Skip ${skipped.title}` }).click()
   await expect(group).toHaveCount(0)
@@ -86,24 +86,24 @@ test('the page stays while questions remain, and Back returns to where the user 
   const pusher = await askingAgent(request, 'Stayer', PUSH_PROMPT)
   const checker = await askingAgent(request, 'Waiter', CHECKS_PROMPT)
   await page.goto(`/#agents/${pusher.id}`)
-  await questionsSection(page).click()
-  await expect(page).toHaveURL(/#questions$/)
+  await requestsSection(page).click()
+  await expect(page).toHaveURL(/#requests$/)
   await agentQuestions(page, pusher).getByRole('radio', { name: 'No' }).click()
   await page.getByRole('button', { name: 'Submit all' }).click()
 
   await expect(sentLine(page)).toContainText('Sent 1 answer')
-  await expect(page).toHaveURL(/#questions$/)
+  await expect(page).toHaveURL(/#requests$/)
   await expect(agentQuestions(page, checker)).toBeVisible()
   await expect(agentQuestions(page, pusher)).toHaveCount(0)
   await page.getByRole('button', { name: 'Back', exact: true }).click()
   await expect(page).toHaveURL(new RegExp(`#agents/${pusher.id}$`))
 
   await page.goto('about:blank')
-  await page.goto('/#questions')
+  await page.goto('/#requests')
   await page.getByRole('button', { name: 'Back', exact: true }).click()
   await expect(page).toHaveURL(/#agents$/)
-  await expect(page.getByRole('heading', { name: 'Questions' })).toHaveCount(0)
-  await page.goto('/#questions')
+  await expect(page.getByRole('heading', { name: 'Requests' })).toHaveCount(0)
+  await page.goto('/#requests')
   await page.getByRole('button', { name: `Skip ${checker.title}` }).click()
   await expect(page).toHaveURL(/#agents$/)
   expect(await apiData<Question[]>(request, '/questions')).toEqual([])

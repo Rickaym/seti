@@ -57,21 +57,6 @@ export const answerItem = (question: Question, draft: Draft): QuestionAnswerItem
   other: draft.other.trim() === '' ? null : draft.other.trim(),
 })
 
-/** Open questions by agent, each agent at the time of its oldest question. */
-export function byAgent(questions: readonly Question[]): { taskId: string; title: string; questions: Question[] }[] {
-  const groups = new Map<string, { taskId: string; title: string; questions: Question[] }>()
-  for (const question of questions) {
-    const group = groups.get(question.task_id) ?? {
-      taskId: question.task_id,
-      title: question.task_title,
-      questions: [],
-    }
-    group.questions.push(question)
-    groups.set(question.task_id, group)
-  }
-  return [...groups.values()]
-}
-
 const count = (n: number, word: string) => `${String(n)} ${word}${n === 1 ? '' : 's'}`
 
 /** One line saying what a send did. */

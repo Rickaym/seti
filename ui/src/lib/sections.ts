@@ -1,12 +1,13 @@
 import type { ModSectionProps } from '@seti/mod-api'
 import { Registry } from '@seti/shared'
-import { Bot, FileText, Headset, MessageCircleQuestion, Orbit, Settings } from 'lucide-react'
+import { Bot, FileText, Headset, Inbox, Orbit, Settings } from 'lucide-react'
 import { useSyncExternalStore, type ComponentType } from 'react'
 import { knowledgeWaiting } from '@/hooks/useKnowledgeWaiting'
-import { openQuestionCount } from '@/hooks/useQuestions'
+import { pendingRequestCount } from '@/hooks/useRequests'
 import type { CountStore } from '@/lib/polled'
+import { REQUESTS } from '@/panels/requests/label'
 
-type CoreSectionKey = 'ea' | 'home' | 'agents' | 'questions' | 'context' | 'settings'
+type CoreSectionKey = 'ea' | 'home' | 'agents' | 'requests' | 'context' | 'settings'
 
 /** Seti's own sections, or a mod's as `<mod>.<view>`. */
 export type SectionKey = CoreSectionKey | `${string}.${string}`
@@ -15,7 +16,7 @@ const SECTION_GROUPS = ['Work', 'Configure', 'Mods'] as const
 
 /** A count on a section's row, such as what waits there for the user; zero shows none. */
 interface SectionBadge extends CountStore {
-  /** What the count means, for screen readers, such as `2 questions wait on you`. */
+  /** What the count means, for screen readers, such as `2 requests wait on you`. */
   describe: (count: number) => string
 }
 
@@ -24,7 +25,7 @@ export interface SidebarItem {
   label: string
   icon: ComponentType<{ className?: string }>
   group: (typeof SECTION_GROUPS)[number]
-  /** Alt with this digit opens it, numbered from 1 down the sidebar; Questions and mods have none. */
+  /** Alt with this digit opens it, numbered from 1 down the sidebar; Requests and mods have none. */
   digit: number | null
   /** Words besides its group that find it in the Go to palette. */
   keywords?: string
@@ -43,15 +44,15 @@ const CORE_SECTIONS: readonly SidebarItem[] = [
   { key: 'home', label: 'Home', icon: Orbit, group: 'Work', digit: 2 },
   { key: 'agents', label: 'Agents', icon: Bot, group: 'Work', digit: 3 },
   {
-    key: 'questions',
-    label: 'Questions',
-    icon: MessageCircleQuestion,
+    key: 'requests',
+    label: REQUESTS.label,
+    icon: Inbox,
     group: 'Work',
     digit: null,
-    keywords: 'answer agents ask secrets',
+    keywords: 'answer questions agents ask secrets access allow plans approve notes',
     badge: {
-      ...openQuestionCount,
-      describe: (count) => counted(count, 'question waits on you', 'questions wait on you'),
+      ...pendingRequestCount,
+      describe: (count) => counted(count, `${REQUESTS.one} waits on you`, `${REQUESTS.many} wait on you`),
     },
   },
   {
