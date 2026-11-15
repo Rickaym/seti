@@ -536,7 +536,7 @@ def default_ea_usage() -> dict[str, Any]:
         "window_days": 7,
         "calls_today": 4,
         "calls_window": 30,
-        "by_channel": {"voice": 18, "chat": 9, "inbox": 3},
+        "by_channel": {"voice": 18, "chat": 9, "inbox": 3, "think": 2},
         "ttfb": {"samples": 30, "p50_ms": 820, "p95_ms": 1940},
         "avg_prompt_tokens": 16200,
         "avg_completion_tokens": 85,
@@ -677,6 +677,7 @@ class FakeSeti:
     home: dict[str, Any] = field(default_factory=default_home)
     ea_usage: dict[str, Any] = field(default_factory=default_ea_usage)
     usage_records: list[dict[str, Any]] = field(default_factory=list)
+    thoughts: list[dict[str, Any]] = field(default_factory=list)
     requests: list[httpx.Request] = field(default_factory=list)
     fail: dict[tuple[str, str], tuple[int, dict[str, Any]]] = field(default_factory=dict)
     ea_history: list[dict[str, Any]] = field(default_factory=list)
@@ -1371,6 +1372,9 @@ class FakeSeti:
             case ["ea", "usage"]:
                 self.usage_records.extend(body["records"])
                 return ok({"recorded": len(body["records"])})
+            case ["ea", "thoughts"]:
+                self.thoughts.append(body)
+                return ok({"recorded": True})
             case ["workspaces"]:
                 workspace = {
                     "id": f"w{len(self.workspaces) + 1}",

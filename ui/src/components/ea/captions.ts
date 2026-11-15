@@ -17,6 +17,8 @@ export interface ActionItem extends ItemBase {
   callId: string | null
   /** Null until the bot reports what the call did. */
   summary: string | null
+  /** What a long call, such as a think, is doing now; null when it said nothing. */
+  progress: string | null
   /** Null while the call runs or when it ended without a report. */
   ok: boolean | null
   running: boolean
@@ -47,6 +49,7 @@ export type CaptionEvent =
   | { type: 'call-started'; tool: string; callId: string; at: number }
   | { type: 'call-stopped'; tool: string; callId: string; cancelled: boolean }
   | { type: 'action'; action: EaAction; at: number }
+  | { type: 'progress'; tool: string; text: string }
   | { type: 'marker'; text: string; at: number }
 
 export const initialCaptions: CaptionState = { items: [], nextId: 1, segments: new Map(), shown: new Map() }
@@ -150,7 +153,9 @@ function runningIndex(items: readonly CaptionItem[], tool: string, callId: strin
 
 function callStarted(state: CaptionState, tool: string, callId: string, at: number): CaptionState {
   const known = state.items.some((item) => item.kind === 'action' && item.callId === callId)
-  return known ? state : append(state, { kind: 'action', tool, callId, summary: null, ok: null, running: true, at })
+  return known
+    ? state
+    : append(state, { kind: 'action', tool, callId, summary: null, progress: null, ok: null, running: true, at })
 }
 
 function callStopped(state: CaptionState, tool: string, callId: string, cancelled: boolean): CaptionState {
@@ -173,9 +178,19 @@ function action(state: CaptionState, reported: EaAction, at: number): CaptionSta
   const item = state.items[index]
   if (item?.kind !== 'action') {
     const { tool, summary, ok } = reported
-    return append(state, { kind: 'action', tool, callId: null, summary, ok, running: false, at })
+    return append(state, { kind: 'action', tool, callId: null, summary, progress: null, ok, running: false, at })
   }
   return { ...state, items: replaceAt(state.items, index, { ...item, summary: reported.summary, ok: reported.ok }) }
+}
+
+/** Shows what the newest running call of that tool is doing; nothing when none runs. */
+function progress(state: CaptionState, tool: string, text: string): CaptionState {
+  const index = state.items.findLastIndex((item) => item.kind === 'action' && item.running && item.tool === tool)
+  const item = state.items[index]
+  if (item?.kind !== 'action') {
+    return state
+  }
+  return { ...state, items: replaceAt(state.items, index, { ...item, progress: text }) }
 }
 
 export function captionsReducer(state: CaptionState, event: CaptionEvent): CaptionState {
@@ -193,6 +208,8 @@ export function captionsReducer(state: CaptionState, event: CaptionEvent): Capti
       return callStopped(state, event.tool, event.callId, event.cancelled)
     case 'action':
       return action(state, event.action, event.at)
+    case 'progress':
+      return progress(state, event.tool, event.text)
     case 'marker':
       return append(closeBot(state), { kind: 'marker', text: event.text, at: event.at })
   }

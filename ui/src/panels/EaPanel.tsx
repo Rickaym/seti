@@ -22,6 +22,7 @@ import { CallCard } from '@/panels/ea/CallCard'
 import { EaComposer } from '@/panels/ea/EaComposer'
 import { EaSettings } from '@/panels/ea/EaSettings'
 import { InboxMenu } from '@/panels/ea/InboxMenu'
+import { ThinkingLine } from '@/panels/ea/ThinkingLine'
 import { chatView, EA_TASK_ID, lastReply, liveRows } from '@/panels/ea/rows'
 import { useEaChat } from '@/panels/ea/useEaChat'
 import { TranscriptPane } from '@/panels/tasks/TranscriptPane'
@@ -232,6 +233,7 @@ export function EaPanel() {
           contentClassName={COLUMN}
         />
       )}
+      <ThinkingLine live={replying ? live : null} />
       {calling && (
         <div className="shrink-0 px-3 pt-2 max-md:px-2">
           <div className={COLUMN}>

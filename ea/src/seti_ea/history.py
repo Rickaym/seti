@@ -94,6 +94,43 @@ def is_pending_result(content: object) -> bool:
     )
 
 
+def _async_payload(content: object) -> Mapping[str, Any] | None:
+    if not isinstance(content, str) or not content.startswith("{"):
+        return None
+    try:
+        parsed = json.loads(content)
+    except ValueError:
+        return None
+    if isinstance(parsed, dict) and parsed.get("type") == "async_tool":
+        return cast(Mapping[str, Any], parsed)
+    return None
+
+
+def settled_async(messages: Sequence[LLMContextMessage]) -> set[str]:
+    """Ids of background tool calls whose result or cancellation reached the context."""
+    settled: set[str] = set()
+    for raw in messages:
+        if isinstance(raw, LLMSpecificMessage):
+            continue
+        message = cast(Mapping[str, Any], raw)
+        payload = _async_payload(message.get("content")) if message.get("role") == "developer" else None
+        if payload is not None and payload.get("status") == "finished":
+            settled.add(str(payload.get("tool_call_id")))
+    return settled
+
+
+def is_waiting(content: object, settled: set[str]) -> bool:
+    """A tool result still to come: pipecat's placeholder, or a background call not settled yet."""
+    if is_pending_result(content):
+        return True
+    payload = _async_payload(content)
+    return (
+        payload is not None
+        and payload.get("status") == "running"
+        and str(payload.get("tool_call_id")) not in settled
+    )
+
+
 def is_summary(message: Mapping[str, Any]) -> bool:
     content = message.get("content")
     return message.get("role") == "user" and isinstance(content, str) and content.startswith(SUMMARY_PREFIX)
@@ -270,6 +307,7 @@ class HistorySync:
             )
             if m.get("role") == "tool"
         }
+        settled = settled_async(messages)
         dropped: set[str] = set()
         batch: list[tuple[LLMContextMessage, Kind, Message]] = []
         for raw in messages:
@@ -282,9 +320,9 @@ class HistorySync:
             if is_summary(message) or is_live_note(message):
                 continue
             call_ids = [str(call.get("id")) for call in _tool_calls(message)]
-            unfinished = any(c not in results or is_pending_result(results[c]) for c in call_ids)
+            unfinished = any(c not in results or is_waiting(results[c], settled) for c in call_ids)
             pending = message.get("role") == "tool" and (
-                is_pending_result(message.get("content")) or str(message.get("tool_call_id")) in dropped
+                is_waiting(message.get("content"), settled) or str(message.get("tool_call_id")) in dropped
             )
             if unfinished or pending:
                 if not final:

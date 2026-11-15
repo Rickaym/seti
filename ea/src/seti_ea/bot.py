@@ -78,6 +78,9 @@ from seti_ea.prompt import (
 )
 from seti_ea.redact import scrub_value, secrets_of
 from seti_ea.spotter import LOCAL_SPOTTER
+from seti_ea.think import THINK_TOOL, Thinker, responses_ask
+from seti_ea.think_speech import QUIET_SECS, SpokenProgress
+from seti_ea.think_tool import ThinkTool
 from seti_ea.toolkit import ToolResult, ToolSpec
 from seti_ea.tools import TOOL_SPECS, EaTools
 from seti_ea.usage import UsageObserver, UsageRecorder
@@ -128,6 +131,11 @@ def action_message(tool: str, result: ToolResult) -> dict[str, Any]:
 
 
 IDLE_END_MESSAGE: dict[str, Any] = {"type": "ea-call-end", "reason": "bot-idle"}
+
+
+def progress_message(text: str) -> dict[str, Any]:
+    """The RTVI server message that shows what a running think is doing."""
+    return {"type": "ea-progress", "tool": THINK_TOOL, "text": text}
 
 
 def keyterms(wake: WakeSettings) -> list[str]:
@@ -308,8 +316,19 @@ async def run_bot(
     async def fall_asleep() -> ToolResult:
         return await put_to_sleep(wake, announce_wake, retune)
 
+    usage = UsageRecorder(seti)
+    progress = SpokenProgress(
+        lambda text: tts.queue_frame(filler_frame(text)),
+        lambda: gate.floor_free(QUIET_SECS) and not (wake.settings.enabled and not wake.awake),
+        show=lambda text: rtvi.send_server_message(progress_message(text)),
+    )
+    think = ThinkTool(Thinker(tools, responses_ask(settings), usage), seti, "voice", report, progress)
     guard = InboxGuard(VOICE_HELD_TOOLS)
-    schemas = [*tool_schemas(tools, report, guard=guard.check), sleep_schema(fall_asleep, report)]
+    schemas = [
+        *tool_schemas(tools, report, guard=guard.check),
+        think.schema(),
+        sleep_schema(fall_asleep, report),
+    ]
     context = LLMContext(tools=ToolsSchema(standard_tools=schemas))
     history = HistorySync(seti, context, lock=conversation.lock)
     inbox = conversation.attach()
@@ -331,7 +350,6 @@ async def run_bot(
             auto_context_summarization_config=summarization_config(settings.history_max_tokens),
         ),
     )
-    usage = UsageRecorder(seti)
 
     async def take(ids: Sequence[int]) -> Delivered:
         return await deliver(seti, ids, "voice")
@@ -444,7 +462,8 @@ async def run_bot(
     ) -> None:
         await history.flush()
         await usage.flush()
-        if not aggregator.has_function_calls_in_progress:
+        # A think runs on in the background, so only a call the reply waits for defers the check.
+        if not aggregator.has_synchronous_function_calls_in_progress:
             await promises.reply_ended(interrupted=message.interrupted)
 
     @assistant_aggregator.event_handler("on_summary_applied")
@@ -485,6 +504,8 @@ async def run_bot(
     finally:
         for task in delivering:
             task.cancel()
+        await progress.stop()
+        await think.settle()
         if conversation.call is call_inbox:
             conversation.call = None
         conversation.detach(inbox)

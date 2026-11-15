@@ -689,11 +689,58 @@ in that turn, act items never share a report turn with other items, `start_task`
 the instruction it writes forbids replying on Slack or to customers. Subscriptions default to
 `report`.
 
+## The EA hands hard questions to a slower thinker and keeps talking
+
+The EA's own model answers fast because it runs without reasoning, so it does not weigh several
+agents, PRs or plans well. For those questions it calls `think` (`ea/src/seti_ea/think.py`), which
+hands the question, a compact summary of the recent conversation and the latest live context note
+to a reasoning model on the Responses API (`EA_THINK_MODEL` at `EA_THINK_EFFORT`, `gpt-6-sol` at
+`medium` by default). The thinker answers with a short spoken version and an optional longer one
+for the chat. It runs at most four rounds of tools, and only the EA's read tools listed in
+`THINK_TOOLS`; it refuses any other tool and never sends the `refresh` argument, which would make
+Seti probe again. Whatever it recommends goes back to the EA, which puts any action to the user,
+so every write still passes `gate.py`. Requests store nothing at OpenAI (`store=False`).
+
+`think` is a pipecat async function call (`cancel_on_interruption=False`), so the conversation
+goes on while it works: the user can ask something else and the EA answers it as usual. The EA's
+model can stop it with pipecat's built-in `cancel_think` when the user says never mind or asks
+something that replaces it. The handler gives up after 90 seconds with a plain result, and pipecat
+cancels it 10 seconds later as a backstop. It is not shielded, unlike the tools that write, because
+a cancelled read loses nothing. On a call the answer waits until the user finishes speaking and the
+EA is not mid-reply, then arrives once as pipecat's deferred result. The conversation is stored up
+to the call and held back until the think settles, so the history never keeps a placeholder for a
+result that later lands in place.
+
+On a call the user never sits in silence (`think_speech.py`). `ToolAnnouncer` acknowledges the
+think at once in one of a few lines, and `SpokenProgress` says a progress line 6 seconds in and
+then every 11 seconds, at most four. A line names what the thinker reads when that is new, such as
+"I'm going through the open PRs.", and otherwise one of a few "still working" lines, never the same
+line twice in one think. A line waits while the user speaks or a reply is due or under way, and is
+dropped when it was held up for more than 3 seconds. Progress lines are spoken with
+`append_to_context=False`, so the model never sees them as a turn to answer. A typical call:
+
+| Time  | Heard                                                                           |
+| ----- | ------------------------------------------------------------------------------- |
+| 0 s   | User: "Which of the three open PRs should I merge first?"                       |
+| 0.8 s | EA: "Let me think that through." (the acknowledgement)                          |
+| 6 s   | EA: "I'm going through the open PRs." (the thinker's first read)                |
+| 15 s  | User: "Is Atlas still running?" EA: "Yes, it's on its third turn."              |
+| 17 s  | A line is due while the EA answers; it waits, then is dropped at 20 s           |
+| 31 s  | EA: "I'm reading PR 12 in detail."                                              |
+| 34 s  | EA: "Right, here's what I'd do: merge PR 12 first, since it unblocks the rest." |
+
+The call card shows the same steps on the running `think` row, from `ea-progress` server messages.
+In the typed chat the reply streams `thinking` events instead, and the chat shows a Thinking line
+with the latest step until the answer arrives. Each think is audited as `ea.thought` through
+`POST /api/ea/thoughts`, which only the bot may call and which takes the channel, outcome, the
+question's length, its duration and the rounds of tools, never the question's text. The thinker's
+model calls count in EA usage under `think`.
+
 ## The EA records what its model calls cost and how fast they answer
 
 An observer in each EA pipeline (`usage.py`) turns pipecat's metrics into one record per model
 call: time to first byte, prompt, cached and completion tokens, the number of tool calls, the model
-and whether it ran on a call, in the chat or as an inbox report. On a call it also records the time
+and whether it ran on a call, in the chat, as an inbox report or thinking a question through. On a call it also records the time
 to first byte of speech to text and text to speech. The bot posts the records in batches to
 `POST /api/ea/usage`, which only the bot may call and which takes numbers and model names only,
 never message text. Seti keeps them in `ea_usage` for 30 days, dropping older rows as new ones

@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { RETRYING_LABEL } from '@/hooks/useClientSend'
 import { useCoarsePointer } from '@/hooks/useMedia'
 import { IDLE_COMMANDS } from '@/lib/command-catalog'
+import { keepFocus } from '@/lib/keep-focus'
 import { CommandField } from '@/panels/tasks/CommandField'
 
 function hintFor(replying: boolean, touch: boolean): string {
@@ -75,7 +76,7 @@ export function EaComposer({
           </Hint>
         ) : (
           touch && (
-            <Button aria-label="Send" onClick={send} disabled={blocked}>
+            <Button aria-label="Send" onMouseDown={keepFocus} onClick={send} disabled={blocked}>
               <Send className="size-4" />
             </Button>
           )

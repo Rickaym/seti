@@ -13,6 +13,7 @@ import { SmallWebRTCTransport, WavMediaManager } from '@pipecat-ai/small-webrtc-
 import {
   eaActionMessage,
   eaCallEndMessage,
+  eaProgressMessage,
   eaWakeMessage,
   type EaCallEndReason,
   type EaRequestData,
@@ -197,6 +198,10 @@ function listen(client: PipecatClient, dispatch: (action: CallAction) => void): 
     const parsed = eaActionMessage.safeParse(data)
     if (parsed.success) {
       caption({ type: 'action', action: parsed.data, at: Date.now() })
+    }
+    const progress = eaProgressMessage.safeParse(data)
+    if (progress.success) {
+      caption({ type: 'progress', tool: progress.data.tool, text: progress.data.text })
     }
     const wake = eaWakeMessage.safeParse(data)
     if (wake.success) {

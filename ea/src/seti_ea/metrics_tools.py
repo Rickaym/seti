@@ -112,7 +112,8 @@ def ea_usage_lines(stats: Any) -> list[str]:
     where: dict[str, Any] = raw if isinstance(raw, dict) else {}
     split = (
         f"{int(_num(where, 'voice'))} on calls, {int(_num(where, 'chat'))} in chat, "
-        f"{int(_num(where, 'inbox'))} for inbox reports"
+        f"{int(_num(where, 'inbox'))} for inbox reports, "
+        f"{int(_num(where, 'think'))} thinking questions through"
     )
     today = int(_num(fields, "calls_today"))
     tools = plural(int(_num(fields, "tool_calls")), "tool call")

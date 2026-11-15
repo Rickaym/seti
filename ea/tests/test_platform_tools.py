@@ -127,7 +127,7 @@ async def test_overview_metrics_reads_what_agents_shipped(tools: EaTools, fake_s
         "- an archived agent: 3 merged, 40 turns, 5 hours running, 11 dollars.",
         "1 tool call running now.",
         "The EA's own model calls: 4 today, 30 in the last 7 days (18 on calls, 9 in chat, 3 for inbox "
-        "reports), with 11 tool calls.",
+        "reports, 2 thinking questions through), with 11 tool calls.",
         "Each call took 16200 input tokens on average, 62% of them cached, and wrote 85.",
         "First token: median 0.8 seconds, 95th percentile 1.9 seconds.",
         "Speech to text: median 0.3 seconds, 95th percentile 0.6 seconds.",

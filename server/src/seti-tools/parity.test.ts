@@ -29,6 +29,7 @@ const NOT_FOR_AGENTS: Record<string, string> = {
   list_watches: "Watches feed the EA's inbox.",
   reply_team_chat: 'Answers a mention of @ea as the EA; agents post with post_team_chat.',
   go_to_sleep: "Ends the EA's listening on a voice call.",
+  think: "Hands the EA's own hard question to a slower reasoning model; an agent reasons in its own turn.",
   confirm_asked: "Carries out the user's yes to questions the EA asked; agents ask with request_change.",
   set_agent_access: 'Per-agent access is a security setting only the user changes.',
   set_agent_profile: 'Credentials are a security setting only the user changes.',

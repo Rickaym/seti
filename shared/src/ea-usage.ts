@@ -6,8 +6,8 @@ export const EA_USAGE_KEEP_DAYS = 30
 /** The rolling window the EA usage stats count, in days. */
 export const EA_USAGE_WINDOW_DAYS = 7
 
-/** Where an EA model call ran: on a voice call, in the typed chat, or as an inbox report. */
-export const EA_USAGE_CHANNELS = ['voice', 'chat', 'inbox'] as const
+/** Where an EA model call ran: on a call, in the typed chat, as an inbox report, or thinking. */
+export const EA_USAGE_CHANNELS = ['voice', 'chat', 'inbox', 'think'] as const
 export type EaUsageChannel = (typeof EA_USAGE_CHANNELS)[number]
 
 const EA_USAGE_BATCH_MAX = 200
@@ -83,4 +83,35 @@ export interface EaUsageStats {
   models: string[]
   stt: EaLatency
   tts: EaLatency
+}
+
+/** How a think ended: answered, cancelled by the user, out of time, or failed. */
+export const EA_THOUGHT_OUTCOMES = ['answered', 'cancelled', 'timed_out', 'failed'] as const
+export type EaThoughtOutcome = (typeof EA_THOUGHT_OUTCOMES)[number]
+
+const EA_THOUGHT_QUESTION_MAX = 2000
+const EA_THOUGHT_ROUNDS_MAX = 20
+
+/** One think the EA ran, in numbers only: never the question's text. */
+export const eaThoughtInput = z.strictObject({
+  channel: z.enum(['voice', 'chat']),
+  outcome: z.enum(EA_THOUGHT_OUTCOMES),
+  question_chars: z.number().int().min(0).max(EA_THOUGHT_QUESTION_MAX),
+  duration_ms: latencyMs,
+  tool_rounds: z.number().int().min(0).max(EA_THOUGHT_ROUNDS_MAX),
+})
+export type EaThoughtInput = z.infer<typeof eaThoughtInput>
+
+const OUTCOME_WORDS: Record<EaThoughtOutcome, string> = {
+  answered: 'answered',
+  cancelled: 'was cancelled',
+  timed_out: 'ran out of time',
+  failed: 'failed',
+}
+
+/** The audit line for a think, such as "EA thought a question through in 23 s: answered". */
+export function thoughtSummary({ outcome, duration_ms, tool_rounds }: EaThoughtInput): string {
+  const seconds = Math.round(duration_ms / 1000)
+  const rounds = tool_rounds === 1 ? '1 round of reading' : `${String(tool_rounds)} rounds of reading`
+  return `EA thought a question through in ${String(seconds)} s with ${rounds}: ${OUTCOME_WORDS[outcome]}`
 }
