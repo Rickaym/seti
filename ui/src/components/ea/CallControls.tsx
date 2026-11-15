@@ -18,11 +18,14 @@ function Control({ hint, touch, ...props }: ComponentProps<typeof Button> & { hi
     <Button
       size={touch ? 'lg' : 'sm'}
       {...props}
-      className={cn('flex-1', touch ? 'h-11 text-sm' : 'h-8', props.className)}
+      className={cn('flex-1', touch ? 'h-11 px-1.5 text-sm' : 'h-8', props.className)}
     />
   )
   return touch ? button : <Hint text={hint}>{button}</Hint>
 }
+
+/** A phone too narrow for four thumb-sized buttons wraps them instead of overflowing. */
+const row = (touch: boolean, className?: string) => cn('flex gap-2 px-3 pb-3', touch && 'flex-wrap gap-1.5', className)
 
 async function reroute(store: EaCallStore): Promise<void> {
   if (!(await store.reroute())) {
@@ -43,7 +46,7 @@ export function CallControls({ call, canStart, touch, className }: CallControlsP
   const sleeping = asleep(call)
   if (!callActive(call.phase)) {
     return (
-      <div className={cn('flex gap-2 px-3 pb-3', className)}>
+      <div className={row(touch, className)}>
         <Control
           touch={touch}
           hint={`Start a call (${CALL_SHORTCUT.label})`}
@@ -57,7 +60,7 @@ export function CallControls({ call, canStart, touch, className }: CallControlsP
     )
   }
   return (
-    <div className={cn('flex gap-2 px-3 pb-3', className)}>
+    <div className={row(touch, className)}>
       <Control
         touch={touch}
         hint={call.micOn ? 'Mute your microphone' : 'Unmute your microphone'}

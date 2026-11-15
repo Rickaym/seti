@@ -6,6 +6,7 @@ import { expect, test } from './support/fixtures.js'
 
 test.use({ permissions: ['microphone'] })
 
+const NARROW_PHONE = 340
 const READY: EaHealth = { ok: true, configured: true, missing: [], model: 'gpt-4.1-mini', turn: true }
 
 async function mockEa(page: Page) {
@@ -20,7 +21,16 @@ const sent = async (page: Page) => (await audioSpy(page)).sent
 const horizontalOverflow = async (page: Page) =>
   page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
 
-test('Reroute in the call sheet and a headset that connects both move the call without a reconnect', async ({
+async function expectButtonsInside(page: Page) {
+  const sheet = await eaSheet(page).boundingBox()
+  for (const button of await eaSheet(page).getByRole('button').all()) {
+    const box = await button.boundingBox()
+    expect((box?.x ?? 0) + (box?.width ?? 0)).toBeLessThanOrEqual((sheet?.x ?? 0) + (sheet?.width ?? 0) + 1)
+  }
+  expect(await horizontalOverflow(page)).toBeLessThanOrEqual(0)
+}
+
+test('a headset that connects and Reroute in the call sheet both move the call without a reconnect', async ({
   page,
 }) => {
   await spyOnAudio(page)
@@ -33,16 +43,15 @@ test('Reroute in the call sheet and a headset that connects both move the call w
 
   const reroute = eaSheet(page).getByRole('button', { name: 'Reroute', exact: true })
   expect((await reroute.boundingBox())?.height).toBeGreaterThanOrEqual(44)
-  const sheet = await eaSheet(page).boundingBox()
-  for (const button of await eaSheet(page).getByRole('button').all()) {
-    const box = await button.boundingBox()
-    expect((box?.x ?? 0) + (box?.width ?? 0)).toBeLessThanOrEqual((sheet?.x ?? 0) + (sheet?.width ?? 0) + 1)
-  }
-  expect(await horizontalOverflow(page)).toBeLessThanOrEqual(0)
+  await expectButtonsInside(page)
+  const size = page.viewportSize()
+  await page.setViewportSize({ width: NARROW_PHONE, height: size?.height ?? 800 })
+  await expectButtonsInside(page)
+  await page.setViewportSize(size ?? { width: 393, height: 800 })
 
-  await reroute.tap()
-  await expect.poll(async () => sent(page)).toEqual(['default', 'default'])
   await plugHeadset(page)
+  await expect.poll(async () => sent(page)).toEqual(['default', 'default'])
+  await reroute.tap()
   await expect.poll(async () => sent(page)).toEqual(['default', 'default', 'default'])
   await expect(eaSheet(page).getByTestId('ea-status')).toHaveText('Listening')
   expect(offers).toHaveLength(1)
