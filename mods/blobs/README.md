@@ -2,6 +2,10 @@
 
 Draws each agent as a small flat blob in its colour, with a face that shows what it is doing. In the agent list the blob sits at the row's left edge in place of the colour bar, and its face stands in for the status marker. In paused grid panels, the grid's agent picker, the legend, the phone agent header and Home, the status marker itself becomes a small blob.
 
+## Colours
+
+A blob looks the same in light and dark mode. Its body is the agent's colour as you chose it, and its face is a very dark or very light shade of the same hue, whichever reads better on that colour. An agent with no colour is a mid grey, and a stopped agent fades toward that grey. A body nearly as dark as a dark page, or as light as a light one, gets a thin edge in the theme's border colour. The small marks beside the head follow the theme, since they sit on the page.
+
 ## Faces
 
 - running: open eyes and a small smile; the blob bobs and blinks.

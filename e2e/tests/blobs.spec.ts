@@ -1,3 +1,4 @@
+import { expectSamePaintInBothThemes } from './support/blob-paint.js'
 import {
   animationsOf,
   bookmarkOf,
@@ -120,4 +121,8 @@ test('the legend draws its statuses as blobs while the list shows them', async (
   const legend = await open()
   await expect(legend.locator('[data-status-light] svg').filter({ visible: true })).toHaveCount(8)
   await expect(legend.getByTestId('status-blob')).toHaveCount(0)
+})
+
+test('blobs keep their colours and faces the same in light and dark mode', async ({ page, request }) => {
+  await expectSamePaintInBothThemes(page, request)
 })

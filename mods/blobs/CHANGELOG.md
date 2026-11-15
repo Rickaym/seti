@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.4.0
+
+Blobs look the same in light and dark mode. The body takes the agent's colour exactly as chosen, and the face is a very dark or very light shade of that colour's hue, whichever reads better on it. An agent with no colour is one grey in both modes, and a stopped agent fades toward that grey. A body nearly as dark or light as the page gets a thin edge so it stays visible.
+
 ## 1.3.0
 
 Blobs are redrawn as one flat shape in the agent's colour with a simple face that reads at 16 px. Running blobs look happy, idle ones are asleep with a small z, finished ones smile, and agents that need you look up with a question or exclamation mark. The Style setting is gone, and a saved style is dropped.

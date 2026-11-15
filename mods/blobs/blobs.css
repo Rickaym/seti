@@ -1,20 +1,10 @@
 .seti-blob {
-  --blob-skin: var(--agent-stripe, currentColor);
   position: relative;
   display: block;
   flex: none;
   width: 0.875rem;
   height: 0.875rem;
   margin: -0.0625rem;
-}
-
-.seti-blob[data-tinted='false'] {
-  --agent-stripe: initial;
-}
-
-/* A stopped agent's body leans toward the muted text colour, which keeps its face readable. */
-.seti-blob[data-faded='true'] {
-  --blob-skin: color-mix(in oklab, var(--agent-stripe, currentColor) 40%, var(--muted-foreground));
 }
 
 .seti-blob-bookmark,
@@ -80,13 +70,22 @@
   fill: var(--blob-skin);
 }
 
+/* A body as dark or light as the page gets a 1px edge in the border colour, outside its fill. */
+.dark .seti-blob[data-tone='dark'] .skin,
+.light .seti-blob[data-tone='light'] .skin {
+  stroke: var(--border);
+  stroke-width: 2px;
+  paint-order: stroke;
+  vector-effect: non-scaling-stroke;
+}
+
 .seti-blob .fill {
-  fill: var(--background);
+  fill: var(--blob-face);
 }
 
 .seti-blob .line {
   fill: none;
-  stroke: var(--background);
+  stroke: var(--blob-face);
   stroke-width: 1.7;
   stroke-linecap: round;
   stroke-linejoin: round;

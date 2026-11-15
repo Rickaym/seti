@@ -1,6 +1,8 @@
+import { contrast, hexOf, oklch, rgbOf, rgbOfOklch } from '@seti/mod-api'
 import { describe, expect, it } from 'vitest'
 import { BODY } from './Face'
 import { blobLook, blobSettings, DEFAULT_SETTINGS, EXPRESSION, showsIn, SIZE_PX, SIZES, type Expression } from './look'
+import { blobPaint, FADED_SHARE, faceOn, GREY } from './paint'
 import manifest from './seti-mod.json' with { type: 'json' }
 
 const STATUSES = Object.keys(EXPRESSION) as (keyof typeof EXPRESSION)[]
@@ -90,5 +92,78 @@ describe('blob settings', () => {
     }
     expect(SIZE_PX.Large.fine).toBeLessThanOrEqual(36)
     expect(SIZE_PX.Large.coarse).toBeLessThanOrEqual(43)
+  })
+})
+
+const PRESETS = ['#e8605b', '#e4a339', '#d4be52', '#95c352', '#3baca6', '#5488ec', '#7e74e1', '#cb57be']
+const LIGHT_BODIES = ['#ffffff', '#f5f0e0', '#ffff00', '#d4be52', '#a0e0ff']
+const DARK_BODIES = ['#000000', '#141821', '#1e3a8a', '#0000ff', '#4a1030']
+const lightnessOf = (hex: string) => oklch(rgbOf(hex)).l
+const hueGap = (a: string, b: string) => {
+  const gap = Math.abs(oklch(rgbOf(a)).h - oklch(rgbOf(b)).h) % 360
+  return Math.min(gap, 360 - gap)
+}
+
+describe('blob paint', () => {
+  it('draws the body in the colour the user chose, not one fitted to the theme', () => {
+    for (const color of [...PRESETS, ...LIGHT_BODIES, ...DARK_BODIES]) {
+      expect(blobPaint(color, false).body).toBe(color)
+    }
+  })
+
+  it('puts a very dark face on light bodies and a very light one on dark bodies', () => {
+    for (const body of LIGHT_BODIES) {
+      expect(lightnessOf(faceOn(body)), body).toBeLessThan(0.3)
+    }
+    for (const body of DARK_BODIES) {
+      expect(lightnessOf(faceOn(body)), body).toBeGreaterThan(0.9)
+    }
+  })
+
+  it("shades the face in the body's own hue, readable on every preset", () => {
+    for (const body of PRESETS) {
+      const face = faceOn(body)
+      expect(hueGap(face, body), body).toBeLessThan(12)
+      expect(contrast(rgbOf(face), rgbOf(body)), body).toBeGreaterThanOrEqual(4.3)
+    }
+  })
+
+  it('reads only the colour, so light and dark mode draw the same blob', () => {
+    for (const color of [...PRESETS, ...DARK_BODIES, null]) {
+      expect(blobPaint(color, false)).toEqual(blobPaint(color, false))
+      expect(blobPaint(color, true)).toEqual(blobPaint(color, true))
+    }
+    expect(blobPaint).toHaveLength(2)
+    expect(faceOn).toHaveLength(1)
+  })
+
+  it('draws an agent with no colour in one grey with a dark face, faded or not', () => {
+    const grey = hexOf(rgbOfOklch(GREY))
+    expect(blobPaint(null, false)).toEqual({ body: grey, face: faceOn(grey), tone: 'mid' })
+    expect(blobPaint(null, true)).toEqual(blobPaint(null, false))
+    expect(lightnessOf(faceOn(grey))).toBeLessThan(0.3)
+  })
+
+  it('mutes a stopped agent toward the same grey, keeping its hue and a readable face', () => {
+    for (const color of [...PRESETS, ...DARK_BODIES]) {
+      const own = oklch(rgbOf(color))
+      const faded = blobPaint(color, true)
+      const lch = oklch(rgbOf(faded.body))
+      expect(lch.c, color).toBeLessThanOrEqual(own.c * FADED_SHARE + 0.01)
+      expect(Math.abs(lch.l - GREY.l), color).toBeLessThanOrEqual(Math.abs(own.l - GREY.l) + 0.01)
+      expect(contrast(rgbOf(faded.face), rgbOf(faded.body)), color).toBeGreaterThanOrEqual(4.3)
+    }
+  })
+
+  it('marks only bodies as dark or light as a page, which get a thin edge there', () => {
+    for (const color of DARK_BODIES.filter((body) => lightnessOf(body) < 0.4)) {
+      expect(blobPaint(color, false).tone, color).toBe('dark')
+    }
+    for (const color of ['#ffffff', '#f5f0e0', '#ffff00']) {
+      expect(blobPaint(color, false).tone, color).toBe('light')
+    }
+    for (const color of ['#e8605b', '#5488ec', '#7e74e1', null]) {
+      expect(blobPaint(color, false).tone, String(color)).toBe('mid')
+    }
   })
 })
