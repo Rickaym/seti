@@ -29,7 +29,7 @@ const row = (touch: boolean, className?: string) => cn('flex gap-2 px-3 pb-3', t
 
 async function reroute(store: EaCallStore): Promise<void> {
   if (!(await store.reroute())) {
-    toast.error('Could not reroute the call', { description: 'Hang up and call again.', duration: Infinity })
+    toast.error('Could not switch the audio', { description: 'Hang up and call again.', duration: Infinity })
   }
 }
 
@@ -97,7 +97,7 @@ export function CallControls({ call, canStart, touch, className }: CallControlsP
         onClick={() => void reroute(store)}
       >
         <Headphones />
-        Reroute
+        Audio
       </Control>
       <Control
         touch={touch}

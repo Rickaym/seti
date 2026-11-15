@@ -369,7 +369,7 @@ On Android, Chrome sends call audio to a Bluetooth headset only when Chrome may 
 (Android settings, Apps, Chrome, Permissions). Chrome picks the headset when the call opens the
 microphone, and its output follows the microphone. So a call follows a headset that connects or
 wakes mid-call by reopening the microphone and the EA's voice once the device list settles, and
-the Reroute button in the call does the same on demand. A saved microphone that is not Bluetooth
+the Audio button in the call does the same on demand. A saved microphone that is not Bluetooth
 gives way to the system default while a Bluetooth headset is listed, since only the default
 follows the headset there.
 
