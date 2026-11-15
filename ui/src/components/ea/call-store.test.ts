@@ -10,6 +10,7 @@ interface FakeCall {
   switched: (string | null)[]
   mics: MediaTrackConstraints[]
   sent: string[]
+  reroutes: number
   answer: () => void
   refuse: (error: Error) => void
 }
@@ -31,6 +32,7 @@ function setup(overrides: Partial<CallDeps> = {}) {
       switched: [],
       mics: [mic()],
       sent: [],
+      reroutes: 0,
       answer,
       refuse,
     }
@@ -49,6 +51,11 @@ function setup(overrides: Partial<CallDeps> = {}) {
       },
       switchMic: (deviceId) => {
         call.switched.push(deviceId)
+      },
+      reroute: async () => {
+        call.reroutes += 1
+        handlers.reattach()
+        return Promise.resolve(true)
       },
       send: (type) => {
         call.sent.push(type)
@@ -266,5 +273,26 @@ describe('EaCallStore', () => {
     expect(store.getSnapshot().captions.items).toHaveLength(2)
     store.clearCaptions()
     expect(store.getSnapshot().captions.items).toEqual([])
+  })
+
+  it('reroutes only a connected call, and replays the voice of the current call only', async () => {
+    const { store, calls } = setup()
+    let replays = 0
+    store.setAudioReattach(() => {
+      replays += 1
+    })
+    expect(await store.reroute()).toBe(false)
+    const connecting = store.connect()
+    await settle()
+    expect(await store.reroute()).toBe(false)
+    calls[0]?.answer()
+    await connecting
+    expect(await store.reroute()).toBe(true)
+    expect(calls[0]?.reroutes).toBe(1)
+    expect(replays).toBe(1)
+    await store.hangUp()
+    calls[0]?.handlers.reattach()
+    expect(replays).toBe(1)
+    expect(await store.reroute()).toBe(false)
   })
 })

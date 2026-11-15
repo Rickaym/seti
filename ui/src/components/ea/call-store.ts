@@ -9,6 +9,8 @@ export interface LiveCall {
   enableMic: (on: boolean) => void
   /** Reopens the microphone on another device, null for the system default, mid-call. */
   switchMic: (deviceId: string | null) => void
+  /** Reopens the microphone and the EA's voice on the current route; resolves to whether it did. */
+  reroute: () => Promise<boolean>
   /** Sends an RTVI client message to the bot. */
   send: (type: string) => void
   /** The readable reason a connect failed. */
@@ -19,6 +21,8 @@ export interface CallHandlers {
   dispatch: (action: CallAction) => void
   /** The call ended without a hang-up; `error` says why when the engine knows, `reason` always. */
   dropped: (error: string | null, reason: EaCallEndReason) => void
+  /** Re-attaches the EA's voice, so the browser opens its output on the current route. */
+  reattach: () => void
 }
 
 interface CallEngine {
@@ -49,6 +53,7 @@ export class EaCallStore {
   private generation = 0
   private live: LiveCall | null = null
   private unlockAudio: (() => void) | null = null
+  private reattachAudio: (() => void) | null = null
 
   constructor(deps: CallDeps) {
     this.deps = deps
@@ -123,6 +128,11 @@ export class EaCallStore {
               this.end(error, reason)
             }
           },
+          reattach: () => {
+            if (!superseded()) {
+              this.reattachAudio?.()
+            }
+          },
         },
         this.deps.mic,
       )
@@ -146,6 +156,11 @@ export class EaCallStore {
   /** Lets the bot's audio play later; iOS Safari allows that only when a tap started it. */
   readonly setAudioUnlock = (unlock: (() => void) | null): void => {
     this.unlockAudio = unlock
+  }
+
+  /** Lets a reroute replay the bot's audio, so it plays on the route the call uses now. */
+  readonly setAudioReattach = (reattach: (() => void) | null): void => {
+    this.reattachAudio = reattach
   }
 
   /** Records whether the browser refused to play the EA's voice without a user gesture. */
@@ -175,6 +190,15 @@ export class EaCallStore {
     if (this.state.phase === 'connected') {
       this.live?.switchMic(deviceId)
     }
+  }
+
+  /** Moves a live call to the headset or output in use now; false when there is no call to move. */
+  readonly reroute = async (): Promise<boolean> => {
+    const live = this.live
+    if (this.state.phase !== 'connected' || live === null) {
+      return false
+    }
+    return live.reroute()
   }
 
   readonly setOutputMuted = (muted: boolean): void => {

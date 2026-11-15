@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import { apiBeacon } from '@/api'
 import { useEaCall } from './call-context'
 import { CallEndRecorder, pageHidden, sessionTabStorage } from './call-end'
-import type { CallEnd } from './call-state'
+import type { CallEnd, CallRoute } from './call-state'
 import type { EaCallStore } from './call-store'
 import { useCallMediaSession } from './media-session'
 
@@ -12,7 +12,7 @@ const sendEnd = (report: EaCallEndInput) => {
 }
 
 /** Reports each call end to the audit log; one the page closed on, when the tab opens Seti again. */
-function useCallEnds(connected: boolean, auto: boolean, lastEnd: CallEnd | null): void {
+function useCallEnds(connected: boolean, auto: boolean, lastEnd: CallEnd | null, route: CallRoute): void {
   const [recorder] = useState(
     () => new CallEndRecorder({ send: sendEnd, storage: sessionTabStorage, now: Date.now, hidden: pageHidden }),
   )
@@ -29,6 +29,9 @@ function useCallEnds(connected: boolean, auto: boolean, lastEnd: CallEnd | null)
     }
   }, [recorder, connected, auto])
   useEffect(() => {
+    recorder.route(route)
+  }, [recorder, route, connected])
+  useEffect(() => {
     if (lastEnd !== null) {
       recorder.ended(lastEnd.reason)
     }
@@ -37,9 +40,9 @@ function useCallEnds(connected: boolean, auto: boolean, lastEnd: CallEnd | null)
 
 /** Keeps a live call going as media the phone shows, and records how each call ends. */
 export function CallSession({ store }: { store: EaCallStore }) {
-  const { phase, micOn, auto, lastEnd } = useEaCall()
+  const { phase, micOn, auto, lastEnd, route } = useEaCall()
   const connected = phase === 'connected'
   useCallMediaSession(store, connected, micOn)
-  useCallEnds(connected, auto, lastEnd)
+  useCallEnds(connected, auto, lastEnd, route)
   return null
 }

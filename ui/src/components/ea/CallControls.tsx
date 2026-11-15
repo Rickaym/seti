@@ -1,12 +1,14 @@
 import { EA_CLIENT_MESSAGES } from '@seti/shared'
-import { Mic, MicOff, Moon, Phone, PhoneOff } from 'lucide-react'
+import { Headphones, Mic, MicOff, Moon, Phone, PhoneOff } from 'lucide-react'
 import type { ComponentProps, ReactElement } from 'react'
+import { toast } from 'sonner'
 import { Hint } from '@/components/Hint'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { useEaCallStore } from './call-context'
 import { asleep, callActive, type CallState } from './call-state'
 import { CALL_SHORTCUT } from './call-status'
+import type { EaCallStore } from './call-store'
 
 const PRESSED = 'aria-pressed:border-primary aria-pressed:bg-primary/10 aria-pressed:text-primary'
 
@@ -16,10 +18,19 @@ function Control({ hint, touch, ...props }: ComponentProps<typeof Button> & { hi
     <Button
       size={touch ? 'lg' : 'sm'}
       {...props}
-      className={cn('flex-1', touch ? 'h-11 text-sm' : 'h-8', props.className)}
+      className={cn('flex-1', touch ? 'h-11 px-1.5 text-sm' : 'h-8', props.className)}
     />
   )
   return touch ? button : <Hint text={hint}>{button}</Hint>
+}
+
+/** A phone too narrow for four thumb-sized buttons wraps them instead of overflowing. */
+const row = (touch: boolean, className?: string) => cn('flex gap-2 px-3 pb-3', touch && 'flex-wrap gap-1.5', className)
+
+async function reroute(store: EaCallStore): Promise<void> {
+  if (!(await store.reroute())) {
+    toast.error('Could not reroute the call', { description: 'Hang up and call again.', duration: Infinity })
+  }
 }
 
 interface CallControlsProps {
@@ -35,7 +46,7 @@ export function CallControls({ call, canStart, touch, className }: CallControlsP
   const sleeping = asleep(call)
   if (!callActive(call.phase)) {
     return (
-      <div className={cn('flex gap-2 px-3 pb-3', className)}>
+      <div className={row(touch, className)}>
         <Control
           touch={touch}
           hint={`Start a call (${CALL_SHORTCUT.label})`}
@@ -49,7 +60,7 @@ export function CallControls({ call, canStart, touch, className }: CallControlsP
     )
   }
   return (
-    <div className={cn('flex gap-2 px-3 pb-3', className)}>
+    <div className={row(touch, className)}>
       <Control
         touch={touch}
         hint={call.micOn ? 'Mute your microphone' : 'Unmute your microphone'}
@@ -77,6 +88,16 @@ export function CallControls({ call, canStart, touch, className }: CallControlsP
       >
         <Moon />
         Sleep
+      </Control>
+      <Control
+        touch={touch}
+        hint="Move the call to your headset or the output in use now"
+        variant="outline"
+        disabled={!connected}
+        onClick={() => void reroute(store)}
+      >
+        <Headphones />
+        Reroute
       </Control>
       <Control
         touch={touch}

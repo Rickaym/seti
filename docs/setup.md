@@ -327,9 +327,17 @@ pings the EA from a worker every second, since the EA drops its voice three seco
 ping and a background page slows its own timers. A network stall ends the call only once the
 browser declares the path failed, after about 30 seconds. While a call is live, the phone shows it
 as media with Mute and Hang up. Each call end goes to the audit log as `ea.call_ended`, with its
-reason, its length and whether Seti was in the background, but no audio or words; Settings, EA
-shows the last one. On Android, Chrome sends call audio to a Bluetooth headset only when Chrome may
-use Nearby devices (Android settings, Apps, Chrome, Permissions).
+reason, its length, whether Seti was in the background, the kinds of microphone it used (such as
+`default` or `bluetooth`, never a device name) and how often it rerouted, but no audio or words;
+Settings, EA shows the last one.
+
+On Android, Chrome sends call audio to a Bluetooth headset only when Chrome may use Nearby devices
+(Android settings, Apps, Chrome, Permissions). Chrome picks the headset when the call opens the
+microphone, and its output follows the microphone. So a call follows a headset that connects or
+wakes mid-call by reopening the microphone and the EA's voice once the device list settles, and
+the Reroute button in the call does the same on demand. A saved microphone that is not Bluetooth
+gives way to the system default while a Bluetooth headset is listed, since only the default
+follows the headset there.
 
 ### Redis
 

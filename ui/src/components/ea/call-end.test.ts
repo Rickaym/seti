@@ -36,7 +36,9 @@ describe('CallEndRecorder', () => {
     recorder.visibility()
     clock.now = 150_000
     recorder.ended('ice-failed')
-    expect(sent).toEqual([{ reason: 'ice-failed', auto: true, hidden: true, duration_s: 150, hidden_s: 90 }])
+    expect(sent).toEqual([
+      { reason: 'ice-failed', auto: true, hidden: true, duration_s: 150, hidden_s: 90, inputs: [], reroutes: 0 },
+    ])
     expect(stored()).toBeNull()
     recorder.ended('hang-up')
     expect(sent).toHaveLength(1)
@@ -57,9 +59,24 @@ describe('CallEndRecorder', () => {
     const left = JSON.stringify({ at: 5, auto: false, hiddenAt: 9 })
     const { recorder, sent, stored } = setup(left)
     recorder.recover()
-    expect(sent).toEqual([{ reason: 'page-closed', auto: false, hidden: true, duration_s: null, hidden_s: null }])
+    expect(sent).toEqual([
+      { reason: 'page-closed', auto: false, hidden: true, duration_s: null, hidden_s: null, inputs: [], reroutes: 0 },
+    ])
     expect(stored()).toBeNull()
     setup('not json').recorder.recover()
+  })
+
+  it('reports the microphones a call used and its reroutes, also after the page closed on it', () => {
+    const { recorder, sent, stored } = setup()
+    recorder.route({ inputs: ['bluetooth'], reroutes: 4 })
+    recorder.connected(false)
+    recorder.route({ inputs: ['default', 'bluetooth'], reroutes: 1 })
+    const left = stored()
+    recorder.ended('hang-up')
+    expect(sent[0]).toMatchObject({ inputs: ['default', 'bluetooth'], reroutes: 1 })
+    const next = setup(left)
+    next.recorder.recover()
+    expect(next.sent[0]).toMatchObject({ reason: 'page-closed', inputs: ['default', 'bluetooth'], reroutes: 1 })
   })
 
   it('reads the last end for the settings', () => {
