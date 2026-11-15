@@ -56,8 +56,11 @@ function Action({ item }: { item: ActionItem }) {
       >
         <Wrench className="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
         <span className="shrink-0 font-semibold">{item.tool}</span>
-        <span className="min-w-0 flex-1 truncate text-muted-foreground" title={item.summary ?? undefined}>
-          {item.summary ?? (item.running ? 'Working...' : '')}
+        <span
+          className="min-w-0 flex-1 truncate text-muted-foreground"
+          title={item.summary ?? item.progress ?? undefined}
+        >
+          {item.summary ?? item.progress ?? (item.running ? 'Working...' : '')}
         </span>
         <ActionState item={item} />
       </div>

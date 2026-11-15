@@ -16,5 +16,7 @@ test('the EA settings show what its model calls cost and how fast they answered'
   await expect(card).toContainText('Speech to text 0.3 s, text to speech 0.2 s, medians on calls')
 
   await card.getByRole('button', { name: /^Calls:/ }).hover()
-  await expect(page.getByRole('tooltip')).toContainText('3 on calls, 1 in chat, 1 for inbox reports, with 5 tool calls')
+  await expect(page.getByRole('tooltip')).toContainText(
+    '3 on calls, 1 in chat, 1 for inbox reports, 0 thinking questions through, with 5 tool calls',
+  )
 })

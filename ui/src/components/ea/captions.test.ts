@@ -10,7 +10,7 @@ function lines(items: readonly CaptionItem[]): string[] {
       case 'bot':
         return `${item.kind}${item.final ? '' : '*'} ${item.text}`
       case 'action':
-        return `action ${item.tool} ${item.running ? 'running' : String(item.ok)} ${item.summary ?? '-'}`
+        return `action ${item.tool} ${item.running ? 'running' : String(item.ok)} ${item.summary ?? item.progress ?? '-'}`
       case 'marker':
         return `marker ${item.text}`
     }
@@ -84,5 +84,20 @@ describe('captionsReducer', () => {
       { type: 'marker', text: 'Call ended', at: 4 },
     ])
     expect(lines(state.items)).toEqual(['bot Checking. Done.', 'action list_tasks running -', 'marker Call ended'])
+  })
+
+  it('shows what a running think is doing until it reports its answer', () => {
+    const state = run([
+      { type: 'progress', tool: 'think', text: 'Nobody listens' },
+      { type: 'call-started', tool: 'think', callId: 't1', at: 1 },
+      { type: 'progress', tool: 'think', text: 'Weighing it up.' },
+      { type: 'progress', tool: 'think', text: "I'm going through the open PRs." },
+    ])
+    expect(lines(state.items)).toEqual(["action think running I'm going through the open PRs."])
+    const done = [
+      { type: 'call-stopped', tool: 'think', callId: 't1', cancelled: false },
+      { type: 'action', action: { type: 'ea-action', tool: 'think', summary: 'Merge PR 12 first.', ok: true }, at: 2 },
+    ] satisfies CaptionEvent[]
+    expect(lines(done.reduce(captionsReducer, state).items)).toEqual(['action think true Merge PR 12 first.'])
   })
 })

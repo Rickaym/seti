@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from seti_ea.actions import CONFIRM_TOOLS
+from seti_ea.think import THINK_TOOL
 
 PHRASES = (
     "One moment.",
@@ -93,7 +94,15 @@ ACTION_LINES = {
     "change_workspace": "Very good. Changing the workspace.",
     "move_agent_to_workspace": "Certainly. Moving it there.",
     "confirm_asked": "Very good. Going ahead.",
+    "cancel_think": "Very good. I'll leave that one.",
 }
+# A think can take a minute, so it is always acknowledged, in words that vary from one to the next.
+THINK_LINES = (
+    "Let me think that through.",
+    "Give me a moment to weigh that up.",
+    "Let me work that one out.",
+    "Right. Let me reason that through.",
+)
 GROUP_CHAT_LINES = {
     True: "Certainly. Muting it in the group chat.",
     False: "Certainly. Unmuting it.",
@@ -142,6 +151,7 @@ class ToolAnnouncer:
         self._cooldown = cooldown_secs
         self._clock = clock
         self._next = 0
+        self._thinks = 0
         self._last: float | None = None
 
     def phrase(self, calls: Sequence[ToolCall] = ()) -> str | None:
@@ -150,6 +160,10 @@ class ToolAnnouncer:
         if any(call.name == SLEEP_TOOL for call in calls):
             self._last = now
             return SLEEP_LINE
+        if any(call.name == THINK_TOOL for call in calls):
+            self._last = now
+            self._thinks += 1
+            return THINK_LINES[(self._thinks - 1) % len(THINK_LINES)]
         if self._last is not None and now - self._last < self._cooldown:
             return None
         self._last = now

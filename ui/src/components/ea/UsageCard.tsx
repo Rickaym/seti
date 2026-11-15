@@ -82,7 +82,7 @@ function Stats({ stats }: { stats: EaUsageStats }) {
           label="Calls"
           value={`${String(stats.calls_today)} today`}
           detail={`${String(stats.calls_window)} in ${days} days`}
-          hint={`Model calls in the last ${days} days: ${String(where.voice)} on calls, ${String(where.chat)} in chat, ${String(where.inbox)} for inbox reports, with ${String(stats.tool_calls)} tool calls.`}
+          hint={`Model calls in the last ${days} days: ${String(where.voice)} on calls, ${String(where.chat)} in chat, ${String(where.inbox)} for inbox reports, ${String(where.think)} thinking questions through, with ${String(stats.tool_calls)} tool calls.`}
         />
       </div>
       {(stats.stt.samples > 0 || stats.tts.samples > 0) && (

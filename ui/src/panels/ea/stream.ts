@@ -1,6 +1,6 @@
 import type { EaChatEvent } from '@seti/shared'
 
-const EVENT_TYPES = new Set<EaChatEvent['type']>(['text', 'tool', 'tool_result', 'done', 'error'])
+const EVENT_TYPES = new Set<EaChatEvent['type']>(['text', 'thinking', 'tool', 'tool_result', 'done', 'error'])
 
 const isEventType = (value: string): value is EaChatEvent['type'] => (EVENT_TYPES as Set<string>).has(value)
 
