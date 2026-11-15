@@ -1,4 +1,4 @@
-import type { Rgb } from './agent-color'
+import type { Rgb } from '@seti/shared'
 
 /**
  * The theme tokens now on <html> as sRGB, read through the browser so color-mix and oklch come

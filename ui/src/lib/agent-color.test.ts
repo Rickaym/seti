@@ -3,19 +3,14 @@ import {
   agentColorFromWords,
   agentColorInput,
   agentColorWord,
-  normalizeAgentColor,
-} from '@seti/shared'
-import { describe, expect, it } from 'vitest'
-import {
-  agentColorLabel,
   contrast,
-  deriveAgentColor,
+  normalizeAgentColor,
   oklch,
-  PRESET_SWATCHES,
   rgbOf,
   type Rgb,
-  type ThemeInk,
-} from '@/lib/agent-color'
+} from '@seti/shared'
+import { describe, expect, it } from 'vitest'
+import { agentColorLabel, deriveAgentColor, PRESET_SWATCHES, type ThemeInk } from '@/lib/agent-color'
 
 describe('normalizeAgentColor', () => {
   it('takes #rgb and #rrggbb in any case and preset names, and stores #rrggbb', () => {

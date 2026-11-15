@@ -2,7 +2,7 @@
   "id": "blobs",
   "name": "Blobs",
   "displayName": "Blobs",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "seti": "^1.16",
   "description": "Draws each agent as a flat blob in its colour, with a face that shows its state.",
   "author": "Seti",

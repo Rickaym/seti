@@ -30,14 +30,19 @@ export type {
   TaskListEntry,
 } from '@seti/shared'
 export {
+  contrast,
   firstText,
   GRID_COLS,
+  hexOf,
   listedStatus,
+  oklch,
   TERMINAL_NAME_MAX,
   isRecord,
   orNull,
   previewStatus,
   recordAt,
+  rgbOf,
+  rgbOfOklch,
   SETI_HOST,
   SETI_HOSTNAMES,
   SIDE_QUESTION_MAX,
@@ -45,6 +50,8 @@ export {
   textAt,
   timeOf,
   type JsonRecord,
+  type Lch,
+  type Rgb,
 } from '@seti/shared'
 export type * from './agents.js'
 export type * from './server.js'

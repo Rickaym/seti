@@ -1,7 +1,7 @@
 import { flavors } from '@catppuccin/palette'
+import { contrast, labDistance, oklch } from '@seti/shared'
 import { describe, expect, it } from 'vitest'
 import { cascade, resolve, srgbOf, hueGap } from '@/components/theme/theme-cascade'
-import { contrast, labDistance, oklch } from '@/lib/agent-color'
 import { colourTokens, themeModFiles } from './theme-mod-files'
 
 const themeFile = (id: string) => {

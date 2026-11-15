@@ -1,3 +1,4 @@
+import { expectSamePaintInBothThemes } from './support/blob-paint.js'
 import {
   expectInsideRows,
   expectMarkers,
@@ -55,4 +56,8 @@ test('every size stays whole inside its row down to a 320 px screen', async ({ p
       await expectFitsPhone(page, `agent list with ${size} blobs at ${String(viewport)} px`)
     }
   }
+})
+
+test('on a phone, blobs keep their colours and faces the same in light and dark mode', async ({ page, request }) => {
+  await expectSamePaintInBothThemes(page, request)
 })
