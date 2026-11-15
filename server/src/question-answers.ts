@@ -50,7 +50,7 @@ function answerProblem(question: Question, item: Extract<QuestionAnswerItem, { a
   return null
 }
 
-const SECRET_FIELD = 'enter it in its own field on the Questions page; answers never carry a secret'
+const SECRET_FIELD = 'enter it in its own field on the Requests page; answers never carry a secret'
 
 function checkItem(question: Question, item: QuestionAnswerItem): void {
   if (item.action === 'dismiss') {

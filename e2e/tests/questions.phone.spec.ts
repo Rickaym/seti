@@ -7,8 +7,8 @@ import {
   agentQuestions,
   askingAgent,
   lastReply,
-  openQuestionsFromMenu,
-  questionsSection,
+  openRequestsFromMenu,
+  requestsSection,
   sectionCount,
   sentLine,
   sentToast,
@@ -16,7 +16,7 @@ import {
 
 test.use({ serverEnv: FAKE_CLAUDE_ENV })
 
-test('on a phone the Questions page goes back, and one Submit all answers two agents and closes it', async ({
+test('on a phone the Requests page goes back, and one Submit all answers two agents and closes it', async ({
   page,
   request,
 }) => {
@@ -24,15 +24,15 @@ test('on a phone the Questions page goes back, and one Submit all answers two ag
   const checker = await askingAgent(request, 'Phone checker', CHECKS_PROMPT)
 
   await page.goto('/#agents')
-  await openQuestionsFromMenu(page)
-  await expect(page).toHaveURL(/#questions$/)
-  await expect(page.getByRole('heading', { name: 'Questions' })).toBeVisible()
-  await expectFitsPhone(page, 'Questions')
+  await openRequestsFromMenu(page)
+  await expect(page).toHaveURL(/#requests$/)
+  await expect(page.getByRole('heading', { name: 'Requests' })).toBeVisible()
+  await expectFitsPhone(page, 'Requests')
   await page.getByRole('button', { name: 'Back', exact: true }).tap()
   await expect(page).toHaveURL(/#agents$/)
   await expect(page.getByRole('heading', { name: 'Agents', level: 1 })).toBeVisible()
 
-  await openQuestionsFromMenu(page)
+  await openRequestsFromMenu(page)
   await agentQuestions(page, pusher).getByRole('radio', { name: 'No' }).tap()
   const checks = agentQuestions(page, checker)
   await checks.getByRole('checkbox', { name: /E2E/ }).tap()
@@ -44,8 +44,8 @@ test('on a phone the Questions page goes back, and one Submit all answers two ag
   await expect(page).toHaveURL(/#agents$/)
   await expect(page.getByRole('heading', { name: 'Agents', level: 1 })).toBeVisible()
   await page.getByRole('button', { name: 'Menu' }).tap()
-  await expect(questionsSection(page)).toBeVisible()
-  await expect(sectionCount(questionsSection(page))).toHaveCount(0)
+  await expect(requestsSection(page)).toBeVisible()
+  await expect(sectionCount(requestsSection(page))).toHaveCount(0)
   await page.keyboard.press('Escape')
   await expect.poll(async () => lastReply(request, pusher.id)).toBe(`Got your answers. ${PUSH_QUESTION} No`)
   await expect.poll(async () => lastReply(request, checker.id)).toContain('E2E')

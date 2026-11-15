@@ -240,7 +240,7 @@ export async function expireLeftoverQuestions(): Promise<void> {
 const ASKING =
   'When you need the user to decide or tell you something before you can go on, ask with the ' +
   'AskUserQuestion tool instead of writing the question in your reply. Seti collects every ' +
-  "agent's questions in one Questions view; your call waits there and its result carries the " +
+  "agent's questions in one Requests view; your call waits there and its result carries the " +
   'answers. Give each question two to four short options, since the user can always answer in ' +
   'their own words instead; for a yes or no question make the options exactly Yes and No. Ask ' +
   'related questions together, up to four in one call. Ask the same way before an action that ' +

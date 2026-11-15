@@ -12,6 +12,8 @@ Handler = Callable[[Mapping[str, Any]], Awaitable[ToolResult]]
 
 PROMPT_CHARS = 200
 ID_CHARS = 8
+HELD_ONE = "access change, tool call or plan"
+HELD_MANY = "access changes, tool calls or plans"
 
 ANSWER_QUESTION_SPEC = ToolSpec(
     "answer_question",
@@ -53,7 +55,7 @@ def answer_type(question: Mapping[str, Any]) -> str:
 
 
 SECRET_IN_SETI = (
-    "{name} is a secret the agent asked for; only the user enters it, on the Questions page in Seti. "
+    "{name} is a secret the agent asked for; only the user enters it, on the Requests page in Seti. "
     "Tell the user to answer it there; you can only dismiss it."
 )
 
@@ -85,6 +87,58 @@ async def list_questions(seti: SetiClient, now: datetime) -> ToolResult:
         )
         lines += [_question_line(question) for question in asked]
     return ToolResult("\n".join(lines), f"{plural(len(open_questions), 'question')} open")
+
+
+def _change_text(change: Mapping[str, Any]) -> str:
+    kind = change.get("kind")
+    if kind == "allow_host":
+        return f"access to {change.get('host')}:{change.get('port', 443)}"
+    if kind == "api_key":
+        return f"an API key {change.get('env')} for {and_list([str(h) for h in change.get('hosts', [])])}"
+    return f"the MCP server {change.get('server')}"
+
+
+def _held_lines(pending: Mapping[str, Any]) -> list[str]:
+    lines = [
+        f"- {r.get('task_title')} asks for {_change_text(r.get('change') or {})}: "
+        f"{clip(str(r.get('reason', '')), PROMPT_CHARS)}"
+        for r in dicts(pending.get("access"))
+    ]
+    for request in dicts(pending.get("permissions")):
+        what = (
+            "asks to approve its plan"
+            if request.get("tool_name") == "ExitPlanMode"
+            else f"asks to use {request.get('tool_name')}: "
+            f"{clip(str(request.get('summary', '')), PROMPT_CHARS)}"
+        )
+        lines.append(f"- {request.get('task_title')} {what}")
+    return lines
+
+
+async def list_requests(seti: SetiClient, now: datetime) -> ToolResult:
+    """Every request that waits on the user, for search_seti's requests scope."""
+    pending = await seti.get("/requests")
+    pending = pending if isinstance(pending, dict) else {}
+    asked = dicts(pending.get("questions"))
+    held = _held_lines(pending)
+    notes = dicts(pending.get("notes"))
+    if not asked and not held and not notes:
+        return ToolResult("Nothing waits on the user in Requests.", "No requests")
+    lines = []
+    if asked:
+        lines.append(f"{plural(len(asked), 'question')}, which you may pass the user's answers to:")
+        lines += [f"{_question_line(q)} from {q.get('task_title')}" for q in asked]
+    if held:
+        lines.append(
+            f"{plural(len(held), HELD_ONE, HELD_MANY)} only the user allows or denies, in Seti, Requests; "
+            "remind the user, never answer them:"
+        )
+        lines += held
+    if notes:
+        lines.append(f"{plural(len(notes), 'knowledge note')} only the user approves, in Seti, Requests:")
+        lines += [f'- "{n.get("title")}", proposed {ago(n.get("created_at"), now)}' for n in notes]
+    count = len(asked) + len(held) + len(notes)
+    return ToolResult("\n".join(lines), f"{plural(count, 'request')} waiting")
 
 
 def _find(open_questions: list[dict[str, Any]], ref: str) -> dict[str, Any]:

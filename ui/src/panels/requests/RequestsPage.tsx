@@ -1,19 +1,19 @@
 import { ArrowLeft } from 'lucide-react'
-import { toast } from 'sonner'
 import { Hint } from '@/components/Hint'
 import { DetailHeader } from '@/components/SplitPane'
 import { Button } from '@/components/ui/button'
-import { useOpenQuestions } from '@/hooks/useQuestions'
+import { useRequests } from '@/hooks/useRequests'
 import { goBack } from '@/lib/route'
-import { QuestionsForm } from '@/panels/questions/QuestionsForm'
+import { RequestsView } from '@/panels/requests/RequestsView'
+import { REQUESTS } from '@/panels/requests/label'
 
 const back = () => {
   goBack('agents')
 }
 
-/** Every agent's open questions in one place; it goes back once a send leaves none open. */
-export function QuestionsPage() {
-  const open = useOpenQuestions()
+/** Every agent's pending requests in one place; it goes back once everything in it is settled. */
+export function RequestsPage() {
+  const { requests } = useRequests()
   return (
     <div className="flex h-full min-h-0 flex-col">
       <DetailHeader>
@@ -23,20 +23,13 @@ export function QuestionsPage() {
               <ArrowLeft />
             </Button>
           </Hint>
-          <h1 className="truncate text-lg font-semibold max-md:text-base">Questions</h1>
+          <h1 className="truncate text-lg font-semibold max-md:text-base">{REQUESTS.label}</h1>
         </div>
         <div className="text-xs text-muted-foreground">
-          What your agents wait on you for. Each agent goes on once all its questions are answered or dismissed.
+          What your agents wait on you for: questions, access, plans and tool calls, then notes to approve.
         </div>
       </DetailHeader>
-      <QuestionsForm
-        questions={open}
-        submitLabel="Submit all"
-        onSettled={(summary) => {
-          toast.success(summary)
-          back()
-        }}
-      />
+      <RequestsView requests={requests} submitLabel="Submit all" onEmpty={back} />
     </div>
   )
 }

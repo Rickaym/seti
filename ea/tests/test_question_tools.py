@@ -132,3 +132,32 @@ async def test_answer_question_names_the_matches_when_several_fit(
 def test_prompt_says_the_ea_answers_only_with_what_the_user_said() -> None:
     assert "Answer with answer_question only with what the user said" in SYSTEM_PROMPT
     assert "never answer on your own judgment or guess" in SYSTEM_PROMPT
+
+
+async def test_search_seti_lists_every_request_and_says_which_only_the_user_answers(
+    tools: EaTools, fake_seti: FakeSeti
+) -> None:
+    empty = await tools.call("search_seti", {"in": "requests"})
+    assert empty.text == "Nothing waits on the user in Requests."
+    fake_seti.questions = [dict(PUSH)]
+    fake_seti.change_requests = [
+        {
+            "task_title": "Fetcher",
+            "change": {"kind": "allow_host", "host": "fixtures.example.com", "port": 443},
+            "reason": "The tests download fixtures.",
+        }
+    ]
+    fake_seti.permission_requests = [{"task_title": "Planner", "tool_name": "ExitPlanMode", "summary": ""}]
+    fake_seti.knowledge = [
+        {"title": "Build first", "status": "proposed", "created_at": "2026-09-27T11:00:00.000Z"}
+    ]
+    result = await tools.call("search_seti", {"in": "requests"})
+    lines = result.text.splitlines()
+    assert lines[0] == "1 question, which you may pass the user's answers to:"
+    assert lines[1] == "- [1a2b3c4d] Push (yes or no, or own words): Push? from Builder"
+    assert lines[2].startswith("2 access changes, tool calls or plans only the user allows or denies")
+    assert lines[3] == ("- Fetcher asks for access to fixtures.example.com:443: The tests download fixtures.")
+    assert lines[4] == "- Planner asks to approve its plan"
+    assert lines[5] == "1 knowledge note only the user approves, in Seti, Requests:"
+    assert lines[6].startswith('- "Build first", proposed')
+    assert result.summary == "4 requests waiting"

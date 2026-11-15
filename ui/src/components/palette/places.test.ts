@@ -127,14 +127,14 @@ describe('other places', () => {
       'EA',
       'Home',
       'Agents',
-      'Questions',
+      'Requests',
       'Context',
       'Settings',
       'Group chat',
     ])
-    expect(sections.find((p) => p.title === 'Questions')).toMatchObject({
-      target: { section: 'questions' },
-      keywords: 'Work answer agents ask secrets',
+    expect(sections.find((p) => p.title === 'Requests')).toMatchObject({
+      target: { section: 'requests' },
+      keywords: 'Work answer questions agents ask secrets access allow plans approve notes',
     })
     const chat = sections.at(-1)?.target
     if (chat !== undefined && 'run' in chat) {

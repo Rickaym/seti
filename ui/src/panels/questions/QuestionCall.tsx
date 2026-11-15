@@ -3,9 +3,9 @@ import { MessageCircleQuestion } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { apiGet } from '@/api'
 import { Button } from '@/components/ui/button'
-import { useAgentQuestionCount } from '@/hooks/useQuestions'
+import { useAgentQuestionCount } from '@/hooks/useRequests'
 import type { ToolUseBlock } from '@/lib/transcript'
-import { openQuestionsIn } from '@/panels/questions/open-questions'
+import { openRequestsIn } from '@/panels/requests/open-requests'
 
 /** Claude Code's tool for asking the user, whose calls show as their questions and answers. */
 export const ASK_TOOL = 'AskUserQuestion'
@@ -86,7 +86,7 @@ export function QuestionCall({ taskId, block, done }: { taskId: string; block: T
           <Button
             size="xs"
             onClick={() => {
-              openQuestionsIn(taskId)
+              openRequestsIn(taskId)
             }}
           >
             Answer

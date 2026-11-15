@@ -2,7 +2,7 @@ import { listedStatus, waitsOnYou, type TaskListEntry } from '@seti/shared'
 import { CircleAlert } from 'lucide-react'
 import { useNeedsYou } from '@/hooks/useNeedsYou'
 import { agentColorAttr } from '@/lib/agent-color-sheet'
-import { useOpenFromNeedsYou } from '@/panels/questions/useQuestionsPane'
+import { useOpenFromNeedsYou } from '@/panels/requests/useRequestsPane'
 import { StatusLight } from '@/panels/tasks/StatusPill'
 import { reasonLine } from '@/panels/tasks/status-label'
 

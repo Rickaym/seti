@@ -3,7 +3,6 @@ import { describe, expect, it } from 'vitest'
 import {
   answerItem,
   asksForSecret,
-  byAgent,
   draftOf,
   EMPTY_DRAFT,
   initialDraft,
@@ -66,9 +65,7 @@ describe('question drafts', () => {
     })
   })
 
-  it('groups questions by agent and sums up a send', () => {
-    const other = question({ id: 'q2', task_id: 't2', task_title: 'Tester' })
-    expect(byAgent([question(), other, question({ id: 'q3' })]).map((group) => group.questions.length)).toEqual([2, 1])
+  it('sums up a send', () => {
     expect(
       sentSummary({ answered: 3, dismissed: 1, skipped: 0, resumed: [{ task_id: 't1', task_title: 'Builder' }] }),
     ).toBe('Sent 3 answers, dismissed 1 question. Going on: Builder.')
