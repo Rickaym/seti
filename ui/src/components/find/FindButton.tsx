@@ -1,8 +1,8 @@
 import { TextSearch } from 'lucide-react'
-import type { MouseEvent } from 'react'
 import { Hint } from '@/components/Hint'
 import type { FindState } from '@/components/find/useFind'
 import { Button } from '@/components/ui/button'
+import { keepFocus } from '@/lib/keep-focus'
 
 /** Opens find and replace in a message box, for screens without a keyboard to press Ctrl+F. */
 export function FindButton({ find }: { find: FindState }) {
@@ -13,17 +13,13 @@ export function FindButton({ find }: { find: FindState }) {
         size="icon-sm"
         aria-label="Find"
         className="shrink-0 pointer-coarse:size-10"
+        onMouseDown={keepFocus}
         onClick={find.openFind}
       >
         <TextSearch />
       </Button>
     </Hint>
   )
-}
-
-/** Tapping it leaves focus in the field, so the field's box keeps showing the button. */
-const keepFocus = (e: MouseEvent) => {
-  e.preventDefault()
 }
 
 /**
