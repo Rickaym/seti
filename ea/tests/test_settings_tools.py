@@ -931,7 +931,7 @@ async def test_refreshes_resources_ea_settings_schedule_and_security(
         'Done. Your wake word is on: on a call you answer after hearing "Hey Seti", and stay awake 60 '
         "seconds after the last words."
     )
-    assert on.text.endswith("You address the user with no title.")
+    assert on.text.endswith("You address the user with no title. You listen and speak in English.")
     asked, titled = await confirm(tools, "update_ea_settings", {"form_of_address": " ma'am "})
     assert asked.text.count('You address the user as "ma\'am" now and then.') == 1
     assert titled.ok
@@ -940,10 +940,31 @@ async def test_refreshes_resources_ea_settings_schedule_and_security(
     long = await tools.call("update_ea_settings", {"form_of_address": "x" * 21})
     assert long.summary == "Too long"
     _, cleared = await confirm(tools, "update_ea_settings", {"form_of_address": ""})
-    assert cleared.text.endswith("You address the user with no title.")
+    assert "You address the user with no title." in cleared.text
     security = await tools.call("get_security_settings", {})
     assert security.text.startswith("The sandbox is on")
     assert "You cannot change them or see any secret." in security.text
+
+
+async def test_the_ea_changes_its_language_by_code_or_name(tools: EaTools, fake: SettingsFake) -> None:
+    asked, turkish = await confirm(tools, "update_ea_settings", {"language": "Turkish"})
+    assert asked.text.count("You listen and speak in Turkish.") == 1
+    assert turkish.text.endswith("You listen and speak in Turkish.")
+    assert fake.ea["language"] == "tr"
+    assert fake.ea["wake_phrase"] == "Hey Seti"
+    same = await tools.call("update_ea_settings", {"language": "tr"})
+    assert same.summary == "Nothing to change"
+    _, kept = await confirm(tools, "update_ea_settings", {"keep_awake_seconds": 45})
+    assert fake.ea["language"] == "tr"
+    assert kept.text.endswith("You listen and speak in Turkish.")
+    _, multi = await confirm(tools, "update_ea_settings", {"language": "multi"})
+    assert multi.text.endswith(
+        "You listen in any of your languages and answer in the one the user last used."
+    )
+    unknown = await tools.call("update_ea_settings", {"language": "Klingon"})
+    assert unknown.summary == "Unknown language"
+    assert "You can speak: English, Multilingual, Arabic" in unknown.text
+    assert fake.ea["language"] == "multi"
 
 
 async def test_seti_refusing_the_ea_reads_plainly(tools: EaTools, fake: SettingsFake) -> None:

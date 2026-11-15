@@ -17,6 +17,7 @@ from pipecat.frames.frames import (
     OutputTransportMessageUrgentFrame,
     STTUpdateSettingsFrame,
     TTSSpeakFrame,
+    TTSUpdateSettingsFrame,
 )
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.worker import PipelineParams, PipelineWorker
@@ -66,9 +67,11 @@ from seti_ea.inbox import (
     VoiceDelivery,
     deliver,
 )
+from seti_ea.language import stt_endpointing, stt_language, tts_language
 from seti_ea.live_context import LiveContext, LiveContextInjector
 from seti_ea.local_wake import PausableDeepgramSTT, SleepControl
 from seti_ea.packs import VOICE_TIMEOUT_SECS, PackPrompt, SystemPromptUpdates
+from seti_ea.phrasebook import CallLanguage, Phrasebook, responses_translate
 from seti_ea.promises import PromiseCheck
 from seti_ea.prompt import (
     SYSTEM_PROMPT,
@@ -90,7 +93,7 @@ from seti_ea.wake import (
     WakeSettings,
     WakeStrategy,
     WakeUserAggregator,
-    fetch_wake_settings,
+    fetch_ea_settings,
     turn_start_strategies,
     wake_message,
 )
@@ -205,6 +208,15 @@ def voice_text_filter() -> MarkdownTextFilter:
     return MarkdownTextFilter(MarkdownTextFilter.InputParams(filter_code=True, filter_tables=True))
 
 
+def language_frames(language: str) -> tuple[STTUpdateSettingsFrame, TTSUpdateSettingsFrame]:
+    """Moves speech to text and the voice of a live call to the EA's language."""
+    heard = DeepgramSTTService.Settings(
+        language=stt_language(language), endpointing=stt_endpointing(language)
+    )
+    voiced = ElevenLabsTTSService.Settings(language=tts_language(language))
+    return STTUpdateSettingsFrame(delta=heard), TTSUpdateSettingsFrame(delta=voiced)
+
+
 async def publish_wake(wake: WakeStrategy, before: WakeSettings, announce: Announce, retune: Retune) -> None:
     """Retunes speech to text if the keyterms changed, then announces the wake state."""
     if keyterms(before) != keyterms(wake.settings):
@@ -273,7 +285,9 @@ async def run_bot(
     gate = SilenceGate()
     call_inbox = CallInbox()
     conversation.call = call_inbox
-    wake = WakeStrategy(await fetch_wake_settings(seti))
+    wake_settings, language = await fetch_ea_settings(seti)
+    wake = WakeStrategy(wake_settings)
+    speaking = CallLanguage(language, Phrasebook(responses_translate(settings, seti)))
     if call.auto:
         wake.sleep()
     transport = SmallWebRTCTransport(
@@ -284,13 +298,19 @@ async def run_bot(
     stt = PausableDeepgramSTT(
         paused=wake.settings.enabled and LOCAL_SPOTTER.get() is not None,
         api_key=settings.deepgram_api_key,
-        settings=DeepgramSTTService.Settings(keyterm=keyterms(wake.settings)),
+        settings=DeepgramSTTService.Settings(
+            keyterm=keyterms(wake.settings),
+            language=stt_language(language),
+            endpointing=stt_endpointing(language),
+        ),
     )
     control = SleepControl(wake, stt, LOCAL_SPOTTER.get)
     tts = ElevenLabsTTSService(
         api_key=settings.elevenlabs_api_key,
         settings=ElevenLabsTTSService.Settings(
-            voice=settings.elevenlabs_voice_id, model=settings.elevenlabs_model
+            voice=settings.elevenlabs_voice_id,
+            model=settings.elevenlabs_model,
+            language=tts_language(language),
         ),
         text_filters=[voice_text_filter()],
     )
@@ -316,9 +336,14 @@ async def run_bot(
     async def fall_asleep() -> ToolResult:
         return await put_to_sleep(wake, announce_wake, retune)
 
+    async def say(text: str) -> None:
+        line = speaking.line(text)
+        if line is not None:
+            await tts.queue_frame(filler_frame(line))
+
     usage = UsageRecorder(seti)
     progress = SpokenProgress(
-        lambda text: tts.queue_frame(filler_frame(text)),
+        say,
         lambda: gate.floor_free(QUIET_SECS) and not (wake.settings.enabled and not wake.awake),
         show=lambda text: rtvi.send_server_message(progress_message(text)),
     )
@@ -373,7 +398,7 @@ async def run_bot(
         params=PipelineParams(enable_metrics=True, enable_usage_metrics=True),
         idle_timeout_secs=IDLE_TIMEOUT_SECS,
         cancel_on_idle_timeout=False,
-        observers=[SilenceObserver(gate), UsageObserver(usage, "voice")],
+        observers=[SilenceObserver(gate), UsageObserver(usage, "voice"), speaking],
         rtvi_processor=rtvi,
         rtvi_observer_params=RTVIObserverParams(
             function_call_report_level={"*": RTVIFunctionCallReportLevel.NAME}
@@ -385,8 +410,11 @@ async def run_bot(
 
     async def apply_settings() -> None:
         before = wake.settings
-        if wake.configure(await fetch_wake_settings(seti)):
+        now, language = await fetch_ea_settings(seti)
+        if wake.configure(now):
             await publish_wake(wake, before, announce_wake, retune)
+        if speaking.change(language):
+            await worker.queue_frames(language_frames(language))
 
     @worker.event_handler("on_idle_timeout")
     async def on_idle_timeout(_worker: PipelineWorker) -> None:
@@ -403,7 +431,7 @@ async def run_bot(
             return
         text = announcer.phrase([ToolCall(c.function_name, c.arguments or {}) for c in calls])
         if text is not None:
-            await tts.queue_frame(filler_frame(text))
+            await say(text)
 
     @rtvi.event_handler("on_client_ready")
     async def on_client_ready(_rtvi: RTVIProcessor) -> None:

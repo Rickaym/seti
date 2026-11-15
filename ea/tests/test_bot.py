@@ -7,7 +7,10 @@ from pipecat.adapters.schemas.tools_schema import ToolsSchema
 from pipecat.adapters.services.open_ai_adapter import OpenAILLMAdapter, OpenAILLMInvocationParams
 from pipecat.frames.frames import FunctionCallResultProperties
 from pipecat.processors.aggregators.llm_context import LLMContext
+from pipecat.services.deepgram.stt import DeepgramSTTService
+from pipecat.services.elevenlabs.tts import ElevenLabsTTSService
 from pipecat.services.llm_service import FunctionCallParams
+from pipecat.transcriptions.language import Language
 from pipecat.turns.user_stop import TurnAnalyzerUserTurnStopStrategy
 
 from seti_ea.bot import (
@@ -15,6 +18,7 @@ from seti_ea.bot import (
     action_message,
     filler_frame,
     keyterms,
+    language_frames,
     openai_llm,
     put_to_sleep,
     sleep_schema,
@@ -222,6 +226,18 @@ def test_the_prompt_covers_sleep_and_queued_messages() -> None:
     assert "Before start_task, stop_task or a public post_team_chat, say" in SYSTEM_PROMPT
     assert "send_to_task" not in SYSTEM_PROMPT
     assert "Messaging an idle task" not in SYSTEM_PROMPT
+
+
+def test_a_language_change_retunes_speech_to_text_and_the_voice() -> None:
+    def deltas(language: str) -> tuple[object, object]:
+        heard, voiced = language_frames(language)
+        return heard.delta, voiced.delta
+
+    hears, speaks = DeepgramSTTService.Settings, ElevenLabsTTSService.Settings
+    assert deltas("tr") == (hears(language=Language.TR, endpointing=None), speaks(language=Language.TR))
+    assert deltas("fil") == (hears(language=Language.TL, endpointing=None), speaks(language=Language.FIL))
+    assert deltas("multi") == (hears(language="multi", endpointing=100), speaks(language=None))
+    assert deltas("en") == (hears(language=Language.EN, endpointing=None), speaks(language=None))
 
 
 def test_filler_lines_are_spoken_but_kept_out_of_the_llm_context() -> None:

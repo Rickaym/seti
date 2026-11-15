@@ -15,6 +15,7 @@ import {
   ATTENTION_TIERS,
   EA_CONTEXT_PACKS,
   EA_FORM_OF_ADDRESS,
+  EA_LANGUAGE,
   EA_INBOX,
   EA_INBOX_COALESCE,
   EA_INBOX_URGENT,
@@ -177,4 +178,5 @@ export const MIGRATIONS: readonly Migration[] = [
   { version: 100, name: 'question_secrets', sql: QUESTION_SECRETS },
   { version: 101, name: 'task_aside', sql: TASK_ASIDE },
   { version: 102, name: 'task_model_fallback', sql: TASK_MODEL_FALLBACK },
+  { version: 103, name: 'ea_language', sql: EA_LANGUAGE },
 ]

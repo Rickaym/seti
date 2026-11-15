@@ -6,6 +6,8 @@ from typing import Any, cast
 
 from loguru import logger
 
+from seti_ea.language import DEFAULT as DEFAULT_LANGUAGE
+from seti_ea.language import language_of
 from seti_ea.prompt import base_prompt
 from seti_ea.seti import SetiClient, SetiError
 
@@ -13,9 +15,11 @@ VOICE_TIMEOUT_SECS = 0.3
 CHAT_TIMEOUT_SECS = 2.0
 
 
-def system_prompt(packs: str, actions: str = "", form_of_address: str = "") -> str:
+def system_prompt(
+    packs: str, actions: str = "", form_of_address: str = "", language: str = DEFAULT_LANGUAGE
+) -> str:
     """The base prompt, the role and reference packs as Seti rendered them, then mod actions."""
-    base = base_prompt(form_of_address)
+    base = base_prompt(form_of_address, language)
     return "\n\n".join(part for part in (base, packs.strip(), actions.strip()) if part)
 
 
@@ -28,6 +32,7 @@ class PackPrompt:
         self._text = ""
         self._actions = ""
         self._address = ""
+        self._language = DEFAULT_LANGUAGE
 
     async def system_prompt(self) -> str:
         try:
@@ -40,10 +45,11 @@ class PackPrompt:
             self._text = str(prompt.get("text") or "")
             self._actions = str(prompt.get("mod_actions") or "")
             self._address = str(prompt.get("form_of_address") or "")
+            self._language = language_of(prompt)
         return self._prompt()
 
     def _prompt(self) -> str:
-        return system_prompt(self._text, self._actions, self._address)
+        return system_prompt(self._text, self._actions, self._address, self._language)
 
 
 class SystemPromptUpdates:

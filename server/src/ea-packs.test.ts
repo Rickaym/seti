@@ -76,6 +76,7 @@ describe('EA context packs', () => {
       max_chars: EA_PACK_CHARS_MAX,
       mod_actions: '',
       form_of_address: '',
+      language: 'en',
     })
   })
 

@@ -30,7 +30,7 @@ from seti_ea.wake import (
     WakeSettings,
     WakeStrategy,
     WakeUserAggregator,
-    fetch_wake_settings,
+    fetch_ea_settings,
     normalise_transcript,
     parse_wake_settings,
     strip_wake_phrase,
@@ -53,10 +53,14 @@ def test_settings_parse_with_defaults() -> None:
 
 async def test_settings_come_from_seti_and_fall_back_to_off(fake_seti: FakeSeti) -> None:
     seti = SetiClient("http://127.0.0.1:3006", transport=httpx.MockTransport(fake_seti.handle))
-    assert await fetch_wake_settings(seti) == WakeSettings()
+    assert await fetch_ea_settings(seti) == (WakeSettings(), "en")
     fake_seti.ea_settings = {"wake_enabled": True, "wake_phrase": "Hey Seti", "keep_awake_seconds": 20}
-    assert await fetch_wake_settings(seti) == WakeSettings(enabled=True, keep_awake_secs=20.0)
-    assert [r.url.path for r in fake_seti.requests] == ["/api/ea/settings", "/api/ea/settings"]
+    assert await fetch_ea_settings(seti) == (WakeSettings(enabled=True, keep_awake_secs=20.0), "en")
+    fake_seti.ea_settings = {**fake_seti.ea_settings, "language": "tr"}
+    assert (await fetch_ea_settings(seti))[1] == "tr"
+    fake_seti.ea_settings = {**fake_seti.ea_settings, "language": "Klingon"}
+    assert (await fetch_ea_settings(seti))[1] == "en"
+    assert [r.url.path for r in fake_seti.requests] == ["/api/ea/settings"] * 4
 
 
 def test_the_phrase_is_not_sent_as_the_request() -> None:

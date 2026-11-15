@@ -11,6 +11,7 @@ import {
   SpeakerPicker,
   TestSpeaker,
 } from '@/components/ea/AudioDevices'
+import { LanguageSetting } from '@/components/ea/LanguageSetting'
 import { LiveContextCard } from '@/components/ea/LiveContextCard'
 import { RelayCheck } from '@/components/ea/RelayCheck'
 import { SetupCard } from '@/components/ea/SetupCard'
@@ -122,6 +123,13 @@ export function EaPage() {
             description="A title or name the EA uses now and then, such as sir, ma'am or your first name. Empty means none."
           >
             <AddressSetting state={settings} />
+          </SettingRow>
+          <SettingRow
+            label="Language"
+            stack
+            description="What the EA listens, speaks and writes in; a change applies to a live call at once. The wake phrase stays in English words."
+          >
+            <LanguageSetting state={settings} />
           </SettingRow>
         </SettingsCard>
         <SettingsCard title="Connection">

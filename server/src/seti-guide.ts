@@ -156,6 +156,7 @@ export async function eaPackPrompt(): Promise<EaPackPrompt> {
     max_chars: max,
     mod_actions: eaModActions(),
     form_of_address: settings.form_of_address,
+    language: settings.language,
   }
 }
 

@@ -724,6 +724,34 @@ with the latest step until the answer arrives. Each think is audited as `ea.thou
 question's length, its duration and the rounds of tools, never the question's text. The thinker's
 model calls count in EA usage under `think`.
 
+## The EA listens, speaks and writes in the language the user picks
+
+`ea_settings.language` holds one code from `EA_LANGUAGES` in `shared/src/ea-language.ts`: English,
+the default, the 31 other languages that both Deepgram Nova-3 and ElevenLabs Flash v2.5 cover, and
+`multi`, Deepgram's code-switching mode. `ea/src/seti_ea/language.py` keeps the EA's copy of the
+list, and a server test holds the two equal. The setting changes on Settings, EA or through the
+EA's `update_ea_settings`, and is audited as `ea.settings_changed` like the wake word.
+
+The language reaches three places. Speech to text gets it as Deepgram's `language`, with the
+shorter endpointing Deepgram recommends in `multi`. The voice gets it as ElevenLabs'
+`language_code`; English and `multi` send none, so the voice follows the text. The prompt gets a
+Language section that tells the model to speak and write the language on calls, in the typed chat
+and in inbox reports, and to leave tool names, code, file names and quoted agent text as written.
+In `multi` it answers in the language the user last used. The closing question
+"Shall I go ahead?" stays English in the typed chat, where the Yes and No buttons key on it.
+
+A change applies to a live call: the call re-reads the settings on `ea-settings-changed` and after
+`update_ea_settings`, and queues an `STTUpdateSettingsFrame` and a `TTSUpdateSettingsFrame`, each
+of which reconnects its service. The prompt is rebuilt each turn, so the next reply follows.
+
+The fixed lines a call says while tools run (`announce.py`, `think_speech.py`) are English in the
+code. For another language `phrasebook.py` has the think model translate the whole set in one
+call, the first time a call uses that language, and keeps the result in memory until the EA
+restarts. A line is said only once its translation is in, so English never plays inside a call in
+another language; until then, and for the progress lines that name an agent or a PR, the call
+stays quiet. In `multi` the lines follow the language Deepgram detected on the last transcript.
+The wake word is unchanged: `spotter.py` matches English sounds, so the phrase stays English.
+
 ## The EA records what its model calls cost and how fast they answer
 
 An observer in each EA pipeline (`usage.py`) turns pipecat's metrics into one record per model
