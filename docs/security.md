@@ -216,11 +216,21 @@ message, not of a security setting. The EA may relay answers; agents and mods ma
   the core function (`answerQuestions` in `server/src/question-answers.ts`), not just the route.
 - An answer in the user's own words is refused with 422 when Seti's secret scan
   (`credentialFindings` in `server/src/scrub.ts`) finds a credential in it, and nothing in the
-  batch is stored. An AskUserQuestion question that asks for a secret says on the Questions page
+  batch is stored. An AskUserQuestion question that asks for a secret says on the Requests page
   to dismiss it and have the agent ask with `ask_secret`.
 - Question text and option descriptions are stored with secrets redacted. The audit log records
   that a question was asked, answered, dismissed or expired, with who answered, the type, the
   option labels picked and the length of the own-words answer, never its text.
+
+### The Requests panel
+
+The Requests panel lists questions, access changes, plan approvals, tool calls and knowledge
+proposals together, from `GET /api/requests`, which only reads. It adds no route that answers
+anything: each card calls the route it calls in the agent's chat, so an access Allow still goes
+through `POST /api/tasks/:id/change-requests/:request_id`, which refuses the EA in the route and
+agents' Seti tools and mods in `answerChangeRequest`, and is audited as the user. Tool calls and
+plans keep their user-only route, and notes keep theirs. The EA may read the listing, through
+`search_seti` in `requests`, and relays answers to questions only.
 
 ### Secret questions
 
@@ -230,7 +240,7 @@ underscores, never a variable Seti sets), a short purpose and, in the sandbox, t
 receive it. The value never reaches the agent's context, its transcript, the question rows, the
 audit log, the server log or the EA.
 
-- The user enters the value on the Questions page or in the agent's Questions drawer, in a masked
+- The user enters the value on the Requests page or in the agent's Requests drawer, in a masked
   field with show and hide. Submit sends it alone to `POST /api/questions/:id/secret`, never in
   the answers batch, and the form drops it from memory once it is sent or the drawer closes. The general answers route refuses an answer to a secret
   question with 400.

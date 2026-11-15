@@ -616,32 +616,20 @@ every agent to ask through AskUserQuestion instead of in its reply. The guess th
 a question (`server/src/turn-asking.ts`) reads only the prose after the last tool use, the
 fallback for an agent that asks in text.
 
-The Questions page (`#questions`, the Questions section in the sidebar's Work group below Agents,
-also in the Go to palette) lists every open question by agent, oldest first, with the control its
-type takes, Dismiss per question, Skip per agent and one Submit all. Its Back button steps back
-through Seti's own history, which `ui/src/lib/route.ts` counts in each entry's history state, or
-opens the Agents list when Seti opened on the page. Once a send leaves no question open, the page goes back the same way and says
-what it sent in a toast; while some stay open it says so on its status line. The section's row in
-the sidebar and in the phone menu shows how many questions are open, from the `badge` the section
-declares in `ui/src/lib/sections.ts`, as Context counts the knowledge proposals that wait. The
-section has no Alt digit, so Context and Settings keep Alt+4 and Alt+5. The old
-`#agents/questions` address redirects to `#questions`.
-
-One agent's questions open in its Questions drawer, from "N questions" in the agent's header or
-Answer on an AskUserQuestion call in its transcript, with the same fields, Submit, Dismiss and
-Skip (`QuestionsForm`). The drawer shares the agent's side pane with Files, one at a time, so the
-chat keeps its width: opening one closes the other, after any unsaved note may go. It is docked
-and resizable beside the agent on a wide screen and covers the screen on a phone; in a layout such
-as the grid it opens in the shared dock Files uses. It closes itself once the agent has no
-question open, however they were settled. Opening an asking agent from Needs you opens its drawer
-straight away (`ui/src/panels/questions/open-questions.ts`, like a file handed to Files). In the
-transcript an AskUserQuestion call shows each question and, once settled, its answer.
+Open questions are answered in the Requests panel and in an agent's Requests drawer, both
+described under [Requests wait in one panel](#requests-wait-in-one-panel). The panel lists every
+open question by agent with the control its type takes, Dismiss per question, Skip per agent and
+one Submit all; once a send settles every question shown, it says what it sent in a toast. Opening
+an asking agent from Needs you opens its Requests drawer straight away
+(`ui/src/panels/requests/open-requests.ts`, like a file handed to Files). In the transcript an
+AskUserQuestion call shows each question and, once settled, its answer, with Answer opening the
+drawer while one is open.
 The EA lists the open questions with `search_seti` in `questions`, reads them out by type and
 passes on the user's answer with `answer_question`, which calls the same route; its prompt holds it
 to what the user said.
 
 A recommended option is picked from the start: Claude Code's convention ends its label with
-`(Recommended)`, and the page picks the first such option of a single-answer question, or each one
+`(Recommended)`, and the panel picks the first such option of a single-answer question, or each one
 of a multi-answer question, shows a Recommended tag, and sends the exact label on Submit all.
 `questionsContext` tells agents to put a recommendation first and mark it that way.
 
@@ -930,6 +918,53 @@ while the agent is open, until it clears:
 
 A permission request outranks open questions, which outrank a change request, which outranks a stall; the watchdog (`server/src/stall-watch.ts`) checks the
 open sessions once a minute.
+
+## Requests wait in one panel
+
+Every formal request that waits on the user's answer is listed in one place: the Requests panel
+(`#requests`, the Requests section in the sidebar's Work group below Agents, also in the Go to
+palette). `GET /api/requests` (`server/src/pending-requests.ts`) returns them by kind in one
+`PendingRequests` shape from `shared/src/requests.ts`:
+
+| Kind      | Where it comes from                                    | Answered with                    | Holds the agent |
+| --------- | ------------------------------------------------------ | -------------------------------- | --------------- |
+| Questions | AskUserQuestion and `ask_secret`                       | the question's own control, Skip | yes             |
+| Access    | `request_change`: a host, a connection, an MCP server  | Allow or Deny, the access card   | yes             |
+| Plans     | ExitPlanMode, held as a permission request             | Approve or Deny                  | yes             |
+| Tools     | a tool call no rule allows, or a repeated call         | Allow, Always or Deny            | yes             |
+| Notes     | `propose_knowledge`, from an agent, the EA or the user | Approve, Edit or Reject          | no              |
+
+Each kind is answered on its own route, with its own guard, so listing them together adds no
+power: access, tool calls, plans and notes stay the user's, and the EA only relays answers to
+questions. Stalls that have no answer in Seti (an MCP sign-in, a silent turn), failed turns and
+turns that ended on a question in prose stay in Needs you only, and so do mod and EA asks, which
+are not an agent's requests. The panel's name lives in one constant, `REQUESTS` in
+`ui/src/panels/requests/label.ts`.
+
+The panel groups the requests by agent, with the agent's colour stripe, status marker (a blob
+under the Blobs mod) and reason line; the agents a request holds up come first, the longest wait
+first, then the notes (`ui/src/panels/requests/groups.ts`). Once two kinds wait, a row of toggles
+filters by kind, each with its count. Each request is answered in place with the same card the
+agent's chat shows (`PermissionCard`, `ChangeCard`, `KnowledgeCard`) and the question fields, plus
+one Submit all for every answered question. An answered card leaves at once, and once nothing
+that showed is left the panel goes back through Seti's own history, which `ui/src/lib/route.ts`
+counts in each entry's history state, or opens the Agents list when Seti opened on the panel. The
+section's row in the sidebar and in the phone menu counts every pending request, from the `badge`
+the section declares in `ui/src/lib/sections.ts`. The section has no Alt digit, so Context and
+Settings keep Alt+4 and Alt+5. The old `#questions` and `#agents/questions` addresses redirect to
+`#requests`.
+
+One agent's requests of every kind open in its Requests drawer, from "N requests" in the agent's
+header, with the same cards. The drawer shares the agent's side pane with Files, one at a time, so
+the chat keeps its width: opening one closes the other, after any unsaved note may go. It is docked
+and resizable beside the agent on a wide screen and covers the screen on a phone; in a layout such
+as the grid it opens in the shared dock Files uses. It closes itself once the agent has no request
+left, however they were settled.
+
+The status bar's "N need you" item opens the Requests panel while every agent that needs the user
+has a request there, and the Needs you group otherwise, so an agent waiting on something the panel
+cannot hold is never hidden (`ui/src/hooks/useNeedsYou.ts`). The EA lists every kind with
+`search_seti` in `requests` and answers only questions.
 
 ## Notifications follow the turn-end path
 
