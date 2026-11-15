@@ -1,10 +1,16 @@
+import fs from 'node:fs'
+import path from 'node:path'
 import { expect, test } from './support/fixtures.js'
 import { expectFitsPhone } from './support/phone-layout.js'
 import { prompts, seedAgent, shareToSeti, shareWaits, underServiceWorker } from './support/share-target.js'
 
 test.use({ serviceWorkers: 'allow' })
 
-const PHOTO = { name: 'whiteboard photo.png', type: 'image/png', body: 'not really a png' }
+const PHOTO = {
+  name: 'whiteboard photo.png',
+  type: 'image/png',
+  body: fs.readFileSync(path.join(import.meta.dirname, 'support', 'media', 'dot.png')),
+}
 
 test('a phone share picks an agent by touch and sends the files with the message', async ({ page }) => {
   const id = await seedAgent('Phone share agent')
@@ -14,6 +20,7 @@ test('a phone share picks an agent by touch and sends the files with the message
   await expect(page.getByRole('heading', { name: 'Share' })).toBeVisible()
   const chip = page.getByRole('list', { name: 'Attachments' }).getByRole('listitem')
   await expect(chip).toContainText('whiteboard-photo.png')
+  await expect(chip.getByRole('img', { name: 'whiteboard-photo.png' })).toHaveJSProperty('naturalWidth', 32)
   await expect(page.getByRole('combobox', { name: 'Message' })).toHaveValue(
     'From the whiteboard\nhttps://example.com/board',
   )

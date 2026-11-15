@@ -8,7 +8,7 @@ import { apiData, expect } from './fixtures.js'
 export interface SharedFile {
   name: string
   type: string
-  body: string
+  body: string | Buffer
 }
 
 export interface ShareSheet {
@@ -28,31 +28,36 @@ export async function underServiceWorker(page: Page): Promise<void> {
 
 /** Posts to the share target as the share sheet does: a multipart form navigation. */
 export async function shareToSeti(page: Page, share: ShareSheet): Promise<void> {
-  await page.evaluate((sheet: ShareSheet) => {
-    const form = document.createElement('form')
-    form.method = 'post'
-    form.enctype = 'multipart/form-data'
-    form.action = '/share-target'
-    for (const name of ['title', 'text', 'url'] as const) {
-      const input = document.createElement('input')
-      input.type = 'hidden'
-      input.name = name
-      input.value = sheet[name] ?? ''
-      form.append(input)
-    }
-    const files = document.createElement('input')
-    files.type = 'file'
-    files.name = 'files'
-    files.multiple = true
-    const picked = new DataTransfer()
-    for (const file of sheet.files ?? []) {
-      picked.items.add(new File([file.body], file.name, { type: file.type }))
-    }
-    files.files = picked.files
-    form.append(files)
-    document.body.append(form)
-    form.submit()
-  }, share)
+  const encoded = (share.files ?? []).map((file) => ({ ...file, body: Buffer.from(file.body).toString('base64') }))
+  await page.evaluate(
+    (sheet) => {
+      const form = document.createElement('form')
+      form.method = 'post'
+      form.enctype = 'multipart/form-data'
+      form.action = '/share-target'
+      for (const name of ['title', 'text', 'url'] as const) {
+        const input = document.createElement('input')
+        input.type = 'hidden'
+        input.name = name
+        input.value = sheet[name] ?? ''
+        form.append(input)
+      }
+      const files = document.createElement('input')
+      files.type = 'file'
+      files.name = 'files'
+      files.multiple = true
+      const picked = new DataTransfer()
+      for (const file of sheet.files) {
+        const bytes = Uint8Array.from(atob(file.body), (char) => char.charCodeAt(0))
+        picked.items.add(new File([bytes], file.name, { type: file.type }))
+      }
+      files.files = picked.files
+      form.append(files)
+      document.body.append(form)
+      form.submit()
+    },
+    { ...share, files: encoded },
+  )
   await page.waitForURL(/#share$/)
 }
 
