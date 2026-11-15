@@ -8,6 +8,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.lifecycleScope
+import com.google.androidbrowserhelper.trusted.SharingUtils
 import dev.seti.android.api.ApiException
 import dev.seti.android.api.UnauthorizedException
 import dev.seti.android.data.SetiStore
@@ -63,7 +64,10 @@ class MainActivity : ComponentActivity() {
 
     private fun open(url: HttpUrl) {
         Refresh.now(this)
-        TwaActivity.open(this, url)
+        when {
+            SharingUtils.isShareIntent(intent) -> TwaActivity.share(this, intent, url)
+            else -> TwaActivity.open(this, url)
+        }
         finish()
     }
 

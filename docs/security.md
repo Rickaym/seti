@@ -51,6 +51,12 @@ private key off the host. The sandbox model is in [Architecture](architecture.md
   `OFFICIAL_ANDROID_APP`, for its web view and passkey sharing. A self-built app set in Settings,
   Devices (or `SETI_ANDROID_PACKAGE` and `SETI_ANDROID_CERT_SHA256`) joins it, and
   replaces it only when that setting says so.
+- The share target, `POST /share-target`, is not an upload. The service worker takes the post and
+  keeps the files in the browser's cache on that device; nothing reaches the server until the
+  Share page uploads them through the signed-in session, as Attach does, and sends them with the
+  user's message, which the audit log records with `via: share` and each file's name and size. A
+  post that reaches the server without the worker gets a redirect to the Share page, and the server
+  reads none of it.
 - `/hooks/<id>` and share links are the only paths without Access or a token: each webhook has an
   unguessable id and its own signing secret, and every delivery must be signed. Share links are
   described below.

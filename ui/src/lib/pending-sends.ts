@@ -17,6 +17,8 @@ export interface PendingSend {
   /** The draft's uploaded files: chips while pending, and back into the draft on Edit. */
   files: DraftAttachment[]
   interrupt: boolean
+  /** Sent from the Share page, which the audit log records. */
+  via?: 'share'
   state: PendingState
   /** Why the last attempt failed, while failed. */
   error: string | null
@@ -134,7 +136,7 @@ export interface PendingSnapshot {
   added: number
 }
 
-export type NewSend = Pick<PendingSend, 'text' | 'prompt' | 'attachments' | 'files' | 'interrupt'>
+export type NewSend = Pick<PendingSend, 'text' | 'prompt' | 'attachments' | 'files' | 'interrupt' | 'via'>
 
 /** One task's unsent messages, sent one at a time in the order they were written. */
 export interface PendingStore {

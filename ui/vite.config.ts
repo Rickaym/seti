@@ -4,7 +4,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
-import { defineConfig, type Plugin, type Rolldown } from 'vite'
+import { build, defineConfig, type Plugin, type Rolldown } from 'vite'
 import { HASHED_PREFIX, type Precache } from './sw/precache'
 
 const SW_SOURCE = path.resolve(import.meta.dirname, 'sw/sw.ts')
@@ -45,7 +45,7 @@ function initialFiles(bundle: Rolldown.OutputBundle): Set<string> {
       .map((chunk) => [chunk.fileName, chunk]),
   )
   const initial = new Set<string>()
-  const queue = [...chunks.values()].filter((chunk) => chunk.isEntry && chunk.fileName !== SW_FILE)
+  const queue = [...chunks.values()].filter((chunk) => chunk.isEntry)
   for (let chunk = queue.pop(); chunk !== undefined; chunk = queue.pop()) {
     if (initial.has(chunk.fileName)) {
       continue
@@ -73,7 +73,21 @@ function builtFiles(dir: string, skip: ReadonlySet<string>): string[] {
     .sort((a, b) => a.localeCompare(b))
 }
 
-/** Emits sw.js at the root of the build with the built files and their content hash baked in. */
+/** Builds sw.js on its own with every import inlined, since a classic worker script cannot import. */
+async function buildWorker(outDir: string): Promise<void> {
+  await build({
+    configFile: false,
+    logLevel: 'warn',
+    publicDir: false,
+    build: {
+      outDir,
+      emptyOutDir: false,
+      rolldownOptions: { input: SW_SOURCE, output: { format: 'iife', entryFileNames: SW_FILE } },
+    },
+  })
+}
+
+/** Writes sw.js at the root of the build with the built files and their content hash baked in. */
 function serviceWorker(): Plugin {
   let outDir = ''
   let onDemand = new Set<string>()
@@ -85,15 +99,13 @@ function serviceWorker(): Plugin {
     configResolved(config) {
       outDir = path.resolve(config.root, config.build.outDir)
     },
-    buildStart() {
-      this.emitFile({ type: 'chunk', id: SW_SOURCE, fileName: SW_FILE })
-    },
     generateBundle(_options, bundle) {
       onDemand = onDemandFiles(bundle)
       initial = initialFiles(bundle)
       emitted = new Set(Object.keys(bundle))
     },
-    writeBundle() {
+    async writeBundle() {
+      await buildWorker(outDir)
       const files = builtFiles(outDir, onDemand)
       const assets = files.filter((file) => `/${file}`.startsWith(HASHED_PREFIX))
       const unhashed = assets.filter((file) => !emitted.has(file))

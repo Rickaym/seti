@@ -9,6 +9,12 @@ running subagents and the state of its PR. Both fit as many agents as their size
 the rest; tapping an agent opens it in Seti. Agents also has shortcuts to start an agent and call
 the EA, and shows today's cost in its footer.
 
+The app also puts Seti in Android's share menu. A share of files, text or a link reaches
+`MainActivity`, which hands it to the Trusted Web Activity with read access to the files; Chrome
+then posts it to `/share-target` on the paired server, where Seti's service worker keeps it for the
+Share page. The share target is built at launch from the pairing, not from static manifest
+metadata, so the one build works with any server.
+
 One build works with every Seti server. The app learns its server from pairing, then opens that
 origin in the Trusted Web Activity and points the widgets at it. Pairing again with another server
 switches to it.

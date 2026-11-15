@@ -1,13 +1,9 @@
 import { z } from 'zod'
+import { ATTACHMENTS_PER_MESSAGE } from './attachment-limits.js'
 
 /** About 1k tokens at 4 characters each, or 30 lines; Claude Code folds 800 only on screen. */
 export const PASTE_FILE_CHARS = 4000
 export const PASTE_FILE_LINES = 30
-
-/** A file the agent should open, not a message: 25 MB each, 50 MB and 20 files a message. */
-export const ATTACHMENT_FILE_MAX = 25 * 1024 * 1024
-export const ATTACHMENT_MESSAGE_MAX = 50 * 1024 * 1024
-export const ATTACHMENTS_PER_MESSAGE = 20
 
 /** The workspace folder attachments land in, next to chat.md and the other workspace files. */
 export const UPLOADS_DIR = 'uploads'
