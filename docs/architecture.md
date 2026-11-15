@@ -133,8 +133,8 @@ restart and health check.
 
 ## Agents run sandboxed with credentials outside
 
-Every agent runs in Claude Code's `auto` permission mode with Seti's allow, ask and deny rules
-(Settings, Permissions). The rules and the shell guard decide first, and edits in the agent's
+Every agent runs in Claude Code's `auto` permission mode with Seti's allow, ask, deny and review
+rules (Settings, Permissions). The rules and the shell guard decide first, and edits in the agent's
 directories go ahead. A classifier model then allows or turns down each other call. A call it
 turns down never reaches the user: the agent gets the reason, the transcript shows the failed
 call, and the audit log records it. A call the classifier cannot decide, or one an ask rule
@@ -170,6 +170,15 @@ asks in Bypass too; a command the shell guard refuses is left to that guard. All
 once and starts the count again, Always stops asking about that exact call while the agent's
 process runs, and Deny tells the agent why. The switch, on by default, is under Repeats in
 Settings, Lifecycle.
+
+A review rule (`server/src/review-hooks.ts`) names an MCP tool, such as
+`mcp__slack__send_message`, or a whole server, such as `mcp__slack`, for every agent or one. Each
+call it names waits in Needs you as a permission request of kind `review`, with the call's text
+fields in boxes the user can change before Allow, so a message goes out only as the user approved
+it. Like the repeat guard it is a PreToolUse hook, so it asks in Bypass too; a call a deny rule
+names is left to that rule. Allow runs the call with the edits, Deny tells the agent why, and
+there is no Always, since review asks every time. Any editable MCP call that an ask rule or the
+classifier sends to the user gets the same Edit button.
 
 Settings shows the
 rules agents load from Claude Code's own settings files read-only. Sandboxed agents may edit any

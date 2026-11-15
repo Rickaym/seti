@@ -1,5 +1,5 @@
 import type { PermissionUpdate } from '@anthropic-ai/claude-agent-sdk'
-import { permissionRuleText, type BuiltInRule, type PermissionBehavior, type PermissionRule } from '@seti/shared'
+import { permissionRuleText, type BuiltInRule, type ClaudeBehavior, type PermissionRule } from '@seti/shared'
 
 /** Tools that only read or plan, which every agent uses without asking; secrets stay denied. */
 const READ_TOOLS = [
@@ -57,7 +57,7 @@ export const GUARDS = [
 
 /** Built-in rules: read-only tools for all, the sandbox's tools inside it, and the kill denials. */
 export function builtInRules(): BuiltInRule[] {
-  const rule = (behavior: PermissionBehavior, text: string, applies: BuiltInRule['applies']) => ({
+  const rule = (behavior: ClaudeBehavior, text: string, applies: BuiltInRule['applies']) => ({
     behavior,
     rule: text,
     applies,
@@ -72,7 +72,7 @@ export function builtInRules(): BuiltInRule[] {
 }
 
 /** The permissions settings Claude Code starts with, or takes mid-session when a rule changes. */
-export type PermissionSettings = Record<PermissionBehavior, string[]>
+export type PermissionSettings = Record<ClaudeBehavior, string[]>
 
 interface RuleSources {
   builtIn: readonly BuiltInRule[]
@@ -89,7 +89,7 @@ const appliesTo = (rule: BuiltInRule, sandboxed: boolean) =>
 /** Every rule an agent runs with, by behavior, each once. */
 export function composeRules(sources: RuleSources): PermissionSettings {
   const rules = [...sources.builtIn.filter((rule) => appliesTo(rule, sources.sandboxed)), ...sources.stored]
-  const of = (behavior: PermissionBehavior) => [
+  const of = (behavior: ClaudeBehavior) => [
     ...new Set(rules.filter((rule) => rule.behavior === behavior).map((rule) => rule.rule)),
   ]
   return { allow: of('allow'), ask: of('ask'), deny: [...new Set([...of('deny'), ...sources.fixedDeny])] }

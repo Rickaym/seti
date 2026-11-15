@@ -14,8 +14,9 @@ import { tasks } from './db.js'
 import { refuseAgent } from './ea-guard.js'
 import { HttpError } from './http.js'
 import { projectSettingsRules, userSettingsRules } from './inherited-rules.js'
+import { changedFields, withFields } from './permission-edits.js'
 import { builtInRules, GUARDS } from './permission-policy.js'
-import { allowed, denied, resolveRequest, waitingInput, waitsFor } from './permission-requests.js'
+import { allowed, denied, inputText, resolveRequest, waitingInput, waitsFor } from './permission-requests.js'
 import { liveSessions } from './runner.js'
 import { permissionSettings } from './session-options.js'
 import { permissionRequests, permissionRules } from './store/permissions.js'
@@ -110,29 +111,55 @@ async function keepRules(task: Task, request: PermissionRequest, scope: Permissi
   }
 }
 
-async function auditAnswer(task: Task, request: PermissionRequest, input: AnswerPermissionInput): Promise<void> {
+async function auditAnswer(
+  task: Task,
+  request: PermissionRequest,
+  input: AnswerPermissionInput,
+  edited: readonly string[],
+): Promise<void> {
   const allow = input.decision !== 'deny'
   const kept =
     request.kind === 'repeat'
       ? ' and stopped asking about this repeat'
       : ` and always allowed ${request.suggestions.join(', ')}`
   const always = input.decision === 'always' ? kept : ''
+  const changed = edited.length > 0 ? ` with ${edited.join(', ')} edited` : ''
   await audit.record({
     actor: 'user',
     kind: allow ? 'task.permission_allowed' : 'task.permission_denied',
     subject_type: 'task',
     subject_id: task.id,
-    summary: `${allow ? 'Allowed' : 'Denied'} ${request.tool_name} for task "${task.title}"${always}`,
+    summary: `${allow ? 'Allowed' : 'Denied'} ${request.tool_name} for task "${task.title}"${changed}${always}`,
     detail: {
       title: task.title,
       tool: request.tool_name,
       call: request.summary,
       decision: input.decision,
       ...(request.kind === 'repeat' ? { repeat: true } : {}),
+      ...(request.kind === 'review' ? { review: true } : {}),
+      ...(edited.length > 0 ? { edited: [...edited] } : {}),
       ...(input.decision === 'always' ? { scope: input.scope ?? 'agent', rules: request.suggestions } : {}),
       ...(input.message === undefined || input.message === '' ? {} : { message: input.message }),
     },
   })
+}
+
+/**
+ * The input an allowed call runs with, the fields the user's edits change by name only, and the
+ * input the request keeps when they changed any.
+ */
+function callOf(request: PermissionRequest, input: AnswerPermissionInput) {
+  const original = waitingInput(request.id)
+  const fields = input.decision === 'deny' ? {} : (input.fields ?? {})
+  const edited = changedFields(original, fields)
+  if (edited.length === 0) {
+    return { call: original, edited, shown: undefined }
+  }
+  if (!request.editable) {
+    throw new HttpError(409, 'This call cannot be edited; allow or deny it as it is')
+  }
+  const call = withFields(original, fields)
+  return { call, edited, shown: inputText(call) }
 }
 
 /** The user's answer to a request the agent waits on; Always allow also keeps its rules, if any. */
@@ -153,19 +180,22 @@ export async function answerPermission(
     throw new HttpError(409, 'This call has no rule to always allow; allow it once instead')
   }
   const message = input.decision === 'deny' ? (input.message ?? null) : null
-  const settled = await permissionRequests.settle(request.id, input.decision === 'deny' ? 'denied' : 'allowed', message)
+  const { call, edited, shown } = callOf(request, input)
+  const settled = await permissionRequests.settle(
+    request.id,
+    input.decision === 'deny' ? 'denied' : 'allowed',
+    message,
+    shown,
+  )
   if (settled === undefined) {
     throw new HttpError(409, 'The agent no longer waits on this request')
   }
   if (input.decision === 'always') {
     await keepRules(task, settled, input.scope ?? 'agent')
   }
-  await auditAnswer(task, settled, input)
+  await auditAnswer(task, settled, input, edited)
   const always = input.decision === 'always'
-  const result =
-    input.decision === 'deny'
-      ? denied(message)
-      : allowed(settled, waitingInput(settled.id), permissionModeOf(task), always)
+  const result = input.decision === 'deny' ? denied(message) : allowed(settled, call, permissionModeOf(task), always)
   await resolveRequest(settled, result)
   return settled
 }

@@ -62,6 +62,7 @@ const PERMISSION: PermissionRequest = {
   input: JSON.stringify({ command: INFRA_COMMAND, description: 'Apply the upgrade' }, null, 2),
   reason: 'No rule allows terraform apply',
   suggestions: ['Bash(terraform apply:*)'],
+  editable: false,
   state: 'pending',
   message: null,
   created_at: at(1),

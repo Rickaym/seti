@@ -3,14 +3,23 @@ import { lenientArray, orDefault, type ResponseSchema } from './lenient.js'
 
 /**
  * What a rule does with a tool call it matches. Deny beats ask and ask beats allow, wherever each
- * rule comes from, so an agent's own allow never lifts a global deny.
+ * rule comes from, so an agent's own allow never lifts a global deny. Review holds an MCP tool's
+ * call for the user to check and edit before it runs, in Bypass too.
  */
-export const PERMISSION_BEHAVIORS = ['allow', 'ask', 'deny'] as const
+export const PERMISSION_BEHAVIORS = ['allow', 'ask', 'deny', 'review'] as const
 export type PermissionBehavior = (typeof PERMISSION_BEHAVIORS)[number]
+
+/** The behaviors Claude Code applies itself; Seti applies review with a hook. */
+export type ClaudeBehavior = Exclude<PermissionBehavior, 'review'>
 
 /** A rule in Claude Code's syntax: a tool name, optionally with what it matches in parentheses. */
 const RULE = /^[A-Za-z][\w-]*(\((?=.*\)$)[^\0\n\r]+\))?$/
 const RULE_MAX = 500
+
+/** An MCP server, which covers all its tools, or one tool, as in mcp__slack or mcp__slack__send. */
+const MCP_RULE = /^mcp__[\w-]+$/
+
+const REVIEW_HINT = 'Review takes an MCP tool or server, such as mcp__slack__send_message or mcp__slack'
 
 export const permissionRuleText = z
   .string()
@@ -32,7 +41,7 @@ export type BuiltInScope = 'all' | 'sandboxed' | 'unsandboxed'
 
 /** A rule Seti applies on its own, which the settings page lists but cannot remove. */
 export interface BuiltInRule {
-  behavior: PermissionBehavior
+  behavior: ClaudeBehavior
   rule: string
   applies: BuiltInScope
 }
@@ -42,7 +51,7 @@ export interface BuiltInRule {
  * the file changes it.
  */
 export interface InheritedRule {
-  behavior: PermissionBehavior
+  behavior: ClaudeBehavior
   rule: string
   /** The settings file, with the home directory as ~. */
   source: string
@@ -65,10 +74,15 @@ export interface AgentPermissions extends PermissionPolicy {
   project: InheritedRule[]
 }
 
-export const addPermissionRuleInput = z.object({
-  behavior: z.enum(PERMISSION_BEHAVIORS),
-  rule: permissionRuleText,
-})
+export const addPermissionRuleInput = z
+  .object({
+    behavior: z.enum(PERMISSION_BEHAVIORS),
+    rule: permissionRuleText,
+  })
+  .refine((input) => input.behavior !== 'review' || MCP_RULE.test(input.rule), {
+    message: REVIEW_HINT,
+    path: ['rule'],
+  })
 export type AddPermissionRuleInput = z.input<typeof addPermissionRuleInput>
 
 const ruleId = z.coerce.number().int().positive()
@@ -80,8 +94,11 @@ export const taskPermissionRuleParams = z.object({ id: z.string().trim().min(1),
 export const PERMISSION_REQUEST_STATES = ['pending', 'allowed', 'denied', 'cancelled'] as const
 export type PermissionRequestState = (typeof PERMISSION_REQUEST_STATES)[number]
 
-/** Why Seti asks: a call no rule allows, or a call the agent repeats with the same result. */
-export const PERMISSION_REQUEST_KINDS = ['tool', 'repeat'] as const
+/**
+ * Why Seti asks: a call no rule allows, a call the agent repeats with the same result, or an MCP
+ * call a review rule holds for the user to check.
+ */
+export const PERMISSION_REQUEST_KINDS = ['tool', 'repeat', 'review'] as const
 export type PermissionRequestKind = (typeof PERMISSION_REQUEST_KINDS)[number]
 
 /** A tool call the agent waits on the user to allow or deny. */
@@ -98,6 +115,8 @@ export interface PermissionRequest {
   reason: string | null
   /** The rules Always allow adds; empty when the call has none or must not get one, as a repeat. */
   suggestions: string[]
+  /** Whether the user may edit the call's text fields before allowing it: unredacted MCP calls. */
+  editable: boolean
   state: PermissionRequestState
   /** What the user told the agent with a deny. */
   message: string | null
@@ -113,12 +132,19 @@ export const PERMISSION_SCOPES = ['agent', 'global'] as const
 export type PermissionScope = (typeof PERMISSION_SCOPES)[number]
 
 const MESSAGE_MAX = 2000
+const FIELD_MAX = 100_000
+const FIELDS_MAX = 50
 
 export const answerPermissionInput = z.object({
   decision: z.enum(PERMISSION_DECISIONS),
   scope: z.enum(PERMISSION_SCOPES).default('agent'),
   /** Told to the agent with a deny. */
   message: z.string().trim().max(MESSAGE_MAX).optional(),
+  /** New values for an editable call's top-level text fields, by name; an allow runs with them. */
+  fields: z
+    .record(z.string().max(200), z.string().max(FIELD_MAX))
+    .refine((fields) => Object.keys(fields).length <= FIELDS_MAX, 'Too many fields')
+    .optional(),
 })
 export type AnswerPermissionInput = z.input<typeof answerPermissionInput>
 
@@ -135,6 +161,7 @@ export const permissionRequestSchema = z.object({
   input: orDefault('input', z.string(), ''),
   reason: maybeText('reason'),
   suggestions: orDefault('suggestions', z.array(z.string()), []),
+  editable: orDefault('editable', z.boolean(), false),
   state: orDefault<PermissionRequestState>('state', z.enum(PERMISSION_REQUEST_STATES), 'cancelled'),
   message: maybeText('message'),
   created_at: z.string(),
@@ -151,14 +178,16 @@ const ruleSchema = z.object({
   created_at: z.string(),
 }) satisfies ResponseSchema<PermissionRule>
 
+export const CLAUDE_BEHAVIORS = ['allow', 'ask', 'deny'] as const satisfies readonly ClaudeBehavior[]
+
 const builtInSchema = z.object({
-  behavior: z.enum(PERMISSION_BEHAVIORS),
+  behavior: z.enum(CLAUDE_BEHAVIORS),
   rule: z.string(),
   applies: z.enum(['all', 'sandboxed', 'unsandboxed']),
 }) satisfies ResponseSchema<BuiltInRule>
 
 const inheritedSchema = z.object({
-  behavior: z.enum(PERMISSION_BEHAVIORS),
+  behavior: z.enum(CLAUDE_BEHAVIORS),
   rule: z.string(),
   source: z.string(),
 }) satisfies ResponseSchema<InheritedRule>

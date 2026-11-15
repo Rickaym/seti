@@ -1,6 +1,6 @@
 import {
+  addPermissionRuleInput,
   PERMISSION_BEHAVIORS,
-  permissionRuleText,
   type InheritedRule,
   type PermissionBehavior,
   type PermissionRule,
@@ -15,13 +15,29 @@ import { Input } from '@/components/ui/input'
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 import { cn } from '@/lib/utils'
 
-const BEHAVIOR_TITLE: Record<PermissionBehavior, string> = { allow: 'Allow', ask: 'Ask', deny: 'Deny' }
+const BEHAVIOR_TITLE: Record<PermissionBehavior, string> = {
+  allow: 'Allow',
+  ask: 'Ask',
+  deny: 'Deny',
+  review: 'Review',
+}
 
 const BEHAVIOR_MARK: Record<PermissionBehavior, string> = {
   allow: 'bg-success',
   ask: 'bg-warning',
   deny: 'bg-muted-foreground',
+  review: 'bg-primary',
 }
+
+const PLACEHOLDER: Record<PermissionBehavior, string> = {
+  allow: 'Bash(pnpm test:*)',
+  ask: 'Bash(git push:*)',
+  deny: 'Bash(rm:*)',
+  review: 'mcp__slack__send_message',
+}
+
+const REVIEW_TIP =
+  'Review holds each call of an MCP tool or server for you to check and edit before it runs, in Bypass too.'
 
 /** One rule in a list: what it does, the rule, a note such as its file, and a way to remove it. */
 export interface RuleEntry {
@@ -72,7 +88,7 @@ function RuleRow({ entry }: { entry: RuleEntry }) {
   )
 }
 
-/** Rules grouped as allow, ask and deny, each group under a header with its count. */
+/** Rules grouped as allow, ask, deny and review, each group under a header with its count. */
 export function RuleGroups({ entries, label }: { entries: readonly RuleEntry[]; label: string }) {
   return (
     <div aria-label={label} role="group">
@@ -121,14 +137,14 @@ export function RuleEditor({
   const behaviorId = useId()
 
   const add = async () => {
-    const parsed = permissionRuleText.safeParse(text)
+    const parsed = addPermissionRuleInput.safeParse({ behavior, rule: text })
     if (!parsed.success) {
       toast.error(parsed.error.issues[0]?.message ?? 'Check the rule')
       return
     }
     setBusy(true)
     try {
-      await apiPost(path, { behavior, rule: parsed.data })
+      await apiPost(path, parsed.data)
       setText('')
       onChange()
     } catch (e) {
@@ -195,12 +211,13 @@ export function RuleEditor({
         <Input
           id={ruleId}
           value={text}
-          placeholder="Bash(pnpm test:*)"
+          placeholder={PLACEHOLDER[behavior]}
           className="h-7 min-w-40 flex-1 font-mono text-xs"
           onChange={(event) => {
             setText(event.target.value)
           }}
         />
+        {behavior === 'review' && <InfoTip label="About review rules" text={REVIEW_TIP} />}
         <Button type="submit" size="sm" variant="outline" disabled={busy || text.trim() === ''}>
           <Plus />
           Add

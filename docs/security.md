@@ -141,6 +141,14 @@ private key off the host. The sandbox model is in [Architecture](architecture.md
   in Settings, Lifecycle; the EA changes it only with the user's yes (`set_auto_archive`), and
   agents' Seti tools and mods are refused (`refuseAgent` in `updateAutoArchive`), so an agent
   cannot turn off the guard that stops it. A change is audited as `system.repeat_guard_changed`.
+- Review rules hold each call of the MCP tools they name until the user allows or denies it, in
+  Bypass too, because they run as a PreToolUse hook. When Seti cannot read its review rules the
+  hook denies the call rather than let it run unchecked, and a call a deny rule names is left to
+  that rule, so a review's Allow never lifts a deny. Only the call's top-level text fields can
+  change, only for MCP calls, and only when the request shows the input whole with nothing
+  redacted, so an edit never sends a placeholder or rewrites a shell command past the guard. The
+  answer route refuses the EA and agents as for any request. The audit records which fields
+  changed, never their values, and the request keeps the input the call ran with.
 - Agents at Self or Full propose security changes they need with `request_change`; nothing else
   applies them. A request names the exact change and the agent's reason: a host and port for the
   network allowlist (443 unless it names one), a connection's variable and hosts, or an MCP server

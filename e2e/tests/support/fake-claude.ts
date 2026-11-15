@@ -7,7 +7,8 @@ import { FallbackPlayer } from './fake-fallback.js'
 import { InProcessClient, type SdkServer } from './fake-mcp.js'
 import { actPermission, PERMISSION_PROMPT, PLAN_APPROVAL_PROMPT, type CanUseTool } from './fake-permission.js'
 import { actQuestions, QUESTION_PROMPT } from './fake-question.js'
-import { REPEAT_PROMPT, repeatBuild, type FakeHooks } from './fake-repeat.js'
+import type { FakeHooks } from './fake-repeat.js'
+import { hookTurnOf } from './fake-review.js'
 import { sideChatQuery } from './fake-side-chat.js'
 import { actSteps, gateOf, type StepActor } from './fake-steps.js'
 
@@ -380,12 +381,13 @@ class FakeClaude {
   private async answer(prompt: string): Promise<void> {
     const seti = SETI_CALL.exec(prompt)
     const gate = gateOf(prompt)
+    const hooked = hookTurnOf(prompt)
     if (seti?.[1] !== undefined && seti[2] !== undefined) {
       await this.callSeti(seti[1], seti[2], prompt.includes(HOLD_PROMPT))
     } else if (prompt.includes(QUESTION_PROMPT)) {
       await actQuestions(prompt, this.options.canUseTool, this.actor())
-    } else if (prompt.includes(REPEAT_PROMPT)) {
-      await repeatBuild(this.options.hooks, this.actor())
+    } else if (hooked !== undefined) {
+      await hooked(this.options.hooks, this.actor())
     } else if (prompt.includes(SHELL_PROMPT)) {
       this.startShell()
     } else if (prompt.includes(LIMIT_PROMPT)) {

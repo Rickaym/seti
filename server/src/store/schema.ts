@@ -35,7 +35,15 @@ import { QUESTION_SECRETS, QUESTIONS } from './schema-questions.js'
 import { DROP_ROUTINES, REMINDER_CHANNELS, REMINDER_CRON } from './schema-reminders.js'
 import { PACK_KIND, rolesToPacks } from './schema-roles.js'
 import { MESSAGE_SEARCH, MESSAGE_SEARCH_TALK, MESSAGE_TIME } from './schema-search.js'
-import { CLAUDE_LOGINS, PERMISSIONS, SANDBOX_AWS, SANDBOX_SSH, SECRET_ENV, SECRETS } from './schema-security.js'
+import {
+  CLAUDE_LOGINS,
+  PERMISSION_REVIEW,
+  PERMISSIONS,
+  SANDBOX_AWS,
+  SANDBOX_SSH,
+  SECRET_ENV,
+  SECRETS,
+} from './schema-security.js'
 import { CLIENT_SENDS } from './schema-sends.js'
 import { SHARE_PREVIEWS, SHARES } from './schema-shares.js'
 import { loginsToHosts, SSH_HOST_KEYS } from './schema-ssh-keys.js'
@@ -179,4 +187,5 @@ export const MIGRATIONS: readonly Migration[] = [
   { version: 101, name: 'task_aside', sql: TASK_ASIDE },
   { version: 102, name: 'task_model_fallback', sql: TASK_MODEL_FALLBACK },
   { version: 103, name: 'ea_language', sql: EA_LANGUAGE },
+  { version: 104, name: 'permission_review', sql: PERMISSION_REVIEW },
 ]

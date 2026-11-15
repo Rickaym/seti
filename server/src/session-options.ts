@@ -31,6 +31,7 @@ import { builtInRules, composeRules, type PermissionSettings } from './permissio
 import { canUseToolFor } from './permission-requests.js'
 import { taskPluginConfigs } from './plugins.js'
 import { repeatHooks } from './repeat-hooks.js'
+import { reviewHook } from './review-hooks.js'
 import { mcpTargets, signedInServers } from './sandbox-mcp.js'
 import { sandboxHooks, secretDenyRules, setiHomePaths, unsandboxedHookRules, type SandboxContext } from './sandbox.js'
 import { redactSecrets } from './scrub.js'
@@ -332,7 +333,8 @@ function sessionHooks(
   const guard = bashGuard(scope, auditRefusal(task))
   const sandbox = policy === null ? [] : (sandboxHooks(async () => allowedFor(task.id)).PreToolUse ?? [])
   const repeat = repeatHooks({ task, session, refused: (tool, input) => guardRefuses(tool, input, scope) })
-  return { ...repeat, PreToolUse: [guard, ...sandbox, ...(repeat.PreToolUse ?? [])] }
+  const review = reviewHook({ taskId: task.id, session, denyRules: async () => (await permissionSettings(task)).deny })
+  return { ...repeat, PreToolUse: [guard, ...sandbox, review, ...(repeat.PreToolUse ?? [])] }
 }
 
 /** Rules for every task, a sandbox's launcher and env, else the borrowed MCP servers. */
