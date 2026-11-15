@@ -3,7 +3,6 @@ import { Square } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { DetailBar, DetailBarActions } from '@/components/DetailBar'
 import { Button } from '@/components/ui/button'
-import { useAgentRoom } from '@/hooks/useAgentRoom'
 import { AgentQuestionsButton } from '@/panels/questions/AgentQuestionsButton'
 import { FallbackMark } from '@/panels/tasks/FallbackMark'
 import { PhoneActions } from '@/panels/tasks/PhoneActions'
@@ -26,7 +25,6 @@ interface PhoneHeaderProps {
 
 /** The phone's agent header, the terminal's bar: back, status, name and actions. */
 export function PhoneHeader({ task, title, light, subtasks, settings, running, on }: PhoneHeaderProps) {
-  useAgentRoom()
   return (
     <DetailBar className="typing:hidden" data-testid="agent-header">
       <PhoneBack />

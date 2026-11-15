@@ -28,9 +28,8 @@ these steps.
   terminal keys, sheets, toasts and the phone file viewer keep clear of the notch, the rounded
   corners and the home indicator. The status bar style is `default`, so iOS draws the clock in
   its own light or dark bar above the page; a translucent bar would put white text over Seti's
-  light header. An open agent hands the chat the header's and status bar's room: its own
-  one-row header clears the notch, the reply box clears the home indicator, and the back button
-  carries the Needs you count.
+  light header. An open agent keeps the status bar under its reply box until the keyboard
+  comes up, and its back button carries the Needs you count.
 - **Push.** Seti asks for permission inside the tap on Push, as iOS requires, and sends through
   Apple's push service with a TTL, an urgency and a per-agent topic, so a newer push about an
   agent replaces the older one. A push stays well under Apple's 4 KB limit. Tapping one opens

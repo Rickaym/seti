@@ -13,7 +13,7 @@ const HEADER_MAX_PX = 45
 /** One line of reply box plus its padding and rule. */
 const COMPOSER_MAX_PX = 56
 /** Share of the viewport the transcript gets with the keyboard closed. */
-const TRANSCRIPT_SHARE = 0.75
+const TRANSCRIPT_SHARE = 0.7
 const NARROWEST = { width: 320, height: 568 }
 
 const assistant = (text: string) =>
@@ -78,10 +78,13 @@ async function expectTouchSized(locator: Locator, name: string): Promise<void> {
   expect(Math.min(box?.width ?? 0, box?.height ?? 0), name).toBeGreaterThanOrEqual(TARGET_PX)
 }
 
-test('the agent view gives the chat the screen: the app header, one agent row, a slim reply box', async ({ page }) => {
+test('the agent view keeps the status bar and still gives the chat most of the screen', async ({ page }) => {
   await openAgent(page, unique('Room budget'))
   await expect(page.getByRole('banner')).toBeVisible()
-  await expect(page.getByRole('contentinfo')).toBeHidden()
+  const statusBar = page.getByRole('contentinfo')
+  await expect(statusBar).toBeVisible()
+  const [replyBox, barBox] = [await edgesAtRest(page, composer(page)), await edgesAtRest(page, statusBar)]
+  expect(barBox.top, 'the status bar sits right under the reply box').toBe(replyBox.bottom)
   expect(await heightOf(page, header(page))).toBeLessThanOrEqual(HEADER_MAX_PX)
   expect(await heightOf(page, composer(page))).toBeLessThanOrEqual(COMPOSER_MAX_PX)
   const viewport = page.viewportSize()?.height ?? 0
@@ -156,11 +159,19 @@ test('a busy agent on a 320px phone keeps its title, Stop and every control at 4
   await expectFitsPhone(page, 'busy agent at 320px')
 })
 
-test('with the notch and home indicator the header and reply box stay clear of both', async ({ page }) => {
+test('with the notch and home indicator the header, reply box and status bar stay clear of both', async ({ page }) => {
   await safeAreas(page, PORTRAIT)
   await openAgent(page, unique('Room insets'))
   await expectClear(page, header(page).getByRole('button', { name: 'Back to agents' }), PORTRAIT, 'back button')
   await expectClear(page, header(page).getByRole('button', { name: 'More actions' }), PORTRAIT, 'more button')
   await expectClear(page, reply(page), PORTRAIT, 'reply box')
   await expectClear(page, page.getByRole('button', { name: 'Send' }), PORTRAIT, 'send button')
+  const item = page.getByRole('contentinfo').getByRole('button').first()
+  await expectClear(page, item, PORTRAIT, 'status bar item')
+  const [send, bar] = [
+    await page.getByRole('button', { name: 'Send' }).boundingBox(),
+    await page.getByRole('contentinfo').boundingBox(),
+  ]
+  const gap = (bar?.y ?? 0) - ((send?.y ?? 0) + (send?.height ?? 0))
+  expect(gap, 'no second inset between the reply box and the status bar').toBeLessThan(PORTRAIT.bottom / 2)
 })
