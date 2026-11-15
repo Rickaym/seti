@@ -50,7 +50,7 @@ test('the EA leads the sidebar as its chat and the status bar as its call', asyn
   await expect(work.first()).toHaveAccessibleName('EA')
   await expect(work.first()).toHaveAttribute('aria-current', 'page')
   await expect(work.nth(1)).toHaveAccessibleName('Home')
-  await expect(work.nth(3)).toHaveAccessibleName(/^Questions/)
+  await expect(work.nth(3)).toHaveAccessibleName(/^Requests/)
 
   const start = page.getByRole('contentinfo').getByRole('button').first()
   await expect(start).toHaveAccessibleName('Start an EA call')

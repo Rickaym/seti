@@ -136,6 +136,8 @@ test('a permission request that arrives while typing shows above the keyboard', 
   await expect.poll(async () => inViewport(page, card.getByRole('button', { name: 'Allow', exact: true }))).toBe(true)
   await expect(reply(page)).toBeFocused()
   await expect(statusBar(page)).toBeHidden()
+  await card.getByRole('button', { name: 'Deny' }).tap()
+  await expect(card).toHaveCount(0)
 })
 
 /** Opens the terminal alone from the menu, as a phone has no sidebar or grid. */

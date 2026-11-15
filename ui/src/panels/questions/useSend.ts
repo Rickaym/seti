@@ -2,7 +2,7 @@ import type { AnswerQuestionsResult, QuestionAnswerItem, SupplySecretResult } fr
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { apiPost, errorText } from '@/api'
-import { refreshQuestions } from '@/hooks/useQuestions'
+import { refreshRequests } from '@/hooks/useRequests'
 import { sentSummary } from '@/panels/questions/drafts'
 
 /** A secret the user entered, which goes only to its question's own route. */
@@ -62,7 +62,7 @@ export function useSend(onSent: (ids: readonly string[]) => void) {
     } finally {
       onSent(sent)
       setSending(false)
-      refreshQuestions()
+      refreshRequests()
     }
     return { summary: line, sent }
   }

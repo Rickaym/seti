@@ -5,7 +5,7 @@ import {
   agentQuestions,
   askingAgent,
   lastReply,
-  questionsSection,
+  requestsSection,
   sectionCount,
   sentLine,
   sentToast,
@@ -20,8 +20,8 @@ test('an agent asks for a secret and gets only the path of the file the user fil
   expect(asker.blocked).toBe(`Asks a question: the secret ${SECRET_NAME}, ${SECRET_PURPOSE}`)
 
   await page.goto('/#agents')
-  await questionsSection(page).click()
-  await expect(page.getByRole('heading', { name: 'Questions' })).toBeVisible()
+  await requestsSection(page).click()
+  await expect(page.getByRole('heading', { name: 'Requests' })).toBeVisible()
 
   const secret = agentQuestions(page, asker)
   await expect(secret).toContainText(SECRET_NAME)
@@ -50,17 +50,17 @@ test('an agent asks for a secret and gets only the path of the file the user fil
   await expectKeptOut(page, request, asker, value)
 })
 
-test('Questions stays in the sidebar with nothing open, and the palette opens it', async ({ page }) => {
+test('Requests stays in the sidebar with nothing open, and the palette opens it', async ({ page }) => {
   await page.goto('/#agents')
-  await expect(sectionCount(questionsSection(page))).toHaveCount(0)
-  await questionsSection(page).click()
-  await expect(page.getByRole('heading', { name: 'Questions' })).toBeVisible()
+  await expect(sectionCount(requestsSection(page))).toHaveCount(0)
+  await requestsSection(page).click()
+  await expect(page.getByRole('heading', { name: 'Requests' })).toBeVisible()
   await page.goto('/#home')
   await page.keyboard.press('Control+k')
   const search = page.getByRole('dialog', { name: 'Search Seti' }).getByRole('combobox')
   await expect(search).toBeFocused()
-  await search.fill('Questions')
+  await search.fill('Requests')
   await page.keyboard.press('Enter')
-  await expect(page).toHaveURL(/#questions$/)
-  await expect(page.getByRole('heading', { name: 'Questions' })).toBeVisible()
+  await expect(page).toHaveURL(/#requests$/)
+  await expect(page.getByRole('heading', { name: 'Requests' })).toBeVisible()
 })

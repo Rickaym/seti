@@ -42,28 +42,28 @@ export async function lastToolResult(request: APIRequestContext, taskId: string)
   return results.at(-1) ?? ''
 }
 
-/** The agent's questions on the Questions page. */
+/** The agent's questions on the Requests page. */
 export const agentQuestions = (page: Page, task: Task) =>
   page.getByRole('region', { name: `Questions from ${task.title}` })
 
-/** The Questions page's line saying how many are answered, then what Submit all sent. */
+/** The Requests page's line saying how many are answered, then what Submit all sent. */
 export const sentLine = (page: Page) => page.getByRole('main').getByRole('status')
 
-/** The Questions drawer beside an agent, which holds only that agent's questions. */
-export const questionsDrawer = (page: Page) => page.getByRole('region', { name: 'Agent questions' })
+/** The Requests drawer beside an agent, which holds only that agent's requests. */
+export const requestsDrawer = (page: Page) => page.getByRole('region', { name: 'Agent requests' })
 
 /** The toast a send that settled every question shows as it closes the page or the drawer. */
 export const sentToast = (page: Page, text: string | RegExp) => toasts(page).filter({ hasText: text })
 
-/** The Questions row in the sidebar, or in the phone menu while it is open. */
-export const questionsSection = (page: Page) =>
-  page.getByRole('navigation', { name: 'Sections' }).getByRole('button', { name: 'Questions', exact: true })
+/** The Requests row in the sidebar, or in the phone menu while it is open. */
+export const requestsSection = (page: Page) =>
+  page.getByRole('navigation', { name: 'Sections' }).getByRole('button', { name: 'Requests', exact: true })
 
 /** The number a section's row shows, absent while it counts nothing. */
 export const sectionCount = (row: Locator) => row.locator('[data-section-count] > [aria-hidden="true"]')
 
-/** Opens the phone menu and taps Questions in it. */
-export async function openQuestionsFromMenu(page: Page): Promise<void> {
+/** Opens the phone menu and taps Requests in it. */
+export async function openRequestsFromMenu(page: Page): Promise<void> {
   await page.getByRole('button', { name: 'Menu' }).tap()
-  await questionsSection(page).tap()
+  await requestsSection(page).tap()
 }

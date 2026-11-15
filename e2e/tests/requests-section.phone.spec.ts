@@ -5,37 +5,37 @@ import { FAKE_CLAUDE_ENV } from './support/processes.js'
 import {
   agentQuestions,
   askingAgent,
-  openQuestionsFromMenu,
-  questionsDrawer,
-  questionsSection,
+  openRequestsFromMenu,
+  requestsDrawer,
+  requestsSection,
   sectionCount,
 } from './support/questions.js'
 
 test.use({ serverEnv: FAKE_CLAUDE_ENV })
 
-test('on a phone the menu lists Questions below Agents, with no count while none are open', async ({ page }) => {
+test('on a phone the menu lists Requests below Agents, with no count while none are open', async ({ page }) => {
   await page.goto('/#home')
   await page.getByRole('button', { name: 'Menu' }).tap()
   const work = page.getByRole('navigation', { name: 'Sections' }).getByRole('group', { name: 'Work' })
-  await expect(work.getByRole('button')).toHaveText(['EA', 'Home', 'Agents', 'Questions'])
-  await expect(sectionCount(questionsSection(page))).toHaveCount(0)
-  await questionsSection(page).tap()
-  await expect(page).toHaveURL(/#questions$/)
-  await expect(page.getByRole('heading', { name: 'Questions' })).toBeVisible()
-  await expectFitsPhone(page, 'Questions with none open')
+  await expect(work.getByRole('button')).toHaveText(['EA', 'Home', 'Agents', 'Requests'])
+  await expect(sectionCount(requestsSection(page))).toHaveCount(0)
+  await requestsSection(page).tap()
+  await expect(page).toHaveURL(/#requests$/)
+  await expect(page.getByRole('heading', { name: 'Requests' })).toBeVisible()
+  await expectFitsPhone(page, 'Requests with none open')
   await page.getByRole('button', { name: 'Back', exact: true }).tap()
   await expect(page).toHaveURL(/#home$/)
 
   await page.evaluate(() => {
     window.location.hash = 'agents/questions'
   })
-  await expect(page).toHaveURL(/#questions$/)
-  await expect(page.getByRole('heading', { name: 'Questions' })).toBeVisible()
+  await expect(page).toHaveURL(/#requests$/)
+  await expect(page.getByRole('heading', { name: 'Requests' })).toBeVisible()
   await page.getByRole('button', { name: 'Back', exact: true }).tap()
   await expect(page).toHaveURL(/#home$/)
 })
 
-test('on a phone the menu counts open questions, the Agents list offers none, and the agent opens its drawer', async ({
+test('on a phone the menu counts pending requests, the Agents list offers none, and the agent opens its drawer', async ({
   page,
   request,
 }) => {
@@ -50,24 +50,24 @@ test('on a phone the menu counts open questions, the Agents list offers none, an
   await page.keyboard.press('Escape')
 
   await page.getByRole('button', { name: 'Menu' }).tap()
-  const row = questionsSection(page)
+  const row = requestsSection(page)
   await expect(sectionCount(row)).toHaveText('3')
-  await expect(row).toHaveAccessibleDescription('3 questions wait on you')
-  await expectFitsPhone(page, 'menu with the Questions count')
+  await expect(row).toHaveAccessibleDescription('3 requests wait on you')
+  await expectFitsPhone(page, 'menu with the Requests count')
   await row.tap()
-  await expect(page).toHaveURL(/#questions$/)
+  await expect(page).toHaveURL(/#requests$/)
   await expect(agentQuestions(page, pusher)).toBeVisible()
   await expect(agentQuestions(page, checker)).toBeVisible()
 
   await page.goto(`/#agents/${checker.id}`)
-  await page.getByRole('button', { name: 'Answer 2 questions' }).tap()
-  const drawer = questionsDrawer(page)
+  await page.getByRole('button', { name: 'Answer 2 requests' }).tap()
+  const drawer = requestsDrawer(page)
   await expect(drawer).toBeVisible()
   await expect(drawer.getByRole('region', { name: /^Questions from / })).toHaveCount(1)
 
   await page.goto('/#home')
-  await openQuestionsFromMenu(page)
-  await expect(page).toHaveURL(/#questions$/)
+  await openRequestsFromMenu(page)
+  await expect(page).toHaveURL(/#requests$/)
   await page.getByRole('button', { name: `Skip ${pusher.title}` }).tap()
   await page.getByRole('button', { name: `Skip ${checker.title}` }).tap()
   await expect(page).toHaveURL(/#home$/)

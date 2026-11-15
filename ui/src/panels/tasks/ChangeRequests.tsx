@@ -12,7 +12,9 @@ import { toast } from 'sonner'
 import { apiGetValid, apiPost, errorText } from '@/api'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { refreshRequests } from '@/hooks/useRequests'
 import { refreshTasks } from '@/hooks/useTasks'
+import { cn } from '@/lib/utils'
 
 const ACTION = 'pointer-coarse:h-11'
 const PRESSED = 'aria-pressed:border-primary aria-pressed:bg-primary/10 aria-pressed:text-primary'
@@ -136,8 +138,14 @@ function KeyField({
   )
 }
 
+interface CardProps {
+  request: ChangeRequest
+  onAnswered: () => void
+  className?: string
+}
+
 /** One change an agent asked for, with the exact change, its reason, and Allow or Deny. */
-function ChangeCard({ request, onAnswered }: { request: ChangeRequest; onAnswered: () => void }) {
+export function ChangeCard({ request, onAnswered, className }: CardProps) {
   const [busy, setBusy] = useState(false)
   const [scope, setScope] = useState<HostScope>('agent')
   const [key, setKey] = useState('')
@@ -159,6 +167,7 @@ function ChangeCard({ request, onAnswered }: { request: ChangeRequest; onAnswere
       await apiPost(`/tasks/${request.task_id}/change-requests/${request.id}`, parsed.data)
       onAnswered()
       refreshTasks()
+      refreshRequests()
     } catch (e) {
       toast.error(errorText(e))
     } finally {
@@ -175,7 +184,7 @@ function ChangeCard({ request, onAnswered }: { request: ChangeRequest; onAnswere
   return (
     <section
       aria-label={`Change request: ${title(request, scope)}`}
-      className="mt-3 border border-warning/60 bg-warning/5 px-3 py-2.5 text-xs"
+      className={cn('border border-warning/60 bg-warning/5 px-3 py-2.5 text-xs', className)}
     >
       <div className="flex items-start gap-2">
         <Icon className="mt-px size-3.5 shrink-0 text-warning-text" aria-hidden />
@@ -249,6 +258,7 @@ export function ChangeRequests({
     <ChangeCard
       key={request.id}
       request={request}
+      className="mt-3"
       onAnswered={() => {
         setPending((prev) => prev.filter((other) => other.id !== request.id))
       }}

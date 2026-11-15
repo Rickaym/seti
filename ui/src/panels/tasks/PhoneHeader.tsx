@@ -3,7 +3,7 @@ import { Square } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { DetailBar, DetailBarActions } from '@/components/DetailBar'
 import { Button } from '@/components/ui/button'
-import { AgentQuestionsButton } from '@/panels/questions/AgentQuestionsButton'
+import { AgentRequestsButton } from '@/panels/requests/AgentRequestsButton'
 import { FallbackMark } from '@/panels/tasks/FallbackMark'
 import { PhoneActions } from '@/panels/tasks/PhoneActions'
 import { PhoneBack } from '@/panels/tasks/PhoneBack'
@@ -34,7 +34,7 @@ export function PhoneHeader({ task, title, light, subtasks, settings, running, o
         <FallbackMark fallback={task.model_fallback} />
       </div>
       <DetailBarActions>
-        <AgentQuestionsButton taskId={task.id} onToggle={on.questions} compact />
+        <AgentRequestsButton taskId={task.id} onToggle={on.requests} compact />
         <PhonePrsButton task={task} />
         {running.busy && (
           <Button variant="ghost" size="icon-sm" aria-label="Stop" onClick={on.stop}>

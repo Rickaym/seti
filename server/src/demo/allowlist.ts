@@ -35,6 +35,7 @@ const READS = [
   '/api/knowledge/summary',
   '/api/knowledge/:id',
   '/api/questions',
+  '/api/requests',
   '/api/ping',
   '/api/system',
   '/api/access',

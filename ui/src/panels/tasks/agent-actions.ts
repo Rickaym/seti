@@ -20,8 +20,8 @@ export interface ActionHandlers {
   find: () => void
   files: () => void
   processes: () => void
-  /** Opens or closes the agent's Questions drawer. */
-  questions: () => void
+  /** Opens or closes the agent's Requests drawer. */
+  requests: () => void
   pin: (pinned: boolean) => void
   rename: () => void
   /** Stops the turn or shell command. */

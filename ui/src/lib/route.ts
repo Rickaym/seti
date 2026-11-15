@@ -128,11 +128,11 @@ function settingsTarget(moved: string | Moved, tail: string[]): Target {
   return { hash: ['settings', page, ...(under === undefined ? [] : [under]), ...tail].join('/'), card: null }
 }
 
-/** Where an old `#tasks`, `#prs` or moved settings hash such as `#repos` lives now, or null. */
+/** Where an old `#tasks`, `#prs`, `#questions` or moved settings hash lives now, or null. */
 function movedTarget(hash: string): Target | null {
   const [section = '', ...rest] = parts(hash)
-  if (section === 'agents' && rest[0] === 'questions') {
-    return { hash: 'questions', card: null }
+  if (section === 'questions' || (section === 'agents' && rest[0] === 'questions')) {
+    return { hash: 'requests', card: null }
   }
   if (section === 'tasks') {
     return { hash: ['agents', ...rest].join('/'), card: null }

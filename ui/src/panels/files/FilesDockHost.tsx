@@ -10,7 +10,7 @@ interface FilesDockHostProps {
   children: ReactNode
 }
 
-/** Lets the framed agents inside it open Files or Questions in one shared dock on its right. */
+/** Lets the framed agents inside it open Files or Requests in one shared dock on its right. */
 export function FilesDockHost({ titleOf, children }: FilesDockHostProps) {
   const { dock, setElement } = useFilesDockOwner()
   const title = dock.owner === null ? '' : titleOf(dock.owner)
