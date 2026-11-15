@@ -47,7 +47,8 @@ these steps.
   have their own back arrow on a phone. iOS has no pull to refresh in a Home Screen app; Seti
   refreshes live and offers Reload when a new version is waiting.
 
-Not supported on iOS: the manifest shortcuts (New agent and Needs you on Android), and a launch
+Not supported on iOS: the manifest shortcuts (New agent and Needs you on Android), the share
+target that puts Seti in Android's share menu (Safari has no web share targets), and a launch
 screen in Seti's colours, which iOS takes only from a startup image for every device size and
 theme. The launch shows a plain screen for a moment instead.
 

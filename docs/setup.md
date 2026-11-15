@@ -121,6 +121,31 @@ curl -s -K <(printf 'header = "Authorization: Bearer %s"\n' "$(cat ~/.seti/crede
 
 To sign every browser out, rotate the token: see [Security](security.md#rotating).
 
+## Sharing to Seti from a phone
+
+On Android, Seti appears in other apps' share menus once it is installed, so a photo, a PDF, any
+other file, some text or a link goes to an agent with a message of your own. Install it either way:
+
+- **The app.** Install the Seti app and pair it with your server. An app installed before share
+  support needs the new release, or a new build of `android/`, before it shows in the share menu.
+- **The web app.** In Chrome, open Seti and choose Install app (or Add to Home screen). Chrome reads
+  the share target from Seti's manifest when it installs, so a web app installed earlier needs to
+  be removed and installed again.
+
+A share opens Seti's Share page. The files show as attachments you can remove, and shared text or
+a link fills the message box. Pick an agent (those that need you and the latest come first, and
+Search finds the rest) and tap Send, or tap New agent to start one with the files and message on
+the start page. Cancel discards the share. When the browser is signed out, Seti asks you to sign in
+first and keeps the share meanwhile.
+
+The share stays on the phone until you send it: the service worker keeps it in the browser's cache,
+and the Share page uploads the files through the signed-in session, as Attach does. The same limits
+apply: 25 MB a file, 20 files and 50 MB a message. Files over them stay out, and the Share page says
+which and why.
+
+iOS does not support web share targets, so Seti cannot appear in the iPhone share sheet. Save the
+file to Files and use Attach in Seti instead.
+
 ## Exposing Seti remotely
 
 Seti listens on loopback by default, and that is the safest setup. Anyone who can drive its API

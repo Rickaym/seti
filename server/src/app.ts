@@ -6,6 +6,8 @@ import {
   DEVICE_PAIR_PATH,
   PAIR_PAGE_PATH,
   SETI_HOSTNAMES,
+  SHARE_HASH,
+  SHARE_TARGET_PATH,
   WIDGET_SUMMARY_PATH,
   type DeviceScope,
   type SystemInfo,
@@ -370,6 +372,7 @@ export function createApp(access: AccessGuardOptions = defaultAccess(), eaUrl: s
 
   app.get(ASSET_LINKS_PATH, async (c) => c.json(await assetLinks()))
   app.get(PAIR_PAGE_PATH, (c) => c.html(PAIR_PAGE))
+  app.post(SHARE_TARGET_PATH, (c) => c.redirect(`/${SHARE_HASH}`, 303))
   app.get('/agent/:id', (c) => c.redirect(`/#agents/${encodeURIComponent(c.req.param('id'))}`))
   app.use('/*', cacheHeaders)
   app.use('/*', serveStatic({ root: path.relative(process.cwd(), UI_DIST) }))
