@@ -93,7 +93,7 @@ export function uniqueName(name: string, taken: readonly string[]): string {
   }
 }
 
-const tokenFor = (name: string) => `[${name}]`
+export const tokenFor = (name: string) => `[${name}]`
 
 const pasteNumber = (taken: readonly string[]) =>
   Math.max(0, ...taken.map((name) => Number(/^paste-(\d+)\./.exec(name)?.[1] ?? 0))) + 1

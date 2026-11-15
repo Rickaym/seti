@@ -1,3 +1,4 @@
+import { SHARE_HASH } from '@seti/shared'
 import { CircleQuestionMark, PanelLeft, Plus, RefreshCw, Search, Webhook } from 'lucide-react'
 import { lazy, Suspense, useEffect, useRef, useState, type ReactNode } from 'react'
 import { DemoNotice } from '@/components/DemoNotice'
@@ -54,6 +55,10 @@ const QuestionsPage = lazy(async () =>
 )
 const ContextPanel = lazy(async () => import('@/panels/ContextPanel').then((m) => ({ default: m.ContextPanel })))
 const SettingsPanel = lazy(async () => import('@/panels/SettingsPanel').then((m) => ({ default: m.SettingsPanel })))
+const SharePage = lazy(async () => import('@/panels/share/SharePage').then((m) => ({ default: m.SharePage })))
+
+/** The share sheet lands on `#share`, a page of its own outside the sidebar's sections. */
+const isShareHash = () => window.location.hash === SHARE_HASH
 
 /** Seti's sections from their lazy panels, a mod's from the view its UI half registered. */
 function panelFor(route: Route): ReactNode {
@@ -68,6 +73,24 @@ function panelFor(route: Route): ReactNode {
   const View = sectionRegistry.get(route.section)?.view
   return panels[route.section]?.() ?? (View === undefined ? null : <View id={route.id} />)
 }
+
+interface MainView {
+  name: string
+  key: string
+  view: ReactNode
+}
+
+const sectionView = (route: Route): MainView => ({
+  name: sectionLabel(route.section),
+  key: route.section,
+  view: panelFor(route),
+})
+
+/** Each arrival on `#share` mounts the page afresh, so it reads the share waiting now. */
+const shareView = (visit: number): MainView => ({ name: 'Share', key: 'share', view: <SharePage key={visit} /> })
+
+/** Counts arrivals on `#share`; null while elsewhere. */
+const nextShareVisit = (visit: number | null): number | null => (isShareHash() ? (visit ?? 0) + 1 : null)
 
 const SIDEBAR_KEY = 'seti.sidebar.hidden'
 
@@ -199,6 +222,7 @@ function settleHash(): Route {
 
 export function App() {
   const [route, setRoute] = useState<Route>(settleHash)
+  const [shareVisit, setShareVisit] = useState(() => nextShareVisit(null))
   useAppHeight()
   useTypingMode()
   const narrow = useNarrow()
@@ -230,12 +254,15 @@ export function App() {
     const onHash = () => {
       armLanding('page')
       setRoute(settleHash())
+      setShareVisit(nextShareVisit)
     }
     window.addEventListener('hashchange', onHash)
     return () => {
       window.removeEventListener('hashchange', onHash)
     }
   }, [])
+
+  const shown = shareVisit === null ? sectionView(route) : shareView(shareVisit)
 
   const select = (section: SectionKey) => {
     navigate(section)
@@ -276,9 +303,9 @@ export function App() {
       <div className="relative flex min-h-0 flex-1">
         {!narrow && !sidebar.hidden && <Sidebar active={route.section} onSelect={select} />}
         <main ref={main} {...PANEL} className="min-h-0 min-w-0 flex-1 overflow-hidden">
-          <ErrorBoundary name={sectionLabel(route.section)} resetKey={route.section}>
+          <ErrorBoundary name={shown.name} resetKey={shown.key}>
             <Suspense fallback={<div className="p-6 text-sm text-muted-foreground">Loading...</div>}>
-              {panelFor(route)}
+              {shown.view}
             </Suspense>
           </ErrorBoundary>
         </main>

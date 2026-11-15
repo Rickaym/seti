@@ -1,4 +1,6 @@
+import { SHARE_TARGET_PATH } from '@seti/shared/attachment-limits'
 import { isHashed, passesThrough, planPrecache, type Precache } from './precache'
+import { receiveShare } from './share-inbox'
 
 declare const self: ServiceWorkerGlobalScope
 
@@ -182,6 +184,10 @@ self.addEventListener('notificationclick', (event) => {
 self.addEventListener('fetch', (event) => {
   const { request } = event
   const url = new URL(request.url)
+  if (request.method === 'POST' && url.origin === self.location.origin && url.pathname === SHARE_TARGET_PATH) {
+    event.respondWith(receiveShare(request, caches, crypto.randomUUID()))
+    return
+  }
   if (request.method !== 'GET' || url.origin !== self.location.origin || passesThrough(url.pathname)) {
     return
   }
