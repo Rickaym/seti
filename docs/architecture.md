@@ -339,20 +339,38 @@ on GitHub, and every open PR linked to an agent, whether the agent opened it or 
 it. A PR needs no registered repo to show its title, CI, review threads, owning agents and Fix CI.
 Open PRs that other people wrote appear only once an agent links them.
 
-One refresh reads the GraphQL `search(type: ISSUE, first: 50)` for
-`is:pr is:open author:@me sort:updated-desc` with every field the views read, page by page along
-its cursors, up to four pages (200 PRs) and about 3 points of the budget a page. It stops after
-the first page while the budget is under the poller's floor. Then one `resource(url:)` query per
-20 linked PRs the search left out follows (`server/src/github.ts`). `more` in the list counts the
-login's PRs past the cap; the picker shows it as one line and the tools say so.
-`server/src/prs.ts` keeps the list for 60 seconds, then serves it stale while one process
-refreshes it, and shares it through Redis. Seti reads the list once a few seconds after it starts.
-A list view that asks before any list exists gets the first page as soon as it arrives; status
-lookups wait for the whole list. A PR linked after the list was read makes the next status lookup
-refresh once, so its chip has a status at once. Every query runs as the host's `gh` login, the
-same one the PR poller uses; the per-owner tokens of a credential are for agents' own requests
-through the egress proxy and are never used here, so a PR in a repo that login cannot read shows
-without a status.
+The list and the detail of a PR are read apart, because GitHub answers them at very different
+speeds. The list is two searches for `is:pr is:open author:@me sort:updated-desc` with pages of
+100, run side by side (`server/src/github-list.ts`): the rows (number, title, repo, branches,
+draft, author, update time) take about 2 seconds for 90 PRs, and their status (review decision,
+conflicts and the check rollup as one value) about 7, each for 1 point of the budget. A view that
+asks before any list exists gets the rows as soon as they arrive and their status with the next
+read. Both follow their cursors for at most two pages (200 PRs) and stop after the first while the
+budget is under the poller's floor; `more` counts the login's PRs past that.
+
+The detail of a PR (each check, review threads, labels, comments for previews and mentions, the
+body) is read per PR through `resource(url:)` queries of 20, 1 point and about 4 seconds each
+(`server/src/pr-details.ts`). Seti reads it ahead for PRs linked to agents, since chips, Fix CI and
+the widget show it, and for any other PR only when a view asks: the picker mounts its rows 20 at a
+time and asks for the detail of the rows it mounted, in one request. URLs asked within 25 ms go to
+GitHub together. `GET /api/prs` sends slim rows only; `POST /api/prs/lookup` answers the detail of
+the URLs it is given and names the ones GitHub has not answered within 2.5 seconds as `pending`.
+
+Every copy is served stale while it is read again: the list for 60 seconds, shared through Redis
+and kept in the `pr_list_cache` table, so the first view after a restart shows the last known list
+at once, marked as refreshing; each PR's detail for 60 seconds, shared through Redis. Seti reads
+the list and the linked PRs' detail once a few seconds after it starts. When the PR poller sees a
+PR change it marks that PR's detail stale.
+
+In the UI one store holds the status of every PR on screen (`ui/src/panels/tasks/pr-status-store.ts`).
+It asks for all of them in one request, asks again with a growing pause for the ones still pending
+or after a failed request, and again every minute while the page is visible, so a chip shows
+"Loading status" until an answer arrives and "No status from GitHub" only once GitHub said the PR
+is not an open one it can read.
+
+Every query runs as the host's `gh` login, the same one the PR poller uses; the per-owner tokens
+of a credential are for agents' own requests through the egress proxy and are never used here, so
+a PR in a repo that login cannot read shows without a status.
 
 Starting an agent on a PR's branch still needs a checkout, so `start_agent_from_pr` refuses a PR
 whose repo Seti has none of.

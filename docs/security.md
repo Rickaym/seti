@@ -812,7 +812,10 @@ every open PR linked to an agent, in any repo, so titles, branch names, check na
 from all of them are untrusted text. The UI renders them as text, the PR URL in a request must
 match the anchored GitHub PR pattern, and agents and the EA receive them as tool results. The
 tokens of a credential, per owner or default, are never used for these calls. Seti writes to a PR
-in one case: the preview label, on an open PR it lists, while the PR previews mod is on.
+in one case: the preview label, on an open PR it lists, while the PR previews mod is on. The
+detail lookup reads GitHub only for URLs the list holds or an agent links, so a caller cannot make
+Seti fetch arbitrary PRs in bulk; one PR by URL goes through `GET /api/prs/by-url`. The last list
+is kept in the `pr_list_cache` table as rows of that same untrusted text, with no token in it.
 
 ## Public demo
 
