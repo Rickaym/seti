@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { type APIRequestContext, type Locator, type Page, expect } from '@playwright/test'
 import { openSeedDb } from './db.js'
 import { paths } from './env.js'
-import { setFakeGh } from './fake-gh-env.js'
+import { prNode, setFakeGh } from './fake-gh-env.js'
 import { setModEnabled } from './mods.js'
 
 const READY_COMMENT = `## Preview Environment Ready
@@ -13,59 +13,16 @@ const READY_COMMENT = `## Preview Environment Ready
 |--------|-------|
 | Commit | \`abc1234\` |`
 
-/** An open PR node as the repo PR list query reads it, with the Actions bot's Ready comment. */
-function openPrNode(slug: string, number: number) {
-  return {
-    number,
-    title: 'Preview me',
-    body: '',
-    url: `https://github.com/${slug}/pull/${String(number)}`,
-    isDraft: false,
-    headRefName: 'feat/preview',
-    baseRefName: 'main',
-    headRefOid: 'abc1234def',
-    updatedAt: '2026-11-01T00:00:00Z',
-    reviewDecision: null,
-    mergeable: 'MERGEABLE',
-    author: { login: 'e2e' },
-    labels: { nodes: [{ name: 'preview' }] },
-    commits: { nodes: [] },
-    comments: {
-      nodes: [{ author: { login: 'github-actions' }, body: READY_COMMENT, updatedAt: '2026-11-01T00:00:00Z' }],
-    },
-    reviewThreads: { nodes: [] },
-  }
-}
-
-/** An idle agent linked to an open PR of a registered repo whose preview is up. */
+/** An idle agent linked to an open PR whose preview is up, in a repo Seti has no checkout of. */
 export async function seedPreviewAgent(repo: string): Promise<{ id: string; host: string; label: string }> {
-  const slug = `e2e/${repo}`
-  setFakeGh('e2e', {}, { [slug]: [openPrNode(slug, 1)] })
+  const url = `https://github.com/e2e/${repo}/pull/1`
+  const ready = { id: '1', login: 'github-actions', body: READY_COMMENT, created_at: '2026-11-01T00:00:00Z' }
+  setFakeGh('e2e', { [url]: { ...prNode(url, 'OPEN', [ready]), labels: { nodes: [{ name: 'preview' }] } } })
   const db = openSeedDb()
   const id = randomUUID()
   const ts = new Date().toISOString()
-  await db.run(
-    `INSERT INTO repo (id, slug, path, base_branch, created_at) VALUES (?, ?, ?, 'main', ?)`,
-    slug,
-    slug,
-    paths.checkout,
-    ts,
-  )
-  await db.run(
-    `INSERT INTO task (id, title, repo_id, cwd, worktree, status, created_at, updated_at)
-     VALUES (?, ?, NULL, ?, 0, 'idle', ?, ?)`,
-    id,
-    `E2E preview ${repo}`,
-    paths.checkout,
-    ts,
-    ts,
-  )
-  await db.run(
-    `INSERT INTO task_pr (task_id, pr_url, linked_at, source) VALUES (?, ?, ?, 'user')`,
-    id,
-    `https://github.com/${slug}/pull/1`,
-    ts,
-  )
+  await db.idleTask(id, `E2E preview ${repo}`, paths.checkout, ts)
+  await db.run(`INSERT INTO task_pr (task_id, pr_url, linked_at, source) VALUES (?, ?, ?, 'user')`, id, url, ts)
   await db.close()
   return { id, host: `${repo}-pr-1.seti.localhost`, label: `${repo}#1` }
 }

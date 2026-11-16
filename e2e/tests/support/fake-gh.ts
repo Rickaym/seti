@@ -5,8 +5,8 @@ interface FakeGhState {
   viewer: string
   /** GraphQL PullRequest nodes by PR URL. */
   prs: Record<string, unknown>
-  /** The open PR nodes of each repo by slug, as the repo PR list query reads them. */
-  repos?: Record<string, unknown[]>
+  /** The open PR nodes the search for the login's own PRs returns. */
+  authored?: unknown[]
 }
 
 function readState(): FakeGhState {
@@ -45,10 +45,11 @@ function answer(args: readonly string[]): string | null {
     return null
   }
   const given = fields(args)
-  const owner = given.get('owner')
-  if (owner !== undefined) {
-    const nodes = state.repos?.[`${owner}/${given.get('name') ?? ''}`] ?? []
-    return JSON.stringify({ data: { repository: { pullRequests: { nodes } } } })
+  if (given.has('q')) {
+    const nodes = state.authored ?? []
+    return JSON.stringify({
+      data: { search: { issueCount: nodes.length, pageInfo: { hasNextPage: false, endCursor: null }, nodes } },
+    })
   }
   const urls = [...given].filter(([name]) => /^u\d+$/.test(name))
   const data = Object.fromEntries(urls.map(([name, url]) => [`p${name.slice(1)}`, state.prs[url] ?? null]))

@@ -122,7 +122,6 @@ function openPr(url: string, head: string, repo = REPO): OpenPr {
   const number = Number(url.split('/').at(-1))
   return {
     key: `app-${String(number)}`,
-    repo_id: repo.id,
     repo_slug: repo.slug,
     number,
     title: `PR ${String(number)}`,

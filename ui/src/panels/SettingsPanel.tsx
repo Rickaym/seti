@@ -45,7 +45,7 @@ const PAGES: Record<Exclude<SettingsPageKey, ProbedPageKey>, (detail: string | n
   repos: () => <ReposPage />,
   ea: () => <EaPage />,
   resources: () => <ResourcesPage />,
-  channels: () => <ChannelsPage />,
+  channels: (detail) => <ChannelsPage detail={detail} />,
   about: () => <AboutPage />,
   account: () => <AccountPage />,
   signin: () => <SignInPage />,

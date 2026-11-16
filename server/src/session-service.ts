@@ -75,7 +75,8 @@ export function suggestPr(repo: Repo | null, branch: string | null, prs: readonl
   if (repo === null || branch === null || branch === 'HEAD') {
     return null
   }
-  const pr = prs.find((candidate) => candidate.repo_id === repo.id && candidate.head_ref === branch)
+  const slug = repo.slug.toLowerCase()
+  const pr = prs.find((candidate) => candidate.repo_slug.toLowerCase() === slug && candidate.head_ref === branch)
   return pr
     ? {
         url: pr.url,

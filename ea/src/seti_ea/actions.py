@@ -1079,6 +1079,14 @@ class AgentActions:
     async def start_agent_from_pr(self, args: Mapping[str, Any]) -> ToolResult:
         pr = await self._find.resolve_pr(arg_str(args, "pr"))
         instructions = arg_str(args, "instructions")
+        slug = str(pr.get("repo_slug", ""))
+        repos = dicts(await self._seti.get("/repos"))
+        repo = next((r for r in repos if str(r.get("slug", "")).lower() == slug.lower()), None)
+        if repo is None:
+            raise ToolError(
+                f"Seti has no checkout of {slug} to start an agent in. Add the repo first.",
+                f"No checkout of {repo_name(slug)}",
+            )
         number = pr.get("number")
         head = str(pr.get("head_ref", ""))
         title = arg_str(args, "title", required=False) or f"PR #{number}: {pr.get('title', '')}"
@@ -1104,7 +1112,7 @@ class AgentActions:
         body = {
             "title": title,
             "prompt": prompt,
-            "repo_ids": [pr.get("repo_id")],
+            "repo_ids": [repo.get("id")],
             "worktree": True,
             "ref": head,
             "pr_urls": [pr.get("url")],
@@ -1119,15 +1127,15 @@ class AgentActions:
     async def request_preview(self, args: Mapping[str, Any]) -> ToolResult:
         pr = await self._find.resolve_pr(arg_str(args, "pr"))
         label = pr_label(str(pr.get("url", "")))
-        listing = await self._seti.get("/prs", {"scope": "all"})
+        listing = await self._seti.get("/prs")
         if isinstance(listing, dict) and listing.get("previews_on") is False:
             raise ToolError(
                 "PR previews are off in Seti. The user can turn them on in Settings, Mods.",
                 "PR previews are off",
             )
-        groups = dicts(listing.get("repos")) if isinstance(listing, dict) else []
-        group = next((g for g in groups if g.get("repo_id") == pr.get("repo_id")), None)
-        if group is not None and group.get("previews") is not True:
+        listed = dicts(listing.get("prs")) if isinstance(listing, dict) else []
+        siblings = [p for p in listed if p.get("repo_slug") == pr.get("repo_slug")]
+        if not any((p.get("preview") or {}).get("state") not in (None, "none") for p in siblings):
             raise ToolError(
                 f"Seti has no previews for {repo_name(str(pr.get('repo_slug', '')))}, so it offers no "
                 "Preview action there.",

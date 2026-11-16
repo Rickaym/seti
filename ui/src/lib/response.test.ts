@@ -4,7 +4,6 @@ import { readResponse } from '@/api'
 
 const pr = (key: string, extra: Record<string, unknown> = {}) => ({
   key,
-  repo_id: 'r1',
   repo_slug: 'Octocat/seti',
   number: 7,
   title: `PR ${key}`,
@@ -30,9 +29,10 @@ const pr = (key: string, extra: Record<string, unknown> = {}) => ({
 
 const list = (prs: unknown[]) => ({
   viewer: 'octocat',
-  scope: 'all',
+  prs,
+  error: null,
+  more: 0,
   previews_on: true,
-  repos: [{ repo_id: 'r1', slug: 'Octocat/seti', error: null, previews: false, prs }],
 })
 
 const task = (id: string, extra: Record<string, unknown> = {}) => ({
@@ -79,14 +79,14 @@ describe('readResponse', () => {
   it('passes a well-formed PR list through untouched and quietly', () => {
     const spy = warn()
     const body = list([pr('a')])
-    expect(readResponse('/prs?scope=all', prListSchema, body)).toEqual(body)
+    expect(readResponse('/prs', prListSchema, body)).toEqual(body)
     expect(spy).not.toHaveBeenCalled()
   })
 
   it('defaults a PR preview that is null instead of failing the list', () => {
     const spy = warn()
-    const parsed = readResponse('/prs?scope=mine', prListSchema, list([pr('a', { preview: null }), pr('b')]))
-    expect(parsed.repos[0]?.prs.map((p) => p.preview)).toEqual([
+    const parsed = readResponse('/prs', prListSchema, list([pr('a', { preview: null }), pr('b')]))
+    expect(parsed.prs.map((p) => p.preview)).toEqual([
       { state: 'none', url: null, commit: null, stale: false },
       { state: 'none', url: null, commit: null, stale: false },
     ])
@@ -106,8 +106,8 @@ describe('readResponse', () => {
 
   it('drops a PR too broken to show and keeps the rest', () => {
     warn()
-    const parsed = readResponse('/prs?scope=all', prListSchema, list([{ key: 'x' }, pr('b')]))
-    expect(parsed.repos[0]?.prs.map((p) => p.key)).toEqual(['b'])
+    const parsed = readResponse('/prs', prListSchema, list([{ key: 'x' }, pr('b')]))
+    expect(parsed.prs.map((p) => p.key)).toEqual(['b'])
   })
 
   it('logs the same repair once across polls', () => {
@@ -157,6 +157,6 @@ describe('readResponse', () => {
 
   it('fails with the endpoint named when the outer shape is wrong', () => {
     expect(() => readResponse('/tasks', taskListSchema, { tasks: [] })).not.toThrow()
-    expect(() => readResponse('/prs?scope=all', prListSchema, 'oops')).toThrow(/^Unexpected response from \/prs: /)
+    expect(() => readResponse('/prs', prListSchema, 'oops')).toThrow(/^Unexpected response from \/prs: /)
   })
 })

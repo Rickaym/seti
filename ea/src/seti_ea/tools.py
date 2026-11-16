@@ -366,14 +366,8 @@ TOOL_SPECS: list[ToolSpec] = [
     ),
     ToolSpec(
         "list_prs",
-        "List open pull requests in registered repos with CI, review, preview and linked tasks.",
-        {
-            "scope": {
-                "type": "string",
-                "enum": ["mine", "all"],
-                "description": "mine for the user's own PRs (default), all for everyone's.",
-            }
-        },
+        "List the user's open pull requests and those agents opened or linked, in any repo, with CI, "
+        "review, preview and linked tasks.",
     ),
     ToolSpec(
         "get_pr",
@@ -1100,30 +1094,27 @@ class EaTools:
             lines.append(f"And {len(tasks) - LIST_LIMIT} older ones not listed.")
         return ToolResult("\n".join(lines), f"Listed {plural(len(tasks), 'agent')}")
 
-    async def _open_prs(self, scope: str) -> dict[str, Any]:
-        data = await self._seti.get("/prs", {"scope": scope})
+    async def _open_prs(self) -> dict[str, Any]:
+        data = await self._seti.get("/prs")
         return data if isinstance(data, dict) else {}
 
     @staticmethod
     def _prs_of(pr_list: Mapping[str, Any]) -> list[dict[str, Any]]:
-        prs: list[dict[str, Any]] = []
-        for repo in dicts(pr_list.get("repos")):
-            prs.extend(dicts(repo.get("prs")))
-        return prs
+        return dicts(pr_list.get("prs"))
 
     async def _task_prs(self, task: Mapping[str, Any]) -> list[str]:
         urls = [u for u in task.get("pr_urls") or [] if isinstance(u, str)]
         if not urls:
             return ["No linked PRs."]
         try:
-            open_prs = {str(p.get("url")): p for p in self._prs_of(await self._open_prs("all"))}
+            open_prs = {str(p.get("url")): p for p in self._prs_of(await self._open_prs())}
         except SetiError as e:
             return [f"{plural(len(urls), 'linked PR')}, status unavailable: {e.title}."]
         lines = [f"{plural(len(urls), 'linked PR')}:"]
         for url in urls:
             pr = open_prs.get(url)
             if pr is None:
-                lines.append(f"- {pr_label(url)}: not open in a registered repo")
+                lines.append(f"- {pr_label(url)}: not open, or GitHub gave no status")
             else:
                 lines.append(f"- {pr_line(pr)}")
         return lines
@@ -1371,33 +1362,29 @@ class EaTools:
         return ToolResult("\n".join(lines), summary)
 
     async def list_prs(self, args: Mapping[str, Any]) -> ToolResult:
-        scope = arg_str(args, "scope", required=False) or "mine"
-        if scope not in ("mine", "all"):
-            raise ToolError("Scope must be mine or all.", "Bad scope")
-        data = await self._open_prs(scope)
+        data = await self._open_prs()
         lines: list[str] = []
-        if scope == "mine" and data.get("viewer") is None:
+        if data.get("viewer") is None:
             lines.append("The GitHub CLI is not logged in, so Seti cannot tell which PRs are yours.")
-        for repo in dicts(data.get("repos")):
-            if repo.get("error"):
-                lines.append(
-                    f"Could not load {repo_name(str(repo.get('slug')))}: {clip(str(repo['error']), 120)}"
-                )
+        if data.get("error"):
+            lines.append(f"Could not load the open PRs: {clip(str(data['error']), 120)}")
         prs = self._prs_of(data)
         prs.sort(key=lambda p: str(p.get("updated_at", "")), reverse=True)
-        whose = "of yours" if scope == "mine" else "in total"
-        lines.insert(0, f"{plural(len(prs), 'open PR')} {whose}.")
+        lines.insert(0, f"{plural(len(prs), 'open PR')} of yours and your agents.")
+        more = data.get("more")
+        if isinstance(more, int) and more > 0:
+            lines.append(f"GitHub has {more} more open of yours; these are the most recently updated.")
         for pr in prs[:PR_LIMIT]:
             linked = [f"{title_of(t)} ({status_word(t.get('status'))})" for t in dicts(pr.get("tasks"))]
             task_text = f"; task {', '.join(linked)}" if linked else "; no task"
             lines.append(f"- {pr_line(pr)}{task_text}")
         if len(prs) > PR_LIMIT:
             lines.append(f"And {len(prs) - PR_LIMIT} more not listed.")
-        return ToolResult("\n".join(lines), f"Listed {plural(len(prs), 'PR')} ({scope})")
+        return ToolResult("\n".join(lines), f"Listed {plural(len(prs), 'PR')}")
 
     async def resolve_pr(self, ref: str) -> dict[str, Any]:
         """The open PR ref names by URL, repo and number, title, or the task it belongs to."""
-        prs = self._prs_of(await self._open_prs("all"))
+        prs = self._prs_of(await self._open_prs())
 
         def label(p: Mapping[str, Any]) -> str:
             return f"{pr_label(str(p.get('url', '')))}, {clip(str(p.get('title', '')), 50)}"
@@ -1414,7 +1401,7 @@ class EaTools:
             if isinstance(pr, dict):
                 return pr
             raise ToolError(
-                f"{pr_label(ref)} is merged, closed, or not in a registered repo.",
+                f"{pr_label(ref)} is merged, closed, or out of reach of Seti's GitHub login.",
                 f"{pr_label(ref)} is not open",
             )
         numbers = NUMBER.findall(ref)
@@ -1719,7 +1706,7 @@ class EaTools:
         slug = str(repo.get("slug"))
         tasks, prs, files = await asyncio.gather(
             _attempt(self._tasks()),
-            _attempt(self._open_prs("all")),
+            _attempt(self._open_prs()),
             _attempt(self._list("/context/files")),
         )
         lines = [f"{slug}, base branch {repo.get('base_branch')}."]
@@ -1731,11 +1718,12 @@ class EaTools:
             tally = ", ".join(f"{n} {status_word(s)}" for s, n in counts.items())
             lines.append(f"{plural(len(mine), 'task')}{': ' + tally if tally else ''}.")
         if isinstance(prs, dict):
-            entry = next((r for r in dicts(prs.get("repos")) if r.get("repo_id") == repo_id), None)
-            if entry is not None and entry.get("error"):
-                lines.append(f"Open PRs could not be loaded: {clip(str(entry.get('error')), 120)}")
-            elif entry is not None:
-                open_prs = dicts(entry.get("prs"))
+            if prs.get("error"):
+                lines.append(f"Open PRs could not be loaded: {clip(str(prs.get('error')), 120)}")
+            else:
+                open_prs = [
+                    p for p in self._prs_of(prs) if str(p.get("repo_slug", "")).lower() == slug.lower()
+                ]
                 failing = [p for p in open_prs if p.get("ci") == "failure"]
                 conflicts = sum(1 for p in open_prs if p.get("mergeable") == "conflicting")
                 lines.append(
@@ -2288,7 +2276,7 @@ class EaTools:
             return ToolResult(text, "Read Seti's mods")
         tasks, prs, audit, account = await asyncio.gather(
             _attempt(self._tasks()),
-            _attempt(self._open_prs("mine")),
+            _attempt(self._open_prs()),
             _attempt(self._seti.get("/audit", {"limit": AUDIT_PAGE})),
             _attempt(self._seti.get("/account")),
         )
@@ -2367,7 +2355,8 @@ class EaTools:
             return f"PRs unavailable: {prs.title}."
         if prs.get("viewer") is None:
             return "The GitHub CLI is not logged in, so your PRs are unknown."
-        mine = self._prs_of(prs)
+        viewer = str(prs.get("viewer")).lower()
+        mine = [p for p in self._prs_of(prs) if str(p.get("author", "")).lower() == viewer]
         failing = sorted(
             (p for p in mine if p.get("ci") == "failure"),
             key=lambda p: str(p.get("updated_at", "")),

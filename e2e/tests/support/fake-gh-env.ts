@@ -28,7 +28,7 @@ export function fakeGhEnv(): NodeJS.ProcessEnv {
   }
 }
 
-/** A PR node as the watch query reads it, its comments, and `closedAt` once ended. */
+/** A PR node with the fields of every PR query, its comments, and `closedAt` once ended. */
 export function prNode(
   url: string,
   state: 'OPEN' | 'MERGED' | 'CLOSED',
@@ -39,7 +39,18 @@ export function prNode(
   return {
     url,
     number: Number(number),
+    title: `Change ${number}`,
+    body: '',
     state,
+    isDraft: false,
+    headRefName: `feat/change-${number}`,
+    baseRefName: 'main',
+    headRefOid: 'abc1234def',
+    updatedAt: '2026-10-07T09:00:00Z',
+    reviewDecision: null,
+    author: { login: 'e2e' },
+    labels: { nodes: [] as { name: string }[] },
+    reviewThreads: { nodes: [] as { isResolved: boolean }[] },
     mergeable: 'MERGEABLE',
     closedAt: state === 'OPEN' ? null : closedAt,
     repository: { nameWithOwner: slug },
@@ -51,15 +62,16 @@ export function prNode(
         body: comment.body,
         url: `${url}#issuecomment-${comment.id}`,
         createdAt: comment.created_at,
+        updatedAt: comment.created_at,
         author: { __typename: 'User', login: comment.login },
       })),
     },
   }
 }
 
-/** What the fake gh answers from now on: who is signed in, each PR by URL, each repo's open PRs. */
-export function setFakeGh(viewer: string, prs: Record<string, unknown>, repos: Record<string, unknown[]> = {}): void {
+/** What the fake gh answers from now on: who is signed in, each PR by URL, the login's open PRs. */
+export function setFakeGh(viewer: string, prs: Record<string, unknown>, authored: readonly unknown[] = []): void {
   const next = `${stateFile}.next`
-  fs.writeFileSync(next, JSON.stringify({ viewer, prs, repos }))
+  fs.writeFileSync(next, JSON.stringify({ viewer, prs, authored }))
   fs.renameSync(next, stateFile)
 }

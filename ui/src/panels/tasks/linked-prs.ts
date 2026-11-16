@@ -14,7 +14,7 @@ export interface LinkedPr {
   /** `owner/repo` from the URL, so PRs Seti has no status for still filter by repo. */
   slug: string
   number: number
-  /** Live status while the PR is open in a registered repo. */
+  /** Live status while the PR is open and GitHub shows it to Seti. */
   pr: PullRequest | null
   group: LinkedPrGroup
   /** Position in link order; later links count as more recent when no update time is known. */

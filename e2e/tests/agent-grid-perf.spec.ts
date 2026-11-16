@@ -35,7 +35,6 @@ function openPr(url: string): PullRequest {
   const [, slug = '', number = '0'] = /github\.com\/(.+)\/pull\/(\d+)$/.exec(url) ?? []
   return {
     key: url,
-    repo_id: slug,
     repo_slug: slug,
     number: Number(number),
     title: `Change ${number}`,

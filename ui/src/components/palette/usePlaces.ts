@@ -17,7 +17,7 @@ import {
 
 const NONE: readonly never[] = []
 
-const prs = createPolledResource('/prs?scope=all', 60_000, { schema: prListSchema })
+const prs = createPolledResource('/prs', 60_000, { schema: prListSchema })
 const contextFiles = createPolledResource<ContextFile[]>('/context/files', 60_000)
 const contextPacks = createPolledResource<ContextPack[]>('/context/packs', 60_000)
 

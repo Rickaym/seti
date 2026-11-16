@@ -28,7 +28,6 @@ const THREADS = new Map([
 function openPr(n: number): PullRequest {
   return {
     key: `many-${String(n)}`,
-    repo_id: SLUG,
     repo_slug: SLUG,
     number: n,
     title: n === LOGIN_PR ? 'Fix login redirect' : `Many change ${String(n)}`,

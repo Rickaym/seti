@@ -126,17 +126,15 @@ export const archivedPlaces = (tasks: readonly ArchivedTaskEntry[]): Place[] =>
   }))
 
 export const prPlaces = (list: PrList | undefined): Place[] =>
-  (list?.repos ?? []).flatMap((group) =>
-    group.prs.map((pr) => ({
-      id: `pr:${pr.key}`,
-      kind: 'pr',
-      title: pr.title,
-      detail: `${pr.repo_slug}#${String(pr.number)}`,
-      icon: pr.draft ? GitPullRequestDraft : GitPullRequest,
-      keywords: [pr.author ?? '', pr.head_ref, pr.draft ? 'draft' : ''].join(' '),
-      target: { run: () => window.open(pr.url, '_blank', 'noopener,noreferrer') },
-    })),
-  )
+  (list?.prs ?? []).map((pr) => ({
+    id: `pr:${pr.url}`,
+    kind: 'pr',
+    title: pr.title,
+    detail: `${pr.repo_slug}#${String(pr.number)}`,
+    icon: pr.draft ? GitPullRequestDraft : GitPullRequest,
+    keywords: [pr.author ?? '', pr.head_ref, pr.draft ? 'draft' : ''].join(' '),
+    target: { run: () => window.open(pr.url, '_blank', 'noopener,noreferrer') },
+  }))
 
 export function contextPlaces(files: readonly ContextFile[], packs: readonly ContextPack[]): Place[] {
   const filePlaces = files.map((file): Place => ({
