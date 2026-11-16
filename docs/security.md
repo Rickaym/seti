@@ -149,6 +149,25 @@ private key off the host. The sandbox model is in [Architecture](architecture.md
   redacted, so an edit never sends a placeholder or rewrites a shell command past the guard. The
   answer route refuses the EA and agents as for any request. The audit records which fields
   changed, never their values, and the request keeps the input the call ran with.
+- A review rule holds only the tool it names, so a rule for one tool of a server leaves that
+  server's other writing tools unchecked: a message tool reviewed while a file upload with a
+  comment posts freely. When the user adds a review rule for one tool, Seti lists the server's
+  other tools that write or send as a checklist, with one switch for a rule that names the whole
+  server, and one confirm adds the rules chosen. A rule for the whole server also holds the tools
+  the server adds later, and its reads. Which tools write comes from real signals, in this order
+  (`server/src/review-coverage.ts`): a server that annotates its tools decides, and every tool it
+  does not mark read-only is listed, selected when it is open-world or when the server marks no
+  tool so, since an absent open-world hint means open; for a server with no annotations the
+  words of each tool's name decide, as for the outward audit (`server/src/outward.ts`); a name
+  with no known word is listed as Unknown and left unselected. Seti keeps no list of vendor tool
+  names. Annotations are the server's own claims, so a server that marks a writing tool
+  read-only hides it from the checklist; the rule for the whole server does not depend on them.
+  The tool list comes from the capability probes Seti already holds, and with none for a server
+  the typed rule is added as it is, with a line saying the server is not connected. Seti never
+  adds or changes a review rule by itself: where rules name some tools of a server and other
+  outward tools are left out, the rules page and the agent's rules show one line with their
+  count and the same checklist. Adding several rules at once (`POST .../rules/batch`) refuses
+  the EA, agents and mods as adding one does, and audits each rule.
 - Agents at Self or Full propose security changes they need with `request_change`; nothing else
   applies them. A request names the exact change and the agent's reason: a host and port for the
   network allowlist (443 unless it names one), a connection's variable and hosts, or an MCP server

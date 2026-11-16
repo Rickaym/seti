@@ -54,6 +54,7 @@ def reminder_channel(**reminder: Any) -> dict[str, Any]:
             "failures": 0,
             "last_run_at": "2026-09-27T11:00:00.000Z",
             "next_run_at": "2026-09-27T12:30:00.000Z",
+            "upcoming": ["2026-09-27T12:30:00.000Z", "2026-09-27T13:30:00.000Z", "2026-09-27T14:30:00.000Z"],
             "last_output": "Check the open pull requests.",
             "runs": RUNS,
             **reminder,
@@ -239,3 +240,34 @@ async def test_update_switches_between_cron_and_interval(tools: EaTools, fake: R
     assert nothing.text == "That changes nothing in the reminder PR nudge."
     lonely = await tools.call("update_channel", {"channel": "pr nudge", "timezone": "UTC"})
     assert lonely.text == "A timezone goes with a cron schedule; give one too."
+
+
+async def test_upcoming_runs_are_listed_in_the_users_time(tools: EaTools, fake: ReminderFake) -> None:
+    fake.channels.append(
+        {
+            "id": "p" * 24,
+            "name": "Release feed",
+            "source": "poller",
+            "poller": {
+                "interval_s": 300,
+                "enabled": True,
+                "upcoming": ["2026-09-27T12:05:00.000Z", "2026-09-27T12:10:00.000Z"],
+            },
+        }
+    )
+    fake.channels.append(reminder_channel(enabled=False, next_run_at=None, upcoming=[]) | {"name": "Standup"})
+    token = CURRENT_CLOCK.set(parse_user_clock({"timezone": "Europe/Berlin"}))
+    try:
+        listed = await tools.call("list_channels", {"upcoming": True})
+    finally:
+        CURRENT_CLOCK.reset(token)
+    assert listed.text.splitlines() == [
+        "Next runs in Europe/Berlin time, soonest first:",
+        "- Release feed (poller, every 5 minutes): next in 5 minutes, Sunday 14:05",
+        "- PR nudge (reminder, every 1 hour): next in 30 minutes, Sunday 14:30, Sunday 15:30 and "
+        "Sunday 16:30",
+        "Paused: Standup.",
+    ]
+    fake.channels[:] = [c for c in fake.channels if c.get("source") not in ("poller", "reminder")]
+    none = await tools.call("list_channels", {"upcoming": True})
+    assert none.text == "No poller or reminder has a run to come."

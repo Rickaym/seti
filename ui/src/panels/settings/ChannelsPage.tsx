@@ -1,14 +1,17 @@
 import type { ChannelInfo, ChannelSecret, PollerChannelInfo, ReminderChannelInfo } from '@seti/shared'
-import { AlarmClock, Plus, Radar, Webhook } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { AlarmClock, CalendarClock, Plus, Radar, RadioTower, Webhook } from 'lucide-react'
+import { useEffect, useState, type ReactElement } from 'react'
 import { apiGet, errorText } from '@/api'
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { navigate } from '@/lib/route'
 import { NewWebhookDialog } from './channels/NewWebhookDialog'
 import { PollerCard } from './channels/PollerCard'
 import { PollerEditor } from './channels/PollerEditor'
 import { ReminderCard } from './channels/ReminderCard'
 import { ReminderEditor } from './channels/ReminderEditor'
+import { SchedulePanel } from './channels/SchedulePanel'
 import { SecretDialog } from './channels/SecretDialog'
 import { WebhookCard } from './channels/WebhookCard'
 import { SettingsBody, SettingsHeader } from './layout'
@@ -72,8 +75,89 @@ function NewChannel({ onPick }: { onPick: (source: Source) => void }) {
   )
 }
 
+const SCHEDULE = 'schedule'
+
+/** The card a link from the schedule points at. */
+const cardId = (channelId: string) => `channel-${channelId}`
+
+/** Brings the card a link names into view once the channels are there. */
+function useCardInView(loaded: boolean, detail: string | null): void {
+  useEffect(() => {
+    if (!loaded || detail === null || detail === SCHEDULE) {
+      return
+    }
+    const frame = requestAnimationFrame(() => {
+      document.getElementById(cardId(detail))?.scrollIntoView({ block: 'start' })
+    })
+    return () => {
+      cancelAnimationFrame(frame)
+    }
+  }, [loaded, detail])
+}
+
+/** The channels as cards, and what they run next as a schedule, each under its own tab. */
+function ChannelViews({
+  channels,
+  error,
+  detail,
+  card,
+}: {
+  channels: ChannelInfo[] | null
+  error: string
+  detail: string | null
+  card: (info: ChannelInfo) => ReactElement
+}) {
+  if (channels === null) {
+    return (
+      <p className={error === '' ? 'text-sm text-muted-foreground' : 'text-sm text-destructive'}>
+        {error === '' ? 'Loading...' : error}
+      </p>
+    )
+  }
+  if (channels.length === 0) {
+    return (
+      <p className="text-sm text-muted-foreground">
+        No channels yet. Create a webhook and point a sender at its URL, a poller for a feed or API, or a reminder.
+      </p>
+    )
+  }
+  return (
+    <Tabs
+      value={detail === SCHEDULE ? SCHEDULE : 'channels'}
+      onValueChange={(value) => {
+        navigate('settings', value === SCHEDULE ? `channels/${SCHEDULE}` : 'channels')
+      }}
+      className="gap-4"
+    >
+      <div className="border-b border-border">
+        <TabsList variant="line" aria-label="Channels views" className="h-9">
+          <TabsTrigger value="channels" className="flex-none px-2.5">
+            <RadioTower />
+            Channels
+          </TabsTrigger>
+          <TabsTrigger value={SCHEDULE} className="flex-none px-2.5">
+            <CalendarClock />
+            Schedule
+          </TabsTrigger>
+        </TabsList>
+      </div>
+      <TabsContent value="channels" className="space-y-4">
+        {channels.map(card)}
+      </TabsContent>
+      <TabsContent value={SCHEDULE}>
+        <SchedulePanel
+          channels={channels}
+          onOpen={(id) => {
+            navigate('settings', `channels/${id}`)
+          }}
+        />
+      </TabsContent>
+    </Tabs>
+  )
+}
+
 /** Channels: webhooks, pollers and reminders, whose events go to their subscribers. */
-export function ChannelsPage() {
+export function ChannelsPage({ detail }: { detail: string | null }) {
   const [channels, setChannels] = useState<ChannelInfo[] | null>(null)
   const [error, setError] = useState('')
   const [creating, setCreating] = useState<Source | null>(null)
@@ -85,6 +169,7 @@ export function ChannelsPage() {
       setError(errorText(e))
     })
   }, [])
+  useCardInView(channels !== null, detail)
   const replace = (next: ChannelInfo) => {
     setChannels((prev) => prev?.map((info) => (info.id === next.id ? next : info)) ?? null)
   }
@@ -119,6 +204,7 @@ export function ChannelsPage() {
       return (
         <PollerCard
           key={info.id}
+          id={cardId(info.id)}
           info={info}
           onChange={replace}
           onRemoved={removed}
@@ -132,6 +218,7 @@ export function ChannelsPage() {
       return (
         <ReminderCard
           key={info.id}
+          id={cardId(info.id)}
           info={info}
           onChange={replace}
           onRemoved={removed}
@@ -154,17 +241,7 @@ export function ChannelsPage() {
         />
       }
     >
-      {channels === null && (
-        <p className={error === '' ? 'text-sm text-muted-foreground' : 'text-sm text-destructive'}>
-          {error === '' ? 'Loading...' : error}
-        </p>
-      )}
-      {channels?.length === 0 && (
-        <p className="text-sm text-muted-foreground">
-          No channels yet. Create a webhook and point a sender at its URL, a poller for a feed or API, or a reminder.
-        </p>
-      )}
-      <div className="space-y-4">{channels?.map(card)}</div>
+      <ChannelViews channels={channels} error={error} detail={detail} card={card} />
       <NewWebhookDialog
         open={creating === 'webhook'}
         onClose={() => {

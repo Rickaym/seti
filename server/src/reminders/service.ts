@@ -1,6 +1,8 @@
 import {
   CHANNEL_ACTIVITY_SHOWN,
+  nextRuns,
   REMINDER_LIMITS,
+  UPCOMING_RUNS,
   type EaNoticeSeverity,
   type ReminderChannelInfo,
   type ReminderRun,
@@ -57,7 +59,8 @@ function statusOf(record: ReminderRecord): ReminderStatus {
 }
 
 async function info(record: ReminderRecord): Promise<ReminderChannelInfo> {
-  const { id, name, created_at, updated_at } = record
+  const { id, name, created_at, updated_at, interval_s, schedule } = record
+  const next_run_at = record.enabled ? record.next_run_at : null
   return {
     source: 'reminder',
     preset: 'reminder',
@@ -73,7 +76,8 @@ async function info(record: ReminderRecord): Promise<ReminderChannelInfo> {
       status: statusOf(record),
       failures: record.failures,
       last_run_at: record.last_run_at,
-      next_run_at: record.enabled ? record.next_run_at : null,
+      next_run_at,
+      upcoming: nextRuns({ interval_s, schedule, next_run_at }, new Date(), UPCOMING_RUNS),
       last_output: record.last_output,
       runs: await reminderStore.runs(id, CHANNEL_ACTIVITY_SHOWN),
       health: await channelHealth({ source: 'reminder', ...record }),
