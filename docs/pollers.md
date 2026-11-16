@@ -88,3 +88,25 @@ The card shows the status (pending, ok, erroring, failing, paused), the last and
 runs with their logs and errors, Poll to run now, a switch to pause, and Edit, whose Test run
 executes the script once without storing or reporting anything and shows its items, notes, log and
 error.
+
+## Schedule
+
+Settings, Channels has a Schedule tab that lists what runs next, grouped by day in the viewer's
+timezone: Today, Tomorrow, then dates. It covers the next 24 hours, 7 days or 30 days and shows
+three kinds of entry: pollers, reminders and the follow-ups the EA scheduled. Webhooks run on no
+schedule and stay out. An entry shows its local time, its name and its timing in words, and opens
+the channel's card, or the EA for a follow-up.
+
+A channel with more than 6 runs in a day shows as one line for that day with the count, such as
+"Every 5 min, 288 runs", at the time of the first one; fewer runs are listed one by one. A cron
+reminder read in another timezone than the viewer's names it. Paused pollers and reminders have no
+runs to come, so the tab counts and names them under the list.
+
+Pollers always run on an interval, and reminders on an interval or a cron schedule. Cron runs are
+exact. Interval runs are projected from the stored next run in steps of the interval, so a
+poller's real runs differ by its jitter, and move back while it backs off after failures.
+
+Seti computes all of this from `nextRuns` and `runsInRange` in `shared/src/schedule.ts`. Each
+poller and reminder also reports its next 5 runs as `upcoming`, which is what the EA and agents
+read: `list_channels` with `upcoming` answers "what is scheduled next?" with the coming runs,
+soonest first, and the paused channels.

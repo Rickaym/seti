@@ -12,7 +12,7 @@ export const AGENDA_RANGES = [
 export type AgendaRangeId = (typeof AGENDA_RANGES)[number]['id']
 
 /** A channel with more runs than this in a day shows as one line with their count. */
-export const COLLAPSE_OVER = 6
+const COLLAPSE_OVER = 6
 
 export type AgendaKind = 'poller' | 'reminder' | 'followup'
 

@@ -2,7 +2,6 @@ import type { ChannelInfo, EaFollowup } from '@seti/shared'
 import { AlarmClock, Headset, Radar } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { apiGet } from '@/api'
-import { Hint } from '@/components/Hint'
 import { browserTimezone } from '@/components/schedule/cron'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { navigate } from '@/lib/route'
@@ -129,11 +128,9 @@ export function SchedulePanel({ channels, onOpen }: { channels: ChannelInfo[]; o
         >
           <TabsList aria-label="Range">
             {AGENDA_RANGES.map(({ id, label, hint }) => (
-              <Hint key={id} text={hint}>
-                <TabsTrigger value={id} className="px-3">
-                  {label}
-                </TabsTrigger>
-              </Hint>
+              <TabsTrigger key={id} value={id} title={hint} className="px-3">
+                {label}
+              </TabsTrigger>
             ))}
           </TabsList>
         </Tabs>

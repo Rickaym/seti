@@ -83,8 +83,14 @@ const cardId = (channelId: string) => `channel-${channelId}`
 /** Brings the card a link names into view once the channels are there. */
 function useCardInView(loaded: boolean, detail: string | null): void {
   useEffect(() => {
-    if (loaded && detail !== null && detail !== SCHEDULE) {
+    if (!loaded || detail === null || detail === SCHEDULE) {
+      return
+    }
+    const frame = requestAnimationFrame(() => {
       document.getElementById(cardId(detail))?.scrollIntoView({ block: 'start' })
+    })
+    return () => {
+      cancelAnimationFrame(frame)
     }
   }, [loaded, detail])
 }
