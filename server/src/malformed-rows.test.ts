@@ -320,7 +320,7 @@ describe('a transcript holding malformed rows', () => {
     await store(TURN, 'seti', { error: 'Stopped sleep', stopped: true })
     await store(TURN, 'seti', { error: 'Restarted', session: 5 })
     expect(await stoppedNotes.sinceLastTurn(TURN)).toEqual(['Stopped sleep'])
-    expect(await sessionRestarts.sinceLastTurn(TURN)).toEqual([])
+    expect(await sessionRestarts.sinceLastTurn(TURN)).toBe(false)
   })
 
   it('logs each malformed row once, with its ids, kind and reason and none of its content', async () => {

@@ -108,7 +108,7 @@ describe('restarting a session', () => {
     expect(await setiNotes(id)).toEqual([
       { error: 'Session restarted; the conversation continues', session: 'restarted' },
     ])
-    expect((await latestRestart())?.detail).toMatchObject({ interrupted: false, fresh: false })
+    expect((await latestRestart())?.detail).toMatchObject({ interrupted: false })
 
     expect(await turn(id, 'second')).toBe(warm)
     expect(warm.prompts[0]).toContain('The user restarted your Claude Code session from Seti')
@@ -146,20 +146,7 @@ describe('restarting a session', () => {
     expect((await tasks.get(id))?.status).toBe('stopped')
     const warm = await warmSession(first)
     expect(warm.options).toMatchObject({ resume: (await tasks.get(id))?.session_id })
-    expect((await latestRestart())?.detail).toMatchObject({ interrupted: true, fresh: false })
-  })
-
-  it('starts a fresh session without the conversation when asked', async () => {
-    const id = await newTask()
-    const first = await turn(id, 'first')
-    expect((await restart(id, { fresh: true })).status).toBe(200)
-    const warm = await warmSession(first)
-    expect(warm.options).not.toHaveProperty('resume')
-    expect((await tasks.get(id))?.session_id).toBeNull()
-    expect((await setiNotes(id)).at(-1)).toMatchObject({ session: 'fresh' })
-    await turn(id, 'again')
-    expect(warm.prompts[0]).toContain('fresh Claude Code session')
-    expect((await latestRestart())?.detail).toMatchObject({ fresh: true })
+    expect((await latestRestart())?.detail).toMatchObject({ interrupted: true })
   })
 
   it('reports how the new process connects its MCP servers', async () => {

@@ -132,8 +132,8 @@ test.describe('the built-in Seti guide pack', () => {
     await expect.poll(async () => (await guide(request)).linked_by_default).toBe(true)
 
     await page.goto('/#agents/new')
-    await page.getByLabel('Message').fill('Sketch the offsite agenda')
-    await page.getByLabel('Message').press('Enter')
+    await page.getByLabel('Message', { exact: true }).fill('Sketch the offsite agenda')
+    await page.getByLabel('Message', { exact: true }).press('Enter')
     await expect(page).toHaveURL(/#agents\/[\da-f-]{36}$/)
     const id = new URL(page.url()).hash.split('/')[1] ?? ''
     await openAgentSettings(page, 'Access')
@@ -164,12 +164,12 @@ test.describe('the built-in Seti guide pack', () => {
     await expect.poll(async () => (await guide(request)).linked_by_default).toBe(false)
 
     await page.goto('/#agents/new')
-    await expect(page.getByLabel('Message')).toBeEditable()
+    await expect(page.getByLabel('Message', { exact: true })).toBeEditable()
     const reloaded = page.waitForRequest((r) => new URL(r.url()).pathname === '/api/context/files')
     release()
     await reloaded
     await expect(page).toHaveURL(/#agents\/new$/)
-    await expect(page.getByLabel('Message')).toBeEditable()
+    await expect(page.getByLabel('Message', { exact: true })).toBeEditable()
   })
 })
 

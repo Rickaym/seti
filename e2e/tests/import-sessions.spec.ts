@@ -98,7 +98,7 @@ test('imports one terminal session with its history, PR and an imported marker',
   await page.keyboard.press('Escape')
   await expect(main.getByRole('group', { name: 'Pull request app#12' })).toBeVisible()
   await expect(main.getByRole('group', { name: 'Pull request docs#4' })).toBeVisible()
-  await expect(main.getByRole('button', { name: /E2E imported login/ })).not.toContainText('#')
+  await expect(main.getByRole('button', { name: /^E2E imported login/ })).not.toContainText('#')
 
   const audit = await apiData<AuditPage>(page.request, '/audit?kind=task.imported&limit=5')
   expect(audit.events.find((e) => e.subject_id === task.id)?.detail).toMatchObject({
@@ -143,7 +143,7 @@ test('imports a few ticked sessions together after reviewing each one', async ({
   expect(notesTask).toMatchObject({ title: 'E2E notes, continued', cwd: paths.checkout, pr_urls: [] })
   expect(laptopTask).toMatchObject({ title: laptop.title, cwd: paths.checkout, repo_id: repo?.id })
 
-  const list = page.getByRole('main').getByRole('button', { name: new RegExp(laptop.title) })
+  const list = page.getByRole('main').getByRole('button', { name: new RegExp(`^${laptop.title}`) })
   await list.click()
   await expect(page.getByRole('region', { name: 'Transcript' }).getByText(laptop.reply)).toBeVisible()
 })
