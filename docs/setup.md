@@ -16,7 +16,8 @@ curl -fsSL https://raw.githubusercontent.com/rickaym/seti/main/scripts/install.s
    `scripts/install.sh` instead; through curl, it clones Seti to `~/seti` first.
 2. When it finishes, open a new shell so it finds the tools the installer added to `~/.local/bin`
    and nvm, then log in to Claude Code (`claude`, then `/login`) and to GitHub (`gh auth login`).
-   Agents use your Claude login; Seti watches your PRs with your `gh` login.
+   Agents use your Claude login; Seti lists and watches your PRs, in any repo, with your `gh`
+   login.
 3. Open `http://seti.localhost:3006`. From another machine, forward the port first:
    `ssh -L 3006:127.0.0.1:3006 <host>`.
 4. Sign in with the local token: `cat ~/.seti/credentials/local-token-user` and paste it. The

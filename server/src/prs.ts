@@ -11,6 +11,8 @@ const TTL_MS = 60_000
 /** How long other processes, or this one after a restart, may serve a list they did not fetch. */
 const SHARED_TTL_S = 60 * 60
 const REFRESH_CLAIM_MS = 30_000
+/** A failed first fetch is not retried for this long, so a gh with no login is not run per read. */
+const FAILURE_TTL_MS = 10_000
 
 /** The open PRs as one fetch found them, newest first. */
 interface OpenPrs {
@@ -25,6 +27,7 @@ interface OpenPrs {
 interface CacheEntry {
   list: OpenPrs | null
   pending: Promise<OpenPrs> | null
+  failed: { at: number; error: unknown } | null
 }
 
 const entries = new Map<string, CacheEntry>()
@@ -46,7 +49,7 @@ const sharedKey = () => `gh:prs:v3:${decoratedBy()}`
 
 function entryFor(): CacheEntry {
   const key = decoratedBy()
-  const entry = entries.get(key) ?? { list: null, pending: null }
+  const entry = entries.get(key) ?? { list: null, pending: null, failed: null }
   entries.set(key, entry)
   return entry
 }
@@ -84,10 +87,16 @@ async function revalidate(force = false): Promise<OpenPrs> {
     const shared = force ? undefined : await cache.get<OpenPrs>(sharedKey())
     const list = shared !== undefined && Date.now() - shared.at < TTL_MS ? shared : await fetchShared()
     entry.list = list
+    entry.failed = null
     return list
-  })().finally(() => {
-    entry.pending = null
-  })
+  })()
+    .catch((error: unknown) => {
+      entry.failed = { at: Date.now(), error }
+      throw error
+    })
+    .finally(() => {
+      entry.pending = null
+    })
   return entry.pending
 }
 
@@ -106,6 +115,9 @@ async function openPrs(): Promise<OpenPrs> {
   if (entry.list === null) {
     const shared = await cache.get<OpenPrs>(sharedKey())
     if (shared === undefined) {
+      if (entry.failed !== null && Date.now() - entry.failed.at < FAILURE_TTL_MS) {
+        throw entry.failed.error
+      }
       return revalidate()
     }
     entry.list = shared

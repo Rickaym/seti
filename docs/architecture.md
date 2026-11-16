@@ -325,6 +325,27 @@ worker. Each run's engine is dropped whole rather than freed, since this QuickJS
 teardown asserts after a garbage collection inside a promise job; a trap inside the engine reads as
 "The script ran out of memory" and retires its worker too.
 
+## The PR views read GitHub, not a repo list
+
+The PR views show two sets merged into one list: every open PR the `gh` login wrote, in any repo
+on GitHub, and every open PR linked to an agent, whether the agent opened it or the user linked
+it. A PR needs no registered repo to show its title, CI, review threads, owning agents and Fix CI.
+Open PRs that other people wrote appear only once an agent links them.
+
+One refresh costs one GraphQL `search(type: ISSUE, first: 50)` for
+`is:pr is:open author:@me sort:updated-desc` with every field the views read, about 3 points of
+the budget, plus one `resource(url:)` query per 20 linked PRs the search left out
+(`server/src/github.ts`). The search returns the 50 most recently updated PRs; `more` in the list
+counts the rest, and the tools say so. `server/src/prs.ts` keeps the list for 60 seconds, then
+serves it stale while one process refreshes it, and shares it through Redis. A PR linked after the
+list was read makes the next status lookup refresh once, so its chip has a status at once. Both
+queries run as the host's `gh` login, the same one the PR poller uses; the per-owner tokens of a
+credential are for agents' own requests through the egress proxy and are never used here, so a PR
+in a repo that login cannot read shows without a status.
+
+Starting an agent on a PR's branch still needs a checkout, so `start_agent_from_pr` refuses a PR
+whose repo Seti has none of.
+
 ## Mods add to Seti through registries with disposers
 
 A mod is a package described by `seti-mod.json`, validated by `modManifest` in

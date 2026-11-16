@@ -139,14 +139,14 @@ export interface PrDecoration {
 
 export type PrDecorator = (pr: PrSubject, comments: readonly PrComment[]) => PrDecoration
 
-/** An open PR of a registered repo, with the fields decorators filled in. */
+/** An open PR Seti lists, with the fields decorators filled in. */
 export type OpenPrSummary = Pick<PullRequest, 'repo_slug' | 'number' | 'url' | 'preview' | 'preview_host'>
 
 /** Seti's open PRs, for a mod whose manifest declares a PR decorator; bundled mods only. */
 export interface ModPrsApi {
   /** Fills in fields of each PR as Seti fetches it from GitHub; Seti checks what it gives. */
   decorate: (id: string, decorator: PrDecorator) => Disposer
-  /** The open PRs of registered repos, as last fetched and decorated. */
+  /** The open PRs Seti lists, as last fetched and decorated. */
   open: () => Promise<OpenPrSummary[]>
 }
 

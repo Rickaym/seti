@@ -25,6 +25,7 @@ interface PrPickerProps {
 /** Links one of the open PRs Seti lists, those of the agent's repos first, or a pasted URL. */
 export function PrPicker({ task, path, linked, onLinked }: PrPickerProps) {
   const [prs, setPrs] = useState<PullRequest[] | null>(null)
+  const [failure, setFailure] = useState<string | null>(null)
   const [query, setQuery] = useState('')
   const [pasted, setPasted] = useState('')
 
@@ -32,6 +33,7 @@ export function PrPicker({ task, path, linked, onLinked }: PrPickerProps) {
     apiGetValid('/prs', prListSchema)
       .then((list) => {
         setPrs(list.prs)
+        setFailure(list.error)
       })
       .catch((e: unknown) => toast.error(errorText(e)))
   }, [])
@@ -75,7 +77,9 @@ export function PrPicker({ task, path, linked, onLinked }: PrPickerProps) {
       <ul className="max-h-64 overflow-y-auto border border-border">
         {prs === null && <li className="p-2 text-xs text-muted-foreground">Loading...</li>}
         {prs !== null && choices.length === 0 && (
-          <li className="p-2 text-xs text-muted-foreground">No open PRs match.</li>
+          <li className="p-2 text-xs text-muted-foreground">
+            {failure === null ? 'No open PRs match.' : `GitHub gave no PRs: ${failure}`}
+          </li>
         )}
         {choices.map((pr) => (
           <li key={pr.url}>

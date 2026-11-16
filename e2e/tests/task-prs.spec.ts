@@ -44,10 +44,7 @@ test('links two pull requests from different repos to one task and unlinks one',
   await linkByUrl(page, WEB_PR)
   const api = main.getByRole('group', { name: 'Pull request api#5' })
   const web = main.getByRole('group', { name: 'Pull request web#9' })
-  await expect(api.getByRole('link', { name: 'api#5' })).toHaveAttribute(
-    'title',
-    'Not open, or not in a registered repo',
-  )
+  await expect(api.getByRole('link', { name: 'api#5' })).toHaveAttribute('title', 'No status from GitHub')
   await expect(web).toBeVisible()
   await expect(web.getByRole('link', { name: 'web#9' })).toHaveAttribute('href', WEB_PR)
   const listItem = page.locator(`[data-task-id="${id}"]`)
