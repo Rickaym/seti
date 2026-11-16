@@ -260,8 +260,10 @@ class LiveScope implements ScopeLimits {
   private reporting = false
   private readonly reported = new Set<number>()
   private readonly started = Date.now()
-  /** The run was killed after its scope was gone, so only the kernel log can tell an OOM kill. */
+  /** The scope went before its last counts were read, so only the kernel log can tell an OOM kill. */
   private unread = false
+  /** OOM kills counted under the scope's parent when the scope was found. */
+  private around: number | null = null
 
   constructor(unit: string, plan: ScopePlan, launchPid: number) {
     this.unit = unit
@@ -365,6 +367,7 @@ class LiveScope implements ScopeLimits {
       const unified = unifiedPath(readText(`/proc/${String(pid)}/cgroup`) ?? '')
       if (unified?.endsWith(`/${this.unit}`) === true) {
         this.dir = path.join(CGROUP_ROOT, unified)
+        this.around = this.killsAround()
         this.watchEvents(path.join(this.dir, 'memory.events'))
         this.tick()
         this.check()
@@ -388,14 +391,27 @@ class LiveScope implements ScopeLimits {
     }
   }
 
+  /** OOM kills counted under the scope's parent, which is still there once the scope is gone. */
+  private killsAround(): number | null {
+    const text = this.dir === null ? null : readText(path.join(path.dirname(this.dir), 'memory.events'))
+    return text === null ? null : parseEvents(text).oom_kill
+  }
+
+  /** The parent counted a kill since the scope was found that the scope's own counts never showed. */
+  private missedKill(): boolean {
+    const now = this.killsAround()
+    return now !== null && this.around !== null && now - this.around > this.seen.oom_kill
+  }
+
   /**
    * Reads the last counts. systemd removes the scope as its last process dies, often before
-   * the kernel's oom_kill notice reaches the watcher, so a killed run then asks the kernel log.
+   * the kernel's oom_kill notice reaches the watcher. The kernel log is asked then, for a killed
+   * run and for one that ended by itself just after a tool of it was stopped.
    */
   end(killed: boolean): void {
     const read = this.check()
     this.watcher?.close()
-    if (read || !killed) {
+    if (read || !(killed || this.missedKill())) {
       return
     }
     this.unread = true

@@ -1,5 +1,6 @@
 import fs from 'node:fs'
 import path from 'node:path'
+import { TOOL_OOM_ADJ } from './oom-guard.js'
 
 /**
  * A Claude Code stand-in holding more memory than its tool has when a 300 MB cap hits. It starts
@@ -78,3 +79,18 @@ export interface OomRun {
 
 /** The root's report: the last line it printed. */
 export const oomRun = (out: string) => JSON.parse(out.trim().split('\n').at(-1) ?? '{}') as OomRun
+
+/**
+ * Why the stand-in cannot run here, or null when it can. A process already at the tool level, as
+ * every command in an agent's or a Seti terminal's scope is, starts a root the kernel ranks with
+ * its tool, so the kernel stops the larger root and there is no guard to see.
+ */
+export function oomRunBlocked(): string | null {
+  let adj: number
+  try {
+    adj = Number(fs.readFileSync('/proc/self/oom_score_adj', 'utf8'))
+  } catch {
+    return null
+  }
+  return adj < TOOL_OOM_ADJ ? null : `this process runs at oom_score_adj ${String(adj)}, the level of a tool`
+}

@@ -307,7 +307,8 @@ describe('task inputs', () => {
   it('keeps waking for automatic turns spread wider than the window', async () => {
     await fakeTimers(['Date', 'setTimeout', 'clearTimeout'])
     const id = await newTask()
-    const spacing = Math.ceil(AUTO_TURN_BURST.windowMs / (AUTO_TURN_BURST.turns - 1))
+    // A minute past the window: waitIdle moves the faked clock on while each turn is stored.
+    const spacing = Math.ceil((AUTO_TURN_BURST.windowMs + MINUTE) / (AUTO_TURN_BURST.turns - 1))
     for (let turn = 0; turn < AUTO_TURN_BURST.turns + 2; turn += 1) {
       vi.setSystemTime(Date.parse('2026-09-01T10:00:00Z') + turn * spacing)
       await deliverInputs(id, [failing])
