@@ -21,9 +21,6 @@ test('the picker mounts rows in batches and loads detail only for the rows it mo
   expect(asked.map((urls) => urls.toSorted(byNumber))).toEqual([urlsOf(1, 20)])
 
   await rows.last().scrollIntoViewIfNeeded()
-  await picker.getByRole('list').evaluate((list) => {
-    list.scrollTo(0, list.scrollHeight)
-  })
   await expect(rows).toHaveCount(40)
   await expect.poll(() => asked.length).toBe(2)
   expect(asked[1]?.toSorted(byNumber)).toEqual(urlsOf(21, 40))
