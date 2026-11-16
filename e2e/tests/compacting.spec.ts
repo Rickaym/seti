@@ -3,7 +3,7 @@ import type { APIRequestContext, Page } from '@playwright/test'
 import type { MessagePage, MessageRow, TaskStatus } from '@seti/shared'
 import { openSeedDb } from './support/db.js'
 import { paths } from './support/env.js'
-import { expect, test } from './support/fixtures.js'
+import { expect, nextApiResponse, test } from './support/fixtures.js'
 
 const SESSION = 'compacting-session'
 const BUSY_HINT = 'Enter queues it for the agent, Alt+Enter interrupts and sends. Esc stops it.'
@@ -78,6 +78,16 @@ async function seedTask(title: string, status: TaskStatus, rows: Seeded[]): Prom
   return id
 }
 
+/**
+ * Loads the agent's page and waits for its asides, the last thing the page asks about the agent.
+ * A test that deletes its agent sooner has the page ask for one that is gone.
+ */
+async function loaded(page: Page, taskId: string, load: () => Promise<unknown>): Promise<void> {
+  const asides = nextApiResponse(page, 'GET', `/mods/side-chat/tasks/${taskId}/asides`)
+  await load()
+  await asides
+}
+
 const indicator = (page: Page) => page.getByRole('status', { name: 'Compacting' })
 const reply = (page: Page) => page.getByRole('combobox', { name: 'Reply' })
 const composerStatus = (page: Page) => page.getByRole('status', { name: 'Composer status' })
@@ -94,7 +104,7 @@ test('a /compact turn shows one live compaction line, and the result after a rel
     ['sdk', compacting(), 35],
     ['sdk', compacting(), 5],
   ])
-  await page.goto(`/#agents/${taskId}`)
+  await loaded(page, taskId, async () => page.goto(`/#agents/${taskId}`))
   await expect(page.getByText('The auth module is refactored.')).toBeVisible()
 
   await expect(indicator(page)).toHaveCount(1)
@@ -107,7 +117,7 @@ test('a /compact turn shows one live compaction line, and the result after a rel
     ['sdk', sdk({ type: 'system', subtype: 'status', status: null, compact_result: 'success' }), 1],
     ['sdk', boundary('manual'), 1],
   ])
-  await page.reload()
+  await loaded(page, taskId, async () => page.reload())
   await expect(page.getByText('Compacted \u00b7 758.7k \u2192 16.2k tokens \u00b7 3m 11s')).toBeVisible()
   await expect(indicator(page)).toHaveCount(0)
   await expect(reply(page)).toHaveAttribute('placeholder', BUSY_HINT)
@@ -140,7 +150,7 @@ test('auto compaction shows live, then its boundary or the end of the turn clear
       body: `retry: 300\n\n${events[stage]}`,
     })
   })
-  await page.goto(`/#agents/${taskId}`)
+  await loaded(page, taskId, async () => page.goto(`/#agents/${taskId}`))
   await expect(page.getByText('Working through the failing tests.')).toBeVisible()
   await expect(indicator(page)).toContainText(/Compacting the conversation\s*2\ds/)
   await expect(reply(page)).toHaveAttribute('placeholder', COMPACTING_HINT)
@@ -169,7 +179,7 @@ test('a turn that ends while compacting drops the compaction line', async ({ pag
       body: `retry: 300\n\n${body}`,
     })
   })
-  await page.goto(`/#agents/${taskId}`)
+  await loaded(page, taskId, async () => page.goto(`/#agents/${taskId}`))
   await expect(indicator(page)).toBeVisible()
 
   ended = true
@@ -202,7 +212,7 @@ test('an agent opened again shows compaction only once its stream answers', asyn
       body: `retry: 300\n\n${backlog}`,
     })
   })
-  await page.goto(`/#agents/${taskId}`)
+  await loaded(page, taskId, async () => page.goto(`/#agents/${taskId}`))
   await expect(indicator(page)).toBeVisible()
 
   answering = false
@@ -235,7 +245,7 @@ test('compaction that hears nothing for five minutes refetches the agent once', 
     })
   })
   await page.clock.install()
-  await page.goto(`/#agents/${taskId}`)
+  await loaded(page, taskId, async () => page.goto(`/#agents/${taskId}`))
   await expect(indicator(page)).toBeVisible()
 
   await appendRows(taskId, [
