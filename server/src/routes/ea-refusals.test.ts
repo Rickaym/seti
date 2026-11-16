@@ -218,6 +218,9 @@ describe('security settings stay with the user', () => {
     const headers = [{ key: 'Authorization', value: 'Bearer abc' }]
     const remote = { name: 'tracker', scope: 'user', transport: 'http', url: 'https://mcp.tracker.test/mcp' }
     await refused(await send(EA, 'POST', '/mcp/servers', { ...remote, headers }))
+    await refused(
+      await send(EA, 'POST', '/mcp/servers', { ...remote, oauth: { client_id: 'app', client_secret: 's' } }),
+    )
     const callback = { callback_url: 'http://localhost:1234/callback?code=abc&state=def' }
     await refused(await send(EA, 'POST', '/mcp/auth/some-session/complete', callback))
     expect((await send(USER, 'POST', '/mcp/auth/some-session/complete', callback)).status).not.toBe(403)

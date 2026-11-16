@@ -80,6 +80,7 @@ export async function addMcpServer(input: McpServerRequest): Promise<McpServerCh
   await auditMcp('mcp.server_added', input.name, `Added MCP server ${input.name} (${input.scope} scope)`, {
     scope: input.scope,
     transport: input.transport,
+    oauth_client: input.transport !== 'stdio' && input.oauth !== undefined,
   })
   return change
 }

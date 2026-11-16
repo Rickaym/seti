@@ -1,5 +1,6 @@
 import {
   mcpAuthCompleteInput,
+  mcpConnectorQuery,
   mcpDefaultInput,
   mcpDefaultParams,
   mcpScopeInput,
@@ -20,6 +21,7 @@ import {
   startMcpSignIn,
 } from '../mcp-actions.js'
 import { mcpAuth } from '../mcp-auth.js'
+import { listConnectors } from '../mcp-connectors.js'
 import { mcpCatalog, setMcpDefault } from '../mcp-selection.js'
 import { noteSignedIn } from '../mcp-session-status.js'
 
@@ -27,13 +29,17 @@ const failureText = (e: unknown) => (e instanceof Error ? e.message : String(e))
 
 export const mcpRoutes = new Hono()
   .get('/selection', async (c) => ok(c, await mcpCatalog()))
+  .get('/connectors', valid('query', mcpConnectorQuery), async (c) => {
+    const { q, cursor } = c.req.valid('query')
+    return ok(c, await listConnectors(q, cursor))
+  })
   .put('/defaults/:name', valid('param', mcpDefaultParams), validJson(mcpDefaultInput), async (c) =>
     ok(c, await setMcpDefault(c.req.valid('param').name, c.req.valid('json').enabled)),
   )
   .post('/servers', validJson(mcpServerInput), async (c) => {
     const input = c.req.valid('json')
-    if (fromEa() && (input.transport === 'stdio' || input.headers.length > 0)) {
-      return refuseEa(c, 'add a server that runs a command or takes credential headers')
+    if (fromEa() && (input.transport === 'stdio' || input.headers.length > 0 || input.oauth !== undefined)) {
+      return refuseEa(c, 'add a server that runs a command or takes credential headers or an OAuth client')
     }
     return ok(c, await addMcpServer(input))
   })

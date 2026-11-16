@@ -1,4 +1,4 @@
-import { localServerNote, type McpServer } from '@seti/shared'
+import { localServerNote, type McpConnector, type McpServer } from '@seti/shared'
 import { Plus } from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'sonner'
@@ -6,6 +6,7 @@ import { Hint } from '@/components/Hint'
 import { Button } from '@/components/ui/button'
 import { DefaultSwitch } from '@/panels/access/DefaultSwitch'
 import { useMcpSelection } from '@/panels/mcp/selection'
+import { ConnectorCatalogDialog } from './ConnectorCatalogDialog'
 import { McpAuthDialog } from './McpAuthDialog'
 import { McpServerDialog } from './McpServerDialog'
 import { EmptyRow, Section } from './Section'
@@ -27,7 +28,7 @@ export function McpSection({
   onRefresh: () => void
 }) {
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set())
-  const [adding, setAdding] = useState(false)
+  const [adding, setAdding] = useState<'catalog' | { preset: McpConnector | undefined } | null>(null)
   const [signingIn, setSigningIn] = useState<McpServer | null>(null)
   const selection = useMcpSelection()
   const entries = new Map((selection.entries ?? []).map((entry) => [entry.name, entry]))
@@ -46,14 +47,14 @@ export function McpSection({
         title="MCP servers"
         count={views.length}
         actions={
-          <Hint text="Add an MCP server with claude mcp add">
+          <Hint text="Add a common connector, an MCP Registry server or your own">
             <Button
               type="button"
               variant="outline"
               size="xs"
               aria-label="Add MCP server"
               onClick={() => {
-                setAdding(true)
+                setAdding('catalog')
               }}
             >
               <Plus />
@@ -100,14 +101,29 @@ export function McpSection({
           />
         )}
       </Section>
-      {adding && (
+      {adding === 'catalog' && (
+        <ConnectorCatalogDialog
+          onClose={() => {
+            setAdding(null)
+          }}
+          onPick={(preset) => {
+            setAdding({ preset })
+          }}
+          onInstalled={() => {
+            setAdding(null)
+            onRefresh()
+          }}
+        />
+      )}
+      {adding !== null && adding !== 'catalog' && (
         <McpServerDialog
           repoId={repoId}
+          preset={adding.preset}
           onClose={() => {
-            setAdding(false)
+            setAdding(null)
           }}
           onSaved={(change) => {
-            setAdding(false)
+            setAdding(null)
             toast.success(`Added ${change.name} to the ${change.scope} config`)
             onRefresh()
           }}

@@ -4,19 +4,22 @@ import {
   mcpServerInput,
   type McpAddTransport,
   type McpConfigScope,
+  type McpConnector,
   type McpServerChange,
   type McpServerInput,
   type Repo,
 } from '@seti/shared'
-import { Plus, X } from 'lucide-react'
+import { Plus } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { apiGet, apiPost, errorText } from '@/api'
 import { CrudEditDialog, Field } from '@/components/crud/CrudForm'
 import { FindableTextarea } from '@/components/find/FindableTextarea'
-import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { OAuthFields, type OAuthForm } from './OAuthFields'
+import { PairRows } from './PairRows'
+import { newPair, type Pair } from './pairs'
 
 const HOME = '__home__'
 
@@ -32,13 +35,7 @@ const TRANSPORT_LABEL: Record<McpAddTransport, string> = {
   stdio: 'stdio (local command)',
 }
 
-interface Pair {
-  id: number
-  key: string
-  value: string
-}
-
-interface Form {
+interface Form extends OAuthForm {
   name: string
   transport: McpAddTransport
   scope: McpConfigScope
@@ -47,12 +44,6 @@ interface Form {
   command: string
   args: string
   pairs: Pair[]
-}
-
-let nextPairId = 0
-const newPair = (): Pair => {
-  nextPairId += 1
-  return { id: nextPairId, key: '', value: '' }
 }
 
 function toInput(form: Form): McpServerInput {
@@ -68,80 +59,58 @@ function toInput(form: Form): McpServerInput {
     const args = form.args.split('\n').filter((arg) => arg.trim() !== '')
     return { ...where, transport: 'stdio', command: form.command, args, env: pairs }
   }
-  return { ...where, transport: form.transport, url: form.url.trim(), headers: pairs }
+  return { ...where, transport: form.transport, url: form.url.trim(), headers: pairs, ...oauthOf(form) }
 }
 
-function PairRows({
-  label,
-  item,
-  pairs,
-  keyPlaceholder,
-  valuePlaceholder,
-  onChange,
-}: {
-  label: string
-  /** One row's name on the add button, kept to a word. */
-  item: string
-  pairs: Pair[]
-  keyPlaceholder: string
-  valuePlaceholder: string
-  onChange: (pairs: Pair[]) => void
-}) {
-  const update = (id: number, patch: Partial<Pair>) => {
-    onChange(pairs.map((p) => (p.id === id ? { ...p, ...patch } : p)))
+function oauthOf(form: Form): Pick<McpServerInput & { transport: 'http' }, 'oauth'> {
+  const clientId = form.clientId.trim()
+  if (clientId === '') {
+    return {}
   }
-  return (
-    <div className="col-span-full grid gap-1.5">
-      <span className="text-xs font-medium text-foreground">{label}</span>
-      {pairs.map((pair, i) => (
-        <div key={pair.id} className="grid grid-cols-[minmax(0,2fr)_minmax(0,3fr)_auto] gap-2">
-          <Input
-            aria-label={`${label} ${String(i + 1)} name`}
-            placeholder={keyPlaceholder}
-            value={pair.key}
-            onChange={(e) => {
-              update(pair.id, { key: e.target.value })
-            }}
-          />
-          <Input
-            aria-label={`${label} ${String(i + 1)} value`}
-            type="password"
-            autoComplete="off"
-            placeholder={valuePlaceholder}
-            value={pair.value}
-            onChange={(e) => {
-              update(pair.id, { value: e.target.value })
-            }}
-          />
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-sm"
-            aria-label={`Remove ${label.toLowerCase()} ${String(i + 1)}`}
-            onClick={() => {
-              onChange(pairs.filter((p) => p.id !== pair.id))
-            }}
-          >
-            <X />
-          </Button>
-        </div>
-      ))}
-      <div>
-        <Button
-          type="button"
-          variant="outline"
-          size="xs"
-          aria-label={`Add ${label.toLowerCase().replace(/s$/, '')}`}
-          onClick={() => {
-            onChange([...pairs, newPair()])
-          }}
-        >
-          <Plus />
-          Add {item}
-        </Button>
-      </div>
-    </div>
-  )
+  const port = form.callbackPort.trim()
+  return {
+    oauth: {
+      client_id: clientId,
+      ...(form.clientSecret === '' ? {} : { client_secret: form.clientSecret }),
+      ...(port === '' ? {} : { callback_port: Number(port) }),
+    },
+  }
+}
+
+const BLANK: McpConnector = {
+  id: '',
+  name: '',
+  title: '',
+  description: '',
+  source: 'common',
+  transport: 'http',
+  url: '',
+  command: '',
+  args: [],
+  fields: [],
+  oauth: null,
+  plugin: null,
+  homepage: null,
+  note: '',
+}
+
+/** The form a picked connector starts: its launch, its named fields and its OAuth needs. */
+function initialForm(preset: McpConnector, location: string): Form {
+  const pairs = preset.fields.map((f) => newPair(f.key, f.value, f.description))
+  const port = preset.oauth?.callback_port ?? null
+  return {
+    name: preset.name,
+    transport: preset.transport,
+    scope: 'user',
+    location,
+    url: preset.url,
+    command: preset.command,
+    args: preset.args.join('\n'),
+    pairs: pairs.length === 0 ? [newPair()] : pairs,
+    clientId: '',
+    clientSecret: '',
+    callbackPort: port === null ? '' : String(port),
+  }
 }
 
 function LocationField({ form, set, repos }: { form: Form; set: (patch: Partial<Form>) => void; repos: Repo[] }) {
@@ -238,25 +207,19 @@ function TransportFields({ form, set }: { form: Form; set: (patch: Partial<Form>
 
 export function McpServerDialog({
   repoId,
+  preset,
   onClose,
   onSaved,
 }: {
   repoId: string | undefined
+  /** The connector the form starts from; a blank form without one. */
+  preset?: McpConnector | undefined
   onClose: () => void
   onSaved: (change: McpServerChange) => void
 }) {
   const [repos, setRepos] = useState<Repo[]>([])
   const [saving, setSaving] = useState(false)
-  const [form, setForm] = useState<Form>(() => ({
-    name: '',
-    transport: 'http',
-    scope: 'user',
-    location: repoId ?? HOME,
-    url: '',
-    command: '',
-    args: '',
-    pairs: [newPair()],
-  }))
+  const [form, setForm] = useState<Form>(() => initialForm(preset ?? BLANK, repoId ?? HOME))
 
   useEffect(() => {
     apiGet<Repo[]>('/repos')
@@ -287,7 +250,7 @@ export function McpServerDialog({
   return (
     <CrudEditDialog
       open
-      title="Add MCP server"
+      title={preset === undefined ? 'Add MCP server' : `Add ${preset.title}`}
       onCancel={onClose}
       onSave={() => void save()}
       saving={saving}
@@ -295,6 +258,9 @@ export function McpServerDialog({
       savingLabel="Adding..."
       saveIcon={Plus}
     >
+      {preset !== undefined && preset.note !== '' && (
+        <p className="col-span-full text-xs text-muted-foreground">{preset.note}</p>
+      )}
       <Field label="Name">
         <Input
           aria-label="Name"
@@ -348,9 +314,10 @@ export function McpServerDialog({
       </Field>
       <LocationField form={form} set={set} repos={repos} />
       <TransportFields form={form} set={set} />
+      {form.transport !== 'stdio' && <OAuthFields form={form} set={set} open={preset?.oauth?.own_client === true} />}
       <p className="col-span-full text-xs text-muted-foreground">
-        Runs <code>claude mcp add</code>. Header and environment values are written to the Claude Code config and never
-        shown again here.
+        Runs <code>claude mcp add</code>. Header, environment and client secret values are written to the Claude Code
+        config and never shown again here.
       </p>
     </CrudEditDialog>
   )
