@@ -51,11 +51,14 @@ function statusText(info: ReminderChannelInfo): string {
 
 /** A reminder: its status and schedule, subscribers, and its runs and messages folded away. */
 export function ReminderCard({
+  id,
   info,
   onChange,
   onRemoved,
   onEdit,
 }: {
+  /** The anchor a link from the schedule scrolls to. */
+  id: string
   info: ReminderChannelInfo
   onChange: (next: ChannelInfo) => void
   onRemoved: (id: string) => void
@@ -105,6 +108,7 @@ export function ReminderCard({
 
   return (
     <SettingsCard
+      id={id}
       title={info.name}
       actions={
         <div className="flex items-center gap-1">
