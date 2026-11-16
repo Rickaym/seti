@@ -16,6 +16,8 @@ const LOADING: PrStatus = { state: 'loading' }
 const NONE: PrStatus = { state: 'none' }
 
 const statuses = new Map<string, PrStatus>()
+/** When each URL was last answered, so a view that mounts again asks only for what went stale. */
+const answeredAt = new Map<string, number>()
 const watched = new Map<string, number>()
 const listeners = new Set<() => void>()
 let queued = new Set<string>()
@@ -57,11 +59,11 @@ async function askChunk(urls: readonly string[]): Promise<string[]> {
     const waiting = new Set(pending)
     for (const url of urls) {
       const pr = found.get(url)
-      if (pr !== undefined) {
-        statuses.set(url, { state: 'ready', pr })
-      } else if (!waiting.has(url)) {
-        statuses.set(url, NONE)
+      if (waiting.has(url) && pr === undefined) {
+        continue
       }
+      statuses.set(url, pr === undefined ? NONE : { state: 'ready', pr })
+      answeredAt.set(url, Date.now())
     }
     return pending.filter((url) => urls.includes(url))
   } catch {
@@ -126,7 +128,7 @@ export function watchPrStatuses(urls: readonly string[]): () => void {
   for (const url of urls) {
     const count = watched.get(url) ?? 0
     watched.set(url, count + 1)
-    if (count === 0) {
+    if (count === 0 && Date.now() - (answeredAt.get(url) ?? 0) >= REFRESH_MS) {
       fresh.push(url)
     }
   }
