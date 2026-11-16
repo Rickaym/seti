@@ -1,26 +1,44 @@
 import type { HomeDay, HomeSummary, HomeTally } from '@seti/shared'
 import { Flame, GitMerge } from 'lucide-react'
+import { Sparkline } from '@/components/Sparkline'
 import { usd } from '@/lib/money'
 import { durationLabel } from '@/lib/time'
 import { cn } from '@/lib/utils'
 
 const DAY_LABEL = new Intl.DateTimeFormat(undefined, { weekday: 'short', day: 'numeric', month: 'short' })
 
-const dayLabel = (day: HomeDay) => {
-  const date = new Date(`${day.day}T12:00:00`)
-  const name = Number.isNaN(date.getTime()) ? day.day : DAY_LABEL.format(date)
-  return `${name}: ${String(day.merged)} merged, ${String(day.turns)} turns`
+const dayName = (day: string) => {
+  const date = new Date(`${day}T12:00:00`)
+  return Number.isNaN(date.getTime()) ? day : DAY_LABEL.format(date)
 }
 
-/** Deeper fills for busier days, so a run of merges reads at a glance. */
-function cellFill(merged: number): string {
-  if (merged === 0) {
-    return 'bg-muted'
+type DayMeasure = 'merged' | 'turns'
+
+function counted(unit: DayMeasure, value: number): string {
+  if (unit === 'merged') {
+    return `${String(value)} merged`
   }
-  if (merged === 1) {
-    return 'bg-primary/45'
-  }
-  return merged === 2 ? 'bg-primary/70' : 'bg-primary'
+  return `${String(value)} ${value === 1 ? 'turn' : 'turns'}`
+}
+
+/** One measure a day for the month, on its own scale so a few merges never sit flat under turns. */
+function DayLine({ label, unit, days }: { label: string; unit: DayMeasure; days: HomeDay[] }) {
+  const points = days.map((day) => ({ at: day.day, value: day[unit] }))
+  const peak = Math.max(0, ...points.map((p) => p.value))
+  return (
+    <div className="flex flex-col gap-0.5">
+      <p className="flex items-baseline justify-between text-xs">
+        <span>{label}</span>
+        <span className="text-2xs text-muted-foreground tabular-nums">peak {peak}</span>
+      </p>
+      <Sparkline
+        label={`${label} per day, last 30 days`}
+        points={points}
+        format={(value) => counted(unit, value)}
+        when={dayName}
+      />
+    </div>
+  )
 }
 
 function Streak({ summary }: { summary: HomeSummary }) {
@@ -37,16 +55,8 @@ function Streak({ summary }: { summary: HomeSummary }) {
           <span className="text-muted-foreground">No merge today or yesterday</span>
         )}
       </p>
-      <ol aria-label="PRs merged per day, last 30 days" className="flex gap-[3px]">
-        {summary.days.map((day) => (
-          <li
-            key={day.day}
-            title={dayLabel(day)}
-            aria-label={dayLabel(day)}
-            className={cn('h-4 min-w-0 flex-1', cellFill(day.merged))}
-          />
-        ))}
-      </ol>
+      <DayLine label="Turns" unit="turns" days={summary.days} />
+      <DayLine label="Merged" unit="merged" days={summary.days} />
       <p aria-hidden className="flex justify-between text-2xs text-muted-foreground">
         <span>30 days ago</span>
         <span>Today</span>
@@ -97,7 +107,7 @@ function Tally({ totals }: { totals: HomeTally }) {
   )
 }
 
-/** What the agents shipped: the merge streak, a month of days, and totals for the week and month. */
+/** What the agents shipped: the streak, a month of turns and merges, and week and month totals. */
 export function HomeMetrics({ summary }: { summary: HomeSummary }) {
   return (
     <section aria-labelledby="home-shipped" className="flex flex-col gap-3">

@@ -10,21 +10,25 @@ interface SparkPoint {
   value: number | null
 }
 
+const clockTime = (at: string) => new Date(at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+
 /**
  * A small line of recent values with a hover readout. `max` fixes the top of the scale, as 100
- * for percents; otherwise the largest value sets it.
+ * for percents; otherwise the largest value sets it. `when` names a point; clock time by default.
  */
 export function Sparkline({
   label,
   points,
   format,
   max,
+  when = clockTime,
   className,
 }: {
   label: string
   points: readonly SparkPoint[]
   format: (value: number) => string
   max?: number
+  when?: (at: string) => string
   className?: string
 }) {
   const [hover, setHover] = useState<number | null>(null)
@@ -85,8 +89,7 @@ export function Sparkline({
       </svg>
       {hovered !== undefined && hovered !== null && (
         <div className="pointer-events-none absolute -top-6 right-0 border border-border bg-popover px-1.5 py-0.5 text-2xs whitespace-nowrap text-popover-foreground tabular-nums">
-          {new Date(hovered.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}{' '}
-          {hovered.value === null ? '-' : format(hovered.value)}
+          {when(hovered.at)} {hovered.value === null ? '-' : format(hovered.value)}
         </div>
       )}
     </div>
