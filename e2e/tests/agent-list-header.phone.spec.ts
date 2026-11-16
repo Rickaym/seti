@@ -34,6 +34,7 @@ test('the Agents header on a phone holds new and the menu, fits, and its menu re
 
   await header.getByRole('button', { name: 'More list actions' }).tap()
   for (const item of [
+    page.getByRole('menuitemcheckbox', { name: 'Archive agents' }),
     page.getByRole('menuitemcheckbox', { name: 'Archived' }),
     page.getByRole('menuitem', { name: 'Import sessions' }),
   ]) {

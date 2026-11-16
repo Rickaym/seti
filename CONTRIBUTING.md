@@ -289,8 +289,10 @@ Report a vulnerability through GitHub's private vulnerability reporting on
 - No single-key shortcuts. Esc closes and stops, Ctrl+K (Cmd+K on a Mac) opens the palette, and
   other navigation uses modifier combos. The Vim mode mod (`mods/vim/`), off until the user turns it
   on, is the one exception, and it binds nothing destructive.
-- Restart, Fresh and Archive sit in the footer of the agent's settings, each with a line saying
-  what it does to the agent.
+- Restart and Archive sit in the footer of the agent's settings, each with a line saying what it
+  does to the agent. Archive is also on each row of the agent list, on hover or keyboard focus, and
+  the list menu's Archive agents keeps it on every row for touch screens. Archiving from a row asks
+  nothing, since its toast offers Undo.
 - Components come from `ui/src/components/ui` (shadcn) and colours from the theme tokens, so every
   theme and both modes work.
 

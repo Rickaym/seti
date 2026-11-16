@@ -51,7 +51,7 @@ test('a task shows running while a background subagent runs after its turn, unti
   await page.goto(`/#agents/${id}`)
   const main = page.getByRole('main')
   const header = main.getByRole('heading', { name: title }).locator('..')
-  const listItem = main.getByRole('button', { name: new RegExp(title) })
+  const listItem = main.getByRole('button', { name: new RegExp(`^${title}`) })
   await expect(header.getByText('running', { exact: true })).toHaveAttribute('title', '1 subagent running')
   await expect(listItem.getByRole('img', { name: 'running', exact: true })).toHaveAttribute(
     'title',

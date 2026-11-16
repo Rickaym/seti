@@ -8,7 +8,7 @@ test.use({ allowedHttpStatuses: [503] })
 const skeleton = (page: Page) => page.getByRole('status', { name: 'Loading transcript' })
 const transcript = (page: Page) => page.getByRole('region', { name: 'Transcript' })
 const composer = (page: Page) => page.getByRole('combobox', { name: 'Reply' })
-const listItem = (page: Page, title: string) => page.getByRole('button', { name: new RegExp(title) })
+const listItem = (page: Page, title: string) => page.getByRole('button', { name: new RegExp(`^${title}`) })
 
 const box = async (locator: Locator) => {
   const found = await locator.boundingBox()

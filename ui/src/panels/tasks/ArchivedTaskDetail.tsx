@@ -1,8 +1,8 @@
-import type { ArchivedTaskEntry, RestoreReport } from '@seti/shared'
+import type { ArchivedTaskEntry } from '@seti/shared'
 import { Archive, ArchiveRestore, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'sonner'
-import { apiDelete, apiPost, errorText } from '@/api'
+import { apiDelete, errorText } from '@/api'
 import { Hint } from '@/components/Hint'
 import { BackButton, DetailHeader, DetailTitle } from '@/components/SplitPane'
 import { Button } from '@/components/ui/button'
@@ -18,6 +18,7 @@ import { useFilesPane } from '@/panels/files/useFilesPane'
 import { bytesLabel } from '@/panels/resources/format'
 import { ArchivedPill } from '@/panels/tasks/StatusPill'
 import { TranscriptPane } from '@/panels/tasks/TranscriptPane'
+import { restoreTask } from '@/panels/tasks/useArchive'
 import { WorkspaceSelect } from '@/panels/tasks/workspaces/WorkspaceSelect'
 
 const NONE = [] as const
@@ -65,15 +66,8 @@ export function ArchivedTaskDetail({ task }: { task: ArchivedTaskEntry }) {
 
   const restore = async () => {
     setRestoring(true)
-    try {
-      const report = await apiPost<RestoreReport>(`/tasks/${task.id}/unarchive`)
-      toast.success(`Restored "${task.title}" with ${String(report.rows)} transcript rows`)
-      refreshTaskLists()
-    } catch (e) {
-      toast.error(errorText(e))
-    } finally {
-      setRestoring(false)
-    }
+    await restoreTask(task)
+    setRestoring(false)
   }
 
   const remove = async () => {

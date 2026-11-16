@@ -1,8 +1,15 @@
 import { agentColorWord, type Task, type TaskDisplayStatus, type TaskListEntry, waitsOnYou } from '@seti/shared'
+import { relativeTime } from '@/lib/time'
 import { statusLabel } from './status-label'
 
 export const repoLabel = (task: Pick<Task, 'cwd' | 'repos'>) =>
   task.repos.length === 0 ? task.cwd : task.repos.map((repo) => repo.slug).join(', ')
+
+/** The full place and the age, shown on hover since the row shows neither. */
+export const rowHint = (task: Task, iso: string) => `${repoLabel(task)}\n${relativeTime(iso)}`
+
+export const ROW =
+  'flex w-full items-center gap-1.5 border-b border-border px-3 py-2 text-left outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset pointer-coarse:min-h-11'
 
 const lastSegment = (path: string) => path.split('/').filter(Boolean).at(-1) ?? path
 
