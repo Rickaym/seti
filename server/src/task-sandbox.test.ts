@@ -21,7 +21,7 @@ import { findBinary } from './binaries.js'
 import { CLAUDE_HOME, SETI_HOME } from './config.js'
 import { tasks } from './db.js'
 import { detectScopeHost, type ScopePlan } from './memory-scope.js'
-import { oomRun, oomScriptArgs } from './oom-fixtures.js'
+import { oomRun, oomRunBlocked, oomScriptArgs } from './oom-fixtures.js'
 import { TOOL_OOM_ADJ } from './oom-guard.js'
 import { Proc } from './proc.js'
 import { loadSandboxCa, type SandboxCa } from './sandbox-ca.js'
@@ -178,26 +178,30 @@ describe.skipIf(!available)('a real task sandbox', () => {
     expect(out).toMatch(/^0::\/user\.slice\/.*\/seti-[0-9a-f]{8}-shell-bwrap-task-[0-9a-f]{8}\.scope$/m)
   })
 
-  it.skipIf(scopes === null).each(['hog', 'rush'] as const)(
-    'keeps the process the sandbox runs alive when its %s tool hits the cap',
-    async (tool) => {
-      if (scopes === null) {
-        return
-      }
-      const cap = { high_mb: 300, max_mb: 300, swap_max_mb: 0 }
-      const plan: ScopePlan = { host: scopes, taskId: task.id, kind: 'agent', cap, cpu: { quota_percent: null } }
-      const policy = await sandboxPolicy.get()
-      const sandbox = await taskSandbox(task, { ctx: { ...sandboxContext(), home }, policy, memory: cap })
-      const child = sandbox.spawn(process.execPath, oomScriptArgs(work, tool), { stdin: 'ignore', scope: plan })
-      let out = ''
-      child.stdout?.on('data', (chunk: Buffer) => (out += chunk.toString()))
-      const code = await new Promise<number | null>((resolve) => child.on('exit', resolve))
-      expect(code).toBe(0)
-      const result = oomRun(out)
-      expect(result).toMatchObject({ held: 160, after: result.before })
-      expect(result.child).toEqual({ code: null, signal: 'SIGKILL', adj: String(TOOL_OOM_ADJ) })
-    },
-  )
+  for (const tool of ['hog', 'rush'] as const) {
+    it.skipIf(scopes === null)(
+      `keeps the process the sandbox runs alive when its ${tool} tool hits the cap`,
+      async ({ skip }) => {
+        const blocked = oomRunBlocked()
+        if (scopes === null || blocked !== null) {
+          skip(blocked ?? undefined)
+          return
+        }
+        const cap = { high_mb: 300, max_mb: 300, swap_max_mb: 0 }
+        const plan: ScopePlan = { host: scopes, taskId: task.id, kind: 'agent', cap, cpu: { quota_percent: null } }
+        const policy = await sandboxPolicy.get()
+        const sandbox = await taskSandbox(task, { ctx: { ...sandboxContext(), home }, policy, memory: cap })
+        const child = sandbox.spawn(process.execPath, oomScriptArgs(work, tool), { stdin: 'ignore', scope: plan })
+        let out = ''
+        child.stdout?.on('data', (chunk: Buffer) => (out += chunk.toString()))
+        const code = await new Promise<number | null>((resolve) => child.on('exit', resolve))
+        expect(code).toBe(0)
+        const result = oomRun(out)
+        expect(result).toMatchObject({ held: 160, after: result.before })
+        expect(result.child).toEqual({ code: null, signal: 'SIGKILL', adj: String(TOOL_OOM_ADJ) })
+      },
+    )
+  }
 
   it('hides Seti, ssh, gh and the Claude login, and shows the task directory and workspace', async () => {
     const paths = [

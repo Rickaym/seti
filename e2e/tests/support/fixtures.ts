@@ -75,6 +75,7 @@ interface Fixtures {
   leaveFocus: undefined
   assetsOutsideChromium: undefined
   emptyGrids: undefined
+  quietEa: undefined
 }
 
 interface WorkerFixtures {
@@ -131,6 +132,24 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
       }
       const db = openSeedDb()
       await db.run('DELETE FROM workspace_grid')
+      await db.close()
+      await use(undefined)
+    },
+    { auto: true },
+  ],
+  /**
+   * Nothing waits for or from the EA when a test starts. Seti hands the EA's due items to its chat
+   * a minute after the EA last asked, and each then toasts until dismissed in a later spec.
+   */
+  quietEa: [
+    async ({ setiServer: _server, serverEnv }, use) => {
+      if (serverEnv.SETI_DEMO === '1') {
+        await use(undefined)
+        return
+      }
+      const db = openSeedDb()
+      await db.run('DELETE FROM ea_inbox WHERE delivered_at IS NULL')
+      await db.run('UPDATE ea_history SET unseen = false WHERE unseen')
       await db.close()
       await use(undefined)
     },

@@ -4,6 +4,7 @@ import path from 'node:path'
 import { openSeedDb } from './support/db.js'
 import { paths } from './support/env.js'
 import { expect, test } from './support/fixtures.js'
+import { settled } from './support/phone-layout.js'
 
 const TARGET_PX = 44
 
@@ -19,6 +20,8 @@ test('a phone sees and reaches the directory actions without hovering', async ({
   await page.goto(`/#agents/${id}`)
   await page.getByRole('main').getByRole('button', { name: 'Agent settings' }).click()
   const row = page.getByRole('dialog').getByRole('group', { name: notes })
+  await expect(row).toBeVisible()
+  await settled(page)
   for (const name of [`Work in ${notes}`, `Remove ${notes}`]) {
     const button = row.getByRole('button', { name })
     await expect(button).toHaveCSS('opacity', '1')
