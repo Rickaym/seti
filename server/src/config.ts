@@ -114,6 +114,8 @@ export const DATABASE_URL = env('SETI_DATABASE_URL', socketUrl(databaseName(SETI
 /** A Redis unix socket path or redis:// URL; `off` runs without Redis. */
 export const REDIS_URL = env('SETI_REDIS_URL', '/run/seti-redis/redis.sock')
 export const CLAUDE_BIN = findClaudeBin(process.env.SETI_CLAUDE_BIN)
+/** The MCP Registry the server catalog searches; a private mirror serves the same v0 API. */
+export const MCP_REGISTRY_URL = env('SETI_MCP_REGISTRY_URL', 'https://registry.modelcontextprotocol.io')
 export const HOST = env('SETI_HOST', '127.0.0.1')
 export const PORT = Number(env('SETI_PORT', '3006'))
 export const UI_DIST = path.resolve(import.meta.dirname, '../../ui/dist')

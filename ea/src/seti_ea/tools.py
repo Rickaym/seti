@@ -505,8 +505,15 @@ TOOL_SPECS: list[ToolSpec] = [
     ),
     ToolSpec(
         "list_mcp_servers",
-        "List the MCP servers agents get, with connection and sign-in state and tool counts.",
-        {"refresh": {"type": "boolean", "description": "Probe them again first, after a change."}},
+        "List the MCP servers agents get, with connection and sign-in state and tool counts; or, with "
+        "find, search common connectors and the MCP Registry for servers to add.",
+        {
+            "refresh": {"type": "boolean", "description": "Probe them again first, after a change."},
+            "find": {
+                "type": "string",
+                "description": "Words to search connectors by, such as gmail, instead of listing.",
+            },
+        },
     ),
     AGENT_ACCESS_SPEC,
     SSH_HOSTS_SPEC,
@@ -647,6 +654,25 @@ DIRECT_ONLY: ContextVar[bool] = ContextVar("direct_only", default=False)
 
 # The follow-up the EA is working on, so one it schedules from there chains from it.
 INBOX_ORIGIN: ContextVar[int | None] = ContextVar("inbox_origin", default=None)
+
+
+def connector_line(connector: Mapping[str, Any]) -> str:
+    """One connector to add: its title, where it runs and what adding it takes."""
+    title = str(connector.get("title") or connector.get("name"))
+    oauth = connector.get("oauth")
+    fields = dicts(connector.get("fields"))
+    if connector.get("plugin"):
+        how = f"the {connector.get('plugin')} plugin"
+    elif connector.get("transport") == "stdio":
+        command = " ".join([str(connector.get("command")), *map(str, connector.get("args") or [])])
+        how = f"local command {clip(command, 80)}"
+    else:
+        how = f"{str(connector.get('transport')).upper()} {connector.get('url')}"
+    needs = [str(f.get("key")) for f in fields if f.get("required")]
+    if isinstance(oauth, dict) and oauth.get("own_client"):
+        needs.append("your own OAuth app")
+    need = f", needs {', '.join(needs)}" if needs else ""
+    return f"{title} (name {connector.get('name')}): {how}{need}"
 
 
 def setup_note(setup: Mapping[str, Any]) -> str:
@@ -1809,6 +1835,9 @@ class EaTools:
         return ToolResult("\n".join(lines), f"Read {clip(name, 60)}")
 
     async def list_mcp_servers(self, args: Mapping[str, Any]) -> ToolResult:
+        find = arg_str(args, "find", required=False)
+        if find:
+            return await self._find_connectors(find)
         refresh = arg_bool(args, "refresh")
         snapshot = await (
             self._seti.post("/capabilities/refresh") if refresh else self._seti.get("/capabilities")
@@ -1833,6 +1862,21 @@ class EaTools:
         if len(servers) > 20:
             lines.append(f"And {len(servers) - 20} more not listed.")
         return ToolResult("\n".join(lines), f"Listed {plural(len(servers), 'MCP server')}")
+
+    async def _find_connectors(self, query: str) -> ToolResult:
+        found = await self._seti.get("/mcp/connectors", {"q": query})
+        data = found if isinstance(found, dict) else {}
+        connectors = [*dicts(data.get("common")), *dicts(data.get("registry"))][:12]
+        if not connectors:
+            error = str(data.get("registry_error") or "")
+            return ToolResult(f"No connector matches {query}. {error}".strip(), "No connectors")
+        lines = [f"Connectors for {query}:"]
+        lines.extend(f"- {connector_line(c)}" for c in connectors)
+        lines.append(
+            "You add a remote one without keys with add_mcp_server; the user adds plugins, local commands, "
+            "keys and OAuth apps in Settings, MCP servers, Add server."
+        )
+        return ToolResult("\n".join(lines), f"Found {plural(len(connectors), 'connector')}")
 
     @staticmethod
     def _components(value: Any) -> str:

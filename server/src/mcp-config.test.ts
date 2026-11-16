@@ -144,6 +144,45 @@ describe('CLI arguments', () => {
     ])
   })
 
+  it('passes an OAuth client before -- and keeps its secret out of the arguments', async () => {
+    const input = parse({
+      name: 'gmail',
+      scope: 'user',
+      transport: 'http',
+      url: 'https://gmail.example.com/mcp',
+      oauth: { client_id: 'abc.apps', client_secret: 'SHHH', callback_port: 8765 },
+    })
+    const args = addArgs(input)
+    expect(args).toEqual([
+      'mcp',
+      'add',
+      '--scope',
+      'user',
+      '--transport',
+      'http',
+      '--client-id',
+      'abc.apps',
+      '--callback-port',
+      '8765',
+      '--client-secret',
+      '--',
+      'gmail',
+      'https://gmail.example.com/mcp',
+    ])
+    expect(args.join(' ')).not.toContain('SHHH')
+    const run = vi.fn<RunCli>(async () => Promise.resolve())
+    await createMcpConfig(run).add(input, '/home/me')
+    expect(run).toHaveBeenCalledWith(args, '/home/me', { MCP_CLIENT_SECRET: 'SHHH' })
+    const failing = vi.fn<RunCli>(async () => Promise.reject(Object.assign(new Error('x'), { stderr: 'bad SHHH' })))
+    expect((await rejection(createMcpConfig(failing).add(input, '/home/me'))).message).toBe('bad [redacted]')
+  })
+
+  it('rejects an OAuth client with spaces or a port out of range', () => {
+    const base = { name: 'x', scope: 'user', transport: 'http', url: 'https://a.example.com' } as const
+    expect(mcpServerInput.safeParse({ ...base, oauth: { client_id: 'a b' } }).success).toBe(false)
+    expect(mcpServerInput.safeParse({ ...base, oauth: { client_id: 'a', callback_port: 80 } }).success).toBe(false)
+  })
+
   it('builds remove arguments', () => {
     expect(removeArgs('x', 'project')).toEqual(['mcp', 'remove', '--scope', 'project', '--', 'x'])
   })
@@ -162,7 +201,7 @@ describe('createMcpConfig', () => {
   it('runs the CLI in the given cwd and returns only name and scope', async () => {
     const run = vi.fn<RunCli>(async () => Promise.resolve())
     const result = await createMcpConfig(run).add(input, '/home/me')
-    expect(run).toHaveBeenCalledWith(addArgs(input), '/home/me')
+    expect(run).toHaveBeenCalledWith(addArgs(input), '/home/me', {})
     expect(result).toEqual({ name: 'x', scope: 'user' })
     expect(JSON.stringify(result)).not.toContain('TOPSECRET')
   })
