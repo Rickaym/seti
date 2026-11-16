@@ -6,11 +6,8 @@ import {
   REMINDER_API_DOC,
   reminderUpdateInput,
   CORE_WEBHOOK_SOURCE,
-  type ChannelDelivery,
-  type ChannelEvent,
   type ChannelInfo,
   type ReminderChannelInfo,
-  type WebhookChannelInfo,
 } from '@seti/shared'
 import { z } from 'zod'
 import {
@@ -36,6 +33,8 @@ import {
   testReminderScript,
 } from './reminders.js'
 import { done, setiTool, ToolRefusal, type SetiTool } from './tool.js'
+import { upcomingView } from './upcoming.js'
+import { deliveryView, webhookView } from './webhook-view.js'
 import {
   createChannel,
   deleteChannel,
@@ -53,47 +52,6 @@ import { pollers } from '../pollers/service.js'
 import { runReminderNow, updateReminder } from '../reminders/actions.js'
 import { reminders } from '../reminders/service.js'
 
-const ACTIVITY_SHOWN = 5
-
-const SECRET_STATES = {
-  reveal: 'Its secret waits for the user, who copies it once from Settings, Channels into the sender.',
-  paste: 'Its secret is still missing: the user pastes the one the sender issued in Settings, Channels.',
-} as const
-
-const eventView = ({ title, kind, severity, url, created_at }: ChannelEvent) => ({
-  title,
-  kind,
-  severity,
-  url,
-  created_at,
-})
-
-const deliveryView = ({ received_at, status, http_status, reason, routes }: ChannelDelivery) => ({
-  received_at,
-  status,
-  http_status,
-  reason,
-  routes: routes.map(({ target, task_id, outcome, reason: why }) => ({ target, task_id, outcome, reason: why })),
-})
-
-/** A webhook as an agent needs it: where senders post, how it signs, and never its secret. */
-const webhookView = (info: WebhookChannelInfo, shown = ACTIVITY_SHOWN) => ({
-  id: info.id,
-  name: info.name,
-  source: info.source,
-  preset: info.preset,
-  sender: info.sender.label,
-  ...(info.unavailable === null ? {} : { refuses_deliveries: info.unavailable }),
-  url: info.public_url ?? info.path,
-  signs_with: info.sender.signature,
-  mapping: info.mapping,
-  secret: info.secret_pending === null ? 'set' : SECRET_STATES[info.secret_pending],
-  secret_rotated_at: info.secret_rotated_at,
-  subscribers: info.subscriptions.map(subscriberView),
-  recent_events: info.recent.slice(0, shown).map(eventView),
-  deliveries: info.deliveries.slice(0, shown).map(deliveryView),
-})
-
 function channelView(info: ChannelInfo, shown?: number) {
   if (info.source === 'poller') {
     return pollerView(info, false)
@@ -106,9 +64,18 @@ const listChannelsTool = setiTool({
   description:
     "List the channels that report to the EA's inbox or to agents: webhooks that senders such as uptime " +
     'monitors, GitHub or Sentry post to, pollers Seti runs for services without webhooks, and reminders ' +
-    'whose script Seti runs on an interval, with their subscribers and latest events.',
-  input: {},
-  run: async () => (await listChannels()).map((info) => channelView(info, 1)),
+    'whose script Seti runs on an interval or cron schedule, with their subscribers and latest events. ' +
+    'With upcoming, what is scheduled next instead: the coming runs of every poller and reminder.',
+  input: {
+    upcoming: z
+      .boolean()
+      .optional()
+      .describe('Show only the next runs of pollers and reminders, soonest first, and which are paused.'),
+  },
+  run: async ({ upcoming }) => {
+    const channels = await listChannels()
+    return upcoming === true ? upcomingView(channels) : channels.map((info) => channelView(info, 1))
+  },
 })
 
 const RUNS_SHOWN = 10

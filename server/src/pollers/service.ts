@@ -1,6 +1,8 @@
 import {
   CHANNEL_ACTIVITY_SHOWN,
+  nextRuns,
   POLLER_LIMITS,
+  UPCOMING_RUNS,
   type EaNoticeSeverity,
   type PollerChannelInfo,
   type PollerRun,
@@ -63,6 +65,7 @@ function statusOf(record: PollerRecord): PollerStatus {
 
 async function info(record: PollerRecord): Promise<PollerChannelInfo> {
   const { id, name, created_at, updated_at } = record
+  const next_run_at = record.enabled ? record.next_run_at : null
   return {
     source: 'poller',
     preset: 'poller',
@@ -83,7 +86,8 @@ async function info(record: PollerRecord): Promise<PollerChannelInfo> {
       status: statusOf(record),
       failures: record.failures,
       last_run_at: record.last_run_at,
-      next_run_at: record.enabled ? record.next_run_at : null,
+      next_run_at,
+      upcoming: nextRuns({ interval_s: record.interval_s, next_run_at }, new Date(), UPCOMING_RUNS),
       baseline_at: record.baseline_at,
       keys: await pollerStore.keys(id),
       runs: await pollerStore.runs(id, CHANNEL_ACTIVITY_SHOWN),

@@ -119,6 +119,8 @@ export interface ReminderInfo extends ReminderSettings {
   failures: number
   last_run_at: string | null
   next_run_at: string | null
+  /** The next runs of its cron schedule or interval, soonest first; empty while paused. */
+  upcoming: string[]
   last_output: string | null
   runs: ReminderRun[]
   health: ChannelHealth

@@ -82,6 +82,7 @@ export const reminderView = (info: ReminderChannelInfo, withScript = true) => {
     failures: reminder.failures,
     last_run_at: reminder.last_run_at,
     next_run_at: reminder.next_run_at,
+    ...(withScript ? { upcoming: reminder.upcoming } : {}),
     last_output: reminder.last_output,
     subscribers: info.subscriptions.map(subscriberView),
     ...(withScript ? { script: reminder.script } : {}),

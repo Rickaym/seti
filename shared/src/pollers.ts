@@ -167,6 +167,8 @@ export interface PollerInfo extends PollerSettings {
   failures: number
   last_run_at: string | null
   next_run_at: string | null
+  /** The next runs its interval projects from next_run_at, soonest first; empty while paused. */
+  upcoming: string[]
   /** When the first successful run recorded the items already there; null until then. */
   baseline_at: string | null
   keys: number
