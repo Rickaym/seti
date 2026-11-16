@@ -29,6 +29,7 @@ async function seedTask(title: string): Promise<string> {
 async function linkByUrl(page: Page, url: string): Promise<void> {
   await page.getByRole('main').getByRole('button', { name: 'Link PR' }).click()
   const picker = page.getByRole('dialog')
+  await expect(picker.getByText(/^GitHub gave no PRs: /)).toBeVisible()
   await picker.getByLabel('Pull request URL').fill(url)
   await picker.getByRole('button', { name: 'Link', exact: true }).click()
   await expect(picker).toBeHidden()

@@ -137,7 +137,11 @@ async function openPrsCovering(urls: readonly string[]): Promise<OpenPr[]> {
     return list.prs
   }
   const linked = new Set(await linkedPrUrls())
-  return unseen.some((url) => linked.has(url)) ? (await revalidate(true)).prs : list.prs
+  if (!unseen.some((url) => linked.has(url))) {
+    return list.prs
+  }
+  // A failed refresh keeps the list already read.
+  return (await revalidate(true).catch(() => list)).prs
 }
 
 interface Loaded {
