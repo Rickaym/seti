@@ -102,7 +102,7 @@ async function shownRows(page: Page): Promise<string[]> {
       }),
     )
 }
-const listItem = (page: Page, title: string) => page.getByRole('button', { name: new RegExp(title) })
+const listItem = (page: Page, title: string) => page.getByRole('button', { name: new RegExp(`^${title}`) })
 
 /** The texts of the task's rows as the server holds them, oldest first. */
 async function serverReplies(request: APIRequestContext, id: string): Promise<string[]> {

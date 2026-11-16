@@ -14,11 +14,15 @@ interface Props {
   onSearching: (open: boolean) => void
   archived: boolean
   onArchived: (archived: boolean) => void
+  /** Archive shows on every row of the list. */
+  archiving: boolean
+  onArchiving: (archiving: boolean) => void
   onImport: () => void
 }
 
 /** The Agents list title with layout toggles, the filter, new agent and the list menu. */
-export function AgentsHeader({ narrow, searching, onSearching, archived, onArchived, onImport }: Props) {
+export function AgentsHeader(props: Props) {
+  const { narrow, searching, onSearching, archived, onArchived, archiving, onArchiving, onImport } = props
   return (
     <div className="flex items-center justify-between gap-2 border-b border-border px-3 py-2">
       <h1 className="min-w-0 truncate text-sm font-semibold">Agents</h1>
@@ -37,7 +41,13 @@ export function AgentsHeader({ narrow, searching, onSearching, archived, onArchi
             <Plus />
           </Button>
         </Hint>
-        <AgentListMenu archived={archived} onArchived={onArchived} onImport={onImport} />
+        <AgentListMenu
+          archived={archived}
+          onArchived={onArchived}
+          archiving={archiving}
+          onArchiving={onArchiving}
+          onImport={onImport}
+        />
       </div>
     </div>
   )

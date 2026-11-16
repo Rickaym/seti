@@ -191,8 +191,6 @@ export type SendMessageInput = z.input<typeof sendMessageInput>
 export const restartSessionInput = z.object({
   /** Stop a running turn first; without it a running agent is refused. */
   interrupt: z.boolean().default(false),
-  /** Start a new session that has none of the conversation, instead of resuming it. */
-  fresh: z.boolean().default(false),
 })
 export type RestartSessionInput = z.input<typeof restartSessionInput>
 
@@ -422,7 +420,7 @@ export const RESENT_NOTE =
   'Claude Code closed the turn without reading this message (it was cleaning up a background shell ' +
   'of the previous session), so Seti sent it again.'
 
-/** How the user restarted a task's session: resuming the conversation, or fresh without it. */
+/** What a restart note says of the session; `fresh` marks one begun without the conversation. */
 export type SessionRestart = 'restarted' | 'fresh'
 
 export type TaskEvent =

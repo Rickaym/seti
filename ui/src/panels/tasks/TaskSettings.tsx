@@ -91,7 +91,7 @@ export const TaskSettings = memo(function TaskSettingsView({
 }: TaskSettingsProps) {
   const sandboxed = useSandboxed(task)
   const archive = useArchive(task)
-  const session = useSessionRestart(task, running, onChanged)
+  const restart = useSessionRestart(task, running, onChanged)
   const [channelCount, setChannelCount] = useState(0)
   const [open, setOpen] = useState(false)
   const narrow = useNarrow()
@@ -275,11 +275,7 @@ export const TaskSettings = memo(function TaskSettingsView({
       busy={busy}
       onRestart={() => {
         setOpen(false)
-        void session.restart()
-      }}
-      onFresh={() => {
-        setOpen(false)
-        void session.fresh()
+        void restart()
       }}
       onArchive={() => {
         setOpen(false)

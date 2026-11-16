@@ -1,20 +1,16 @@
 import {
   listedStatus,
   runningSubtasks,
-  todoProgress,
-  type AgentTodo,
   type ArchivedTaskEntry,
   type SubtaskBrief,
-  type Task,
   type TaskListEntry,
 } from '@seti/shared'
-import { ArrowLeft, ChevronDown, Pin } from 'lucide-react'
+import { ArrowLeft, Check, ChevronDown } from 'lucide-react'
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react'
 import { toast } from 'sonner'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { Hint } from '@/components/Hint'
 import { DetailPane, ListPane } from '@/components/SplitPane'
-import { UnsandboxedBadge } from '@/components/UnsandboxedBadge'
 import { CHORDS, useChords } from '@/components/shortcuts/chords'
 import { Button } from '@/components/ui/button'
 import { useNarrow } from '@/hooks/useMedia'
@@ -24,97 +20,26 @@ import { onRevealNeedsYou, storeCollapsed, storedCollapsed } from '@/lib/needs-y
 import { PANES } from '@/lib/pane-size'
 import { navigate } from '@/lib/route'
 import { openStartPage } from '@/lib/start-context'
-import { relativeTime } from '@/lib/time'
 import { cn } from '@/lib/utils'
 import { useOpenFromNeedsYou } from '@/panels/requests/useRequestsPane'
 import { bytesLabel } from '@/panels/resources/format'
 import { AgentFilter } from '@/panels/tasks/AgentFilter'
+import { AgentListRow } from '@/panels/tasks/AgentListRow'
 import { AgentView } from '@/panels/tasks/AgentView'
 import { AgentsHeader } from '@/panels/tasks/AgentsHeader'
 import { ArchivedTaskDetail } from '@/panels/tasks/ArchivedTaskDetail'
-import { ModAgentAccent } from '@/panels/tasks/ModAgentAccent'
 import { StartPage } from '@/panels/tasks/StartPage'
-import { StatusLine } from '@/panels/tasks/StatusLine'
-import { ArchivedLight, StatusLight } from '@/panels/tasks/StatusPill'
+import { ArchivedLight } from '@/panels/tasks/StatusPill'
 import { DetailSkeleton } from '@/panels/tasks/TranscriptSkeleton'
-import { UnseenDot } from '@/panels/tasks/UnseenDot'
-import { AGENT_DRAG_TYPE, filterAgents, groupAgents, repoLabel, type AgentRow } from '@/panels/tasks/agent-list'
+import { filterAgents, groupAgents, ROW, rowHint, type AgentRow } from '@/panels/tasks/agent-list'
 import { useActiveLayout, useLayoutPlace } from '@/panels/tasks/agents-layouts'
 import { ImportSessionsDialog } from '@/panels/tasks/import/ImportSessionsDialog'
-import { reasonLine } from '@/panels/tasks/status-label'
 import { WorkspaceSwitcher } from '@/panels/tasks/workspaces/WorkspaceSwitcher'
 import { useShownWorkspace } from '@/panels/tasks/workspaces/useShownWorkspace'
 import { TerminalOr } from '@/panels/terminal/TerminalAlone'
 
-/** The full place and the age, shown on hover since the row shows neither. */
-const rowHint = (task: Task, iso: string) => `${repoLabel(task)}\n${relativeTime(iso)}`
-
-const ROW =
-  'flex w-full items-center gap-1.5 border-b border-border px-3 py-2 text-left outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset pointer-coarse:min-h-11'
-
-/** A mod's accent: inside the row near its left edge, over the padding so rows keep their height. */
-const ACCENT = '-my-2 -ml-1.5 items-center'
-
-interface TaskButtonProps {
-  row: AgentRow
-  selected: boolean
-  /** A layout that takes agents shows, so the row drags onto it. */
-  draggable: boolean
-  place: 'list' | 'needsYou'
-  onOpen: (taskId: string) => void
-}
-
 const showAgent = (taskId: string) => {
   navigate('agents', taskId)
-}
-
-/** How far the agent is through its todo list, shown only while items remain. */
-function TodoCount({ todos }: { todos: readonly AgentTodo[] }) {
-  const { done, total } = todoProgress(todos)
-  if (total === 0 || done === total) {
-    return null
-  }
-  const counts = `${String(done)}/${String(total)}`
-  return (
-    <span
-      data-testid="agent-todo-count"
-      aria-label={`${counts} todos done`}
-      className="shrink-0 text-2xs text-muted-foreground tabular-nums"
-    >
-      {counts}
-    </span>
-  )
-}
-
-/** One agent as one line, the same height whatever it holds. */
-function TaskButton({ row, selected, draggable, place, onOpen }: TaskButtonProps) {
-  const { task, running, status } = row
-  const reason = reasonLine(task, status)
-  return (
-    <button
-      type="button"
-      {...agentColorAttr(task.color)}
-      title={[rowHint(task, task.updated_at), status, reason].filter((line) => line !== null).join('\n')}
-      draggable={draggable}
-      onDragStart={(event) => {
-        event.dataTransfer.setData(AGENT_DRAG_TYPE, task.id)
-        event.dataTransfer.setData('text/plain', task.title)
-      }}
-      onClick={() => {
-        onOpen(task.id)
-      }}
-      className={cn(ROW, 'agent-stripe', selected && (task.color === null ? 'bg-accent' : 'agent-tint'))}
-    >
-      <ModAgentAccent status={status} subagents={running} agent={task} place={place} className={ACCENT} />
-      {task.pinned && <Pin className="size-3 shrink-0 text-muted-foreground" aria-label="Pinned" />}
-      <span className={cn('min-w-0 truncate text-sm font-medium', reason === null && 'flex-1')}>{task.title}</span>
-      <StatusLine text={reason} hint={false} className="min-w-[10ch] flex-1" />
-      <UnsandboxedBadge task={task} />
-      <TodoCount todos={task.todos} />
-      {task.unseen && <UnseenDot />}
-      <StatusLight status={status} place={place} subagents={running} agent={task} />
-    </button>
-  )
 }
 
 function ArchivedListItem({ task, selected }: { task: ArchivedTaskEntry; selected: boolean }) {
@@ -134,6 +59,16 @@ function ArchivedListItem({ task, selected }: { task: ArchivedTaskEntry; selecte
       <span className="min-w-0 flex-1 truncate text-sm font-medium text-muted-foreground">{task.title}</span>
       <ArchivedLight />
     </button>
+  )
+}
+
+/** What the list shows now, above its rows, with the way back at its end. */
+function ListNote({ text, children }: { text: string; children: ReactNode }) {
+  return (
+    <div className="flex items-center justify-between gap-2 border-b border-border py-1.5 pr-1.5 pl-3">
+      <span className="min-w-0 truncate text-xs text-muted-foreground">{text}</span>
+      {children}
+    </div>
   )
 }
 
@@ -215,6 +150,7 @@ function ActiveList({
   selectedId,
   draggable,
   filter,
+  archiving,
 }: {
   tasks: readonly TaskListEntry[]
   live: LiveSubtasks | null
@@ -222,6 +158,8 @@ function ActiveList({
   draggable: boolean
   /** The filter shows only once opened from the header; `focusTick` focuses it again. */
   filter: { open: boolean; onClose: () => void; focusTick: number }
+  /** Archive shows on every row until `onDone`. */
+  archiving: { on: boolean; onDone: () => void }
 }) {
   const [query, setQuery] = useState('')
   if (!filter.open && query !== '') {
@@ -239,15 +177,15 @@ function ActiveList({
   const { needsYou, others } = useMemo(() => groupAgents(filterAgents(rows, query)), [rows, query])
   const fromNeedsYou = useOpenFromNeedsYou()
   const item = (place: 'list' | 'needsYou') => (row: AgentRow) => (
-    <div key={row.task.id} data-task-id={row.task.id}>
-      <TaskButton
-        row={row}
-        selected={row.task.id === selectedId}
-        draggable={draggable}
-        place={place}
-        onOpen={place === 'needsYou' ? fromNeedsYou : showAgent}
-      />
-    </div>
+    <AgentListRow
+      key={row.task.id}
+      row={row}
+      selected={row.task.id === selectedId}
+      draggable={draggable}
+      place={place}
+      archiving={archiving.on}
+      onOpen={place === 'needsYou' ? fromNeedsYou : showAgent}
+    />
   )
   if (tasks.length === 0) {
     return (
@@ -260,6 +198,16 @@ function ActiveList({
     <>
       {filter.open && (
         <AgentFilter query={query} onQuery={setQuery} focusTick={filter.focusTick} onClose={filter.onClose} />
+      )}
+      {archiving.on && (
+        <ListNote text="Archive agents">
+          <Hint text="Hide Archive on the rows again">
+            <Button size="xs" variant="ghost" onClick={archiving.onDone}>
+              <Check />
+              Done
+            </Button>
+          </Hint>
+        </ListNote>
       )}
       <div className="min-h-0 flex-1 overflow-y-auto">
         {needsYou.length + others.length === 0 && (
@@ -285,6 +233,7 @@ export function TasksPanel(props: { selectedId: string | null; subId: string | n
   const layout = useActiveLayout(narrow)
   const { archived, loaded: archivedLoaded } = useArchivedTasks()
   const [showArchived, setShowArchived] = useState(false)
+  const [archiving, setArchiving] = useState(false)
   const [importing, setImporting] = useState(false)
   const [searching, setSearching] = useState(false)
   const [focusTick, setFocusTick] = useState(0)
@@ -360,6 +309,11 @@ export function TasksPanel(props: { selectedId: string | null; subId: string | n
           onSearching={setSearching}
           archived={showArchived}
           onArchived={setShowArchived}
+          archiving={!showArchived && archiving}
+          onArchiving={(on) => {
+            setShowArchived(false)
+            setArchiving(on)
+          }}
           onImport={() => {
             setImporting(true)
           }}
@@ -367,8 +321,7 @@ export function TasksPanel(props: { selectedId: string | null; subId: string | n
         <WorkspaceSwitcher workspaces={view.workspaces} current={view.shown} />
         {showArchived ? (
           <>
-            <div className="flex items-center justify-between gap-2 border-b border-border py-1.5 pr-1.5 pl-3">
-              <span className="min-w-0 truncate text-xs text-muted-foreground">Archived, read-only</span>
+            <ListNote text="Archived, read-only">
               <Hint text="Back to active agents">
                 <Button
                   size="xs"
@@ -381,7 +334,7 @@ export function TasksPanel(props: { selectedId: string | null; subId: string | n
                   Active
                 </Button>
               </Hint>
-            </div>
+            </ListNote>
             <div className="min-h-0 flex-1 overflow-y-auto" aria-label="Archived agents">
               {archivedLoaded && listed && view.archived.length === 0 && (
                 <p className="p-4 text-sm text-muted-foreground">No archived agents.</p>
@@ -399,6 +352,12 @@ export function TasksPanel(props: { selectedId: string | null; subId: string | n
               selectedId={selectedId}
               draggable={layout?.acceptsAgents === true}
               filter={{ open: searching, onClose: closeSearch, focusTick }}
+              archiving={{
+                on: archiving,
+                onDone: () => {
+                  setArchiving(false)
+                },
+              }}
             />
           )
         )}

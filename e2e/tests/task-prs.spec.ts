@@ -114,7 +114,7 @@ test('brings PRs still in flight in front of merged ones', async ({ page }) => {
   await expect(groups).toHaveCount(4)
   await expect(groups.nth(0)).toHaveAccessibleName('Pull request mixed#6')
   await expect(groups.nth(1)).toHaveAccessibleName('Pull request mixed#5')
-  await expect(main.getByRole('button', { name: /E2E mixed PRs/ })).not.toContainText('mixed#')
+  await expect(main.getByRole('button', { name: /^E2E mixed PRs/ })).not.toContainText('mixed#')
 })
 
 test('shows complete for an idle task once its linked PRs are merged or closed', async ({ page }) => {
@@ -143,9 +143,9 @@ test('shows complete for an idle task once its linked PRs are merged or closed',
   const header = main.getByRole('heading', { name: 'E2E landed PRs' }).locator('..')
   await expect(header.getByText('complete', { exact: true })).toBeVisible()
   await expect(
-    main.getByRole('button', { name: /E2E landed PRs/ }).getByRole('img', { name: 'complete' }),
+    main.getByRole('button', { name: /^E2E landed PRs/ }).getByRole('img', { name: 'complete' }),
   ).toBeVisible()
-  await expect(main.getByRole('button', { name: /E2E open PR/ }).getByRole('img', { name: 'idle' })).toBeVisible()
+  await expect(main.getByRole('button', { name: /^E2E open PR/ }).getByRole('img', { name: 'idle' })).toBeVisible()
 })
 
 test('the PR chip row holds one count at every width, with no flicker at the boundaries', async ({ page }) => {

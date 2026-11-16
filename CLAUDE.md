@@ -77,7 +77,8 @@ UI:
   modifier combos are fine.
 - Needs you holds only agents that cannot go on without the user, each with a reason line; the
   status bar shows one "N need you" item. A red CI run shows on the PR, not in Needs you.
-- Restart, Fresh and Archive live in the footer of the agent's settings, each with its consequence.
+- Restart and Archive live in the footer of the agent's settings, each with its consequence. Archive
+  is also on each row of the agent list: on hover or focus, or on every row from the list menu.
 - A UI change gets a phone spec (`e2e/tests/<name>.phone.spec.ts`) beside its desktop spec.
 
 Writing:

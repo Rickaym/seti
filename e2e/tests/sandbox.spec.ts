@@ -187,7 +187,7 @@ test.describe('task sandbox', () => {
     const title = `E2E sandbox ${randomUUID().slice(0, 8)}`
     const id = await seedTask(title)
     await page.goto(`/#agents/${id}`)
-    const item = page.getByRole('button', { name: new RegExp(title) })
+    const item = page.getByRole('button', { name: new RegExp(`^${title}`) })
     const badge = item.getByRole('img', { name: /^Unsandboxed/ })
     await expect(badge).toBeVisible()
     await expect(item.getByText('unsandboxed')).toHaveCount(0)

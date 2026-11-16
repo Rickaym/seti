@@ -137,7 +137,7 @@ describe('a session that cannot start', () => {
     if (!task) {
       throw new Error('Task was not stored')
     }
-    await restartSession(task, { interrupt: false, fresh: false })
+    await restartSession(task, { interrupt: false })
     await settled(id)
     expect(await promptTexts(id)).toEqual(['first'])
     expect((await tasks.get(id))?.status).toBe('idle')

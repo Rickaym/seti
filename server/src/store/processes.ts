@@ -1,4 +1,4 @@
-import type { SessionRestart, SetiControlLevel } from '@seti/shared'
+import type { SetiControlLevel } from '@seti/shared'
 import { sql } from '../db.js'
 
 /** The id of the last prompt the agent read, or 0 before its first. */
@@ -22,14 +22,14 @@ export const stoppedNotes = {
 }
 
 export const sessionRestarts = {
-  /** How the user restarted the session since the agent last read a message, oldest first. */
-  sinceLastTurn: async (taskId: string): Promise<SessionRestart[]> =>
+  /** Whether the user restarted the session since the agent last read a message. */
+  sinceLastTurn: async (taskId: string): Promise<boolean> =>
     (
-      await sql<{ session: SessionRestart }[]>`SELECT payload::json ->> 'session' AS session FROM task_message
-        WHERE task_id = ${taskId} AND kind = 'seti' AND (payload::json ->> 'session') IN ('restarted', 'fresh')
+      await sql`SELECT 1 FROM task_message
+        WHERE task_id = ${taskId} AND kind = 'seti' AND (payload::json ->> 'session') = 'restarted'
           AND id > ${lastTurn(taskId)}
-        ORDER BY id`
-    ).map((row) => row.session),
+        LIMIT 1`
+    ).length > 0,
 }
 
 export const setiControlNotes = {

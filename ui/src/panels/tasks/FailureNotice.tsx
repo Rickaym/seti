@@ -137,7 +137,7 @@ export function TaskFailure({
         <RotateCcw />
         Retry turn
       </Button>
-      <Button size="xs" variant="ghost" onClick={() => void restart(false)}>
+      <Button size="xs" variant="ghost" onClick={() => void restart()}>
         <RotateCw />
         Restart session
       </Button>

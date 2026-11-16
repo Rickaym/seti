@@ -329,21 +329,16 @@ async def test_session_restarts_keep_the_conversation_after_a_yes(
     assert asked.summary == "Asked first: restart the session of Fix the logout button"
     assert done.text == "Restarted the session of Fix the logout button; the conversation continues."
     assert fake_seti.writes() == [
-        ("POST", f"{LOGOUT}/session/restart", {}, {"interrupt": False, "fresh": False}),
+        ("POST", f"{LOGOUT}/session/restart", {}, {"interrupt": False}),
     ]
 
 
-async def test_session_restart_stops_a_running_turn_and_can_start_fresh(
-    tools: EaTools, fake_seti: FakeSeti
-) -> None:
-    asked, done = await confirm(tools, "restart_agent_session", {"task": "login", "fresh": True})
-    assert "fresh Claude Code session: the agent forgets the conversation so far" in asked.text
+async def test_session_restart_stops_a_running_turn(tools: EaTools, fake_seti: FakeSeti) -> None:
+    asked, done = await confirm(tools, "restart_agent_session", {"task": "login"})
     assert "Its running turn stops first." in asked.text
-    assert done.text == (
-        "Started Fix the login redirect bug in a fresh session; it no longer has the earlier conversation."
-    )
+    assert done.text == "Restarted the session of Fix the login redirect bug; the conversation continues."
     assert fake_seti.writes() == [
-        ("POST", f"{LOGIN}/session/restart", {}, {"interrupt": True, "fresh": True}),
+        ("POST", f"{LOGIN}/session/restart", {}, {"interrupt": True}),
     ]
 
 
