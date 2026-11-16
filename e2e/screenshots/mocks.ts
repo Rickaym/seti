@@ -24,7 +24,6 @@ const check = (name: string, detail: string, state: PrCheck['state'] = 'success'
 /** The storefront PR: green CI, a ready preview, changes asked for in two open threads. */
 const STOREFRONT_PR: PullRequest = {
   key: 'storefront-482',
-  repo_id: 'acme/storefront',
   repo_slug: 'acme/storefront',
   number: 482,
   title: 'fix(checkout): retry card captures on gateway timeouts',

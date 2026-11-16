@@ -3,9 +3,6 @@ import { isRecord, lenientArray, orDefault, type ResponseSchema } from './lenien
 import { prUrl } from './pr-url.js'
 import { TASK_STATUSES, type TaskStatus } from './tasks.js'
 
-export const PR_SCOPES = ['mine', 'all'] as const
-export type PrScope = (typeof PR_SCOPES)[number]
-
 export const prByUrlQuery = z.object({ url: prUrl })
 
 /** Most PRs one lookup resolves; above any agent's linked PRs. */
@@ -13,8 +10,6 @@ const MAX_PR_LOOKUP = 1000
 
 /** PR URLs whose open pull requests one request returns, such as every PR an agent links. */
 export const prLookupInput = z.object({ urls: z.array(prUrl).max(MAX_PR_LOOKUP) })
-
-export const prListQuery = z.object({ scope: z.enum(PR_SCOPES).default('mine') })
 
 export const prRefParams = z.object({
   owner: z.string().regex(/^[\w.-]+$/),
@@ -68,9 +63,9 @@ export type PrRelation =
 
 export interface RelatedPr {
   url: string
-  /** The PR's key when it is open in a registered repo, else null. */
+  /** The PR's key when Seti lists it as open, else null. */
   key: string | null
-  /** `repo#123` for open PRs of registered repos, `owner/repo#123` otherwise. */
+  /** `repo#123` for open PRs Seti lists, `owner/repo#123` otherwise. */
   label: string
   title: string | null
   ci: CiState | null
@@ -79,7 +74,6 @@ export interface RelatedPr {
 
 export interface PullRequest {
   key: string
-  repo_id: string
   repo_slug: string
   number: number
   title: string
@@ -103,20 +97,15 @@ export interface PullRequest {
   related: RelatedPr[]
 }
 
-export interface RepoPrs {
-  repo_id: string
-  slug: string
-  error: string | null
-  /** True when any open PR of the repo, in any scope, has a preview comment. */
-  previews: boolean
-  prs: PullRequest[]
-}
-
+/** The open PRs the GitHub login wrote and those agents opened or linked, newest first. */
 export interface PrList {
-  /** Null when the GitHub CLI is not logged in; the mine scope is then empty. */
+  /** Null when the GitHub CLI is not logged in. */
   viewer: string | null
-  scope: PrScope
-  repos: RepoPrs[]
+  prs: PullRequest[]
+  /** Why GitHub gave no list, such as a missing login; null when it answered. */
+  error: string | null
+  /** Open PRs of the login that GitHub has beyond the newest ones listed. */
+  more: number
   /** False while no mod fills in previews, so a preview cannot be requested. */
   previews_on: boolean
 }
@@ -191,7 +180,6 @@ const relatedPrSchema = z.object({
 
 const pullRequestSchema = z.object({
   key: z.string(),
-  repo_id: z.string(),
   repo_slug: z.string(),
   number: z.number(),
   title: z.string(),
@@ -223,17 +211,10 @@ export const pullRequestsSchema = lenientArray('pull request', pullRequestSchema
   PullRequest[]
 >
 
-const repoPrsSchema = z.object({
-  repo_id: z.string(),
-  slug: z.string(),
-  error: nullableText('repo error'),
-  previews: orDefault('repo previews', z.boolean(), false),
-  prs: lenientArray('pull request', pullRequestSchema),
-})
-
 export const prListSchema = z.object({
   viewer: nullableText('viewer'),
-  scope: z.enum(PR_SCOPES),
-  repos: lenientArray('repo', repoPrsSchema),
+  prs: lenientArray('pull request', pullRequestSchema),
+  error: nullableText('list error'),
+  more: orDefault('more', z.number().int().nonnegative(), 0),
   previews_on: orDefault('previews on', z.boolean(), true),
 }) satisfies ResponseSchema<PrList>

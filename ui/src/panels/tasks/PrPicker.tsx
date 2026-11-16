@@ -22,16 +22,16 @@ interface PrPickerProps {
   onLinked: () => void
 }
 
-/** Links an open PR from the registered repos, the agent's own first, or a pasted URL. */
+/** Links one of the open PRs Seti lists, those of the agent's repos first, or a pasted URL. */
 export function PrPicker({ task, path, linked, onLinked }: PrPickerProps) {
   const [prs, setPrs] = useState<PullRequest[] | null>(null)
   const [query, setQuery] = useState('')
   const [pasted, setPasted] = useState('')
 
   useEffect(() => {
-    apiGetValid('/prs?scope=all', prListSchema)
+    apiGetValid('/prs', prListSchema)
       .then((list) => {
-        setPrs(list.repos.flatMap((group) => group.prs))
+        setPrs(list.prs)
       })
       .catch((e: unknown) => toast.error(errorText(e)))
   }, [])
@@ -66,7 +66,7 @@ export function PrPicker({ task, path, linked, onLinked }: PrPickerProps) {
       <div className="text-xs font-medium">Link a pull request</div>
       <Input
         aria-label="Search pull requests"
-        placeholder="Search open PRs in registered repos"
+        placeholder="Search open PRs"
         value={query}
         onChange={(e) => {
           setQuery(e.target.value)
@@ -78,7 +78,7 @@ export function PrPicker({ task, path, linked, onLinked }: PrPickerProps) {
           <li className="p-2 text-xs text-muted-foreground">No open PRs match.</li>
         )}
         {choices.map((pr) => (
-          <li key={pr.key}>
+          <li key={pr.url}>
             <button
               type="button"
               className="flex w-full items-center gap-2 px-2 py-1.5 text-left text-xs hover:bg-accent"

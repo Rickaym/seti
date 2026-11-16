@@ -33,7 +33,7 @@ interface ChipProps {
 
 const NO_STATUS: Record<LinkedPr['group'], string> = {
   fix: '',
-  open: 'Not open, or not in a registered repo',
+  open: 'No status from GitHub',
   merged: 'Merged',
   closed: 'Closed',
 }

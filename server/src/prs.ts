@@ -1,32 +1,36 @@
-import type { LinkedTask, PrList, PrScope, PullRequest, Repo, RelatedPr, RepoPrs } from '@seti/shared'
+import type { LinkedTask, PrList, PullRequest, RelatedPr } from '@seti/shared'
 import { repos } from './db.js'
-import { addPreviewLabel, fetchOpenPrs, viewerLogin, type OpenPr } from './github.js'
+import { addPreviewLabel, fetchAuthoredPrs, fetchOpenPrsByUrl, viewerLogin, type OpenPr } from './github.js'
 import { HttpError } from './http.js'
 import { prDecorators, previewsOn } from './pr-decorators.js'
 import { relatePrs } from './pr-graph.js'
 import { cache } from './redis.js'
-import { tasksByPrUrl } from './store/prs.js'
+import { linkedPrUrls, tasksByPrUrl } from './store/prs.js'
 
 const TTL_MS = 60_000
 /** How long other processes, or this one after a restart, may serve a list they did not fetch. */
 const SHARED_TTL_S = 60 * 60
 const REFRESH_CLAIM_MS = 30_000
 
-interface CacheEntry {
-  at: number
-  prs: OpenPr[] | null
-  pending: Promise<OpenPr[]> | null
-}
-
-interface SharedPrs {
+/** The open PRs as one fetch found them, newest first. */
+interface OpenPrs {
   at: number
   prs: OpenPr[]
+  /** Open PRs of the gh login that GitHub has beyond the ones its search returned. */
+  more: number
+  /** The linked PR URLs the fetch covered, so a PR linked since then asks GitHub again. */
+  linked: string[]
+}
+
+interface CacheEntry {
+  list: OpenPrs | null
+  pending: Promise<OpenPrs> | null
 }
 
 const entries = new Map<string, CacheEntry>()
 const fetchedListeners: ((prs: readonly OpenPr[]) => void)[] = []
 
-/** Hears each repo's open PRs as this process fetches them from GitHub. */
+/** Hears the open PRs each time this process fetches them from GitHub. */
 export function onOpenPrsFetched(listener: (prs: readonly OpenPr[]) => void): void {
   fetchedListeners.push(listener)
 }
@@ -37,40 +41,50 @@ const decoratedBy = () =>
     .map((entry) => entry.key)
     .join(',')
 
-const cacheKey = (repo: Repo) => `${repo.id}:${repo.slug}:${decoratedBy()}`
 /** Versioned so lists cached before a field was added are fetched again. */
-const sharedKey = (repo: Repo) => `gh:prs:v2:${cacheKey(repo)}`
+const sharedKey = () => `gh:prs:v3:${decoratedBy()}`
 
-function entryFor(repo: Repo): CacheEntry {
-  const key = cacheKey(repo)
-  const entry = entries.get(key) ?? { at: 0, prs: null, pending: null }
+function entryFor(): CacheEntry {
+  const key = decoratedBy()
+  const entry = entries.get(key) ?? { list: null, pending: null }
   entries.set(key, entry)
   return entry
 }
 
-function adopt(repo: Repo, shared: SharedPrs): OpenPr[] {
-  const entry = entryFor(repo)
-  entry.prs = shared.prs
-  entry.at = shared.at
-  return shared.prs
-}
+const newestFirst = (a: OpenPr, b: OpenPr) => b.updated_at.localeCompare(a.updated_at)
 
-async function fetchShared(repo: Repo): Promise<SharedPrs> {
-  const shared = { at: Date.now(), prs: await fetchOpenPrs(repo) }
-  await cache.set(sharedKey(repo), shared, SHARED_TTL_S)
-  for (const listener of fetchedListeners) {
-    listener(shared.prs)
+/** One search for the login's open PRs, then a URL lookup for the linked PRs it left out. */
+async function fetchFromGithub(): Promise<OpenPrs> {
+  const [linked, authored] = await Promise.all([linkedPrUrls(), fetchAuthoredPrs()])
+  const listed = new Set(authored.prs.map((pr) => pr.url))
+  const others = await fetchOpenPrsByUrl(linked.filter((url) => !listed.has(url)))
+  const byUrl = new Map([...authored.prs, ...others].map((pr) => [pr.url, pr]))
+  return {
+    at: Date.now(),
+    prs: [...byUrl.values()].sort(newestFirst),
+    more: Math.max(0, authored.total - authored.prs.length),
+    linked,
   }
-  return shared
 }
 
-/** Asks GitHub unless another process fetched a fresh list meanwhile. */
-async function revalidate(repo: Repo): Promise<OpenPr[]> {
-  const entry = entryFor(repo)
+async function fetchShared(): Promise<OpenPrs> {
+  const key = sharedKey()
+  const list = await fetchFromGithub()
+  await cache.set(key, list, SHARED_TTL_S)
+  for (const listener of fetchedListeners) {
+    listener(list.prs)
+  }
+  return list
+}
+
+/** Asks GitHub unless another process fetched a fresh list meanwhile; `force` always asks. */
+async function revalidate(force = false): Promise<OpenPrs> {
+  const entry = entryFor()
   entry.pending ??= (async () => {
-    const shared = await cache.get<SharedPrs>(sharedKey(repo))
-    const fresh = shared !== undefined && Date.now() - shared.at < TTL_MS ? shared : await fetchShared(repo)
-    return adopt(repo, fresh)
+    const shared = force ? undefined : await cache.get<OpenPrs>(sharedKey())
+    const list = shared !== undefined && Date.now() - shared.at < TTL_MS ? shared : await fetchShared()
+    entry.list = list
+    return list
   })().finally(() => {
     entry.pending = null
   })
@@ -78,53 +92,56 @@ async function revalidate(repo: Repo): Promise<OpenPr[]> {
 }
 
 /** One process refreshes a stale list while every process keeps serving it. */
-async function refreshInBackground(repo: Repo): Promise<void> {
-  if (entryFor(repo).pending === null && !(await cache.claim(`${sharedKey(repo)}:refresh`, REFRESH_CLAIM_MS))) {
+async function refreshInBackground(): Promise<void> {
+  if (entryFor().pending === null && !(await cache.claim(`${sharedKey()}:refresh`, REFRESH_CLAIM_MS))) {
     return
   }
   // A failed background refresh keeps the stale list; the next call retries.
-  await revalidate(repo).catch(() => undefined)
+  await revalidate().catch(() => undefined)
 }
 
 /** Fresh for a minute, then served stale while one shared gh call refreshes it. */
-async function repoPrs(repo: Repo): Promise<OpenPr[]> {
-  const entry = entryFor(repo)
-  let prs = entry.prs
-  if (prs === null) {
-    const shared = await cache.get<SharedPrs>(sharedKey(repo))
+async function openPrs(): Promise<OpenPrs> {
+  const entry = entryFor()
+  if (entry.list === null) {
+    const shared = await cache.get<OpenPrs>(sharedKey())
     if (shared === undefined) {
-      return revalidate(repo)
+      return revalidate()
     }
-    prs = adopt(repo, shared)
+    entry.list = shared
   }
-  if (Date.now() - entry.at >= TTL_MS) {
-    void refreshInBackground(repo)
+  if (Date.now() - entry.list.at >= TTL_MS) {
+    void refreshInBackground()
   }
-  return prs
+  return entry.list
 }
 
-interface RepoResult {
-  repo: Repo
+/** The list, fetched again first when one of the URLs was linked to an agent after it was read. */
+async function openPrsCovering(urls: readonly string[]): Promise<OpenPr[]> {
+  const list = await openPrs()
+  const known = new Set([...list.prs.map((pr) => pr.url), ...list.linked])
+  const unseen = urls.filter((url) => !known.has(url))
+  if (unseen.length === 0) {
+    return list.prs
+  }
+  const linked = new Set(await linkedPrUrls())
+  return unseen.some((url) => linked.has(url)) ? (await revalidate(true)).prs : list.prs
+}
+
+interface Loaded {
   prs: OpenPr[]
+  more: number
   error: string | null
 }
 
-async function loadAll(): Promise<RepoResult[]> {
-  return Promise.all(
-    (await repos.list()).map(async (repo) => {
-      try {
-        return { repo, prs: await repoPrs(repo), error: null }
-      } catch (e) {
-        return { repo, prs: [], error: e instanceof Error ? e.message : String(e) }
-      }
-    }),
-  )
+async function load(): Promise<Loaded> {
+  try {
+    const { prs, more } = await openPrs()
+    return { prs, more, error: null }
+  } catch (e) {
+    return { prs: [], more: 0, error: e instanceof Error ? e.message : String(e) }
+  }
 }
-
-const sameLogin = (a: string | null, b: string) => a !== null && a.toLowerCase() === b.toLowerCase()
-
-const inScope = (pr: OpenPr, scope: PrScope, viewer: string | null) =>
-  scope === 'all' || (viewer !== null && sameLogin(pr.author, viewer))
 
 const viewerOrNull = async () => viewerLogin().catch(() => null)
 
@@ -133,7 +150,7 @@ interface Relations {
   related: Map<string, RelatedPr[]>
 }
 
-/** Relations across every cached PR; mentions were extracted once when each repo was fetched. */
+/** Relations across every cached PR; mentions were extracted once when the list was fetched. */
 async function relationsOf(prs: readonly OpenPr[]): Promise<Relations> {
   const tasks = await tasksByPrUrl()
   const bases = (await repos.list()).map((repo) => repo.base_branch)
@@ -144,29 +161,16 @@ function withRelations({ refs: _refs, body: _body, ...pr }: OpenPr, relations: R
   return { ...pr, tasks: relations.tasks.get(pr.url) ?? [], related: relations.related.get(pr.url) ?? [] }
 }
 
-export async function listPrs(scope: PrScope): Promise<PrList> {
-  const [viewer, results] = await Promise.all([viewerOrNull(), loadAll()])
-  const relations = await relationsOf(results.flatMap((r) => r.prs))
-  const repoPrsList: RepoPrs[] = results.map(({ repo, error, prs }) => ({
-    repo_id: repo.id,
-    slug: repo.slug,
-    error,
-    previews: prs.some((pr) => pr.preview.state !== 'none'),
-    prs: prs.filter((pr) => inScope(pr, scope, viewer)).map((pr) => withRelations(pr, relations)),
-  }))
-  return { viewer, scope, repos: repoPrsList, previews_on: previewsOn() }
+/** Every open PR the gh login wrote and every open PR linked to an agent, in any repo. */
+export async function listPrs(): Promise<PrList> {
+  const [viewer, { prs, more, error }] = await Promise.all([viewerOrNull(), load()])
+  const relations = await relationsOf(prs)
+  return { viewer, prs: prs.map((pr) => withRelations(pr, relations)), error, more, previews_on: previewsOn() }
 }
 
-/** An open PR of a registered repo by URL, with tasks and relations; null when closed or unknown. */
-export async function findPr(url: string): Promise<PullRequest | null> {
-  const prs = (await loadAll()).flatMap((r) => r.prs)
-  const pr = prs.find((candidate) => candidate.url === url)
-  return pr ? withRelations(pr, await relationsOf(prs)) : null
-}
-
-/** The open PRs of registered repos among the URLs, related once for the whole batch. */
+/** The open PRs among the URLs, related once for the batch; closed or unknown ones are left out. */
 export async function lookupPrs(urls: readonly string[]): Promise<PullRequest[]> {
-  const prs = (await loadAll()).flatMap((r) => r.prs)
+  const prs = await openPrsCovering(urls).catch(() => [])
   const wanted = new Set(urls)
   const found = prs.filter((pr) => wanted.has(pr.url))
   if (found.length === 0) {
@@ -176,26 +180,33 @@ export async function lookupPrs(urls: readonly string[]): Promise<PullRequest[]>
   return found.map((pr) => withRelations(pr, relations))
 }
 
-/** Open PRs of every registered repo from the cache; only a repo never loaded waits for gh. */
+/** An open PR by URL, listed or not, with tasks and relations; null when closed or unknown. */
+export async function findPr(url: string): Promise<PullRequest | null> {
+  const [listed] = await lookupPrs([url])
+  if (listed) {
+    return listed
+  }
+  const [pr] = await fetchOpenPrsByUrl([url]).catch(() => [])
+  return pr ? withRelations(pr, await relationsOf([...(await load()).prs, pr])) : null
+}
+
+/** The listed open PRs from the cache; only a list never loaded waits for gh. */
 export async function cachedOpenPrs(): Promise<OpenPr[]> {
-  return (await loadAll()).flatMap((r) => r.prs)
+  return (await load()).prs
 }
 
 /** Requests a fresh preview deploy; resolves true when the preview label had to be re-added. */
 export async function redeployPreview(owner: string, name: string, number: number): Promise<boolean> {
   const slug = `${owner}/${name}`.toLowerCase()
-  const repo = (await repos.list()).find((r) => r.slug.toLowerCase() === slug)
-  if (!repo) {
-    throw new HttpError(404, 'Repo is not registered in Seti')
+  const pr = (await openPrs()).prs.find((open) => open.repo_slug.toLowerCase() === slug && open.number === number)
+  if (!pr) {
+    throw new HttpError(404, 'Not an open pull request Seti lists')
   }
-  if (!(await repoPrs(repo)).some((pr) => pr.number === number)) {
-    throw new HttpError(404, 'Not an open pull request')
+  const relabeled = await addPreviewLabel(pr.repo_slug, number)
+  const entry = entryFor()
+  if (entry.list !== null) {
+    entry.list = { ...entry.list, at: 0 }
   }
-  const relabeled = await addPreviewLabel(repo.slug, number)
-  const entry = entries.get(cacheKey(repo))
-  if (entry) {
-    entry.at = 0
-  }
-  await cache.del(sharedKey(repo))
+  await cache.del(sharedKey())
   return relabeled
 }

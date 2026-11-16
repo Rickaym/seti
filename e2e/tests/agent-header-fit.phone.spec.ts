@@ -17,7 +17,6 @@ const PR_URLS = [411, 412].map((n) => `https://github.com/e2e/dashboard/pull/${S
 
 const failingPr = (url: string, index: number): PullRequest => ({
   key: `header-fit-${String(index)}`,
-  repo_id: 'e2e/dashboard',
   repo_slug: 'e2e/dashboard',
   number: 411 + index,
   title: 'Backoff on reconnect',

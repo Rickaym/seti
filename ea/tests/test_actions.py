@@ -16,6 +16,7 @@ from fakes import (
     FakeSeti,
     listed_subtasks,
     make_task,
+    pr,
     subtask,
 )
 
@@ -480,6 +481,15 @@ async def test_start_agent_from_pr_sends_what_the_pr_page_sends(tools: EaTools, 
     assert body["prompt"].endswith("Task: Fix the failing e2e test")
 
 
+async def test_start_agent_from_pr_needs_a_checkout_of_the_repo(tools: EaTools, fake_seti: FakeSeti) -> None:
+    far = "https://github.com/initech/billing/pull/4"
+    fake_seti.prs["prs"].append(pr(far, "fix: totals", repo_slug="initech/billing"))
+    refused = await tools.call("start_agent_from_pr", {"pr": far, "instructions": "Fix it"})
+    assert not refused.ok
+    assert refused.text == "Seti has no checkout of initech/billing to start an agent in. Add the repo first."
+    assert not fake_seti.writes()
+
+
 async def test_preview_label_needs_a_yes_and_previews_on_the_repo(
     tools: EaTools, fake_seti: FakeSeti
 ) -> None:
@@ -487,10 +497,10 @@ async def test_preview_label_needs_a_yes_and_previews_on_the_repo(
     assert "This adds the preview label to seti PR 28 on GitHub as the user's account" in asked.text
     assert done.text == "Added the preview label on seti PR 28. The preview updates in a few minutes."
     assert fake_seti.writes() == [("POST", "/api/prs/Octocat/seti/28/redeploy", {}, {})]
-    fake_seti.prs["repos"][0]["prs"][0]["labels"] = ["preview"]
+    fake_seti.prs["prs"][0]["labels"] = ["preview"]
     relabel = await tools.call("request_preview", {"pr": "seti PR 28"})
     assert "removes the preview label from seti PR 28 and adds it again" in relabel.text
-    fake_seti.prs["repos"][0]["previews"] = False
+    fake_seti.prs["prs"][0]["preview"] = {"state": "none", "url": None, "commit": None, "stale": False}
     off = await tools.call("request_preview", {"pr": "seti PR 28"})
     assert not off.ok
     assert off.text.startswith("Seti has no previews for seti")

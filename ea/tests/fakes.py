@@ -72,7 +72,6 @@ def pr(url: str, title: str, **extra: Any) -> dict[str, Any]:
     number = int(url.rsplit("/", 1)[-1])
     item: dict[str, Any] = {
         "key": f"seti-{number}",
-        "repo_id": REPO_SETI,
         "repo_slug": "Octocat/seti",
         "number": number,
         "title": title,
@@ -101,32 +100,22 @@ def pr(url: str, title: str, **extra: Any) -> dict[str, Any]:
 def default_prs() -> dict[str, Any]:
     return {
         "viewer": "octocat",
-        "scope": "all",
-        "repos": [
-            {
-                "repo_id": REPO_SETI,
-                "slug": "Octocat/seti",
-                "error": None,
-                "previews": True,
-                "prs": [
-                    pr(
-                        PR_SETI,
-                        "fix: login redirect",
-                        ci="failure",
-                        checks=[
-                            {"name": "e2e", "state": "failure", "detail": "", "url": None},
-                            {"name": "static", "state": "success", "detail": "", "url": None},
-                        ],
-                        review_decision="changes_requested",
-                        preview={"state": "ready", "url": "https://x", "commit": "abc", "stale": True},
-                        tasks=[
-                            {"id": TASK_LOGIN, "title": "Fix the login redirect bug", "status": "running"}
-                        ],
-                    )
+        "prs": [
+            pr(
+                PR_SETI,
+                "fix: login redirect",
+                ci="failure",
+                checks=[
+                    {"name": "e2e", "state": "failure", "detail": "", "url": None},
+                    {"name": "static", "state": "success", "detail": "", "url": None},
                 ],
-            },
-            {"repo_id": REPO_WEB, "slug": "Octocat/web", "error": "gh failed", "previews": False, "prs": []},
+                review_decision="changes_requested",
+                preview={"state": "ready", "url": "https://x", "commit": "abc", "stale": True},
+                tasks=[{"id": TASK_LOGIN, "title": "Fix the login redirect bug", "status": "running"}],
+            )
         ],
+        "error": None,
+        "more": 0,
         "previews_on": True,
         "clusters": [],
     }
@@ -1247,10 +1236,10 @@ class FakeSeti:
                     return err(404, "Subtask not found")
                 return ok({**brief, **self.subtask_details.get(tool_use_id, {"prompt": "", "result": None})})
             case ["prs"]:
-                return ok({**self.prs, "scope": params.get("scope", "mine")})
+                return ok(self.prs)
             case ["prs", "by-url"]:
                 url = params.get("url")
-                found = [p for r in self.prs["repos"] for p in r["prs"] if p["url"] == url]
+                found = [p for p in self.prs["prs"] if p["url"] == url]
                 return ok(found[0] if found else None)
             case ["repos"]:
                 return ok(self.repos)

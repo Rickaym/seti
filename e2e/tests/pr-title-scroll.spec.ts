@@ -15,7 +15,6 @@ const PAST_PAUSE_MS = 1500
 function pr(number: number, title: string): PullRequest {
   return {
     key: `scroll-${String(number)}`,
-    repo_id: SLUG,
     repo_slug: SLUG,
     number,
     title,
@@ -41,13 +40,14 @@ function pr(number: number, title: string): PullRequest {
 
 const LIST: PrList = {
   viewer: 'e2e',
-  scope: 'all',
-  repos: [{ repo_id: SLUG, slug: SLUG, error: null, previews: false, prs: [pr(1, SHORT), pr(2, LONG)] }],
+  prs: [pr(1, SHORT), pr(2, LONG)],
+  error: null,
+  more: 0,
   previews_on: true,
 }
 
 async function openPicker(page: Page): Promise<{ id: string; picker: Locator }> {
-  await page.route(/\/api\/prs\?scope=all$/, async (route) => route.fulfill({ json: { data: LIST, meta: {} } }))
+  await page.route(/\/api\/prs$/, async (route) => route.fulfill({ json: { data: LIST, meta: {} } }))
   const db = openSeedDb()
   const id = randomUUID()
   await db.idleTask(id, 'E2E scrolling PR titles', paths.checkout, new Date().toISOString())

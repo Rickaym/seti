@@ -159,7 +159,6 @@ const CAPABILITIES: CapabilitiesSnapshot = {
 
 const LONG_PR: PullRequest = {
   key: 'docs-1',
-  repo_id: 'e2e/docs',
   repo_slug: 'e2e/docs',
   number: 1,
   title: TITLE,
