@@ -180,6 +180,13 @@ names is left to that rule. Allow runs the call with the edits, Deny tells the a
 there is no Always, since review asks every time. Any editable MCP call that an ask rule or the
 classifier sends to the user gets the same Edit button.
 
+A rule for one tool leaves the server's other writing tools unreviewed, so adding one opens a
+checklist of them (`server/src/review-coverage.ts`): the tools the server's MCP annotations do not
+mark read-only, or, for a server without annotations, the tools whose names say they write. One
+switch makes a rule for the whole server instead, and one confirm adds the chosen rules through
+`POST /api/permissions/rules/batch`. The permission policy carries `review_gaps`, the servers
+whose rules cover only some outward tools, which the rules page shows as one line each.
+
 Settings shows the
 rules agents load from Claude Code's own settings files read-only. Sandboxed agents may edit any
 file they can reach, and run any shell command the classifier allows, so the sandbox stays the

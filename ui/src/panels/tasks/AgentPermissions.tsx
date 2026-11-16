@@ -42,6 +42,7 @@ export function AgentPermissions({ task }: { task: Task }) {
           <RuleEditor
             rules={permissions.own}
             path={`/tasks/${taskId}/permissions/rules`}
+            gaps={permissions.review_gaps}
             empty="No rules of its own."
             onChange={load}
           />

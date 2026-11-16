@@ -93,6 +93,7 @@ export function PermissionsPage() {
           <RuleEditor
             rules={policy.rules}
             path="/permissions/rules"
+            gaps={policy.review_gaps}
             empty="No rules yet. Always allow on a request adds one, or add one here."
             onChange={load}
           />

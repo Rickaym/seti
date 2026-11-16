@@ -77,6 +77,19 @@ export function preview(text: string): string {
 
 const capitalize = (text: string) => text.charAt(0).toUpperCase() + text.slice(1)
 
+/** `plugin_slack_slack` reads as `Slack`, and `claude_ai_Google_Drive` as `Google Drive`. */
+export function serverDisplayName(rawServer: string): string {
+  return capitalize(shortServer(rawServer).replace(/_/g, ' '))
+}
+
+function shortServer(rawServer: string): string {
+  const server = rawServer.replace(/^plugin_/, '').replace(/^claude_ai_/, '')
+  const halves = server.split('_')
+  const half = halves.length % 2 === 0 ? halves.length / 2 : 0
+  const doubled = half > 0 && halves.slice(0, half).join('_') === halves.slice(half).join('_')
+  return doubled ? halves.slice(0, half).join('_') : server
+}
+
 /** `mcp__plugin_slack_slack__slack_send_message` reads as `Slack send_message`; others as named. */
 export function toolDisplayName(name: string): string {
   const parts = name.split('__')
@@ -84,16 +97,10 @@ export function toolDisplayName(name: string): string {
   if (prefix !== 'mcp' || rawServer === undefined || rest.length === 0) {
     return name
   }
-  let server = rawServer.replace(/^plugin_/, '').replace(/^claude_ai_/, '')
-  const halves = server.split('_')
-  const half = halves.length % 2 === 0 ? halves.length / 2 : 0
-  if (half > 0 && halves.slice(0, half).join('_') === halves.slice(half).join('_')) {
-    server = halves.slice(0, half).join('_')
-  }
   const tool = rest.join('__')
-  const prefixed = `${server.toLowerCase()}_`
+  const prefixed = `${shortServer(rawServer).toLowerCase()}_`
   const action = tool.toLowerCase().startsWith(prefixed) ? tool.slice(prefixed.length) : tool
-  return `${capitalize(server.replace(/_/g, ' '))} ${action}`
+  return `${serverDisplayName(rawServer)} ${action}`
 }
 
 const textOf = (value: unknown): string | null => {

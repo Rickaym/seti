@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { lenientArray, orDefault, type ResponseSchema } from './lenient.js'
+import { reviewGapSchema, type ReviewGap } from './review-tools.js'
 
 /**
  * What a rule does with a tool call it matches. Deny beats ask and ask beats allow, wherever each
@@ -65,6 +66,8 @@ export interface PermissionPolicy {
   guards: string[]
   /** Rules for every agent. */
   rules: PermissionRule[]
+  /** Servers the scope's review rules cover in part, with tools that write or send left out. */
+  review_gaps: ReviewGap[]
 }
 
 /** The rules of one agent: its own, and the global and built-in ones it runs with. */
@@ -84,6 +87,20 @@ export const addPermissionRuleInput = z
     path: ['rule'],
   })
 export type AddPermissionRuleInput = z.input<typeof addPermissionRuleInput>
+
+const BATCH_MAX = 300
+
+/** Several rules of one behavior, added with one confirm. */
+export const addPermissionRulesInput = z
+  .object({
+    behavior: z.enum(PERMISSION_BEHAVIORS),
+    rules: z.array(permissionRuleText).min(1).max(BATCH_MAX),
+  })
+  .refine((input) => input.behavior !== 'review' || input.rules.every((rule) => MCP_RULE.test(rule)), {
+    message: REVIEW_HINT,
+    path: ['rules'],
+  })
+export type AddPermissionRulesInput = z.input<typeof addPermissionRulesInput>
 
 const ruleId = z.coerce.number().int().positive()
 
@@ -197,6 +214,7 @@ export const permissionPolicySchema = z.object({
   inherited: lenientArray('inherited rule', inheritedSchema),
   guards: orDefault('guards', z.array(z.string()), []),
   rules: lenientArray('permission rule', ruleSchema),
+  review_gaps: lenientArray('review gap', reviewGapSchema),
 }) satisfies ResponseSchema<PermissionPolicy>
 
 export const agentPermissionsSchema = permissionPolicySchema.extend({

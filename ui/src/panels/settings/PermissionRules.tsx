@@ -4,6 +4,8 @@ import {
   type InheritedRule,
   type PermissionBehavior,
   type PermissionRule,
+  type ReviewCoverage,
+  type ReviewGap,
 } from '@seti/shared'
 import { Plus, Trash2 } from 'lucide-react'
 import { useId, useState } from 'react'
@@ -14,6 +16,9 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 import { cn } from '@/lib/utils'
+import { ReviewChecklist } from './ReviewChecklist'
+import { ReviewGaps } from './ReviewGaps'
+import { hasSiblings, loadCoverage } from './review-coverage'
 
 const BEHAVIOR_TITLE: Record<PermissionBehavior, string> = {
   allow: 'Allow',
@@ -122,9 +127,12 @@ export function RuleEditor({
   rules,
   path,
   empty,
+  gaps,
   onChange,
 }: {
   rules: readonly PermissionRule[]
+  /** Servers the scope's review rules cover in part. */
+  gaps: readonly ReviewGap[]
   /** Where the scope's rules live, such as /permissions/rules. */
   path: string
   empty: string
@@ -133,6 +141,8 @@ export function RuleEditor({
   const [behavior, setBehavior] = useState<PermissionBehavior>('allow')
   const [text, setText] = useState('')
   const [busy, setBusy] = useState(false)
+  const [checklist, setChecklist] = useState<ReviewCoverage | null>(null)
+  const [unlisted, setUnlisted] = useState('')
   const ruleId = useId()
   const behaviorId = useId()
 
@@ -143,14 +153,31 @@ export function RuleEditor({
       return
     }
     setBusy(true)
+    setUnlisted('')
     try {
+      const coverage = behavior === 'review' ? await loadCoverage(path, parsed.data.rule) : null
+      if (coverage !== null && hasSiblings(coverage)) {
+        setChecklist(coverage)
+        return
+      }
       await apiPost(path, parsed.data)
+      if (coverage !== null && !coverage.known) {
+        setUnlisted(`Added. ${coverage.label} is not connected, so Seti cannot list its other tools.`)
+      }
       setText('')
       onChange()
     } catch (e) {
       toast.error(errorText(e))
     } finally {
       setBusy(false)
+    }
+  }
+
+  const choose = async (gap: ReviewGap) => {
+    try {
+      setChecklist(await loadCoverage(path, gap.server))
+    } catch (e) {
+      toast.error(errorText(e))
     }
   }
 
@@ -180,6 +207,7 @@ export function RuleEditor({
           />
         </div>
       )}
+      {gaps.length > 0 && <ReviewGaps gaps={gaps} onChoose={(gap) => void choose(gap)} />}
       <form
         className="flex flex-wrap items-center gap-2 px-3 py-2.5"
         onSubmit={(event) => {
@@ -223,6 +251,25 @@ export function RuleEditor({
           Add
         </Button>
       </form>
+      {unlisted !== '' && (
+        <p role="status" className="px-3 pb-2.5 text-2xs text-muted-foreground">
+          {unlisted}
+        </p>
+      )}
+      {checklist !== null && (
+        <ReviewChecklist
+          key={`${checklist.server} ${checklist.tool ?? ''}`}
+          coverage={checklist}
+          path={path}
+          onClose={() => {
+            setChecklist(null)
+          }}
+          onAdded={() => {
+            setText('')
+            onChange()
+          }}
+        />
+      )}
     </>
   )
 }
