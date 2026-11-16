@@ -17,8 +17,8 @@ import {
   unitName,
   type ScopeHost,
 } from './memory-scope.js'
-import { oomRun, oomScriptArgs } from './oom-fixtures.js'
-import { TOOL_OOM_ADJ } from './oom-guard.js'
+import { oomRun, oomRunBlocked, oomScriptArgs } from './oom-fixtures.js'
+import { kernelOomKills, TOOL_OOM_ADJ } from './oom-guard.js'
 import { applyCaps, scopeMemory } from './scope-limits.js'
 import { agentEnv } from './session-options.js'
 
@@ -107,6 +107,11 @@ const NO_CPU_CAP = { quota_percent: null }
 /** Allocates 256 MB a megabyte at a time, far past the 64 MB cap the test gives it. */
 const ALLOCATE = 'const a = []; for (let i = 0; i < 256; i++) a.push(Buffer.alloc(1 << 20, 1))'
 
+/** Runs its argument as a tool, and exits cleanly the moment the tool is gone. */
+const EXIT_AFTER_TOOL = `require('node:child_process')
+  .spawn(process.execPath, ['-e', process.argv[1]], { stdio: 'ignore' })
+  .on('close', () => process.exit(0))`
+
 describe.skipIf(host === null)('a scope on this host', () => {
   it('stops a process over its cap inside the scope and notes it in the transcript', async ({ skip }) => {
     if (host === null) {
@@ -137,6 +142,43 @@ describe.skipIf(host === null)('a scope on this host', () => {
       { timeout: 5000 },
     )
     expect(scopeMemory(taskId)).toEqual([])
+  })
+
+  it('notes a tool stopped just before its scope ends by itself, though the scope is gone by then', async ({
+    skip,
+  }) => {
+    if (host === null || (await kernelOomKills('none.scope', Date.now())) === null) {
+      skip()
+      return
+    }
+    const taskId = 'memory-scope-clean-exit'
+    const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'seti-memory-scope-'))
+    await tasks.insert({ id: taskId, title: 'Memory', repo_id: null, cwd, worktree: false, pr_urls: [] })
+    recordMemoryEvents()
+    const cap = { high_mb: 64, max_mb: 64, swap_max_mb: 0 }
+    const child = launch(
+      { host, taskId, kind: 'shell', cap, cpu: NO_CPU_CAP },
+      process.execPath,
+      ['-e', EXIT_AFTER_TOOL, ALLOCATE],
+      (command, args) =>
+        spawn(command, args, { env: { ...process.env, XDG_RUNTIME_DIR: host.runtimeDir }, stdio: 'ignore' }),
+    )
+    const ended = once(child, 'exit')
+    await vi.waitFor(() => {
+      expect(scopeMemory(taskId)).toHaveLength(1)
+    })
+    // Seti hears nothing while the tool is stopped and the scope goes, as on a busy host.
+    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 1000)
+    const [code, signal] = (await ended) as [number | null, string | null]
+    expect({ code, signal }).toEqual({ code: 0, signal: null })
+    await vi.waitFor(
+      async () => {
+        const notes = (await messages.page(taskId, 10)).messages.filter((row) => row.kind === 'seti')
+        expect(notes.map((row) => row.payload)).toEqual([expect.objectContaining({ memory: 'oom_kill' })])
+      },
+      { timeout: 5000 },
+    )
+    fs.rmSync(cwd, { recursive: true, force: true })
   })
 
   /** Runs the Claude Code stand-in in a 300 MB agent scope until its tool is stopped. */
@@ -185,8 +227,9 @@ describe.skipIf(host === null)('a scope on this host', () => {
   const limit = "the agent's process tree hit its 300 MB memory cap"
 
   it('stops a tool the guard raised, not the larger process the scope started, and notes it once', async ({ skip }) => {
-    if (host === null) {
-      skip()
+    const blocked = oomRunBlocked()
+    if (host === null || blocked !== null) {
+      skip(blocked ?? undefined)
       return
     }
     expect([`hog was stopped: ${limit}`, `A process was stopped: ${limit}`]).toContain(
@@ -197,8 +240,9 @@ describe.skipIf(host === null)('a scope on this host', () => {
   it('starts a command at the raised adj, so one filling the cap at once is stopped, not the root', async ({
     skip,
   }) => {
-    if (host === null) {
-      skip()
+    const blocked = oomRunBlocked()
+    if (host === null || blocked !== null) {
+      skip(blocked ?? undefined)
       return
     }
     const named = ['rush', 'MainThread', 'node', 'A process'].map((name) => `${name} was stopped: ${limit}`)

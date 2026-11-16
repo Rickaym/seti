@@ -246,8 +246,10 @@ that scope instead of earlyoom picking a large process anywhere on the host.
 - Seti watches each scope's `memory.events`; kills in one burst become one note in the agent's
   transcript. Where the kernel log is readable (`journalctl -k`), the note names what was stopped
   ("tsc was stopped: the agent's process tree hit its 6 GB memory cap"); otherwise /proc tells
-  whether Claude Code itself died, which ends the turn. The Processes view shows the scope's memory
-  against its cap.
+  whether Claude Code itself died, which ends the turn. A scope is gone the moment its last process
+  exits, sometimes before Seti read its last counts; when the run was killed, or the scope's parent
+  counted a kill the scope never showed, Seti asks the kernel log for it. The Processes view shows
+  the scope's memory against its cap.
 - The agent learns its cap from its system prompt and `SETI_MEMORY_CAP_MB`, and Node tools default
   to a heap of 70% of the cap through `NODE_OPTIONS`; a heap size the agent sets wins.
 - `MemoryHigh` is `infinity` by default. Throttling only reclaims what can be reclaimed: with swap
