@@ -151,6 +151,22 @@ describe('channel seti tools', () => {
     expect(created.next_run_at).toBe(nextRunTimes('0 9 * * 1-5', 'Europe/Berlin', 1)[0])
     const made = await auditEvents.latest('system.channel_created')
     expect(made).toMatchObject({ subject_id: created.id, detail: { cron: '0 9 * * 1-5 (Europe/Berlin)' } })
+    const slots = nextRunTimes('0 9 * * 1-5', 'Europe/Berlin', 5)
+    expect(created.upcoming).toEqual(slots)
+    const upcoming = (await call(caller, 'list_channels', { upcoming: true })).json() as {
+      next_runs: { at: string; channel: string; source: string; runs: string }[]
+      paused: string[]
+    }
+    expect(upcoming.next_runs.filter((run) => run.channel === 'Standup')).toEqual(
+      slots.map((at) => ({ at, channel: 'Standup', source: 'reminder', runs: 'cron 0 9 * * 1-5 (Europe/Berlin)' })),
+    )
+    const times = upcoming.next_runs.map((run) => Date.parse(run.at))
+    expect(times).toEqual([...times].sort((a, b) => a - b))
+    await call(caller, 'update_channel', { channel: 'Standup', active: false })
+    const whilePaused = (await call(caller, 'list_channels', { upcoming: true })).json() as typeof upcoming
+    expect(whilePaused.paused).toContain('Standup')
+    expect(whilePaused.next_runs.some((run) => run.channel === 'Standup')).toBe(false)
+    await call(caller, 'update_channel', { channel: 'Standup', active: true })
 
     const update = async (args: object) => call(caller, 'update_channel', { channel: 'Standup', ...args })
     expect((await update({ cron: '30 8 * * *' })).json()).toMatchObject({

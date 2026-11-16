@@ -70,6 +70,7 @@ export const pollerView = (info: PollerChannelInfo, withScript = true) => {
     failures: poller.failures,
     last_run_at: poller.last_run_at,
     next_run_at: poller.next_run_at,
+    ...(withScript ? { upcoming: poller.upcoming } : {}),
     keys: poller.keys,
     subscribers: info.subscriptions.map(subscriberView),
     ...(withScript ? { script: poller.script.slice(0, SCRIPT_SHOWN) } : {}),
