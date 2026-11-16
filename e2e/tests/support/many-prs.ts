@@ -59,7 +59,7 @@ export async function mockManyStatuses(page: Page, count = MANY_PRS): Promise<vo
       .filter((n) => stateOf(n) === 'open')
       .map(openPr)
       .filter((pr) => asked.has(pr.url))
-    await route.fulfill({ json: { data: prs, meta: {} } })
+    await route.fulfill({ json: { data: { prs, pending: [] }, meta: {} } })
   })
 }
 

@@ -16,9 +16,19 @@ export interface LinkedPr {
   number: number
   /** Live status while the PR is open and GitHub shows it to Seti. */
   pr: PullRequest | null
+  /** True while the status was asked for and has not arrived. */
+  loading: boolean
   group: LinkedPrGroup
   /** Position in link order; later links count as more recent when no update time is known. */
   linked: number
+}
+
+const NO_LOADING: ReadonlySet<string> = new Set()
+
+/** The statuses that arrived, and the URLs still waiting for one. */
+export interface LiveStatuses {
+  statuses: ReadonlyMap<string, PullRequest>
+  loading?: ReadonlySet<string>
 }
 
 const URL_PARTS = /github\.com\/([\w.-]+\/[\w.-]+)\/pull\/(\d+)$/
@@ -44,7 +54,7 @@ function byRelevance(a: LinkedPr, b: LinkedPr): number {
 /** Linked PRs to fix first, then open, merged and closed; the most recent first within each. */
 export function orderLinkedPrs(
   urls: readonly string[],
-  statuses: ReadonlyMap<string, PullRequest>,
+  { statuses, loading = NO_LOADING }: LiveStatuses,
   states: Readonly<Record<string, LinkedPrState>>,
   homeSlug: string | null,
 ): LinkedPr[] {
@@ -58,6 +68,7 @@ export function orderLinkedPrs(
         slug,
         number: Number(number),
         pr,
+        loading: pr === null && loading.has(url),
         group: groupOf(pr, states[url]),
         linked,
       }

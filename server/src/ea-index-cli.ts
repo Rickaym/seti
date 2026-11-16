@@ -35,7 +35,8 @@ async function main(): Promise<void> {
       say(
         `Search: ${status.vector ? 'vector and full text' : 'full text only'}; embeddings ${status.embeddings ? 'on' : 'off'}.`,
       )
-      const prs = await indexPrs(await cachedOpenPrs()).catch(() => 0)
+      const detailed = (await cachedOpenPrs()).filter((pr) => pr.body !== undefined)
+      const prs = await indexPrs(detailed).catch(() => 0)
       const result = await backfillIndex((done, total) => {
         if (done === total || done % 25 === 0) {
           say(`Indexed ${String(done)} of ${String(total)} tasks`)

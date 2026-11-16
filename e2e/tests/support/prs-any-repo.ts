@@ -77,11 +77,11 @@ export async function expectListedWithoutRepos(request: APIRequestContext, seede
       const list = await apiData<PrList>(request, '/prs')
       return list.prs
         .filter((pr) => pr.url === linked.url || pr.url === authored.url)
-        .map((pr) => [pr.repo_slug, pr.title, pr.ci, pr.unresolved_threads, pr.tasks.map((task) => task.id)])
+        .map((pr) => [pr.repo_slug, pr.title, pr.ci, pr.tasks.map((task) => task.id)])
     })
     .toEqual([
-      [authored.slug, authored.title, 'success', 0, []],
-      [linked.slug, linked.title, 'failure', 1, [agent.id]],
+      [authored.slug, authored.title, 'success', []],
+      [linked.slug, linked.title, 'failure', [agent.id]],
     ])
   expect((await apiData<PrList>(request, '/prs')).viewer).toBe(VIEWER)
 }

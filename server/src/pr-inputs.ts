@@ -7,6 +7,7 @@ import { deliverInputs } from './inputs.js'
 import { unlinkEndedPrs } from './pr-ended.js'
 import { freshPosts, prEvents, type PrPost, type PrSnapshot } from './pr-events.js'
 import { agentPosts } from './pr-self.js'
+import { prChanged } from './prs.js'
 import { openQuerySince } from './runner.js'
 import { prHeld, type HeldGroup, type HeldInput } from './store/pr-held.js'
 import { prWatch, type PrListener } from './store/pr-watch.js'
@@ -63,6 +64,8 @@ export interface PrInputDeps {
   eaWatchers?: (url: string) => Promise<string[]>
   notifyEa?: (taskId: string, inputs: readonly PrInput[]) => Promise<void>
   onError: (error: unknown) => void
+  /** Hears each PR whose state, CI, reviews or comments changed since the last poll. */
+  changed?: (url: string) => Promise<void>
   /** False while the GitHub budget is too low to spend on polling; the poll waits a turn. */
   canPoll?: () => Promise<boolean>
   /** Holds updates while the subagent that owns the PR runs; without it they go out at once. */
@@ -131,6 +134,7 @@ export function createPrInputPoller(deps: PrInputDeps) {
       const { inputs, next } = prEvents(previous, pr, own, now())
       await deps.save(url, next)
       if (inputs.length > 0) {
+        await deps.changed?.(url)
         for (const listener of await deps.listeners(url)) {
           const routedInputs = await routed(listener, inputs)
           if (routedInputs !== null) {
@@ -213,6 +217,7 @@ export const prInputs = createPrInputPoller({
   unlinkEnded: unlinkEndedPrs,
   eaWatchers: prWatch.eaWatchers,
   notifyEa: watchPrInputs,
+  changed: prChanged,
   canPoll: async () => canPollGithub(),
   held: prHeld,
   onError: (error) => {

@@ -1,38 +1,50 @@
-import { pullRequestsSchema, type PullRequest } from '@seti/shared'
-import { useCallback, useEffect, useState } from 'react'
-import { apiPost, readResponse } from '@/api'
+import type { PullRequest } from '@seti/shared'
+import { useCallback, useEffect, useMemo, useSyncExternalStore } from 'react'
+import {
+  prStatus,
+  prStatusVersion,
+  reloadPrStatuses,
+  subscribePrStatuses,
+  watchPrStatuses,
+} from '@/panels/tasks/pr-status-store'
 
-const NONE: ReadonlyMap<string, PullRequest> = new Map()
+const NO_URLS: readonly string[] = []
 
-/** Live status of the open PRs among the URLs, in one request for the whole set. */
-export function usePrStatuses(urls: readonly string[]): {
+export interface PrStatuses {
+  /** The open PRs among the URLs whose status has arrived. */
   statuses: ReadonlyMap<string, PullRequest>
+  /** URLs asked for and not answered yet; the rest without a status are no open PR. */
+  loading: ReadonlySet<string>
   reload: () => void
-} {
-  const [statuses, setStatuses] = useState(NONE)
-  const [round, setRound] = useState(0)
-  const key = urls.toSorted((a, b) => a.localeCompare(b)).join('\n')
+}
 
-  useEffect(() => {
-    if (key === '') {
-      return
+/**
+ * Live status of the open PRs among the URLs, shared by every view that shows them: one request
+ * for all, asked again until GitHub answered and every minute while the page is on screen.
+ */
+export function usePrStatuses(urls: readonly string[]): PrStatuses {
+  const key = urls.toSorted((a, b) => a.localeCompare(b)).join('\n')
+  const version = useSyncExternalStore(subscribePrStatuses, prStatusVersion)
+
+  useEffect(() => (key === '' ? undefined : watchPrStatuses(key.split('\n'))), [key])
+
+  const { statuses, loading } = useMemo(() => {
+    const ready = new Map<string, PullRequest>()
+    const waiting = new Set<string>()
+    for (const url of key === '' ? NO_URLS : key.split('\n')) {
+      const status = prStatus(url)
+      if (status.state === 'ready') {
+        ready.set(url, status.pr)
+      } else if (status.state === 'loading') {
+        waiting.add(url)
+      }
     }
-    let live = true
-    apiPost<unknown>('/prs/lookup', { urls: key.split('\n') })
-      .then((body) => {
-        if (live) {
-          setStatuses(new Map(readResponse('/prs/lookup', pullRequestsSchema, body).map((pr) => [pr.url, pr])))
-        }
-      })
-      // A failed lookup keeps the last statuses; the chips still link and unlink without them.
-      .catch(() => undefined)
-    return () => {
-      live = false
-    }
-  }, [key, round])
+    return { statuses: ready, loading: waiting }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the store's version says when to read it again
+  }, [key, version])
 
   const reload = useCallback(() => {
-    setRound((n) => n + 1)
-  }, [])
-  return { statuses: key === '' ? NONE : statuses, reload }
+    reloadPrStatuses(key === '' ? NO_URLS : key.split('\n'))
+  }, [key])
+  return { statuses, loading, reload }
 }

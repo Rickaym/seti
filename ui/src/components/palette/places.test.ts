@@ -4,7 +4,7 @@ import {
   prStates,
   type ContextPack,
   type PrList,
-  type PullRequest,
+  type PrRow,
   type TaskListEntry,
 } from '@seti/shared'
 import { describe, expect, it, vi } from 'vitest'
@@ -99,7 +99,7 @@ describe('other places', () => {
   it('names pull requests by title with repo#number below and opens them on GitHub', () => {
     const url = 'https://github.com/Octocat/seti/pull/42'
     const pr = { key: 'k1', repo_slug: 'Octocat/seti', number: 42, title: 'Palette', draft: false, author: 'me', url }
-    const list = { prs: [pr as PullRequest] } as PrList
+    const list = { prs: [pr as PrRow] } as PrList
     const places = prPlaces(list)
     expect(places).toMatchObject([{ id: `pr:${url}`, title: 'Palette', detail: 'Octocat/seti#42' }])
     const open = vi.fn()

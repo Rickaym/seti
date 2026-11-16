@@ -57,7 +57,7 @@ test('a linked PR with a null preview leaves the agent header and the rest of th
   }
   await db.close()
   await page.route(/\/api\/prs\/lookup$/, async (route) => {
-    await route.fulfill({ json: { data: MALFORMED } })
+    await route.fulfill({ json: { data: { prs: MALFORMED, pending: [] } } })
   })
   await page.goto(`/#agents/${id}`)
   const main = page.getByRole('main')

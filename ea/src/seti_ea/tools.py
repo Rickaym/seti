@@ -367,7 +367,7 @@ TOOL_SPECS: list[ToolSpec] = [
     ToolSpec(
         "list_prs",
         "List the user's open pull requests and those agents opened or linked, in any repo, with CI, "
-        "review, preview and linked tasks.",
+        "review and linked tasks. Use get_pr for one PR's failing checks, review threads and preview.",
     ),
     ToolSpec(
         "get_pr",
@@ -1107,13 +1107,12 @@ class EaTools:
         if not urls:
             return ["No linked PRs."]
         try:
-            open_prs = {str(p.get("url")): p for p in self._prs_of(await self._open_prs())}
+            found = await asyncio.gather(*(self._seti.get("/prs/by-url", {"url": url}) for url in urls))
         except SetiError as e:
             return [f"{plural(len(urls), 'linked PR')}, status unavailable: {e.title}."]
         lines = [f"{plural(len(urls), 'linked PR')}:"]
-        for url in urls:
-            pr = open_prs.get(url)
-            if pr is None:
+        for url, pr in zip(urls, found, strict=True):
+            if not isinstance(pr, dict):
                 lines.append(f"- {pr_label(url)}: not open, or GitHub gave no status")
             else:
                 lines.append(f"- {pr_line(pr)}")
@@ -1472,8 +1471,19 @@ class EaTools:
                     pass
         return "; ".join(words[:2])
 
+    async def pr_detail(self, ref: str) -> dict[str, Any]:
+        """The open PR ref names with its checks, review threads, labels, preview and related PRs."""
+        row = await self.resolve_pr(ref)
+        pr = await self._seti.get("/prs/by-url", {"url": str(row.get("url", ""))})
+        if not isinstance(pr, dict):
+            label = pr_label(str(row.get("url", "")))
+            raise ToolError(
+                f"GitHub gave no detail for {label}; it may have just closed.", f"No detail for {label}"
+            )
+        return pr
+
     async def get_pr(self, args: Mapping[str, Any]) -> ToolResult:
-        pr = await self.resolve_pr(arg_str(args, "pr"))
+        pr = await self.pr_detail(arg_str(args, "pr"))
         now = self._now()
         label = pr_label(str(pr.get("url", "")))
         author = f", by {pr.get('author')}" if pr.get("author") else ""

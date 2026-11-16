@@ -451,6 +451,8 @@ class Resolver(Protocol):
 
     async def resolve_pr(self, ref: str) -> dict[str, Any]: ...
 
+    async def pr_detail(self, ref: str) -> dict[str, Any]: ...
+
     async def resolve_subtask(self, task: Mapping[str, Any], ref: str) -> dict[str, Any]: ...
 
 
@@ -1125,21 +1127,13 @@ class AgentActions:
         )
 
     async def request_preview(self, args: Mapping[str, Any]) -> ToolResult:
-        pr = await self._find.resolve_pr(arg_str(args, "pr"))
+        pr = await self._find.pr_detail(arg_str(args, "pr"))
         label = pr_label(str(pr.get("url", "")))
         listing = await self._seti.get("/prs")
         if isinstance(listing, dict) and listing.get("previews_on") is False:
             raise ToolError(
                 "PR previews are off in Seti. The user can turn them on in Settings, Mods.",
                 "PR previews are off",
-            )
-        listed = dicts(listing.get("prs")) if isinstance(listing, dict) else []
-        siblings = [p for p in listed if p.get("repo_slug") == pr.get("repo_slug")]
-        if not any((p.get("preview") or {}).get("state") not in (None, "none") for p in siblings):
-            raise ToolError(
-                f"Seti has no previews for {repo_name(str(pr.get('repo_slug', '')))}, so it offers no "
-                "Preview action there.",
-                "No previews for that repo",
             )
         labels = [str(x).lower() for x in pr.get("labels") or []]
         relabel = PREVIEW_LABEL in labels

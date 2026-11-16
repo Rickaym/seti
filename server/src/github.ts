@@ -19,7 +19,7 @@ import { cache } from './redis.js'
 
 const exec = promisify(execFile)
 
-/** Every field of an open PR the views read; both the search and the URL lookup select it. */
+/** Every field of an open PR's detail, which the URL lookup selects. */
 const OPEN_PR_FIELDS = `number title body url state isDraft headRefName baseRefName headRefOid updatedAt
   reviewDecision mergeable
   repository { nameWithOwner }
@@ -28,17 +28,6 @@ const OPEN_PR_FIELDS = `number title body url state isDraft headRefName baseRefN
   commits(last: 1) { nodes { commit { ${ROLLUP_FIELDS} } } }
   comments(last: 30) { nodes { author { login } body updatedAt } }
   ${THREAD_FIELDS}`
-
-/** The open PRs the gh login wrote, in any repo, newest first. */
-const AUTHORED_SEARCH = 'is:pr is:open author:@me sort:updated-desc'
-
-const SEARCH_QUERY = `query($q: String!, $after: String) {
-  search(type: ISSUE, query: $q, first: 50, after: $after) {
-    issueCount
-    pageInfo { hasNextPage endCursor }
-    nodes { ... on PullRequest { ${OPEN_PR_FIELDS} } }
-  }
-}`
 
 const login = z.object({ login: z.string() }).nullable()
 
@@ -74,22 +63,11 @@ const ghPullRequest = z.object({
 })
 type GhPullRequest = z.infer<typeof ghPullRequest>
 
-const ghSearchResponse = z.object({
-  data: z.object({
-    search: z.object({
-      issueCount: z.number().int(),
-      pageInfo: z.object({ hasNextPage: z.boolean(), endCursor: z.string().nullable() }),
-      nodes: z.array(z.unknown()),
-    }),
-  }),
-})
-
 /** A PR as GitHub reports it, with its text and references; tasks and relations come later. */
 export type OpenPr = Omit<PullRequest, 'tasks' | 'related'> & { refs: PrRef[]; body?: string }
 
-function mergeable(value: string): Mergeable {
-  return value === 'MERGEABLE' || value === 'CONFLICTING' ? (value.toLowerCase() as Mergeable) : 'unknown'
-}
+export const toMergeable = (value: string): Mergeable =>
+  value === 'MERGEABLE' || value === 'CONFLICTING' ? (value.toLowerCase() as Mergeable) : 'unknown'
 
 function toOpenPr(pr: GhPullRequest): OpenPr {
   const slug = pr.repository.nameWithOwner
@@ -117,7 +95,7 @@ function toOpenPr(pr: GhPullRequest): OpenPr {
     head_oid: pr.headRefOid,
     updated_at: pr.updatedAt,
     review_decision: pr.reviewDecision === null ? null : (pr.reviewDecision.toLowerCase() as ReviewDecision),
-    mergeable: mergeable(pr.mergeable),
+    mergeable: toMergeable(pr.mergeable),
     labels: pr.labels.nodes.map((l) => l.name),
     ...readRollup(rollup),
     unresolved_threads: unresolvedThreads(pr.reviewThreads),
@@ -126,35 +104,6 @@ function toOpenPr(pr: GhPullRequest): OpenPr {
     body: pr.body,
   }
 }
-
-/** One page of the login's open PRs, how many GitHub has in all, and the cursor of the next page. */
-export interface AuthoredPage {
-  prs: OpenPr[]
-  total: number
-  next: string | null
-}
-
-const isNode = (node: unknown) => typeof node === 'object' && node !== null && Object.keys(node).length > 0
-
-export function parseSearchResponse(stdout: string): AuthoredPage {
-  const { issueCount, pageInfo, nodes } = ghSearchResponse.parse(JSON.parse(stdout)).data.search
-  const found = nodes.filter(isNode).map((node) => ghPullRequest.parse(node))
-  return {
-    prs: found.filter((pr) => pr.state === 'OPEN').map(toOpenPr),
-    total: issueCount,
-    next: pageInfo.hasNextPage ? pageInfo.endCursor : null,
-  }
-}
-
-export const searchQueryArgs = (after: string | null = null): string[] => [
-  'api',
-  'graphql',
-  '-f',
-  `query=${SEARCH_QUERY}`,
-  '-f',
-  `q=${AUTHORED_SEARCH}`,
-  ...(after === null ? [] : ['-f', `after=${after}`]),
-]
 
 const labelsPath = (slug: string, number: number) => `repos/${slug}/issues/${String(number)}/labels`
 
@@ -197,10 +146,6 @@ export async function gh(args: string[]): Promise<string> {
     throw new Error(stderr === '' ? `gh ${args[0] ?? ''} failed` : stderr, { cause: e })
   }
 }
-
-/** One page of the search for the open PRs the gh login wrote; it runs as the host gh login. */
-export const fetchAuthoredPage = async (after: string | null): Promise<AuthoredPage> =>
-  parseSearchResponse(await gh(searchQueryArgs(after)))
 
 let viewer: Promise<string> | null = null
 
@@ -418,15 +363,15 @@ export const openPrQueryArgs = (urls: readonly string[]) => resourceQueryArgs(ur
 
 const parseListed = (node: unknown) => ghPullRequest.parse(node)
 
-const openOnes = (found: ReadonlyMap<string, GhPullRequest | null>): OpenPr[] =>
-  [...found.values()].flatMap((pr) => (pr?.state === 'OPEN' ? [toOpenPr(pr)] : []))
+const openOrNull = (found: ReadonlyMap<string, GhPullRequest | null>): Map<string, OpenPr | null> =>
+  new Map([...found].map(([url, pr]) => [url, pr?.state === 'OPEN' ? toOpenPr(pr) : null]))
 
 export const parseOpenPrResponse = (urls: readonly string[], stdout: string) =>
-  openOnes(parseResources(urls, stdout, parseListed))
+  openOrNull(parseResources(urls, stdout, parseListed))
 
-/** The PRs among the URLs that are open, in any repo gh can read; the rest are left out. */
-export const fetchOpenPrsByUrl = async (urls: readonly string[]) =>
-  openOnes(await fetchResources(urls, OPEN_PR_FIELDS, parseListed))
+/** The detail of each URL's PR while it is open in a repo gh can read, else null. */
+export const fetchPrDetails = async (urls: readonly string[]) =>
+  openOrNull(await fetchResources(urls, OPEN_PR_FIELDS, parseListed))
 
 export const fetchWatchedPrs = async (urls: readonly string[]) => fetchResources(urls, WATCH_FIELDS, parseWatched)
 

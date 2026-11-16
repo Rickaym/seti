@@ -87,7 +87,7 @@ test('linked PR rows reach 44px and an unlink can be undone', async ({ page, req
   const id = await seedTask(unique('Touch linked'))
   expect((await request.post(`/api/tasks/${id}/prs`, { data: { url: PR_URL } })).ok()).toBe(true)
   await page.route(/\/api\/prs\/lookup$/, async (route) => {
-    await route.fulfill({ json: { data: [failingPr], meta: {} } })
+    await route.fulfill({ json: { data: { prs: [failingPr], pending: [] }, meta: {} } })
   })
   await page.goto(`/#agents/${id}`)
   const sheet = await openAgentPrs(page)

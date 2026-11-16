@@ -38,6 +38,8 @@ const NO_STATUS: Record<LinkedPr['group'], string> = {
   closed: 'Closed',
 }
 
+const LOADING_STATUS = 'Loading status'
+
 function PrChip({ item, path, owner, agent, onChanged, bare = false }: ChipProps) {
   const { pr, label } = item
   const unlink = (
@@ -64,7 +66,8 @@ function PrChip({ item, path, owner, agent, onChanged, bare = false }: ChipProps
         href={item.url}
         target="_blank"
         rel="noreferrer"
-        title={pr?.title ?? NO_STATUS[item.group]}
+        title={pr?.title ?? (item.loading ? LOADING_STATUS : NO_STATUS[item.group])}
+        aria-busy={item.loading || undefined}
       >
         <ScrollOnHover text={label} title={null} />
       </a>
@@ -140,8 +143,11 @@ interface ChipRowProps {
 
 /** Linked PRs on one line, the most pressing first; the rest open from "+N more". */
 function PrChipRow({ urls, states, homeSlug, path, owner, agent, limit, picker, className, testId }: ChipRowProps) {
-  const { statuses, reload } = usePrStatuses(urls)
-  const ordered = useMemo(() => orderLinkedPrs(urls, statuses, states, homeSlug), [urls, statuses, states, homeSlug])
+  const { statuses, loading, reload } = usePrStatuses(urls)
+  const ordered = useMemo(
+    () => orderLinkedPrs(urls, { statuses, loading }, states, homeSlug),
+    [urls, statuses, loading, states, homeSlug],
+  )
   const candidates = ordered.slice(0, limit)
   const { row, chips, mores, fit } = useFittedCount(candidates.length)
   const chip = (item: LinkedPr) => (

@@ -1,11 +1,12 @@
 import { CircleX, GitMerge, GitPullRequest, GitPullRequestClosed, List, Plus, X, type LucideIcon } from 'lucide-react'
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 import { Hint } from '@/components/Hint'
 import { ScrollOnHover } from '@/components/ScrollOnHover'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet'
+import { useBatches } from '@/hooks/useBatches'
 import { useNarrow } from '@/hooks/useMedia'
 import { refreshTasks } from '@/hooks/useTasks'
 import { relativeTime } from '@/lib/time'
@@ -53,6 +54,13 @@ function RowMeta({ item: { pr, slug, number } }: { item: LinkedPr }) {
   )
 }
 
+const noStatus = (item: LinkedPr, title: string) => {
+  if (item.loading) {
+    return 'Loading status'
+  }
+  return item.group === 'open' ? 'No status from GitHub' : title
+}
+
 function LinkedPrRow({ item, path, owner, agent, onChanged, onSent }: RowProps) {
   const { pr } = item
   const { icon: Icon, className, title } = GROUP[item.group]
@@ -74,7 +82,7 @@ function LinkedPrRow({ item, path, owner, agent, onChanged, onSent }: RowProps) 
             />
             <ScrollOnHover
               className={cn((pr === null || draft) && 'text-muted-foreground')}
-              text={pr?.title ?? (item.group === 'open' ? 'No status from GitHub' : title)}
+              text={pr?.title ?? noStatus(item, title)}
             />
           </span>
           <RowMeta item={item} />
@@ -100,32 +108,10 @@ function LinkedPrRow({ item, path, owner, agent, onChanged, onSent }: RowProps) 
   )
 }
 
-/** Grows the mounted row count by a batch each time the sentinel scrolls into view. */
-function useBatches(total: number) {
-  const [shown, setShown] = useState(BATCH)
-  const sentinel = useRef<HTMLDivElement>(null)
-  useEffect(() => {
-    const node = sentinel.current
-    if (node === null || shown >= total) {
-      return
-    }
-    const observer = new IntersectionObserver((entries) => {
-      if (entries.some((entry) => entry.isIntersecting)) {
-        setShown((n) => n + BATCH)
-      }
-    })
-    observer.observe(node)
-    return () => {
-      observer.disconnect()
-    }
-  }, [shown, total])
-  return { shown, sentinel }
-}
-
 type RowsProps = Omit<RowProps, 'item'> & { matches: readonly LinkedPr[] }
 
 function GroupedRows({ matches, ...shared }: RowsProps) {
-  const { shown, sentinel } = useBatches(matches.length)
+  const { shown, sentinel } = useBatches(matches.length, BATCH)
   const mounted = matches.slice(0, shown)
   const groups = LINKED_PR_GROUPS.map((group) => ({
     group,
