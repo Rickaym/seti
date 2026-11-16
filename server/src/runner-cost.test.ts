@@ -3,7 +3,6 @@ import { describe, expect, it, vi } from 'vitest'
 import { messages, tasks } from './db.js'
 import type { FakeSession } from './fake-sdk.js'
 import { endSession, runTurn, stopTurn } from './runner.js'
-import { restartSession } from './session-restart.js'
 import { waitIdle } from './wait-idle.js'
 
 /**
@@ -142,20 +141,6 @@ describe('the cost of an agent', () => {
     expect(cost).toBeLessThanOrEqual(0.9375)
     expect(cost).toBeCloseTo(0.8125)
     expect(await turnCosts(id)).toEqual([0.5, 0.25, null, 0.0625])
-  })
-
-  it('counts a fresh session from zero on top of what the agent spent before', async () => {
-    const id = await newTask()
-    await turn(id, 'spend 0.5')
-    const task = await tasks.get(id)
-    if (task === undefined) {
-      throw new Error('task missing')
-    }
-    await restartSession(task, { interrupt: false, fresh: true })
-    const fresh = await turn(id, 'spend 0.25')
-    expect(fresh.options.resume).toBeUndefined()
-    await turn(id, 'spend 0.25')
-    expect(await costOf(id)).toBeCloseTo(1)
   })
 
   it('counts what background subagents spent after a result with the next one', async () => {

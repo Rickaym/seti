@@ -55,7 +55,7 @@ export async function expectGroupedSettings(dialog: Locator): Promise<void> {
     const panel = await showSection(dialog, name)
     await expect(panel.locator('dt')).toHaveText([...rows])
     const body = await panel.boundingBox()
-    for (const action of ['Restart session', 'Fresh session', 'Archive']) {
+    for (const action of ['Restart session', 'Archive']) {
       const button = dialog.getByRole('button', { name: action, exact: true })
       await expect(button, `${action} on ${name}`).toBeInViewport()
       const box = await button.boundingBox()
@@ -65,24 +65,15 @@ export async function expectGroupedSettings(dialog: Locator): Promise<void> {
   await expectLifecycleFooter(dialog)
 }
 
-/** Restart and Fresh side by side with their consequences, Archive apart below them. */
+/** Restart and Archive side by side, each with its consequence. */
 async function expectLifecycleFooter(dialog: Locator): Promise<void> {
   const footer = dialog.getByRole('group', { name: 'Lifecycle' })
+  await expect(footer.getByRole('button')).toHaveText(['Restart session', 'Archive'])
   const restart = footer.getByRole('button', { name: 'Restart session', exact: true })
-  const fresh = footer.getByRole('button', { name: 'Fresh session', exact: true })
   const archive = footer.getByRole('button', { name: 'Archive', exact: true })
   await expect(restart).toHaveAccessibleDescription(/^Keeps the conversation/)
-  await expect(fresh).toHaveAccessibleDescription(/^Forgets the conversation/)
   await expect(archive).toHaveAccessibleDescription(/^(Leaves the list|Stop the agent)/)
-  const destructive = await fresh.evaluate((element) => {
-    const probe = document.createElement('span')
-    probe.className = 'text-destructive'
-    element.append(probe)
-    const color = getComputedStyle(probe).color
-    probe.remove()
-    return color
-  })
-  await expect(fresh).toHaveCSS('color', destructive)
-  const [freshBox, archiveBox] = [await fresh.boundingBox(), await archive.boundingBox()]
-  expect(archiveBox?.y ?? 0).toBeGreaterThan((freshBox?.y ?? 0) + (freshBox?.height ?? 0))
+  const [restartBox, archiveBox] = [await restart.boundingBox(), await archive.boundingBox()]
+  expect(archiveBox?.y).toBe(restartBox?.y)
+  expect(archiveBox?.x ?? 0).toBeGreaterThan((restartBox?.x ?? 0) + (restartBox?.width ?? 0))
 }

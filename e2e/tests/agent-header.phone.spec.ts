@@ -104,7 +104,7 @@ test('agent settings open as a bottom sheet with every row and action in reach',
   const edges = await edgesAtRest(page, sheet)
   expect(edges.top).toBeGreaterThan(0)
   expect(edges.bottom).toBeLessThanOrEqual(viewport(page).height + 1)
-  for (const name of ['Restart session', 'Fresh session', 'Archive']) {
+  for (const name of ['Restart session', 'Archive']) {
     const button = sheet.getByRole('button', { name, exact: true })
     await expect(button).toBeInViewport({ ratio: 1 })
     expect((await box(button)).height, name).toBeGreaterThanOrEqual(TARGET_PX)

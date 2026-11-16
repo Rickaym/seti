@@ -313,10 +313,6 @@ export const tasks = {
     await sql`UPDATE task SET session_id = ${session.sessionId}, permission_mode = ${session.permissionMode},
       model = ${session.model} WHERE id = ${id}`
   },
-  /** Forgets the session id, so the next process starts a new session instead of resuming. */
-  clearSession: async (id: string) => {
-    await sql`UPDATE task SET session_id = NULL WHERE id = ${id}`
-  },
   addOutward: async (id: string, count: number) => {
     await sql`UPDATE task SET outward_count = outward_count + ${count} WHERE id = ${id}`
   },

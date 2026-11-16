@@ -82,10 +82,9 @@ test('a sandbox switch during a turn offers to restart now so it applies at once
     .toEqual(['stopped', true])
 })
 
-test('restarts the open agent from the palette, and starts it fresh behind a warning', async ({ page, request }) => {
+test('restarts the open agent from the palette', async ({ page, request }) => {
   const { id, session } = await startSessionAgent(request)
   await page.goto(`/#agents/${id}`)
-  const main = page.getByRole('main')
   await expect(transcript(page)).toContainText(`Session ${session}, resumed none`)
 
   await page.keyboard.press('Control+k')
@@ -94,18 +93,5 @@ test('restarts the open agent from the palette, and starts it fresh behind a war
   const dialog = page.getByRole('dialog', { name: 'Restart session' })
   await dialog.getByRole('button', { name: 'Restart', exact: true }).click()
   await expect(toasts(page).filter({ hasText: 'Session restarted' })).toBeVisible()
-
-  await page.keyboard.press('Control+k')
-  await page.keyboard.type('>fresh session')
-  await page.keyboard.press('Enter')
-  const fresh = page.getByRole('dialog', { name: 'Start fresh session' })
-  await expect(fresh).toContainText('The agent forgets this conversation')
-  await fresh.getByRole('button', { name: 'Start fresh', exact: true }).click()
-  await expect(toasts(page).filter({ hasText: 'Fresh session started' })).toBeVisible()
-  await expect(transcript(page)).toContainText('Fresh session started')
-
-  await main.getByRole('combobox', { name: 'Reply' }).fill(`And now, ${SESSION_PROMPT}?`)
-  await main.getByRole('combobox', { name: 'Reply' }).press('Enter')
-  await expect(transcript(page)).toContainText(/Session [\w-]+, resumed none[\s\S]*Session [\w-]+, resumed none/)
-  expect((await apiData<Task>(request, `/tasks/${id}`)).session_id).not.toBe(session)
+  expect((await apiData<Task>(request, `/tasks/${id}`)).session_id).toBe(session)
 })
