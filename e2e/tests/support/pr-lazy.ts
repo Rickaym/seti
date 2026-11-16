@@ -5,12 +5,12 @@ import { openSeedDb } from './db.js'
 import { paths } from './env.js'
 import { linkPrs, pr, prUrl } from './pr-ci.js'
 
-export const LAZY = 'e2e/lazy'
+const LAZY = 'e2e/lazy'
 export const LATE = prUrl('e2e/late', 4)
 export const GONE = prUrl('e2e/late', 5)
 
 /** A PR's detail as the lookup answers it, with two unresolved review threads. */
-export const lazyDetail = (number: number): PullRequest => pr(LAZY, number, { unresolved_threads: 2 })
+const lazyDetail = (number: number): PullRequest => pr(LAZY, number, { unresolved_threads: 2 })
 
 /** The slim row the list sends for a PR: what a row shows, and none of its detail. */
 export function lazyRow(number: number): PrRow {
