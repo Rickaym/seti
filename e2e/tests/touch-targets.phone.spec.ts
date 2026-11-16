@@ -5,6 +5,7 @@ import { openSeedDb } from './support/db.js'
 import { paths } from './support/env.js'
 import { apiData, expect, test, unique } from './support/fixtures.js'
 import { openAgentPrs } from './support/phone-agent.js'
+import { settled } from './support/phone-layout.js'
 import { BURST, seedToolBurst } from './support/tool-groups.js'
 
 const TARGET_PX = 44
@@ -94,6 +95,8 @@ test('linked PR rows reach 44px and an unlink can be undone', async ({ page, req
   const sheet = await openAgentPrs(page)
   const row = sheet.getByRole('listitem', { name: 'Pull request touch#7' })
   const unlink = row.getByRole('button', { name: 'Unlink touch#7' })
+  await expect(unlink).toBeVisible()
+  await settled(page)
   await expectTall(row, 'PR row')
   await expectTall(row.getByRole('button', { name: 'Fix CI' }), 'Fix CI')
   const box = await size(unlink)
