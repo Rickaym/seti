@@ -1,12 +1,12 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { AuthoredPrs, OpenPr } from './github.js'
+import type { AuthoredPage, OpenPr } from './github.js'
 import { cache, redisReady } from './redis.js'
 
 vi.hoisted(() => {
   process.env.SETI_REDIS_URL = process.env.SETI_TEST_REDIS_URL ?? '/run/seti-redis/redis.sock'
 })
 
-const gh = vi.hoisted(() => ({ fetchAuthoredPrs: vi.fn<() => Promise<AuthoredPrs>>() }))
+const gh = vi.hoisted(() => ({ fetchAuthoredPage: vi.fn<() => Promise<AuthoredPage>>() }))
 
 vi.mock('./db.js', () => ({
   repos: { list: async () => Promise.resolve([]) },
@@ -17,7 +17,7 @@ vi.mock('./store/prs.js', () => ({
   linkedPrUrls: async () => Promise.resolve([]),
 }))
 vi.mock('./github.js', () => ({
-  fetchAuthoredPrs: gh.fetchAuthoredPrs,
+  fetchAuthoredPage: gh.fetchAuthoredPage,
   fetchOpenPrsByUrl: async () => Promise.resolve([]),
   addPreviewLabel: vi.fn(),
   viewerLogin: async () => Promise.resolve('me'),
@@ -57,7 +57,7 @@ beforeAll(async () => {
 })
 
 beforeEach(async () => {
-  gh.fetchAuthoredPrs.mockReset().mockResolvedValue({ prs: [pr(1), pr(2)], total: 2 })
+  gh.fetchAuthoredPage.mockReset().mockResolvedValue({ prs: [pr(1), pr(2)], total: 2, next: null })
   await cache.del('gh:prs:v3:')
 })
 
@@ -65,11 +65,11 @@ describe('PR lists shared through Redis', () => {
   it('serves a list another process fetched without asking GitHub again', async () => {
     const first = await freshProcess()
     await first.listPrs()
-    expect(gh.fetchAuthoredPrs).toHaveBeenCalledTimes(1)
+    expect(gh.fetchAuthoredPage).toHaveBeenCalledTimes(1)
 
     const second = await freshProcess()
     const list = await second.listPrs()
     expect(list.prs.map((p) => p.number)).toEqual([1, 2])
-    expect(gh.fetchAuthoredPrs).toHaveBeenCalledTimes(1)
+    expect(gh.fetchAuthoredPage).toHaveBeenCalledTimes(1)
   })
 })

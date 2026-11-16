@@ -32,9 +32,10 @@ const OPEN_PR_FIELDS = `number title body url state isDraft headRefName baseRefN
 /** The open PRs the gh login wrote, in any repo, newest first. */
 const AUTHORED_SEARCH = 'is:pr is:open author:@me sort:updated-desc'
 
-const SEARCH_QUERY = `query($q: String!) {
-  search(type: ISSUE, query: $q, first: 50) {
+const SEARCH_QUERY = `query($q: String!, $after: String) {
+  search(type: ISSUE, query: $q, first: 50, after: $after) {
     issueCount
+    pageInfo { hasNextPage endCursor }
     nodes { ... on PullRequest { ${OPEN_PR_FIELDS} } }
   }
 }`
@@ -74,7 +75,13 @@ const ghPullRequest = z.object({
 type GhPullRequest = z.infer<typeof ghPullRequest>
 
 const ghSearchResponse = z.object({
-  data: z.object({ search: z.object({ issueCount: z.number().int(), nodes: z.array(z.unknown()) }) }),
+  data: z.object({
+    search: z.object({
+      issueCount: z.number().int(),
+      pageInfo: z.object({ hasNextPage: z.boolean(), endCursor: z.string().nullable() }),
+      nodes: z.array(z.unknown()),
+    }),
+  }),
 })
 
 /** A PR as GitHub reports it, with its text and references; tasks and relations come later. */
@@ -120,27 +127,33 @@ function toOpenPr(pr: GhPullRequest): OpenPr {
   }
 }
 
-/** The open PRs GitHub found for the login, and how many it has in all. */
-export interface AuthoredPrs {
+/** One page of the login's open PRs, how many GitHub has in all, and the cursor of the next page. */
+export interface AuthoredPage {
   prs: OpenPr[]
   total: number
+  next: string | null
 }
 
 const isNode = (node: unknown) => typeof node === 'object' && node !== null && Object.keys(node).length > 0
 
-export function parseSearchResponse(stdout: string): AuthoredPrs {
-  const { issueCount, nodes } = ghSearchResponse.parse(JSON.parse(stdout)).data.search
+export function parseSearchResponse(stdout: string): AuthoredPage {
+  const { issueCount, pageInfo, nodes } = ghSearchResponse.parse(JSON.parse(stdout)).data.search
   const found = nodes.filter(isNode).map((node) => ghPullRequest.parse(node))
-  return { prs: found.filter((pr) => pr.state === 'OPEN').map(toOpenPr), total: issueCount }
+  return {
+    prs: found.filter((pr) => pr.state === 'OPEN').map(toOpenPr),
+    total: issueCount,
+    next: pageInfo.hasNextPage ? pageInfo.endCursor : null,
+  }
 }
 
-export const searchQueryArgs = (): string[] => [
+export const searchQueryArgs = (after: string | null = null): string[] => [
   'api',
   'graphql',
   '-f',
   `query=${SEARCH_QUERY}`,
   '-f',
   `q=${AUTHORED_SEARCH}`,
+  ...(after === null ? [] : ['-f', `after=${after}`]),
 ]
 
 const labelsPath = (slug: string, number: number) => `repos/${slug}/issues/${String(number)}/labels`
@@ -185,8 +198,9 @@ export async function gh(args: string[]): Promise<string> {
   }
 }
 
-/** One search for the open PRs the gh login wrote; it runs as the host gh login. */
-export const fetchAuthoredPrs = async (): Promise<AuthoredPrs> => parseSearchResponse(await gh(searchQueryArgs()))
+/** One page of the search for the open PRs the gh login wrote; it runs as the host gh login. */
+export const fetchAuthoredPage = async (after: string | null): Promise<AuthoredPage> =>
+  parseSearchResponse(await gh(searchQueryArgs(after)))
 
 let viewer: Promise<string> | null = null
 

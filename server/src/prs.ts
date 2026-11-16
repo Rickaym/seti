@@ -1,6 +1,7 @@
 import type { LinkedTask, PrList, PullRequest, RelatedPr } from '@seti/shared'
 import { repos } from './db.js'
-import { addPreviewLabel, fetchAuthoredPrs, fetchOpenPrsByUrl, viewerLogin, type OpenPr } from './github.js'
+import { canPollGithub } from './github-cache.js'
+import { addPreviewLabel, fetchAuthoredPage, fetchOpenPrsByUrl, viewerLogin, type OpenPr } from './github.js'
 import { HttpError } from './http.js'
 import { prDecorators, previewsOn } from './pr-decorators.js'
 import { relatePrs } from './pr-graph.js'
@@ -13,6 +14,9 @@ const SHARED_TTL_S = 60 * 60
 const REFRESH_CLAIM_MS = 30_000
 /** A failed first fetch is not retried for this long, so a gh with no login is not run per read. */
 const FAILURE_TTL_MS = 10_000
+/** Search pages of 50 one refresh reads at most; `more` counts the login's PRs past them. */
+const MAX_PAGES = 4
+const WARM_DELAY_MS = 5000
 
 /** The open PRs as one fetch found them, newest first. */
 interface OpenPrs {
@@ -27,6 +31,8 @@ interface OpenPrs {
 interface CacheEntry {
   list: OpenPrs | null
   pending: Promise<OpenPrs> | null
+  /** The first search page of the fetch in flight, for a list no one has read yet. */
+  firstPage: Promise<OpenPrs> | null
   failed: { at: number; error: unknown } | null
 }
 
@@ -49,16 +55,34 @@ const sharedKey = () => `gh:prs:v3:${decoratedBy()}`
 
 function entryFor(): CacheEntry {
   const key = decoratedBy()
-  const entry = entries.get(key) ?? { list: null, pending: null, failed: null }
+  const entry = entries.get(key) ?? { list: null, pending: null, firstPage: null, failed: null }
   entries.set(key, entry)
   return entry
 }
 
 const newestFirst = (a: OpenPr, b: OpenPr) => b.updated_at.localeCompare(a.updated_at)
 
-/** One search for the login's open PRs, then a URL lookup for the linked PRs it left out. */
-async function fetchFromGithub(): Promise<OpenPrs> {
-  const [linked, authored] = await Promise.all([linkedPrUrls(), fetchAuthoredPrs()])
+type OnFirstPage = (list: OpenPrs) => void
+
+/** The search page by page while more follow, up to MAX_PAGES and while the budget allows. */
+async function fetchAuthored(onFirstPage: OnFirstPage): Promise<{ prs: OpenPr[]; total: number }> {
+  const first = await fetchAuthoredPage(null)
+  const prs = [...first.prs]
+  let next = first.next
+  if (next !== null) {
+    onFirstPage({ at: Date.now(), prs: first.prs, more: Math.max(0, first.total - prs.length), linked: [] })
+  }
+  for (let page = 1; page < MAX_PAGES && next !== null && (await canPollGithub()); page += 1) {
+    const following = await fetchAuthoredPage(next)
+    prs.push(...following.prs)
+    next = following.next
+  }
+  return { prs, total: first.total }
+}
+
+/** The search for the login's open PRs, then a URL lookup for the linked PRs it left out. */
+async function fetchFromGithub(onFirstPage: OnFirstPage): Promise<OpenPrs> {
+  const [linked, authored] = await Promise.all([linkedPrUrls(), fetchAuthored(onFirstPage)])
   const listed = new Set(authored.prs.map((pr) => pr.url))
   const others = await fetchOpenPrsByUrl(linked.filter((url) => !listed.has(url)))
   const byUrl = new Map([...authored.prs, ...others].map((pr) => [pr.url, pr]))
@@ -70,9 +94,9 @@ async function fetchFromGithub(): Promise<OpenPrs> {
   }
 }
 
-async function fetchShared(): Promise<OpenPrs> {
+async function fetchShared(onFirstPage: OnFirstPage): Promise<OpenPrs> {
   const key = sharedKey()
-  const list = await fetchFromGithub()
+  const list = await fetchFromGithub(onFirstPage)
   await cache.set(key, list, SHARED_TTL_S)
   for (const listener of fetchedListeners) {
     listener(list.prs)
@@ -83,9 +107,16 @@ async function fetchShared(): Promise<OpenPrs> {
 /** Asks GitHub unless another process fetched a fresh list meanwhile; `force` always asks. */
 async function revalidate(force = false): Promise<OpenPrs> {
   const entry = entryFor()
-  entry.pending ??= (async () => {
+  if (entry.pending !== null) {
+    return entry.pending
+  }
+  let onFirstPage: OnFirstPage = () => undefined
+  entry.firstPage = new Promise<OpenPrs>((resolve) => {
+    onFirstPage = resolve
+  })
+  entry.pending = (async () => {
     const shared = force ? undefined : await cache.get<OpenPrs>(sharedKey())
-    const list = shared !== undefined && Date.now() - shared.at < TTL_MS ? shared : await fetchShared()
+    const list = shared !== undefined && Date.now() - shared.at < TTL_MS ? shared : await fetchShared(onFirstPage)
     entry.list = list
     entry.failed = null
     return list
@@ -96,6 +127,7 @@ async function revalidate(force = false): Promise<OpenPrs> {
     })
     .finally(() => {
       entry.pending = null
+      entry.firstPage = null
     })
   return entry.pending
 }
@@ -109,8 +141,8 @@ async function refreshInBackground(): Promise<void> {
   await revalidate().catch(() => undefined)
 }
 
-/** Fresh for a minute, then served stale while one shared gh call refreshes it. */
-async function openPrs(): Promise<OpenPrs> {
+/** Fresh for a minute, then stale while one gh call refreshes it; `firstPage` skips the wait. */
+async function openPrs(firstPage = false): Promise<OpenPrs> {
   const entry = entryFor()
   if (entry.list === null) {
     const shared = await cache.get<OpenPrs>(sharedKey())
@@ -118,7 +150,8 @@ async function openPrs(): Promise<OpenPrs> {
       if (entry.failed !== null && Date.now() - entry.failed.at < FAILURE_TTL_MS) {
         throw entry.failed.error
       }
-      return revalidate()
+      const pending = revalidate()
+      return firstPage && entry.firstPage !== null ? Promise.race([entry.firstPage, pending]) : pending
     }
     entry.list = shared
   }
@@ -152,7 +185,7 @@ interface Loaded {
 
 async function load(): Promise<Loaded> {
   try {
-    const { prs, more } = await openPrs()
+    const { prs, more } = await openPrs(true)
     return { prs, more, error: null }
   } catch (e) {
     return { prs: [], more: 0, error: e instanceof Error ? e.message : String(e) }
@@ -225,4 +258,14 @@ export async function redeployPreview(owner: string, name: string, number: numbe
   }
   await cache.del(sharedKey())
   return relabeled
+}
+
+/** Reads the list once shortly after start, so the first PR view does not wait for GitHub. */
+export function warmOpenPrs(): void {
+  const warm = async () => {
+    if (await canPollGithub()) {
+      await openPrs()
+    }
+  }
+  setTimeout(() => void warm().catch(() => undefined), WARM_DELAY_MS).unref()
 }

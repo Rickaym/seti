@@ -47,7 +47,9 @@ function answer(args: readonly string[]): string | null {
   const given = fields(args)
   if (given.has('q')) {
     const nodes = state.authored ?? []
-    return JSON.stringify({ data: { search: { issueCount: nodes.length, nodes } } })
+    return JSON.stringify({
+      data: { search: { issueCount: nodes.length, pageInfo: { hasNextPage: false, endCursor: null }, nodes } },
+    })
   }
   const urls = [...given].filter(([name]) => /^u\d+$/.test(name))
   const data = Object.fromEntries(urls.map(([name, url]) => [`p${name.slice(1)}`, state.prs[url] ?? null]))

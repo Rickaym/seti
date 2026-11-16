@@ -104,7 +104,7 @@ export interface PrList {
   prs: PullRequest[]
   /** Why GitHub gave no list, such as a missing login; null when it answered. */
   error: string | null
-  /** Open PRs of the login that GitHub has beyond the newest ones listed. */
+  /** Open PRs of the login that GitHub has beyond the newest 200 Seti reads. */
   more: number
   /** False while no mod fills in previews, so a preview cannot be requested. */
   previews_on: boolean

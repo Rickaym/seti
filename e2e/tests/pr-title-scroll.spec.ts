@@ -42,7 +42,7 @@ const LIST: PrList = {
   viewer: 'e2e',
   prs: [pr(1, SHORT), pr(2, LONG)],
   error: null,
-  more: 0,
+  more: 3,
   previews_on: true,
 }
 
@@ -56,6 +56,7 @@ async function openPicker(page: Page): Promise<{ id: string; picker: Locator }> 
   await page.getByRole('main').getByRole('button', { name: 'Link PR' }).click()
   const picker = page.getByRole('dialog')
   await expect(picker.getByRole('button', { name: LONG })).toBeVisible()
+  await expect(picker.getByText('3 more open PRs not listed')).toBeVisible()
   return { id, picker }
 }
 

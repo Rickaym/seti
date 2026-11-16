@@ -94,8 +94,10 @@ const node = {
   reviewThreads: { nodes: [{ isResolved: false }, { isResolved: true }, { isResolved: false }] },
 }
 
-const response = (nodes: unknown[], issueCount = nodes.length) =>
-  JSON.stringify({ data: { search: { issueCount, nodes } } })
+const response = (nodes: unknown[], issueCount = nodes.length, endCursor: string | null = null) =>
+  JSON.stringify({
+    data: { search: { issueCount, pageInfo: { hasNextPage: endCursor !== null, endCursor }, nodes } },
+  })
 
 const parsed = (nodes: unknown[]) => parseSearchResponse(response(nodes)).prs
 
@@ -177,7 +179,8 @@ describe('parseSearchResponse', () => {
       repository: { nameWithOwner: 'initech/billing' },
     }
     const found = parseSearchResponse(response([node, {}, elsewhere, { ...node, state: 'MERGED' }], 77))
-    expect(found.total).toBe(77)
+    expect(found).toMatchObject({ total: 77, next: null })
+    expect(parseSearchResponse(response([node], 77, 'Y3Vyc29yOjUw')).next).toBe('Y3Vyc29yOjUw')
     expect(found.prs.map((pr) => [pr.key, pr.repo_slug])).toEqual([
       ['dashboard-2231', SLUG],
       ['billing-7', 'initech/billing'],
@@ -197,8 +200,10 @@ describe('gh arguments', () => {
   it('builds one search for the open PRs of the gh login, without a shell', () => {
     const args = searchQueryArgs()
     expect(args.slice(0, 3)).toEqual(['api', 'graphql', '-f'])
-    expect(args[3]).toContain('search(type: ISSUE, query: $q, first: 50)')
+    expect(args[3]).toContain('search(type: ISSUE, query: $q, first: 50, after: $after)')
+    expect(args[3]).toContain('pageInfo { hasNextPage endCursor }')
     expect(args.slice(-2)).toEqual(['-f', 'q=is:pr is:open author:@me sort:updated-desc'])
+    expect(searchQueryArgs('Y3Vyc29yOjUw').slice(-2)).toEqual(['-f', 'after=Y3Vyc29yOjUw'])
   })
 
   it('looks linked PRs up by URL with the fields of the search', () => {

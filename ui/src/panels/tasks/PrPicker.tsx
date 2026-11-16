@@ -26,6 +26,7 @@ interface PrPickerProps {
 export function PrPicker({ task, path, linked, onLinked }: PrPickerProps) {
   const [prs, setPrs] = useState<PullRequest[] | null>(null)
   const [failure, setFailure] = useState<string | null>(null)
+  const [more, setMore] = useState(0)
   const [query, setQuery] = useState('')
   const [pasted, setPasted] = useState('')
 
@@ -34,6 +35,7 @@ export function PrPicker({ task, path, linked, onLinked }: PrPickerProps) {
       .then((list) => {
         setPrs(list.prs)
         setFailure(list.error)
+        setMore(list.more)
       })
       .catch((e: unknown) => toast.error(errorText(e)))
   }, [])
@@ -96,6 +98,7 @@ export function PrPicker({ task, path, linked, onLinked }: PrPickerProps) {
           </li>
         ))}
       </ul>
+      {more > 0 && <p className="text-xs text-muted-foreground">{more} more open PRs not listed</p>}
       <div className="flex gap-2">
         <Input
           aria-label="Pull request URL"

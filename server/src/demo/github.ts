@@ -128,7 +128,9 @@ function graphql(args: readonly string[]): string {
   const given = fields(args)
   if (given.has('q')) {
     const nodes = [...prs.values()].map(prNode)
-    return JSON.stringify({ data: { search: { issueCount: nodes.length, nodes } } })
+    return JSON.stringify({
+      data: { search: { issueCount: nodes.length, pageInfo: { hasNextPage: false, endCursor: null }, nodes } },
+    })
   }
   const lookups = [...given].filter(([key]) => /^u\d+$/.test(key))
   const data = Object.fromEntries(
