@@ -42,7 +42,7 @@ describe('orderLinkedPrs', () => {
       pr('web', 6, { mergeable: 'conflicting' }),
     )
     const states: Record<string, LinkedPrState> = { [url('web', 1)]: 'closed', [url('web', 3)]: 'merged' }
-    const ordered = orderLinkedPrs(urls, statuses, states, 'e2e/web')
+    const ordered = orderLinkedPrs(urls, { statuses }, states, 'e2e/web')
     expect(ordered.map((item) => [item.label, item.group])).toEqual([
       ['#6', 'fix'],
       ['#4', 'fix'],
@@ -60,20 +60,30 @@ describe('orderLinkedPrs', () => {
       pr('api', 2, { updated_at: '2026-10-01T00:00:00Z' }),
     )
     const states: Record<string, LinkedPrState> = { [url('api', 3)]: 'merged', [url('api', 4)]: 'merged' }
-    const ordered = orderLinkedPrs(urls, statuses, states, null)
+    const ordered = orderLinkedPrs(urls, { statuses }, states, null)
     expect(ordered.map((item) => item.label)).toEqual(['api#1', 'api#2', 'api#4', 'api#3'])
     expect(ordered[0]).toMatchObject({ slug: 'e2e/api', number: 1 })
   })
 
   it('counts a PR with no status and no polled state as open', () => {
-    const [only] = orderLinkedPrs([url('web', 9)], new Map(), {}, 'e2e/web')
-    expect(only).toMatchObject({ group: 'open', pr: null, label: '#9' })
+    const [only] = orderLinkedPrs(
+      [url('web', 9)],
+      { statuses: new Map(), loading: new Set([url('web', 9)]) },
+      {},
+      'e2e/web',
+    )
+    expect(only).toMatchObject({ group: 'open', pr: null, label: '#9', loading: true })
   })
 })
 
 describe('filterLinkedPrs', () => {
   const urls = Array.from({ length: 150 }, (_, n) => url(n % 2 === 0 ? 'web' : 'api', n + 1))
-  const all = orderLinkedPrs(urls, statusMap(pr('web', 41, { title: 'Fix login redirect' })), {}, 'e2e/web')
+  const all = orderLinkedPrs(
+    urls,
+    { statuses: statusMap(pr('web', 41, { title: 'Fix login redirect' })) },
+    {},
+    'e2e/web',
+  )
 
   it('keeps everything for an empty query', () => {
     expect(filterLinkedPrs(all, '  ')).toHaveLength(150)

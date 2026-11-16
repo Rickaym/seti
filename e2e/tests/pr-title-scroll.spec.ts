@@ -43,6 +43,7 @@ const LIST: PrList = {
   prs: [pr(1, SHORT), pr(2, LONG)],
   error: null,
   more: 3,
+  refreshing: false,
   previews_on: true,
 }
 

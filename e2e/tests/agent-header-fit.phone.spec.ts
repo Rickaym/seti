@@ -103,7 +103,7 @@ test('the busiest agent header keeps one 44px row on a 360px phone with its titl
   page,
 }) => {
   await page.route(/\/api\/prs\/lookup$/, async (route) => {
-    await route.fulfill({ json: { data: PR_URLS.map(failingPr), meta: {} } })
+    await route.fulfill({ json: { data: { prs: PR_URLS.map(failingPr), pending: [] }, meta: {} } })
   })
   await page.setViewportSize(NARROWEST)
   const id = await seedWorstCase()

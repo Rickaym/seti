@@ -6,9 +6,7 @@ import {
   labelRemoveArgs,
   openPrQueryArgs,
   parseOpenPrResponse,
-  parseSearchResponse,
   parseWatchResponse,
-  searchQueryArgs,
   watchQueryArgs,
 } from './github.js'
 import { prDecorators } from './pr-decorators.js'
@@ -94,14 +92,14 @@ const node = {
   reviewThreads: { nodes: [{ isResolved: false }, { isResolved: true }, { isResolved: false }] },
 }
 
-const response = (nodes: unknown[], issueCount = nodes.length, endCursor: string | null = null) =>
-  JSON.stringify({
-    data: { search: { issueCount, pageInfo: { hasNextPage: endCursor !== null, endCursor }, nodes } },
-  })
+const parsed = (nodes: unknown[]) => [
+  ...parseOpenPrResponse(
+    nodes.map((_, index) => `https://github.com/x/y/pull/${String(index)}`),
+    JSON.stringify({ data: Object.fromEntries(nodes.map((n, index) => [`p${String(index)}`, n])) }),
+  ).values(),
+]
 
-const parsed = (nodes: unknown[]) => parseSearchResponse(response(nodes)).prs
-
-describe('parseSearchResponse', () => {
+describe('parseOpenPrResponse', () => {
   it('normalizes a GraphQL pull request', () => {
     const [pr] = parsed([node])
     expect(pr).toMatchObject({
@@ -121,8 +119,6 @@ describe('parseSearchResponse', () => {
       { slug: 'globex/dashboard', number: 2240, place: 'comment', pull: false },
     ])
     expect(pr).not.toHaveProperty('repo_id')
-    expect(searchQueryArgs().join(' ')).toContain('number title body url')
-    expect(searchQueryArgs().join(' ')).toContain('reviewThreads(first: 100) { nodes { isResolved } }')
     expect(pr?.checks).toEqual([
       { name: 'test', state: 'success', detail: 'success', url: 'https://github.com/x/runs/1' },
       { name: 'build', state: 'pending', detail: 'in_progress', url: null },
@@ -168,47 +164,24 @@ describe('parseSearchResponse', () => {
   it('rejects output that does not match the schema', () => {
     expect(() => parsed([{ ...node, number: '2231' }])).toThrow()
     expect(() => parsed([{ ...node, reviewThreads: { nodes: [{}] } }])).toThrow()
-    expect(() => parseSearchResponse(JSON.stringify({ data: { search: null } }))).toThrow()
   })
 
-  it('names each PR by the repo GitHub reports and counts the PRs beyond the page', () => {
-    const elsewhere = {
-      ...node,
-      number: 7,
-      url: 'https://github.com/initech/billing/pull/7',
-      repository: { nameWithOwner: 'initech/billing' },
-    }
-    const found = parseSearchResponse(response([node, {}, elsewhere, { ...node, state: 'MERGED' }], 77))
-    expect(found).toMatchObject({ total: 77, next: null })
-    expect(parseSearchResponse(response([node], 77, 'Y3Vyc29yOjUw')).next).toBe('Y3Vyc29yOjUw')
-    expect(found.prs.map((pr) => [pr.key, pr.repo_slug])).toEqual([
-      ['dashboard-2231', SLUG],
-      ['billing-7', 'initech/billing'],
+  it('keeps the open PRs among the URLs, in any repo', () => {
+    const urls = [node.url, 'https://github.com/globex/dashboard/pull/1', 'https://github.com/globex/gone/pull/2']
+    const stdout = JSON.stringify({ data: { p0: node, p1: { ...node, number: 1, state: 'CLOSED' }, p2: null } })
+    expect([...parseOpenPrResponse(urls, stdout)].map(([url, pr]) => [url, pr?.key ?? null])).toEqual([
+      [node.url, 'dashboard-2231'],
+      ['https://github.com/globex/dashboard/pull/1', null],
+      ['https://github.com/globex/gone/pull/2', null],
     ])
   })
 })
 
-describe('parseOpenPrResponse', () => {
-  it('keeps the open PRs among the URLs, in any repo', () => {
-    const urls = [node.url, 'https://github.com/globex/dashboard/pull/1', 'https://github.com/globex/gone/pull/2']
-    const stdout = JSON.stringify({ data: { p0: node, p1: { ...node, number: 1, state: 'CLOSED' }, p2: null } })
-    expect(parseOpenPrResponse(urls, stdout).map((pr) => pr.key)).toEqual(['dashboard-2231'])
-  })
-})
-
 describe('gh arguments', () => {
-  it('builds one search for the open PRs of the gh login, without a shell', () => {
-    const args = searchQueryArgs()
-    expect(args.slice(0, 3)).toEqual(['api', 'graphql', '-f'])
-    expect(args[3]).toContain('search(type: ISSUE, query: $q, first: 50, after: $after)')
-    expect(args[3]).toContain('pageInfo { hasNextPage endCursor }')
-    expect(args.slice(-2)).toEqual(['-f', 'q=is:pr is:open author:@me sort:updated-desc'])
-    expect(searchQueryArgs('Y3Vyc29yOjUw').slice(-2)).toEqual(['-f', 'after=Y3Vyc29yOjUw'])
-  })
-
-  it('looks linked PRs up by URL with the fields of the search', () => {
+  it('looks PRs up by URL with every field of their detail', () => {
     const args = openPrQueryArgs(['https://github.com/globex/dashboard/pull/1'])
     expect(args[3]).toContain('p0: resource(url: $u0) { ... on PullRequest { number title body url state')
+    expect(args[3]).toContain('reviewThreads(first: 100) { nodes { isResolved } }')
     expect(args.slice(-2)).toEqual(['-f', 'u0=https://github.com/globex/dashboard/pull/1'])
   })
 

@@ -485,9 +485,7 @@ async def test_start_agent_from_pr_needs_a_checkout_of_the_repo(tools: EaTools, 
     assert not fake_seti.writes()
 
 
-async def test_preview_label_needs_a_yes_and_previews_on_the_repo(
-    tools: EaTools, fake_seti: FakeSeti
-) -> None:
+async def test_preview_label_needs_a_yes_and_the_previews_mod(tools: EaTools, fake_seti: FakeSeti) -> None:
     asked, done = await confirm(tools, "request_preview", {"pr": "seti PR 28"})
     assert "This adds the preview label to seti PR 28 on GitHub as the user's account" in asked.text
     assert done.text == "Added the preview label on seti PR 28. The preview updates in a few minutes."
@@ -495,10 +493,6 @@ async def test_preview_label_needs_a_yes_and_previews_on_the_repo(
     fake_seti.prs["prs"][0]["labels"] = ["preview"]
     relabel = await tools.call("request_preview", {"pr": "seti PR 28"})
     assert "removes the preview label from seti PR 28 and adds it again" in relabel.text
-    fake_seti.prs["prs"][0]["preview"] = {"state": "none", "url": None, "commit": None, "stale": False}
-    off = await tools.call("request_preview", {"pr": "seti PR 28"})
-    assert not off.ok
-    assert off.text.startswith("Seti has no previews for seti")
     fake_seti.prs["previews_on"] = False
     mod_off = await tools.call("request_preview", {"pr": "seti PR 28"})
     assert not mod_off.ok

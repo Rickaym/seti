@@ -4,7 +4,7 @@ import {
   startAgentInput,
   WARM_CACHE_MAX_MB,
   warmCacheSettingsInput,
-  type PullRequest,
+  type PrRow,
   type Repo,
   type WarmCacheStatus,
 } from '@seti/shared'
@@ -33,8 +33,8 @@ const repoRef = z.string().trim().min(1).describe('The repo by slug (owner/name)
 
 const openPrs = async () => (await listPrs()).prs
 
-/** The PR without its long check details, as list and get answers show it. */
-const prBrief = (pr: PullRequest) => ({
+/** The PR as a slim row, as list and get answers show it. */
+const prBrief = (pr: PrRow) => ({
   key: pr.key,
   url: pr.url,
   repo: pr.repo_slug,
@@ -46,14 +46,12 @@ const prBrief = (pr: PullRequest) => ({
   base_ref: pr.base_ref,
   updated_at: pr.updated_at,
   ci: pr.ci,
-  unresolved_threads: pr.unresolved_threads,
   review_decision: pr.review_decision,
   mergeable: pr.mergeable,
-  preview: pr.preview.state,
   tasks: pr.tasks,
 })
 
-async function prByUrl(prs: readonly PullRequest[], match: RegExpExecArray): Promise<PullRequest> {
+async function prByUrl(prs: readonly PrRow[], match: RegExpExecArray): Promise<PrRow> {
   const [, owner = '', name = '', number = ''] = match
   const url = `https://github.com/${owner}/${name}/pull/${number}`
   const found = prs.find((pr) => pr.url.toLowerCase() === url.toLowerCase()) ?? (await findPr(url))
@@ -63,7 +61,7 @@ async function prByUrl(prs: readonly PullRequest[], match: RegExpExecArray): Pro
   return found
 }
 
-function prByNumber(prs: readonly PullRequest[], ref: string, number: number): PullRequest {
+function prByNumber(prs: readonly PrRow[], ref: string, number: number): PrRow {
   const words = ref
     .toLowerCase()
     .replace(NUMBER, ' ')
@@ -79,7 +77,7 @@ function prByNumber(prs: readonly PullRequest[], ref: string, number: number): P
 }
 
 /** The open PR a reference names by URL, number, key or title, or by the agent linked to it. */
-async function resolvePr(ref: string): Promise<PullRequest> {
+async function resolvePr(ref: string): Promise<PrRow> {
   const prs = await openPrs()
   const url = PR_URL.exec(ref)
   if (url !== null) {
@@ -113,7 +111,7 @@ const resolveRepo = async (ref: string): Promise<Repo> =>
 const listPrsTool = setiTool({
   name: 'list_prs',
   description:
-    "List the open pull requests Seti's GitHub login wrote and those agents opened or linked, in any repo, newest first, with CI, unresolved review threads, review, merge state, preview and linked agents.",
+    "List the open pull requests Seti's GitHub login wrote and those agents opened or linked, in any repo, newest first, as slim rows with CI, review, merge state and linked agents. Use get_pr for one PR's checks, review threads and preview.",
   input: {},
   run: async () => {
     const list = await listPrs()
@@ -127,9 +125,16 @@ const getPr = setiTool({
     'One open pull request in detail: checks with failing names, unresolved review threads, review, merge conflicts, labels, preview, related PRs and linked agents.',
   input: { pr: prRef },
   run: async ({ pr: ref }) => {
-    const pr = await resolvePr(ref)
+    const row = await resolvePr(ref)
+    const pr = await findPr(row.url)
+    if (pr === null) {
+      throw new ToolRefusal(
+        `GitHub gave no detail for ${row.repo_slug}#${String(row.number)}; it may have just closed.`,
+      )
+    }
     return {
       ...prBrief(pr),
+      unresolved_threads: pr.unresolved_threads,
       labels: pr.labels,
       checks: pr.checks.map(({ name, state, url }) => ({ name, state, url })),
       preview: pr.preview,
@@ -147,9 +152,6 @@ const requestPreviewTool = setiTool({
     const list = await listPrs()
     if (!list.previews_on) {
       throw new ToolRefusal(PREVIEWS_OFF)
-    }
-    if (!list.prs.some((open) => open.repo_slug === pr.repo_slug && open.preview.state !== 'none')) {
-      throw new ToolRefusal(`Seti has no previews for ${pr.repo_slug}, so it offers no Preview action there.`)
     }
     const [owner = '', name = ''] = pr.repo_slug.split('/')
     return requestPreview(owner, name, pr.number)

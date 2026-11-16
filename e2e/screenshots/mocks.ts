@@ -124,7 +124,7 @@ export async function mockLiveServices(page: Page): Promise<void> {
   await mockChannels(page)
   await page.route(/\/api\/prs\/lookup$/, async (route) => {
     const asked = new Set((route.request().postDataJSON() as { urls: string[] }).urls)
-    await route.fulfill({ json: envelope([STOREFRONT_PR].filter((pr) => asked.has(pr.url))) })
+    await route.fulfill({ json: envelope({ prs: [STOREFRONT_PR].filter((pr) => asked.has(pr.url)), pending: [] }) })
   })
   await page.route(/\/api\/tasks\/[^/]+\/permission-requests$/, async (route) => {
     const infra = route.request().url().includes(AGENTS.infra)

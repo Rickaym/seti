@@ -1,4 +1,4 @@
-import { accountStatusSchema, prListSchema, pullRequestsSchema, taskListSchema } from '@seti/shared'
+import { accountStatusSchema, prListSchema, prLookupSchema, taskListSchema } from '@seti/shared'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { readResponse } from '@/api'
 
@@ -32,8 +32,11 @@ const list = (prs: unknown[]) => ({
   prs,
   error: null,
   more: 0,
+  refreshing: false,
   previews_on: true,
 })
+
+const lookup = (prs: unknown[], pending: string[] = []) => ({ prs, pending })
 
 const task = (id: string, extra: Record<string, unknown> = {}) => ({
   id,
@@ -76,32 +79,43 @@ afterEach(() => {
 })
 
 describe('readResponse', () => {
-  it('passes a well-formed PR list through untouched and quietly', () => {
+  it('reads a PR list as slim rows, quietly, and says when a newer one is loading', () => {
     const spy = warn()
-    const body = list([pr('a')])
-    expect(readResponse('/prs', prListSchema, body)).toEqual(body)
+    const parsed = readResponse('/prs', prListSchema, { ...list([pr('a')]), refreshing: true })
+    expect(parsed.refreshing).toBe(true)
+    expect(parsed.prs[0]).toMatchObject({ key: 'a', ci: 'success', tasks: [] })
+    expect(parsed.prs[0]).not.toHaveProperty('checks')
     expect(spy).not.toHaveBeenCalled()
   })
 
-  it('defaults a PR preview that is null instead of failing the list', () => {
+  it('defaults a PR preview that is null instead of failing the lookup', () => {
     const spy = warn()
-    const parsed = readResponse('/prs', prListSchema, list([pr('a', { preview: null }), pr('b')]))
+    const parsed = readResponse('/prs/lookup', prLookupSchema, lookup([pr('a', { preview: null }), pr('b')]))
     expect(parsed.prs.map((p) => p.preview)).toEqual([
       { state: 'none', url: null, commit: null, stale: false },
       { state: 'none', url: null, commit: null, stale: false },
     ])
     expect(spy).toHaveBeenCalledOnce()
-    expect(String(spy.mock.calls[0]?.[0])).toMatch(/^Seti repaired a malformed response from \/prs: preview/)
+    expect(String(spy.mock.calls[0]?.[0])).toMatch(/^Seti repaired a malformed response from \/prs\/lookup: preview/)
   })
 
   it('reads a missing or malformed unresolved thread count as zero', () => {
     warn()
-    const parsed = readResponse('/prs/lookup', pullRequestsSchema, [
-      pr('a', { unresolved_threads: undefined }),
-      pr('b', { unresolved_threads: -2 }),
-      pr('c', { unresolved_threads: 4 }),
-    ])
-    expect(parsed.map((p) => p.unresolved_threads)).toEqual([0, 0, 4])
+    const parsed = readResponse(
+      '/prs/lookup',
+      prLookupSchema,
+      lookup(
+        [
+          pr('a', { unresolved_threads: undefined }),
+          pr('b', { unresolved_threads: -2 }),
+          pr('c', { unresolved_threads: 4 }),
+        ],
+        ['https://github.com/x/y/pull/9'],
+      ),
+    )
+    expect(parsed.prs.map((p) => p.unresolved_threads)).toEqual([0, 0, 4])
+    expect(parsed.pending).toEqual(['https://github.com/x/y/pull/9'])
+    expect(readResponse('/prs/lookup', prLookupSchema, { prs: [] }).pending).toEqual([])
   })
 
   it('drops a PR too broken to show and keeps the rest', () => {
@@ -112,9 +126,9 @@ describe('readResponse', () => {
 
   it('logs the same repair once across polls', () => {
     const spy = warn()
-    const body = [pr('a', { draft: 'yes' })]
-    const [first] = readResponse('/prs/lookup', pullRequestsSchema, body)
-    readResponse('/prs/lookup', pullRequestsSchema, body)
+    const body = lookup([pr('a', { draft: 'yes' })])
+    const [first] = readResponse('/prs/lookup', prLookupSchema, body).prs
+    readResponse('/prs/lookup', prLookupSchema, body)
     expect(first?.draft).toBe(false)
     expect(spy).toHaveBeenCalledOnce()
   })

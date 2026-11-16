@@ -148,7 +148,7 @@ test('nine agents open in the grid with one request of each kind, light renders 
     const ids = await seedGridAgents()
     await page.route(/\/api\/prs\/lookup$/, async (route) => {
       const { urls } = route.request().postDataJSON() as { urls: string[] }
-      await route.fulfill({ json: { data: urls.map(openPr), meta: {} } })
+      await route.fulfill({ json: { data: { prs: urls.map(openPr), pending: [] }, meta: {} } })
     })
     await page.addInitScript(installProbe)
     await page.addInitScript((stored) => {

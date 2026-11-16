@@ -7,7 +7,7 @@ import { openAgentPrs } from './support/phone-agent.js'
 import { expectFitsPhone } from './support/phone-layout.js'
 import { pr, QUIET } from './support/pr-ci.js'
 
-const LIST: PrList = { viewer: 'e2e', prs: [pr(QUIET, 1)], error: null, more: 12, previews_on: true }
+const LIST: PrList = { viewer: 'e2e', prs: [pr(QUIET, 1)], error: null, more: 12, refreshing: false, previews_on: true }
 
 test('the phone PR picker says how many open PRs it does not list', async ({ page }) => {
   await page.route(/\/api\/prs$/, async (route) => route.fulfill({ json: { data: LIST, meta: {} } }))

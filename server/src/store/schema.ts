@@ -31,6 +31,7 @@ import { MODS_RUNTIME } from './schema-mods-runtime.js'
 import { BLOBS_ONE_STYLE, MODS, PREVIEWS_MOD, REQUIRED_MODS, USER_THEME } from './schema-mods.js'
 import { NOTIFICATIONS } from './schema-notifications.js'
 import { CHANNEL_EVENT_ROUTING, CHANNEL_RUN_DUE, POLLER_CHANNELS } from './schema-pollers.js'
+import { PR_LIST_CACHE } from './schema-prs.js'
 import { QUESTION_SECRETS, QUESTIONS } from './schema-questions.js'
 import { DROP_ROUTINES, REMINDER_CHANNELS, REMINDER_CRON } from './schema-reminders.js'
 import { PACK_KIND, rolesToPacks } from './schema-roles.js'
@@ -188,4 +189,5 @@ export const MIGRATIONS: readonly Migration[] = [
   { version: 102, name: 'task_model_fallback', sql: TASK_MODEL_FALLBACK },
   { version: 103, name: 'ea_language', sql: EA_LANGUAGE },
   { version: 104, name: 'permission_review', sql: PERMISSION_REVIEW },
+  { version: 105, name: 'pr_list_cache', sql: PR_LIST_CACHE },
 ]

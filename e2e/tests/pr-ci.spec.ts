@@ -138,6 +138,7 @@ test('chips, list rows and palette rows open the PR on GitHub in a new tab', asy
     prs: [OPEN[0] ?? pr(RED, 5)],
     error: null,
     more: 0,
+    refreshing: false,
     previews_on: true,
   }
   await page.route(/\/api\/prs$/, async (route) => route.fulfill({ json: { data: list, meta: {} } }))

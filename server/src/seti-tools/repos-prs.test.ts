@@ -27,12 +27,16 @@ vi.mock('@anthropic-ai/claude-agent-sdk', async (importOriginal) => ({
   query: sdk.query,
 }))
 
-const github = vi.hoisted(() => ({ list: null as PrList | null, relabeled: [] as string[] }))
+const github = vi.hoisted(() => ({
+  list: null as PrList | null,
+  details: [] as PullRequest[],
+  relabeled: [] as string[],
+}))
 
 vi.mock('../prs.js', async (importOriginal) => ({
   ...(await importOriginal<typeof Prs>()),
   listPrs: async () => Promise.resolve(github.list),
-  findPr: async () => Promise.resolve(null),
+  findPr: async (url: string) => Promise.resolve(github.details.find((pr) => pr.url === url) ?? null),
   redeployPreview: async (owner: string, name: string, number: number) => {
     github.relabeled.push(`${owner}/${name}#${String(number)}`)
     return Promise.resolve(false)
@@ -158,11 +162,13 @@ describe('PR tools', () => {
   beforeAll(async () => {
     repo.path = checkout('acme/web')
     await repos.insert(repo)
+    github.details = [pr, far]
     github.list = {
       viewer: 'octo',
-      prs: [{ ...pr, preview: { state: 'ready', url: 'https://pr-7.example.com', commit: 'abc', stale: false } }, far],
+      prs: [pr, far],
       error: null,
       more: 3,
+      refreshing: false,
       previews_on: false,
     }
   })
@@ -172,8 +178,11 @@ describe('PR tools', () => {
     expect((await call(caller, 'list_prs', {})).data()).toMatchObject({
       error: null,
       more_not_listed: 3,
-      prs: [{ key: 'web-7', ci: 'failure', unresolved_threads: 2 }, { key: 'billing-4' }],
+      prs: [{ key: 'web-7', ci: 'failure' }, { key: 'billing-4' }],
     })
+    const [listed] = ((await call(caller, 'list_prs', {})).data() as { prs: Record<string, unknown>[] }).prs
+    expect(listed).not.toHaveProperty('checks')
+    expect(listed).not.toHaveProperty('unresolved_threads')
     expect((await call(caller, 'get_pr', { pr: far.url })).data()).toMatchObject({
       repo: 'initech/billing',
       ci: 'failure',

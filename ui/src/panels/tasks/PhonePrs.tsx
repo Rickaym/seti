@@ -12,8 +12,8 @@ import { usePrStatuses } from '@/panels/tasks/usePrStatuses'
 
 /** The agent's linked PRs with their live status, in a sheet that unmounts on close. */
 function LinkedPrs({ task, onClose }: { task: TaskListEntry; onClose: () => void }) {
-  const { statuses } = usePrStatuses(task.pr_urls)
-  const prs = orderLinkedPrs(task.pr_urls, statuses, task.pr_states.by_url, task.repo_slug)
+  const live = usePrStatuses(task.pr_urls)
+  const prs = orderLinkedPrs(task.pr_urls, live, task.pr_states.by_url, task.repo_slug)
   const path = prsPath(task.id)
   return (
     <AgentPrsSheet

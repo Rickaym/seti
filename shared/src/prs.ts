@@ -72,7 +72,8 @@ export interface RelatedPr {
   reasons: PrRelation[]
 }
 
-export interface PullRequest {
+/** What a row of the PR list shows: enough to render, sort and search, with no heavy detail. */
+export interface PrRow {
   key: string
   repo_slug: string
   number: number
@@ -82,30 +83,44 @@ export interface PullRequest {
   author: string | null
   head_ref: string
   base_ref: string
-  head_oid: string
   updated_at: string
   review_decision: ReviewDecision | null
   mergeable: Mergeable
-  labels: string[]
+  /** The check rollup as one value; null with no checks or while GitHub has not said yet. */
   ci: CiState | null
+  tasks: LinkedTask[]
+}
+
+/** A PR with its detail: each check, review threads, labels, preview and related PRs. */
+export interface PullRequest extends PrRow {
+  head_oid: string
+  labels: string[]
   checks: PrCheck[]
   /** Review threads not yet resolved, outdated ones included. */
   unresolved_threads: number
   preview: Preview
   preview_host: string | null
-  tasks: LinkedTask[]
   related: RelatedPr[]
+}
+
+/** The detail of the open PRs among the URLs asked for, and the URLs GitHub has not answered yet. */
+export interface PrLookup {
+  prs: PullRequest[]
+  /** Still loading: ask again. A URL in neither list is not an open PR GitHub shows. */
+  pending: string[]
 }
 
 /** The open PRs the GitHub login wrote and those agents opened or linked, newest first. */
 export interface PrList {
   /** Null when the GitHub CLI is not logged in. */
   viewer: string | null
-  prs: PullRequest[]
+  prs: PrRow[]
   /** Why GitHub gave no list, such as a missing login; null when it answered. */
   error: string | null
   /** Open PRs of the login that GitHub has beyond the newest 200 Seti reads. */
   more: number
+  /** True while a newer list is being read from GitHub and this one is the last known. */
+  refreshing: boolean
   /** False while no mod fills in previews, so a preview cannot be requested. */
   previews_on: boolean
 }
@@ -178,7 +193,7 @@ const relatedPrSchema = z.object({
   reasons: lenientArray('related reason', z.custom<PrRelation>(isRecord)),
 })
 
-const pullRequestSchema = z.object({
+const prRowSchema = z.object({
   key: z.string(),
   repo_slug: z.string(),
   number: z.number(),
@@ -188,7 +203,6 @@ const pullRequestSchema = z.object({
   author: nullableText('author'),
   head_ref: orDefault('head_ref', z.string(), ''),
   base_ref: orDefault('base_ref', z.string(), ''),
-  head_oid: orDefault('head_oid', z.string(), ''),
   updated_at: z.string(),
   review_decision: orDefault<ReviewDecision | null>(
     'review_decision',
@@ -196,25 +210,30 @@ const pullRequestSchema = z.object({
     null,
   ),
   mergeable: orDefault<Mergeable>('mergeable', z.enum(['mergeable', 'conflicting', 'unknown']), 'unknown'),
-  labels: orDefault('labels', z.array(z.string()), []),
   ci: ciField('ci'),
+  tasks: lenientArray('linked agent', z.object({ id: z.string(), title: z.string(), status: z.enum(TASK_STATUSES) })),
+}) satisfies ResponseSchema<PrRow>
+
+const pullRequestSchema = prRowSchema.extend({
+  head_oid: orDefault('head_oid', z.string(), ''),
+  labels: orDefault('labels', z.array(z.string()), []),
   checks: lenientArray('check', prCheckSchema),
   unresolved_threads: threadCount,
   preview: orDefault('preview', previewSchema, NO_PREVIEW),
   preview_host: nullableText('preview_host'),
-  tasks: lenientArray('linked agent', z.object({ id: z.string(), title: z.string(), status: z.enum(TASK_STATUSES) })),
   related: lenientArray('related pull request', relatedPrSchema),
 }) satisfies ResponseSchema<PullRequest>
 
-/** The open PRs a lookup found; URLs of closed or unknown PRs are left out. */
-export const pullRequestsSchema = lenientArray('pull request', pullRequestSchema) satisfies ResponseSchema<
-  PullRequest[]
->
+export const prLookupSchema = z.object({
+  prs: lenientArray('pull request', pullRequestSchema),
+  pending: orDefault('pending', z.array(z.string()), []),
+}) satisfies ResponseSchema<PrLookup>
 
 export const prListSchema = z.object({
   viewer: nullableText('viewer'),
-  prs: lenientArray('pull request', pullRequestSchema),
+  prs: lenientArray('pull request', prRowSchema),
   error: nullableText('list error'),
   more: orDefault('more', z.number().int().nonnegative(), 0),
+  refreshing: orDefault('refreshing', z.boolean(), false),
   previews_on: orDefault('previews on', z.boolean(), true),
 }) satisfies ResponseSchema<PrList>

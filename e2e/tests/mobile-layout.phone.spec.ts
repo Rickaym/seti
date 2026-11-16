@@ -182,7 +182,9 @@ const LONG_PR: PullRequest = {
 }
 
 async function mockServices(page: Page): Promise<void> {
-  await page.route(/\/api\/prs\/lookup$/, async (route) => route.fulfill({ json: { data: [LONG_PR], meta: {} } }))
+  await page.route(/\/api\/prs\/lookup$/, async (route) =>
+    route.fulfill({ json: { data: { prs: [LONG_PR], pending: [] }, meta: {} } }),
+  )
   await page.route(/\/api\/capabilities(\?.*)?$/, async (route) =>
     route.fulfill({ json: { data: CAPABILITIES, meta: {} } }),
   )

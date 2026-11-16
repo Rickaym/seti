@@ -57,7 +57,7 @@ export const OPEN = [pr(RED, 5, { ci: 'failure', checks: FAILING }), ...[1, 2, 3
 export async function mockStatuses(page: Page): Promise<void> {
   await page.route(/\/api\/prs\/lookup$/, async (route) => {
     const asked = new Set((route.request().postDataJSON() as { urls: string[] }).urls)
-    await route.fulfill({ json: { data: OPEN.filter((item) => asked.has(item.url)), meta: {} } })
+    await route.fulfill({ json: { data: { prs: OPEN.filter((item) => asked.has(item.url)), pending: [] }, meta: {} } })
   })
 }
 
