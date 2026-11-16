@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import Any
 from zoneinfo import ZoneInfo
 
-from seti_ea.clock import CURRENT_CLOCK
+from seti_ea.clock import CURRENT_CLOCK, zone_label
 from seti_ea.format import (
     ago,
     and_list,
@@ -179,7 +179,7 @@ def _upcoming_line(info: Mapping[str, Any], times: list[datetime], now: datetime
 
 def upcoming_runs(channels: list[dict[str, Any]], now: datetime) -> list[str]:
     """What pollers and reminders run next, one line each, soonest first, then the paused ones."""
-    zone = _user_zone()
+    zone = zone_label(CURRENT_CLOCK.get())
     scheduled = [c for c in channels if c.get("source") in ("poller", "reminder")]
     coming = [(times, c) for c in scheduled if (times := _upcoming_times(_scheduled(c)))]
     coming.sort(key=lambda pair: pair[0][0])
