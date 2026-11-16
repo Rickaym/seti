@@ -268,6 +268,6 @@ async def test_upcoming_runs_are_listed_in_the_users_time(tools: EaTools, fake: 
         "Sunday 16:30",
         "Paused: Standup.",
     ]
-    fake.channels[:] = [c for c in fake.channels if c.get("source") == "webhook"]
+    fake.channels[:] = [c for c in fake.channels if c.get("source") not in ("poller", "reminder")]
     none = await tools.call("list_channels", {"upcoming": True})
     assert none.text == "No poller or reminder has a run to come."
