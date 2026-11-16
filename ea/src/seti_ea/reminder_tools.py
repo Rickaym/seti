@@ -6,7 +6,17 @@ from typing import Any
 from zoneinfo import ZoneInfo
 
 from seti_ea.clock import CURRENT_CLOCK
-from seti_ea.format import ago, and_list, clip, cron_words, plural, schedule_health, until
+from seti_ea.format import (
+    ago,
+    and_list,
+    clip,
+    cron_words,
+    local_time,
+    parse_time,
+    plural,
+    schedule_health,
+    until,
+)
 from seti_ea.gate import CONFIRMED, Confirmations, ask, gate_key
 from seti_ea.seti import SetiClient, SetiError
 from seti_ea.toolkit import ToolError, ToolResult, ToolSpec, arg_bool, arg_int, arg_str, dicts, name_of
@@ -137,6 +147,52 @@ def reminder_line(info: Mapping[str, Any], now: datetime) -> str:
     runs = dicts(reminder.get("runs"))
     last = f"; last {_run_line(runs[0], now)}" if runs else ""
     return f"{_when(reminder)}, {status}{last}"
+
+
+SPARSE_S = 3600
+SPARSE_SHOWN = 3
+
+
+def _scheduled(info: Mapping[str, Any]) -> dict[str, Any]:
+    scheduled = info.get(str(info.get("source")))
+    return scheduled if isinstance(scheduled, dict) else {}
+
+
+def _upcoming_times(scheduled: Mapping[str, Any]) -> list[datetime]:
+    times = scheduled.get("upcoming")
+    parsed = [parse_time(t) for t in times] if isinstance(times, list) else []
+    return [t for t in parsed if t is not None]
+
+
+def _upcoming_line(info: Mapping[str, Any], times: list[datetime], now: datetime, zone: str) -> str:
+    scheduled = _scheduled(info)
+    sparse = len(times) < 2 or (times[1] - times[0]).total_seconds() >= SPARSE_S
+    shown = times[:SPARSE_SHOWN] if sparse else times[:1]
+    when = and_list([local_time(t.isoformat(), zone) for t in shown])
+    how = (
+        _when(scheduled)
+        if info.get("source") == "reminder"
+        else f"every {_every(scheduled.get('interval_s'))}"
+    )
+    return f"- {name_of(info)} ({info.get('source')}, {how}): next {until(shown[0].isoformat(), now)}, {when}"
+
+
+def upcoming_runs(channels: list[dict[str, Any]], now: datetime) -> list[str]:
+    """What pollers and reminders run next, one line each, soonest first, then the paused ones."""
+    zone = _user_zone()
+    scheduled = [c for c in channels if c.get("source") in ("poller", "reminder")]
+    coming = [(times, c) for c in scheduled if (times := _upcoming_times(_scheduled(c)))]
+    coming.sort(key=lambda pair: pair[0][0])
+    paused = [name_of(c) for c in scheduled if _scheduled(c).get("enabled") is False]
+    lines = (
+        [f"Next runs in {zone} time, soonest first:"]
+        if coming
+        else ["No poller or reminder has a run to come."]
+    )
+    lines.extend(_upcoming_line(c, times, now, zone) for times, c in coming)
+    if paused:
+        lines.append(f"Paused: {and_list(paused)}.")
+    return lines
 
 
 def _timing_changes(reminder: Mapping[str, Any], args: Mapping[str, Any]) -> tuple[dict[str, Any], list[str]]:

@@ -20,6 +20,7 @@ from seti_ea.reminder_tools import (
     ReminderTools,
     reminder_changes,
     reminder_line,
+    upcoming_runs,
 )
 from seti_ea.seti import SetiClient, SetiError
 from seti_ea.toolkit import (
@@ -141,7 +142,15 @@ SETTINGS_SPECS: list[ToolSpec] = [
         "list_channels",
         "List the channels that report to your inbox or to agents: webhooks that senders such as uptime "
         "monitors, GitHub or Sentry post to, pollers Seti runs for services without webhooks, and "
-        "reminders whose script Seti runs on an interval or cron schedule, with their latest events.",
+        "reminders whose script Seti runs on an interval or cron schedule, with their latest events. "
+        "With upcoming, what is scheduled next instead: the coming runs of every poller and reminder "
+        "in the user's time, soonest first, and which are paused.",
+        {
+            "upcoming": {
+                "type": "boolean",
+                "description": "Show only what pollers and reminders run next, and when.",
+            }
+        },
     ),
     ToolSpec(
         "list_my_channels",
@@ -796,6 +805,8 @@ class SettingsTools:
         if not channels:
             return ToolResult("There are no channels yet.", "No channels")
         now = self._now()
+        if arg_bool(args, "upcoming"):
+            return ToolResult("\n".join(upcoming_runs(channels, now)), "Listed the next runs")
         noun = "channel" if any(_kind(c) != "webhook" for c in channels) else "webhook"
         lines = [f"{plural(len(channels), noun)}:"]
         for c in channels:
