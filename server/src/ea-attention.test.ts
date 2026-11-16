@@ -32,6 +32,9 @@ const PHONE = {
 
 let count = 0
 
+/** One millisecond after `since`, so a turn that ends then is inside the brief on any clock. */
+const justAfter = (since: string) => new Date(Date.parse(since) + 1).toISOString()
+
 async function newTask(title: string, fields: Partial<Task> = {}): Promise<Task> {
   count += 1
   const id = `attention-task-${String(count)}`
@@ -113,7 +116,10 @@ describe('the since-you-left brief', () => {
     const since = new Date().toISOString()
     expect(await buildBrief(since, new Date().toISOString())).toBeNull()
     const old = await newTask('Older', { closing_line: 'Done long ago', updated_at: '2020-01-01T00:00:00.000Z' })
-    const done = await newTask('Speech engine', { closing_line: 'Opened PR #12; CI is green' })
+    const done = await newTask('Speech engine', {
+      closing_line: 'Opened PR #12; CI is green',
+      updated_at: justAfter(since),
+    })
     const stuck = await newTask('Voicemail', { blocked: 'Asks to use Bash: make deploy' })
     const brief = await buildBrief(since, new Date().toISOString())
     expect(brief?.needs_you).toEqual([
@@ -128,7 +134,7 @@ describe('the since-you-left brief', () => {
 
   it("leaves out a watched agent's finished turn when its tier is off", async () => {
     const since = new Date().toISOString()
-    const watched = await newTask('Watched', { closing_line: 'Shipped' })
+    const watched = await newTask('Watched', { closing_line: 'Shipped', updated_at: justAfter(since) })
     await eaWatches.add(watched.id, '', since)
     await notificationSettings.set({ ...DEFAULT_TIERS, digest: 'off' })
     expect(await buildBrief(since, new Date().toISOString())).toBeNull()
