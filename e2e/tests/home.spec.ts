@@ -11,9 +11,10 @@ test('Home is the landing page and counts what each agent shipped', async ({ pag
   const metrics = page.getByRole('complementary', { name: 'Metrics' })
   await expect(metrics.getByRole('heading', { name: 'Shipped' })).toBeVisible()
   await expect(metrics.getByRole('row', { name: /^Merged/ })).toBeVisible()
-  await expect(
-    metrics.getByRole('list', { name: 'PRs merged per day, last 30 days' }).getByRole('listitem'),
-  ).toHaveCount(30)
+  await expect(metrics.getByRole('img', { name: /^Turns per day, last 30 days: now \d+ turns?,/ })).toBeVisible()
+  const merged = metrics.getByRole('img', { name: /^Merged per day, last 30 days: now \d+ merged,/ })
+  await merged.hover()
+  await expect(metrics.getByText(/merged$/).last()).toBeVisible()
   const row = metrics.getByRole('button', { name: new RegExp(agent.title) })
   await expect(row).toContainText('1 turn')
   await expect(row).toContainText('1')
