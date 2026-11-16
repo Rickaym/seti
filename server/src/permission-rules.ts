@@ -1,11 +1,13 @@
 import type {
   AddPermissionRuleInput,
+  AddPermissionRulesInput,
   AgentPermissions,
   AnswerPermissionInput,
   PermissionPolicy,
   PermissionRequest,
   PermissionRule,
   PermissionScope,
+  ReviewCoverage,
   Task,
 } from '@seti/shared'
 import { audit } from './audit.js'
@@ -17,6 +19,7 @@ import { projectSettingsRules, userSettingsRules } from './inherited-rules.js'
 import { changedFields, withFields } from './permission-edits.js'
 import { builtInRules, GUARDS } from './permission-policy.js'
 import { allowed, denied, inputText, resolveRequest, waitingInput, waitsFor } from './permission-requests.js'
+import { reviewCoverage, reviewGaps } from './review-coverage.js'
 import { liveSessions } from './runner.js'
 import { permissionSettings } from './session-options.js'
 import { permissionRequests, permissionRules } from './store/permissions.js'
@@ -36,22 +39,38 @@ async function refreshPermissions(taskId?: string): Promise<void> {
 /** How many of an agent's past requests its transcript shows. */
 const RECENT_REQUESTS = 50
 
+const reviewRules = (rules: readonly PermissionRule[]) =>
+  rules.filter((rule) => rule.behavior === 'review').map((rule) => rule.rule)
+
 export async function permissionPolicy(): Promise<PermissionPolicy> {
+  const rules = await permissionRules.list(null)
+  const review = reviewRules(rules)
   return {
     built_in: builtInRules(),
     inherited: userSettingsRules(),
     guards: GUARDS,
-    rules: await permissionRules.list(null),
+    rules,
+    review_gaps: reviewGaps(review, review),
   }
 }
 
 /** The agent's rules, with what it loads from its project's Claude Code settings too. */
 export async function agentPermissions(task: Task): Promise<AgentPermissions> {
+  const policy = await permissionPolicy()
+  const own = await permissionRules.list(task.id)
+  const review = reviewRules(own)
   return {
-    ...(await permissionPolicy()),
-    own: await permissionRules.list(task.id),
+    ...policy,
+    own,
     project: projectSettingsRules(task.cwd),
+    review_gaps: reviewGaps(review, [...reviewRules(policy.rules), ...review]),
   }
+}
+
+/** The writing tools of a rule's server; `task` null counts only the review rules for every agent. */
+export async function ruleCoverage(task: Task | null, rule: string): Promise<ReviewCoverage> {
+  const own = task === null ? [] : await permissionRules.list(task.id)
+  return reviewCoverage(rule, reviewRules([...(await permissionRules.list(null)), ...own]))
 }
 
 async function auditRule(task: Task | null, rule: PermissionRule, change: 'added' | 'removed'): Promise<void> {
@@ -78,13 +97,33 @@ async function auditRule(task: Task | null, rule: PermissionRule, change: 'added
 
 const RULES_ARE_THE_USERS = 'change permission rules'
 
-/** Adds a rule for every agent with `task` null, else for that agent; open sessions take it now. */
-export async function addPermissionRule(task: Task | null, input: AddPermissionRuleInput): Promise<PermissionRule> {
+/** Adds rules for every agent with `task` null, else for that agent; open sessions take them now. */
+export async function addPermissionRules(task: Task | null, input: AddPermissionRulesInput): Promise<PermissionRule[]> {
   refuseAgent(RULES_ARE_THE_USERS)
-  const { rule, added } = await permissionRules.add(task?.id ?? null, input.behavior, input.rule)
-  if (added) {
-    await auditRule(task, rule, 'added')
-    await refreshPermissions(task?.id)
+  const rules: PermissionRule[] = []
+  let changed = false
+  try {
+    for (const text of new Set(input.rules)) {
+      const { rule, added } = await permissionRules.add(task?.id ?? null, input.behavior, text)
+      rules.push(rule)
+      if (added) {
+        changed = true
+        await auditRule(task, rule, 'added')
+      }
+    }
+  } finally {
+    if (changed) {
+      await refreshPermissions(task?.id)
+    }
+  }
+  return rules
+}
+
+/** Adds one rule, as addPermissionRules does. */
+export async function addPermissionRule(task: Task | null, input: AddPermissionRuleInput): Promise<PermissionRule> {
+  const [rule] = await addPermissionRules(task, { behavior: input.behavior, rules: [input.rule] })
+  if (rule === undefined) {
+    throw new HttpError(500, 'The rule was not added')
   }
   return rule
 }

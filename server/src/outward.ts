@@ -95,14 +95,22 @@ export function bashCommand(input: unknown): string {
 /** Seti tools that change only the calling agent's own row in Seti. */
 const OWN_ROW_TOOLS = new Set(['mcp__seti__set_status'])
 
+/** What the words of an MCP tool's name say it does; a write word beats a read word. */
+export function mcpNameKind(name: string): 'write' | 'read' | 'unknown' {
+  const w = words(name.split('__').pop() ?? '')
+  if (w.some((x) => WRITE_WORDS.has(x))) {
+    return 'write'
+  }
+  return w.some((x) => READ_WORDS.has(x)) ? 'read' : 'unknown'
+}
+
 /** True when a tool call can change something outside this machine. Unknown MCP tools count. */
 export function isOutward(name: string, input: unknown): boolean {
   if (OWN_ROW_TOOLS.has(name)) {
     return false
   }
   if (name.startsWith('mcp__')) {
-    const w = words(name.split('__').pop() ?? '')
-    return w.some((x) => WRITE_WORDS.has(x)) || !w.some((x) => READ_WORDS.has(x))
+    return mcpNameKind(name) !== 'read'
   }
   if (name === 'Bash') {
     const cmd = bashCommand(input)
