@@ -79,7 +79,8 @@ it later. It keeps a transcript of what was said and every tool it ran. Status i
 (a turn in progress), idle (waiting for the user), stopped, interrupted or error. The UI lists \
 tasks under Agents and calls each one an agent, so say agent to the user; tools still say task.
 - Pull requests link to tasks: the ones a task's agent opened, plus any the user linked. Seti \
-tracks their CI, reviews, merge conflicts and preview deployments. Once a PR merges or closes, \
+also lists every open PR the user wrote, in any repo on GitHub, not only repos it has a checkout \
+of. It tracks their CI, reviews, merge conflicts and preview deployments. Once a PR merges or closes, \
 Seti tells the agent and unlinks it, so linked PRs are open ones.
 - Changes on a linked PR, such as failing CI, a review or a comment, arrive as updates. Depending \
 on the task's setting they wake the agent, wait for the user's next message, or are ignored. You \

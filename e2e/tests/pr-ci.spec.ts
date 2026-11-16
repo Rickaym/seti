@@ -135,11 +135,12 @@ test('chips, list rows and palette rows open the PR on GitHub in a new tab', asy
 
   const list: PrList = {
     viewer: 'e2e',
-    scope: 'all',
-    repos: [{ repo_id: RED, slug: RED, error: null, previews: false, prs: [OPEN[0] ?? pr(RED, 5)] }],
+    prs: [OPEN[0] ?? pr(RED, 5)],
+    error: null,
+    more: 0,
     previews_on: true,
   }
-  await page.route(/\/api\/prs\?scope=all$/, async (route) => route.fulfill({ json: { data: list, meta: {} } }))
+  await page.route(/\/api\/prs$/, async (route) => route.fulfill({ json: { data: list, meta: {} } }))
   await page.evaluate(() => {
     const opened: unknown[][] = []
     Object.assign(window, { opened })

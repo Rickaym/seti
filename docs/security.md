@@ -804,6 +804,16 @@ request joins only the asking agent's credential, with the key the user pasted o
 none until the user fills it in. The EA and agents' Seti tools cannot see or change connections; the server
 refuses them.
 
+## Pull requests from GitHub
+
+The PR views read GitHub with the host's `gh` login, which Seti neither stores nor reads: it runs
+`gh api` with an argument list and no shell. The list holds every open PR that login wrote and
+every open PR linked to an agent, in any repo, so titles, branch names, check names and comments
+from all of them are untrusted text. The UI renders them as text, the PR URL in a request must
+match the anchored GitHub PR pattern, and agents and the EA receive them as tool results. The
+tokens of a credential, per owner or default, are never used for these calls. Seti writes to a PR
+in one case: the preview label, on an open PR it lists, while the PR previews mod is on.
+
 ## Public demo
 
 The public demo is a separate entry point, `server/src/demo/main.ts`, that starts only with

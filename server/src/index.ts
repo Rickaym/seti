@@ -46,6 +46,7 @@ import { retireBundledPlugins } from './plugins.js'
 import { pollerScheduler } from './pollers/service.js'
 import { prDiscovery } from './pr-discovery.js'
 import { prInputs } from './pr-inputs.js'
+import { warmOpenPrs } from './prs.js'
 import { expireLeftoverQuestions } from './questions.js'
 import { cache } from './redis.js'
 import { reminderTicker } from './reminders/service.js'
@@ -167,6 +168,7 @@ audit.startRetention()
 await pollerScheduler.start()
 reminderTicker.start()
 prInputs.start()
+warmOpenPrs()
 prDiscovery.start()
 startBackups(DATABASE_URL, BACKUP_DIR, BACKUP)
 startTaskRetention(TASK_RETENTION_DAYS)

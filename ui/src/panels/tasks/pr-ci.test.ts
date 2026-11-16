@@ -5,7 +5,6 @@ import { checkOutcome, fixCiMessage, needsFix } from './pr-ci'
 function pr(number: number, over: Partial<PullRequest> = {}): PullRequest {
   return {
     key: `web-${String(number)}`,
-    repo_id: 'e2e/web',
     repo_slug: 'e2e/web',
     number,
     title: `change ${String(number)}`,

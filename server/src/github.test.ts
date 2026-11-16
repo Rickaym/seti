@@ -4,9 +4,11 @@ import {
   labelAddArgs,
   labelListArgs,
   labelRemoveArgs,
-  parsePrResponse,
+  openPrQueryArgs,
+  parseOpenPrResponse,
+  parseSearchResponse,
   parseWatchResponse,
-  prQueryArgs,
+  searchQueryArgs,
   watchQueryArgs,
 } from './github.js'
 import { prDecorators } from './pr-decorators.js'
@@ -26,7 +28,7 @@ vi.mock('node:child_process', () => ({
   },
 }))
 
-const REPO = { id: 'r1', slug: 'globex/dashboard' }
+const SLUG = 'globex/dashboard'
 
 const READY = [
   '## Preview Environment Ready',
@@ -41,6 +43,8 @@ const node = {
   title: 'fix(workflow): editor top bar',
   body: 'Pairs with globex/voice-bot#88.\n\n```\nsee #1\n```',
   url: 'https://github.com/globex/dashboard/pull/2231',
+  state: 'OPEN',
+  repository: { nameWithOwner: SLUG },
   isDraft: false,
   headRefName: 'fix/workflow-editor-top-bar',
   baseRefName: 'staging-eu',
@@ -90,14 +94,19 @@ const node = {
   reviewThreads: { nodes: [{ isResolved: false }, { isResolved: true }, { isResolved: false }] },
 }
 
-const response = (nodes: unknown[]) => JSON.stringify({ data: { repository: { pullRequests: { nodes } } } })
+const response = (nodes: unknown[], issueCount = nodes.length, endCursor: string | null = null) =>
+  JSON.stringify({
+    data: { search: { issueCount, pageInfo: { hasNextPage: endCursor !== null, endCursor }, nodes } },
+  })
 
-describe('parsePrResponse', () => {
+const parsed = (nodes: unknown[]) => parseSearchResponse(response(nodes)).prs
+
+describe('parseSearchResponse', () => {
   it('normalizes a GraphQL pull request', () => {
-    const [pr] = parsePrResponse(REPO, response([node]))
+    const [pr] = parsed([node])
     expect(pr).toMatchObject({
       key: 'dashboard-2231',
-      repo_id: 'r1',
+      repo_slug: SLUG,
       author: 'alice-dev',
       review_decision: 'changes_requested',
       mergeable: 'mergeable',
@@ -111,8 +120,9 @@ describe('parsePrResponse', () => {
       { slug: 'globex/voice-bot', number: 88, place: 'body', pull: false },
       { slug: 'globex/dashboard', number: 2240, place: 'comment', pull: false },
     ])
-    expect(prQueryArgs(REPO.slug).join(' ')).toContain('number title body url')
-    expect(prQueryArgs(REPO.slug).join(' ')).toContain('reviewThreads(first: 100) { nodes { isResolved } }')
+    expect(pr).not.toHaveProperty('repo_id')
+    expect(searchQueryArgs().join(' ')).toContain('number title body url')
+    expect(searchQueryArgs().join(' ')).toContain('reviewThreads(first: 100) { nodes { isResolved } }')
     expect(pr?.checks).toEqual([
       { name: 'test', state: 'success', detail: 'success', url: 'https://github.com/x/runs/1' },
       { name: 'build', state: 'pending', detail: 'in_progress', url: null },
@@ -136,9 +146,9 @@ describe('parsePrResponse', () => {
         return { preview, preview_host: 'dashboard-pr-2231.seti.localhost' }
       },
     })
-    const [pr] = parsePrResponse(REPO, response([node]))
+    const [pr] = parsed([node])
     dispose()
-    expect(seen).toEqual([{ slug: REPO.slug, number: 2231, headOid: node.headRefOid }, 'github-actions'])
+    expect(seen).toEqual([{ slug: SLUG, number: 2231, headOid: node.headRefOid }, 'github-actions'])
     expect(pr).toMatchObject({ preview, preview_host: 'dashboard-pr-2231.seti.localhost' })
   })
 
@@ -150,23 +160,56 @@ describe('parsePrResponse', () => {
       reviewThreads: { nodes: [] },
       reviewDecision: null,
     }
-    const [pr] = parsePrResponse(REPO, response([bare]))
+    const [pr] = parsed([bare])
     expect(pr).toMatchObject({ ci: null, checks: [], unresolved_threads: 0, review_decision: null, preview_host: null })
     expect(pr?.preview.state).toBe('none')
   })
 
   it('rejects output that does not match the schema', () => {
-    expect(() => parsePrResponse(REPO, response([{ ...node, number: '2231' }]))).toThrow()
-    expect(() => parsePrResponse(REPO, response([{ ...node, reviewThreads: { nodes: [{}] } }]))).toThrow()
-    expect(() => parsePrResponse(REPO, JSON.stringify({ data: { repository: null } }))).toThrow(/no repository/)
+    expect(() => parsed([{ ...node, number: '2231' }])).toThrow()
+    expect(() => parsed([{ ...node, reviewThreads: { nodes: [{}] } }])).toThrow()
+    expect(() => parseSearchResponse(JSON.stringify({ data: { search: null } }))).toThrow()
+  })
+
+  it('names each PR by the repo GitHub reports and counts the PRs beyond the page', () => {
+    const elsewhere = {
+      ...node,
+      number: 7,
+      url: 'https://github.com/initech/billing/pull/7',
+      repository: { nameWithOwner: 'initech/billing' },
+    }
+    const found = parseSearchResponse(response([node, {}, elsewhere, { ...node, state: 'MERGED' }], 77))
+    expect(found).toMatchObject({ total: 77, next: null })
+    expect(parseSearchResponse(response([node], 77, 'Y3Vyc29yOjUw')).next).toBe('Y3Vyc29yOjUw')
+    expect(found.prs.map((pr) => [pr.key, pr.repo_slug])).toEqual([
+      ['dashboard-2231', SLUG],
+      ['billing-7', 'initech/billing'],
+    ])
+  })
+})
+
+describe('parseOpenPrResponse', () => {
+  it('keeps the open PRs among the URLs, in any repo', () => {
+    const urls = [node.url, 'https://github.com/globex/dashboard/pull/1', 'https://github.com/globex/gone/pull/2']
+    const stdout = JSON.stringify({ data: { p0: node, p1: { ...node, number: 1, state: 'CLOSED' }, p2: null } })
+    expect(parseOpenPrResponse(urls, stdout).map((pr) => pr.key)).toEqual(['dashboard-2231'])
   })
 })
 
 describe('gh arguments', () => {
-  it('builds the PR query without a shell', () => {
-    const args = prQueryArgs('globex/dashboard')
+  it('builds one search for the open PRs of the gh login, without a shell', () => {
+    const args = searchQueryArgs()
     expect(args.slice(0, 3)).toEqual(['api', 'graphql', '-f'])
-    expect(args.slice(-4)).toEqual(['-f', 'owner=globex', '-f', 'name=dashboard'])
+    expect(args[3]).toContain('search(type: ISSUE, query: $q, first: 50, after: $after)')
+    expect(args[3]).toContain('pageInfo { hasNextPage endCursor }')
+    expect(args.slice(-2)).toEqual(['-f', 'q=is:pr is:open author:@me sort:updated-desc'])
+    expect(searchQueryArgs('Y3Vyc29yOjUw').slice(-2)).toEqual(['-f', 'after=Y3Vyc29yOjUw'])
+  })
+
+  it('looks linked PRs up by URL with the fields of the search', () => {
+    const args = openPrQueryArgs(['https://github.com/globex/dashboard/pull/1'])
+    expect(args[3]).toContain('p0: resource(url: $u0) { ... on PullRequest { number title body url state')
+    expect(args.slice(-2)).toEqual(['-f', 'u0=https://github.com/globex/dashboard/pull/1'])
   })
 
   it('builds the label calls on the issues REST API', () => {

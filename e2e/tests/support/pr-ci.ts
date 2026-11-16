@@ -13,7 +13,6 @@ export function pr(slug: string, number: number, over: Partial<PullRequest> = {}
   const repo = slug.split('/').at(-1) ?? slug
   return {
     key: `${repo}-${String(number)}`,
-    repo_id: slug,
     repo_slug: slug,
     number,
     title: `${repo} change ${String(number)}`,

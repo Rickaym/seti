@@ -332,6 +332,31 @@ worker. Each run's engine is dropped whole rather than freed, since this QuickJS
 teardown asserts after a garbage collection inside a promise job; a trap inside the engine reads as
 "The script ran out of memory" and retires its worker too.
 
+## The PR views read GitHub, not a repo list
+
+The PR views show two sets merged into one list: every open PR the `gh` login wrote, in any repo
+on GitHub, and every open PR linked to an agent, whether the agent opened it or the user linked
+it. A PR needs no registered repo to show its title, CI, review threads, owning agents and Fix CI.
+Open PRs that other people wrote appear only once an agent links them.
+
+One refresh reads the GraphQL `search(type: ISSUE, first: 50)` for
+`is:pr is:open author:@me sort:updated-desc` with every field the views read, page by page along
+its cursors, up to four pages (200 PRs) and about 3 points of the budget a page. It stops after
+the first page while the budget is under the poller's floor. Then one `resource(url:)` query per
+20 linked PRs the search left out follows (`server/src/github.ts`). `more` in the list counts the
+login's PRs past the cap; the picker shows it as one line and the tools say so.
+`server/src/prs.ts` keeps the list for 60 seconds, then serves it stale while one process
+refreshes it, and shares it through Redis. Seti reads the list once a few seconds after it starts.
+A list view that asks before any list exists gets the first page as soon as it arrives; status
+lookups wait for the whole list. A PR linked after the list was read makes the next status lookup
+refresh once, so its chip has a status at once. Every query runs as the host's `gh` login, the
+same one the PR poller uses; the per-owner tokens of a credential are for agents' own requests
+through the egress proxy and are never used here, so a PR in a repo that login cannot read shows
+without a status.
+
+Starting an agent on a PR's branch still needs a checkout, so `start_agent_from_pr` refuses a PR
+whose repo Seti has none of.
+
 ## Mods add to Seti through registries with disposers
 
 A mod is a package described by `seti-mod.json`, validated by `modManifest` in

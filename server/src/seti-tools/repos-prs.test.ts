@@ -124,7 +124,6 @@ describe('PR tools', () => {
   }
   const pr: PullRequest = {
     key: 'web-7',
-    repo_id: repo.id,
     repo_slug: repo.slug,
     number: 7,
     title: 'Fix the login form',
@@ -147,22 +146,40 @@ describe('PR tools', () => {
     related: [],
   }
 
+  const far: PullRequest = {
+    ...pr,
+    key: 'billing-4',
+    repo_slug: 'initech/billing',
+    number: 4,
+    title: 'Round the totals',
+    url: 'https://github.com/initech/billing/pull/4',
+  }
+
   beforeAll(async () => {
     repo.path = checkout('acme/web')
     await repos.insert(repo)
     github.list = {
       viewer: 'octo',
-      scope: 'all',
-      repos: [{ ...repo, repo_id: repo.id, error: null, previews: true, prs: [pr] }],
+      prs: [{ ...pr, preview: { state: 'ready', url: 'https://pr-7.example.com', commit: 'abc', stale: false } }, far],
+      error: null,
+      more: 3,
       previews_on: false,
     }
   })
 
   it('lists, reads and previews open PRs by number or URL', async () => {
     const caller = await newCaller()
-    expect((await call(caller, 'list_prs', { scope: 'all' })).data()).toMatchObject({
-      prs: [{ key: 'web-7', ci: 'failure', unresolved_threads: 2 }],
+    expect((await call(caller, 'list_prs', {})).data()).toMatchObject({
+      error: null,
+      more_not_listed: 3,
+      prs: [{ key: 'web-7', ci: 'failure', unresolved_threads: 2 }, { key: 'billing-4' }],
     })
+    expect((await call(caller, 'get_pr', { pr: far.url })).data()).toMatchObject({
+      repo: 'initech/billing',
+      ci: 'failure',
+      checks: [{ name: 'lint' }],
+    })
+    expect((await call(caller, 'get_repo', { repo: 'acme/web' })).data()).toMatchObject({ prs: [{ key: 'web-7' }] })
     expect((await call(caller, 'get_pr', { pr: 'web #7' })).data()).toMatchObject({
       unresolved_threads: 2,
       checks: [{ name: 'lint' }],
@@ -191,6 +208,8 @@ describe('PR tools', () => {
       profile_id: caller.profile_id,
       pr_urls: [pr.url],
     })
+    const refused = await call(caller, 'start_agent_from_pr', { pr: far.url, instructions: 'Fix lint' })
+    expect(refused.text).toContain('Seti has no checkout of initech/billing')
   })
 })
 

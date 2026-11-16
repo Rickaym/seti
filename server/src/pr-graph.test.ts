@@ -15,7 +15,6 @@ function pr(slug: string, spec: Spec): OpenPr {
   const name = slug.split('/').at(-1) ?? slug
   return {
     key: `${name}-${String(spec.number)}`,
-    repo_id: slug,
     repo_slug: slug,
     number: spec.number,
     title: `${name} ${String(spec.number)}`,

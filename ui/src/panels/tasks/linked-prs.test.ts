@@ -7,7 +7,6 @@ const url = (repo: string, number: number) => `https://github.com/e2e/${repo}/pu
 function pr(repo: string, number: number, over: Partial<PullRequest> = {}): PullRequest {
   return {
     key: `${repo}-${String(number)}`,
-    repo_id: `e2e/${repo}`,
     repo_slug: `e2e/${repo}`,
     number,
     title: `${repo} change ${String(number)}`,

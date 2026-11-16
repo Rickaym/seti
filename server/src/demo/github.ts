@@ -126,12 +126,11 @@ function fields(args: readonly string[]): Map<string, string> {
 
 function graphql(args: readonly string[]): string {
   const given = fields(args)
-  const owner = given.get('owner')
-  const name = given.get('name')
-  if (owner !== undefined && name !== undefined) {
-    const slug = `${owner}/${name}`
-    const nodes = [...prs.values()].filter((pr) => pr.slug === slug).map(prNode)
-    return JSON.stringify({ data: { repository: { pullRequests: { nodes } } } })
+  if (given.has('q')) {
+    const nodes = [...prs.values()].map(prNode)
+    return JSON.stringify({
+      data: { search: { issueCount: nodes.length, pageInfo: { hasNextPage: false, endCursor: null }, nodes } },
+    })
   }
   const lookups = [...given].filter(([key]) => /^u\d+$/.test(key))
   const data = Object.fromEntries(

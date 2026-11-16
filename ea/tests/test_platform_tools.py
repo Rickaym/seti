@@ -4,7 +4,6 @@ import pytest
 from fakes import (
     NOW,
     PR_SETI,
-    REPO_WEB,
     SUB_EXPLORE,
     SUB_TESTS,
     TASK_DOCS,
@@ -40,7 +39,7 @@ async def test_overview_covers_every_area(tools: EaTools, fake_seti: FakeSeti) -
         "Agents made 1 outward call in the last hour.",
     ]
     assert result.summary == "Read the Seti overview"
-    assert gets(fake_seti, "/api/prs") == [{"scope": "mine"}]
+    assert gets(fake_seti, "/api/prs") == [{}]
     assert not fake_seti.posts()
 
 
@@ -191,7 +190,7 @@ async def test_overview_changelog_with_only_upkeep(tools: EaTools, fake_seti: Fa
 async def test_overview_of_an_empty_seti(tools: EaTools, fake_seti: FakeSeti) -> None:
     fake_seti.tasks = []
     fake_seti.audit = []
-    fake_seti.prs = {"viewer": None, "scope": "mine", "repos": [], "clusters": []}
+    fake_seti.prs = {"viewer": None, "prs": [], "error": None, "more": 0}
     result = await tools.call("seti_overview", {})
     assert result.text.splitlines() == [
         "No tasks.",
@@ -401,7 +400,7 @@ async def test_get_pr_resolves_many_ways(tools: EaTools, ref: str) -> None:
 
 
 async def test_get_pr_details(tools: EaTools, fake_seti: FakeSeti) -> None:
-    seti_prs = fake_seti.prs["repos"][0]["prs"]
+    seti_prs = fake_seti.prs["prs"]
     seti_prs[0]["checks"].append({"name": "deploy", "state": "pending", "detail": "", "url": None})
     seti_prs[0]["checks"].append({"name": "docs", "state": "neutral", "detail": "", "url": None})
     seti_prs[0]["labels"] = ["preview", "bug"]
@@ -435,10 +434,8 @@ async def test_get_pr_details(tools: EaTools, fake_seti: FakeSeti) -> None:
 
 
 async def test_get_pr_disambiguates_numbers_by_repo(tools: EaTools, fake_seti: FakeSeti) -> None:
-    web = pr(
-        "https://github.com/Octocat/web/pull/28", "feat: web thing", repo_id=REPO_WEB, repo_slug="Octocat/web"
-    )
-    fake_seti.prs["repos"][1] = {**fake_seti.prs["repos"][1], "error": None, "prs": [web]}
+    web = pr("https://github.com/Octocat/web/pull/28", "feat: web thing", repo_slug="Octocat/web")
+    fake_seti.prs["prs"].append(web)
     ambiguous = await tools.call("get_pr", {"pr": "PR 28"})
     assert not ambiguous.ok
     assert '"PR 28" matches 2 open PRs' in ambiguous.text
@@ -449,7 +446,7 @@ async def test_get_pr_disambiguates_numbers_by_repo(tools: EaTools, fake_seti: F
 async def test_get_pr_closed_or_unknown(tools: EaTools, fake_seti: FakeSeti) -> None:
     closed = await tools.call("get_pr", {"pr": "https://github.com/Octocat/seti/pull/7"})
     assert not closed.ok
-    assert closed.text == "seti PR 7 is merged, closed, or not in a registered repo."
+    assert closed.text == "seti PR 7 is merged, closed, or out of reach of Seti's GitHub login."
     assert gets(fake_seti, "/api/prs/by-url") == [{"url": "https://github.com/Octocat/seti/pull/7"}]
     unknown = await tools.call("get_pr", {"pr": "PR 99"})
     assert not unknown.ok
@@ -668,6 +665,7 @@ async def test_get_repo(tools: EaTools, fake_seti: FakeSeti) -> None:
         "1 open PR, 1 failing CI, 0 with merge conflicts.",
         "Context files: CLAUDE.md 1.2 KB, CLAUDE.local.md 300 bytes.",
     ]
+    fake_seti.prs["error"] = "gh failed"
     web = await tools.call("get_repo", {"repo": "octocat/web"})
     assert web.text.splitlines() == [
         "Octocat/web, base branch dev.",

@@ -34,7 +34,6 @@ async function seedTask(title: string, status: 'idle' | 'error' = 'idle'): Promi
 
 const failingPr: PullRequest = {
   key: 'touch-7',
-  repo_id: SLUG,
   repo_slug: SLUG,
   number: 7,
   title: 'touch change',

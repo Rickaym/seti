@@ -1,5 +1,4 @@
 import {
-  PR_SCOPES,
   PREVIEW_LABEL,
   repoInput,
   startAgentInput,
@@ -32,7 +31,7 @@ const prRef = z
 
 const repoRef = z.string().trim().min(1).describe('The repo by slug (owner/name), name or id.')
 
-const openPrs = async () => (await listPrs('all')).repos.flatMap((group) => group.prs)
+const openPrs = async () => (await listPrs()).prs
 
 /** The PR without its long check details, as list and get answers show it. */
 const prBrief = (pr: PullRequest) => ({
@@ -59,7 +58,7 @@ async function prByUrl(prs: readonly PullRequest[], match: RegExpExecArray): Pro
   const url = `https://github.com/${owner}/${name}/pull/${number}`
   const found = prs.find((pr) => pr.url.toLowerCase() === url.toLowerCase()) ?? (await findPr(url))
   if (found === null) {
-    throw new ToolRefusal(`${owner}/${name}#${number} is merged, closed, or not in a registered repo.`)
+    throw new ToolRefusal(`${owner}/${name}#${number} is merged, closed, or out of reach of Seti's GitHub login.`)
   }
   return found
 }
@@ -114,16 +113,11 @@ const resolveRepo = async (ref: string): Promise<Repo> =>
 const listPrsTool = setiTool({
   name: 'list_prs',
   description:
-    'List open pull requests in registered repos, newest first, with CI, unresolved review threads, review, merge state, preview and linked agents. Scope mine (the default) or all.',
-  input: { scope: z.enum(PR_SCOPES).default('mine') },
-  run: async ({ scope }) => {
-    const list = await listPrs(scope)
-    const prs = list.repos.flatMap((group) => group.prs).sort((a, b) => b.updated_at.localeCompare(a.updated_at))
-    return {
-      viewer: list.viewer,
-      errors: list.repos.flatMap((group) => (group.error === null ? [] : [{ repo: group.slug, error: group.error }])),
-      prs: prs.map(prBrief),
-    }
+    "List the open pull requests Seti's GitHub login wrote and those agents opened or linked, in any repo, newest first, with CI, unresolved review threads, review, merge state, preview and linked agents.",
+  input: {},
+  run: async () => {
+    const list = await listPrs()
+    return { viewer: list.viewer, error: list.error, more_not_listed: list.more, prs: list.prs.map(prBrief) }
   },
 })
 
@@ -150,12 +144,11 @@ const requestPreviewTool = setiTool({
   input: { pr: prRef },
   run: async ({ pr: ref }) => {
     const pr = await resolvePr(ref)
-    const list = await listPrs('all')
+    const list = await listPrs()
     if (!list.previews_on) {
       throw new ToolRefusal(PREVIEWS_OFF)
     }
-    const group = list.repos.find((entry) => entry.repo_id === pr.repo_id)
-    if (group !== undefined && !group.previews) {
+    if (!list.prs.some((open) => open.repo_slug === pr.repo_slug && open.preview.state !== 'none')) {
       throw new ToolRefusal(`Seti has no previews for ${pr.repo_slug}, so it offers no Preview action there.`)
     }
     const [owner = '', name = ''] = pr.repo_slug.split('/')
@@ -174,6 +167,11 @@ const startAgentFromPr = setiTool({
   },
   run: async ({ pr: ref, instructions, title }, ctx) => {
     const pr = await resolvePr(ref)
+    const slug = pr.repo_slug.toLowerCase()
+    const repo = (await repos.list()).find((known) => known.slug.toLowerCase() === slug)
+    if (repo === undefined) {
+      throw new ToolRefusal(`Seti has no checkout of ${pr.repo_slug} to start an agent in. Add the repo first.`)
+    }
     const prompt = [
       `Work on pull request #${String(pr.number)} in ${pr.repo_slug}: ${pr.title}`,
       pr.url,
@@ -187,7 +185,7 @@ const startAgentFromPr = setiTool({
     const input = startAgentInput.parse({
       title: title ?? `PR #${String(pr.number)}: ${pr.title}`,
       prompt,
-      repo_ids: [pr.repo_id],
+      repo_ids: [repo.id],
       worktree: true,
       ref: pr.head_ref,
       pr_urls: [pr.url],
@@ -207,19 +205,19 @@ const listRepos = setiTool({
 
 const getRepo = setiTool({
   name: 'get_repo',
-  description: 'One registered repo: the agents working in it, its open PRs and its CLAUDE.md files.',
+  description: 'One registered repo: the agents working in it, its open PRs that Seti lists and its CLAUDE.md files.',
   input: { repo: repoRef },
   run: async ({ repo: ref }) => {
     const repo = await resolveRepo(ref)
-    const [agents, list, files] = await Promise.all([taskListEntries(), listPrs('all'), listContextFiles()])
-    const group = list.repos.find((entry) => entry.repo_id === repo.id)
+    const [agents, list, files] = await Promise.all([taskListEntries(), listPrs(), listContextFiles()])
+    const slug = repo.slug.toLowerCase()
     return {
       ...repo,
       agents: agents
         .filter((task) => task.repos.some((entry) => entry.id === repo.id))
         .map(({ id, title, status }) => ({ id, title, status })),
-      pr_error: group?.error ?? null,
-      prs: (group?.prs ?? []).map(prBrief),
+      pr_error: list.error,
+      prs: list.prs.filter((pr) => pr.repo_slug.toLowerCase() === slug).map(prBrief),
       context_files: files
         .filter((file) => file.key.startsWith(`repo:${repo.id}:`))
         .map(({ key, label, exists, size }) => ({ key, label, exists, size })),

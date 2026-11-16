@@ -8,6 +8,7 @@ from fakes import (
     TASK_LOGOUT,
     FakeSeti,
     make_task,
+    pr,
     subtask,
 )
 from pipecat.utils.async_tool_cancellation import cancel_tool_name
@@ -143,7 +144,7 @@ async def test_get_task_reports_prs_updates_and_digest(tools: EaTools) -> None:
     assert (
         "- seti PR 28, fix: login redirect: CI failing (e2e), changes requested, preview out of date"
     ) in text
-    assert "- seti PR 7: not open in a registered repo" in text
+    assert "- seti PR 7: not open, or GitHub gave no status" in text
     assert "2 updates waiting for the agent (the agent gets them when this turn ends)" in text
     assert "CI failed on seti#28; Review on seti#28" in text
     assert "old update" not in text
@@ -278,28 +279,37 @@ async def test_start_task_in_an_existing_directory(tools: EaTools, fake_seti: Fa
 
 
 async def test_list_prs(tools: EaTools, fake_seti: FakeSeti) -> None:
-    result = await tools.call("list_prs", {"scope": "all"})
+    far = pr("https://github.com/initech/billing/pull/4", "fix: totals", repo_slug="initech/billing")
+    fake_seti.prs["prs"].append(far)
+    fake_seti.prs["more"] = 27
+    result = await tools.call("list_prs", {})
     assert result.ok
-    lines = result.text.splitlines()
-    assert lines[0] == "1 open PR in total."
-    assert lines[1] == "Could not load web: gh failed"
-    assert lines[2] == (
+    assert result.text.splitlines() == [
+        "2 open PRs of yours and your agents.",
+        "GitHub has 27 more open of yours; these are the most recently updated.",
         "- seti PR 28, fix: login redirect: CI failing (e2e), changes requested, preview out of date; "
-        "task Fix the login redirect bug (running)"
-    )
-    assert fake_seti.requests[-1].url.params["scope"] == "all"
+        "task Fix the login redirect bug (running)",
+        "- billing PR 4, fix: totals: CI passing; no task",
+    ]
+    assert dict(fake_seti.requests[-1].url.params) == {}
+
+
+async def test_list_prs_reports_a_github_error(tools: EaTools, fake_seti: FakeSeti) -> None:
+    fake_seti.prs = {"viewer": "octocat", "prs": [], "error": "gh failed", "more": 0}
+    result = await tools.call("list_prs", {})
+    assert result.text.splitlines()[1] == "Could not load the open PRs: gh failed"
 
 
 async def test_list_prs_counts_unresolved_review_threads(tools: EaTools, fake_seti: FakeSeti) -> None:
-    fake_seti.prs["repos"][0]["prs"][0]["unresolved_threads"] = 1
-    result = await tools.call("list_prs", {"scope": "all"})
+    fake_seti.prs["prs"][0]["unresolved_threads"] = 1
+    result = await tools.call("list_prs", {})
     assert "CI failing (e2e), 1 unresolved review thread, changes requested" in result.text
 
 
 async def test_list_prs_without_github_login(tools: EaTools, fake_seti: FakeSeti) -> None:
-    fake_seti.prs = {"viewer": None, "scope": "mine", "repos": [], "clusters": []}
+    fake_seti.prs = {"viewer": None, "prs": [], "error": None, "more": 0}
     result = await tools.call("list_prs", {})
-    assert result.text.startswith("0 open PRs of yours.\nThe GitHub CLI is not logged in")
+    assert result.text.startswith("0 open PRs of yours and your agents.\nThe GitHub CLI is not logged in")
 
 
 async def test_list_repos(tools: EaTools) -> None:

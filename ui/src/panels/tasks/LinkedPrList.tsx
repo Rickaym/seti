@@ -74,7 +74,7 @@ function LinkedPrRow({ item, path, owner, agent, onChanged, onSent }: RowProps) 
             />
             <ScrollOnHover
               className={cn((pr === null || draft) && 'text-muted-foreground')}
-              text={pr?.title ?? (item.group === 'open' ? 'No status: not in a registered repo' : title)}
+              text={pr?.title ?? (item.group === 'open' ? 'No status from GitHub' : title)}
             />
           </span>
           <RowMeta item={item} />
