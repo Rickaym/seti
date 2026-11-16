@@ -2,7 +2,6 @@ import {
   AGENT_COLOR_PRESETS,
   agentColorFromWords,
   listedStatus,
-  restartSessionInput,
   rewindInput,
   sendMessageInput,
   startAgentInput,
@@ -293,13 +292,13 @@ const stopBackgroundWork = setiTool({
 const restartAgentSession = setiTool({
   name: 'restart_agent_session',
   description:
-    "Restart another agent's Claude Code session, as when its MCP servers failed or it seems stuck: the conversation is kept and its background work ends; a running turn stops first. With fresh it forgets the conversation instead.",
-  input: { task: taskRef, fresh: restartSessionInput.shape.fresh },
-  run: async ({ task: ref, fresh }, ctx) => {
+    "Restart another agent's Claude Code session, as when its MCP servers failed or it seems stuck: the conversation is kept and its background work ends; a running turn stops first.",
+  input: { task: taskRef },
+  run: async ({ task: ref }, ctx) => {
     const task = await liveTask(ref)
     notSelf(ctx, task, 'restart')
-    await restartSession(task, { interrupt: true, fresh })
-    return done(`Restarted the session of ${task.title}${fresh ? ' fresh' : ''}.`)
+    await restartSession(task, { interrupt: true })
+    return done(`Restarted the session of ${task.title}.`)
   },
 })
 

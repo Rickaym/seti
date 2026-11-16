@@ -242,16 +242,9 @@ ACTION_SPECS: list[ToolSpec] = [
         "restart_agent_session",
         "Restart an agent's Claude Code session, as when its MCP servers failed to connect, a sign-in "
         "or config change should take effect, or it seems stuck: the conversation is kept, and its "
-        "background shells, processes and subagents end. A running turn stops first. With fresh, the "
-        "agent starts a new session that forgets the conversation instead. Needs the user's yes.",
-        {
-            "task": TASK_REF,
-            "fresh": {
-                "type": "boolean",
-                "description": "true to start a fresh session without the conversation.",
-            },
-            "confirmed": CONFIRMED,
-        },
+        "background shells, processes and subagents end. A running turn stops first. Needs the "
+        "user's yes.",
+        {"task": TASK_REF, "confirmed": CONFIRMED},
         ["task"],
     ),
     ToolSpec(
@@ -870,35 +863,23 @@ class AgentActions:
 
     async def restart_agent_session(self, args: Mapping[str, Any]) -> ToolResult:
         task, title = await self._task_ref(args)
-        fresh = arg_bool(args, "fresh")
         running = task.get("status") == "running"
-        if not await self._cleared(args, gate_key("restart_agent_session", task.get("id"), fresh, running)):
+        if not await self._cleared(args, gate_key("restart_agent_session", task.get("id"), running)):
             stop = " Its running turn stops first." if running else ""
             effect = (
-                f"This starts {title} in a fresh Claude Code session: the agent forgets the conversation "
-                "so far, which stays in its transcript, and its background shells, processes and "
-                f"subagents end.{stop}"
-                if fresh
-                else f"This restarts the Claude Code session of {title}: the conversation is kept, "
+                f"This restarts the Claude Code session of {title}: the conversation is kept, "
                 "Claude Code starts again with its MCP servers, plugins and tools loaded anew, and its "
                 f"background shells, processes and subagents end.{stop}"
             )
-            what = f"start {title} fresh" if fresh else f"restart the session of {title}"
-            return ask("restart_agent_session", args, effect, what)
-        body = {"interrupt": running, "fresh": fresh}
+            return ask("restart_agent_session", args, effect, f"restart the session of {title}")
         try:
-            await self._seti.post(f"/tasks/{task.get('id')}/session/restart", body)
+            await self._seti.post(f"/tasks/{task.get('id')}/session/restart", {"interrupt": running})
         except SetiError as e:
             if e.status == 409:
                 raise ToolError(
                     f"Could not restart the session of {title}: {e.detail or e.title}", "Not restarted"
                 ) from e
             raise
-        if fresh:
-            return ToolResult(
-                f"Started {title} in a fresh session; it no longer has the earlier conversation.",
-                clip(f"Started {title} fresh", 70),
-            )
         return ToolResult(
             f"Restarted the session of {title}; the conversation continues.",
             clip(f"Restarted the session of {title}", 70),

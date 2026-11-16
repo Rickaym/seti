@@ -51,7 +51,7 @@ export function SandboxToggle({ task, running, onChanged }: { task: Task; runnin
         hint={`${task.sandbox ? SANDBOX_HINT.on : SANDBOX_HINT.off} Changing it restarts the session at the next turn.`}
       />
       {turnSandbox !== null && turnSandbox !== task.sandbox && (
-        <Button variant="outline" size="sm" onClick={() => void restart(false)}>
+        <Button variant="outline" size="sm" onClick={() => void restart()}>
           <RotateCw />
           Restart now
         </Button>
