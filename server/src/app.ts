@@ -102,6 +102,7 @@ import { sandboxRoutes } from './routes/sandbox.js'
 import { secretRoutes } from './routes/secrets.js'
 import { sessionRoutes } from './routes/sessions.js'
 import { publicShareHandler } from './routes/share-public.js'
+import { sharedToolRoutes } from './routes/shared-tools.js'
 import { shareRoutes, taskShareRoutes } from './routes/shares.js'
 import { sshRoutes } from './routes/ssh.js'
 import { stepUpRoutes } from './routes/step-up.js'
@@ -318,6 +319,7 @@ export function createApp(access: AccessGuardOptions = defaultAccess(), eaUrl: s
   app.route('/api/sandbox', sandboxRoutes)
   app.route('/api/secrets', secretRoutes)
   app.route('/api/sessions', sessionRoutes)
+  app.route('/api/shared-tools', sharedToolRoutes)
   app.route('/api/ssh', sshRoutes)
   app.route('/api/revisions', revisionRoutes)
   app.route('/api/uploads', uploadRoutes)

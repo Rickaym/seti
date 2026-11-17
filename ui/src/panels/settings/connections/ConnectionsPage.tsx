@@ -7,8 +7,8 @@ import { PageHeader } from '@/components/crud/PageHeader'
 import { Button } from '@/components/ui/button'
 import { navigate } from '@/lib/route'
 import { SettingsBody, SettingsHeader, SettingsList } from '../layout'
+import { AddConnection } from './AddConnection'
 import { ConnectionDetail } from './ConnectionDetail'
-import { NewConnectionDialog } from './NewConnectionDialog'
 import { kindLabel, statusText } from './connection-form'
 
 const open = (id: string) => {
@@ -84,7 +84,7 @@ function useConnections() {
 }
 
 function ConnectionList() {
-  const { list, error } = useConnections()
+  const { list, error, reload } = useConnections()
   const [adding, setAdding] = useState(false)
   return (
     <SettingsBody
@@ -125,11 +125,13 @@ function ConnectionList() {
         )}
       </SettingsList>
       {adding && (
-        <NewConnectionDialog
+        <AddConnection
+          connections={list ?? []}
           onClose={() => {
             setAdding(false)
           }}
-          onCreated={open}
+          onOpen={open}
+          onAdded={reload}
         />
       )}
     </SettingsBody>

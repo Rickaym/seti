@@ -399,6 +399,24 @@ Sandboxed agents hold no keys or tokens; the agent's egress proxy adds them. For
 the Claude token in Settings, Credentials (from `claude setup-token`), otherwise the host's Claude
 Code login.
 
+New connection starts at a list of services to pick by name. Each one asks only for what that
+service needs, in the service's own words, and fills in the hosts, header, token URL and scope:
+
+- Microsoft Entra app: the Directory (tenant) ID, the Application (client) ID and a client secret.
+  A token is for one API, so each API ticked (Microsoft Graph, Azure Resource Manager, Key Vault,
+  Azure Storage) becomes its own connection with the same app.
+- Google service account: the JSON key file, the APIs to reach (Admin directory, Gmail, Drive,
+  Sheets, Calendar, Cloud Platform) as one connection, and optionally the Workspace user to act as
+  under domain-wide delegation. Each API asks for its read-only scope until its Write switch is on.
+- Services that take one key, such as OpenAI, ElevenLabs, Stripe, Slack, Cloudflare, Linear, Notion
+  and Sentry. Twilio and Jira Cloud take the key as a Basic auth password, which the agent sends
+  and the proxy swaps in.
+
+A service's connections are added together or not at all, under names and variables nothing else
+uses, and the audit log records the template they came from, never what was typed. Custom opens
+the form with every field for a service the list does not have. The list is
+`shared/src/connection-key-services.ts` and `shared/src/connection-template-list.ts`.
+
 A connection is one service's access, made in Settings, Connections: its name, the hosts it may
 reach (exact or `*.suffix`), how Seti signs in, and the values that takes. Agents see its variable,
 such as `STRIPE`, holding a placeholder. The proxy swaps the placeholder for the value in headers
@@ -470,6 +488,29 @@ Running agents pick up a change in their next session. The page notices installs
 `claude plugin` in a terminal on its own; Refresh reads everything again. Only the user changes
 plugins and marketplaces: the EA and paired devices are refused, agents have no tool for it, and
 the audit log records every change.
+
+### Shared tools
+
+A script an agent wrote that proved useful can become a shared tool: a typed tool every agent can
+call. The agent proposes it with `request_change`; the request card shows the tool's arguments,
+whether it says it writes anything, the whole script, its hash, the variables it reads and the
+hosts it sends them to, and Allow publishes it. From its next turn every agent whose credential
+carries a connection for each variable gets the tool as `mcp__shared__<name>`; a tool that needs
+none loads for every agent. An agent whose credential lacks a variable can see the tool and what
+is missing, and ask you for the key.
+
+In a sandboxed agent the script runs inside the sandbox, like the agent's own commands. In an
+agent without the sandbox it runs with that agent's access to this machine, and each call asks
+you first unless one of your permission rules allows it.
+
+The script reads its arguments as one JSON object on stdin and prints its result to stdout, as
+JSON when it has structure. A non-zero exit is an error that carries what the script wrote to
+stderr. A call is stopped after 120 seconds unless the proposal sets another limit, up to 600.
+
+Settings, Plugins lists the shared tools with who proposed each one and when. Code shows the
+arguments and the script, the switch turns a tool off for every agent, and Remove deletes it;
+both apply from each agent's next turn. An agent proposes a new version under the same name, and
+its card shows the changes against the published one.
 
 ### Access: defaults and per-agent choices
 

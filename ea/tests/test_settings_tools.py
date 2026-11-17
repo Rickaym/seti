@@ -379,6 +379,10 @@ class SettingsFake(FakeSeti):
                 return ok({"id": plugin_id, **body})
             case "DELETE", ["plugins", "defaults", _]:
                 return httpx.Response(204)
+            case "PATCH", ["shared-tools", name]:
+                return ok({"name": name, **body})
+            case "DELETE", ["shared-tools", _]:
+                return httpx.Response(204)
             case "POST", ["mcp", "servers"]:
                 return ok({"name": body["name"], "scope": body["scope"]})
             case "DELETE", ["mcp", "servers", name]:
@@ -867,6 +871,30 @@ async def test_plugins_are_added_switched_and_removed(tools: EaTools, fake: Sett
     _, off = await confirm(tools, "set_plugin_enabled", {"plugin": "acme", "enabled": False})
     assert off.ok
     assert writes(fake)[-1][0:2] == ("PATCH", f"/api/plugins/defaults/{fake.plugins['defaults'][0]['id']}")
+
+
+async def test_a_shared_tool_is_turned_off_and_removed_but_never_turned_on(
+    tools: EaTools, fake: SettingsFake
+) -> None:
+    fake.shared_tools = [
+        {
+            "name": "invoices",
+            "enabled": True,
+            "needs": [{"env": "BILLING_KEY", "hosts": ["api.billing.test"]}],
+        }
+    ]
+    on = await tools.call("set_plugin_enabled", {"plugin": "invoices", "enabled": True, "confirmed": True})
+    assert on.summary == "User only"
+    asked, off = await confirm(tools, "set_plugin_enabled", {"plugin": "invoices", "enabled": False})
+    assert "only the user turns it back on" in asked.text
+    assert off.text == "Turned the shared tool invoices off."
+    assert writes(fake)[-1] == ("PATCH", "/api/shared-tools/invoices", {"enabled": False})
+    asked, removed = await confirm(tools, "remove_plugin", {"plugin": "invoices"})
+    assert "its code is deleted from Seti" in asked.text
+    assert removed.text == "Removed the shared tool invoices."
+    assert writes(fake)[-1][0:2] == ("DELETE", "/api/shared-tools/invoices")
+    missing = await tools.call("remove_plugin", {"plugin": "nothing-like-it"})
+    assert missing.summary.startswith("No default plugin or shared tool matches")
 
 
 async def test_mcp_servers_remote_only_and_sign_in_link_only_for_connectors(

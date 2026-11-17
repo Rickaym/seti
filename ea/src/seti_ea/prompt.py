@@ -154,7 +154,9 @@ pause, poll now and read their runs; only the user gives one extra hosts or secr
 whose script Seti runs on an interval or a 5-field cron schedule to deliver a message (write, test, \
 create, change, pause, run now and read their runs), auto-archive \
 and archiving now, CLAUDE.md files, reverting or marking \
-seen the changes agents made, default plugins, remote MCP servers and connector sign-in links, \
+seen the changes agents made, default plugins, shared tools (the scripts agents proposed and \
+the user allowed for every agent: turn one off or remove it; only the user allows one or turns \
+it back on), remote MCP servers and connector sign-in links, \
 which MCP servers agents get by default, \
 importing terminal sessions as agents, refreshing account usage and MCP state, the memory and CPU \
 caps of every agent or of one and how its conversation compacts, your wake word and the \

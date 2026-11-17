@@ -67,7 +67,7 @@ export interface ConnectionPreset {
   form: Partial<ConnectionForm>
 }
 
-/** Starting points for a new connection; the user fills in the tenant, values and hosts. */
+/** Starting points for a custom connection; named services have templates instead. */
 export const PRESETS: readonly ConnectionPreset[] = [
   { label: 'API key', hint: 'The agent sends it; Seti swaps in the key on its hosts.', form: { kind: 'key' } },
   {
@@ -81,36 +81,14 @@ export const PRESETS: readonly ConnectionPreset[] = [
     form: { kind: 'client_credentials', addsHeader: true, clientAuth: 'client_secret_basic' },
   },
   {
-    label: 'Entra ID app',
-    hint: 'A Microsoft Entra app with a client secret, for Microsoft Graph.',
-    form: {
-      kind: 'client_credentials',
-      addsHeader: true,
-      hosts: 'graph.microsoft.com',
-      tokenUrl: 'https://login.microsoftonline.com/TENANT_ID/oauth2/v2.0/token',
-      scope: 'https://graph.microsoft.com/.default',
-    },
-  },
-  {
     label: 'Refresh token',
     hint: 'Seti trades a refresh token for access tokens and keeps the newest one.',
     form: { kind: 'refresh_token', addsHeader: true, clientAuth: 'none' },
   },
   {
     label: 'Signed JWT',
-    hint: 'RFC 7523: Seti signs a JWT with your private key and trades it for a token, as Salesforce does.',
+    hint: 'RFC 7523: Seti signs a JWT with your private key, or a Google key file when no issuer is given.',
     form: { kind: 'jwt_bearer', addsHeader: true },
-  },
-  {
-    label: 'Google key file',
-    hint: 'A Google service account key file; Seti signs its own token requests.',
-    form: {
-      kind: 'jwt_bearer',
-      addsHeader: true,
-      hosts: '*.googleapis.com',
-      tokenUrl: 'https://oauth2.googleapis.com/token',
-      scope: 'https://www.googleapis.com/auth/cloud-platform',
-    },
   },
 ]
 

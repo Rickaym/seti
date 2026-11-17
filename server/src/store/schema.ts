@@ -46,6 +46,7 @@ import {
   SECRETS,
 } from './schema-security.js'
 import { CLIENT_SENDS } from './schema-sends.js'
+import { SHARED_TOOLS } from './schema-shared-tools.js'
 import { SHARE_PREVIEWS, SHARES } from './schema-shares.js'
 import { loginsToHosts, SSH_HOST_KEYS } from './schema-ssh-keys.js'
 import { importSshHosts, SSH_HOSTS } from './schema-ssh.js'
@@ -190,4 +191,5 @@ export const MIGRATIONS: readonly Migration[] = [
   { version: 103, name: 'ea_language', sql: EA_LANGUAGE },
   { version: 104, name: 'permission_review', sql: PERMISSION_REVIEW },
   { version: 105, name: 'pr_list_cache', sql: PR_LIST_CACHE },
+  { version: 106, name: 'shared_tools', sql: SHARED_TOOLS },
 ]

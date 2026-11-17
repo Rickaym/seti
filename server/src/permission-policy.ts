@@ -1,5 +1,11 @@
 import type { PermissionUpdate } from '@anthropic-ai/claude-agent-sdk'
-import { permissionRuleText, type BuiltInRule, type ClaudeBehavior, type PermissionRule } from '@seti/shared'
+import {
+  permissionRuleText,
+  SHARED_TOOL_SERVER,
+  type BuiltInRule,
+  type ClaudeBehavior,
+  type PermissionRule,
+} from '@seti/shared'
 
 /** Tools that only read or plan, which every agent uses without asking; secrets stay denied. */
 const READ_TOOLS = [
@@ -32,8 +38,11 @@ const GH_READS = [
   'gh issue list',
 ]
 
-/** Tools the sandbox contains: its mounts bound edits and the egress proxy bounds the network. */
-const SANDBOXED_TOOLS = ['Bash', 'Edit', 'Write', 'NotebookEdit', 'WebFetch']
+/**
+ * Tools the sandbox contains: its mounts bound edits and the egress proxy bounds the network. A
+ * shared tool is a script that runs inside it like a Bash command.
+ */
+const SANDBOXED_TOOLS = ['Bash', 'Edit', 'Write', 'NotebookEdit', 'WebFetch', `mcp__${SHARED_TOOL_SERVER}`]
 
 /** Killing processes by name hits other agents' and the user's processes too. */
 const KILL_COMMANDS = ['pkill', 'killall']

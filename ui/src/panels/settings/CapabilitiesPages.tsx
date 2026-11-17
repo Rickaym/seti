@@ -11,6 +11,7 @@ import { CommandList, ModelList, SkillGroups, SubagentList } from '@/panels/capa
 import { McpSection } from '@/panels/capabilities/McpSection'
 import { PluginSection } from '@/panels/capabilities/PluginSection'
 import { Section } from '@/panels/capabilities/Section'
+import { SharedToolSection } from '@/panels/capabilities/SharedToolSection'
 import { filterCommands, filterGroups, filterServers, matches, normalize } from '@/panels/capabilities/filter'
 import { useCapabilities, USER_SCOPE } from '@/panels/capabilities/useCapabilities'
 import { SettingsBody, SettingsHeader } from './layout'
@@ -234,6 +235,7 @@ function PluginList({
     <div className="space-y-4 text-xs">
       <SearchBox label="Search plugins" placeholder="Search plugins" value={query} onChange={setQuery} />
       <PluginSection query={normalize(query)} refreshToken={refreshes} onChanged={onChanged} onLoading={onLoading} />
+      <SharedToolSection query={normalize(query)} refreshToken={refreshes} />
     </div>
   )
 }
@@ -252,7 +254,7 @@ function PluginsPage({ capabilities, refreshes, onRefresh }: PageProps) {
       header={
         <SettingsHeader
           title="Plugins"
-          description="Seti's plugin folders and the Claude Code plugins agents load."
+          description="Seti's plugin folders, the Claude Code plugins agents load and the shared tools you allowed."
           actions={<RefreshButton busy={pluginsLoading} onClick={onRefresh} />}
         />
       }
