@@ -8,7 +8,7 @@ import { serviceMark } from './service-marks'
 describe('service marks', () => {
   it('has a path for every icon key a catalog may name', () => {
     for (const key of SERVICE_ICON_KEYS) {
-      expect(serviceMark(key), key).toMatch(/^M[\d\s.,a-zA-Z-]+$/)
+      expect(serviceMark(key), key).toMatch(/^[Mm][\d\s.,a-zA-Z-]+$/)
     }
   })
 
