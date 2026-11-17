@@ -708,6 +708,9 @@ importers:
       remark-gfm:
         specifier: ^4.0.1
         version: 4.0.1
+      simple-icons:
+        specifier: ^16.38.0
+        version: 16.38.0
       sonner:
         specifier: ^2.0.8
         version: 2.0.8(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
@@ -5551,6 +5554,10 @@ packages:
   simple-git-hooks@2.14.0:
     resolution: {integrity: sha512-kkTORPAuxQz2g1QUuN0J8yGWT28tjGBfPOdJ4xT7Vbeu30veKUZQIoID2qGgCDAakaQn59UeZJJ4cFGB8PVP2A==}
     hasBin: true
+
+  simple-icons@16.38.0:
+    resolution: {integrity: sha512-B0Wws90eL0Fm65aH35CA8kM+7/Zzgsaytt0DndBx7VFm3+o9HurVIVRQZ1hvqqYYIyNJq7ycn3kQm2v2FhiWSQ==}
+    engines: {node: '>=0.12.18'}
 
   smol-toml@1.9.1:
     resolution: {integrity: sha512-j7WyPdf0CJoutMzMoPLF/bVXHtKZIT9Rb4eGeEbWw8X2t5oirjPgpL+OpaENZrILYaXqYwnVH+qgUwVbl+pUJQ==}
@@ -11552,6 +11559,8 @@ snapshots:
       side-channel-weakmap: 1.0.2
 
   simple-git-hooks@2.14.0: {}
+
+  simple-icons@16.38.0: {}
 
   smol-toml@1.9.1: {}
 

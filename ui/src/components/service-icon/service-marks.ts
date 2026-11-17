@@ -1,0 +1,73 @@
+import type { ServiceIconKey } from '@seti/shared'
+import {
+  siAirtable,
+  siAtlassian,
+  siClickup,
+  siCloudflare,
+  siDeepgram,
+  siElevenlabs,
+  siFathom,
+  siFigma,
+  siGithub,
+  siGmail,
+  siGoogle,
+  siGooglecalendar,
+  siGoogledrive,
+  siHuggingface,
+  siIntercom,
+  siJira,
+  siLinear,
+  siNeon,
+  siNotion,
+  siPagerduty,
+  siPaypal,
+  siPosthog,
+  siPrisma,
+  siReplicate,
+  siResend,
+  siSentry,
+  siStripe,
+  siSupabase,
+  siVercel,
+  siWebflow,
+} from 'simple-icons'
+
+/** One 24 by 24 path per service, from Simple Icons; drawn in the text colour, never the brand's. */
+const SERVICE_MARKS: Record<ServiceIconKey, string> = {
+  airtable: siAirtable.path,
+  atlassian: siAtlassian.path,
+  clickup: siClickup.path,
+  cloudflare: siCloudflare.path,
+  deepgram: siDeepgram.path,
+  elevenlabs: siElevenlabs.path,
+  fathom: siFathom.path,
+  figma: siFigma.path,
+  github: siGithub.path,
+  gmail: siGmail.path,
+  google: siGoogle.path,
+  googlecalendar: siGooglecalendar.path,
+  googledrive: siGoogledrive.path,
+  huggingface: siHuggingface.path,
+  intercom: siIntercom.path,
+  jira: siJira.path,
+  linear: siLinear.path,
+  neon: siNeon.path,
+  notion: siNotion.path,
+  pagerduty: siPagerduty.path,
+  paypal: siPaypal.path,
+  posthog: siPosthog.path,
+  prisma: siPrisma.path,
+  replicate: siReplicate.path,
+  resend: siResend.path,
+  sentry: siSentry.path,
+  stripe: siStripe.path,
+  supabase: siSupabase.path,
+  vercel: siVercel.path,
+  webflow: siWebflow.path,
+}
+
+const BY_KEY: ReadonlyMap<string, string> = new Map(Object.entries(SERVICE_MARKS))
+
+/** The path of a service's mark, or undefined for a key this build does not know. */
+export const serviceMark = (key: string | null | undefined): string | undefined =>
+  typeof key === 'string' ? BY_KEY.get(key) : undefined

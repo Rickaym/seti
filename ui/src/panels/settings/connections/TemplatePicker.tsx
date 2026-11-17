@@ -2,6 +2,7 @@ import { CONNECTION_TEMPLATES, templateMatches, type ConnectionTemplate } from '
 import { Search, SlidersHorizontal } from 'lucide-react'
 import { useState } from 'react'
 import { Hint } from '@/components/Hint'
+import { ServiceIcon } from '@/components/service-icon/ServiceIcon'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
@@ -19,7 +20,6 @@ const whereOf = (template: ConnectionTemplate) =>
   [...template.hosts, ...template.parts.map((part) => part.title)].join(', ')
 
 function TemplateRow({ template, onPick }: { template: ConnectionTemplate; onPick: () => void }) {
-  const Icon = TEMPLATE_ICON[template.category]
   return (
     <li className="border-b border-border last:border-b-0">
       <button
@@ -28,7 +28,7 @@ function TemplateRow({ template, onPick }: { template: ConnectionTemplate; onPic
         onClick={onPick}
         className="flex w-full items-start gap-3 px-3 py-2 text-left hover:bg-accent pointer-coarse:min-h-11"
       >
-        <Icon className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden />
+        <ServiceIcon icon={template.icon} fallback={TEMPLATE_ICON[template.category]} className="mt-0.5" />
         <span className="flex min-w-0 flex-1 flex-col gap-0.5">
           <span className="flex min-w-0 items-center gap-2">
             <span className="truncate text-sm font-medium">{template.title}</span>
