@@ -170,8 +170,9 @@ private key off the host. The sandbox model is in [Architecture](architecture.md
   the EA, agents and mods as adding one does, and audits each rule.
 - Agents at Self or Full propose security changes they need with `request_change`; nothing else
   applies them. A request names the exact change and the agent's reason: a host and port for the
-  network allowlist (443 unless it names one), a connection's variable and hosts, or an MCP server
-  Seti already has. Hosts on this machine or its networks (localhost, loopback, private and
+  network allowlist (443 unless it names one), a connection's variable and hosts, an MCP server
+  Seti already has, or a script of its own as a shared tool (see [Shared tools](#shared-tools)).
+  Hosts on this machine or its networks (localhost, loopback, private and
   link-local addresses) and wildcards over a top-level domain or any other public suffix, such as
   `*.co.uk` or `*.github.io`, are refused outright, and a
   wildcard or an address shows a warning on the card. The sandbox, Bypass, permission modes and
@@ -447,6 +448,51 @@ characters, refuses anything that starts with `-`, and passes the target after `
 runs at a time, each has a time limit, and the audit log records each with the CLI's answer. A
 preview reads the marketplace manifest and, for a plugin inside the marketplace checkout,
 `claude plugin details`, which lists its components without starting them.
+
+## Shared tools
+
+An approved shared tool is code every sandboxed agent may run. An agent proposes one script with
+`request_change`, kind `shared_tool`: a name, a description of when and how to use it, the path of
+the file, and up to five variables it reads with the hosts it sends them to. Only the user's own
+Allow publishes it; the answer route and the function behind it refuse the EA, agents and mods.
+
+The path that matters is prompt injection: an agent that read hostile text, in a web page, an
+issue or a file, proposes a tool that carries the attacker's code, and every other agent then
+runs it. Four things bound that:
+
+- Seti reads the file itself when the agent asks, and keeps that snapshot with its SHA-256 on the
+  request. The card shows this snapshot and Allow publishes exactly it, so a later edit of the file
+  changes nothing. The file is one regular file inside the agent's own folders, never a symlink, a
+  hidden path or Seti's own data, read once through a descriptor, UTF-8 text of at most 64 KB.
+- The card shows the whole script, its hash, the description, the variables and hosts, and for a
+  name that is already published the line changes against the published version, with a warning
+  that every sandboxed agent will be able to run it. An update that was filed against a version
+  that has since been replaced is refused, so the diff the user read is the change that applies.
+- The tool call takes only those fields. Unknown fields are refused, so no value travels with a
+  proposal, and a description with backticks is refused, because a skill runs the commands that
+  backticks quote when it loads.
+- The script runs as an ordinary command inside the sandbox of the agent that calls it. It reads
+  what that agent reads and reaches the hosts that agent reaches, and nothing more. Publishing a
+  tool grants no key and no host to anyone: a variable it names is a placeholder only in agents
+  whose credential already carries that connection, and the egress proxy swaps in the value on the
+  connection's hosts alone.
+
+Seti writes each published version into a folder of its own under `shared-tools` in its home, laid
+out as a Claude Code plugin with one skill and the script beside it, and removes folders only
+through `owned-dirs.ts`. A sandbox mounts the folders of the tools its agent gets read-only, and no
+sandbox mounts the rest of Seti's home, so a sandboxed agent cannot change a published script. A
+tool loads into an agent only when the agent is sandboxed, the tool is on, and the agent's
+credential carries a connection for every variable the tool names. An unsandboxed agent never gets
+one, since the script would run with the host's access. An agent that lacks a variable sees the
+tool and what is missing in `list_plugins`, and asks for the key with the ordinary `api_key`
+request.
+
+Settings, Plugins lists the tools with their code. Turning a tool off narrows what agents run, so
+the EA and agents at Seti control Full may do it; turning one on again and removing one stay the
+user's, and the EA may remove one after the user's yes. The audit log records each step as
+`shared_tool.proposed`, `.allowed`, `.denied`, `.disabled`, `.enabled` and `.removed`, with the
+tool's name, its hash and the agent, never the script. What remains is the review itself: a script
+the user allows without reading runs in every sandboxed agent, with each agent's access.
 
 ## Mods
 

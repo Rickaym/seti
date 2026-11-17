@@ -471,6 +471,21 @@ Running agents pick up a change in their next session. The page notices installs
 plugins and marketplaces: the EA and paired devices are refused, agents have no tool for it, and
 the audit log records every change.
 
+### Shared tools
+
+A script an agent wrote that proved useful can become a shared tool. The agent proposes it with
+`request_change`; the request card shows the whole script, its hash, the variables it reads and
+the hosts it sends them to, and Allow publishes it. From its next turn every sandboxed agent gets
+the tool as a skill, provided its credential carries a connection for each variable the tool
+needs; a tool that needs none loads for every sandboxed agent. Agents that run without the sandbox
+never get shared tools. An agent whose credential lacks a variable can see the tool and what is
+missing, and ask you for the key.
+
+Settings, Plugins lists the shared tools with who proposed each one and when. Code shows the
+script, the switch turns a tool off for every agent, and Remove deletes it; both apply from each
+agent's next turn. An agent proposes a new version under the same name, and its card shows the
+changes against the published one.
+
 ### Access: defaults and per-agent choices
 
 Everything an agent may reach follows one model: each SSH host, AWS, MCP server, context

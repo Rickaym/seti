@@ -223,6 +223,25 @@ runs under bubblewrap with its own pid, network, IPC and UTS namespaces:
   the user makes with the Sandbox switch on the start page, badged in the UI and audited. The EA
   is refused, and an agent that starts another always starts it sandboxed.
 
+## Shared tools are plugins Seti writes from an approved snapshot
+
+A shared tool is one script an agent proposed and the user allowed for every agent. The proposal
+is a `request_change` of kind `shared_tool`; `server/src/shared-tool-proposals.ts` reads the file
+when the agent asks and stores its content and SHA-256 in the request, so the card, the Allow and
+the published tool are the same bytes. Allow stores the tool in `shared_tool`, which is the
+truth, and `server/src/shared-tool-files.ts` writes it to `shared-tools/<name>-<hash>` under
+Seti's home as a Claude Code plugin: `.claude-plugin/plugin.json`, `skills/<name>/SKILL.md` and
+the script beside it, which the skill names as `${CLAUDE_SKILL_DIR}/<file>`. A new version gets a
+new folder, so every session sees a changed plugin path and starts again with it at its next turn.
+Startup writes missing folders again from the table and removes the ones no tool names.
+
+`sharedToolPlugins` in `server/src/shared-tools.ts` adds the folders to a task's plugins beside the
+Seti defaults, and the sandbox mounts them read-only. A tool loads only when the task is sandboxed,
+the tool is on, and the task's credential carries a connection for every variable the tool needs;
+the script then finds the connection's placeholder in that variable and the egress proxy swaps in
+the value on the connection's hosts. `list_plugins` tells an agent which tools it gets and which
+variables it lacks.
+
 ## Each agent runs in a scope with memory and CPU caps
 
 Seti starts an agent's Claude Code process, sandboxed or not, each `!` command and the short-lived
@@ -1015,13 +1034,13 @@ Every formal request that waits on the user's answer is listed in one place: the
 palette). `GET /api/requests` (`server/src/pending-requests.ts`) returns them by kind in one
 `PendingRequests` shape from `shared/src/requests.ts`:
 
-| Kind      | Where it comes from                                    | Answered with                    | Holds the agent |
-| --------- | ------------------------------------------------------ | -------------------------------- | --------------- |
-| Questions | AskUserQuestion and `ask_secret`                       | the question's own control, Skip | yes             |
-| Access    | `request_change`: a host, a connection, an MCP server  | Allow or Deny, the access card   | yes             |
-| Plans     | ExitPlanMode, held as a permission request             | Approve or Deny                  | yes             |
-| Tools     | a tool call no rule allows, or a repeated call         | Allow, Always or Deny            | yes             |
-| Notes     | `propose_knowledge`, from an agent, the EA or the user | Approve, Edit or Reject          | no              |
+| Kind      | Where it comes from                                                  | Answered with                    | Holds the agent |
+| --------- | -------------------------------------------------------------------- | -------------------------------- | --------------- |
+| Questions | AskUserQuestion and `ask_secret`                                     | the question's own control, Skip | yes             |
+| Access    | `request_change`: a host, a connection, an MCP server, a shared tool | Allow or Deny, the access card   | yes             |
+| Plans     | ExitPlanMode, held as a permission request                           | Approve or Deny                  | yes             |
+| Tools     | a tool call no rule allows, or a repeated call                       | Allow, Always or Deny            | yes             |
+| Notes     | `propose_knowledge`, from an agent, the EA or the user               | Approve, Edit or Reject          | no              |
 
 Each kind is answered on its own route, with its own guard, so listing them together adds no
 power: access, tool calls, plans and notes stay the user's, and the EA only relays answers to
