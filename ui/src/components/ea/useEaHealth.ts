@@ -1,19 +1,24 @@
 import type { EaHealth, EaNotRunning } from '@seti/shared'
 import { useCallback, useEffect, useState } from 'react'
-import { startPolling } from '@/lib/poll-loop'
+import { errorText, isUnreachable } from '@/api'
+import { pollTimeoutMs, startPolling } from '@/lib/poll-loop'
+import { appReach } from '@/lib/reach'
 import { apiErrorOf } from './ice'
 
 const HEALTH_PATH = '/api/ea/health'
 
 const POLL_MS = 15_000
-const TIMEOUT_MS = 5_000
+const UNREACHED = 'Seti could not be reached'
 
 export type HealthState =
   { status: 'loading' } | { status: 'up'; health: EaHealth } | { status: 'down'; reason: string }
 
-async function readHealth(): Promise<HealthState> {
+/** The bot's health, or null when Seti itself gave no answer, which says nothing about the bot. */
+async function readHealth(): Promise<HealthState | null> {
+  const sentAt = Date.now()
   try {
-    const res = await fetch(HEALTH_PATH, { cache: 'no-store', signal: AbortSignal.timeout(TIMEOUT_MS) })
+    const res = await fetch(HEALTH_PATH, { cache: 'no-store', signal: AbortSignal.timeout(pollTimeoutMs(POLL_MS)) })
+    appReach.answered()
     if (!res.ok) {
       const error = await apiErrorOf(res)
       return { status: 'down', reason: error?.detail ?? `The health check failed with status ${String(res.status)}` }
@@ -21,7 +26,11 @@ async function readHealth(): Promise<HealthState> {
     const body = (await res.json()) as EaHealth | EaNotRunning
     return 'running' in body ? { status: 'down', reason: body.reason } : { status: 'up', health: body }
   } catch (e) {
-    return { status: 'down', reason: e instanceof Error ? e.message : String(e) }
+    if (isUnreachable(e)) {
+      appReach.unanswered(sentAt)
+      return null
+    }
+    return { status: 'down', reason: errorText(e) }
   }
 }
 
@@ -61,7 +70,7 @@ export function useEaHealth(): { state: HealthState; refresh: () => void } {
     const check = () => {
       void readHealth().then((next) => {
         if (live) {
-          setState(next)
+          setState((prev) => next ?? (prev.status === 'loading' ? { status: 'down', reason: UNREACHED } : prev))
         }
       })
     }

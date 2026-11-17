@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { errorText } from '@/api'
+import { errorText, isUnreachable } from '@/api'
 import { getIfChanged } from '@/lib/conditional-get'
-import { startPolling } from '@/lib/poll-loop'
+import { pollTimeoutMs, startPolling } from '@/lib/poll-loop'
+import { appReach } from '@/lib/reach'
 import { shareEqual } from '@/lib/share-equal'
 
 interface Polled<T> {
@@ -27,8 +28,10 @@ export function usePolledGet<T>(path: string | null, intervalMs: number): Polled
     issued.current += 1
     const id = issued.current
     const kept = held.current?.path === path ? held.current : null
-    getIfChanged(path, kept?.etag ?? null, AbortSignal.timeout(Math.max(intervalMs, 5000)))
+    const sentAt = Date.now()
+    getIfChanged(path, kept?.etag ?? null, AbortSignal.timeout(pollTimeoutMs(intervalMs)))
       .then((answer) => {
+        appReach.answered()
         if (id !== issued.current) {
           return
         }
@@ -44,9 +47,19 @@ export function usePolledGet<T>(path: string | null, intervalMs: number): Polled
         })
       })
       .catch((e: unknown) => {
+        const lost = isUnreachable(e)
+        if (lost) {
+          appReach.unanswered(sentAt)
+        } else {
+          appReach.answered()
+        }
         if (id === issued.current) {
           const error = errorText(e)
-          setState((prev) => (prev.path === path && prev.error === error ? prev : { ...prev, path, error }))
+          setState((prev) => {
+            const shown = prev.path === path
+            const keep = shown && (prev.error === error || (lost && prev.data !== undefined))
+            return keep ? prev : { path, data: shown ? prev.data : undefined, error }
+          })
         }
       })
   }, [path, intervalMs])

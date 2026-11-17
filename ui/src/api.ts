@@ -150,6 +150,11 @@ export async function pingApi(signal: AbortSignal): Promise<number> {
 /** What Chrome, Firefox and Safari say when fetch cannot reach the server at all. */
 const NETWORK_FAILURE = /^(Failed to fetch|NetworkError when attempting to fetch resource\.?|Load failed)$/u
 
+/** Whether a request got no answer at all: it timed out or never reached the server. */
+export const isUnreachable = (e: unknown) =>
+  (e instanceof DOMException && e.name === 'TimeoutError') ||
+  (e instanceof TypeError && NETWORK_FAILURE.test(e.message))
+
 export const errorText = (e: unknown) => {
   if (e instanceof TypeError && NETWORK_FAILURE.test(e.message)) {
     return 'Seti could not be reached'

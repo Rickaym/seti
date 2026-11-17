@@ -1,11 +1,13 @@
 import type { ResponseSchema } from '@seti/shared'
-import { errorText, readResponse } from '@/api'
+import { errorText, isUnreachable, readResponse } from '@/api'
 import { getIfChanged } from '@/lib/conditional-get'
-import { startPolling } from '@/lib/poll-loop'
+import { pollTimeoutMs, startPolling } from '@/lib/poll-loop'
+import { appReach } from '@/lib/reach'
 import { shareEqual } from '@/lib/share-equal'
 
 export interface PolledState<T> {
   data: T | undefined
+  /** What the server answered wrong, or that nothing has loaded; never a lost poll over data. */
   error: string | null
   /** When the latest answer came, as of the last change to data or error. */
   lastOk: number | null
@@ -71,8 +73,10 @@ export function createPolledResource<T>(
   const refresh = () => {
     issued += 1
     const id = issued
-    getIfChanged(path, etag, AbortSignal.timeout(intervalMs))
+    const sentAt = Date.now()
+    getIfChanged(path, etag, AbortSignal.timeout(pollTimeoutMs(intervalMs)))
       .then((answer) => {
+        appReach.answered()
         if (answer === null || id < applied) {
           answered(id, undefined)
           return
@@ -83,7 +87,15 @@ export function createPolledResource<T>(
       })
       .catch((e: unknown) => {
         const error = failure(e)
-        apply(id, (prev) => (prev.error === error ? prev : { ...prev, error, lastOk: latestOk }))
+        const lost = isUnreachable(e)
+        if (lost) {
+          appReach.unanswered(sentAt)
+        } else {
+          appReach.answered()
+        }
+        apply(id, (prev) =>
+          prev.error === error || (lost && prev.data !== undefined) ? prev : { ...prev, error, lastOk: latestOk },
+        )
       })
   }
 
