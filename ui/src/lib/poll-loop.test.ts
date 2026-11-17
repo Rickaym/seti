@@ -3,7 +3,7 @@ import type { Link, LinkState } from '@/lib/link'
 
 vi.mock('@/lib/app-link', () => ({ appLink: null }))
 
-const { startPolling } = await import('@/lib/poll-loop')
+const { pollTimeoutMs, startPolling } = await import('@/lib/poll-loop')
 
 const page = { visibilityState: 'visible', addEventListener: vi.fn(), removeEventListener: vi.fn() }
 
@@ -103,5 +103,20 @@ describe('startPolling', () => {
     expect(always).toHaveBeenCalledTimes(3)
     stopShown()
     stopAlways()
+  })
+})
+
+describe('pollTimeoutMs', () => {
+  it('gives a short poll ten seconds and a long one its whole interval', () => {
+    const { link } = fakeLink()
+    expect(pollTimeoutMs(5000, link)).toBe(10_000)
+    expect(pollTimeoutMs(60_000, link)).toBe(60_000)
+  })
+
+  it('waits as long as the stretched interval on a poor link', () => {
+    const { link, set } = fakeLink()
+    set({ slow: true, reason: 'the link was poor' })
+    expect(pollTimeoutMs(5000, link)).toBe(20_000)
+    expect(pollTimeoutMs(1000, link)).toBe(10_000)
   })
 })

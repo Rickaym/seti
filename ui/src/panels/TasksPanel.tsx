@@ -7,7 +7,6 @@ import {
 } from '@seti/shared'
 import { ArrowLeft, Check, ChevronDown } from 'lucide-react'
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react'
-import { toast } from 'sonner'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { Hint } from '@/components/Hint'
 import { DetailPane, ListPane } from '@/components/SplitPane'
@@ -28,6 +27,7 @@ import { AgentListRow } from '@/panels/tasks/AgentListRow'
 import { AgentView } from '@/panels/tasks/AgentView'
 import { AgentsHeader } from '@/panels/tasks/AgentsHeader'
 import { ArchivedTaskDetail } from '@/panels/tasks/ArchivedTaskDetail'
+import { ListFailure } from '@/panels/tasks/ListFailure'
 import { StartPage } from '@/panels/tasks/StartPage'
 import { ArchivedLight } from '@/panels/tasks/StatusPill'
 import { DetailSkeleton } from '@/panels/tasks/TranscriptSkeleton'
@@ -261,12 +261,6 @@ export function TasksPanel(props: { selectedId: string | null; subId: string | n
     setLive({ taskId, subtasks })
   }, [])
 
-  useEffect(() => {
-    if (error !== null) {
-      toast.error(error)
-    }
-  }, [error])
-
   const selected = tasks.find((t) => t.id === selectedId)
   const selectedArchived = selected === undefined ? archived.find((t) => t.id === selectedId) : undefined
   const view = useShownWorkspace(selected ?? selectedArchived, tasks, archived)
@@ -319,6 +313,7 @@ export function TasksPanel(props: { selectedId: string | null; subId: string | n
           }}
         />
         <WorkspaceSwitcher workspaces={view.workspaces} current={view.shown} />
+        <ListFailure error={error} loaded={loaded} />
         {showArchived ? (
           <>
             <ListNote text="Archived, read-only">

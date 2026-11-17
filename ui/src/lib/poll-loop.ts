@@ -9,6 +9,13 @@ export interface PollOptions {
   link?: Link
 }
 
+/** Long enough for a full body on a poor link, however short the interval. */
+const MIN_TIMEOUT_MS = 10_000
+
+/** How long a poll may take: the wait for the next one, which a poor link stretches. */
+export const pollTimeoutMs = (intervalMs: number, link: Link = appLink): number =>
+  Math.max(MIN_TIMEOUT_MS, link.getSnapshot().slow ? intervalMs * SLOW_FACTOR : intervalMs)
+
 const hidden = () => document.visibilityState === 'hidden'
 
 /** Runs `run` each interval, paused offline or hidden, slowed on a poor link; returns the stop. */

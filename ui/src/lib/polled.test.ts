@@ -18,6 +18,9 @@ vi.mock('@/lib/conditional-get', () => ({
 }))
 
 const { createPolledResource } = await import('@/lib/polled')
+const { appReach } = await import('@/lib/reach')
+
+const timedOut = () => new DOMException('The operation timed out.', 'TimeoutError')
 
 const page = { visibilityState: 'visible', addEventListener: vi.fn(), removeEventListener: vi.fn() }
 
@@ -102,6 +105,41 @@ describe('createPolledResource', () => {
     await vi.advanceTimersByTimeAsync(1000)
     expect(sentTags).toEqual([null, '"v1"', '"v1"'])
     expect(resource.getSnapshot().data?.items[0]?.n).toBe(2)
+    stop()
+  })
+
+  it('keeps its data and reports nothing when a poll gets no answer, and says so app-wide', async () => {
+    answers.push({ items: [{ id: 'a', n: 1 }] }, timedOut(), new TypeError('Failed to fetch'), unchanged)
+    const { resource, notified, stop } = subscribed()
+    await vi.advanceTimersByTimeAsync(0)
+    const first = resource.getSnapshot()
+    await vi.advanceTimersByTimeAsync(2000)
+    expect(resource.getSnapshot()).toBe(first)
+    expect(notified).toHaveBeenCalledTimes(1)
+    expect(appReach.getSnapshot().reconnecting).toBe(true)
+    await vi.advanceTimersByTimeAsync(1000)
+    expect(appReach.getSnapshot().reconnecting).toBe(false)
+    expect(resource.getSnapshot()).toBe(first)
+    stop()
+  })
+
+  it('says a first load got no response, since there is no data to keep', async () => {
+    answers.push(timedOut(), { items: [] })
+    const { resource, stop } = subscribed()
+    await vi.advanceTimersByTimeAsync(0)
+    expect(resource.getSnapshot()).toMatchObject({ data: undefined, error: 'No response' })
+    await vi.advanceTimersByTimeAsync(1000)
+    expect(resource.getSnapshot()).toMatchObject({ data: { items: [] }, error: null })
+    stop()
+  })
+
+  it('counts an error answer as the server being reachable', async () => {
+    answers.push(timedOut(), new Error('down'))
+    const { stop } = subscribed()
+    await vi.advanceTimersByTimeAsync(0)
+    expect(appReach.getSnapshot().reconnecting).toBe(true)
+    await vi.advanceTimersByTimeAsync(1000)
+    expect(appReach.getSnapshot().reconnecting).toBe(false)
     stop()
   })
 
