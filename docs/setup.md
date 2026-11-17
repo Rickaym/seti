@@ -22,8 +22,9 @@ curl -fsSL https://raw.githubusercontent.com/rickaym/seti/main/scripts/install.s
    `ssh -L 3006:127.0.0.1:3006 <host>`.
 4. Sign in with the local token: `cat ~/.seti/credentials/local-token-user` and paste it. The
    browser keeps an HttpOnly session cookie for 30 days.
-5. In Settings, add repos under Repos, and check the Claude account under Account and the sandbox
-   under Sandbox.
+5. In Settings, check the Claude account under Account and the sandbox under Sandbox. An agent
+   starts in a fresh folder of its own under `~/work` and clones the repos it needs, so there is
+   no repo or directory to pick first.
 
 Pass options after `bash -s --` when you use curl:
 
@@ -259,7 +260,7 @@ Seti would refuse.
 | `SETI_AUTH_IDLE_DAYS`, `SETI_AUTH_MAX_DAYS`        | `7`, `30`                    | Passkey session idle and absolute limits                          |
 | `SETI_ANDROID_PACKAGE`, `SETI_ANDROID_CERT_SHA256` | unset                        | A self-built Android app to trust until Settings sets one         |
 | `SETI_CLAUDE_HOME`, `SETI_CLAUDE_BIN`              | `~/.claude`, see below       | Claude Code config, and the binary sessions run                   |
-| `SETI_SCRATCH_ROOT`                                | `~/work`                     | Where agents without a repo get a directory                       |
+| `SETI_SCRATCH_ROOT`                                | `~/work`                     | Where each new agent gets its own folder                          |
 | `SETI_SESSION_IDLE_MINUTES`                        | `15`                         | How long an idle agent's process stays open                       |
 | `SETI_MEMORY_SCOPES`                               | on                           | `off` runs agents without systemd memory and CPU caps             |
 | `SETI_AUDIT_RETENTION_DAYS`                        | `365`                        | Days the audit log keeps events                                   |
@@ -751,6 +752,6 @@ NODE_ENV=development SETI_HOME=/tmp/seti-scratch SETI_PORT=3106 SETI_REDIS_URL=o
 | `~/.seti/pre-credentials-*/` | Env files and units as `migrate-secrets.sh` found them          |
 | PostgreSQL database `seti`   | Tasks, transcripts, PRs, channels, the audit log, sealed tokens |
 | `~/.claude/projects/`        | Claude Code sessions, which Seti resumes                        |
-| `~/work/`                    | New clones and worktrees agents make                            |
+| `~/work/`                    | One folder per agent, holding its clones and worktrees          |
 
 Seti keeps `~/.seti` owner-only and tightens anything more open at startup.

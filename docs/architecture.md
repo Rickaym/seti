@@ -193,10 +193,14 @@ file they can reach, and run any shell command the classifier allows, so the san
 boundary for them. The whole Claude Code process of a task, and each `!` command,
 runs under bubblewrap with its own pid, network, IPC and UTS namespaces:
 
-- It sees the system read-only, its own home root and `/tmp`, the task's directories, the
-  top-level non-dot folders of the home directory and package caches read-write, and toolchains
-  and Claude Code configuration read-only. Dotfiles, `~/.seti`, `~/.ssh`, cloud and GitHub
-  credentials, `/run/user` and the database sockets are not mounted.
+- It sees the system read-only, its own home root and `/tmp`, the task's own folder and package
+  caches read-write, and toolchains and Claude Code configuration read-only. Nothing else of the
+  user's home is mounted: no checkout, no other agent's folder under `~/work`, and no dotfiles,
+  `~/.seti`, `~/.ssh`, cloud and GitHub credentials, `/run/user` or database sockets.
+- An agent made before private sandboxes keeps its mounts: the top-level non-dot folders of the
+  home directory and the shared `~/work`, read-write, because it works in checkouts and worktrees
+  there. The task row marks it (`task.home_access`, migration 107: on for the rows that existed,
+  off for every new one). The user can turn it off in the agent's settings, never on again.
 - `.git/config` and `.git/hooks` are read-only in every mounted repo, since they run code when the
   repo is used outside the sandbox.
 - A repo's records of worktrees the sandbox cannot see, such as other agents' worktrees, are
@@ -586,11 +590,35 @@ calls for its own commands, storage and settings to `/api/mod-frames/<id>/call`,
 as the mod. Status items and theme tokens of a running third-party mod reach the UI through
 `/api/mod-live`, as text Seti draws and token CSS Seti rebuilt.
 
+## Every agent starts in its own folder
+
+Starting an agent takes a message and nothing about where it works. `startTask`
+(`server/src/tasks.ts`) makes the folder `SCRATCH_ROOT/<title slug>-<id8>` and runs the session
+there; the request shapes carry no repo, branch or directory, and a request that still sends them
+has them stripped. The agent's prompt (`taskFolderContext` in `server/src/task-location.ts`) names
+the folder and tells it to clone the repos it needs there with `git clone` or `gh repo clone` and to
+make worktrees inside it.
+
+Claude Code reads a repo's own `.mcp.json`, `.claude/settings.json`, hooks and commands only from
+the directory its session starts in; in a subfolder only `CLAUDE.md` and skills load, and only once
+the agent touches a file there. So every agent has one tool of its own, `set_working_directory`,
+which moves its session into a directory inside its own folders from its next turn and keeps the
+conversation. Seti resolves the path through its symlinks and refuses anything outside the agent's
+folders; the folder it came from stays attached. The user and the EA have no such control.
+
+GitHub requests that name no owner get the default token of the agent's credential; a request to
+`github.com/<owner>/...` gets that owner's token when the credential has one
+(`server/src/github-token.ts`).
+
+Agents made earlier, in a repo checkout, a worktree Seti created or with extra directories, keep
+all of them in their session and sandbox until they are archived. Their settings show the folders
+read-only.
+
 ## Archiving packs an agent's folders, deleting removes them
 
-An agent has three kinds of folders Seti made for it: a scratch folder `SCRATCH_ROOT/<title
-slug>-<id8>` when it started without a repo or directory (default `~/work`), its workspace
-`~/.seti/workspace/<task id>`, and its worktrees in `~/.seti/worktrees`. Archiving moves the
+An agent has up to three kinds of folders Seti made for it: its own folder `SCRATCH_ROOT/<title
+slug>-<id8>` (default `~/work`), its workspace `~/.seti/workspace/<task id>`, and, for an agent
+from before agents cloned for themselves, its worktrees in `~/.seti/worktrees`. Archiving moves the
 transcript into a compressed row (`task_archive`) and hands the folders to
 `server/src/archive-files.ts`, which runs in the background so a large folder does not hold up the
 request:

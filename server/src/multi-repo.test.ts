@@ -3,12 +3,14 @@ import fs from 'node:fs'
 import path from 'node:path'
 import type { Options } from '@anthropic-ai/claude-agent-sdk'
 import type * as Sdk from '@anthropic-ai/claude-agent-sdk'
-import type { AuditEvent, AuditPage, Repo, Task } from '@seti/shared'
+import type { Repo, Task } from '@seti/shared'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createApp } from './app.js'
 import { WORKTREE_ROOT } from './config.js'
 import { repos, tasks } from './db.js'
-import { taskReposContext } from './tasks.js'
+import { createWorktree } from './git.js'
+import { taskFolderContext } from './task-location.js'
+import { tokenOwner } from './task-sandbox.js'
 import { USER_AUTH } from './test-auth.js'
 import { workspaceDir } from './workspace/dir.js'
 
@@ -90,15 +92,46 @@ async function send<T>(method: 'POST' | 'PUT' | 'DELETE' | 'GET', url: string, b
   return { status: res.status, body: (text === '' ? {} : JSON.parse(text)) as Reply<T>['body'] }
 }
 
-const createTask = async (body: Record<string, unknown>) =>
-  send<Task>('POST', '/tasks', { title: 'Cross repo', prompt: 'List a file from each repo', ...body })
+let count = 0
+
+/** An agent as Seti made them before agents cloned for themselves: a worktree of each repo. */
+async function worktreeAgent(list: readonly Repo[]): Promise<Task> {
+  const id = `repo-agent-${String(++count)}-${crypto.randomUUID().slice(0, 8)}`
+  const dirs: string[] = []
+  for (const repo of list) {
+    dirs.push(await createWorktree(repo.path, repo.base_branch, `${path.basename(repo.path)}-${id}`))
+  }
+  const [primary, ...extras] = list.map((repo, index) => ({ repo_id: repo.id, dir: dirs[index] ?? '' }))
+  await tasks.insert(
+    {
+      id,
+      title: 'Cross repo',
+      repo_id: primary?.repo_id ?? null,
+      cwd: primary?.dir ?? '',
+      worktree: true,
+      pr_urls: [],
+      sandbox: false,
+      home_access: true,
+    },
+    extras,
+  )
+  return required(id)
+}
+
+async function required(id: string): Promise<Task> {
+  const task = await tasks.get(id)
+  if (task === undefined) {
+    throw new Error('Task is gone')
+  }
+  return task
+}
 
 const lastCall = () => sdk.calls.at(-1)?.options
 
-/** Sessions start once the task's GitHub token is looked up, just after the task is created. */
-async function started(count: number): Promise<void> {
+/** Sessions start once the task's GitHub token is looked up, just after the turn is asked for. */
+async function started(sessions: number): Promise<void> {
   await vi.waitFor(() => {
-    expect(sdk.calls).toHaveLength(count)
+    expect(sdk.calls).toHaveLength(sessions)
   })
 }
 
@@ -110,26 +143,25 @@ afterAll(() => {
   fs.rmSync(scratch, { recursive: true, force: true })
 })
 
-describe('tasks on several repos', () => {
-  it('creates a worktree per repo, passes the extras to the SDK and removes them all on delete', async () => {
-    const { status, body } = await createTask({ repo_ids: [api.id, web.id], worktree: true, ref: 'dev' })
-    expect(status).toBe(200)
-    const task = body.data
+describe('an agent that Seti gave worktrees of several repos', () => {
+  it('keeps them in its session and prompt, and loses them when it is deleted', async () => {
+    const task = await worktreeAgent([api, web])
     const [primary, extra] = task.repos
-    expect(task.repos.map((repo) => repo.slug)).toEqual(['acme/api', 'acme/web'])
-    expect(task).toMatchObject({ repo_id: api.id, repo_slug: 'acme/api', cwd: primary?.dir, worktree: true })
-    expect(primary?.dir.startsWith(WORKTREE_ROOT)).toBe(true)
-    expect(extra?.dir.startsWith(WORKTREE_ROOT)).toBe(true)
     const primaryDir = primary?.dir ?? ''
     const extraDir = extra?.dir ?? ''
-    expect(git(primaryDir, 'rev-parse', 'HEAD')).toBe(git(api.path, 'rev-parse', 'origin/dev'))
-    expect(git(extraDir, 'rev-parse', 'HEAD')).toBe(git(web.path, 'rev-parse', 'origin/main'))
+    expect(task.repos.map((repo) => repo.slug)).toEqual(['acme/api', 'acme/web'])
+    expect(task).toMatchObject({ repo_id: api.id, repo_slug: 'acme/api', cwd: primaryDir, worktree: true })
+    expect(primaryDir.startsWith(WORKTREE_ROOT)).toBe(true)
+    expect(extraDir.startsWith(WORKTREE_ROOT)).toBe(true)
 
+    expect((await send('POST', `/tasks/${task.id}/messages`, { prompt: 'Carry on' })).status).toBe(200)
     await started(1)
     expect(lastCall()).toMatchObject({ cwd: primaryDir, additionalDirectories: [extraDir, workspaceDir(task.id)] })
     const append = JSON.stringify(lastCall()?.systemPrompt)
     expect(append).toContain(`- acme/api: ${primaryDir} (your working directory)`)
     expect(append).toContain(`- acme/web: ${extraDir}`)
+    expect(append).toContain('Seti made a detached worktree of acme/api, acme/web')
+    expect(append).not.toContain('Your own working folder')
 
     expect((await send('DELETE', `/tasks/${task.id}`)).status).toBe(204)
     expect(fs.existsSync(primaryDir)).toBe(false)
@@ -138,66 +170,21 @@ describe('tasks on several repos', () => {
     expect(git(web.path, 'worktree', 'list')).not.toContain(extraDir)
   })
 
-  it('works in the checkouts themselves without the worktree switch', async () => {
-    const { body } = await createTask({ repo_ids: [web.id, api.id] })
-    expect(body.data.repos).toEqual([
-      { id: web.id, slug: 'acme/web', dir: web.path, worktree: false },
-      { id: api.id, slug: 'acme/api', dir: api.path, worktree: false },
-    ])
-    await started(1)
-    expect(lastCall()).toMatchObject({ cwd: web.path, additionalDirectories: [api.path, workspaceDir(body.data.id)] })
-    expect((await tasks.get(body.data.id))?.worktree).toBe(false)
-  })
-
-  it('keeps one-repo and no-repo tasks as they were', async () => {
-    const single = await createTask({ repo_id: api.id })
-    expect(single.body.data.repos).toEqual([{ id: api.id, slug: 'acme/api', dir: api.path, worktree: false }])
-    await started(1)
-    expect(lastCall()?.additionalDirectories).toEqual([workspaceDir(single.body.data.id)])
-    expect(await taskReposContext(single.body.data.id)).toBeNull()
-
-    const plain = await createTask({ cwd: scratch })
-    expect(plain.body.data).toMatchObject({ repo_id: null, repos: [], cwd: scratch })
-    await started(2)
-    expect(lastCall()?.additionalDirectories).toEqual([workspaceDir(plain.body.data.id)])
-  })
-
-  it('removes the worktrees it made when a later repo fails', async () => {
-    const broken = await scratchRepo('broken')
-    await repos.update(broken.id, { slug: broken.slug, path: broken.path, base_branch: 'missing' })
-    const before = fs.readdirSync(WORKTREE_ROOT)
-    const count = (await tasks.list()).length
-    const res = await createTask({ repo_ids: [api.id, broken.id], worktree: true })
-    expect(res.status).toBe(500)
-    expect(fs.readdirSync(WORKTREE_ROOT)).toEqual(before)
-    expect(await tasks.list()).toHaveLength(count)
-    await repos.remove(broken.id)
-  })
-
-  it('records every repo in the audit log', async () => {
-    const { body } = await createTask({ repo_ids: [api.id, web.id] })
-    const page = await send<AuditPage>('GET', '/audit?kind=task.created&limit=1')
-    const [event] = page.body.data.events as [AuditEvent]
-    expect(event).toMatchObject({
-      subject_id: body.data.id,
-      summary: 'Created task "Cross repo" in acme/api + acme/web',
-      detail: { repo: 'acme/api', repos: ['acme/api', 'acme/web'] },
-    })
+  it('says nothing about folders to an agent with one repo', async () => {
+    const task = await worktreeAgent([api])
+    expect(await taskFolderContext(task.id)).toBeNull()
+    await send('DELETE', `/tasks/${task.id}`)
   })
 })
 
-describe('repo selection validation', () => {
-  const unknown = '44444444-4444-4444-8444-444444444444'
-
-  it.each([
-    [{ repo_ids: ['nope'] }, 'repo_ids.0: Invalid UUID'],
-    [{ repo_ids: [api.id, api.id] }, 'repo_ids: a repo can only be picked once'],
-    [{ repo_ids: [api.id], repo_id: web.id }, 'repo_id: send repo_ids or repo_id, not both'],
-    [{ repo_ids: Array.from({ length: 11 }, () => crypto.randomUUID()) }, 'repo_ids: pick at most 10 repos'],
-    [{ repo_ids: [api.id, unknown] }, 'Unknown repo'],
-  ])('rejects a task with %j', async (selection, message) => {
-    const res = await createTask(selection)
-    expect(res.status).toBe(400)
-    expect(res.body.error?.detail).toBe(message)
+describe('the GitHub token for requests that name no owner', () => {
+  it("is the first repo owner's for an older agent and the credential's default for a new one", async () => {
+    const old = await worktreeAgent([api, web])
+    expect(tokenOwner(old)).toBe('acme')
+    const { body } = await send<Task>('POST', '/tasks', { title: 'No repo', prompt: 'Look around', sandbox: false })
+    expect(body.data.repos).toEqual([])
+    expect(tokenOwner(body.data)).toBeNull()
+    await started(1)
+    await send('DELETE', `/tasks/${old.id}`)
   })
 })

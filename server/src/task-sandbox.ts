@@ -243,8 +243,11 @@ const taskDir = (taskId: string) => path.join(SANDBOX_ROOT, taskId)
 /** The host directory a task's sandbox sees as /tmp. */
 export const sandboxTmpDir = (taskId: string) => path.join(taskDir(taskId), 'tmp')
 
-/** The owner of the task's first repo, whose GitHub token covers requests that name no owner. */
-const taskOwner = (task: Task) => task.repos[0]?.slug.split('/')[0] ?? null
+/**
+ * The owner whose GitHub token covers requests that name none: the first repo's for an agent from
+ * before agents cloned for themselves, else null, which is the credential's default token.
+ */
+export const tokenOwner = (task: Pick<Task, 'repos'>) => task.repos[0]?.slug.split('/')[0] ?? null
 
 async function taskProxy(task: Task, authority: SandboxCa): Promise<EgressProxy> {
   const taskId = task.id
@@ -259,7 +262,7 @@ async function taskProxy(task: Task, authority: SandboxCa): Promise<EgressProxy>
     ca: authority,
     credentials: {
       claude: async () => (await claudeCredential(accessOf(taskId).login))?.token ?? null,
-      github: async (owner) => agentToken(accessOf(taskId).profileId, owner ?? taskOwner(task)),
+      github: async (owner) => agentToken(accessOf(taskId).profileId, owner ?? tokenOwner(task)),
       connector: async () => Promise.resolve(connectorCredential()),
     },
     rules: () => accessOf(taskId).rules,
@@ -375,6 +378,7 @@ export async function taskSandbox(task: Task, request: SandboxRequest): Promise<
     taskDir: dir,
     cwd: task.cwd,
     dirs: extraDirs(task),
+    homeAccess: task.home_access,
     workspace: workspaceDir(task.id),
     readOnly: request.readOnly ?? [],
     caDir: '',

@@ -11,6 +11,7 @@ import type {
 import { afterAll, describe, expect, it, vi } from 'vitest'
 import { tasks } from '../db.js'
 import { SETI_TOOLS } from './catalog.js'
+import { toolsFor } from './levels.js'
 import { callSetiTool } from './server.js'
 import { teamMessages, USER_READER } from '../store/team.js'
 
@@ -70,28 +71,14 @@ async function data<T>(callerId: string, name: string, args: object = {}): Promi
 const PR = 'https://github.com/acme/web/pull/42'
 
 describe('agent setup tools', () => {
-  it('adds a directory inside the caller and refuses one outside it', async () => {
-    const own = path.join(scratch, 'caller-work')
-    const caller = await newTask('Setup caller', own, 'full')
-    const target = await newTask('Setup target', path.join(scratch, 'target-work'))
-    const inside = path.join(own, 'shared')
-    fs.mkdirSync(inside)
-    const outside = path.join(scratch, 'elsewhere')
-    fs.mkdirSync(outside)
-
-    const refused = await call(caller, 'add_agent_directory', { task: target, path: outside })
-    expect(refused.isError).toBe(true)
-    expect(refused.text).toContain('inside one of your own')
-    await data(caller, 'add_agent_directory', { task: target, path: inside })
-    expect((await tasks.get(target))?.dirs).toEqual([inside])
-
-    const cwdRefused = await call(caller, 'remove_from_agent', {
-      task: target,
-      what: path.join(scratch, 'target-work'),
-    })
-    expect(cwdRefused.isError).toBe(true)
-    await data(caller, 'remove_from_agent', { task: target, what: inside })
-    expect((await tasks.get(target))?.dirs).toEqual([])
+  it('have no tool that gives an agent a repo or a directory, at any level', () => {
+    const gone = ['add_agent_repo', 'add_agent_directory', 'remove_from_agent', 'set_agent_working_directory']
+    for (const level of ['off', 'self', 'full'] as const) {
+      const names = toolsFor(level).map((tool) => tool.name)
+      expect(names.filter((name) => gone.includes(name))).toEqual([])
+      expect(names).toContain('set_working_directory')
+    }
+    expect(SETI_TOOLS.map((tool) => tool.name)).not.toContain('set_working_directory')
   })
 
   it('links and unlinks a PR, audited as the calling agent', async () => {

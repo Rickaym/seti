@@ -31,6 +31,7 @@ import { Fields, Row } from '@/panels/tasks/SettingsFields'
 import { HeldBack } from '@/panels/tasks/StartFacts'
 import { TaskChannels } from '@/panels/tasks/TaskChannels'
 import { TaskColor } from '@/panels/tasks/TaskColor'
+import { TaskHomeAccess } from '@/panels/tasks/TaskHomeAccess'
 import { InputModeSelect } from '@/panels/tasks/TaskInputs'
 import { TaskLocation } from '@/panels/tasks/TaskLocation'
 import { TaskNotify } from '@/panels/tasks/TaskNotify'
@@ -180,8 +181,8 @@ export const TaskSettings = memo(function TaskSettingsView({
         <Row label="Notify">
           <TaskNotify task={task} onChanged={onChanged} />
         </Row>
-        <Row label="Directories">
-          <TaskLocation task={task} onChanged={onChanged} />
+        <Row label="Folder">
+          <TaskLocation task={task} />
         </Row>
       </Fields>
     ),
@@ -202,6 +203,11 @@ export const TaskSettings = memo(function TaskSettingsView({
         <Row label="Isolation" warn={!sandboxed}>
           <SandboxToggle task={task} running={running} onChanged={onChanged} />
         </Row>
+        {task.home_access && sandboxed && (
+          <Row label="Home folders">
+            <TaskHomeAccess task={task} onChanged={onChanged} />
+          </Row>
+        )}
         <Row label="Bypass">
           <BypassToggle task={task} onChanged={onChanged} />
         </Row>

@@ -94,7 +94,7 @@ const PRELUDE = `(host, input, logic) => {
       setColor: (id, color) => call('tasks.manage.set_color', { id, color }),
       linkPr: (id, url) => call('tasks.manage.link_pr', { id, url }),
       unlinkPr: (id, url) => call('tasks.manage.unlink_pr', { id, url }),
-      start: ({ title, prompt, repo } = {}) => call('tasks.manage.start', { title, prompt, repo }),
+      start: ({ title, prompt } = {}) => call('tasks.manage.start', { title, prompt }),
       stop: (id) => call('tasks.manage.stop', { id }),
     },
     chat: {

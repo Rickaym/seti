@@ -21,9 +21,12 @@ const PREFACES: Record<SetiControlLevel, { loaded: string; pending: string }> = 
     pending: 'Seti control is now Self: mcp__seti__* tools that reach past you refuse calls.',
   },
   off: {
-    loaded: 'Seti control is now off: of the mcp__seti__* tools only set_status, send_file and ask_secret remain.',
+    loaded:
+      'Seti control is now off: of the mcp__seti__* tools only set_status, set_working_directory, send_file ' +
+      'and ask_secret remain.',
     pending:
-      'Seti control is now off: the mcp__seti__* tools beyond set_status, send_file and ask_secret refuse calls.',
+      'Seti control is now off: the mcp__seti__* tools beyond set_status, set_working_directory, send_file and ' +
+      'ask_secret refuse calls.',
   },
 }
 

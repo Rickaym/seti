@@ -1,8 +1,9 @@
 import { z } from 'zod'
 
 /**
- * How far an agent's seti tools reach: off gives only set_status and send_file, self acts on the
- * agent itself and reads Seti, full acts on Seti as the EA does. Only the user changes it.
+ * How far an agent's seti tools reach: off gives only its own status, working directory and file
+ * handoffs, self acts on the agent itself and reads Seti, full acts on Seti as the EA does. Only
+ * the user changes it.
  */
 export const SETI_CONTROL_LEVELS = ['off', 'self', 'full'] as const
 export type SetiControlLevel = (typeof SETI_CONTROL_LEVELS)[number]

@@ -199,19 +199,16 @@ describe('task routes', () => {
     const task = await send<Task>('POST', '/tasks', {
       title: 'Fix login',
       prompt: 'Go',
-      cwd: scratch,
       context_pack_ids: [pack.data.id],
       pr_urls: [first],
     })
     expect(await latest('task.created')).toMatchObject({
       actor: 'user',
       subject_id: task.data.id,
-      summary: `Created task "Fix login" in ${scratch}`,
+      summary: `Created task "Fix login" in ${task.data.cwd}`,
       detail: {
         title: 'Fix login',
-        repo: null,
-        cwd: scratch,
-        worktree: false,
+        cwd: task.data.cwd,
         context_packs: ['Ops'],
         pr_urls: [first],
       },

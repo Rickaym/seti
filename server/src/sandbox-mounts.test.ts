@@ -79,6 +79,7 @@ const layout = (patch: Partial<SandboxLayout> = {}): SandboxLayout => ({
   taskDir,
   cwd: repo,
   dirs: [],
+  homeAccess: true,
   readOnly: [],
   caDir,
   systemBundle: '/etc/ssl/certs/ca-certificates.crt',
@@ -229,7 +230,7 @@ describe('sandboxMounts', () => {
   })
 })
 
-describe('the home directory', () => {
+describe('the home directory of an older agent with home access', () => {
   const mounts = sandboxMounts(layout())
   const code = path.join(home, 'code')
 
@@ -333,6 +334,63 @@ describe('the home directory', () => {
     expect(fs.existsSync(path.join(claudeHome, memory))).toBe(true)
     expect(dests(wt)).not.toContain(path.join(inside, 'projects', projectSlug(mainRepo)))
     expect(dests(mounts).filter((dest) => dest.endsWith('/memory'))).toEqual([])
+  })
+})
+
+describe('a private sandbox, as every new agent gets', () => {
+  const work = make(home, WORK_DIR)
+  const own = make(work, 'fix-login-11111111')
+  const neighbour = make(work, 'other-agent-22222222')
+  const clone = make(own, 'app')
+  make(clone, '.git', 'hooks')
+  touch(path.join(clone, '.git', 'config'))
+  const mounts = sandboxMounts(layout({ cwd: own, homeAccess: false }))
+  const sources = mounts.flatMap((mount) => ('src' in mount ? [mount.src] : []))
+  const outsideDotFolders = (dir: string) => !path.relative(home, dir).startsWith('.')
+
+  it('binds its own folder writable and nothing else of the home folders, not even read-only', () => {
+    expect(find(mounts, own)).toEqual([{ kind: 'bind', src: own, dest: own }])
+    expect(find(mounts, home)).toEqual([{ kind: 'bind', src: path.join(taskDir, 'home'), dest: home }])
+    const fromHome = sources.filter((src) => src.startsWith(`${home}/`) && outsideDotFolders(src))
+    expect(fromHome).toEqual([own])
+    for (const hidden of [path.join(home, 'code'), repo, mainRepo, branchCheckout, work, neighbour]) {
+      expect(dests(mounts)).not.toContain(hidden)
+    }
+  })
+
+  it('leaves the home folders out when home access is left unsaid', () => {
+    const unsaid = Object.fromEntries(Object.entries(layout({ cwd: own })).filter(([key]) => key !== 'homeAccess'))
+    expect(sandboxMounts(unsaid as unknown as SandboxLayout)).toEqual(mounts)
+  })
+
+  it('keeps the toolchains read-only and the package caches writable', () => {
+    expect(dests(mounts, 'ro-bind')).toEqual(
+      expect.arrayContaining([
+        path.join(home, '.nvm'),
+        path.join(home, '.gitconfig'),
+        path.join(home, '.cargo', 'bin'),
+      ]),
+    )
+    expect(dests(mounts, 'bind')).toContain(path.join(home, '.npm'))
+    expect(dests(mounts)).not.toContain(path.join(home, '.ssh'))
+  })
+
+  it('works in a clone inside its folder with the folder still bound, and guards the clone git config', () => {
+    const moved = sandboxMounts(layout({ cwd: clone, dirs: [own], homeAccess: false }))
+    expect(dests(moved, 'bind')).toEqual(expect.arrayContaining([own, clone]))
+    expect(dests(moved, 'ro-bind')).toEqual(
+      expect.arrayContaining([path.join(clone, '.git', 'config'), path.join(clone, '.git', 'hooks')]),
+    )
+    expect(dests(moved)).not.toContain(neighbour)
+  })
+
+  it('takes the home folders away from an older agent once its home access is switched off', () => {
+    const before = sandboxMounts(layout({ cwd: worktree }))
+    const after = sandboxMounts(layout({ cwd: worktree, homeAccess: false }))
+    const lost = dests(before).filter((dest) => !dests(after).includes(dest))
+    expect(lost).toEqual(expect.arrayContaining([path.join(home, 'code'), branchCheckout, work]))
+    expect(dests(after, 'bind')).toEqual(expect.arrayContaining([worktree, commonGit]))
+    expect(dests(after)).not.toContain(path.join(home, 'code'))
   })
 })
 

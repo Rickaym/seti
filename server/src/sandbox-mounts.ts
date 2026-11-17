@@ -22,6 +22,8 @@ export interface SandboxLayout {
   cwd: string
   /** Further directories the task works in, read-write like cwd. */
   dirs: readonly string[]
+  /** An older agent's sandbox also shows the user's top-level home folders, writable. */
+  homeAccess?: boolean
   /** The task's Seti workspace, read-write although it lives in Seti's own data. */
   workspace?: string | null
   /** Read-only extras such as the Claude Code binary and local plugin folders. */
@@ -236,10 +238,14 @@ function pathDirs(layout: SandboxLayout): string[] {
 export const WORK_DIR = 'work'
 
 /**
- * The home directory's top-level folders without a dot, where the user keeps code checkouts, and
- * the shared work folder. Files and dot folders at the top level are never among them.
+ * For an agent with home access only: the home directory's top-level folders without a dot, where
+ * the user keeps code checkouts, and the shared work folder. Files and dot folders at the top
+ * level are never among them. Every other agent sees none of them.
  */
 function homeDirs(layout: SandboxLayout): string[] {
+  if (layout.homeAccess !== true) {
+    return []
+  }
   fs.mkdirSync(path.join(layout.home, WORK_DIR), { recursive: true })
   return fs
     .readdirSync(layout.home, { withFileTypes: true })

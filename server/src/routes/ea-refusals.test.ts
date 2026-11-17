@@ -3,11 +3,15 @@ import type { Options } from '@anthropic-ai/claude-agent-sdk'
 import type * as Sdk from '@anthropic-ai/claude-agent-sdk'
 import type { AccessDefault, ChannelInfo, ChannelSecret, Task, TaskAccessView, WebhookChannelInfo } from '@seti/shared'
 import { afterAll, describe, expect, it, vi } from 'vitest'
+import { asAgent } from '../access.js'
 import { createApp } from '../app.js'
 import { webhooks } from '../channels/service.js'
 import { hmacHex } from '../channels/signature.js'
 import { tasks } from '../db.js'
+import { setupKey } from '../session-options.js'
 import { auditEvents } from '../store/audit.js'
+import { updateTask } from '../task-actions.js'
+import { requireTask } from '../tasks.js'
 import { EA_AUTH, USER_AUTH } from '../test-auth.js'
 import { withBundledMods } from '../test-mods.js'
 
@@ -128,8 +132,36 @@ describe('security settings stay with the user', () => {
     expect((await send(USER, 'GET', '/secrets')).status).toBe(200)
   })
 
+  it("lets only the user take an older agent's home folders away, once and for good", async () => {
+    const id = 'home-access-agent'
+    await tasks.insert({ id, title: id, repo_id: null, cwd: scratch, worktree: false, pr_urls: [], home_access: true })
+    const before = await setupKey(await requireTask(id))
+    expect(await refused(await send(EA, 'PATCH', `/tasks/${id}`, { home_access: false }))).toBe(
+      "The EA cannot change an agent's home folders; the user does that in Seti",
+    )
+    const caller = await requireTask(id)
+    await expect(asAgent(caller, async () => updateTask(id, { home_access: false }))).rejects.toThrow(
+      "Agents cannot change an agent's home folders",
+    )
+    expect((await requireTask(id)).home_access).toBe(true)
+    expect((await send(USER, 'PATCH', `/tasks/${id}`, { home_access: true })).status).toBe(400)
+
+    expect((await data<Task>(await send(USER, 'PATCH', `/tasks/${id}`, { home_access: false }))).home_access).toBe(
+      false,
+    )
+    expect(await setupKey(await requireTask(id))).not.toBe(before)
+    expect(await auditEvents.latest('task.access_changed')).toMatchObject({
+      actor: 'user',
+      subject_id: id,
+      summary: `Took your home folders out of the sandbox of task "${id}"`,
+      detail: { home_access: false },
+    })
+    await idleTask('born-private')
+    expect((await requireTask('born-private')).home_access).toBe(false)
+  })
+
   it('starts EA agents sandboxed and only with the ssh and AWS defaults', async () => {
-    const base = { title: 'EA agent', prompt: 'Say hi', cwd: scratch }
+    const base = { title: 'EA agent', prompt: 'Say hi' }
     expect(await refused(await send(EA, 'POST', '/tasks', { ...base, sandbox: false }))).toContain(
       'outside the sandbox',
     )

@@ -33,8 +33,8 @@ import { prWatch } from './store/pr-watch.js'
 import { workspaceRows } from './store/workspaces.js'
 import { agentTodos, forgetSubtasks, subtaskBriefs, subtaskOf } from './subtask-cache.js'
 import { linkSubtaskPr, publishSubtasks, unlinkSubtaskPr } from './subtask-prs.js'
-import { setTaskCwd } from './task-location.js'
 import {
+  dropTaskHomeAccess,
   linkTaskPr,
   renameTask,
   requireTask,
@@ -81,7 +81,7 @@ export async function updateTask(id: string, input: z.output<typeof updateTaskIn
     [input.title, async (task) => renameTask(task, input.title ?? task.title)],
     [input.input_mode, async (task) => setInputMode(task, input.input_mode ?? task.input_mode)],
     [input.sandbox, async (task) => setTaskSandbox(task, input.sandbox ?? task.sandbox)],
-    [input.cwd, async (task) => setTaskCwd(task, input.cwd ?? task.cwd)],
+    [input.home_access, dropTaskHomeAccess],
     [input.profile_id, async (task) => setTaskProfile(task, input.profile_id ?? task.profile_id)],
     [input.seti_control, async (task) => changeSetiControl(task, input.seti_control ?? task.seti_control)],
     [input.color, async (task) => setTaskColor(task, input.color === undefined ? task.color : input.color)],

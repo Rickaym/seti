@@ -1,14 +1,11 @@
-import fs from 'node:fs'
 import os from 'node:os'
-import path from 'node:path'
 import { query } from '@anthropic-ai/claude-agent-sdk'
 import { AWS_ACCESS_ID, DEFAULT_PROFILE_ID, PLANNED_TITLE_MAX, plannerOutput, type PlannerOutput } from '@seti/shared'
 import { z } from 'zod'
 import { probeEnv, withTimeout } from './capabilities.js'
-import { repos } from './db.js'
 import { localServers, readHostConfig } from './mcp-borrowed.js'
 import { mcpCatalog } from './mcp-selection.js'
-import { checkPlan, cleanTitle, clip, type PlannerAnswer, type PlannerCatalog, type PlanPins } from './planner-rules.js'
+import { checkPlan, cleanTitle, type PlannerAnswer, type PlannerCatalog, type PlanPins } from './planner-rules.js'
 import { accessDefaults } from './store/access.js'
 import { contextPacks } from './store/context.js'
 import { profiles } from './store/credentials.js'
@@ -16,8 +13,6 @@ import { sshHostStore } from './store/ssh.js'
 
 const PLANNER_MODEL = 'claude-haiku-4-5'
 const PLANNER_TIMEOUT_MS = 8000
-const README_BYTES = 4096
-const DESCRIPTION_MAX = 160
 
 /** One model call: the rendered prompt, and the message and catalog it came from. */
 export interface PlannerRequest {
@@ -30,40 +25,9 @@ export interface PlannerRequest {
 /** Answers a planner request with the model's JSON; the answer is validated by the caller. */
 export type PlannerModel = (request: PlannerRequest, signal: AbortSignal) => Promise<unknown>
 
-const readmeCache = new Map<string, { mtimeMs: number; description: string }>()
-
-const isProse = (line: string) => line !== '' && !/^(?:#|!\[|\[!|<|```|---|===|\||>)/.test(line)
-
-/** The first line of prose in a repo's README, cached until the file changes. */
-function readmeDescription(repoPath: string): string {
-  const file = path.join(repoPath, 'README.md')
-  try {
-    const { mtimeMs } = fs.statSync(file)
-    const cached = readmeCache.get(file)
-    if (cached?.mtimeMs === mtimeMs) {
-      return cached.description
-    }
-    const handle = fs.openSync(file, 'r')
-    const buffer = Buffer.alloc(README_BYTES)
-    const read = fs.readSync(handle, buffer, 0, README_BYTES, 0)
-    fs.closeSync(handle)
-    const line = buffer
-      .toString('utf8', 0, read)
-      .split('\n')
-      .map((part) => part.trim())
-      .find(isProse)
-    const description = clip(line ?? '', DESCRIPTION_MAX)
-    readmeCache.set(file, { mtimeMs, description })
-    return description
-  } catch {
-    return ''
-  }
-}
-
 /** What exists to choose from; read fresh per plan, probing nothing. */
 async function plannerCatalog(): Promise<PlannerCatalog> {
-  const [repoList, packs, mcp, hosts, sshDefaults, awsDefaults, profile] = await Promise.all([
-    repos.list(),
+  const [packs, mcp, hosts, sshDefaults, awsDefaults, profile] = await Promise.all([
     contextPacks.list(),
     mcpCatalog(false),
     sshHostStore.list(),
@@ -73,12 +37,6 @@ async function plannerCatalog(): Promise<PlannerCatalog> {
   ])
   const local = localServers(readHostConfig())
   return {
-    repos: repoList.map((repo) => ({
-      id: repo.id,
-      slug: repo.slug,
-      description: readmeDescription(repo.path),
-      path: repo.path,
-    })),
     packs: packs.flatMap(({ id, name, description, linked_by_default, builtin, kind }) =>
       kind === 'role' ? [] : [{ id, name, description, linked_by_default, builtin }],
     ),
@@ -93,12 +51,10 @@ async function plannerCatalog(): Promise<PlannerCatalog> {
 
 const PLANNER_SYSTEM = `You set up a coding agent in Seti from the user's first message to it.
 Answer with one JSON object and nothing else:
-{"title": string, "repos": string[], "worktree": boolean, "link_packs": string[], "unlink_packs": string[], "enable_mcp": string[], "disable_mcp": string[], "ssh_hosts": string[], "aws": boolean}
+{"title": string, "link_packs": string[], "unlink_packs": string[], "enable_mcp": string[], "disable_mcp": string[], "ssh_hosts": string[], "aws": boolean}
 
 Rules:
 - title: what the agent will do, at most ${String(PLANNED_TITLE_MAX)} characters, sentence case, no quotes, no final period.
-- repos: slugs from the repo list that the message is clearly about; the agent runs in the first. Leave it empty when no repo clearly fits: the agent then works in a fresh folder of its own.
-- worktree: true when repos are picked, so parallel agents on one repo do not collide. False only when the message asks to work in the main checkout itself.
 - link_packs: names of context packs that clearly help and are not linked by default. unlink_packs: default packs that are clearly irrelevant. Otherwise leave both empty.
 - enable_mcp and disable_mcp: MCP server names to turn on or off against their defaults, only when the message clearly needs or rules them out. Otherwise leave both empty. A server marked [local to ...] is turned on only when the message names it.
 - ssh_hosts: aliases of SSH hosts the message explicitly asks the agent to reach and that are off by default. aws: true only when the message explicitly asks to use AWS and it is off by default. Unclear permissions are NOT given: when in doubt, leave them out.
@@ -125,11 +81,6 @@ function plannerPrompt(message: string, catalog: PlannerCatalog, titleOnly: bool
   const lists = titleOnly
     ? ['Only the title matters here; leave every list empty and aws false.']
     : [
-        'Repos:',
-        ...bullet(
-          catalog.repos.map((repo) => `- ${described(repo.slug, repo.description)}`),
-          'none registered',
-        ),
         'Context packs:',
         ...bullet(
           catalog.packs.map(
@@ -259,7 +210,6 @@ export async function planAgent(message: string, pins: PlanPins = {}, timeoutMs 
 /** A title alone, for agents whose setup is given, such as imported sessions. */
 export async function planTitle(message: string, timeoutMs = PLANNER_TIMEOUT_MS): Promise<string> {
   const empty: PlannerCatalog = {
-    repos: [],
     packs: [],
     mcp: [],
     ssh_hosts: [],

@@ -2,36 +2,14 @@ import { execFileSync } from 'node:child_process'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import type * as Sdk from '@anthropic-ai/claude-agent-sdk'
-import type { Repo, Task, WarmCacheStatus } from '@seti/shared'
-import { afterAll, describe, expect, it, vi } from 'vitest'
+import type { Repo, WarmCacheStatus } from '@seti/shared'
+import { afterAll, describe, expect, it } from 'vitest'
 import { createApp } from './app.js'
 import { repos } from './db.js'
 import { auditEvents } from './store/audit.js'
 import { EA_AUTH, USER_AUTH } from './test-auth.js'
 
-const sdk = vi.hoisted(() => ({ sessions: 0 }))
-
-vi.mock('@anthropic-ai/claude-agent-sdk', async (importOriginal) => ({
-  ...(await importOriginal<typeof Sdk>()),
-  query: () => {
-    sdk.sessions += 1
-    const session = (async function* () {
-      await Promise.resolve()
-      yield* []
-    })()
-    return Object.assign(session, { close: () => undefined })
-  },
-}))
-
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'seti-warm-routes-'))
-
-/** Sessions start just after a task is created; waiting keeps them inside the test's database. */
-async function started(count: number): Promise<void> {
-  await vi.waitFor(() => {
-    expect(sdk.sessions).toBe(count)
-  })
-}
 
 afterAll(() => {
   fs.rmSync(scratch, { recursive: true, force: true })
@@ -137,75 +115,5 @@ describe('warm cache settings', () => {
     expect((await send('PUT', `/repos/${repo.id}/warm-caches`, settings(['.git/x']))).status).toBe(400)
     expect((await send('PUT', `/repos/${repo.id}/warm-caches`, settings([], { max_mb: 0 }))).status).toBe(400)
     expect((await send('GET', `/repos/${crypto.randomUUID()}/warm-caches`)).status).toBe(404)
-  })
-})
-
-describe('seeding new agent worktrees', () => {
-  it('copies the main checkout caches before the first turn and records them on the task', async () => {
-    const repo = await scratchRepo('seeded')
-    fs.writeFileSync(path.join(repo.path, 'tsconfig.tsbuildinfo'), '{"warm":true}')
-    const { status, body } = await send<Task>('POST', '/tasks', {
-      title: 'Warm start',
-      prompt: 'Typecheck',
-      repo_ids: [repo.id],
-      worktree: true,
-    })
-    expect(status).toBe(200)
-    await started(1)
-    const task = body.data
-    expect(fs.readFileSync(path.join(task.cwd, 'tsconfig.tsbuildinfo'), 'utf8')).toBe('{"warm":true}')
-    expect(task.warm_caches).toEqual([
-      expect.objectContaining({ repo: 'acme/seeded', outcome: 'seeded', source: 'main', paths: 1, bytes: 13 }),
-    ])
-    expect(await auditEvents.latest('task.caches_seeded')).toMatchObject({
-      subject_id: task.id,
-      summary: expect.stringMatching(/^Warm caches: 1 path, 1 KB from main checkout for task "Warm start"$/) as string,
-      detail: { paths: 1, bytes: 13, sources: [repo.path] },
-    })
-  })
-
-  it('records nothing to audit when seeding is off, and still starts the agent when seeding fails', async () => {
-    const off = await scratchRepo('off')
-    await send('PUT', `/repos/${off.id}/warm-caches`, settings(['**/*.tsbuildinfo'], { enabled: false }))
-    const before = await auditEvents.latest('task.caches_seeded')
-    const quiet = await send<Task>('POST', '/tasks', {
-      title: 'Cold',
-      prompt: 'Go',
-      repo_ids: [off.id],
-      worktree: true,
-    })
-    expect(quiet.body.data.warm_caches).toEqual([expect.objectContaining({ outcome: 'off' })])
-    await started(2)
-    expect((await auditEvents.latest('task.caches_seeded'))?.id).toBe(before?.id)
-
-    const broken = await scratchRepo('broken')
-    const unreadable = path.join(broken.path, 'tsconfig.tsbuildinfo')
-    fs.writeFileSync(unreadable, 'secret-ish')
-    fs.chmodSync(unreadable, 0o000)
-    const begun = await send<Task>('POST', '/tasks', {
-      title: 'Still starts',
-      prompt: 'Go',
-      repo_ids: [broken.id],
-      worktree: true,
-    })
-    fs.chmodSync(unreadable, 0o600)
-    expect(begun.status).toBe(200)
-    await started(3)
-    expect(begun.body.data.warm_caches).toEqual([expect.objectContaining({ outcome: 'failed', paths: 0 })])
-    expect(fs.existsSync(path.join(begun.body.data.cwd, 'tsconfig.tsbuildinfo'))).toBe(false)
-  })
-
-  it('seeds a worktree added to a running agent', async () => {
-    const first = await scratchRepo('first')
-    const second = await scratchRepo('second')
-    fs.writeFileSync(path.join(second.path, 'tsconfig.tsbuildinfo'), 'second')
-    const task = (await send<Task>('POST', '/tasks', { title: 'Two', prompt: 'Go', repo_ids: [first.id] })).body.data
-    expect(task.warm_caches).toEqual([])
-    await started(4)
-    const added = await send<Task>('POST', `/tasks/${task.id}/repos`, { repo_id: second.id, worktree: true })
-    expect(added.status).toBe(200)
-    const dir = added.body.data.repos.find((entry) => entry.id === second.id)?.dir ?? ''
-    expect(fs.readFileSync(path.join(dir, 'tsconfig.tsbuildinfo'), 'utf8')).toBe('second')
-    expect(added.body.data.warm_caches).toEqual([expect.objectContaining({ repo: 'acme/second', outcome: 'seeded' })])
   })
 })

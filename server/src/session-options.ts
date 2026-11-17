@@ -239,6 +239,7 @@ export const sandboxStamp = async (task: Task) => ({
   ...(await sandboxPolicy.get()),
   updated_at: null,
   task: task.sandbox,
+  home: task.home_access,
   profile: await profileStamp(task),
   mcp: mcpTargets(),
   aws: (await taskAws(task.id)) ? ((await profiles.get(task.profile_id))?.aws.region ?? null) : null,

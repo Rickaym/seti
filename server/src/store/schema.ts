@@ -60,6 +60,7 @@ import {
   SUBTASK_PR,
   TASK_BYPASS_UNTIL,
   TASK_CLOSING_LINE,
+  TASK_HOME_ACCESS,
   TASK_COLOR_HEX,
   TASK_DIRS,
   TASK_MODEL_FALLBACK,
@@ -192,4 +193,5 @@ export const MIGRATIONS: readonly Migration[] = [
   { version: 104, name: 'permission_review', sql: PERMISSION_REVIEW },
   { version: 105, name: 'pr_list_cache', sql: PR_LIST_CACHE },
   { version: 106, name: 'shared_tools', sql: SHARED_TOOLS },
+  { version: 107, name: 'task_home_access', sql: TASK_HOME_ACCESS },
 ]
