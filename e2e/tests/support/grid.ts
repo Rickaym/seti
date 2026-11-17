@@ -1,12 +1,11 @@
 import type { APIRequestContext, Locator, Page } from '@playwright/test'
 import type { Envelope, Task, WorkspaceEntry, WorkspaceGrid } from '@seti/shared'
-import { paths } from './env.js'
 import { apiData, expect } from './fixtures.js'
 
 /** Starts an agent on the fake Claude Code, which answers each message with "Done.". */
 export async function startAgent(request: APIRequestContext, title: string): Promise<string> {
   const response = await request.post('/api/tasks', {
-    data: { title, prompt: `Please greet as ${title}`, cwd: paths.checkout, sandbox: false },
+    data: { title, prompt: `Please greet as ${title}`, sandbox: false },
   })
   expect(response.ok(), 'POST /api/tasks').toBe(true)
   const { id } = ((await response.json()) as Envelope<Task>).data

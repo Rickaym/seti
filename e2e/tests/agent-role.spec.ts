@@ -1,7 +1,6 @@
 import type { Page } from '@playwright/test'
 import { BUILTIN_ROLES, type ContextPack, type ContextPackSummary, type MessagePage, type Task } from '@seti/shared'
 import { settingsDialog, showSection } from './support/agent-settings.js'
-import { paths } from './support/env.js'
 import { SYSTEM_PROMPT_PROMPT } from './support/fake-claude.js'
 import { apiData, expect, test, toasts, unique, waitForToastsToClear } from './support/fixtures.js'
 import { FAKE_CLAUDE_ENV } from './support/processes.js'
@@ -14,7 +13,7 @@ const REVIEWER = role('Reviewer')
 
 async function startAgent(page: Page, pinned: boolean): Promise<Task> {
   const created = await page.request.post('/api/tasks', {
-    data: { title: unique('Release lead'), prompt: 'Hi', cwd: paths.checkout, sandbox: false },
+    data: { title: unique('Release lead'), prompt: 'Hi', sandbox: false },
   })
   expect(created.ok(), 'POST /api/tasks').toBe(true)
   const task = ((await created.json()) as { data: Task }).data

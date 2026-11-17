@@ -1,6 +1,5 @@
 import type { Page } from '@playwright/test'
 import type { Envelope, PermissionPolicy, Task } from '@seti/shared'
-import { paths } from './support/env.js'
 import { REVIEW_DRAFT, REVIEW_PROMPT, reviewSent } from './support/fake-review.js'
 import { apiData, expect, test, unique } from './support/fixtures.js'
 import { FAKE_CLAUDE_ENV } from './support/processes.js'
@@ -30,7 +29,6 @@ test('a review rule holds an MCP call until the user edits and allows it', async
       data: {
         title: unique('Notifier'),
         prompt: `Please ${REVIEW_PROMPT} ${tool}`,
-        cwd: paths.checkout,
         sandbox: false,
       },
     })

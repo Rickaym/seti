@@ -1,6 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import type { WorkspaceEntry } from '@seti/shared'
-import { paths } from './support/env.js'
+import type { Task, WorkspaceEntry } from '@seti/shared'
 import { apiData, expect, test, unique } from './support/fixtures.js'
 import { mainGrid } from './support/grid.js'
 import { tapMoreAction } from './support/phone-agent.js'
@@ -30,7 +29,7 @@ test("an agent's More sheet opens a terminal alone on the whole screen, with the
   await expect(keys.getByRole('button').first()).toHaveText('Esc')
 
   await run(terminal, 'pwd; echo start-$((5+5)); sleep 30 && echo after-$((1+2))')
-  await expect(screenOf(terminal)).toContainText(paths.checkout)
+  await expect(screenOf(terminal)).toContainText((await apiData<Task>(request, `/tasks/${id}`)).cwd)
   await expect(screenOf(terminal)).toContainText('start-10')
   await keys.getByRole('button', { name: 'Control' }).tap()
   await expect(keys.getByRole('button', { name: 'Control' })).toHaveAttribute('aria-pressed', 'true')

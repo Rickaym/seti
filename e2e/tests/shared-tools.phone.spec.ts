@@ -1,14 +1,12 @@
 import { expect, test, toasts, unique, waitForToastsToClear } from './support/fixtures.js'
 import { expectFitsPhone } from './support/phone-layout.js'
 import { FAKE_CLAUDE_ENV } from './support/processes.js'
-import { proposeTool, removeToolScript, sharedTool, startToolsmith } from './support/shared-tools.js'
+import { proposeTool, sharedTool, startToolsmith } from './support/shared-tools.js'
 
 const LONG_LINE = `print("${'a line much wider than a phone '.repeat(6)}")`
 const SCRIPT = `#!/usr/bin/env python3\n${LONG_LINE}\n`
 
 test.use({ serverEnv: FAKE_CLAUDE_ENV })
-
-test.afterEach(removeToolScript)
 
 test('a phone reviews a proposed tool, allows it, reads its code, turns it off and removes it', async ({
   page,

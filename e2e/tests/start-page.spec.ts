@@ -224,7 +224,7 @@ test('the start page offers no repo, branch or directory, and sends the message 
   await expect(message(page)).toBeEditable()
   await expect(page.getByRole('group', { name: 'Recent repos' })).toHaveCount(0)
   await expect(main(page).getByRole('button', { name: api.slug })).toHaveCount(0)
-  await expect(main(page).getByRole('combobox')).toHaveCount(0)
+  await expect(main(page).locator('select')).toHaveCount(0)
   await message(page).fill('Bump the dependencies')
   await message(page).press('Enter')
   await expect(page).toHaveURL(/#agents\/e2e-intercepted$/)

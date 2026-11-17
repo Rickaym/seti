@@ -13,7 +13,7 @@ test.use({ serverEnv: FAKE_CLAUDE_ENV })
 /** Starts an agent whose first turn ends its process with `reason`; a retry of it succeeds. */
 async function failingAgent(request: APIRequestContext, reason: string): Promise<string> {
   const response = await request.post('/api/tasks', {
-    data: { title: unique('Failing'), prompt: `Please ${FAIL_PROMPT} ${reason}`, cwd: paths.checkout, sandbox: false },
+    data: { title: unique('Failing'), prompt: `Please ${FAIL_PROMPT} ${reason}`, sandbox: false },
   })
   expect(response.ok(), 'POST /api/tasks').toBe(true)
   const { id } = ((await response.json()) as Envelope<Task>).data

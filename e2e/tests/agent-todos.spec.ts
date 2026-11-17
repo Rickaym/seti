@@ -18,7 +18,7 @@ const lights = (page: Page) => strip(page).getByTestId('todo-row').getByRole('im
 test("the todo strip follows the agent's own list live, with its status lights", async ({ page, request }) => {
   const gate = fs.mkdtempSync(path.join(paths.root, 'todo-gate-'))
   const response = await request.post('/api/tasks', {
-    data: { title: unique('Todos'), prompt: planPrompt(gate), cwd: paths.checkout, sandbox: false },
+    data: { title: unique('Todos'), prompt: planPrompt(gate), sandbox: false },
   })
   expect(response.ok(), 'POST /api/tasks').toBe(true)
   const { id } = ((await response.json()) as Envelope<Task>).data

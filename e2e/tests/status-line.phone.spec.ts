@@ -1,5 +1,4 @@
 import type { Envelope, Task } from '@seti/shared'
-import { paths } from './support/env.js'
 import { setiPrompt } from './support/fake-claude.js'
 import { apiData, expect, test, unique } from './support/fixtures.js'
 import { expectFitsPhone } from './support/phone-layout.js'
@@ -15,7 +14,7 @@ test('an agent status shows on its row in the phone list, and the agent bar leav
 }) => {
   const title = unique('Phone status')
   const response = await request.post('/api/tasks', {
-    data: { title, prompt: 'Say hello', cwd: paths.checkout, sandbox: false },
+    data: { title, prompt: 'Say hello', sandbox: false },
   })
   expect(response.ok(), 'POST /api/tasks').toBe(true)
   const { id } = ((await response.json()) as Envelope<Task>).data

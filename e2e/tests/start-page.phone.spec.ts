@@ -12,7 +12,7 @@ test('a phone starts an agent from one message, with nothing else to pick', asyn
   await expect(message).toBeEditable()
   await expect(main.getByText('It works in its own folder and clones what it needs.')).toBeVisible()
   await expect(page.getByRole('group', { name: 'Recent repos' })).toHaveCount(0)
-  await expect(main.getByRole('combobox')).toHaveCount(0)
+  await expect(main.locator('select')).toHaveCount(0)
   await expectFitsPhone(page, 'the start page')
 
   const start = main.getByRole('button', { name: 'Start agent' })

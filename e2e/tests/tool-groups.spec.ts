@@ -128,7 +128,7 @@ test('with grouping off every call keeps a compact row of its own', async ({ pag
 test('streamed calls join the running group in place', async ({ page, request }) => {
   const gate = fs.mkdtempSync(path.join(paths.root, 'burst-gate-'))
   const response = await request.post('/api/tasks', {
-    data: { title: unique('Checks'), prompt: burstPrompt(gate), cwd: paths.checkout, sandbox: false },
+    data: { title: unique('Checks'), prompt: burstPrompt(gate), sandbox: false },
   })
   expect(response.ok(), 'POST /api/tasks').toBe(true)
   const { id } = ((await response.json()) as Envelope<Task>).data
