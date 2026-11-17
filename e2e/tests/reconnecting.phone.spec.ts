@@ -1,5 +1,5 @@
 import { expect, test, toasts } from './support/fixtures.js'
-import { DROPPED_REQUEST, loseLink, seedListedAgent } from './support/lost-link.js'
+import { DROPPED_REQUEST, loseLink, runClockUntil, seedListedAgent } from './support/lost-link.js'
 import { expectFitsPhone } from './support/phone-layout.js'
 
 test.use({ allowedConsoleErrors: [DROPPED_REQUEST] })
@@ -34,8 +34,7 @@ test('a lost link on a phone turns Health into one Reconnecting item, with no to
   await page.keyboard.press('Escape')
 
   await restore()
-  await page.clock.runFor(5000)
-  await expect(health).not.toContainText('Reconnecting')
+  await runClockUntil(page, async () => expect(health).not.toContainText('Reconnecting', { timeout: 1000 }))
   await expect(health).toContainText('Health')
   await expect(toasts(page)).toHaveCount(0)
   await expect(agent).toBeVisible()

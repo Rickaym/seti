@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import type { Page } from '@playwright/test'
+import { expect, type Page } from '@playwright/test'
 import { openSeedDb } from './db.js'
 import { paths } from './env.js'
 
@@ -21,4 +21,12 @@ export async function seedListedAgent(): Promise<string> {
 export async function loseLink(page: Page): Promise<() => Promise<void>> {
   await page.route(API, async (route) => route.abort('timedout'))
   return async () => page.unroute(API)
+}
+
+/** Runs the page's clock a poll interval at a time until `settled` holds; lost pings slow polls. */
+export async function runClockUntil(page: Page, settled: () => Promise<void>): Promise<void> {
+  await expect(async () => {
+    await page.clock.runFor(5000)
+    await settled()
+  }).toPass({ timeout: 30_000 })
 }

@@ -1,6 +1,6 @@
 import type { Page } from '@playwright/test'
 import { expect, test, toasts } from './support/fixtures.js'
-import { DROPPED_REQUEST, loseLink, seedListedAgent } from './support/lost-link.js'
+import { DROPPED_REQUEST, loseLink, runClockUntil, seedListedAgent } from './support/lost-link.js'
 
 test.use({ allowedConsoleErrors: [DROPPED_REQUEST], allowedHttpStatuses: [500, 502] })
 
@@ -37,8 +37,7 @@ test('a lost link shows one quiet Reconnecting item, keeps the list, raises no t
   await expect(page.getByRole('tooltip')).toContainText('Every view keeps what it last showed')
 
   await restore()
-  await page.clock.runFor(5000)
-  await expect(api(page, 'up')).toBeVisible()
+  await runClockUntil(page, async () => expect(api(page, 'up')).toBeVisible({ timeout: 1000 }))
   await expect(bar(page).getByText('Reconnecting')).toHaveCount(0)
   await expect(toasts(page)).toHaveCount(0)
   await expect(agent).toBeVisible()
