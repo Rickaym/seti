@@ -293,7 +293,7 @@ describe('which agents load a shared tool', () => {
     const dir = toolFolder((await sharedTools.get(name)) ?? { name, sha256: '' })
     const paths = async (task: Task) => (await sharedToolPlugins(task)).map((plugin) => plugin.path)
     expect(await paths(caller)).not.toContain(dir)
-    expect(await paths(caller)).toContain(toolFolder((await sharedTools.get(open.name)) ?? open))
+    expect(await paths(caller)).toContain(toolFolder({ name: open.name, sha256: sha256('print("open")\n') }))
     const listing = await call('list_plugins', caller, {})
     const listed = (listing.json() as { shared_tools: { name: string }[] }).shared_tools
     expect(listed.find((tool) => tool.name === name)).toMatchObject({ available: false, missing: [env] })
