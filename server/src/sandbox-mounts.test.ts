@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest'
 import { sandboxClaudeJson, sandboxServers } from './sandbox-claude-json.js'
 import {
   bwrapArgs,
+  canonicalRoot,
   mountProblem,
   projectSlug,
   SANDBOX_CA,
@@ -193,6 +194,37 @@ describe('sandboxMounts', () => {
     )
     expect(fs.existsSync(path.join(commonGit, 'hooks'))).toBe(true)
     expect(dests(wt)).not.toContain(path.join(setiHome, 'worktrees'))
+  })
+
+  it('follows a .git file only to a repository that records the folder as its worktree or submodule', () => {
+    const foreign = make(root, 'elsewhere', 'repo')
+    const foreignGit = make(foreign, '.git')
+    touch(path.join(foreignGit, 'config'))
+    const direct = make(home, 'code', 'forged-direct')
+    touch(path.join(direct, '.git'), `gitdir: ${foreignGit}\n`)
+    const viaAdmin = make(home, 'code', 'forged-admin')
+    const admin = make(home, 'code', 'forged-admin-state')
+    touch(path.join(viaAdmin, '.git'), `gitdir: ${admin}\n`)
+    touch(path.join(admin, 'commondir'), `${foreignGit}\n`)
+    touch(path.join(admin, 'gitdir'), `${path.join(viaAdmin, '.git')}\n`)
+    const unrecorded = make(home, 'code', 'forged-unrecorded')
+    const stale = make(foreignGit, 'worktrees', 'someone-else')
+    touch(path.join(unrecorded, '.git'), `gitdir: ${stale}\n`)
+    touch(path.join(stale, 'commondir'), '../..\n')
+    touch(path.join(stale, 'gitdir'), `${path.join(root, 'elsewhere', 'their-worktree', '.git')}\n`)
+    for (const forged of [direct, viaAdmin, unrecorded]) {
+      const reached = sandboxMounts(layout({ cwd: forged })).filter((mount) => mount.dest.startsWith(foreign))
+      expect(reached, forged).toEqual([])
+      expect(canonicalRoot(forged), forged).not.toBe(foreign)
+    }
+
+    const submodule = make(repo, 'vendor', 'lib')
+    const moduleGit = make(repo, '.git', 'modules', 'lib')
+    touch(path.join(submodule, '.git'), 'gitdir: ../../.git/modules/lib\n')
+    expect(canonicalRoot(submodule)).toBe(submodule)
+    expect(canonicalRoot(worktree)).toBe(mainRepo)
+    fs.rmSync(submodule, { recursive: true })
+    fs.rmSync(moduleGit, { recursive: true })
   })
 
   it('masks hidden paths inside mounted directories, after the directories', () => {
