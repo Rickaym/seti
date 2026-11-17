@@ -1,19 +1,27 @@
-import { expect, test, toasts, waitForToastsToClear } from './support/fixtures.js'
+import { expect, test, toasts, unique, waitForToastsToClear } from './support/fixtures.js'
 import { expectFitsPhone } from './support/phone-layout.js'
-import { seedToolProposal, sharedTool } from './support/shared-tools.js'
+import { FAKE_CLAUDE_ENV } from './support/processes.js'
+import { proposeTool, removeToolScript, sharedTool, startToolsmith } from './support/shared-tools.js'
 
 const LONG_LINE = `print("${'a line much wider than a phone '.repeat(6)}")`
 const SCRIPT = `#!/usr/bin/env python3\n${LONG_LINE}\n`
+
+test.use({ serverEnv: FAKE_CLAUDE_ENV })
+
+test.afterEach(removeToolScript)
 
 test('a phone reviews a proposed tool, allows it, reads its code, turns it off and removes it', async ({
   page,
   request,
 }) => {
-  const { taskId, name } = await seedToolProposal(SCRIPT)
+  const agent = await startToolsmith(request)
+  const name = unique('invoices')
+  await proposeTool(request, agent, name, SCRIPT)
 
-  await page.goto(`/#agents/${taskId}`)
+  await page.goto(`/#agents/${agent.id}`)
   const card = page.getByRole('main').getByRole('region', { name: /^Change request: / })
   await expect(card).toContainText(`Publish the shared tool ${name}?`)
+  await expect(card.getByRole('list', { name: 'Arguments' })).toContainText('customer string, required')
   await expect(card.getByRole('region', { name: `Code of ${name}` })).toHaveText(SCRIPT)
   await card.scrollIntoViewIfNeeded()
   await expectFitsPhone(page, 'shared tool proposal')
@@ -42,6 +50,7 @@ test('a phone reviews a proposed tool, allows it, reads its code, turns it off a
   await tool.getByRole('button', { name: `Remove ${name}` }).tap()
   const confirm = page.getByRole('dialog', { name: `Remove ${name}` })
   await confirm.getByRole('button', { name: 'Remove' }).tap()
+  await expect(toasts(page).filter({ hasText: `Removed ${name}` })).toBeVisible()
   await expect(tool).toBeHidden()
   expect(await sharedTool(request, name)).toBeUndefined()
 })
