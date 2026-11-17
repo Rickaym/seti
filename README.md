@@ -131,7 +131,7 @@ the [install script](scripts/install.sh) before you run it.
 2. Open `http://seti.localhost:3006`. From another machine, forward the port first:
    `ssh -L 3006:127.0.0.1:3006 <host>`.
 3. Sign in with the token that `cat ~/.seti/credentials/local-token-user` prints.
-4. Add a repo in Settings, Repos, then start an agent.
+4. Start an agent: say what it should do and which repos to clone.
 
 [Setup](docs/setup.md) covers every option, remote access and upgrades. `pnpm run doctor` in
 `~/seti` says what is wrong and how to fix it.
