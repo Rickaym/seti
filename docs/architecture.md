@@ -1105,3 +1105,19 @@ agent wrote in that turn, with credentials redacted. A turn that wrote nothing r
 without a reply".
 Each agent push also carries the Needs you count, which the service worker puts on the app icon
 with the Badging API; an open page keeps that badge in step with its status bar.
+
+## An open tab reloads once when a deploy replaced its build
+
+The UI loads each panel as its own file, named after a hash of its content. A deploy replaces
+those files, so a tab opened before it asks for a file the server no longer has. Seti hears of the
+failure twice: Vite's `vite:preloadError` event, and the error boundary that catches the failed
+panel (`ui/src/components/ErrorBoundary.tsx`). Both call `recoverFromStaleBuild` in
+`ui/src/components/stale-build-recovery.tsx`, and `planRecovery` in `ui/src/lib/stale-build.ts`
+decides what happens:
+
+- The page reloads on the same view when the server answers a ping and no form holds unsaved
+  changes. Unsent composer text survives, since drafts live in `localStorage`.
+- With unsaved changes the page stays, and a New version notice offers Reload.
+- A tab gets one automatic reload per build and per minute, recorded in `sessionStorage`. A panel
+  that still fails after it, a server that gives no answer and storage that cannot keep the record
+  all leave the reload to the user: the panel says it did not load and offers Reload.
