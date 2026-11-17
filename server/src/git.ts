@@ -81,9 +81,20 @@ export async function directoryBytes(dir: string): Promise<number | null> {
   }
 }
 
+/**
+ * Drops a checkout's record of one worktree whose folder is gone. `git worktree prune` would also
+ * drop the worktrees agents keep in their sandbox homes, whose folders this side cannot see.
+ */
+export async function forgetWorktree(repoPath: string, dir: string): Promise<void> {
+  if (!fs.existsSync(dir)) {
+    // git fails when it holds no record of the folder, which leaves nothing to drop
+    await git(repoPath, 'worktree', 'remove', '--force', dir).catch(() => '')
+  }
+}
+
 /** Checks a removed worktree out again at its branch, or detached at its commit when that fails. */
 export async function recreateWorktree(repoPath: string, dir: string, branch: string | null, head: string) {
-  await git(repoPath, 'worktree', 'prune')
+  await forgetWorktree(repoPath, dir)
   if (branch !== null) {
     try {
       await git(repoPath, 'worktree', 'add', dir, branch)
@@ -102,7 +113,7 @@ export async function removeWorktree(repoPath: string, dir: string): Promise<voi
   if (fs.existsSync(dir)) {
     await git(repoPath, 'worktree', 'remove', '--force', dir)
   } else {
-    await git(repoPath, 'worktree', 'prune')
+    await forgetWorktree(repoPath, dir)
   }
 }
 

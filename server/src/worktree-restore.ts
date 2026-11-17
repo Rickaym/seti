@@ -3,7 +3,7 @@ import path from 'node:path'
 import type { Task } from '@seti/shared'
 import { audit } from './audit.js'
 import { WORKTREE_ROOT } from './config.js'
-import { createWorktree, git } from './git.js'
+import { createWorktree, forgetWorktree } from './git.js'
 import { workingDirs } from './session-options.js'
 import { taskLocation } from './store/task-location.js'
 
@@ -23,7 +23,7 @@ async function missingWorktrees(task: Task) {
 export async function restoreMissingWorktrees(task: Task, note: (text: string) => Promise<unknown>): Promise<void> {
   for (const worktree of await missingWorktrees(task)) {
     try {
-      await git(worktree.repo_path, 'worktree', 'prune')
+      await forgetWorktree(worktree.repo_path, worktree.dir)
       await createWorktree(worktree.repo_path, worktree.base_branch, path.basename(worktree.dir))
     } catch (e) {
       const why = e instanceof Error ? e.message : String(e)

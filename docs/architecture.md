@@ -199,6 +199,13 @@ runs under bubblewrap with its own pid, network, IPC and UTS namespaces:
   credentials, `/run/user` and the database sockets are not mounted.
 - `.git/config` and `.git/hooks` are read-only in every mounted repo, since they run code when the
   repo is used outside the sandbox.
+- A repo's records of worktrees the sandbox cannot see, such as other agents' worktrees, are
+  read-only, so `git worktree prune` inside cannot drop them for looking deleted. A worktree the
+  agent made in its own home, such as `~/feature` beside the repo, lives in that agent's private
+  home and stays its own to commit in after a restart; to every other agent, and to the host, its
+  folder does not exist. Seti itself never runs `git worktree prune`: it drops the record of the
+  one worktree it is replacing or removing. Run `git worktree prune` by hand in a main checkout
+  only when no agent keeps a worktree of it in its home.
 - Its network namespace has only loopback. `socat` bridges `127.0.0.1:3128` to the task's egress
   proxy in Seti, its only way out, which allows the configured hosts and refuses the rest.
 - No credential enters the sandbox. Claude Code and `gh` hold placeholders; the proxy terminates

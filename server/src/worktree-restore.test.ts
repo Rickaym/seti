@@ -73,6 +73,20 @@ describe('restoreMissingWorktrees', () => {
     expect(events.find((event) => event.subject_id === 'lost')?.detail).toMatchObject({ dir, ref: 'origin/main' })
   })
 
+  it('drops only the missing worktree record, not one whose folder a sandbox home holds', async () => {
+    const repo = clonedRepo('deleted')
+    const dir = await agentInWorktree('deleted', repo)
+    const side = path.join(root, 'in-a-sandbox-home')
+    run(repo, 'worktree', 'add', '-q', '--detach', side)
+    fs.renameSync(side, path.join(root, 'out-of-sight'))
+    fs.rmSync(dir, { recursive: true, force: true })
+
+    await restoreMissingWorktrees(await agent('deleted'), async () => Promise.resolve())
+
+    expect(fs.existsSync(path.join(dir, 'README.md'))).toBe(true)
+    expect(fs.existsSync(path.join(repo, '.git', 'worktrees', 'in-a-sandbox-home'))).toBe(true)
+  })
+
   it('leaves a worktree that is still there alone', async () => {
     const repo = clonedRepo('kept')
     const dir = await agentInWorktree('kept', repo)
