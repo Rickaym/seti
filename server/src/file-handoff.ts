@@ -29,7 +29,7 @@ const NAME_MAX = 80
 const EXT_MAX = 16
 
 /** The folders the task's agent works in, as the Files view and its sandbox see them. */
-async function reachOf(task: Task): Promise<FileContext> {
+export async function reachOf(task: Task): Promise<FileContext> {
   const rules = fileRules(task.id, await sandboxPolicy.get(), sandboxContext())
   return { task, rules, roots: taskRoots(task, rules) }
 }
@@ -47,7 +47,7 @@ interface Source {
 const refuse = (status: 400 | 403 | 404 | 413, raw: string, why: string) => new HttpError(status, `${raw} ${why}`)
 
 /** The path as the agent means it: absolute, under its workspace variable, or under its cwd. */
-function lexicalPath(raw: string, task: Task): string {
+export function lexicalPath(raw: string, task: Task): string {
   if (raw.includes('\0')) {
     throw new HttpError(400, 'Paths cannot hold NUL bytes')
   }

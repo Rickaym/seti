@@ -2,12 +2,13 @@ import { getDomain } from 'tldts'
 import { z } from 'zod'
 import { connectionEnv, connectionHost, connectionValue } from './connections.js'
 import { isRecord, lenientArray, orDefault, type ResponseSchema } from './lenient.js'
+import { sharedToolProposal, type SharedToolChange } from './shared-tools.js'
 
 /**
  * Changes an agent may ask the user for. Nothing else is requestable: the sandbox, Bypass,
  * permission modes and rules, security settings, secret values and other agents stay the user's.
  */
-export const CHANGE_KINDS = ['allow_host', 'api_key', 'mcp_server'] as const
+export const CHANGE_KINDS = ['allow_host', 'api_key', 'mcp_server', 'shared_tool'] as const
 export type ChangeKind = (typeof CHANGE_KINDS)[number]
 
 /** Who an allowed host reaches: the agent that asked, or every sandboxed agent. */
@@ -89,8 +90,12 @@ export const requestedChange = z.discriminatedUnion('kind', [
   }),
   z.object({ kind: z.literal('api_key'), env: connectionEnv, hosts: z.array(connectionHost).min(1).max(5) }),
   z.object({ kind: z.literal('mcp_server'), server: z.string().trim().min(1).max(255) }),
+  sharedToolProposal,
 ])
-export type RequestedChange = z.output<typeof requestedChange>
+/** A change as the agent asks for it; a shared tool is still a path Seti has not read. */
+export type AskedChange = z.output<typeof requestedChange>
+/** A change as Seti stores it: a shared tool carries the script Seti read when the agent asked. */
+export type RequestedChange = Exclude<AskedChange, { kind: 'shared_tool' }> | SharedToolChange
 
 export const REQUEST_REASON_MAX = 500
 
@@ -114,6 +119,8 @@ export function describeChange(change: RequestedChange): string {
       return `an API key ${change.env} for ${change.hosts.join(', ')}`
     case 'mcp_server':
       return `the MCP server ${change.server}`
+    case 'shared_tool':
+      return `the shared tool ${change.name}`
   }
 }
 

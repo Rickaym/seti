@@ -95,6 +95,8 @@ def _change_text(change: Mapping[str, Any]) -> str:
         return f"access to {change.get('host')}:{change.get('port', 443)}"
     if kind == "api_key":
         return f"an API key {change.get('env')} for {and_list([str(h) for h in change.get('hosts', [])])}"
+    if kind == "shared_tool":
+        return f"the shared tool {change.get('name')}, a script for every agent that the user reviews in Seti"
     return f"the MCP server {change.get('server')}"
 
 

@@ -154,6 +154,7 @@ AUDIT_AREAS = (
     "context",
     "mcp",
     "plugin",
+    "shared_tool",
     "pr",
     "account",
     "seti",
@@ -514,7 +515,8 @@ TOOL_SPECS: list[ToolSpec] = [
     LIST_PROCESSES_SPEC,
     ToolSpec(
         "list_plugins",
-        "List Seti's default plugin folders and the Claude Code plugins installed, with what they add.",
+        "List Seti's default plugin folders and the Claude Code plugins installed, with what they add, "
+        "and the shared tools: scripts agents proposed and the user allowed for every agent.",
     ),
     ToolSpec(
         "account_status",
@@ -1920,8 +1922,26 @@ class EaTools:
                 lines.append(f"And {len(installed) - LIST_LIMIT} more not listed.")
         else:
             lines.append("No Claude Code plugins installed.")
+        shared = dicts(await self._seti.get("/shared-tools"))
+        lines.extend(self._shared_tool_lines(shared))
         total = len(defaults) + len(installed)
-        return ToolResult("\n".join(lines), f"Listed {plural(total, 'plugin')}")
+        tools = f" and {plural(len(shared), 'shared tool')}" if shared else ""
+        return ToolResult("\n".join(lines), f"Listed {plural(total, 'plugin')}{tools}")
+
+    @staticmethod
+    def _shared_tool_lines(shared: list[dict[str, Any]]) -> list[str]:
+        if not shared:
+            return []
+        on = sum(1 for t in shared if t.get("enabled") is True)
+        lines = [f"{plural(len(shared), 'shared tool')}, {on} on:"]
+        for t in shared[:LIST_LIMIT]:
+            envs = [str(n.get("env")) for n in dicts(t.get("needs"))]
+            needs = f"needs {', '.join(envs)}" if envs else "needs no key"
+            state = "on" if t.get("enabled") is True else "off"
+            lines.append(f"- {name_of(t)}: {state}, {needs}; proposed by {t.get('proposer_title')}")
+        if len(shared) > LIST_LIMIT:
+            lines.append(f"And {len(shared) - LIST_LIMIT} more not listed.")
+        return lines
 
     def _usage_parts(self, windows: list[dict[str, Any]]) -> list[str]:
         now = self._now()

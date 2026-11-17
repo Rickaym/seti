@@ -91,7 +91,10 @@ REPO_SCOPE = {
     "description": "A repo name, for servers of that repo's local or project scope. Leave out otherwise.",
 }
 MCP_REF = {"type": "string", "description": "The MCP server's name."}
-PLUGIN_REF = {"type": "string", "description": "The default plugin's name, or its folder."}
+PLUGIN_REF = {
+    "type": "string",
+    "description": "The default plugin's name or its folder, or a shared tool's name.",
+}
 MAPPING = {
     "type": "array",
     "items": {"type": "string"},
@@ -406,13 +409,16 @@ SETTINGS_SPECS: list[ToolSpec] = [
     ),
     ToolSpec(
         "remove_plugin",
-        "Remove a Seti default plugin; its folder stays on disk. Needs the user's yes.",
+        "Remove a Seti default plugin; its folder stays on disk. Or remove a shared tool, a script "
+        "an agent proposed and the user allowed for every agent, which deletes its code from Seti. "
+        "Needs the user's yes.",
         {"plugin": PLUGIN_REF, "confirmed": CONFIRMED},
         ["plugin"],
     ),
     ToolSpec(
         "set_plugin_enabled",
-        "Turn a Seti default plugin on or off for new agents. Needs the user's yes.",
+        "Turn a Seti default plugin on or off for new agents, or turn a shared tool off for every "
+        "agent. Only the user turns a shared tool back on, in Settings, Plugins. Needs the user's yes.",
         {
             "plugin": PLUGIN_REF,
             "enabled": {"type": "boolean", "description": "true to turn it on, false to turn it off."},
@@ -1602,13 +1608,45 @@ class SettingsTools:
             f"Marked the changes to {labels} as seen.", f"Marked {plural(len(refs), 'change')} seen"
         )
 
-    async def _plugin(self, args: Mapping[str, Any]) -> dict[str, Any]:
+    async def _plugin(self, args: Mapping[str, Any]) -> tuple[dict[str, Any], bool]:
+        """The default plugin the reference names, else the shared tool, and whether it is a tool."""
         ref = arg_str(args, "plugin")
         plugins = dicts(await self._seti.get("/plugins/defaults"))
         found = pick(
             plugins, ref, lambda p: str(p.get("id", "")), name_of, lambda p: [str(p.get("path", ""))]
         )
-        return only(found, ref, "default plugin", name_of, "Call list_plugins to see them.")
+        if found:
+            return only(found, ref, "default plugin", name_of, "Call list_plugins to see them."), False
+        shared = pick(dicts(await self._seti.get("/shared-tools")), ref, name_of, name_of, lambda _t: [])
+        noun = "shared tool" if shared else "default plugin or shared tool"
+        return only(shared, ref, noun, name_of, "Call list_plugins to see them."), bool(shared)
+
+    async def _remove_shared_tool(self, args: Mapping[str, Any], name: str) -> ToolResult:
+        if not await self._cleared(args, gate_key("remove_plugin", "shared_tool", name)):
+            effect = (
+                f"This removes the shared tool {name}: agents lose it from their next turn and "
+                "its code is deleted from Seti. Only a new proposal the user allows brings it back."
+            )
+            return ask("remove_plugin", args, effect, f"remove shared tool {name}")
+        await self._seti.delete(f"/shared-tools/{name}")
+        return ToolResult(f"Removed the shared tool {name}.", clip(f"Removed shared tool {name}", 70))
+
+    async def _disable_shared_tool(self, args: Mapping[str, Any], tool: Mapping[str, Any]) -> ToolResult:
+        name = name_of(tool)
+        if arg_bool(args, "enabled"):
+            raise ToolError(
+                f"Only the user turns the shared tool {name} on, in Settings, Plugins.", "User only"
+            )
+        if tool.get("enabled") is not True:
+            return ToolResult(f"The shared tool {name} is already off.", f"{clip(name, 50)} already off")
+        if not await self._cleared(args, gate_key("set_plugin_enabled", "shared_tool", name, False)):
+            effect = (
+                f"This turns the shared tool {name} off for every agent from its next turn. Its code "
+                "stays in Seti, and only the user turns it back on."
+            )
+            return ask("set_plugin_enabled", args, effect, f"turn {name} off")
+        await self._seti.patch(f"/shared-tools/{name}", {"enabled": False})
+        return ToolResult(f"Turned the shared tool {name} off.", clip(f"Turned shared tool {name} off", 70))
 
     async def add_plugin(self, args: Mapping[str, Any]) -> ToolResult:
         path = arg_str(args, "path")
@@ -1628,8 +1666,10 @@ class SettingsTools:
         )
 
     async def remove_plugin(self, args: Mapping[str, Any]) -> ToolResult:
-        plugin = await self._plugin(args)
+        plugin, shared = await self._plugin(args)
         name = name_of(plugin)
+        if shared:
+            return await self._remove_shared_tool(args, name)
         if not await self._cleared(args, gate_key("remove_plugin", plugin.get("id"))):
             effect = (
                 f"This removes the default plugin {name} from Seti: new agents no longer get it. "
@@ -1640,10 +1680,12 @@ class SettingsTools:
         return ToolResult(f"Removed the default plugin {name}.", clip(f"Removed plugin {name}", 70))
 
     async def set_plugin_enabled(self, args: Mapping[str, Any]) -> ToolResult:
-        plugin = await self._plugin(args)
+        plugin, shared = await self._plugin(args)
         name = name_of(plugin)
         if "enabled" not in args:
             raise ToolError("The enabled argument is missing.", "Missing enabled")
+        if shared:
+            return await self._disable_shared_tool(args, plugin)
         enabled = arg_bool(args, "enabled")
         state = "on" if enabled else "off"
         if (plugin.get("enabled") is True) == enabled:

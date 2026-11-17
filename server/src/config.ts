@@ -32,6 +32,8 @@ export const BACKUP_DIR = path.join(SETI_HOME, 'backups')
 export const ARCHIVE_ROOT = path.join(SETI_HOME, 'archive')
 /** Bare git repositories a mod install fetches into, each removed once read. */
 export const MOD_FETCH_ROOT = path.join(SETI_HOME, 'mod-fetch')
+/** Plugin folders of the shared tools the user allowed, one per published version. */
+export const SHARED_TOOLS_ROOT = path.join(SETI_HOME, 'shared-tools')
 
 /** Development and test runs make their own credentials; production only reads them. */
 const DEV_MODE =

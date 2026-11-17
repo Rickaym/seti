@@ -1,4 +1,5 @@
 import type { SDKMessage } from '@anthropic-ai/claude-agent-sdk'
+import { sharedToolWrites } from './shared-tool-writes.js'
 
 const WRITE_WORDS = new Set([
   'send',
@@ -110,7 +111,7 @@ export function isOutward(name: string, input: unknown): boolean {
     return false
   }
   if (name.startsWith('mcp__')) {
-    return mcpNameKind(name) !== 'read'
+    return sharedToolWrites(name) ?? mcpNameKind(name) !== 'read'
   }
   if (name === 'Bash') {
     const cmd = bashCommand(input)

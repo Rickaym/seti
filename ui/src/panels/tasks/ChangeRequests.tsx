@@ -6,7 +6,20 @@ import {
   type ChangeRequest,
   type HostScope,
 } from '@seti/shared'
-import { Check, Eye, EyeOff, Globe, KeyRound, Plug, TriangleAlert, User, Users, X, type LucideIcon } from 'lucide-react'
+import {
+  Check,
+  Eye,
+  EyeOff,
+  Globe,
+  KeyRound,
+  Plug,
+  TriangleAlert,
+  User,
+  Users,
+  Wrench,
+  X,
+  type LucideIcon,
+} from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { apiGetValid, apiPost, errorText } from '@/api'
@@ -15,6 +28,7 @@ import { Input } from '@/components/ui/input'
 import { refreshRequests } from '@/hooks/useRequests'
 import { refreshTasks } from '@/hooks/useTasks'
 import { cn } from '@/lib/utils'
+import { SharedToolProposal } from './SharedToolProposal'
 
 const ACTION = 'pointer-coarse:h-11'
 const PRESSED = 'aria-pressed:border-primary aria-pressed:bg-primary/10 aria-pressed:text-primary'
@@ -23,6 +37,7 @@ const KIND_ICONS: Record<ChangeRequest['change']['kind'], LucideIcon> = {
   allow_host: Globe,
   api_key: KeyRound,
   mcp_server: Plug,
+  shared_tool: Wrench,
 }
 
 function title(request: ChangeRequest, scope: HostScope): string {
@@ -34,11 +49,15 @@ function title(request: ChangeRequest, scope: HostScope): string {
       return `Add the connection ${change.env}?`
     case 'mcp_server':
       return `Turn on the MCP server ${change.server}?`
+    case 'shared_tool':
+      return `${change.snapshot.replaces === null ? 'Publish' : 'Update'} the shared tool ${change.name}?`
   }
 }
 
+type ListChange = Exclude<ChangeRequest['change'], { kind: 'shared_tool' }>
+
 /** The line the change adds and the list it joins. */
-function diffOf(change: ChangeRequest['change'], scope: HostScope): [string, string] {
+function diffOf(change: ListChange, scope: HostScope): [string, string] {
   switch (change.kind) {
     case 'allow_host':
       return [hostEntry(change), `Network allowlist of ${scope === 'all' ? 'every agent' : 'this agent'}`]
@@ -50,8 +69,8 @@ function diffOf(change: ChangeRequest['change'], scope: HostScope): [string, str
 }
 
 /** The exact change, as a line added to the list it joins. */
-function Diff({ request, scope }: { request: ChangeRequest; scope: HostScope }) {
-  const [line, where] = diffOf(request.change, scope)
+function Diff({ change, scope }: { change: ListChange; scope: HostScope }) {
+  const [line, where] = diffOf(change, scope)
   return (
     <div className="flex flex-col gap-0.5">
       <code className="bg-muted px-1.5 py-1 font-mono text-2xs break-all whitespace-pre-wrap">+ {line}</code>
@@ -191,7 +210,11 @@ export function ChangeCard({ request, onAnswered, className }: CardProps) {
         <div className="flex min-w-0 flex-1 flex-col gap-1.5">
           <p className="font-medium text-foreground">{title(request, scope)}</p>
           <p className="text-muted-foreground">{request.reason}</p>
-          <Diff request={request} scope={scope} />
+          {request.change.kind === 'shared_tool' ? (
+            <SharedToolProposal change={request.change} />
+          ) : (
+            <Diff change={request.change} scope={scope} />
+          )}
           {request.flags.map((flag) => (
             <p key={flag} className="flex items-center gap-1 text-warning-text">
               <TriangleAlert className="size-3 shrink-0" aria-hidden />
