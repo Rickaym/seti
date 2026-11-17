@@ -1,4 +1,4 @@
-export interface ReachState {
+interface ReachState {
   /** Polls go unanswered: the link or the server is slow or gone, and views hold their last data. */
   reconnecting: boolean
   /** When the server last answered a poll, as of the moment polls began to go unanswered. */
