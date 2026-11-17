@@ -399,6 +399,24 @@ Sandboxed agents hold no keys or tokens; the agent's egress proxy adds them. For
 the Claude token in Settings, Credentials (from `claude setup-token`), otherwise the host's Claude
 Code login.
 
+New connection starts at a list of services to pick by name. Each one asks only for what that
+service needs, in the service's own words, and fills in the hosts, header, token URL and scope:
+
+- Microsoft Entra app: the Directory (tenant) ID, the Application (client) ID and a client secret.
+  A token is for one API, so each API ticked (Microsoft Graph, Azure Resource Manager, Key Vault,
+  Azure Storage) becomes its own connection with the same app.
+- Google service account: the JSON key file, the APIs to reach (Admin directory, Gmail, Drive,
+  Sheets, Calendar, Cloud Platform) as one connection, and optionally the Workspace user to act as
+  under domain-wide delegation. Each API asks for its read-only scope until its Write switch is on.
+- Services that take one key, such as OpenAI, ElevenLabs, Stripe, Slack, Cloudflare, Linear, Notion
+  and Sentry. Twilio and Jira Cloud take the key as a Basic auth password, which the agent sends
+  and the proxy swaps in.
+
+A service's connections are added together or not at all, under names and variables nothing else
+uses, and the audit log records the template they came from, never what was typed. Custom opens
+the form with every field for a service the list does not have. The list is
+`shared/src/connection-key-services.ts` and `shared/src/connection-template-list.ts`.
+
 A connection is one service's access, made in Settings, Connections: its name, the hosts it may
 reach (exact or `*.suffix`), how Seti signs in, and the values that takes. Agents see its variable,
 such as `STRIPE`, holding a placeholder. The proxy swaps the placeholder for the value in headers

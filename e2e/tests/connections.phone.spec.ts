@@ -17,6 +17,7 @@ test('a connection is added, filled in and given to a credential on a phone', as
   await expectFitsPhone(page, 'connections')
 
   await main.getByRole('button', { name: 'Connection', exact: true }).tap()
+  await page.getByRole('dialog', { name: 'Add connection' }).getByRole('button', { name: 'Custom' }).tap()
   const dialog = page.getByRole('dialog', { name: 'New connection' })
   await dialog.getByLabel('Kind').selectOption('Header key')
   await dialog.getByLabel('Name', { exact: true }).fill('phone_vendor_with_a_long_name')

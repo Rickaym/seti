@@ -1,0 +1,289 @@
+import type { ConnectionTemplate, ConnectionTemplateField, TemplateCategory } from './connection-templates.js'
+
+const secret = (key: string, label: string, help: string): ConnectionTemplateField => ({
+  key,
+  label,
+  help,
+  placeholder: 'Paste it now or later',
+  slot: 'value',
+  format: 'text',
+  required: false,
+})
+
+interface KeyService {
+  id: string
+  title: string
+  description: string
+  category: TemplateCategory
+  docs: string
+  env: string
+  hosts: string[]
+  /** The header's name and value; Authorization with a bearer token when absent, none when null. */
+  header?: [name: string, template: string] | null
+  /** What the service calls the key, and where to find it. */
+  key: [label: string, help: string]
+  note?: string
+  fields?: ConnectionTemplateField[]
+}
+
+/** A service that takes one pasted key in one header, or in the request the agent sends. */
+function keyService(service: KeyService): ConnectionTemplate {
+  const header = service.header === undefined ? (['Authorization', 'Bearer {{value}}'] as const) : service.header
+  return {
+    id: service.id,
+    title: service.title,
+    description: service.description,
+    category: service.category,
+    docs: service.docs,
+    fields: [...(service.fields ?? []), secret('key', ...service.key)],
+    name: service.id,
+    env: service.env,
+    kind: 'key',
+    hosts: service.hosts,
+    header: header === null ? null : { name: header[0], template: header[1] },
+    mint: null,
+    parts: [],
+    parts_mode: 'each',
+    note: service.note ?? '',
+  }
+}
+
+const BASIC_NOTE = 'Agents send it as the Basic auth password; Seti swaps in the value on the way.'
+
+const KEY_SERVICES: KeyService[] = [
+  {
+    id: 'openai',
+    title: 'OpenAI',
+    description: 'Models, embeddings, images and audio.',
+    category: 'ai',
+    docs: 'https://developers.openai.com/api/reference/overview',
+    env: 'OPENAI_API_KEY',
+    hosts: ['api.openai.com'],
+    key: ['API key', 'An API key of the project or the account.'],
+  },
+  {
+    id: 'huggingface',
+    title: 'Hugging Face Inference',
+    description: 'Models served through Inference Providers.',
+    category: 'ai',
+    docs: 'https://huggingface.co/docs/inference-providers/index',
+    env: 'HF_TOKEN',
+    hosts: ['router.huggingface.co'],
+    key: ['Access token', 'A fine-grained token allowed to make calls to Inference Providers.'],
+  },
+  {
+    id: 'replicate',
+    title: 'Replicate',
+    description: 'Run and deploy models.',
+    category: 'ai',
+    docs: 'https://replicate.com/docs/reference/http',
+    env: 'REPLICATE_API_TOKEN',
+    hosts: ['api.replicate.com'],
+    key: ['API token', 'From the API tokens page of the account.'],
+  },
+  {
+    id: 'vast',
+    title: 'Vast.ai',
+    description: 'Rent and manage GPU instances.',
+    category: 'ai',
+    docs: 'https://docs.vast.ai/api-reference/introduction',
+    env: 'VAST_API_KEY',
+    hosts: ['console.vast.ai'],
+    key: ['API key', 'From the Keys page of the console.'],
+  },
+  {
+    id: 'elevenlabs',
+    title: 'ElevenLabs',
+    description: 'Text to speech, voices and transcription.',
+    category: 'voice',
+    docs: 'https://elevenlabs.io/docs/api-reference/authentication',
+    env: 'ELEVENLABS_API_KEY',
+    hosts: ['api.elevenlabs.io'],
+    header: ['xi-api-key', '{{value}}'],
+    key: ['API key', 'An API key of the account.'],
+  },
+  {
+    id: 'deepgram',
+    title: 'Deepgram',
+    description: 'Speech to text and text to speech.',
+    category: 'voice',
+    docs: 'https://developers.deepgram.com/reference/authentication',
+    env: 'DEEPGRAM_API_KEY',
+    hosts: ['api.deepgram.com'],
+    header: ['Authorization', 'Token {{value}}'],
+    key: ['API key', 'Created in the Deepgram console.'],
+  },
+  {
+    id: 'stripe',
+    title: 'Stripe',
+    description: 'Payments, customers and billing.',
+    category: 'payments',
+    docs: 'https://docs.stripe.com/api/authentication',
+    env: 'STRIPE_API_KEY',
+    hosts: ['api.stripe.com'],
+    key: ['Secret key', 'A restricted key (rk_) limits what agents can do; a secret key (sk_) allows everything.'],
+  },
+  {
+    id: 'slack',
+    title: 'Slack',
+    description: 'Messages, channels and users through the Web API.',
+    category: 'messaging',
+    docs: 'https://docs.slack.dev/apis/web-api/',
+    env: 'SLACK_TOKEN',
+    hosts: ['slack.com'],
+    key: ['Token', 'A bot token (xoxb-) or a user token (xoxp-) of an installed app.'],
+  },
+  {
+    id: 'twilio',
+    title: 'Twilio',
+    description: 'SMS, voice calls and phone numbers.',
+    category: 'messaging',
+    docs: 'https://www.twilio.com/docs/usage/requests-to-twilio',
+    env: 'TWILIO_API_SECRET',
+    hosts: ['api.twilio.com'],
+    header: null,
+    key: ['API key secret', 'The secret of an API key, or the Auth Token of the account.'],
+    note: `${BASIC_NOTE} The user name is the API key SID, or the Account SID with an Auth Token.`,
+  },
+  {
+    id: 'sendgrid',
+    title: 'SendGrid',
+    description: 'Send email and manage templates.',
+    category: 'email',
+    docs: 'https://www.twilio.com/docs/sendgrid/api-reference/how-to-use-the-sendgrid-v3-api/authentication',
+    env: 'SENDGRID_API_KEY',
+    hosts: ['api.sendgrid.com'],
+    key: ['API key', 'An API key with the permissions agents need.'],
+  },
+  {
+    id: 'resend',
+    title: 'Resend',
+    description: 'Send email and manage domains.',
+    category: 'email',
+    docs: 'https://resend.com/docs/api-reference/introduction',
+    env: 'RESEND_API_KEY',
+    hosts: ['api.resend.com'],
+    key: ['API key', 'Starts with re_.'],
+    note: 'Resend refuses requests without a User-Agent header, which the agent sends.',
+  },
+  {
+    id: 'cloudflare',
+    title: 'Cloudflare',
+    description: 'Zones, DNS, Workers and the rest of the Cloudflare API.',
+    category: 'developer',
+    docs: 'https://developers.cloudflare.com/fundamentals/api/how-to/make-api-calls/',
+    env: 'CLOUDFLARE_API_TOKEN',
+    hosts: ['api.cloudflare.com'],
+    key: ['API token', 'An API token with the permissions agents need, not the Global API key.'],
+  },
+  {
+    id: 'vercel',
+    title: 'Vercel',
+    description: 'Projects, deployments and domains.',
+    category: 'developer',
+    docs: 'https://vercel.com/docs/rest-api/reference/welcome',
+    env: 'VERCEL_TOKEN',
+    hosts: ['api.vercel.com'],
+    key: ['Access token', 'An access token of the account or the team.'],
+  },
+  {
+    id: 'supabase',
+    title: 'Supabase Management',
+    description: 'Projects, branches and settings of a Supabase organization.',
+    category: 'developer',
+    docs: 'https://supabase.com/docs/reference/api/introduction',
+    env: 'SUPABASE_ACCESS_TOKEN',
+    hosts: ['api.supabase.com'],
+    key: ['Access token', 'A personal access token (sbp_) from the account page.'],
+  },
+  {
+    id: 'apify',
+    title: 'Apify',
+    description: 'Run Actors and read their datasets.',
+    category: 'developer',
+    docs: 'https://docs.apify.com/api/v2',
+    env: 'APIFY_TOKEN',
+    hosts: ['api.apify.com'],
+    key: ['API token', 'From the Integrations page of the console.'],
+  },
+  {
+    id: 'sentry',
+    title: 'Sentry',
+    description: 'Issues, events and releases.',
+    category: 'monitoring',
+    docs: 'https://docs.sentry.io/api/auth/',
+    env: 'SENTRY_AUTH_TOKEN',
+    hosts: ['sentry.io'],
+    key: ['Auth token', 'An internal integration token or a personal token.'],
+  },
+  {
+    id: 'pagerduty',
+    title: 'PagerDuty',
+    description: 'Incidents, schedules and services.',
+    category: 'monitoring',
+    docs: 'https://docs.pagerduty.com/developer/authentication',
+    env: 'PAGERDUTY_API_TOKEN',
+    hosts: ['api.pagerduty.com'],
+    header: ['Authorization', 'Token token={{value}}'],
+    key: ['API token', 'An account or user REST API token.'],
+  },
+  {
+    id: 'linear',
+    title: 'Linear',
+    description: 'Issues, projects and cycles through the GraphQL API.',
+    category: 'work',
+    docs: 'https://linear.app/developers/graphql',
+    env: 'LINEAR_API_KEY',
+    hosts: ['api.linear.app'],
+    header: ['Authorization', '{{value}}'],
+    key: ['Personal API key', 'Created under Settings, Security and access.'],
+  },
+  {
+    id: 'notion',
+    title: 'Notion',
+    description: 'Pages, databases and comments.',
+    category: 'work',
+    docs: 'https://developers.notion.com/reference/authentication',
+    env: 'NOTION_TOKEN',
+    hosts: ['api.notion.com'],
+    key: ['Access token', 'The token of an internal connection, or a personal access token.'],
+    note: 'The agent sends the Notion-Version header itself.',
+  },
+  {
+    id: 'clickup',
+    title: 'ClickUp',
+    description: 'Tasks, lists and docs.',
+    category: 'work',
+    docs: 'https://developer.clickup.com/docs/authentication',
+    env: 'CLICKUP_API_TOKEN',
+    hosts: ['api.clickup.com'],
+    header: ['Authorization', '{{value}}'],
+    key: ['Personal token', 'Starts with pk_; under Settings, Apps, API Token.'],
+  },
+  {
+    id: 'jira',
+    title: 'Jira Cloud',
+    description: 'Issues, projects and boards of an Atlassian site.',
+    category: 'work',
+    docs: 'https://developer.atlassian.com/cloud/jira/platform/basic-auth-for-rest-apis/',
+    env: 'JIRA_API_TOKEN',
+    hosts: ['{site}.atlassian.net'],
+    header: null,
+    fields: [
+      {
+        key: 'site',
+        label: 'Site name',
+        help: 'The first part of the site address, before .atlassian.net.',
+        placeholder: 'your-domain',
+        slot: null,
+        format: 'subdomain',
+        required: true,
+      },
+    ],
+    key: ['API token', 'An API token of the Atlassian account.'],
+    note: `${BASIC_NOTE} The user name is the Atlassian account email.`,
+  },
+]
+
+/** The services that take one pasted key, as templates. */
+export const KEY_SERVICE_TEMPLATES: readonly ConnectionTemplate[] = KEY_SERVICES.map(keyService)

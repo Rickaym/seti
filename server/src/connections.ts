@@ -129,44 +129,72 @@ async function profileNames(ids: readonly string[]): Promise<string[]> {
   })
 }
 
-async function insert(
-  settings: ConnectionSettings,
-  values: Partial<Record<ConnectionSlot, string>>,
-  profileIds: readonly string[],
-): Promise<ConnectionRow> {
-  const id = randomUUID()
-  try {
-    await transaction(async (tx) => {
-      await connectionRows.insert(tx, id, settings, newPlaceholder(settings.name))
-      for (const slot of KIND_SLOTS[settings.kind]) {
-        const value = values[slot]
-        if (value !== undefined) {
-          await storeValue(tx, { id, slots: {} }, slot, value)
-        }
-      }
-      await connectionRows.setProfiles(tx, id, profileIds)
-      await connectionRows.touchProfiles(tx, profileIds)
-    })
-  } catch (e) {
-    throw unique(e) ? new HttpError(409, `A connection named ${settings.name} already exists`) : e
-  }
-  return requireConnection(id)
+interface NewConnection {
+  settings: ConnectionSettings
+  values: Partial<Record<ConnectionSlot, string>>
+  profileIds: readonly string[]
+  /** The names of the credentials that carry it, for the audit log. */
+  carriers: string[]
 }
 
-/** Adds a connection with any values given and the credentials that carry it, in one step. */
+/** Stores every connection or none of them. */
+async function insert(...wanted: Omit<NewConnection, 'carriers'>[]): Promise<ConnectionRow[]> {
+  const ids = wanted.map(() => randomUUID())
+  try {
+    await transaction(async (tx) => {
+      for (const [at, { settings, values, profileIds }] of wanted.entries()) {
+        const id = ids[at] ?? ''
+        await connectionRows.insert(tx, id, settings, newPlaceholder(settings.name))
+        for (const slot of KIND_SLOTS[settings.kind]) {
+          const value = values[slot]
+          if (value !== undefined) {
+            await storeValue(tx, { id, slots: {} }, slot, value)
+          }
+        }
+        await connectionRows.setProfiles(tx, id, profileIds)
+        await connectionRows.touchProfiles(tx, profileIds)
+      }
+    })
+  } catch (e) {
+    const names = wanted.map((entry) => entry.settings.name).join(' or ')
+    throw unique(e) ? new HttpError(409, `A connection named ${names} already exists`) : e
+  }
+  return Promise.all(ids.map(requireConnection))
+}
+
+/** Adds connections with their values and credentials, all or none, from a template if named. */
+export async function createConnections(
+  inputs: readonly ConnectionCreateRequest[],
+  template: string | null,
+): Promise<Connection[]> {
+  const wanted: NewConnection[] = []
+  for (const { values, profile_ids: profileIds, ...settings } of inputs) {
+    checkValues(values)
+    await assertFree(settings, null)
+    wanted.push({ settings, values, profileIds, carriers: await profileNames(profileIds) })
+  }
+  const rows = await insert(...wanted)
+  const from = template === null ? {} : { template }
+  const source = template === null ? '' : ` from the template ${template}`
+  for (const [at, row] of rows.entries()) {
+    const { carriers = [], values = {} } = wanted[at] ?? {}
+    await auditConnection({
+      kind: 'system.connection_created',
+      row,
+      summary: `Added the connection ${row.name} for ${hostsText(row)}${source}`,
+      detail: { ...settingsLine(row), credentials: carriers, values: Object.keys(values), ...from },
+    })
+  }
+  return Promise.all(rows.map(view))
+}
+
+/** Adds one connection in one step. */
 export async function createConnection(input: ConnectionCreateRequest): Promise<Connection> {
-  const { values, profile_ids: profileIds, ...settings } = input
-  checkValues(values)
-  await assertFree(settings, null)
-  const carriers = await profileNames(profileIds)
-  const row = await insert(settings, values, profileIds)
-  await auditConnection({
-    kind: 'system.connection_created',
-    row,
-    summary: `Added the connection ${row.name} for ${hostsText(row)}`,
-    detail: { ...settingsLine(row), credentials: carriers, values: Object.keys(values) },
-  })
-  return view(row)
+  const [made] = await createConnections([input], null)
+  if (made === undefined) {
+    throw new HttpError(500, 'The connection was not stored')
+  }
+  return made
 }
 
 const hostsText = (row: { hosts: readonly string[] }) => (row.hosts.length === 0 ? 'no hosts' : row.hosts.join(', '))
@@ -194,7 +222,10 @@ export async function createConnectionPlaceholder(
     mint: null,
   }
   await assertFree(settings, null)
-  const row = await insert(settings, {}, [])
+  const [row] = await insert({ settings, values: {}, profileIds: [] })
+  if (row === undefined) {
+    throw new HttpError(500, 'The connection was not stored')
+  }
   await auditConnection({
     kind: 'system.connection_created',
     row,
