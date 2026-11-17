@@ -225,9 +225,36 @@ An agent moves its own session with `set_working_directory`, to a directory that
 the folders it already has. The path is resolved through its symlinks first, so a link out of the
 folder is refused, and the move is audited as `task.cwd_changed` with the agent as actor. Moving
 into a clone makes Claude Code load that repo's `.mcp.json`, settings and hooks, which the agent
-could already write; in the sandbox they run inside it. `.git/config` and `.git/hooks` of the
-directory the session runs in are mounted read-only, since Seti's own git commands read them
-outside the sandbox.
+could already write; in the sandbox they run inside it.
+
+### An agent's clone is hostile input
+
+Seti treats everything in an agent's own folder as input the agent wrote, and never lets it run
+code on the host. The agent may change its clone's `.git/config`, hooks and attributes freely;
+the rule is on Seti's side:
+
+- Seti runs git on the host in a folder an agent can write only through one helper, `agentGit`
+  in `server/src/git.ts`. It sets no hooks path, no fsmonitor, no pager, editor, ssh or proxy
+  command, no askpass or credential helper and no external diff, ignores the system and user
+  config, allows no transport, and formats diffs with `--no-ext-diff --no-textconv`. It serves
+  the archive's check for uncommitted work and the patch that saves it, the delete rule's check,
+  and the removal of a stray worktree. Clean and smudge filters cannot be switched off without
+  changing what git reports for Git LFS, so those commands run only in worktrees Seti made from
+  a registered repo, whose config the sandbox keeps read-only.
+- The main checkout of a worktree is read from its `.git` files, without running git.
+- A `.git` file can name any folder as the repository behind a worktree. Without home access the
+  sandbox follows it only for a worktree Seti made, or when it stays inside the task's own
+  folders, so a forged pointer mounts nothing of the user's and shares no other project's Claude
+  Code memory.
+- The capability probe is Claude Code running on the host, where project settings start hooks
+  and the servers of `.mcp.json`. In a folder under the scratch root it loads the user's settings
+  only, so the commands and servers a clone defines show in the agent's session, which runs in
+  the sandbox, but not in the Capabilities list or the composer's command menu.
+- `gh` runs in Seti's own working directory with explicit repository arguments, never in a task
+  folder, and file search runs ripgrep, which executes nothing a folder configures.
+
+Agents that keep home access are outside this rule: they write to the user's checkouts, which the
+user then uses on the host. Unsandboxed agents run on the host by definition.
 
 ## Knowledge notes
 

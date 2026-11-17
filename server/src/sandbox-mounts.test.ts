@@ -375,13 +375,42 @@ describe('a private sandbox, as every new agent gets', () => {
     expect(dests(mounts)).not.toContain(path.join(home, '.ssh'))
   })
 
-  it('works in a clone inside its folder with the folder still bound, and guards the clone git config', () => {
-    const moved = sandboxMounts(layout({ cwd: clone, dirs: [own], homeAccess: false }))
+  it('works in a clone inside its folder with the folder still bound, and leaves the clone git config its own', () => {
+    const moved = sandboxMounts(layout({ cwd: clone, dirs: [own], homeAccess: false, ownRoot: work }))
     expect(dests(moved, 'bind')).toEqual(expect.arrayContaining([own, clone]))
-    expect(dests(moved, 'ro-bind')).toEqual(
-      expect.arrayContaining([path.join(clone, '.git', 'config'), path.join(clone, '.git', 'hooks')]),
-    )
+    expect(dests(moved, 'ro-bind').filter((dest) => dest.startsWith(own))).toEqual([])
     expect(dests(moved)).not.toContain(neighbour)
+  })
+
+  it('still covers the git config and hooks of a checkout of the user that an older agent runs in', () => {
+    const inCheckout = sandboxMounts(layout({ homeAccess: false, ownRoot: work }))
+    expect(dests(inCheckout, 'ro-bind')).toEqual(
+      expect.arrayContaining([path.join(repo, '.git', 'config'), path.join(repo, '.git', 'hooks')]),
+    )
+    const inWorktree = sandboxMounts(layout({ cwd: worktree, homeAccess: false, ownRoot: work }))
+    expect(dests(inWorktree, 'bind')).toContain(commonGit)
+    expect(dests(inWorktree, 'ro-bind')).toEqual(
+      expect.arrayContaining([
+        path.join(commonGit, 'config'),
+        path.join(commonGit, 'hooks'),
+        path.join(worktree, '.git'),
+      ]),
+    )
+  })
+
+  it('does not follow a .git file the agent wrote to a repository outside its folders', () => {
+    const forged = make(own, 'forged')
+    const admin = make(own, 'forged-admin')
+    touch(path.join(forged, '.git'), `gitdir: ${admin}\n`)
+    touch(path.join(admin, 'commondir'), `${commonGit}\n`)
+    const forgedMounts = sandboxMounts(layout({ cwd: forged, dirs: [own], homeAccess: false, ownRoot: work }))
+    const reached = forgedMounts.filter(
+      (mount) => mount.dest.startsWith(mainRepo) || ('src' in mount && mount.src.startsWith(mainRepo)),
+    )
+    expect(reached).toEqual([])
+    expect(dests(forgedMounts).some((dest) => dest.includes(projectSlug(mainRepo)))).toBe(false)
+    const older = sandboxMounts(layout({ cwd: forged, dirs: [own] }))
+    expect(dests(older, 'bind')).toContain(commonGit)
   })
 
   it('takes the home folders away from an older agent once its home access is switched off', () => {

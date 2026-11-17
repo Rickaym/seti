@@ -19,7 +19,7 @@ import { awsBroker } from './aws-credentials.js'
 import { findBinary } from './binaries.js'
 import { claudeCredential, CONNECTOR_SCOPE, connectorCredential } from './claude-credential.js'
 import { hostLoginKey } from './claude-logins.js'
-import { CLAUDE_HOME, SETI_HOME, WORKTREE_ROOT } from './config.js'
+import { CLAUDE_HOME, SCRATCH_ROOT, SETI_HOME, WORKTREE_ROOT } from './config.js'
 import {
   auditBlockedKey,
   connectionEnv,
@@ -30,7 +30,7 @@ import {
 import type { EgressPlaceholder } from './egress-placeholders.js'
 import { startEgressProxy, type EgressProxy } from './egress-proxy.js'
 import { ruleCaHosts, ruleCovers, type EgressRule } from './egress-rules.js'
-import { agentToken, agentTokenStamp } from './github-token.js'
+import { agentToken, agentTokenStamp, tokenOwner } from './github-token.js'
 import { taskBorrowedServers } from './mcp-borrowed.js'
 import { connectorIds, taskDeniedServers } from './mcp-selection.js'
 import { launch, type ScopePlan } from './memory-scope.js'
@@ -48,7 +48,7 @@ import {
 } from './sandbox-mcp.js'
 import {
   bwrapArgs,
-  canonicalRoot,
+  checkoutOf,
   mountProblem,
   SANDBOX_CA,
   SANDBOX_RUN,
@@ -243,12 +243,6 @@ const taskDir = (taskId: string) => path.join(SANDBOX_ROOT, taskId)
 /** The host directory a task's sandbox sees as /tmp. */
 export const sandboxTmpDir = (taskId: string) => path.join(taskDir(taskId), 'tmp')
 
-/**
- * The owner whose GitHub token covers requests that name none: the first repo's for an agent from
- * before agents cloned for themselves, else null, which is the credential's default token.
- */
-export const tokenOwner = (task: Pick<Task, 'repos'>) => task.repos[0]?.slug.split('/')[0] ?? null
-
 async function taskProxy(task: Task, authority: SandboxCa): Promise<EgressProxy> {
   const taskId = task.id
   const existing = proxies.get(taskId)
@@ -379,6 +373,7 @@ export async function taskSandbox(task: Task, request: SandboxRequest): Promise<
     cwd: task.cwd,
     dirs: extraDirs(task),
     homeAccess: task.home_access,
+    ownRoot: SCRATCH_ROOT,
     workspace: workspaceDir(task.id),
     readOnly: request.readOnly ?? [],
     caDir: '',
@@ -396,7 +391,7 @@ export async function taskSandbox(task: Task, request: SandboxRequest): Promise<
   }
   prepareDirs(dir)
   fs.mkdirSync(workspaceDir(task.id), { recursive: true, mode: 0o700 })
-  const projects = [task.cwd, canonicalRoot(task.cwd) ?? task.cwd]
+  const projects = [task.cwd, checkoutOf(task.cwd, layout) ?? task.cwd]
   const denied = new Set(await taskDeniedServers(task.id))
   const connections = await taskConnections(task)
   const headerRules = connectionRules(connections)

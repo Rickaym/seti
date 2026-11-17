@@ -24,6 +24,8 @@ export interface SandboxLayout {
   dirs: readonly string[]
   /** An older agent's sandbox also shows the user's top-level home folders, writable. */
   homeAccess?: boolean
+  /** Where Seti makes each agent's own folder; a repository in there is the agent's to change. */
+  ownRoot?: string
   /** The task's Seti workspace, read-write although it lives in Seti's own data. */
   workspace?: string | null
   /** Read-only extras such as the Claude Code binary and local plugin folders. */
@@ -255,6 +257,28 @@ function homeDirs(layout: SandboxLayout): string[] {
     .filter((dir) => !within(layout.setiHome, dir) && !within(layout.claudeHome, dir))
 }
 
+const NO_GIT: GitMounts = { writable: [], guards: [], common: null }
+
+/**
+ * What a work directory's repository adds to a sandbox without home access. A clone in the
+ * agent's own folder is its own: no cover on its config and hooks, which Seti never runs. A
+ * `.git` file that points outside the task's folders is honoured only in a worktree Seti made,
+ * since the agent could write that pointer itself to reach a folder of the user's.
+ */
+function privateGitMounts(dir: string, layout: SandboxLayout, workDirs: readonly string[]): GitMounts {
+  const git = gitMounts(dir)
+  if (git.common === null) {
+    return git
+  }
+  const common = git.common
+  const mine = workDirs.some((root) => within(common, root))
+  const own = layout.ownRoot !== undefined && dir !== layout.ownRoot && within(dir, layout.ownRoot)
+  if (mine && own) {
+    return { ...git, guards: [] }
+  }
+  return mine || within(dir, layout.worktreeRoot) ? git : NO_GIT
+}
+
 interface HostBinds {
   writable: string[]
   readOnly: string[]
@@ -266,7 +290,10 @@ function hostBinds(layout: SandboxLayout): HostBinds {
   const shown = (dir: string) => exists(dir) && !layout.hidden.some((secret) => within(dir, secret))
   const workDirs = [layout.cwd, ...layout.dirs]
   const code = homeDirs(layout)
-  const git = [...workDirs, ...code].map(gitMounts)
+  const git =
+    layout.homeAccess === true
+      ? [...workDirs, ...code].map(gitMounts)
+      : workDirs.map((dir) => privateGitMounts(dir, layout, workDirs))
   const commons = git.flatMap((entry) => entry.writable).filter((dir) => mountProblem(dir, layout) === null)
   const writable = [...workDirs, ...code, ...commons, ...CACHES.map((dir) => path.join(layout.home, dir)).filter(shown)]
   const secrets = layout.hidden.filter((entry) => !(layout.excluded ?? []).includes(entry))
@@ -286,15 +313,33 @@ function hostBinds(layout: SandboxLayout): HostBinds {
   return { writable, readOnly, guards: [...new Set(guards)] }
 }
 
+type Trust = Pick<SandboxLayout, 'cwd' | 'dirs' | 'homeAccess' | 'worktreeRoot'>
+
+/**
+ * The checkout whose Claude Code state a task directory shares. Without home access one outside
+ * the task's folders counts only for a worktree Seti made: the agent writes its other `.git`
+ * pointers itself, and could aim one at a repository of the user's.
+ */
+export function checkoutOf(dir: string, layout: Trust): string | null {
+  const root = canonicalRoot(dir)
+  if (root === null || layout.homeAccess === true || within(dir, layout.worktreeRoot)) {
+    return root
+  }
+  return [layout.cwd, ...layout.dirs].some((work) => within(root, work)) ? root : null
+}
+
 /**
  * The auto memory folders of the main checkouts behind the task's directories, which Claude Code
- * uses from worktrees too; the task's own project folder already holds its memory.
+ * uses from worktrees too; the task's own project folder already holds its memory. Without home
+ * access a checkout outside the task's folders counts only for a worktree Seti made.
  */
 function memoryDirs(layout: SandboxLayout): string[] {
   const own = projectSlug(layout.cwd)
   const slugs = [layout.cwd, ...layout.dirs]
-    .map(canonicalRoot)
-    .flatMap((root) => (root === null ? [] : [projectSlug(root)]))
+    .flatMap((dir) => {
+      const root = checkoutOf(dir, layout)
+      return root === null ? [] : [projectSlug(root)]
+    })
     .filter((slug) => slug !== own)
   return [...new Set(slugs)].map((slug) => path.join('projects', slug, 'memory'))
 }

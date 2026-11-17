@@ -14,7 +14,7 @@ import { requireTask } from '../tasks.js'
 import { scopeCwd } from './capabilities.js'
 
 const catalogFor = async (cwd: string, agent = false) =>
-  commandCatalog(await capabilityCache.lookup(cwd, await nearbyDirs(cwd)), { agent })
+  commandCatalog(await capabilityCache.lookup(cwd, nearbyDirs(cwd)), { agent })
 
 async function auditShell(kind: Extract<AuditKind, `task.shell_${string}`>, task: Task, command: string) {
   const verb = kind === 'task.shell_run' ? 'Ran' : 'Stopped'

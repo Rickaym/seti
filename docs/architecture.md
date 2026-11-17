@@ -201,8 +201,11 @@ runs under bubblewrap with its own pid, network, IPC and UTS namespaces:
   home directory and the shared `~/work`, read-write, because it works in checkouts and worktrees
   there. The task row marks it (`task.home_access`, migration 107: on for the rows that existed,
   off for every new one). The user can turn it off in the agent's settings, never on again.
-- `.git/config` and `.git/hooks` are read-only in every mounted repo, since they run code when the
-  repo is used outside the sandbox.
+- A clone in the agent's own folder is the agent's: its `.git/config` and hooks stay writable,
+  so `git remote add`, `git config` and `git push -u` work. In a checkout of the user's that an
+  older agent works in, `.git/config` and `.git/hooks` are read-only, since they run code when
+  the user uses the repo outside the sandbox. A `.git` file that points outside the task's
+  folders is followed only in a worktree Seti made.
 - A repo's records of worktrees the sandbox cannot see, such as other agents' worktrees, are
   read-only, so `git worktree prune` inside cannot drop them for looking deleted. A worktree the
   agent made in its own home, such as `~/feature` beside the repo, lives in that agent's private

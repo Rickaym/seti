@@ -5,6 +5,7 @@ import {
   type McpServerStatus,
   type McpServerStatusConfig,
   type SdkPluginConfig,
+  type SettingSource,
   type SDKControlInitializeResponse,
   type SDKUserMessage,
   type SlashCommand,
@@ -17,7 +18,7 @@ import {
   type McpServer,
   type McpTransport,
 } from '@seti/shared'
-import { PROBE_DELAY_MS } from './config.js'
+import { PROBE_DELAY_MS, SCRATCH_ROOT } from './config.js'
 import { cache } from './redis.js'
 
 /** The slice of an SDK Query the probe uses, so tests can inject a fake. */
@@ -232,10 +233,18 @@ export function setAfterProbe(listener: () => void): void {
   afterProbe = listener
 }
 
+/**
+ * The settings a probe of a directory loads. A probe runs on the host, outside any sandbox, and
+ * project settings start hooks and the servers of `.mcp.json`. In a folder an agent owns, the
+ * agent writes those, so its probe reads the user's settings alone.
+ */
+export const probeSources = (cwd: string): SettingSource[] =>
+  cwd.startsWith(SCRATCH_ROOT + path.sep) ? ['user'] : ['user', 'project', 'local']
+
 const startSdkProbe: StartProbe = (cwd, signal) =>
   query({
     prompt: idlePrompt(signal),
-    options: { cwd, settingSources: ['user', 'project', 'local'], env: probeEnv(), plugins: loadedPlugins },
+    options: { cwd, settingSources: probeSources(cwd), env: probeEnv(), plugins: loadedPlugins },
   })
 
 /** A snapshot older than this is still served, while a new probe replaces it. */

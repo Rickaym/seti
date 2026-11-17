@@ -18,7 +18,7 @@ import { spawn as spawnPty } from 'node-pty'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { readProcesses, stoppable, subtreeOf, terminate } from './agent-processes.js'
 import { findBinary } from './binaries.js'
-import { CLAUDE_HOME, SETI_HOME } from './config.js'
+import { CLAUDE_HOME, SCRATCH_ROOT, SETI_HOME } from './config.js'
 import { tasks } from './db.js'
 import { detectScopeHost, type ScopePlan } from './memory-scope.js'
 import { oomRun, oomRunBlocked, oomScriptArgs } from './oom-fixtures.js'
@@ -274,6 +274,25 @@ describe.skipIf(!available)('a real task sandbox', () => {
     expect(fs.existsSync(path.join(project, 'planted.ts'))).toBe(false)
     expect(fs.existsSync(path.join(home, 'work', 'stray.txt'))).toBe(false)
     expect(fs.readdirSync(other)).toEqual(['notes.txt'])
+  })
+
+  it('lets a new agent change the git config and hooks of a clone it moved into', async () => {
+    const own = path.join(SCRATCH_ROOT, 'owns-its-clone-33333333')
+    const clone = path.join(own, 'app')
+    fs.mkdirSync(clone, { recursive: true })
+    execFileSync(findBinary('git'), ['-C', clone, 'init', '-q', '--initial-branch=main'])
+    const script = [
+      'git config user.name Agent && git config user.email agent@seti.invalid',
+      'git remote add origin https://github.com/acme/app.git && git remote -v | head -1',
+      'git commit -q --allow-empty -m init && git branch --set-upstream-to=main 2>/dev/null; git checkout -q -b feature',
+      'printf "#!/bin/sh\\n" > .git/hooks/pre-commit && echo hook-written',
+    ].join('\n')
+    const { code, out } = await inSandbox(script, null, { cwd: clone, dirs: [own], home_access: false })
+    expect(out).toContain('origin\thttps://github.com/acme/app.git')
+    expect(out).toContain('hook-written')
+    expect(code).toBe(0)
+    expect(fs.readFileSync(path.join(clone, '.git', 'config'), 'utf8')).toContain('[remote "origin"]')
+    fs.rmSync(own, { recursive: true, force: true })
   })
 
   it('keeps dotfiles written at the home root inside the sandbox', async () => {

@@ -69,14 +69,7 @@ export function commandCatalog(
   }
 }
 
-const checkouts = new Map<string, Promise<string | null>>()
-
 /** Directories whose commands best stand in for an unprobed one: its main checkout, then home. */
-export async function nearbyDirs(cwd: string): Promise<string[]> {
-  let main = checkouts.get(cwd)
-  if (main === undefined) {
-    main = mainCheckout(cwd)
-    checkouts.set(cwd, main)
-  }
-  return [await main, os.homedir()].filter((dir): dir is string => dir !== null && dir !== cwd)
+export function nearbyDirs(cwd: string): string[] {
+  return [mainCheckout(cwd), os.homedir()].filter((dir): dir is string => dir !== null && dir !== cwd)
 }
