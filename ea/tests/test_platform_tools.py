@@ -603,6 +603,18 @@ async def test_list_plugins(tools: EaTools, fake_seti: FakeSeti) -> None:
         "1 installed Claude Code plugin, 1 enabled:",
         "- posthog (user scope): enabled, 2 skills, 1 MCP server",
     ]
+    fake_seti.shared_tools = [
+        {"name": "invoices", "enabled": True, "needs": [{"env": "BILLING_KEY"}], "proposer_title": "Biller"},
+        {"name": "lint-all", "enabled": False, "needs": [], "proposer_title": "Linter"},
+    ]
+    shared = await tools.call("list_plugins", {})
+    assert shared.text.splitlines()[-3:] == [
+        "2 shared tools, 1 on:",
+        "- invoices: on, needs BILLING_KEY; proposed by Biller",
+        "- lint-all: off, needs no key; proposed by Linter",
+    ]
+    assert shared.summary == "Listed 3 plugins and 2 shared tools"
+    fake_seti.shared_tools = []
     fake_seti.plugins = {"defaults": [], "installed": [], "installed_error": "claude: command not found"}
     broken = await tools.call("list_plugins", {})
     assert broken.text.splitlines() == [

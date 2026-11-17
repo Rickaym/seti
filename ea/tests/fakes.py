@@ -687,6 +687,7 @@ class FakeSeti:
     file_contents: dict[str, str] = field(default_factory=lambda: {"user": USER_CLAUDE_MD})
     capabilities: dict[str, Any] = field(default_factory=default_capabilities)
     plugins: dict[str, Any] = field(default_factory=default_plugins)
+    shared_tools: list[dict[str, Any]] = field(default_factory=list)
     account: dict[str, Any] = field(default_factory=default_account)
     changelog: dict[str, Any] = field(default_factory=default_changelog)
     update: dict[str, Any] = field(default_factory=default_update)
@@ -1267,6 +1268,8 @@ class FakeSeti:
                 return ok(self.plugins)
             case ["plugins", "defaults"]:
                 return ok(self.plugins["defaults"])
+            case ["shared-tools"]:
+                return ok(self.shared_tools)
             case ["account"]:
                 return ok(self.account)
             case ["mods", "whats-new", "changelog"]:
