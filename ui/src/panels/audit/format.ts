@@ -9,6 +9,7 @@ export const AREA_LABELS: Record<AuditArea, string> = {
   context: 'Context',
   mcp: 'MCP',
   plugin: 'Plugins',
+  shared_tool: 'Shared tools',
   pr: 'Pull requests',
   account: 'Account',
   seti: 'Agent changes to Seti',
@@ -40,6 +41,7 @@ const GONE = new Set([
   'repo.removed',
   'context.pack_deleted',
   'plugin.default_removed',
+  'shared_tool.removed',
   'system.profile_deleted',
   'system.connection_deleted',
 ])
@@ -59,6 +61,7 @@ const SUBJECT_LINKS: Record<AuditEvent['subject_type'], ((id: string) => Subject
   repo: settingsLink('repos', 'Repos'),
   mcp_server: settingsLink('mcp', 'MCP servers'),
   plugin: settingsLink('plugins', 'Plugins'),
+  shared_tool: settingsLink('plugins', 'Shared tools'),
   credential_profile: (id) => ({ href: `#settings/credentials/${id}`, label: 'Credential' }),
   connection: (id) => ({ href: `#settings/connections/${id}`, label: 'Connection' }),
   account: settingsLink('account', 'Account'),
