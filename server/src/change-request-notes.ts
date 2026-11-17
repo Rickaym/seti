@@ -1,7 +1,8 @@
-import { describeChange, hostEntry, type ChangeRequest, type SetiInput } from '@seti/shared'
+import { describeChange, hostEntry, sharedToolCallName, type ChangeRequest, type SetiInput } from '@seti/shared'
 import { audit } from './audit.js'
 import { tasks } from './db.js'
 import { deliverInputs } from './inputs.js'
+import { auditTool } from './shared-tools.js'
 import { refreshBlocked } from './task-blocked.js'
 
 type Outcome = SetiInput['kind']
@@ -31,6 +32,13 @@ function allowedText(request: ChangeRequest, keySet: boolean): { title: string; 
         title: `The user turned on the MCP server ${change.server} for you`,
         body: 'Its tools load when your session restarts at your next turn.',
       }
+    case 'shared_tool':
+      return {
+        title: `The user published your shared tool ${change.name}`,
+        body:
+          `Agents get it as the tool ${sharedToolCallName(change.name)} from their next turn, each only ` +
+          'when its credential has the variables the tool needs.',
+      }
   }
 }
 
@@ -58,6 +66,34 @@ const AUDIT_KINDS = {
   expired: 'task.change_expired',
 } as const
 
+/** Records the answer; a tool's publishing records itself, and its denial goes by name and hash. */
+async function auditOutcome(request: ChangeRequest, outcome: Outcome, title: string): Promise<void> {
+  const what = describeChange(request.change)
+  const verbs = { allowed: 'Allowed', denied: 'Denied', expired: 'Expired' } as const
+  const summary = `${verbs[outcome]} the request of task "${title}" for ${what}`
+  if (request.change.kind === 'shared_tool' && outcome !== 'expired') {
+    if (outcome === 'denied') {
+      const tool = { name: request.change.name, sha256: request.change.snapshot.sha256 }
+      await auditTool({ kind: 'shared_tool.denied', tool, summary, taskId: request.task_id, requestId: request.id })
+    }
+    return
+  }
+  await audit.record({
+    actor: outcome === 'expired' ? 'system' : 'user',
+    kind: AUDIT_KINDS[outcome],
+    subject_type: 'task',
+    subject_id: request.task_id,
+    summary,
+    detail: {
+      title,
+      request_id: request.id,
+      change: what,
+      kind: request.change.kind,
+      ...(request.scope === null ? {} : { scope: request.scope }),
+    },
+  })
+}
+
 /**
  * Records how a request ended, tells the agent as an update, and takes it off the agent's reason
  * line. An expiry is Seti's; an answer is the user's. keySet means the user pasted the key on
@@ -67,21 +103,7 @@ export async function closeRequest(request: ChangeRequest, outcome: Outcome, key
   const task = await tasks.get(request.task_id)
   const title = task?.title ?? request.task_id
   const what = describeChange(request.change)
-  const verbs = { allowed: 'Allowed', denied: 'Denied', expired: 'Expired' } as const
-  await audit.record({
-    actor: outcome === 'expired' ? 'system' : 'user',
-    kind: AUDIT_KINDS[outcome],
-    subject_type: 'task',
-    subject_id: request.task_id,
-    summary: `${verbs[outcome]} the request of task "${title}" for ${what}`,
-    detail: {
-      title,
-      request_id: request.id,
-      change: what,
-      kind: request.change.kind,
-      ...(request.scope === null ? {} : { scope: request.scope }),
-    },
-  })
+  await auditOutcome(request, outcome, title)
   const text = textOf(request, outcome, keySet)
   const input: SetiInput = {
     source: 'seti',

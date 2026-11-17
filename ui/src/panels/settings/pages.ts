@@ -105,7 +105,7 @@ const CORE_GROUPS: { group: SettingsGroup; pages: (Omit<SettingsPage, 'group'> &
     pages: [
       { key: 'account', label: 'Account', icon: UserRound, keywords: 'claude login usage plan' },
       { key: 'mcp', label: 'MCP servers', icon: Blocks },
-      { key: 'plugins', label: 'Plugins', icon: Puzzle, keywords: 'marketplaces' },
+      { key: 'plugins', label: 'Plugins', icon: Puzzle, keywords: 'marketplaces shared tools' },
       { key: 'skills', label: 'Skills', icon: SquareSlash, keywords: 'slash commands' },
       { key: 'subagents', label: 'Subagents', icon: Users, keywords: 'models' },
     ],

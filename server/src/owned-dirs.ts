@@ -2,16 +2,17 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import type { Task } from '@seti/shared'
-import { ARCHIVE_ROOT, MOD_FETCH_ROOT, SCRATCH_ROOT, WORKTREE_ROOT } from './config.js'
+import { ARCHIVE_ROOT, MOD_FETCH_ROOT, SCRATCH_ROOT, SHARED_TOOLS_ROOT, WORKTREE_ROOT } from './config.js'
 import { WORKSPACE_ROOT } from './workspace/dir.js'
 
-/** The roots Seti makes per-agent folders in, each folder exactly one level below its root. */
+/** The roots Seti makes folders of its own in, each folder exactly one level below its root. */
 export const OWNED_ROOTS = {
   scratch: SCRATCH_ROOT,
   worktrees: WORKTREE_ROOT,
   workspace: WORKSPACE_ROOT,
   archive: ARCHIVE_ROOT,
   modFetch: MOD_FETCH_ROOT,
+  sharedTools: SHARED_TOOLS_ROOT,
 } as const
 
 export type OwnedRoot = keyof typeof OWNED_ROOTS

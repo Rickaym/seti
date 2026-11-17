@@ -16,7 +16,8 @@ checklist.
   it carries. The EA and agents' Seti tools never change them, never see a value and never create
   share links; the server refuses them (`server/src/ea-guard.ts`), not just the tool list. Agents
   may propose a change with `request_change` (a host, a connection without its value, an MCP
-  server); only the user's own Allow applies it, and the approve route refuses the EA and agents.
+  server, a script as a shared tool); only the user's own Allow applies it, and the approve route
+  refuses the EA and agents.
 - Every other platform action gets an EA tool in the same PR, because the EA is the hands-free way
   to run Seti. The EA has a 128-tool cap, so extend an existing tool before adding one.
 - Public surfaces stay minimal, because they face the internet without a login: exact anchored

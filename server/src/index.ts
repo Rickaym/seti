@@ -57,6 +57,7 @@ import { TERMINAL_FRAME_MAX } from './routes/terminal.js'
 import { loadSdkModule } from './sdk-query.js'
 import { storeBox } from './secrets.js'
 import { signInHint } from './seti-auth.js'
+import { syncSharedTools } from './shared-tools.js'
 import { stopLeftoverScopes } from './stale-scopes.js'
 import { watchSilentSessions } from './stall-watch.js'
 import { auditEvents } from './store/audit.js'
@@ -164,6 +165,7 @@ startRequestExpiry()
 startKnowledgeSweep()
 const interrupted = await markRestartCut()
 await retireBundledPlugins()
+await syncSharedTools()
 audit.startRetention()
 await pollerScheduler.start()
 reminderTicker.start()

@@ -489,6 +489,29 @@ Running agents pick up a change in their next session. The page notices installs
 plugins and marketplaces: the EA and paired devices are refused, agents have no tool for it, and
 the audit log records every change.
 
+### Shared tools
+
+A script an agent wrote that proved useful can become a shared tool: a typed tool every agent can
+call. The agent proposes it with `request_change`; the request card shows the tool's arguments,
+whether it says it writes anything, the whole script, its hash, the variables it reads and the
+hosts it sends them to, and Allow publishes it. From its next turn every agent whose credential
+carries a connection for each variable gets the tool as `mcp__shared__<name>`; a tool that needs
+none loads for every agent. An agent whose credential lacks a variable can see the tool and what
+is missing, and ask you for the key.
+
+In a sandboxed agent the script runs inside the sandbox, like the agent's own commands. In an
+agent without the sandbox it runs with that agent's access to this machine, and each call asks
+you first unless one of your permission rules allows it.
+
+The script reads its arguments as one JSON object on stdin and prints its result to stdout, as
+JSON when it has structure. A non-zero exit is an error that carries what the script wrote to
+stderr. A call is stopped after 120 seconds unless the proposal sets another limit, up to 600.
+
+Settings, Plugins lists the shared tools with who proposed each one and when. Code shows the
+arguments and the script, the switch turns a tool off for every agent, and Remove deletes it;
+both apply from each agent's next turn. An agent proposes a new version under the same name, and
+its card shows the changes against the published one.
+
 ### Access: defaults and per-agent choices
 
 Everything an agent may reach follows one model: each SSH host, AWS, MCP server, context

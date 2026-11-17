@@ -223,6 +223,27 @@ runs under bubblewrap with its own pid, network, IPC and UTS namespaces:
   the user makes with the Sandbox switch on the start page, badged in the UI and audited. The EA
   is refused, and an agent that starts another always starts it sandboxed.
 
+## Shared tools are typed MCP tools served from an approved snapshot
+
+A shared tool is one script an agent proposed and the user allowed for every agent. The proposal
+is a `request_change` of kind `shared_tool`; `server/src/shared-tool-proposals.ts` reads the file
+when the agent asks and stores its content in the request with one SHA-256 over the script and
+the definition, so the card, the Allow and the published tool are the same bytes. Allow stores the
+tool in `shared_tool`, which is the truth, and `server/src/shared-tool-files.ts` writes it to
+`shared-tools/<name>-<hash>` under Seti's home: `tool.json` with the definition and the program
+that starts the script, and the script beside it. A new version gets a new folder, so every
+session sees a changed setup and starts again with it at its next turn. Startup writes missing
+folders again from the table and removes the ones no tool names.
+
+`sharedToolFolders` in `server/src/shared-tools.ts` picks the folders a task gets: the tool is on
+and the task's credential carries a connection for every variable the tool needs, on the hosts
+the tool names. The session gets one stdio MCP server named `shared`, which is Node running
+`server/src/shared-tool-server.ts` with those folders as arguments. The file imports only Node
+builtins and speaks JSON-RPC over stdio itself. Claude Code starts it, so it inherits the agent
+process's environment and, for a sandboxed agent, runs inside the sandbox, which mounts the
+folders read-only. A call checks the arguments against the schema, runs the script with them on
+stdin, and returns stdout as text, and as structured content when it is a JSON object.
+
 ## Each agent runs in a scope with memory and CPU caps
 
 Seti starts an agent's Claude Code process, sandboxed or not, each `!` command and the short-lived
@@ -1015,13 +1036,13 @@ Every formal request that waits on the user's answer is listed in one place: the
 palette). `GET /api/requests` (`server/src/pending-requests.ts`) returns them by kind in one
 `PendingRequests` shape from `shared/src/requests.ts`:
 
-| Kind      | Where it comes from                                    | Answered with                    | Holds the agent |
-| --------- | ------------------------------------------------------ | -------------------------------- | --------------- |
-| Questions | AskUserQuestion and `ask_secret`                       | the question's own control, Skip | yes             |
-| Access    | `request_change`: a host, a connection, an MCP server  | Allow or Deny, the access card   | yes             |
-| Plans     | ExitPlanMode, held as a permission request             | Approve or Deny                  | yes             |
-| Tools     | a tool call no rule allows, or a repeated call         | Allow, Always or Deny            | yes             |
-| Notes     | `propose_knowledge`, from an agent, the EA or the user | Approve, Edit or Reject          | no              |
+| Kind      | Where it comes from                                                  | Answered with                    | Holds the agent |
+| --------- | -------------------------------------------------------------------- | -------------------------------- | --------------- |
+| Questions | AskUserQuestion and `ask_secret`                                     | the question's own control, Skip | yes             |
+| Access    | `request_change`: a host, a connection, an MCP server, a shared tool | Allow or Deny, the access card   | yes             |
+| Plans     | ExitPlanMode, held as a permission request                           | Approve or Deny                  | yes             |
+| Tools     | a tool call no rule allows, or a repeated call                       | Allow, Always or Deny            | yes             |
+| Notes     | `propose_knowledge`, from an agent, the EA or the user               | Approve, Edit or Reject          | no              |
 
 Each kind is answered on its own route, with its own guard, so listing them together adds no
 power: access, tool calls, plans and notes stay the user's, and the EA only relays answers to

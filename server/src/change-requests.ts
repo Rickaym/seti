@@ -19,6 +19,8 @@ import { refuseAgent } from './ea-guard.js'
 import { HttpError } from './http.js'
 import { hasKey, placeKeyRequest } from './key-requests.js'
 import { allowForEveryAgent } from './sandbox-policy.js'
+import { publishedAlready, snapshotProposal } from './shared-tool-proposals.js'
+import { auditTool, publishSharedTool } from './shared-tools.js'
 import { allowedFor, changeRequests, taskHosts } from './store/change-requests.js'
 import { refreshBlocked } from './task-blocked.js'
 
@@ -47,7 +49,7 @@ async function mcpItem(task: Task, server: string) {
 
 /** Why the agent need not ask, or null when the change is new to it; refuses what cannot apply. */
 async function alreadyHas(task: Task, change: RequestedChange): Promise<string | null> {
-  if (change.kind !== 'mcp_server' && !(await sandboxed(task))) {
+  if ((change.kind === 'allow_host' || change.kind === 'api_key') && !(await sandboxed(task))) {
     throw new HttpError(409, SANDBOX_ONLY)
   }
   switch (change.kind) {
@@ -61,6 +63,8 @@ async function alreadyHas(task: Task, change: RequestedChange): Promise<string |
       return (await hasKey(task, change)) ? `Your credential already has ${change.env}.` : null
     case 'mcp_server':
       return (await mcpItem(task, change.server)).enabled ? `You already have the MCP server ${change.server}.` : null
+    case 'shared_tool':
+      return (await publishedAlready(change)) ? `The shared tool ${change.name} is published with this code.` : null
   }
 }
 
@@ -77,11 +81,12 @@ async function checkRate(task: Task): Promise<void> {
 /** Files the agent's request for the user to allow or deny, once per pending change. */
 export async function fileChangeRequest(task: Task, input: FileChangeRequest): Promise<Filed> {
   refuseArchived(task)
-  const already = await alreadyHas(task, input.change)
+  const change = input.change.kind === 'shared_tool' ? await snapshotProposal(task, input.change) : input.change
+  const already = await alreadyHas(task, change)
   if (already !== null) {
     return { outcome: 'already', text: already }
   }
-  const waiting = await changeRequests.pendingSame(task.id, input.change)
+  const waiting = await changeRequests.pendingSame(task.id, change)
   if (waiting !== undefined) {
     return { outcome: 'waiting', request: waiting }
   }
@@ -89,7 +94,7 @@ export async function fileChangeRequest(task: Task, input: FileChangeRequest): P
   const request = await changeRequests.open({
     id: randomUUID(),
     task_id: task.id,
-    change: input.change,
+    change,
     reason: input.reason,
     profile_id: task.profile_id,
     expires_at: new Date(Date.now() + REQUEST_TTL_MS).toISOString(),
@@ -97,12 +102,25 @@ export async function fileChangeRequest(task: Task, input: FileChangeRequest): P
   if (request === undefined) {
     throw new HttpError(409, 'The same request is already waiting for the user.')
   }
+  await auditFiled(task, request)
+  await refreshBlocked(task.id)
+  return { outcome: 'filed', request }
+}
+
+/** Records the request; a proposed tool by its name and hash, never its code. */
+async function auditFiled(task: Task, request: ChangeRequest): Promise<void> {
+  const summary = `Task "${task.title}" asked for ${describeChange(request.change)}`
+  if (request.change.kind === 'shared_tool') {
+    const tool = { name: request.change.name, sha256: request.change.snapshot.sha256 }
+    await auditTool({ kind: 'shared_tool.proposed', tool, summary, taskId: task.id, requestId: request.id })
+    return
+  }
   await audit.record({
     actor: 'user',
     kind: 'task.change_requested',
     subject_type: 'task',
     subject_id: task.id,
-    summary: `Task "${task.title}" asked for ${describeChange(request.change)}`,
+    summary,
     detail: {
       title: task.title,
       request_id: request.id,
@@ -111,8 +129,6 @@ export async function fileChangeRequest(task: Task, input: FileChangeRequest): P
       reason: request.reason,
     },
   })
-  await refreshBlocked(task.id)
-  return { outcome: 'filed', request }
 }
 
 /** The agent's requests that wait for the user, oldest first. */
@@ -133,6 +149,9 @@ async function apply(task: Task, request: ChangeRequest, answer: Extract<AnswerC
       return
     case 'api_key':
       await placeKeyRequest(task, change, answer.value)
+      return
+    case 'shared_tool':
+      await publishSharedTool(task, request, change)
       return
   }
 }

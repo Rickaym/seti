@@ -19,6 +19,7 @@ import { withSignIn } from '../mcp-sign-in.js'
 import { changeNotificationSettings, notificationStatus } from '../notifications.js'
 import { pluginCatalog, removeDefaultPlugin } from '../plugins.js'
 import { sandboxStatus } from '../sandbox-status.js'
+import { sharedToolsFor } from '../shared-tools.js'
 import { sshStatus } from '../ssh.js'
 import { deleteStaleFolders, staleFolders } from '../stale-folders.js'
 import { updateTask } from '../task-actions.js'
@@ -61,11 +62,26 @@ async function serverOf(name: string, ref: string | undefined) {
 
 const listPlugins = setiTool({
   name: 'list_plugins',
-  description: "List Seti's default plugin folders and the Claude Code plugins installed, with what each adds.",
+  description:
+    "List Seti's default plugin folders and the Claude Code plugins installed, with what each adds, and the " +
+    'shared tools: scripts agents proposed and the user allowed for every agent. Each shared tool says whether ' +
+    'you have it, under which tool name, and when not, the variables your credential lacks; ask for one with ' +
+    'request_change, kind api_key, and propose a script of your own with kind shared_tool.',
   input: {},
-  run: async () => {
+  run: async (_args, ctx) => {
     const listing = await pluginCatalog.list(false)
     return {
+      shared_tools: (await sharedToolsFor(ctx.caller)).map(
+        ({ name, description, needs, writes, enabled, available, missing, why, tool }) => ({
+          name,
+          description,
+          needs,
+          writes,
+          enabled,
+          available,
+          ...(available ? { tool } : { missing, why }),
+        }),
+      ),
       defaults: listing.defaults.map(({ id, name, path, version, enabled, components, problem }) => ({
         id,
         name,

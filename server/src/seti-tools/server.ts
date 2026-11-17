@@ -83,6 +83,10 @@ export function sessionSetiServers(task: Task): Record<string, McpServerConfig> 
   return { [SETI_SERVER]: setiMcpServer(task) }
 }
 
+const SHARED_TOOLS =
+  'A script of yours that other agents would reuse can become a shared tool the same way: request_change, ' +
+  'kind shared_tool.'
+
 const CONTEXT: Record<SetiControlLevel, string | null> = {
   off: null,
   self:
@@ -101,5 +105,6 @@ const CONTEXT: Record<SetiControlLevel, string | null> = {
 /** What the agent's system prompt says its seti tools can do, by its Seti control level. */
 export async function setiToolsContext(taskId: string): Promise<string | null> {
   const task = await tasks.get(taskId)
-  return task === undefined ? null : CONTEXT[task.seti_control]
+  const context = task === undefined ? null : CONTEXT[task.seti_control]
+  return context === null ? null : `${context} ${SHARED_TOOLS}`
 }
