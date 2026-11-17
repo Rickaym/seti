@@ -293,6 +293,36 @@ describe('the home directory', () => {
     expect(own).toContain(otherAdmin)
   })
 
+  it('leaves the record of a worktree in its own private home writable, never one it cannot see', () => {
+    const record = (name: string, dir: string) => {
+      const admin = make(commonGit, 'worktrees', name)
+      touch(path.join(admin, 'gitdir'), `${path.join(dir, '.git')}\n`)
+      return admin
+    }
+    const own = record('own-home', path.join(home, 'own-home'))
+    touch(path.join(taskDir, 'home', 'own-home', '.git'), `gitdir: ${own}\n`)
+    const nested = record('own-nested', path.join(home, 'side', 'nested'))
+    touch(path.join(taskDir, 'home', 'side', 'nested', '.git'), `gitdir: ${nested}\n`)
+    const others = record('other-home', path.join(home, 'other-home'))
+    touch(path.join(setiHome, 'sandbox', 'task-2', 'home', 'other-home', '.git'), `gitdir: ${others}\n`)
+    const missing = record('gone', path.join(home, 'gone'))
+    const emptied = record('emptied', path.join(home, 'emptied'))
+    make(taskDir, 'home', 'emptied')
+    const outside = record('outside', path.join(root, 'elsewhere'))
+    touch(path.join(taskDir, 'home', '.seti', 'worktrees', 'task-2', '.git'), `gitdir: ${otherAdmin}\n`)
+
+    const readOnly = dests(sandboxMounts(layout()), 'ro-bind')
+    expect(readOnly).not.toContain(own)
+    expect(readOnly).not.toContain(nested)
+    expect(readOnly).not.toContain(branchAdmin)
+    expect(readOnly).toEqual(expect.arrayContaining([others, missing, emptied, outside, otherAdmin]))
+
+    const second = make(setiHome, 'sandbox', 'task-2')
+    const fromOther = dests(sandboxMounts(layout({ taskDir: second })), 'ro-bind')
+    expect(fromOther).not.toContain(others)
+    expect(fromOther).toEqual(expect.arrayContaining([own, nested, missing]))
+  })
+
   it("binds the main checkout's memory for a worktree task, not its other sessions", () => {
     const wt = sandboxMounts(layout({ cwd: worktree }))
     const memory = path.join('projects', projectSlug(mainRepo), 'memory')

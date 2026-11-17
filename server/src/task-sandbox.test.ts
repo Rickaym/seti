@@ -289,6 +289,25 @@ describe.skipIf(!available)('a real task sandbox', () => {
     expect(fs.existsSync(path.join(project, '.git', 'hooks', 'post-checkout'))).toBe(false)
   })
 
+  it('commits in a worktree it made in its own home after the sandbox starts again', async () => {
+    const made = await inSandbox('git -C ~/project worktree add -q ~/side -b side && echo added')
+    expect(made.out).toContain('added')
+    expect(fs.existsSync(path.join(home, 'side'))).toBe(false)
+    const { code, out } = await inSandbox(
+      [
+        'cd ~/side && echo x > note.txt && git add note.txt',
+        'git -c user.name=Seti -c user.email=test@seti.invalid commit -qm side && echo committed',
+        'git worktree prune && git worktree list',
+      ].join(' && '),
+    )
+    expect(out).toContain('committed')
+    expect(out).toContain(`${path.join(home, 'side')} `)
+    expect(code).toBe(0)
+    // eslint-disable-next-line sonarjs/no-os-command-from-path -- tests use the git on PATH like the server
+    const subject = execFileSync('git', ['-C', project, 'log', '-1', '--format=%s', 'side'], { encoding: 'utf8' })
+    expect(subject.trim()).toBe('side')
+  })
+
   it('adds the host sign-in to a remote MCP server behind the Seti CA, without the token inside', async () => {
     const access = ['mcp', 'fake', 'access', 'value'].join('-')
     let authority: Promise<SandboxCa> | null = null

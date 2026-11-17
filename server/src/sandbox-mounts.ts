@@ -159,10 +159,22 @@ function gitMounts(dir: string): GitMounts {
 }
 
 /**
+ * Whether a path the host lacks is a worktree in the task's private home, which the sandbox shows
+ * at the home path wherever no host folder is bound over it.
+ */
+function inPrivateHome(worktree: string, layout: SandboxLayout, bound: readonly string[]): boolean {
+  if (!within(worktree, layout.home) || worktree === layout.home || exists(worktree)) {
+    return false
+  }
+  const inside = path.join(layout.taskDir, 'home', path.relative(layout.home, worktree))
+  return !bound.some((root) => within(worktree, root)) && exists(path.join(inside, '.git'))
+}
+
+/**
  * Admin folders of worktrees the sandbox cannot see, such as other tasks' worktrees; they stay
  * read-only so that `git worktree prune` inside cannot drop them for looking deleted.
  */
-function unseenWorktrees(commons: readonly string[], visible: readonly string[]): string[] {
+function unseenWorktrees(commons: readonly string[], seen: (worktree: string) => boolean): string[] {
   return commons.flatMap((common) => {
     const admin = path.join(common, 'worktrees')
     const names = fs.statSync(admin, { throwIfNoEntry: false })?.isDirectory() === true ? fs.readdirSync(admin) : []
@@ -173,8 +185,7 @@ function unseenWorktrees(commons: readonly string[], visible: readonly string[])
         if (!exists(pointer)) {
           return false
         }
-        const worktree = path.dirname(path.resolve(entry, fs.readFileSync(pointer, 'utf8').trim()))
-        return !visible.some((root) => within(worktree, root))
+        return !seen(path.dirname(path.resolve(entry, fs.readFileSync(pointer, 'utf8').trim())))
       })
   })
 }
@@ -263,7 +274,9 @@ function hostBinds(layout: SandboxLayout): HostBinds {
     ...pinned,
   ].filter((dir) => !isSystem(dir) && !writable.some((root) => within(dir, root)))
   const repos = [...new Set(git.flatMap((entry) => (entry.common === null ? [] : [entry.common])))]
-  const guards = [...git.flatMap((entry) => entry.guards), ...unseenWorktrees(repos, writable)]
+  const seen = (worktree: string) =>
+    writable.some((root) => within(worktree, root)) || inPrivateHome(worktree, layout, [...writable, ...readOnly])
+  const guards = [...git.flatMap((entry) => entry.guards), ...unseenWorktrees(repos, seen)]
   return { writable, readOnly, guards: [...new Set(guards)] }
 }
 
