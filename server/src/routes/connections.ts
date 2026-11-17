@@ -4,9 +4,11 @@ import {
   connectionParams,
   connectionProfilesInput,
   connectionSlotParams,
+  connectionTemplateInput,
   connectionValueInput,
 } from '@seti/shared'
 import { Hono } from 'hono'
+import { createFromTemplate } from '../connection-templates.js'
 import {
   clearConnectionValue,
   createConnection,
@@ -32,6 +34,10 @@ export const connectionRoutes = new Hono()
   .post('/', validJson(connectionCreateInput), async (c) =>
     ok(c, await settleConnection(await createConnection(c.req.valid('json')))),
   )
+  .post('/from-template', validJson(connectionTemplateInput), async (c) => {
+    const made = await createFromTemplate(c.req.valid('json'))
+    return ok(c, await Promise.all(made.map(settleConnection)))
+  })
   .get('/:id', validId, async (c) => ok(c, await getConnection(c.req.valid('param').id)))
   .put('/:id', validId, validJson(connectionInput), async (c) =>
     ok(c, await settleConnection(await updateConnection(c.req.valid('param').id, c.req.valid('json')))),
