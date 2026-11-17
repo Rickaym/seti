@@ -4,6 +4,7 @@ import path from 'node:path'
 import { query } from '@anthropic-ai/claude-agent-sdk'
 import { SANDBOX_POLICY_DEFAULT } from '@seti/shared'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
+import { removeTaskFiles } from './archive-files.js'
 import { binaryPath } from './binaries.js'
 import {
   createCapabilityCache,
@@ -34,7 +35,7 @@ const available = binaryPath('bwrap') !== null && binaryPath('socat') !== null
 const TIMING = { pollMs: 200, pendingCapMs: 8000, callTimeoutMs: 30_000 }
 
 /** A folder whose project settings and `.mcp.json` each write the hostname they ran on. */
-function hostileFolder(name: string): { dir: string; ran: () => Record<string, string> } {
+function hostileFolder(name: string, serverSeconds = 2): { dir: string; ran: () => Record<string, string> } {
   const dir = path.join(home, name)
   fs.mkdirSync(path.join(dir, '.claude'), { recursive: true })
   const mark = (what: string) => `hostname > ${path.join(dir, what)}-ran`
@@ -43,7 +44,7 @@ function hostileFolder(name: string): { dir: string; ran: () => Record<string, s
     path.join(dir, '.claude', 'settings.json'),
     JSON.stringify({ hooks: { SessionStart: [hook], Setup: [hook] }, enableAllProjectMcpServers: true }),
   )
-  const server = { command: 'sh', args: ['-c', `${mark('mcp')}; sleep 2`] }
+  const server = { command: 'sh', args: ['-c', `${mark('mcp')}; sleep ${String(serverSeconds)}`] }
   fs.writeFileSync(path.join(dir, '.mcp.json'), JSON.stringify({ mcpServers: { planted: server } }))
   const ran = () =>
     Object.fromEntries(
@@ -89,6 +90,28 @@ describe.skipIf(!available)('the capability probe of a folder a sandboxed agent 
     const snapshot = await createCapabilityCache(undefined, TIMING).get(folder.dir)
     expect(folder.ran()).toEqual({ hook: 'seti-sandbox', mcp: 'seti-sandbox' })
     expect(snapshot.servers.map((server) => server.name)).toContain('planted')
+  }, 90_000)
+
+  it('ends a probe that still runs in the sandbox before the agent is deleted', async () => {
+    const folder = hostileFolder('deleted', 60)
+    const task = { id: 'probe-deleted', title: 'Deleted', repo_id: null, cwd: folder.dir, worktree: false, pr_urls: [] }
+    await tasks.insert(task)
+    const probing = createCapabilityCache(undefined, TIMING)
+      .get(folder.dir)
+      .then(
+        () => 'finished',
+        () => 'ended',
+      )
+    await vi.waitFor(() => {
+      expect(folder.ran()).toMatchObject({ mcp: 'seti-sandbox' })
+    })
+    const stored = await tasks.get(task.id)
+    if (stored === undefined) {
+      throw new Error('Task was not stored')
+    }
+    await removeTaskFiles(stored)
+    expect(await probing).toBe('ended')
+    expect(fs.existsSync(path.join(home, '.seti', 'sandbox', task.id))).toBe(false)
   }, 90_000)
 
   it("reads only the user's settings in another folder such an agent can write, so nothing there runs", async () => {
