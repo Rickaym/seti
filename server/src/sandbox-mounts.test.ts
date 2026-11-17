@@ -255,6 +255,14 @@ describe('the home directory', () => {
     expect(find(pinned, liveCheckout).filter((mount) => mount.kind !== 'tmpfs')).toEqual([])
   })
 
+  it("mounts a shared tool's plugin folder read-only though it lies in Seti's own data", () => {
+    const tool = make(setiHome, 'shared-tools', 'invoices-0123456789ab')
+    const pinned = sandboxMounts(layout({ readOnly: [tool] }))
+    expect(find(pinned, tool)).toEqual([{ kind: 'ro-bind', src: tool, dest: tool }])
+    expect(dests(pinned, 'bind')).not.toContain(path.join(setiHome, 'shared-tools'))
+    expect(dests(pinned)).not.toContain(setiHome)
+  })
+
   it('skips top-level files, dot folders and excluded folders', () => {
     const all = dests(mounts)
     for (const skipped of [path.join(home, 'backup.key'), path.join(home, '.zshrc'), liveCheckout]) {

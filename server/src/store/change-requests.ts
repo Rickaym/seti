@@ -1,10 +1,22 @@
-import { hostFlags, type ChangeRequest, type ChangeState, type HostScope, type RequestedChange } from '@seti/shared'
+import {
+  hostFlags,
+  sharedToolFlags,
+  type ChangeRequest,
+  type ChangeState,
+  type HostScope,
+  type RequestedChange,
+} from '@seti/shared'
 import { now, sql } from '../db.js'
 import { sandboxPolicy } from './sandbox.js'
 
 type RequestRecord = Omit<ChangeRequest, 'change' | 'flags'> & { change: string; change_key: string }
 
-const flagsOf = (change: RequestedChange) => (change.kind === 'allow_host' ? hostFlags(change.host) : [])
+function flagsOf(change: RequestedChange): string[] {
+  if (change.kind === 'shared_tool') {
+    return sharedToolFlags(change)
+  }
+  return change.kind === 'allow_host' ? hostFlags(change.host) : []
+}
 
 function toRequest({ change: text, change_key: _key, ...row }: RequestRecord): ChangeRequest {
   const change = JSON.parse(text) as RequestedChange
@@ -14,7 +26,10 @@ function toRequest({ change: text, change_key: _key, ...row }: RequestRecord): C
 const requests = (rows: readonly RequestRecord[]) => rows.map(toRequest)
 
 /** One string per distinct change, so the same change asked twice while pending is one request. */
-const changeKey = (change: RequestedChange) => JSON.stringify(change)
+const changeKey = (change: RequestedChange) =>
+  JSON.stringify(
+    change.kind === 'shared_tool' ? { kind: change.kind, name: change.name, sha256: change.snapshot.sha256 } : change,
+  )
 
 export interface NewChangeRequest {
   id: string

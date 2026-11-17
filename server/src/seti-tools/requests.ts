@@ -13,13 +13,18 @@ const requestChange = setiTool({
     'tap, and Seti tells you the answer as an update. Kinds: allow_host (a host and port on the network ' +
     `allowlist, ${String(HTTPS_PORT)} by default; the user picks you or every agent), api_key (a connection by ` +
     'its variable name and hosts; the user pastes the key into the request in Seti as they allow it, and you ' +
-    'only ever hold a placeholder), mcp_server (an MCP server Seti has, for you). Never ask for a key or ' +
+    'only ever hold a placeholder), mcp_server (an MCP server Seti has, for you), shared_tool (one script ' +
+    'file of yours, at most 64 KB, that proved useful, for every agent: name it, say when to use it and how ' +
+    'to call it, and list the variables it reads with their hosts; Seti reads the file as it is now, the ' +
+    'user reviews that code, and once allowed every sandboxed agent whose credential has those variables ' +
+    'gets it as a skill; the same name again proposes an update). Never ask for a key or ' +
     'token in chat, and never ask for the sandbox off, Bypass, permission rules, secret values or other ' +
     `agents. Carry on with other work or end your turn while it waits; it expires after ${HOURS} hours, and ` +
     `at most ${String(PENDING_MAX)} wait at once.`,
   input: {
     change: fileChangeInput.shape.change.describe(
-      'The change: {kind: "allow_host", host, port?}, {kind: "api_key", env, hosts} or {kind: "mcp_server", server}.',
+      'The change: {kind: "allow_host", host, port?}, {kind: "api_key", env, hosts}, {kind: "mcp_server", server} ' +
+        'or {kind: "shared_tool", name, description, path, needs?: [{env, hosts}]}.',
     ),
     reason: z
       .string()

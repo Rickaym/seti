@@ -35,6 +35,7 @@ import { reviewHook } from './review-hooks.js'
 import { mcpTargets, signedInServers } from './sandbox-mcp.js'
 import { sandboxHooks, secretDenyRules, setiHomePaths, unsandboxedHookRules, type SandboxContext } from './sandbox.js'
 import { redactSecrets } from './scrub.js'
+import { sharedToolPlugins } from './shared-tools.js'
 import { keyStamp, sshStamp } from './ssh-files.js'
 import { allowedFor } from './store/change-requests.js'
 import { profiles } from './store/credentials.js'
@@ -100,6 +101,9 @@ export const hostLimitsEnv = (cap: MemoryCap | null): Record<string, string> => 
 export const workingDirs = (task: Task) =>
   [...new Set([...extraDirs(task), workspaceDir(task.id)])].filter((dir) => dir !== task.cwd)
 
+/** The plugins a task's session loads: Seti's defaults and its own choices, then shared tools. */
+const taskPlugins = async (task: Task) => [...(await taskPluginConfigs(task.id)), ...(await sharedToolPlugins(task))]
+
 /** Everything a session's process starts with that needs a new process when it changes. */
 async function sessionSetup(task: Task) {
   const dirs = workingDirs(task)
@@ -108,7 +112,7 @@ async function sessionSetup(task: Task) {
     ...(dirs.length === 0 ? {} : { additionalDirectories: dirs }),
     permissionMode: permissionModeOf(task),
     ...bypassLaunch(task),
-    plugins: await taskPluginConfigs(task.id),
+    plugins: await taskPlugins(task),
     systemPrompt: { type: 'preset', preset: 'claude_code', append: await systemAppend(task.id) },
   } satisfies Options
 }
@@ -162,7 +166,7 @@ export async function sandboxFor(task: Task): Promise<TaskSandbox | null> {
   if (!(policy.enabled && task.sandbox)) {
     return null
   }
-  const plugins = (await taskPluginConfigs(task.id)).map((plugin) => plugin.path)
+  const plugins = (await taskPlugins(task)).map((plugin) => plugin.path)
   const memory = (await planScope(task.id, 'agent'))?.cap ?? null
   return taskSandbox(task, { ctx: sandboxContext(), policy, readOnly: plugins, memory })
 }
