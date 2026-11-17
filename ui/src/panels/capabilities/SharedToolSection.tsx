@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Switch } from '@/components/ui/switch'
 import { DeleteIconButton } from '@/components/ui/table-action-buttons'
 import { relativeTime } from '@/lib/time'
-import { ScriptCode, ToolNeeds } from '@/panels/tasks/SharedToolProposal'
+import { ScriptCode, ToolArguments, ToolEffect, ToolNeeds } from '@/panels/tasks/SharedToolProposal'
 import { EmptyRow, Section } from './Section'
 import { matches } from './filter'
 
@@ -54,6 +54,7 @@ function CodeDialog({ name, onClose }: { name: string; onClose: () => void }) {
             <p className="break-all text-muted-foreground">
               {tool.file}, sha256 <code className="font-mono">{tool.sha256}</code>
             </p>
+            <ToolArguments input={tool.input} />
             <ScriptCode name={tool.name} content={tool.content} />
           </div>
         )}
@@ -87,7 +88,7 @@ function ToolRow({ tool, onChanged, onView }: RowProps) {
 
   const remove = async () => {
     const message =
-      `Agents lose the skill ${tool.name} from their next turn, and its code is deleted from Seti. ` +
+      `Agents lose the tool ${tool.name} from their next turn, and its code is deleted from Seti. ` +
       'Only a new proposal that you allow brings it back.'
     if (!(await confirm({ title: `Remove ${tool.name}`, message, confirmLabel: 'Remove', variant: 'destructive' }))) {
       return
@@ -103,6 +104,7 @@ function ToolRow({ tool, onChanged, onView }: RowProps) {
       <div className="flex min-w-0 flex-1 basis-64 flex-col gap-1">
         <span className="font-mono font-semibold break-all">{tool.name}</span>
         <p className="break-words whitespace-pre-wrap text-muted-foreground">{tool.description}</p>
+        <ToolEffect tool={tool} />
         <ToolNeeds needs={tool.needs} />
         <p className="text-2xs break-all text-muted-foreground" title={tool.sha256}>
           Proposed by {tool.proposer_title} {relativeTime(tool.updated_at)}, sha256{' '}
@@ -110,7 +112,7 @@ function ToolRow({ tool, onChanged, onView }: RowProps) {
         </p>
       </div>
       <span className="flex shrink-0 items-center gap-2">
-        <Hint text="Read the script agents run">
+        <Hint text="Read the arguments and the script agents run">
           <Button type="button" variant="outline" size="xs" aria-label={`Code of ${tool.name}`} onClick={onView}>
             <Code />
             Code
@@ -170,9 +172,9 @@ export function SharedToolSection({ query, refreshToken }: { query: string; refr
   return (
     <Section title="Shared tools" count={rows.length}>
       <p className="border-b border-border px-3 py-1.5 text-muted-foreground">
-        Scripts agents proposed and you allowed. Each loads as a skill into every sandboxed agent whose credential has
-        the variables it needs, and runs with that agent&apos;s own access. Agents without the sandbox never get them.
-        Turning one off or removing it applies from each agent&apos;s next turn.
+        Scripts agents proposed and you allowed. Each is a typed tool for every agent whose credential has the variables
+        it needs. In a sandboxed agent it runs inside the sandbox; in an agent without the sandbox it runs with that
+        agent&apos;s access to this machine. Turning one off or removing it applies from each agent&apos;s next turn.
       </p>
       {error !== '' && <p className="border-b border-border px-3 py-2 text-destructive">{error}</p>}
       {tools !== null && rows.length === 0 && (

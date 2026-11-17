@@ -1,4 +1,10 @@
-import type { SharedToolChange } from '@seti/shared'
+import {
+  definitionText,
+  proposedDefinition,
+  type SharedToolChange,
+  type SharedToolDefinition,
+  type ToolInputProperty,
+} from '@seti/shared'
 import { LineDiff } from '@/panels/revisions/FieldChange'
 
 const HASH_CHARS = 12
@@ -19,9 +25,9 @@ export function ScriptCode({ name, content }: { name: string; content: string })
 }
 
 /** What a tool reads and where it sends it, one variable a line. */
-export function ToolNeeds({ needs }: { needs: SharedToolChange['needs'] }) {
+export function ToolNeeds({ needs }: { needs: SharedToolDefinition['needs'] }) {
   if (needs.length === 0) {
-    return <p className="text-2xs text-muted-foreground">Needs no key: every sandboxed agent gets it.</p>
+    return <p className="text-2xs text-muted-foreground">Needs no key: every agent gets it.</p>
   }
   return (
     <ul aria-label="Needs" className="flex flex-col gap-0.5 text-2xs text-muted-foreground">
@@ -34,20 +40,69 @@ export function ToolNeeds({ needs }: { needs: SharedToolChange['needs'] }) {
   )
 }
 
-/** A proposed shared tool: what it is for, what it needs, its hash, its changes and its code. */
+function typeOf(property: ToolInputProperty): string {
+  if (property.enum !== undefined) {
+    return property.enum.join(' | ')
+  }
+  return property.type === 'array' && property.items !== undefined ? `${typeOf(property.items)}[]` : property.type
+}
+
+/** The arguments an agent passes: each with its type, whether it is required and what it means. */
+export function ToolArguments({ input }: { input: SharedToolDefinition['input'] }) {
+  const entries = Object.entries(input.properties)
+  if (entries.length === 0) {
+    return <p className="text-2xs text-muted-foreground">Takes no arguments.</p>
+  }
+  return (
+    <ul aria-label="Arguments" className="flex flex-col gap-0.5 text-2xs text-muted-foreground">
+      {entries.map(([name, property]) => (
+        <li key={name} className="break-words">
+          <code className="font-mono text-foreground">{name}</code> {typeOf(property)}
+          {input.required.includes(name) ? ', required' : ', optional'}
+          {property.description === undefined ? '' : `: ${property.description}`}
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+/** Whether the tool only reads, as its proposer declared, and how long a call may run. */
+export function ToolEffect({ tool }: { tool: Pick<SharedToolDefinition, 'writes' | 'timeout_seconds'> }) {
+  return (
+    <p className="text-2xs text-muted-foreground">
+      {tool.writes ? 'Declared to change or send things outside the workspace' : 'Declared read-only'}, stopped after{' '}
+      {tool.timeout_seconds} s
+    </p>
+  )
+}
+
+/** A proposed shared tool: what it does, its arguments, what it needs, its hash, changes and code. */
 export function SharedToolProposal({ change }: { change: SharedToolChange }) {
   const { snapshot } = change
+  const definition = definitionText(proposedDefinition(change))
   return (
     <div className="flex min-w-0 flex-col gap-1.5">
       <p className="break-words whitespace-pre-wrap text-foreground">{change.description}</p>
+      <ToolArguments input={change.input} />
+      <ToolEffect tool={change} />
       <ToolNeeds needs={change.needs} />
       <p className="text-2xs break-all text-muted-foreground" title={snapshot.sha256}>
         {snapshot.file}, sha256 <code className="font-mono">{snapshot.sha256.slice(0, HASH_CHARS)}</code>
       </p>
       {snapshot.replaces !== null && (
         <div role="region" aria-label={`Changes to ${change.name}`} className="flex flex-col gap-0.5">
-          <span className="text-2xs text-muted-foreground">Changes to the published version</span>
-          <LineDiff before={snapshot.replaces.content} after={snapshot.content} />
+          {snapshot.replaces.definition !== definition && (
+            <>
+              <span className="text-2xs text-muted-foreground">Changes to the published definition</span>
+              <LineDiff before={snapshot.replaces.definition} after={definition} />
+            </>
+          )}
+          {snapshot.replaces.content !== snapshot.content && (
+            <>
+              <span className="text-2xs text-muted-foreground">Changes to the published script</span>
+              <LineDiff before={snapshot.replaces.content} after={snapshot.content} />
+            </>
+          )}
         </div>
       )}
       <ScriptCode name={change.name} content={snapshot.content} />
