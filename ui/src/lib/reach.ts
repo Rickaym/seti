@@ -10,7 +10,7 @@ export interface Reach {
   getSnapshot: () => ReachState
   /** The server answered a poll; an error status counts, since it shows the server is there. */
   answered: () => void
-  /** A poll sent at `sentAt` timed out or never arrived; ignored when an answer came since. */
+  /** A poll sent at `sentAt` got no answer from Seti; ignored when an answer came since. */
   unanswered: (sentAt: number) => void
 }
 

@@ -1,5 +1,6 @@
 import type { CapabilitiesSummary, ChannelsSummary, ResourceSummary } from '@seti/shared'
 import { createContext } from 'react'
+import type { Connection } from '@/components/status-bar/connection'
 
 /** Warning colours the item on the bar; only critical fills it, so it outranks a failed agent. */
 export type StatusTone = 'default' | 'muted' | 'warning' | 'critical' | 'danger'
@@ -38,12 +39,12 @@ export const mcpTone = (summary: CapabilitiesSummary): StatusTone =>
 
 export const sandboxTone = (enabled: boolean): StatusTone => (enabled ? 'default' : 'warning')
 
-/** Offline is the browser's state, not a fault of the server, so it stays quiet. */
-export function apiTone(error: string | null, online: boolean): StatusTone {
-  if (!online) {
+/** A lost link is the network's state, not a fault of the server, so it stays quiet. */
+export function apiTone(connection: Connection): StatusTone {
+  if (connection === 'offline' || connection === 'reconnecting') {
     return 'muted'
   }
-  return error === null ? 'default' : 'danger'
+  return connection === 'down' ? 'danger' : 'default'
 }
 
 /** Inside the phone's health sheet: items render as rows with their hint; a press closes it. */

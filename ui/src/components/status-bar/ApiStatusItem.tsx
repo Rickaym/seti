@@ -1,9 +1,9 @@
-import { useEffect, useSyncExternalStore } from 'react'
+import { useContext, useEffect, useSyncExternalStore } from 'react'
 import { ItemHint, StatusBarItem } from '@/components/status-bar/StatusBarItem'
-import { apiTone } from '@/components/status-bar/tone'
+import { useConnection, WAITING, type Connection } from '@/components/status-bar/connection'
+import { apiTone, RowContext } from '@/components/status-bar/tone'
 import { useLatency, useLink } from '@/hooks/useLatency'
 import { useNow } from '@/hooks/useNow'
-import { useSystem } from '@/hooks/useSystem'
 import { latencyProbe } from '@/lib/app-link'
 import { latencyStats } from '@/lib/latency'
 import { SLOW_FACTOR } from '@/lib/link'
@@ -11,23 +11,12 @@ import { liveStream } from '@/lib/live-stream'
 import { relativeTime } from '@/lib/time'
 import { cn } from '@/lib/utils'
 
-type Connection = 'pending' | 'up' | 'down' | 'offline'
-
 const DOT: Record<Connection, string> = {
   pending: 'bg-muted-foreground/60',
   up: 'bg-success',
+  reconnecting: 'border border-muted-foreground',
   down: 'bg-destructive',
   offline: 'border border-muted-foreground',
-}
-
-function connection(online: boolean, error: string | null, lastOk: number | null): Connection {
-  if (!online) {
-    return 'offline'
-  }
-  if (error !== null) {
-    return 'down'
-  }
-  return lastOk === null ? 'pending' : 'up'
 }
 
 function lastSeen(lastOk: number | null): string {
@@ -85,25 +74,36 @@ function ConnectionHint({ summary, slowedBy }: { summary: string; slowedBy: stri
 }
 
 export function ApiStatusItem() {
-  const { error, lastOk } = useSystem()
+  const { state, error, lastAnswer } = useConnection()
   const link = useLink()
-  const state = connection(link.online, error, lastOk)
+  const row = useContext(RowContext) !== null
   useEffect(() => latencyProbe.keepSampling(), [])
   const summaries: Record<Connection, string> = {
     pending: 'Connecting to the Seti server...',
     up: 'Connected to the Seti server.',
-    down: `The Seti server is not answering /api/system (${error ?? ''}). ${lastSeen(lastOk)}`,
+    reconnecting: `The Seti server is not answering. ${lastSeen(lastAnswer)} Every view keeps what it last showed and catches up by itself.`,
+    down: `The Seti server answers /api/system with an error (${error ?? ''}). ${lastSeen(lastAnswer)}`,
     offline: 'This browser is offline. Seti stops polling and catches up once it is back online.',
   }
+  const waiting = row ? undefined : WAITING[state]
   return (
     <StatusBarItem
       label={`API ${state}`}
       name="API"
-      tone={apiTone(error, link.online)}
+      tone={apiTone(state)}
       tooltip={<ConnectionHint summary={summaries[state]} slowedBy={link.online ? link.reason : null} />}
     >
-      <span className={cn('size-2', DOT[state])} />
-      API
+      {waiting === undefined ? (
+        <>
+          <span className={cn('size-2', DOT[state])} />
+          API
+        </>
+      ) : (
+        <>
+          <waiting.icon className="size-3" aria-hidden />
+          {waiting.text}
+        </>
+      )}
     </StatusBarItem>
   )
 }

@@ -1,5 +1,6 @@
 import { HeartPulse } from 'lucide-react'
 import { useState, type ReactNode } from 'react'
+import { useConnection, WAITING, type Connection } from '@/components/status-bar/connection'
 import {
   apiTone,
   channelsTone,
@@ -12,24 +13,21 @@ import {
   type StatusTone,
 } from '@/components/status-bar/tone'
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from '@/components/ui/sheet'
-import { useLink } from '@/hooks/useLatency'
 import { useResourceSummary } from '@/hooks/useResources'
 import { useCapabilitySummary, useChannelsSummary } from '@/hooks/useSummaries'
 import { useSystem } from '@/hooks/useSystem'
 import { cn } from '@/lib/utils'
 
-function useHealthTones(): StatusTone[] {
+function useHealthTones(connection: Connection): StatusTone[] {
   const resources = useResourceSummary().data
   const mcp = useCapabilitySummary().data
   const channels = useChannelsSummary().data
-  const system = useSystem()
-  const { online } = useLink()
-  const sandbox = system.data?.sandbox
+  const sandbox = useSystem().data?.sandbox
   return [
     resources ? resourcesTone(resources) : 'default',
     mcp ? mcpTone(mcp) : 'default',
     channels ? channelsTone(channels) : 'default',
-    apiTone(system.error, online),
+    apiTone(connection),
     sandbox ? sandboxTone(sandbox.enabled) : 'default',
   ]
 }
@@ -37,10 +35,14 @@ function useHealthTones(): StatusTone[] {
 /** On a phone the health items fold into one item that opens them as rows with their details. */
 export function HealthItem({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false)
-  const tones = useHealthTones()
-  const tone = worstTone(tones)
+  const connection = useConnection().state
+  const tones = useHealthTones(connection)
   const flagged = tones.filter((t) => t !== 'default' && t !== 'muted').length
-  const label = flagged === 0 ? 'Health: all clear' : `Health: ${String(flagged)} to check`
+  const waiting = WAITING[connection]
+  const tone = waiting !== undefined && flagged === 0 ? 'muted' : worstTone(tones)
+  const Icon = waiting?.icon ?? HeartPulse
+  const label =
+    flagged === 0 ? `Health: ${waiting?.text.toLowerCase() ?? 'all clear'}` : `Health: ${String(flagged)} to check`
   return (
     <>
       <button
@@ -57,8 +59,8 @@ export function HealthItem({ children }: { children: ReactNode }) {
           TONE[tone],
         )}
       >
-        <HeartPulse className="size-3" aria-hidden />
-        Health
+        <Icon className="size-3" aria-hidden />
+        {waiting?.text ?? 'Health'}
         {flagged > 0 && <span className="tabular-nums">{flagged}</span>}
       </button>
       <Sheet open={open} onOpenChange={setOpen}>
