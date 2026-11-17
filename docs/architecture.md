@@ -223,24 +223,26 @@ runs under bubblewrap with its own pid, network, IPC and UTS namespaces:
   the user makes with the Sandbox switch on the start page, badged in the UI and audited. The EA
   is refused, and an agent that starts another always starts it sandboxed.
 
-## Shared tools are plugins Seti writes from an approved snapshot
+## Shared tools are typed MCP tools served from an approved snapshot
 
 A shared tool is one script an agent proposed and the user allowed for every agent. The proposal
 is a `request_change` of kind `shared_tool`; `server/src/shared-tool-proposals.ts` reads the file
-when the agent asks and stores its content and SHA-256 in the request, so the card, the Allow and
-the published tool are the same bytes. Allow stores the tool in `shared_tool`, which is the
-truth, and `server/src/shared-tool-files.ts` writes it to `shared-tools/<name>-<hash>` under
-Seti's home as a Claude Code plugin: `.claude-plugin/plugin.json`, `skills/<name>/SKILL.md` and
-the script beside it, which the skill names as `${CLAUDE_SKILL_DIR}/<file>`. A new version gets a
-new folder, so every session sees a changed plugin path and starts again with it at its next turn.
-Startup writes missing folders again from the table and removes the ones no tool names.
+when the agent asks and stores its content in the request with one SHA-256 over the script and
+the definition, so the card, the Allow and the published tool are the same bytes. Allow stores the
+tool in `shared_tool`, which is the truth, and `server/src/shared-tool-files.ts` writes it to
+`shared-tools/<name>-<hash>` under Seti's home: `tool.json` with the definition and the program
+that starts the script, and the script beside it. A new version gets a new folder, so every
+session sees a changed setup and starts again with it at its next turn. Startup writes missing
+folders again from the table and removes the ones no tool names.
 
-`sharedToolPlugins` in `server/src/shared-tools.ts` adds the folders to a task's plugins beside the
-Seti defaults, and the sandbox mounts them read-only. A tool loads only when the task is sandboxed,
-the tool is on, and the task's credential carries a connection for every variable the tool needs;
-the script then finds the connection's placeholder in that variable and the egress proxy swaps in
-the value on the connection's hosts. `list_plugins` tells an agent which tools it gets and which
-variables it lacks.
+`sharedToolFolders` in `server/src/shared-tools.ts` picks the folders a task gets: the tool is on
+and the task's credential carries a connection for every variable the tool needs, on the hosts
+the tool names. The session gets one stdio MCP server named `shared`, which is Node running
+`server/src/shared-tool-server.ts` with those folders as arguments. The file imports only Node
+builtins and speaks JSON-RPC over stdio itself. Claude Code starts it, so it inherits the agent
+process's environment and, for a sandboxed agent, runs inside the sandbox, which mounts the
+folders read-only. A call checks the arguments against the schema, runs the script with them on
+stdin, and returns stdout as text, and as structured content when it is a JSON object.
 
 ## Each agent runs in a scope with memory and CPU caps
 
