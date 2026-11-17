@@ -1,28 +1,32 @@
 import { randomUUID } from 'node:crypto'
 import fs from 'node:fs'
 import path from 'node:path'
-import type { SharedToolCode } from '@seti/shared'
+import {
+  definitionText,
+  toolDefinition,
+  type SharedToolCode,
+  type SharedToolDefinition,
+  type SharedToolManifest,
+} from '@seti/shared'
 import { SHARED_TOOLS_ROOT } from './config.js'
 import { removeOwnedDir } from './owned-dirs.js'
+import { sha256 } from './task-files.js'
 
-const MANIFEST = path.join('.claude-plugin', 'plugin.json')
+const MANIFEST = 'tool.json'
 const HASH_CHARS = 12
 const READ_ONLY = 0o444
-const RUNNABLE = 0o555
 
 type Published = Pick<SharedToolCode, 'name' | 'sha256'>
 
-/** What a tool's plugin folder is written from. */
-type ToolFiles = Pick<SharedToolCode, 'name' | 'description' | 'file' | 'content' | 'sha256' | 'needs'>
+/** What a tool's folder is written from: its definition and its script. */
+export type ToolFiles = SharedToolDefinition & { content: string }
 
-/** The plugin name agents see the tool under; its skill is `seti-<name>:<name>`. */
-export const toolPluginName = (name: string) => `seti-${name}`
+/** The hash of a tool: its definition and its script, so a change to either is a new version. */
+export const toolHash = (tool: ToolFiles) => sha256(`${definitionText(tool)}\n${tool.content}`)
 
-/** One folder per published version, so a new version is a new plugin path for every session. */
+/** One folder per published version, so a new version is a new path for every session. */
 export const toolFolder = (tool: Published) =>
   path.join(SHARED_TOOLS_ROOT, `${tool.name}-${tool.sha256.slice(0, HASH_CHARS)}`)
-
-const skillDir = (tool: Pick<SharedToolCode, 'name'>) => path.join('skills', tool.name)
 
 const INTERPRETERS: Readonly<Record<string, string>> = {
   '.py': 'python3',
@@ -32,77 +36,26 @@ const INTERPRETERS: Readonly<Record<string, string>> = {
   '.cjs': 'node',
 }
 
-/** How the skill tells an agent to start the script: by its first line, else by its extension. */
-function runLine(tool: Pick<SharedToolCode, 'file' | 'content'>): string {
-  const script = `"\${CLAUDE_SKILL_DIR}/${tool.file}"`
-  if (tool.content.startsWith('#!')) {
-    return script
+/** The program that starts the script: what its first line names, else what its extension does. */
+export function runPrefix(tool: Pick<ToolFiles, 'file' | 'content'>): string[] {
+  const shebang = /^#!\s*(\S+)(?:[ \t]+(\S+))?/.exec(tool.content)
+  if (shebang !== null) {
+    return [shebang[1] ?? '', ...(shebang[2] === undefined ? [] : [shebang[2]])]
   }
   const interpreter = INTERPRETERS[path.extname(tool.file).toLowerCase()]
-  return interpreter === undefined ? script : `${interpreter} ${script}`
-}
-
-const oneLine = (text: string) => text.replace(/\s+/g, ' ').trim()
-
-/** The skill an agent reads: when to use the tool, how to run it and what it needs. */
-function skillText(tool: ToolFiles): string {
-  const needs = tool.needs.map((need) => `- \`${need.env}\`, sent to ${need.hosts.join(', ')}`)
-  const needsText =
-    needs.length === 0
-      ? []
-      : [
-          'It reads these variables, which your credential carries as Seti placeholders:',
-          '',
-          ...needs,
-          '',
-          "Seti's proxy swaps in the real values on those hosts only. Never print them or ask for the keys.",
-          '',
-        ]
-  return [
-    '---',
-    `name: ${tool.name}`,
-    `description: ${JSON.stringify(oneLine(tool.description))}`,
-    '---',
-    '',
-    `# ${tool.name}`,
-    '',
-    tool.description,
-    '',
-    'Run the script with Bash, adding its arguments:',
-    '',
-    '```',
-    runLine(tool),
-    '```',
-    '',
-    ...needsText,
-    'This is a shared tool: an agent proposed the script and the user allowed it for every agent. It runs',
-    'with your own access and nothing more. Its files are read-only; to change it, propose a new version',
-    'with request_change.',
-    '',
-  ].join('\n')
+  return interpreter === undefined ? [] : [interpreter]
 }
 
 function manifestText(tool: ToolFiles): string {
-  const manifest = {
-    name: toolPluginName(tool.name),
-    version: tool.sha256.slice(0, HASH_CHARS),
-    description: oneLine(tool.description),
-  }
+  const manifest: SharedToolManifest = { ...toolDefinition(tool), run: runPrefix(tool) }
   return `${JSON.stringify(manifest, null, 2)}\n`
 }
 
-/** The files of the tool's plugin folder, by path inside it, with the mode each is written with. */
-function folderFiles(tool: ToolFiles): { rel: string; text: string; mode: number }[] {
-  return [
-    { rel: MANIFEST, text: manifestText(tool), mode: READ_ONLY },
-    { rel: path.join(skillDir(tool), 'SKILL.md'), text: skillText(tool), mode: READ_ONLY },
-    {
-      rel: path.join(skillDir(tool), tool.file),
-      text: tool.content,
-      mode: tool.content.startsWith('#!') ? RUNNABLE : READ_ONLY,
-    },
-  ]
-}
+/** The files of the tool's folder, by name: what the tool server reads, and the script. */
+const folderFiles = (tool: ToolFiles): { name: string; text: string }[] => [
+  { name: MANIFEST, text: manifestText(tool) },
+  { name: tool.file, text: tool.content },
+]
 
 function readOrNull(file: string): string | null {
   try {
@@ -114,9 +67,9 @@ function readOrNull(file: string): string | null {
 
 /** Whether the folder holds exactly the files the published tool makes. */
 const intact = (dir: string, tool: ToolFiles) =>
-  folderFiles(tool).every(({ rel, text }) => readOrNull(path.join(dir, rel)) === text)
+  folderFiles(tool).every(({ name, text }) => readOrNull(path.join(dir, name)) === text)
 
-/** Whether the tool's plugin folder is on disk for a session to load. */
+/** Whether the tool's folder is on disk for a session to load. */
 export const toolFolderReady = (tool: Published) => fs.existsSync(path.join(toolFolder(tool), MANIFEST))
 
 async function removeFolder(dir: string): Promise<void> {
@@ -126,8 +79,8 @@ async function removeFolder(dir: string): Promise<void> {
   }
 }
 
-/** Writes the tool's plugin folder next to its final place, then moves it there in one step. */
-export async function writeToolFolder(tool: ToolFiles): Promise<string> {
+/** Writes the tool's folder next to its final place, then moves it there in one step. */
+export async function writeToolFolder(tool: ToolFiles & { sha256: string }): Promise<string> {
   const dir = toolFolder(tool)
   if (intact(dir, tool)) {
     return dir
@@ -137,9 +90,9 @@ export async function writeToolFolder(tool: ToolFiles): Promise<string> {
     await removeFolder(dir)
   }
   const staging = path.join(SHARED_TOOLS_ROOT, `staging-${randomUUID()}`)
-  for (const { rel, text, mode } of folderFiles(tool)) {
-    fs.mkdirSync(path.dirname(path.join(staging, rel)), { recursive: true })
-    fs.writeFileSync(path.join(staging, rel), text, { mode, flag: 'wx' })
+  fs.mkdirSync(staging)
+  for (const { name, text } of folderFiles(tool)) {
+    fs.writeFileSync(path.join(staging, name), text, { mode: READ_ONLY, flag: 'wx' })
   }
   fs.renameSync(staging, dir)
   return dir

@@ -1,6 +1,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import {
+  definitionText,
   formatBytes,
   SHARED_TOOL_BYTES_MAX,
   type SharedToolChange,
@@ -9,11 +10,12 @@ import {
 } from '@seti/shared'
 import { lexicalPath, reachOf } from './file-handoff.js'
 import { HttpError } from './http.js'
+import { runPrefix, toolHash } from './shared-tool-files.js'
 import { sharedTools } from './store/shared-tools.js'
-import { isHidden, openChecked, pathProblem, sha256, within } from './task-files.js'
+import { isHidden, openChecked, pathProblem, within } from './task-files.js'
 
 const FILE_NAME = /^[A-Za-z0-9][\w.+-]{0,79}$/
-const SKILL_FILE = 'skill.md'
+const MANIFEST_FILE = 'tool.json'
 
 const refuse = (status: 400 | 403 | 404 | 413, raw: string, why: string) => new HttpError(status, `${raw} ${why}`)
 
@@ -78,32 +80,21 @@ function readScript(real: string, raw: string): string {
 export async function snapshotProposal(task: Task, proposal: SharedToolProposal): Promise<SharedToolChange> {
   const real = await scriptPath(task, proposal.path)
   const file = path.basename(real)
-  if (!FILE_NAME.test(file) || file.toLowerCase() === SKILL_FILE) {
+  if (!FILE_NAME.test(file) || file.toLowerCase() === MANIFEST_FILE) {
     throw refuse(400, proposal.path, 'needs a plain file name of letters, digits, dots, hyphens and underscores')
   }
   const content = readScript(real, proposal.path)
-  const published = await sharedTools.get(proposal.name)
-  return {
-    ...proposal,
-    snapshot: {
-      file,
-      content,
-      sha256: sha256(content),
-      replaces: published === undefined ? null : { sha256: published.sha256, content: published.content },
-    },
+  if (runPrefix({ file, content }).length === 0) {
+    throw refuse(400, proposal.path, 'needs a #! first line, or a name ending in .py, .sh, .js, .mjs or .cjs')
   }
+  const published = await sharedTools.get(proposal.name)
+  const replaces =
+    published === undefined
+      ? null
+      : { sha256: published.sha256, content: published.content, definition: definitionText(published) }
+  return { ...proposal, snapshot: { file, content, sha256: toolHash({ ...proposal, file, content }), replaces } }
 }
 
-const sameNeeds = (a: SharedToolChange['needs'], b: SharedToolChange['needs']) =>
-  JSON.stringify(a) === JSON.stringify(b)
-
-/** Whether the proposal is what is published already: the same code, description and needs. */
-export async function publishedAlready(change: SharedToolChange): Promise<boolean> {
-  const published = await sharedTools.get(change.name)
-  return (
-    published?.sha256 === change.snapshot.sha256 &&
-    published.file === change.snapshot.file &&
-    published.description === change.description &&
-    sameNeeds(published.needs, change.needs)
-  )
-}
+/** Whether the proposal is what is published already: the same definition and the same code. */
+export const publishedAlready = async (change: SharedToolChange) =>
+  (await sharedTools.get(change.name))?.sha256 === change.snapshot.sha256

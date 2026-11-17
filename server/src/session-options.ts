@@ -35,7 +35,7 @@ import { reviewHook } from './review-hooks.js'
 import { mcpTargets, signedInServers } from './sandbox-mcp.js'
 import { sandboxHooks, secretDenyRules, setiHomePaths, unsandboxedHookRules, type SandboxContext } from './sandbox.js'
 import { redactSecrets } from './scrub.js'
-import { sharedToolPlugins } from './shared-tools.js'
+import { sharedToolFolders, sharedToolServer, TOOL_SERVER } from './shared-tools.js'
 import { keyStamp, sshStamp } from './ssh-files.js'
 import { allowedFor } from './store/change-requests.js'
 import { profiles } from './store/credentials.js'
@@ -101,9 +101,6 @@ export const hostLimitsEnv = (cap: MemoryCap | null): Record<string, string> => 
 export const workingDirs = (task: Task) =>
   [...new Set([...extraDirs(task), workspaceDir(task.id)])].filter((dir) => dir !== task.cwd)
 
-/** The plugins a task's session loads: Seti's defaults and its own choices, then shared tools. */
-const taskPlugins = async (task: Task) => [...(await taskPluginConfigs(task.id)), ...(await sharedToolPlugins(task))]
-
 /** Everything a session's process starts with that needs a new process when it changes. */
 async function sessionSetup(task: Task) {
   const dirs = workingDirs(task)
@@ -112,7 +109,7 @@ async function sessionSetup(task: Task) {
     ...(dirs.length === 0 ? {} : { additionalDirectories: dirs }),
     permissionMode: permissionModeOf(task),
     ...bypassLaunch(task),
-    plugins: await taskPlugins(task),
+    plugins: await taskPluginConfigs(task.id),
     systemPrompt: { type: 'preset', preset: 'claude_code', append: await systemAppend(task.id) },
   } satisfies Options
 }
@@ -160,15 +157,17 @@ const TODO_TOOLS = { CLAUDE_CODE_ENABLE_TODO_TOOLS: '1' }
 /** Claude Code runs Bash commands in the login shell, often zsh; agents write bash, so use bash. */
 const BASH_SHELL = { CLAUDE_CODE_SHELL: '/bin/bash', SHELL: '/bin/bash' }
 
-/** The task's sandbox, with its local plugins mounted read-only, or null when it runs without. */
+/** The task's sandbox, with its plugins and shared tools read-only, or null when it runs without. */
 export async function sandboxFor(task: Task): Promise<TaskSandbox | null> {
   const policy = await sandboxPolicy.get()
   if (!(policy.enabled && task.sandbox)) {
     return null
   }
-  const plugins = (await taskPlugins(task)).map((plugin) => plugin.path)
+  const plugins = (await taskPluginConfigs(task.id)).map((plugin) => plugin.path)
+  const tools = await sharedToolFolders(task)
+  const readOnly = tools.length === 0 ? plugins : [...plugins, TOOL_SERVER, ...tools]
   const memory = (await planScope(task.id, 'agent'))?.cap ?? null
-  return taskSandbox(task, { ctx: sandboxContext(), policy, readOnly: plugins, memory })
+  return taskSandbox(task, { ctx: sandboxContext(), policy, readOnly, memory })
 }
 
 const hasPipes = (child: ChildProcess): child is ChildProcess & { stdin: Writable; stdout: Readable } =>
@@ -251,6 +250,7 @@ const keyOf = async (task: Task, { permissionMode: _mode, ...setup }: SessionSet
   JSON.stringify({
     ...setup,
     mcp_denied: await taskDeniedServers(task.id),
+    shared_tools: await sharedToolFolders(task),
     mcp_borrowed: borrowedStamp(await taskBorrowedServers(task)),
     mcp_signed_in: [...signedInServers()].toSorted((a, b) => a.localeCompare(b, 'en')),
     mcp_tokens: [...tokenServers()].toSorted((a, b) => a.localeCompare(b, 'en')),
@@ -387,7 +387,10 @@ async function optionsOf(task: Task, abortController: AbortController, setup: Se
     perTaskStopAffordance: true,
     settingSources: ['user', 'project', 'local'],
     ...sandbox,
-    ...withInProcessServers(task, 'mcpServers' in sandbox ? sandbox.mcpServers : {}),
+    ...withInProcessServers(task, {
+      ...('mcpServers' in sandbox ? sandbox.mcpServers : {}),
+      ...sharedToolServer(await sharedToolFolders(task)),
+    }),
     settings: { ...sandbox.settings, ...compact.settings },
     hooks: { ...sandbox.hooks, PreCompact: [compactHook(task.id)] },
     env: {

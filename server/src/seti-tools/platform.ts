@@ -19,7 +19,7 @@ import { withSignIn } from '../mcp-sign-in.js'
 import { changeNotificationSettings, notificationStatus } from '../notifications.js'
 import { pluginCatalog, removeDefaultPlugin } from '../plugins.js'
 import { sandboxStatus } from '../sandbox-status.js'
-import { setSharedToolEnabled, sharedToolsFor } from '../shared-tools.js'
+import { sharedToolsFor } from '../shared-tools.js'
 import { sshStatus } from '../ssh.js'
 import { deleteStaleFolders, staleFolders } from '../stale-folders.js'
 import { updateTask } from '../task-actions.js'
@@ -65,20 +65,21 @@ const listPlugins = setiTool({
   description:
     "List Seti's default plugin folders and the Claude Code plugins installed, with what each adds, and the " +
     'shared tools: scripts agents proposed and the user allowed for every agent. Each shared tool says whether ' +
-    'you get it as a skill and, when not, the variables your credential lacks; ask for one with ' +
+    'you have it, under which tool name, and when not, the variables your credential lacks; ask for one with ' +
     'request_change, kind api_key, and propose a script of your own with kind shared_tool.',
   input: {},
   run: async (_args, ctx) => {
     const listing = await pluginCatalog.list(false)
     return {
       shared_tools: (await sharedToolsFor(ctx.caller)).map(
-        ({ name, description, needs, enabled, available, missing, why, skill }) => ({
+        ({ name, description, needs, writes, enabled, available, missing, why, tool }) => ({
           name,
           description,
           needs,
+          writes,
           enabled,
           available,
-          ...(available ? { skill } : { missing, why }),
+          ...(available ? { tool } : { missing, why }),
         }),
       ),
       defaults: listing.defaults.map(({ id, name, path, version, enabled, components, problem }) => ({
@@ -106,18 +107,6 @@ const removePlugin = setiTool({
     const plugin = byPath ?? pickOne(all, ref, 'default plugin', (p) => [p.id, p.name])
     await removeDefaultPlugin(plugin.id)
     return done(`Removed the default plugin ${plugin.name}.`)
-  },
-})
-
-const disableTool = setiTool({
-  name: 'disable_tool',
-  description:
-    'Turn a shared tool off for every agent, for one that misbehaves; its code stays in Seti and agents lose ' +
-    'its skill from their next turn. Only the user turns it back on or removes it.',
-  input: { tool: z.string().trim().min(1).describe("The shared tool's name, as list_plugins shows it.") },
-  run: async ({ tool }) => {
-    await setSharedToolEnabled(tool, false)
-    return done(`Turned the shared tool ${tool} off for every agent.`)
   },
 })
 
@@ -325,7 +314,6 @@ const setNotifications = setiTool({
 export const PLATFORM_TOOLS = [
   listPlugins,
   removePlugin,
-  disableTool,
   listMcpServers,
   removeMcpServerTool,
   reconnectMcpServerTool,

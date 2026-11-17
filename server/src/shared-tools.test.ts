@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
 import fs from 'node:fs'
 import os from 'node:os'
@@ -5,33 +6,49 @@ import path from 'node:path'
 import {
   auditQuery,
   SHARED_TOOL_BYTES_MAX,
+  toolInput,
   type ChangeRequest,
   type SetiControlLevel,
   type SharedToolChange,
+  type SharedToolDefinition,
   type Task,
 } from '@seti/shared'
 import { describe, expect, it } from 'vitest'
 import { asAgent } from './access.js'
 import { createApp } from './app.js'
+import { findBinary } from './binaries.js'
 import { answerChangeRequest } from './change-requests.js'
-import { SHARED_TOOLS_ROOT } from './config.js'
+import { SETI_HOME, SHARED_TOOLS_ROOT } from './config.js'
 import { createConnectionPlaceholder, setConnectionProfiles } from './connections.js'
 import { messages, tasks } from './db.js'
+import { isOutward } from './outward.js'
+import { permissionSettings, sandboxFor, sessionOptions, setupKey } from './session-options.js'
 import { SETI_TOOLS } from './seti-tools/catalog.js'
 import { REQUEST_TOOLS } from './seti-tools/requests.js'
 import { callSetiTool } from './seti-tools/server.js'
-import { toolFolder } from './shared-tool-files.js'
+import { toolFolder, toolHash } from './shared-tool-files.js'
 import {
   removeSharedTool,
   setSharedToolEnabled,
-  sharedToolPlugins,
+  sharedToolFolders,
   syncSharedTools,
+  TOOL_SERVER,
   toolReach,
 } from './shared-tools.js'
 import { auditEvents } from './store/audit.js'
 import { sharedTools } from './store/shared-tools.js'
-import { sha256 } from './task-files.js'
+import { removeTaskSandbox } from './task-sandbox.js'
 import { EA_AUTH, USER_AUTH } from './test-auth.js'
+
+const bwrapWorks = (() => {
+  try {
+    findBinary('socat')
+    execFileSync(findBinary('bwrap'), ['--unshare-user', '--unshare-net', '--ro-bind', '/', '/', 'true'])
+    return true
+  } catch {
+    return false
+  }
+})()
 
 const app = createApp()
 const [requestChange] = REQUEST_TOOLS
@@ -73,9 +90,29 @@ async function call(tool: string, caller: Task, args: object) {
   return { text, isError: 'isError' in result, json: (): unknown => JSON.parse(text) }
 }
 
+const INPUT = {
+  type: 'object',
+  properties: { customer: { type: 'string', description: 'The customer id.' } },
+  required: ['customer'],
+}
+
+/** The hash Seti gives a published tool: its definition and its script together. */
+const hashOf = (name: string, content: string, fields: Partial<SharedToolDefinition> = {}) =>
+  toolHash({
+    name,
+    description: DESCRIPTION,
+    input: toolInput.parse(INPUT),
+    writes: false,
+    timeout_seconds: 120,
+    needs: [],
+    file: 'invoices.py',
+    content,
+    ...fields,
+  })
+
 const propose = async (caller: Task, change: object) =>
   call(requestChange?.name ?? '', caller, {
-    change: { kind: 'shared_tool', description: DESCRIPTION, ...change },
+    change: { kind: 'shared_tool', description: DESCRIPTION, input: INPUT, writes: false, ...change },
     reason: 'Other agents keep asking me to look invoices up for them.',
   })
 
@@ -115,16 +152,22 @@ describe('proposing a shared tool', () => {
     expect(request.change).toMatchObject({
       name: 'invoices',
       needs: [],
-      snapshot: { file: 'invoices.py', content: body, sha256: sha256(body), replaces: null },
+      input: INPUT,
+      writes: false,
+      timeout_seconds: 120,
+      snapshot: { file: 'invoices.py', content: body, sha256: hashOf('invoices', body), replaces: null },
     })
-    expect(request.flags).toEqual(['Every sandboxed agent will be able to run this'])
+    expect(request.flags).toEqual([
+      'Every agent will be able to run this',
+      'An agent without the sandbox runs it with your access to this machine',
+    ])
     expect((await tasks.get(caller.id))?.blocked).toBe('Asks for the shared tool invoices')
     const event = await lastAudit('shared_tool.proposed')
     expect(event).toMatchObject({
       actor: 'agent',
       subject_type: 'shared_tool',
       subject_id: 'invoices',
-      detail: { name: 'invoices', sha256: sha256(body), task_id: caller.id, request_id: request.id },
+      detail: { name: 'invoices', sha256: hashOf('invoices', body), task_id: caller.id, request_id: request.id },
     })
     expect(JSON.stringify(event)).not.toContain('secret-free body')
 
@@ -141,7 +184,7 @@ describe('proposing a shared tool', () => {
       path: script(caller, 'ledger.sh', 'curl -H "x-key: $LEDGER_KEY" https://api.ledger.test/\n'),
       needs: [{ env: 'LEDGER_KEY', hosts: ['api.ledger.test'] }],
     })
-    expect(request.flags).toEqual(['Every sandboxed agent whose credential has LEDGER_KEY will be able to run this'])
+    expect(request.flags).toContain('Every agent whose credential has LEDGER_KEY will be able to run this')
   })
 
   it('refuses a script that is too large, a symlink, a folder and a path outside the agent', async () => {
@@ -166,7 +209,7 @@ describe('proposing a shared tool', () => {
     expect((await propose(caller, { name: 'gone', path: 'gone.py' })).text).toContain('does not exist')
   })
 
-  it('refuses text that is not UTF-8, extra fields, a value and a description with backticks', async () => {
+  it('refuses text that is not UTF-8, extra fields, a value and a script with no way to start', async () => {
     const caller = await newTask()
     fs.writeFileSync(path.join(caller.cwd, 'binary.py'), Buffer.from([0xff, 0xfe, 0x00, 0x41]))
     expect((await propose(caller, { name: 'binary', path: 'binary.py' })).text).toContain('not UTF-8 text')
@@ -175,8 +218,8 @@ describe('proposing a shared tool', () => {
     const keyed = { env: 'PLAIN_KEY', hosts: ['api.plain.test'], value: 'sk-live-123' }
     expect((await propose(caller, { name: 'plain', path: file, needs: [keyed] })).isError).toBe(true)
     expect((await propose(caller, { name: 'Plain Tool', path: file })).isError).toBe(true)
-    const injected = await propose(caller, { name: 'plain', path: file, description: `${DESCRIPTION} !\`id\`` })
-    expect(injected.text).toContain('without backticks')
+    script(caller, 'notes.txt', 'no way to start this\n')
+    expect((await propose(caller, { name: 'plain', path: 'notes.txt' })).text).toContain('needs a #! first line')
     expect(await sharedTools.get('plain')).toBeUndefined()
   })
 
@@ -210,30 +253,37 @@ describe('answering a proposal', () => {
     })
   })
 
-  it('publishes the snapshot as a plugin folder with a skill and the script, and tells the agent', async () => {
+  it('publishes the snapshot as a folder with tool.json and the script, and tells the agent', async () => {
     const body = '#!/usr/bin/env python3\nprint("published")\n'
     const needs = [{ env: 'BILLING_KEY', hosts: ['api.billing.test'] }]
     const { name, caller, request } = await published(body, needs)
     const tool = await sharedTools.get(name)
-    expect(tool).toMatchObject({ file: 'invoices.py', sha256: sha256(body), enabled: true, needs })
+    const hash = hashOf(name, body, { needs })
+    expect(tool).toMatchObject({ file: 'invoices.py', sha256: hash, enabled: true, needs, writes: false })
     expect(tool).toMatchObject({ proposer_task_id: caller.id, proposer_title: caller.title })
-    const dir = toolFolder({ name, sha256: sha256(body) })
+    const dir = toolFolder({ name, sha256: hash })
     expect(path.dirname(dir)).toBe(SHARED_TOOLS_ROOT)
-    const manifest = JSON.parse(fs.readFileSync(path.join(dir, '.claude-plugin', 'plugin.json'), 'utf8')) as object
-    expect(manifest).toMatchObject({ name: `seti-${name}` })
-    const skill = fs.readFileSync(path.join(dir, 'skills', name, 'SKILL.md'), 'utf8')
-    expect(skill).toContain(`---\nname: ${name}\ndescription: ${JSON.stringify(DESCRIPTION)}\n---\n`)
-    expect(skill).toContain('"${CLAUDE_SKILL_DIR}/invoices.py"')
-    expect(skill).toContain('`BILLING_KEY`, sent to api.billing.test')
-    const scriptFile = path.join(dir, 'skills', name, 'invoices.py')
+    expect(new Set(fs.readdirSync(dir))).toEqual(new Set(['invoices.py', 'tool.json']))
+    const manifest = JSON.parse(fs.readFileSync(path.join(dir, 'tool.json'), 'utf8')) as object
+    expect(manifest).toEqual({
+      name,
+      description: DESCRIPTION,
+      input: INPUT,
+      writes: false,
+      timeout_seconds: 120,
+      needs,
+      file: 'invoices.py',
+      run: ['/usr/bin/env', 'python3'],
+    })
+    const scriptFile = path.join(dir, 'invoices.py')
     expect(fs.readFileSync(scriptFile, 'utf8')).toBe(body)
-    expect(fs.statSync(scriptFile).mode & 0o777).toBe(0o555)
+    expect(fs.statSync(scriptFile).mode & 0o777).toBe(0o444)
 
     const event = await lastAudit('shared_tool.allowed')
     expect(event).toMatchObject({
       actor: 'user',
       subject_id: name,
-      detail: { name, sha256: sha256(body), task_id: caller.id, request_id: request.id },
+      detail: { name, sha256: hash, task_id: caller.id, request_id: request.id },
     })
     expect(JSON.stringify(event)).not.toContain('published')
     const told = (await messages.page(caller.id, 20)).messages.flatMap((row) =>
@@ -248,58 +298,93 @@ describe('answering a proposal', () => {
     const { name, caller } = await published(first)
     const second = 'print("one")\nprint("two")\n'
     const update = await filed(caller, { name, path: script(caller, 'invoices.py', second) })
-    expect(update.change.snapshot.replaces).toEqual({ sha256: sha256(first), content: first })
+    expect(update.change.snapshot.replaces).toMatchObject({ sha256: hashOf(name, first), content: first })
+    expect(update.change.snapshot.replaces?.definition).toContain('"writes": false')
     expect(update.flags).toContain(`Replaces the published ${name}`)
     const other = await newTask()
     const stale = await filed(other, { name, path: script(other, 'invoices.py', 'print("other")\n') })
 
     expect((await answer(caller, update.id, 'allow')).status).toBe(200)
-    expect((await sharedTools.get(name))?.sha256).toBe(sha256(second))
-    expect(fs.existsSync(toolFolder({ name, sha256: sha256(second) }))).toBe(true)
-    expect(fs.existsSync(toolFolder({ name, sha256: sha256(first) }))).toBe(false)
+    expect((await sharedTools.get(name))?.sha256).toBe(hashOf(name, second))
+    expect(fs.existsSync(toolFolder({ name, sha256: hashOf(name, second) }))).toBe(true)
+    expect(fs.existsSync(toolFolder({ name, sha256: hashOf(name, first) }))).toBe(false)
 
     const refused = await answer(other, stale.id, 'allow')
     expect(refused.status).toBe(409)
     expect(await refused.text()).toContain('changed after the agent asked')
-    expect((await sharedTools.get(name))?.sha256).toBe(sha256(second))
+    expect((await sharedTools.get(name))?.sha256).toBe(hashOf(name, second))
+
+    const sameCode = await filed(caller, { name, path: 'invoices.py', writes: true })
+    expect(sameCode.change.snapshot.sha256).toBe(hashOf(name, second, { writes: true }))
+    expect(sameCode.change.snapshot.replaces?.content).toBe(second)
+    expect((await answer(caller, sameCode.id, 'allow')).status).toBe(200)
+    expect(await sharedTools.get(name)).toMatchObject({ writes: true, sha256: sameCode.change.snapshot.sha256 })
+    expect(isOutward(`mcp__shared__${name}`, {})).toBe(true)
     await sharedTools.remove(name)
+  })
+
+  it.each([
+    ['a $ref', { type: 'object', properties: { a: { $ref: 'https://schemas.example.com/a.json' } } }],
+    ['an unknown keyword', { type: 'object', properties: { a: { type: 'string', pattern: '.*' } } }],
+    ['a required name with no property', { type: 'object', properties: {}, required: ['a'] }],
+    ['a top level that is not an object', { type: 'string' }],
+    [
+      'arguments nested too deep',
+      {
+        type: 'object',
+        properties: {
+          a: {
+            type: 'array',
+            items: { type: 'array', items: { type: 'array', items: { type: 'array', items: { type: 'string' } } } },
+          },
+        },
+      },
+    ],
+  ])('refuses an argument schema with %s', async (_label, input) => {
+    const caller = await newTask()
+    const result = await propose(caller, { name: 'schema', path: script(caller, 'schema.py', 'print(5)\n'), input })
+    expect(result.isError).toBe(true)
   })
 })
 
 describe('which agents load a shared tool', () => {
   const need = [{ env: 'REACH_KEY', hosts: ['api.reach.test'] }]
+  const carries = (hosts: string[]) => [
+    { env: 'OTHER', hosts: [] },
+    { env: 'REACH_KEY', hosts },
+  ]
 
   it.each([
-    ['no needs', { enabled: true, needs: [] }, { sandboxed: true, envs: [] }, true],
-    ['needs met', { enabled: true, needs: need }, { sandboxed: true, envs: ['OTHER', 'REACH_KEY'] }, true],
-    ['needs missing', { enabled: true, needs: need }, { sandboxed: true, envs: ['OTHER'] }, false],
-    ['unsandboxed', { enabled: true, needs: [] }, { sandboxed: false, envs: [] }, false],
-    ['disabled', { enabled: false, needs: [] }, { sandboxed: true, envs: [] }, false],
-  ])('%s', (_label, tool, agent, available) => {
-    expect(toolReach(tool, agent).available).toBe(available)
+    ['no needs', { enabled: true, needs: [] }, [], true],
+    ['needs met', { enabled: true, needs: need }, carries(['api.reach.test']), true],
+    ['needs met by a wildcard', { enabled: true, needs: need }, carries(['*.reach.test']), true],
+    ['needs missing', { enabled: true, needs: need }, [{ env: 'OTHER', hosts: [] }], false],
+    ['the variable on other hosts', { enabled: true, needs: need }, carries(['api.other.test']), false],
+    ['turned off', { enabled: false, needs: [] }, [], false],
+  ])('%s', (_label, tool, carried, available) => {
+    expect(toolReach(tool, carried).available).toBe(available)
   })
 
   it('names the variables an agent lacks', () => {
-    expect(toolReach({ enabled: true, needs: need }, { sandboxed: true, envs: [] })).toMatchObject({
+    expect(toolReach({ enabled: true, needs: need }, [])).toMatchObject({
       missing: ['REACH_KEY'],
       why: expect.stringContaining('request_change') as string,
     })
   })
 
-  it('loads a tool with needs once the credential carries the connection, and lists what is missing', async () => {
+  it('loads a tool with needs once the credential carries the connection, sandboxed or not', async () => {
     const env = `LOAD_KEY_${randomUUID().slice(0, 6).toUpperCase()}`
     const { name, caller } = await published('print("load")\n', [{ env, hosts: ['api.load.test'] }])
     const open = await published('print("open")\n')
     const dir = toolFolder((await sharedTools.get(name)) ?? { name, sha256: '' })
-    const paths = async (task: Task) => (await sharedToolPlugins(task)).map((plugin) => plugin.path)
-    expect(await paths(caller)).not.toContain(dir)
-    expect(await paths(caller)).toContain(toolFolder({ name: open.name, sha256: sha256('print("open")\n') }))
+    const openDir = toolFolder({ name: open.name, sha256: hashOf(open.name, 'print("open")\n') })
+    expect(await sharedToolFolders(caller)).toEqual([openDir])
     const listing = await call('list_plugins', caller, {})
     const listed = (listing.json() as { shared_tools: { name: string }[] }).shared_tools
     expect(listed.find((tool) => tool.name === name)).toMatchObject({ available: false, missing: [env] })
     expect(listed.find((tool) => tool.name === open.name)).toMatchObject({
       available: true,
-      skill: `seti-${open.name}:${open.name}`,
+      tool: `mcp__shared__${open.name}`,
     })
 
     const connection = await createConnectionPlaceholder(
@@ -307,36 +392,93 @@ describe('which agents load a shared tool', () => {
       'user',
     )
     await setConnectionProfiles(connection.id, [caller.profile_id])
-    expect(await paths(caller)).toContain(dir)
-    expect(await paths(await newTask('self', false))).toEqual([])
+    expect(await sharedToolFolders(caller)).toContain(dir)
+    expect(await sharedToolFolders(await newTask('self', false))).toContain(dir)
 
     fs.rmSync(dir, { recursive: true })
-    expect(await paths(caller)).not.toContain(dir)
+    expect(await sharedToolFolders(caller)).not.toContain(dir)
     await syncSharedTools()
-    expect(await paths(caller)).toContain(dir)
+    expect(await sharedToolFolders(caller)).toContain(dir)
     await sharedTools.remove(name)
     await sharedTools.remove(open.name)
   })
 })
 
+describe('how a session gets its shared tools', () => {
+  it('offers them through one stdio MCP server that Claude Code starts, and restarts on a change', async () => {
+    const unsandboxed = await newTask('self', false)
+    const before = await setupKey(unsandboxed)
+    expect((await sessionOptions(unsandboxed, new AbortController())).mcpServers).not.toHaveProperty('shared')
+    const { name } = await published('#!/bin/sh\ncat\n')
+    const dir = toolFolder((await sharedTools.get(name)) ?? { name, sha256: '' })
+    const options = await sessionOptions(unsandboxed, new AbortController())
+    expect(options.mcpServers?.shared).toEqual({ type: 'stdio', command: process.execPath, args: [TOOL_SERVER, dir] })
+    expect(options.spawnClaudeCodeProcess).toBeUndefined()
+    expect(await setupKey(unsandboxed)).not.toBe(before)
+    const rules = await permissionSettings(unsandboxed)
+    expect(rules.allow).not.toContain('mcp__shared')
+    expect((await permissionSettings(await newTask())).allow).toContain('mcp__shared')
+    await sharedTools.remove(name)
+  })
+
+  it.skipIf(!bwrapWorks)(
+    'starts the server of a sandboxed agent through the sandbox wrapper, where its scripts run',
+    async () => {
+      const body = [
+        '#!/bin/sh',
+        'cat > /dev/null',
+        'echo "host=$(cat /proc/sys/kernel/hostname)"',
+        'touch "$(dirname "$0")/written" 2> /dev/null && echo "wrote" || echo "read-only"',
+        `ls "${SETI_HOME}/credentials" > /dev/null 2>&1 && echo "sees-secrets" || echo "no-secrets"`,
+        '',
+      ].join('\n')
+      const { name } = await published(body)
+      const dir = toolFolder((await sharedTools.get(name)) ?? { name, sha256: '' })
+      fs.mkdirSync(path.join(SETI_HOME, 'credentials'), { recursive: true })
+      const task = await newTask()
+      const options = await sessionOptions(task, new AbortController())
+      const server = options.mcpServers?.shared
+      expect(server).toEqual({ type: 'stdio', command: process.execPath, args: [TOOL_SERVER, dir] })
+      expect(options.spawnClaudeCodeProcess).toBeTypeOf('function')
+
+      const sandbox = await sandboxFor(task)
+      const wrapped = sandbox?.command(process.execPath, [TOOL_SERVER, dir])
+      expect(path.basename(wrapped?.program ?? '')).not.toBe(path.basename(process.execPath))
+      expect(wrapped?.args.join(' ')).toContain(`--ro-bind ${dir} ${dir}`)
+
+      const child = sandbox?.spawn(process.execPath, [TOOL_SERVER, dir], { stdin: 'pipe' })
+      let out = ''
+      child?.stdout?.on('data', (chunk: Buffer) => (out += chunk.toString()))
+      const request = { jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name, arguments: { customer: 'c1' } } }
+      child?.stdin?.end(`${JSON.stringify(request)}\n`)
+      await new Promise((resolve) => child?.on('exit', resolve))
+      const reply = JSON.parse(out) as { result: { content: { text: string }[]; isError: boolean } }
+      expect(reply.result.isError).toBe(false)
+      expect(reply.result.content[0]?.text.trim().split('\n')).toEqual(['host=seti-sandbox', 'read-only', 'no-secrets'])
+      expect(fs.existsSync(path.join(dir, 'written'))).toBe(false)
+      await removeTaskSandbox(task.id)
+      await sharedTools.remove(name)
+    },
+  )
+})
+
 describe('managing shared tools', () => {
-  it('lets the EA and agents with Full turn one off, and only the user turn it on', async () => {
+  it('lets the EA turn one off, only the user turn it on, and agents do neither', async () => {
     const { name } = await published()
     const full = await newTask('full')
-    expect((await call('disable_tool', await newTask('self'), { tool: name })).isError).toBe(true)
+    expect(SETI_TOOLS.map((tool) => tool.name)).not.toContain('disable_tool')
+    await expect(asAgent(full, async () => setSharedToolEnabled(name, false))).rejects.toThrow(/Agents cannot/)
     expect((await sharedTools.get(name))?.enabled).toBe(true)
-    expect((await call('disable_tool', full, { tool: name })).isError).toBe(false)
+    expect((await send('PATCH', `/shared-tools/${name}`, { enabled: false }, EA_AUTH)).status).toBe(200)
     expect((await sharedTools.get(name))?.enabled).toBe(false)
-    expect(await lastAudit('shared_tool.disabled')).toMatchObject({ actor: 'agent', detail: { name } })
-    expect(await sharedToolPlugins(full)).toEqual([])
+    expect(await lastAudit('shared_tool.disabled')).toMatchObject({ actor: 'user', detail: { name, via: 'ea' } })
+    expect(await sharedToolFolders(full)).toEqual([])
 
     expect((await send('PATCH', `/shared-tools/${name}`, { enabled: true }, EA_AUTH)).status).toBe(403)
     await expect(asAgent(full, async () => setSharedToolEnabled(name, true))).rejects.toThrow(/Agents cannot/)
     expect((await sharedTools.get(name))?.enabled).toBe(false)
     expect((await send('PATCH', `/shared-tools/${name}`, { enabled: true })).status).toBe(200)
     expect(await lastAudit('shared_tool.enabled')).toMatchObject({ actor: 'user', detail: { name } })
-    expect((await send('PATCH', `/shared-tools/${name}`, { enabled: false }, EA_AUTH)).status).toBe(200)
-    expect((await sharedTools.get(name))?.enabled).toBe(false)
     await sharedTools.remove(name)
   })
 
@@ -345,7 +487,7 @@ describe('managing shared tools', () => {
     const { name } = await published(body)
     const list = (await (await send('GET', '/shared-tools')).json()) as { data: Record<string, unknown>[] }
     const row = list.data.find((tool) => tool.name === name)
-    expect(row).toMatchObject({ name, sha256: sha256(body), bytes: body.length })
+    expect(row).toMatchObject({ name, sha256: hashOf(name, body), bytes: body.length, input: INPUT })
     expect(row).not.toHaveProperty('content')
     const one = (await (await send('GET', `/shared-tools/${name}`)).json()) as { data: object }
     expect(one.data).toMatchObject({ name, content: body })

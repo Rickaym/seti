@@ -51,7 +51,6 @@ const ONLY_FOR_AGENTS: Record<string, string> = {
   read_transcript: "The EA reads a time window with get_task's window, which keeps it under its tool cap.",
   search_knowledge: "The EA searches notes with search_seti's knowledge scope, which keeps it under its tool cap.",
   verify_knowledge: 'A check runs the verify step in a repo, which the EA has no shell for.',
-  disable_tool: 'The EA turns a shared tool off with set_plugin_enabled, which agents lack since it turns plugins on.',
 }
 
 /**

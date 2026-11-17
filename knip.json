@@ -8,6 +8,7 @@
       "entry": [
         "src/pollers/worker.ts",
         "src/reminders/runner.ts",
+        "src/shared-tool-server.ts",
         "src/mods/logic/runner.ts",
         "src/demo/main.ts",
         "src/demo/agent.ts",

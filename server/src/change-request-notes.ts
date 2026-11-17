@@ -1,8 +1,7 @@
-import { describeChange, hostEntry, type ChangeRequest, type SetiInput } from '@seti/shared'
+import { describeChange, hostEntry, sharedToolCallName, type ChangeRequest, type SetiInput } from '@seti/shared'
 import { audit } from './audit.js'
 import { tasks } from './db.js'
 import { deliverInputs } from './inputs.js'
-import { toolPluginName } from './shared-tool-files.js'
 import { auditTool } from './shared-tools.js'
 import { refreshBlocked } from './task-blocked.js'
 
@@ -37,8 +36,8 @@ function allowedText(request: ChangeRequest, keySet: boolean): { title: string; 
       return {
         title: `The user published your shared tool ${change.name}`,
         body:
-          `Sandboxed agents get it as the skill ${toolPluginName(change.name)}:${change.name} from their next ` +
-          'turn, each only when its credential has the variables the tool needs.',
+          `Agents get it as the tool ${sharedToolCallName(change.name)} from their next turn, each only ` +
+          'when its credential has the variables the tool needs.',
       }
   }
 }

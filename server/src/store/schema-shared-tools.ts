@@ -1,6 +1,7 @@
 /**
  * Scripts agents proposed and the user allowed for every agent. The row is the published tool:
- * its code, its hash and the variables it needs; its plugin folder on disk is written from it.
+ * its code, its arguments, its hash and the variables it needs; its folder on disk is written
+ * from it.
  */
 export const SHARED_TOOLS = `
 CREATE TABLE shared_tool (
@@ -10,6 +11,9 @@ CREATE TABLE shared_tool (
   content TEXT NOT NULL,
   sha256 TEXT NOT NULL,
   needs TEXT NOT NULL DEFAULT '[]',
+  input TEXT NOT NULL,
+  writes BOOLEAN NOT NULL,
+  timeout_seconds INTEGER NOT NULL,
   enabled BOOLEAN NOT NULL DEFAULT true,
   proposer_task_id TEXT REFERENCES task(id) ON DELETE SET NULL,
   proposer_title TEXT NOT NULL,

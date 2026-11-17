@@ -1624,7 +1624,7 @@ class SettingsTools:
     async def _remove_shared_tool(self, args: Mapping[str, Any], name: str) -> ToolResult:
         if not await self._cleared(args, gate_key("remove_plugin", "shared_tool", name)):
             effect = (
-                f"This removes the shared tool {name}: agents lose its skill from their next turn and "
+                f"This removes the shared tool {name}: agents lose it from their next turn and "
                 "its code is deleted from Seti. Only a new proposal the user allows brings it back."
             )
             return ask("remove_plugin", args, effect, f"remove shared tool {name}")
