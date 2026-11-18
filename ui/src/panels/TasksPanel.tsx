@@ -296,7 +296,12 @@ export function TasksPanel(props: { selectedId: string | null; subId: string | n
 
   return (
     <div className="flex h-full min-h-0">
-      <ListPane detailOpen={selectedId !== null} pane={PANES.agents} label="Resize agent list">
+      <ListPane
+        detailOpen={selectedId !== null}
+        pane={PANES.agents}
+        label="Resize agent list"
+        className={place.listHidden ? 'md:hidden' : ''}
+      >
         <AgentsHeader
           narrow={narrow}
           searching={showArchived ? null : searching}
