@@ -154,9 +154,10 @@ private key off the host. The sandbox model is in [Architecture](architecture.md
   task, tool, call summary and the rules the request offered, and noted in the agent's transcript.
   Once four fifths of the time has passed, and at least five minutes before the end, the agent's
   reason line ends with "times out soon", which pushes one more needs-you notification. A request
-  whose session is gone (the agent stopped, was archived, or Seti restarted) closes as cancelled
-  with nothing sent; startup arms whatever is still pending from its stored deadline and ends
-  what is overdue. The setting is the user's: `PUT /api/permissions/timeout` refuses the EA in the
+  whose session is gone (the agent stopped or was archived) closes as cancelled with nothing sent.
+  A request a restart of Seti kept runs on the same clock: startup arms whatever is still pending
+  from its stored deadline and ends what is overdue, and that denial resumes the agent as the
+  user's answer would. The setting is the user's: `PUT /api/permissions/timeout` refuses the EA in the
   route and agents' Seti tools and mods in `setPermissionTimeout` (`refuseAgent`), and a change is
   audited as `system.permission_timeout_changed` with the old and new value. A new value applies
   to requests already waiting, counted from when each was raised, so one older than it is denied
