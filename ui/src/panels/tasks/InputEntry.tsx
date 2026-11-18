@@ -1,15 +1,18 @@
-import type {
-  AgentInput,
-  AgentInputKind,
-  ChannelInput,
-  EaNoticeSeverity,
-  InputSubtask,
-  PrInput,
-  PrInputKind,
-  SetiInput,
-  TaskInput,
-  TeamInput,
-  WorkspaceInput,
+import {
+  QUIET_LABELS,
+  quietReason,
+  type AgentInput,
+  type AgentInputKind,
+  type ChannelInput,
+  type EaNoticeSeverity,
+  type InputSubtask,
+  type PrInput,
+  type PrInputKind,
+  type PrQuietReason,
+  type SetiInput,
+  type TaskInput,
+  type TeamInput,
+  type WorkspaceInput,
 } from '@seti/shared'
 import {
   AlertTriangle,
@@ -47,8 +50,26 @@ const KIND_STYLES: Record<PrInputKind, { icon: LucideIcon; className: string }> 
   closed: { icon: GitPullRequestClosed, className: 'border-muted-foreground text-muted-foreground' },
 }
 
-/** Marks an update the agent has not read yet, or one the user dismissed unread. */
+const QUIET_TIPS: Record<PrQuietReason, string> = {
+  own_action: 'The agent did this itself, so Seti recorded it without telling the agent',
+  repeat: 'The agent already has this result for the same commit, so Seti only recorded it',
+  nothing_pending: 'Nothing waited for this pass: it started no turn and goes with the next one',
+}
+
+/** Marks an update the agent has not read yet, one the user dismissed, or one Seti only recorded. */
 function StateBadge({ input, queued }: { input: TaskInput; queued: boolean }) {
+  const quiet = quietReason(input)
+  if (quiet !== undefined) {
+    return (
+      <span
+        className="shrink-0 bg-muted px-1.5 py-0.5 text-2xs font-semibold text-muted-foreground uppercase"
+        title={QUIET_TIPS[quiet]}
+        data-quiet={quiet}
+      >
+        {QUIET_LABELS[quiet]}
+      </span>
+    )
+  }
   if (input.dismissed_at !== undefined) {
     return (
       <span className="shrink-0 bg-muted px-1.5 py-0.5 text-2xs font-semibold text-muted-foreground uppercase">
@@ -312,9 +333,12 @@ function SourceEntry({ taskId, input, queued }: { taskId: string; input: TaskInp
   }
 }
 
-/** An update from outside the conversation, marked while unread or once dismissed. */
+/** An update from outside the conversation, marked while unread, once dismissed or when quiet. */
 export function InputEntry({ taskId, input, queued }: { taskId: string; input: TaskInput; queued: boolean }) {
   const entry = <SourceEntry taskId={taskId} input={input} queued={queued} />
+  if (quietReason(input) !== undefined) {
+    return <div className="opacity-60">{entry}</div>
+  }
   return input.dismissed_at === undefined ? (
     entry
   ) : (

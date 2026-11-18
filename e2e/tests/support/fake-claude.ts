@@ -4,6 +4,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { FallbackPlayer } from './fake-fallback.js'
+import { Inbox, Outbox, type Message, type UserMessage } from './fake-inbox.js'
 import { InProcessClient, type SdkServer } from './fake-mcp.js'
 import { actPermission, PERMISSION_PROMPT, PLAN_APPROVAL_PROMPT, type CanUseTool } from './fake-permission.js'
 import { actQuestions, QUESTION_PROMPT } from './fake-question.js'
@@ -46,13 +47,6 @@ const FAIL_REASON = /fail this turn with (.+)$/
 /** Prompts that failed once; the server keeps this module, so a retry of one succeeds. */
 const failedOnce = new Set<string>()
 
-type Message = Record<string, unknown> & { type: string }
-
-interface UserMessage {
-  message: { content: string | { type: string; text?: string }[] }
-  uuid?: string
-}
-
 interface SpawnOptions {
   command: string
   args: string[]
@@ -84,54 +78,6 @@ const text = (m: UserMessage) =>
     ? m.message.content
     : m.message.content.map((block) => block.text ?? '').join('')
 
-/** Lets one waiter sleep until a message arrives or the session ends. */
-class Outbox {
-  private readonly items: Message[] = []
-  private wake: (() => void) | null = null
-  private failure: Error | null = null
-  ended = false
-
-  push(m: Message): void {
-    this.items.push(m)
-    this.poke()
-  }
-
-  end(): void {
-    this.ended = true
-    this.poke()
-  }
-
-  /** Ends the stream with an error, as a Claude Code process that exits does. */
-  fail(error: Error): void {
-    this.failure = error
-    this.end()
-  }
-
-  async *drain(): AsyncGenerator<Message> {
-    for (;;) {
-      const next = this.items.shift()
-      if (next !== undefined) {
-        yield next
-      } else if (this.ended) {
-        if (this.failure !== null) {
-          throw this.failure
-        }
-        return
-      } else {
-        await new Promise<void>((resolve) => {
-          this.wake = resolve
-        })
-      }
-    }
-  }
-
-  private poke(): void {
-    const wake = this.wake
-    this.wake = null
-    wake?.()
-  }
-}
-
 /**
  * The e2e suite's stand-in for Claude Code, which Seti loads through SETI_SDK_MODULE. A prompt
  * that asks for a background shell starts a real process tree under a placeholder Claude Code
@@ -145,6 +91,7 @@ class FakeClaude {
   private claude: ChildProcess | null = null
   private readonly shells = new Map<string, string>()
   private release: (() => void) | null = null
+  private inbox: Inbox | null = null
   /** Query.interrupt cut the held turn short, so it ends as Claude Code's interrupted turns do. */
   private cut = false
   private seti: InProcessClient | null = null
@@ -303,7 +250,18 @@ class FakeClaude {
         this.toolResult(id, content, output)
       },
       ended: () => this.outbox.ended,
+      joined: () => this.takeJoining(),
     }
+  }
+
+  /** Takes the updates queued to join this turn, as Claude Code does between tool calls. */
+  private takeJoining(): string[] {
+    return (this.inbox?.joining() ?? []).map((m) => {
+      if (m.uuid !== undefined) {
+        this.sdk({ type: 'command_lifecycle', command_uuid: m.uuid, state: 'started' })
+      }
+      return text(m)
+    })
   }
 
   /** Calls a seti tool as Claude Code would, shows the call and its answer, then holds if asked. */
@@ -350,10 +308,9 @@ class FakeClaude {
   }
 
   async run(input: AsyncIterable<UserMessage>): Promise<void> {
-    for await (const m of input) {
-      if (this.outbox.ended) {
-        break
-      }
+    const inbox = Inbox.reading(input)
+    this.inbox = inbox
+    for (let m = await inbox.next(); m !== null && !this.outbox.ended; m = await inbox.next()) {
       if (m.uuid !== undefined) {
         this.sdk({ type: 'command_lifecycle', command_uuid: m.uuid, state: 'started' })
       }

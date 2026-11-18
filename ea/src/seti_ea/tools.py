@@ -618,16 +618,26 @@ TOOL_SPECS: list[ToolSpec] = [
         "post's text with the user first. With to, it is a direct message to that one agent: it "
         "joins its running turn at once or starts a turn, and only you, that agent and the user see "
         "it. It never cuts a turn short; stop_task does that. To hear when the agent is done, use "
-        "watch_task.",
+        "watch_task. With fix_ci and no text, it is Seti's Fix CI: each agent with failing CI on an "
+        "open PR linked to it gets one short direct message naming only its own failing PRs, or "
+        "with to, that agent alone. Archived and stopped agents and failing PRs with no agent are "
+        "skipped and named in the result. Before it reaches more than one agent, tell the user how "
+        "many and get a yes.",
         {
-            "text": {"type": "string", "description": "The message, short and self-contained."},
+            "text": {
+                "type": "string",
+                "description": "The message, short and self-contained. Leave out with fix_ci.",
+            },
             "to": {
                 "type": "string",
                 "description": "For a direct message: the agent's @handle, title or id. Leave out "
-                "for a public post.",
+                "for a public post, or with fix_ci to reach every agent with failing PRs.",
+            },
+            "fix_ci": {
+                "type": "boolean",
+                "description": "True to send the short Fix CI message instead of text.",
             },
         },
-        ["text"],
     ),
     ToolSpec(
         "reply_team_chat",
@@ -2223,15 +2233,48 @@ class EaTools:
         member = found or await self._seti.get(f"/team/members/{task.get('id')}")
         return str(member.get("handle")) if isinstance(member, dict) else wanted
 
+    async def _fix_ci(self, to: str) -> ToolResult:
+        """Sends each agent in Seti's Fix CI plan its short message, as a direct message."""
+        only: dict[str, str | int] | None = None
+        if to:
+            only = {"task": str((await self.resolve_task(to)).get("id"))}
+        plan = await self._seti.get("/prs/fix-ci", only)
+        fields = plan if isinstance(plan, dict) else {}
+        lines: list[str] = []
+        nudges = dicts(fields.get("nudges"))
+        for nudge in nudges:
+            task = (dicts([nudge.get("task")]) or [{}])[0]
+            message = str(nudge.get("message", ""))
+            await self._post_direct(message, await self._handle_of(str(task.get("id"))))
+            lines.append(f'- {title_of(task)}: "{message}"')
+        for skip in dicts(fields.get("skipped")):
+            task = (dicts([skip.get("task")]) or [{}])[0]
+            lines.append(f"- Skipped {title_of(task)}: it is {skip.get('reason')}.")
+        unlinked = fields.get("unlinked")
+        if isinstance(unlinked, int) and unlinked > 0:
+            lines.append(f"- Skipped {plural(unlinked, 'failing PR')} with no agent linked.")
+        if fields.get("error"):
+            lines.append(f"GitHub gave no PR list, so some may be missing: {clip(str(fields['error']), 120)}")
+        if not nudges:
+            where = f"linked to {to}" if to else "linked to an agent that takes messages"
+            return ToolResult(
+                "\n".join([f"No open PR {where} has failing CI.", *lines]), "No failing CI to fix"
+            )
+        summary = f"Asked {plural(len(nudges), 'agent')} to fix CI"
+        return ToolResult("\n".join([f"{summary}, each by direct message:", *lines]), summary)
+
     async def post_team_chat(self, args: Mapping[str, Any]) -> ToolResult:
-        text = arg_str(args, "text")
         to = arg_str(args, "to", required=False)
+        fix_ci = args.get("fix_ci") is True
+        text = "" if fix_ci else arg_str(args, "text")
         if not to and DIRECT_ONLY.get():
             raise ToolError(
                 "Here you may only send a direct message to one agent, with to; a public post waits "
                 "for the user's yes.",
                 "Direct messages only",
             )
+        if fix_ci:
+            return await self._fix_ci(to)
         if to:
             return await self._post_direct(text, await self._handle_of(to))
         posted = await self._seti.post("/team/messages", {"text": text})

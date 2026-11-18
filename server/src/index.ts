@@ -41,6 +41,7 @@ import { watchDevMods } from './mods/dev.js'
 import { startModUpdates } from './mods/updates.js'
 import { notifyInterrupted, preparePush } from './notifications.js'
 import { dropLeftoverRequests } from './permission-requests.js'
+import { resumePermissionTimeouts } from './permission-timeout.js'
 import { enforcePrivateHome } from './permissions.js'
 import { loadPlannerModule } from './planner.js'
 import { retireBundledPlugins } from './plugins.js'
@@ -160,6 +161,7 @@ relayTeamEvents()
 await auditEvents.sealPending()
 await stopLeftoverScopes()
 await dropLeftoverRequests()
+await resumePermissionTimeouts()
 await expireLeftoverQuestions()
 await resumeBypass()
 startRequestExpiry()

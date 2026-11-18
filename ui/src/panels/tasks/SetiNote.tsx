@@ -1,9 +1,9 @@
-import { CircleStop, Eraser, FastForward, MemoryStick, RotateCw, ShieldCheck, ShieldOff } from 'lucide-react'
+import { CircleStop, Eraser, FastForward, MemoryStick, RotateCw, ShieldCheck, ShieldOff, TimerOff } from 'lucide-react'
 import { isFailureNote, type SetiPayload } from '@/lib/seti-notes'
 import { FailureLine } from '@/panels/tasks/FailureNotice'
 import { Line } from '@/panels/tasks/TranscriptLines'
 
-/** A note from Seti: memory, a restart, a stopped process, Seti control, a resend, a failure. */
+/** A note from Seti: memory, a restart, a stopped process, Seti control, a timeout, a failure. */
 export function SetiNote({ payload }: { payload: SetiPayload }) {
   if (payload.memory !== undefined) {
     return (
@@ -24,6 +24,17 @@ export function SetiNote({ payload }: { payload: SetiPayload }) {
   }
   if (payload.bypass !== undefined) {
     return <Line icon={FastForward}>{payload.error}</Line>
+  }
+  if (payload.timed_out !== undefined) {
+    const at = new Date(payload.timed_out)
+    return (
+      <Line icon={TimerOff}>
+        {payload.error}{' '}
+        <time dateTime={payload.timed_out} title={at.toLocaleString()}>
+          {at.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+        </time>
+      </Line>
+    )
   }
   return isFailureNote(payload) ? <FailureLine raw={payload.error} /> : <Line icon={RotateCw}>{payload.error}</Line>
 }

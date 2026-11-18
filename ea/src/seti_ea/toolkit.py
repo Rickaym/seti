@@ -196,7 +196,7 @@ def running_subagents(task: Mapping[str, Any]) -> int:
 
 
 def queued_update_rows(messages: list[Any]) -> list[dict[str, Any]]:
-    """Undismissed update rows after the last prompt that reached the model, as the Seti UI counts them."""
+    """Update rows waiting after the last prompt that reached the model, as the Seti UI counts them."""
     queued: list[dict[str, Any]] = []
     for row in messages:
         if not isinstance(row, dict):
@@ -204,10 +204,11 @@ def queued_update_rows(messages: list[Any]) -> list[dict[str, Any]]:
         payload = row.get("payload")
         if not isinstance(payload, dict):
             continue
+        waits = payload.get("dismissed_at") is None and payload.get("quiet") is None
         if row.get("kind") == "prompt":
             if not str(payload.get("text", "")).startswith("/") and payload.get("queued") != "removed":
                 queued = []
-        elif row.get("kind") == "input" and payload.get("dismissed_at") is None:
+        elif row.get("kind") == "input" and waits:
             queued.append(row)
     return queued
 

@@ -1,5 +1,5 @@
 import { startFailure } from '@seti/shared'
-import type { NextMessage } from './agent-session.js'
+import type { NextMessage } from './next-message.js'
 
 /**
  * Messages of a task whose session could not start, kept until the user sends another message,

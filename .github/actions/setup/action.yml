@@ -1,25 +1,73 @@
 name: setup
 description: Install the sandbox and share preview tools, Node, pnpm and workspace dependencies
 
+inputs:
+  playwright-deps:
+    description: Also install the system packages Chromium needs
+    default: 'false'
+
 runs:
   using: composite
   steps:
-    - shell: bash
+    - id: apt
+      shell: bash
       env:
-        DEBIAN_FRONTEND: noninteractive
+        PLAYWRIGHT_DEPS: ${{ inputs.playwright-deps }}
       run: |
         source <(sed -n '/^APT_PREVIEW=(/,/)$/p' scripts/install.sh)
+        packages="bubblewrap socat openssh-server ripgrep ${APT_PREVIEW[*]}"
+        archives="$RUNNER_TEMP/apt-archives"
+        scope=base
+        if [[ $PLAYWRIGHT_DEPS == true ]]; then
+          scope=playwright
+        fi
+        mkdir -p "$archives/partial"
+        printf '%s\n' "Dir::Cache::archives \"$archives\";" 'APT::Keep-Downloaded-Packages "true";' \
+          'Acquire::Retries "3";' 'Acquire::http::Timeout "30";' 'Acquire::https::Timeout "30";' \
+          | sudo tee /etc/apt/apt.conf.d/90ci-archives >/dev/null
         sudo rm -f /var/lib/man-db/auto-update
+        {
+          echo "packages=$packages"
+          echo "archives=$archives"
+          echo "scope=$scope"
+          echo "list=$(printf '%s' "$packages" | sha256sum | cut -c1-16)"
+          echo "image=$ImageOS-$ImageVersion"
+        } >> "$GITHUB_OUTPUT"
+    - id: apt-cache
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+      with:
+        path: ${{ steps.apt.outputs.archives }}
+        key: apt-${{ steps.apt.outputs.scope }}-${{ steps.apt.outputs.list }}-${{ steps.apt.outputs.image }}
+        restore-keys: |
+          apt-${{ steps.apt.outputs.scope }}-${{ steps.apt.outputs.list }}-
+          apt-playwright-${{ steps.apt.outputs.list }}-
+    - if: steps.apt-cache.outputs.cache-hit == 'true'
+      shell: bash
+      env:
+        DEBIAN_FRONTEND: noninteractive
+        ARCHIVES: ${{ steps.apt.outputs.archives }}
+      run: |
+        debs=("$ARCHIVES"/*.deb)
+        printf 'installing %s cached packages\n' "${#debs[@]}"
+        sudo apt-get install -y -qq --no-install-recommends --no-download "${debs[@]}"
+    - if: steps.apt-cache.outputs.cache-hit != 'true'
+      shell: bash
+      env:
+        DEBIAN_FRONTEND: noninteractive
+        PACKAGES: ${{ steps.apt.outputs.packages }}
+      run: |
         sudo apt-get update -qq
-        previews=()
-        for pkg in "${APT_PREVIEW[@]}"; do
+        wanted=()
+        for pkg in $PACKAGES; do
           policy="$(apt-cache policy "$pkg")"
           if [[ $policy == *'Candidate: '* && $policy != *'Candidate: (none)'* ]]; then
-            previews+=("$pkg")
+            wanted+=("$pkg")
           fi
         done
-        printf 'share preview packages: %s\n' "${previews[*]}"
-        sudo apt-get install -y -qq --no-install-recommends bubblewrap socat openssh-server ripgrep "${previews[@]}"
+        printf 'packages: %s\n' "${wanted[*]}"
+        sudo apt-get install -y -q --no-install-recommends "${wanted[@]}"
+    - shell: bash
+      run: |
         printf '%s\n' 'abi <abi/4.0>,' 'include <tunables/global>' \
           'profile bwrap /usr/bin/bwrap flags=(unconfined) {' '  userns,' '  include if exists <local/bwrap>' '}' \
           | sudo tee /etc/apparmor.d/bwrap >/dev/null
@@ -39,3 +87,19 @@ runs:
       env:
         SKIP_INSTALL_SIMPLE_GIT_HOOKS: '1'
       run: pnpm install --frozen-lockfile
+    - if: inputs.playwright-deps == 'true'
+      shell: bash
+      run: pnpm --filter @seti/e2e exec playwright install-deps chromium
+    - if: steps.apt-cache.outputs.cache-hit != 'true'
+      shell: bash
+      env:
+        ARCHIVES: ${{ steps.apt.outputs.archives }}
+      run: |
+        sudo chown -R "$(id -u):$(id -g)" "$ARCHIVES"
+        for deb in "$ARCHIVES"/*.deb; do
+          read -r name version < <(dpkg-deb -W --showformat='${Package}:${Architecture} ${Version}\n' "$deb")
+          if [[ "$(dpkg-query -W -f='${Version}' "$name" 2>/dev/null)" != "$version" ]]; then
+            rm -f "$deb"
+          fi
+        done
+        printf 'caching %s packages\n' "$(find "$ARCHIVES" -name '*.deb' | wc -l)"

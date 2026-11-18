@@ -1,8 +1,10 @@
 import {
+  quietReason,
   unresolvedThreadsText,
   type EaContext,
   type EaContextTask,
   type MessageRow,
+  type PrQuietReason,
   type TeamMessage,
 } from '@seti/shared'
 import {
@@ -26,6 +28,8 @@ import { redactCredentials } from './scrub.js'
 /** About 1,500 tokens at four characters per token. */
 export const CONTEXT_BUDGET_CHARS = 6000
 const LINE_CHARS = 300
+/** Updates Seti kept from an agent as its own action or a repeat are no news to the EA either. */
+const NOT_NEWS: readonly (PrQuietReason | undefined)[] = ['own_action', 'repeat']
 const EVENT_LINES = 8
 const LISTED_PRS_MAX = 12
 const SHOWN_CHECKS = 4
@@ -191,6 +195,7 @@ function setiText(payload: Extract<MessageRow, { kind: 'seti' }>['payload'], tas
     payload.session !== undefined ||
     payload.seti_control !== undefined ||
     payload.bypass !== undefined ||
+    payload.timed_out !== undefined ||
     (payload.memory !== undefined && payload.ended_turn !== true)
   return routine
     ? { text: `${payload.error} (${task})`, priority: ROUTINE }
@@ -205,6 +210,9 @@ function eventText(
   const task = `task ${quote(title)}`
   if (row.kind === 'input') {
     if (row.payload.source === 'channel' && !eaChannels.has(row.payload.channel_id)) {
+      return null
+    }
+    if (NOT_NEWS.includes(quietReason(row.payload))) {
       return null
     }
     const serious = row.payload.kind === 'ci_failed' || row.payload.kind === 'conflict'

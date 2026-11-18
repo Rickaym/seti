@@ -1,3 +1,4 @@
+import { SERVICE_ICON_KEYS } from '@seti/shared'
 import { describe, expect, it, vi } from 'vitest'
 import { commonConnectors } from './mcp-connector-list.js'
 import { configName, createMcpRegistry, toConnector, type Fetch } from './mcp-registry.js'
@@ -117,6 +118,14 @@ describe('createMcpRegistry', () => {
 })
 
 describe('commonConnectors', () => {
+  it('names a known brand mark or none', () => {
+    const keys: readonly string[] = SERVICE_ICON_KEYS
+    const icons = commonConnectors('').map((c) => c.icon)
+    expect(icons.filter((icon) => icon !== null).every((icon) => keys.includes(icon))).toBe(true)
+    expect(commonConnectors('notion')[0]?.icon).toBe('notion')
+    expect(commonConnectors('slack')[0]?.icon).toBeNull()
+  })
+
   it('lists every connector for an empty query and matches all words', () => {
     expect(commonConnectors('').length).toBeGreaterThan(20)
     expect(commonConnectors('google mail').map((c) => c.name)).toEqual([])

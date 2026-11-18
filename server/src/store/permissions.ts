@@ -1,11 +1,24 @@
-import type { PermissionBehavior, PermissionRequest, PermissionRequestState, PermissionRule } from '@seti/shared'
+import {
+  DEFAULT_PERMISSION_TIMEOUT_MINUTES,
+  PERMISSION_TIMEOUT_MINUTES,
+  type PermissionBehavior,
+  type PermissionRequest,
+  type PermissionRequestState,
+  type PermissionRule,
+  type PermissionTimeoutMinutes,
+  timeoutAt,
+  type PermissionTimeoutSettings,
+} from '@seti/shared'
 import { now, sql } from '../db.js'
 
 /** A request as Seti records it before the user answers. */
 export type NewPermissionRequest = Pick<
   PermissionRequest,
   'id' | 'task_id' | 'tool_name' | 'kind' | 'summary' | 'input' | 'reason' | 'suggestions' | 'editable'
->
+> & {
+  /** Minutes until Seti denies it unanswered; 0 never does. */
+  timeout_minutes: number
+}
 
 type RequestRecord = Omit<PermissionRequest, 'suggestions'> & { suggestions: string }
 
@@ -57,11 +70,12 @@ export const permissionRules = {
 
 export const permissionRequests = {
   open: async (request: NewPermissionRequest): Promise<PermissionRequest> => {
+    const at = now()
     const [row] = await sql<RequestRecord[]>`INSERT INTO permission_request
-      (id, task_id, tool_name, kind, summary, input, reason, suggestions, editable, state, created_at)
+      (id, task_id, tool_name, kind, summary, input, reason, suggestions, editable, state, created_at, timeout_at)
       VALUES (${request.id}, ${request.task_id}, ${request.tool_name}, ${request.kind}, ${request.summary},
         ${request.input}, ${request.reason}, ${JSON.stringify(request.suggestions)}, ${request.editable},
-        'pending', ${now()}) RETURNING *`
+        'pending', ${at}, ${timeoutAt(at, request.timeout_minutes)}) RETURNING *`
     if (row === undefined) {
       throw new Error('The permission request was not recorded')
     }
@@ -82,6 +96,18 @@ export const permissionRequests = {
     requests(
       await sql<RequestRecord[]>`UPDATE permission_request
         SET state = ${state}, message = ${message}, decided_at = ${now()}, input = COALESCE(${input ?? null}, input)
+        WHERE id = ${id} AND state = 'pending' RETURNING *`,
+    ).at(0),
+  /** Denies a pending request whose time ran out by `at`; undefined when it was answered or retimed. */
+  timeOut: async (id: string, at: string): Promise<PermissionRequest | undefined> =>
+    requests(
+      await sql<RequestRecord[]>`UPDATE permission_request SET state = 'denied', timed_out = true, decided_at = ${at}
+        WHERE id = ${id} AND state = 'pending' AND timeout_at <= ${at} RETURNING *`,
+    ).at(0),
+  /** Moves a pending request's deadline; undefined when it is not pending any more. */
+  retime: async (id: string, deadline: string | null): Promise<PermissionRequest | undefined> =>
+    requests(
+      await sql<RequestRecord[]>`UPDATE permission_request SET timeout_at = ${deadline}
         WHERE id = ${id} AND state = 'pending' RETURNING *`,
     ).at(0),
   /** The agent's pending requests, oldest first. */
@@ -107,6 +133,26 @@ export const permissionRequests = {
       await sql<{ id: string }[]>`UPDATE permission_request SET state = 'cancelled', decided_at = ${now()}
         WHERE state = 'pending' RETURNING id`
     ).map((row) => row.id),
+}
+
+const knownMinutes = (value: number): PermissionTimeoutMinutes =>
+  PERMISSION_TIMEOUT_MINUTES.find((minutes) => minutes === value) ?? DEFAULT_PERMISSION_TIMEOUT_MINUTES
+
+export const timeoutSettings = {
+  get: async (): Promise<PermissionTimeoutSettings> => {
+    const [row] = await sql<{ request_timeout_minutes: number; updated_at: string }[]>`SELECT
+      request_timeout_minutes, updated_at FROM permission_settings WHERE id = 1`
+    return row === undefined
+      ? { request_timeout_minutes: DEFAULT_PERMISSION_TIMEOUT_MINUTES, updated_at: null }
+      : { request_timeout_minutes: knownMinutes(row.request_timeout_minutes), updated_at: row.updated_at }
+  },
+  set: async (minutes: PermissionTimeoutMinutes): Promise<PermissionTimeoutSettings> => {
+    const at = now()
+    await sql`INSERT INTO permission_settings (id, request_timeout_minutes, updated_at) VALUES (1, ${minutes}, ${at})
+      ON CONFLICT (id) DO UPDATE SET request_timeout_minutes = excluded.request_timeout_minutes,
+        updated_at = excluded.updated_at`
+    return { request_timeout_minutes: minutes, updated_at: at }
+  },
 }
 
 export const bypass = {

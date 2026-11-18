@@ -23,6 +23,10 @@ export interface ModAgentFrame {
   draggable: boolean
   /** Rows the frame adds to the agent's More actions menu, after a separator. */
   menu: readonly ModAgentAction[]
+  /** Shows the status and the latest message in place of the transcript and the reply box. */
+  calm?: boolean
+  /** Esc pressed in the focused frame while nothing runs, such as to make the frame calm again. */
+  onEscape?: () => void
 }
 
 /** One agent, or one of its subagents, as the agent page shows it. */
@@ -90,6 +94,8 @@ export interface ModAgentsLayout {
   newTerminal?: () => void
   /** The workspace the agent list shows, and the first one, for a layout kept per workspace. */
   showWorkspace?: (workspace: { id: string; first: string | null }) => void
+  /** Whether the agents list hides while the layout shows; its own controls bring the list back. */
+  hidesList?: () => boolean
 }
 
 /** Terminals a mod keeps, such as a layout's panels; Seti lists them beside the device's own. */

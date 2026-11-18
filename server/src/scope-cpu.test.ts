@@ -2,11 +2,13 @@ import { spawn } from 'node:child_process'
 import { once } from 'node:events'
 import fs from 'node:fs'
 import path from 'node:path'
-import { MEMORY_CAP_DEFAULTS } from '@seti/shared'
+import { defaultMemoryCap } from '@seti/shared'
 import { describe, expect, it, vi } from 'vitest'
 import { detectScopeHost, launch, liveScopes, scopeArgs } from './memory-scope.js'
 import { CpuSampler, cpuProperties, cpuUsage, parseCpuStat, type CpuStat } from './scope-cpu.js'
 import { applyCpuCaps, scopeCpu } from './scope-limits.js'
+
+const SIX_GB = defaultMemoryCap(8192)
 
 /** cpu.stat of a scope held at a 3-core ceiling that the kernel paused 42 times. */
 const CPU_STAT = [
@@ -30,7 +32,7 @@ describe('CPU limits of a scope', () => {
   })
 
   it('starts a scope with its CPU limits where the host has the cpu controller, and none without', () => {
-    const scope = { unit: 'u.scope', cap: MEMORY_CAP_DEFAULTS, bindTo: null }
+    const scope = { unit: 'u.scope', cap: SIX_GB, bindTo: null }
     const capped = scopeArgs({ ...scope, cpu: { quota_percent: 300 } }, 'true', [])
     expect(capped.slice(5, 13)).toEqual([
       '-p',
@@ -113,7 +115,7 @@ describe.skipIf(cpuHost === null)('CPU limits of a scope on this host', () => {
       host: cpuHost,
       taskId,
       kind: 'shell' as const,
-      cap: MEMORY_CAP_DEFAULTS,
+      cap: SIX_GB,
       cpu: { quota_percent: 300 },
     }
     const child = launch(plan, process.execPath, ['-e', 'setTimeout(() => {}, 30000)'], (command, args) =>

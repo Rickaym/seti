@@ -1,81 +1,103 @@
 import type { SDKMessage } from '@anthropic-ai/claude-agent-sdk'
+import type { WatchedPr } from './github.js'
+import { bashCommand } from './outward.js'
 import type { PrPost } from './pr-events.js'
-import { postsPrCommentCall, resultText, toolResults } from './pr-link.js'
+import { pushTargets } from './pr-evidence.js'
+import { createsPrCall, endsPrCall, postsPrCommentCall, resultText, toolResults } from './pr-link.js'
 import { postTargets, targetsPr, type PrTarget } from './pr-target.js'
 import { prWatch, type StoredCall } from './store/pr-watch.js'
 
-/** A call that posted a comment or review: when it ran, the PRs it named, the anchors it linked. */
-export interface AgentPosting {
+/** A call that acted on a PR: whose it was, when it ran, the PRs it named, the anchors it linked. */
+export interface AgentCall {
+  task_id: string
   at: number
+  /** When its result came back; null while it runs. */
+  until: number | null
   anchors: string[]
   targets: PrTarget[]
 }
 
-/** Longest a post may trail the call that made it, and how far GitHub's clock may run ahead. */
+/** Longest a call's effect may trail its start while it runs, and how far clocks may differ. */
 const POST_LAG_MS = 10 * 60_000
-const CLOCK_SKEW_MS = 60_000
+const CLOCK_SKEW_MS = 5_000
 
 const ANCHOR = /#(issuecomment-|pullrequestreview-|discussion_r)(\d+)/g
 
 const anchorsIn = (text: string) => [...text.matchAll(ANCHOR)].map((match) => `${match[1] ?? ''}${match[2] ?? ''}`)
 
-/** The posting calls among stored transcript rows, with the anchors of what their output links. */
-export function agentPostings(rows: readonly StoredCall[]): AgentPosting[] {
-  const calls = new Map<string, AgentPosting>()
+type Acts = (name: string, input: unknown) => boolean
+
+/** The calls an assistant message makes that `acts` picks, by tool call id. */
+function callsIn(row: StoredCall, message: SDKMessage, acts: Acts): [string, AgentCall][] {
+  if (message.type !== 'assistant') {
+    return []
+  }
+  return message.message.content.flatMap((block): [string, AgentCall][] => {
+    if (block.type !== 'tool_use' || !acts(block.name, block.input)) {
+      return []
+    }
+    const targets = postTargets(block.name, block.input)
+    return [[block.id, { task_id: row.task_id, at: Date.parse(row.created_at), until: null, anchors: [], targets }]]
+  })
+}
+
+/** The calls among stored transcript rows that `acts` picks, with the anchors their output links. */
+function agentCalls(rows: readonly StoredCall[], acts: Acts): AgentCall[] {
+  const calls = new Map<string, AgentCall>()
   for (const row of rows) {
     const message = JSON.parse(row.payload) as SDKMessage
-    if (message.type === 'assistant') {
-      for (const block of message.message.content) {
-        if (block.type === 'tool_use' && postsPrCommentCall(block.name, block.input)) {
-          calls.set(block.id, {
-            at: Date.parse(row.created_at),
-            anchors: [],
-            targets: postTargets(block.name, block.input),
-          })
-        }
-      }
+    for (const [id, call] of callsIn(row, message, acts)) {
+      calls.set(id, call)
     }
     for (const result of toolResults(message)) {
-      calls.get(result.tool_use_id)?.anchors.push(...anchorsIn(resultText(result)))
+      const call = calls.get(result.tool_use_id)
+      if (call !== undefined) {
+        call.until = Date.parse(row.created_at)
+        call.anchors.push(...anchorsIn(resultText(result)))
+      }
     }
   }
   return [...calls.values()]
 }
 
-/** A call naming no PR posts on its branch's PR, which a stored call cannot tell: maybe this one. */
-const mayPostOn = (posting: AgentPosting, pr: string) =>
-  posting.targets.length === 0 || posting.targets.some((target) => targetsPr(target, pr))
+/** The calls that posted a comment or review. */
+export const agentPostings = (rows: readonly StoredCall[]) => agentCalls(rows, postsPrCommentCall)
+
+/** A call naming no PR acts on its branch's PR, which a stored call cannot tell: maybe this one. */
+const mayActOn = (call: AgentCall, pr: string) =>
+  call.targets.length === 0 || call.targets.some((target) => targetsPr(target, pr))
+
+/** Whether something GitHub timed at `at` happened while the call ran, clocks allowed for. */
+const duringCall = (call: AgentCall, at: number) =>
+  at >= call.at - CLOCK_SKEW_MS && at <= (call.until ?? call.at + POST_LAG_MS) + CLOCK_SKEW_MS
 
 /**
- * Ids of the posts on the PR at `pr` the agents wrote: those a posting call's output links, and
- * for each call on that PR whose output links none, the first post by the gh user soon after it,
- * as agents post as them.
+ * The posts on the PR at `pr` that agents wrote, each with the task that wrote it: those a
+ * posting call's output links, and the posts by the gh user made while a call on that PR ran
+ * whose output links none, as agents post as them.
  */
 export function ownPosts(
   posts: readonly PrPost[],
-  postings: readonly AgentPosting[],
+  postings: readonly AgentCall[],
   viewer: string,
   pr: string,
-): Set<string> {
-  const linked = new Set(postings.flatMap((posting) => posting.anchors))
-  const own = new Set(
-    posts
-      .filter((post) => [post.url, ...post.inline].some((url) => anchorsIn(url).some((a) => linked.has(a))))
-      .map((post) => post.id),
-  )
-  const byViewer = posts
-    .filter((post) => post.at !== null && post.login?.toLowerCase() === viewer.toLowerCase())
-    .map((post) => ({ id: post.id, at: Date.parse(post.at ?? '') }))
-    .toSorted((a, b) => a.at - b.at)
-  const unlinked = postings
-    .filter((posting) => posting.anchors.length === 0 && mayPostOn(posting, pr))
-    .toSorted((a, b) => a.at - b.at)
-  for (const call of unlinked) {
-    const claimed = byViewer.find(
-      (post) => !own.has(post.id) && post.at >= call.at - CLOCK_SKEW_MS && post.at <= call.at + POST_LAG_MS,
-    )
-    if (claimed !== undefined) {
-      own.add(claimed.id)
+): Map<string, string> {
+  const linked = new Map(postings.flatMap((posting) => posting.anchors.map((anchor) => [anchor, posting.task_id])))
+  const own = new Map<string, string>()
+  for (const post of posts) {
+    const anchor = [post.url, ...post.inline].flatMap(anchorsIn).find((found) => linked.has(found))
+    const taskId = anchor === undefined ? undefined : linked.get(anchor)
+    if (taskId !== undefined) {
+      own.set(post.id, taskId)
+    }
+  }
+  const unlinked = postings.filter((posting) => posting.anchors.length === 0 && mayActOn(posting, pr))
+  for (const post of posts) {
+    const at = post.at === null ? Number.NaN : Date.parse(post.at)
+    const byViewer = post.login?.toLowerCase() === viewer.toLowerCase()
+    const call = byViewer && !own.has(post.id) ? unlinked.find((posting) => duringCall(posting, at)) : undefined
+    if (call !== undefined) {
+      own.set(post.id, call.task_id)
     }
   }
   return own
@@ -93,11 +115,51 @@ export function callWindow(posts: readonly PrPost[]): { from: string; to: string
   }
 }
 
-/** Ids of the new posts on a PR that the agents linked to it wrote. */
-export async function agentPosts(url: string, posts: readonly PrPost[], viewer: string): Promise<Set<string>> {
+/** The new posts on a PR that the agents linked to it wrote, by post id with the writing task. */
+export async function agentPosts(url: string, posts: readonly PrPost[], viewer: string): Promise<Map<string, string>> {
   const window = callWindow(posts)
   if (window === null) {
-    return new Set()
+    return new Map()
   }
   return ownPosts(posts, agentPostings(await prWatch.calls(url, window.from, window.to)), viewer, url)
 }
+
+/** The tasks whose merge or close call on the PR at `pr` ran when GitHub says it ended. */
+export function endedBy(rows: readonly StoredCall[], pr: string, closedAt: number): Set<string> {
+  const calls = agentCalls(rows, endsPrCall).filter((call) => mayActOn(call, pr) && duringCall(call, closedAt))
+  return new Set(calls.map((call) => call.task_id))
+}
+
+/** The tasks linked to a PR that merged or closed it themselves. */
+export async function agentEnders(pr: WatchedPr): Promise<Set<string>> {
+  const closedAt = pr.closed_at === null ? Number.NaN : Date.parse(pr.closed_at)
+  if (!Number.isFinite(closedAt)) {
+    return new Set()
+  }
+  const from = new Date(closedAt - POST_LAG_MS - CLOCK_SKEW_MS).toISOString()
+  const to = new Date(closedAt + CLOCK_SKEW_MS).toISOString()
+  return endedBy(await prWatch.calls(pr.url, from, to), pr.url, closedAt)
+}
+
+const MCP_PUSH = /(?:^|__)(?:push_files|create_or_update_file)$/i
+
+const pushesCall = (name: string, input: unknown): boolean =>
+  createsPrCall(name, input) || (name === 'Bash' ? pushTargets(bashCommand(input)) !== null : MCP_PUSH.test(name))
+
+/** Whether any of the stored calls pushed commits or opened a PR. */
+export function pushed(rows: readonly StoredCall[]): boolean {
+  return rows.some((row) => {
+    const message = JSON.parse(row.payload) as SDKMessage
+    return (
+      message.type === 'assistant' &&
+      message.message.content.some((block) => block.type === 'tool_use' && pushesCall(block.name, block.input))
+    )
+  })
+}
+
+/**
+ * Whether the task has a CI result to wait for on the PR: it pushed or opened a PR since Seti
+ * last gave it a CI result for this one.
+ */
+export const awaitsCi = async (taskId: string, pr: WatchedPr): Promise<boolean> =>
+  pushed(await prWatch.pushCalls(taskId, pr.subject))

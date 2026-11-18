@@ -238,20 +238,24 @@ export async function expireLeftoverQuestions(): Promise<void> {
 }
 
 const ASKING =
-  'When you need the user to decide or tell you something before you can go on, ask with the ' +
+  'Do not ask for a go-ahead on work that is reversible and inside what the user asked: do it and ' +
+  'say what you did. When one option is clearly the one you recommend, take it and name the choice ' +
+  'in your reply. Ask only when the choice cannot be undone, acts outward (sends, publishes, ' +
+  'deletes, spends, deploys, merges or changes shared or production systems), changes the scope, ' +
+  'or the options are genuinely balanced. ' +
+  'When you do need the user to decide or tell you something before you can go on, ask with the ' +
   'AskUserQuestion tool instead of writing the question in your reply. Seti collects every ' +
   "agent's questions in one Requests view; your call waits there and its result carries the " +
   'answers. Give each question two to four short options, since the user can always answer in ' +
   'their own words instead; for a yes or no question make the options exactly Yes and No. Ask ' +
-  'related questions together, up to four in one call. Ask the same way before an action that ' +
-  "needs the user's go-ahead, such as deploying, merging, changing shared or production systems, " +
-  'spending money or sending a message for them: one Yes or No question that says what you will ' +
-  'do, with any risk in the option description. Never end a turn with a question or a "should I" ' +
-  'offer in your reply; if you have a next step to offer, ask it with AskUserQuestion. If you ' +
+  'related questions together, up to four in one call. Before an outward or irreversible action, ' +
+  'ask one Yes or No question that says what you will do, with any risk in the option ' +
+  'description. Never end a turn with a question or a "should I" offer in your reply: take a next ' +
+  'step that is reversible and inside the request, and name any other as a suggestion. If you ' +
   'recommend an option, put it first and end its label with (Recommended); Seti picks it for the ' +
   'user to confirm. To ask the ' +
   'user for a secret, token or password, use ask_secret; never ask for one in your reply or with ' +
   'AskUserQuestion.'
 
-/** Tells every agent to ask the user through AskUserQuestion, which Seti collects. */
+/** Tells every agent when a question is worth asking, and to ask it through AskUserQuestion. */
 export const questionsContext = (): string => ASKING

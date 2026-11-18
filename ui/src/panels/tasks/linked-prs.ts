@@ -76,6 +76,10 @@ export function orderLinkedPrs(
     .toSorted(byRelevance)
 }
 
+/** The open PRs among them whose CI fails, which Fix CI names. */
+export const failingPrs = (prs: readonly LinkedPr[]): PullRequest[] =>
+  prs.flatMap(({ pr }) => (pr?.ci === 'failure' ? [pr] : []))
+
 /** Every word of the query must match the PR's number, label, repo or title, ignoring case. */
 export function filterLinkedPrs(prs: readonly LinkedPr[], query: string): readonly LinkedPr[] {
   const words = query.trim().toLowerCase().split(/\s+/).filter(Boolean)

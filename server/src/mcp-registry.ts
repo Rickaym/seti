@@ -109,6 +109,7 @@ export function toConnector(raw: unknown): McpConnector | null {
     name: configName(server.name),
     title: server.title === '' ? server.name : server.title,
     description: server.description,
+    icon: null,
     source: 'registry',
     ...launch,
     oauth: null,

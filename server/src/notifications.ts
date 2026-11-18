@@ -1,5 +1,4 @@
 import { createHash } from 'node:crypto'
-import { createRequire } from 'node:module'
 import {
   agentUrl,
   ASKED_IN_REPLY,
@@ -18,7 +17,7 @@ import {
   type TaskStatus,
   type TestNotificationResult,
 } from '@seti/shared'
-import type * as WebPush from 'web-push'
+import { generateRequestDetails, generateVAPIDKeys, type Urgency } from 'web-push'
 import { audit } from './audit.js'
 import { inBackground } from './background.js'
 import { firstLine } from './closing-line.js'
@@ -32,9 +31,6 @@ import { sealedSecrets, secret, SecretUnreadableError } from './secrets.js'
 import { notificationSettings, pushDevices, type PushTarget } from './store/notifications.js'
 import { attentionOf } from './task-attention.js'
 import { askedQuestion } from './turn-asking.js'
-
-/** web-push is CommonJS whose exports Node's ESM loader cannot name, so it loads through require. */
-const webPush = createRequire(import.meta.url)('web-push') as typeof WebPush
 
 /** Push services of the browsers Seti runs in; a subscription elsewhere is refused. */
 const PUSH_HOSTS = ['fcm.googleapis.com', 'push.services.mozilla.com', 'push.apple.com', 'notify.windows.com']
@@ -95,7 +91,7 @@ async function vapidKeys(): Promise<VapidKeys> {
     keys = readKeys(stored)
     return keys
   }
-  const made = webPush.generateVAPIDKeys()
+  const made = generateVAPIDKeys()
   const saved = await sealedSecrets.putIfAbsent(VAPID_KEYS_SECRET, JSON.stringify(made))
   keys = saved ? made : readKeys((await secret(VAPID_KEYS_SECRET)) ?? '')
   return keys
@@ -134,7 +130,7 @@ function endpointProblem(endpoint: string): string | null {
 
 interface Delivery {
   ttl: number
-  urgency: WebPush.Urgency
+  urgency: Urgency
   topic: string
 }
 
@@ -145,7 +141,7 @@ function topicOf(id: string): string {
 }
 
 function request(target: PushTarget, payload: NotificationPayload, pair: VapidKeys, delivery: Delivery) {
-  return webPush.generateRequestDetails(target, JSON.stringify(payload), {
+  return generateRequestDetails(target, JSON.stringify(payload), {
     vapidDetails: { subject: SUBJECT, publicKey: pair.publicKey, privateKey: pair.privateKey },
     TTL: delivery.ttl,
     urgency: delivery.urgency,
