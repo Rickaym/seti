@@ -449,9 +449,11 @@ agent pushed or opened a PR since Seti last gave it a CI result for this PR (`gi
 such as one after someone else updated the branch, is recorded quietly. A failure always wakes.
 
 A failure is reported once per head commit, and again only for checks that had not failed on it
-before. A conflict is reported once per pair of base and head commit: GitHub recomputes
-mergeability when a branch moves and reports it unknown in between, which is not a new conflict;
-a new head commit that still conflicts, or the base branch moving under a conflicted PR, is.
+before. A conflict is reported once per head commit and base branch, until GitHub finds the PR
+merging cleanly again. GitHub recomputes mergeability whenever the base branch moves and reports it
+unknown in between; the same commit still conflicts after that, so it is not reported again. A new
+head commit that still conflicts, a PR retargeted to another base branch, and a conflict that comes
+back after a clean merge state are news.
 
 ## Mods add to Seti through registries with disposers
 

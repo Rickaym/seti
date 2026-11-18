@@ -15,7 +15,8 @@ function pr(overrides: Partial<WatchedPr> = {}): WatchedPr {
     closed_at: null,
     conflicting: false,
     head_oid: 'aaaaaaa1111',
-    base_oid: 'ba5e0000001',
+    clean: false,
+    base_ref: 'main',
     ci: 'pending',
     checks: [],
     reviews: [],
@@ -195,31 +196,33 @@ describe('a merge conflict', () => {
   const told = prEvents(baseline(), conflicted)
   const unknown = prEvents(told.next, pr()).next
 
-  it('is reported once for a base and head commit, however often GitHub recomputes it', () => {
+  it('is reported once for a head commit, however often the base moves and GitHub recomputes it', () => {
     expect(told.inputs).toMatchObject([{ kind: 'conflict' }])
-    expect(told.next.conflict).toEqual({ base: 'ba5e0000001', head: 'aaaaaaa1111' })
+    expect(told.next.conflict).toEqual({ base: 'main', head: 'aaaaaaa1111' })
     expect(unknown).toMatchObject({ conflicting: false, conflict: told.next.conflict })
     expect(marks(unknown, conflicted)).toEqual([])
     expect(marks(prEvents(unknown, conflicted).next, conflicted)).toEqual([])
   })
 
-  it('is news after the base branch moved', () => {
-    const moved = pr({ conflicting: true, base_oid: 'ba5e0000002' })
-    expect(marks(unknown, moved)).toEqual(['conflict'])
-    expect(marks(told.next, moved)).toEqual(['conflict'])
-    expect(marks(prEvents(told.next, moved).next, moved)).toEqual([])
-  })
-
-  it('is news on a new head commit that still conflicts', () => {
-    expect(marks(unknown, pr({ conflicting: true, head_oid: 'bbbbbbb2222' }))).toEqual(['conflict'])
+  it.each([
+    ['a new head commit that still conflicts', unknown, pr({ conflicting: true, head_oid: 'bbbbbbb2222' })],
+    ['another base branch', told.next, pr({ conflicting: true, base_ref: 'release' })],
+    [
+      'a conflict that came back after the PR merged cleanly',
+      prEvents(told.next, pr({ clean: true })).next,
+      conflicted,
+    ],
+  ])('is news on %s', (_name, previous, next) => {
+    expect(marks(previous, next)).toEqual(['conflict'])
+    expect(marks(prEvents(previous, next).next, next)).toEqual([])
   })
 
   it('stays reported for a PR whose snapshot predates the record, and without a base to tell it by', () => {
     const legacy: PrSnapshot = { state: 'open', conflicting: true, ci: null, review_ids: [], comment_ids: [] }
     const adopted = prEvents(legacy, conflicted)
     expect(adopted.inputs).toEqual([])
-    expect(adopted.next.conflict).toEqual({ base: 'ba5e0000001', head: 'aaaaaaa1111' })
-    const gone = pr({ conflicting: true, base_oid: null })
+    expect(adopted.next.conflict).toEqual({ base: 'main', head: 'aaaaaaa1111' })
+    const gone = pr({ conflicting: true, base_ref: null })
     expect(marks(baseline(), gone)).toEqual(['conflict'])
     expect(marks(prEvents(baseline(), gone).next, gone)).toEqual([])
   })

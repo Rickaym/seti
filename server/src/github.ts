@@ -170,9 +170,8 @@ export async function addPreviewLabel(slug: string, number: number): Promise<boo
   return present
 }
 
-const WATCH_FIELDS = `url number state mergeable closedAt
+const WATCH_FIELDS = `url number state mergeable closedAt baseRefName
   repository { nameWithOwner }
-  baseRef { target { oid } }
   commits(last: 1) { nodes { commit { oid ${ROLLUP_FIELDS} } } }
   reviews(last: 20) { nodes {
     id state body url submittedAt author { __typename login }
@@ -191,7 +190,7 @@ const ghWatchedPr = z.object({
   mergeable: z.string(),
   closedAt: z.string().nullable(),
   repository: z.object({ nameWithOwner: z.string() }),
-  baseRef: z.object({ target: z.object({ oid: z.string() }).nullable() }).nullish(),
+  baseRefName: z.string().nullish(),
   commits: z.object({
     nodes: z.array(
       z.object({
@@ -268,8 +267,10 @@ export interface WatchedPr {
   closed_at: string | null
   conflicting: boolean
   head_oid: string | null
-  /** The tip of the base branch; null once the branch is gone. */
-  base_oid: string | null
+  /** GitHub worked out that it merges cleanly; false while it conflicts or is not known yet. */
+  clean: boolean
+  /** The branch it merges into. */
+  base_ref: string | null
   ci: CiState | null
   checks: PrCheck[]
   reviews: WatchedReview[]
@@ -291,7 +292,8 @@ function toWatchedPr(pr: z.infer<typeof ghWatchedPr>): WatchedPr {
     closed_at: pr.closedAt,
     conflicting: pr.mergeable === 'CONFLICTING',
     head_oid: commit?.oid ?? null,
-    base_oid: pr.baseRef?.target?.oid ?? null,
+    clean: pr.mergeable === 'MERGEABLE',
+    base_ref: pr.baseRefName ?? null,
     ...readRollup(rollup),
     reviews: pr.reviews.nodes.map((review) => ({
       id: review.id,

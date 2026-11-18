@@ -10,7 +10,7 @@ export interface PrSnapshot {
    * marks checks seen running again on that commit since.
    */
   ci: { oid: string; state: 'success' | 'failure'; failing?: string[]; rerun?: true } | null
-  /** The base and head commits of the conflict reported last. */
+  /** The base branch and head commit of the conflict reported last, until it merges cleanly. */
   conflict?: { base: string; head: string }
   review_ids: string[]
   comment_ids: string[]
@@ -52,9 +52,9 @@ function snapshotOf(pr: WatchedPr, ci: PrSnapshot['ci'], conflict?: PrSnapshot['
   }
 }
 
-/** The commits a conflict is between; undefined when GitHub names no base or head to tell it by. */
+/** What a conflict is between; undefined when GitHub names no base or head to tell it by. */
 const conflictOf = (pr: WatchedPr): PrSnapshot['conflict'] =>
-  pr.conflicting && pr.base_oid !== null && pr.head_oid !== null ? { base: pr.base_oid, head: pr.head_oid } : undefined
+  pr.conflicting && pr.base_ref !== null && pr.head_oid !== null ? { base: pr.base_ref, head: pr.head_oid } : undefined
 
 const failingChecks = (pr: WatchedPr) => pr.checks.filter((check) => check.state === 'failure')
 
@@ -298,8 +298,8 @@ const conflictInput = (pr: WatchedPr): PrInput => ({
 })
 
 /**
- * A conflict is news once per base and head commit. GitHub forgets and recomputes it whenever a
- * branch moves, so one it reports again between the same commits is the one already reported.
+ * A conflict is news once per head commit and base branch, until the PR merges cleanly again.
+ * GitHub recomputes it whenever the base moves, and the same commit still conflicts after that.
  */
 function newConflict(previous: PrSnapshot, pr: WatchedPr): boolean {
   if (!pr.conflicting || pr.state !== 'open') {
@@ -393,5 +393,5 @@ export function prEvents(
     ...postInputs(pr, own).map((input) => quieted(input, 'own_action')),
     ...lifecycleInputs(previous, pr, closing, reader.ended === true),
   ]
-  return { inputs, next: snapshotOf(pr, nextCiRecord, conflictOf(pr) ?? previous.conflict) }
+  return { inputs, next: snapshotOf(pr, nextCiRecord, pr.clean ? undefined : (conflictOf(pr) ?? previous.conflict)) }
 }
