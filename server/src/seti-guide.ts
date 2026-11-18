@@ -68,8 +68,6 @@ function toolLines(has: Has): string[] {
 
 const tools = (mode: InputMode | null, has: Has) => [
   '## Tools',
-  '- No sleep, until or watch loops: run long commands with run_in_background.',
-  '- A background command stops at its timeout, 30 minutes by default: set one for longer work.',
   '- In a long wait, show what for on your row with seti set_status, such as "waiting on CI".',
   ...(mode === 'wake' ? ['- After a push, end the turn: Seti wakes you on CI results, reviews and comments.'] : []),
   ...toolLines(has),

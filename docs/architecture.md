@@ -256,10 +256,15 @@ stdin, and returns stdout as text, and as structured content when it is a JSON o
 
 Seti starts an agent's Claude Code process, sandboxed or not, each `!` command and the short-lived
 rewind helper through `systemd-run --user --scope`, so the process tree lives in a transient scope
-of its own with `MemoryMax` and `MemorySwapMax` set (by default 6 GB and 1 GB; Settings, Resources
-sets the default and an agent's settings can override it, and a change reaches running scopes at
-once through `systemctl set-property`). Above `MemoryMax` the OOM killer stops a process inside
-that scope instead of earlyoom picking a large process anywhere on the host.
+of its own with `MemoryMax` and `MemorySwapMax` set (Settings, Resources sets the default and an
+agent's settings can override it, and a change reaches running scopes at once through
+`systemctl set-property`). Above `MemoryMax` the OOM killer stops a process inside that scope
+instead of earlyoom picking a large process anywhere on the host.
+
+Until a cap is saved in Settings, Resources, the default follows the host (`defaultMemoryCap` in
+`shared/src/memory.ts`): 30% of its memory in whole GB, at least 6 GB and at most 16 GB, so 10 GB on
+a 32 GB host, with 1 GB of swap. A larger cap means fewer `tsc` runs stopped at it and more risk
+to the host when several agents peak together. A saved cap always wins over the computed one.
 
 - `OOMPolicy=continue` keeps the rest of the tree running when one process, such as `tsc`, is
   killed, so Claude Code sees the failed command and goes on.
@@ -752,7 +757,14 @@ startup expires what a restart cut off.
 Open questions set the agent's reason line in Needs you through `server/src/task-blocked.ts`,
 such as `Asks 2 questions: Which checks should I run first?`, after a permission request and
 before a change request. `questionsContext`, registered with `registerContextProvider`, tells
-every agent to ask through AskUserQuestion instead of in its reply. The guess that a turn ended on
+every agent to ask through AskUserQuestion instead of in its reply, and when not to ask at all: no
+go-ahead for reversible work inside the request, and a clearly recommended option is taken and
+named. It asks only for a choice that cannot be undone, acts outward, changes the scope or is
+genuinely balanced. `houseRulesContext` (`server/src/house-rules.ts`), registered the same way,
+states the rules the shell guard and Claude Code enforce: no foreground sleep or polling, stopping
+a process by PID, `rm -r` on literal paths and the exact tool name `Bash`. A `SubagentStart` hook
+of every session gives the same rules to each subagent, which does not read its parent's system
+prompt. The guess that a turn ended on
 a question (`server/src/turn-asking.ts`) reads only the prose after the last tool use, the
 fallback for an agent that asks in text.
 

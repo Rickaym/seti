@@ -37,6 +37,7 @@ import { watchDroppedPrompts } from './dropped-prompt.js'
 import { watchBlocked, watchTurnEnd } from './ea-turn-watch.js'
 import { jsonEtag } from './etag.js'
 import { githubTokenMode } from './github-token.js'
+import { houseRulesContext } from './house-rules.js'
 import { fail, HttpError, ok } from './http.js'
 import { inputPreface } from './input-preface.js'
 import { wakeAfterTurn, wakeWhenUnblocked } from './inputs.js'
@@ -344,6 +345,7 @@ export function createApp(access: AccessGuardOptions = defaultAccess(), eaUrl: s
   registerContextProvider(cpuPrompt)
   registerContextProvider(setiToolsContext)
   registerContextProvider(knowledgeContext)
+  registerContextProvider(houseRulesContext)
   registerContextProvider(questionsContext)
   registerContextProvider(modContextPrompt)
   connectModLogic({ ops: logicOps(installedMods.manifest), host: modLogicHost })

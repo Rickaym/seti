@@ -1,13 +1,17 @@
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { MEMORY_CAP_DEFAULTS, type MemoryCapSettings, type TaskMemoryCap } from '@seti/shared'
-import { beforeAll, describe, expect, it } from 'vitest'
+import { defaultMemoryCap, type MemoryCapSettings, type TaskMemoryCap } from '@seti/shared'
+import { beforeAll, describe, expect, it, vi } from 'vitest'
 import { createApp } from '../app.js'
 import { tasks } from '../db.js'
 import { effectiveCap, planScope } from '../memory-cap.js'
 import { auditEvents } from '../store/audit.js'
 import { USER_AUTH } from '../test-auth.js'
+
+const SIX_GB = defaultMemoryCap(8192)
+const GIB = 1024 ** 3
+const hostMemory = vi.spyOn(os, 'totalmem').mockReturnValue(8 * GIB)
 
 const TASK = 'memory-cap-task'
 const OTHER = 'memory-cap-other'
@@ -34,17 +38,30 @@ beforeAll(async () => {
 })
 
 describe('the memory cap settings', () => {
+  it('sizes the default to the host until the user saves a cap', async () => {
+    hostMemory.mockReturnValue(32 * GIB)
+    const larger = { high_mb: 10240, max_mb: 10240, swap_max_mb: 1024 }
+    expect(await data<MemoryCapSettings>('/resources/memory')).toMatchObject({ cap: larger, defaults: larger })
+    expect(await effectiveCap(OTHER)).toEqual(larger)
+    hostMemory.mockReturnValue(8 * GIB)
+    expect((await data<MemoryCapSettings>('/resources/memory')).cap).toEqual(SIX_GB)
+  })
+
   it('starts at the defaults, saves a new default and audits it', async () => {
     const initial = await data<MemoryCapSettings>('/resources/memory')
     expect(initial).toEqual({
       cap: { high_mb: 6144, max_mb: 6144, swap_max_mb: 1024 },
-      defaults: MEMORY_CAP_DEFAULTS,
+      defaults: SIX_GB,
       enforced: false,
       updated_at: null,
     })
     const cap = { high_mb: 3072, max_mb: 5120, swap_max_mb: 512 }
     const saved = await data<MemoryCapSettings>('/resources/memory', 'PUT', cap)
     expect(saved.cap).toEqual(cap)
+    hostMemory.mockReturnValue(32 * GIB)
+    expect((await data<MemoryCapSettings>('/resources/memory')).cap).toEqual(cap)
+    expect(await effectiveCap(OTHER)).toEqual(cap)
+    hostMemory.mockReturnValue(8 * GIB)
     expect(saved.updated_at).not.toBeNull()
     expect(await effectiveCap(TASK)).toEqual(cap)
     await auditEvents.settled()
@@ -53,7 +70,7 @@ describe('the memory cap settings', () => {
       summary: 'Set the agent memory cap to 5 GB RAM, soft cap at 3 GB, 512 MB swap',
       detail: { max_mb: 5120, was_max_mb: 6144 },
     })
-    await data('/resources/memory', 'PUT', MEMORY_CAP_DEFAULTS)
+    await data('/resources/memory', 'PUT', SIX_GB)
     await auditEvents.settled()
     expect((await auditEvents.latest('system.memory_cap_changed'))?.summary).toBe(
       'Set the agent memory cap to 6 GB RAM, 1 GB swap',
@@ -70,7 +87,7 @@ describe('the memory cap settings', () => {
     ]) {
       expect((await request('/resources/memory', 'PUT', body)).status).toBe(400)
     }
-    expect((await data<MemoryCapSettings>('/resources/memory')).cap).toEqual(MEMORY_CAP_DEFAULTS)
+    expect((await data<MemoryCapSettings>('/resources/memory')).cap).toEqual(SIX_GB)
   })
 })
 
@@ -79,7 +96,7 @@ describe('the memory cap of one agent', () => {
     const own = { high_mb: 8192, max_mb: 12288, swap_max_mb: 0 }
     const set = await data<TaskMemoryCap>(`/tasks/${TASK}/memory`, 'PUT', { cap: own })
     expect(set).toEqual({ override: own, effective: own, enforced: false })
-    expect(await effectiveCap(OTHER)).toEqual(MEMORY_CAP_DEFAULTS)
+    expect(await effectiveCap(OTHER)).toEqual(SIX_GB)
     await auditEvents.settled()
     expect(await auditEvents.latest('task.memory_cap_changed')).toMatchObject({
       subject_id: TASK,
@@ -87,7 +104,7 @@ describe('the memory cap of one agent', () => {
     })
 
     const cleared = await data<TaskMemoryCap>(`/tasks/${TASK}/memory`, 'PUT', { cap: null })
-    expect(cleared).toEqual({ override: null, effective: MEMORY_CAP_DEFAULTS, enforced: false })
+    expect(cleared).toEqual({ override: null, effective: SIX_GB, enforced: false })
     expect(await data<TaskMemoryCap>(`/tasks/${TASK}/memory`)).toEqual(cleared)
     await auditEvents.settled()
     expect((await auditEvents.latest('task.memory_cap_changed'))?.summary).toBe(
