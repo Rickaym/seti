@@ -1,5 +1,6 @@
 import {
   channelCreateInput,
+  subscriptionDeliveryInput,
   channelFilterInput,
   channelModeInput,
   channelRotateInput,
@@ -17,6 +18,7 @@ import {
   revealChannelSecret,
   rotateChannel,
   SECRET_VALUES,
+  setChannelDelivery,
   setChannelFilter,
   setChannelMode,
   subscribeChannel,
@@ -81,6 +83,15 @@ export const channelRoutes = new Hono()
     const { id, sub } = c.req.valid('param')
     return ok(c, await setChannelMode(id, sub, c.req.valid('json').mode))
   })
+  .put(
+    '/:id/subscriptions/:sub/delivery',
+    valid('param', subscriptionParam),
+    validJson(subscriptionDeliveryInput),
+    async (c) => {
+      const { id, sub } = c.req.valid('param')
+      return ok(c, await setChannelDelivery(id, sub, c.req.valid('json').delivery))
+    },
+  )
   .delete('/:id/subscriptions/:sub', valid('param', subscriptionParam), async (c) => {
     const { id, sub } = c.req.valid('param')
     return ok(c, await unsubscribeChannel(id, sub))

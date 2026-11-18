@@ -4,6 +4,7 @@ import { ShellToaster } from '@/components/ShellToaster'
 import { SignInGate } from '@/components/SignIn'
 import { EaCallProvider } from '@/components/ea/EaCallProvider'
 import { ShortcutProvider } from '@/components/shortcuts/ShortcutProvider'
+import { watchStaleBuild } from '@/components/stale-build-recovery'
 import { TeamChatProvider } from '@/components/team/TeamChatProvider'
 import { ThemeProvider } from '@/components/theme/theme-provider'
 import { ConfirmProvider } from '@/components/ui/confirm-dialog'
@@ -14,6 +15,7 @@ import { App } from './App'
 import './App.css'
 
 installThemeTokens()
+watchStaleBuild()
 
 const rootEl = document.getElementById('root')
 if (!rootEl) {

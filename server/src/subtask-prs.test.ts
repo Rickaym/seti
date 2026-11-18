@@ -11,7 +11,8 @@ import { beforeAll, describe, expect, it, vi } from 'vitest'
 import { createApp } from './app.js'
 import { messages, sql, tasks } from './db.js'
 import type { WatchedPr } from './github.js'
-import { deliverInputs, inputPreface } from './inputs.js'
+import { inputPreface } from './input-preface.js'
+import { deliverInputs } from './inputs.js'
 import { migrate } from './pg.js'
 import { createPrInputPoller } from './pr-inputs.js'
 import { openQuerySince, runTurn, subscribe } from './runner.js'
@@ -101,6 +102,8 @@ const watched = (url: string, ci: WatchedPr['ci']): WatchedPr => ({
   closed_at: null,
   conflicting: false,
   head_oid: `oid-${String(ci)}`,
+  clean: false,
+  base_ref: null,
   ci,
   checks: [],
   reviews: [],

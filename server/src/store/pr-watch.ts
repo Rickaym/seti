@@ -17,11 +17,15 @@ export interface EndedLink {
   tool_use_id: string | null
 }
 
-/** A stored transcript row, its payload still JSON text. */
+/** A stored transcript row of a task, its payload still JSON text. */
 export interface StoredCall {
+  task_id: string
   payload: string
   created_at: string
 }
+
+/** Enough of a task's newest candidate calls to find one that pushed. */
+const PUSH_CALLS = 200
 
 /** Each task's linked and dismissed PRs; a PR both linked and dismissed counts as linked. */
 const TASK_PRS = sql`SELECT task_id, pr_url, 0 AS dismissed FROM task_pr
@@ -52,11 +56,25 @@ export const prWatch = {
   ],
   /** Tool calls and results of the tasks linked to the PR, stored between `from` and `to`. */
   calls: async (url: string, from: string, to: string): Promise<StoredCall[]> => [
-    ...(await sql<StoredCall[]>`SELECT m.payload, m.created_at FROM task_message m
+    ...(await sql<StoredCall[]>`SELECT m.task_id, m.payload, m.created_at FROM task_message m
       WHERE m.task_id IN (SELECT task_id FROM task_pr WHERE pr_url = ${url}) AND m.kind = 'sdk'
         AND m.created_at >= ${from} AND m.created_at <= ${to}
         AND (strpos(m.payload, '"tool_use"') > 0 OR strpos(m.payload, '"tool_result"') > 0)
       ORDER BY m.id`),
+  ],
+  /** The task's newest calls that may push or open a PR since its last CI update on `subject`. */
+  pushCalls: async (taskId: string, subject: string): Promise<StoredCall[]> => [
+    ...(await sql<StoredCall[]>`SELECT m.task_id, m.payload, m.created_at FROM task_message m
+      WHERE m.task_id = ${taskId} AND m.kind = 'sdk' AND strpos(m.payload, '"tool_use"') > 0
+        AND (strpos(m.payload, 'push') > 0 OR strpos(m.payload, 'gh pr create') > 0
+          OR strpos(m.payload, '/pulls') > 0 OR strpos(m.payload, 'create_pull_request') > 0)
+        AND m.id > COALESCE((
+          SELECT MAX(i.id) FROM task_message i
+          WHERE i.task_id = ${taskId} AND i.kind = 'input' AND (i.payload::json ->> 'source') = 'pr'
+            AND (i.payload::json ->> 'subject') = ${subject}
+            AND (i.payload::json ->> 'kind') IN ('ci_passed', 'ci_failed')
+        ), 0)
+      ORDER BY m.id DESC LIMIT ${PUSH_CALLS}`),
   ],
   /** Tasks the EA watches that link this PR. */
   eaWatchers: async (url: string) =>

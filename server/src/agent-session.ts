@@ -6,7 +6,7 @@ import type {
   SDKResultMessage,
   SDKUserMessage,
 } from '@anthropic-ai/claude-agent-sdk'
-import type { PromptAttachment } from '@seti/shared'
+import type { NextMessage, QueuePriority } from './next-message.js'
 import type { UserContent } from './user-content.js'
 
 /** How long an interrupted turn may take to end before its session is closed. */
@@ -90,29 +90,6 @@ export function outcomeOf(running: boolean, interrupt: boolean): SendOutcome {
     return 'started'
   }
   return interrupt ? 'interrupted' : 'queued'
-}
-
-/** When Claude Code hands a message sent during a turn over: now, at the next step, or after it. */
-export type QueuePriority = NonNullable<SDKUserMessage['priority']>
-
-/** A message waiting for its session to start, or for the turn being cut short to end. */
-export interface NextMessage {
-  prompt: string | null
-  /** Files sent with the prompt; images among them go to the agent with the text. */
-  attachments?: PromptAttachment[]
-  /** It cut the running turn short, so it goes out once that turn ended. */
-  interrupted: boolean
-  /** The user's last message sent again; refused while a turn runs. */
-  retry?: boolean
-  /** The browser's id for the send, which its prompt row carries. */
-  client_id?: string
-  /** Who wrote it when not the user, such as the EA starting an agent; the agent is told. */
-  from?: string
-  /**
-   * For updates with no user text: reach a running turn at its next step, or now for a person's
-   * message, which moves the turn's running commands to the background; not after the turn.
-   */
-  priority?: Exclude<QueuePriority, 'later'>
 }
 
 /** A message Claude Code holds in its queue until the agent can read it. */
