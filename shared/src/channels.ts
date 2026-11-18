@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { DELIVERY_TIMINGS, type DeliveryTiming } from './channel-delivery.js'
 import { webhookSourceId, type WebhookSourceInfo } from './channel-sources.js'
 import type { EaNoticeSeverity } from './ea.js'
 import { POLLER_EVENT_KINDS, type PollerInfo } from './pollers.js'
@@ -84,6 +85,8 @@ export interface ChannelSubscription {
   events: string[] | null
   /** For the EA: act hands an alert's work to an existing agent unasked; tasks always report. */
   mode: ChannelEaMode
+  /** For a task: when its agent gets the updates; null follows the agent's update mode. */
+  delivery: DeliveryTiming | null
   created_at: string
 }
 
@@ -223,7 +226,12 @@ export const channelSubscribeInput = z.discriminatedUnion('target', [
     events: eventFilter.default(null),
     mode: z.enum(CHANNEL_EA_MODES).default('report'),
   }),
-  z.object({ target: z.literal('task'), task_id: z.string().min(1).max(100), events: eventFilter.default(null) }),
+  z.object({
+    target: z.literal('task'),
+    task_id: z.string().min(1).max(100),
+    events: eventFilter.default(null),
+    delivery: z.enum(DELIVERY_TIMINGS).nullable().default(null),
+  }),
 ])
 export type ChannelSubscribeInput = z.input<typeof channelSubscribeInput>
 

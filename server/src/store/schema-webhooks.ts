@@ -79,6 +79,14 @@ ALTER TABLE channel_subscription ADD CONSTRAINT channel_subscription_task_report
 ALTER TABLE ea_inbox ADD COLUMN act BOOLEAN NOT NULL DEFAULT false;
 `
 
+/** When a subscribed agent gets a channel's updates; NULL follows the agent's update mode. */
+export const CHANNEL_SUBSCRIPTION_DELIVERY = `
+ALTER TABLE channel_subscription ADD COLUMN delivery TEXT
+  CHECK (delivery IN ('now', 'after_turn', 'with_message'));
+ALTER TABLE channel_subscription ADD CONSTRAINT channel_subscription_ea_no_delivery
+  CHECK (target = 'task' OR delivery IS NULL);
+`
+
 /** The GitHub and Sentry webhooks and two poller templates moved into mods, named <mod>.<id>. */
 export const CHANNEL_SOURCE_MODS = `
 UPDATE channel SET preset = 'github-webhooks.github' WHERE preset = 'github';

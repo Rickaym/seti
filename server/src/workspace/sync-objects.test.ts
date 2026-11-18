@@ -217,7 +217,12 @@ describe('channels in task.md', () => {
       subscribe_ea: false,
       mapping: {},
     })
-    const sub = await subscriptions.subscribe(channel.id, { target: 'task', task_id: TASK, events: ['push'] })
+    const sub = await subscriptions.subscribe(channel.id, {
+      target: 'task',
+      task_id: TASK,
+      events: ['push'],
+      delivery: null,
+    })
     await vi.waitFor(() => {
       expect(read('task.md')).toContain('- Deploys (GitHub): push\n')
     })

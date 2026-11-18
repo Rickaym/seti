@@ -38,7 +38,8 @@ import { watchBlocked, watchTurnEnd } from './ea-turn-watch.js'
 import { jsonEtag } from './etag.js'
 import { githubTokenMode } from './github-token.js'
 import { fail, HttpError, ok } from './http.js'
-import { inputPreface, wakeAfterTurn } from './inputs.js'
+import { inputPreface } from './input-preface.js'
+import { wakeAfterTurn, wakeWhenUnblocked } from './inputs.js'
 import { knowledgeContext } from './knowledge-index.js'
 import { defaultLocalAuth } from './local-auth.js'
 import { forgetGoneServersLater } from './mcp-presence.js'
@@ -354,6 +355,7 @@ export function createApp(access: AccessGuardOptions = defaultAccess(), eaUrl: s
   registerTurnPreface(setiControlPreface)
   onTurnEnd(watchTurnEnd)
   onTurnEnd(wakeAfterTurn)
+  wakeWhenUnblocked()
   onTurnEnd((taskId) => {
     inBackground('pr discovery', async () => prDiscovery.run(taskId))
   })

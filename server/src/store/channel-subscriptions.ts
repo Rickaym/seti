@@ -1,10 +1,10 @@
-import type { ChannelEaMode, ChannelSubscription, ChannelTarget } from '@seti/shared'
+import type { DeliveryTiming, ChannelEaMode, ChannelSubscription, ChannelTarget } from '@seti/shared'
 import { sql } from '../db.js'
 
 type Row = Omit<ChannelSubscription, 'events'> & { events: string | null }
 
 const SELECT = sql`SELECT s.id, s.channel_id, c.name AS channel_name, c.preset, s.target, s.task_id,
-    t.title AS task_title, (t.archived_at IS NOT NULL) AS task_archived, s.events, s.mode, s.created_at
+    t.title AS task_title, (t.archived_at IS NOT NULL) AS task_archived, s.events, s.mode, s.delivery, s.created_at
   FROM channel_subscription s
   JOIN channel c ON c.id = s.channel_id
   LEFT JOIN task t ON t.id = s.task_id`
@@ -22,6 +22,7 @@ export interface NewSubscription {
   task_id: string | null
   events: readonly string[] | null
   mode?: ChannelEaMode
+  delivery?: DeliveryTiming | null
   created_at: string
 }
 
@@ -45,9 +46,9 @@ export const channelSubscriptions = {
   /** Undefined when the channel already has this subscriber. */
   add: async (sub: NewSubscription): Promise<ChannelSubscription | undefined> => {
     const [row] = await sql<{ id: number }[]>`INSERT INTO channel_subscription
-        (channel_id, target, task_id, events, mode, created_at)
+        (channel_id, target, task_id, events, mode, delivery, created_at)
       VALUES (${sub.channel_id}, ${sub.target}, ${sub.task_id}, ${eventsText(sub.events)}, ${sub.mode ?? 'report'},
-        ${sub.created_at})
+        ${sub.delivery ?? null}, ${sub.created_at})
       ON CONFLICT DO NOTHING RETURNING id`
     return row === undefined ? undefined : channelSubscriptions.get(row.id)
   },
@@ -57,6 +58,10 @@ export const channelSubscriptions = {
   },
   setMode: async (id: number, mode: ChannelEaMode): Promise<ChannelSubscription | undefined> => {
     await sql`UPDATE channel_subscription SET mode = ${mode} WHERE id = ${id}`
+    return channelSubscriptions.get(id)
+  },
+  setDelivery: async (id: number, delivery: DeliveryTiming | null): Promise<ChannelSubscription | undefined> => {
+    await sql`UPDATE channel_subscription SET delivery = ${delivery} WHERE id = ${id}`
     return channelSubscriptions.get(id)
   },
   remove: async (id: number): Promise<boolean> =>

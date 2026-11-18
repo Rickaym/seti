@@ -1,4 +1,4 @@
-import type { MessageRow, PrInput, TaskInput, TeamInput } from '@seti/shared'
+import type { ChannelInput, DeliveryTiming, MessageRow, PrInput, TaskInput, TeamInput } from '@seti/shared'
 import { describe, expect, it } from 'vitest'
 import { clockTime } from '@/components/account/format'
 import { dismissQuestion, waitingReason } from '@/lib/queued-inputs'
@@ -32,6 +32,19 @@ describe('waitingReason', () => {
     expect(waitingReason(mode, false, paused, [review]).kind).toBe('message')
   })
 
+  it('follows what each channel subscription chose', () => {
+    expect(waitingReason('wake', false, null, [event('with_message')]).kind).toBe('message')
+    expect(waitingReason('wake', true, null, [event('with_message'), review]).kind).toBe('turn')
+    expect(waitingReason('wake', true, null, [event('now'), review]).text).toBe(
+      'The agent gets them at the next step of this turn.',
+    )
+    expect(waitingReason('wake', true, null, [event('after_turn')]).text).toBe(
+      'The agent gets them when this turn ends.',
+    )
+    expect(waitingReason('wake', false, null, [event('now')]).kind).toBe('soon')
+    expect(waitingReason('queue', true, null, [event('now')]).kind).toBe('message')
+  })
+
   it('leaves group chat messages for the next message, as they never wake the agent', () => {
     expect(waitingReason('wake', false, null, [mention]).kind).toBe('message')
     expect(waitingReason('wake', true, PAUSED, [mention]).kind).toBe('message')
@@ -46,6 +59,20 @@ const review: PrInput = {
   body: '',
   url: null,
 }
+const event = (delivery: DeliveryTiming): ChannelInput => ({
+  source: 'channel',
+  kind: 'deploy',
+  channel: 'Deploys',
+  channel_id: 'hook',
+  event_id: 1,
+  severity: 'info',
+  subject: 'ci',
+  title: 'Deploy failed',
+  body: '',
+  url: null,
+  received_at: PAUSED,
+  delivery,
+})
 const mention: TeamInput = {
   source: 'team',
   kind: 'mention',
@@ -82,5 +109,25 @@ describe('queuedInputs', () => {
       inputRow(4, mention),
     ]
     expect(queuedInputs(rows).map((row) => row.id)).toEqual([4])
+  })
+
+  it('keeps updates held for the next message through automatic turns, until a hand-over or a message', () => {
+    const prompt = (id: number, payload: Extract<MessageRow, { kind: 'prompt' }>['payload']): MessageRow => ({
+      id,
+      task_id: 't',
+      outward: [],
+      created_at: PAUSED,
+      kind: 'prompt',
+      payload,
+    })
+    const rows: MessageRow[] = [
+      inputRow(1, event('with_message')),
+      inputRow(2, review),
+      prompt(3, { text: '', auto: true, inputs: 1 }),
+      inputRow(4, event('now')),
+    ]
+    expect(queuedInputs(rows).map((row) => row.id)).toEqual([1, 4])
+    expect(queuedInputs([...rows, prompt(5, { text: '', auto: true, held: true, inputs: 2 })])).toEqual([])
+    expect(queuedInputs([...rows, prompt(5, { text: 'morning', inputs: 2 })])).toEqual([])
   })
 })
