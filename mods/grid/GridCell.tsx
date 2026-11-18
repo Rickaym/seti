@@ -22,6 +22,8 @@ export interface CellProps {
   framed: boolean
   /** Streams its agent; a paused panel shows a stand-in until it is focused. */
   live: boolean
+  /** Shows the agent's status and latest message in place of its transcript and reply box. */
+  calm: boolean
   locked: boolean
   /** Arrow keys move and resize this panel. */
   arranging: boolean
@@ -36,6 +38,8 @@ export interface CellProps {
   onPicking: (id: string | null) => void
   onRemove: (id: string) => void
   onArrange: (id: string) => void
+  /** Folds the focused panel back to calm. */
+  onRest: () => void
   /** Shows a terminal outside the grid, or a new shell, in this empty panel. */
   onPickTerminal: (id: string, existing?: TerminalRef) => void
 }
@@ -212,10 +216,13 @@ function usePanelMenu({ id, task, locked, onRemove, onPicking, onArrange }: Cell
 /** A panel: an agent view, a paused stand-in or a picker; only the focused panel takes keys. */
 export const GridCell = memo(function GridCellView(props: CellProps) {
   const { id, task, focused, framed, locked, arranging, pickFrom, placed } = props
-  const { onFocusPanel, onPick, onPicking } = props
+  const { calm, onFocusPanel, onPick, onPicking, onRest } = props
   const [dropping, setDropping] = useState(false)
   const menu = usePanelMenu(props)
-  const frame = useMemo<Frame>(() => ({ id, focused, draggable: !locked, menu }), [id, focused, locked, menu])
+  const frame = useMemo<Frame>(
+    () => ({ id, focused, draggable: !locked, menu, calm, onEscape: onRest }),
+    [id, focused, locked, menu, calm, onRest],
+  )
 
   const colour = panelColour(task)
   /* eslint-disable jsx-a11y/no-noninteractive-element-interactions --
@@ -226,6 +233,7 @@ export const GridCell = memo(function GridCellView(props: CellProps) {
       data-grid-cell=""
       data-grid-panel={id}
       data-grid-focused={focused}
+      data-grid-calm={calm}
       {...seti().panels.markers.PANEL}
       {...seti().panels.markers.focused(focused)}
       data-grid-empty={task === null ? '' : undefined}

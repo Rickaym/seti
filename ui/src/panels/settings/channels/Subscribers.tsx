@@ -4,6 +4,7 @@ import type {
   ChannelRoute,
   ChannelSubscribeInput,
   ChannelSubscription,
+  DeliveryTiming,
   TaskListEntry,
 } from '@seti/shared'
 import { Bot, Pin, Plus, X, Zap } from 'lucide-react'
@@ -18,6 +19,7 @@ import { Switch } from '@/components/ui/switch'
 import { useTasks } from '@/hooks/useTasks'
 import { relativeTime } from '@/lib/time'
 import { cn } from '@/lib/utils'
+import { DeliveryPicker } from './DeliveryPicker'
 import { EventFilter } from './EventFilter'
 import { ROUTE_TONE } from './subscriptions'
 
@@ -96,8 +98,8 @@ function AddAgent({ subs, onAdd }: { subs: readonly ChannelSubscription[]; onAdd
 
 function Row({ label, children }: { label: ReactNode; children: ReactNode }) {
   return (
-    <li className="flex items-center gap-2 border-b border-border px-3 py-2 last:border-b-0">
-      <div className="min-w-0 flex-1">{label}</div>
+    <li className="flex flex-wrap items-center justify-end gap-2 border-b border-border px-3 py-2 last:border-b-0">
+      <div className="min-w-32 flex-1">{label}</div>
       <div className="flex shrink-0 items-center gap-1.5">{children}</div>
     </li>
   )
@@ -138,6 +140,9 @@ export function Subscribers({ info, onChange }: { info: ChannelInfo; onChange: (
   }
   const setMode = (sub: ChannelSubscription, mode: ChannelEaMode) => {
     save(sub, '/mode', { mode })
+  }
+  const setDelivery = (sub: ChannelSubscription, delivery: DeliveryTiming | null) => {
+    save(sub, '/delivery', { delivery })
   }
 
   return (
@@ -213,6 +218,14 @@ export function Subscribers({ info, onChange }: { info: ChannelInfo; onChange: (
               </div>
             }
           >
+            <DeliveryPicker
+              subscriber={sub.task_title ?? 'agent'}
+              delivery={sub.delivery}
+              disabled={busy}
+              onSave={(delivery) => {
+                setDelivery(sub, delivery)
+              }}
+            />
             <EventFilter
               info={info}
               subscriber={sub.task_title ?? 'agent'}

@@ -3,7 +3,8 @@
 TLDR: a poller is a channel for a service that sends no webhooks. Seti runs its small JavaScript
 module on a schedule in an isolated engine, compares the items it returns with the last run, and
 reports what is new, changed or gone to the channel's subscribers, like a webhook would. No model
-runs and nothing is spent unless something changed.
+runs and nothing is spent unless something changed. Each subscribed agent gets an update at once,
+after its turn or with the user's next message, as its subscription says.
 
 ## Where pollers fit
 
@@ -14,6 +15,38 @@ Settings, Channels, New, Poller creates one from a template, which stays a plain
 Blank is Seti's own; HTTP JSON and RSS/Atom feed come from the bundled Poller templates mod. A
 poller keeps its own copy of the script, so turning that mod off only takes its templates out of
 the menu and stops no poller.
+
+## When an agent gets an update
+
+Each agent's subscription to a channel says when the agent gets its updates. The subscriber list
+on the channel's card and the Channels row of the agent's settings both set it, and the Schedule
+tab and the subscriber list show it as a small label. It applies to pollers, reminders and
+webhooks alike.
+
+| Delivery      | Idle agent                        | Running turn                                 |
+| ------------- | --------------------------------- | -------------------------------------------- |
+| Agent default | as the agent's Updates setting    | as the agent's Updates setting               |
+| Now           | starts a turn                     | joins the turn at its next step              |
+| After turn    | starts a turn                     | waits for the turn's end, then starts a turn |
+| With message  | waits for the user's next message | waits for the user's next message            |
+
+Now reaches a running turn the way a message typed during it does: Claude Code hands it over
+between two steps, so nothing is interrupted or discarded. An update held for the user's next
+message never starts a turn and stays out of the turns Seti starts for other updates; it goes
+with the next message somebody writes to the agent, or joins the running turn once the user
+answers the agent's question. It waits in the bar above the composer until then, where Hand over
+gives it to the agent at once and Dismiss discards it.
+
+The agent's Updates setting caps the subscription's choice: Wait for my message holds every update
+for the next message, Off drops them, and only Wake the agent lets the choice apply. Agent default
+follows that setting, which makes it After turn for an agent that wakes. An agent blocked on the
+user, with a question or a permission request open, takes no update into its turn: Now waits until
+the user answered, then joins the turn. Updates that arrive within 5 seconds of each other, 30 at
+most, reach the agent as one batch, and a batch with a Now update in it joins the running turn
+whole. PR updates and group chat messages have no such choice and follow the agent's setting.
+
+The EA and agents set it with the `delivery` argument of `subscribe_channel`: `now`, `after_turn`,
+`with_message` or `agent`. Every change is audited with the old and the new value.
 
 ## The script
 
