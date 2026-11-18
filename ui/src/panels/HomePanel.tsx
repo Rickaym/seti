@@ -26,7 +26,7 @@ function openNode(node: GraphNodeSpec): void {
 function graphLabel(model: GraphModel): string {
   const count = (kind: GraphNodeSpec['kind']) => model.nodes.filter((node) => node.kind === kind).length
   const running = model.nodes.filter((node) => node.status === 'running').length
-  return `Graph of ${String(count('agent'))} agents, ${String(running)} running, with ${String(count('repo'))} repos, ${String(count('mcp'))} MCP servers and ${String(count('subagent'))} subagents running`
+  return `Graph of ${String(count('agent'))} agents, ${String(running)} running, with ${String(count('repo'))} repos and ${String(count('subagent'))} subagents running`
 }
 
 function EmptyGraph() {
