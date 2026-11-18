@@ -59,9 +59,7 @@ def _recent_line(fields: Mapping[str, Any], titles: Mapping[str, str], now: date
 def _agent_line(agent: Mapping[str, Any], titles: Mapping[str, str]) -> str:
     title = titles.get(str(agent.get("task_id")), "an archived agent")
     merged = int(_num(agent, "merged_30d"))
-    servers = ", ".join(str(use.get("server")) for use in dicts(agent.get("mcp"))[:3])
-    tools = f"; uses {servers}" if servers else ""
-    return f"- {title}: {merged} merged, {_work(agent, '30d')}{tools}."
+    return f"- {title}: {merged} merged, {_work(agent, '30d')}."
 
 
 def metrics_lines(summary: Any, titles: Mapping[str, str], now: datetime) -> list[str]:
