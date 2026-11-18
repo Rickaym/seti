@@ -27,6 +27,7 @@ from seti_ea.format import (
     PR_URL,
     ago,
     and_list,
+    asked,
     clip,
     duration,
     headings,
@@ -38,6 +39,7 @@ from seti_ea.format import (
     pr_label,
     pr_line,
     preview_word,
+    question_note,
     repo_name,
     size_words,
     status_note,
@@ -1097,10 +1099,9 @@ class EaTools:
                 "" if ref or len(names) < 2 else f" in {names.get(str(t.get('workspace_id')), 'a workspace')}"
             )
             seen = ", not seen yet" if t.get("unseen") is True else ""
+            state = f"{status_word(shown_status(t))}{question_note(t)}{status_note(t)}{seen}"
             lines.append(
-                f"- {title_of(t)}{where}: {status_word(shown_status(t))}{status_note(t)}{seen}, "
-                f"{task_repos(t)}, "
-                f"updated {ago(t.get('updated_at'), now)}"
+                f"- {title_of(t)}{where}: {state}, {task_repos(t)}, updated {ago(t.get('updated_at'), now)}"
             )
         if len(tasks) > LIST_LIMIT:
             lines.append(f"And {len(tasks) - LIST_LIMIT} older ones not listed.")
@@ -1172,6 +1173,8 @@ class EaTools:
         todos = todo_line(task)
         if todos is not None:
             lines.append(todos)
+        if asked(task):
+            lines.append(f'Its turn ended by asking you: "{asked(task)}"')
         if task.get("status_line"):
             since = ago(task.get("status_line_at"), now)
             lines.append(f'Its status line reads "{task.get("status_line")}", set {since}.')
@@ -2410,7 +2413,8 @@ class EaTools:
             parts.append("none running")
         parts.append(f"{idle} idle")
         if asking:
-            parts.append(f"{len(asking)} asking you ({', '.join(title_of(t) for t in asking[:3])})")
+            asks = ", ".join(f"{title_of(t)}{question_note(t).replace(',', ':', 1)}" for t in asking[:3])
+            parts.append(f"{len(asking)} asking you ({asks})")
         blocked = [t for t in tasks if shown_status(t) == "blocked"]
         if blocked:
             waits = ", ".join(f"{title_of(t)}: {t.get('blocked')}" for t in blocked[:3])

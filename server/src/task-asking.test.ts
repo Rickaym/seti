@@ -78,7 +78,7 @@ describe('agents asking the user', () => {
 
     expect(await asking(id)).toBe(true)
     const entry = (await read<TaskListEntry[]>('')).find((task) => task.id === id)
-    expect(entry?.asking).toBe(true)
+    expect(entry).toMatchObject({ asking: true, question: 'Should I open the PR now?' })
     const status = entry && listedStatus(entry)
     expect(status).toBe('asking')
     expect(status !== undefined && needsYou(status)).toBe(true)
@@ -102,6 +102,7 @@ describe('agents asking the user', () => {
     await finishTurn(id, 'question')
     await finishTurn(id, 'thanks')
     expect(await asking(id)).toBe(false)
+    expect((await read<TaskListEntry[]>('')).find((task) => task.id === id)?.question).toBeNull()
   })
 
   it('does not mark a turn whose last tool use was AskUserQuestion, which waits as questions', async () => {

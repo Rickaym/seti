@@ -123,6 +123,25 @@ async def test_list_tasks_says_which_agents_ask_the_user(tools: EaTools, fake_se
     assert (await tools.call("list_tasks", {"status": "idle"})).text == "There are no idle tasks."
 
 
+async def test_an_asking_agent_is_listed_with_the_question_it_asked(
+    tools: EaTools, fake_seti: FakeSeti
+) -> None:
+    fake_seti.tasks[1].update(asking=True, question="Should I push to `main` or wait for review?")
+    listed = await tools.call("list_tasks", {"status": "asking"})
+    assert listed.text.splitlines()[1] == (
+        '- Fix the logout button: asking you a question, "Should I push to main or wait for review?", '
+        "not seen yet, seti, updated 5 minutes ago"
+    )
+    detail = await tools.call("get_task", {"task": "logout"})
+    assert 'Its turn ended by asking you: "Should I push to main or wait for review?"' in detail.text
+    overview = await tools.call("seti_overview", {})
+    assert (
+        '1 asking you (Fix the logout button: "Should I push to main or wait for review?")' in overview.text
+    )
+    fake_seti.tasks[1].update(asking=False, question=None)
+    assert "asking you" not in (await tools.call("get_task", {"task": "logout"})).text
+
+
 async def test_a_task_with_running_subagents_counts_as_running(tools: EaTools, fake_seti: FakeSeti) -> None:
     fake_seti.subtasks[TASK_LOGOUT] = [subtask("toolu_bg", "Watch CI", "running", background=True)]
     running = await tools.call("list_tasks", {"status": "running"})

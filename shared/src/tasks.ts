@@ -44,6 +44,9 @@ export const NEEDS_YOU_STATUSES: readonly TaskDisplayStatus[] = [...FAILED_STATU
 
 export const needsYou = (status: TaskDisplayStatus) => NEEDS_YOU_STATUSES.includes(status)
 
+/** The reason line of an agent whose turn ended on a question written in its reply. */
+export const ASKED_IN_REPLY = 'Asked in its reply'
+
 /**
  * In the Needs you group: a needs-you status the user has not opened the agent to see yet, or a
  * blocked agent, which stays there until the user answers it.

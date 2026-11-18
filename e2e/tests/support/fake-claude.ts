@@ -9,6 +9,7 @@ import { InProcessClient, type SdkServer } from './fake-mcp.js'
 import { actPermission, PERMISSION_PROMPT, PLAN_APPROVAL_PROMPT, type CanUseTool } from './fake-permission.js'
 import { actQuestions, QUESTION_PROMPT } from './fake-question.js'
 import type { FakeHooks } from './fake-repeat.js'
+import { ASK_REPLY, plainReply } from './fake-replies.js'
 import { hookTurnOf } from './fake-review.js'
 import { sideChatQuery } from './fake-side-chat.js'
 import { actSteps, gateOf, type StepActor } from './fake-steps.js'
@@ -28,12 +29,6 @@ export const SESSION_PROMPT = 'which session is this'
 export const HOLD_PROMPT = 'keep working until stopped'
 /** The user row Claude Code writes when Query.interrupt cuts a turn short. */
 const INTERRUPT_MARKER = '[Request interrupted by user]'
-/** What a prompt asks for to get a turn that ends with ASK_REPLY, a question for the user. */
-export const ASK_PROMPT = 'ask me which branch'
-export const ASK_REPLY = 'The fix is ready on two branches.\n\nWhich one should I push?'
-
-const plainReply = (prompt: string) => (prompt.includes(ASK_PROMPT) ? ASK_REPLY : 'Done.')
-
 /**
  * A prompt that calls one tool of the session's seti MCP server, with its arguments as JSON;
  * with `hold` the turn then keeps working until stopped.
