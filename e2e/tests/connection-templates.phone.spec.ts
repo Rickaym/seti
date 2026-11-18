@@ -19,7 +19,11 @@ test('a service is picked by name, filled in and added on a phone', async ({ pag
   const picker = page.getByRole('dialog', { name: 'Add connection' })
   await expect(picker.getByRole('button', { name: 'Custom' })).toBeVisible()
   await expectFitsPhone(page, 'service picker')
+  const stripe = picker.getByRole('button', { name: 'Stripe' })
+  await expect(stripe.locator('svg[data-service-icon="stripe"]')).toBeVisible()
+  expect((await stripe.boundingBox())?.height).toBeGreaterThanOrEqual(44)
   await picker.getByLabel('Search services').fill('entra')
+  await expect(picker.getByRole('button', { name: 'Microsoft Entra app' }).locator('svg.lucide-cloud')).toBeVisible()
   await picker.getByRole('button', { name: 'Microsoft Entra app' }).tap()
 
   const form = page.getByRole('dialog', { name: 'Microsoft Entra app' })

@@ -96,6 +96,7 @@ const ENTRA: ConnectionTemplate = {
   title: 'Microsoft Entra app',
   description: 'An app registration with a client secret, for Microsoft Graph and Azure.',
   category: 'cloud',
+  icon: null,
   docs: 'https://learn.microsoft.com/en-us/entra/identity-platform/v2-oauth2-client-creds-grant-flow',
   fields: [
     {
@@ -147,6 +148,7 @@ const GOOGLE: ConnectionTemplate = {
   title: 'Google service account',
   description: 'A service account key file, for Google Workspace and Google Cloud APIs.',
   category: 'cloud',
+  icon: 'google',
   docs: 'https://developers.google.com/identity/protocols/oauth2/service-account',
   fields: [
     {
