@@ -405,6 +405,56 @@ a PR in a repo that login cannot read shows without a status.
 Starting an agent on a PR's branch still needs a checkout, so `start_agent_from_pr` refuses a PR
 whose repo Seti has none of.
 
+## PR updates wake an agent only for news
+
+The PR poller (`server/src/pr-inputs.ts`) reads every PR linked to an agent once a minute, compares
+it with the last snapshot in `pr_watch` and turns each change into an update for the linked agents:
+CI failed or passed, a review, a comment, a conflict, a merge or a close. Updates from one poll
+reach an agent as one batch, and batches that follow within a few seconds join the same turn.
+
+Three kinds of update are recorded without starting a turn. Each still shows in the agent's
+transcript, greyed and marked with the reason, and the PR views show the same state as before.
+
+| Mark                     | When                                                                    | What the agent gets          |
+| ------------------------ | ----------------------------------------------------------------------- | ---------------------------- |
+| not sent: own action     | the agent posted the comment or review, or merged or closed the PR      | nothing                      |
+| not sent: repeat         | checks ran again on a commit and ended as Seti reported them before     | nothing                      |
+| no wake: nothing pending | CI passed, no failure was reported before it, and the agent pushed none | the pass, with its next turn |
+
+A batch in which every update is quiet starts no turn; a mixed batch wakes the agent with the rest.
+Quiet updates never count as waiting, so they raise no "queued" bar and cannot be dismissed. Other
+agents linked to the same PR, and the EA when it watches one of them, are told what an agent did
+as before.
+
+An agent and the user often act as the same GitHub login, so the author of an event does not say
+who acted. Seti reads the agent's own tool calls instead (`server/src/pr-self.ts`):
+
+- A comment or review is the agent's when the output of one of its posting calls (`gh pr comment`,
+  `gh pr review`, a `gh api` write to comments, reviews or replies, a GitHub MCP comment or review
+  tool) links it by its id. This match is exact.
+- When that output links nothing, a post is the agent's if the host's `gh` login wrote it on the PR
+  the call names, or on any linked PR when the call names none, while the call ran, with 5 seconds
+  allowed for clock difference. A comment the user writes under the same login on the same PR in
+  those seconds is taken for the agent's.
+- A merge or close is the agent's when one of its calls (`gh pr merge`, `gh pr close`, the matching
+  `gh api` and GitHub MCP calls) ran on that PR at the time GitHub gives for the PR's end, with the
+  same allowance. A merge that `gh pr merge --auto` lands later is news and wakes the agent.
+
+Anything Seti cannot tie to a call of that agent is delivered, so a script that posts through
+other means comes back as an update.
+
+A pass wakes the agent when the last CI result Seti reported for the PR was a failure, or when the
+agent pushed or opened a PR since Seti last gave it a CI result for this PR (`git push`,
+`gh pr create`, a GitHub MCP push): it started the run, so it waits for the result. Any other pass,
+such as one after someone else updated the branch, is recorded quietly. A failure always wakes.
+
+A failure is reported once per head commit, and again only for checks that had not failed on it
+before. A conflict is reported once per head commit and base branch, until GitHub finds the PR
+merging cleanly again. GitHub recomputes mergeability whenever the base branch moves and reports it
+unknown in between; the same commit still conflicts after that, so it is not reported again. A new
+head commit that still conflicts, a PR retargeted to another base branch, and a conflict that comes
+back after a clean merge state are news.
+
 ## Mods add to Seti through registries with disposers
 
 A mod is a package described by `seti-mod.json`, validated by `modManifest` in

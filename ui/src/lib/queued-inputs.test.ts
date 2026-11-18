@@ -74,12 +74,14 @@ describe('dismissQuestion', () => {
 })
 
 describe('queuedInputs', () => {
-  it('leaves out dismissed updates and those before the last prompt the agent read', () => {
+  it('leaves out dismissed and quiet updates and those before the last prompt the agent read', () => {
     const rows: MessageRow[] = [
       inputRow(1, review),
       { id: 2, task_id: 't', outward: [], created_at: PAUSED, kind: 'prompt', payload: { text: 'go' } },
       inputRow(3, { ...review, dismissed_at: PAUSED }),
       inputRow(4, mention),
+      inputRow(5, { ...review, quiet: 'own_action' }),
+      inputRow(6, { ...review, quiet: 'nothing_pending' }),
     ]
     expect(queuedInputs(rows).map((row) => row.id)).toEqual([4])
   })
