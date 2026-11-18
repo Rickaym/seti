@@ -43,7 +43,7 @@ test('the header has no Fix CI while no linked PR fails', async ({ page, request
   await page.goto(`/#agents/${agent.id}`)
   const main = page.getByRole('main')
   await expect(main.getByRole('group', { name: 'Pull request quiet#1' })).toContainText('ci pass')
-  await expect(main.getByRole('button', { name: 'Fix CI' })).toHaveCount(0)
+  await expect(main.getByRole('button', { name: 'Fix CI', exact: true })).toHaveCount(0)
 })
 
 test('Fix CI in the Agents list nudges two agents, each about its own PRs, after a confirm', async ({
@@ -52,7 +52,7 @@ test('Fix CI in the Agents list nudges two agents, each about its own PRs, after
 }) => {
   const agents = await twoAgentsToNudge(page, request, 'E2E nudge')
   await page.goto('/#agents')
-  const fix = page.getByRole('button', { name: 'Fix CI' })
+  const fix = page.getByRole('button', { name: 'Fix CI', exact: true })
   await expect(fix).toContainText('3')
   await fix.click()
   await expectNudgeConfirm(page, agents)
@@ -70,5 +70,5 @@ test('the Agents list has no Fix CI while no agent has a failing PR', async ({ p
   await page.goto('/#agents')
   await asked
   await expect(page.getByRole('button', { name: 'New agent' })).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Fix CI' })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Fix CI', exact: true })).toHaveCount(0)
 })

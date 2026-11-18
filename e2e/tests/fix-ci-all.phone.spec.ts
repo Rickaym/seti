@@ -33,7 +33,7 @@ test('Fix CI at the top of the phone PR sheet sends one message naming both fail
 test('Fix CI in the phone Agents list nudges two agents after a confirm', async ({ page, request }) => {
   const agents = await twoAgentsToNudge(page, request, 'Phone nudge')
   await page.goto('/#agents')
-  const fix = page.getByRole('button', { name: 'Fix CI' })
+  const fix = page.getByRole('button', { name: 'Fix CI', exact: true })
   await expect(fix).toContainText('3')
   await expectFitsPhone(page, 'Agents list with Fix CI')
   await fix.tap()
