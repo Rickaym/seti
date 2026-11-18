@@ -414,7 +414,7 @@ describe('task inputs', () => {
       await quietSpell(id)
       await wakeWaiting()
       await waitIdle(id)
-      expect(sdk.state.prompts).toEqual([])
+      expect(await prompts(id)).toEqual([])
       expect((await inputRows(id)).map((row) => (row.payload.source === 'pr' ? row.payload.quiet : null))).toEqual([
         'own_action',
         'repeat',
