@@ -16,6 +16,10 @@ test('Add server lists common connectors and fills the add form from one', async
   const catalog = page.getByRole('dialog', { name: 'Add MCP server' })
   const common = catalog.getByRole('region', { name: 'Common' })
   await expect(common.getByRole('button', { name: 'Supabase' })).toBeVisible()
+  await expect(
+    common.getByRole('button', { name: 'Supabase' }).locator('svg[data-service-icon="supabase"]'),
+  ).toBeVisible()
+  await expect(common.getByRole('button', { name: 'Slack' }).locator('svg.lucide-plug')).toBeVisible()
   await expect(common.getByRole('button', { name: 'Slack' })).toContainText('slack@claude-plugins-official')
 
   await catalog.getByRole('textbox', { name: 'Search connectors' }).fill('gmail')

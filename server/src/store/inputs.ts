@@ -5,6 +5,10 @@ import { readPayload } from '../stored-rows.js'
 /** A prompt that reached the agent's queue and was not taken back before the agent read it. */
 const SENT = sql`COALESCE(payload::json ->> 'queued', '') <> 'removed'`
 const NOT_DISMISSED = sql`(payload::json ->> 'dismissed_at') IS NULL`
+/** Not a PR update Seti only recorded, which waits for nobody. */
+const NOT_QUIET = sql`(payload::json ->> 'quiet') IS NULL`
+/** A pass nobody waited for still goes to the agent with its next turn. */
+const READABLE = sql`COALESCE(payload::json ->> 'quiet', 'nothing_pending') = 'nothing_pending'`
 
 /** The id of the last prompt the agent read; updates after it wait for the agent. */
 // eslint-disable-next-line @typescript-eslint/promise-function-async -- a fragment, never awaited
@@ -24,21 +28,36 @@ const lastHeldRead = (taskId: string) => sql`COALESCE((
     AND (COALESCE(payload::json ->> 'auto', 'false') = 'false' OR (payload::json ->> 'held') = 'true')
 ), 0)`
 
-/** An undismissed update the agent has not read; a held one outlasts automatic turns. */
+/** An undismissed update after the prompt that read its kind; a held one outlasts automatic turns. */
 // eslint-disable-next-line @typescript-eslint/promise-function-async -- a fragment, never awaited
-const waiting = (taskId: string) => sql`task_id = ${taskId} AND kind = 'input' AND ${NOT_DISMISSED}
+const unread = (taskId: string) => sql`task_id = ${taskId} AND kind = 'input' AND ${NOT_DISMISSED}
   AND id > CASE WHEN ${HELD} THEN ${lastHeldRead(taskId)} ELSE ${lastRead(taskId)} END`
+
+/** An unread update that waits for the agent, which a quiet one never does. */
+// eslint-disable-next-line @typescript-eslint/promise-function-async -- a fragment, never awaited
+const waiting = (taskId: string) => sql`${unread(taskId)} AND ${NOT_QUIET}`
+
+/** The newest `limit` unread updates: those that wait, or all the agent reads with a turn. */
+async function newest(
+  taskId: string,
+  limit: number,
+  scope: { held: boolean; readable: boolean },
+): Promise<TaskInput[]> {
+  const rows = await sql<{ id: number; payload: string }[]>`SELECT id, payload FROM (
+      SELECT id, payload FROM task_message
+      WHERE ${unread(taskId)} AND ${scope.readable ? READABLE : NOT_QUIET} ${scope.held ? sql`` : sql`AND NOT ${HELD}`}
+      ORDER BY id DESC LIMIT ${limit}
+    ) AS pending ORDER BY id`
+  return rows.flatMap((row) => readPayload({ task_id: taskId, id: row.id }, 'input', row.payload) ?? [])
+}
 
 export const taskInputs = {
   /** The newest `limit` waiting updates; without `held`, only those an automatic turn takes. */
   pending: async (taskId: string, limit: number, held = true): Promise<TaskInput[]> =>
-    (
-      await sql<{ id: number; payload: string }[]>`SELECT id, payload FROM (
-        SELECT id, payload FROM task_message
-        WHERE ${waiting(taskId)} ${held ? sql`` : sql`AND NOT ${HELD}`}
-        ORDER BY id DESC LIMIT ${limit}
-      ) AS pending ORDER BY id`
-    ).flatMap((row) => readPayload({ task_id: taskId, id: row.id }, 'input', row.payload) ?? []),
+    newest(taskId, limit, { held, readable: false }),
+  /** What the agent reads with a turn: the waiting updates and the quiet ones that go along. */
+  forTurn: async (taskId: string, limit: number, held = true): Promise<TaskInput[]> =>
+    newest(taskId, limit, { held, readable: true }),
   /**
    * How soon the waiting updates of these sources want a turn: now when any asks to join a
    * running turn, else after_turn; null when none may start a turn, as held ones never do.

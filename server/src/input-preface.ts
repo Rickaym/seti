@@ -90,7 +90,7 @@ const describeSeti = (input: SetiInput) =>
  * user's next message go only with a turn that takes them.
  */
 export async function inputPreface(taskId: string, turn: PrefacedTurn = { held: true }): Promise<TurnPreface | null> {
-  const pending = await taskInputs.pending(taskId, PREFACE_INPUTS, turn.held)
+  const pending = await taskInputs.forTurn(taskId, PREFACE_INPUTS, turn.held)
   if (pending.length === 0) {
     return null
   }

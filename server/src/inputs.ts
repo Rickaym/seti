@@ -10,6 +10,7 @@ import {
   WAKING_SOURCES,
   deliveryStep,
   heldForMessage,
+  quietReason,
   sourceCounts,
 } from '@seti/shared'
 import { audit } from './audit.js'
@@ -271,7 +272,7 @@ function wakeSoon(taskId: string): void {
 
 export type InputOutcome = Pick<ChannelRoute, 'outcome' | 'reason'>
 
-/** Records updates and, if the task wants that, wakes the agent once more updates stop coming. */
+/** Records updates and, unless all are quiet, wakes a task that wants that once they stop coming. */
 export async function deliverInputs(taskId: string, inputs: readonly TaskInput[]): Promise<InputOutcome> {
   return inLane(taskId, async (): Promise<InputOutcome> => {
     const task = await tasks.get(taskId)
@@ -287,7 +288,11 @@ export async function deliverInputs(taskId: string, inputs: readonly TaskInput[]
     for (const input of inputs) {
       await appendMessage(taskId, { kind: 'input', payload: input })
     }
-    if (inputs.every(heldForMessage)) {
+    const live = inputs.filter((input) => quietReason(input) === undefined)
+    if (live.length === 0) {
+      return { outcome: 'ignored', reason: 'Recorded without starting a turn' }
+    }
+    if (live.every(heldForMessage)) {
       await watchUpdatesWaiting(taskId)
       return { outcome: 'queued', reason: task.input_mode === 'wake' ? HELD_FOR_MESSAGE : HOLDS }
     }

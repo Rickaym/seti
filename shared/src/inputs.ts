@@ -9,6 +9,19 @@ export type InputMode = (typeof INPUT_MODES)[number]
 export const PR_INPUT_KINDS = ['ci_failed', 'ci_passed', 'review', 'comment', 'conflict', 'merged', 'closed'] as const
 export type PrInputKind = (typeof PR_INPUT_KINDS)[number]
 
+/**
+ * Why Seti recorded a PR update without starting a turn for it. The agent never reads its own
+ * action or a repeat; a pass nobody waited for goes along with its next turn.
+ */
+export type PrQuietReason = 'own_action' | 'repeat' | 'nothing_pending'
+
+/** How a quiet update is marked wherever updates are listed. */
+export const QUIET_LABELS: Record<PrQuietReason, string> = {
+  own_action: 'not sent: own action',
+  repeat: 'not sent: repeat',
+  nothing_pending: 'no wake: nothing pending',
+}
+
 interface InputBase {
   /** What the update is about, such as `owner/repo#123`. */
   subject: string
@@ -36,6 +49,8 @@ export interface PrInput extends InputBase {
   kind: PrInputKind
   /** The subagent the PR is linked to; its parent agent gets the update addressed to it. */
   subtask?: InputSubtask
+  /** Set when Seti only recorded the update, with the reason. */
+  quiet?: PrQuietReason
 }
 
 /** A team chat message for this task: it mentioned the task, went to it alone, or to every one. */
@@ -88,6 +103,10 @@ export interface SetiInput extends InputBase {
 
 /** An update from outside the conversation that the task's agent receives on its next turn. */
 export type TaskInput = PrInput | TeamInput | WorkspaceInput | ChannelInput | AgentInput | SetiInput
+
+/** Why Seti started no turn for the update, or undefined for one that waits for the agent. */
+export const quietReason = (input: TaskInput): PrQuietReason | undefined =>
+  input.source === 'pr' ? input.quiet : undefined
 
 /** Updates of these sources start a turn in a task that wakes on updates. */
 export const WAKING_SOURCES: readonly TaskInput['source'][] = ['pr', 'channel', 'agent', 'seti']
