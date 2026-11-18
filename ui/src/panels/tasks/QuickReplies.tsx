@@ -50,7 +50,7 @@ export function QuickReplies({ taskId, messages }: { taskId: string; messages: r
             className="max-w-full min-w-0 pointer-coarse:min-h-11 pointer-coarse:px-3"
             onClick={() => {
               setSent(true)
-              sendAsUser(taskId, text)
+              void sendAsUser(taskId, text)
             }}
           >
             <Icon />
