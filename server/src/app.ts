@@ -27,7 +27,7 @@ import {
 import { cancelWaitsOnArchive, deliverAgentWaits } from './agent-waits.js'
 import { briefOnReturn } from './attention-brief.js'
 import { inBackground } from './background.js'
-import { setAfterProbe, setProbePlugins } from './capabilities.js'
+import { setAfterProbe, setProbeLauncher, setProbePlugins } from './capabilities.js'
 import { compressEventStreams } from './compress-events.js'
 import { EA_URL, PERMISSION_MODE, PUBLIC_ACCESS, UI_DIST } from './config.js'
 import { connectionContext } from './connection-egress.js'
@@ -53,6 +53,7 @@ import { notifyStatusEvent, notifyTurnEnd } from './notifications.js'
 import { PAIR_PAGE } from './pair-page.js'
 import { defaultPluginConfigs } from './plugins.js'
 import { prDiscovery } from './pr-discovery.js'
+import { sandboxedProbeLaunch } from './probe-launch.js'
 import { stoppedPreface } from './process-stop.js'
 import { questionsContext } from './questions.js'
 import { accessRoutes } from './routes/access.js'
@@ -333,6 +334,7 @@ export function createApp(access: AccessGuardOptions = defaultAccess(), eaUrl: s
   registerContextProvider(taskReposContext)
   registerContextProvider(importedContext)
   setProbePlugins(defaultPluginConfigs)
+  setProbeLauncher(sandboxedProbeLaunch)
   setAfterProbe(forgetGoneServersLater)
   registerContextProvider(sandboxPrompt)
   registerContextProvider(connectionContext)
