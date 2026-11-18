@@ -1138,8 +1138,7 @@ midnight:
 | Turns           | turn results in `task_message`                                                                            |
 | Time running    | each turn's reported `duration_ms`                                                                        |
 | Cost            | each turn's own cost, stored with its result                                                              |
-| MCP servers     | `mcp__<server>__` tool calls in the agent's messages                                                      |
-| Calls right now | the runner's in-memory open tool calls, with their MCP server and subagent                                |
+| Calls right now | the runner's in-memory open tool calls, with their subagent                                               |
 
 The counts come per day as well as for the week and the month, so the EA can report today and
 compare the week with the 7 days before. The latest merges are the six newest PRs
@@ -1149,8 +1148,7 @@ A PR linked to two agents counts once in the totals and once for each agent, and
 dismissed before the merge does not count. The streak is the run of days with a merge, ending
 today or, while today has none yet, yesterday. Archived agents keep their merged PRs; their turns
 moved into the archive and are left out. The counts are reused until a message is stored or a PR
-merges, and redone at most every 5 seconds. The MCP count reads only the messages stored since the
-last read, so a busy install pays for each message once.
+merges, and redone at most every 5 seconds.
 
 ## Every stall goes through Needs you
 

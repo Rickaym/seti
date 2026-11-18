@@ -11,7 +11,7 @@ export interface Shipped {
 
 const hoursAgo = (hours: number) => new Date(Date.now() - hours * 3_600_000).toISOString()
 
-/** An idle agent with one turn, one GitHub MCP call and one PR that merged an hour ago. */
+/** An idle agent with one turn and one PR that merged an hour ago. */
 export async function seedShipped(prefix: string): Promise<Shipped> {
   const db = openSeedDb()
   const id = randomUUID()
@@ -19,8 +19,6 @@ export async function seedShipped(prefix: string): Promise<Shipped> {
   const pr = `https://github.com/acme/web/pull/${String(Date.now() % 100_000)}`
   await db.idleTask(id, title, paths.checkout, hoursAgo(3))
   await db.run(`UPDATE task SET color = '#3baca6' WHERE id = ?`, id)
-  const call = { type: 'tool_use', id: `toolu_${id.slice(0, 8)}`, name: 'mcp__github__create_pull_request', input: {} }
-  await db.message(id, 'sdk', JSON.stringify({ type: 'assistant', message: { content: [call] } }), hoursAgo(2.5))
   const result = { type: 'result', subtype: 'success', duration_ms: 90_000, seti_turn_cost_usd: 0.42 }
   await db.message(id, 'sdk', JSON.stringify(result), hoursAgo(2))
   const snapshot = { state: 'merged', conflicting: false, ci: null, review_ids: [], comment_ids: [] }

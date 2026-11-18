@@ -32,11 +32,6 @@ async function message(taskId: string, payload: object, at: string): Promise<voi
 
 const result = (cost: number, ms: number) => ({ type: 'result', duration_ms: ms, seti_turn_cost_usd: cost })
 
-const mcpCall = (name: string) => ({
-  type: 'assistant',
-  message: { content: [{ type: 'tool_use', id: `toolu_${name}`, name, input: { note: '"name":"mcp__fake__x' } }] },
-})
-
 async function get(path: string, auth = USER_AUTH): Promise<Response> {
   return app.request(`/api/home${path}`, { headers: { host: 'localhost', ...auth } })
 }
@@ -48,10 +43,6 @@ beforeAll(async () => {
   await message('home-a', result(1.5, 60_000), daysAgo(0))
   await message('home-a', result(2, 120_000), daysAgo(10))
   await message('home-a', result(9, 1), daysAgo(35))
-  await message('home-b', mcpCall('mcp__github__create_pull_request'), daysAgo(2))
-  await message('home-b', mcpCall('mcp__github__get_issue'), daysAgo(2))
-  await message('home-b', mcpCall('mcp__linear__search'), daysAgo(3))
-  await message('home-b', mcpCall('mcp__github__old'), daysAgo(40))
   await sql`INSERT INTO task_pr (task_id, pr_url, linked_at, source) VALUES
     ('home-b', ${SHARED}, ${daysAgo(5)}, 'agent')`
   await sql`INSERT INTO task_pr_dismissed (task_id, pr_url, at) VALUES
@@ -74,10 +65,6 @@ describe('GET /api/home', () => {
     expect(a?.run_ms_30d).toBe(180_000)
     const b = data.agents.find((agent) => agent.task_id === 'home-b')
     expect(b).toMatchObject({ merged_30d: 1, turns_30d: 0 })
-    expect(b?.mcp).toEqual([
-      { server: 'github', calls: 2 },
-      { server: 'linear', calls: 1 },
-    ])
     expect(data.totals).toMatchObject({ merged_7d: 2, merged_30d: 2, turns_30d: 2, cost_7d_usd: 1.5 })
     expect(data.days).toHaveLength(30)
     expect(data.days.at(-1)).toMatchObject({ merged: 0, turns: 1, cost_usd: 1.5, run_ms: 60_000 })
@@ -91,7 +78,7 @@ describe('GET /api/home', () => {
     expect(data.recent[1]?.task_ids.toSorted()).toEqual(['home-a', 'home-b'])
   })
 
-  it('shows the calls running now, with the MCP server and subagent they belong to', async () => {
+  it('shows the calls running now, with the subagent they belong to', async () => {
     trackToolCalls('home-b', {
       type: 'assistant',
       parent_tool_use_id: 'toolu_agent',
@@ -102,7 +89,6 @@ describe('GET /api/home', () => {
       expect.objectContaining({
         task_id: 'home-b',
         tool: 'mcp__github__merge',
-        server: 'github',
         subagent: 'toolu_agent',
       }),
     ])
