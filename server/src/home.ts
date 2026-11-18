@@ -4,13 +4,11 @@ import {
   type HomeAgentStats,
   type HomeDay,
   type HomeLiveCall,
-  type HomeMcpUse,
   type HomeMerge,
   type HomeQuery,
   type HomeSummary,
   type HomeTally,
 } from '@seti/shared'
-import { mcpUse } from './home-mcp.js'
 import { homeStore, type MergedLink, type TurnDay } from './store/home.js'
 import { openToolCalls } from './tool-calls.js'
 
@@ -81,7 +79,6 @@ interface Sources {
   days: string[]
   turns: TurnDay[]
   merged: MergedLink[]
-  mcp: Map<string, HomeMcpUse[]>
 }
 
 const weekStartOf = (days: readonly string[]) => days.at(-HOME_DAYS.week) ?? ''
@@ -89,11 +86,10 @@ const weekStartOf = (days: readonly string[]) => days.at(-HOME_DAYS.week) ?? ''
 const byShipped = (a: HomeAgentStats, b: HomeAgentStats) =>
   b.merged_30d === a.merged_30d ? b.turns_30d - a.turns_30d : b.merged_30d - a.merged_30d
 
-function agentStats({ days, turns, merged, mcp }: Sources): HomeAgentStats[] {
+function agentStats({ days, turns, merged }: Sources): HomeAgentStats[] {
   const weekStart = weekStartOf(days)
   const agents = new Map<string, HomeAgentStats>()
-  const agent = (taskId: string): HomeAgentStats =>
-    agents.get(taskId) ?? { task_id: taskId, ...EMPTY_TALLY, mcp: mcp.get(taskId) ?? [] }
+  const agent = (taskId: string): HomeAgentStats => agents.get(taskId) ?? { task_id: taskId, ...EMPTY_TALLY }
   for (const row of turns) {
     const stats = agent(row.task_id)
     agents.set(row.task_id, { ...stats, ...withTurns(stats, row, row.day >= weekStart) })
@@ -169,18 +165,17 @@ function totals({ days, turns, merged }: Sources): Pick<Counted, 'totals' | 'day
   }
 }
 
-async function countIn(zone: string, today: string, now: number): Promise<Counted> {
+async function countIn(zone: string, today: string): Promise<Counted> {
   const days = lastDays(today, HOME_DAYS.month)
   const [first = '', last = ''] = [days[0], days.at(-1)]
   const since = new Date(Date.parse(`${first}T00:00:00Z`) - ZONE_SLACK_MS).toISOString()
   const fromId = await homeStore.firstIdSince(since)
-  const [turns, merged, mcp] = await Promise.all([
+  const [turns, merged] = await Promise.all([
     fromId === null ? [] : homeStore.turnDays(since, zone, fromId),
     homeStore.mergedLinks(since, zone),
-    mcpUse(now),
   ])
   const inWindow = (row: { day: string }) => row.day >= first && row.day <= last
-  const sources = { days, turns: turns.filter(inWindow), merged: merged.filter(inWindow), mcp }
+  const sources = { days, turns: turns.filter(inWindow), merged: merged.filter(inWindow) }
   const summed = totals(sources)
   return { zone, ...summed, streak_days: shippingStreak(summed.days), agents: agentStats(sources) }
 }
@@ -189,7 +184,6 @@ function liveCalls(): HomeLiveCall[] {
   return openToolCalls().map(({ taskId, call }) => ({
     task_id: taskId,
     tool: call.name,
-    server: /^mcp__(.+?)__/.exec(call.name)?.[1] ?? null,
     subagent: call.parent,
     since: new Date(call.since).toISOString(),
   }))
@@ -214,7 +208,7 @@ async function counted(query: HomeQuery, now: number): Promise<Counted> {
   if (cache.size >= CACHE_KEYS) {
     cache.clear()
   }
-  const summary = countIn(zone, today, now)
+  const summary = countIn(zone, today)
   cache.set(key, { at: now, mark, summary })
   summary.catch(() => {
     cache.delete(key)
