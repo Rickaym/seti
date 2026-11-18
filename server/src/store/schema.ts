@@ -193,5 +193,5 @@ export const MIGRATIONS: readonly Migration[] = [
   { version: 104, name: 'permission_review', sql: PERMISSION_REVIEW },
   { version: 105, name: 'pr_list_cache', sql: PR_LIST_CACHE },
   { version: 106, name: 'shared_tools', sql: SHARED_TOOLS },
-  { version: 108, name: 'channel_subscription_delivery', sql: CHANNEL_SUBSCRIPTION_DELIVERY },
+  { version: 107, name: 'channel_subscription_delivery', sql: CHANNEL_SUBSCRIPTION_DELIVERY },
 ]
