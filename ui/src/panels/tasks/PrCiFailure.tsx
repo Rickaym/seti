@@ -1,23 +1,12 @@
-import type { PullRequest, TaskListEntry } from '@seti/shared'
+import type { PullRequest } from '@seti/shared'
 import { ExternalLink, Wrench } from 'lucide-react'
 import { useState, type ComponentProps } from 'react'
-import { toast } from 'sonner'
 import { Hint } from '@/components/Hint'
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { sendAsUser } from '@/hooks/usePendingSends'
-import { navigate, parseHash } from '@/lib/route'
-import { useAgentFrame } from '@/panels/tasks/agent-frame'
+import { useFixCi, type PrAgent } from '@/panels/tasks/fix-ci'
 import { CheckIcon, CiBadge } from '@/panels/tasks/pr-badges'
-import { checkOutcome, failingChecks, fixCiMessage } from '@/panels/tasks/pr-ci'
-
-/** The agent a PR belongs to: the one it is linked to, or the parent of the subagent it is. */
-export type PrAgent = Pick<TaskListEntry, 'id' | 'title'>
-
-const viewing = (agentId: string) => {
-  const route = parseHash()
-  return route.section === 'agents' && route.id === agentId && route.sub === null
-}
+import { checkOutcome, failingChecks } from '@/panels/tasks/pr-ci'
 
 interface FailingChecksProps {
   pr: PullRequest
@@ -29,14 +18,10 @@ interface FailingChecksProps {
 /** Each failing check of a PR with how it ended and its log, then Fix CI, which tells its agent. */
 export function FailingChecks({ pr, agent, onSent }: FailingChecksProps) {
   const failing = failingChecks(pr)
-  const framed = useAgentFrame() !== null
+  const ask = useFixCi(agent)
   const fix = () => {
-    sendAsUser(agent.id, fixCiMessage(pr))
+    ask([pr])
     onSent()
-    if (!framed && !viewing(agent.id)) {
-      navigate('agents', agent.id)
-    }
-    toast.success(`Asked ${agent.title} to fix CI on #${String(pr.number)}`)
   }
   return (
     <div className="grid gap-1.5" data-testid="failing-checks">
@@ -67,7 +52,7 @@ export function FailingChecks({ pr, agent, onSent }: FailingChecksProps) {
           ))}
         </ul>
       )}
-      <Hint text="Ask the agent to fix the failing checks">
+      <Hint text="Ask the agent to fix CI on this PR">
         <Button size="xs" className="justify-self-start pointer-coarse:min-h-11" onClick={fix}>
           <Wrench />
           Fix CI

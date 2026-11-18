@@ -1,5 +1,5 @@
 import httpx
-from fakes import FakeSeti, team_message
+from fakes import TASK_DOCS, TASK_LOGOUT, FakeSeti, team_message
 
 from seti_ea.announce import ToolAnnouncer, ToolCall
 from seti_ea.chat import INBOX_TOOLS
@@ -151,14 +151,76 @@ async def test_a_direct_message_finds_the_agent_by_title_and_names_who_sees_it(
     assert by_handle.summary == "Sent @button a direct message"
 
 
+def fix_ci_nudge(task_id: str, title: str, message: str) -> dict[str, object]:
+    return {"task": {"id": task_id, "title": title, "status": "idle"}, "prs": [], "message": message}
+
+
+async def test_fix_ci_sends_each_agent_its_own_short_message(tools: EaTools, fake_seti: FakeSeti) -> None:
+    fake_seti.fix_ci = {
+        "nudges": [
+            fix_ci_nudge(
+                TASK_LOGOUT, "Fix the logout button", "CI is failing on #1 and #2. Please fix them."
+            ),
+            fix_ci_nudge(TASK_DOCS, "Write deploy docs", "CI is failing on #7. Please fix it."),
+        ],
+        "skipped": [{"task": {"id": "old", "title": "Old agent", "status": "idle"}, "reason": "archived"}],
+        "unlinked": 2,
+        "error": None,
+    }
+    result = await tools.call("post_team_chat", {"fix_ci": True})
+    assert result.ok
+    assert fake_seti.posts() == [
+        ("/api/team/messages", {"text": "CI is failing on #1 and #2. Please fix them.", "to": "button"}),
+        ("/api/team/messages", {"text": "CI is failing on #7. Please fix it.", "to": "docs"}),
+    ]
+    assert result.summary == "Asked 2 agents to fix CI"
+    assert result.text.splitlines() == [
+        "Asked 2 agents to fix CI, each by direct message:",
+        '- Fix the logout button: "CI is failing on #1 and #2. Please fix them."',
+        '- Write deploy docs: "CI is failing on #7. Please fix it."',
+        "- Skipped Old agent: it is archived.",
+        "- Skipped 2 failing PRs with no agent linked.",
+    ]
+
+
+async def test_fix_ci_for_one_agent_asks_seti_for_that_agent_alone(
+    tools: EaTools, fake_seti: FakeSeti
+) -> None:
+    fake_seti.fix_ci["nudges"] = [
+        fix_ci_nudge(TASK_LOGOUT, "Fix the logout button", "CI is failing on #1. Please fix it."),
+        fix_ci_nudge(TASK_DOCS, "Write deploy docs", "CI is failing on #7. Please fix it."),
+    ]
+    result = await tools.call("post_team_chat", {"fix_ci": True, "to": "deploy docs"})
+    asked = [r for r in fake_seti.requests if r.url.path == "/api/prs/fix-ci"]
+    assert [dict(r.url.params) for r in asked] == [{"task": TASK_DOCS}]
+    assert fake_seti.posts() == [
+        ("/api/team/messages", {"text": "CI is failing on #7. Please fix it.", "to": "docs"})
+    ]
+    assert result.summary == "Asked 1 agent to fix CI"
+
+
+async def test_fix_ci_with_nothing_failing_sends_nothing(tools: EaTools, fake_seti: FakeSeti) -> None:
+    fake_seti.fix_ci["unlinked"] = 1
+    result = await tools.call("post_team_chat", {"fix_ci": True})
+    assert fake_seti.posts() == []
+    assert result.text.splitlines() == [
+        "No open PR linked to an agent that takes messages has failing CI.",
+        "- Skipped 1 failing PR with no agent linked.",
+    ]
+    missing = await tools.call("post_team_chat", {})
+    assert not missing.ok
+
+
 async def test_an_act_report_may_only_send_direct_messages(tools: EaTools, fake_seti: FakeSeti) -> None:
     token = DIRECT_ONLY.set(True)
     try:
         refused = await tools.call("post_team_chat", {"text": "@all heads up"})
+        every_agent = await tools.call("post_team_chat", {"fix_ci": True})
     finally:
         DIRECT_ONLY.reset(token)
     assert not refused.ok
     assert "direct message" in refused.text
+    assert not every_agent.ok
     assert fake_seti.posts() == []
 
 

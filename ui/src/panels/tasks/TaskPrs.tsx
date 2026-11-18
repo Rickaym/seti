@@ -7,11 +7,13 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { refreshTasks } from '@/hooks/useTasks'
 import { TOUCH_TARGET } from '@/lib/touch'
 import { cn } from '@/lib/utils'
+import { AgentFixCi } from '@/panels/tasks/FixCi'
 import { MoreLinkedPrs } from '@/panels/tasks/LinkedPrList'
 import { PrChips } from '@/panels/tasks/PrChips'
-import { FailingCiBadge, FailingCiButton, type PrAgent } from '@/panels/tasks/PrCiFailure'
+import { FailingCiBadge, FailingCiButton } from '@/panels/tasks/PrCiFailure'
 import { PrPicker } from '@/panels/tasks/PrPicker'
-import { orderLinkedPrs, type LinkedPr } from '@/panels/tasks/linked-prs'
+import type { PrAgent } from '@/panels/tasks/fix-ci'
+import { failingPrs, orderLinkedPrs, type LinkedPr } from '@/panels/tasks/linked-prs'
 import { CiBadge, Tag, ThreadsBadge } from '@/panels/tasks/pr-badges'
 import { prsPath, unlinkWithUndo } from '@/panels/tasks/pr-links'
 import { usePrStatuses } from '@/panels/tasks/usePrStatuses'
@@ -194,6 +196,7 @@ function PrChipRow({ urls, states, homeSlug, path, owner, agent, limit, picker, 
           </div>
         </div>
       )}
+      <AgentFixCi agent={agent} prs={failingPrs(ordered)} inline />
       {picker}
     </div>
   )

@@ -1,5 +1,5 @@
 import type { APIRequestContext } from '@playwright/test'
-import type { PrList, Repo } from '@seti/shared'
+import type { FixCiPlan, PrList, Repo } from '@seti/shared'
 import { fakeGhEnv, prNode, setFakeGh } from './fake-gh-env.js'
 import { apiData, expect, unique } from './fixtures.js'
 import { startAgent } from './many-prs.js'
@@ -84,4 +84,8 @@ export async function expectListedWithoutRepos(request: APIRequestContext, seede
       [linked.slug, linked.title, 'failure', [agent.id]],
     ])
   expect((await apiData<PrList>(request, '/prs')).viewer).toBe(VIEWER)
+  const plan = await apiData<FixCiPlan>(request, `/prs/fix-ci?task=${agent.id}`)
+  expect(plan.nudges.map((nudge) => [nudge.task.id, nudge.message])).toEqual([
+    [agent.id, 'CI is failing on #3. Please fix it.'],
+  ])
 }

@@ -375,6 +375,14 @@ on GitHub, and every open PR linked to an agent, whether the agent opened it or 
 it. A PR needs no registered repo to show its title, CI, review threads, owning agents and Fix CI.
 Open PRs that other people wrote appear only once an agent links them.
 
+Fix CI sends an agent one short message as the user, such as "CI is failing on #482 and #915.
+Please fix them.", with the repo before each number when the PRs span several; the agent reads the
+checks itself. `GET /api/prs/fix-ci` plans it for every agent, or for one with `?task=`
+(`planFixCi` in `shared/src/pr-fix-ci.ts`): each agent linked to an open PR with failing CI gets
+one message naming only its own PRs, archived and stopped agents are skipped, and failing PRs with
+no agent are counted. The Agents list's Fix CI button shows that plan and asks before it sends, and
+the EA sends the same messages as direct messages through `post_team_chat` with `fix_ci`.
+
 The list and the detail of a PR are read apart, because GitHub answers them at very different
 speeds. The list is two searches for `is:pr is:open author:@me sort:updated-desc` with pages of
 100, run side by side (`server/src/github-list.ts`): the rows (number, title, repo, branches,

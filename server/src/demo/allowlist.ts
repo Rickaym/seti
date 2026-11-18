@@ -91,6 +91,7 @@ const READS = [
   '/api/plugins/defaults',
   '/api/prs',
   '/api/prs/by-url',
+  '/api/prs/fix-ci',
   '/api/repos',
   '/api/resources',
   '/api/resources/cpu',
