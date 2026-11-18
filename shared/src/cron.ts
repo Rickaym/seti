@@ -36,8 +36,9 @@ export function runsBetween(cron: string, timezone: string, range: { from: Date;
 
 /** The newest slot at or before `at`, or null when the schedule has none. */
 export function previousRunTime(cron: string, timezone: string, at: Date): string | null {
-  // croner counts whole seconds and returns slots before the second of its reference time
-  const [slot] = croner(cron, timezone).previousRuns(1, new Date(at.getTime() + 1000))
+  // croner returns slots before its reference time, so ask from a second later and skip any past `at`
+  const slots = croner(cron, timezone).previousRuns(2, new Date(at.getTime() + 1000))
+  const slot = slots.find((run) => run.getTime() <= at.getTime())
   return slot === undefined ? null : slot.toISOString()
 }
 

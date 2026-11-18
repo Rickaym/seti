@@ -561,11 +561,10 @@ def default_home() -> dict[str, Any]:
                 **tally,
                 "merged_30d": 6,
                 "cost_30d_usd": 20,
-                "mcp": [{"server": "github", "calls": 9}],
             },
-            {"task_id": "gone", **tally, "merged_30d": 3, "cost_30d_usd": 11, "mcp": []},
+            {"task_id": "gone", **tally, "merged_30d": 3, "cost_30d_usd": 11},
         ],
-        "live": [{"task_id": TASK_LOGIN, "tool": "Bash", "server": None, "subagent": None, "since": ""}],
+        "live": [{"task_id": TASK_LOGIN, "tool": "Bash", "subagent": None, "since": ""}],
     }
 
 
