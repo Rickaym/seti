@@ -8,7 +8,6 @@ const TOKENS = [
   '--muted-foreground',
   '--border',
   '--card',
-  '--accent',
   '--primary',
   '--warning',
   '--destructive',
@@ -22,7 +21,6 @@ export interface GraphInk {
   muted: string
   border: string
   card: string
-  accent: string
   primary: string
   warning: string
   destructive: string
@@ -45,7 +43,6 @@ export function readGraphInk(): GraphInk | null {
     muted,
     border: hexOf(tokens['--border']),
     card: hexOf(tokens['--card']),
-    accent: hexOf(tokens['--accent']),
     primary: hexOf(tokens['--primary']),
     warning: hexOf(tokens['--warning']),
     destructive: hexOf(tokens['--destructive']),
