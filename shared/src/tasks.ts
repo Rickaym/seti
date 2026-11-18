@@ -363,7 +363,8 @@ export type MessageBody =
    * A note from Seti; `stopped` marks one about a process the user stopped, `session` one about a
    * session restart and `seti_control` one about the agent's Seti control level, which the agent
    * reads; `memory` one about the agent's memory cap, with `ended_turn` when the cap stopped Claude
-   * Code itself; `bypass` one about Bypass turning on or off.
+   * Code itself; `bypass` one about Bypass turning on or off; `resumed` one about a turn that a
+   * restart of Seti cut off and Seti resumed by itself.
    */
   | {
       kind: 'seti'
@@ -376,6 +377,7 @@ export type MessageBody =
         /** The level before this change, so a change undone before the next turn says nothing. */
         seti_control_was?: SetiControlLevel
         bypass?: boolean
+        resumed?: boolean
         memory?: MemoryEvent
         ended_turn?: boolean
       }

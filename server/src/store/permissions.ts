@@ -5,9 +5,12 @@ import { now, sql } from '../db.js'
 export type NewPermissionRequest = Pick<
   PermissionRequest,
   'id' | 'task_id' | 'tool_name' | 'kind' | 'summary' | 'input' | 'reason' | 'suggestions' | 'editable'
->
+> & {
+  /** A hash of the exact call, which an answer given after a restart allows once. */
+  input_hash?: string
+}
 
-type RequestRecord = Omit<PermissionRequest, 'suggestions'> & { suggestions: string }
+type RequestRecord = Omit<PermissionRequest, 'suggestions'> & { suggestions: string; input_hash: string | null }
 
 function readSuggestions(text: string): string[] {
   try {
@@ -18,7 +21,10 @@ function readSuggestions(text: string): string[] {
   }
 }
 
-const toRequest = (row: RequestRecord): PermissionRequest => ({ ...row, suggestions: readSuggestions(row.suggestions) })
+const toRequest = ({ input_hash: _hash, ...row }: RequestRecord): PermissionRequest => ({
+  ...row,
+  suggestions: readSuggestions(row.suggestions),
+})
 
 const requests = (rows: readonly RequestRecord[]) => rows.map(toRequest)
 
@@ -58,10 +64,11 @@ export const permissionRules = {
 export const permissionRequests = {
   open: async (request: NewPermissionRequest): Promise<PermissionRequest> => {
     const [row] = await sql<RequestRecord[]>`INSERT INTO permission_request
-      (id, task_id, tool_name, kind, summary, input, reason, suggestions, editable, state, created_at)
+      (id, task_id, tool_name, kind, summary, input, reason, suggestions, editable, state, created_at,
+        input_hash)
       VALUES (${request.id}, ${request.task_id}, ${request.tool_name}, ${request.kind}, ${request.summary},
         ${request.input}, ${request.reason}, ${JSON.stringify(request.suggestions)}, ${request.editable},
-        'pending', ${now()}) RETURNING *`
+        'pending', ${now()}, ${request.input_hash ?? null}) RETURNING *`
     if (row === undefined) {
       throw new Error('The permission request was not recorded')
     }
@@ -101,12 +108,19 @@ export const permissionRequests = {
       await sql<RequestRecord[]>`SELECT * FROM permission_request
         WHERE task_id = ${taskId} ORDER BY created_at DESC, id DESC LIMIT ${limit}`,
     ),
-  /** Drops every pending request, as at startup when no process waits on one; returns their ids. */
-  cancelAll: async (): Promise<string[]> =>
+  /**
+   * The pending requests a restart left with no call waiting, which can no longer be edited since
+   * their input went with the process; returns each with its task.
+   */
+  orphan: async (): Promise<{ id: string; task_id: string }[]> =>
     (
-      await sql<{ id: string }[]>`UPDATE permission_request SET state = 'cancelled', decided_at = ${now()}
-        WHERE state = 'pending' RETURNING id`
-    ).map((row) => row.id),
+      await sql<{ id: string; task_id: string }[]>`UPDATE permission_request SET editable = false
+        WHERE state = 'pending' RETURNING id, task_id`
+    ).map((row) => ({ ...row })),
+  /** The hash of the request's exact call; null for one recorded before hashes. */
+  hashOf: async (id: string): Promise<string | null> =>
+    (await sql<{ input_hash: string | null }[]>`SELECT input_hash FROM permission_request WHERE id = ${id}`).at(0)
+      ?.input_hash ?? null,
 }
 
 export const bypass = {

@@ -19,6 +19,7 @@ import { projectSettingsRules, userSettingsRules } from './inherited-rules.js'
 import { changedFields, withFields } from './permission-edits.js'
 import { builtInRules, GUARDS } from './permission-policy.js'
 import { allowed, denied, inputText, resolveRequest, waitingInput, waitsFor } from './permission-requests.js'
+import { deliverLateDecision, isLateRequest } from './restart-waits.js'
 import { reviewCoverage, reviewGaps } from './review-coverage.js'
 import { liveSessions } from './runner.js'
 import { permissionSettings } from './session-options.js'
@@ -190,6 +191,12 @@ async function auditAnswer(
 function callOf(request: PermissionRequest, input: AnswerPermissionInput) {
   const original = waitingInput(request.id)
   const fields = input.decision === 'deny' ? {} : (input.fields ?? {})
+  if (isLateRequest(request.id)) {
+    if (Object.keys(fields).length > 0) {
+      throw new HttpError(409, 'A restart ended this call, so it cannot be edited; allow or deny it as it is')
+    }
+    return { call: original, edited: [], shown: undefined }
+  }
   const edited = changedFields(original, fields)
   if (edited.length === 0) {
     return { call: original, edited, shown: undefined }
@@ -201,23 +208,33 @@ function callOf(request: PermissionRequest, input: AnswerPermissionInput) {
   return { call, edited, shown: inputText(call) }
 }
 
-/** The user's answer to a request the agent waits on; Always allow also keeps its rules, if any. */
+/** The task's request the answer is for; refused unless a call or a restart's leftover waits. */
+async function answerable(task: Task, requestId: string, input: AnswerPermissionInput): Promise<PermissionRequest> {
+  const request = await permissionRequests.get(requestId)
+  if (request?.task_id !== task.id) {
+    throw new HttpError(404, 'No such permission request')
+  }
+  if (request.state !== 'pending' || !(waitsFor(request.id) || isLateRequest(request.id))) {
+    throw new HttpError(409, 'The agent no longer waits on this request')
+  }
+  if (input.decision === 'always' && request.suggestions.length === 0 && request.kind !== 'repeat') {
+    throw new HttpError(409, 'This call has no rule to always allow; allow it once instead')
+  }
+  return request
+}
+
+/**
+ * The user's answer to a request the agent waits on; Always allow also keeps its rules, if any.
+ * The answer to a request a restart cut off resumes the agent with it instead.
+ */
 export async function answerPermission(
   task: Task,
   requestId: string,
   input: AnswerPermissionInput,
 ): Promise<PermissionRequest> {
   refuseAgent('answer permission requests')
-  const request = await permissionRequests.get(requestId)
-  if (request?.task_id !== task.id) {
-    throw new HttpError(404, 'No such permission request')
-  }
-  if (request.state !== 'pending' || !waitsFor(request.id)) {
-    throw new HttpError(409, 'The agent no longer waits on this request')
-  }
-  if (input.decision === 'always' && request.suggestions.length === 0 && request.kind !== 'repeat') {
-    throw new HttpError(409, 'This call has no rule to always allow; allow it once instead')
-  }
+  const request = await answerable(task, requestId, input)
+  const late = isLateRequest(request.id)
   const message = input.decision === 'deny' ? (input.message ?? null) : null
   const { call, edited, shown } = callOf(request, input)
   const settled = await permissionRequests.settle(
@@ -236,6 +253,9 @@ export async function answerPermission(
   const always = input.decision === 'always'
   const result = input.decision === 'deny' ? denied(message) : allowed(settled, call, permissionModeOf(task), always)
   await resolveRequest(settled, result)
+  if (late) {
+    await deliverLateDecision(settled)
+  }
   return settled
 }
 

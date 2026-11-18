@@ -4,6 +4,7 @@ import { tasks } from './db.js'
 import { changeRequests } from './store/change-requests.js'
 import { permissionRequests } from './store/permissions.js'
 import { questions } from './store/questions.js'
+import { restartCuts } from './store/restart.js'
 import { onAnyTaskEvent, publish } from './task-events.js'
 
 const LINE_CHARS = 120
@@ -66,6 +67,7 @@ async function refresh(taskId: string): Promise<string | null> {
     permissionLine(await permissionRequests.pending(taskId)) ??
     questionLine(await questions.openList(taskId)) ??
     changeLine(await changeRequests.pending(taskId)) ??
+    (await restartCuts.held(taskId)) ??
     stallLine(taskId)
   if (await tasks.setBlocked(taskId, blocked)) {
     publish(taskId, { type: 'blocked', blocked })
@@ -75,7 +77,8 @@ async function refresh(taskId: string): Promise<string | null> {
 
 /**
  * Sets the task's reason line from what it waits on: a permission request first, then its open
- * questions, then a change the agent asked for, else a stall.
+ * questions, then a change the agent asked for, then restarts that keep cutting it off, else a
+ * stall.
  * A change tells the task's views, and a new reason pushes a needs-you notification.
  */
 export async function refreshBlocked(taskId: string): Promise<string | null> {

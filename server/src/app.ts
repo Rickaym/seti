@@ -55,6 +55,8 @@ import { defaultPluginConfigs } from './plugins.js'
 import { prDiscovery } from './pr-discovery.js'
 import { stoppedPreface } from './process-stop.js'
 import { questionsContext } from './questions.js'
+import { noteTurnFinished } from './restart-resume.js'
+import { settleLeftoversOnTurnStart } from './restart-waits.js'
 import { accessRoutes } from './routes/access.js'
 import { accountRoutes } from './routes/account.js'
 import { archivedGuard, archiveRoutes, taskArchiveRoutes } from './routes/archive.js'
@@ -365,6 +367,8 @@ export function createApp(access: AccessGuardOptions = defaultAccess(), eaUrl: s
   onAnyTaskEvent(watchBlocked)
   onTurnEnd(statusLineTurnEnded)
   clearStallsOnTurnStart()
+  settleLeftoversOnTurnStart()
+  onTurnEnd(noteTurnFinished)
   restartQuietOnAnswer()
   clearStatusLinesWhenIdle()
   onTurnEnd(deliverAgentWaits)

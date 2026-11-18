@@ -7,6 +7,8 @@ import type {
   SDKUserMessage,
 } from '@anthropic-ai/claude-agent-sdk'
 import type { PromptAttachment } from '@seti/shared'
+import { InputQueue } from './input-queue.js'
+import type { CutKind } from './store/restart.js'
 import type { UserContent } from './user-content.js'
 
 /** How long an interrupted turn may take to end before its session is closed. */
@@ -17,67 +19,6 @@ const ARRIVAL_WAIT_MS = 2000
 const CONTEXT_WAIT_MS = 3000
 
 type BackgroundTasks = Extract<SDKMessage, { subtype: 'background_tasks_changed' }>['tasks']
-
-/** The user messages of one query, handed over as they come until the queue is closed. */
-class InputQueue implements AsyncIterable<SDKUserMessage> {
-  private readonly waiting: SDKUserMessage[]
-  private readonly sent: SDKUserMessage[]
-  private wake: (() => void) | null = null
-  private closed = false
-
-  constructor(replayed: readonly SDKUserMessage[] = []) {
-    this.waiting = [...replayed]
-    this.sent = [...replayed]
-  }
-
-  push(content: UserContent, uuid: UUID, priority?: SDKUserMessage['priority']): void {
-    const message: SDKUserMessage = {
-      type: 'user',
-      message: { role: 'user', content },
-      parent_tool_use_id: null,
-      uuid,
-      ...(priority === undefined ? {} : { priority }),
-      // Claude Code joins only a person's "now" message to the running turn; others end it.
-      ...(priority === 'now' ? { origin: { kind: 'human' } } : {}),
-    }
-    this.waiting.push(message)
-    this.sent.push(message)
-    this.wakeUp()
-  }
-
-  close(): void {
-    this.closed = true
-    this.wakeUp()
-  }
-
-  /** Closes this queue and returns one that hands over the same messages again. */
-  replay(): InputQueue {
-    this.close()
-    return new InputQueue(this.sent)
-  }
-
-  async *[Symbol.asyncIterator](): AsyncGenerator<SDKUserMessage> {
-    for (;;) {
-      const next = this.waiting.shift()
-      if (next !== undefined) {
-        yield next
-        continue
-      }
-      if (this.closed) {
-        return
-      }
-      await new Promise<void>((resolve) => {
-        this.wake = resolve
-      })
-    }
-  }
-
-  private wakeUp(): void {
-    const wake = this.wake
-    this.wake = null
-    wake?.()
-  }
-}
 
 /** Why the running turn is being cut short: Stop, or a message sent with the interrupt flag. */
 type TurnEnding = 'stop' | 'replace'
@@ -183,6 +124,10 @@ export class LiveSession {
   /** Why Claude Code retries the API, since its last message of work; null when it does not. */
   retrying: string | null = null
   private openerTimer: ReturnType<typeof setTimeout> | null = null
+  /** What started the running turn: a written message, updates, or background work. */
+  turnKind: CutKind = 'user'
+  /** Seti is stopping, so the next start resumes the turn instead of this one reporting its end. */
+  restartCut = false
 
   constructor(backlog: NextMessage[]) {
     this.backlog = backlog
@@ -286,7 +231,8 @@ export class LiveSession {
   }
 
   /** Sends a message into the session, which starts a turn. */
-  send(content: UserContent, promptId: number): void {
+  send(content: UserContent, promptId: number, kind: CutKind = 'user'): void {
+    this.turnKind = kind
     this.since ??= promptId
     this.heardAt = Date.now()
     this.cancelIdle()
@@ -456,11 +402,23 @@ export class LiveSession {
     })
   }
 
+  /** Ends the running turn as Seti stops: interrupted where Claude Code can, else closed. */
+  cutForRestart(): void {
+    this.restartCut = true
+    this.backlog = []
+    if (this.started && this.query !== null) {
+      this.interrupt('stop')
+    } else {
+      this.close()
+    }
+  }
+
   /** Background work reporting back started a turn; false when one was already running. */
   resumeWork(): boolean {
     if (this.running) {
       return false
     }
+    this.turnKind = 'wake'
     this.carryOn()
     return true
   }

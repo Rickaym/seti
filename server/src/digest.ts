@@ -203,8 +203,13 @@ function sdkLines(m: SDKMessage, lookup: Lookup): [DigestKind, string][] {
   return []
 }
 
-const setiNoteIsError = ({ session, seti_control, bypass }: Extract<MessageRow, { kind: 'seti' }>['payload']) =>
-  session === undefined && seti_control === undefined && bypass === undefined
+const setiNoteIsError = ({
+  session,
+  seti_control,
+  bypass,
+  resumed,
+}: Extract<MessageRow, { kind: 'seti' }>['payload']) =>
+  session === undefined && seti_control === undefined && bypass === undefined && resumed !== true
 
 function rowLines(row: MessageRow, lookup: Lookup): [DigestKind, string][] {
   switch (row.kind) {

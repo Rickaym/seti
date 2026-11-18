@@ -131,10 +131,17 @@ async function stop(child: ChildProcess, pid: number): Promise<void> {
 export interface WorkerServer {
   baseURL: string
   close: () => Promise<void>
+  /** Stops the server as a deploy does and starts it again on the same port, home and database. */
+  restart: () => Promise<void>
 }
 
-/** Starts Node in the server folder and resolves once it listens; `drop` names its database. */
-async function launch(args: string[], env: NodeJS.ProcessEnv, drop: 'worker' | 'demo'): Promise<WorkerServer> {
+interface Started {
+  child: ServerProcess
+  pid: number
+  origin: string
+}
+
+async function start(args: string[], env: NodeJS.ProcessEnv): Promise<Started> {
   const child = spawn(process.execPath, args, {
     cwd: SERVER_DIR,
     env,
@@ -147,24 +154,43 @@ async function launch(args: string[], env: NodeJS.ProcessEnv, drop: 'worker' | '
     await started
     throw new Error('Seti started without a process id')
   }
-  /** A worker that exits without its teardown still takes its server along. */
-  const orphaned = () => {
-    if (running(child)) {
-      process.kill(-pid, 'SIGKILL')
-    }
-  }
-  process.once('exit', orphaned)
-  const close = async () => {
-    process.off('exit', orphaned)
+  try {
+    return { child, pid, origin: await started }
+  } catch (e) {
     await stop(child, pid)
+    throw e
+  }
+}
+
+/** Starts Node in the server folder and resolves once it listens; `drop` names its database. */
+async function launch(args: string[], env: NodeJS.ProcessEnv, drop: 'worker' | 'demo'): Promise<WorkerServer> {
+  const cleanUp = async () => {
     await dropDatabases(drop)
     fs.rmSync(paths.root, { recursive: true, force: true })
   }
-  try {
-    return { baseURL: await started, close }
-  } catch (e) {
-    await close()
+  let current = await start(args, env).catch(async (e: unknown) => {
+    await cleanUp()
     throw e
+  })
+  /** A worker that exits without its teardown still takes its server along. */
+  const orphaned = () => {
+    if (running(current.child)) {
+      process.kill(-current.pid, 'SIGKILL')
+    }
+  }
+  process.once('exit', orphaned)
+  const baseURL = current.origin
+  return {
+    baseURL,
+    close: async () => {
+      process.off('exit', orphaned)
+      await stop(current.child, current.pid)
+      await cleanUp()
+    },
+    restart: async () => {
+      await stop(current.child, current.pid)
+      current = await start(args, { ...env, SETI_PORT: new URL(baseURL).port })
+    },
   }
 }
 

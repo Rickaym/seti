@@ -2,13 +2,14 @@ import { RESENT_NOTE, type MessageRow } from '@seti/shared'
 
 export type SetiPayload = Extract<MessageRow, { kind: 'seti' }>['payload']
 
-export const isFailureNote = ({ memory, session, stopped, seti_control: control, bypass, error }: SetiPayload) =>
-  memory === undefined &&
-  session === undefined &&
-  stopped !== true &&
-  control === undefined &&
-  bypass === undefined &&
-  error !== RESENT_NOTE
+export const isFailureNote = (payload: SetiPayload) =>
+  payload.memory === undefined &&
+  payload.session === undefined &&
+  payload.stopped !== true &&
+  payload.seti_control === undefined &&
+  payload.bypass === undefined &&
+  payload.resumed !== true &&
+  payload.error !== RESENT_NOTE
 
 /** The failed turn no message has followed yet, which the notice under the transcript shows. */
 export function openFailure(messages: readonly MessageRow[]): number | null {

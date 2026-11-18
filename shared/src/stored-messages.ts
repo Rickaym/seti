@@ -101,6 +101,7 @@ const setiPayload = z.looseObject({
   seti_control: z.union([z.boolean(), setiControlLevel]).optional(),
   seti_control_was: setiControlLevel.optional(),
   bypass: z.boolean().optional(),
+  resumed: z.boolean().optional(),
 })
 
 const shellPayload = z.looseObject({

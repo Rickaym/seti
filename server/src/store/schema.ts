@@ -34,6 +34,7 @@ import { CHANNEL_EVENT_ROUTING, CHANNEL_RUN_DUE, POLLER_CHANNELS } from './schem
 import { PR_LIST_CACHE } from './schema-prs.js'
 import { QUESTION_SECRETS, QUESTIONS } from './schema-questions.js'
 import { DROP_ROUTINES, REMINDER_CHANNELS, REMINDER_CRON } from './schema-reminders.js'
+import { RESTART_CUTS } from './schema-restart.js'
 import { PACK_KIND, rolesToPacks } from './schema-roles.js'
 import { MESSAGE_SEARCH, MESSAGE_SEARCH_TALK, MESSAGE_TIME } from './schema-search.js'
 import {
@@ -192,4 +193,5 @@ export const MIGRATIONS: readonly Migration[] = [
   { version: 104, name: 'permission_review', sql: PERMISSION_REVIEW },
   { version: 105, name: 'pr_list_cache', sql: PR_LIST_CACHE },
   { version: 106, name: 'shared_tools', sql: SHARED_TOOLS },
+  { version: 111, name: 'restart_cuts', sql: RESTART_CUTS },
 ]
