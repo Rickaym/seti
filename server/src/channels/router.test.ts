@@ -548,7 +548,7 @@ describe('the channel_subscriptions migration', () => {
     await sql`ALTER TABLE channel_event DROP COLUMN kind`
     await sql`ALTER TABLE channel_delivery DROP COLUMN routes`
     await sql`ALTER TABLE ea_inbox DROP COLUMN act`
-    await sql`DELETE FROM schema_migration WHERE version IN (18, 48, 108)`
+    await sql`DELETE FROM schema_migration WHERE version IN (18, 48, 107)`
     const at = '2026-09-01T00:00:00.000Z'
     for (const [id, on] of [
       ['migrate-on-aaaaaaaaaaaaa', 1],
@@ -557,7 +557,7 @@ describe('the channel_subscriptions migration', () => {
       await sql`INSERT INTO channel (id, name, preset, secret, deliver_to_ea, mapping, created_at, updated_at)
         VALUES (${id}, ${id}, 'generic', 'plain', ${on}, '{}', ${at}, ${at})`
     }
-    expect(await migrate(sql)).toEqual([18, 48, 108])
+    expect(await migrate(sql)).toEqual([18, 48, 107])
     expect(await channelSubscriptions.forChannel('migrate-on-aaaaaaaaaaaaa')).toMatchObject([
       { target: 'ea', task_id: null, events: null, mode: 'report', delivery: null, created_at: at },
     ])
