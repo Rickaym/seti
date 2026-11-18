@@ -1,6 +1,7 @@
+from datetime import timedelta
 from typing import Any
 
-from fakes import FakeSeti
+from fakes import NOW, FakeSeti
 
 from seti_ea.prompt import SYSTEM_PROMPT
 from seti_ea.tools import EaTools
@@ -138,7 +139,7 @@ async def test_search_seti_lists_every_request_and_says_which_only_the_user_answ
     tools: EaTools, fake_seti: FakeSeti
 ) -> None:
     empty = await tools.call("search_seti", {"in": "requests"})
-    assert empty.text == "Nothing waits on the user in Requests."
+    assert empty.text.startswith("Nothing waits on the user in Requests. Seti denies a tool call or plan")
     fake_seti.questions = [dict(PUSH)]
     fake_seti.change_requests = [
         {
@@ -161,6 +162,27 @@ async def test_search_seti_lists_every_request_and_says_which_only_the_user_answ
     assert lines[5] == "1 knowledge note only the user approves, in Seti, Requests:"
     assert lines[6].startswith('- "Build first", proposed')
     assert result.summary == "4 requests waiting"
+
+
+async def test_search_seti_says_when_a_request_times_out_and_what_the_timeout_is(
+    tools: EaTools, fake_seti: FakeSeti
+) -> None:
+    soon = (NOW + timedelta(minutes=42, seconds=30)).isoformat().replace("+00:00", "Z")
+    fake_seti.permission_requests = [
+        {"task_title": "Deployer", "tool_name": "Bash", "summary": "make deploy", "timeout_at": soon},
+        {"task_title": "Reader", "tool_name": "Read", "summary": "/etc/hosts", "timeout_at": None},
+    ]
+    lines = (await tools.call("search_seti", {"in": "requests"})).text.splitlines()
+    assert lines[1] == (
+        "- Deployer asks to use Bash: make deploy; denied automatically in 42 minutes if nobody answers"
+    )
+    assert lines[2] == "- Reader asks to use Read: /etc/hosts"
+    assert lines[3].startswith("Seti denies a tool call or plan nobody answers within 1 hour")
+    assert "only the user changes that timeout" in lines[3]
+
+    fake_seti.request_timeout_minutes = 0
+    off = (await tools.call("search_seti", {"in": "requests"})).text.splitlines()
+    assert off[-1] == "The request timeout is off: a tool call or plan waits until the user answers."
 
 
 async def test_search_seti_says_a_review_waits_for_the_user_before_the_call_runs(

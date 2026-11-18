@@ -141,6 +141,27 @@ private key off the host. The sandbox model is in [Architecture](architecture.md
   in Settings, Lifecycle; the EA changes it only with the user's yes (`set_auto_archive`), and
   agents' Seti tools and mods are refused (`refuseAgent` in `updateAutoArchive`), so an agent
   cannot turn off the guard that stops it. A change is audited as `system.repeat_guard_changed`.
+- A permission request nobody answers is denied after the request timeout, so an agent never waits
+  on the user for ever. The timeout is one install-wide setting in Settings, Permissions: Off, 15
+  min, 1 h, 4 h or 24 h, 1 h by default, kept in `permission_settings`. Each request stores its
+  deadline (`timeout_at`, counted from when it was raised), and `server/src/permission-timeout.ts`
+  arms a timer per request this process waits on. At the deadline Seti settles that one request as
+  denied with `timed_out` set, through the same `resolveRequest` path as the user's Deny, and the
+  agent reads that nobody answered in time, that it is no judgement on the action, and to carry on
+  or ask again. A timeout adds no rule, never counts as an always answer and touches no other
+  request, a subagent's request runs on the same clock as any other, and Bypass, questions and
+  change requests are unaffected. The denial is audited as `task.permission_timed_out` with the
+  task, tool, call summary and the rules the request offered, and noted in the agent's transcript.
+  Once four fifths of the time has passed, and at least five minutes before the end, the agent's
+  reason line ends with "times out soon", which pushes one more needs-you notification. A request
+  whose session is gone (the agent stopped, was archived, or Seti restarted) closes as cancelled
+  with nothing sent; startup arms whatever is still pending from its stored deadline and ends
+  what is overdue. The setting is the user's: `PUT /api/permissions/timeout` refuses the EA in the
+  route and agents' Seti tools and mods in `setPermissionTimeout` (`refuseAgent`), and a change is
+  audited as `system.permission_timeout_changed` with the old and new value. A new value applies
+  to requests already waiting, counted from when each was raised, so one older than it is denied
+  at once. The EA reads the setting and each request's deadline through `search_seti` in
+  `requests`.
 - Review rules hold each call of the MCP tools they name until the user allows or denies it, in
   Bypass too, because they run as a PreToolUse hook. When Seti cannot read its review rules the
   hook denies the call rather than let it run unchecked, and a call a deny rule names is left to

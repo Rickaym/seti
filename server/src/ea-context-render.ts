@@ -191,6 +191,7 @@ function setiText(payload: Extract<MessageRow, { kind: 'seti' }>['payload'], tas
     payload.session !== undefined ||
     payload.seti_control !== undefined ||
     payload.bypass !== undefined ||
+    payload.timed_out !== undefined ||
     (payload.memory !== undefined && payload.ended_turn !== true)
   return routine
     ? { text: `${payload.error} (${task})`, priority: ROUTINE }

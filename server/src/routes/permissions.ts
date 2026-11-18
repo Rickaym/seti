@@ -4,6 +4,7 @@ import {
   answerPermissionInput,
   permissionRequestParams,
   permissionRuleParams,
+  permissionTimeoutInput,
   reviewCoverageQuery,
   setBypassInput,
   taskPermissionRuleParams,
@@ -24,9 +25,10 @@ import {
   taskFor,
   taskRequests,
 } from '../permission-rules.js'
+import { permissionTimeout, setPermissionTimeout } from '../permission-timeout.js'
 
 /** The EA may list rules and requests to remind the user, never change or answer them. */
-const userOnly = eaReadOnly('change permission rules or answer permission requests')
+const userOnly = eaReadOnly('change permission rules or the request timeout, or answer permission requests')
 
 const bypassUserOnly = eaReadOnly("turn an agent's Bypass on or off")
 
@@ -47,6 +49,10 @@ export const permissionRoutes = new Hono()
     return c.body(null, 204)
   })
   .get('/requests', async (c) => ok(c, await pendingRequests()))
+  .get('/timeout', async (c) => ok(c, await permissionTimeout()))
+  .put('/timeout', validJson(permissionTimeoutInput), async (c) =>
+    ok(c, await setPermissionTimeout(c.req.valid('json'))),
+  )
 
 export const taskPermissionRoutes = new Hono()
   .get('/:id/permissions', async (c) => ok(c, await agentPermissions(await taskFor(c.req.param('id')))))

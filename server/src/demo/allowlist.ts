@@ -86,6 +86,7 @@ const READS = [
   '/api/notifications',
   '/api/permissions',
   '/api/permissions/requests',
+  '/api/permissions/timeout',
   '/api/plugins',
   '/api/plugins/defaults',
   '/api/prs',

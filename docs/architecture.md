@@ -139,7 +139,8 @@ directories go ahead. A classifier model then allows or turns down each other ca
 turns down never reaches the user: the agent gets the reason, the transcript shows the failed
 call, and the audit log records it. A call the classifier cannot decide, or one an ask rule
 matches, waits as a permission request until the user answers it, and the agent shows in Needs
-you meanwhile. Where auto mode is unavailable, Claude Code starts in the `default` mode, and every
+you meanwhile. A request nobody answers within the request timeout (Settings, Permissions; 1 h by
+default) is denied by Seti, and the agent is told it timed out and goes on. Where auto mode is unavailable, Claude Code starts in the `default` mode, and every
 call no rule allows waits as a request, edits in the agent's directories included. In auto mode
 Claude Code drops broad shell allow rules, such as `Bash` alone or an interpreter prefix, so the
 classifier also reviews a sandboxed agent's shell commands. Unsandboxed agents get no prefix rules
