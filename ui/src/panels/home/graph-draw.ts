@@ -33,13 +33,10 @@ interface EdgeStyle {
   width: number
 }
 
-/** Live edges take their agent's colour; MCP edges thicken with the calls behind them. */
+/** Live edges take their agent's colour. */
 function edgeStyle(edge: SimEdge, source: SimNode, ink: GraphInk): EdgeStyle {
   if (edge.spec.live) {
     return { colour: ink.agent(source.color), alpha: 0.95, width: 1.75 }
-  }
-  if (edge.spec.kind === 'mcp') {
-    return { colour: ink.muted, alpha: 0.32, width: 1 + Math.log2(1 + edge.spec.weight) / 3 }
   }
   return { colour: ink.muted, alpha: 0.6, width: 1 }
 }
@@ -142,15 +139,6 @@ function drawAgent(ctx: CanvasRenderingContext2D, node: SimNode, scene: Scene): 
   }
 }
 
-function hexagon(ctx: CanvasRenderingContext2D, x: number, y: number, r: number): void {
-  ctx.beginPath()
-  for (let i = 0; i < 6; i++) {
-    const a = (Math.PI / 3) * i + Math.PI / 6
-    ctx.lineTo(x + r * Math.cos(a), y + r * Math.sin(a))
-  }
-  ctx.closePath()
-}
-
 function drawNode(ctx: CanvasRenderingContext2D, node: SimNode, scene: Scene): void {
   const { ink } = scene
   const { k } = scene.view
@@ -180,13 +168,6 @@ function drawNode(ctx: CanvasRenderingContext2D, node: SimNode, scene: Scene): v
       ctx.strokeStyle = ink.muted
       ctx.fillRect(x - r, y - r, 2 * r, 2 * r)
       ctx.strokeRect(x - r, y - r, 2 * r, 2 * r)
-      return
-    case 'mcp':
-      ctx.fillStyle = ink.accent
-      ctx.strokeStyle = ink.muted
-      hexagon(ctx, x, y, r + 1)
-      ctx.fill()
-      ctx.stroke()
   }
 }
 
