@@ -79,6 +79,15 @@ export function needsYouByWorkspace(tasks: readonly TaskListEntry[]): Map<string
   return counts
 }
 
+/** How many agents need the user in workspaces other than `current`, from the counts by workspace. */
+export function needsYouElsewhere(counts: ReadonlyMap<string, number>, current: string | null): number {
+  let total = 0
+  for (const [workspace, count] of counts) {
+    total += workspace === current ? 0 : count
+  }
+  return total
+}
+
 /** Where the Needs you group has agents: this workspace when it does, else the newest failure's. */
 export function needsYouWorkspace(tasks: readonly TaskListEntry[], current: string | null): string | null {
   const list = waiting(tasks)

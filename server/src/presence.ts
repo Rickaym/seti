@@ -69,9 +69,9 @@ export function onScreen(deviceId: string, taskId: string, at: number): boolean 
   return seen.active || seen.agents.has(taskId)
 }
 
-/** Some device has a Seti page with focus now, so a toast there reaches the user. */
-export function pageFocused(at = Date.now()): boolean {
-  return [...focus.values()].some((seen) => seen.active && fresh(seen, at))
+/** Some device that `hears` has a Seti page with focus now, so a toast there reaches the user. */
+export function pageFocused(at = Date.now(), hears: (deviceId: string) => boolean = () => true): boolean {
+  return [...focus].some(([deviceId, seen]) => seen.active && fresh(seen, at) && hears(deviceId))
 }
 
 /** The last time a page had focus or a call was live. */

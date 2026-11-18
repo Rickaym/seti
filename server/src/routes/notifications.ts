@@ -1,4 +1,5 @@
 import {
+  notifyScopeInput,
   notificationFocusInput,
   notificationSettingsInput,
   pushDeviceInput,
@@ -14,6 +15,7 @@ import {
   savePushDevice,
   sendTestNotification,
 } from '../notifications.js'
+import { changeNotifyScope } from '../notify-scope.js'
 import { recordFocus } from '../presence.js'
 
 export const notificationRoutes = new Hono()
@@ -30,6 +32,9 @@ export const notificationRoutes = new Hono()
     await removePushDevice(c.req.valid('param').device_id)
     return c.body(null, 204)
   })
+  .put('/devices/:device_id/scope', valid('param', pushDeviceParams), validJson(notifyScopeInput), async (c) =>
+    ok(c, await changeNotifyScope(c.req.valid('param').device_id, c.req.valid('json'))),
+  )
   .put('/focus', validJson(notificationFocusInput), (c) => {
     recordFocus(c.req.valid('json'))
     return c.body(null, 204)

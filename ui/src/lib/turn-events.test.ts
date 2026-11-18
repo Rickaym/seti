@@ -76,9 +76,22 @@ describe('wantedEvents', () => {
 
   it('skips agents on screen, muted agents, agents the EA reports on and quiet tiers', () => {
     const shown = new Set(['shown'])
-    expect(kinds(wantedEvents(events, DEFAULT_TIERS, shown))).toEqual(['done:finished', 'failed:needs_you'])
-    expect(kinds(wantedEvents(events, { ...DEFAULT_TIERS, active: 'brief' }, shown))).toEqual(['failed:needs_you'])
-    expect(kinds(wantedEvents(events, DEFAULT_TIERS, shown, new Set(['done'])))).toEqual(['failed:needs_you'])
+    const settings = DEFAULT_TIERS
+    expect(kinds(wantedEvents(events, { settings, shown }))).toEqual(['done:finished', 'failed:needs_you'])
+    expect(kinds(wantedEvents(events, { settings: { ...settings, active: 'brief' }, shown }))).toEqual([
+      'failed:needs_you',
+    ])
+    expect(kinds(wantedEvents(events, { settings, shown, eaTasks: new Set(['done']) }))).toEqual(['failed:needs_you'])
+  })
+
+  it('skips agents in a workspace this device is not notified about, needs-you included', () => {
+    const elsewhere: TurnEvent[] = [
+      { task: { ...task('here', 'error', SINCE), workspace_id: 'b' }, kind: 'needs_you' },
+      { task: { ...task('there', 'error', SINCE), workspace_id: 'a' }, kind: 'needs_you' },
+    ]
+    const wanted = { settings: DEFAULT_TIERS, shown: new Set<string>() }
+    expect(kinds(wantedEvents(elsewhere, { ...wanted, hears: (id) => id === 'b' }))).toEqual(['here:needs_you'])
+    expect(kinds(wantedEvents(elsewhere, wanted))).toEqual(['here:needs_you', 'there:needs_you'])
   })
 })
 

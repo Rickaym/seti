@@ -19,3 +19,13 @@ CREATE TABLE notification_settings (
 
 ALTER TABLE task ADD COLUMN notifications_muted BOOLEAN NOT NULL DEFAULT false;
 `
+
+/** The workspace each browser shows and whether its notifications keep to it, by its device id. */
+export const NOTIFY_SCOPE = `
+CREATE TABLE notify_scope (
+  device_id TEXT PRIMARY KEY,
+  workspace_id TEXT REFERENCES workspace(id) ON DELETE SET NULL,
+  workspace_only BOOLEAN NOT NULL DEFAULT true,
+  updated_at TEXT NOT NULL
+);
+`

@@ -4,6 +4,7 @@ import { toast } from 'sonner'
 import { useAttention } from '@/hooks/useAttention'
 import { useNarrow } from '@/hooks/useMedia'
 import { useFocusReport, useNotifications } from '@/hooks/useNotifications'
+import { useNotifyScope, useWorkspaceReport } from '@/hooks/useNotifyScope'
 import { useTasks } from '@/hooks/useTasks'
 import { failuresSince } from '@/lib/failure-toasts'
 import { playSound, soundOn } from '@/lib/notify-sound'
@@ -54,7 +55,8 @@ function useReturned(awayMs: number): () => boolean {
 /**
  * Raises a toast with the closing line of each agent that finished a turn off screen, and plays
  * a short sound for those and for agents that need you, whose toasts FailureToasts shows. Agents
- * the EA reports on are left to its inbox, so each event surfaces once.
+ * the EA reports on are left to its inbox, so each event surfaces once, and agents in a workspace
+ * this device is not notified about stay quiet.
  */
 export function TurnNotices({ route }: { route: Route }) {
   const { tasks, loaded } = useTasks()
@@ -62,6 +64,8 @@ export function TurnNotices({ route }: { route: Route }) {
   const { eaTasks, awayMs } = useAttention()
   const shownList = useShownAgents(route)
   useFocusReport(shownList)
+  useWorkspaceReport()
+  const { hears } = useNotifyScope()
   const shownKey = shownList.join(' ')
   const shown = useMemo(() => new Set(shownKey === '' ? [] : shownKey.split(' ')), [shownKey])
   const [since] = useState(() => failuresSince())
@@ -77,7 +81,7 @@ export function TurnNotices({ route }: { route: Route }) {
     }
     const { events, seen: next } = turnEvents(seen.current, tasks, since)
     seen.current = next
-    const wanted = wantedEvents(events, settings, shown, eaTasks)
+    const wanted = wantedEvents(events, { settings, shown, eaTasks, hears })
     for (const { task, kind } of wanted) {
       if (kind === 'finished') {
         toast(task.title, {
@@ -96,7 +100,7 @@ export function TurnNotices({ route }: { route: Route }) {
     if (loudest !== undefined && soundOn() && (document.hasFocus() || !subscribed)) {
       playSound(loudest)
     }
-  }, [tasks, loaded, since, settings, shown, subscribed, eaTasks, tookReturn])
+  }, [tasks, loaded, since, settings, shown, subscribed, eaTasks, hears, tookReturn])
 
   return null
 }

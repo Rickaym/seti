@@ -15,11 +15,14 @@ import {
 import { useTasks } from '@/hooks/useTasks'
 import { WorkspaceNameDialog } from './WorkspaceNameDialog'
 import { createWorkspace, deleteWorkspace, renameWorkspace, switchWorkspace } from './workspace-actions'
-import { needsYouByWorkspace } from './workspace-store'
+import { needsYouByWorkspace, needsYouElsewhere } from './workspace-store'
 
 type Naming = { kind: 'new' } | { kind: 'rename'; workspace: WorkspaceEntry }
 
 const needLabel = (count: number) => `${String(count)} ${count === 1 ? 'needs' : 'need'} you`
+
+const elsewhereLabel = (count: number) =>
+  `${needLabel(count)} in ${count === 1 ? 'another workspace' : 'other workspaces'}`
 
 /** Opens the dialog that names a new workspace, from the switcher or the palette. */
 export function NewWorkspaceDialog({ onClose }: { onClose: () => void }) {
@@ -44,6 +47,7 @@ export function WorkspaceSwitcher({ workspaces, current }: WorkspaceSwitcherProp
   const confirm = useConfirm()
   const { tasks } = useTasks()
   const waiting = useMemo(() => needsYouByWorkspace(tasks), [tasks])
+  const elsewhere = needsYouElsewhere(waiting, current?.id ?? null)
   const [naming, setNaming] = useState<Naming | null>(null)
   const name = current?.name ?? 'Workspace'
 
@@ -63,15 +67,21 @@ export function WorkspaceSwitcher({ workspaces, current }: WorkspaceSwitcherProp
   return (
     <div className="border-b border-border px-1.5 py-1">
       <DropdownMenu modal={false}>
-        <Hint text="Switch workspace">
+        <Hint text={elsewhere > 0 ? `Switch workspace; ${elsewhereLabel(elsewhere)}` : 'Switch workspace'}>
           <DropdownMenuTrigger asChild>
             <button
               type="button"
               aria-label={`Workspace: ${name}`}
+              aria-description={elsewhere > 0 ? elsewhereLabel(elsewhere) : undefined}
               className="flex w-full min-w-0 items-center gap-1.5 px-1.5 py-1 text-left text-xs font-medium outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring pointer-coarse:min-h-11"
             >
               <Layers className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
               <span className="min-w-0 flex-1 truncate">{name}</span>
+              {elsewhere > 0 && (
+                <span data-needs-you-elsewhere className="shrink-0 text-2xs text-destructive tabular-nums">
+                  {elsewhere}
+                </span>
+              )}
               <ChevronsUpDown className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
             </button>
           </DropdownMenuTrigger>
@@ -95,9 +105,9 @@ export function WorkspaceSwitcher({ workspaces, current }: WorkspaceSwitcherProp
                 >
                   <span className="min-w-0 flex-1 truncate">{workspace.name}</span>
                   {count > 0 && (
-                    <span className="shrink-0 text-2xs text-destructive tabular-nums" title={needLabel(count)}>
-                      {count}
-                    </span>
+                    <Hint text={`${needLabel(count)} in ${workspace.name}`} side="right">
+                      <span className="shrink-0 text-2xs text-destructive tabular-nums">{count}</span>
+                    </Hint>
                   )}
                 </DropdownMenuRadioItem>
               )

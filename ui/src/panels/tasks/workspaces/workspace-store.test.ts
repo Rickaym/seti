@@ -1,6 +1,12 @@
 import { listedSubtasks, prStates, type TaskListEntry, type TaskStatus } from '@seti/shared'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { needsYouByWorkspace, needsYouWorkspace, resolveWorkspace, WORKSPACE_KEY } from './workspace-store'
+import {
+  needsYouByWorkspace,
+  needsYouElsewhere,
+  needsYouWorkspace,
+  resolveWorkspace,
+  WORKSPACE_KEY,
+} from './workspace-store'
 
 const agent = (id: string, workspace_id: string, status: TaskStatus, updated_at = '2026-10-01T00:00:00Z') =>
   ({
@@ -42,6 +48,15 @@ describe('needs you by workspace', () => {
         ['side', 2],
       ]),
     )
+  })
+
+  it('counts for the switcher the agents that need the user outside the shown workspace', () => {
+    const counts = needsYouByWorkspace(tasks)
+    expect(needsYouElsewhere(counts, 'main')).toBe(2)
+    expect(needsYouElsewhere(counts, 'side')).toBe(1)
+    expect(needsYouElsewhere(counts, 'quiet')).toBe(3)
+    expect(needsYouElsewhere(counts, null)).toBe(3)
+    expect(needsYouElsewhere(new Map(), 'main')).toBe(0)
   })
 
   it('stays in the shown workspace when it has some, else goes to the newest failure', () => {

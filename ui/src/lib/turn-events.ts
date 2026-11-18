@@ -63,22 +63,28 @@ export function turnEvents(
   return { events, seen }
 }
 
+export interface Wanted {
+  settings: NotificationSettings
+  /** Agents the page shows now. */
+  shown: ReadonlySet<string>
+  /** Agents the EA reports on. */
+  eaTasks?: ReadonlySet<string>
+  /** Whether this device is notified about agents in the workspace; left out, about all. */
+  hears?: (workspaceId: string) => boolean
+}
+
 /**
- * The events to raise on this page: not muted, not on screen, and not about an agent the EA
- * reports on, whose inbox item is its one surface. Needs-you always shows; a finished turn shows
- * while the active tier toasts.
+ * The events to raise on this page: not muted, not on screen, in a workspace this device hears
+ * about, and not about an agent the EA reports on, whose inbox item is its one surface.
+ * Needs-you always shows; a finished turn shows while the active tier toasts.
  */
-export function wantedEvents(
-  events: readonly TurnEvent[],
-  settings: NotificationSettings,
-  shown: ReadonlySet<string>,
-  eaTasks: ReadonlySet<string> = new Set(),
-): TurnEvent[] {
+export function wantedEvents(events: readonly TurnEvent[], { settings, shown, eaTasks, hears }: Wanted): TurnEvent[] {
   return events.filter(
     (event) =>
       !event.task.notifications_muted &&
       !shown.has(event.task.id) &&
-      !eaTasks.has(event.task.id) &&
+      eaTasks?.has(event.task.id) !== true &&
+      hears?.(event.task.workspace_id) !== false &&
       (event.kind === 'needs_you' || tierToasts(settings, 'active')),
   )
 }
