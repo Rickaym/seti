@@ -3,8 +3,8 @@ from types import SimpleNamespace
 from typing import Any, cast
 
 from fakes import NOW, FakeSeti, settings
-from pipecat.adapters.schemas.tools_schema import ToolsSchema
-from pipecat.adapters.services.open_ai_adapter import OpenAILLMAdapter, OpenAILLMInvocationParams
+from pipecat.adapters.llm.schemas.tools_schema import ToolsSchema
+from pipecat.adapters.llm.services.open_ai_adapter import OpenAILLMAdapter, OpenAILLMInvocationParams
 from pipecat.frames.frames import FunctionCallResultProperties
 from pipecat.processors.aggregators.llm_context import LLMContext
 from pipecat.services.deepgram.stt import DeepgramSTTService
@@ -25,7 +25,7 @@ from seti_ea.bot import (
     smart_turn,
     tool_schemas,
     turn_stop_strategies,
-    voice_text_filter,
+    voice_text_transforms,
 )
 from seti_ea.clock import TimeNotes, parse_user_clock
 from seti_ea.prompt import GREETING, SYSTEM_PROMPT
@@ -246,13 +246,26 @@ def test_filler_lines_are_spoken_but_kept_out_of_the_llm_context() -> None:
     assert frame.append_to_context is False
 
 
-async def test_voice_filter_strips_markdown_before_speech() -> None:
-    spoken = await voice_text_filter().filter(
+async def spoken(text: str) -> str:
+    for text_type, transform in voice_text_transforms():
+        assert text_type == "*"
+        text = await transform(text, "sentence")
+    return text
+
+
+async def test_voice_transforms_strip_markdown_before_speech() -> None:
+    said = await spoken(
         "**Service Resilience is mixed.** Its agent reported `#2248` ready; see **PII Issues**."
     )
-    assert "*" not in spoken
-    assert "`" not in spoken
-    assert "Service Resilience is mixed." in spoken
+    assert said == "Service Resilience is mixed. Its agent reported #2248 ready; see PII Issues."
+    assert await spoken("Here it is.\n```sh\npnpm check\n```\nThat is all.") == "Here it is.\n\nThat is all."
+
+
+async def test_voice_transforms_drop_tables_and_marks_split_across_sentences() -> None:
+    assert await spoken("**Service Resilience is mixed.") == "Service Resilience is mixed."
+    assert await spoken("** Its agent reported `#2248") == " Its agent reported #2248"
+    table = "The numbers:\n| Agent | PRs |\n|---|---|\n| Alpha | 3 |\nAnything else?"
+    assert await spoken(table) == "The numbers:\nAnything else?"
 
 
 def test_voice_rules_forbid_markdown_even_after_typed_turns() -> None:
