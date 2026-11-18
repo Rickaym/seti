@@ -1,9 +1,7 @@
 import { execFileSync } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
-import type { Page } from '@playwright/test'
-import type { AuditPage, Envelope, Repo, Task, WarmCacheStatus } from '@seti/shared'
-import { openAgentSettings } from './support/agent-settings.js'
+import type { AuditPage, Envelope, Repo, WarmCacheStatus } from '@seti/shared'
 import { paths } from './support/env.js'
 import { apiData, expect, removeRepos, test, toasts, unique } from './support/fixtures.js'
 
@@ -40,12 +38,7 @@ function tsCheckout(name: string): string {
   return checkout
 }
 
-const main = (page: Page) => page.getByRole('main')
-
-test('a repo turns warm caches off and on, edits its patterns and cap, and new agents start warm', async ({
-  page,
-  request,
-}) => {
+test('a repo turns warm caches off and on and edits its patterns and cap', async ({ page, request }) => {
   const name = unique('warmrepo')
   const checkout = tsCheckout(name)
   const added = await request.post('/api/repos', { data: { slug: `e2e/${name}`, path: checkout, base_branch: 'main' } })
@@ -85,21 +78,5 @@ test('a repo turns warm caches off and on, edits its patterns and cap, and new a
       '**/node_modules/.cache, **/.mypy_cache, **/.ruff_cache, **/.pytest_cache; cap 512 MB',
   )
 
-  fs.writeFileSync(path.join(checkout, 'tsconfig.tsbuildinfo'), '{"warm":true}')
-  await page.goto('/#agents/new')
-  await page.getByLabel('Message').fill(`Typecheck ${name}`)
-  await page.getByLabel('Message').press('Enter')
-  await expect(page).toHaveURL(/#agents\/[\da-f-]{36}$/)
-  const id = new URL(page.url()).hash.split('/')[1] ?? ''
-  const details = await openAgentSettings(page, 'Session')
-  await expect(details.getByRole('list', { name: 'Warm caches' })).toHaveText('1 path, 1 KB from main checkout')
-  await page.keyboard.press('Escape')
-  await expect(details).toBeHidden()
-  await expect(main(page).getByLabel('Warm caches', { exact: true })).toHaveCount(0)
-  const task = await apiData<Task>(request, `/tasks/${id}`)
-  expect(fs.readFileSync(path.join(task.cwd, 'tsconfig.tsbuildinfo'), 'utf8')).toBe('{"warm":true}')
-
-  await page.goto('/#agents')
-  expect((await request.delete(`/api/tasks/${id}`)).ok()).toBe(true)
   await removeRepos(request, [repo])
 })

@@ -6,6 +6,7 @@ import {
   isGitHubOwner,
   type GitHubTokenMode,
   type StoredSecretName,
+  type Task,
 } from '@seti/shared'
 import { SETI_HOME } from './config.js'
 import { githubTokens, secret, secrets } from './secrets.js'
@@ -52,6 +53,9 @@ async function openToken(name: StoredSecretName): Promise<string | null> {
     return null
   }
 }
+
+/** Whose GitHub token covers requests naming no owner: an older agent's first repo's, else none. */
+export const tokenOwner = (task: Pick<Task, 'repos'>) => task.repos[0]?.slug.split('/')[0] ?? null
 
 /**
  * The fine-grained token the egress proxy puts on sandboxed agents' GitHub requests, never the gh

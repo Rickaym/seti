@@ -62,6 +62,7 @@ import {
   SUBTASK_PR,
   TASK_BYPASS_UNTIL,
   TASK_CLOSING_LINE,
+  TASK_HOME_ACCESS,
   TASK_COLOR_HEX,
   TASK_DIRS,
   TASK_MODEL_FALLBACK,
@@ -198,4 +199,5 @@ export const MIGRATIONS: readonly Migration[] = [
   { version: 107, name: 'channel_subscription_delivery', sql: CHANNEL_SUBSCRIPTION_DELIVERY },
   { version: 108, name: 'permission_timeout', sql: PERMISSION_TIMEOUT },
   { version: 109, name: 'restart_cuts', sql: RESTART_CUTS },
+  { version: 110, name: 'task_home_access', sql: TASK_HOME_ACCESS },
 ]

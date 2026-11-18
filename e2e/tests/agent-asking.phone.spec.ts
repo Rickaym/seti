@@ -12,7 +12,7 @@ test('an agent asking a question sits in Needs you on the phone and says so in i
   request,
 }) => {
   const response = await request.post('/api/tasks', {
-    data: { title: unique('Phone asking'), prompt: `Please ${ASK_PROMPT}`, cwd: paths.checkout, sandbox: false },
+    data: { title: unique('Phone asking'), prompt: `Please ${ASK_PROMPT}`, sandbox: false },
   })
   expect(response.ok(), 'POST /api/tasks').toBe(true)
   const { id } = ((await response.json()) as Envelope<Task>).data

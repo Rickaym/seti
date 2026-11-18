@@ -14,7 +14,6 @@ import { z } from 'zod'
 import { capOf } from '../agent-cap.js'
 import { startAgent } from '../agent-start.js'
 import { archiveTask, listArchived, unarchiveTask } from '../archive.js'
-import { repos } from '../db.js'
 import { HttpError } from '../http.js'
 import { deliverPending, dismissPending } from '../inputs.js'
 import { rewindTargets, rewindTask } from '../rewind-task.js'
@@ -34,7 +33,7 @@ import {
   updateTask,
 } from '../task-actions.js'
 import { anyTask, liveTask, pickOne, taskRef } from './refs.js'
-import { done, notSelf, setiTool, ToolRefusal, type ToolContext } from './tool.js'
+import { done, notSelf, setiTool, ToolRefusal } from './tool.js'
 import { resolveWorkspace, workspaceNames, workspaceRef } from './workspaces.js'
 
 const NOTIFY_WHEN_DONE = sendMessageInput.shape.notify_when_done.describe(
@@ -105,39 +104,20 @@ const handOverUpdates = setiTool({
   },
 })
 
-/** A directory the caller works in, or one inside it; agents start others only where they work. */
-function ownDirectory(ctx: ToolContext, dir: string): string {
-  const mine = [ctx.caller.cwd, ...ctx.caller.repos.map((repo) => repo.dir), ...ctx.caller.dirs]
-  const inside = mine.some((root) => dir === root || dir.startsWith(root.endsWith('/') ? root : `${root}/`))
-  if (!inside) {
-    throw new ToolRefusal(
-      `You can start agents only in a registered repo or in a directory of your own: ${mine.join(', ')}`,
-    )
-  }
-  return dir
-}
-
 const startTaskTool = setiTool({
   name: 'start_task',
   description:
-    "Start a new agent on a prompt. Seti's planner titles it and picks repos, context packs and MCP servers for what you leave out. It runs sandboxed with at most your own access: never SSH, AWS, MCP servers, plugins or credentials you lack, and Seti control Self, never Full. With notify_when_done, Seti sends you its final message as an update once its first turn ends.",
+    "Start a new agent on a prompt. It works in a fresh folder of its own and clones the repos it needs, so name them in the prompt. Seti's planner titles it and picks context packs and MCP servers. It runs sandboxed with at most your own access: never SSH, AWS, MCP servers, plugins or credentials you lack, and Seti control Self, never Full. With notify_when_done, Seti sends you its final message as an update once its first turn ends.",
   input: {
     prompt: startAgentInput.shape.prompt,
     title: startAgentInput.shape.title,
-    repos: z.array(z.string().trim().min(1)).max(10).optional().describe('Registered repos by slug or id.'),
-    worktree: startAgentInput.shape.worktree,
-    directory: z.string().trim().min(1).optional().describe('An existing directory of yours, instead of repos.'),
     workspace: workspaceRef.optional().describe('The workspace it joins; left out, your own.'),
     notify_when_done: NOTIFY_WHEN_DONE,
   },
-  run: async ({ prompt, title, repos: refs, worktree, directory, workspace, notify_when_done }, ctx) => {
-    const registered = await repos.list()
-    const repoIds = refs?.map((ref) => pickOne(registered, ref, 'repo', (repo) => [repo.id, repo.slug]).id)
+  run: async ({ prompt, title, workspace, notify_when_done }, ctx) => {
     const input = startAgentInput.parse({
       prompt,
       title,
-      ...(repoIds === undefined || repoIds.length === 0 ? {} : { repo_ids: [...new Set(repoIds)], worktree }),
-      ...(directory === undefined || repoIds !== undefined ? {} : { cwd: ownDirectory(ctx, directory) }),
       workspace_id: workspace === undefined ? ctx.caller.workspace_id : (await resolveWorkspace(workspace)).id,
       notify_when_done,
     })

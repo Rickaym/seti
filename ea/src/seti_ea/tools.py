@@ -427,32 +427,16 @@ TOOL_SPECS: list[ToolSpec] = [
     ),
     ToolSpec(
         "start_task",
-        "Start a new task: a Claude Code agent working on the prompt. Seti's planner titles it and "
-        "picks repos, context packs and MCP servers from the prompt for whatever you leave out; "
-        "with no repo it gets a fresh folder under ~/work. Unclear permissions are not given: it "
-        "runs sandboxed with SSH hosts and AWS only as their defaults say; only the user grants "
-        "more. Everything can be changed later. Confirm the prompt, and the repos if the user "
-        "named any, with the user first.",
+        "Start a new task: a Claude Code agent working on the prompt. It works in a fresh folder "
+        "of its own and clones the repos it needs, so name them in the prompt. Seti's planner titles "
+        "it and picks context packs and MCP servers from the prompt. Unclear permissions are not "
+        "given: it runs sandboxed with SSH hosts and AWS only as their defaults say; only the user "
+        "grants more. Confirm the prompt with the user first.",
         {
             "prompt": {"type": "string", "description": "The full instructions for the agent."},
             "title": {
                 "type": "string",
                 "description": "Only when the user names the task; otherwise Seti titles it.",
-            },
-            "repos": {
-                "type": "array",
-                "items": {"type": "string"},
-                "description": "Only repos the user named, as slugs or names, the one the agent runs in "
-                "first. Leave out to let Seti pick.",
-            },
-            "worktree": {
-                "type": "boolean",
-                "description": "With named repos: false to work in the checkout itself. Worktrees are "
-                "the default so parallel tasks do not collide.",
-            },
-            "directory": {
-                "type": "string",
-                "description": "Without repos only: an existing directory to work in, absolute or ~/.",
             },
             "workspace": {
                 "type": "string",
@@ -1669,20 +1653,6 @@ class EaTools:
     async def start_task(self, args: Mapping[str, Any]) -> ToolResult:
         prompt = arg_str(args, "prompt")
         title = arg_str(args, "title", required=False)
-        raw = args.get("repos")
-        refs = [
-            r
-            for r in (raw if isinstance(raw, list) else [raw] if isinstance(raw, str) else [])
-            if isinstance(r, str) and r.strip()
-        ]
-        repo_ids: list[str] = []
-        if refs:
-            repos = await self._repos()
-            for ref in refs:
-                repo_id = str(resolve_repo(repos, ref).get("id"))
-                if repo_id not in repo_ids:
-                    repo_ids.append(repo_id)
-        directory = "" if repo_ids else arg_str(args, "directory", required=False)
         body: dict[str, Any] = {"prompt": prompt}
         workspace_ref = arg_str(args, "workspace", required=False)
         if workspace_ref:
@@ -1691,28 +1661,17 @@ class EaTools:
             )
         if title:
             body["title"] = title
-        if repo_ids:
-            body["repo_ids"] = repo_ids
-            if "worktree" in args:
-                body["worktree"] = arg_bool(args, "worktree")
-        elif directory:
-            body["cwd"] = directory
         notify = arg_bool(args, "notify_when_done")
         if notify:
             body["notify_when_done"] = True
         created = await self._seti.post("/tasks/start", body)
         task = created if isinstance(created, dict) else {}
         title = str(task.get("title") or title or "the new task")
-        slugs = [str(r.get("slug")) for r in dicts(task.get("repos"))]
-        if slugs:
-            where = ", ".join(repo_name(s) for s in slugs)
-        else:
-            where = directory or f"a fresh folder, {task.get('cwd')}, with no repo"
-        worktree = " in a worktree" if task.get("worktree") else ""
         setup = task.get("setup")
         note = setup_note(setup) if isinstance(setup, dict) else ""
         return ToolResult(
-            f"Started task {title} in {where}{worktree}. It is {status_word(task.get('status', 'running'))}."
+            f"Started task {title} in its own folder, {task.get('cwd')}. "
+            f"It is {status_word(task.get('status', 'running'))}."
             f"{note}{NOTIFY_NOTE if notify else ''}",
             f"Started agent {clip(title, 60)}",
         )

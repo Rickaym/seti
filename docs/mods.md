@@ -203,7 +203,7 @@ Every call on `seti` is one request to Seti, which checks it as the mod, within 
 | `fetch(url, init?)`                                                                            | `net.fetch`, or `connection` with `init.connection` |
 | `tasks.list({ status?, limit? })`, `get(id)`, `transcript(id, { limit?, before? })`, `prs(id)` | `tasks.read`                                        |
 | `tasks.rename`, `pin`, `setColor`, `linkPr`, `unlinkPr`                                        | `tasks.manage` with that action                     |
-| `tasks.start({ title, prompt, repo? })`, `tasks.stop(id)`                                      | `tasks.manage` with that action; asks the user      |
+| `tasks.start({ title, prompt })`, `tasks.stop(id)`                                             | `tasks.manage` with that action; asks the user      |
 | `chat.post(text)`, `chat.post(text, { to })`                                                   | `chat.post` with `public`, or `direct`              |
 | `files.list(agentId, dir)`, `files.read(agentId, path)`                                        | `files.read`                                        |
 | `statusBar.set(item, { text })`                                                                | an item in `statusBar`                              |

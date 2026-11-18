@@ -1,5 +1,4 @@
 import type { Envelope, Task } from '@seti/shared'
-import { paths } from './support/env.js'
 import { REPEAT_COMMAND, REPEAT_DONE, REPEAT_PROMPT, REPEAT_REASON } from './support/fake-repeat.js'
 import { apiData, expect, test, unique } from './support/fixtures.js'
 import { expectFitsPhone } from './support/phone-layout.js'
@@ -9,7 +8,7 @@ test.use({ serverEnv: FAKE_CLAUDE_ENV })
 
 test('a repeated call fits the phone, is allowed with a tap, and the switch is in reach', async ({ page, request }) => {
   const response = await request.post('/api/tasks', {
-    data: { title: unique('Phone loop'), prompt: `Please ${REPEAT_PROMPT}`, cwd: paths.checkout, sandbox: false },
+    data: { title: unique('Phone loop'), prompt: `Please ${REPEAT_PROMPT}`, sandbox: false },
   })
   expect(response.ok(), 'POST /api/tasks').toBe(true)
   const { id } = ((await response.json()) as Envelope<Task>).data

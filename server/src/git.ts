@@ -5,11 +5,65 @@ import { pipeline } from 'node:stream/promises'
 import { promisify } from 'node:util'
 import { binaryPath } from './binaries.js'
 import { WORKTREE_ROOT } from './config.js'
+import { canonicalRoot } from './sandbox-mounts.js'
 
 const exec = promisify(execFile)
 
 export async function git(cwd: string, ...args: string[]): Promise<string> {
   const { stdout } = await exec('git', ['-C', cwd, ...args], { maxBuffer: 16 * 1024 * 1024 })
+  return stdout.trim()
+}
+
+/**
+ * Config that keeps git from running a program a repository names: hooks, the fsmonitor, pagers,
+ * editors, ssh and proxy commands, credential and askpass helpers and external diffs. No
+ * transport is allowed either, so nothing a remote or a URL rewrite names is started.
+ */
+const NO_PROGRAMS = [
+  'core.hooksPath=/dev/null',
+  'core.fsmonitor=false',
+  'core.pager=cat',
+  'core.editor=true',
+  'sequence.editor=true',
+  'core.sshCommand=false',
+  'core.gitProxy=',
+  'core.askPass=',
+  'core.alternateRefsCommand=',
+  'credential.helper=',
+  'diff.external=',
+  'protocol.allow=never',
+].flatMap((setting) => ['-c', setting])
+
+/** No system or user config, no prompt, pager or external diff from the environment either. */
+function closedEnv(extra: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv {
+  const dropped = ['GIT_EXTERNAL_DIFF', 'GIT_SSH', 'GIT_SSH_COMMAND', 'GIT_ASKPASS']
+  return {
+    ...Object.fromEntries(Object.entries(process.env).filter(([name]) => !dropped.includes(name))),
+    GIT_CONFIG_NOSYSTEM: '1',
+    GIT_CONFIG_GLOBAL: '/dev/null',
+    GIT_TERMINAL_PROMPT: '0',
+    GIT_PAGER: 'cat',
+    GIT_OPTIONAL_LOCKS: '0',
+    ...extra,
+  }
+}
+
+/** Commands that format diffs, where an attribute can name a diff driver or a textconv program. */
+const DIFFING = new Set(['diff', 'show', 'log'])
+
+/** The arguments of a git command in a folder an agent can write to, where config is hostile. */
+function guarded(cwd: string, args: readonly string[]): string[] {
+  const [command = '', ...rest] = args
+  const plainDiff = DIFFING.has(command) ? ['--no-ext-diff', '--no-textconv'] : []
+  return [...NO_PROGRAMS, '-C', cwd, command, ...plainDiff, ...rest]
+}
+
+/**
+ * Runs git where an agent controls the repository: its config, hooks and attributes are input,
+ * and nothing they name runs. Local commands only; the repository's remotes are never contacted.
+ */
+export async function agentGit(cwd: string, ...args: string[]): Promise<string> {
+  const { stdout } = await exec('git', guarded(cwd, args), { maxBuffer: 16 * 1024 * 1024, env: closedEnv() })
   return stdout.trim()
 }
 
@@ -33,21 +87,19 @@ export async function listWorktrees(repoPath: string): Promise<string[]> {
   }
 }
 
-/** The main checkout a worktree belongs to; null outside git, in a bare repo's worktree, or in it. */
-export async function mainCheckout(dir: string): Promise<string | null> {
-  try {
-    const common = await git(dir, 'rev-parse', '--path-format=absolute', '--git-common-dir')
-    const main = path.basename(common) === '.git' ? path.dirname(common) : null
-    return main === dir ? null : main
-  } catch {
-    return null
-  }
+/**
+ * The main checkout a worktree belongs to, read from its `.git` files without running git; null
+ * outside git, in a bare repo's worktree, or in the main checkout itself.
+ */
+export function mainCheckout(dir: string): string | null {
+  const main = canonicalRoot(dir)
+  return main === null || main === dir || !fs.existsSync(path.join(main, '.git')) ? null : main
 }
 
 /** Whether a checkout has uncommitted or untracked changes; false when git cannot tell. */
 export async function hasLocalChanges(dir: string): Promise<boolean> {
   try {
-    return (await git(dir, 'status', '--porcelain')) !== ''
+    return (await agentGit(dir, 'status', '--porcelain')) !== ''
   } catch {
     return false
   }
@@ -63,10 +115,10 @@ export interface WorktreeState {
 }
 
 export async function worktreeState(dir: string): Promise<WorktreeState> {
-  const head = await git(dir, 'rev-parse', 'HEAD')
-  const branch = await git(dir, 'symbolic-ref', '--quiet', '--short', 'HEAD').catch(() => '')
-  const dirty = (await git(dir, 'status', '--porcelain')) !== ''
-  const remotes = await git(dir, 'branch', '--remotes', '--contains', 'HEAD')
+  const head = await agentGit(dir, 'rev-parse', 'HEAD')
+  const branch = await agentGit(dir, 'symbolic-ref', '--quiet', '--short', 'HEAD').catch(() => '')
+  const dirty = (await agentGit(dir, 'status', '--porcelain')) !== ''
+  const remotes = await agentGit(dir, 'branch', '--remotes', '--contains', 'HEAD')
   return { head, branch: branch === '' ? null : branch, dirty, pushed: remotes !== '' }
 }
 
@@ -123,15 +175,15 @@ export async function removeWorktree(repoPath: string, dir: string): Promise<voi
  */
 export async function saveUncommitted(dir: string, file: string): Promise<void> {
   const index = `${file}.index`
-  const env = { ...process.env, GIT_INDEX_FILE: index }
+  const env = closedEnv({ GIT_INDEX_FILE: index })
   try {
-    await exec('git', ['-C', dir, 'read-tree', 'HEAD'], { env })
-    await exec('git', ['-C', dir, 'add', '-A'], { env })
+    await exec('git', guarded(dir, ['read-tree', 'HEAD']), { env })
+    await exec('git', guarded(dir, ['add', '-A']), { env })
     const bin = binaryPath('git')
     if (bin === null) {
       throw new Error('git is not installed')
     }
-    const child = spawn(bin, ['-C', dir, 'diff', '--cached', '--binary', 'HEAD'], {
+    const child = spawn(bin, guarded(dir, ['diff', '--cached', '--binary', 'HEAD']), {
       env,
       stdio: ['ignore', 'pipe', 'ignore'],
     })
@@ -151,11 +203,11 @@ export async function saveUncommitted(dir: string, file: string): Promise<void> 
 
 /** Removes a linked worktree through its main checkout so git forgets it; false when it has none. */
 export async function removeLinkedWorktree(dir: string): Promise<boolean> {
-  const main = await mainCheckout(dir)
+  const main = mainCheckout(dir)
   if (main === null) {
     return false
   }
-  await git(main, 'worktree', 'remove', '--force', dir)
+  await agentGit(main, 'worktree', 'remove', '--force', dir)
   return true
 }
 

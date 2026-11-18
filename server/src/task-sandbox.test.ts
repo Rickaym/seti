@@ -18,7 +18,7 @@ import { spawn as spawnPty } from 'node-pty'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { readProcesses, stoppable, subtreeOf, terminate } from './agent-processes.js'
 import { findBinary } from './binaries.js'
-import { CLAUDE_HOME, SETI_HOME } from './config.js'
+import { CLAUDE_HOME, SCRATCH_ROOT, SETI_HOME } from './config.js'
 import { tasks } from './db.js'
 import { detectScopeHost, type ScopePlan } from './memory-scope.js'
 import { oomRun, oomRunBlocked, oomScriptArgs } from './oom-fixtures.js'
@@ -129,9 +129,10 @@ describe.skipIf(!available)('a real task sandbox', () => {
   async function inSandbox(
     script: string,
     scope: ScopePlan | null = null,
+    as: Partial<Task> = {},
   ): Promise<{ code: number | null; out: string }> {
     const ctx = { ...sandboxContext(), home }
-    const sandbox = await taskSandbox(task, { ctx, policy: await sandboxPolicy.get() })
+    const sandbox = await taskSandbox({ ...task, ...as }, { ctx, policy: await sandboxPolicy.get() })
     const child = sandbox.spawn('/bin/bash', ['-c', script], { stdin: 'ignore', scope })
     let out = ''
     child.stdout?.on('data', (chunk: Buffer) => (out += chunk.toString()))
@@ -234,7 +235,7 @@ describe.skipIf(!available)('a real task sandbox', () => {
     expect(out).toContain(`cwd=${work}`)
   })
 
-  it("shows the home's code folders, not its files, dotfiles or excluded folders", async () => {
+  it("shows an older agent with home access the home's code folders, not its files or dotfiles", async () => {
     const shown = ['project/src/main.ts', 'work']
     const absent = ['backup.key', '.profile', '.ssh/id_ed25519', 'seti-live']
     const script = [
@@ -242,9 +243,58 @@ describe.skipIf(!available)('a real task sandbox', () => {
       ...absent.map((p) => `test -e ~/${p} && echo "VISIBLE ${p}"`),
       'true',
     ].join('\n')
-    const { code, out } = await inSandbox(script)
+    const { code, out } = await inSandbox(script, null, { home_access: true })
     expect(code).toBe(0)
     expect(out).not.toMatch(/MISSING|VISIBLE/)
+  })
+
+  it('gives a new agent a private home: its own folder, and none of the home folders or other agents', async () => {
+    const own = path.join(home, 'work', 'fix-login-11111111')
+    const other = path.join(home, 'work', 'other-agent-22222222')
+    fs.mkdirSync(own, { recursive: true })
+    fs.mkdirSync(other, { recursive: true })
+    fs.writeFileSync(path.join(other, 'notes.txt'), 'theirs\n')
+    const script = [
+      'ls ~/work',
+      'for p in project/src/main.ts seti-live backup.key .ssh/id_ed25519 work/other-agent-22222222; do',
+      '  test -e ~/$p && echo "VISIBLE $p"',
+      'done',
+      'mkdir -p ~/project && echo x > ~/project/planted.ts && echo x > ~/work/stray.txt',
+      'git init -q app && git -C app -c user.name=a -c user.email=a@b.invalid commit -q --allow-empty -m init',
+      'git -C app worktree add -q ../app-feature -b feature && echo worktree-added',
+      'echo mine > app/README.md && pwd',
+    ].join('\n')
+    const { code, out } = await inSandbox(script, null, { cwd: own, home_access: false })
+    expect(out).not.toContain('VISIBLE')
+    expect(out).toContain('fix-login-11111111\n')
+    expect(out).not.toContain('other-agent')
+    expect(out).toContain('worktree-added')
+    expect(out).toContain(`${own}\n`)
+    expect(code).toBe(0)
+    expect(fs.readFileSync(path.join(own, 'app', 'README.md'), 'utf8')).toBe('mine\n')
+    expect(fs.existsSync(path.join(own, 'app-feature', '.git'))).toBe(true)
+    expect(fs.existsSync(path.join(project, 'planted.ts'))).toBe(false)
+    expect(fs.existsSync(path.join(home, 'work', 'stray.txt'))).toBe(false)
+    expect(fs.readdirSync(other)).toEqual(['notes.txt'])
+  })
+
+  it('lets a new agent change the git config and hooks of a clone it moved into', async () => {
+    const own = path.join(SCRATCH_ROOT, 'owns-its-clone-33333333')
+    const clone = path.join(own, 'app')
+    fs.mkdirSync(clone, { recursive: true })
+    execFileSync(findBinary('git'), ['-C', clone, 'init', '-q', '--initial-branch=main'])
+    const script = [
+      'git config user.name Agent && git config user.email agent@seti.invalid',
+      'git remote add origin https://github.com/acme/app.git && git remote -v | head -1',
+      'git commit -q --allow-empty -m init && git branch --set-upstream-to=main 2>/dev/null; git checkout -q -b feature',
+      'printf "#!/bin/sh\\n" > .git/hooks/pre-commit && echo hook-written',
+    ].join('\n')
+    const { code, out } = await inSandbox(script, null, { cwd: clone, dirs: [own], home_access: false })
+    expect(out).toContain('origin\thttps://github.com/acme/app.git')
+    expect(out).toContain('hook-written')
+    expect(code).toBe(0)
+    expect(fs.readFileSync(path.join(clone, '.git', 'config'), 'utf8')).toContain('[remote "origin"]')
+    fs.rmSync(own, { recursive: true, force: true })
   })
 
   it('keeps dotfiles written at the home root inside the sandbox', async () => {
@@ -280,6 +330,8 @@ describe.skipIf(!available)('a real task sandbox', () => {
         'echo x >> ~/project/.git/config 2>/dev/null || echo config-read-only',
         'touch ~/project/src/new.ts && echo code-writable',
       ].join('\n'),
+      null,
+      { home_access: true },
     )
     expect(code).toBe(0)
     expect(out).toContain('added')
@@ -292,7 +344,8 @@ describe.skipIf(!available)('a real task sandbox', () => {
   })
 
   it('commits in a worktree it made in its own home after the sandbox starts again', async () => {
-    const made = await inSandbox('git -C ~/project worktree add -q ~/side -b side && echo added')
+    const older = { home_access: true }
+    const made = await inSandbox('git -C ~/project worktree add -q ~/side -b side && echo added', null, older)
     expect(made.out).toContain('added')
     expect(fs.existsSync(path.join(home, 'side'))).toBe(false)
     const { code, out } = await inSandbox(
@@ -301,6 +354,8 @@ describe.skipIf(!available)('a real task sandbox', () => {
         'git -c user.name=Seti -c user.email=test@seti.invalid commit -qm side && echo committed',
         'git worktree prune && git worktree list',
       ].join(' && '),
+      null,
+      older,
     )
     expect(out).toContain('committed')
     expect(out).toContain(`${path.join(home, 'side')} `)

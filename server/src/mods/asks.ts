@@ -11,7 +11,7 @@ import {
 import { asMod, currentRequestSource } from '../access.js'
 import { audit } from '../audit.js'
 import { SAFE_MODE_FORCED } from '../config.js'
-import { now, repos } from '../db.js'
+import { now } from '../db.js'
 import { fromDelegate } from '../ea-guard.js'
 import { HttpError } from '../http.js'
 import { pushToEveryDevice } from '../notifications.js'
@@ -40,22 +40,9 @@ function summaryOf(name: string, op: ModAskOp, args: Record<string, unknown>, ta
   if (op === 'tasks.manage.start') {
     const prompt = String(args.prompt)
     const shown = prompt.length > PROMPT_SHOWN ? `${prompt.slice(0, PROMPT_SHOWN)}...` : prompt
-    const where = typeof args.repo_slug === 'string' ? ` in ${args.repo_slug}` : ''
-    return `The ${name} mod wants to start an agent "${String(args.title)}"${where} with this prompt: ${shown}`
+    return `The ${name} mod wants to start an agent "${String(args.title)}" with this prompt: ${shown}`
   }
   return `The ${name} mod wants to stop the running turn of "${target}"`
-}
-
-/** The args with the slug of the repo they name, so the user sees where an agent would start. */
-async function withRepo(args: Record<string, unknown>): Promise<Record<string, unknown>> {
-  if (typeof args.repo !== 'string') {
-    return args
-  }
-  const repo = await repos.get(args.repo)
-  if (repo === undefined) {
-    throw new HttpError(404, `Seti has no repo ${args.repo}`)
-  }
-  return { ...args, repo_slug: repo.slug }
 }
 
 /**
@@ -67,7 +54,6 @@ export async function askUser(
   { name, op, args, target = '' }: { name: string; op: ModAskOp; args: Record<string, unknown>; target?: string },
 ): Promise<{ asked: string }> {
   const at = now()
-  const recorded = await withRepo(args)
   if ((await modAsks.openCount(call.modId, at)) >= MOD_LIMITS.openAsks) {
     throw new HttpError(429, `The ${call.modId} mod has ${String(MOD_LIMITS.openAsks)} asks open already`)
   }
@@ -75,8 +61,8 @@ export async function askUser(
     id: randomUUID(),
     mod_id: call.modId,
     op,
-    args: recorded,
-    summary: summaryOf(name, op, recorded, target),
+    args,
+    summary: summaryOf(name, op, args, target),
     created_at: at,
     expires_at: new Date(Date.parse(at) + MOD_LIMITS.askTtlMs).toISOString(),
   })
@@ -113,7 +99,6 @@ async function runAllowed(ask: ModAsk): Promise<string> {
     const input = createTaskInput.parse({
       title: ask.args.title,
       prompt: ask.args.prompt,
-      repo_ids: typeof ask.args.repo === 'string' ? [ask.args.repo] : [],
       sandbox: true,
       profile_id: DEFAULT_PROFILE_ID,
       seti_control: 'self',

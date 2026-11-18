@@ -1,5 +1,4 @@
 import type { MessagePage, Task } from '@seti/shared'
-import { paths } from './support/env.js'
 import { HOLD_PROMPT } from './support/fake-claude.js'
 import { SIDE_ANSWER, SLOW_QUESTION } from './support/fake-side-chat.js'
 import { apiData, expect, test, unique } from './support/fixtures.js'
@@ -70,7 +69,7 @@ test('/btw in the reply box asks mid-turn in the side chat sheet and sends nothi
   request,
 }) => {
   const response = await request.post('/api/tasks', {
-    data: { title: unique('Phone btw'), prompt: `Please ${HOLD_PROMPT}`, cwd: paths.checkout, sandbox: false },
+    data: { title: unique('Phone btw'), prompt: `Please ${HOLD_PROMPT}`, sandbox: false },
   })
   expect(response.ok()).toBe(true)
   const { id } = ((await response.json()) as { data: Task }).data
@@ -103,7 +102,7 @@ test('with the side chat off the phone drops Ask aside, /btw offers Turn on, and
   request,
 }) => {
   const response = await request.post('/api/tasks', {
-    data: { title: unique('Phone side off'), prompt: `Please ${HOLD_PROMPT}`, cwd: paths.checkout, sandbox: false },
+    data: { title: unique('Phone side off'), prompt: `Please ${HOLD_PROMPT}`, sandbox: false },
   })
   expect(response.ok()).toBe(true)
   const { id } = ((await response.json()) as { data: Task }).data

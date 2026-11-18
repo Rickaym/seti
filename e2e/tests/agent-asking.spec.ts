@@ -1,6 +1,5 @@
 import type { APIRequestContext, Page } from '@playwright/test'
 import type { Envelope, MessagePage, Task, TaskListEntry } from '@seti/shared'
-import { paths } from './support/env.js'
 import { ASK_PROMPT, ASK_REPLY, CHOICE_OPTIONS, CHOICE_PROMPT, CHOICE_QUESTION } from './support/fake-replies.js'
 import { apiData, expect, test, toasts, unique } from './support/fixtures.js'
 import { FAKE_CLAUDE_ENV } from './support/processes.js'
@@ -20,7 +19,7 @@ async function barCount(page: Page): Promise<number> {
 
 async function startAsking(request: APIRequestContext, title: string, prompt = ASK_PROMPT): Promise<string> {
   const response = await request.post('/api/tasks', {
-    data: { title, prompt: `Please ${prompt}`, cwd: paths.checkout, sandbox: false },
+    data: { title, prompt: `Please ${prompt}`, sandbox: false },
   })
   expect(response.ok(), 'POST /api/tasks').toBe(true)
   const { id } = ((await response.json()) as Envelope<Task>).data

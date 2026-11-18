@@ -8,14 +8,13 @@ import {
   type Task,
   type TaskListEntry,
 } from '@seti/shared'
-import { paths } from './env.js'
 import { PERMISSION_PROMPT, PLAN_APPROVAL_PROMPT } from './fake-permission.js'
 import { apiData, expect, unique } from './fixtures.js'
 
 /** Starts a fake agent on the prompt and waits until its reason line says what it waits on. */
 async function blockedAgent(request: APIRequestContext, name: string, prompt: string, line: RegExp): Promise<Task> {
   const response = await request.post('/api/tasks', {
-    data: { title: unique(name), prompt, cwd: paths.checkout, sandbox: false },
+    data: { title: unique(name), prompt, sandbox: false },
   })
   expect(response.ok(), 'POST /api/tasks').toBe(true)
   const task = ((await response.json()) as Envelope<Task>).data

@@ -94,7 +94,7 @@ export function bashCommand(input: unknown): string {
 }
 
 /** Seti tools that change only the calling agent's own row in Seti. */
-const OWN_ROW_TOOLS = new Set(['mcp__seti__set_status'])
+const OWN_ROW_TOOLS = new Set(['mcp__seti__set_status', 'mcp__seti__set_working_directory'])
 
 /** What the words of an MCP tool's name say it does; a write word beats a read word. */
 export function mcpNameKind(name: string): 'write' | 'read' | 'unknown' {

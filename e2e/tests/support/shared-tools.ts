@@ -2,7 +2,6 @@ import fs from 'node:fs'
 import path from 'node:path'
 import type { APIRequestContext } from '@playwright/test'
 import type { ChangeRequest, Envelope, SharedTool, SharedToolChange, Task } from '@seti/shared'
-import { paths } from './env.js'
 import { setiPrompt } from './fake-claude.js'
 import { apiData, expect, unique } from './fixtures.js'
 
@@ -10,21 +9,16 @@ export const TOOL_DESCRIPTION = 'List the open invoices of a customer. Use it wh
 export const TOOL_REASON = 'Other agents keep asking me to look invoices up for them.'
 const TOOL_FILE = 'invoices.py'
 
-const scriptPath = () => path.join(paths.checkout, TOOL_FILE)
-
-/** Takes the proposed script out of the checkout, which other specs share. */
-export const removeToolScript = () => {
-  fs.rmSync(scriptPath(), { force: true })
-}
+const scriptPath = (agent: Task) => path.join(agent.cwd, TOOL_FILE)
 
 async function idle(request: APIRequestContext, id: string): Promise<void> {
   await expect.poll(async () => (await apiData<Task>(request, `/tasks/${id}`)).status).toBe('idle')
 }
 
-/** An agent on the fake Claude Code with the script in its working directory. */
+/** An agent on the fake Claude Code, which keeps the script in its own folder. */
 export async function startToolsmith(request: APIRequestContext): Promise<Task> {
   const response = await request.post('/api/tasks', {
-    data: { title: unique('Toolsmith'), prompt: 'Say hello', cwd: paths.checkout, sandbox: false },
+    data: { title: unique('Toolsmith'), prompt: 'Say hello', sandbox: false },
   })
   expect(response.ok(), 'POST /api/tasks').toBe(true)
   const task = ((await response.json()) as Envelope<Task>).data
@@ -34,7 +28,7 @@ export async function startToolsmith(request: APIRequestContext): Promise<Task> 
 
 /** Has the agent call request_change for the script as it is now, and returns the filed proposal. */
 export async function proposeTool(request: APIRequestContext, agent: Task, name: string, content: string) {
-  fs.writeFileSync(scriptPath(), content)
+  fs.writeFileSync(scriptPath(agent), content)
   const change = {
     kind: 'shared_tool',
     name,

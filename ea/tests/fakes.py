@@ -1019,18 +1019,6 @@ class FakeSeti:
         match parts:
             case ["workspaces", workspace_id]:
                 return self._delete_workspace(workspace_id)
-            case ["tasks", task_id, "repos", repo_id]:
-                task = self._task(task_id)
-                if task is None:
-                    return err(404, "Task not found")
-                task["repos"] = [r for r in task["repos"] if r["id"] != repo_id]
-                return ok(task)
-            case ["tasks", task_id, "dirs"]:
-                task = self._task(task_id)
-                if task is None or params.get("path") not in task.get("dirs", []):
-                    return err(404, "Not Found", "That directory is not part of this agent")
-                task["dirs"] = [d for d in task["dirs"] if d != params.get("path")]
-                return ok(task)
             case ["tasks", task_id] | ["context", "packs", task_id]:
                 return httpx.Response(204)
             case ["repos", _]:
@@ -1375,29 +1363,16 @@ class FakeSeti:
         return ok({"from": sender, "to": body["to"], "files": files, "posted": {"deliveries": []}})
 
     def _planned_task(self, body: dict[str, Any]) -> dict[str, Any]:
-        """What POST /tasks/start makes: the planner picks seti when the prompt names it."""
+        """What POST /tasks/start makes: an agent in a fresh folder, set up by the planner."""
         prompt = str(body["prompt"])
-        planned = "repo_ids" not in body and "cwd" not in body and "seti" in prompt.lower()
-        ids = [REPO_SETI] if planned else list(body.get("repo_ids") or [])
         title = body.get("title") or f"Planned: {prompt[:24]}"
         task = make_task("44444444-aaaa-4bbb-8ccc-000000000004", title, "running")
-        worktree = bool(ids) and body.get("worktree", True)
-        repos = [r for i in ids for r in self.repos if r["id"] == i]
-        if repos:
-            entries = [
-                {"id": r["id"], "slug": r["slug"], "dir": r["path"], "worktree": worktree} for r in repos
-            ]
-            task.update(repo_id=repos[0]["id"], repo_slug=repos[0]["slug"], repos=entries, worktree=worktree)
-        else:
-            cwd = body.get("cwd") or "/home/u/work/scratch-44444444"
-            task.update(repo_id=None, repo_slug=None, repos=[], cwd=cwd)
+        task.update(repo_id=None, repo_slug=None, repos=[], cwd="/home/u/work/scratch-44444444")
         withheld = ["AWS: not asked for explicitly"] if "aws" in prompt.lower() else []
         task["setup"] = {
             "planner": "model",
             "fallback_reason": None,
-            "repos": [r["slug"] for r in repos],
-            "worktree": worktree,
-            "packs_linked": ["Style"] if planned else [],
+            "packs_linked": ["Style"] if "title" not in body and "seti" in prompt.lower() else [],
             "packs_unlinked": [],
             "mcp_enabled": [],
             "mcp_disabled": [],
@@ -1431,31 +1406,7 @@ class FakeSeti:
                 return ok(workspace)
             case ["tasks"]:
                 task = make_task("44444444-aaaa-4bbb-8ccc-000000000004", body["title"], "running")
-                if not body.get("repo_ids"):
-                    cwd = body.get("cwd") or "/home/u/work/scratch-44444444"
-                    task.update(repo_id=None, repo_slug=None, repos=[], cwd=cwd)
-                return ok(task)
-            case ["tasks", task_id, "repos"]:
-                task = self._task(task_id)
-                repo = next((r for r in self.repos if r["id"] == body["repo_id"]), None)
-                if task is None or repo is None:
-                    return err(404, "Task not found")
-                if any(r["id"] == repo["id"] for r in task["repos"]):
-                    return err(409, "Conflict", f"{repo['slug']} is already part of this agent")
-                worktree = body.get("worktree", False)
-                entry_dir = (
-                    f"/home/u/.seti/worktrees/{repo['slug'].split('/')[-1]}-x" if worktree else repo["path"]
-                )
-                entry = {"id": repo["id"], "slug": repo["slug"], "dir": entry_dir, "worktree": worktree}
-                task["repos"] = [*task["repos"], entry]
-                return ok(task)
-            case ["tasks", task_id, "dirs"]:
-                task = self._task(task_id)
-                if task is None:
-                    return err(404, "Task not found")
-                if not body["path"].startswith(("/", "~/")):
-                    return err(400, "Bad Request", "Give an absolute path or one under ~/")
-                task["dirs"] = [*task.get("dirs", []), body["path"]]
+                task.update(repo_id=None, repo_slug=None, repos=[], cwd="/home/u/work/scratch-44444444")
                 return ok(task)
             case ["tasks", task_id, "messages"]:
                 task = self._task(task_id)

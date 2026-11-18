@@ -30,7 +30,7 @@ const COMPACT_SHOWN_PRS = 2
 
 interface TaskMetaProps {
   task: TaskListEntry
-  /** Names the repo or folder alone and shows fewer PRs. */
+  /** Names the repos without owners and shows fewer PRs; a folder always shows by its name. */
   compact?: boolean
 }
 
@@ -54,7 +54,7 @@ function TaskMeta({ task, compact = false }: TaskMetaProps) {
   return (
     <div className="flex min-w-0 items-center gap-x-3 text-xs text-muted-foreground">
       <span className="min-w-0 truncate" title={task.cwd}>
-        {compact ? shortRepoLabel(task) : repoLabel(task)}
+        {compact || task.repos.length === 0 ? shortRepoLabel(task) : repoLabel(task)}
       </span>
       <TaskPrs task={task} limit={compact ? COMPACT_SHOWN_PRS : SHOWN_PRS} />
       <StatusLine text={task.blocked ?? task.status_line} className="min-w-[10ch] flex-1" />

@@ -1,5 +1,4 @@
 import type { Envelope, Task } from '@seti/shared'
-import { paths } from './support/env.js'
 import { PERMISSION_COMMAND, PERMISSION_DONE, PERMISSION_PROMPT } from './support/fake-permission.js'
 import { apiData, expect, test, unique } from './support/fixtures.js'
 import { expectFitsPhone } from './support/phone-layout.js'
@@ -12,7 +11,6 @@ test('a permission request fits the phone and is answered with a tap', async ({ 
     data: {
       title: unique('Phone permission'),
       prompt: `Please ${PERMISSION_PROMPT}`,
-      cwd: paths.checkout,
       sandbox: false,
     },
   })

@@ -137,7 +137,7 @@ import { sandboxPolicy } from './store/sandbox.js'
 import { subdomainProxy } from './subdomain-proxy.js'
 import { clearStallsOnTurnStart } from './task-blocked.js'
 import { onAnyTaskEvent } from './task-events.js'
-import { taskReposContext } from './tasks.js'
+import { taskFolderContext } from './task-location.js'
 import { openWorkspace, startWorkspaceSync, workspaceTurnEnded } from './workspace/engine.js'
 
 /** Large enough for a full context file or prompt, small enough to refuse memory floods. */
@@ -337,7 +337,7 @@ export function createApp(access: AccessGuardOptions = defaultAccess(), eaUrl: s
   app.route('/api/permissions', permissionRoutes)
   registerContextProvider(workspaceContext)
   registerContextProvider(contextPackPrompt)
-  registerContextProvider(taskReposContext)
+  registerContextProvider(taskFolderContext)
   registerContextProvider(importedContext)
   setProbePlugins(defaultPluginConfigs)
   setProbeLauncher(sandboxedProbeLaunch)

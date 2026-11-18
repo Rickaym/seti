@@ -213,8 +213,8 @@ test.describe('credentials', () => {
       sent.body = route.request().postDataJSON() as StartAgentInput
       await route.fulfill({ json: { data: { id: 'e2e-intercepted' }, meta: {} } })
     })
-    await page.getByLabel('Message').fill('Never reaches the server.')
-    await page.getByLabel('Message').press('Enter')
+    await page.getByLabel('Message', { exact: true }).fill('Never reaches the server.')
+    await page.getByLabel('Message', { exact: true }).press('Enter')
     await expect(page).toHaveURL(/#agents\/e2e-intercepted$/)
     const { workspace_id } = await apiData<Task>(request, `/tasks/${id}`)
     expect(sent.body).toEqual({ prompt: 'Never reaches the server.', workspace_id, client_id: expect.any(String) })

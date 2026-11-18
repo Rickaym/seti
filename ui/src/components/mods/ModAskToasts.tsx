@@ -23,8 +23,7 @@ function headline(ask: ModAsk, prompt: string | null): string {
   if (prompt === null) {
     return ask.summary
   }
-  const where = typeof ask.args.repo_slug === 'string' ? ` in ${ask.args.repo_slug}` : ''
-  return `Start an agent "${String(ask.args.title)}"${where} with this prompt:`
+  return `Start an agent "${String(ask.args.title)}" with this prompt:`
 }
 
 async function decide(ask: ModAsk, decision: ModAskDecision, modName: string): Promise<void> {

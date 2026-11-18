@@ -1,7 +1,6 @@
 import { AWS_ACCESS_ID, PLANNED_TITLE_MAX, type AccessChoice, type PlannerOutput, type TaskSetup } from '@seti/shared'
 
 export interface PlannerCatalog {
-  repos: { id: string; slug: string; description: string; path?: string }[]
   packs: { id: string; name: string; description: string; linked_by_default: boolean; builtin: boolean }[]
   /** `local_to`: the directories whose local config alone has the server. */
   mcp: { name: string; default_enabled: boolean; local_to?: string[] }[]
@@ -13,10 +12,6 @@ export interface PlannerCatalog {
 /** What the caller fixed already, so the planner leaves it alone. */
 export interface PlanPins {
   title?: string | undefined
-  repo_ids?: readonly string[] | undefined
-  worktree?: boolean | undefined
-  /** A pinned directory: no repos. */
-  cwd?: string | undefined
   /** The EA never grants SSH or AWS, whatever the planner says. */
   fromEa?: boolean
   /** Nor does an agent starting another with its seti tools. */
@@ -25,8 +20,6 @@ export interface PlanPins {
 
 export interface AgentPlan {
   title: string
-  repo_ids: string[]
-  worktree: boolean
   context_pack_ids: string[]
   mcp_enabled: string[]
   mcp_disabled: string[]
@@ -51,7 +44,7 @@ function unquote(text: string): string {
 }
 
 /** Cuts at a word boundary so a clipped title never ends mid-word. */
-export function clip(text: string, max: number): string {
+function clip(text: string, max: number): string {
   if (text.length <= max) {
     return text
   }
@@ -94,22 +87,6 @@ export const asksForAws = (message: string) => AWS_WORDS.test(message)
 const byName = <T extends { name: string }>(items: readonly T[], name: string) =>
   items.find((item) => item.name.toLowerCase() === name.trim().toLowerCase())
 
-function pickRepos(names: readonly string[], catalog: PlannerCatalog, withheld: string[]) {
-  const picked: PlannerCatalog['repos'] = []
-  for (const name of names) {
-    const wanted = name.trim().toLowerCase()
-    const repo = catalog.repos.find(
-      (candidate) => candidate.slug.toLowerCase() === wanted || candidate.slug.toLowerCase().endsWith(`/${wanted}`),
-    )
-    if (repo === undefined) {
-      withheld.push(`unknown repo ${name}`)
-    } else if (!picked.includes(repo)) {
-      picked.push(repo)
-    }
-  }
-  return picked.slice(0, 10)
-}
-
 type Pack = PlannerCatalog['packs'][number]
 
 const findPacks = (names: readonly string[], pool: readonly Pack[]) => [
@@ -141,21 +118,16 @@ function pickPacks(raw: PlannerOutput, catalog: PlannerCatalog) {
 
 type McpEntry = PlannerCatalog['mcp'][number]
 
-/** What an MCP choice is checked against: the message and the directories the agent works in. */
+/** What an MCP choice is checked against: the message, and where refusals are noted. */
 interface McpAsk {
   message: string
-  repoPaths: readonly string[]
   withheld: string[]
 }
 
 /** A local server of other directories goes on only when the message names it, like an SSH host. */
-function grantLocal(server: McpEntry, { message, repoPaths, withheld }: McpAsk): boolean {
-  const dirs = server.local_to ?? []
-  if (dirs.length === 0) {
+function grantLocal(server: McpEntry, { message, withheld }: McpAsk): boolean {
+  if ((server.local_to ?? []).length === 0) {
     return true
-  }
-  if (dirs.some((dir) => repoPaths.includes(dir))) {
-    return false
   }
   if (!mentions(message, server.name)) {
     withheld.push(`MCP ${server.name}: not asked for explicitly`)
@@ -269,22 +241,13 @@ export interface PlannerAnswer {
 export function checkPlan(answer: PlannerAnswer, catalog: PlannerCatalog, pins: PlanPins = {}): AgentPlan {
   const { raw, message } = answer
   const withheld: string[] = []
-  const pinnedRepos = pins.repo_ids?.map((id) => catalog.repos.find((repo) => repo.id === id))
-  const picked =
-    pins.cwd !== undefined
-      ? []
-      : (pinnedRepos?.filter((repo) => repo !== undefined) ?? pickRepos(raw.repos, catalog, withheld))
-  const worktree = picked.length > 0 && (pins.repo_ids === undefined ? raw.worktree : (pins.worktree ?? true))
   const packs = pickPacks(raw, catalog)
-  const repoPaths = [...picked.flatMap((repo) => (repo.path === undefined ? [] : [repo.path])), pins.cwd ?? '']
-  const mcp = pickMcp(raw, catalog, { message, repoPaths, withheld })
+  const mcp = pickMcp(raw, catalog, { message, withheld })
   const access = pickAccess(raw, message, catalog, grantlessOf(pins))
   withheld.push(...access.withheld)
   const setup: TaskSetup = {
     planner: answer.reason === null ? 'model' : 'fallback',
     fallback_reason: answer.reason,
-    repos: picked.map((repo) => repo.slug),
-    worktree,
     packs_linked: packs.linked,
     packs_unlinked: packs.unlinked,
     mcp_enabled: mcp.enabled,
@@ -295,8 +258,6 @@ export function checkPlan(answer: PlannerAnswer, catalog: PlannerCatalog, pins: 
   }
   return {
     title: pins.title ?? cleanTitle(raw.title, message),
-    repo_ids: pins.repo_ids === undefined ? picked.map((repo) => repo.id) : [...pins.repo_ids],
-    worktree,
     context_pack_ids: packs.ids,
     mcp_enabled: mcp.enabled,
     mcp_disabled: mcp.disabled,

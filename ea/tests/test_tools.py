@@ -1,8 +1,6 @@
 import httpx
 import pytest
 from fakes import (
-    REPO_SETI,
-    REPO_WEB,
     TASK_DOCS,
     TASK_LOGIN,
     TASK_LOGOUT,
@@ -233,70 +231,31 @@ async def test_hand_over_updates(tools: EaTools, fake_seti: FakeSeti) -> None:
     assert nothing.text == "No updates are waiting for Fix the logout button."
 
 
-async def test_start_task_pins_the_repos_the_user_named(tools: EaTools, fake_seti: FakeSeti) -> None:
-    result = await tools.call(
-        "start_task",
-        {
-            "title": "Add dark mode",
-            "prompt": "Add a dark theme",
-            "repos": ["seti", "octocat/web"],
-            "worktree": True,
-        },
-    )
+async def test_start_task_sends_the_prompt_and_title_and_no_place(
+    tools: EaTools, fake_seti: FakeSeti
+) -> None:
+    old = {"repos": ["seti", "octocat/web"], "worktree": True, "directory": "~/notes"}
+    result = await tools.call("start_task", {"title": "Add dark mode", "prompt": "Add a dark theme", **old})
     assert result.ok
-    assert result.text == "Started task Add dark mode in seti, web in a worktree. It is running."
+    assert result.text == (
+        "Started task Add dark mode in its own folder, /home/u/work/scratch-44444444. It is running."
+    )
     assert fake_seti.posts() == [
-        (
-            "/api/tasks/start",
-            {
-                "title": "Add dark mode",
-                "prompt": "Add a dark theme",
-                "repo_ids": [REPO_SETI, REPO_WEB],
-                "worktree": True,
-            },
-        )
+        ("/api/tasks/start", {"title": "Add dark mode", "prompt": "Add a dark theme"})
     ]
 
 
-async def test_start_task_leaves_title_and_repos_to_the_planner(tools: EaTools, fake_seti: FakeSeti) -> None:
+async def test_start_task_leaves_the_title_to_the_planner(tools: EaTools, fake_seti: FakeSeti) -> None:
     result = await tools.call("start_task", {"prompt": "Speed up the seti test suite, and check AWS costs"})
     assert fake_seti.posts() == [
         ("/api/tasks/start", {"prompt": "Speed up the seti test suite, and check AWS costs"})
     ]
     assert result.text == (
-        "Started task Planned: Speed up the seti test s in seti in a worktree. It is running. "
+        "Started task Planned: Speed up the seti test s in its own folder, /home/u/work/scratch-44444444. "
+        "It is running. "
         "Seti linked the context packs Style. AWS stays off; the user turns it on in the agent's details."
     )
     assert result.summary == "Started agent Planned: Speed up the seti test s"
-
-
-async def test_start_task_rejects_unknown_and_ambiguous_repos(tools: EaTools, fake_seti: FakeSeti) -> None:
-    unknown = await tools.call("start_task", {"title": "t", "prompt": "p", "repos": ["infra"]})
-    assert not unknown.ok
-    assert "Registered repos: Octocat/seti, Octocat/web, Octocat/web-admin" in unknown.text
-    ambiguous = await tools.call("start_task", {"title": "t", "prompt": "p", "repos": ["we"]})
-    assert not ambiguous.ok
-    assert "matches several repos: Octocat/web, Octocat/web-admin" in ambiguous.text
-    assert not fake_seti.posts()
-
-
-async def test_start_task_without_repos_gets_a_fresh_folder(tools: EaTools, fake_seti: FakeSeti) -> None:
-    result = await tools.call("start_task", {"title": "Scratch", "prompt": "Explore", "worktree": True})
-    assert result.text == (
-        "Started task Scratch in a fresh folder, /home/u/work/scratch-44444444, with no repo. It is running."
-    )
-    assert fake_seti.posts()[0][1] == {"title": "Scratch", "prompt": "Explore"}
-
-
-async def test_start_task_in_an_existing_directory(tools: EaTools, fake_seti: FakeSeti) -> None:
-    result = await tools.call("start_task", {"title": "Notes", "prompt": "Tidy", "directory": "~/notes"})
-    assert result.text == "Started task Notes in ~/notes. It is running."
-    assert fake_seti.posts()[0][1]["cwd"] == "~/notes"
-    with_repo = await tools.call(
-        "start_task", {"title": "Code", "prompt": "Fix", "repos": ["seti"], "directory": "~/notes"}
-    )
-    assert with_repo.ok
-    assert "cwd" not in fake_seti.posts()[1][1]
 
 
 async def test_list_prs(tools: EaTools, fake_seti: FakeSeti) -> None:

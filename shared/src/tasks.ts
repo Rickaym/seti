@@ -15,7 +15,7 @@ import type { ModelFallback } from './model-fallback.js'
 import type { PermissionRequest } from './permissions.js'
 import { disabledPluginIds } from './plugins.js'
 import { prUrl } from './pr-url.js'
-import { checkRepoSelection, repoSelectionFields, withRepoIds, type RepoRef } from './repos.js'
+import type { RepoRef } from './repos.js'
 import { DEFAULT_SETI_CONTROL, setiControlLevel, type SetiControlLevel } from './seti-control.js'
 import type { ShellProgress, ShellResult } from './shell.js'
 import type { SubtaskBrief } from './subtasks.js'
@@ -111,34 +111,28 @@ export const STATUS_LINE_MAX = 60
 /** A short live status an agent sets on its own row, such as waiting on CI; empty clears it. */
 export const statusLineText = z.string().trim().max(STATUS_LINE_MAX)
 
-export const createTaskInput = z
-  .object({
-    /** Left out, Seti's planner titles the agent from the prompt. */
-    title: z.string().trim().min(1).max(200).optional(),
-    prompt: z.string().trim().min(1, 'prompt is required'),
-    ...repoSelectionFields,
-    cwd: z.string().trim().optional(),
-    worktree: z.boolean().default(false),
-    ref: z.string().trim().min(1).optional(),
-    pr_urls: z.array(prUrl).max(MAX_TASK_PRS).optional(),
-    /** Leave out for the packs linked by default. */
-    context_pack_ids: z.array(z.uuid()).optional(),
-    disabled_plugin_ids: disabledPluginIds,
-    /** MCP servers this agent turns on or off against the defaults. */
-    ...mcpChoiceFields,
-    /** Run in Claude Code's sandbox when the sandbox setting is on; off for ssh or cloud CLIs. */
-    sandbox: z.boolean().default(true),
-    /** Overrides against the access defaults, such as ssh hosts or AWS; see effective access. */
-    access: accessChoices,
-    /** The credential profile whose tokens the sandbox proxy adds. */
-    profile_id: z.string().trim().min(1).max(64).default(DEFAULT_PROFILE_ID),
-    /** How far the agent's seti MCP tools reach; a security setting. */
-    seti_control: setiControlLevel.default(DEFAULT_SETI_CONTROL),
-    /** Left out, the agent joins the first workspace. */
-    workspace_id: workspaceId.optional(),
-  })
-  .superRefine(checkRepoSelection)
-  .transform(withRepoIds)
+/** A new agent always works in a fresh folder of its own, so a request names no place. */
+export const createTaskInput = z.object({
+  /** Left out, Seti's planner titles the agent from the prompt. */
+  title: z.string().trim().min(1).max(200).optional(),
+  prompt: z.string().trim().min(1, 'prompt is required'),
+  pr_urls: z.array(prUrl).max(MAX_TASK_PRS).optional(),
+  /** Leave out for the packs linked by default. */
+  context_pack_ids: z.array(z.uuid()).optional(),
+  disabled_plugin_ids: disabledPluginIds,
+  /** MCP servers this agent turns on or off against the defaults. */
+  ...mcpChoiceFields,
+  /** Run in Claude Code's sandbox when the sandbox setting is on; off for ssh or cloud CLIs. */
+  sandbox: z.boolean().default(true),
+  /** Overrides against the access defaults, such as ssh hosts or AWS; see effective access. */
+  access: accessChoices,
+  /** The credential profile whose tokens the sandbox proxy adds. */
+  profile_id: z.string().trim().min(1).max(64).default(DEFAULT_PROFILE_ID),
+  /** How far the agent's seti MCP tools reach; a security setting. */
+  seti_control: setiControlLevel.default(DEFAULT_SETI_CONTROL),
+  /** Left out, the agent joins the first workspace. */
+  workspace_id: workspaceId.optional(),
+})
 export type CreateTaskInput = z.input<typeof createTaskInput>
 export type CreateTaskRequest = z.output<typeof createTaskInput>
 /** A create request with its title settled, and how the planner set it up when it did. */
@@ -146,8 +140,6 @@ export type TaskRequest = CreateTaskRequest & { title: string; setup?: TaskSetup
 
 export const updateTaskInput = z.object({
   title: z.string().trim().min(1).optional(),
-  /** One of the task's repo or directory paths; its session restarts there at the next turn. */
-  cwd: z.string().trim().min(1).optional(),
   input_mode: z.enum(INPUT_MODES).optional(),
   sandbox: z.boolean().optional(),
   pinned: z.boolean().optional(),
@@ -159,23 +151,11 @@ export const updateTaskInput = z.object({
   workspace_id: workspaceId.optional(),
   /** Keeps the agent's turns from notifying any device. */
   notifications_muted: z.boolean().optional(),
+  /** Only false: takes the user's home folders out of an older agent's sandbox for good. */
+  home_access: z.literal(false).optional(),
 })
 
 export const taskPrInput = z.object({ url: prUrl })
-
-/** Adds a registered repo to a task: its checkout, or a new worktree like at creation. */
-export const taskRepoInput = z.object({
-  repo_id: z.uuid(),
-  worktree: z.boolean().default(false),
-  ref: z.string().trim().min(1).optional(),
-})
-export type TaskRepoInput = z.input<typeof taskRepoInput>
-
-export const taskRepoParams = z.object({ id: z.string().min(1), repo_id: z.string().min(1) })
-
-/** An existing directory, absolute or under ~/, the agent can read and edit besides its own. */
-export const taskDirInput = z.object({ path: z.string().trim().min(1, 'path is required') })
-export type TaskDirInput = z.input<typeof taskDirInput>
 
 export const sendMessageInput = z.object({
   prompt: z.string().trim().min(1, 'prompt is required'),
@@ -273,6 +253,8 @@ export interface Task {
   worktree: boolean
   /** Asked to run sandboxed; it does while the sandbox setting is on too. */
   sandbox: boolean
+  /** An agent from before private sandboxes: its sandbox shows the user's home folders, writable. */
+  home_access: boolean
   /** The credential profile a sandboxed task's proxy takes GitHub, AWS and header credentials from. */
   profile_id: string
   /** How far the agent's seti MCP tools reach: nothing, the agent itself, or Seti as the EA. */
@@ -478,6 +460,7 @@ export const taskFields = {
   cwd: text('cwd'),
   worktree: flag('worktree'),
   sandbox: flag('sandbox', true),
+  home_access: flag('home_access'),
   profile_id: text('profile_id', DEFAULT_PROFILE_ID),
   seti_control: orDefault<SetiControlLevel>('seti_control', setiControlLevel, 'off'),
   bypass_until: maybeText('bypass_until'),
