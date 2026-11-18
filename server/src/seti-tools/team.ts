@@ -147,7 +147,7 @@ const setiOverview = setiTool({
       .boolean()
       .default(false)
       .describe(
-        "Instead, the shipping metrics: PRs merged in the last 7 and 30 days, the daily streak, turns, time running and cost per day, the latest merges, MCP servers per agent, and under ea the EA's own model calls over 7 days with their tokens, cached share and latency.",
+        "Instead, the shipping metrics: PRs merged in the last 7 and 30 days, the daily streak, turns, time running and cost per day, the latest merges, and under ea the EA's own model calls over 7 days with their tokens, cached share and latency.",
       ),
     mods: z
       .boolean()
