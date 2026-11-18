@@ -13,7 +13,7 @@ async function seedTask(): Promise<string> {
   const db = openSeedDb()
   const id = randomUUID()
   const at = new Date().toISOString()
-  await db.idleTask(id, 'Find in the message', paths.checkout, at)
+  await db.idleTask(id, 'Find in a draft', paths.checkout, at)
   await db.message(id, 'prompt', JSON.stringify({ text: 'Seeded find prompt.' }), at)
   await db.close()
   return id
