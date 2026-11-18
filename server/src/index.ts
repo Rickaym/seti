@@ -216,7 +216,7 @@ const sockets = new WebSocketServer({
 serve({ fetch: createApp().fetch, hostname: HOST, port: PORT, websocket: { server: sockets } }, (info) => {
   process.stdout.write(`seti listening on http://${info.address}:${String(info.port)}\n`)
   void signInHint(PUBLIC_ACCESS)
-  void wakeWaiting()
+  void wakeWaiting(interrupted.resume.map((each) => each.taskId))
   inBackground('resume', async () => resumeInterrupted(interrupted.resume))
   void audit.record({
     actor: 'system',

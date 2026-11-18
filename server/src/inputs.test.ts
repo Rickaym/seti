@@ -186,6 +186,8 @@ describe('task inputs', () => {
     const held = await newTask('queue')
     await deliverInputs(held, [passed])
     await tasks.setInputMode(held, 'wake')
+    await wakeWaiting([held])
+    expect(await prompts(held)).toEqual([])
     await wakeWaiting()
     await waitIdle(held)
     expect(await prompts(held)).toEqual([{ text: '', auto: true, inputs: 1 }])

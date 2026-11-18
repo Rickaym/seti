@@ -43,7 +43,9 @@ An agent whose session had background work is also told that the restart stopped
 processes live in the session's process tree (and in its memory scope, which is bound to Seti's
 unit) and end with it; other agents are not told. The transcript gets a Seti note, "Seti restarted
 during this turn and resumed it", and the audit log a `task.resumed_after_restart` event with the
-actor `system`, the kind of turn and the background count. Turns the user waits on resume first,
+actor `system`, the kind of turn and the background count. Updates that waited through the restart
+reach a resumed agent with that message instead of in a turn of their own. Turns the user waits on
+resume first,
 then wake-ups, then updates. Three sessions start two seconds apart, the next three follow twenty
 seconds later, and so on, so a restart that cut many turns does not start them all at once.
 
