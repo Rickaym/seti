@@ -1,12 +1,13 @@
-import type { ChannelInfo, ChannelSubscribeInput, ChannelSubscription } from '@seti/shared'
+import type { ChannelInfo, ChannelSubscribeInput, ChannelSubscription, DeliveryTiming } from '@seti/shared'
 import { AlarmClock, Plus, Radar, Webhook, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
-import { apiDelete, apiGet, apiPost, errorText } from '@/api'
+import { apiDelete, apiGet, apiPost, apiPut, errorText } from '@/api'
 import { Hint } from '@/components/Hint'
 import { SettingsLink } from '@/components/SettingsLink'
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { DeliveryPicker } from './DeliveryPicker'
 import { filterLabel } from './subscriptions'
 
 const SOURCE_ICONS = { poller: Radar, reminder: AlarmClock } as const
@@ -136,6 +137,15 @@ export function SubscribedChannels({ listPath, subscriber, addHint, testId, onCo
       toast.error(errorText(e))
     }
   }
+  const setDelivery = async (sub: ChannelSubscription, delivery: DeliveryTiming | null) => {
+    try {
+      const path = `/channels/${sub.channel_id}/subscriptions/${String(sub.id)}/delivery`
+      const saved = await apiPut<ChannelSubscription>(path, { delivery })
+      setSubs(subs.map((entry) => (entry.id === saved.id ? saved : entry)))
+    } catch (e) {
+      toast.error(errorText(e))
+    }
+  }
   return (
     <div className="flex flex-wrap items-center gap-1" data-testid={testId}>
       {subs.length === 0 && <span className="text-muted-foreground">None</span>}
@@ -145,6 +155,14 @@ export function SubscribedChannels({ listPath, subscriber, addHint, testId, onCo
           <span className="max-w-40 truncate" title={filterLabel(sub.events)}>
             {sub.channel_name}
           </span>
+          {sub.target === 'task' && (
+            <DeliveryPicker
+              compact
+              subscriber={sub.channel_name}
+              delivery={sub.delivery}
+              onSave={(delivery) => void setDelivery(sub, delivery)}
+            />
+          )}
           <Button
             size="icon-xs"
             variant="ghost"

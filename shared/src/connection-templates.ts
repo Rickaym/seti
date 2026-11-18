@@ -13,6 +13,7 @@ import {
   type ConnectionRequest,
   type ConnectionSlot,
 } from './connections.js'
+import type { ServiceIconKey } from './service-icons.js'
 
 export const TEMPLATE_CATEGORIES = [
   'cloud',
@@ -67,6 +68,8 @@ export interface ConnectionTemplate {
   title: string
   description: string
   category: TemplateCategory
+  /** The brand mark beside its name; its category's icon stands in when null. */
+  icon: ServiceIconKey | null
   /** The service's own page on signing in to its API. */
   docs: string
   fields: ConnectionTemplateField[]

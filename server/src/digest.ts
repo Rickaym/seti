@@ -1,6 +1,8 @@
 import type { SDKAssistantMessage, SDKMessage, SDKResultMessage, SDKUserMessage } from '@anthropic-ai/claude-agent-sdk'
 import {
   compactedAt,
+  QUIET_LABELS,
+  quietReason,
   type DigestKind,
   type DigestLine,
   type MessageRow,
@@ -143,6 +145,15 @@ function shellLine(run: ShellResult): string {
 const updateLine = (input: TaskInput) =>
   clip(input.title.includes(input.subject) ? input.title : `${input.subject}: ${input.title}`, USER_CHARS)
 
+/** How an update the agent did not get as usual is marked: dismissed, or quiet with its reason. */
+function updateMark(input: TaskInput): string {
+  const quiet = quietReason(input)
+  if (quiet !== undefined) {
+    return ` (${QUIET_LABELS[quiet]})`
+  }
+  return input.dismissed_at === undefined ? '' : ' (dismissed)'
+}
+
 interface Lookup {
   results: ReadonlyMap<string, ToolResultBlock>
   subtasks: ReadonlyMap<string, SubtaskBrief>
@@ -203,8 +214,10 @@ function sdkLines(m: SDKMessage, lookup: Lookup): [DigestKind, string][] {
   return []
 }
 
-const setiNoteIsError = ({ session, seti_control, bypass }: Extract<MessageRow, { kind: 'seti' }>['payload']) =>
-  session === undefined && seti_control === undefined && bypass === undefined
+type SetiPayload = Extract<MessageRow, { kind: 'seti' }>['payload']
+
+const setiNoteIsError = ({ session, seti_control, bypass, timed_out }: SetiPayload) =>
+  session === undefined && seti_control === undefined && bypass === undefined && timed_out === undefined
 
 function rowLines(row: MessageRow, lookup: Lookup): [DigestKind, string][] {
   switch (row.kind) {
@@ -217,7 +230,7 @@ function rowLines(row: MessageRow, lookup: Lookup): [DigestKind, string][] {
     case 'shell':
       return [['shell', shellLine(row.payload)]]
     case 'input':
-      return [['update', `${updateLine(row.payload)}${row.payload.dismissed_at === undefined ? '' : ' (dismissed)'}`]]
+      return [['update', `${updateLine(row.payload)}${updateMark(row.payload)}`]]
     case 'notice':
       return [['update', row.payload.title]]
     case 'unreadable':

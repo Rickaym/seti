@@ -5,6 +5,7 @@ import { apiGet } from '@/api'
 import { browserTimezone } from '@/components/schedule/cron'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { navigate } from '@/lib/route'
+import { DeliveryLabel } from './DeliveryPicker'
 import {
   AGENDA_RANGES,
   buildAgenda,
@@ -69,9 +70,14 @@ function Entry({ entry, onOpen }: { entry: AgendaEntry; onOpen: (entry: AgendaEn
         </time>
         <span className="min-w-0 flex-1">
           <span className="block truncate text-sm font-medium">{entry.name}</span>
-          <span className="block text-muted-foreground">
-            {entry.detail}
-            {runs}
+          <span className="flex flex-wrap items-center gap-x-2 text-muted-foreground">
+            <span>
+              {entry.detail}
+              {runs}
+            </span>
+            {entry.deliveries.map((delivery) => (
+              <DeliveryLabel key={delivery ?? 'agent'} delivery={delivery} />
+            ))}
           </span>
         </span>
         <span className="flex shrink-0 items-center gap-1.5 text-muted-foreground">

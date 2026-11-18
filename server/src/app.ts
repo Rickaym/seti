@@ -27,7 +27,7 @@ import {
 import { cancelWaitsOnArchive, deliverAgentWaits } from './agent-waits.js'
 import { briefOnReturn } from './attention-brief.js'
 import { inBackground } from './background.js'
-import { setAfterProbe, setProbePlugins } from './capabilities.js'
+import { setAfterProbe, setProbeLauncher, setProbePlugins } from './capabilities.js'
 import { compressEventStreams } from './compress-events.js'
 import { EA_URL, PERMISSION_MODE, PUBLIC_ACCESS, UI_DIST } from './config.js'
 import { connectionContext } from './connection-egress.js'
@@ -39,7 +39,8 @@ import { jsonEtag } from './etag.js'
 import { githubTokenMode } from './github-token.js'
 import { houseRulesContext } from './house-rules.js'
 import { fail, HttpError, ok } from './http.js'
-import { inputPreface, wakeAfterTurn } from './inputs.js'
+import { inputPreface } from './input-preface.js'
+import { wakeAfterTurn, wakeWhenUnblocked } from './inputs.js'
 import { knowledgeContext } from './knowledge-index.js'
 import { defaultLocalAuth } from './local-auth.js'
 import { forgetGoneServersLater } from './mcp-presence.js'
@@ -52,8 +53,10 @@ import { logicOps } from './mods/ops/table.js'
 import { startModTaskEvents } from './mods/task-events.js'
 import { notifyStatusEvent, notifyTurnEnd } from './notifications.js'
 import { PAIR_PAGE } from './pair-page.js'
+import { watchPermissionTimeouts } from './permission-timeout.js'
 import { defaultPluginConfigs } from './plugins.js'
 import { prDiscovery } from './pr-discovery.js'
+import { sandboxedProbeLaunch } from './probe-launch.js'
 import { stoppedPreface } from './process-stop.js'
 import { questionsContext } from './questions.js'
 import { accessRoutes } from './routes/access.js'
@@ -334,6 +337,7 @@ export function createApp(access: AccessGuardOptions = defaultAccess(), eaUrl: s
   registerContextProvider(taskReposContext)
   registerContextProvider(importedContext)
   setProbePlugins(defaultPluginConfigs)
+  setProbeLauncher(sandboxedProbeLaunch)
   setAfterProbe(forgetGoneServersLater)
   registerContextProvider(sandboxPrompt)
   registerContextProvider(connectionContext)
@@ -356,6 +360,7 @@ export function createApp(access: AccessGuardOptions = defaultAccess(), eaUrl: s
   registerTurnPreface(setiControlPreface)
   onTurnEnd(watchTurnEnd)
   onTurnEnd(wakeAfterTurn)
+  wakeWhenUnblocked()
   onTurnEnd((taskId) => {
     inBackground('pr discovery', async () => prDiscovery.run(taskId))
   })
@@ -367,6 +372,7 @@ export function createApp(access: AccessGuardOptions = defaultAccess(), eaUrl: s
   onAnyTaskEvent(watchBlocked)
   onTurnEnd(statusLineTurnEnded)
   clearStallsOnTurnStart()
+  watchPermissionTimeouts()
   restartQuietOnAnswer()
   clearStatusLinesWhenIdle()
   onTurnEnd(deliverAgentWaits)

@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import type { McpAddTransport } from './mcp.js'
+import type { ServiceIconKey } from './service-icons.js'
 
 /** A header of a remote server or an environment variable of a local one, named but never filled. */
 export interface McpConnectorField {
@@ -25,6 +26,8 @@ export interface McpConnector {
   name: string
   title: string
   description: string
+  /** The brand mark of a common connector; null for the rest, the MCP Registry's included. */
+  icon: ServiceIconKey | null
   source: 'common' | 'registry'
   transport: McpAddTransport
   url: string

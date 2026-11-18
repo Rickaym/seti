@@ -1,4 +1,4 @@
-import { runsInRange, type ChannelInfo, type EaFollowup, type RunTiming } from '@seti/shared'
+import { runsInRange, type ChannelInfo, type DeliveryTiming, type EaFollowup, type RunTiming } from '@seti/shared'
 import { describeSchedule } from '@/components/schedule/cron'
 import { intervalLabel } from './interval'
 
@@ -28,6 +28,8 @@ export interface AgendaEntry {
   detail: string
   /** How many runs the line stands for; over one for a collapsed line. */
   runs: number
+  /** When its subscribed agents get what it reports, one entry per choice; null follows the agent. */
+  deliveries: (DeliveryTiming | null)[]
 }
 
 export interface AgendaDay {
@@ -54,7 +56,15 @@ interface Scheduled {
   enabled: boolean
   timing: RunTiming
   detail: string
+  deliveries: (DeliveryTiming | null)[]
 }
+
+/** The delivery choices of the channel's agents that still get its updates, each once. */
+const deliveriesOf = (info: ChannelInfo) => [
+  ...new Set(
+    info.subscriptions.filter((sub) => sub.target === 'task' && !sub.task_archived).map((sub) => sub.delivery),
+  ),
+]
 
 function scheduledOf(info: ChannelInfo, timezone: string): Scheduled | null {
   if (info.source === 'poller') {
@@ -67,6 +77,7 @@ function scheduledOf(info: ChannelInfo, timezone: string): Scheduled | null {
       enabled,
       timing,
       detail: `Every ${intervalLabel(interval_s)}`,
+      deliveries: deliveriesOf(info),
     }
   }
   if (info.source !== 'reminder') {
@@ -82,6 +93,7 @@ function scheduledOf(info: ChannelInfo, timezone: string): Scheduled | null {
     enabled,
     timing: { interval_s, schedule, next_run_at },
     detail,
+    deliveries: deliveriesOf(info),
   }
 }
 
@@ -111,12 +123,12 @@ function daysBetween(now: Date, to: Date): { start: Date; end: Date }[] {
 function channelEntries(channel: Scheduled, day: { start: Date; end: Date }): AgendaEntry[] {
   const range = { from: new Date(day.start.getTime() - 1), to: new Date(day.end.getTime() - 1) }
   const { count, times } = runsInRange(channel.timing, range, COLLAPSE_OVER)
-  const { id, name, kind, detail } = channel
+  const { id, name, kind, detail, deliveries } = channel
   const [first] = times
   if (count > COLLAPSE_OVER && first !== undefined) {
-    return [{ key: `${id}:${first}`, at: first, kind, id, name, detail, runs: count }]
+    return [{ key: `${id}:${first}`, at: first, kind, id, name, detail, runs: count, deliveries }]
   }
-  return times.map((at) => ({ key: `${id}:${at}`, at, kind, id, name, detail, runs: 1 }))
+  return times.map((at) => ({ key: `${id}:${at}`, at, kind, id, name, detail, runs: 1, deliveries }))
 }
 
 function followupEntries(followups: EaFollowup[], day: { start: Date; end: Date }, first: boolean): AgendaEntry[] {
@@ -133,6 +145,7 @@ function followupEntries(followups: EaFollowup[], day: { start: Date; end: Date 
       name: item.title,
       detail: item.kind === 'reminder' ? 'The EA reminds you' : 'The EA checks back',
       runs: 1,
+      deliveries: [],
     }))
 }
 

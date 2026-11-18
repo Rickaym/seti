@@ -298,7 +298,7 @@ async function handOver(message: TeamMessage, target: Plan): Promise<Pick<TeamDe
       if (!running && !target.startIdle) {
         return { mode: 'held', reason: 'idle' }
       }
-      await runAutoTurn(target.task.id, target.priority)
+      await runAutoTurn(target.task.id, { priority: target.priority })
       return { mode: running ? target.priority : 'start', reason: null }
     } catch (e) {
       return { mode: 'held', reason: e instanceof HttpError ? e.message : 'busy' }

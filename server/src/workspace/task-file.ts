@@ -1,4 +1,4 @@
-import { awsRoleName, type AwsOutcome, type ChannelSubscription, type Task } from '@seti/shared'
+import { awsRoleName, type AwsOutcome, type ChannelSubscription, type DeliveryTiming, type Task } from '@seti/shared'
 import { channelSourceLabel } from '../channels/source-info.js'
 
 export interface TaskView {
@@ -17,8 +17,17 @@ export interface TaskView {
 
 const list = (items: readonly string[]) => (items.length === 0 ? 'none' : items.join(', '))
 
-const channelLine = (sub: ChannelSubscription) =>
-  `- ${sub.channel_name} (${channelSourceLabel(sub.preset)}): ${sub.events === null ? 'every event' : sub.events.join(', ')}`
+const DELIVERY_NOTES: Record<DeliveryTiming, string> = {
+  now: 'reaches you at once, during a turn too',
+  after_turn: 'reaches you once your turn is over',
+  with_message: "held for the user's next message",
+}
+
+function channelLine(sub: ChannelSubscription): string {
+  const events = sub.events === null ? 'every event' : sub.events.join(', ')
+  const when = sub.delivery === null ? '' : `; ${DELIVERY_NOTES[sub.delivery]}`
+  return `- ${sub.channel_name} (${channelSourceLabel(sub.preset)}): ${events}${when}`
+}
 
 /** The AWS the agent has, and when it has none, the one step that gives it. */
 function awsLine(aws: AwsOutcome): string {

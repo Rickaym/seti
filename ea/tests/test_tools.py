@@ -179,6 +179,8 @@ def test_queued_updates_match_the_ui_rule() -> None:
         {"kind": "input", "payload": {"title": "c"}},
         {"kind": "prompt", "payload": {"text": "taken back", "queued": "removed"}},
         {"kind": "input", "payload": {"title": "d", "dismissed_at": "2026-09-27T12:00:00.000Z"}},
+        {"kind": "input", "payload": {"title": "e", "quiet": "own_action"}},
+        {"kind": "input", "payload": {"title": "f", "quiet": "nothing_pending"}},
     ]
     assert [u["title"] for u in queued_updates(rows)] == ["b", "c"]
 
