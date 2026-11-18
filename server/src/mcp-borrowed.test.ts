@@ -1,6 +1,17 @@
+import fs from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { tasks } from './db.js'
-import { borrowedServers, borrowedStamp, isBorrowed, localServers, taskBorrowedServers, tilde } from './mcp-borrowed.js'
+import {
+  borrowedServers,
+  borrowedStamp,
+  isBorrowed,
+  localServers,
+  ownProjects,
+  taskBorrowedServers,
+  tilde,
+} from './mcp-borrowed.js'
 import { mcpDefaults, taskMcpChoices } from './store/mcp.js'
 
 const staging = { type: 'http', url: 'https://staging.example.com/api/mcp' }
@@ -38,6 +49,36 @@ describe('borrowedServers', () => {
     expect(stamp.names).toEqual(['staging-mine'])
     expect(JSON.stringify(stamp)).not.toContain('Bearer')
     expect(borrowedStamp({ 'staging-mine': staging }).digest).not.toBe(stamp.digest)
+  })
+})
+
+describe('ownProjects', () => {
+  const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'seti-own-projects-')))
+  const write = (file: string, text: string) => {
+    fs.mkdirSync(path.dirname(file), { recursive: true })
+    fs.writeFileSync(file, text)
+  }
+
+  it('counts the main checkout of a real worktree, and never a repository a forged .git file names', () => {
+    const main = path.join(root, 'main')
+    const worktree = path.join(root, 'main-feature')
+    const admin = path.join(main, '.git', 'worktrees', 'main-feature')
+    write(path.join(worktree, '.git'), `gitdir: ${admin}\n`)
+    write(path.join(admin, 'commondir'), '../..\n')
+    write(path.join(admin, 'gitdir'), `${path.join(worktree, '.git')}\n`)
+    expect(ownProjects(worktree)).toEqual([worktree, main])
+
+    const forged = path.join(root, 'agent-folder')
+    const state = path.join(root, 'agent-folder-state')
+    write(path.join(forged, '.git'), `gitdir: ${state}\n`)
+    write(path.join(state, 'commondir'), `${path.join(main, '.git')}\n`)
+    write(path.join(state, 'gitdir'), `${path.join(forged, '.git')}\n`)
+    expect(ownProjects(forged)).toEqual([forged])
+    const local = { projects: { [main]: { mcpServers: { 'main-local': { command: 'main-mcp' } } } } }
+    expect(Object.keys(borrowedServers(local, ownProjects(forged), () => true))).toEqual(['main-local'])
+    expect(borrowedServers(local, ownProjects(forged), () => false)).toEqual({})
+    expect(borrowedServers(local, ownProjects(worktree), () => true)).toEqual({})
+    fs.rmSync(root, { recursive: true, force: true })
   })
 })
 

@@ -331,6 +331,8 @@ export type QueueState = 'waiting' | 'delivered' | 'removed'
 export interface PromptPayload {
   text: string
   auto?: boolean
+  /** An automatic turn that also took the updates held for the user's next message. */
+  held?: boolean
   /** Updates from outside the conversation the agent received with this turn. */
   inputs?: number
   /** This message stopped the turn that was running when it was sent. */

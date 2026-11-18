@@ -59,6 +59,8 @@ export interface AgentsLayout {
   newTerminal?: () => void
   /** The workspace the agent list shows, and the first one, for a layout kept per workspace. */
   showWorkspace?: (workspace: { id: string; first: string | null }) => void
+  /** Whether the agents list hides while the layout shows; its own controls bring the list back. */
+  hidesList?: () => boolean
 }
 
 export const agentsLayouts = new Registry<AgentsLayout>('agents layout', (layout) => layout.key)
@@ -120,6 +122,11 @@ function useLayoutShows(layout: AgentsLayout | null, route: AgentsLayoutRoute): 
   return useSyncExternalStore(layout?.subscribe ?? noLayout, () => layout?.shows(route) ?? false)
 }
 
+/** Whether the active layout asks for the agents list to hide, as its choice changes. */
+function useLayoutHidesList(layout: AgentsLayout | null): boolean {
+  return useSyncExternalStore(layout?.subscribe ?? noLayout, () => layout?.hidesList?.() ?? false)
+}
+
 /** The agents the active layout shows now, none without one. */
 export function useLayoutAgents(layout: AgentsLayout | null): readonly string[] {
   return useSyncExternalStore(layout?.subscribe ?? noLayout, () => layout?.shownAgents() ?? NONE)
@@ -135,7 +142,8 @@ interface AddressAgents {
 
 /**
  * Where the address shows: in the active layout, which gets the agent or terminal it names, or
- * on its own, where `alone` names a terminal the layout does not hold.
+ * on its own, where `alone` names a terminal the layout does not hold. `listHidden` says the
+ * layout on screen asked for the agents list to hide.
  */
 export function useLayoutPlace(layout: AgentsLayout | null, { selectedId, terminalId, listed, loaded }: AddressAgents) {
   const named = selectedId === TERMINAL_ROUTE ? (terminalId ?? '') : null
@@ -145,8 +153,10 @@ export function useLayoutPlace(layout: AgentsLayout | null, { selectedId, termin
       ? { id: selectedId, terminal: null, listed, loaded }
       : { id: null, terminal: named, listed: false, loaded },
   )
+  const hidesList = useLayoutHidesList(layout)
   return {
     inLayout,
+    listHidden: inLayout && hidesList,
     alone: named !== null && !inLayout ? named : null,
     routeId: named === null ? selectedId : null,
     terminalId: named,

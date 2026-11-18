@@ -1,7 +1,9 @@
 import { Copy, RotateCw, TriangleAlert } from 'lucide-react'
 import { Component, Fragment, type ErrorInfo, type ReactNode } from 'react'
 import { toast } from 'sonner'
+import { recoverFromStaleBuild, reloadPage } from '@/components/stale-build-recovery'
 import { Button } from '@/components/ui/button'
+import { isStaleBuildError, type StaleRecovery } from '@/lib/stale-build'
 import { cn } from '@/lib/utils'
 
 /** panel fills its area, row is one transcript line, item a status bar slot, inline a block. */
@@ -20,6 +22,8 @@ interface Props {
 interface State {
   error: Error | null
   componentStack: string
+  /** Set when a build file did not load: checking until Seti knows whether it reloads the page. */
+  stale: StaleRecovery | 'checking' | null
   /** Bumped by Reload so the children mount from scratch. */
   attempt: number
 }
@@ -45,8 +49,13 @@ interface FallbackProps {
   error: Error
   componentStack: string
   className: string | undefined
+  /** The crash is a build file that did not load, which only a page reload cures. */
+  stale: boolean
   onReload: () => void
 }
+
+const STALE_HINT = 'A part of Seti did not load, usually because Seti was updated. Reload to get the current version.'
+const STALE_RELOAD_DETAIL = 'Loads the page again with the current version of Seti, on this same view'
 
 function ErrorText({ error }: { error: Error }) {
   return (
@@ -70,7 +79,7 @@ function ItemFallback({ name, onReload }: Pick<FallbackProps, 'name' | 'onReload
   )
 }
 
-function RowFallback({ name, error, componentStack, className }: Omit<FallbackProps, 'kind' | 'onReload'>) {
+function RowFallback({ name, error, componentStack, className }: Omit<FallbackProps, 'kind' | 'stale' | 'onReload'>) {
   return (
     <div role="note" className={cn('text-xs text-muted-foreground', className)}>
       <details>
@@ -95,7 +104,18 @@ function RowFallback({ name, error, componentStack, className }: Omit<FallbackPr
   )
 }
 
-function PanelFallback({ name, kind, error, componentStack, className, onReload }: FallbackProps) {
+/** A status bar slot and a transcript line stay quiet for the moment before the page reloads. */
+const UPDATING_CLASS: Record<FallbackKind, string> = { panel: 'p-6', inline: 'p-3', row: 'sr-only', item: 'sr-only' }
+
+function Updating({ kind }: { kind: FallbackKind }) {
+  return (
+    <div role="status" className={cn('text-sm text-muted-foreground', UPDATING_CLASS[kind])}>
+      Updating Seti...
+    </div>
+  )
+}
+
+function PanelFallback({ name, kind, error, componentStack, className, stale, onReload }: FallbackProps) {
   return (
     <div
       role="alert"
@@ -110,15 +130,17 @@ function PanelFallback({ name, kind, error, componentStack, className, onReload 
           <TriangleAlert className="size-4 shrink-0 text-destructive" aria-hidden />
           {name} could not be shown.
         </p>
-        <p className="text-muted-foreground">The rest of Seti still works. Reload this panel to try again.</p>
+        <p className="text-muted-foreground">
+          {stale ? STALE_HINT : 'The rest of Seti still works. Reload this panel to try again.'}
+        </p>
         <details>
           <summary className="cursor-pointer text-muted-foreground">Error details</summary>
           <ErrorText error={error} />
         </details>
         <div className="flex flex-wrap gap-1.5">
-          <Button size="sm" variant="outline" onClick={onReload}>
+          <Button size="sm" variant="outline" title={stale ? STALE_RELOAD_DETAIL : undefined} onClick={onReload}>
             <RotateCw />
-            Reload this panel
+            {stale ? 'Reload' : 'Reload this panel'}
           </Button>
           <Button
             size="sm"
@@ -138,10 +160,10 @@ function PanelFallback({ name, kind, error, componentStack, className, onReload 
 
 /** Keeps a render crash inside one area, with a way to reload it, instead of blanking the app. */
 export class ErrorBoundary extends Component<Props, State> {
-  override state: State = { error: null, componentStack: '', attempt: 0 }
+  override state: State = { error: null, componentStack: '', stale: null, attempt: 0 }
 
   static getDerivedStateFromError(error: unknown): Partial<State> {
-    return { error: asError(error) }
+    return { error: asError(error), stale: isStaleBuildError(error) ? 'checking' : null }
   }
 
   override componentDidCatch(error: unknown, info: ErrorInfo): void {
@@ -149,6 +171,11 @@ export class ErrorBoundary extends Component<Props, State> {
     this.setState({ componentStack })
     // eslint-disable-next-line no-console -- crashes are reported to the browser console
     console.error(`Seti could not render ${this.props.name}:`, asError(error), componentStack)
+    if (isStaleBuildError(error)) {
+      void recoverFromStaleBuild().then((stale) => {
+        this.setState((state) => (state.error === error ? { stale } : null))
+      })
+    }
   }
 
   override componentDidUpdate(previous: Props): void {
@@ -158,17 +185,21 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   reload = (): void => {
-    this.setState((state) => ({ error: null, componentStack: '', attempt: state.attempt + 1 }))
+    this.setState((state) => ({ error: null, componentStack: '', stale: null, attempt: state.attempt + 1 }))
   }
 
   override render(): ReactNode {
-    const { error, componentStack, attempt } = this.state
+    const { error, componentStack, stale, attempt } = this.state
     const { name, kind = 'panel', className, children } = this.props
     if (error === null) {
       return <Fragment key={attempt}>{children}</Fragment>
     }
+    if (stale === 'checking' || stale === 'reload') {
+      return <Updating kind={kind} />
+    }
+    const onReload = stale === null ? this.reload : reloadPage
     if (kind === 'item') {
-      return <ItemFallback name={name} onReload={this.reload} />
+      return <ItemFallback name={name} onReload={onReload} />
     }
     if (kind === 'row') {
       return <RowFallback name={name} error={error} componentStack={componentStack} className={className} />
@@ -180,7 +211,8 @@ export class ErrorBoundary extends Component<Props, State> {
         error={error}
         componentStack={componentStack}
         className={className}
-        onReload={this.reload}
+        stale={stale !== null}
+        onReload={onReload}
       />
     )
   }

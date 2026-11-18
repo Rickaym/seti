@@ -14,6 +14,7 @@ import { livePanels, streamBudget } from './grid-streams'
 import { FilesDockHost } from './parts'
 import { cn, seti } from './seti'
 import { addTerminalTile, terminalInPanel, terminalToGrid, useRoutedTile } from './tiles'
+import { useCalm } from './useCalm'
 import { placeText, sizeText, usePanelKeys } from './usePanelKeys'
 
 const GridLayout = lazy(async () => import('react-grid-layout').then((m) => ({ default: m.GridLayout })))
@@ -58,6 +59,7 @@ export const AgentGrid = memo(function AgentGridView({
   const room = useRoom(area)
   const measured = room.width > 0 && room.height > 0
   const [picking, setPicking] = useState<string | null>(null)
+  const { open, calm, rest, wake } = useCalm(focused)
   const [budget] = useState(() => streamBudget(connectionProtocol()))
   const byId = useMemo(() => new Map(tasks.map((task) => [task.id, task])), [tasks])
 
@@ -88,13 +90,17 @@ export const AgentGrid = memo(function AgentGridView({
     }
   }, [])
 
-  const onFocusPanel = useCallback((id: string) => {
-    const current = gridStore.getSnapshot()
-    if (current.focused !== id) {
-      gridStore.focus(id)
-      showInAddress(current.panels.find((panel) => panel.i === id)?.agent ?? null)
-    }
-  }, [])
+  const onFocusPanel = useCallback(
+    (id: string) => {
+      wake()
+      const current = gridStore.getSnapshot()
+      if (current.focused !== id) {
+        gridStore.focus(id)
+        showInAddress(current.panels.find((panel) => panel.i === id)?.agent ?? null)
+      }
+    },
+    [wake],
+  )
 
   const onPick = useCallback((id: string, agent: string | null) => {
     setPicking(null)
@@ -263,6 +269,7 @@ export const AgentGrid = memo(function AgentGridView({
                 focused={panel.i === focused}
                 framed={shown.length > 1}
                 live={live.has(panel.i)}
+                calm={calm && panel.i !== open}
                 locked={locked}
                 arranging={arranging === panel.i}
                 subId={panel.agent !== null && panel.agent === routeId ? subId : null}
@@ -275,6 +282,7 @@ export const AgentGrid = memo(function AgentGridView({
                 onPicking={setPicking}
                 onRemove={onRemove}
                 onArrange={arrange}
+                onRest={rest}
                 onPickTerminal={onPickTerminal}
               />
             ) : (
@@ -297,6 +305,8 @@ export const AgentGrid = memo(function AgentGridView({
       byId,
       focused,
       live,
+      calm,
+      open,
       locked,
       arranging,
       routeId,
@@ -310,6 +320,7 @@ export const AgentGrid = memo(function AgentGridView({
       onPick,
       onRemove,
       arrange,
+      rest,
       onPickTerminal,
     ],
   )

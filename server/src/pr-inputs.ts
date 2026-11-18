@@ -5,8 +5,8 @@ import { canPollGithub } from './github-cache.js'
 import { fetchWatchedPrs, viewerLogin, type WatchedPr } from './github.js'
 import { deliverInputs } from './inputs.js'
 import { unlinkEndedPrs } from './pr-ended.js'
-import { freshPosts, prEvents, type PrPost, type PrSnapshot } from './pr-events.js'
-import { agentPosts } from './pr-self.js'
+import { freshPosts, prEvents, type PrPost, type PrReader, type PrSnapshot } from './pr-events.js'
+import { agentEnders, agentPosts, awaitsCi } from './pr-self.js'
 import { prChanged } from './prs.js'
 import { openQuerySince } from './runner.js'
 import { prHeld, type HeldGroup, type HeldInput } from './store/pr-held.js'
@@ -46,6 +46,14 @@ function foldHeld(inputs: readonly PrInput[]): PrInput[] {
 const addressed = (inputs: readonly PrInput[], subtask: InputSubtask | null): PrInput[] =>
   subtask === null ? [...inputs] : inputs.map((input) => ({ ...input, subtask }))
 
+/** What the agents did on a PR themselves since the last poll, which decides who hears what. */
+interface OwnActions {
+  posts: ReadonlyMap<string, string>
+  enders: ReadonlySet<string>
+  /** A pass came that only wakes a task waiting for it. */
+  passed: boolean
+}
+
 export interface PrInputDeps {
   watched: () => Promise<string[]>
   listeners: (url: string) => Promise<PrListener[]>
@@ -55,8 +63,12 @@ export interface PrInputDeps {
   save: (url: string, snapshot: PrSnapshot) => Promise<void>
   fetch: (urls: readonly string[]) => Promise<Map<string, WatchedPr | null>>
   viewer: () => Promise<string>
-  /** Ids of the new reviews and comments on the PR that its agents posted themselves. */
-  agentPosts?: (url: string, posts: readonly PrPost[], viewer: string) => Promise<ReadonlySet<string>>
+  /** The new reviews and comments on the PR that its agents posted, by id with the posting task. */
+  agentPosts?: (url: string, posts: readonly PrPost[], viewer: string) => Promise<ReadonlyMap<string, string>>
+  /** The tasks that merged or closed the PR themselves. */
+  agentEnders?: (pr: WatchedPr) => Promise<ReadonlySet<string>>
+  /** Whether the task pushed something whose CI result it has not been given yet. */
+  awaitsCi?: (taskId: string, pr: WatchedPr) => Promise<boolean>
   deliver: (taskId: string, inputs: readonly PrInput[]) => Promise<unknown>
   /** Drops the links to PRs that merged or closed, once their last update went out. */
   unlinkEnded?: () => Promise<unknown>
@@ -79,7 +91,7 @@ export function createPrInputPoller(deps: PrInputDeps) {
   let timer: NodeJS.Timeout | null = null
 
   const add = (into: Map<string, PrInput[]>, taskIds: readonly string[], inputs: readonly PrInput[]) => {
-    for (const taskId of taskIds) {
+    for (const taskId of inputs.length === 0 ? [] : taskIds) {
       into.set(taskId, [...(into.get(taskId) ?? []), ...inputs])
     }
   }
@@ -88,16 +100,41 @@ export function createPrInputPoller(deps: PrInputDeps) {
 
   /**
    * Updates of a PR linked to a subagent name it, so its parent agent can pass them on. While the
-   * subagent runs it watches the PR itself, so they wait for it to end; null when they wait.
+   * subagent runs it watches the PR itself, so they wait for it to end; quiet ones are recorded
+   * at once. Returns what goes out now.
    */
-  async function routed(listener: PrListener, inputs: readonly PrInput[]): Promise<PrInput[] | null> {
+  async function routed(listener: PrListener, inputs: readonly PrInput[]): Promise<PrInput[]> {
     const call = listener.tool_use_id
     const subtask = call === null ? null : await deps.subtask(listener.task_id, call)
     if (call !== null && subtask?.running === true && deps.held !== undefined) {
-      await deps.held.hold(listener.task_id, call, inputs, new Date(now()).toISOString())
-      return null
+      const waiting = inputs.filter((input) => input.quiet === undefined)
+      await deps.held.hold(listener.task_id, call, waiting, new Date(now()).toISOString())
+      return addressed(
+        inputs.filter((input) => input.quiet !== undefined),
+        subtask,
+      )
     }
     return addressed(inputs, subtask)
+  }
+
+  /** Who posted the new reviews and comments, who ended the PR, and whether a pass needs a waiter. */
+  async function ownActions(previous: PrSnapshot | undefined, pr: WatchedPr, viewer: string): Promise<OwnActions> {
+    const posts = freshPosts(previous, pr)
+    const authors = posts.length === 0 ? undefined : await deps.agentPosts?.(pr.url, posts, viewer)
+    const unread = prEvents(previous, pr, { awaitsCi: false }, now()).inputs
+    const ended = unread.some((input) => ENDS.includes(input.kind))
+    return {
+      posts: authors ?? new Map<string, string>(),
+      enders: (ended ? await deps.agentEnders?.(pr) : undefined) ?? new Set<string>(),
+      passed: unread.some((input) => input.quiet === 'nothing_pending'),
+    }
+  }
+
+  /** What one task did on the PR itself. */
+  async function readerOf(taskId: string, pr: WatchedPr, own: OwnActions): Promise<PrReader> {
+    const posts = new Set([...own.posts].filter(([, author]) => author === taskId).map(([id]) => id))
+    const waits = own.passed ? await deps.awaitsCi?.(taskId, pr) : undefined
+    return { posts, ended: own.enders.has(taskId), ...(waits === undefined ? {} : { awaitsCi: waits }) }
   }
 
   /** Hands over what was held for subagents that ended, or that held it past PR_HOLD_MAX_MS. */
@@ -129,19 +166,17 @@ export function createPrInputPoller(deps: PrInputDeps) {
         continue
       }
       const previous = await deps.snapshot(url)
-      const posts = freshPosts(previous, pr)
-      const own = posts.length === 0 ? undefined : await deps.agentPosts?.(url, posts, viewer)
-      const { inputs, next } = prEvents(previous, pr, own, now())
+      const own = await ownActions(previous, pr, viewer)
+      const { inputs, next } = prEvents(previous, pr, { posts: new Set(own.posts.keys()) }, now())
       await deps.save(url, next)
       if (inputs.length > 0) {
         await deps.changed?.(url)
         for (const listener of await deps.listeners(url)) {
-          const routedInputs = await routed(listener, inputs)
-          if (routedInputs !== null) {
-            add(perTask, [listener.task_id], routedInputs)
-          }
+          const reader = await readerOf(listener.task_id, pr, own)
+          add(perTask, [listener.task_id], await routed(listener, prEvents(previous, pr, reader, now()).inputs))
         }
-        add(perWatch, (await deps.eaWatchers?.(url)) ?? [], inputs)
+        const news = inputs.filter((input) => input.quiet === undefined)
+        add(perWatch, (await deps.eaWatchers?.(url)) ?? [], news)
       }
     }
     return { perTask, perWatch }
@@ -213,6 +248,8 @@ export const prInputs = createPrInputPoller({
   fetch: fetchWatchedPrs,
   viewer: viewerLogin,
   agentPosts,
+  agentEnders,
+  awaitsCi,
   deliver: deliverInputs,
   unlinkEnded: unlinkEndedPrs,
   eaWatchers: prWatch.eaWatchers,

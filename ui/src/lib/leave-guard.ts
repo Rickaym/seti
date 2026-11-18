@@ -9,6 +9,9 @@ export function addLeaveGuard(guard: LeaveGuard): () => void {
   }
 }
 
+/** Whether a form holds changes that leaving would discard. */
+export const hasUnsavedChanges = () => guards.size > 0
+
 export async function mayLeave(): Promise<boolean> {
   for (const guard of guards) {
     if (!(await guard())) {

@@ -119,6 +119,27 @@ EA_MODE = {
     "description": "Your inbox only: report (the default) reports its alerts and asks before acting; act "
     "lets you send an alert's work to an existing agent without asking. Leave out to keep it.",
 }
+DELIVERIES = ("now", "after_turn", "with_message", "agent")
+DELIVERY = {
+    "type": "string",
+    "enum": list(DELIVERIES),
+    "description": "Agents only, when the agent gets the updates: now starts a turn or joins the running "
+    "one at its next step; after_turn waits for the running turn to end; with_message holds them for the "
+    "user's next message to the agent; agent follows the agent's update mode, the default. The agent's "
+    "update mode caps it: one that holds updates holds these too, and off drops them. Leave out to keep it.",
+}
+DELIVERY_EFFECTS = {
+    "now": "hands its updates to the agent at once, joining a running turn at its next step",
+    "after_turn": "hands its updates to the agent once its running turn is over",
+    "with_message": "holds its updates for the user's next message to the agent",
+    "agent": "hands its updates over as the agent's update mode says",
+}
+DELIVERY_RESULTS = {
+    "now": "at once, during a running turn too",
+    "after_turn": "once its running turn is over",
+    "with_message": "with the user's next message",
+    "agent": "as its update mode says",
+}
 MODE_EFFECTS = {
     "report": "has you report them and ask before acting",
     "act": "lets you send their work to an existing agent without asking",
@@ -260,13 +281,14 @@ SETTINGS_SPECS: list[ToolSpec] = [
     ToolSpec(
         "subscribe_channel",
         "Have a webhook deliver its events to an agent, as updates the agent acts on under its update "
-        "mode, or to your inbox; or change which event kinds an existing subscriber takes, or whether you "
-        "report or act on its alerts. Pinned agents suit this best. Agents cannot subscribe themselves; "
-        "they ask you. Needs the user's yes.",
+        "mode, or to your inbox; or change which event kinds an existing subscriber takes, when an agent "
+        "gets them, or whether you report or act on its alerts. Pinned agents suit this best. Agents "
+        "cannot subscribe themselves; they ask you. Needs the user's yes.",
         {
             "channel": CHANNEL_REF,
             "subscriber": SUBSCRIBER_REF,
             "events": EVENT_KINDS,
+            "delivery": DELIVERY,
             "mode": EA_MODE,
             "confirmed": CONFIRMED,
         },
@@ -671,13 +693,32 @@ def _mode_arg(args: Mapping[str, Any]) -> str | None:
     return mode
 
 
+def _delivery_of(sub: Mapping[str, Any]) -> str:
+    delivery = sub.get("delivery")
+    return delivery if isinstance(delivery, str) and delivery in DELIVERIES else "agent"
+
+
+def _delivery_arg(args: Mapping[str, Any]) -> str | None:
+    delivery = arg_str(args, "delivery", required=False)
+    if not delivery:
+        return None
+    delivery = normalize(delivery).replace(" ", "_")
+    if delivery not in DELIVERIES:
+        raise ToolError(
+            f"Unknown delivery {delivery}. Use now, after_turn, with_message or agent.", "Bad delivery"
+        )
+    return delivery
+
+
 def _subscriber_line(sub: Mapping[str, Any]) -> str:
+    when = ""
     if sub.get("target") == "ea":
         who = "you (act)" if _mode_of(sub) == "act" else "you"
     else:
         who = str(sub.get("task_title") or "an agent")
+        when = f", {DELIVERY_RESULTS[_delivery_of(sub)]}" if sub.get("delivery") else ""
     archived = " (archived, gets nothing until restored)" if sub.get("task_archived") is True else ""
-    return f"{who}{archived}: {_events_words(sub.get('events'))}"
+    return f"{who}{archived}: {_events_words(sub.get('events'))}{when}"
 
 
 def _routes_words(delivery: Mapping[str, Any]) -> str:
@@ -1068,21 +1109,32 @@ class SettingsTools:
             raise ToolError(
                 "Only your inbox has a report or act mode; an agent takes events as updates.", "Bad mode"
             )
+        timing = _delivery_arg(args)
+        if timing is not None and target["target"] != "task":
+            raise ToolError(
+                "Only an agent's subscription has a delivery; your inbox takes events as they come.",
+                "Bad delivery",
+            )
         existing = self._existing(info, target)
-        keep = existing is not None and mode is not None and "events" not in args
+        keep = existing is not None and (mode is not None or timing is not None) and "events" not in args
         events = existing.get("events") if existing is not None and keep else _event_kinds(args)
         refilter = existing is not None and existing.get("events") != events
         remode = existing is not None and mode is not None and _mode_of(existing) != mode
+        retime = existing is not None and timing is not None and _delivery_of(existing) != timing
         subject = f"{who[0].upper()}{who[1:]}"
-        if existing is not None and not refilter and not remode:
+        if existing is not None and not refilter and not remode and not retime:
             verb = "act on" if _mode_of(existing) == "act" else "report"
             now = f", and you already {verb} its alerts" if mode is not None else ""
+            when = f", {DELIVERY_RESULTS[timing]}" if timing is not None else ""
             return ToolResult(
-                f"{subject} already takes {_events_words(events)} from {name}{now}.",
+                f"{subject} already takes {_events_words(events)} from {name}{when}{now}.",
                 clip(f"{name} unchanged", 70),
             )
-        if not await self._cleared(args, gate_key("subscribe_channel", info.get("id"), target, events, mode)):
+        timed = timing is not None and (existing is None or retime)
+        key = gate_key("subscribe_channel", info.get("id"), target, events, mode, timing)
+        if not await self._cleared(args, key):
             moded = f", and {MODE_EFFECTS[mode]}" if mode is not None and (existing is None or remode) else ""
+            moded += f", and {DELIVERY_EFFECTS[timing]}" if timing is not None and timed else ""
             if existing is None:
                 how = " as updates it acts on under its update mode" if target["target"] == "task" else ""
                 effect = (
@@ -1092,6 +1144,8 @@ class SettingsTools:
                 effect = (
                     f"This makes {who} take {_events_words(events)} from the {_kind(info)} {name}{moded}."
                 )
+            elif timing is not None and retime:
+                effect = f"For the {_kind(info)} {name} and {who}, this {DELIVERY_EFFECTS[timing]}."
             else:
                 effect = f"For alerts from the {_kind(info)} {name}, this {MODE_EFFECTS[mode or 'report']}."
             return ask("subscribe_channel", args, effect, f"subscribe {who} to {name}")
@@ -1101,20 +1155,31 @@ class SettingsTools:
             if mode is not None and (existing is None or remode)
             else ""
         )
+        gets = (
+            f" {subject} now gets its updates {DELIVERY_RESULTS[timing]}."
+            if timing is not None and timed
+            else ""
+        )
         if existing is None:
-            body = {**target, "events": events, **({} if mode is None else {"mode": mode})}
+            wire = {} if timing in (None, "agent") else {"delivery": timing}
+            body = {**target, "events": events, **({} if mode is None else {"mode": mode}), **wire}
             await self._refusable(self._seti.post(base, body), "Not subscribed")
-            text = f"Subscribed {who} to the {_kind(info)} {name}: {_events_words(events)}.{acts}"
+            text = f"Subscribed {who} to the {_kind(info)} {name}: {_events_words(events)}.{acts}{gets}"
             return ToolResult(text, clip(f"Subscribed to {name}", 70))
         path = f"{base}/{existing.get('id')}"
         if refilter:
             await self._refusable(self._seti.put(path, {"events": events}), "Filter not changed")
         if remode:
             await self._refusable(self._seti.put(f"{path}/mode", {"mode": mode}), "Mode not changed")
+        if retime:
+            wanted = None if timing == "agent" else timing
+            await self._refusable(
+                self._seti.put(f"{path}/delivery", {"delivery": wanted}), "Delivery not changed"
+            )
         took = (
             f"{subject} now takes {_events_words(events)} from the {_kind(info)} {name}." if refilter else ""
         )
-        text = " ".join(part for part in (took, acts.strip()) if part)
+        text = " ".join(part for part in (took, acts.strip(), gets.strip()) if part)
         return ToolResult(text, clip(f"Subscribed to {name}", 70))
 
     async def unsubscribe_channel(self, args: Mapping[str, Any]) -> ToolResult:

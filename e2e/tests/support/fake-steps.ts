@@ -10,6 +10,8 @@ const GATE_POLL_MS = 20
 const BURST_PROMPT = 'run the checks one by one'
 export const BURST_COMMANDS = ['npm run lint', 'npm run typecheck', 'npm test', 'npm run build'] as const
 export const BURST_DONE = 'All checks pass.'
+/** What the burst says when an update joined the turn between two of its calls. */
+export const JOINED_REPLY = 'Noted the update; carrying on.'
 
 /** What a prompt asks for to get a plan kept with Claude Code's task tools, a step at a time. */
 const PLAN_PROMPT = 'work through a plan'
@@ -38,6 +40,8 @@ export interface StepActor {
   toolResult: (toolUseId: string, content: string, output?: unknown) => void
   /** Whether the session ended, which ends the turn too. */
   ended: () => boolean
+  /** Takes the updates that asked to join the running turn, as their texts. */
+  joined: () => string[]
 }
 
 const sleep = async (ms: number) =>
@@ -66,6 +70,9 @@ async function burst(actor: StepActor, gate: string): Promise<void> {
       return
     }
     actor.toolResult(id, `${command}: ok`)
+    if (actor.joined().length > 0) {
+      actor.assistant([{ type: 'text', text: JOINED_REPLY }])
+    }
   }
   actor.assistant([{ type: 'text', text: BURST_DONE }])
 }

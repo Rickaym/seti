@@ -100,7 +100,7 @@ const handOverUpdates = setiTool({
   run: async ({ task: ref }, ctx) => {
     const task = await liveTask(ref)
     notSelf(ctx, task, 'hand updates to')
-    return done(`Handed ${String(await deliverPending(task.id, 'user'))} updates to ${task.title}.`)
+    return done(`Handed ${String(await deliverPending(task.id, 'user', { held: true }))} updates to ${task.title}.`)
   },
 })
 

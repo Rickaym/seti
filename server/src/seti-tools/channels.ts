@@ -1,7 +1,5 @@
 import {
   channelCreateInput,
-  channelFilterInput,
-  channelSubscribeInput,
   channelUpdateInput,
   REMINDER_API_DOC,
   reminderUpdateInput,
@@ -10,16 +8,8 @@ import {
   type ReminderChannelInfo,
 } from '@seti/shared'
 import { z } from 'zod'
-import {
-  channelRef,
-  existingSubscription,
-  findChannel,
-  findWebhook,
-  subscriberOf,
-  subscriberRef,
-  subscriberView,
-  webhookRef,
-} from './channel-refs.js'
+import { channelRef, existingSubscription, findChannel, findWebhook, webhookRef } from './channel-refs.js'
+import { subscribeChannelTool, unsubscribeChannelTool } from './channel-subscribe.js'
 import { POLLER_TOOLS, pollerRunView, pollerView, testPollerScript } from './pollers.js'
 import {
   REMINDER_TOOLS,
@@ -40,7 +30,6 @@ import {
   deleteChannel,
   listChannels,
   rotateChannel,
-  setChannelFilter,
   subscribeChannel,
   unsubscribeChannel,
   updateChannel,
@@ -289,48 +278,6 @@ const testChannelScript = setiTool({
       return testPollerScript(script, saved?.source === 'poller' ? saved : null)
     }
     throw new ToolRefusal('Say whether the script is for a poller or a reminder, or name a saved one.')
-  },
-})
-
-const subscribeChannelTool = setiTool({
-  name: 'subscribe_channel',
-  description:
-    "Have a channel deliver its events to an agent, yourself included, as updates it acts on under its update mode, or to the EA's inbox; or change which event kinds an existing subscriber takes. Pinned agents suit this best.",
-  input: {
-    channel: channelRef,
-    subscriber: subscriberRef,
-    events: channelFilterInput.shape.events
-      .optional()
-      .describe('Event kinds it takes, such as pull_request or issue.created; leave out for every event.'),
-  },
-  run: async ({ channel, subscriber, events }) => {
-    const info = await findChannel(channel)
-    const { target, who } = await subscriberOf(subscriber, true)
-    const wanted = events ?? null
-    const existing = existingSubscription(info, target)
-    if (existing === undefined) {
-      return subscriberView(await subscribeChannel(info.id, channelSubscribeInput.parse({ ...target, events: wanted })))
-    }
-    if (JSON.stringify(existing.events) === JSON.stringify(wanted)) {
-      return done(`${who} already takes those events from ${info.name}.`)
-    }
-    return subscriberView(await setChannelFilter(info.id, existing.id, wanted))
-  },
-})
-
-const unsubscribeChannelTool = setiTool({
-  name: 'unsubscribe_channel',
-  description: "Stop a channel delivering its events to an agent or to the EA's inbox.",
-  input: { channel: channelRef, subscriber: subscriberRef },
-  run: async ({ channel, subscriber }) => {
-    const info = await findChannel(channel)
-    const { target, who } = await subscriberOf(subscriber, false)
-    const existing = existingSubscription(info, target)
-    if (existing === undefined) {
-      throw new ToolRefusal(`${who} does not subscribe to ${info.name}.`)
-    }
-    await unsubscribeChannel(info.id, existing.id)
-    return done(`Unsubscribed ${who} from ${info.name}.`)
   },
 })
 

@@ -72,11 +72,11 @@ export const existingSubscription = (info: ChannelInfo, target: z.input<typeof c
     (sub) => sub.target === target.target && sub.task_id === ('task_id' in target ? target.task_id : null),
   )
 
-/** A subscription as an agent needs it: who takes the events and which kinds. */
+/** A subscription as an agent needs it: who takes the events, which kinds, and when. */
 export const subscriberView = (sub: ChannelSubscription) => ({
   subscription_id: sub.id,
   target: sub.target,
   ...(sub.task_id === null ? {} : { task_id: sub.task_id, title: sub.task_title, archived: sub.task_archived }),
   events: sub.events ?? 'every event',
-  ...(sub.target === 'ea' ? { mode: sub.mode } : {}),
+  ...(sub.target === 'ea' ? { mode: sub.mode } : { delivery: sub.delivery ?? 'agent' }),
 })
