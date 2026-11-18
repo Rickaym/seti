@@ -71,8 +71,6 @@ export interface HomeMerge {
 export interface HomeLiveCall {
   task_id: string
   tool: string
-  /** The MCP server of an `mcp__<server>__<tool>` call; null for Claude Code's own tools. */
-  server: string | null
   /** The Agent call of the subagent that runs it; null for the agent itself. */
   subagent: string | null
   since: string
@@ -147,7 +145,6 @@ export const homeSummarySchema: ResponseSchema<HomeSummary> = z.object({
     z.object({
       task_id: z.string(),
       tool: z.string(),
-      server: orDefault('live server', z.string().nullable(), null),
       subagent: orDefault('live subagent', z.string().nullable(), null),
       since: z.string(),
     }),

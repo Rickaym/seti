@@ -55,15 +55,15 @@ const summary: HomeSummary = {
   ],
   recent: [],
   live: [
-    { task_id: 'b', tool: 'Bash', server: null, subagent: 's2', since: '' },
-    { task_id: 'b', tool: 'mcp__linear__search', server: 'linear', subagent: null, since: '' },
+    { task_id: 'b', tool: 'Bash', subagent: 's2', since: '' },
+    { task_id: 'b', tool: 'mcp__linear__search', subagent: null, since: '' },
   ],
 }
 
 const b = task('b', { running_subtasks: [subtask('s1', null), subtask('s2', 's1'), subtask('s3', 'gone')] })
 
 describe('buildGraph', () => {
-  it('links agents to shared repos, MCP servers, nested subagents and live calls', () => {
+  it('links agents to shared repos, nested subagents and live calls', () => {
     const graph = buildGraph({ tasks: [task('a'), b], archived: [], summary, filters: DEFAULT_FILTERS })
     const edges = graph.edges.map((edge) => `${edge.source}>${edge.target}${edge.live ? ' live' : ''}`)
     expect(graph.nodes.filter((node) => node.kind === 'repo')).toHaveLength(1)
@@ -71,14 +71,22 @@ describe('buildGraph', () => {
       expect.arrayContaining([
         'agent:a>repo:r1',
         'agent:b>repo:r1',
-        'agent:a>mcp:github',
         'agent:b>sub:b:s1 live',
         'sub:b:s1>sub:b:s2 live',
         'agent:b>sub:b:s3 live',
         'sub:b:s2>tool:sub:b:s2:Bash live',
-        'agent:b>mcp:linear live',
+        'agent:b>tool:agent:b:mcp__linear__search live',
       ]),
     )
+  })
+
+  it('draws no MCP server, whether an agent called one in 30 days or calls one now', () => {
+    const graph = buildGraph({ tasks: [task('a'), b], archived: [], summary, filters: DEFAULT_FILTERS })
+    expect(graph.nodes.map((node) => node.kind as string)).not.toContain('mcp')
+    expect(graph.edges.map((edge) => edge.kind as string)).not.toContain('mcp')
+    expect(graph.nodes.some((node) => node.id.startsWith('mcp:'))).toBe(false)
+    expect(graph.edges.filter((edge) => edge.source === 'agent:a').map((edge) => edge.target)).toEqual(['repo:r1'])
+    expect(graph.nodes.find((node) => node.id === 'tool:agent:b:mcp__linear__search')?.label).toBe('search')
   })
 
   it('sizes agents by turns or by cost, and hides what the filters turn off', () => {

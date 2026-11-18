@@ -79,15 +79,10 @@ function hubAgents(node: GraphNodeSpec, ctx: CardContext): string[] {
 
 function HubBody({ node, ctx }: { node: GraphNodeSpec; ctx: CardContext }) {
   const agents = hubAgents(node, ctx)
-  const calls = node.kind === 'mcp' ? ctx.model.edges.filter((edge) => edge.target === node.id) : []
-  const total = calls.reduce((sum, edge) => sum + (edge.live ? 0 : edge.weight), 0)
-  const live = calls.filter((edge) => edge.live).length
   return (
     <>
       <p className="text-muted-foreground">
-        {node.kind === 'repo' ? 'Repo' : 'MCP server'}, {agents.length} {agents.length === 1 ? 'agent' : 'agents'}
-        {node.kind === 'mcp' && `, ${String(total)} calls in 30 days`}
-        {live > 0 && `, ${String(live)} now`}
+        Repo, {agents.length} {agents.length === 1 ? 'agent' : 'agents'}
       </p>
       {agents.length > 0 && (
         <ul className="flex flex-col gap-0.5">
@@ -118,7 +113,7 @@ function body(node: GraphNodeSpec, ctx: CardContext): ReactNode {
   if (node.kind === 'agent' && task !== undefined) {
     return <AgentBody task={task} ctx={ctx} />
   }
-  if (node.kind === 'repo' || node.kind === 'mcp') {
+  if (node.kind === 'repo') {
     return <HubBody node={node} ctx={ctx} />
   }
   return <RunBody node={node} ctx={ctx} />
