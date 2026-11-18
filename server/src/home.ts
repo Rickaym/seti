@@ -189,7 +189,6 @@ function liveCalls(): HomeLiveCall[] {
   return openToolCalls().map(({ taskId, call }) => ({
     task_id: taskId,
     tool: call.name,
-    server: /^mcp__(.+?)__/.exec(call.name)?.[1] ?? null,
     subagent: call.parent,
     since: new Date(call.since).toISOString(),
   }))

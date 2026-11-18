@@ -1002,7 +1002,7 @@ midnight:
 | Time running    | each turn's reported `duration_ms`                                                                        |
 | Cost            | each turn's own cost, stored with its result                                                              |
 | MCP servers     | `mcp__<server>__` tool calls in the agent's messages                                                      |
-| Calls right now | the runner's in-memory open tool calls, with their MCP server and subagent                                |
+| Calls right now | the runner's in-memory open tool calls, with their subagent                                               |
 
 The counts come per day as well as for the week and the month, so the EA can report today and
 compare the week with the 7 days before. The latest merges are the six newest PRs

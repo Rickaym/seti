@@ -43,10 +43,11 @@ test('graph filters are toggles that stay set after a reload', async ({ page }) 
   const toolbar = page.getByRole('toolbar', { name: 'Graph' })
   const tools = toolbar.getByRole('button', { name: 'Tools' })
   await expect(tools).toHaveAttribute('aria-pressed', 'true')
-  await expect(page.getByText(/with \d+ repos, [1-9]\d* MCP servers/)).toBeAttached()
+  await expect(
+    page.getByText(/^Graph of [1-9]\d* agents, \d+ running, with \d+ repos and \d+ subagents running$/),
+  ).toBeAttached()
   await tools.click()
   await expect(tools).toHaveAttribute('aria-pressed', 'false')
-  await expect(page.getByText(/, 0 MCP servers/)).toBeAttached()
   await toolbar.getByRole('button', { name: 'Archived' }).click()
   await page.reload()
   await expect(toolbar.getByRole('button', { name: 'Tools' })).toHaveAttribute('aria-pressed', 'false')

@@ -91,7 +91,7 @@ describe('GET /api/home', () => {
     expect(data.recent[1]?.task_ids.toSorted()).toEqual(['home-a', 'home-b'])
   })
 
-  it('shows the calls running now, with the MCP server and subagent they belong to', async () => {
+  it('shows the calls running now, with the subagent they belong to', async () => {
     trackToolCalls('home-b', {
       type: 'assistant',
       parent_tool_use_id: 'toolu_agent',
@@ -102,7 +102,6 @@ describe('GET /api/home', () => {
       expect.objectContaining({
         task_id: 'home-b',
         tool: 'mcp__github__merge',
-        server: 'github',
         subagent: 'toolu_agent',
       }),
     ])
