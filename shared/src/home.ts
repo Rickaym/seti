@@ -4,9 +4,6 @@ import { lenientArray, orDefault, type ResponseSchema } from './lenient.js'
 /** The days the shipping metrics count back over, today included, in the reader's timezone. */
 export const HOME_DAYS = { week: 7, month: 30 } as const
 
-/** MCP servers listed per agent, most called first. */
-export const HOME_MCP_LIMIT = 8
-
 /** The latest merged PRs the metrics list, newest first. */
 export const HOME_RECENT_LIMIT = 6
 
@@ -38,15 +35,8 @@ export interface HomeTally {
   run_ms_30d: number
 }
 
-/** An MCP server an agent's tool calls reached in the last 30 days. */
-export interface HomeMcpUse {
-  server: string
-  calls: number
-}
-
 export interface HomeAgentStats extends HomeTally {
   task_id: string
-  mcp: HomeMcpUse[]
 }
 
 /** One day in the reader's timezone: PRs merged, and the turns run with their cost and time. */
@@ -131,14 +121,7 @@ export const homeSummarySchema: ResponseSchema<HomeSummary> = z.object({
   totals: orDefault('home totals', z.object(tallyFields), EMPTY_TALLY),
   streak_days: count('streak_days'),
   days: lenientArray('home day', homeDay),
-  agents: lenientArray(
-    'home agent',
-    z.object({
-      task_id: z.string(),
-      ...tallyFields,
-      mcp: lenientArray('mcp use', z.object({ server: z.string(), calls: count('calls') })),
-    }),
-  ),
+  agents: lenientArray('home agent', z.object({ task_id: z.string(), ...tallyFields })),
   recent: lenientArray('home merge', homeMerge),
   live: lenientArray(
     'live call',
