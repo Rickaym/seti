@@ -1,16 +1,13 @@
 # Grid
 
 Shows agents and terminals side by side in panels you drag, resize and tidy. Each workspace keeps
-its own layout, shared by every device; whether the grid is on, calm and beside the list is up to
-each device.
+its own layout, shared by every device; whether the grid is on and beside the list is up to each
+device.
 
 ## Use
 
 - Grid in the Agents header, Alt+G or Agent grid in the palette turns the grid on and off.
 - Open in grid in an agent's header puts that agent in a panel.
-- Calm shows each panel's status, todo progress and latest message alone. A question or a permission
-  request shows in full above it. Click a panel, or move focus into it, for its transcript and reply
-  box; Esc while nothing runs, or another panel, folds it again. Esc still stops a running agent.
 - List hides the agents list beside the grid and brings it back.
 - Drag an agent from the list onto the grid, or pick one in an empty panel.
 - Drag a panel by its header and resize it by its edges; Lock keeps the layout still.

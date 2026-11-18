@@ -1,4 +1,4 @@
-import { Eraser, Leaf, Lock, LockOpen, PanelLeft, Rows3, Terminal } from 'lucide-react'
+import { Eraser, Lock, LockOpen, PanelLeft, Rows3, Terminal } from 'lucide-react'
 import { clearGrid, lockGrid, setPerScreen, tidyGrid } from './grid-actions'
 import { PER_SCREEN, templateAcross, templateRows } from './grid-layout'
 import { gridPrefs, useGridPrefs } from './grid-prefs'
@@ -88,10 +88,10 @@ function TemplatePicker() {
   )
 }
 
-/** The grid's controls along its top, level with the Agents list header: List and Calm first. */
+/** The grid's controls along its top, level with the Agents list header: List first. */
 export function GridToolbar() {
   const { locked, panels, perScreen } = useGrid()
-  const { calm, listHidden } = useGridPrefs()
+  const { listHidden } = useGridPrefs()
   const count = panels.length
   return (
     <div
@@ -110,19 +110,6 @@ export function GridToolbar() {
         hint={listHidden ? 'Show the agents list beside the grid' : 'Hide the agents list, so the grid gets its room'}
       />
       <p className="mr-auto min-w-0 truncate text-xs text-muted-foreground tabular-nums">{panelCount(count)}</p>
-      <ToggleButton
-        pressed={calm}
-        onPressedChange={(on) => {
-          gridPrefs.set({ calm: on })
-        }}
-        icon={<Leaf />}
-        label="Calm"
-        hint={
-          calm
-            ? 'Panels show the status and the latest message; click one for its transcript, Esc folds it again'
-            : 'Show only the status and the latest message in each panel until you click it'
-        }
-      />
       <Hint text="Add a terminal to the grid, in the home folder">
         <Button variant="outline" size="sm" onClick={addTerminalTile}>
           <Terminal />

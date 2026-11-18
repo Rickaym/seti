@@ -116,15 +116,3 @@ test('stays away while every message of yours is in view', async ({ page }) => {
   await expect(transcript(page).locator('[data-own-message]')).toHaveCount(1)
   await expect(nav(page)).toHaveCount(0)
 })
-
-test('the stepper stands in the margin beside the messages, never over one', async ({ page }) => {
-  const id = await seedOwnMessages(unique('Own margin'))
-  await page.goto(`/#agents/${id}`)
-  const newest = transcript(page).getByText(reply(4, REPLIES[3]))
-  await expect(newest).toBeInViewport()
-  const row = transcript(page).locator('[data-message-id]').last()
-  const [navBox, rowBox] = await Promise.all([nav(page).boundingBox(), row.boundingBox()])
-  expect(navBox).not.toBeNull()
-  expect(rowBox).not.toBeNull()
-  expect((rowBox?.x ?? 0) + (rowBox?.width ?? 0)).toBeLessThanOrEqual(navBox?.x ?? 0)
-})

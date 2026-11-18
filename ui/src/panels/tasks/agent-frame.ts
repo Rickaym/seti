@@ -13,10 +13,6 @@ export interface AgentFrame {
   draggable: boolean
   /** Rows the frame adds to the agent's More actions menu, after a separator. */
   menu: readonly AgentAction[]
-  /** Shows the status and the latest message in place of the transcript and the reply box. */
-  calm?: boolean
-  /** Esc pressed in the focused frame while nothing runs, such as to make the frame calm again. */
-  onEscape?: () => void
 }
 
 export const AgentFrameContext = createContext<AgentFrame | null>(null)

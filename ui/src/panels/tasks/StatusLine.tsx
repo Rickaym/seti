@@ -7,24 +7,15 @@ interface StatusLineProps {
   className?: string
   /** Show the whole text on hover; off inside a control that carries it in its own title. */
   hint?: boolean
-  /** Lines the text may wrap to before it is cut; one by default. */
-  lines?: 1 | 2
 }
 
 /** The live status an agent set on its row, muted and cut to fit. */
-export function StatusLine({ text, className, hint = true, lines = 1 }: StatusLineProps) {
+export function StatusLine({ text, className, hint = true }: StatusLineProps) {
   if (text === null) {
     return null
   }
   const line = (
-    <span
-      data-testid="status-line"
-      className={cn(
-        'min-w-0 text-xs text-muted-foreground',
-        lines === 1 ? 'truncate' : 'line-clamp-2 wrap-anywhere',
-        className,
-      )}
-    >
+    <span data-testid="status-line" className={cn('min-w-0 truncate text-xs text-muted-foreground', className)}>
       {text}
     </span>
   )

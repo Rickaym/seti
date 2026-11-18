@@ -2,9 +2,6 @@ import { sandboxViolations, WEBFETCH_BLOCKED } from '@seti/shared'
 import { elapsedLabel } from '@/lib/time'
 import { inputString, type ToolUseBlock } from '@/lib/transcript'
 
-/** Claude Code's tool for asking the user, whose calls show as their questions and answers. */
-export const ASK_TOOL = 'AskUserQuestion'
-
 /** What a tool does, for its icon and for the words of a group's label. */
 export type ToolKind = 'command' | 'monitor' | 'read' | 'edit' | 'search' | 'web' | 'agent' | 'todo' | 'mcp' | 'other'
 

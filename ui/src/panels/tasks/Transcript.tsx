@@ -11,7 +11,7 @@ import { transcriptItems } from '@/lib/rewind'
 import { openFailure } from '@/lib/seti-notes'
 import { isAgentTool } from '@/lib/subtasks'
 import { rowRole, transcriptViews, type RoleContext, type Segment, type TranscriptView } from '@/lib/tool-groups'
-import { ASK_TOOL, startsBackground } from '@/lib/tool-summary'
+import { startsBackground } from '@/lib/tool-summary'
 import {
   indexTranscript,
   localCommandOutput,
@@ -37,7 +37,7 @@ import {
 } from '@/lib/transcript-blocks'
 import { FileLink } from '@/panels/files/FileLink'
 import { useFileLinks } from '@/panels/files/file-links'
-import { QuestionCall } from '@/panels/questions/QuestionCall'
+import { ASK_TOOL, QuestionCall } from '@/panels/questions/QuestionCall'
 import { InputEntry } from '@/panels/tasks/InputEntry'
 import { ModelFallbackNotice } from '@/panels/tasks/ModelFallbackNotice'
 import { NoticeEntry } from '@/panels/tasks/NoticeEntry'
