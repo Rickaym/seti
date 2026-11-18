@@ -142,7 +142,8 @@ export type NewSend = Pick<PendingSend, 'text' | 'prompt' | 'attachments' | 'fil
 export interface PendingStore {
   subscribe: (listener: () => void) => () => void
   snapshot: () => PendingSnapshot
-  add: (send: NewSend) => void
+  /** Queues the message and returns the id its row will carry. */
+  add: (send: NewSend) => string
   retry: (clientId: string) => void
   /** Takes a failed message out of the transcript and hands it to the reply box. */
   edit: (clientId: string) => void
@@ -226,6 +227,7 @@ export function createPendingStore(taskId: string, deps: StoreDeps): PendingStor
       }
       update({ sends: pendingReducer(state.sends, { type: 'add', send: added }), added: state.added + 1 })
       enqueue(added.clientId)
+      return added.clientId
     },
     retry: (clientId) => {
       dispatch({ type: 'retry', clientId })
