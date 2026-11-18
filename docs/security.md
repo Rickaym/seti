@@ -154,9 +154,10 @@ private key off the host. The sandbox model is in [Architecture](architecture.md
   task, tool, call summary and the rules the request offered, and noted in the agent's transcript.
   Once four fifths of the time has passed, and at least five minutes before the end, the agent's
   reason line ends with "times out soon", which pushes one more needs-you notification. A request
-  whose session is gone (the agent stopped, was archived, or Seti restarted) closes as cancelled
-  with nothing sent; startup arms whatever is still pending from its stored deadline and ends
-  what is overdue. The setting is the user's: `PUT /api/permissions/timeout` refuses the EA in the
+  whose session is gone (the agent stopped or was archived) closes as cancelled with nothing sent.
+  A request a restart of Seti kept runs on the same clock: startup arms whatever is still pending
+  from its stored deadline and ends what is overdue, and that denial resumes the agent as the
+  user's answer would. The setting is the user's: `PUT /api/permissions/timeout` refuses the EA in the
   route and agents' Seti tools and mods in `setPermissionTimeout` (`refuseAgent`), and a change is
   audited as `system.permission_timeout_changed` with the old and new value. A new value applies
   to requests already waiting, counted from when each was raised, so one older than it is denied
@@ -300,6 +301,14 @@ message, not of a security setting. The EA may relay answers; agents and mods ma
 - Question text and option descriptions are stored with secrets redacted. The audit log records
   that a question was asked, answered, dismissed or expired, with who answered, the type, the
   option labels picked and the length of the own-words answer, never its text.
+- A restart of Seti keeps open questions and pending permission requests, and the user's answer
+  then resumes the agent's session as a message from Seti (`server/src/restart-waits.ts`). The
+  routes, their checks and who may answer are the same as before the restart. Allowing a tool call
+  after a restart allows that one call only: Seti keeps a SHA-256 hash of the tool name and its
+  whole input on the request row, never a second copy of the input, and lets the agent's next call
+  with the same hash run once within fifteen minutes; any other call asks again. The grant lives in
+  the server's memory and is gone after another restart. Such a request cannot be edited, and a
+  secret question still expires, since its value never passes through a message.
 
 ### The Requests panel
 

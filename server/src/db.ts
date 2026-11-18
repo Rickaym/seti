@@ -320,15 +320,17 @@ export const tasks = {
     await sql`DELETE FROM task WHERE id = ${id}`
   },
   /**
-   * Turns cannot survive a restart; only the server calls this, once at startup. With `resume`, a
-   * cut turn that waited on nothing is left seen and marked to resume; the rest need the user.
+   * Turns cannot survive a restart; only the server calls this, once at startup. Each cut turn is
+   * left unseen; `waits` says its agent has a question or a permission request still open.
    */
-  markInterrupted: async (resume = false): Promise<{ id: string; resume: boolean }[]> => {
-    const rows = await sql<{ id: string; unseen: boolean }[]>`UPDATE task SET status = 'interrupted',
-      unseen = NOT (${resume} AND blocked IS NULL AND archived_at IS NULL), blocked = NULL, updated_at = ${now()}
-      WHERE status = 'running' RETURNING id, unseen`
+  markInterrupted: async (): Promise<{ id: string; archived: boolean; waits: boolean }[]> => {
+    const rows = await sql<{ id: string; archived: boolean; waits: boolean }[]>`UPDATE task
+      SET status = 'interrupted', unseen = true, updated_at = ${now()}
+      WHERE status = 'running' RETURNING id, archived_at IS NOT NULL AS archived,
+        (EXISTS (SELECT 1 FROM question q WHERE q.task_id = task.id AND q.status = 'open')
+          OR EXISTS (SELECT 1 FROM permission_request p WHERE p.task_id = task.id AND p.state = 'pending')) AS waits`
     await sql`UPDATE task SET status_line = NULL, status_line_at = NULL WHERE status_line IS NOT NULL`
-    return rows.map((row) => ({ id: row.id, resume: !row.unseen }))
+    return rows.map((row) => ({ ...row }))
   },
 }
 

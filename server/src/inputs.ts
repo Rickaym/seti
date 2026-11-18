@@ -237,10 +237,13 @@ export function wakeWhenUnblocked(): void {
   })
 }
 
-/** Hands over updates that waited through a restart, for every task that wakes on them. */
-export async function wakeWaiting(): Promise<void> {
+/**
+ * Hands over updates that waited through a restart, for every task that wakes on them. Tasks in
+ * `resuming` are left out: the message that resumes their cut turn brings their updates along.
+ */
+export async function wakeWaiting(resuming: readonly string[] = []): Promise<void> {
   for (const task of await tasks.list()) {
-    if (task.input_mode === 'wake') {
+    if (task.input_mode === 'wake' && !resuming.includes(task.id)) {
       await wakeTask(task.id)
     }
   }

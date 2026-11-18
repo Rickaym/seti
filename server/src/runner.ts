@@ -167,7 +167,7 @@ async function openTurn(
 
 async function send(taskId: string, session: LiveSession, next: NextMessage): Promise<void> {
   const { content, promptId } = await openTurn(taskId, next, false)
-  session.send(content, promptId)
+  session.send(content, promptId, next.prompt === null ? 'updates' : 'user')
 }
 
 async function enqueue(taskId: string, session: LiveSession, next: NextMessage): Promise<void> {
@@ -310,7 +310,9 @@ async function endTurn(taskId: string, session: LiveSession, m: SDKResultMessage
 
 async function closeTurn(taskId: string, session: LiveSession, error: string | null): Promise<void> {
   const ending = session.endTurn()
-  if (ending !== null && session.backlog.length > 0) {
+  if (session.restartCut) {
+    session.close()
+  } else if (ending !== null && session.backlog.length > 0) {
     await sendBacklog(taskId, session)
   } else if (session.queuedUuids.length > 0) {
     session.carryOn()
@@ -373,9 +375,9 @@ async function finish(taskId: string, session: LiveSession, lastError: string | 
   if (failedStart) {
     keepUnstarted(taskId, backlog)
     await reportEnd(taskId, 'error', lastError)
-  } else if (backlog.length > 0 && (await tasks.get(taskId))) {
+  } else if (!session.restartCut && backlog.length > 0 && (await tasks.get(taskId))) {
     openSession(taskId, session, backlog)
-  } else if (running) {
+  } else if (running && !session.restartCut) {
     await reportEnd(taskId, endedBySeti ? 'stopped' : endStatus(lastError), lastError)
   }
   session.turnReported()
@@ -475,26 +477,6 @@ onShutdown(async () => {
     await endSession(taskId)
   }
 })
-
-/** Takes a message back from Claude Code's queue before the agent reads it. */
-export async function removeQueued(taskId: string, promptId: number): Promise<void> {
-  const session = live.get(taskId)
-  const uuid = session?.uuidOf(promptId) ?? null
-  if (session === undefined || uuid === null) {
-    throw new HttpError(409, 'That message is not waiting in the queue')
-  }
-  const cancelled = await session.cancelQueued(uuid)
-  if (cancelled === null) {
-    throw new HttpError(409, 'This Claude Code version cannot take back a queued message')
-  }
-  if (!cancelled) {
-    throw new HttpError(409, 'The agent already picked up that message')
-  }
-  const settled = session.settle(uuid)
-  if (settled !== null) {
-    await inLane(taskId, async () => markQueued(taskId, settled, 'removed'))
-  }
-}
 
 /** Closes the task's session if nothing runs in it; false when a turn or background work runs. */
 export async function closeIdleSession(taskId: string): Promise<boolean> {

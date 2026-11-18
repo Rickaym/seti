@@ -34,6 +34,7 @@ import { CHANNEL_EVENT_ROUTING, CHANNEL_RUN_DUE, POLLER_CHANNELS } from './schem
 import { PR_LIST_CACHE } from './schema-prs.js'
 import { QUESTION_SECRETS, QUESTIONS } from './schema-questions.js'
 import { DROP_ROUTINES, REMINDER_CHANNELS, REMINDER_CRON } from './schema-reminders.js'
+import { RESTART_CUTS } from './schema-restart.js'
 import { PACK_KIND, rolesToPacks } from './schema-roles.js'
 import { MESSAGE_SEARCH, MESSAGE_SEARCH_TALK, MESSAGE_TIME } from './schema-search.js'
 import {
@@ -196,4 +197,5 @@ export const MIGRATIONS: readonly Migration[] = [
   { version: 106, name: 'shared_tools', sql: SHARED_TOOLS },
   { version: 107, name: 'channel_subscription_delivery', sql: CHANNEL_SUBSCRIPTION_DELIVERY },
   { version: 108, name: 'permission_timeout', sql: PERMISSION_TIMEOUT },
+  { version: 109, name: 'restart_cuts', sql: RESTART_CUTS },
 ]

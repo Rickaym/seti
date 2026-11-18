@@ -13,6 +13,7 @@ import { inBackground } from './background.js'
 import { tasks } from './db.js'
 import { refuseAgent } from './ea-guard.js'
 import { announce, dropRequest, resolveRequest, waitsFor } from './permission-requests.js'
+import { deliverLateDecision, isLateRequest } from './restart-waits.js'
 import { appendMessage } from './runner.js'
 import { permissionRequests, timeoutSettings } from './store/permissions.js'
 import { refreshBlocked } from './task-blocked.js'
@@ -62,17 +63,23 @@ async function deliverTimeout(request: PermissionRequest): Promise<void> {
 
 /**
  * Denies the request once its time is up, as the user's Deny would but with no rule and for this
- * request only; one whose session is gone closes without a word.
+ * request only; one whose session is gone closes without a word. The denial of a request a
+ * restart kept resumes its agent, as the user's answer would.
  */
 async function timeOut(requestId: string): Promise<void> {
   timers.delete(requestId)
-  if (!waitsFor(requestId)) {
+  const late = isLateRequest(requestId)
+  if (!late && !waitsFor(requestId)) {
     await dropRequest(requestId)
     return
   }
   const settled = await permissionRequests.timeOut(requestId, new Date().toISOString())
-  if (settled !== undefined) {
-    await deliverTimeout(settled)
+  if (settled === undefined) {
+    return
+  }
+  await deliverTimeout(settled)
+  if (late) {
+    await deliverLateDecision(settled)
   }
 }
 
@@ -99,13 +106,13 @@ function arm(request: PermissionRequest): void {
   timers.set(request.id, { deny, warn })
 }
 
-/** Arms each request this process waits on when raised or retimed; a settled one is disarmed. */
+/** Arms each request a call or a kept leftover waits on when raised or retimed; else disarms. */
 export function watchPermissionTimeouts(): void {
   onAnyTaskEvent((_taskId, event) => {
     if (event.type !== 'permission') {
       return
     }
-    if (event.request.state === 'pending' && waitsFor(event.request.id)) {
+    if (event.request.state === 'pending' && (waitsFor(event.request.id) || isLateRequest(event.request.id))) {
       arm(event.request)
     } else {
       disarm(event.request.id)

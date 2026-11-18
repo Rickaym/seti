@@ -21,17 +21,60 @@ keep running. The open sessions live in the server's memory (the `live` map in
 `server/src/runner.ts`), so one server process owns them all: a restart marks running turns interrupted
 (the next message resumes the session), and a second process cannot steer another's sessions.
 
-With Resume after restart on (the Lifecycle settings page, on by default), Seti sends each agent a
-restart cut off one message in its own session once it is listening again, two seconds apart:
-"Seti restarted while your last turn ran. Check what finished before the cut, without repeating
-any step that may already have run, then continue." It goes the way a follow-up from the user goes,
-marked as written by Seti, and is audited as `task.resumed_after_restart` with the actor `system`.
-`markRestartCut` in `server/src/restart-resume.ts` picks the agents before startup clears their
-reason lines: an agent that was waiting on the user (a permission request, a change request, an MCP
-sign-in or a stall) or is archived stays interrupted for the user, as does every agent while the
-setting is off. An agent picked to resume is left seen, so it raises no Needs you row or push; one
-whose resume cannot start falls back to the interrupted notice. An agent the user messaged first is
-skipped, and each agent resumes at most once per start.
+A stop of Seti (SIGTERM or SIGINT, as `systemctl --user restart seti` sends) first records what
+it cuts off. `cutRunningTurns` in `server/src/restart-cut.ts` writes one `restart_cut` row per
+running turn with what started it (`user` for a written message, `updates` for a turn Seti started
+for updates, `wake` for a turn background work started by reporting back) and how many background
+commands and subagents ran in its session, audits the stop as `system.stopping`, and interrupts
+each turn, so Claude Code ends it and writes its session file before the process closes. It runs
+beside the poller drain and is bounded at seven seconds (Claude Code gets five to answer the
+interrupt before its process is closed), so a stop takes no longer than before and stays far
+inside systemd's stop timeout, which `deploy/seti.service` leaves at the default. The tasks stay
+`running` in the database, and a question or permission request the turn waited on is left open.
+A crash or a kill leaves no rows; startup then treats every task still marked running the same
+way, without knowing what kind of turn it was.
+
+With Resume after restart on (the Lifecycle settings page, on by default), startup resumes each
+cut turn by itself once Seti listens again. `markRestartCut` in `server/src/restart-resume.ts`
+marks the cut tasks interrupted and picks those to resume; `resumeInterrupted` then sends each one
+message in its own session, marked as written by Seti: "Seti restarted while you were working.
+Continue where you left off; check the state of anything you had running before repeating it."
+An agent whose session had background work is also told that the restart stopped it, since those
+processes live in the session's process tree (and in its memory scope, which is bound to Seti's
+unit) and end with it; other agents are not told. The transcript gets a Seti note, "Seti restarted
+during this turn and resumed it", and the audit log a `task.resumed_after_restart` event with the
+actor `system`, the kind of turn and the background count. Updates that waited through the restart
+reach a resumed agent with that message instead of in a turn of their own. Turns the user waits on
+resume first,
+then wake-ups, then updates. Three sessions start two seconds apart, the next three follow twenty
+seconds later, and so on, so a restart that cut many turns does not start them all at once.
+
+Startup resumes nothing for an agent that is archived, that the user stopped (its turn was not
+running), that the user messaged first, or while the setting is off; those cut off stay
+interrupted and notify. An agent that waited on the user's answer is not resumed either, and
+nothing is lost for it: `keepLeftoverRequests` in `server/src/restart-waits.ts` keeps its open
+questions and pending permission requests, the agent stays in Needs you with the same reason
+line, and the answer resumes its session. Claude Code cannot take an answer for a tool call of a
+process that ended, so the answer arrives as a message from Seti instead: the questions with the
+user's answers, or the user's decision on the call. An allowed call runs once without a second
+request when the agent makes exactly the same call again within fifteen minutes; Seti matches it
+by a hash of the tool and its input (`server/src/permission-grants.ts`), kept on the request row.
+A request a restart cut off cannot be edited, because its input went with the process. It still
+times out from when it was raised (`server/src/permission-timeout.ts`), and that denial resumes the
+agent as the user's answer would. A secret
+question does expire at startup, since its value only ever goes to the call that waited. When the
+agent starts a turn for any other reason, what the restart left open for it is expired.
+
+An agent that restarts keep cutting off is not resumed forever. Each resume counts in
+`restart_cut`, a turn that ends by itself sets the count back to zero, and after three resumes
+within thirty minutes with no finished turn in between startup leaves the agent interrupted, in
+Needs you with the reason "Not resumed: restarts cut it off 3 times in 30 minutes before it
+finished a turn", audited as `task.resume_held`. The next turn anyone starts clears that. An agent
+whose resume cannot start falls back to the interrupted notice.
+
+A restart still loses what only the process held: messages queued behind the cut turn (they show
+as taken back), background commands and subagents, and the wake-up an idle agent expected from
+background work, since no turn of its own was running to resume.
 
 Restarting a session from the agent's settings ends its process with the background work in it and
 opens the next one at once, resuming the same session id, so its MCP servers reconnect and report
@@ -759,8 +802,9 @@ call's own input with `answers` added, keyed by each question's text: the label,
 or, for a multi-answer question, the list of both. Claude Code's host-answer check requires that
 shape: an unchanged input, keys that are question texts, and a list only for `multiSelect`. A
 dismissed question reads as dismissed; a group the user only dismissed is turned down with a note
-to go on with the agent's own judgment. A stopped turn or an ended session expires the group, and
-startup expires what a restart cut off.
+to go on with the agent's own judgment. A stopped turn or an ended session expires the group. A
+restart of Seti does not: the group stays open, and its answers resume the agent's session as a
+message from Seti.
 
 Open questions set the agent's reason line in Needs you through `server/src/task-blocked.ts`,
 such as `Asks 2 questions: Which checks should I run first?`, after a permission request and
@@ -1125,7 +1169,7 @@ while the agent is open, until it clears:
 | An MCP server's sign-in tool                                                                  | `Sign in to the linear MCP server in Seti`                               | a sign-in finishes, or the next turn starts |
 | A running turn with no message for 20 minutes, not counting time a request waited on the user | `No output for 20 min while running`, or the API error it keeps retrying | the session speaks again, or the turn ends  |
 
-A permission request outranks open questions, which outrank a change request, which outranks a stall; the watchdog (`server/src/stall-watch.ts`) checks the
+A permission request outranks open questions, which outrank a change request, which outranks the reason startup stopped resuming an agent after restarts, which outranks a stall; the watchdog (`server/src/stall-watch.ts`) checks the
 open sessions once a minute.
 
 ## Requests wait in one panel
@@ -1184,7 +1228,8 @@ change here. Each goes through the attention router first, which sends it to a p
 page has focus and the EA does not carry the agent. The Needs you group and its counts use
 `waitsOnYou`, which adds that the user has not opened the agent since its turn ended;
 notifications do not, since a turn end is always unseen. Startup notifies the agents a restart cut
-off, and marks them unseen. Pushes use Web Push with a VAPID key
+off and it does not resume, and marks them unseen; an agent that still waits on an answer is not
+notified again. Pushes use Web Push with a VAPID key
 pair that Seti makes on first start and seals in the secret store; the `web-push` library encrypts
 each payload to the device's keys, and Seti sends it itself, only to known push services. Each
 notification carries the agent's id as its tag and push topic, so a newer one replaces an older

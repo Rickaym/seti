@@ -1,10 +1,13 @@
 import { randomUUID } from 'node:crypto'
 import type { CanUseTool, PermissionMode, PermissionResult, PermissionUpdate } from '@anthropic-ai/claude-agent-sdk'
 import type { PermissionRequest, PermissionRequestKind } from '@seti/shared'
-import { audit } from './audit.js'
+import { permissionModeOf } from './bypass-mode.js'
+import { tasks } from './db.js'
 import { INPUT_CHARS, isEditable } from './permission-edits.js'
+import { callHash, takeGrant } from './permission-grants.js'
 import { alwaysRules } from './permission-policy.js'
 import { ASK_TOOL, askQuestions } from './questions.js'
+import { stoppingForRestart } from './restart-state.js'
 import { redactSecrets, scrubValue } from './scrub.js'
 import { permissionRequests, timeoutSettings } from './store/permissions.js'
 import { setStall, refreshBlocked } from './task-blocked.js'
@@ -67,21 +70,27 @@ const DROPPED: PermissionResult = { behavior: 'deny', message: 'The request was 
 
 /**
  * Waits for the user's answer to the request, from before it is recorded so no answer comes too
- * early; a turn cut short or a closed session drops the request.
+ * early; a turn cut short or a closed session drops the request. A turn Seti's own stop cuts off
+ * leaves it pending, so the user's answer still reaches the agent after the start.
  */
 async function answerOf(id: string, signals: readonly AbortSignal[]): Promise<PermissionResult> {
   const signal = AbortSignal.any([...signals])
   return new Promise((resolve) => {
     const drop = () => {
-      if (waiting.delete(id)) {
-        dropRequest(id)
-          .catch((e: unknown) => {
-            process.stderr.write(`permissions: could not drop request ${id}: ${String(e)}\n`)
-          })
-          .finally(() => {
-            resolve(DROPPED)
-          })
+      if (!waiting.delete(id)) {
+        return
       }
+      if (stoppingForRestart()) {
+        resolve(DROPPED)
+        return
+      }
+      dropRequest(id)
+        .catch((e: unknown) => {
+          process.stderr.write(`permissions: could not drop request ${id}: ${String(e)}\n`)
+        })
+        .finally(() => {
+          resolve(DROPPED)
+        })
     }
     waiting.set(id, (result) => {
       signal.removeEventListener('abort', drop)
@@ -143,8 +152,19 @@ interface Ask {
   suggestions: string[]
 }
 
+/** The call the user allowed after a restart cut it off runs once without a second request. */
+async function allowedAlready(taskId: string, ask: Ask, hash: string): Promise<PermissionResult | null> {
+  const task = takeGrant(taskId, hash) ? await tasks.get(taskId) : undefined
+  return task === undefined ? null : allowed({ tool_name: ask.tool }, ask.input, permissionModeOf(task))
+}
+
 /** Records the call, shows it to the user, and waits for their answer. */
 async function askUser(taskId: string, ask: Ask, signals: readonly AbortSignal[]): Promise<PermissionResult> {
+  const hash = callHash(ask.tool, ask.input)
+  const granted = await allowedAlready(taskId, ask, hash)
+  if (granted !== null) {
+    return granted
+  }
   const id = randomUUID()
   inputs.set(id, ask.input)
   const answer = answerOf(id, signals)
@@ -159,9 +179,14 @@ async function askUser(taskId: string, ask: Ask, signals: readonly AbortSignal[]
       reason: ask.reason,
       suggestions: ask.suggestions,
       editable: ask.kind !== 'repeat' && isEditable(ask.tool, ask.input),
+      input_hash: hash,
       timeout_minutes: (await timeoutSettings.get()).request_timeout_minutes,
     })
-    await (waiting.has(id) ? announce(request) : dropRequest(id))
+    if (waiting.has(id)) {
+      await announce(request)
+    } else if (!stoppingForRestart()) {
+      await dropRequest(id)
+    }
     return await answer
   } finally {
     inputs.delete(id)
@@ -221,17 +246,3 @@ export const askForReview = async (
   signals: readonly AbortSignal[],
 ): Promise<PermissionResult> =>
   askUser(taskId, { ...call, kind: 'review', reason: REVIEW_REASON, suggestions: [] }, signals)
-
-/** No process waits on a request a restart left pending; startup drops them. */
-export async function dropLeftoverRequests(): Promise<void> {
-  const dropped = await permissionRequests.cancelAll()
-  if (dropped.length > 0) {
-    await audit.record({
-      actor: 'system',
-      kind: 'task.permission_denied',
-      subject_type: 'system',
-      summary: `Dropped ${String(dropped.length)} permission requests a restart cut off`,
-      detail: { requests: dropped.length },
-    })
-  }
-}

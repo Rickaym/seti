@@ -12,6 +12,7 @@ import {
 } from '@seti/shared'
 import { audit } from './audit.js'
 import { tasks } from './db.js'
+import { stoppingForRestart } from './restart-state.js'
 import { redactSecrets } from './scrub.js'
 import { questions, type NewQuestion } from './store/questions.js'
 import { refreshBlocked } from './task-blocked.js'
@@ -129,12 +130,20 @@ export async function expireGroup(groupId: string, reason: string): Promise<Ques
   return expired
 }
 
-/** Waits for the group's answers, from before it is recorded; a stopped turn expires it. */
+/**
+ * Waits for the group's answers, from before it is recorded; a stopped turn expires it. A turn
+ * Seti's own stop cuts off leaves it open, so the answer still reaches the agent after the start.
+ */
 async function answersOf(groupId: string, waiter: Omit<Waiter, 'resolve'>, signals: readonly AbortSignal[]) {
   const signal = AbortSignal.any([...signals])
   return new Promise<PermissionResult>((resolve) => {
     const drop = () => {
       if (!waiting.has(groupId)) {
+        return
+      }
+      if (stoppingForRestart()) {
+        waiting.delete(groupId)
+        resolve(EXPIRED)
         return
       }
       expireGroup(groupId, 'the agent stopped waiting')
@@ -214,7 +223,7 @@ export async function askQuestions(
     await auditAsked(taskId, stored)
     if (waiting.has(groupId)) {
       await refreshBlocked(taskId)
-    } else {
+    } else if (!stoppingForRestart()) {
       await expireGroup(groupId, 'the agent stopped waiting')
     }
     return await answer
@@ -223,15 +232,18 @@ export async function askQuestions(
   }
 }
 
-/** No process waits on a question a restart left open; startup expires them. */
-export async function expireLeftoverQuestions(): Promise<void> {
-  const expired = await questions.expireAll()
+/**
+ * A secret question cannot outlive its call, which takes the value straight from the user's
+ * field; startup expires those a restart left open. Other questions stay open for a late answer.
+ */
+export async function expireLeftoverSecrets(): Promise<void> {
+  const expired = await questions.expireSecrets()
   if (expired.length > 0) {
     await audit.record({
       actor: 'system',
       kind: 'task.question_expired',
       subject_type: 'system',
-      summary: `Expired ${plural(expired.length, 'question')} a restart cut off`,
+      summary: `Expired ${plural(expired.length, 'secret question')} a restart cut off`,
       detail: { questions: expired.length, reason: 'restart' },
     })
   }
