@@ -165,7 +165,9 @@ describe('permission request timeout', () => {
     expect(Date.parse(request.timeout_at ?? '') - Date.parse(request.created_at)).toBe(60 * MINUTE)
 
     await vi.advanceTimersByTimeAsync(47 * MINUTE)
-    expect((await tasks.get(task.id))?.blocked).toBe('Asks to use Bash: make deploy')
+    await vi.waitFor(async () => {
+      expect((await tasks.get(task.id))?.blocked).toBe('Asks to use Bash: make deploy')
+    })
     await vi.advanceTimersByTimeAsync(2 * MINUTE)
     await vi.waitFor(async () => {
       expect((await tasks.get(task.id))?.blocked).toBe('Asks to use Bash: make deploy, times out soon')
