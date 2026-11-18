@@ -1,10 +1,12 @@
 import { randomUUID } from 'node:crypto'
 import type { PermissionResult } from '@anthropic-ai/claude-agent-sdk'
+import { timedOutMessage } from '@seti/shared'
 import { describe, expect, it, vi } from 'vitest'
 import { messages, sql, tasks } from './db.js'
 import { callHash, grantOnce, takeGrant } from './permission-grants.js'
 import { canUseToolFor } from './permission-requests.js'
 import { answerPermission } from './permission-rules.js'
+import { resumePermissionTimeouts } from './permission-timeout.js'
 import { answerQuestions } from './question-answers.js'
 import { askQuestions } from './questions.js'
 import { markRestartCut } from './restart-resume.js'
@@ -84,6 +86,7 @@ async function request(taskId: string, input: Record<string, unknown> = DEPLOY) 
     suggestions: [],
     editable: true,
     input_hash: callHash('Bash', input),
+    timeout_minutes: 60,
   })
 }
 
@@ -231,6 +234,22 @@ describe('a permission request a restart cut off', () => {
     await answerPermission(await taskOf(id), pending.id, { decision: 'deny', message: 'Not on a Friday' })
     await waitIdle(id)
     expect((await sent(id))[0]?.text).toContain('The user has denied it since and said: Not on a Friday.')
+    expect(takeGrant(id, callHash('Bash', DEPLOY))).toBe(false)
+  })
+
+  it('is denied when its time runs out, which resumes the agent with the reason', async () => {
+    const id = await cutTask()
+    const pending = await request(id)
+    await permissionRequests.retime(pending.id, new Date(Date.now() - 1000).toISOString())
+    await restart()
+    await resumePermissionTimeouts()
+    await vi.waitFor(async () => {
+      expect(await permissionRequests.get(pending.id)).toMatchObject({ state: 'denied', timed_out: true })
+    })
+    await vi.waitFor(async () => {
+      expect((await sent(id))[0]?.text).toContain(`Bash (make deploy). ${timedOutMessage(0)}`)
+    })
+    await waitIdle(id)
     expect(takeGrant(id, callHash('Bash', DEPLOY))).toBe(false)
   })
 })

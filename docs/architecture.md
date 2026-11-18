@@ -59,7 +59,9 @@ process that ended, so the answer arrives as a message from Seti instead: the qu
 user's answers, or the user's decision on the call. An allowed call runs once without a second
 request when the agent makes exactly the same call again within fifteen minutes; Seti matches it
 by a hash of the tool and its input (`server/src/permission-grants.ts`), kept on the request row.
-A request a restart cut off cannot be edited, because its input went with the process. A secret
+A request a restart cut off cannot be edited, because its input went with the process. It still
+times out from when it was raised (`server/src/permission-timeout.ts`), and that denial resumes the
+agent as the user's answer would. A secret
 question does expire at startup, since its value only ever goes to the call that waited. When the
 agent starts a turn for any other reason, what the restart left open for it is expired.
 
@@ -180,7 +182,8 @@ directories go ahead. A classifier model then allows or turns down each other ca
 turns down never reaches the user: the agent gets the reason, the transcript shows the failed
 call, and the audit log records it. A call the classifier cannot decide, or one an ask rule
 matches, waits as a permission request until the user answers it, and the agent shows in Needs
-you meanwhile. Where auto mode is unavailable, Claude Code starts in the `default` mode, and every
+you meanwhile. A request nobody answers within the request timeout (Settings, Permissions; 1 h by
+default) is denied by Seti, and the agent is told it timed out and goes on. Where auto mode is unavailable, Claude Code starts in the `default` mode, and every
 call no rule allows waits as a request, edits in the agent's directories included. In auto mode
 Claude Code drops broad shell allow rules, such as `Bash` alone or an interpreter prefix, so the
 classifier also reviews a sandboxed agent's shell commands. Unsandboxed agents get no prefix rules
@@ -296,10 +299,15 @@ stdin, and returns stdout as text, and as structured content when it is a JSON o
 
 Seti starts an agent's Claude Code process, sandboxed or not, each `!` command and the short-lived
 rewind helper through `systemd-run --user --scope`, so the process tree lives in a transient scope
-of its own with `MemoryMax` and `MemorySwapMax` set (by default 6 GB and 1 GB; Settings, Resources
-sets the default and an agent's settings can override it, and a change reaches running scopes at
-once through `systemctl set-property`). Above `MemoryMax` the OOM killer stops a process inside
-that scope instead of earlyoom picking a large process anywhere on the host.
+of its own with `MemoryMax` and `MemorySwapMax` set (Settings, Resources sets the default and an
+agent's settings can override it, and a change reaches running scopes at once through
+`systemctl set-property`). Above `MemoryMax` the OOM killer stops a process inside that scope
+instead of earlyoom picking a large process anywhere on the host.
+
+Until a cap is saved in Settings, Resources, the default follows the host (`defaultMemoryCap` in
+`shared/src/memory.ts`): 30% of its memory in whole GB, at least 6 GB and at most 16 GB, so 10 GB on
+a 32 GB host, with 1 GB of swap. A larger cap means fewer `tsc` runs stopped at it and more risk
+to the host when several agents peak together. A saved cap always wins over the computed one.
 
 - `OOMPolicy=continue` keeps the rest of the tree running when one process, such as `tsc`, is
   killed, so Claude Code sees the failed command and goes on.
@@ -410,6 +418,14 @@ on GitHub, and every open PR linked to an agent, whether the agent opened it or 
 it. A PR needs no registered repo to show its title, CI, review threads, owning agents and Fix CI.
 Open PRs that other people wrote appear only once an agent links them.
 
+Fix CI sends an agent one short message as the user, such as "CI is failing on #482 and #915.
+Please fix them.", with the repo before each number when the PRs span several; the agent reads the
+checks itself. `GET /api/prs/fix-ci` plans it for every agent, or for one with `?task=`
+(`planFixCi` in `shared/src/pr-fix-ci.ts`): each agent linked to an open PR with failing CI gets
+one message naming only its own PRs, archived and stopped agents are skipped, and failing PRs with
+no agent are counted. The Agents list's Fix CI button shows that plan and asks before it sends, and
+the EA sends the same messages as direct messages through `post_team_chat` with `fix_ci`.
+
 The list and the detail of a PR are read apart, because GitHub answers them at very different
 speeds. The list is two searches for `is:pr is:open author:@me sort:updated-desc` with pages of
 100, run side by side (`server/src/github-list.ts`): the rows (number, title, repo, branches,
@@ -445,6 +461,56 @@ a PR in a repo that login cannot read shows without a status.
 
 Starting an agent on a PR's branch still needs a checkout, so `start_agent_from_pr` refuses a PR
 whose repo Seti has none of.
+
+## PR updates wake an agent only for news
+
+The PR poller (`server/src/pr-inputs.ts`) reads every PR linked to an agent once a minute, compares
+it with the last snapshot in `pr_watch` and turns each change into an update for the linked agents:
+CI failed or passed, a review, a comment, a conflict, a merge or a close. Updates from one poll
+reach an agent as one batch, and batches that follow within a few seconds join the same turn.
+
+Three kinds of update are recorded without starting a turn. Each still shows in the agent's
+transcript, greyed and marked with the reason, and the PR views show the same state as before.
+
+| Mark                     | When                                                                    | What the agent gets          |
+| ------------------------ | ----------------------------------------------------------------------- | ---------------------------- |
+| not sent: own action     | the agent posted the comment or review, or merged or closed the PR      | nothing                      |
+| not sent: repeat         | checks ran again on a commit and ended as Seti reported them before     | nothing                      |
+| no wake: nothing pending | CI passed, no failure was reported before it, and the agent pushed none | the pass, with its next turn |
+
+A batch in which every update is quiet starts no turn; a mixed batch wakes the agent with the rest.
+Quiet updates never count as waiting, so they raise no "queued" bar and cannot be dismissed. Other
+agents linked to the same PR, and the EA when it watches one of them, are told what an agent did
+as before.
+
+An agent and the user often act as the same GitHub login, so the author of an event does not say
+who acted. Seti reads the agent's own tool calls instead (`server/src/pr-self.ts`):
+
+- A comment or review is the agent's when the output of one of its posting calls (`gh pr comment`,
+  `gh pr review`, a `gh api` write to comments, reviews or replies, a GitHub MCP comment or review
+  tool) links it by its id. This match is exact.
+- When that output links nothing, a post is the agent's if the host's `gh` login wrote it on the PR
+  the call names, or on any linked PR when the call names none, while the call ran, with 5 seconds
+  allowed for clock difference. A comment the user writes under the same login on the same PR in
+  those seconds is taken for the agent's.
+- A merge or close is the agent's when one of its calls (`gh pr merge`, `gh pr close`, the matching
+  `gh api` and GitHub MCP calls) ran on that PR at the time GitHub gives for the PR's end, with the
+  same allowance. A merge that `gh pr merge --auto` lands later is news and wakes the agent.
+
+Anything Seti cannot tie to a call of that agent is delivered, so a script that posts through
+other means comes back as an update.
+
+A pass wakes the agent when the last CI result Seti reported for the PR was a failure, or when the
+agent pushed or opened a PR since Seti last gave it a CI result for this PR (`git push`,
+`gh pr create`, a GitHub MCP push): it started the run, so it waits for the result. Any other pass,
+such as one after someone else updated the branch, is recorded quietly. A failure always wakes.
+
+A failure is reported once per head commit, and again only for checks that had not failed on it
+before. A conflict is reported once per head commit and base branch, until GitHub finds the PR
+merging cleanly again. GitHub recomputes mergeability whenever the base branch moves and reports it
+unknown in between; the same commit still conflicts after that, so it is not reported again. A new
+head commit that still conflicts, a PR retargeted to another base branch, and a conflict that comes
+back after a clean merge state are news.
 
 ## Mods add to Seti through registries with disposers
 
@@ -743,9 +809,38 @@ message from Seti.
 Open questions set the agent's reason line in Needs you through `server/src/task-blocked.ts`,
 such as `Asks 2 questions: Which checks should I run first?`, after a permission request and
 before a change request. `questionsContext`, registered with `registerContextProvider`, tells
-every agent to ask through AskUserQuestion instead of in its reply. The guess that a turn ended on
-a question (`server/src/turn-asking.ts`) reads only the prose after the last tool use, the
-fallback for an agent that asks in text.
+every agent to ask through AskUserQuestion instead of in its reply, and when not to ask at all: no
+go-ahead for reversible work inside the request, and a clearly recommended option is taken and
+named. It asks only for a choice that cannot be undone, acts outward, changes the scope or is
+genuinely balanced. `houseRulesContext` (`server/src/house-rules.ts`), registered the same way,
+states the rules the shell guard and Claude Code enforce: no foreground sleep or polling, stopping
+a process by PID, `rm -r` on literal paths and the exact tool name `Bash`. A `SubagentStart` hook
+of every session gives the same rules to each subagent, which does not read its parent's system
+prompt. An agent that asks in its reply all the same is caught by a detector that reads only the
+prose after the turn's last tool use and calls no model (`proseQuestion` in
+`shared/src/prose-question.ts`, fed by `server/src/turn-asking.ts`). The reply asks when its last
+paragraph outside fenced code ends with a question, or when a question and a list of answers end
+it together. It does not ask when the question mark sits in code, in quotes, in a quote block or
+in a heading, when the reply goes on after the question, when a list under the question reads as
+the agent's own answer, when the agent puts the question to itself ("Why did it fail?") or when it
+is a closing courtesy such as "Anything else?". The detector also returns the question on one line
+and up to four answers the reply listed: a numbered or lettered list right after the question, or
+a list right before a question that asks which one. Its limits are kept as rows of the table in
+`server/src/prose-question.test.ts`: a question followed by a remark reads as answered, and a
+rhetorical question that ends the reply reads as asked.
+
+An agent whose turn ended this way shows the status `asking` and the reason line "Asked in its
+reply". Its push reads `Asks:` and the question. Under its last message the agent view offers
+quick replies (`ui/src/panels/tasks/QuickReplies.tsx`): Yes and No when either answers the
+question, and one per listed answer. A tap sends that answer as the reply box would, and the
+quick replies go once any message starts the next turn. If the agent is still unanswered 15
+minutes after its turn ended, Seti pushes once more, `Still waits:` and the question, under the
+same rules as the first push: none for a muted or archived agent, one the EA carries or one a
+device shows (`server/src/asking-reminder.ts`). The reminder is a timer set at the turn end.
+Startup sets it again, for the rest of the wait, only for a turn that ended less than 15 minutes
+earlier, so a restart never reminds twice, and a question that came due while Seti was down gets
+none. The task list carries each asking agent's `question`, which the EA's `list_tasks`,
+`get_task` and `seti_overview` and an agent's own `list_tasks` read.
 
 Open questions are answered in the Requests panel and in an agent's Requests drawer, both
 described under [Requests wait in one panel](#requests-wait-in-one-panel). The panel lists every
@@ -1062,7 +1157,8 @@ last read, so a busy install pays for each message once.
 An agent that cannot go on without the user shows in Needs you with a reason line on its row, and
 its devices get a high-urgency push. Turn ends set three states: `error` (a failed turn, a rate
 limit, a lost login), `interrupted` (a restart cut the turn off) and `asking` (the turn ended on a
-question in its prose). An AskUserQuestion call waits as questions instead, as above. Everything
+question in its prose, with the reason line "Asked in its reply"). An AskUserQuestion call waits
+as questions instead, as above. Everything
 that holds an agent up without ending its turn sets `task.blocked`, which
 `server/src/task-blocked.ts` keeps. It shows as the `blocked` status, which stays in Needs you
 while the agent is open, until it clears:

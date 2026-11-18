@@ -11,6 +11,7 @@ import {
 import { audit } from './audit.js'
 import { fromEa, refuseAgent } from './ea-guard.js'
 import { HttpError } from './http.js'
+import { releaseHeld } from './inputs.js'
 import { expireGroup, resumeGroup, waiterOf } from './questions.js'
 import { deliverLateAnswers, isLateGroup } from './restart-waits.js'
 import { credentialFindings } from './scrub.js'
@@ -219,6 +220,9 @@ export async function answerQuestions(input: AnswerQuestionsInput): Promise<Answ
       result.resumed.push({ task_id: question.task_id, task_title: question.task_title })
     }
     await refreshBlocked(question.task_id)
+    if (resumed) {
+      await releaseHeld(question.task_id)
+    }
   }
   return result
 }

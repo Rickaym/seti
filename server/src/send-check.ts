@@ -1,5 +1,5 @@
-import type { NextMessage } from './agent-session.js'
 import { HttpError } from './http.js'
+import type { NextMessage } from './next-message.js'
 import { shellTurnGuard } from './shell-context.js'
 import { pendingPrefaces } from './turn-prompt.js'
 
@@ -20,7 +20,7 @@ export async function checkSend(
   if (shell !== null) {
     throw new HttpError(409, shell)
   }
-  const count = await pendingPrefaces(taskId, prompt)
+  const count = await pendingPrefaces(taskId, message)
   if (prompt === null && count === 0) {
     throw new HttpError(409, 'Nothing is waiting for the agent')
   }

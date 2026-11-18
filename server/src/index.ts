@@ -5,6 +5,7 @@ import { WebSocketServer } from 'ws'
 import { accountStatus, warmAccount } from './account.js'
 import { createApp } from './app.js'
 import { startAutoArchive } from './archive.js'
+import { rearmAskingReminders } from './asking-reminder.js'
 import { audit } from './audit.js'
 import { inBackground } from './background.js'
 import { startBackups } from './backup-schedule.js'
@@ -39,6 +40,7 @@ import { modHost } from './mods/bundled.js'
 import { watchDevMods } from './mods/dev.js'
 import { startModUpdates } from './mods/updates.js'
 import { notifyInterrupted, preparePush } from './notifications.js'
+import { resumePermissionTimeouts } from './permission-timeout.js'
 import { enforcePrivateHome } from './permissions.js'
 import { loadPlannerModule } from './planner.js'
 import { retireBundledPlugins } from './plugins.js'
@@ -199,6 +201,7 @@ await modHost.start()
 await watchDevMods()
 startModUpdates()
 notifyInterrupted(interrupted.notify)
+await rearmAskingReminders()
 await startEaIndex()
 if (PLANNER_MODULE !== '') {
   await loadPlannerModule(PLANNER_MODULE)
@@ -218,6 +221,7 @@ serve({ fetch: createApp().fetch, hostname: HOST, port: PORT, websocket: { serve
   void signInHint(PUBLIC_ACCESS)
   void wakeWaiting(interrupted.resume.map((each) => each.taskId))
   inBackground('resume', async () => resumeInterrupted(interrupted.resume))
+  inBackground('permission timeouts', resumePermissionTimeouts)
   void audit.record({
     actor: 'system',
     kind: 'system.started',

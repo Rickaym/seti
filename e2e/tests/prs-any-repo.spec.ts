@@ -37,5 +37,5 @@ test('a PR in a repo Seti has no checkout of shows its status, takes Fix CI and 
   await expect(checks).toBeHidden()
   await expect(page.getByText(`Asked ${agent.title} to fix CI on #3`)).toBeVisible()
   const sent = page.getByRole('region', { name: 'Transcript' }).locator('[data-own-message]')
-  await expect(sent.filter({ hasText: `CI is failing on your pull request #3 in ${linked.slug}` })).toHaveCount(1)
+  await expect(sent.filter({ hasText: 'CI is failing on #3. Please fix it.' })).toHaveCount(1)
 })

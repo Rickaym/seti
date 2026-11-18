@@ -1,10 +1,13 @@
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { MEMORY_CAP_DEFAULTS, memoryBudgetLine, memoryNote, type OomVictims } from '@seti/shared'
+import { defaultMemoryCap, memoryBudgetLine, memoryNote, type OomVictims } from '@seti/shared'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
+import { agentHeapMb } from './node-heap.js'
 import { parseOomKills, processLabel, TOOL_OOM_ADJ, ToolGuard } from './oom-guard.js'
 import { Proc } from './proc.js'
+
+const SIX_GB = defaultMemoryCap(8192)
 
 describe('processLabel', () => {
   it('names a Node, Python or npm tool by its script, not its interpreter', () => {
@@ -174,7 +177,7 @@ describe('ToolGuard', () => {
 
 describe('memory notes', () => {
   const report = (victims: OomVictims | null, kind: 'agent' | 'shell' = 'agent') =>
-    memoryNote({ event: 'oom_kill', cap: MEMORY_CAP_DEFAULTS, kind, victims })
+    memoryNote({ event: 'oom_kill', cap: SIX_GB, kind, victims })
 
   it('names the tools the cap stopped, so the note shows the agent went on', () => {
     expect(report({ root: false, names: ['tsc'] })).toBe(
@@ -205,8 +208,17 @@ describe('memory notes', () => {
     ).toContain('1.5 GB')
   })
 
+  it('names the cap the host default gives, in the note and in the budget line', () => {
+    const cap = defaultMemoryCap(32 * 1024)
+    expect(memoryNote({ event: 'oom_kill', cap, kind: 'agent', victims: { root: false, names: ['tsc'] } })).toBe(
+      "tsc was stopped: the agent's process tree hit its 10 GB memory cap",
+    )
+    expect(memoryBudgetLine(cap, agentHeapMb(cap))).toContain('a 10 GB memory cap. Keep Node heaps')
+    expect(agentHeapMb(cap)).toBe(7168)
+  })
+
   it('gives the agent its budget in one line of its system prompt', () => {
-    expect(memoryBudgetLine(MEMORY_CAP_DEFAULTS, 4300)).toBe(
+    expect(memoryBudgetLine(SIX_GB, 4300)).toBe(
       'Your process tree has a 6 GB memory cap. Keep Node heaps (--max-old-space-size) under about 4.2 GB, ' +
         'run one tsc or build at a time, and prefer incremental or per-package type checks. At the cap the ' +
         'kernel stops your largest tool process first.',

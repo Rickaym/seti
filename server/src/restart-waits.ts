@@ -1,4 +1,4 @@
-import type { PermissionRequest } from '@seti/shared'
+import { timedOutMessage, timeoutMinutesOf, type PermissionRequest } from '@seti/shared'
 import { audit } from './audit.js'
 import { inBackground } from './background.js'
 import { tasks } from './db.js'
@@ -72,6 +72,9 @@ const LATE_CALL = "Seti restarted while this call waited for the user's permissi
 
 /** What the agent reads about a call the user decided on after the restart cut it off. */
 function lateDecisionText(request: PermissionRequest): string {
+  if (request.timed_out) {
+    return `${LATE_CALL} ${callOf(request)}. ${timedOutMessage(timeoutMinutesOf(request))}`
+  }
   if (request.state === 'allowed') {
     const again =
       request.tool_name === 'ExitPlanMode'

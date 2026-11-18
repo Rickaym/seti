@@ -201,6 +201,8 @@ describe('task watches', () => {
       closed_at: null,
       conflicting: false,
       head_oid: oid,
+      clean: false,
+      base_ref: null,
       ci,
       checks: ci === 'failure' ? [{ name: 'test', state: 'failure', detail: 'failure', url: null }] : [],
       reviews: [],

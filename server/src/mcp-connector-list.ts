@@ -1,9 +1,10 @@
-import type { McpConnector, McpConnectorField } from '@seti/shared'
+import type { McpConnector, McpConnectorField, ServiceIconKey } from '@seti/shared'
 
 interface Common {
   name: string
   title: string
   description: string
+  icon?: ServiceIconKey
   url?: string
   plugin?: string
   header?: Pick<McpConnectorField, 'key' | 'description'>
@@ -27,6 +28,7 @@ const COMMON: readonly Common[] = [
     name: 'gmail',
     title: 'Gmail',
     description: 'Search, read and draft email.',
+    icon: 'gmail',
     url: 'https://gmailmcp.googleapis.com/mcp/v1',
     google: true,
   },
@@ -34,6 +36,7 @@ const COMMON: readonly Common[] = [
     name: 'google-drive',
     title: 'Google Drive',
     description: 'Find and read Docs, Sheets and other files.',
+    icon: 'googledrive',
     url: 'https://drivemcp.googleapis.com/mcp/v1',
     google: true,
   },
@@ -41,6 +44,7 @@ const COMMON: readonly Common[] = [
     name: 'google-calendar',
     title: 'Google Calendar',
     description: 'Read and schedule events.',
+    icon: 'googlecalendar',
     url: 'https://calendarmcp.googleapis.com/mcp/v1',
     google: true,
   },
@@ -54,42 +58,78 @@ const COMMON: readonly Common[] = [
     name: 'supabase',
     title: 'Supabase',
     description: 'Projects, databases, migrations and edge functions.',
+    icon: 'supabase',
     url: 'https://mcp.supabase.com/mcp',
   },
   {
     name: 'notion',
     title: 'Notion',
     description: 'Search and edit pages and databases.',
+    icon: 'notion',
     url: 'https://mcp.notion.com/mcp',
   },
-  { name: 'linear', title: 'Linear', description: 'Issues, projects and cycles.', url: 'https://mcp.linear.app/mcp' },
+  {
+    name: 'linear',
+    title: 'Linear',
+    description: 'Issues, projects and cycles.',
+    icon: 'linear',
+    url: 'https://mcp.linear.app/mcp',
+  },
   {
     name: 'github',
     title: 'GitHub',
     description: 'Repositories, issues, pull requests and Actions.',
+    icon: 'github',
     url: 'https://api.githubcopilot.com/mcp/',
     header: { key: 'Authorization', description: 'Bearer and a personal access token' },
   },
-  { name: 'sentry', title: 'Sentry', description: 'Issues, events and releases.', url: 'https://mcp.sentry.dev/mcp' },
+  {
+    name: 'sentry',
+    title: 'Sentry',
+    description: 'Issues, events and releases.',
+    icon: 'sentry',
+    url: 'https://mcp.sentry.dev/mcp',
+  },
   {
     name: 'atlassian',
     title: 'Atlassian',
     description: 'Jira issues and Confluence pages.',
+    icon: 'atlassian',
     url: 'https://mcp.atlassian.com/v1/mcp',
   },
   {
     name: 'figma',
     title: 'Figma',
     description: 'Designs, components and variables.',
+    icon: 'figma',
     url: 'https://mcp.figma.com/mcp',
   },
-  { name: 'vercel', title: 'Vercel', description: 'Projects, deployments and logs.', url: 'https://mcp.vercel.com' },
-  { name: 'stripe', title: 'Stripe', description: 'Customers, payments and products.', url: 'https://mcp.stripe.com' },
-  { name: 'clickup', title: 'ClickUp', description: 'Tasks, lists and docs.', url: 'https://mcp.clickup.com/mcp' },
+  {
+    name: 'vercel',
+    title: 'Vercel',
+    description: 'Projects, deployments and logs.',
+    icon: 'vercel',
+    url: 'https://mcp.vercel.com',
+  },
+  {
+    name: 'stripe',
+    title: 'Stripe',
+    description: 'Customers, payments and products.',
+    icon: 'stripe',
+    url: 'https://mcp.stripe.com',
+  },
+  {
+    name: 'clickup',
+    title: 'ClickUp',
+    description: 'Tasks, lists and docs.',
+    icon: 'clickup',
+    url: 'https://mcp.clickup.com/mcp',
+  },
   {
     name: 'fathom',
     title: 'Fathom',
     description: 'Meeting recordings and summaries.',
+    icon: 'fathom',
     url: 'https://api.fathom.ai/mcp',
   },
   { name: 'granola', title: 'Granola', description: 'Meeting notes.', url: 'https://mcp.granola.ai/mcp' },
@@ -97,6 +137,7 @@ const COMMON: readonly Common[] = [
     name: 'posthog',
     title: 'PostHog',
     description: 'Analytics, flags and errors.',
+    icon: 'posthog',
     url: 'https://mcp.posthog.com/mcp',
   },
   { name: 'canva', title: 'Canva', description: 'Designs and brand assets.', url: 'https://mcp.canva.com/mcp' },
@@ -104,6 +145,7 @@ const COMMON: readonly Common[] = [
     name: 'intercom',
     title: 'Intercom',
     description: 'Conversations and contacts.',
+    icon: 'intercom',
     url: 'https://mcp.intercom.com/mcp',
   },
   { name: 'monday', title: 'monday.com', description: 'Boards and items.', url: 'https://mcp.monday.com/mcp' },
@@ -111,17 +153,37 @@ const COMMON: readonly Common[] = [
     name: 'airtable',
     title: 'Airtable',
     description: 'Bases, tables and records.',
+    icon: 'airtable',
     url: 'https://mcp.airtable.com/mcp',
   },
-  { name: 'neon', title: 'Neon', description: 'Serverless Postgres projects.', url: 'https://mcp.neon.tech/mcp' },
+  {
+    name: 'neon',
+    title: 'Neon',
+    description: 'Serverless Postgres projects.',
+    icon: 'neon',
+    url: 'https://mcp.neon.tech/mcp',
+  },
   {
     name: 'cloudflare',
     title: 'Cloudflare',
     description: 'Workers, KV, R2 and D1.',
+    icon: 'cloudflare',
     url: 'https://bindings.mcp.cloudflare.com/mcp',
   },
-  { name: 'paypal', title: 'PayPal', description: 'Invoices, orders and payments.', url: 'https://mcp.paypal.com/mcp' },
-  { name: 'webflow', title: 'Webflow', description: 'Sites, pages and CMS.', url: 'https://mcp.webflow.com/mcp' },
+  {
+    name: 'paypal',
+    title: 'PayPal',
+    description: 'Invoices, orders and payments.',
+    icon: 'paypal',
+    url: 'https://mcp.paypal.com/mcp',
+  },
+  {
+    name: 'webflow',
+    title: 'Webflow',
+    description: 'Sites, pages and CMS.',
+    icon: 'webflow',
+    url: 'https://mcp.webflow.com/mcp',
+  },
   { name: 'attio', title: 'Attio', description: 'CRM records and lists.', url: 'https://mcp.attio.com/mcp' },
   {
     name: 'honeycomb',
@@ -129,7 +191,13 @@ const COMMON: readonly Common[] = [
     description: 'Queries, traces and SLOs.',
     url: 'https://mcp.honeycomb.io/mcp',
   },
-  { name: 'prisma', title: 'Prisma', description: 'Prisma Postgres databases.', url: 'https://mcp.prisma.io/mcp' },
+  {
+    name: 'prisma',
+    title: 'Prisma',
+    description: 'Prisma Postgres databases.',
+    icon: 'prisma',
+    url: 'https://mcp.prisma.io/mcp',
+  },
 ]
 
 const GOOGLE_PORT = 8765
@@ -141,6 +209,7 @@ function toConnector(entry: Common): McpConnector {
     name: entry.name,
     title: entry.title,
     description: entry.description,
+    icon: entry.icon ?? null,
     source: 'common',
     transport: 'http',
     url: entry.url ?? '',

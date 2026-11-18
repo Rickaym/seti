@@ -102,6 +102,7 @@ const setiPayload = z.looseObject({
   seti_control_was: setiControlLevel.optional(),
   bypass: z.boolean().optional(),
   resumed: z.boolean().optional(),
+  timed_out: text.optional(),
 })
 
 const shellPayload = z.looseObject({

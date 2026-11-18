@@ -3,7 +3,7 @@ import { handleCandidates, parseMentions, type AuditEvent, type TeamPosted } fro
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createApp } from './app.js'
 import { messages, sql, tasks } from './db.js'
-import { inputPreface } from './inputs.js'
+import { inputPreface } from './input-preface.js'
 import { endSession, isRunning, runTurn } from './runner.js'
 import { auditEvents } from './store/audit.js'
 import { eaInbox } from './store/inbox.js'

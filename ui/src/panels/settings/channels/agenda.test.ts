@@ -1,4 +1,11 @@
-import type { ChannelInfo, CronSchedule, EaFollowup } from '@seti/shared'
+import type {
+  ChannelInfo,
+  ChannelSubscription,
+  ChannelTarget,
+  CronSchedule,
+  DeliveryTiming,
+  EaFollowup,
+} from '@seti/shared'
 import { describe, expect, it } from 'vitest'
 import { buildAgenda } from './agenda'
 
@@ -11,6 +18,7 @@ const poller = (name: string, interval_s: number, next: Date | null) =>
     source: 'poller',
     id: name,
     name,
+    subscriptions: [] as ChannelSubscription[],
     poller: { enabled: next !== null, interval_s, next_run_at: next?.toISOString() ?? null },
   }) as ChannelInfo
 
@@ -19,6 +27,7 @@ const reminder = (name: string, interval_s: number, next: Date | null, schedule:
     source: 'reminder',
     id: name,
     name,
+    subscriptions: [] as ChannelSubscription[],
     reminder: { enabled: next !== null, interval_s, schedule, next_run_at: next?.toISOString() ?? null },
   }) as ChannelInfo
 
@@ -95,5 +104,32 @@ describe('buildAgenda', () => {
 
   it('has no days when nothing runs in the range', () => {
     expect(lines([reminder('Monthly', 3600, local(20, 9), { cron: '0 9 20 * *', timezone: ZONE })], 24)).toEqual([])
+  })
+
+  it('carries when the subscribed agents get what a channel reports, each choice once', () => {
+    const sub = (
+      delivery: DeliveryTiming | null,
+      target: ChannelTarget = 'task',
+      archived = false,
+    ): ChannelSubscription => ({
+      id: 1,
+      channel_id: 'Feed',
+      channel_name: 'Feed',
+      preset: 'poller',
+      target,
+      task_id: target === 'task' ? 'task' : null,
+      task_title: null,
+      task_archived: archived,
+      events: null,
+      mode: 'report',
+      delivery,
+      created_at: NOW.toISOString(),
+    })
+    const feed: ChannelInfo = {
+      ...poller('Feed', 14_400, local(1, 12)),
+      subscriptions: [sub(null, 'ea'), sub('now'), sub('now'), sub(null), sub('with_message', 'task', true)],
+    }
+    const agenda = buildAgenda({ channels: [feed], followups: [], now: NOW, hours: 4, timezone: ZONE })
+    expect(agenda.days[0]?.entries.map((entry) => entry.deliveries)).toEqual([['now', null]])
   })
 })

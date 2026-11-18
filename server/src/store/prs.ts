@@ -20,3 +20,10 @@ export async function linkedPrUrls(): Promise<string[]> {
     ORDER BY p.pr_url`
   return rows.map((row) => row.pr_url)
 }
+
+/** The archived agents among those with a linked PR. */
+export async function archivedLinkedTaskIds(): Promise<Set<string>> {
+  const rows = await sql<{ id: string }[]>`SELECT DISTINCT t.id FROM task_pr p JOIN task t ON t.id = p.task_id
+    WHERE t.archived_at IS NOT NULL`
+  return new Set(rows.map((row) => row.id))
+}

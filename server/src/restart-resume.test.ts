@@ -143,6 +143,7 @@ describe('resuming after a restart', () => {
       task_id: permission,
       ...request,
       suggestions: [],
+      timeout_minutes: 60,
       editable: false,
     })
     await refreshBlocked(permission)

@@ -1,5 +1,9 @@
-import { MEMORY_CAP_DEFAULTS, type MemoryCap } from '@seti/shared'
+import os from 'node:os'
+import { defaultMemoryCap, type MemoryCap } from '@seti/shared'
 import { now, sql } from '../db.js'
+
+/** The cap of every agent while the user has saved none, sized to this host's memory. */
+export const hostDefaultCap = (): MemoryCap => defaultMemoryCap(os.totalmem() / 1024 ** 2)
 
 interface CapRow {
   high_mb: number
@@ -11,11 +15,11 @@ interface CapRow {
 const toCap = (row: CapRow): MemoryCap => ({ high_mb: row.high_mb, max_mb: row.max_mb, swap_max_mb: row.swap_max_mb })
 
 export const memorySettings = {
-  /** The default cap of every agent and when it was saved; null while the built-in one applies. */
+  /** The default cap of every agent and when it was saved; null while the host's own applies. */
   get: async (): Promise<{ cap: MemoryCap; updated_at: string | null }> => {
     const [row] = await sql<CapRow[]>`SELECT high_mb, max_mb, swap_max_mb, updated_at FROM memory_settings WHERE id = 1`
     return row === undefined
-      ? { cap: MEMORY_CAP_DEFAULTS, updated_at: null }
+      ? { cap: hostDefaultCap(), updated_at: null }
       : { cap: toCap(row), updated_at: row.updated_at }
   },
   set: async (cap: MemoryCap): Promise<string> => {
