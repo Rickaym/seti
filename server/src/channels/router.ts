@@ -12,10 +12,10 @@ import { channelRouting, ROUTE_ATTEMPTS } from '../store/channel-routing.js'
 import { channelSubscriptions } from '../store/channel-subscriptions.js'
 
 /** A channel event as the update a subscribed task's agent reads. */
-const channelInput = (event: ChannelEvent, channelName: string): ChannelInput => ({
+const channelInput = (event: ChannelEvent, sub: ChannelSubscription): ChannelInput => ({
   source: 'channel',
   kind: event.kind,
-  channel: channelName,
+  channel: sub.channel_name,
   channel_id: event.channel,
   event_id: event.id,
   severity: event.severity,
@@ -24,6 +24,7 @@ const channelInput = (event: ChannelEvent, channelName: string): ChannelInput =>
   body: event.detail,
   url: event.url,
   received_at: event.created_at,
+  ...(sub.delivery === null ? {} : { delivery: sub.delivery }),
 })
 
 async function deliver(sub: ChannelSubscription, event: ChannelEvent): Promise<InputOutcome> {
@@ -34,7 +35,7 @@ async function deliver(sub: ChannelSubscription, event: ChannelEvent): Promise<I
     await routeChannelEvent(event, sub.mode === 'act')
     return { outcome: 'delivered', reason: 'Queued in the EA inbox' }
   }
-  return deliverInputs(sub.task_id, [channelInput(event, sub.channel_name)])
+  return deliverInputs(sub.task_id, [channelInput(event, sub)])
 }
 
 const message = (e: unknown) => (e instanceof Error ? e.message : String(e))

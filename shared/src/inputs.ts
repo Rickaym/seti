@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import type { DeliveryTiming } from './channel-delivery.js'
 import type { EaNoticeSeverity } from './ea.js'
 
 /** What a task does with updates from outside the conversation: wake, hold or drop them. */
@@ -75,7 +76,12 @@ export interface ChannelInput extends InputBase {
   event_id: number
   severity: EaNoticeSeverity
   received_at: string
+  /** When the subscription has the agent get it; absent follows the agent's update mode. */
+  delivery?: DeliveryTiming
 }
+
+/** Whether an update waits for the user's next message, whatever else starts a turn meanwhile. */
+export const heldForMessage = (input: TaskInput) => input.source === 'channel' && input.delivery === 'with_message'
 
 /** How a turn of another agent ended, for an agent that asked Seti to tell it. */
 export const AGENT_INPUT_KINDS = ['idle', 'error', 'stopped'] as const

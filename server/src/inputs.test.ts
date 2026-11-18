@@ -4,7 +4,8 @@ import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vites
 import { createApp } from './app.js'
 import { messages, tasks } from './db.js'
 import { fakeTimers } from './fake-timers.js'
-import { AUTO_TURN_BURST, WAKE_DEBOUNCE, deliverInputs, inputPreface, wakeWaiting } from './inputs.js'
+import { inputPreface } from './input-preface.js'
+import { AUTO_TURN_BURST, WAKE_DEBOUNCE, deliverInputs, wakeWaiting } from './inputs.js'
 import { isRunning, stopTurn } from './runner.js'
 import { auditEvents } from './store/audit.js'
 import { eaContextStore } from './store/ea-context.js'
@@ -420,7 +421,7 @@ describe('task inputs', () => {
         'repeat',
         'nothing_pending',
       ])
-      expect(await taskInputs.waking(id, ['pr'])).toBe(false)
+      expect(await taskInputs.waking(id, ['pr'])).toBeNull()
       expect((await eaContextStore.waitingUpdates()).get(id)).toBeUndefined()
       expect((await request('POST', `/${id}/inputs/dismiss`, { up_to: 1_000_000 })).status).toBe(409)
     })
@@ -528,7 +529,7 @@ describe('task inputs', () => {
       await quietSpell(id)
       expect(await prompts(id)).toEqual([
         { text: 'look', inputs: 1 },
-        { text: '', auto: true, inputs: 1 },
+        { text: '', auto: true, held: true, inputs: 1 },
       ])
     })
   })
