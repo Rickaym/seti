@@ -1,5 +1,5 @@
 import type { SDKAssistantMessage, SDKResultMessage, SDKUserMessage } from '@anthropic-ai/claude-agent-sdk'
-import { SHELL_CONTEXT_RUNS, type MessageRow } from '@seti/shared'
+import { quietReason, SHELL_CONTEXT_RUNS, type MessageRow } from '@seti/shared'
 import { compactFailure } from '@/lib/compacting'
 
 type AssistantBlock = SDKAssistantMessage['message']['content'][number]
@@ -270,13 +270,17 @@ export const fullCommandText = (row: MessageRow, toolUseId: string) =>
 const readsPending = (row: MessageRow) =>
   row.kind === 'prompt' && !row.payload.text.startsWith('/') && row.payload.queued !== 'removed'
 
-/** Undismissed updates the agent has not read: input rows after the last prompt it read. */
+/** Updates waiting for the agent: undismissed, not quiet input rows after the last prompt it read. */
 export function queuedInputs(rows: readonly MessageRow[]): Extract<MessageRow, { kind: 'input' }>[] {
   let queued: Extract<MessageRow, { kind: 'input' }>[] = []
   for (const row of rows) {
     if (readsPending(row)) {
       queued = []
-    } else if (row.kind === 'input' && row.payload.dismissed_at === undefined) {
+    } else if (
+      row.kind === 'input' &&
+      row.payload.dismissed_at === undefined &&
+      quietReason(row.payload) === undefined
+    ) {
       queued.push(row)
     }
   }

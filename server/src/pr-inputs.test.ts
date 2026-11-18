@@ -24,6 +24,7 @@ const watched = (url: string, overrides: Partial<WatchedPr> = {}): WatchedPr => 
   closed_at: null,
   conflicting: false,
   head_oid: 'abc1234',
+  base_oid: 'ba5e001',
   ci: 'pending',
   checks: [],
   reviews: [],
@@ -191,7 +192,7 @@ describe('PR input poller', () => {
     const asked: string[][] = []
     h.deps.agentPosts = async (url, posts, viewer) => {
       asked.push([url, viewer, ...posts.map((post) => post.id)])
-      return Promise.resolve(new Set(['2']))
+      return Promise.resolve(new Map([['2', 't1']]))
     }
     const poller = createPrInputPoller(h.deps)
     await poller.poll()
@@ -200,10 +201,114 @@ describe('PR input poller', () => {
     await poller.poll()
     expect(asked).toEqual([[WEB, 'octocat', '1', '2', '3']])
     expect(h.delivered).toHaveLength(1)
-    expect(h.delivered[0]?.inputs).toMatchObject([{ kind: 'comment', title: '2 new comments on acme/web#1' }])
+    expect(h.delivered[0]?.inputs).toMatchObject([
+      { kind: 'comment', title: '2 new comments on acme/web#1' },
+      { kind: 'comment', title: 'octocat commented on acme/web#1', quiet: 'own_action' },
+    ])
     expect(h.delivered[0]?.inputs[0]?.body).not.toContain('Comment 2')
     await poller.poll()
     expect(asked).toHaveLength(1)
+  })
+
+  const said = (login: string, id: string) => ({
+    id,
+    body: `Comment ${id}`,
+    url: `${WEB}#issuecomment-${id}`,
+    created_at: '2026-10-07T10:00:00Z',
+    author: { login, bot: false },
+  })
+
+  /** Each delivery as the task and its updates, a quiet one with its reason. */
+  const told = (delivered: readonly { taskId: string; inputs: readonly PrInput[] }[]) =>
+    delivered.map((d) => [
+      d.taskId,
+      ...d.inputs.map((input) => (input.quiet === undefined ? input.kind : `${input.kind}:${input.quiet}`)),
+    ])
+
+  it('only records what an agent posted and merged for that agent, and tells the others', async () => {
+    const prs = new Map<string, WatchedPr | null>([[WEB, watched(WEB)]])
+    const h = harness(prs, { [WEB]: ['t1', 't2'] })
+    h.deps.agentPosts = async () => Promise.resolve(new Map([['2', 't1']]))
+    const asked: string[] = []
+    h.deps.agentEnders = async (pr) => {
+      asked.push(pr.url)
+      return Promise.resolve(new Set(['t1']))
+    }
+    await h.poller.poll()
+    prs.set(WEB, watched(WEB, { comments: [said('octocat', '2')] }))
+    await h.poller.poll()
+    expect(told(h.delivered)).toEqual([
+      ['t1', 'comment:own_action'],
+      ['t2', 'comment'],
+    ])
+    expect(asked).toEqual([])
+    const closedAt = '2026-10-07T10:05:00Z'
+    prs.set(WEB, watched(WEB, { state: 'merged', closed_at: closedAt, comments: [said('octocat', '2')] }))
+    await h.poller.poll()
+    expect(told(h.delivered.slice(2))).toEqual([
+      ['t1', 'merged:own_action'],
+      ['t2', 'merged'],
+    ])
+    expect(asked).toEqual([WEB])
+  })
+
+  it('wakes for a pass only the task that waits for it, unless a failure was reported', async () => {
+    const prs = new Map<string, WatchedPr | null>([[WEB, watched(WEB)]])
+    const h = harness(prs, { [WEB]: ['idle', 'pusher'] })
+    const asked: string[] = []
+    h.deps.awaitsCi = async (taskId) => {
+      asked.push(taskId)
+      return Promise.resolve(taskId === 'pusher')
+    }
+    const watching: (readonly PrInput[])[] = []
+    h.deps.eaWatchers = async () => Promise.resolve(['idle'])
+    h.deps.notifyEa = async (_taskId, inputs) => {
+      watching.push(inputs)
+      return Promise.resolve()
+    }
+    await h.poller.poll()
+    prs.set(WEB, watched(WEB, { ci: 'success' }))
+    await h.poller.poll()
+    expect(told(h.delivered)).toEqual([
+      ['idle', 'ci_passed:nothing_pending'],
+      ['pusher', 'ci_passed'],
+    ])
+    expect(asked).toEqual(['idle', 'pusher'])
+    expect(watching).toMatchObject([[{ kind: 'ci_passed' }]])
+    expect(watching[0]?.[0]?.quiet).toBeUndefined()
+
+    prs.set(WEB, watched(WEB, { ci: 'failure', head_oid: 'def5678' }))
+    await h.poller.poll()
+    prs.set(WEB, watched(WEB, { ci: 'success', head_oid: 'fff9999' }))
+    await h.poller.poll()
+    expect(told(h.delivered.slice(2))).toEqual([
+      ['idle', 'ci_failed'],
+      ['pusher', 'ci_failed'],
+      ['idle', 'ci_passed'],
+      ['pusher', 'ci_passed'],
+    ])
+    expect(asked).toHaveLength(2)
+  })
+
+  it('leaves the EA and the PR views out of a repeat, which it only records for the agents', async () => {
+    const prs = new Map<string, WatchedPr | null>([[WEB, watched(WEB)]])
+    const h = harness(prs, { [WEB]: ['t1'] })
+    const watching: (readonly PrInput[])[] = []
+    h.deps.eaWatchers = async () => Promise.resolve(['t1'])
+    h.deps.notifyEa = async (_taskId, inputs) => {
+      watching.push(inputs)
+      return Promise.resolve()
+    }
+    await h.poller.poll()
+    for (const ci of ['failure', 'pending', 'failure'] as const) {
+      prs.set(WEB, watched(WEB, { ci }))
+      await h.poller.poll()
+    }
+    expect(told(h.delivered)).toEqual([
+      ['t1', 'ci_failed'],
+      ['t1', 'ci_failed:repeat'],
+    ])
+    expect(watching).toHaveLength(1)
   })
 
   it('never runs two polls at once', async () => {
@@ -295,6 +400,19 @@ describe('PR input poller', () => {
       expect(h.delivered.slice(-2).map((d) => [d.taskId, d.inputs.map((input) => input.kind)])).toEqual([
         ['lead', ['ci_failed']],
         ['peer', ['ci_failed']],
+      ])
+    })
+
+    it('records what the lead agent did itself at once, and holds only what waits for it', async () => {
+      const prs = new Map<string, WatchedPr | null>([[WEB, watched(WEB)]])
+      const h = holding(prs, { [WEB]: ['lead>toolu_a'] })
+      h.deps.agentPosts = async () => Promise.resolve(new Map([['2', 'lead']]))
+      await h.poller.poll()
+      prs.set(WEB, watched(WEB, { comments: [said('alice', '1'), said('octocat', '2')] }))
+      await h.poller.poll()
+      expect(h.rows.map((row) => row.input.title)).toEqual(['alice commented on acme/web#1'])
+      expect(h.delivered).toMatchObject([
+        { taskId: 'lead', inputs: [{ kind: 'comment', quiet: 'own_action', subtask: h.fix }] },
       ])
     })
 

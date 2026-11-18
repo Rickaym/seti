@@ -13,6 +13,7 @@ import {
   type TeamInput,
   type WorkspaceInput,
   WAKING_SOURCES,
+  quietReason,
   sourceCounts,
 } from '@seti/shared'
 import { audit } from './audit.js'
@@ -122,7 +123,7 @@ const describeSeti = (input: SetiInput) =>
 
 /** Updates the agent has not read yet, for the start of its next turn. */
 export async function inputPreface(taskId: string): Promise<TurnPreface | null> {
-  const pending = await taskInputs.pending(taskId, PREFACE_INPUTS)
+  const pending = await taskInputs.forTurn(taskId, PREFACE_INPUTS)
   if (pending.length === 0) {
     return null
   }
@@ -315,7 +316,7 @@ function wakeSoon(taskId: string): void {
 
 export type InputOutcome = Pick<ChannelRoute, 'outcome' | 'reason'>
 
-/** Records updates and, if the task wants that, wakes the agent once more updates stop coming. */
+/** Records updates and, unless all are quiet, wakes a task that wants that once they stop coming. */
 export async function deliverInputs(taskId: string, inputs: readonly TaskInput[]): Promise<InputOutcome> {
   return inLane(taskId, async (): Promise<InputOutcome> => {
     const task = await tasks.get(taskId)
@@ -330,6 +331,9 @@ export async function deliverInputs(taskId: string, inputs: readonly TaskInput[]
     }
     for (const input of inputs) {
       await appendMessage(taskId, { kind: 'input', payload: input })
+    }
+    if (inputs.every((input) => quietReason(input) !== undefined)) {
+      return { outcome: 'ignored', reason: 'Recorded without starting a turn' }
     }
     const blocker = await wakeBlocker(taskId)
     if (blocker === null) {

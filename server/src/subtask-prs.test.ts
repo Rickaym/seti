@@ -101,6 +101,7 @@ const watched = (url: string, ci: WatchedPr['ci']): WatchedPr => ({
   closed_at: null,
   conflicting: false,
   head_oid: `oid-${String(ci)}`,
+  base_oid: null,
   ci,
   checks: [],
   reviews: [],

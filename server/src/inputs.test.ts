@@ -399,6 +399,58 @@ describe('task inputs', () => {
     expect(again.status).toBe(409)
   })
 
+  describe('quiet PR updates', () => {
+    const own: PrInput = { ...failing, kind: 'review', title: 'octocat reviewed acme/web#7', quiet: 'own_action' }
+    const repeat: PrInput = { ...failing, quiet: 'repeat' }
+    const idle: PrInput = { ...passed, quiet: 'nothing_pending' }
+
+    it('records a batch of only quiet updates and starts no turn for it', async () => {
+      await fakeTimers(['Date', 'setTimeout', 'clearTimeout'])
+      const id = await newTask()
+      expect(await deliverInputs(id, [own, repeat, idle])).toEqual({
+        outcome: 'ignored',
+        reason: 'Recorded without starting a turn',
+      })
+      await quietSpell(id)
+      await wakeWaiting()
+      await waitIdle(id)
+      expect(sdk.state.prompts).toEqual([])
+      expect((await inputRows(id)).map((row) => (row.payload.source === 'pr' ? row.payload.quiet : null))).toEqual([
+        'own_action',
+        'repeat',
+        'nothing_pending',
+      ])
+      expect(await taskInputs.waking(id, ['pr'])).toBe(false)
+      expect((await eaContextStore.waitingUpdates()).get(id)).toBeUndefined()
+      expect((await request('POST', `/${id}/inputs/dismiss`, { up_to: 1_000_000 })).status).toBe(409)
+    })
+
+    it('hands a pass nobody waited for to the agent with its next turn, and never its own action or a repeat', async () => {
+      const id = await newTask()
+      await deliverInputs(id, [own, repeat, idle])
+      expect((await request('POST', `/${id}/messages`, { prompt: 'status?' })).status).toBe(200)
+      await waitIdle(id)
+      const sent = sdk.state.prompts[0] ?? ''
+      expect(sent.match(/<update /g)).toHaveLength(1)
+      expect(sent).toContain('kind="ci_passed"')
+      expect(await prompts(id)).toEqual([{ text: 'status?', inputs: 1 }])
+    })
+
+    it('wakes for a mixed batch and hands over only what is new', async () => {
+      await fakeTimers(['Date', 'setTimeout', 'clearTimeout'])
+      const id = await newTask()
+      const review: PrInput = { ...failing, kind: 'review', title: 'alice reviewed acme/web#7', body: 'Rename it' }
+      expect(await deliverInputs(id, [own, review, repeat])).toMatchObject({ outcome: 'delivered' })
+      await quietSpell(id)
+      const sent = sdk.state.prompts[0] ?? ''
+      expect(sent.match(/<update /g)).toHaveLength(1)
+      expect(sent).toContain('alice reviewed acme/web#7')
+      expect(sent).not.toContain('octocat reviewed')
+      expect(await prompts(id)).toEqual([{ text: '', auto: true, inputs: 1 }])
+      expect(await inputRows(id)).toHaveLength(3)
+    })
+  })
+
   it('refuses to dismiss when nothing is waiting, and a bad up_to', async () => {
     const id = await newTask('queue')
     const res = await request('POST', `/${id}/inputs/dismiss`, { up_to: 1 })

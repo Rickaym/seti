@@ -1,12 +1,17 @@
-import type { PrInput } from '@seti/shared'
+import type { PrInput, PrQuietReason } from '@seti/shared'
 import type { PrAuthor, WatchedPr, WatchedReview } from './github.js'
 
 /** What Seti last reported about a PR, so only changes become updates. */
 export interface PrSnapshot {
   state: WatchedPr['state']
   conflicting: boolean
-  /** The last CI result reported per head commit, with the failing checks already named. */
-  ci: { oid: string; state: 'success' | 'failure'; failing?: string[] } | null
+  /**
+   * The last CI result reported per head commit, with the failing checks already named. `rerun`
+   * marks checks seen running again on that commit since.
+   */
+  ci: { oid: string; state: 'success' | 'failure'; failing?: string[]; rerun?: true } | null
+  /** The base and head commits of the conflict reported last. */
+  conflict?: { base: string; head: string }
   review_ids: string[]
   comment_ids: string[]
 }
@@ -19,20 +24,37 @@ const MAX_POSTS = 20
 const CLOSING_MS = 2 * 60_000
 const UNLINKED = 'Seti unlinked it from this agent; its updates stop here.'
 
+/** What the task that reads the updates did on the PR itself, which Seti does not tell it again. */
+export interface PrReader {
+  /** Ids of the new reviews and comments it posted. */
+  posts?: ReadonlySet<string>
+  /** It merged or closed the PR. */
+  ended?: boolean
+  /** False when it pushed nothing whose CI result it could be waiting for. */
+  awaitsCi?: boolean
+}
+
+const quieted = (input: PrInput, quiet: PrQuietReason | null): PrInput => (quiet === null ? input : { ...input, quiet })
+
 const clip = (text: string, max: number, url: string) =>
   text.length <= max ? text : `${text.slice(0, max)}\n[... clipped, full text: ${url}]`
 
 const shortOid = (oid: string) => oid.slice(0, 7)
 
-function snapshotOf(pr: WatchedPr, ci: PrSnapshot['ci']): PrSnapshot {
+function snapshotOf(pr: WatchedPr, ci: PrSnapshot['ci'], conflict?: PrSnapshot['conflict']): PrSnapshot {
   return {
     state: pr.state,
     conflicting: pr.conflicting,
     ci,
+    ...(conflict === undefined ? {} : { conflict }),
     review_ids: pr.reviews.filter((review) => review.state !== 'PENDING').map((review) => review.id),
     comment_ids: pr.comments.map((comment) => comment.id),
   }
 }
+
+/** The commits a conflict is between; undefined when GitHub names no base or head to tell it by. */
+const conflictOf = (pr: WatchedPr): PrSnapshot['conflict'] =>
+  pr.conflicting && pr.base_oid !== null && pr.head_oid !== null ? { base: pr.base_oid, head: pr.head_oid } : undefined
 
 const failingChecks = (pr: WatchedPr) => pr.checks.filter((check) => check.state === 'failure')
 
@@ -103,6 +125,7 @@ const COMMENT_VERB = { title: 'commented on', line: 'commented' }
 
 /** A new review or comment, as one entry of an update. */
 interface Post {
+  id: string
   kind: 'review' | 'comment'
   at: string
   author: string
@@ -196,13 +219,14 @@ export function freshPosts(previous: PrSnapshot | undefined, pr: WatchedPr): PrP
   return [...reviews, ...comments]
 }
 
-function reviewPosts(previous: PrSnapshot, pr: WatchedPr, own: ReadonlySet<string>): Post[] {
+function reviewPosts(previous: PrSnapshot, pr: WatchedPr): Post[] {
   return freshReviews(previous, pr).flatMap((review): Post[] => {
     const verb = REVIEW_VERBS[review.state]
-    if (verb === undefined || own.has(review.id)) {
+    if (verb === undefined) {
       return []
     }
     const post: Post = {
+      id: review.id,
       kind: 'review',
       at: review.submitted_at ?? '',
       author: authorName(review.author),
@@ -215,22 +239,21 @@ function reviewPosts(previous: PrSnapshot, pr: WatchedPr, own: ReadonlySet<strin
   })
 }
 
-const commentPosts = (previous: PrSnapshot, pr: WatchedPr, own: ReadonlySet<string>): Post[] =>
-  freshComments(previous, pr)
-    .filter((comment) => !own.has(comment.id))
-    .map((comment) => ({
-      kind: 'comment',
-      at: comment.created_at,
-      author: authorName(comment.author),
-      verb: COMMENT_VERB,
-      body: comment.body,
-      inline: [],
-      url: comment.url,
-    }))
+const commentPosts = (previous: PrSnapshot, pr: WatchedPr): Post[] =>
+  freshComments(previous, pr).map((comment) => ({
+    id: comment.id,
+    kind: 'comment',
+    at: comment.created_at,
+    author: authorName(comment.author),
+    verb: COMMENT_VERB,
+    body: comment.body,
+    inline: [],
+    url: comment.url,
+  }))
 
-/** New reviews and comments from people and review bots, oldest first, without the agents' own. */
-const newPosts = (previous: PrSnapshot, pr: WatchedPr, own: ReadonlySet<string>): Post[] =>
-  [...reviewPosts(previous, pr, own), ...commentPosts(previous, pr, own)].toSorted((a, b) => a.at.localeCompare(b.at))
+/** New reviews and comments from people, review bots and agents, oldest first. */
+const newPosts = (previous: PrSnapshot, pr: WatchedPr): Post[] =>
+  [...reviewPosts(previous, pr), ...commentPosts(previous, pr)].toSorted((a, b) => a.at.localeCompare(b.at))
 
 function postInputs(pr: WatchedPr, posts: readonly Post[]): PrInput[] {
   const [only] = posts
@@ -274,30 +297,66 @@ const conflictInput = (pr: WatchedPr): PrInput => ({
   url: pr.url,
 })
 
-function lifecycleInputs(previous: PrSnapshot, pr: WatchedPr, closing: readonly Post[]): PrInput[] {
-  const conflict = pr.conflicting && !previous.conflicting && pr.state === 'open' ? [conflictInput(pr)] : []
-  const ended = pr.state !== 'open' && previous.state === 'open' ? [stateInput(pr, closing)] : []
-  return [...conflict, ...ended]
-}
-
-/** The same CI record with every failing check seen so far on its commit. */
-function nextCi(previous: PrSnapshot['ci'], current: PrSnapshot['ci']): PrSnapshot['ci'] {
-  if (previous === null || current?.oid !== previous.oid) {
-    return previous
+/**
+ * A conflict is news once per base and head commit. GitHub forgets and recomputes it whenever a
+ * branch moves, so one it reports again between the same commits is the one already reported.
+ */
+function newConflict(previous: PrSnapshot, pr: WatchedPr): boolean {
+  if (!pr.conflicting || pr.state !== 'open') {
+    return false
   }
-  const failing = [...new Set([...(previous.failing ?? []), ...(current.failing ?? [])])]
-  return { ...previous, failing }
+  const now = conflictOf(pr)
+  const told = previous.conflict
+  if (now === undefined || told === undefined) {
+    return !previous.conflicting
+  }
+  return now.base !== told.base || now.head !== told.head
 }
 
-/** A new CI result, or checks that failed late on a reported commit, and the CI record to keep. */
-function ciInputs(previous: PrSnapshot, pr: WatchedPr): { inputs: PrInput[]; ci: PrSnapshot['ci'] } {
+function lifecycleInputs(previous: PrSnapshot, pr: WatchedPr, closing: readonly Post[], ended: boolean): PrInput[] {
+  const conflict = newConflict(previous, pr) ? [conflictInput(pr)] : []
+  const end = pr.state !== 'open' && previous.state === 'open' ? [stateInput(pr, closing)] : []
+  return [...conflict, ...end.map((input) => quieted(input, ended ? 'own_action' : null))]
+}
+
+/**
+ * The reported CI record of a commit after another look at it: with every failing check seen so
+ * far, and marked while its checks run again.
+ */
+function nextCi(told: PrSnapshot['ci'], current: PrSnapshot['ci'], pr: WatchedPr): PrSnapshot['ci'] {
+  if (told === null) {
+    return null
+  }
+  if (told.oid !== pr.head_oid) {
+    return told
+  }
+  if (current === null) {
+    return pr.ci === 'pending' ? { ...told, rerun: true } : told
+  }
+  const failing =
+    current.state === 'failure' ? [...new Set([...(told.failing ?? []), ...(current.failing ?? [])])] : null
+  return { oid: told.oid, state: told.state, ...(failing === null ? {} : { failing }) }
+}
+
+/**
+ * A new CI result, or checks that failed late on a reported commit, and the CI record to keep. A
+ * pass wakes the agent after a reported failure or its own push; a rerun that ends as the commit
+ * was reported before is a repeat.
+ */
+function ciInputs(previous: PrSnapshot, pr: WatchedPr, awaitsCi: boolean): { inputs: PrInput[]; ci: PrSnapshot['ci'] } {
   const current = finishedCi(pr)
-  if (current !== null && (current.oid !== previous.ci?.oid || current.state !== previous.ci.state)) {
-    return { inputs: [ciInput(pr, current)], ci: current }
+  const told = previous.ci
+  if (current === null) {
+    return { inputs: [], ci: nextCi(told, current, pr) }
   }
-  const known = previous.ci?.failing
-  const late = current?.state === 'failure' && known !== undefined ? lateFailureInput(pr, current, known) : null
-  return { inputs: late === null ? [] : [late], ci: nextCi(previous.ci, current) }
+  if (told?.oid !== current.oid || told.state !== current.state) {
+    const idle = current.state === 'success' && told?.state !== 'failure' && !awaitsCi
+    return { inputs: [quieted(ciInput(pr, current), idle ? 'nothing_pending' : null)], ci: current }
+  }
+  const late =
+    current.state === 'failure' && told.failing !== undefined ? lateFailureInput(pr, current, told.failing) : null
+  const again = told.rerun === true ? [quieted(ciInput(pr, current), 'repeat')] : []
+  return { inputs: late === null ? again : [late], ci: nextCi(told, current, pr) }
 }
 
 /** A PR that ended under CLOSING_MS ago may still get the comment that ended it, so its end waits. */
@@ -305,26 +364,34 @@ const settling = (pr: WatchedPr, now: number) =>
   pr.state !== 'open' && pr.closed_at !== null && now < Date.parse(pr.closed_at) + CLOSING_MS
 
 /**
- * Updates since the last snapshot, and the next one. The first sighting, and a PR seen again
- * after it ended, only set a baseline. `own` holds the ids of the agents' reviews and comments.
- * The end of a PR carries the comments and reviews that came with it.
+ * Updates since the last snapshot for the task `reader` describes, and the next snapshot. The
+ * first sighting, and a PR seen again after it ended, only set a baseline. What the reader did
+ * itself, a repeat, and a pass it did not wait for are marked quiet. The end of a PR carries the
+ * comments and reviews of others that came with it.
  */
 export function prEvents(
   previous: PrSnapshot | undefined,
   pr: WatchedPr,
-  own: ReadonlySet<string> = new Set(),
+  reader: PrReader = {},
   now = Date.now(),
 ): { inputs: PrInput[]; next: PrSnapshot } {
   if (previous?.state !== 'open') {
-    return { inputs: [], next: snapshotOf(pr, finishedCi(pr)) }
+    return { inputs: [], next: snapshotOf(pr, finishedCi(pr), conflictOf(pr)) }
   }
   if (settling(pr, now)) {
     return { inputs: [], next: previous }
   }
-  const { inputs: ci, ci: nextCiRecord } = ciInputs(previous, pr)
-  const posts = newPosts(previous, pr, own)
+  const { inputs: ci, ci: nextCiRecord } = ciInputs(previous, pr, reader.awaitsCi ?? true)
+  const all = newPosts(previous, pr)
+  const own = all.filter((post) => reader.posts?.has(post.id) === true)
+  const posts = all.filter((post) => !own.includes(post))
   const closing = pr.state === 'open' ? [] : closingPosts(pr, posts)
   const rest = posts.filter((post) => !closing.includes(post))
-  const inputs = [...ci, ...postInputs(pr, rest), ...lifecycleInputs(previous, pr, closing)]
-  return { inputs, next: snapshotOf(pr, nextCiRecord) }
+  const inputs = [
+    ...ci,
+    ...postInputs(pr, rest),
+    ...postInputs(pr, own).map((input) => quieted(input, 'own_action')),
+    ...lifecycleInputs(previous, pr, closing, reader.ended === true),
+  ]
+  return { inputs, next: snapshotOf(pr, nextCiRecord, conflictOf(pr) ?? previous.conflict) }
 }

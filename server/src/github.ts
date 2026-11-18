@@ -172,6 +172,7 @@ export async function addPreviewLabel(slug: string, number: number): Promise<boo
 
 const WATCH_FIELDS = `url number state mergeable closedAt
   repository { nameWithOwner }
+  baseRef { target { oid } }
   commits(last: 1) { nodes { commit { oid ${ROLLUP_FIELDS} } } }
   reviews(last: 20) { nodes {
     id state body url submittedAt author { __typename login }
@@ -190,6 +191,7 @@ const ghWatchedPr = z.object({
   mergeable: z.string(),
   closedAt: z.string().nullable(),
   repository: z.object({ nameWithOwner: z.string() }),
+  baseRef: z.object({ target: z.object({ oid: z.string() }).nullable() }).nullish(),
   commits: z.object({
     nodes: z.array(
       z.object({
@@ -266,6 +268,8 @@ export interface WatchedPr {
   closed_at: string | null
   conflicting: boolean
   head_oid: string | null
+  /** The tip of the base branch; null once the branch is gone. */
+  base_oid: string | null
   ci: CiState | null
   checks: PrCheck[]
   reviews: WatchedReview[]
@@ -287,6 +291,7 @@ function toWatchedPr(pr: z.infer<typeof ghWatchedPr>): WatchedPr {
     closed_at: pr.closedAt,
     conflicting: pr.mergeable === 'CONFLICTING',
     head_oid: commit?.oid ?? null,
+    base_oid: pr.baseRef?.target?.oid ?? null,
     ...readRollup(rollup),
     reviews: pr.reviews.nodes.map((review) => ({
       id: review.id,

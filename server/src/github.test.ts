@@ -252,6 +252,7 @@ describe('watched PRs', () => {
     mergeable: 'CONFLICTING',
     closedAt: null,
     repository: { nameWithOwner: 'acme/web' },
+    baseRef: { target: { oid: 'ba5e001' } },
     commits: {
       nodes: [
         {
@@ -301,6 +302,7 @@ describe('watched PRs', () => {
       closed_at: null,
       conflicting: true,
       head_oid: 'abc1234def',
+      base_oid: 'ba5e001',
       ci: 'failure',
       checks: [{ name: 'test', state: 'failure', detail: 'failure', url: 'd' }],
       reviews: [
