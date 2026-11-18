@@ -17,7 +17,7 @@ interface Box {
   bottom: number
 }
 
-const isHub = (node: SimNode) => node.kind === 'repo' || node.kind === 'mcp' || node.kind === 'tool'
+const isHub = (node: SimNode) => node.kind === 'repo' || node.kind === 'tool'
 
 /** Lower draws first and wins a crowded spot: the focus, then agents that need the user. */
 function rank(node: SimNode, scene: Scene): number {

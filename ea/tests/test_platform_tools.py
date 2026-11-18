@@ -122,7 +122,7 @@ async def test_overview_metrics_reads_what_agents_shipped(tools: EaTools, fake_s
         "The 7 days before those: 7 merged, 14 turns, 1 hour 10 minutes running, 3.5 dollars.",
         "Latest merges: seti PR 28 by Fix the login redirect bug and an archived agent, 2 hours ago.",
         "Agents by PRs merged in the last 30 days:",
-        "- Fix the login redirect bug: 6 merged, 40 turns, 5 hours running, 20 dollars; uses github.",
+        "- Fix the login redirect bug: 6 merged, 40 turns, 5 hours running, 20 dollars.",
         "- an archived agent: 3 merged, 40 turns, 5 hours running, 11 dollars.",
         "1 tool call running now.",
         "The EA's own model calls: 4 today, 30 in the last 7 days (18 on calls, 9 in chat, 3 for inbox "
