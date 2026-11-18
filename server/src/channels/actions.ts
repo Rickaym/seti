@@ -1,6 +1,7 @@
 import {
   type AuditKind,
   type ChannelInfo,
+  type DeliveryTiming,
   type ChannelSecret,
   type ChannelEaMode,
   type ChannelSubscription,
@@ -31,7 +32,12 @@ const sourceWord = (sub: ChannelSubscription) =>
 const filterWords = (events: readonly string[] | null) => (events === null ? 'every event' : events.join(', '))
 
 /** A task's subscription shows in the task's audit trail; the EA's in the EA's. */
-async function auditSubscription(kind: AuditKind, sub: ChannelSubscription, summary: string): Promise<void> {
+async function auditSubscription(
+  kind: AuditKind,
+  sub: ChannelSubscription,
+  summary: string,
+  change: Record<string, string | null> = {},
+): Promise<void> {
   await audit.record({
     actor: 'user',
     kind,
@@ -44,7 +50,8 @@ async function auditSubscription(kind: AuditKind, sub: ChannelSubscription, summ
       target: sub.target,
       ...(sub.task_id === null ? {} : { task_id: sub.task_id, title: sub.task_title ?? '' }),
       events: sub.events === null ? null : [...sub.events],
-      ...(sub.target === 'ea' ? { mode: sub.mode } : {}),
+      ...(sub.target === 'ea' ? { mode: sub.mode } : { delivery: sub.delivery }),
+      ...change,
     },
   })
 }
@@ -152,6 +159,15 @@ export async function deleteChannel(id: string): Promise<void> {
   })
 }
 
+const DELIVERY_WORDS: Record<DeliveryTiming, string> = {
+  now: 'it gets them at once, during a running turn too',
+  after_turn: 'it gets them once its turn is over',
+  with_message: "it gets them with the user's next message",
+}
+
+const deliveryWords = (delivery: DeliveryTiming | null) =>
+  delivery === null ? 'it gets them as its update mode says' : DELIVERY_WORDS[delivery]
+
 export async function subscribeChannel(
   id: string,
   input: z.output<typeof channelSubscribeInput>,
@@ -163,7 +179,8 @@ export async function subscribeChannel(
   }
   const sub = await subscriptions.subscribe(id, input)
   const acts = sub.mode === 'act' ? '; it acts on them' : ''
-  const summary = `Subscribed ${subscriberName(sub)} to the ${sourceWord(sub)} ${sub.channel_name}: ${filterWords(sub.events)}${acts}`
+  const when = sub.delivery === null ? '' : `; ${DELIVERY_WORDS[sub.delivery]}`
+  const summary = `Subscribed ${subscriberName(sub)} to the ${sourceWord(sub)} ${sub.channel_name}: ${filterWords(sub.events)}${acts}${when}`
   await auditSubscription('system.channel_subscribed', sub, summary)
   return sub
 }
@@ -184,6 +201,27 @@ export async function setChannelMode(id: string, subId: number, mode: ChannelEaM
   const sub = await subscriptions.setMode(id, subId, mode)
   const summary = `Set the EA on the ${sourceWord(sub)} ${sub.channel_name} to ${MODE_WORDS[sub.mode]}`
   await auditSubscription('system.channel_mode_changed', sub, summary)
+  return sub
+}
+
+/** Sets when the subscribed agent gets the channel's updates; null follows its update mode. */
+export async function setChannelDelivery(
+  id: string,
+  subId: number,
+  delivery: DeliveryTiming | null,
+): Promise<ChannelSubscription> {
+  const before = await subscriptions.get(id, subId)
+  if (before.task_id !== null) {
+    refuseOtherAgent(before.task_id)
+  }
+  const sub = await subscriptions.setDelivery(before, delivery)
+  if (before.delivery !== sub.delivery) {
+    const summary = `Set ${subscriberName(sub)} on the ${sourceWord(sub)} ${sub.channel_name}: ${deliveryWords(sub.delivery)}`
+    await auditSubscription('system.channel_delivery_changed', sub, summary, {
+      from: before.delivery,
+      to: sub.delivery,
+    })
+  }
   return sub
 }
 

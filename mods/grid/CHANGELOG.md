@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.2.0
+
+Calm, on by default, shows each panel's status on its own lines, its todo progress and the agent's latest message from its first line, with no transcript, reply box or message stepper. A question or a permission request shows in full above the message. Click a panel for its transcript and reply box; Esc or another panel folds it again. List hides the agents list beside the grid.
+
 ## 1.1.1
 
 An agent opened from the palette with Enter, while not yet in the grid, now scrolls into view and takes focus the first time; focus no longer lands in another panel and scrolls the grid back to it.

@@ -10,8 +10,11 @@ const QUOTED = /"(?:\\.|[^"\\])*"|'[^']*'/g
 const WORD = /[|;&]+|\n|[^\s|;&]+/g
 const SEPARATOR = /^(?:[|;&]+|\n)$/
 
-/** Flags of `gh pr comment` and `gh pr review` that take the next word as their value. */
-const VALUE_FLAGS = new Set(['-b', '--body', '-F', '--body-file', '-R', '--repo'])
+/** Flags of `gh pr comment`, `review`, `merge` and `close` that take the next word as their value. */
+const VALUE_FLAGS = new Set([
+  ...['-b', '--body', '-F', '--body-file', '-R', '--repo', '-c', '--comment', '-t', '--subject'],
+  ...['-A', '--author-email', '--match-head-commit'],
+])
 
 const PR_LINK = /github\.com\/([\w.-]+\/[\w.-]+)\/(?:pull|issues)\/(\d+)/
 const API_PATH = /(?:^|\/)repos\/([^/\s]+)\/([^/\s]+)\/(?:pulls|issues)\/(\d+)(?:\/|$)/
@@ -38,7 +41,7 @@ function repoFlag(args: readonly string[]): string | null {
   return null
 }
 
-/** The PR a `gh pr comment` or `gh pr review` names; null for a branch or a variable. */
+/** The PR a `gh pr` comment, review, merge or close names; null for a branch or a variable. */
 function ghPrTarget(args: readonly string[]): PrTarget | null {
   const arg = args.find((word, index) => !word.startsWith('-') && !VALUE_FLAGS.has(args[index - 1] ?? ''))
   if (arg === undefined) {
@@ -67,15 +70,15 @@ function ghTarget(args: readonly string[]): PrTarget | null {
   if (group === 'api') {
     return ghApiTarget(args.slice(1))
   }
-  const posts = ['pr', 'issue'].includes(group) && ['comment', 'review'].includes(action)
-  return posts ? ghPrTarget(args.slice(2)) : null
+  const acts = ['pr', 'issue'].includes(group) && ['comment', 'review', 'merge', 'close'].includes(action)
+  return acts ? ghPrTarget(args.slice(2)) : null
 }
 
 /** Shell words with their quotes taken off; a quoted word keeps no spaces or separators inside. */
 const shellWords = (command: string): string[] =>
   command.replace(QUOTED, (quoted) => quoted.slice(1, -1).replace(/[\s|;&]/g, '_')).match(WORD) ?? []
 
-/** The PRs the gh commands in a shell command post to, where they name one. */
+/** The PRs the gh commands in a shell command act on, where they name one. */
 function bashTargets(command: string): PrTarget[] {
   const words = shellWords(command)
   const targets: PrTarget[] = []
@@ -111,7 +114,7 @@ function mcpTarget(input: unknown): PrTarget | null {
   return { repo: typeof owner === 'string' && typeof repo === 'string' ? slugOf(owner, repo) : null, number }
 }
 
-/** The PRs a posting call names; empty when it names none, such as `gh pr comment` on the branch. */
+/** The PRs a call acts on; empty when it names none, such as `gh pr comment` on the branch. */
 export function postTargets(name: string, input: unknown): PrTarget[] {
   if (name === 'Bash') {
     return bashTargets(bashCommand(input))

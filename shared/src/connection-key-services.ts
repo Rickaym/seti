@@ -1,4 +1,5 @@
 import type { ConnectionTemplate, ConnectionTemplateField, TemplateCategory } from './connection-templates.js'
+import type { ServiceIconKey } from './service-icons.js'
 
 const secret = (key: string, label: string, help: string): ConnectionTemplateField => ({
   key,
@@ -15,6 +16,7 @@ interface KeyService {
   title: string
   description: string
   category: TemplateCategory
+  icon?: ServiceIconKey
   docs: string
   env: string
   hosts: string[]
@@ -34,6 +36,7 @@ function keyService(service: KeyService): ConnectionTemplate {
     title: service.title,
     description: service.description,
     category: service.category,
+    icon: service.icon ?? null,
     docs: service.docs,
     fields: [...(service.fields ?? []), secret('key', ...service.key)],
     name: service.id,
@@ -66,6 +69,7 @@ const KEY_SERVICES: KeyService[] = [
     title: 'Hugging Face Inference',
     description: 'Models served through Inference Providers.',
     category: 'ai',
+    icon: 'huggingface',
     docs: 'https://huggingface.co/docs/inference-providers/index',
     env: 'HF_TOKEN',
     hosts: ['router.huggingface.co'],
@@ -76,6 +80,7 @@ const KEY_SERVICES: KeyService[] = [
     title: 'Replicate',
     description: 'Run and deploy models.',
     category: 'ai',
+    icon: 'replicate',
     docs: 'https://replicate.com/docs/reference/http',
     env: 'REPLICATE_API_TOKEN',
     hosts: ['api.replicate.com'],
@@ -96,6 +101,7 @@ const KEY_SERVICES: KeyService[] = [
     title: 'ElevenLabs',
     description: 'Text to speech, voices and transcription.',
     category: 'voice',
+    icon: 'elevenlabs',
     docs: 'https://elevenlabs.io/docs/api-reference/authentication',
     env: 'ELEVENLABS_API_KEY',
     hosts: ['api.elevenlabs.io'],
@@ -107,6 +113,7 @@ const KEY_SERVICES: KeyService[] = [
     title: 'Deepgram',
     description: 'Speech to text and text to speech.',
     category: 'voice',
+    icon: 'deepgram',
     docs: 'https://developers.deepgram.com/reference/authentication',
     env: 'DEEPGRAM_API_KEY',
     hosts: ['api.deepgram.com'],
@@ -118,6 +125,7 @@ const KEY_SERVICES: KeyService[] = [
     title: 'Stripe',
     description: 'Payments, customers and billing.',
     category: 'payments',
+    icon: 'stripe',
     docs: 'https://docs.stripe.com/api/authentication',
     env: 'STRIPE_API_KEY',
     hosts: ['api.stripe.com'],
@@ -160,6 +168,7 @@ const KEY_SERVICES: KeyService[] = [
     title: 'Resend',
     description: 'Send email and manage domains.',
     category: 'email',
+    icon: 'resend',
     docs: 'https://resend.com/docs/api-reference/introduction',
     env: 'RESEND_API_KEY',
     hosts: ['api.resend.com'],
@@ -171,6 +180,7 @@ const KEY_SERVICES: KeyService[] = [
     title: 'Cloudflare',
     description: 'Zones, DNS, Workers and the rest of the Cloudflare API.',
     category: 'developer',
+    icon: 'cloudflare',
     docs: 'https://developers.cloudflare.com/fundamentals/api/how-to/make-api-calls/',
     env: 'CLOUDFLARE_API_TOKEN',
     hosts: ['api.cloudflare.com'],
@@ -181,6 +191,7 @@ const KEY_SERVICES: KeyService[] = [
     title: 'Vercel',
     description: 'Projects, deployments and domains.',
     category: 'developer',
+    icon: 'vercel',
     docs: 'https://vercel.com/docs/rest-api/reference/welcome',
     env: 'VERCEL_TOKEN',
     hosts: ['api.vercel.com'],
@@ -191,6 +202,7 @@ const KEY_SERVICES: KeyService[] = [
     title: 'Supabase Management',
     description: 'Projects, branches and settings of a Supabase organization.',
     category: 'developer',
+    icon: 'supabase',
     docs: 'https://supabase.com/docs/reference/api/introduction',
     env: 'SUPABASE_ACCESS_TOKEN',
     hosts: ['api.supabase.com'],
@@ -211,6 +223,7 @@ const KEY_SERVICES: KeyService[] = [
     title: 'Sentry',
     description: 'Issues, events and releases.',
     category: 'monitoring',
+    icon: 'sentry',
     docs: 'https://docs.sentry.io/api/auth/',
     env: 'SENTRY_AUTH_TOKEN',
     hosts: ['sentry.io'],
@@ -221,6 +234,7 @@ const KEY_SERVICES: KeyService[] = [
     title: 'PagerDuty',
     description: 'Incidents, schedules and services.',
     category: 'monitoring',
+    icon: 'pagerduty',
     docs: 'https://docs.pagerduty.com/developer/authentication',
     env: 'PAGERDUTY_API_TOKEN',
     hosts: ['api.pagerduty.com'],
@@ -232,6 +246,7 @@ const KEY_SERVICES: KeyService[] = [
     title: 'Linear',
     description: 'Issues, projects and cycles through the GraphQL API.',
     category: 'work',
+    icon: 'linear',
     docs: 'https://linear.app/developers/graphql',
     env: 'LINEAR_API_KEY',
     hosts: ['api.linear.app'],
@@ -243,6 +258,7 @@ const KEY_SERVICES: KeyService[] = [
     title: 'Notion',
     description: 'Pages, databases and comments.',
     category: 'work',
+    icon: 'notion',
     docs: 'https://developers.notion.com/reference/authentication',
     env: 'NOTION_TOKEN',
     hosts: ['api.notion.com'],
@@ -254,6 +270,7 @@ const KEY_SERVICES: KeyService[] = [
     title: 'ClickUp',
     description: 'Tasks, lists and docs.',
     category: 'work',
+    icon: 'clickup',
     docs: 'https://developer.clickup.com/docs/authentication',
     env: 'CLICKUP_API_TOKEN',
     hosts: ['api.clickup.com'],
@@ -265,6 +282,7 @@ const KEY_SERVICES: KeyService[] = [
     title: 'Jira Cloud',
     description: 'Issues, projects and boards of an Atlassian site.',
     category: 'work',
+    icon: 'jira',
     docs: 'https://developer.atlassian.com/cloud/jira/platform/basic-auth-for-rest-apis/',
     env: 'JIRA_API_TOKEN',
     hosts: ['{site}.atlassian.net'],

@@ -10,6 +10,8 @@ function pr(overrides: Partial<WatchedPr> = {}): WatchedPr {
     closed_at: null,
     conflicting: false,
     head_oid: 'aaaaaaa1111',
+    clean: false,
+    base_ref: 'main',
     ci: 'pending',
     checks: [],
     reviews: [],
@@ -183,12 +185,14 @@ describe('prEvents', () => {
     expect(inputs).toMatchObject([{ kind: 'comment', title: 'OctoCat commented on acme/web#7', body: 'Please rebase' }])
   })
 
-  it('skips the reviews and comments the agents posted, and remembers them', () => {
+  it('only records the reviews and comments the reading agent posted, and remembers them', () => {
     const own = comment('4', 'Fixed in abc', 'octocat')
     const ownReview = review({ id: 'R4', author: { login: 'octocat', bot: false } })
     const first = prEvents(undefined, pr())
-    const { inputs, next } = prEvents(first.next, pr({ comments: [own], reviews: [ownReview] }), new Set(['4', 'R4']))
-    expect(inputs).toEqual([])
+    const reader = { posts: new Set(['4', 'R4']) }
+    const { inputs, next } = prEvents(first.next, pr({ comments: [own], reviews: [ownReview] }), reader)
+    expect(inputs).toMatchObject([{ kind: 'review', quiet: 'own_action' }])
+    expect(inputs[0]?.title).toBe('2 new reviews and comments on acme/web#7')
     expect(next.comment_ids).toEqual(['4'])
     expect(next.review_ids).toEqual(['R4'])
   })
@@ -244,7 +248,7 @@ describe('prEvents', () => {
     it('carries the comment it was closed with, and does not deliver it again', () => {
       const why = comment('9', 'Not needed anymore, closing', 'alice', { created_at: CLOSED_AT })
       const ended = pr({ state: 'closed', closed_at: CLOSED_AT, comments: [why] })
-      const { inputs, next } = prEvents(baseline(), ended, new Set(), later)
+      const { inputs, next } = prEvents(baseline(), ended, {}, later)
       expect(inputs).toEqual([
         {
           source: 'pr',
@@ -261,7 +265,7 @@ describe('prEvents', () => {
     it('reports a close with no comment as before, and older comments on their own', () => {
       const earlier = comment('10', 'Still needed?', 'alice', { created_at: '2026-10-07T09:00:00Z' })
       const ended = pr({ state: 'closed', closed_at: CLOSED_AT, comments: [earlier] })
-      const { inputs } = prEvents(baseline(), ended, new Set(), later)
+      const { inputs } = prEvents(baseline(), ended, {}, later)
       expect(inputs).toMatchObject([
         { kind: 'comment', title: 'alice commented on acme/web#7', body: 'Still needed?' },
         { kind: 'closed', body: UNLINKED },
@@ -271,7 +275,7 @@ describe('prEvents', () => {
     it('carries the review a PR merged with', () => {
       const approval = review({ id: 'R9', state: 'APPROVED', body: 'Ship it', submitted_at: '2026-10-07T10:04:30Z' })
       const ended = pr({ state: 'merged', closed_at: CLOSED_AT, reviews: [approval] })
-      const { inputs } = prEvents(baseline(), ended, new Set(), later)
+      const { inputs } = prEvents(baseline(), ended, {}, later)
       expect(inputs).toMatchObject([
         {
           kind: 'merged',
@@ -283,12 +287,12 @@ describe('prEvents', () => {
 
     it('waits for a comment that lands just after the close, then carries it', () => {
       const start = baseline()
-      const closedFirst = prEvents(start, pr({ state: 'closed', closed_at: CLOSED_AT }), new Set(), at('10:05:20'))
+      const closedFirst = prEvents(start, pr({ state: 'closed', closed_at: CLOSED_AT }), {}, at('10:05:20'))
       expect(closedFirst).toEqual({ inputs: [], next: start })
       const why = comment('11', 'Superseded by #8', 'alice', { created_at: '2026-10-07T10:05:40Z' })
       const ended = pr({ state: 'closed', closed_at: CLOSED_AT, comments: [why] })
-      expect(prEvents(closedFirst.next, ended, new Set(), at('10:06:30')).inputs).toEqual([])
-      const { inputs } = prEvents(closedFirst.next, ended, new Set(), at('10:07:10'))
+      expect(prEvents(closedFirst.next, ended, {}, at('10:06:30')).inputs).toEqual([])
+      const { inputs } = prEvents(closedFirst.next, ended, {}, at('10:07:10'))
       expect(inputs.map((input) => input.kind)).toEqual(['closed'])
       expect(inputs[0]?.body).toContain('alice: Superseded by #8')
     })
@@ -296,8 +300,12 @@ describe('prEvents', () => {
     it('leaves out the closing comment an agent posted', () => {
       const own = comment('12', 'Closing as duplicate', 'octocat', { created_at: CLOSED_AT })
       const ended = pr({ state: 'closed', closed_at: CLOSED_AT, comments: [own] })
-      const { inputs } = prEvents(baseline(), ended, new Set(['12']), later)
-      expect(inputs).toMatchObject([{ kind: 'closed', body: UNLINKED }])
+      const { inputs } = prEvents(baseline(), ended, { posts: new Set(['12']) }, later)
+      expect(inputs).toMatchObject([
+        { kind: 'comment', quiet: 'own_action' },
+        { kind: 'closed', body: UNLINKED },
+      ])
+      expect(inputs[1]?.quiet).toBeUndefined()
     })
   })
 

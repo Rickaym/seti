@@ -140,7 +140,9 @@ describe('the core functions refuse a Self agent', () => {
     await expect(asCaller(async () => updateTask(other.id, { title: 'x' }))).rejects.toThrow(OUTSIDE)
     await expect(asCaller(async () => linkTaskPr(other.id, 'https://github.com/o/r/pull/1'))).rejects.toThrow(OUTSIDE)
     await expect(
-      asCaller(async () => subscribeChannel(channel.id, { target: 'task', task_id: other.id, events: null })),
+      asCaller(async () =>
+        subscribeChannel(channel.id, { target: 'task', task_id: other.id, events: null, delivery: null }),
+      ),
     ).rejects.toThrow(OUTSIDE)
     await expect(
       asCaller(async () => subscribeChannel(channel.id, { target: 'ea', events: null, mode: 'report' })),

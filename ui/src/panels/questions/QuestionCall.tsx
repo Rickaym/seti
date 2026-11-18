@@ -7,9 +7,6 @@ import { useAgentQuestionCount } from '@/hooks/useRequests'
 import type { ToolUseBlock } from '@/lib/transcript'
 import { openRequestsIn } from '@/panels/requests/open-requests'
 
-/** Claude Code's tool for asking the user, whose calls show as their questions and answers. */
-export const ASK_TOOL = 'AskUserQuestion'
-
 const STATUS_TEXT: Record<Question['status'], string> = {
   open: 'Waiting for you',
   answered: 'Answered',
@@ -98,10 +95,10 @@ export function QuestionCall({ taskId, block, done }: { taskId: string; block: T
           const line = answerLine(records[index])
           return (
             <div key={`${String(index)}-${question.header}`}>
-              <dt className="text-muted-foreground">
+              <dt className="wrap-anywhere text-muted-foreground">
                 <span className="font-semibold">{question.header}</span>: {question.prompt}
               </dt>
-              {line !== null && <dd className="pl-3">{line}</dd>}
+              {line !== null && <dd className="pl-3 wrap-anywhere">{line}</dd>}
             </div>
           )
         })}

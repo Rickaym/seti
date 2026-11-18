@@ -1,7 +1,8 @@
 import type { McpConnector } from '@seti/shared'
-import { Loader2, Plus, Search, TriangleAlert } from 'lucide-react'
+import { Loader2, Plug, Plus, Search, TriangleAlert } from 'lucide-react'
 import { useState } from 'react'
 import { apiPost } from '@/api'
+import { ServiceIcon } from '@/components/service-icon/ServiceIcon'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
@@ -36,18 +37,21 @@ function ConnectorRow({ connector, onOpen }: { connector: McpConnector; onOpen: 
         type="button"
         aria-label={connector.title}
         onClick={onOpen}
-        className="flex w-full flex-col gap-0.5 px-3 py-2 text-left hover:bg-accent pointer-coarse:min-h-11"
+        className="flex w-full items-start gap-3 px-3 py-2 text-left hover:bg-accent pointer-coarse:min-h-11"
       >
-        <span className="flex min-w-0 items-center gap-2">
-          <span className="truncate text-sm font-medium">{connector.title}</span>
-          <span className="ml-auto shrink-0 border border-border px-1 text-2xs leading-4 text-muted-foreground">
-            {needOf(connector)}
+        <ServiceIcon icon={connector.icon} fallback={Plug} className="mt-0.5" />
+        <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+          <span className="flex min-w-0 items-center gap-2">
+            <span className="truncate text-sm font-medium">{connector.title}</span>
+            <span className="ml-auto shrink-0 border border-border px-1 text-2xs leading-4 text-muted-foreground">
+              {needOf(connector)}
+            </span>
           </span>
+          <span className="truncate font-mono text-2xs text-muted-foreground">{whereOf(connector)}</span>
+          {connector.description !== '' && (
+            <span className="line-clamp-2 text-muted-foreground">{connector.description}</span>
+          )}
         </span>
-        <span className="truncate font-mono text-2xs text-muted-foreground">{whereOf(connector)}</span>
-        {connector.description !== '' && (
-          <span className="line-clamp-2 text-muted-foreground">{connector.description}</span>
-        )}
       </button>
     </li>
   )
