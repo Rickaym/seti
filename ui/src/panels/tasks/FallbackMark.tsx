@@ -46,7 +46,7 @@ export function SwitchBackButton({
     ? `Available when the agent's turn ends; it then sends ${command}`
     : `Send ${command} to move the agent back to ${modelLabel(original)}`
   const send = () => {
-    sendAsUser(taskId, command)
+    void sendAsUser(taskId, command)
     toast.success(`Switching back to ${modelLabel(original)}`)
   }
   return (

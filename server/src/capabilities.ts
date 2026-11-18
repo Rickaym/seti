@@ -4,6 +4,7 @@ import {
   query,
   type McpServerStatus,
   type McpServerStatusConfig,
+  type Options,
   type SdkPluginConfig,
   type SettingSource,
   type SDKControlInitializeResponse,
@@ -18,7 +19,7 @@ import {
   type McpServer,
   type McpTransport,
 } from '@seti/shared'
-import { PROBE_DELAY_MS, SCRATCH_ROOT } from './config.js'
+import { PROBE_DELAY_MS } from './config.js'
 import { cache } from './redis.js'
 
 /** The slice of an SDK Query the probe uses, so tests can inject a fake. */
@@ -28,7 +29,7 @@ export interface ProbeSession {
   close: () => void
 }
 
-export type StartProbe = (cwd: string, signal: AbortSignal) => ProbeSession
+export type StartProbe = (cwd: string, signal: AbortSignal) => ProbeSession | Promise<ProbeSession>
 
 export interface ProbeTiming {
   pollMs: number
@@ -181,7 +182,7 @@ export async function probe(
 ): Promise<CapabilitiesSnapshot> {
   const startedAt = Date.now()
   const abort = new AbortController()
-  const session = start(cwd, abort.signal)
+  const session = await start(cwd, abort.signal)
   try {
     const init = await withTimeout(session.initializationResult(), timing.callTimeoutMs, 'Claude Code to start')
     const status = async () => withTimeout(session.mcpServerStatus(), timing.callTimeoutMs, 'MCP server status')
@@ -234,18 +235,39 @@ export function setAfterProbe(listener: () => void): void {
 }
 
 /**
- * The settings a probe of a directory loads. A probe runs on the host, outside any sandbox, and
- * project settings start hooks and the servers of `.mcp.json`. In a folder an agent owns, the
- * agent writes those, so its probe reads the user's settings alone.
+ * How a probe's Claude Code process starts when the host must not run what the directory
+ * configures: inside a sandbox, or on the host reading the user's settings alone.
  */
-export const probeSources = (cwd: string): SettingSource[] =>
-  cwd.startsWith(SCRATCH_ROOT + path.sep) ? ['user'] : ['user', 'project', 'local']
+export interface ProbeLaunch {
+  settingSources: SettingSource[]
+  env?: Record<string, string | undefined>
+  plugins?: SdkPluginConfig[]
+  spawnClaudeCodeProcess?: Options['spawnClaudeCodeProcess']
+}
 
-const startSdkProbe: StartProbe = (cwd, signal) =>
-  query({
+type ProbeLauncher = (cwd: string) => Promise<ProbeLaunch | null>
+
+let probeLaunch: ProbeLauncher = async (_cwd) => Promise.resolve(null)
+
+/** Sets who decides how a directory is probed; null probes it on the host with its own settings. */
+export function setProbeLauncher(launcher: ProbeLauncher): void {
+  probeLaunch = launcher
+}
+
+const startSdkProbe: StartProbe = async (cwd, signal) => {
+  const launch = (await probeLaunch(cwd)) ?? { settingSources: ['user', 'project', 'local'] }
+  const { env = probeEnv(), plugins = loadedPlugins, spawnClaudeCodeProcess, settingSources } = launch
+  return query({
     prompt: idlePrompt(signal),
-    options: { cwd, settingSources: probeSources(cwd), env: probeEnv(), plugins: loadedPlugins },
+    options: {
+      cwd,
+      settingSources,
+      env,
+      plugins,
+      ...(spawnClaudeCodeProcess === undefined ? {} : { spawnClaudeCodeProcess }),
+    },
   })
+}
 
 /** A snapshot older than this is still served, while a new probe replaces it. */
 const FRESH_MS = 60 * 60 * 1000

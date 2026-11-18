@@ -139,7 +139,35 @@ function gitDirs(dir: string): GitDirs | null {
   const own = path.resolve(dir, pointer)
   const commonFile = path.join(own, 'commondir')
   const common = exists(commonFile) ? path.resolve(own, fs.readFileSync(commonFile, 'utf8').trim()) : own
-  return { common, own, linked: true }
+  return recorded(dir, own, common) ? { common, own, linked: true } : null
+}
+
+const real = (file: string) => {
+  try {
+    return fs.realpathSync(file)
+  } catch {
+    return file
+  }
+}
+
+/**
+ * Whether the repository a `.git` file names holds this folder as its own. Anyone who can write
+ * the folder can write that file, so alone it proves nothing: a worktree counts when its admin
+ * folder lies in the repository's `worktrees` and points back at it, and a submodule when its git
+ * directory lies in the `.git/modules` of a checkout above it.
+ */
+function recorded(dir: string, own: string, common: string): boolean {
+  if (own === common) {
+    const marker = `${path.sep}.git${path.sep}modules${path.sep}`
+    const at = own.indexOf(marker)
+    return at > 0 && dir.startsWith(own.slice(0, at) + path.sep)
+  }
+  const back = path.join(own, 'gitdir')
+  if (!within(own, path.join(common, 'worktrees')) || !exists(back)) {
+    return false
+  }
+  const claimed = path.resolve(own, fs.readFileSync(back, 'utf8').trim())
+  return real(claimed) === real(path.join(dir, '.git'))
 }
 
 interface GitMounts {

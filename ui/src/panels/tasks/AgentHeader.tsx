@@ -34,6 +34,21 @@ interface TaskMetaProps {
   compact?: boolean
 }
 
+/** A calm frame's lines: where the agent works and its PRs, then its status on up to two lines. */
+function CalmMeta({ task }: { task: TaskListEntry }) {
+  return (
+    <div className="min-w-0 space-y-0.5 text-xs text-muted-foreground">
+      <div className="flex min-w-0 items-center gap-x-3">
+        <span className="min-w-0 truncate" title={task.cwd}>
+          {shortRepoLabel(task)}
+        </span>
+        <TaskPrs task={task} limit={COMPACT_SHOWN_PRS} />
+      </div>
+      <StatusLine text={task.blocked ?? task.status_line} lines={2} className="block text-foreground" />
+    </div>
+  )
+}
+
 /** Where the agent works, its PRs and its status line on one line. */
 function TaskMeta({ task, compact = false }: TaskMetaProps) {
   return (
@@ -73,6 +88,8 @@ interface AgentHeaderProps {
   onChanged: () => void
   /** The frame the agent shows in, which gets the compact header. */
   frame: AgentFrame | null
+  /** The frame shows calm, so the status gets a line of its own. */
+  calm: boolean
   narrow: boolean
   /** The status pill with its unseen dot and badges. */
   pill: ReactNode
@@ -114,7 +131,7 @@ export function AgentHeader(props: AgentHeaderProps) {
         running={running}
         on={on}
       >
-        <TaskMeta task={task} compact />
+        {props.calm ? <CalmMeta task={task} /> : <TaskMeta task={task} compact />}
       </CompactAgentHeader>
     )
   }

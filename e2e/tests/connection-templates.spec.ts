@@ -23,8 +23,12 @@ test.describe('connection templates', () => {
     await main.getByRole('button', { name: 'Connection', exact: true }).click()
     const picker = page.getByRole('dialog', { name: 'Add connection' })
     await expect(picker.getByRole('button', { name: 'Stripe' })).toBeVisible()
+    await expect(
+      picker.getByRole('button', { name: 'Stripe' }).locator('svg[data-service-icon="stripe"]'),
+    ).toBeVisible()
     await picker.getByLabel('Search services').fill('azure')
     await expect(picker.getByRole('list', { name: 'Services' }).getByRole('listitem')).toHaveCount(1)
+    await expect(picker.getByRole('button', { name: 'Microsoft Entra app' }).locator('svg.lucide-cloud')).toBeVisible()
     await picker.getByRole('button', { name: 'Microsoft Entra app' }).click()
 
     const form = page.getByRole('dialog', { name: 'Microsoft Entra app' })

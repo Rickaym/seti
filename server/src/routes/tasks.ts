@@ -236,7 +236,7 @@ export const taskRoutes = new Hono()
   })
   .post('/:id/inputs/deliver', async (c) => {
     const id = await taskIdOf(c.req.param('id'))
-    await deliverPending(id, 'user')
+    await deliverPending(id, 'user', { held: true })
     return ok(c, await requireTask(id))
   })
   .post('/:id/inputs/dismiss', validJson(dismissInputsInput), async (c) => {

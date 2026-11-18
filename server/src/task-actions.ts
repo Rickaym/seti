@@ -26,7 +26,8 @@ import { HttpError } from './http.js'
 import { setInputMode } from './inputs.js'
 import { slashRefusal } from './mods/commands.js'
 import { setTaskNotificationsMuted } from './notifications.js'
-import { endSession, openQuerySince, removeQueued, runTurn, sessionState, stopSessionTask } from './runner.js'
+import { removeQueued } from './queued-removal.js'
+import { endSession, openQuerySince, runTurn, sessionState, stopSessionTask } from './runner.js'
 import { changeSetiControl } from './seti-control-note.js'
 import { closeAgentChats } from './side-chat/chats.js'
 import { prWatch } from './store/pr-watch.js'
@@ -44,6 +45,7 @@ import {
   setTaskSandbox,
 } from './tasks.js'
 import { endAgentTerminals } from './terminal.js'
+import { askedQuestion } from './turn-asking.js'
 import { placeAttachments, refuseCommandAttachments } from './uploads.js'
 import { countWorkspaces, setTaskWorkspace } from './workspaces.js'
 
@@ -62,6 +64,7 @@ export async function taskListEntries(): Promise<TaskListEntry[]> {
         ...listedSubtasks(subtasks),
         todos: await agentTodos(task.id),
         pr_states: prStates(states.get(task.id) ?? {}, shown),
+        question: await askedQuestion(task),
       }
     }),
   )

@@ -34,11 +34,13 @@ import { CHANNEL_EVENT_ROUTING, CHANNEL_RUN_DUE, POLLER_CHANNELS } from './schem
 import { PR_LIST_CACHE } from './schema-prs.js'
 import { QUESTION_SECRETS, QUESTIONS } from './schema-questions.js'
 import { DROP_ROUTINES, REMINDER_CHANNELS, REMINDER_CRON } from './schema-reminders.js'
+import { RESTART_CUTS } from './schema-restart.js'
 import { PACK_KIND, rolesToPacks } from './schema-roles.js'
 import { MESSAGE_SEARCH, MESSAGE_SEARCH_TALK, MESSAGE_TIME } from './schema-search.js'
 import {
   CLAUDE_LOGINS,
   PERMISSION_REVIEW,
+  PERMISSION_TIMEOUT,
   PERMISSIONS,
   SANDBOX_AWS,
   SANDBOX_SSH,
@@ -74,6 +76,7 @@ import { DROP_ESLINTCACHE_DEFAULT, WARM_CACHES } from './schema-warm-caches.js'
 import {
   CHANNEL_SECRET_PENDING,
   CHANNEL_SOURCE_MODS,
+  CHANNEL_SUBSCRIPTION_DELIVERY,
   CHANNEL_SUBSCRIPTIONS,
   EA_CHANNEL_MODE,
   WEBHOOK_CHANNELS,
@@ -193,5 +196,8 @@ export const MIGRATIONS: readonly Migration[] = [
   { version: 104, name: 'permission_review', sql: PERMISSION_REVIEW },
   { version: 105, name: 'pr_list_cache', sql: PR_LIST_CACHE },
   { version: 106, name: 'shared_tools', sql: SHARED_TOOLS },
-  { version: 107, name: 'task_home_access', sql: TASK_HOME_ACCESS },
+  { version: 107, name: 'channel_subscription_delivery', sql: CHANNEL_SUBSCRIPTION_DELIVERY },
+  { version: 108, name: 'permission_timeout', sql: PERMISSION_TIMEOUT },
+  { version: 109, name: 'restart_cuts', sql: RESTART_CUTS },
+  { version: 110, name: 'task_home_access', sql: TASK_HOME_ACCESS },
 ]

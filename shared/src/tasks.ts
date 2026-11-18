@@ -44,6 +44,9 @@ export const NEEDS_YOU_STATUSES: readonly TaskDisplayStatus[] = [...FAILED_STATU
 
 export const needsYou = (status: TaskDisplayStatus) => NEEDS_YOU_STATUSES.includes(status)
 
+/** The reason line of an agent whose turn ended on a question written in its reply. */
+export const ASKED_IN_REPLY = 'Asked in its reply'
+
 /**
  * In the Needs you group: a needs-you status the user has not opened the agent to see yet, or a
  * blocked agent, which stays there until the user answers it.
@@ -313,6 +316,8 @@ export type QueueState = 'waiting' | 'delivered' | 'removed'
 export interface PromptPayload {
   text: string
   auto?: boolean
+  /** An automatic turn that also took the updates held for the user's next message. */
+  held?: boolean
   /** Updates from outside the conversation the agent received with this turn. */
   inputs?: number
   /** This message stopped the turn that was running when it was sent. */
@@ -345,7 +350,9 @@ export type MessageBody =
    * A note from Seti; `stopped` marks one about a process the user stopped, `session` one about a
    * session restart and `seti_control` one about the agent's Seti control level, which the agent
    * reads; `memory` one about the agent's memory cap, with `ended_turn` when the cap stopped Claude
-   * Code itself; `bypass` one about Bypass turning on or off.
+   * Code itself; `bypass` one about Bypass turning on or off; `resumed` one about a turn that a
+   * restart of Seti cut off and Seti resumed by itself; `timed_out` holds when a permission
+   * request was denied for want of an answer.
    */
   | {
       kind: 'seti'
@@ -358,6 +365,8 @@ export type MessageBody =
         /** The level before this change, so a change undone before the next turn says nothing. */
         seti_control_was?: SetiControlLevel
         bypass?: boolean
+        resumed?: boolean
+        timed_out?: string
         memory?: MemoryEvent
         ended_turn?: boolean
       }

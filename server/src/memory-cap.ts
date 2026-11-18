@@ -1,6 +1,5 @@
 import {
   capLabel,
-  MEMORY_CAP_DEFAULTS,
   memoryBudgetLine,
   type AuditActor,
   type MemoryCap,
@@ -14,7 +13,7 @@ import { refuseAgent } from './ea-guard.js'
 import { scopeHost, type ScopeKind, type ScopePlan } from './memory-scope.js'
 import { agentHeapMb } from './node-heap.js'
 import { applyCaps } from './scope-limits.js'
-import { memorySettings, taskMemoryCaps } from './store/memory.js'
+import { hostDefaultCap, memorySettings, taskMemoryCaps } from './store/memory.js'
 
 /** The cap a task's processes run under: its own, else the default. */
 export async function effectiveCap(taskId: string): Promise<MemoryCap> {
@@ -37,7 +36,7 @@ export async function memoryPrompt(taskId: string): Promise<string | null> {
 
 export async function memoryCapSettings(): Promise<MemoryCapSettings> {
   const { cap, updated_at } = await memorySettings.get()
-  return { cap, defaults: MEMORY_CAP_DEFAULTS, enforced: (await scopeHost()) !== null, updated_at }
+  return { cap, defaults: hostDefaultCap(), enforced: (await scopeHost()) !== null, updated_at }
 }
 
 /** Saves the default cap and applies it at once to running agents without a cap of their own. */

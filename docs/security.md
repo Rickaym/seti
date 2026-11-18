@@ -141,6 +141,28 @@ private key off the host. The sandbox model is in [Architecture](architecture.md
   in Settings, Lifecycle; the EA changes it only with the user's yes (`set_auto_archive`), and
   agents' Seti tools and mods are refused (`refuseAgent` in `updateAutoArchive`), so an agent
   cannot turn off the guard that stops it. A change is audited as `system.repeat_guard_changed`.
+- A permission request nobody answers is denied after the request timeout, so an agent never waits
+  on the user for ever. The timeout is one install-wide setting in Settings, Permissions: Off, 15
+  min, 1 h, 4 h or 24 h, 1 h by default, kept in `permission_settings`. Each request stores its
+  deadline (`timeout_at`, counted from when it was raised), and `server/src/permission-timeout.ts`
+  arms a timer per request this process waits on. At the deadline Seti settles that one request as
+  denied with `timed_out` set, through the same `resolveRequest` path as the user's Deny, and the
+  agent reads that nobody answered in time, that it is no judgement on the action, and to carry on
+  or ask again. A timeout adds no rule, never counts as an always answer and touches no other
+  request, a subagent's request runs on the same clock as any other, and Bypass, questions and
+  change requests are unaffected. The denial is audited as `task.permission_timed_out` with the
+  task, tool, call summary and the rules the request offered, and noted in the agent's transcript.
+  Once four fifths of the time has passed, and at least five minutes before the end, the agent's
+  reason line ends with "times out soon", which pushes one more needs-you notification. A request
+  whose session is gone (the agent stopped or was archived) closes as cancelled with nothing sent.
+  A request a restart of Seti kept runs on the same clock: startup arms whatever is still pending
+  from its stored deadline and ends what is overdue, and that denial resumes the agent as the
+  user's answer would. The setting is the user's: `PUT /api/permissions/timeout` refuses the EA in the
+  route and agents' Seti tools and mods in `setPermissionTimeout` (`refuseAgent`), and a change is
+  audited as `system.permission_timeout_changed` with the old and new value. A new value applies
+  to requests already waiting, counted from when each was raised, so one older than it is denied
+  at once. The EA reads the setting and each request's deadline through `search_seti` in
+  `requests`.
 - Review rules hold each call of the MCP tools they name until the user allows or denies it, in
   Bypass too, because they run as a PreToolUse hook. When Seti cannot read its review rules the
   hook denies the call rather than let it run unchecked, and a call a deny rule names is left to
@@ -242,19 +264,32 @@ the rule is on Seti's side:
   changing what git reports for Git LFS, so those commands run only in worktrees Seti made from
   a registered repo, whose config the sandbox keeps read-only.
 - The main checkout of a worktree is read from its `.git` files, without running git.
-- A `.git` file can name any folder as the repository behind a worktree. Without home access the
-  sandbox follows it only for a worktree Seti made, or when it stays inside the task's own
-  folders, so a forged pointer mounts nothing of the user's and shares no other project's Claude
-  Code memory.
-- The capability probe is Claude Code running on the host, where project settings start hooks
-  and the servers of `.mcp.json`. In a folder under the scratch root it loads the user's settings
-  only, so the commands and servers a clone defines show in the agent's session, which runs in
-  the sandbox, but not in the Capabilities list or the composer's command menu.
+- A `.git` file can name any repository as the one behind a folder. Seti follows it only when
+  that repository records the folder: a worktree whose admin folder lies in the repository's
+  `worktrees` and points back at it, or a submodule under a checkout that holds its git
+  directory. Otherwise the folder counts as no repository (`gitDirs` in
+  `server/src/sandbox-mounts.ts`). Without home access the sandbox also follows a recorded
+  pointer only for a worktree Seti made, or when it stays inside the task's own folders. A forged
+  pointer therefore mounts nothing of the user's, and the folder's local MCP servers and Claude
+  Code memory are its own alone.
+- The capability probe is Claude Code started to list a folder's commands, subagents and MCP
+  servers. Project settings start hooks, and `.mcp.json` starts server commands. For the folder a
+  sandboxed agent works in, the probe therefore runs inside that agent's sandbox, started the way
+  its session is, so whatever the folder configures runs there and the composer menu and
+  Capabilities still show the folder's own commands and servers. For any other folder such an
+  agent has, and for the folders of archived sandboxed agents, the probe runs on the host and
+  loads the user's settings only, so the folder's commands and servers are not listed. Folders of
+  unsandboxed agents and folders no agent has are probed as before
+  (`server/src/probe-launch.ts`).
 - `gh` runs in Seti's own working directory with explicit repository arguments, never in a task
   folder, and file search runs ripgrep, which executes nothing a folder configures.
+- An MCP sign-in runs `claude mcp login` on the host in the folder whose config names the server,
+  when the user starts it. It runs no hook and no server command, and refuses a server from
+  `.mcp.json` that the user has not approved in Claude Code.
 
-Agents that keep home access are outside this rule: they write to the user's checkouts, which the
-user then uses on the host. Unsandboxed agents run on the host by definition.
+The probe and the recorded pointer hold for every sandboxed agent. Beyond those, agents that keep
+home access are outside this rule: they write to the user's checkouts, which the user then uses on
+the host. Unsandboxed agents run on the host by definition.
 
 ## Knowledge notes
 
@@ -311,6 +346,14 @@ message, not of a security setting. The EA may relay answers; agents and mods ma
 - Question text and option descriptions are stored with secrets redacted. The audit log records
   that a question was asked, answered, dismissed or expired, with who answered, the type, the
   option labels picked and the length of the own-words answer, never its text.
+- A restart of Seti keeps open questions and pending permission requests, and the user's answer
+  then resumes the agent's session as a message from Seti (`server/src/restart-waits.ts`). The
+  routes, their checks and who may answer are the same as before the restart. Allowing a tool call
+  after a restart allows that one call only: Seti keeps a SHA-256 hash of the tool name and its
+  whole input on the request row, never a second copy of the input, and lets the agent's next call
+  with the same hash run once within fifteen minutes; any other call asks again. The grant lives in
+  the server's memory and is gone after another restart. Such a request cannot be edited, and a
+  secret question still expires, since its value never passes through a message.
 
 ### The Requests panel
 

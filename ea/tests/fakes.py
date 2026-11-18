@@ -711,6 +711,7 @@ class FakeSeti:
     questions: list[dict[str, Any]] = field(default_factory=list)
     change_requests: list[dict[str, Any]] = field(default_factory=list)
     permission_requests: list[dict[str, Any]] = field(default_factory=list)
+    request_timeout_minutes: int = 60
     team: list[dict[str, Any]] = field(default_factory=list)
     chat_hits: list[dict[str, Any]] = field(default_factory=list)
     chat_more: bool = False
@@ -719,6 +720,9 @@ class FakeSeti:
     )
     file_texts: dict[str, str] = field(default_factory=dict)
     team_deliveries: list[dict[str, Any]] = field(default_factory=list)
+    fix_ci: dict[str, Any] = field(
+        default_factory=lambda: {"nudges": [], "skipped": [], "unlinked": 0, "error": None}
+    )
     rewind_targets: dict[str, list[dict[str, Any]]] = field(default_factory=dict)
     rewind_files: dict[str, Any] = field(default_factory=dict)
     task_packs: dict[str, list[dict[str, Any]]] = field(default_factory=dict)
@@ -1226,6 +1230,10 @@ class FakeSeti:
                 return ok({**brief, **self.subtask_details.get(tool_use_id, {"prompt": "", "result": None})})
             case ["prs"]:
                 return ok(self.prs)
+            case ["prs", "fix-ci"]:
+                only = params.get("task")
+                nudges = [n for n in self.fix_ci["nudges"] if only in (None, n["task"]["id"])]
+                return ok({**self.fix_ci, "nudges": nudges})
             case ["prs", "by-url"]:
                 url = params.get("url")
                 found = [p for p in self.prs["prs"] if p["url"] == url]
@@ -1293,6 +1301,8 @@ class FakeSeti:
                 return ok([n for n in self.knowledge if n["status"] == params.get("status", "proposed")])
             case ["questions"]:
                 return ok([q for q in self.questions if q["status"] == "open"])
+            case ["permissions", "timeout"]:
+                return ok({"request_timeout_minutes": self.request_timeout_minutes, "updated_at": None})
             case ["requests"]:
                 return ok(
                     {

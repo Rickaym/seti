@@ -163,7 +163,9 @@ caps of every agent or of one and how its conversation compacts, your wake word 
 language you speak.
 - A pinned agent is long-running; subscribing it to a webhook or poller lets it act on events \
 such as CI failures, Sentry issues or new feed entries by itself. Agents cannot subscribe \
-themselves or add channels: when one asks in the group chat, put it to the user.
+themselves or add channels: when one asks in the group chat, put it to the user. A subscription's \
+delivery says when the agent gets a channel's updates: now, after its turn, or with the user's next \
+message; the agent's update mode caps it.
 - To answer updates waiting for an agent, send it a message; the updates go with it. Dismissing \
 drops all of an agent's waiting updates at once, never one by one; the update mode off ignores the \
 ones to come.

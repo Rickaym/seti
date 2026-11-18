@@ -51,7 +51,34 @@ describe('channel seti tools', () => {
       subscriber: 'Channel keeper',
       events: ['incident'],
     })
-    expect(subscribed.json()).toMatchObject({ target: 'task', task_id: caller, events: ['incident'] })
+    expect(subscribed.json()).toMatchObject({
+      target: 'task',
+      task_id: caller,
+      events: ['incident'],
+      delivery: 'agent',
+    })
+    const timed = await call(caller, 'subscribe_channel', {
+      channel: 'Agent uptime',
+      subscriber: 'Channel keeper',
+      delivery: 'now',
+    })
+    expect(timed.json()).toMatchObject({ events: ['incident'], delivery: 'now' })
+    expect((await auditEvents.latest('system.channel_delivery_changed'))?.detail).toMatchObject({
+      agent_id: caller,
+      from: null,
+      to: 'now',
+    })
+    const same = { channel: 'Agent uptime', subscriber: 'Channel keeper', delivery: 'now' }
+    expect((await call(caller, 'subscribe_channel', same)).text).toContain('already takes those events')
+    const followed = await call(caller, 'subscribe_channel', { ...same, delivery: 'agent' })
+    expect(followed.json()).toMatchObject({ events: ['incident'], delivery: 'agent' })
+    const forEa = await call(caller, 'subscribe_channel', {
+      channel: 'Agent uptime',
+      subscriber: 'ea',
+      delivery: 'now',
+    })
+    expect(forEa.error).toBe(true)
+    expect(forEa.text).toContain("Only an agent's subscription has a delivery")
 
     const listed = await call(caller, 'list_channels')
     const entry = (JSON.parse(listed.text) as { name: string; subscribers: { target: string }[] }[]).find(

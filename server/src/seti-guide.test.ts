@@ -78,7 +78,8 @@ describe('renderGuide', () => {
     expect(renderGuide({ mode: 'wake', has: only() })).toContain('After a push, end the turn')
     for (const mode of ['queue', 'off', null] as const) {
       const text = renderGuide({ mode, has: only() })
-      expect(text).toContain('No sleep, until or watch loops')
+      expect(text).toContain('In a long wait, show what for on your row')
+      expect(text).not.toContain('No sleep')
       expect(text).not.toContain('After a push')
     }
   })

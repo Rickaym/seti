@@ -1,4 +1,13 @@
-import type { LinkedTask, PrList, PrLookup, PrRow, PullRequest, RelatedPr } from '@seti/shared'
+import {
+  planFixCi,
+  type FixCiPlan,
+  type LinkedTask,
+  type PrList,
+  type PrLookup,
+  type PrRow,
+  type PullRequest,
+  type RelatedPr,
+} from '@seti/shared'
 import { repos } from './db.js'
 import { canPollGithub } from './github-cache.js'
 import { addPreviewLabel, viewerLogin, type OpenPr } from './github.js'
@@ -7,7 +16,7 @@ import { previewsOn } from './pr-decorators.js'
 import { knownDetail, onDetailsFetched, prDetails, refreshDetails, staleDetail } from './pr-details.js'
 import { relatePrs } from './pr-graph.js'
 import { listRefreshing, onListFetched, openList, type ListedPr } from './pr-list.js'
-import { linkedPrUrls, tasksByPrUrl } from './store/prs.js'
+import { archivedLinkedTaskIds, linkedPrUrls, tasksByPrUrl } from './store/prs.js'
 
 /** A status lookup waits this long for detail GitHub has not sent yet, then reports it pending. */
 const LOOKUP_WAIT_MS = 2500
@@ -115,6 +124,12 @@ export async function listPrs(): Promise<PrList> {
     refreshing: listRefreshing(),
     previews_on: previewsOn(),
   }
+}
+
+/** Who Fix CI would ask about which failing open PRs: every linked agent, or only `taskId`. */
+export async function fixCiPlan(taskId?: string): Promise<FixCiPlan> {
+  const [{ prs, error }, archived] = await Promise.all([listPrs(), archivedLinkedTaskIds()])
+  return { ...planFixCi(prs, archived, taskId), error }
 }
 
 /**

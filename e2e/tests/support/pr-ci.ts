@@ -100,19 +100,16 @@ export function watchStarts(page: Page): string[] {
   return starts
 }
 
-/** The Fix CI message for red#5 sits in the agent's own transcript, and the agent is open. */
+/** The agent's own messages in its open transcript that read exactly `text`. */
+export const ownMessages = (page: Page, text: string) =>
+  page.getByRole('region', { name: 'Transcript' }).locator('[data-own-message]').filter({ hasText: text })
+
+/** The short Fix CI message for red#5 sits in the agent's own transcript, and the agent is open. */
 export async function expectFixCiSent(page: Page, agent: { id: string; title: string }): Promise<void> {
   await expect(page.getByText(`Asked ${agent.title} to fix CI on #5`)).toBeVisible()
   await expect(page).toHaveURL(new RegExp(`#agents/${agent.id}$`))
-  const sent = page
-    .getByRole('region', { name: 'Transcript' })
-    .locator('[data-own-message]')
-    .filter({ hasText: 'CI is failing on your pull request #5 in e2e/red: red change 5' })
+  const sent = ownMessages(page, 'CI is failing on #5. Please fix it.')
   await expect(sent).toHaveCount(1)
-  await expect(sent).toContainText(prUrl(RED, 5))
-  await expect(sent).toContainText('Commit abc1234 on feat/red-5')
-  await expect(sent).toContainText(`- build: failed (${LOG})`)
-  await expect(sent).toContainText('- e2e: timed out')
-  await expect(sent).toContainText('push to the PR branch feat/red-5')
-  await expect(sent).not.toContainText('worktree')
+  await expect(sent).not.toContainText('build')
+  await expect(sent).not.toContainText('github.com')
 }

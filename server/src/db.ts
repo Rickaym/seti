@@ -139,13 +139,11 @@ async function insertTask(db: Db, task: ImportedTask, extras: readonly ExtraRepo
     WHERE archived_at IS NULL AND color IS NOT NULL`
   const color = pickAgentColor(live.map((row) => row.color))
   await db`INSERT INTO task (id, title, repo_id, cwd, worktree, sandbox, profile_id, session_id,
-      source_session_id, status, created_at, updated_at, setup, seti_level, workspace_id, color,
-      home_access)
+      source_session_id, status, created_at, updated_at, setup, seti_level, workspace_id, color, home_access)
     VALUES (${task.id}, ${task.title}, ${task.repo_id}, ${task.cwd}, ${task.worktree ? 1 : 0},
       ${task.sandbox === false ? 0 : 1}, ${task.profile_id ?? DEFAULT_PROFILE_ID}, ${task.session_id},
       ${task.source_session_id}, 'idle', ${ts}, ${ts}, ${setup}, ${task.seti_control ?? DEFAULT_SETI_CONTROL},
-      COALESCE(${task.workspace_id ?? null}, default_workspace_id()), ${color},
-      ${task.home_access === true})`
+      COALESCE(${task.workspace_id ?? null}, default_workspace_id()), ${color}, ${task.home_access === true})`
   for (const [index, extra] of extras.entries()) {
     await db`INSERT INTO task_repo (task_id, repo_id, position, dir)
       VALUES (${task.id}, ${extra.repo_id}, ${index + 1}, ${extra.dir})`
@@ -326,15 +324,17 @@ export const tasks = {
     await sql`DELETE FROM task WHERE id = ${id}`
   },
   /**
-   * Turns cannot survive a restart; only the server calls this, once at startup. With `resume`, a
-   * cut turn that waited on nothing is left seen and marked to resume; the rest need the user.
+   * Turns cannot survive a restart; only the server calls this, once at startup. Each cut turn is
+   * left unseen; `waits` says its agent has a question or a permission request still open.
    */
-  markInterrupted: async (resume = false): Promise<{ id: string; resume: boolean }[]> => {
-    const rows = await sql<{ id: string; unseen: boolean }[]>`UPDATE task SET status = 'interrupted',
-      unseen = NOT (${resume} AND blocked IS NULL AND archived_at IS NULL), blocked = NULL, updated_at = ${now()}
-      WHERE status = 'running' RETURNING id, unseen`
+  markInterrupted: async (): Promise<{ id: string; archived: boolean; waits: boolean }[]> => {
+    const rows = await sql<{ id: string; archived: boolean; waits: boolean }[]>`UPDATE task
+      SET status = 'interrupted', unseen = true, updated_at = ${now()}
+      WHERE status = 'running' RETURNING id, archived_at IS NOT NULL AS archived,
+        (EXISTS (SELECT 1 FROM question q WHERE q.task_id = task.id AND q.status = 'open')
+          OR EXISTS (SELECT 1 FROM permission_request p WHERE p.task_id = task.id AND p.state = 'pending')) AS waits`
     await sql`UPDATE task SET status_line = NULL, status_line_at = NULL WHERE status_line IS NOT NULL`
-    return rows.map((row) => ({ id: row.id, resume: !row.unseen }))
+    return rows.map((row) => ({ ...row }))
   },
 }
 

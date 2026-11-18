@@ -1,4 +1,3 @@
-import path from 'node:path'
 import type {
   McpServerStatus,
   McpServerStatusConfig,
@@ -12,13 +11,11 @@ import {
   describeTransport,
   groupCommands,
   probe,
-  probeSources,
   safeUrl,
   toServer,
   type ProbeSession,
   type ProbeTiming,
 } from './capabilities.js'
-import { SCRATCH_ROOT } from './config.js'
 
 const FAST: ProbeTiming = { pollMs: 1, pendingCapMs: 200, callTimeoutMs: 200 }
 
@@ -158,15 +155,6 @@ describe('groupCommands', () => {
       skills: 2,
       subagents: 2,
     })
-  })
-})
-
-describe('probeSources', () => {
-  it("reads only the user's settings in a folder an agent owns, where project hooks and servers are its own", () => {
-    expect(probeSources(path.join(SCRATCH_ROOT, 'fix-login-11111111'))).toEqual(['user'])
-    expect(probeSources(path.join(SCRATCH_ROOT, 'fix-login-11111111', 'app'))).toEqual(['user'])
-    expect(probeSources('/srv/checkouts/app')).toEqual(['user', 'project', 'local'])
-    expect(probeSources(`${SCRATCH_ROOT}-elsewhere/app`)).toEqual(['user', 'project', 'local'])
   })
 })
 

@@ -20,6 +20,7 @@ import { hostLoginKey } from './claude-logins.js'
 import { compactHook, compactSetup, effectiveCompact } from './compact.js'
 import { CLAUDE_HOME, CREDENTIALS, DATABASE_URL, REDIS_URL, SETI_HOME } from './config.js'
 import { connectionEnv, taskConnections } from './connection-egress.js'
+import { COMMAND_LIMIT_HOURS, subagentRules } from './house-rules.js'
 import { borrowedStamp, taskBorrowedServers } from './mcp-borrowed.js'
 import { taskDeniedServers } from './mcp-selection.js'
 import { tokenServers } from './mcp-sign-in.js'
@@ -146,7 +147,7 @@ export const TASK_ID_ENV = 'SETI_TASK_ID'
  * Claude Code stops a background command at its `timeout`, 30 minutes unless the agent sets one,
  * and caps that at 2 hours; this raises the cap to a day.
  */
-const BACKGROUND_LIMIT = { BASH_MAX_TIMEOUT_MS: String(24 * 60 * 60_000) }
+const BACKGROUND_LIMIT = { BASH_MAX_TIMEOUT_MS: String(COMMAND_LIMIT_HOURS * 60 * 60_000) }
 
 /**
  * Claude Code leaves its own todo tools (TaskCreate and the rest, TodoWrite before them) out for
@@ -328,7 +329,7 @@ const auditRefusal = (task: Task) => async (command: string, reason: string) => 
   })
 }
 
-/** Hooks of every task: the shell and repeat guards, and a sandboxed one's WebFetch allowlist. */
+/** Hooks of every task: the guards, a sandboxed one's WebFetch allowlist, rules for subagents. */
 function sessionHooks(
   task: Task,
   policy: SandboxPolicy | null,
@@ -339,7 +340,8 @@ function sessionHooks(
   const sandbox = policy === null ? [] : (sandboxHooks(async () => allowedFor(task.id)).PreToolUse ?? [])
   const repeat = repeatHooks({ task, session, refused: (tool, input) => guardRefuses(tool, input, scope) })
   const review = reviewHook({ taskId: task.id, session, denyRules: async () => (await permissionSettings(task)).deny })
-  return { ...repeat, PreToolUse: [guard, ...sandbox, review, ...(repeat.PreToolUse ?? [])] }
+  const PreToolUse = [guard, ...sandbox, review, ...(repeat.PreToolUse ?? [])]
+  return { ...repeat, PreToolUse, SubagentStart: [subagentRules()] }
 }
 
 /** Rules for every task, a sandbox's launcher and env, else the borrowed MCP servers. */

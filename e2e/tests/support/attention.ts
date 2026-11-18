@@ -1,6 +1,6 @@
 import type { APIRequestContext, Page } from '@playwright/test'
 import type { AttentionState, Envelope, Task } from '@seti/shared'
-import { ASK_PROMPT } from './fake-claude.js'
+import { ASK_PROMPT } from './fake-replies.js'
 import { apiData, expect } from './fixtures.js'
 import { FAKE_CLAUDE_ENV } from './processes.js'
 

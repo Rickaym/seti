@@ -99,6 +99,18 @@ CREATE INDEX permission_request_pending ON permission_request (task_id) WHERE st
 ALTER TABLE task ADD COLUMN blocked TEXT;
 `
 
+/** The timeout of permission requests: the setting, each request's deadline and how it ended. */
+export const PERMISSION_TIMEOUT = `
+ALTER TABLE permission_request ADD COLUMN timeout_at TEXT;
+ALTER TABLE permission_request ADD COLUMN timed_out BOOLEAN NOT NULL DEFAULT false;
+
+CREATE TABLE permission_settings (
+  id INTEGER PRIMARY KEY CHECK (id = 1),
+  request_timeout_minutes INTEGER NOT NULL,
+  updated_at TEXT NOT NULL
+);
+`
+
 /** API keys agents see as placeholder variables, and which credential sets expose each one. */
 export const SECRET_ENV = `
 ALTER TABLE secret ADD COLUMN env TEXT, ADD COLUMN hosts TEXT[], ADD COLUMN placeholder TEXT UNIQUE;

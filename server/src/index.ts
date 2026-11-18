@@ -5,6 +5,7 @@ import { WebSocketServer } from 'ws'
 import { accountStatus, warmAccount } from './account.js'
 import { createApp } from './app.js'
 import { startAutoArchive } from './archive.js'
+import { rearmAskingReminders } from './asking-reminder.js'
 import { audit } from './audit.js'
 import { inBackground } from './background.js'
 import { startBackups } from './backup-schedule.js'
@@ -39,7 +40,7 @@ import { modHost } from './mods/bundled.js'
 import { watchDevMods } from './mods/dev.js'
 import { startModUpdates } from './mods/updates.js'
 import { notifyInterrupted, preparePush } from './notifications.js'
-import { dropLeftoverRequests } from './permission-requests.js'
+import { resumePermissionTimeouts } from './permission-timeout.js'
 import { enforcePrivateHome } from './permissions.js'
 import { loadPlannerModule } from './planner.js'
 import { retireBundledPlugins } from './plugins.js'
@@ -47,11 +48,12 @@ import { pollerScheduler } from './pollers/service.js'
 import { prDiscovery } from './pr-discovery.js'
 import { prInputs } from './pr-inputs.js'
 import { warmOpenPrs } from './prs.js'
-import { expireLeftoverQuestions } from './questions.js'
 import { cache } from './redis.js'
 import { reminderTicker } from './reminders/service.js'
 import { resourceSampler } from './resources.js'
+import { cutRunningTurns } from './restart-cut.js'
 import { markRestartCut, resumeInterrupted } from './restart-resume.js'
+import { keepLeftoverRequests } from './restart-waits.js'
 import { startArchiveLifecycle, startTaskRetention } from './retention.js'
 import { TERMINAL_FRAME_MAX } from './routes/terminal.js'
 import { loadSdkModule } from './sdk-query.js'
@@ -139,11 +141,23 @@ function indexOlderMessages(): void {
     })
 }
 
-/** Lets poller and reminder runs finish or stop them first; the signal then ends the process. */
+/** Records and ends the running turns, for the next start to resume; a failure only logs. */
+async function cutTurns(): Promise<void> {
+  try {
+    await cutRunningTurns()
+  } catch (e) {
+    process.stderr.write(`stop: could not record the running turns: ${e instanceof Error ? e.message : String(e)}\n`)
+  }
+}
+
+/**
+ * Lets poller and reminder runs finish or stops them, and records and ends the running turns
+ * meanwhile; the signal then ends the process.
+ */
 function stopOn(signal: 'SIGTERM' | 'SIGINT'): void {
   process.once(signal, () => {
     stopTerminals()
-    void stopChannelRuns().finally(() => process.kill(process.pid, signal))
+    void Promise.all([stopChannelRuns(), cutTurns()]).finally(() => process.kill(process.pid, signal))
   })
 }
 
@@ -158,8 +172,7 @@ relayTaskEvents()
 relayTeamEvents()
 await auditEvents.sealPending()
 await stopLeftoverScopes()
-await dropLeftoverRequests()
-await expireLeftoverQuestions()
+await keepLeftoverRequests()
 await resumeBypass()
 startRequestExpiry()
 startKnowledgeSweep()
@@ -188,6 +201,7 @@ await modHost.start()
 await watchDevMods()
 startModUpdates()
 notifyInterrupted(interrupted.notify)
+await rearmAskingReminders()
 await startEaIndex()
 if (PLANNER_MODULE !== '') {
   await loadPlannerModule(PLANNER_MODULE)
@@ -205,8 +219,9 @@ const sockets = new WebSocketServer({
 serve({ fetch: createApp().fetch, hostname: HOST, port: PORT, websocket: { server: sockets } }, (info) => {
   process.stdout.write(`seti listening on http://${info.address}:${String(info.port)}\n`)
   void signInHint(PUBLIC_ACCESS)
-  void wakeWaiting()
+  void wakeWaiting(interrupted.resume.map((each) => each.taskId))
   inBackground('resume', async () => resumeInterrupted(interrupted.resume))
+  inBackground('permission timeouts', resumePermissionTimeouts)
   void audit.record({
     actor: 'system',
     kind: 'system.started',
