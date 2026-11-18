@@ -10,20 +10,20 @@ import { usePolled } from '@/hooks/usePolled'
 import { createPolledResource } from '@/lib/polled'
 import { askToFixCi, prCount, useFixCi, type PrAgent } from '@/panels/tasks/fix-ci'
 
-const COMPACT =
-  'flex h-6 min-w-6 -my-1.5 shrink-0 items-center justify-center gap-0.5 text-xs text-destructive tabular-nums hover:underline pointer-coarse:-my-3.5 pointer-coarse:h-11 pointer-coarse:min-w-11'
+const INLINE =
+  'flex h-6 -my-1.5 shrink-0 items-center gap-1 text-xs whitespace-nowrap text-destructive hover:underline pointer-coarse:-my-3.5 pointer-coarse:h-11'
 
 interface AgentFixCiProps {
   agent: PrAgent
   /** The agent's open PRs with failing CI; with none there is no button. */
   prs: readonly FixCiPr[]
-  /** The wrench and the count alone, for a header with no room for the label. */
-  compact?: boolean
+  /** A text button on the line of PR chips, where a filled button would crowd the header. */
+  inline?: boolean
   onSent?: () => void
 }
 
 /** One Fix CI for every failing PR of an agent: one click, one short message naming them all. */
-export function AgentFixCi({ agent, prs, compact = false, onSent }: AgentFixCiProps) {
+export function AgentFixCi({ agent, prs, inline = false, onSent }: AgentFixCiProps) {
   const fix = useFixCi(agent)
   if (prs.length === 0) {
     return null
@@ -32,14 +32,14 @@ export function AgentFixCi({ agent, prs, compact = false, onSent }: AgentFixCiPr
     fix(prs)
     onSent?.()
   }
-  const covered = prs.length === 1 ? 'its PR' : `all ${prCount(prs.length)}`
+  const covered = prs.length === 1 ? 'its 1 PR' : `all ${prCount(prs.length)}`
   const hint = `Ask the agent to fix failing CI on ${covered}`
-  if (compact) {
+  if (inline) {
     return (
       <Hint text={hint}>
-        <button type="button" className={COMPACT} aria-label="Fix CI" data-testid="fix-ci-all" onClick={send}>
+        <button type="button" className={INLINE} data-testid="fix-ci-all" onClick={send}>
           <Wrench className="size-3.5" />
-          {prs.length}
+          Fix CI
         </button>
       </Hint>
     )

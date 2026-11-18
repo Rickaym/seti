@@ -2262,15 +2262,16 @@ class EaTools:
 
     async def post_team_chat(self, args: Mapping[str, Any]) -> ToolResult:
         to = arg_str(args, "to", required=False)
-        if args.get("fix_ci") is True:
-            return await self._fix_ci(to)
-        text = arg_str(args, "text")
+        fix_ci = args.get("fix_ci") is True
+        text = "" if fix_ci else arg_str(args, "text")
         if not to and DIRECT_ONLY.get():
             raise ToolError(
                 "Here you may only send a direct message to one agent, with to; a public post waits "
                 "for the user's yes.",
                 "Direct messages only",
             )
+        if fix_ci:
+            return await self._fix_ci(to)
         if to:
             return await self._post_direct(text, await self._handle_of(to))
         posted = await self._seti.post("/team/messages", {"text": text})

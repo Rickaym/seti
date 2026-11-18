@@ -24,8 +24,7 @@ test('Fix CI in the agent header sends one short message naming both failing PRs
   const before = await agentCount(request)
 
   const fix = main.getByTestId('fix-ci-all')
-  await expect(fix).toHaveAccessibleName('Fix CI')
-  await expect(fix).toHaveText('2')
+  await expect(fix).toHaveText('Fix CI')
   await fix.hover()
   await expect(page.getByRole('tooltip')).toContainText('Ask the agent to fix failing CI on all 2 PRs')
   await fix.click()

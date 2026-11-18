@@ -215,10 +215,12 @@ async def test_an_act_report_may_only_send_direct_messages(tools: EaTools, fake_
     token = DIRECT_ONLY.set(True)
     try:
         refused = await tools.call("post_team_chat", {"text": "@all heads up"})
+        every_agent = await tools.call("post_team_chat", {"fix_ci": True})
     finally:
         DIRECT_ONLY.reset(token)
     assert not refused.ok
     assert "direct message" in refused.text
+    assert not every_agent.ok
     assert fake_seti.posts() == []
 
 

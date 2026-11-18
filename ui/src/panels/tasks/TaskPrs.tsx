@@ -196,7 +196,7 @@ function PrChipRow({ urls, states, homeSlug, path, owner, agent, limit, picker, 
           </div>
         </div>
       )}
-      <AgentFixCi agent={agent} prs={failingPrs(ordered)} compact />
+      <AgentFixCi agent={agent} prs={failingPrs(ordered)} inline />
       {picker}
     </div>
   )
