@@ -52,6 +52,7 @@ import { logicOps } from './mods/ops/table.js'
 import { startModTaskEvents } from './mods/task-events.js'
 import { notifyStatusEvent, notifyTurnEnd } from './notifications.js'
 import { PAIR_PAGE } from './pair-page.js'
+import { watchPermissionTimeouts } from './permission-timeout.js'
 import { defaultPluginConfigs } from './plugins.js'
 import { prDiscovery } from './pr-discovery.js'
 import { sandboxedProbeLaunch } from './probe-launch.js'
@@ -369,6 +370,7 @@ export function createApp(access: AccessGuardOptions = defaultAccess(), eaUrl: s
   onAnyTaskEvent(watchBlocked)
   onTurnEnd(statusLineTurnEnded)
   clearStallsOnTurnStart()
+  watchPermissionTimeouts()
   restartQuietOnAnswer()
   clearStatusLinesWhenIdle()
   onTurnEnd(deliverAgentWaits)

@@ -39,6 +39,7 @@ import { MESSAGE_SEARCH, MESSAGE_SEARCH_TALK, MESSAGE_TIME } from './schema-sear
 import {
   CLAUDE_LOGINS,
   PERMISSION_REVIEW,
+  PERMISSION_TIMEOUT,
   PERMISSIONS,
   SANDBOX_AWS,
   SANDBOX_SSH,
@@ -194,4 +195,5 @@ export const MIGRATIONS: readonly Migration[] = [
   { version: 105, name: 'pr_list_cache', sql: PR_LIST_CACHE },
   { version: 106, name: 'shared_tools', sql: SHARED_TOOLS },
   { version: 107, name: 'channel_subscription_delivery', sql: CHANNEL_SUBSCRIPTION_DELIVERY },
+  { version: 108, name: 'permission_timeout', sql: PERMISSION_TIMEOUT },
 ]
