@@ -2232,18 +2232,20 @@ class EaTools:
 
     async def _fix_ci(self, to: str) -> ToolResult:
         """Sends each agent in Seti's Fix CI plan its short message, as a direct message."""
-        only = {"task": str((await self.resolve_task(to)).get("id"))} if to else None
+        only: dict[str, str | int] | None = None
+        if to:
+            only = {"task": str((await self.resolve_task(to)).get("id"))}
         plan = await self._seti.get("/prs/fix-ci", only)
         fields = plan if isinstance(plan, dict) else {}
         lines: list[str] = []
         nudges = dicts(fields.get("nudges"))
         for nudge in nudges:
-            task = nudge.get("task") if isinstance(nudge.get("task"), dict) else {}
+            task = (dicts([nudge.get("task")]) or [{}])[0]
             message = str(nudge.get("message", ""))
             await self._post_direct(message, await self._handle_of(str(task.get("id"))))
             lines.append(f'- {title_of(task)}: "{message}"')
         for skip in dicts(fields.get("skipped")):
-            task = skip.get("task") if isinstance(skip.get("task"), dict) else {}
+            task = (dicts([skip.get("task")]) or [{}])[0]
             lines.append(f"- Skipped {title_of(task)}: it is {skip.get('reason')}.")
         unlinked = fields.get("unlinked")
         if isinstance(unlinked, int) and unlinked > 0:
