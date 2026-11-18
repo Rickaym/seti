@@ -102,6 +102,7 @@ test('shows PR updates in the transcript, marks the unread ones and switches the
   await waiting.getByRole('button', { name: '2 queued' }).click()
   await expect(page.getByRole('dialog')).toHaveText('2 updates wait for the agent. They go with your next message.')
   await page.keyboard.press('Escape')
+  await expect(page.getByRole('dialog')).toHaveCount(0)
   await expect(waiting.getByRole('button', { name: 'Hand over' })).toBeEnabled()
 
   await openAgentSettings(page, 'Team')
