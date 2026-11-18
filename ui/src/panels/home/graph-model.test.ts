@@ -44,14 +44,8 @@ const summary: HomeSummary = {
   streak_days: 0,
   days: [],
   agents: [
-    {
-      task_id: 'a',
-      ...tally,
-      turns_30d: 40,
-      cost_30d_usd: 1,
-      mcp: [{ server: 'github', calls: 3 }],
-    },
-    { task_id: 'b', ...tally, turns_30d: 10, cost_30d_usd: 9, mcp: [] },
+    { task_id: 'a', ...tally, turns_30d: 40, cost_30d_usd: 1 },
+    { task_id: 'b', ...tally, turns_30d: 10, cost_30d_usd: 9 },
   ],
   recent: [],
   live: [
@@ -80,7 +74,7 @@ describe('buildGraph', () => {
     )
   })
 
-  it('draws no MCP server, whether an agent called one in 30 days or calls one now', () => {
+  it('draws no MCP server for a call that runs now', () => {
     const graph = buildGraph({ tasks: [task('a'), b], archived: [], summary, filters: DEFAULT_FILTERS })
     expect(graph.nodes.map((node) => node.kind as string)).not.toContain('mcp')
     expect(graph.edges.map((edge) => edge.kind as string)).not.toContain('mcp')

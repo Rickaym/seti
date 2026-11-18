@@ -32,7 +32,6 @@ test('hovering a node shows its card, and clicking the node opens the agent', as
   expect(found).not.toBeNull()
   const card = page.getByTestId('home-card')
   await expect(card).toContainText('Merged 30d')
-  await expect(card).toContainText('Uses github')
   await page.mouse.click(found?.x ?? 0, found?.y ?? 0)
   await expect(page).toHaveURL(new RegExp(`#agents/${agent.id}$`))
 })

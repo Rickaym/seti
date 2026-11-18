@@ -51,7 +51,6 @@ function AgentBody({ task, ctx }: { task: TaskListEntry | ArchivedTaskEntry; ctx
   const status = archived ? null : listedStatus(task)
   const reason = archived || status === null ? null : reasonLine(task, status)
   const running = archived ? 0 : task.running_subtasks.length
-  const servers = stats?.mcp.map((use) => use.server) ?? []
   return (
     <>
       <div className="flex items-center gap-1.5 text-muted-foreground">
@@ -60,10 +59,9 @@ function AgentBody({ task, ctx }: { task: TaskListEntry | ArchivedTaskEntry; ctx
       </div>
       {reason !== null && <p className="line-clamp-2 text-muted-foreground">{reason}</p>}
       <AgentFacts stats={stats} />
-      {(servers.length > 0 || running > 0) && (
+      {running > 0 && (
         <p className="text-muted-foreground">
-          {running > 0 && `${String(running)} ${running === 1 ? 'subagent' : 'subagents'} running. `}
-          {servers.length > 0 && `Uses ${servers.join(', ')}.`}
+          {String(running)} {running === 1 ? 'subagent' : 'subagents'} running.
         </p>
       )}
     </>
