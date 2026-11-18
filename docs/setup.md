@@ -282,6 +282,10 @@ Seti would refuse.
 Without `SETI_DATABASE_URL`, a `SETI_HOME` other than `~/.seti` gets its own database, named after
 the directory, so a scratch instance never shares the live one.
 
+The memory cap of an agent has no environment variable: it follows the host, at 30% of its memory
+between 6 GB and 16 GB, until you save one in Settings, Resources. A larger cap means fewer `tsc`
+runs stopped at it and more risk when several agents peak together.
+
 ### Secrets
 
 | File in `~/.seti/credentials`                         | Used by        | Made by                      |
