@@ -49,8 +49,10 @@ test('quick replies fit the phone and send the whole answer on a tap', async ({ 
   }
   await expectFitsPhone(page, 'quick replies under a question')
 
-  await replies.getByRole('button', { name: `${long.slice(0, 25)}...` }).tap()
-  await expect(replies).toHaveCount(0)
+  await expect(async () => {
+    await replies.getByRole('button', { name: `${long.slice(0, 25)}...` }).tap({ timeout: 1000 })
+    await expect(replies).toHaveCount(0, { timeout: 2000 })
+  }, 'the view settles after it opens').toPass()
   await expect(page.getByRole('main').getByText('Done.', { exact: true })).toBeVisible()
   await expect.poll(async () => (await apiData<Task>(request, `/tasks/${id}`)).asking).toBe(false)
   const prompts = (await apiData<MessagePage>(request, `/tasks/${id}/messages`)).messages.flatMap((message) =>

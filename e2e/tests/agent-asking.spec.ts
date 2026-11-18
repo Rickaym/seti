@@ -73,8 +73,12 @@ test('quick replies answer a question asked in a reply, then go away', async ({ 
 
   const replies = page.getByRole('main').getByRole('group', { name: 'Quick replies' })
   await expect(replies.getByRole('button')).toHaveText(['Yes', 'No', short, `${long.slice(0, 25)}...`])
-  await replies.getByRole('button', { name: `${long.slice(0, 25)}...` }).hover()
-  await expect(page.getByRole('tooltip')).toHaveText(`Sends "${long}" as your reply`)
+  await expect(row).toHaveCount(0)
+  await expect(async () => {
+    await page.mouse.move(0, 0)
+    await replies.getByRole('button', { name: `${long.slice(0, 25)}...` }).hover()
+    await expect(page.getByRole('tooltip')).toHaveText(`Sends "${long}" as your reply`, { timeout: 1000 })
+  }, 'the view settles after it opens').toPass()
 
   await replies.getByRole('button', { name: 'Yes' }).click()
   await expect(replies).toHaveCount(0)
