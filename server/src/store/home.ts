@@ -20,18 +20,6 @@ export interface MergedLink {
   day: string
 }
 
-/** An MCP server named in an agent's tool call, from one stored message. */
-export interface McpCallRow {
-  id: number
-  task_id: string
-  created_at: string
-  server: string
-}
-
-/** An unescaped `"name":"mcp__` is a tool call's own name, never text quoted inside a string. */
-const MCP_NAME = '"name":"mcp__'
-const MCP_SERVER = '"name":"mcp__([^"]+?)__'
-
 /** Postgres's timezone names, which `AT TIME ZONE` accepts. */
 let zones: Promise<Set<string>> | null = null
 
@@ -85,16 +73,4 @@ export const homeStore = {
         WHERE task_id = t.id AND created_at >= ${since}) m`
     return row?.id ?? null
   },
-  lastId: async (): Promise<number> => {
-    const [row] = await sql<{ id: number | null }[]>`SELECT max(id)::float8 AS id FROM task_message`
-    return row?.id ?? 0
-  },
-  /** MCP servers named by tool calls in messages with ids after `after`, up to `upto`. */
-  mcpCalls: async (after: number, upto: number): Promise<McpCallRow[]> => [
-    ...(await sql<McpCallRow[]>`SELECT m.id::float8 AS id, m.task_id, m.created_at, r[1] AS server
-      FROM task_message m, regexp_matches(m.payload, ${MCP_SERVER}, 'g') AS r
-      WHERE m.id > ${after} AND m.id <= ${upto} AND m.kind = 'sdk'
-        AND (m.payload::json ->> 'type') = 'assistant' AND strpos(m.payload, ${MCP_NAME}) > 0
-      ORDER BY m.id`),
-  ],
 }

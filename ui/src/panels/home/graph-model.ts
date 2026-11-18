@@ -8,8 +8,9 @@ import {
   type TaskDisplayStatus,
   type TaskListEntry,
 } from '@seti/shared'
+import { toolName } from '@/lib/tool-summary'
 
-export type GraphNodeKind = 'agent' | 'subagent' | 'repo' | 'mcp' | 'tool'
+export type GraphNodeKind = 'agent' | 'subagent' | 'repo' | 'tool'
 
 /** What a node stands for and how it draws; positions live in the renderer. */
 export interface GraphNodeSpec {
@@ -31,11 +32,9 @@ export interface GraphEdgeSpec {
   id: string
   source: string
   target: string
-  kind: 'repo' | 'mcp' | 'subagent' | 'tool'
+  kind: 'repo' | 'subagent' | 'tool'
   /** A subagent or tool call that runs now; it animates. */
   live: boolean
-  /** Calls behind an MCP edge, which thicken it. */
-  weight: number
 }
 
 export interface GraphModel {
@@ -87,17 +86,7 @@ class Builder {
 
   edge(spec: Omit<GraphEdgeSpec, 'id'>): void {
     const id = `${spec.source}>${spec.target}`
-    const known = this.edges.get(id)
-    this.edges.set(id, {
-      ...spec,
-      id,
-      live: spec.live || (known?.live ?? false),
-      weight: spec.weight + (known?.weight ?? 0),
-    })
-  }
-
-  hub(id: string, kind: 'repo' | 'mcp', label: string): void {
-    this.node({ id, kind, label, radius: 7, color: null, taskId: null, status: null, subagent: null })
+    this.edges.set(id, { ...spec, id, live: spec.live || (this.edges.get(id)?.live ?? false) })
   }
 }
 
@@ -128,7 +117,7 @@ function addSubagents(b: Builder, task: TaskListEntry): void {
       status: null,
       subagent: subtask.tool_use_id,
     })
-    b.edge({ source: parent, target: sub, kind: 'subagent', live: true, weight: 1 })
+    b.edge({ source: parent, target: sub, kind: 'subagent', live: true })
   }
 }
 
@@ -147,25 +136,22 @@ function addAgent(b: Builder, task: TaskListEntry | ArchivedTaskEntry, radius: n
   })
   if (input.filters.repos) {
     for (const repo of task.repos) {
-      b.hub(`repo:${repo.id}`, 'repo', lastSegment(repo.slug))
-      b.edge({ source: id, target: `repo:${repo.id}`, kind: 'repo', live: false, weight: 1 })
+      const hub = `repo:${repo.id}`
+      b.node({
+        id: hub,
+        kind: 'repo',
+        label: lastSegment(repo.slug),
+        radius: 7,
+        color: null,
+        taskId: null,
+        status: null,
+        subagent: null,
+      })
+      b.edge({ source: id, target: hub, kind: 'repo', live: false })
     }
   }
   if (input.filters.subagents && !('archive' in task)) {
     addSubagents(b, task)
-  }
-}
-
-function addMcpUse(b: Builder, summary: HomeSummary): void {
-  for (const stats of summary.agents) {
-    const id = agentNodeId(stats.task_id)
-    if (!b.nodes.has(id)) {
-      continue
-    }
-    for (const use of stats.mcp) {
-      b.hub(`mcp:${use.server}`, 'mcp', use.server)
-      b.edge({ source: id, target: `mcp:${use.server}`, kind: 'mcp', live: false, weight: use.calls })
-    }
   }
 }
 
@@ -177,23 +163,18 @@ function addLiveCalls(b: Builder, summary: HomeSummary): void {
     }
     const sub = call.subagent === null ? null : subagentNodeId(call.task_id, call.subagent)
     const source = sub !== null && b.nodes.has(sub) ? sub : agent.id
-    if (call.server !== null) {
-      b.hub(`mcp:${call.server}`, 'mcp', call.server)
-      b.edge({ source, target: `mcp:${call.server}`, kind: 'mcp', live: true, weight: 1 })
-      continue
-    }
     const tool = `tool:${source}:${call.tool}`
     b.node({
       id: tool,
       kind: 'tool',
-      label: call.tool,
+      label: clip(toolName(call.tool).name),
       radius: 4,
       color: agent.color,
       taskId: call.task_id,
       status: null,
       subagent: null,
     })
-    b.edge({ source, target: tool, kind: 'tool', live: true, weight: 1 })
+    b.edge({ source, target: tool, kind: 'tool', live: true })
   }
 }
 
@@ -211,7 +192,6 @@ export function buildGraph(input: GraphInput): GraphModel {
     addAgent(b, task, agentRadius(size(task.id), top), input)
   }
   if (input.summary !== null && input.filters.tools) {
-    addMcpUse(b, input.summary)
     addLiveCalls(b, input.summary)
   }
   return { nodes: [...b.nodes.values()], edges: [...b.edges.values()] }

@@ -23,6 +23,9 @@ test('a phone reads the metrics below the graph and nothing scrolls sideways', a
   const metrics = page.getByRole('complementary', { name: 'Metrics' })
   const graph = page.getByTestId('home-graph')
   await expect(graph).toBeVisible()
+  await expect(
+    page.getByText(/^Graph of [1-9]\d* agents, \d+ running, with \d+ repos and \d+ subagents running$/),
+  ).toBeAttached()
   await metrics.getByRole('heading', { name: 'Shipped' }).scrollIntoViewIfNeeded()
   await expect(metrics.getByRole('heading', { name: 'Shipped' })).toBeInViewport()
   const graphBox = await graph.boundingBox()

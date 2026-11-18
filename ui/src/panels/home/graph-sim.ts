@@ -17,9 +17,9 @@ export interface SimEdge extends SimulationLinkDatum<SimNode> {
   spec: GraphEdgeSpec
 }
 
-const CHARGE: Record<GraphNodeKind, number> = { agent: -260, repo: -180, mcp: -170, subagent: -60, tool: -50 }
-const DISTANCE: Record<GraphEdgeSpec['kind'], number> = { repo: 70, mcp: 90, subagent: 26, tool: 22 }
-const STRENGTH: Record<GraphEdgeSpec['kind'], number> = { repo: 0.45, mcp: 0.22, subagent: 0.9, tool: 0.9 }
+const CHARGE: Record<GraphNodeKind, number> = { agent: -260, repo: -180, subagent: -60, tool: -50 }
+const DISTANCE: Record<GraphEdgeSpec['kind'], number> = { repo: 70, subagent: 26, tool: 22 }
+const STRENGTH: Record<GraphEdgeSpec['kind'], number> = { repo: 0.45, subagent: 0.9, tool: 0.9 }
 const CENTRE_PULL = 0.045
 const SPREAD = 160
 
