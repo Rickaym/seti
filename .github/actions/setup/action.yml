@@ -29,15 +29,18 @@ runs:
         {
           echo "packages=$packages"
           echo "archives=$archives"
-          echo "prefix=apt-$scope-$(printf '%s' "$packages" | sha256sum | cut -c1-16)-"
+          echo "scope=$scope"
+          echo "list=$(printf '%s' "$packages" | sha256sum | cut -c1-16)"
           echo "image=$ImageOS-$ImageVersion"
         } >> "$GITHUB_OUTPUT"
     - id: apt-cache
       uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
       with:
         path: ${{ steps.apt.outputs.archives }}
-        key: ${{ steps.apt.outputs.prefix }}${{ steps.apt.outputs.image }}
-        restore-keys: ${{ steps.apt.outputs.prefix }}
+        key: apt-${{ steps.apt.outputs.scope }}-${{ steps.apt.outputs.list }}-${{ steps.apt.outputs.image }}
+        restore-keys: |
+          apt-${{ steps.apt.outputs.scope }}-${{ steps.apt.outputs.list }}-
+          apt-playwright-${{ steps.apt.outputs.list }}-
     - if: steps.apt-cache.outputs.cache-hit == 'true'
       shell: bash
       env:
