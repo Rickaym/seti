@@ -25,6 +25,7 @@ import {
   type AccessGuardOptions,
 } from './access.js'
 import { cancelWaitsOnArchive, deliverAgentWaits } from './agent-waits.js'
+import { remindWhenAsking } from './asking-reminder.js'
 import { briefOnReturn } from './attention-brief.js'
 import { inBackground } from './background.js'
 import { setAfterProbe, setProbePlugins } from './capabilities.js'
@@ -360,6 +361,7 @@ export function createApp(access: AccessGuardOptions = defaultAccess(), eaUrl: s
   onTurnEnd(workspaceTurnEnded)
   onTurnEnd(watchDroppedPrompts)
   onTurnEnd(notifyTurnEnd)
+  onTurnEnd(remindWhenAsking)
   briefOnReturn()
   onAnyTaskEvent(notifyStatusEvent)
   onAnyTaskEvent(watchBlocked)

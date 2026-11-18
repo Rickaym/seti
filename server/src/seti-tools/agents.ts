@@ -58,6 +58,7 @@ export const brief = (task: Task | TaskListEntry) => ({
   workspace_id: task.workspace_id,
   ...(task.status_line === null ? {} : { status_line: task.status_line }),
   ...(task.last_error === null ? {} : { last_error: task.last_error }),
+  ...('question' in task && task.question !== null ? { question: task.question } : {}),
   ...(task.archived_at === null ? {} : { archived_at: task.archived_at }),
 })
 

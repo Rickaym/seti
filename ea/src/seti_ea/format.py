@@ -110,6 +110,18 @@ def status_note(task: dict[str, Any]) -> str:
     return f', "{line}"' if isinstance(line, str) and line else ""
 
 
+def asked(task: dict[str, Any]) -> str:
+    """The question a task's last turn ended on, kept short; empty when it asks nothing."""
+    question = task.get("question")
+    return clip(question, 200) if isinstance(question, str) else ""
+
+
+def question_note(task: dict[str, Any]) -> str:
+    """`, "Should I merge it?"` for a task whose turn ended on a question, else nothing."""
+    question = asked(task)
+    return f', "{question}"' if question else ""
+
+
 def task_repos(task: dict[str, Any]) -> str:
     repos = task.get("repos")
     names = (

@@ -1,4 +1,4 @@
-import type { Task, TaskDisplayStatus } from '@seti/shared'
+import { ASKED_IN_REPLY, type Task, type TaskDisplayStatus } from '@seti/shared'
 import { classifyFailure, INTERRUPTED } from '@/lib/failure'
 
 const LABELS: Partial<Record<TaskDisplayStatus, string>> = { asking: 'asks you', blocked: 'waits on you' }
@@ -33,8 +33,8 @@ export function statusLightTitle(status: TaskDisplayStatus, subagents: number): 
 }
 
 /**
- * The line an agent's row shows after its title: why it waits on the user or why its turn failed,
- * else the status line it set itself.
+ * The line an agent's row shows after its title: why it waits on the user, why its turn failed or
+ * that it asked in its reply, else the status line it set itself.
  */
 export function reasonLine(
   task: Pick<Task, 'blocked' | 'last_error' | 'status_line'>,
@@ -46,5 +46,8 @@ export function reasonLine(
   if (status === 'error') {
     return classifyFailure(task.last_error ?? '').title
   }
-  return status === 'interrupted' ? INTERRUPTED.title : task.status_line
+  if (status === 'interrupted') {
+    return INTERRUPTED.title
+  }
+  return status === 'asking' ? ASKED_IN_REPLY : task.status_line
 }

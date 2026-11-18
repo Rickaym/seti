@@ -44,6 +44,7 @@ import {
   setTaskSandbox,
 } from './tasks.js'
 import { endAgentTerminals } from './terminal.js'
+import { askedQuestion } from './turn-asking.js'
 import { placeAttachments, refuseCommandAttachments } from './uploads.js'
 import { countWorkspaces, setTaskWorkspace } from './workspaces.js'
 
@@ -62,6 +63,7 @@ export async function taskListEntries(): Promise<TaskListEntry[]> {
         ...listedSubtasks(subtasks),
         todos: await agentTodos(task.id),
         pr_states: prStates(states.get(task.id) ?? {}, shown),
+        question: await askedQuestion(task),
       }
     }),
   )

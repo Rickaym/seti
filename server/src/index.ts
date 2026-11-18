@@ -5,6 +5,7 @@ import { WebSocketServer } from 'ws'
 import { accountStatus, warmAccount } from './account.js'
 import { createApp } from './app.js'
 import { startAutoArchive } from './archive.js'
+import { rearmAskingReminders } from './asking-reminder.js'
 import { audit } from './audit.js'
 import { inBackground } from './background.js'
 import { startBackups } from './backup-schedule.js'
@@ -188,6 +189,7 @@ await modHost.start()
 await watchDevMods()
 startModUpdates()
 notifyInterrupted(interrupted.notify)
+await rearmAskingReminders()
 await startEaIndex()
 if (PLANNER_MODULE !== '') {
   await loadPlannerModule(PLANNER_MODULE)

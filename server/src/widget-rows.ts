@@ -1,4 +1,5 @@
 import {
+  ASKED_IN_REPLY,
   listedStatus,
   todoProgress,
   todoText,
@@ -46,7 +47,7 @@ function clip(text: string, max: number): string {
 /** What a waiting agent's line says when the device hides names. */
 const GENERIC_REASONS: Record<WidgetReason, string> = {
   blocked: 'Waits for your approval',
-  asking: 'Asks you something',
+  asking: ASKED_IN_REPLY,
   error: 'Its turn failed',
   interrupted: 'Cut off by a restart',
 }

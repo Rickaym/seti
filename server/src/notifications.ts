@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto'
 import { createRequire } from 'node:module'
 import {
   agentUrl,
+  ASKED_IN_REPLY,
   ATTENTION_TIERS,
   needsYou,
   NO_CLOSING_LINE,
@@ -29,7 +30,8 @@ import { needsYouCount } from './needs-you-count.js'
 import { onScreen } from './presence.js'
 import { sealedSecrets, secret, SecretUnreadableError } from './secrets.js'
 import { notificationSettings, pushDevices, type PushTarget } from './store/notifications.js'
-import { attentionOf, lastResult } from './task-attention.js'
+import { attentionOf } from './task-attention.js'
+import { askedQuestion } from './turn-asking.js'
 
 /** web-push is CommonJS whose exports Node's ESM loader cannot name, so it loads through require. */
 const webPush = createRequire(import.meta.url)('web-push') as typeof WebPush
@@ -185,8 +187,8 @@ export async function notifyBody(task: Task, kind: AgentNotifyKind): Promise<str
     return firstLine(task.blocked)
   }
   if (task.asking) {
-    const question = firstLine((await lastResult(task.id)).split(/\n\s*\n/).at(-1) ?? '')
-    return question === '' ? 'Asks you' : `Asks: ${question}`
+    const question = await askedQuestion(task)
+    return question === null ? ASKED_IN_REPLY : `Asks: ${question}`
   }
   if (task.status === 'error') {
     const cause = firstLine(task.last_error ?? '')
@@ -199,8 +201,8 @@ export async function notifyBody(task: Task, kind: AgentNotifyKind): Promise<str
 const notified = new Map<string, string>()
 const NOTIFIED_KEPT = 500
 
-function firstTime(task: Task, kind: AgentNotifyKind): boolean {
-  const key = `${kind}@${task.updated_at}`
+function firstTime(task: Task, mark: string): boolean {
+  const key = `${mark}@${task.updated_at}`
   if (notified.get(task.id) === key) {
     return false
   }
@@ -215,19 +217,21 @@ function firstTime(task: Task, kind: AgentNotifyKind): boolean {
   return true
 }
 
-/**
- * Pushes the agent's news to every device that does not show it now, when the attention router
- * picks a push: the EA's item carries an agent it watches, and a page with focus raises a toast.
- * Returns how many devices got it.
- */
-export async function notifyAgent(task: Task, kind: AgentNotifyKind, at = Date.now()): Promise<number> {
-  if (task.notifications_muted || task.archived_at !== null || !firstTime(task, kind)) {
+/** One push about an agent; `mark` tells the pushes about one state of it apart. */
+interface AgentPush {
+  kind: AgentNotifyKind
+  mark: string
+  body: () => Promise<string>
+}
+
+async function pushAgent(task: Task, push: AgentPush, at: number): Promise<number> {
+  if (task.notifications_muted || task.archived_at !== null || !firstTime(task, push.mark)) {
     return 0
   }
   if (await eaCarries(task.id)) {
     return 0
   }
-  const route = await routeAttention({ tier: 'active', needsYou: kind === 'needs_you', viaEa: false }, at)
+  const route = await routeAttention({ tier: 'active', needsYou: push.kind === 'needs_you', viaEa: false }, at)
   if (route !== 'push') {
     return 0
   }
@@ -237,19 +241,37 @@ export async function notifyAgent(task: Task, kind: AgentNotifyKind, at = Date.n
   }
   const payload: NotificationPayload = {
     title: task.title,
-    body: await notifyBody(task, kind),
+    body: await push.body(),
     tag: task.id,
     url: agentUrl(task.id),
-    kind,
+    kind: push.kind,
     badge: await needsYouCount(),
   }
   const delivery: Delivery = {
     ttl: TURN_TTL_S,
-    urgency: kind === 'needs_you' ? 'high' : 'normal',
+    urgency: push.kind === 'needs_you' ? 'high' : 'normal',
     topic: topicOf(task.id),
   }
   const sent = await Promise.all(targets.map(async (target) => deliver(target, payload, delivery)))
   return sent.filter(Boolean).length
+}
+
+/**
+ * Pushes the agent's news to every device that does not show it now, when the attention router
+ * picks a push: the EA's item carries an agent it watches, and a page with focus raises a toast.
+ * Returns how many devices got it.
+ */
+export async function notifyAgent(task: Task, kind: AgentNotifyKind, at = Date.now()): Promise<number> {
+  return pushAgent(task, { kind, mark: kind, body: async () => notifyBody(task, kind) }, at)
+}
+
+/** Pushes once more for a question the agent still waits on, under the rules of its first push. */
+export async function remindAsking(task: Task, at = Date.now()): Promise<number> {
+  const body = async () => {
+    const question = await askedQuestion(task)
+    return question === null ? 'Still waits on your answer' : `Still waits: ${question}`
+  }
+  return pushAgent(task, { kind: 'needs_you', mark: 'still_waits', body }, at)
 }
 
 async function notifyStatus(taskId: string, status: TaskStatus): Promise<void> {

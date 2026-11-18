@@ -701,9 +701,32 @@ startup expires what a restart cut off.
 Open questions set the agent's reason line in Needs you through `server/src/task-blocked.ts`,
 such as `Asks 2 questions: Which checks should I run first?`, after a permission request and
 before a change request. `questionsContext`, registered with `registerContextProvider`, tells
-every agent to ask through AskUserQuestion instead of in its reply. The guess that a turn ended on
-a question (`server/src/turn-asking.ts`) reads only the prose after the last tool use, the
-fallback for an agent that asks in text.
+every agent to ask through AskUserQuestion instead of in its reply. An agent that asks in its
+reply all the same is caught by a detector that reads only the prose after the turn's last tool
+use and calls no model (`proseQuestion` in `shared/src/prose-question.ts`, fed by
+`server/src/turn-asking.ts`). The reply asks when its last paragraph outside fenced code ends
+with a question, or when a question and a list of answers end it together. It does not ask when
+the question mark sits in code, in quotes, in a quote block or in a heading, when the reply goes
+on after the question, when a list under the question reads as the agent's own answer, when the
+agent puts the question to itself ("Why did it fail?") or when it is a closing courtesy such as
+"Anything else?". The detector also returns the question on one line and up to four answers the
+reply listed: a numbered or lettered list right after the question, or a list right before a
+question that asks which one. Its limits are kept as rows of the table in
+`server/src/prose-question.test.ts`: a question followed by a remark reads as answered, and a
+rhetorical question that ends the reply reads as asked.
+
+An agent whose turn ended this way shows the status `asking` and the reason line "Asked in its
+reply". Its push reads `Asks:` and the question. Under its last message the agent view offers
+quick replies (`ui/src/panels/tasks/QuickReplies.tsx`): Yes and No when either answers the
+question, and one per listed answer. A tap sends that answer as the reply box would, and the
+quick replies go once any message starts the next turn. If the agent is still unanswered 15
+minutes after its turn ended, Seti pushes once more, `Still waits:` and the question, under the
+same rules as the first push: none for a muted or archived agent, one the EA carries or one a
+device shows (`server/src/asking-reminder.ts`). The reminder is a timer set at the turn end.
+Startup sets it again, for the rest of the wait, only for a turn that ended less than 15 minutes
+earlier, so a restart never reminds twice, and a question that came due while Seti was down gets
+none. The task list carries each asking agent's `question`, which the EA's `list_tasks`,
+`get_task` and `seti_overview` and an agent's own `list_tasks` read.
 
 Open questions are answered in the Requests panel and in an agent's Requests drawer, both
 described under [Requests wait in one panel](#requests-wait-in-one-panel). The panel lists every
@@ -1020,7 +1043,8 @@ last read, so a busy install pays for each message once.
 An agent that cannot go on without the user shows in Needs you with a reason line on its row, and
 its devices get a high-urgency push. Turn ends set three states: `error` (a failed turn, a rate
 limit, a lost login), `interrupted` (a restart cut the turn off) and `asking` (the turn ended on a
-question in its prose). An AskUserQuestion call waits as questions instead, as above. Everything
+question in its prose, with the reason line "Asked in its reply"). An AskUserQuestion call waits
+as questions instead, as above. Everything
 that holds an agent up without ending its turn sets `task.blocked`, which
 `server/src/task-blocked.ts` keeps. It shows as the `blocked` status, which stays in Needs you
 while the agent is open, until it clears:
