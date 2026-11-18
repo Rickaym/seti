@@ -182,6 +182,15 @@ function LinkedPrList({ prs, ...rest }: ListProps) {
   )
 }
 
+/** Opens the list with the filter focused, whatever sits above it. */
+function focusFilter(event: Event): void {
+  const filter = event.currentTarget instanceof HTMLElement ? event.currentTarget.querySelector('input') : null
+  if (filter !== null) {
+    event.preventDefault()
+    filter.focus()
+  }
+}
+
 interface SheetProps {
   title: string
   open: boolean
@@ -344,6 +353,7 @@ export function MoreLinkedPrs({ prs, hidden, shown, toFix, bare = false, onOpen,
         className="flex max-h-[min(32rem,var(--radix-popover-content-available-height))] w-[30rem] max-w-[calc(100vw-1rem)] flex-col p-0"
         onPointerDownOutside={keepForToasts}
         onFocusOutside={keepForToasts}
+        onOpenAutoFocus={focusFilter}
       >
         <div className="shrink-0 border-b border-border px-3 py-1.5 text-xs font-medium">{title}</div>
         {list}
