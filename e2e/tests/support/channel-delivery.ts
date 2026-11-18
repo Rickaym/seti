@@ -35,8 +35,8 @@ const SCRIPT = `export default ({ state }) => {
   return { message: 'Check the deploy, round ' + count, state: count }
 }`
 
-async function post<T>(request: APIRequestContext, url: string, data?: object): Promise<T> {
-  const response = await request.post(`/api${url}`, data === undefined ? {} : { data })
+async function post<T>(request: APIRequestContext, url: string, data: object = {}): Promise<T> {
+  const response = await request.post(`/api${url}`, { data })
   expect(response.ok(), `POST /api${url}`).toBe(true)
   return ((await response.json()) as Envelope<T>).data
 }
