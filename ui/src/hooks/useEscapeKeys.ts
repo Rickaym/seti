@@ -13,15 +13,13 @@ interface EscapeKeys {
   onStop: () => Promise<void> | void
   /** Esc twice while idle; without it a double press does nothing. */
   onRewind?: () => void
-  /** Each Esc while idle, before any rewind, such as to fold a frame away. */
-  onIdle?: (() => void) | undefined
 }
 
 const inside = (root: HTMLElement | null, target: EventTarget | null) =>
   root !== null && target instanceof Node && (target === document.body || root.contains(target))
 
 /** Esc stops what runs, Esc twice while idle rewinds; dialogs win, inactive scopes ignore it. */
-export function useEscapeKeys({ root, busy, onStop, onRewind, onIdle }: EscapeKeys): void {
+export function useEscapeKeys({ root, busy, onStop, onRewind }: EscapeKeys): void {
   const active = useCommandScope()
   const lastPress = useRef(Number.NEGATIVE_INFINITY)
   const stopping = useRef(false)
@@ -60,7 +58,6 @@ export function useEscapeKeys({ root, busy, onStop, onRewind, onIdle }: EscapeKe
         }
         return
       }
-      onIdle?.()
       if (onRewind === undefined) {
         return
       }
@@ -76,5 +73,5 @@ export function useEscapeKeys({ root, busy, onStop, onRewind, onIdle }: EscapeKe
     return () => {
       document.removeEventListener('keydown', onKeyDown)
     }
-  }, [active, root, busy, onStop, onRewind, onIdle])
+  }, [active, root, busy, onStop, onRewind])
 }

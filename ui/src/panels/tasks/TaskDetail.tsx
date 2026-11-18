@@ -45,7 +45,6 @@ import { TodoStrip } from '@/panels/tasks/TodoStrip'
 import { HeaderUnseenDot } from '@/panels/tasks/UnseenDot'
 import type { ActionHandlers } from '@/panels/tasks/agent-actions'
 import { useAgentFrame, type AgentFrame } from '@/panels/tasks/agent-frame'
-import { useCalmFrame } from '@/panels/tasks/useCalmFrame'
 import { useCompactingResync } from '@/panels/tasks/useCompactingResync'
 import { useMarkSeen } from '@/panels/tasks/useMarkSeen'
 import { usePin } from '@/panels/tasks/usePin'
@@ -111,7 +110,6 @@ export function TaskDetail({ task, onChanged, onSubtasks }: TaskDetailProps) {
   const narrow = useNarrow()
   const frame = useAgentFrame()
   const { rows, pending } = usePanelRows(stream, frame)
-  const { calm, hold } = useCalmFrame(frame, root)
   const processes = useAgentProcesses(task.id, stream.session.open || hasTerminal, frame?.focused !== false)
   const pin = usePin(task, onChanged)
   const [titleDraft, setTitleDraft] = useState<string | null>(null)
@@ -179,7 +177,6 @@ export function TaskDetail({ task, onChanged, onSubtasks }: TaskDetailProps) {
     onRewind: useCallback(() => {
       setRewinding(true)
     }, []),
-    onIdle: frame?.onEscape,
   })
 
   useStopCommand(task, { busy, shell: shellRunning }, stop)
@@ -262,7 +259,6 @@ export function TaskDetail({ task, onChanged, onSubtasks }: TaskDetailProps) {
             task={task}
             onChanged={onChanged}
             frame={frame}
-            calm={calm}
             narrow={narrow}
             pill={pill}
             light={<StatusLight status={shownStatus} place="header" subagents={runningSubagents} agent={task} />}
@@ -295,7 +291,6 @@ export function TaskDetail({ task, onChanged, onSubtasks }: TaskDetailProps) {
             shell={stream.shell}
             permissions={stream.permissions}
             compacting={compacting}
-            calm={calm ? { onHold: hold } : null}
             draft={draft}
             onDraftChange={setDraft}
             onChanged={onChanged}

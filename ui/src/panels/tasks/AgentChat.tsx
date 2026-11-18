@@ -3,7 +3,6 @@ import { useEffect, useMemo, type ComponentProps } from 'react'
 import { usePendingSends } from '@/hooks/usePendingSends'
 import { useTranscriptBlocks } from '@/hooks/useTranscriptBlocks'
 import { confirmedIds } from '@/lib/pending-sends'
-import { CalmBody } from '@/panels/tasks/CalmBody'
 import { ChangeRequests } from '@/panels/tasks/ChangeRequests'
 import { CompactingNote } from '@/panels/tasks/CompactingNote'
 import { Composer } from '@/panels/tasks/Composer'
@@ -42,8 +41,6 @@ interface AgentChatProps {
   permissions: number
   /** When the conversation started compacting, while it does. */
   compacting: string | null
-  /** Set while the view is calm: the latest message stands in for the transcript and reply box. */
-  calm: { onHold: (held: boolean) => void } | null
   draft: string
   onDraftChange: (draft: string) => void
   onChanged: () => void
@@ -58,7 +55,6 @@ export function AgentChat({
   shell,
   permissions,
   compacting,
-  calm,
   draft,
   onDraftChange,
   onChanged,
@@ -66,19 +62,6 @@ export function AgentChat({
   const running = status === 'running'
   const { store, unsent } = usePendingRows(task.id, transcript.stream.messages)
   const blocks = useTranscriptBlocks(task.id)
-  if (calm !== null && transcript.load !== undefined) {
-    return (
-      <CalmBody
-        task={task}
-        status={status}
-        messages={messages}
-        permissions={permissions}
-        load={transcript.load}
-        onHold={calm.onHold}
-        onChanged={onChanged}
-      />
-    )
-  }
   return (
     <>
       <TranscriptPane

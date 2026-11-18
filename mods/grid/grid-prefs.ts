@@ -3,20 +3,18 @@ import { useSyncExternalStore } from 'react'
 
 /** How this device shows the grid, apart from its layouts. */
 export interface GridPrefs {
-  /** Panels show the status and the latest message until one is opened. */
-  calm: boolean
   /** The agents list hides while the grid shows. */
   listHidden: boolean
 }
 
 const PREFS_KEY = 'seti.agents.grid.prefs'
 
-const DEFAULTS: GridPrefs = { calm: true, listHidden: false }
+const DEFAULTS: GridPrefs = { listHidden: false }
 
 function readPrefs(): GridPrefs {
   try {
     const stored: unknown = JSON.parse(localStorage.getItem(PREFS_KEY) ?? 'null')
-    return isRecord(stored) ? { calm: stored.calm !== false, listHidden: stored.listHidden === true } : DEFAULTS
+    return isRecord(stored) ? { listHidden: stored.listHidden === true } : DEFAULTS
   } catch {
     return DEFAULTS
   }

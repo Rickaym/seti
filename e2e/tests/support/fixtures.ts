@@ -62,17 +62,6 @@ function silenceFailureToasts(): void {
   }
 }
 
-/** Grid panels show their transcripts, as the specs written before calm panels expect. */
-function fullGridPanels(): void {
-  try {
-    if (localStorage.getItem('seti.agents.grid.prefs') === null) {
-      localStorage.setItem('seti.agents.grid.prefs', JSON.stringify({ calm: false }))
-    }
-  } catch {
-    // Storage can be blocked; the grid then keeps its own default.
-  }
-}
-
 interface Fixtures {
   /** HTTP error statuses a test provokes on purpose. Any other status of 400 or above fails it. */
   allowedHttpStatuses: number[]
@@ -82,9 +71,6 @@ interface Fixtures {
   allowedCspViolations: RegExp[]
   /** Failure toasts stay off unless a spec turns them on, since many specs leave failed agents. */
   failureToasts: boolean
-  /** The grid starts with calm panels, its default; off unless a spec is about them. */
-  calmGrid: boolean
-  fullGrid: undefined
   failOnBrowserErrors: undefined
   leaveFocus: undefined
   assetsOutsideChromium: undefined
@@ -181,16 +167,6 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
       const left = page.waitForRequest((req) => isFocus(req.url()), { timeout: 1000 }).catch(() => null)
       await page.evaluate(() => window.dispatchEvent(new Event('pagehide'))).catch(() => undefined)
       await left
-    },
-    { auto: true },
-  ],
-  calmGrid: [false, { option: true }],
-  fullGrid: [
-    async ({ page, calmGrid }, use) => {
-      if (!calmGrid) {
-        await page.addInitScript(fullGridPanels)
-      }
-      await use(undefined)
     },
     { auto: true },
   ],
