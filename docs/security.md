@@ -221,6 +221,30 @@ private key off the host. The sandbox model is in [Architecture](architecture.md
   filled in by Seti and replaced with `[secret]` in everything the script, its logs and its events
   see. Only the user gives a poller extra hosts or connections (see [Pollers](pollers.md)).
 
+## Folders a sandboxed agent can write
+
+A sandboxed agent writes freely in its folders, so Seti's own processes, which run on the host,
+treat what they find there as input and never as configuration to act on.
+
+- The capability probe is Claude Code started to list a folder's commands, subagents and MCP
+  servers. Project settings start hooks, and `.mcp.json` starts server commands. For the folder a
+  sandboxed agent works in, the probe therefore runs inside that agent's sandbox, started the way
+  its session is, so whatever the folder configures runs there and the composer menu and
+  Capabilities still show the folder's own commands and servers. For any other folder such an
+  agent has, and for the folders of archived sandboxed agents, the probe runs on the host and
+  loads the user's settings only, so the folder's commands and servers are not listed. Folders of
+  unsandboxed agents and folders no agent has are probed as before
+  (`server/src/probe-launch.ts`).
+- A `.git` file can name any repository as the one behind a folder. Seti follows it only when
+  that repository records the folder: a worktree whose admin folder lies in the repository's
+  `worktrees` and points back at it, or a submodule under a checkout that holds its git
+  directory. Otherwise the folder counts as no repository, so the sandbox mounts nothing for it,
+  and its local MCP servers and Claude Code memory are its own alone
+  (`gitDirs` in `server/src/sandbox-mounts.ts`).
+- An MCP sign-in runs `claude mcp login` on the host in the folder whose config names the server,
+  when the user starts it. It runs no hook and no server command, and refuses a server from
+  `.mcp.json` that the user has not approved in Claude Code.
+
 ## Knowledge notes
 
 Knowledge notes carry text from one agent into every other agent's system prompt, which makes them

@@ -82,6 +82,7 @@ const BLANK: McpConnector = {
   name: '',
   title: '',
   description: '',
+  icon: null,
   source: 'common',
   transport: 'http',
   url: '',

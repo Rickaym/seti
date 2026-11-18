@@ -1,5 +1,5 @@
 import type { PromptPayload } from '@seti/shared'
-import type { NextMessage } from './agent-session.js'
+import type { NextMessage } from './next-message.js'
 
 /** Something that happened outside the conversation, written for the agent, and how many items. */
 export interface TurnPreface {
@@ -7,11 +7,17 @@ export interface TurnPreface {
   count: number
 }
 
+/** The turn a preface is read for. */
+export interface PrefacedTurn {
+  /** It also takes what waits for the user's next message: a written message, or a hand-over. */
+  held: boolean
+}
+
 /**
  * Returns what the agent should learn before its next turn, or null; read once per turn.
  * @public
  */
-export type TurnPrefaceProvider = (taskId: string) => Promise<TurnPreface | null>
+export type TurnPrefaceProvider = (taskId: string, turn: PrefacedTurn) => Promise<TurnPreface | null>
 
 const prefaceProviders: TurnPrefaceProvider[] = []
 
@@ -43,19 +49,22 @@ function autoText(next: NextMessage, queued: boolean): string {
   return next.priority === undefined ? AUTO_QUEUED : AUTO_JOINED
 }
 
-async function prefaces(taskId: string, prompt: string): Promise<TurnPreface[]> {
-  if (prompt.startsWith('/')) {
+type Prefaced = Pick<NextMessage, 'prompt' | 'held'>
+
+async function prefaces(taskId: string, { prompt, held }: Prefaced): Promise<TurnPreface[]> {
+  if (prompt?.startsWith('/') === true) {
     return []
   }
-  const found = await Promise.all(prefaceProviders.map(async (provider) => provider(taskId)))
+  const turn = { held: prompt !== null || held === true }
+  const found = await Promise.all(prefaceProviders.map(async (provider) => provider(taskId, turn)))
   return found.filter((preface) => preface !== null)
 }
 
 const prefaceCount = (found: readonly TurnPreface[]) => found.reduce((sum, preface) => sum + preface.count, 0)
 
 /** How many items the prefaces would hand the agent with this prompt now. */
-export const pendingPrefaces = async (taskId: string, prompt: string | null) =>
-  prefaceCount(await prefaces(taskId, prompt ?? ''))
+export const pendingPrefaces = async (taskId: string, message: Prefaced) =>
+  prefaceCount(await prefaces(taskId, message))
 
 /** Tells the agent a message came from the EA or another agent, never the user. */
 const fromNote = (from: string) => `This message comes from ${from}, not the user.`
@@ -76,11 +85,12 @@ export async function promptFor(
   queued: boolean,
 ): Promise<{ payload: PromptPayload; text: string }> {
   const { prompt, interrupted, retry, attachments = [], client_id: clientId, from } = next
-  const found = await prefaces(taskId, prompt ?? '')
+  const found = await prefaces(taskId, next)
   const count = prefaceCount(found)
   const payload: PromptPayload = {
     text: prompt ?? '',
     ...(prompt === null ? { auto: true } : {}),
+    ...(prompt === null && next.held === true ? { held: true } : {}),
     ...(count > 0 ? { inputs: count } : {}),
     ...(interrupted ? { interrupted } : {}),
     ...(queued ? { queued: 'waiting' } : {}),

@@ -27,11 +27,12 @@ export const eaContextStore = {
     }
     return byTask
   },
-  /** Updates waiting for each task's agent: undismissed ones after the last prompt it read. */
+  /** Updates waiting for each task's agent: undismissed, not quiet, after the last prompt it read. */
   waitingUpdates: async (): Promise<Map<string, number>> => {
     const rows = await sql<{ task_id: string; waiting: number }[]>`SELECT m.task_id, COUNT(*)::int AS waiting
       FROM task_message m
-      WHERE m.kind = 'input' AND (m.payload::json ->> 'dismissed_at') IS NULL AND m.id > COALESCE((
+      WHERE m.kind = 'input' AND (m.payload::json ->> 'dismissed_at') IS NULL
+        AND (m.payload::json ->> 'quiet') IS NULL AND m.id > COALESCE((
         SELECT MAX(p.id) FROM task_message p
         WHERE p.task_id = m.task_id AND p.kind = 'prompt' AND (p.payload::json ->> 'text') NOT LIKE '/%'
           AND COALESCE(p.payload::json ->> 'queued', '') <> 'removed'

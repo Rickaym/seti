@@ -12,6 +12,7 @@ import { ARCHIVE_ROOT } from './config.js'
 import { now, tasks } from './db.js'
 import { directoryBytes, removeWorktree } from './git.js'
 import { busyReason, OWNED_ROOTS, removalRefusal, removeOwnedDir, scratchDirOf, type OwnedRoot } from './owned-dirs.js'
+import { stopTaskProbes } from './probe-launch.js'
 import { taskArchives } from './store/archive.js'
 import { taskLocation } from './store/task-location.js'
 import { inLane } from './task-lane.js'
@@ -435,6 +436,7 @@ export async function removeTaskFolders(task: Task): Promise<string[]> {
  * those taken off it). A folder another agent uses, or a process works in, stays and is logged.
  */
 export async function removeTaskFiles(task: Task): Promise<void> {
+  await stopTaskProbes(task.id)
   await removeTaskSandbox(task.id)
   const left = await removeTaskFolders(task)
   const rest = await others(task.id)

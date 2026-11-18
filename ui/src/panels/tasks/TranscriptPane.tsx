@@ -397,60 +397,62 @@ export function TranscriptPane({
   })
 
   return (
-    <div className="relative min-h-0 flex-1">
-      {/* An opaque scroller is one Chrome scrolls on the compositor on screens of pixel ratio 1. */}
-      <section
-        ref={scroller}
-        aria-label="Transcript"
-        onScroll={onScroll}
-        className="h-full overflow-y-auto bg-background px-5 py-4 [overflow-anchor:none] max-md:px-3 max-md:py-3 in-data-agent-frame:px-3 in-data-agent-frame:py-2"
-      >
-        <div ref={content} className={contentClassName}>
-          {placeholder !== null && <TranscriptPlaceholder shown={placeholder} onRetry={load?.onRetry} />}
-          {!covered && (
-            <>
-              {hasOlder && (
-                <PageButton
-                  later={false}
-                  loading={loadingOlder}
-                  onClick={() => {
-                    void requestOlder()
-                  }}
-                />
-              )}
-              <EmptyLine text={empty} shown={messages.length + unsentCount} older={hasOlder} running={running} />
-              <FindFocusContext value={find?.focusId ?? null}>
-                <Transcript
-                  taskId={taskId}
-                  messages={messages}
-                  rewinds={rewinds}
-                  running={running}
-                  subtasks={subtasks}
-                  subagentRows={subagentRows}
-                  {...(marks === undefined ? {} : { marks })}
-                  blocks={blocks}
-                  edges={edges}
-                />
-              </FindFocusContext>
-              {stretch.hasNewer ? (
-                <PageButton
-                  later
-                  loading={stretch.loadingNewer}
-                  onClick={() => {
-                    void requestNewer()
-                  }}
-                />
-              ) : (
-                <>
-                  <UnsentRows unsent={orNone(unsent)} first={messages.length === 0} />
-                  {children}
-                </>
-              )}
-            </>
-          )}
-        </div>
-      </section>
-      <LatestButton stretch={stretch} unseen={unseen} onJump={jumpToLatest} />
+    <div className="relative flex min-h-0 flex-1 flex-col">
+      <div className="relative min-h-0 flex-1">
+        {/* An opaque scroller is one Chrome scrolls on the compositor on screens of pixel ratio 1. */}
+        <section
+          ref={scroller}
+          aria-label="Transcript"
+          onScroll={onScroll}
+          className="h-full overflow-y-auto bg-background py-4 pr-12 pl-5 [overflow-anchor:none] max-md:px-3 max-md:py-3 in-data-agent-frame:py-2 in-data-agent-frame:pl-3"
+        >
+          <div ref={content} className={contentClassName}>
+            {placeholder !== null && <TranscriptPlaceholder shown={placeholder} onRetry={load?.onRetry} />}
+            {!covered && (
+              <>
+                {hasOlder && (
+                  <PageButton
+                    later={false}
+                    loading={loadingOlder}
+                    onClick={() => {
+                      void requestOlder()
+                    }}
+                  />
+                )}
+                <EmptyLine text={empty} shown={messages.length + unsentCount} older={hasOlder} running={running} />
+                <FindFocusContext value={find?.focusId ?? null}>
+                  <Transcript
+                    taskId={taskId}
+                    messages={messages}
+                    rewinds={rewinds}
+                    running={running}
+                    subtasks={subtasks}
+                    subagentRows={subagentRows}
+                    {...(marks === undefined ? {} : { marks })}
+                    blocks={blocks}
+                    edges={edges}
+                  />
+                </FindFocusContext>
+                {stretch.hasNewer ? (
+                  <PageButton
+                    later
+                    loading={stretch.loadingNewer}
+                    onClick={() => {
+                      void requestNewer()
+                    }}
+                  />
+                ) : (
+                  <>
+                    <UnsentRows unsent={orNone(unsent)} first={messages.length === 0} />
+                    {children}
+                  </>
+                )}
+              </>
+            )}
+          </div>
+        </section>
+        <LatestButton stretch={stretch} unseen={unseen} onJump={jumpToLatest} />
+      </div>
       {!covered && <OwnMessageNav nav={own.nav} seeking={own.seeking} onStep={own.step} />}
     </div>
   )

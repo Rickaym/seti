@@ -235,6 +235,7 @@ export const AUDIT_KINDS = [
   'system.channel_unsubscribed',
   'system.channel_filter_changed',
   'system.channel_mode_changed',
+  'system.channel_delivery_changed',
   'system.channel_polled',
   'system.backup_created',
   'system.backup_failed',

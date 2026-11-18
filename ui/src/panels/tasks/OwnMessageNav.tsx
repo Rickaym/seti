@@ -41,7 +41,10 @@ function StepButton({
   )
 }
 
-/** Steps back and forward through the user's own messages, from the corner of the transcript. */
+/**
+ * Steps back and forward through the user's own messages. It stands in the margin the transcript
+ * keeps free on a wide screen and in a row under it on a phone, so it never covers a message.
+ */
 export function OwnMessageNav({
   nav,
   seeking,
@@ -61,7 +64,7 @@ export function OwnMessageNav({
       role="group"
       aria-label="Your messages"
       data-testid="own-message-nav"
-      className="absolute right-3 bottom-3 flex flex-col items-center border border-border bg-background shadow-md"
+      className="flex items-center border-border bg-background max-md:shrink-0 max-md:justify-end max-md:border-t max-md:px-1 md:absolute md:right-3 md:bottom-3 md:flex-col md:border md:shadow-md"
     >
       <StepButton
         direction="back"

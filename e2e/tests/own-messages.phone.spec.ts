@@ -48,3 +48,16 @@ test('taps back to your messages far outside the loaded rows', async ({ page }) 
   await expect(own(page, 1)).toBeInViewport()
   await expect(back).toBeDisabled()
 })
+
+test('the stepper sits in a row under the transcript, never over a message', async ({ page }) => {
+  const id = await seedOwnMessages(unique('Phone own row'))
+  await page.goto(`/#agents/${id}`)
+  await expect(transcript(page).getByText(reply(4, REPLIES[3]))).toBeInViewport()
+  const [navBox, paneBox] = await Promise.all([
+    page.getByTestId('own-message-nav').boundingBox(),
+    transcript(page).boundingBox(),
+  ])
+  expect(navBox).not.toBeNull()
+  expect(paneBox).not.toBeNull()
+  expect(navBox?.y ?? 0).toBeGreaterThanOrEqual((paneBox?.y ?? 0) + (paneBox?.height ?? 0))
+})
