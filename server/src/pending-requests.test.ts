@@ -64,6 +64,7 @@ async function seed(task: Task) {
     reason: null,
     suggestions: [],
     editable: false,
+    timeout_minutes: 0,
   })
   const note = await knowledge.insert({
     id: randomUUID(),

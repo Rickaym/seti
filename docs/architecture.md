@@ -139,7 +139,8 @@ directories go ahead. A classifier model then allows or turns down each other ca
 turns down never reaches the user: the agent gets the reason, the transcript shows the failed
 call, and the audit log records it. A call the classifier cannot decide, or one an ask rule
 matches, waits as a permission request until the user answers it, and the agent shows in Needs
-you meanwhile. Where auto mode is unavailable, Claude Code starts in the `default` mode, and every
+you meanwhile. A request nobody answers within the request timeout (Settings, Permissions; 1 h by
+default) is denied by Seti, and the agent is told it timed out and goes on. Where auto mode is unavailable, Claude Code starts in the `default` mode, and every
 call no rule allows waits as a request, edits in the agent's directories included. In auto mode
 Claude Code drops broad shell allow rules, such as `Bash` alone or an interpreter prefix, so the
 classifier also reviews a sandboxed agent's shell commands. Unsandboxed agents get no prefix rules
@@ -255,10 +256,15 @@ stdin, and returns stdout as text, and as structured content when it is a JSON o
 
 Seti starts an agent's Claude Code process, sandboxed or not, each `!` command and the short-lived
 rewind helper through `systemd-run --user --scope`, so the process tree lives in a transient scope
-of its own with `MemoryMax` and `MemorySwapMax` set (by default 6 GB and 1 GB; Settings, Resources
-sets the default and an agent's settings can override it, and a change reaches running scopes at
-once through `systemctl set-property`). Above `MemoryMax` the OOM killer stops a process inside
-that scope instead of earlyoom picking a large process anywhere on the host.
+of its own with `MemoryMax` and `MemorySwapMax` set (Settings, Resources sets the default and an
+agent's settings can override it, and a change reaches running scopes at once through
+`systemctl set-property`). Above `MemoryMax` the OOM killer stops a process inside that scope
+instead of earlyoom picking a large process anywhere on the host.
+
+Until a cap is saved in Settings, Resources, the default follows the host (`defaultMemoryCap` in
+`shared/src/memory.ts`): 30% of its memory in whole GB, at least 6 GB and at most 16 GB, so 10 GB on
+a 32 GB host, with 1 GB of swap. A larger cap means fewer `tsc` runs stopped at it and more risk
+to the host when several agents peak together. A saved cap always wins over the computed one.
 
 - `OOMPolicy=continue` keeps the rest of the tree running when one process, such as `tsc`, is
   killed, so Claude Code sees the failed command and goes on.
@@ -412,6 +418,56 @@ a PR in a repo that login cannot read shows without a status.
 
 Starting an agent on a PR's branch still needs a checkout, so `start_agent_from_pr` refuses a PR
 whose repo Seti has none of.
+
+## PR updates wake an agent only for news
+
+The PR poller (`server/src/pr-inputs.ts`) reads every PR linked to an agent once a minute, compares
+it with the last snapshot in `pr_watch` and turns each change into an update for the linked agents:
+CI failed or passed, a review, a comment, a conflict, a merge or a close. Updates from one poll
+reach an agent as one batch, and batches that follow within a few seconds join the same turn.
+
+Three kinds of update are recorded without starting a turn. Each still shows in the agent's
+transcript, greyed and marked with the reason, and the PR views show the same state as before.
+
+| Mark                     | When                                                                    | What the agent gets          |
+| ------------------------ | ----------------------------------------------------------------------- | ---------------------------- |
+| not sent: own action     | the agent posted the comment or review, or merged or closed the PR      | nothing                      |
+| not sent: repeat         | checks ran again on a commit and ended as Seti reported them before     | nothing                      |
+| no wake: nothing pending | CI passed, no failure was reported before it, and the agent pushed none | the pass, with its next turn |
+
+A batch in which every update is quiet starts no turn; a mixed batch wakes the agent with the rest.
+Quiet updates never count as waiting, so they raise no "queued" bar and cannot be dismissed. Other
+agents linked to the same PR, and the EA when it watches one of them, are told what an agent did
+as before.
+
+An agent and the user often act as the same GitHub login, so the author of an event does not say
+who acted. Seti reads the agent's own tool calls instead (`server/src/pr-self.ts`):
+
+- A comment or review is the agent's when the output of one of its posting calls (`gh pr comment`,
+  `gh pr review`, a `gh api` write to comments, reviews or replies, a GitHub MCP comment or review
+  tool) links it by its id. This match is exact.
+- When that output links nothing, a post is the agent's if the host's `gh` login wrote it on the PR
+  the call names, or on any linked PR when the call names none, while the call ran, with 5 seconds
+  allowed for clock difference. A comment the user writes under the same login on the same PR in
+  those seconds is taken for the agent's.
+- A merge or close is the agent's when one of its calls (`gh pr merge`, `gh pr close`, the matching
+  `gh api` and GitHub MCP calls) ran on that PR at the time GitHub gives for the PR's end, with the
+  same allowance. A merge that `gh pr merge --auto` lands later is news and wakes the agent.
+
+Anything Seti cannot tie to a call of that agent is delivered, so a script that posts through
+other means comes back as an update.
+
+A pass wakes the agent when the last CI result Seti reported for the PR was a failure, or when the
+agent pushed or opened a PR since Seti last gave it a CI result for this PR (`git push`,
+`gh pr create`, a GitHub MCP push): it started the run, so it waits for the result. Any other pass,
+such as one after someone else updated the branch, is recorded quietly. A failure always wakes.
+
+A failure is reported once per head commit, and again only for checks that had not failed on it
+before. A conflict is reported once per head commit and base branch, until GitHub finds the PR
+merging cleanly again. GitHub recomputes mergeability whenever the base branch moves and reports it
+unknown in between; the same commit still conflicts after that, so it is not reported again. A new
+head commit that still conflicts, a PR retargeted to another base branch, and a conflict that comes
+back after a clean merge state are news.
 
 ## Mods add to Seti through registries with disposers
 
@@ -709,7 +765,14 @@ startup expires what a restart cut off.
 Open questions set the agent's reason line in Needs you through `server/src/task-blocked.ts`,
 such as `Asks 2 questions: Which checks should I run first?`, after a permission request and
 before a change request. `questionsContext`, registered with `registerContextProvider`, tells
-every agent to ask through AskUserQuestion instead of in its reply. The guess that a turn ended on
+every agent to ask through AskUserQuestion instead of in its reply, and when not to ask at all: no
+go-ahead for reversible work inside the request, and a clearly recommended option is taken and
+named. It asks only for a choice that cannot be undone, acts outward, changes the scope or is
+genuinely balanced. `houseRulesContext` (`server/src/house-rules.ts`), registered the same way,
+states the rules the shell guard and Claude Code enforce: no foreground sleep or polling, stopping
+a process by PID, `rm -r` on literal paths and the exact tool name `Bash`. A `SubagentStart` hook
+of every session gives the same rules to each subagent, which does not read its parent's system
+prompt. The guess that a turn ended on
 a question (`server/src/turn-asking.ts`) reads only the prose after the last tool use, the
 fallback for an agent that asks in text.
 

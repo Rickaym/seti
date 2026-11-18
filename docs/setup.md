@@ -282,6 +282,10 @@ Seti would refuse.
 Without `SETI_DATABASE_URL`, a `SETI_HOME` other than `~/.seti` gets its own database, named after
 the directory, so a scratch instance never shares the live one.
 
+The memory cap of an agent has no environment variable: it follows the host, at 30% of its memory
+between 6 GB and 16 GB, until you save one in Settings, Resources. A larger cap means fewer `tsc`
+runs stopped at it and more risk when several agents peak together.
+
 ### Secrets
 
 | File in `~/.seti/credentials`                         | Used by        | Made by                      |
@@ -551,6 +555,17 @@ upgrade moves each login onto its host. When credentials logged in to one host d
 login of Default (or of the most sets) keeps the alias and each other login becomes a copy of the
 host named after its user, such as `k8s-ubuntu`. Every agent keeps the hosts it reached, through
 its own Access choices.
+
+### Permission requests
+
+A tool call no rule allows waits for you as a permission request: in the agent's chat, in Needs
+you and in Requests, with Allow, Always and Deny. Settings, Permissions holds the rules and the
+Request timeout: Off, 15 min, 1 h, 4 h or 24 h, 1 h by default. A request nobody answers in that
+time is denied, and the agent is told that it timed out, not that you refused, so it carries on
+without the call or asks again. The card shows the time left, the agent's reason line says "times
+out soon" near the end, and the transcript and the audit log record the timeout. A timeout adds no
+rule. A new value applies to requests already waiting, counted from when each was raised. Off
+keeps a request waiting until you answer it.
 
 ### Backups
 

@@ -9,7 +9,7 @@ import tls from 'node:tls'
 import {
   AWS_ACCESS_ID,
   AWS_SETTINGS_DEFAULT,
-  MEMORY_CAP_DEFAULTS,
+  defaultMemoryCap,
   SANDBOX_POLICY_DEFAULT,
   type SshCheck,
   type Task,
@@ -37,6 +37,8 @@ import { taskMcpChoices } from './store/mcp.js'
 import { sandboxPolicy } from './store/sandbox.js'
 import { CLAUDE_PLACEHOLDER, removeTaskSandbox, sandboxEnv, taskSandbox } from './task-sandbox.js'
 import { workspaceDir } from './workspace/dir.js'
+
+const SIX_GB = defaultMemoryCap(8192)
 
 const available = (() => {
   try {
@@ -83,7 +85,7 @@ describe('sandboxEnv', () => {
     const env = sandboxEnv(host, '/home/me', { github: false, connectors: false })
     expect(env.NODE_OPTIONS).toBe('--max-old-space-size=6144')
     expect(env.SETI_MEMORY_CAP_MB).toBeUndefined()
-    const capped = sandboxEnv(host, '/home/me', { github: false, connectors: false, memory: MEMORY_CAP_DEFAULTS })
+    const capped = sandboxEnv(host, '/home/me', { github: false, connectors: false, memory: SIX_GB })
     expect(capped).toMatchObject({ NODE_OPTIONS: '--max-old-space-size=4300', SETI_MEMORY_CAP_MB: '6144' })
     expect(capped.CLAUDE_CODE_SHELL_PREFIX).toBe('/run/seti/tool-shell')
     expect(env.CLAUDE_CODE_SHELL_PREFIX).toBeUndefined()

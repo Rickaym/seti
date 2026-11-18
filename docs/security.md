@@ -141,6 +141,27 @@ private key off the host. The sandbox model is in [Architecture](architecture.md
   in Settings, Lifecycle; the EA changes it only with the user's yes (`set_auto_archive`), and
   agents' Seti tools and mods are refused (`refuseAgent` in `updateAutoArchive`), so an agent
   cannot turn off the guard that stops it. A change is audited as `system.repeat_guard_changed`.
+- A permission request nobody answers is denied after the request timeout, so an agent never waits
+  on the user for ever. The timeout is one install-wide setting in Settings, Permissions: Off, 15
+  min, 1 h, 4 h or 24 h, 1 h by default, kept in `permission_settings`. Each request stores its
+  deadline (`timeout_at`, counted from when it was raised), and `server/src/permission-timeout.ts`
+  arms a timer per request this process waits on. At the deadline Seti settles that one request as
+  denied with `timed_out` set, through the same `resolveRequest` path as the user's Deny, and the
+  agent reads that nobody answered in time, that it is no judgement on the action, and to carry on
+  or ask again. A timeout adds no rule, never counts as an always answer and touches no other
+  request, a subagent's request runs on the same clock as any other, and Bypass, questions and
+  change requests are unaffected. The denial is audited as `task.permission_timed_out` with the
+  task, tool, call summary and the rules the request offered, and noted in the agent's transcript.
+  Once four fifths of the time has passed, and at least five minutes before the end, the agent's
+  reason line ends with "times out soon", which pushes one more needs-you notification. A request
+  whose session is gone (the agent stopped, was archived, or Seti restarted) closes as cancelled
+  with nothing sent; startup arms whatever is still pending from its stored deadline and ends
+  what is overdue. The setting is the user's: `PUT /api/permissions/timeout` refuses the EA in the
+  route and agents' Seti tools and mods in `setPermissionTimeout` (`refuseAgent`), and a change is
+  audited as `system.permission_timeout_changed` with the old and new value. A new value applies
+  to requests already waiting, counted from when each was raised, so one older than it is denied
+  at once. The EA reads the setting and each request's deadline through `search_seti` in
+  `requests`.
 - Review rules hold each call of the MCP tools they name until the user allows or denies it, in
   Bypass too, because they run as a PreToolUse hook. When Seti cannot read its review rules the
   hook denies the call rather than let it run unchecked, and a call a deny rule names is left to
@@ -199,6 +220,30 @@ private key off the host. The sandbox model is in [Architecture](architecture.md
   reaches only allowlisted hosts on public addresses, and the connections a poller may send are
   filled in by Seti and replaced with `[secret]` in everything the script, its logs and its events
   see. Only the user gives a poller extra hosts or connections (see [Pollers](pollers.md)).
+
+## Folders a sandboxed agent can write
+
+A sandboxed agent writes freely in its folders, so Seti's own processes, which run on the host,
+treat what they find there as input and never as configuration to act on.
+
+- The capability probe is Claude Code started to list a folder's commands, subagents and MCP
+  servers. Project settings start hooks, and `.mcp.json` starts server commands. For the folder a
+  sandboxed agent works in, the probe therefore runs inside that agent's sandbox, started the way
+  its session is, so whatever the folder configures runs there and the composer menu and
+  Capabilities still show the folder's own commands and servers. For any other folder such an
+  agent has, and for the folders of archived sandboxed agents, the probe runs on the host and
+  loads the user's settings only, so the folder's commands and servers are not listed. Folders of
+  unsandboxed agents and folders no agent has are probed as before
+  (`server/src/probe-launch.ts`).
+- A `.git` file can name any repository as the one behind a folder. Seti follows it only when
+  that repository records the folder: a worktree whose admin folder lies in the repository's
+  `worktrees` and points back at it, or a submodule under a checkout that holds its git
+  directory. Otherwise the folder counts as no repository, so the sandbox mounts nothing for it,
+  and its local MCP servers and Claude Code memory are its own alone
+  (`gitDirs` in `server/src/sandbox-mounts.ts`).
+- An MCP sign-in runs `claude mcp login` on the host in the folder whose config names the server,
+  when the user starts it. It runs no hook and no server command, and refuses a server from
+  `.mcp.json` that the user has not approved in Claude Code.
 
 ## Knowledge notes
 

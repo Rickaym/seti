@@ -6,7 +6,7 @@ import { INPUT_CHARS, isEditable } from './permission-edits.js'
 import { alwaysRules } from './permission-policy.js'
 import { ASK_TOOL, askQuestions } from './questions.js'
 import { redactSecrets, scrubValue } from './scrub.js'
-import { permissionRequests } from './store/permissions.js'
+import { permissionRequests, timeoutSettings } from './store/permissions.js'
 import { setStall, refreshBlocked } from './task-blocked.js'
 import { publish } from './task-events.js'
 
@@ -30,7 +30,7 @@ function summarize(tool: string, input: Record<string, unknown>): string {
 }
 
 /** Sets the task's reason line from its pending requests and tells its views about the request. */
-async function announce(request: PermissionRequest): Promise<void> {
+export async function announce(request: PermissionRequest): Promise<void> {
   publish(request.task_id, { type: 'permission', request, blocked: await refreshBlocked(request.task_id) })
 }
 
@@ -95,7 +95,8 @@ async function answerOf(id: string, signals: readonly AbortSignal[]): Promise<Pe
   })
 }
 
-async function dropRequest(id: string): Promise<void> {
+/** Closes a pending request nobody waits on any more, without a word to the agent. */
+export async function dropRequest(id: string): Promise<void> {
   const settled = await permissionRequests.settle(id, 'cancelled', null)
   if (settled !== undefined) {
     await announce(settled)
@@ -158,6 +159,7 @@ async function askUser(taskId: string, ask: Ask, signals: readonly AbortSignal[]
       reason: ask.reason,
       suggestions: ask.suggestions,
       editable: ask.kind !== 'repeat' && isEditable(ask.tool, ask.input),
+      timeout_minutes: (await timeoutSettings.get()).request_timeout_minutes,
     })
     await (waiting.has(id) ? announce(request) : dropRequest(id))
     return await answer

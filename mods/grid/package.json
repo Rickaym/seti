@@ -1,7 +1,7 @@
 {
   "name": "@seti/mod-grid",
   "private": true,
-  "version": "1.1.1",
+  "version": "1.2.0",
   "type": "module",
   "exports": {
     "./panels.css": "./panels.css",
@@ -14,7 +14,7 @@
   },
   "dependencies": {
     "@seti/mod-api": "workspace:*",
-    "lucide-react": "^1.68.0",
+    "lucide-react": "^1.73.0",
     "react": "^19.3.1",
     "react-grid-layout": "^2.3.0"
   },

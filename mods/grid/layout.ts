@@ -2,6 +2,7 @@ import type { ModAgentsLayout } from '@seti/mod-api'
 import { LayoutGrid } from 'lucide-react'
 import { AgentGrid } from './AgentGrid'
 import type { Panel } from './grid-layout'
+import { gridPrefs } from './grid-prefs'
 import { gridStore, isInGrid } from './grid-store'
 import { seti } from './seti'
 import { addTerminalTile, holdsTerminal, terminalToGrid } from './tiles'
@@ -29,7 +30,14 @@ export function gridLayout(): ModAgentsLayout {
     view: { view: AgentGrid },
     shows: ({ id, terminal, listed, loaded }) =>
       terminal === null ? id === null || listed || !loaded || isInGrid(id) : holdsTerminal(terminal),
-    subscribe: gridStore.subscribe,
+    subscribe: (listener) => {
+      const stops = [gridStore.subscribe(listener), gridPrefs.subscribe(listener)]
+      return () => {
+        for (const stop of stops) {
+          stop()
+        }
+      }
+    },
     shownAgents: gridAgents,
     acceptsAgents: true,
     overlay: true,
@@ -38,5 +46,6 @@ export function gridLayout(): ModAgentsLayout {
     showWorkspace: ({ id, first }) => {
       gridStore.showWorkspace(id, first)
     },
+    hidesList: () => gridPrefs.get().listHidden,
   }
 }

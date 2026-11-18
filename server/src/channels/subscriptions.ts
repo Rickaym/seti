@@ -1,4 +1,4 @@
-import type { ChannelEaMode, ChannelSubscription, channelSubscribeInput } from '@seti/shared'
+import type { DeliveryTiming, ChannelEaMode, ChannelSubscription, channelSubscribeInput } from '@seti/shared'
 import type { z } from 'zod'
 import { now } from '../db.js'
 import { HttpError } from '../http.js'
@@ -51,6 +51,7 @@ export const subscriptions = {
       task_id: task?.id ?? null,
       events: input.events,
       mode: input.target === 'ea' ? input.mode : 'report',
+      delivery: input.target === 'task' ? input.delivery : null,
       created_at: now(),
     })
     if (added === undefined) {
@@ -69,6 +70,14 @@ export const subscriptions = {
       throw new HttpError(400, 'Only the EA subscription has a report or act mode')
     }
     return (await channelSubscriptions.setMode(sub.id, mode)) ?? sub
+  },
+  get: subscriptionOf,
+  /** Only an agent's subscription has a delivery; the EA takes events into its inbox. */
+  setDelivery: async (sub: ChannelSubscription, delivery: DeliveryTiming | null): Promise<ChannelSubscription> => {
+    if (sub.target !== 'task') {
+      throw new HttpError(400, "Only an agent's subscription has a delivery; the EA takes events into its inbox")
+    }
+    return changed((await channelSubscriptions.setDelivery(sub.id, delivery)) ?? sub)
   },
   unsubscribe: async (channelId: string, id: number): Promise<ChannelSubscription> => {
     const sub = await subscriptionOf(channelId, id)

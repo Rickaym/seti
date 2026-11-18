@@ -1,7 +1,7 @@
 import type { SDKMessage, SDKResultMessage } from '@anthropic-ai/claude-agent-sdk'
 import type { MessageBody, MessageRow, PromptAttachment, Task, TaskSession, TaskStatus } from '@seti/shared'
 import { outsideRequest } from './access.js'
-import { LiveSession, outcomeOf, type NextMessage, type SendOutcome } from './agent-session.js'
+import { LiveSession, outcomeOf, type SendOutcome } from './agent-session.js'
 import { refuseArchived } from './archive-guard.js'
 import { audit } from './audit.js'
 import { inBackground, onShutdown } from './background.js'
@@ -12,6 +12,7 @@ import { linkCreatedPrs } from './created-prs.js'
 import { messages, tasks } from './db.js'
 import { HttpError } from './http.js'
 import { watchSessionMcp } from './mcp-session-status.js'
+import type { NextMessage } from './next-message.js'
 import { outwardToolUses } from './outward.js'
 import { followQueue, markQueued, settleQueued } from './queued-prompts.js'
 import { resumeSession } from './rewind.js'
@@ -108,15 +109,18 @@ export async function runTurn(taskId: string, prompt: string, options: TurnOptio
 
 /**
  * Hands the agent the pending prefaces with no user text, in a new turn or queued for a turn of
- * their own after the running one, or sooner with a priority; returns their count.
+ * their own after the running one, or sooner with a priority; returns their count. With `held`,
+ * the updates that wait for the user's next message go too.
  */
-export async function runAutoTurn(taskId: string, priority?: NextMessage['priority']): Promise<number> {
-  const message = priority === undefined ? { prompt: null } : { prompt: null, priority }
-  return (await inLane(taskId, async () => startTurn(taskId, message, false))).count
+export async function runAutoTurn(taskId: string, how: Pick<NextMessage, 'priority' | 'held'> = {}): Promise<number> {
+  return (await inLane(taskId, async () => startTurn(taskId, { prompt: null, ...how }, false))).count
 }
 
-/** Why pending updates cannot queue behind the running turn, or null when none runs or they can. */
-export function autoQueueBlocker(taskId: string): string | null {
+/**
+ * Why pending updates cannot queue for the running turn, or null when none runs or they can.
+ * Updates that join the turn at its next step do not wait behind the ones queued for its end.
+ */
+export function autoQueueBlocker(taskId: string, joining = false): string | null {
   const session = live.get(taskId)
   if (session?.running !== true) {
     return null
@@ -124,7 +128,7 @@ export function autoQueueBlocker(taskId: string): string | null {
   if (!session.accepting) {
     return 'The running turn is starting or being cut short'
   }
-  return session.autoQueued ? 'Updates already wait for the running turn to end' : null
+  return session.autoQueued && !joining ? 'Updates already wait for the running turn to end' : null
 }
 
 /** Starts the session's process; a pending rewind makes it resume from the rewind point. */

@@ -475,6 +475,72 @@ describe('subscription routes', () => {
   })
 })
 
+describe('a subscription delivery', () => {
+  const delivery = async (channelId: string, sub: number, body: unknown) =>
+    api<ChannelSubscription>('PUT', `/channels/${channelId}/subscriptions/${String(sub)}/delivery`, body)
+
+  it('follows the agent until set, and each change is audited with the old and new value', async () => {
+    const { info } = await channel('generic')
+    const id = await newTask('wake', 'Timed')
+    const added = await subscribe(info.id, { target: 'task', task_id: id })
+    expect(added.data.delivery).toBeNull()
+
+    const now = await delivery(info.id, added.data.id, { delivery: 'now' })
+    expect(now.data).toMatchObject({ id: added.data.id, delivery: 'now' })
+    expect(await auditEvents.latest('system.channel_delivery_changed')).toMatchObject({
+      actor: 'user',
+      subject_type: 'task',
+      subject_id: id,
+      summary: 'Set "Timed" on the webhook Hook generic: it gets them at once, during a running turn too',
+      detail: expect.objectContaining({ from: null, to: 'now', delivery: 'now' }) as unknown,
+    })
+    await delivery(info.id, added.data.id, { delivery: 'with_message' })
+    expect((await auditEvents.latest('system.channel_delivery_changed'))?.detail).toMatchObject({
+      from: 'now',
+      to: 'with_message',
+    })
+    const before = await auditEvents.latest('system.channel_delivery_changed')
+    await delivery(info.id, added.data.id, { delivery: 'with_message' })
+    expect((await auditEvents.latest('system.channel_delivery_changed'))?.id).toBe(before?.id)
+    const follows = await delivery(info.id, added.data.id, { delivery: null })
+    expect(follows.data.delivery).toBeNull()
+    expect((await auditEvents.latest('system.channel_delivery_changed'))?.summary).toBe(
+      'Set "Timed" on the webhook Hook generic: it gets them as its update mode says',
+    )
+
+    expect((await delivery(info.id, added.data.id, { delivery: 'interrupt' })).status).toBe(400)
+    expect((await delivery(info.id, added.data.id, {})).status).toBe(400)
+    const ea = await subscribe(info.id, { target: 'ea' })
+    expect(ea.data.delivery).toBeNull()
+    expect((await delivery(info.id, ea.data.id, { delivery: 'now' })).status).toBe(400)
+    const other = await channel('generic')
+    expect((await delivery(other.info.id, added.data.id, { delivery: 'now' })).status).toBe(404)
+  })
+
+  it('is set when subscribing, travels with each event, and holds one for the next message', async () => {
+    const { info, secret } = await channel('generic')
+    const held = await newTask('wake', 'Patient')
+    const plain = await newTask('queue', 'Plain')
+    const added = await subscribe(info.id, { target: 'task', task_id: held, delivery: 'with_message' })
+    expect(added.data.delivery).toBe('with_message')
+    expect((await auditEvents.latest('system.channel_subscribed'))?.summary).toBe(
+      'Subscribed "Patient" to the webhook Hook generic: every event; it gets them with the user\'s next message',
+    )
+    await subscribe(info.id, { target: 'task', task_id: plain })
+    await sendGeneric(info.path, secret, { title: 'weekly digest', type: 'digest' })
+
+    const routes = await latestRoutes(info.id)
+    expect(routes.map((route) => [route.label, route.outcome, route.reason])).toEqual([
+      ['Patient', 'queued', "Held for the user's next message"],
+      ['Plain', 'queued', 'The agent holds updates until the next message'],
+    ])
+    expect(await inputsOf(held)).toMatchObject([{ title: 'weekly digest', delivery: 'with_message' }])
+    expect(await inputsOf(plain)).toHaveLength(1)
+    expect((await inputsOf(plain))[0]).not.toHaveProperty('delivery')
+    expect(sdk.state.prompts).toEqual([])
+  })
+})
+
 describe('the channel_subscriptions migration', () => {
   it('turns the EA delivery switch into EA subscriptions and drops the column', async () => {
     await sql`DROP TABLE channel_subscription CASCADE`
@@ -482,7 +548,7 @@ describe('the channel_subscriptions migration', () => {
     await sql`ALTER TABLE channel_event DROP COLUMN kind`
     await sql`ALTER TABLE channel_delivery DROP COLUMN routes`
     await sql`ALTER TABLE ea_inbox DROP COLUMN act`
-    await sql`DELETE FROM schema_migration WHERE version IN (18, 48)`
+    await sql`DELETE FROM schema_migration WHERE version IN (18, 48, 107)`
     const at = '2026-09-01T00:00:00.000Z'
     for (const [id, on] of [
       ['migrate-on-aaaaaaaaaaaaa', 1],
@@ -491,9 +557,9 @@ describe('the channel_subscriptions migration', () => {
       await sql`INSERT INTO channel (id, name, preset, secret, deliver_to_ea, mapping, created_at, updated_at)
         VALUES (${id}, ${id}, 'generic', 'plain', ${on}, '{}', ${at}, ${at})`
     }
-    expect(await migrate(sql)).toEqual([18, 48])
+    expect(await migrate(sql)).toEqual([18, 48, 107])
     expect(await channelSubscriptions.forChannel('migrate-on-aaaaaaaaaaaaa')).toMatchObject([
-      { target: 'ea', task_id: null, events: null, mode: 'report', created_at: at },
+      { target: 'ea', task_id: null, events: null, mode: 'report', delivery: null, created_at: at },
     ])
     expect(await channelSubscriptions.forChannel('migrate-off-aaaaaaaaaaaa')).toEqual([])
     const columns = await sql<{ column_name: string }[]>`SELECT column_name FROM information_schema.columns

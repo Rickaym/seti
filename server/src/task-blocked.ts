@@ -1,4 +1,4 @@
-import { describeChange, type ChangeRequest, type PermissionRequest, type Question } from '@seti/shared'
+import { describeChange, timesOutSoon, type ChangeRequest, type PermissionRequest, type Question } from '@seti/shared'
 import { inBackground } from './background.js'
 import { tasks } from './db.js'
 import { changeRequests } from './store/change-requests.js'
@@ -17,7 +17,7 @@ export type StallSource = (typeof STALL_SOURCES)[number]
 /** Each task's stalls by source, held in memory: a restart ends the sessions they come from. */
 const stalls = new Map<string, Map<StallSource, string>>()
 
-/** The reason line of the oldest pending request, with how many more wait behind it. */
+/** The reason line of the oldest pending request: how many more wait, and a timeout that is near. */
 function permissionLine(pending: readonly PermissionRequest[]): string | null {
   const [first] = pending
   if (first === undefined) {
@@ -27,7 +27,8 @@ function permissionLine(pending: readonly PermissionRequest[]): string | null {
   const asked = first.summary === '' || first.tool_name === 'ExitPlanMode' ? what : `${what}: ${first.summary}`
   const line = first.kind === 'repeat' ? (first.reason ?? asked) : asked
   const more = pending.length > 1 ? ` (+${String(pending.length - 1)} more)` : ''
-  return `${clip(line, LINE_CHARS)}${more}`
+  const soon = timesOutSoon(first) ? ', times out soon' : ''
+  return `${clip(line, LINE_CHARS)}${more}${soon}`
 }
 
 /** The reason line of the agent's open questions, with the first one's text. */

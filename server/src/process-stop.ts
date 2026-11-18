@@ -40,7 +40,7 @@ async function requireShell(taskId: string, shellId: string) {
 async function noteStopped(taskId: string, note: string): Promise<void> {
   await inLane(taskId, async () => appendMessage(taskId, { kind: 'seti', payload: { error: note, stopped: true } }))
   if (isRunning(taskId) && autoQueueBlocker(taskId) === null) {
-    await runAutoTurn(taskId, 'next').catch((e: unknown) => {
+    await runAutoTurn(taskId, { priority: 'next' }).catch((e: unknown) => {
       process.stderr.write(`could not tell task ${taskId} about a stopped process: ${String(e)}\n`)
     })
   }
