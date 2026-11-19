@@ -161,7 +161,8 @@ they are.
   the health check and the demo's container. `scripts/`: installer, upgrade and repo checks.
 - `docs/`: [setup](docs/setup.md), [architecture](docs/architecture.md),
   [security](docs/security.md), [pollers](docs/pollers.md), [mods](docs/mods.md) and the
-  [public demo](docs/demo.md).
+  [public demo](docs/demo.md); [protocol](docs/protocol.md) specifies Seti's behaviour as
+  numbered requirements.
 
 ## Recipes
 

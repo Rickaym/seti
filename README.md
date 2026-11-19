@@ -150,6 +150,8 @@ the [install script](scripts/install.sh) before you run it.
    kept as a hash chain.
 
 [Architecture](docs/architecture.md) records the decisions behind each part.
+[The SETI Protocol](docs/protocol.md) specifies the same behaviour as numbered requirements that
+another implementation can follow.
 
 ## Security
 
