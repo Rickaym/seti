@@ -10,8 +10,8 @@ private key off the host. The sandbox model is in [Architecture](architecture.md
 
 - Seti listens on `127.0.0.1` and refuses requests whose `Host` is not a loopback Seti name.
 - Loopback API calls need a local token, as `Authorization: Bearer <token>` or the HttpOnly cookie
-  the sign-in page sets, or a passkey session. Only `/api/ping` and the sign-in calls answer
-  without one. The local token always works on loopback, so it is the way back in.
+  the sign-in page sets, or a passkey session. The paths that answer without one are listed
+  below. The local token always works on loopback, so it is the way back in.
 - Seti signs browsers in with passkeys (WebAuthn, user verification required). A sign-in gives an
   opaque random session id in an HttpOnly, SameSite=Lax cookie, `__Host-` prefixed and Secure on
   the public hostname. Sessions end after `SETI_AUTH_IDLE_DAYS` without a request (7) and after
@@ -57,9 +57,19 @@ private key off the host. The sandbox model is in [Architecture](architecture.md
   user's message, which the audit log records with `via: share` and each file's name and size. A
   post that reaches the server without the worker gets a redirect to the Share page, and the server
   reads none of it.
-- `/hooks/<id>` and share links are the only paths without Access or a token: each webhook has an
-  unguessable id and its own signing secret, and every delivery must be signed. Share links are
-  described below.
+- These paths answer without Access, a token or a session, each with its own check:
+  `/api/ping`, which returns nothing; `/api/local-session`, which takes the local token on loopback;
+  `/api/auth` and the sign-in and setup calls under it, which are rate limited; device pairing at
+  `/api/devices/pair`, which takes a one-time code; the `/pair` page and
+  `/.well-known/assetlinks.json`, which are static; `/hooks/<id>`; and share links, described
+  below. The app's own page and its static files need no API credential; on the public hostname
+  they sit behind Access when Access is set up. Everything else under `/api` needs a credential.
+- Each webhook has an unguessable id and its own secret, and every delivery must prove it holds
+  that secret. A GitHub or Sentry delivery does so with an HMAC-SHA256 signature of the body. A
+  generic webhook takes that signature in `X-Seti-Signature` or, in its place, the secret itself as
+  `Authorization: Bearer <secret>`. A bearer delivery proves who sent it but not that the body
+  arrived unchanged, and it puts the secret on the wire with every delivery, so prefer the
+  signature where the sender can compute one.
 - The EA answers only calls that carry its token, apart from `/health`.
 - The EA's think tool hands a question to a reasoning model with only the EA's read tools
   (`THINK_TOOLS` in `ea/src/seti_ea/think.py`); it refuses any other tool, never asks Seti to probe
@@ -81,7 +91,7 @@ private key off the host. The sandbox model is in [Architecture](architecture.md
 - Seti control is a per-agent level that only the user changes: Off, Self (the default) or Full.
   It decides which `seti` MCP tools the agent gets; they run inside the server as that agent, so no
   token enters its sandbox, and the audit log names the agent as actor. Off leaves its status line,
-  its working directory and file handoffs. Self adds tools that read Seti (context packs, CLAUDE.md files, channels,
+  its working directory, file handoffs and `ask_secret`. Self adds tools that read Seti (context packs, CLAUDE.md files, channels,
   repos, MCP servers, plugins, caps and the sandbox policy) and change only the agent itself (its
   title, colour, pin, update mode, PRs, packs, role, group chat handle and channel
   subscriptions). Full gives the EA's Seti actions. At no level do they change access,
@@ -524,7 +534,7 @@ refused on every share route, and none of them has a tool for it.
   download and a message, and never runs outside the sandbox.
 - Every response under `/share` carries `nosniff`, `no-referrer`, `noindex`, `no-store`, no
   cookie and this policy: `sandbox allow-downloads; default-src 'none'; img-src 'none';
-style-src 'unsafe-inline'`. A page's policy allows images from its own image path alone
+style-src 'unsafe-inline'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'`. A page's policy allows images from its own image path alone
   (`img-src https://<host>/share/<token>/p/`), since the sandbox gives it no origin of its own;
   an audio or video page's policy also allows media from its own download alone
   (`media-src https://<host>/share/<token>/raw`). Preview images, the card and an audio or video
@@ -966,8 +976,12 @@ production never creates a key file and stops naming the missing one. `scripts/i
 them, owner-only, and never prints one.
 
 A connection's value reaches only the hosts the user gave it. Agents hold a placeholder, and the
-proxy swaps it for the value in headers and URLs on those hosts over HTTPS; a request carrying it
-anywhere else is refused and audited. Request bodies pass unread. A connection added for an agent's
+proxy swaps it for the value in headers and URLs on those hosts over HTTPS. A request that carries
+the placeholder to any other host is refused and audited when the proxy can read the request:
+plain HTTP, or HTTPS to a host the proxy terminates TLS for, which are Anthropic, GitHub, signed-in
+MCP servers and the hosts of the agent's connections. HTTPS to any other allowed host is tunnelled
+unread, and request bodies are never read, so a placeholder in a body, or sent to such a host,
+passes without a refusal or an audit record. What leaves is the placeholder, never the value. A connection added for an agent's
 request joins only the asking agent's credential, with the key the user pasted on Allow or with
 none until the user fills it in. The EA and agents' Seti tools cannot see or change connections; the server
 refuses them.

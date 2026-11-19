@@ -41,8 +41,9 @@ The agent's Updates setting caps the subscription's choice: Wait for my message 
 for the next message, Off drops them, and only Wake the agent lets the choice apply. Agent default
 follows that setting, which makes it After turn for an agent that wakes. An agent blocked on the
 user, with a question or a permission request open, takes no update into its turn: Now waits until
-the user answered, then joins the turn. Updates that arrive within 5 seconds of each other, 30 at
-most, reach the agent as one batch, and a batch with a Now update in it joins the running turn
+the user answered, then joins the turn. Seti hands updates over once none has arrived for 5
+seconds, and at most 30 seconds after the first, so a burst reaches the agent as one batch; a turn
+takes the newest 20 waiting updates, and a batch with a Now update in it joins the running turn
 whole. PR updates and group chat messages have no such choice and follow the agent's setting.
 
 The EA and agents set it with the `delivery` argument of `subscribe_channel`: `now`, `after_turn`,
@@ -98,7 +99,7 @@ comes back. A run with unusable or left-out items reports nothing as gone.
 
 | Limit                     | Value                                                          |
 | ------------------------- | -------------------------------------------------------------- |
-| Interval                  | 1 minute to 1 day, 5 minutes by default, 10% jitter            |
+| Interval                  | 1 minute to 1 day, 5 minutes by default, jitter under 5 s      |
 | Timeout                   | 5 to 120 seconds, 30 by default                                |
 | Compute                   | 1 second without awaiting, 10 seconds a run                    |
 | Memory                    | 48 MB engine memory; a run's responses fit even kept whole     |
@@ -107,15 +108,16 @@ comes back. A run with unusable or left-out items reports nothing as gone.
 | Runs at once              | 3 across all pollers, one per poller                           |
 | Worker threads            | 2 by default (`SETI_POLLER_WORKERS`, 1 to 3), 128 MB heap      |
 | Hard stop                 | the worker is stopped 2 seconds past the run's timeout         |
-| Backoff after failures    | the interval doubled per failure, up to 6 hours                |
+| Backoff after failures    | the interval doubled per failure, up to 6 hours, 10% jitter    |
 | Keys kept for comparisons | seen in the last 30 days, the newest 10,000                    |
-| Runs kept                 | the latest 50 per poller                                       |
+| Runs kept                 | 30 days per poller; the latest 50 keep their logs              |
 
 ## Who changes them
 
-Only the user and the EA create and change pollers; agents ask the EA in the group chat. The EA
-writes scripts, test runs them, creates, changes, pauses and polls pollers behind its confirmation
-gate, but Seti refuses it extra hosts, secrets, and a new script for a poller that sends secrets.
+The user, the EA and agents at Seti control Full create and change pollers; other agents ask the
+EA in the group chat. The EA writes scripts, test runs them, creates, changes, pauses and polls
+pollers behind its confirmation gate. Seti refuses the EA and agents extra hosts, secrets, and a
+new script for a poller that sends secrets: those stay the user's.
 
 The card shows the status (pending, ok, erroring, failing, paused), the last and next run, recent
 runs with their logs and errors, Poll to run now, a switch to pause, and Edit, whose Test run
@@ -137,7 +139,7 @@ runs to come, so the tab counts and names them under the list.
 
 Pollers always run on an interval, and reminders on an interval or a cron schedule. Cron runs are
 exact. Interval runs are projected from the stored next run in steps of the interval, so a
-poller's real runs differ by its jitter, and move back while it backs off after failures.
+poller's real runs differ by a few seconds of jitter, and move back while it backs off after failures.
 
 Seti computes all of this from `nextRuns` and `runsInRange` in `shared/src/schedule.ts`. Each
 poller and reminder also reports its next 5 runs as `upcoming`, which is what the EA and agents

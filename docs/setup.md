@@ -425,7 +425,8 @@ the form with every field for a service the list does not have. The list is
 A connection is one service's access, made in Settings, Connections: its name, the hosts it may
 reach (exact or `*.suffix`), how Seti signs in, and the values that takes. Agents see its variable,
 such as `STRIPE`, holding a placeholder. The proxy swaps the placeholder for the value in headers
-and URLs on the connection's hosts only and refuses a request that carries it anywhere else. With
+and URLs on the connection's hosts only, and refuses a request that carries it anywhere else when
+it can read that request ([Security](security.md#where-each-secret-lives) says when it cannot). With
 "Seti adds it" on, the proxy also sets a header from a template (`Bearer {{value}}`) on every
 request to those hosts, so the agent never sends it. A connection signs in one of four ways:
 

@@ -103,7 +103,7 @@ third-party mod may use these contribution points:
 | `taskEvents`       | Agent events it hears, with the `tasks.read` capability                          |
 
 Routes, public paths, input hooks, shortcuts, status markers, agent accents, styles, host proxies,
-PR decorators, fence renderers and PR chips stay with the mods Seti ships. A third-party command binds no key
+PR decorators, fence renderers, transcript blocks and PR chips stay with the mods Seti ships. A third-party command binds no key
 chord, and a third-party file viewer cannot take Seti's own file kinds, serve pages or sit behind a
 settings switch. Seti also refuses a third-party manifest that:
 
@@ -112,7 +112,7 @@ settings switch. Seti also refuses a third-party manifest that:
 - takes a reserved id (`seti`, `core`, `system`, `mod`, `mods`, the group chat's reserved handles
   such as `ea` and `user`, or the id of a mod Seti ships), or the name Seti, EA or Executive
   Assistant;
-- asks for `seti.version`, which is for bundled mods;
+- asks for `seti.version`, `tasks.ask` or `workspaces.layout`, which are for bundled mods;
 - names an `activation` event with nothing to fire it, or declares something without its event:
   `onCommand` goes with `commands`, `onWebhook` with webhook `channelSources`, `onSchedule` with
   `schedules` and `onTaskEvent` with `taskEvents`, and each needs `main`.
