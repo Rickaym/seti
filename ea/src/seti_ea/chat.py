@@ -8,7 +8,7 @@ from datetime import UTC, datetime
 from typing import Any, cast
 
 from loguru import logger
-from pipecat.adapters.schemas.tools_schema import ToolsSchema
+from pipecat.adapters.llm.schemas.tools_schema import ToolsSchema
 from pipecat.frames.frames import (
     ErrorFrame,
     Frame,

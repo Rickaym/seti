@@ -6,13 +6,19 @@ from dataclasses import dataclass, replace
 from typing import Any, cast
 
 from loguru import logger
-from pipecat.frames.frames import Frame
+from pipecat.frames.frames import (
+    BotSpeakingFrame,
+    Frame,
+    InterimTranscriptionFrame,
+    TranscriptionFrame,
+    UserSpeakingFrame,
+    VADUserStartedSpeakingFrame,
+)
 from pipecat.processors.aggregators.llm_context import LLMContext
 from pipecat.processors.aggregators.llm_response_universal import (
     LLMUserAggregator,
     LLMUserAggregatorParams,
 )
-from pipecat.turns.types import ProcessFrameResult
 from pipecat.turns.user_start.base_user_turn_start_strategy import BaseUserTurnStartStrategy
 from pipecat.turns.user_start.min_words_user_turn_start_strategy import MinWordsUserTurnStartStrategy
 from pipecat.turns.user_start.wake_phrase_user_turn_start_strategy import (
@@ -112,7 +118,7 @@ class WakeStrategy(WakePhraseUserTurnStartStrategy):
         super().__init__(phrases=[settings.phrase], timeout=settings.keep_awake_secs)
         self._settings = settings
         self._slept_this_call = False
-        self._patterns = [phrase_pattern(settings.phrase)]
+        self._patterns = [(settings.phrase, phrase_pattern(settings.phrase))]
 
     @property
     def settings(self) -> WakeSettings:
@@ -129,6 +135,11 @@ class WakeStrategy(WakePhraseUserTurnStartStrategy):
     @property
     def awake(self) -> bool:
         return self.state.value == "awake"
+
+    @property
+    def asleep(self) -> bool:
+        """True while the wake word is on and the phrase has not been heard."""
+        return self.settings.enabled and not self.awake
 
     def sleep(self) -> ToolResult:
         """Stop listening until the wake phrase; with the wake word off, for this call only."""
@@ -150,7 +161,7 @@ class WakeStrategy(WakePhraseUserTurnStartStrategy):
 
     def wake(self) -> bool:
         """Wake as if the phrase was heard, with no user turn; False when awake or the word is off."""
-        if not self.settings.enabled or self.awake:
+        if not self.asleep:
             return False
         self._state = type(self.state).AWAKE
         self._accumulated_text = ""
@@ -165,8 +176,7 @@ class WakeStrategy(WakePhraseUserTurnStartStrategy):
         if settings.enabled != self._settings.enabled:
             self._slept_this_call = False
         self._settings = settings
-        self._phrases = [settings.phrase]
-        self._patterns = [phrase_pattern(settings.phrase)]
+        self._patterns = [(settings.phrase, phrase_pattern(settings.phrase))]
         self._timeout = settings.keep_awake_secs
         if switched_on and self.awake:
             self._transition_to_idle()
@@ -176,18 +186,34 @@ class WakeStrategy(WakePhraseUserTurnStartStrategy):
     def _check_wake_phrase(self, text: str) -> bool:
         return super()._check_wake_phrase(normalise_transcript(text))
 
-    async def process_frame(self, frame: Frame) -> ProcessFrameResult:
-        if not self.settings.enabled:
-            return ProcessFrameResult.CONTINUE
-        return await super().process_frame(frame)
+    async def process_frame(self, frame: Frame) -> None:
+        """Listens for the phrase while asleep; awake, activity only keeps the EA awake."""
+        if self.asleep:
+            await super().process_frame(frame)
+        elif self.settings.enabled and isinstance(frame, _KEEPS_AWAKE):
+            self._refresh_timeout()
 
 
+_KEEPS_AWAKE = (UserSpeakingFrame, BotSpeakingFrame, TranscriptionFrame, VADUserStartedSpeakingFrame)
 MIN_INTERRUPTION_WORDS = 2
+
+
+class AwakeMinWords(MinWordsUserTurnStartStrategy):
+    """Starts a turn on enough words, and hears no words while the EA is asleep."""
+
+    def __init__(self, wake: WakeStrategy) -> None:
+        super().__init__(min_words=MIN_INTERRUPTION_WORDS)
+        self._wake = wake
+
+    async def process_frame(self, frame: Frame) -> None:
+        heard = isinstance(frame, (TranscriptionFrame, InterimTranscriptionFrame))
+        if not (heard and self._wake.asleep):
+            await super().process_frame(frame)
 
 
 def turn_start_strategies(wake: WakeStrategy) -> list[BaseUserTurnStartStrategy]:
     """The wake gate, then a turn start that needs two words to cut the EA off mid-reply."""
-    return [wake, MinWordsUserTurnStartStrategy(min_words=MIN_INTERRUPTION_WORDS)]
+    return [wake, AwakeMinWords(wake)]
 
 
 class WakeUserAggregator(LLMUserAggregator):
@@ -202,11 +228,13 @@ class WakeUserAggregator(LLMUserAggregator):
         settings = self._wake.settings
         return strip_wake_phrase(text, settings.phrase) if settings.enabled else text
 
-    async def _maybe_recover_empty_user_turn(self, interrupted_bot: bool) -> bool:
+    async def _maybe_recover_empty_user_turn(
+        self, interrupted_bot: bool, *, turn_inference: bool = False
+    ) -> bool:
         # A turn emptied because the EA fell asleep mid-turn must not make it speak.
-        if self._wake.settings.enabled and not self._wake.awake:
+        if self._wake.asleep:
             return False
-        return await super()._maybe_recover_empty_user_turn(interrupted_bot)
+        return await super()._maybe_recover_empty_user_turn(interrupted_bot, turn_inference=turn_inference)
 
 
 def wake_message(strategy: WakeStrategy, *, local: bool = False) -> dict[str, Any]:

@@ -1,13 +1,14 @@
 """The voice pipeline for one EA session over a SmallWebRTC connection."""
 
 import asyncio
+import re
 from collections.abc import Awaitable, Callable, Collection, Mapping, Sequence
 from datetime import UTC, datetime
 from typing import Any
 
 from loguru import logger
-from pipecat.adapters.schemas.function_schema import FunctionSchema
-from pipecat.adapters.schemas.tools_schema import ToolsSchema
+from pipecat.adapters.llm.schemas.function_schema import FunctionSchema
+from pipecat.adapters.llm.schemas.tools_schema import ToolsSchema
 from pipecat.audio.turn.smart_turn.base_smart_turn import SmartTurnParams
 from pipecat.audio.turn.smart_turn.local_smart_turn_v3 import LocalSmartTurnAnalyzerV3
 from pipecat.audio.vad.silero import SileroVADAnalyzer
@@ -45,7 +46,8 @@ from pipecat.transports.smallwebrtc.transport import SmallWebRTCTransport
 from pipecat.turns.user_start.base_user_turn_start_strategy import BaseUserTurnStartStrategy
 from pipecat.turns.user_stop import BaseUserTurnStopStrategy, TurnAnalyzerUserTurnStopStrategy
 from pipecat.turns.user_turn_strategies import UserTurnStrategies
-from pipecat.utils.text.markdown_text_filter import MarkdownTextFilter
+from pipecat.utils.text.base_text_aggregator import TextType
+from pipecat.utils.text.transforms import TextTransform, strip_markdown
 from pipecat.workers.runner import WorkerRunner
 from pydantic import BaseModel
 
@@ -203,9 +205,18 @@ def openai_llm(settings: Settings, model: str, system: str = SYSTEM_PROMPT) -> O
     )
 
 
-def voice_text_filter() -> MarkdownTextFilter:
-    """Strips markdown, code and tables from speech, in case a reply is written for the chat."""
-    return MarkdownTextFilter(MarkdownTextFilter.InputParams(filter_code=True, filter_tables=True))
+_TABLE_ROW = re.compile(r"^[ \t]*\|.*\|[ \t]*$\n?", re.MULTILINE)
+_STRAY_MARKS = re.compile(r"\*{2,}|_{2,}|`+")
+
+
+async def drop_unspoken(text: str, _text_type: str | TextType) -> str:
+    """Drops table rows, and emphasis or code marks whose other half is in another sentence."""
+    return _STRAY_MARKS.sub("", _TABLE_ROW.sub("", text))
+
+
+def voice_text_transforms() -> list[tuple[TextType | str, TextTransform]]:
+    """Strips markdown, code blocks and tables from speech, in case a reply is written for the chat."""
+    return [("*", strip_markdown), ("*", drop_unspoken)]
 
 
 def language_frames(language: str) -> tuple[STTUpdateSettingsFrame, TTSUpdateSettingsFrame]:
@@ -312,7 +323,7 @@ async def run_bot(
             model=settings.elevenlabs_model,
             language=tts_language(language),
         ),
-        text_filters=[voice_text_filter()],
+        text_transforms=voice_text_transforms(),
     )
     packs = PackPrompt(seti, timeout_secs=VOICE_TIMEOUT_SECS)
     system = await packs.system_prompt()
