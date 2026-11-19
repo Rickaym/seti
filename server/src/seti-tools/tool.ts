@@ -1,5 +1,6 @@
 import type { Task } from '@seti/shared'
 import { z } from 'zod'
+import { onSelf } from '../ea-guard.js'
 import { HttpError } from '../http.js'
 
 /** The agent that called a seti tool; tools act on Seti on its behalf. */
@@ -45,7 +46,7 @@ export class ToolRefusal extends HttpError {
 /** Refuses an action on the calling agent itself, such as stopping or archiving it. */
 export function notSelf(ctx: ToolContext, task: Pick<Task, 'id'>, what: string): void {
   if (task.id === ctx.caller.id) {
-    throw new ToolRefusal(`You cannot ${what} yourself with a seti tool; the user does that in Seti.`)
+    throw new ToolRefusal(onSelf(what))
   }
 }
 

@@ -64,6 +64,12 @@ type ScopeRow = NotifyScope & { device_id: string }
 const scopeOf = (row: NotifyScope | undefined): NotifyScope =>
   row === undefined ? DEFAULT_NOTIFY_SCOPE : { workspace_id: row.workspace_id, workspace_only: row.workspace_only }
 
+/** The ids of the agents whose turn ended after `since`, whatever changed on them later. */
+export async function turnEndedSince(since: string): Promise<Set<string>> {
+  const rows = await sql<{ id: string }[]>`SELECT id FROM task WHERE turn_ended_at > ${since}`
+  return new Set(rows.map((row) => row.id))
+}
+
 export const notifyScopes = {
   get: async (deviceId: string): Promise<NotifyScope> =>
     scopeOf(

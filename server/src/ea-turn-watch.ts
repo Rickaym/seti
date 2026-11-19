@@ -31,7 +31,11 @@ async function turnEndNotice(task: Task, status: TaskStatus): Promise<WatchNotic
       subject: STATE,
     }
   }
-  if (status === 'stopped' || status === 'interrupted') {
+  if (status === 'interrupted') {
+    const title = `${task.title} was cut off by a restart`
+    return { event: 'stopped', title, severity: 'warning', urgent: true, subject: STATE }
+  }
+  if (status === 'stopped') {
     return { event: 'stopped', title: `${task.title} was stopped`, severity: 'warning', subject: STATE }
   }
   if (status !== 'idle') {
@@ -61,6 +65,13 @@ export async function watchTurnEnd(taskId: string, status: TaskStatus): Promise<
       await queueNotice(task, notice)
     }
   })
+}
+
+/** Startup: tells the EA about the watched agents a restart cut off and Seti did not resume. */
+export function watchInterrupted(taskIds: readonly string[]): void {
+  for (const id of taskIds) {
+    inBackground('ea watch', async () => watchTurnEnd(id, 'interrupted'))
+  }
 }
 
 /** Tells the EA how a turn it waited for ended, unless its watch on the task already did. */

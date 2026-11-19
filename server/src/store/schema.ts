@@ -63,6 +63,7 @@ import {
   TASK_BYPASS_UNTIL,
   TASK_CLOSING_LINE,
   TASK_HOME_ACCESS,
+  TASK_TURN_ENDED_AT,
   TASK_COLOR_HEX,
   TASK_DIRS,
   TASK_MODEL_FALLBACK,
@@ -203,4 +204,5 @@ export const MIGRATIONS: readonly Migration[] = [
   { version: 110, name: 'task_home_access', sql: TASK_HOME_ACCESS },
   { version: 111, name: 'notify_scope', sql: NOTIFY_SCOPE },
   { version: 112, name: 'channel_sender', sql: CHANNEL_SENDER },
+  { version: 113, name: 'task_turn_ended_at', sql: TASK_TURN_ENDED_AT },
 ]

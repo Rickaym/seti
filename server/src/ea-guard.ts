@@ -43,6 +43,17 @@ export function refuseOtherAgent(taskId: string): void {
   }
 }
 
+/** The refusal of a seti tool that would act on the agent calling it, such as stopping it. */
+export const onSelf = (what: string) => `You cannot ${what} yourself with a seti tool; the user does that in Seti.`
+
+/** An agent's seti tools never stop, archive, delete, rewind, restart or retry the agent itself. */
+export function refuseOnSelf(taskId: string, what: string): void {
+  const source = currentRequestSource()
+  if (source?.via === 'agent' && source.taskId === taskId) {
+    throw new HttpError(403, onSelf(what))
+  }
+}
+
 /** Below Seti control Full an agent changes nothing every agent shares. */
 export function refuseAtSelf(what: string): void {
   if (ownTaskOnly() !== null) {

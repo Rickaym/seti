@@ -3,6 +3,7 @@ import type { ChannelInput, ChannelSecret, EaInboxItem, EaWatch, PrInput } from 
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createApp } from './app.js'
 import { messages, sql, tasks } from './db.js'
+import { watchTurnEnd } from './ea-turn-watch.js'
 import { watchPrInputs } from './ea-watch.js'
 import type { WatchedPr } from './github.js'
 import { deliverInputs, wakeTask } from './inputs.js'
@@ -107,6 +108,19 @@ afterAll(() => {
 })
 
 describe('task watches', () => {
+  it.each([
+    { status: 'error', event: 'turn_errored', urgent: true },
+    { status: 'interrupted', event: 'stopped', urgent: true },
+    { status: 'stopped', event: 'stopped', urgent: false },
+    { status: 'idle', event: 'turn_finished', urgent: false },
+  ] as const)('keep the urgency of a turn that ended $status', async ({ status, event, urgent }) => {
+    const id = await newTask()
+    await watch(id)
+    await sql`UPDATE task SET status = ${status} WHERE id = ${id}`
+    await watchTurnEnd(id, status)
+    expect((await events(id)).map((item) => [item.event, item.urgent])).toEqual([[event, urgent]])
+  })
+
   it('lists, audits and removes watches; a task nobody watches makes no events', async () => {
     const watched = await newTask()
     const other = await newTask('wake', 'Dashboard')

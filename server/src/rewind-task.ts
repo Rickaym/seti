@@ -7,6 +7,7 @@ import {
 } from '@anthropic-ai/claude-agent-sdk'
 import type { RewindFilesPreview, RewindRestore, RewindResult, RewindTarget, Task } from '@seti/shared'
 import { audit } from './audit.js'
+import { refuseOnSelf } from './ea-guard.js'
 import { HttpError } from './http.js'
 import { planScope } from './memory-cap.js'
 import { matchChain, rewindPoints, type ChainMatch, type RewindPoint } from './rewind.js'
@@ -146,6 +147,7 @@ const preview = (text: string) => (text.length > PREVIEW_CHARS ? `${text.slice(0
 
 /** Goes back to just before an earlier prompt: its conversation on the next turn, its files now. */
 export async function rewindTask(taskId: string, messageId: number, restore: RewindRestore): Promise<RewindResult> {
+  refuseOnSelf(taskId, 'rewind')
   const task = await requireTask(taskId)
   assertIdle(task.id)
   const point = await requirePoint(task, messageId)

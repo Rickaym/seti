@@ -20,7 +20,7 @@ async function routeDelivered(
 ): Promise<EaInboxItem[]> {
   const routes = new Map<number, AttentionRoute>()
   for (const item of items) {
-    const event = { tier: tierOfItem(item), viaEa: true, callable: false }
+    const event = { tier: tierOfItem(item) }
     routes.set(item.id, via === 'voice' ? 'call' : await routeAttention(event, at.getTime()))
   }
   const told = new Set(notify)
