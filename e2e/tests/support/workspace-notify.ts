@@ -124,11 +124,14 @@ async function asBot<T>(request: APIRequestContext, path: string, data?: unknown
   return ((await response.json()) as Envelope<T>).data
 }
 
-/** An agent in the workspace the EA watches, whose turn fails again once it is watched. */
+/** An agent in the workspace the EA watches, whose next turn fails once it is watched. */
 async function watchedFailure(request: APIRequestContext, title: string, workspace: Workspace): Promise<string> {
   const id = await failAgent(request, title, workspace)
   expect((await request.post('/api/ea/watches', { data: { task_id: id, note: 'e2e' } })).ok()).toBe(true)
-  expect((await request.post(`/api/tasks/${id}/retry`)).ok(), 'POST retry').toBe(true)
+  const again = await request.post(`/api/tasks/${id}/messages`, {
+    data: { prompt: `${FAIL_PROMPT} ${unique('watched')}` },
+  })
+  expect(again.ok(), await again.text()).toBe(true)
   return id
 }
 
@@ -167,6 +170,7 @@ export async function eaKeepsToTheOpenWorkspace(page: Page, request: APIRequestC
   const off = scopeSaved(page, (change) => change.workspace_only === false)
   await workspaceOnly(page).click()
   await off
+  await setVisible(page, true)
 
   const loudTitle = `EA loud ${tag}`
   const loud = await watchedFailure(request, loudTitle, a)
