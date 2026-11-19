@@ -72,6 +72,10 @@ class RecordingStt(PausableDeepgramSTT):
         self.closed = 0
         self.gate: asyncio.Event | None = None
 
+    @property
+    def send_sample_rate(self) -> int:
+        return RATE
+
     async def _open(self) -> None:
         if self.gate is not None:
             await self.gate.wait()

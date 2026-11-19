@@ -1,4 +1,5 @@
 import asyncio
+from collections.abc import Sequence
 from types import SimpleNamespace
 from typing import Any, cast
 
@@ -20,7 +21,6 @@ from pipecat.processors.aggregators.llm_context import LLMContext
 from pipecat.processors.aggregators.llm_response_universal import LLMUserAggregatorParams
 from pipecat.processors.frame_processor import FrameDirection, FrameProcessor, FrameProcessorSetup
 from pipecat.tests.utils import SleepFrame, run_test
-from pipecat.turns.types import ProcessFrameResult
 from pipecat.turns.user_stop import BaseUserTurnStopStrategy
 from pipecat.turns.user_turn_strategies import UserTurnStrategies
 from pipecat.utils.asyncio.task_manager import TaskManager
@@ -95,6 +95,12 @@ def transcript(text: str) -> TranscriptionFrame:
     return TranscriptionFrame(text=text, user_id="", timestamp="now")
 
 
+async def hears(strategy: WakeStrategy, text: str) -> bool:
+    """Whether words said now get past the wake gate to the turn start behind it."""
+    await strategy.process_frame(transcript(text))
+    return not strategy.asleep
+
+
 async def test_the_strategy_sleeps_wakes_and_times_out() -> None:
     strategy = WakeStrategy(ON)
     events: list[str] = []
@@ -108,9 +114,9 @@ async def test_the_strategy_sleeps_wakes_and_times_out() -> None:
         events.append("asleep")
 
     await started(strategy)
-    assert await strategy.process_frame(transcript("how many tasks")) == ProcessFrameResult.STOP
+    assert not await hears(strategy, "how many tasks")
     assert not strategy.awake
-    assert await strategy.process_frame(transcript("Hey, Setty!")) == ProcessFrameResult.STOP
+    await strategy.process_frame(transcript("Hey, Setty!"))
     assert strategy.awake
     assert wake_message(strategy) == {
         "type": "ea-wake",
@@ -121,7 +127,7 @@ async def test_the_strategy_sleeps_wakes_and_times_out() -> None:
     }
     for _ in range(3):
         await asyncio.sleep(0.3)
-        assert await strategy.process_frame(UserSpeakingFrame()) == ProcessFrameResult.CONTINUE
+        await strategy.process_frame(UserSpeakingFrame())
     assert strategy.awake
     await asyncio.sleep(0.9)
     assert not strategy.awake
@@ -132,12 +138,12 @@ async def test_the_strategy_sleeps_wakes_and_times_out() -> None:
 async def test_the_strategy_can_be_switched_during_a_call() -> None:
     strategy = WakeStrategy(WakeSettings())
     await started(strategy)
-    assert await strategy.process_frame(transcript("how many tasks")) == ProcessFrameResult.CONTINUE
+    assert await hears(strategy, "how many tasks")
     assert wake_message(strategy)["enabled"] is False
 
     assert strategy.configure(WakeSettings(enabled=True, phrase="OK Computer", keep_awake_secs=5)) is True
     assert strategy.configure(WakeSettings(enabled=True, phrase="OK Computer", keep_awake_secs=5)) is False
-    assert await strategy.process_frame(transcript("hey seti")) == ProcessFrameResult.STOP
+    assert not await hears(strategy, "hey seti")
     assert not strategy.awake
     await strategy.process_frame(transcript("ok computer"))
     assert strategy.awake
@@ -152,10 +158,9 @@ async def test_the_strategy_can_be_switched_during_a_call() -> None:
 class StopOnSilence(BaseUserTurnStopStrategy):
     """Ends the turn as VAD reports silence, so no timer races the next simulated turn."""
 
-    async def process_frame(self, frame: Frame) -> ProcessFrameResult:
+    async def process_frame(self, frame: Frame) -> None:
         if isinstance(frame, VADUserStoppedSpeakingFrame):
-            await self.trigger_user_turn_stopped()
-        return ProcessFrameResult.CONTINUE
+            await self.report_user_turn_stopped()
 
 
 class SleepNow(DataFrame):
@@ -260,7 +265,7 @@ async def test_sleep_ends_the_keep_awake_window_when_the_wake_word_is_on() -> No
     }
     await asyncio.sleep(0.05)
     assert events == ["asleep"]
-    assert await strategy.process_frame(transcript("how many tasks")) == ProcessFrameResult.STOP
+    assert not await hears(strategy, "how many tasks")
     await strategy.process_frame(transcript("hey seti, how many tasks"))
     assert strategy.awake
     await strategy.cleanup()
@@ -270,7 +275,7 @@ async def test_sleep_with_the_wake_word_off_lasts_for_this_call_only() -> None:
     stored = WakeSettings(phrase="OK Computer", keep_awake_secs=5)
     strategy = WakeStrategy(stored)
     await started(strategy)
-    assert await strategy.process_frame(transcript("how many tasks")) == ProcessFrameResult.CONTINUE
+    assert await hears(strategy, "how many tasks")
     result = strategy.sleep()
     assert strategy.temporary
     assert strategy.settings == WakeSettings(enabled=True, phrase="OK Computer", keep_awake_secs=5)
@@ -284,7 +289,7 @@ async def test_sleep_with_the_wake_word_off_lasts_for_this_call_only() -> None:
         "phrase": "OK Computer",
         "local": False,
     }
-    assert await strategy.process_frame(transcript("how many tasks")) == ProcessFrameResult.STOP
+    assert not await hears(strategy, "how many tasks")
     await strategy.process_frame(transcript("OK computer, how many tasks"))
     assert strategy.awake
     assert strategy.temporary
@@ -294,7 +299,7 @@ async def test_sleep_with_the_wake_word_off_lasts_for_this_call_only() -> None:
     assert not next_call.temporary
     assert next_call.settings == stored
     await started(next_call)
-    assert await next_call.process_frame(transcript("how many tasks")) == ProcessFrameResult.CONTINUE
+    assert await hears(next_call, "how many tasks")
     await next_call.cleanup()
 
 
@@ -309,7 +314,7 @@ async def test_switching_the_setting_ends_the_call_only_sleep() -> None:
     assert not strategy.temporary
     strategy.configure(WakeSettings())
     assert not strategy.settings.enabled
-    assert await strategy.process_frame(transcript("how many tasks")) == ProcessFrameResult.CONTINUE
+    assert await hears(strategy, "how many tasks")
     await strategy.cleanup()
 
 
@@ -319,18 +324,50 @@ async def test_after_sleep_speech_is_ignored_until_the_phrase() -> None:
     assert user_texts(context) == ["how many tasks are running?"]
 
 
-async def test_interrupting_the_ea_mid_reply_takes_two_words() -> None:
-    start = turn_start_strategies(WakeStrategy(WakeSettings()))[1]
-    turns: list[str] = []
+async def turns_started(wake: WakeStrategy, frames: Sequence[Frame]) -> int:
+    """How many times the start strategies say a turn started, fed as the turn controller feeds them."""
+    strategies = turn_start_strategies(wake)
+    started_turns: list[object] = []
 
-    @start.event_handler("on_user_turn_started")
     async def on_started(_strategy: object, _params: object) -> None:
-        turns.append("started")
+        started_turns.append(_strategy)
 
-    await start.process_frame(BotStartedSpeakingFrame())
-    assert await start.process_frame(transcript("okay")) == ProcessFrameResult.CONTINUE
-    assert turns == []
-    assert await start.process_frame(transcript("hold on")) == ProcessFrameResult.STOP
-    assert turns == ["started"]
-    await start.process_frame(BotStoppedSpeakingFrame())
-    assert await start.process_frame(transcript("yes")) == ProcessFrameResult.STOP
+    for strategy in strategies:
+        strategy.add_event_handler("on_user_turn_started", on_started)
+    for frame in frames:
+        for strategy in strategies:
+            await strategy.process_frame(frame)
+    return len(started_turns)
+
+
+async def test_interrupting_the_ea_mid_reply_takes_two_words() -> None:
+    wake = WakeStrategy(WakeSettings())
+    assert await turns_started(wake, [BotStartedSpeakingFrame(), transcript("okay")]) == 0
+    assert await turns_started(wake, [BotStartedSpeakingFrame(), transcript("hold on")]) == 1
+    assert await turns_started(wake, [BotStoppedSpeakingFrame(), transcript("yes")]) == 1
+
+
+async def test_awake_a_noise_or_one_word_does_not_cut_the_ea_off() -> None:
+    wake = WakeStrategy(SLOW_ON)
+    await started(wake)
+    assert await turns_started(wake, [transcript("Hey Seti")]) == 2
+    assert wake.awake
+    frames = [
+        BotStartedSpeakingFrame(),
+        VADUserStartedSpeakingFrame(),
+        UserSpeakingFrame(),
+        transcript("okay"),
+    ]
+    assert await turns_started(wake, frames) == 0
+    assert await turns_started(wake, [BotStartedSpeakingFrame(), transcript("hold on")]) == 1
+    await wake.cleanup()
+
+
+async def test_asleep_no_words_start_a_turn_and_the_phrase_is_the_only_way_in() -> None:
+    wake = WakeStrategy(SLOW_ON)
+    await started(wake)
+    interim = InterimTranscriptionFrame(text="how many tasks", user_id="", timestamp="now")
+    frames = [VADUserStartedSpeakingFrame(), interim, transcript("how many tasks are running")]
+    assert await turns_started(wake, frames) == 0
+    assert wake.asleep
+    await wake.cleanup()
