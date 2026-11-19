@@ -1,6 +1,7 @@
 import type { APIRequestContext, Page } from '@playwright/test'
-import type { Envelope, NotifyScopeInput, Task, Workspace } from '@seti/shared'
-import { paths } from './env.js'
+import type { EaInboxDelivered, EaInboxItem, Envelope, NotifyScopeInput, Task, Workspace } from '@seti/shared'
+import { REPLY_TOAST_MS, clearEaReplies, eaToast } from './ea-replies.js'
+import { EA_HEADERS, paths } from './env.js'
 import { FAIL_PROMPT } from './fake-claude.js'
 import { apiData, expect, toasts, unique } from './fixtures.js'
 import type { PushService } from './push.js'
@@ -114,11 +115,76 @@ export async function keepsToTheOpenWorkspace(
   return [quiet, away, here, loud, pushed]
 }
 
-/** Removes what the scenario left: its agents from the lists, and every push device. */
+async function asBot<T>(request: APIRequestContext, path: string, data?: unknown): Promise<T> {
+  const response =
+    data === undefined
+      ? await request.get(path, { headers: EA_HEADERS })
+      : await request.post(path, { headers: EA_HEADERS, data })
+  expect(response.ok(), path).toBe(true)
+  return ((await response.json()) as Envelope<T>).data
+}
+
+/** An agent in the workspace the EA watches, whose turn fails again once it is watched. */
+async function watchedFailure(request: APIRequestContext, title: string, workspace: Workspace): Promise<string> {
+  const id = await failAgent(request, title, workspace)
+  expect((await request.post('/api/ea/watches', { data: { task_id: id, note: 'e2e' } })).ok()).toBe(true)
+  expect((await request.post(`/api/tasks/${id}/retry`)).ok(), 'POST retry').toBe(true)
+  return id
+}
+
+/** Waits for the EA's item about the agent and delivers it in the EA chat, as the EA does. */
+async function deliverItemAbout(request: APIRequestContext, taskId: string): Promise<EaInboxDelivered['items']> {
+  let item: EaInboxItem | undefined
+  await expect
+    .poll(async () => {
+      item = (await asBot<EaInboxItem[]>(request, '/api/ea/inbox/due')).find((each) => each.task_id === taskId)
+      return item !== undefined
+    })
+    .toBe(true)
+  const ids = item === undefined ? [] : [item.id]
+  return (await asBot<EaInboxDelivered>(request, '/api/ea/inbox/deliver', { ids, via: 'chat', notify: ids })).items
+}
+
+/**
+ * The EA's items follow the same rule: with this page on B, its item about a watched agent in A
+ * raises no toast here; with "Active workspace only" off, it does. Returns the agents it started.
+ */
+export async function eaKeepsToTheOpenWorkspace(page: Page, request: APIRequestContext): Promise<string[]> {
+  const tag = unique('ea-scope')
+  const a = await createWorkspace(request, `EA A ${tag}`)
+  const b = await createWorkspace(request, `EA B ${tag}`)
+  await page.goto('/#agents')
+  const onB = scopeSaved(page, (change) => change.workspace_id === b.id)
+  await switchWorkspace(page, b.name)
+  await onB
+
+  const quietTitle = `EA quiet ${tag}`
+  const quiet = await watchedFailure(request, quietTitle, a)
+  expect((await deliverItemAbout(request, quiet)).map((item) => item.route)).toEqual(['digest'])
+
+  await page.goto('/#settings/notifications')
+  await workspaceOnly(page).scrollIntoViewIfNeeded()
+  const off = scopeSaved(page, (change) => change.workspace_only === false)
+  await workspaceOnly(page).click()
+  await off
+
+  const loudTitle = `EA loud ${tag}`
+  const loud = await watchedFailure(request, loudTitle, a)
+  expect((await deliverItemAbout(request, loud)).map((item) => item.route)).toEqual(['toast'])
+  await expect(eaToast(page, `${loudTitle} stopped with an error`)).toBeVisible({ timeout: REPLY_TOAST_MS })
+  await expect(eaToast(page, quietTitle)).toHaveCount(0)
+  return [quiet, loud]
+}
+
+/** Removes what the scenario left: its agents, their watches, the EA's messages and push devices. */
 export async function clearScenario(request: APIRequestContext, agents: readonly string[]): Promise<void> {
   if (agents.length > 0) {
     await request.post('/api/tasks/archive', { data: { task_ids: agents, remove_worktree: false } })
   }
+  for (const id of agents) {
+    await request.delete(`/api/ea/watches/${id}`)
+  }
+  await clearEaReplies(request)
   const { devices } = await apiData<{ devices: { device_id: string }[] }>(request, '/notifications')
   for (const device of devices) {
     await request.delete(`/api/notifications/devices/${device.device_id}`)

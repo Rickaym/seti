@@ -10,7 +10,7 @@ import {
 import { beforeEach, describe, expect, it } from 'vitest'
 import { asAgent } from '../access.js'
 import { createApp } from '../app.js'
-import { sql } from '../db.js'
+import { sql, tasks } from '../db.js'
 import { decideAsk } from '../ea-asks.js'
 import { resetAttention } from '../ea-attention.js'
 import { recordFocus, resetPresence } from '../presence.js'
@@ -18,6 +18,7 @@ import { auditEvents } from '../store/audit.js'
 import { eaAsks } from '../store/ea-replies.js'
 import { eaHistory } from '../store/ea.js'
 import { eaInbox } from '../store/inbox.js'
+import { notifyScopes } from '../store/notifications.js'
 import { EA_AUTH, USER_AUTH } from '../test-auth.js'
 
 const app = createApp()
@@ -80,7 +81,9 @@ describe('unseen EA replies', () => {
     })
     const page = await unseen()
     expect(page.total).toBe(1)
-    expect(page.replies).toEqual([{ id: ids[3], text: 'Two.', created_at: expect.any(String) as string, asks: [] }])
+    expect(page.replies).toEqual([
+      { id: ids[3], text: 'Two.', created_at: expect.any(String) as string, asks: [], workspace_id: null },
+    ])
   })
 
   it('marks seen by id or through an id, for every tab alike', async () => {
@@ -125,6 +128,43 @@ describe('unseen EA replies', () => {
     expect((await eaInbox.unread(new Date().toISOString())).unread).toBe(2)
     await data(await send('POST', '/ea/replies/seen', USER, { ids: [page.replies[0]?.id] }))
     expect((await eaInbox.unread(new Date().toISOString())).unread).toBe(1)
+    resetPresence()
+  })
+
+  it.each([
+    { name: 'keeps to another workspace', only: true, route: 'digest', shown: [] },
+    { name: 'hears every workspace', only: false, route: 'toast', shown: ['ws-a'] },
+  ] as const)('routes a notice about an agent by its workspace: a page that $name', async ({ only, route, shown }) => {
+    resetAttention()
+    for (const id of ['ws-a', 'ws-b']) {
+      await sql`INSERT INTO workspace (id, name, position, created_at)
+        VALUES (${id}, ${id}, 99, ${new Date().toISOString()}) ON CONFLICT (id) DO NOTHING`
+    }
+    const taskId = `replies-billing-${String(only)}`
+    await tasks.insert({ id: taskId, title: 'Billing', repo_id: null, cwd: '/tmp', worktree: false, pr_urls: [] })
+    await sql`UPDATE task SET workspace_id = 'ws-a' WHERE id = ${taskId}`
+    await notifyScopes.set('page-on-b', { workspace_id: 'ws-b', workspace_only: only })
+    recordFocus({ device_id: 'page-on-b', agents: [], active: true })
+    const at = new Date(Date.now() - 1000).toISOString()
+    const item = await eaInbox.add({
+      kind: 'channel_event',
+      event: 'event',
+      title: 'Billing asks for a review',
+      body: '',
+      url: null,
+      severity: 'info',
+      source: 'Billing',
+      task_id: taskId,
+      due_at: at,
+      created_at: at,
+    })
+    const body = { ids: [item.id], via: 'chat', notify: [item.id] }
+    const delivered = await data<EaInboxDelivered>(await send('POST', '/ea/inbox/deliver', BOT, body))
+    expect(delivered.items.map((each) => each.route)).toEqual([route])
+    const page = await unseen()
+    expect(page.replies.map((reply) => reply.workspace_id)).toEqual(shown)
+    await sql`UPDATE ea_history SET unseen = false WHERE unseen`
+    await sql`DELETE FROM notify_scope WHERE device_id = 'page-on-b'`
     resetPresence()
   })
 })

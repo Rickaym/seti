@@ -32,6 +32,8 @@ export interface EaUnseenReply {
   created_at: string
   /** The questions this reply puts to the user, oldest first. */
   asks: EaAsk[]
+  /** The workspace of the agent an inbox notice is about; null for anything else. */
+  workspace_id: string | null
 }
 
 export interface EaUnseenReplies {

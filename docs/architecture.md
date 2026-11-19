@@ -1314,9 +1314,12 @@ switch does not raise it. What the user looks at on purpose keeps every workspac
 count in the status bar and on the app icon, and the workspace switcher, which shows how many
 agents need the user in the other workspaces and in each one. The per-agent mute and the tiers
 apply first. The setting is per device, in Settings, Notifications, on by default and audited;
-the workspace report is view state like a focus report and is not. The phone widgets and the EA
-are not scoped: a widget signs in with its paired device key, which Seti cannot match to a
-browser's device id, and the EA speaks for the whole install.
+the workspace report is view state like a focus report and is not. The EA's inbox items about an
+agent follow the same rule: `server/src/ea-deliver.ts` routes each one with its agent's workspace,
+and a page raises no toast for one whose agent is in a workspace it is not notified about; the
+notice stays in the EA chat. The phone widgets, the EA's own replies and its live call are not
+scoped: a widget signs in with its paired device key, which Seti cannot match to a browser's
+device id, and the EA speaks for the whole install.
 
 ## An open tab reloads once when a deploy replaced its build
 
