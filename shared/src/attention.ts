@@ -9,7 +9,7 @@ export type AttentionTier = (typeof ATTENTION_TIERS)[number]
 
 /**
  * Where the user wants a tier to reach them. push: a phone push while away, a toast while a page
- * has focus, the call while one is live. toast: only a page with focus, else the brief. brief:
+ * has focus. toast: only a page with focus, else the brief, or a push for an urgent event. brief:
  * only the brief on return. off: the EA knows, nothing shows.
  */
 export const TIER_SURFACES = ['push', 'toast', 'brief', 'off'] as const
