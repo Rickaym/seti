@@ -238,7 +238,7 @@ export function Activity({ info }: { info: ChannelInfo }) {
           render={(event) => <EventLine key={event.id} event={event} />}
         />
         <Block
-          title="Deliveries"
+          title={info.source === 'webhook' ? `Deliveries from ${info.sender.label}` : 'Deliveries'}
           label={`${info.name} deliveries`}
           rows={info.deliveries}
           render={(delivery) => <DeliveryLine key={delivery.id} delivery={delivery} />}

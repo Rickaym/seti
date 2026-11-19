@@ -22,6 +22,7 @@ import { relativeTime } from '@/lib/time'
 import { SettingRow, SettingsCard } from '../layout'
 import { Activity } from './Activity'
 import { MappingEditor } from './MappingEditor'
+import { SenderRow } from './SenderRow'
 import { Subscribers } from './Subscribers'
 import { hookUrl } from './hook-url'
 
@@ -38,7 +39,7 @@ function SenderSecretDialog({
   onRotate: (secret: string) => void
 }) {
   const [secret, setSecret] = useState('')
-  const label = info.sender.label
+  const { label, secret_label: secretLabel } = info.sender
   return (
     <CrudEditDialog
       open={open}
@@ -52,9 +53,9 @@ function SenderSecretDialog({
       saveLabel="Rotate"
       saveIcon={KeyRound}
     >
-      <Field label={`${label} client secret`} full>
+      <Field label={`${label}: ${secretLabel}`} full>
         <Input
-          aria-label="Client secret"
+          aria-label={secretLabel}
           type="password"
           autoComplete="off"
           value={secret}
@@ -205,7 +206,7 @@ export function WebhookCard({
       {info.secret_pending === 'paste' && (
         <SettingRow
           label="Secret missing"
-          description={`Paste the client secret ${preset.label} issued; deliveries are refused until then.`}
+          description={`Paste the ${preset.secret_label.toLowerCase()} ${preset.label} issued; deliveries are refused until then.`}
         >
           <Button
             size="xs"
@@ -219,6 +220,7 @@ export function WebhookCard({
           </Button>
         </SettingRow>
       )}
+      <SenderRow info={info} onChange={onChange} />
       <Subscribers info={info} onChange={onChange} />
       {info.preset === CORE_WEBHOOK_SOURCE && (
         <MappingEditor

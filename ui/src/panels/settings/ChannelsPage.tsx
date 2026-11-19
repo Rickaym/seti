@@ -277,6 +277,10 @@ export function ChannelsPage({ detail }: { detail: string | null }) {
         onClose={() => {
           setSecret(null)
         }}
+        onPasted={(next) => {
+          replace(next.channel)
+          setSecret(next)
+        }}
       />
     </SettingsBody>
   )
