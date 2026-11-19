@@ -169,13 +169,13 @@ WHERE t.id = l.task_id AND l.p ->> 'original_model' IS NOT NULL AND l.p ->> 'fal
  * Whether a task's sandbox shows the user's home folders: on for every agent that exists, since
  * they work in them, and off for each agent made from now on.
  */
+export const TASK_HOME_ACCESS = `
+ALTER TABLE task ADD COLUMN home_access BOOLEAN NOT NULL DEFAULT TRUE;
+ALTER TABLE task ALTER COLUMN home_access SET DEFAULT FALSE;
+`
+
 /** When an agent's last turn ended, apart from updated_at, which a rename or a pin also moves. */
 export const TASK_TURN_ENDED_AT = `
 ALTER TABLE task ADD COLUMN turn_ended_at TEXT;
 UPDATE task SET turn_ended_at = updated_at WHERE status <> 'running';
-`
-
-export const TASK_HOME_ACCESS = `
-ALTER TABLE task ADD COLUMN home_access BOOLEAN NOT NULL DEFAULT TRUE;
-ALTER TABLE task ALTER COLUMN home_access SET DEFAULT FALSE;
 `

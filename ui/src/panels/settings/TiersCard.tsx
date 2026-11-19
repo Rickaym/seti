@@ -55,7 +55,7 @@ const SURFACES: Record<TierSurface, { label: string; icon: LucideIcon; hint: str
   push: {
     label: 'Push',
     icon: BellRing,
-    hint: 'A phone push while you are away, a toast while Seti has focus, the EA call while one is live',
+    hint: 'A phone push while you are away, a toast while Seti has focus',
   },
   toast: {
     label: 'Toast',
