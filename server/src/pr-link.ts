@@ -41,6 +41,30 @@ export function postsPrCommentCall(name: string, input: unknown): boolean {
   return GH_API_COMMENTS.test(command) && SENDS_FIELDS.test(command) && !READS_ONLY.test(command)
 }
 
+const GH_END = /\bgh\s+pr\s+(?:merge|close)\b/
+const GH_API_PULL = /\bgh\s+api\b[^\n|;&]*\/pulls\/\d+(\/merge\b)?/
+const CLOSES = /\bstate=closed\b/
+const GRAPHQL_END = /\b(?:mergePullRequest|closePullRequest)\b/
+const END_TOOL = /(?:^|__)(?:merge_pull_request|close_pull_request)$/i
+const UPDATE_TOOL = /(?:^|__)update_pull_request$/i
+
+const closesByField = (input: unknown) =>
+  typeof input === 'object' && input !== null && 'state' in input && input.state === 'closed'
+
+/** A tool call that may merge or close a PR, by gh or a GitHub MCP server. */
+export function endsPrCall(name: string, input: unknown): boolean {
+  if (name !== 'Bash') {
+    return END_TOOL.test(name) || (UPDATE_TOOL.test(name) && closesByField(input))
+  }
+  const command = bashCommand(input)
+  if (GH_GRAPHQL.test(command)) {
+    return GRAPHQL_END.test(command)
+  }
+  const pull = GH_API_PULL.exec(command)
+  const ends = pull !== null && (pull[1] !== undefined || CLOSES.test(command))
+  return GH_END.test(command) || (ends && !READS_ONLY.test(command))
+}
+
 /** A tool call that opens a PR: a PR-creating Bash command or a GitHub MCP create_pull_request. */
 export function createsPrCall(name: string, input: unknown): boolean {
   return name === 'Bash' ? createsPr(bashCommand(input)) : MCP_CREATE_PR.test(name)

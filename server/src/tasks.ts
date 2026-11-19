@@ -1,7 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import fs from 'node:fs'
 import {
-  extraDirs,
   fromMcpChoices,
   toMcpChoices,
   agentColorWord,
@@ -10,7 +8,6 @@ import {
   setupSummary,
   SETI_CONTROL_LABELS,
   type SetiControlLevel,
-  type Repo,
   type Task,
   type TaskRequest,
   type TaskSetup,
@@ -18,10 +15,9 @@ import {
 import { accessSummary, applyStartAccess, awsWithProfile, planStartAccess } from './agent-access.js'
 import { audit, auditPrLink } from './audit.js'
 import { capabilityCache } from './capabilities.js'
-import { repos, tasks, type BackfillMessage } from './db.js'
+import { tasks, type BackfillMessage } from './db.js'
 import { promptAuthor, refuseAgent, refuseOtherAgent } from './ea-guard.js'
 import { watchPrLinked } from './ea-watch.js'
-import { createWorktree, removeWorktree } from './git.js'
 import { HttpError } from './http.js'
 import { errorCode } from './pg.js'
 import { taskPluginNames } from './plugins.js'
@@ -32,10 +28,9 @@ import { profiles } from './store/credentials.js'
 import { taskMcpChoices } from './store/mcp.js'
 import { setiPlugins, taskPluginChoices } from './store/plugins.js'
 import { prDismissals } from './store/pr-discovery.js'
-import { createScratchDir, worktreeName } from './task-location.js'
+import { createScratchDir } from './task-location.js'
 import { rehandleAfterRename } from './team-rename.js'
 import { placeAttachments } from './uploads.js'
-import { recordSeeds, seedWorktrees, type SeedTarget } from './warm-caches.js'
 import { startWorkspace } from './workspaces.js'
 
 export async function requireTask(id: string): Promise<Task> {
@@ -44,108 +39,6 @@ export async function requireTask(id: string): Promise<Task> {
     throw new HttpError(404, 'Task not found')
   }
   return task
-}
-
-async function requireRepos(ids: readonly string[]): Promise<Repo[]> {
-  const found: Repo[] = []
-  for (const id of ids) {
-    const repo = await repos.get(id)
-    if (!repo) {
-      throw new HttpError(400, 'Unknown repo')
-    }
-    found.push(repo)
-  }
-  return found
-}
-
-interface PlacedRepo {
-  repo: Repo
-  dir: string
-}
-
-async function removePlaced(placed: readonly PlacedRepo[]): Promise<void> {
-  await Promise.allSettled(placed.map(async ({ repo, dir }) => removeWorktree(repo.path, dir)))
-}
-
-/** One detached worktree per repo; the start ref applies to the first, the rest use their base. */
-async function createWorktrees(taskId: string, list: readonly Repo[], ref: string | undefined): Promise<PlacedRepo[]> {
-  const placed: PlacedRepo[] = []
-  const names = new Set<string>()
-  try {
-    for (const [index, repo] of list.entries()) {
-      const name = worktreeName(repo, taskId, (candidate) => names.has(candidate))
-      names.add(name)
-      const start = index === 0 ? (ref ?? repo.base_branch) : repo.base_branch
-      placed.push({ repo, dir: await createWorktree(repo.path, start, name) })
-    }
-  } catch (e) {
-    await removePlaced(placed)
-    throw e
-  }
-  return placed
-}
-
-async function placeRepos(taskId: string, input: TaskRequest): Promise<PlacedRepo[]> {
-  const list = await requireRepos(input.repo_ids)
-  if (input.worktree) {
-    return createWorktrees(taskId, list, input.ref)
-  }
-  return list.map((repo) => ({ repo, dir: repo.path }))
-}
-
-interface Location {
-  cwd: string
-  repo_id: string | null
-  worktree: boolean
-  extras: { repo_id: string; dir: string }[]
-  /** Worktrees made for the task, to seed with build caches. */
-  made: SeedTarget[]
-}
-
-/** Repos when picked, else the directory given, else a fresh directory of the agent's own. */
-async function resolveLocation(taskId: string, input: TaskRequest): Promise<Location> {
-  const placed = await placeRepos(taskId, input)
-  const [primary, ...extras] = placed
-  if (primary !== undefined) {
-    return {
-      cwd: primary.dir,
-      repo_id: primary.repo.id,
-      worktree: input.worktree,
-      extras: extras.map(({ repo, dir }) => ({ repo_id: repo.id, dir })),
-      made: input.worktree ? placed : [],
-    }
-  }
-  if (input.cwd === undefined) {
-    return { cwd: createScratchDir(taskId, input.title), repo_id: null, worktree: false, extras: [], made: [] }
-  }
-  const cwd = input.cwd
-  if (cwd === '' || !fs.existsSync(cwd)) {
-    throw new HttpError(400, 'Pick a repo or a working directory that exists')
-  }
-  return { cwd, repo_id: null, worktree: false, extras: [], made: [] }
-}
-
-const here = (task: Task, dir: string) => (dir === task.cwd ? ' (your working directory)' : '')
-
-/** Lists the directories of a task that spans several, so the agent knows where each one is. */
-export async function taskReposContext(taskId: string): Promise<string | null> {
-  const task = await tasks.get(taskId)
-  if (!task || extraDirs(task).length === 0) {
-    return null
-  }
-  const inRepos = task.repos.some((repo) => repo.dir === task.cwd)
-  const lines = [
-    ...(inRepos ? [] : [`- ${task.cwd} (your working directory)`]),
-    ...task.repos.map((repo) => `- ${repo.slug}: ${repo.dir}${here(task, repo.dir)}`),
-    ...task.dirs.map((dir) => `- ${dir}`),
-  ]
-  const intro = 'This task spans several directories. You can read and edit all of them:'
-  const worktrees = task.repos.filter((repo) => repo.worktree).map((repo) => repo.slug)
-  const branches =
-    worktrees.length === 0
-      ? []
-      : [`Seti made a detached worktree of ${worktrees.join(', ')}; create a branch in each one you change.`]
-  return [intro, ...lines, ...branches].join('\n')
 }
 
 function plannedNote(setup: TaskSetup | null): string {
@@ -173,20 +66,15 @@ async function auditCreated(task: Task, actor: AuditActor): Promise<void> {
   const packs = (await taskContextPacks.list(task.id)).map((pack) => pack.name)
   const plugins = await taskPluginNames(await taskPluginChoices.get(task.id))
   const mcp = fromMcpChoices(await taskMcpChoices.get(task.id))
-  const slugs = task.repos.map((repo) => repo.slug)
-  const where = slugs.length === 0 ? task.cwd : slugs.join(' + ')
   await audit.record({
     actor,
     kind: 'task.created',
     subject_type: 'task',
     subject_id: task.id,
-    summary: `Created task "${task.title}" in ${where}${task.worktree ? ' (worktree)' : ''}${task.sandbox ? '' : ', unsandboxed'}${plannedNote(task.setup)}`,
+    summary: `Created task "${task.title}" in ${task.cwd}${task.sandbox ? '' : ', unsandboxed'}${plannedNote(task.setup)}`,
     detail: {
       title: task.title,
-      repo: task.repo_slug,
-      repos: slugs,
       cwd: task.cwd,
-      worktree: task.worktree,
       sandbox: task.sandbox,
       seti_control: task.seti_control,
       color: task.color,
@@ -201,7 +89,7 @@ async function auditCreated(task: Task, actor: AuditActor): Promise<void> {
   })
 }
 
-/** Creates the task row and its working directories, calls onCreated, then starts the first turn. */
+/** Creates the task row and its own fresh folder, calls onCreated, then starts the first turn. */
 export async function startTask(
   input: TaskRequest,
   onCreated?: (taskId: string) => void | Promise<void>,
@@ -214,31 +102,26 @@ export async function startTask(
   const access = await planStartAccess(input.access)
   const workspace = await startWorkspace(input.workspace_id)
   const id = randomUUID()
-  const location = await resolveLocation(id, input)
-  const seeding = seedWorktrees(location.made)
-  await tasks.insert(
-    {
-      id,
-      title: input.title,
-      repo_id: location.repo_id,
-      cwd: location.cwd,
-      worktree: location.worktree,
-      sandbox: input.sandbox,
-      profile_id: input.profile_id,
-      seti_control: input.seti_control,
-      pr_urls: [...new Set(input.pr_urls ?? [])],
-      setup: input.setup ?? null,
-      workspace_id: workspace.id,
-    },
-    location.extras,
-  )
-  capabilityCache.prewarm(location.cwd)
+  const cwd = createScratchDir(id, input.title)
+  await tasks.insert({
+    id,
+    title: input.title,
+    repo_id: null,
+    cwd,
+    worktree: false,
+    sandbox: input.sandbox,
+    profile_id: input.profile_id,
+    seti_control: input.seti_control,
+    pr_urls: [...new Set(input.pr_urls ?? [])],
+    setup: input.setup ?? null,
+    workspace_id: workspace.id,
+  })
+  capabilityCache.prewarm(cwd)
   await taskContextPacks.set(id, packIds)
   await taskPluginChoices.setOptOuts(id, input.disabled_plugin_ids)
   await taskMcpChoices.set(id, toMcpChoices(input))
   await applyStartAccess(await requireTask(id), access)
   await auditCreated(await requireTask(id), actor)
-  await recordSeeds({ id, title: input.title }, location.made, await seeding, actor)
   await onCreated?.(id)
   const first = await placeAttachments(id, input.prompt, input.attachments ?? [])
   await runTurn(id, first.prompt, { attachments: first.attachments, from: promptAuthor() })
@@ -356,6 +239,23 @@ export async function setTaskSandbox(task: Task, on: boolean): Promise<void> {
     subject_id: task.id,
     summary: `Turned the sandbox ${on ? 'on' : 'off'} for task "${task.title}"`,
     detail: { title: task.title, sandbox: on },
+  })
+}
+
+/** Takes the user's home folders out of an older agent's sandbox, from its next turn and for good. */
+export async function dropTaskHomeAccess(task: Task): Promise<void> {
+  refuseAgent("change an agent's home folders")
+  if (!task.home_access) {
+    return
+  }
+  await tasks.dropHomeAccess(task.id)
+  await audit.record({
+    actor: 'user',
+    kind: 'task.access_changed',
+    subject_type: 'task',
+    subject_id: task.id,
+    summary: `Took your home folders out of the sandbox of task "${task.title}"`,
+    detail: { title: task.title, home_access: false },
   })
 }
 

@@ -125,10 +125,10 @@ export const questions = {
       await sql<QuestionRecord[]>`UPDATE question SET status = 'expired', settled_at = ${now()}
         WHERE group_id = ${groupId} AND status = 'open' ${RETURNING}`,
     ),
-  /** Expires every open question, as at startup when no process waits on one; returns them. */
-  expireAll: async (): Promise<Question[]> =>
+  /** Expires every open secret question, as at startup when no call waits on one; returns them. */
+  expireSecrets: async (): Promise<Question[]> =>
     list(
       await sql<QuestionRecord[]>`UPDATE question SET status = 'expired', settled_at = ${now()}
-        WHERE status = 'open' ${RETURNING}`,
+        WHERE status = 'open' AND kind = 'secret' ${RETURNING}`,
     ),
 }

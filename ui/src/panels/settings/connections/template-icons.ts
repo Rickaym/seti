@@ -12,7 +12,7 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 
-/** One icon per kind of service; templates carry no brand logos. */
+/** One icon per kind of service, for a template with no brand mark. */
 export const TEMPLATE_ICON: Record<TemplateCategory, LucideIcon> = {
   cloud: Cloud,
   ai: Sparkles,

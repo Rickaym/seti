@@ -296,6 +296,14 @@ class SettingsFake(FakeSeti):
                     return err(404, "No such subscription on this channel")
                 sub["mode"] = body["mode"]
                 return ok(sub)
+            case "PUT", ["channels", channel_id, "subscriptions", sub_id, "delivery"]:
+                found = next((c for c in self.channels if c["id"] == channel_id), None)
+                subs = found["subscriptions"] if found else []
+                sub = next((s for s in subs if str(s["id"]) == sub_id), None)
+                if sub is None or sub["target"] != "task":
+                    return httpx.Response(400, json={"error": {"message": "Only an agent has a delivery"}})
+                sub["delivery"] = body["delivery"]
+                return ok(sub)
             case "PUT", ["channels", channel_id, "subscriptions", sub_id]:
                 found = self._channel(channel_id)
                 subs = found["subscriptions"] if found else []
@@ -658,6 +666,55 @@ async def test_agents_and_the_ea_subscribe_with_filters(tools: EaTools, fake: Se
     bad = await tools.call("subscribe_channel", {"channel": "uptime", "subscriber": "ea", "events": ["a,b"]})
     assert not bad.ok
     assert bad.summary == "Bad event kind"
+
+
+async def test_an_agent_subscription_says_when_the_agent_gets_its_updates(
+    tools: EaTools, fake: SettingsFake
+) -> None:
+    asked, done = await confirm(
+        tools, "subscribe_channel", {"channel": "uptime", "subscriber": "logout", "delivery": "Now"}
+    )
+    assert "and hands its updates to the agent at once, joining a running turn at its next step" in asked.text
+    assert done.text.endswith(
+        'The agent "Fix the logout button" now gets its updates at once, during a running turn too.'
+    )
+    assert writes(fake)[-1] == (
+        "POST",
+        f"/api/channels/{HOOK}/subscriptions",
+        {"target": "task", "task_id": TASK_LOGOUT, "events": None, "delivery": "now"},
+    )
+    detail = await tools.call("get_channel", {"channel": "uptime"})
+    assert "Fix the logout button: every event, at once, during a running turn too." in detail.text
+
+    same = await tools.call(
+        "subscribe_channel", {"channel": "uptime", "subscriber": "logout", "delivery": "now"}
+    )
+    assert same.text == (
+        'The agent "Fix the logout button" already takes every event from Uptime, '
+        "at once, during a running turn too."
+    )
+    asked, held = await confirm(
+        tools, "subscribe_channel", {"channel": "uptime", "subscriber": "logout", "delivery": "with_message"}
+    )
+    assert "this holds its updates for the user's next message to the agent" in asked.text
+    assert held.text.endswith("now gets its updates with the user's next message.")
+    sub_id = fake.channels[0]["subscriptions"][-1]["id"]
+    path = f"/api/channels/{HOOK}/subscriptions/{sub_id}/delivery"
+    assert writes(fake)[-1] == ("PUT", path, {"delivery": "with_message"})
+    _, follows = await confirm(
+        tools, "subscribe_channel", {"channel": "uptime", "subscriber": "logout", "delivery": "agent"}
+    )
+    assert follows.text.endswith("now gets its updates as its update mode says.")
+    assert writes(fake)[-1] == ("PUT", path, {"delivery": None})
+
+    inbox = await tools.call(
+        "subscribe_channel", {"channel": "uptime", "subscriber": "ea", "delivery": "now"}
+    )
+    assert inbox.summary == "Bad delivery"
+    bad = await tools.call(
+        "subscribe_channel", {"channel": "uptime", "subscriber": "logout", "delivery": "interrupt"}
+    )
+    assert bad.text == "Unknown delivery interrupt. Use now, after_turn, with_message or agent."
 
 
 async def test_the_ea_lists_its_own_channels_and_changes_them_only_after_a_yes(

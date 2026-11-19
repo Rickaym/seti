@@ -1,7 +1,6 @@
 import type { APIRequestContext, Locator, Page } from '@playwright/test'
 import type { Envelope, LinkedPrState, PullRequest, Task } from '@seti/shared'
 import { openSeedDb } from './db.js'
-import { paths } from './env.js'
 import { apiData, expect, unique } from './fixtures.js'
 
 export const MANY_PRS = 150
@@ -94,7 +93,7 @@ export async function linkManyPrs(taskId: string, count = MANY_PRS): Promise<voi
 export async function startAgent(request: APIRequestContext, label: string): Promise<{ id: string; title: string }> {
   const title = unique(label)
   const response = await request.post('/api/tasks', {
-    data: { title, prompt: `Please greet as ${title}`, cwd: paths.checkout, sandbox: false },
+    data: { title, prompt: `Please greet as ${title}`, sandbox: false },
   })
   expect(response.ok(), 'POST /api/tasks').toBe(true)
   const { id } = ((await response.json()) as Envelope<Task>).data

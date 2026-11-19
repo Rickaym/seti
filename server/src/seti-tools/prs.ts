@@ -161,7 +161,7 @@ const requestPreviewTool = setiTool({
 const startAgentFromPr = setiTool({
   name: 'start_agent_from_pr',
   description:
-    "Start a new agent in a worktree of an open PR's branch, linked to the PR. It runs sandboxed with at most your own access and Seti control Self, never Full.",
+    "Start a new agent on an open PR, linked to it; the agent clones the repo into its own folder and checks out the PR's branch. It runs sandboxed with at most your own access and Seti control Self, never Full.",
   input: {
     pr: prRef,
     instructions: z.string().trim().min(1).describe('What the new agent should do on the PR.'),
@@ -169,27 +169,18 @@ const startAgentFromPr = setiTool({
   },
   run: async ({ pr: ref, instructions, title }, ctx) => {
     const pr = await resolvePr(ref)
-    const slug = pr.repo_slug.toLowerCase()
-    const repo = (await repos.list()).find((known) => known.slug.toLowerCase() === slug)
-    if (repo === undefined) {
-      throw new ToolRefusal(`Seti has no checkout of ${pr.repo_slug} to start an agent in. Add the repo first.`)
-    }
     const prompt = [
       `Work on pull request #${String(pr.number)} in ${pr.repo_slug}: ${pr.title}`,
       pr.url,
       '',
-      `You are in an isolated worktree checked out at origin/${pr.head_ref} (detached HEAD).`,
-      `The PR merges ${pr.head_ref} into ${pr.base_ref}.`,
-      `Commit your changes and push them to the PR branch with: git push origin HEAD:${pr.head_ref}`,
+      `Clone ${pr.repo_slug} into your working folder and check out the PR's branch, ${pr.head_ref}.`,
+      `The PR merges ${pr.head_ref} into ${pr.base_ref}. Commit your changes and push them to that branch.`,
       '',
       `Task: ${instructions}`,
     ].join('\n')
     const input = startAgentInput.parse({
       title: title ?? `PR #${String(pr.number)}: ${pr.title}`,
       prompt,
-      repo_ids: [repo.id],
-      worktree: true,
-      ref: pr.head_ref,
       pr_urls: [pr.url],
       workspace_id: ctx.caller.workspace_id,
     })

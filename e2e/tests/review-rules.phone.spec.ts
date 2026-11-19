@@ -1,5 +1,4 @@
 import type { Envelope, PermissionPolicy, PermissionRule, Task } from '@seti/shared'
-import { paths } from './support/env.js'
 import { REVIEW_DRAFT, REVIEW_PROMPT, reviewSent } from './support/fake-review.js'
 import { apiData, expect, test, unique } from './support/fixtures.js'
 import { expectFitsPhone } from './support/phone-layout.js'
@@ -22,7 +21,6 @@ test('a review fits the phone, and its message is edited and sent with taps', as
       data: {
         title: unique('Phone notifier'),
         prompt: `Please ${REVIEW_PROMPT} ${rule}__send_message`,
-        cwd: paths.checkout,
         sandbox: false,
       },
     })

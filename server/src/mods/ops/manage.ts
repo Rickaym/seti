@@ -68,7 +68,6 @@ export const manageOps = {
     args: z.strictObject({
       title: z.string().trim().min(1).max(200),
       prompt: z.string().trim().min(1).max(20_000),
-      repo: z.uuid().optional(),
     }),
     run: async (args, { call, manifest }) => {
       requireAction(call, 'start')

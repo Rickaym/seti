@@ -28,6 +28,7 @@ export function layoutOf(key: string, view: LayoutView, layout: ModAgentsLayout)
     ...(layout.adoptTerminal === undefined ? {} : { adoptTerminal: layout.adoptTerminal }),
     ...(layout.newTerminal === undefined ? {} : { newTerminal: layout.newTerminal }),
     ...(layout.showWorkspace === undefined ? {} : { showWorkspace: layout.showWorkspace }),
+    ...(layout.hidesList === undefined ? {} : { hidesList: layout.hidesList }),
   }
 }
 

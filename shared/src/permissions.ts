@@ -139,6 +139,10 @@ export interface PermissionRequest {
   message: string | null
   created_at: string
   decided_at: string | null
+  /** When Seti denies the request if nobody answers; null while the timeout is off. */
+  timeout_at: string | null
+  /** Whether the denial came from the timeout, not from the user. */
+  timed_out: boolean
 }
 
 export const PERMISSION_DECISIONS = ['allow', 'always', 'deny'] as const
@@ -183,6 +187,8 @@ export const permissionRequestSchema = z.object({
   message: maybeText('message'),
   created_at: z.string(),
   decided_at: maybeText('decided_at'),
+  timeout_at: maybeText('timeout_at'),
+  timed_out: orDefault('timed_out', z.boolean(), false),
 }) satisfies ResponseSchema<PermissionRequest>
 
 export const permissionRequestsSchema = lenientArray('permission request', permissionRequestSchema)

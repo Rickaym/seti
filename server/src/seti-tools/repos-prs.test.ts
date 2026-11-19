@@ -3,7 +3,7 @@ import os from 'node:os'
 import path from 'node:path'
 import type { PrList, PullRequest, Repo, Task } from '@seti/shared'
 import { beforeAll, describe, expect, it, vi } from 'vitest'
-import { repos, tasks } from '../db.js'
+import { messages, repos, tasks } from '../db.js'
 import { setPlannerModel } from '../planner.js'
 import { prDecorators } from '../pr-decorators.js'
 import type * as Prs from '../prs.js'
@@ -217,8 +217,12 @@ describe('PR tools', () => {
       profile_id: caller.profile_id,
       pr_urls: [pr.url],
     })
-    const refused = await call(caller, 'start_agent_from_pr', { pr: far.url, instructions: 'Fix lint' })
-    expect(refused.text).toContain('Seti has no checkout of initech/billing')
+    expect(task?.repos).toEqual([])
+    const first = await messages.firstAfter(task?.id ?? '', 0, 1)
+    expect(JSON.stringify(first[0]?.payload)).toContain('Clone acme/web into your working folder')
+    const elsewhere = await call(caller, 'start_agent_from_pr', { pr: far.url, instructions: 'Fix lint' })
+    expect(elsewhere.error).toBe(false)
+    await waitIdle((elsewhere.data() as { id: string }).id)
   })
 })
 

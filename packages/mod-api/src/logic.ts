@@ -76,7 +76,7 @@ export interface Seti {
     linkPr: (id: string, url: string) => Promise<void>
     unlinkPr: (id: string, url: string) => Promise<void>
     /** Asks the user first; resolves to the ask, never to a started agent. */
-    start: (task: { title: string; prompt: string; repo?: string }) => Promise<{ asked: string }>
+    start: (task: { title: string; prompt: string }) => Promise<{ asked: string }>
     stop: (id: string) => Promise<{ asked: string }>
   }
   /** chat.post with public, or direct with `to`. */

@@ -1,6 +1,5 @@
 import type { APIRequestContext, Page } from '@playwright/test'
 import type { AutoArchiveStatus, Envelope, Task } from '@seti/shared'
-import { paths } from './support/env.js'
 import { REPEAT_COMMAND, REPEAT_DONE, REPEAT_PROMPT, REPEAT_REASON } from './support/fake-repeat.js'
 import { apiData, expect, test, unique } from './support/fixtures.js'
 import { FAKE_CLAUDE_ENV } from './support/processes.js'
@@ -14,7 +13,7 @@ const guard = (page: Page) =>
 
 async function startLooping(request: APIRequestContext, title: string): Promise<string> {
   const response = await request.post('/api/tasks', {
-    data: { title, prompt: `Please ${REPEAT_PROMPT}`, cwd: paths.checkout, sandbox: false },
+    data: { title, prompt: `Please ${REPEAT_PROMPT}`, sandbox: false },
   })
   expect(response.ok(), 'POST /api/tasks').toBe(true)
   return ((await response.json()) as Envelope<Task>).data.id

@@ -12,12 +12,9 @@ import {
   stopTurnQuery,
   subtaskParams,
   taskDigestQuery,
-  taskDirInput,
   taskMessageParams,
   taskMessagesQuery,
   taskPrInput,
-  taskRepoInput,
-  taskRepoParams,
   taskMcpInput,
   taskAccessInput,
   TASK_STREAM_CURSOR,
@@ -61,7 +58,6 @@ import {
   unlinkSubtaskPrUrl,
   updateTask,
 } from '../task-actions.js'
-import { addTaskDir, addTaskRepo, removeTaskDir, removeTaskRepo } from '../task-location.js'
 import { linkTaskPr, requireTask, unlinkTaskPr } from '../tasks.js'
 import { wirePage } from '../transcript.js'
 import { streamTask } from './stream.js'
@@ -135,6 +131,9 @@ export const taskRoutes = new Hono()
     if (fromEa() && input.seti_control !== undefined) {
       return refuseEa(c, "change an agent's Seti control")
     }
+    if (fromEa() && input.home_access !== undefined) {
+      return refuseEa(c, "change an agent's home folders")
+    }
     return ok(c, await updateTask(await taskIdOf(c.req.param('id')), input))
   })
   .get('/:id/access', async (c) => ok(c, await effectiveAccess(await requireTask(c.req.param('id')))))
@@ -148,27 +147,6 @@ export const taskRoutes = new Hono()
     const task = await requireTask(c.req.param('id'))
     await setTaskMcpChoices(task, toMcpChoices(c.req.valid('json')))
     return ok(c, await taskMcpServers(task.id))
-  })
-  .post('/:id/repos', validJson(taskRepoInput), async (c) => {
-    const task = await requireTask(c.req.param('id'))
-    await addTaskRepo(task, c.req.valid('json'))
-    return ok(c, await requireTask(task.id))
-  })
-  .delete('/:id/repos/:repo_id', valid('param', taskRepoParams), async (c) => {
-    const { id, repo_id } = c.req.valid('param')
-    const task = await requireTask(id)
-    await removeTaskRepo(task, repo_id)
-    return ok(c, await requireTask(task.id))
-  })
-  .post('/:id/dirs', validJson(taskDirInput), async (c) => {
-    const task = await requireTask(c.req.param('id'))
-    await addTaskDir(task, c.req.valid('json').path)
-    return ok(c, await requireTask(task.id))
-  })
-  .delete('/:id/dirs', valid('query', taskDirInput), async (c) => {
-    const task = await requireTask(c.req.param('id'))
-    await removeTaskDir(task, c.req.valid('query').path)
-    return ok(c, await requireTask(task.id))
   })
   .post('/:id/prs', validJson(taskPrInput), async (c) => {
     const id = await taskIdOf(c.req.param('id'))
@@ -258,7 +236,7 @@ export const taskRoutes = new Hono()
   })
   .post('/:id/inputs/deliver', async (c) => {
     const id = await taskIdOf(c.req.param('id'))
-    await deliverPending(id, 'user')
+    await deliverPending(id, 'user', { held: true })
     return ok(c, await requireTask(id))
   })
   .post('/:id/inputs/dismiss', validJson(dismissInputsInput), async (c) => {

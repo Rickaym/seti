@@ -4,7 +4,7 @@ from collections.abc import Awaitable, Callable, Mapping
 from datetime import datetime
 from typing import Any
 
-from seti_ea.format import ago, and_list, clip, plural
+from seti_ea.format import ago, and_list, clip, duration, plural, until
 from seti_ea.seti import SetiClient, SetiError
 from seti_ea.toolkit import ToolError, ToolResult, ToolSpec, arg_bool, arg_list, arg_str, dicts, normalize
 
@@ -100,7 +100,19 @@ def _change_text(change: Mapping[str, Any]) -> str:
     return f"the MCP server {change.get('server')}"
 
 
-def _held_lines(pending: Mapping[str, Any]) -> list[str]:
+def _timeout_line(settings: Any) -> str:
+    minutes = settings.get("request_timeout_minutes") if isinstance(settings, dict) else None
+    if not isinstance(minutes, int):
+        return ""
+    if minutes <= 0:
+        return "The request timeout is off: a tool call or plan waits until the user answers."
+    return (
+        f"Seti denies a tool call or plan nobody answers within {duration(minutes * 60)} and tells "
+        "the agent it timed out; only the user changes that timeout, in Seti, Settings, Permissions."
+    )
+
+
+def _held_lines(pending: Mapping[str, Any], now: datetime) -> list[str]:
     lines = [
         f"- {r.get('task_title')} asks for {_change_text(r.get('change') or {})}: "
         f"{clip(str(r.get('reason', '')), PROMPT_CHARS)}"
@@ -114,7 +126,9 @@ def _held_lines(pending: Mapping[str, Any]) -> list[str]:
             what = f"waits for you to review {request.get('tool_name')} before it runs: {summary}"
         else:
             what = f"asks to use {request.get('tool_name')}: {summary}"
-        lines.append(f"- {request.get('task_title')} {what}")
+        left = request.get("timeout_at")
+        timed = f"; denied automatically {until(left, now)} if nobody answers" if left else ""
+        lines.append(f"- {request.get('task_title')} {what}{timed}")
     return lines
 
 
@@ -123,10 +137,11 @@ async def list_requests(seti: SetiClient, now: datetime) -> ToolResult:
     pending = await seti.get("/requests")
     pending = pending if isinstance(pending, dict) else {}
     asked = dicts(pending.get("questions"))
-    held = _held_lines(pending)
+    held = _held_lines(pending, now)
     notes = dicts(pending.get("notes"))
+    timeout = _timeout_line(await seti.get("/permissions/timeout"))
     if not asked and not held and not notes:
-        return ToolResult("Nothing waits on the user in Requests.", "No requests")
+        return ToolResult(f"Nothing waits on the user in Requests. {timeout}".strip(), "No requests")
     lines = []
     if asked:
         lines.append(f"{plural(len(asked), 'question')}, which you may pass the user's answers to:")
@@ -140,6 +155,8 @@ async def list_requests(seti: SetiClient, now: datetime) -> ToolResult:
     if notes:
         lines.append(f"{plural(len(notes), 'knowledge note')} only the user approves, in Seti, Requests:")
         lines += [f'- "{n.get("title")}", proposed {ago(n.get("created_at"), now)}' for n in notes]
+    if timeout:
+        lines.append(timeout)
     count = len(asked) + len(held) + len(notes)
     return ToolResult("\n".join(lines), f"{plural(count, 'request')} waiting")
 

@@ -1,5 +1,5 @@
-import { checkComposer, confirmationFor, type AttachmentRef, type StartAgentInput, type Task } from '@seti/shared'
-import { ArrowUp, GitPullRequest, Loader2, ShieldCheck, ShieldOff, X } from 'lucide-react'
+import { checkComposer, confirmationFor, type StartAgentInput, type Task } from '@seti/shared'
+import { ArrowUp, Loader2, ShieldCheck, ShieldOff } from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { apiSend, errorText } from '@/api'
@@ -22,100 +22,14 @@ import { useCurrentWorkspace } from '@/hooks/useWorkspaces'
 import { withTokens } from '@/lib/attachments'
 import { NEW_TASK_PROMPT } from '@/lib/drafts'
 import { navigate } from '@/lib/route'
-import { clearStartContext, startContext, type StartContext } from '@/lib/start-context'
-import { cn } from '@/lib/utils'
 import { AttachButton, DraftAttachments } from '@/panels/tasks/AttachmentChips'
 import { CommandField, ComposerStatus } from '@/panels/tasks/CommandField'
 
-const RECENT_REPOS = 4
-const HINT = 'Enter starts it, Ctrl+Enter adds a line. Seti picks the repos, context and tools.'
-const TOUCH_HINT = 'Seti picks the repos, context and tools; change them later.'
+const HINT = 'Enter starts it, Ctrl+Enter adds a line. It works in its own folder and clones what it needs.'
+const TOUCH_HINT = 'It works in its own folder and clones what it needs.'
 const UNSANDBOXED = 'Starts outside the sandbox, with your access to every file, host and credential.'
 const SHELL_IN_PROMPT =
   'Shell commands only run in an existing agent, so the new agent gets this as a message. Start anyway?'
-
-interface RecentRepo {
-  id: string
-  slug: string
-}
-
-/** Repos of the most recently active agents, newest first. */
-function useRecentRepos(): RecentRepo[] {
-  const { tasks } = useTasks()
-  const seen = new Map<string, RecentRepo>()
-  for (const task of tasks.toSorted((a, b) => b.updated_at.localeCompare(a.updated_at))) {
-    for (const repo of task.repos) {
-      if (!seen.has(repo.id)) {
-        seen.set(repo.id, { id: repo.id, slug: repo.slug })
-      }
-    }
-  }
-  return [...seen.values()].slice(0, RECENT_REPOS)
-}
-
-const repoName = (slug: string) => slug.slice(slug.indexOf('/') + 1)
-
-function RepoChips({ picked, onToggle }: { picked: readonly string[]; onToggle: (id: string) => void }) {
-  const recent = useRecentRepos()
-  if (recent.length === 0) {
-    return null
-  }
-  return (
-    <div role="group" aria-label="Recent repos" className="flex min-w-0 flex-wrap items-center gap-1.5">
-      {recent.map((repo) => (
-        <Hint
-          key={repo.id}
-          text={picked.includes(repo.id) ? `Runs in ${repo.slug}` : `Work in ${repo.slug} instead of letting Seti pick`}
-        >
-          <button
-            type="button"
-            aria-pressed={picked.includes(repo.id)}
-            aria-label={repo.slug}
-            onClick={() => {
-              onToggle(repo.id)
-            }}
-            className={cn(
-              'max-w-40 truncate border border-border px-2 py-0.5 text-2xs text-muted-foreground hover:bg-accent hover:text-foreground',
-              'aria-pressed:border-primary aria-pressed:text-foreground pointer-coarse:py-1.5',
-            )}
-          >
-            {repoName(repo.slug)}
-          </button>
-        </Hint>
-      ))}
-    </div>
-  )
-}
-
-function ContextChip({ context, onClear }: { context: StartContext; onClear: () => void }) {
-  return (
-    <span className="flex min-w-0 items-center gap-1 border border-primary px-2 py-0.5 text-2xs">
-      <GitPullRequest className="size-3 shrink-0" />
-      <span className="truncate">{context.label}</span>
-      <button
-        type="button"
-        aria-label={`Drop ${context.label}`}
-        className="text-muted-foreground hover:text-foreground"
-        onClick={onClear}
-      >
-        <X className="size-3" />
-      </button>
-    </span>
-  )
-}
-
-interface Message {
-  prompt: string
-  attachments?: AttachmentRef[]
-}
-
-function request(message: Message, context: StartContext | null, picked: readonly string[]): StartAgentInput {
-  if (context !== null) {
-    const { title, repo_ids, ref, pr_urls } = context
-    return { ...message, title, repo_ids, ref, pr_urls }
-  }
-  return picked.length === 0 ? message : { ...message, repo_ids: [...picked] }
-}
 
 /** The new agent joins the workspace the list shows. */
 const inWorkspace = (input: StartAgentInput, workspaceId: string | null): StartAgentInput =>
@@ -178,12 +92,9 @@ export function StartPage() {
   const touch = useCoarsePointer()
   const { refresh } = useTasks()
   const { currentId } = useCurrentWorkspace()
-  const [context, setContext] = useState(startContext)
-  const draftKey = context === null ? NEW_TASK_PROMPT : null
-  const [prompt, setPrompt] = useDraft(draftKey, context?.prompt ?? '')
-  const attachments = useAttachments(draftKey, prompt, setPrompt)
+  const [prompt, setPrompt] = useDraft(NEW_TASK_PROMPT, '')
+  const attachments = useAttachments(NEW_TASK_PROMPT, prompt, setPrompt)
   const find = useFind()
-  const [picked, setPicked] = useState<string[]>([])
   const [starting, setStarting] = useState(false)
   const [sandboxed, setSandboxed] = useState(true)
   const clientSend = useClientSend()
@@ -206,7 +117,7 @@ export function StartPage() {
     setStarting(true)
     try {
       const body = {
-        ...inWorkspace(request(attachments.message(prompt), context, picked), currentId),
+        ...inWorkspace(attachments.message(prompt), currentId),
         ...(sandboxed ? {} : { sandbox: false }),
       }
       const task = await clientSend.run(JSON.stringify(body), async (clientId, options) =>
@@ -215,17 +126,12 @@ export function StartPage() {
       attachments.sent()
       setPrompt('')
       setSandboxed(true)
-      clearStartContext()
       refresh()
       navigate('agents', task.id, { force: true })
     } catch (e) {
       toast.error(errorText(e))
       setStarting(false)
     }
-  }
-
-  const toggle = (id: string) => {
-    setPicked((prev) => (prev.includes(id) ? prev.filter((other) => other !== id) : [...prev, id]))
   }
 
   return (
@@ -261,18 +167,7 @@ export function StartPage() {
               find={find}
               className="min-h-20 border-0 px-3 py-3 text-sm focus-visible:ring-0 md:text-sm dark:bg-transparent"
             />
-            <div className="flex items-end justify-between gap-3 px-2 pb-2">
-              {context === null ? (
-                <RepoChips picked={picked} onToggle={toggle} />
-              ) : (
-                <ContextChip
-                  context={context}
-                  onClear={() => {
-                    clearStartContext()
-                    setContext(null)
-                  }}
-                />
-              )}
+            <div className="flex items-end px-2 pb-2">
               <div className="ml-auto flex shrink-0 items-center gap-1">
                 <SandboxToggle on={sandboxed} onChange={setSandboxed} disabled={starting} />
                 {touch && <FindButton find={find} />}
@@ -298,7 +193,7 @@ export function StartPage() {
           </div>
           {starting ? (
             <p role="status" className="px-1 text-2xs text-muted-foreground">
-              {clientSend.retrying ? RETRYING_LABEL : 'Setting up the agent: picking repos, context and tools...'}
+              {clientSend.retrying ? RETRYING_LABEL : 'Setting up the agent: picking context and tools...'}
             </p>
           ) : (
             <ComposerStatus

@@ -19,7 +19,6 @@ from seti_ea.format import (
 from seti_ea.gate import CONFIRMED, Confirmations, ask, gate_key
 from seti_ea.handoff_tools import SEND_FILE_SPEC, HandoffTools
 from seti_ea.knowledge_tools import PROPOSE_KNOWLEDGE_SPEC, KnowledgeTools
-from seti_ea.location_tools import LOCATION_SPECS, LocationTools
 from seti_ea.my_pack_tools import CHANGE_MY_PACKS_SPEC, MyPackTools
 from seti_ea.process_tools import STOP_PROCESS_SPEC, ProcessTools
 from seti_ea.question_tools import ANSWER_QUESTION_SPEC, QuestionTools
@@ -333,7 +332,8 @@ ACTION_SPECS: list[ToolSpec] = [
     ),
     ToolSpec(
         "start_agent_from_pr",
-        "Start a new agent in a worktree of an open PR's branch, linked to the PR. Needs the user's yes.",
+        "Start a new agent on an open PR, linked to it; the agent clones the repo into its own folder "
+        "and checks out the PR's branch. Needs the user's yes.",
         {
             "pr": PR_REF,
             "instructions": {"type": "string", "description": "What the agent should do on the PR."},
@@ -424,7 +424,6 @@ ACTION_SPECS: list[ToolSpec] = [
         {"repo": REPO_REF, "confirmed": CONFIRMED},
         ["repo"],
     ),
-    *LOCATION_SPECS,
     *ROLE_SPECS,
     CHANGE_MY_PACKS_SPEC,
     *ACCESS_SPECS,
@@ -526,7 +525,6 @@ class AgentActions:
             "update_repo": self.update_repo,
             "remove_repo": self.remove_repo,
         }
-        self.handlers.update(LocationTools(seti, resolver.resolve_task, self.confirmations).handlers)
         self.handlers.update(RoleTools(seti, resolver.resolve_task, self.confirmations).handlers)
         self.handlers.update(MyPackTools(seti, self.confirmations).handlers)
         self.handlers.update(AccessTools(seti, resolver.resolve_task, self.confirmations).handlers)
@@ -1081,22 +1079,15 @@ class AgentActions:
     async def start_agent_from_pr(self, args: Mapping[str, Any]) -> ToolResult:
         pr = await self._find.resolve_pr(arg_str(args, "pr"))
         instructions = arg_str(args, "instructions")
-        slug = str(pr.get("repo_slug", ""))
-        repos = dicts(await self._seti.get("/repos"))
-        repo = next((r for r in repos if str(r.get("slug", "")).lower() == slug.lower()), None)
-        if repo is None:
-            raise ToolError(
-                f"Seti has no checkout of {slug} to start an agent in. Add the repo first.",
-                f"No checkout of {repo_name(slug)}",
-            )
         number = pr.get("number")
         head = str(pr.get("head_ref", ""))
         title = arg_str(args, "title", required=False) or f"PR #{number}: {pr.get('title', '')}"
         label = pr_label(str(pr.get("url", "")))
         if not await self._cleared(args, gate_key("start_agent_from_pr", pr.get("url"), title, instructions)):
             effect = (
-                f'This starts a new agent "{title}" in a worktree of {label}\'s branch {head}, linked to '
-                f'the PR, and it may push to that branch. Its instructions: "{clip(instructions, 240)}"'
+                f'This starts a new agent "{title}" that clones the repo and checks out {label}\'s '
+                f"branch {head}, linked to the PR, and it may push to that branch. Its instructions: "
+                f'"{clip(instructions, 240)}"'
             )
             return ask("start_agent_from_pr", args, effect, f"start an agent on {label}")
         prompt = "\n".join(
@@ -1104,9 +1095,10 @@ class AgentActions:
                 f"Work on pull request #{number} in {pr.get('repo_slug')}: {pr.get('title', '')}",
                 str(pr.get("url", "")),
                 "",
-                f"You are in an isolated worktree checked out at origin/{head} (detached HEAD).",
-                f"The PR merges {head} into {pr.get('base_ref')}.",
-                f"Commit your changes and push them to the PR branch with: git push origin HEAD:{head}",
+                f"Clone {pr.get('repo_slug')} into your working folder and check out the PR's branch, "
+                f"{head}.",
+                f"The PR merges {head} into {pr.get('base_ref')}. Commit your changes and push them to "
+                "that branch.",
                 "",
                 f"Task: {instructions}",
             ]
@@ -1114,15 +1106,12 @@ class AgentActions:
         body = {
             "title": title,
             "prompt": prompt,
-            "repo_ids": [repo.get("id")],
-            "worktree": True,
-            "ref": head,
             "pr_urls": [pr.get("url")],
         }
         created = await self._seti.post("/tasks/start", body)
         status = created.get("status") if isinstance(created, dict) else "running"
         return ToolResult(
-            f'Started the agent "{title}" on {label}, in a worktree of {head}. It is {status}.',
+            f'Started the agent "{title}" on {label}, to work on its branch {head}. It is {status}.',
             clip(f"Started agent on {label}", 70),
         )
 

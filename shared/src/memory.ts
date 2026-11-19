@@ -20,8 +20,21 @@ export const memoryCapInput = z
 
 export type MemoryCap = z.infer<typeof memoryCapInput>
 
-/** No throttle point by default: on a host with full swap a throttled process stalls instead. */
-export const MEMORY_CAP_DEFAULTS: MemoryCap = { high_mb: 6144, max_mb: 6144, swap_max_mb: 1024 }
+const DEFAULT_HOST_SHARE = 0.3
+const DEFAULT_MIN_MB = 6144
+const DEFAULT_MAX_MB = 16384
+const DEFAULT_SWAP_MB = 1024
+
+/**
+ * The cap agents get until the user saves one, from the host's memory in MiB: 30% of it in whole
+ * GB, at least 6 GB and at most 16 GB. It has no throttle point, since on a host with full swap a
+ * throttled process stalls instead.
+ */
+export function defaultMemoryCap(hostMb: number): MemoryCap {
+  const share = Math.round((hostMb * DEFAULT_HOST_SHARE) / 1024) * 1024
+  const max = Math.min(DEFAULT_MAX_MB, Math.max(DEFAULT_MIN_MB, share))
+  return { high_mb: max, max_mb: max, swap_max_mb: DEFAULT_SWAP_MB }
+}
 
 export const throttles = (cap: MemoryCap) => cap.high_mb < cap.max_mb
 

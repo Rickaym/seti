@@ -10,7 +10,12 @@ const gh = vi.hoisted(() => ({
   fetchPrDetails: vi.fn<(urls: readonly string[]) => Promise<Map<string, OpenPr | null>>>(),
   addPreviewLabel: vi.fn<(slug: string, number: number) => Promise<boolean>>(),
 }))
-const state = vi.hoisted(() => ({ linked: [] as string[], budget: true, stored: undefined as string | undefined }))
+const state = vi.hoisted(() => ({
+  linked: [] as string[],
+  archived: [] as string[],
+  budget: true,
+  stored: undefined as string | undefined,
+}))
 
 const SLUG = 'globex/dashboard'
 
@@ -22,6 +27,7 @@ vi.mock('./store/prs.js', () => ({
   tasksByPrUrl: async () =>
     Promise.resolve(new Map([['https://github.com/pr/1', [{ id: 't1', title: 'Fix it', status: 'idle' as const }]]])),
   linkedPrUrls: async () => Promise.resolve(state.linked),
+  archivedLinkedTaskIds: async () => Promise.resolve(new Set(state.archived)),
 }))
 vi.mock('./store/pr-list.js', () => ({
   prListStore: {
@@ -121,6 +127,7 @@ beforeEach(async () => {
   clock += 10 * 60_000
   vi.spyOn(Date, 'now').mockImplementation(() => clock)
   state.linked = [url(1), LINKED.url]
+  state.archived = []
   state.budget = true
   state.stored = undefined
   gh.fetchRowPage.mockReset().mockResolvedValue(rows(ROWS, 5))
@@ -137,6 +144,38 @@ async function warmed(): Promise<void> {
   gh.fetchStatusPage.mockClear()
   gh.fetchPrDetails.mockClear()
 }
+
+describe('fixCiPlan', () => {
+  it('asks the agent linked to a failing PR and counts failing PRs nobody is linked to', async () => {
+    await warmed()
+    expect(await prs.fixCiPlan()).toEqual({
+      nudges: [
+        {
+          task: { id: 't1', title: 'Fix it', status: 'idle' },
+          prs: [{ repo_slug: SLUG, number: 1 }],
+          message: 'CI is failing on #1. Please fix it.',
+        },
+      ],
+      skipped: [],
+      unlinked: 1,
+      error: null,
+    })
+    expect(await prs.fixCiPlan('other')).toMatchObject({ nudges: [], skipped: [], unlinked: 0 })
+  })
+
+  it('skips an archived agent and passes on why GitHub gave no list', async () => {
+    await warmed()
+    state.archived = ['t1']
+    expect(await prs.fixCiPlan('t1')).toMatchObject({
+      nudges: [],
+      skipped: [{ task: { id: 't1' }, reason: 'archived' }],
+    })
+    state.stored = undefined
+    prs = await freshProcess()
+    gh.fetchRowPage.mockRejectedValue(new Error('gh is not logged in'))
+    expect(await prs.fixCiPlan()).toMatchObject({ error: 'gh is not logged in' })
+  })
+})
 
 describe('listPrs', () => {
   it('lists slim rows from two light searches and reads detail only for linked PRs', async () => {

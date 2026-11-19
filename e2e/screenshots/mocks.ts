@@ -66,6 +66,8 @@ const PERMISSION: PermissionRequest = {
   message: null,
   created_at: at(1),
   decided_at: null,
+  timeout_at: null,
+  timed_out: false,
 }
 
 const CALM: ResourceSummary = {

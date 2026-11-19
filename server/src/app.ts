@@ -25,6 +25,7 @@ import {
   type AccessGuardOptions,
 } from './access.js'
 import { cancelWaitsOnArchive, deliverAgentWaits } from './agent-waits.js'
+import { remindWhenAsking } from './asking-reminder.js'
 import { briefOnReturn } from './attention-brief.js'
 import { inBackground } from './background.js'
 import { setAfterProbe, setProbeLauncher, setProbePlugins } from './capabilities.js'
@@ -37,8 +38,10 @@ import { watchDroppedPrompts } from './dropped-prompt.js'
 import { watchBlocked, watchTurnEnd } from './ea-turn-watch.js'
 import { jsonEtag } from './etag.js'
 import { githubTokenMode } from './github-token.js'
+import { houseRulesContext } from './house-rules.js'
 import { fail, HttpError, ok } from './http.js'
-import { inputPreface, wakeAfterTurn } from './inputs.js'
+import { inputPreface } from './input-preface.js'
+import { wakeAfterTurn, wakeWhenUnblocked } from './inputs.js'
 import { knowledgeContext } from './knowledge-index.js'
 import { defaultLocalAuth } from './local-auth.js'
 import { forgetGoneServersLater } from './mcp-presence.js'
@@ -51,11 +54,14 @@ import { logicOps } from './mods/ops/table.js'
 import { startModTaskEvents } from './mods/task-events.js'
 import { notifyStatusEvent, notifyTurnEnd } from './notifications.js'
 import { PAIR_PAGE } from './pair-page.js'
+import { watchPermissionTimeouts } from './permission-timeout.js'
 import { defaultPluginConfigs } from './plugins.js'
 import { prDiscovery } from './pr-discovery.js'
 import { sandboxedProbeLaunch } from './probe-launch.js'
 import { stoppedPreface } from './process-stop.js'
 import { questionsContext } from './questions.js'
+import { noteTurnFinished } from './restart-resume.js'
+import { settleLeftoversOnTurnStart } from './restart-waits.js'
 import { accessRoutes } from './routes/access.js'
 import { accountRoutes } from './routes/account.js'
 import { archivedGuard, archiveRoutes, taskArchiveRoutes } from './routes/archive.js'
@@ -131,7 +137,7 @@ import { sandboxPolicy } from './store/sandbox.js'
 import { subdomainProxy } from './subdomain-proxy.js'
 import { clearStallsOnTurnStart } from './task-blocked.js'
 import { onAnyTaskEvent } from './task-events.js'
-import { taskReposContext } from './tasks.js'
+import { taskFolderContext } from './task-location.js'
 import { openWorkspace, startWorkspaceSync, workspaceTurnEnded } from './workspace/engine.js'
 
 /** Large enough for a full context file or prompt, small enough to refuse memory floods. */
@@ -331,7 +337,7 @@ export function createApp(access: AccessGuardOptions = defaultAccess(), eaUrl: s
   app.route('/api/permissions', permissionRoutes)
   registerContextProvider(workspaceContext)
   registerContextProvider(contextPackPrompt)
-  registerContextProvider(taskReposContext)
+  registerContextProvider(taskFolderContext)
   registerContextProvider(importedContext)
   setProbePlugins(defaultPluginConfigs)
   setProbeLauncher(sandboxedProbeLaunch)
@@ -342,6 +348,7 @@ export function createApp(access: AccessGuardOptions = defaultAccess(), eaUrl: s
   registerContextProvider(cpuPrompt)
   registerContextProvider(setiToolsContext)
   registerContextProvider(knowledgeContext)
+  registerContextProvider(houseRulesContext)
   registerContextProvider(questionsContext)
   registerContextProvider(modContextPrompt)
   connectModLogic({ ops: logicOps(installedMods.manifest), host: modLogicHost })
@@ -356,17 +363,22 @@ export function createApp(access: AccessGuardOptions = defaultAccess(), eaUrl: s
   registerTurnPreface(setiControlPreface)
   onTurnEnd(watchTurnEnd)
   onTurnEnd(wakeAfterTurn)
+  wakeWhenUnblocked()
   onTurnEnd((taskId) => {
     inBackground('pr discovery', async () => prDiscovery.run(taskId))
   })
   onTurnEnd(workspaceTurnEnded)
   onTurnEnd(watchDroppedPrompts)
   onTurnEnd(notifyTurnEnd)
+  onTurnEnd(remindWhenAsking)
   briefOnReturn()
   onAnyTaskEvent(notifyStatusEvent)
   onAnyTaskEvent(watchBlocked)
   onTurnEnd(statusLineTurnEnded)
   clearStallsOnTurnStart()
+  settleLeftoversOnTurnStart()
+  onTurnEnd(noteTurnFinished)
+  watchPermissionTimeouts()
   restartQuietOnAnswer()
   clearStatusLinesWhenIdle()
   onTurnEnd(deliverAgentWaits)

@@ -120,7 +120,6 @@ test('a permission request that arrives while typing shows above the keyboard', 
     data: {
       title: unique('Typing permission'),
       prompt: `Please ${PERMISSION_PROMPT}`,
-      cwd: paths.checkout,
       sandbox: false,
     },
   })

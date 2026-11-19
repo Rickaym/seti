@@ -16,6 +16,7 @@ import { refreshTasks } from '@/hooks/useTasks'
 import { toolLabel } from '@/lib/tool-label'
 import { cn } from '@/lib/utils'
 import { CallFields, EditButton, EditedNote } from '@/panels/tasks/CallFields'
+import { PermissionCountdown } from '@/panels/tasks/PermissionCountdown'
 import { useCallFields } from '@/panels/tasks/use-call-fields'
 
 const isPlan = (request: PermissionRequest) => request.tool_name === 'ExitPlanMode'
@@ -110,7 +111,10 @@ export function PermissionCard({ request, onAnswered, className }: CardProps) {
       <div className="flex items-start gap-2">
         <Hand className="mt-px size-3.5 shrink-0 text-warning-text" aria-hidden />
         <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-          <p className="font-medium text-foreground">{titleOf(request)}</p>
+          <div className="flex flex-wrap items-baseline gap-x-2">
+            <p className="font-medium text-foreground">{titleOf(request)}</p>
+            <PermissionCountdown request={request} />
+          </div>
           {!plan && request.summary !== '' && (
             <code className="bg-muted px-1.5 py-1 font-mono text-2xs break-all whitespace-pre-wrap">
               {request.summary}

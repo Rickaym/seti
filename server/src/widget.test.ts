@@ -137,7 +137,7 @@ describe('widget summary', () => {
     const first = summary.needs_you[0]
     expect(first).toMatchObject({ task_id: blocked, reason: 'blocked', line: 'Asks to use Bash: terraform apply' })
     expect(first?.title.length).toBeLessThanOrEqual(WIDGET_LIMITS.title)
-    expect(summary.needs_you.find((row) => row.reason === 'asking')?.line).toBe('Asks you')
+    expect(summary.needs_you.find((row) => row.reason === 'asking')?.line).toBe('Asked in its reply')
     expect(summary.names_hidden).toBe(false)
     await tasks.setBlocked(blocked, null)
     await Promise.all(asking.map(async (id) => tasks.markSeen(id)))

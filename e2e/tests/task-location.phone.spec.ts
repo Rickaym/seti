@@ -1,33 +1,33 @@
-import { randomUUID } from 'node:crypto'
-import fs from 'node:fs'
-import path from 'node:path'
-import { openSeedDb } from './support/db.js'
-import { paths } from './support/env.js'
 import { expect, test } from './support/fixtures.js'
-import { settled } from './support/phone-layout.js'
+import { seedOlderAgent } from './support/older-agent.js'
+import { expectFitsPhone } from './support/phone-layout.js'
 
 const TARGET_PX = 44
 
-test('a phone sees and reaches the directory actions without hovering', async ({ page, request }) => {
-  const notes = path.join(paths.home, `notes-${randomUUID().slice(0, 8)}`)
-  fs.mkdirSync(notes, { recursive: true })
-  const id = randomUUID()
-  const db = openSeedDb()
-  await db.idleTask(id, 'Phone directories', paths.checkout, new Date().toISOString())
-  await db.close()
-  expect((await request.post(`/api/tasks/${id}/dirs`, { data: { path: notes } })).ok()).toBe(true)
-
+test("a phone reads an older agent's folders and takes its home folders away", async ({ page, request }) => {
+  const { id, slug, notes } = await seedOlderAgent('Phone older agent')
   await page.goto(`/#agents/${id}`)
   await page.getByRole('main').getByRole('button', { name: 'Agent settings' }).click()
-  const row = page.getByRole('dialog').getByRole('group', { name: notes })
-  await expect(row).toBeVisible()
-  await settled(page)
-  for (const name of [`Work in ${notes}`, `Remove ${notes}`]) {
-    const button = row.getByRole('button', { name })
-    await expect(button).toHaveCSS('opacity', '1')
-    const box = await button.boundingBox()
-    expect(Math.min(box?.width ?? 0, box?.height ?? 0)).toBeGreaterThanOrEqual(TARGET_PX)
+  const sheet = page.getByRole('dialog').filter({ has: page.getByRole('tablist', { name: 'Sections' }) })
+  for (const name of [slug, notes]) {
+    const copy = sheet.getByRole('group', { name }).getByRole('button', { name: /^Copy path of / })
+    await expect(copy).toBeVisible()
+    expect((await copy.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(TARGET_PX)
   }
-  const add = page.getByRole('dialog').getByRole('button', { name: 'Add repo or directory' })
-  expect((await add.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(TARGET_PX)
+  for (const gone of [/^Add/, /^Work in /, /^Remove /]) {
+    await expect(sheet.getByRole('button', { name: gone })).toHaveCount(0)
+  }
+  await expectFitsPhone(page, 'the agent settings')
+
+  await sheet.getByRole('tab', { name: 'Access', exact: true }).tap()
+  const access = sheet.getByRole('tabpanel', { name: 'Access' })
+  const remove = access.getByRole('button', { name: 'Remove', exact: true })
+  await expect(remove).toBeVisible()
+  await remove.tap()
+  const confirm = page.getByRole('dialog', { name: 'Remove home folders?' })
+  await expect(confirm).toContainText('can read and write the folders in your home')
+  await confirm.getByRole('button', { name: 'Remove', exact: true }).tap()
+  await expect(access.locator('dt').filter({ hasText: /^Home folders$/ })).toHaveCount(0)
+  await page.goto('/#agents')
+  expect((await request.delete(`/api/tasks/${id}`)).ok()).toBe(true)
 })

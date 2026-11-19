@@ -1,6 +1,5 @@
 import type { APIRequestContext, Page } from '@playwright/test'
 import type { AuditPage, MessagePage, Task } from '@seti/shared'
-import { paths } from './support/env.js'
 import { HOLD_PROMPT } from './support/fake-claude.js'
 import { SIDE_ANSWER, SIDE_READ, SLOW_QUESTION } from './support/fake-side-chat.js'
 import { apiData, expect, test, unique } from './support/fixtures.js'
@@ -80,7 +79,7 @@ test("Ask answers from the agent's session in a dock, with follow-ups kept, and 
 /** An agent whose fake turn runs until it is stopped, with a session to fork. */
 async function busyAgent(request: APIRequestContext): Promise<string> {
   const response = await request.post('/api/tasks', {
-    data: { title: unique('Side busy'), prompt: `Please ${HOLD_PROMPT}`, cwd: paths.checkout, sandbox: false },
+    data: { title: unique('Side busy'), prompt: `Please ${HOLD_PROMPT}`, sandbox: false },
   })
   expect(response.ok()).toBe(true)
   const { id } = ((await response.json()) as { data: Task }).data

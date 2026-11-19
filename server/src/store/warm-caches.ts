@@ -1,4 +1,4 @@
-import { WARM_CACHE_DEFAULTS, type WarmCacheSeed, type WarmCacheSettings } from '@seti/shared'
+import { WARM_CACHE_DEFAULTS, type WarmCacheSettings } from '@seti/shared'
 import { now, sql } from '../db.js'
 
 interface SettingsRow {
@@ -27,8 +27,4 @@ export const warmCacheSettings = {
       ON CONFLICT (repo_id) DO UPDATE SET enabled = EXCLUDED.enabled, patterns = EXCLUDED.patterns,
         max_mb = EXCLUDED.max_mb, updated_at = EXCLUDED.updated_at`
   },
-}
-
-export async function recordWarmCacheSeed(taskId: string, dir: string, seed: WarmCacheSeed): Promise<void> {
-  await sql`UPDATE task_worktree SET warm_cache = ${JSON.stringify(seed)} WHERE task_id = ${taskId} AND dir = ${dir}`
 }

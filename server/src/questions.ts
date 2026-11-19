@@ -12,6 +12,7 @@ import {
 } from '@seti/shared'
 import { audit } from './audit.js'
 import { tasks } from './db.js'
+import { stoppingForRestart } from './restart-state.js'
 import { redactSecrets } from './scrub.js'
 import { questions, type NewQuestion } from './store/questions.js'
 import { refreshBlocked } from './task-blocked.js'
@@ -129,12 +130,20 @@ export async function expireGroup(groupId: string, reason: string): Promise<Ques
   return expired
 }
 
-/** Waits for the group's answers, from before it is recorded; a stopped turn expires it. */
+/**
+ * Waits for the group's answers, from before it is recorded; a stopped turn expires it. A turn
+ * Seti's own stop cuts off leaves it open, so the answer still reaches the agent after the start.
+ */
 async function answersOf(groupId: string, waiter: Omit<Waiter, 'resolve'>, signals: readonly AbortSignal[]) {
   const signal = AbortSignal.any([...signals])
   return new Promise<PermissionResult>((resolve) => {
     const drop = () => {
       if (!waiting.has(groupId)) {
+        return
+      }
+      if (stoppingForRestart()) {
+        waiting.delete(groupId)
+        resolve(EXPIRED)
         return
       }
       expireGroup(groupId, 'the agent stopped waiting')
@@ -214,7 +223,7 @@ export async function askQuestions(
     await auditAsked(taskId, stored)
     if (waiting.has(groupId)) {
       await refreshBlocked(taskId)
-    } else {
+    } else if (!stoppingForRestart()) {
       await expireGroup(groupId, 'the agent stopped waiting')
     }
     return await answer
@@ -223,35 +232,42 @@ export async function askQuestions(
   }
 }
 
-/** No process waits on a question a restart left open; startup expires them. */
-export async function expireLeftoverQuestions(): Promise<void> {
-  const expired = await questions.expireAll()
+/**
+ * A secret question cannot outlive its call, which takes the value straight from the user's
+ * field; startup expires those a restart left open. Other questions stay open for a late answer.
+ */
+export async function expireLeftoverSecrets(): Promise<void> {
+  const expired = await questions.expireSecrets()
   if (expired.length > 0) {
     await audit.record({
       actor: 'system',
       kind: 'task.question_expired',
       subject_type: 'system',
-      summary: `Expired ${plural(expired.length, 'question')} a restart cut off`,
+      summary: `Expired ${plural(expired.length, 'secret question')} a restart cut off`,
       detail: { questions: expired.length, reason: 'restart' },
     })
   }
 }
 
 const ASKING =
-  'When you need the user to decide or tell you something before you can go on, ask with the ' +
+  'Do not ask for a go-ahead on work that is reversible and inside what the user asked: do it and ' +
+  'say what you did. When one option is clearly the one you recommend, take it and name the choice ' +
+  'in your reply. Ask only when the choice cannot be undone, acts outward (sends, publishes, ' +
+  'deletes, spends, deploys, merges or changes shared or production systems), changes the scope, ' +
+  'or the options are genuinely balanced. ' +
+  'When you do need the user to decide or tell you something before you can go on, ask with the ' +
   'AskUserQuestion tool instead of writing the question in your reply. Seti collects every ' +
   "agent's questions in one Requests view; your call waits there and its result carries the " +
   'answers. Give each question two to four short options, since the user can always answer in ' +
   'their own words instead; for a yes or no question make the options exactly Yes and No. Ask ' +
-  'related questions together, up to four in one call. Ask the same way before an action that ' +
-  "needs the user's go-ahead, such as deploying, merging, changing shared or production systems, " +
-  'spending money or sending a message for them: one Yes or No question that says what you will ' +
-  'do, with any risk in the option description. Never end a turn with a question or a "should I" ' +
-  'offer in your reply; if you have a next step to offer, ask it with AskUserQuestion. If you ' +
+  'related questions together, up to four in one call. Before an outward or irreversible action, ' +
+  'ask one Yes or No question that says what you will do, with any risk in the option ' +
+  'description. Never end a turn with a question or a "should I" offer in your reply: take a next ' +
+  'step that is reversible and inside the request, and name any other as a suggestion. If you ' +
   'recommend an option, put it first and end its label with (Recommended); Seti picks it for the ' +
   'user to confirm. To ask the ' +
   'user for a secret, token or password, use ask_secret; never ask for one in your reply or with ' +
   'AskUserQuestion.'
 
-/** Tells every agent to ask the user through AskUserQuestion, which Seti collects. */
+/** Tells every agent when a question is worth asking, and to ask it through AskUserQuestion. */
 export const questionsContext = (): string => ASKING

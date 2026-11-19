@@ -22,8 +22,9 @@ curl -fsSL https://raw.githubusercontent.com/rickaym/seti/main/scripts/install.s
    `ssh -L 3006:127.0.0.1:3006 <host>`.
 4. Sign in with the local token: `cat ~/.seti/credentials/local-token-user` and paste it. The
    browser keeps an HttpOnly session cookie for 30 days.
-5. In Settings, add repos under Repos, and check the Claude account under Account and the sandbox
-   under Sandbox.
+5. In Settings, check the Claude account under Account and the sandbox under Sandbox. An agent
+   starts in a fresh folder of its own under `~/work` and clones the repos it needs, so there is
+   no repo or directory to pick first.
 
 Pass options after `bash -s --` when you use curl:
 
@@ -259,7 +260,7 @@ Seti would refuse.
 | `SETI_AUTH_IDLE_DAYS`, `SETI_AUTH_MAX_DAYS`        | `7`, `30`                    | Passkey session idle and absolute limits                          |
 | `SETI_ANDROID_PACKAGE`, `SETI_ANDROID_CERT_SHA256` | unset                        | A self-built Android app to trust until Settings sets one         |
 | `SETI_CLAUDE_HOME`, `SETI_CLAUDE_BIN`              | `~/.claude`, see below       | Claude Code config, and the binary sessions run                   |
-| `SETI_SCRATCH_ROOT`                                | `~/work`                     | Where agents without a repo get a directory                       |
+| `SETI_SCRATCH_ROOT`                                | `~/work`                     | Where each new agent gets its own folder                          |
 | `SETI_SESSION_IDLE_MINUTES`                        | `15`                         | How long an idle agent's process stays open                       |
 | `SETI_MEMORY_SCOPES`                               | on                           | `off` runs agents without systemd memory and CPU caps             |
 | `SETI_AUDIT_RETENTION_DAYS`                        | `365`                        | Days the audit log keeps events                                   |
@@ -281,6 +282,10 @@ Seti would refuse.
 `SETI_CLAUDE_BIN` defaults to a working `claude` on PATH, else the binary the Agent SDK ships.
 Without `SETI_DATABASE_URL`, a `SETI_HOME` other than `~/.seti` gets its own database, named after
 the directory, so a scratch instance never shares the live one.
+
+The memory cap of an agent has no environment variable: it follows the host, at 30% of its memory
+between 6 GB and 16 GB, until you save one in Settings, Resources. A larger cap means fewer `tsc`
+runs stopped at it and more risk when several agents peak together.
 
 ### Secrets
 
@@ -552,6 +557,17 @@ login of Default (or of the most sets) keeps the alias and each other login beco
 host named after its user, such as `k8s-ubuntu`. Every agent keeps the hosts it reached, through
 its own Access choices.
 
+### Permission requests
+
+A tool call no rule allows waits for you as a permission request: in the agent's chat, in Needs
+you and in Requests, with Allow, Always and Deny. Settings, Permissions holds the rules and the
+Request timeout: Off, 15 min, 1 h, 4 h or 24 h, 1 h by default. A request nobody answers in that
+time is denied, and the agent is told that it timed out, not that you refused, so it carries on
+without the call or asks again. The card shows the time left, the agent's reason line says "times
+out soon" near the end, and the transcript and the audit log record the timeout. A timeout adds no
+rule. A new value applies to requests already waiting, counted from when each was raised. Off
+keeps a request waiting until you answer it.
+
 ### Backups
 
 Seti streams `pg_dump` into encryption to a public key, so the host cannot read its own backups.
@@ -751,6 +767,6 @@ NODE_ENV=development SETI_HOME=/tmp/seti-scratch SETI_PORT=3106 SETI_REDIS_URL=o
 | `~/.seti/pre-credentials-*/` | Env files and units as `migrate-secrets.sh` found them          |
 | PostgreSQL database `seti`   | Tasks, transcripts, PRs, channels, the audit log, sealed tokens |
 | `~/.claude/projects/`        | Claude Code sessions, which Seti resumes                        |
-| `~/work/`                    | New clones and worktrees agents make                            |
+| `~/work/`                    | One folder per agent, holding its clones and worktrees          |
 
 Seti keeps `~/.seti` owner-only and tightens anything more open at startup.

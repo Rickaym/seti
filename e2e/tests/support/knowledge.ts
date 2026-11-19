@@ -1,12 +1,11 @@
 import type { APIRequestContext } from '@playwright/test'
 import type { Envelope, KnowledgeNote, MessagePage, Task } from '@seti/shared'
-import { paths } from './env.js'
 import { setiPrompt, SYSTEM_PROMPT_PROMPT } from './fake-claude.js'
 import { apiData, expect, unique } from './fixtures.js'
 
 async function startAgent(request: APIRequestContext, prompt: string): Promise<Task> {
   const response = await request.post('/api/tasks', {
-    data: { title: unique('Knower'), prompt, cwd: paths.checkout, sandbox: false },
+    data: { title: unique('Knower'), prompt, sandbox: false },
   })
   expect(response.ok(), 'POST /api/tasks').toBe(true)
   const task = ((await response.json()) as Envelope<Task>).data

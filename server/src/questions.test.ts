@@ -1,11 +1,11 @@
 import type { CanUseTool, PermissionResult } from '@anthropic-ai/claude-agent-sdk'
-import type { AnswerQuestionsResult, Question, Task } from '@seti/shared'
+import { BUILTIN_ROLES, type AnswerQuestionsResult, type Question, type Task } from '@seti/shared'
 import { afterAll, describe, expect, it, vi } from 'vitest'
 import { asAgent } from './access.js'
 import { createApp } from './app.js'
 import { tasks } from './db.js'
 import { answerQuestions, SECRET_ANSWER } from './question-answers.js'
-import { expireLeftoverQuestions, questionsContext } from './questions.js'
+import { expireLeftoverSecrets, questionsContext } from './questions.js'
 import { endSession, runTurn, stopTurn } from './runner.js'
 import { auditEvents } from './store/audit.js'
 import { questions } from './store/questions.js'
@@ -299,33 +299,58 @@ describe('AskUserQuestion', () => {
 })
 
 describe('leftover questions', () => {
-  it('expires open questions a restart cut off', async () => {
+  it('keeps the open questions a restart cut off, and expires only the secret ones', async () => {
     const task = await newTask()
-    const [stored] = await questions.open([
-      {
-        id: crypto.randomUUID(),
-        group_id: crypto.randomUUID(),
-        task_id: task.id,
-        subagent_id: null,
-        tool_use_id: 'toolu_left',
-        position: 0,
-        header: 'Left',
-        prompt: 'Left over?',
-        kind: 'yes_no',
-        multi: false,
-        options: [
-          { label: 'Yes', description: null },
-          { label: 'No', description: null },
-        ],
-      },
-    ])
-    await expireLeftoverQuestions()
-    expect((await questions.byIds([stored?.id ?? ''])).map((q) => q.status)).toEqual(['expired'])
+    const left = (kind: 'yes_no' | 'secret', header: string) => ({
+      id: crypto.randomUUID(),
+      group_id: crypto.randomUUID(),
+      task_id: task.id,
+      subagent_id: null,
+      tool_use_id: `toolu_${header}`,
+      position: 0,
+      header,
+      prompt: 'Left over?',
+      kind,
+      multi: false,
+      options:
+        kind === 'secret'
+          ? []
+          : [
+              { label: 'Yes', description: null },
+              { label: 'No', description: null },
+            ],
+    })
+    const [kept] = await questions.open([left('yes_no', 'Left')])
+    const [secret] = await questions.open([left('secret', 'Token')])
+    await expireLeftoverSecrets()
+    expect((await questions.byIds([kept?.id ?? ''])).map((q) => q.status)).toEqual(['open'])
+    expect((await questions.byIds([secret?.id ?? ''])).map((q) => q.status)).toEqual(['expired'])
+    await questions.expireGroup(kept?.group_id ?? '')
   })
 
   it('tells agents to ask through AskUserQuestion rather than in prose', () => {
     expect(questionsContext()).toMatch(/ask with the AskUserQuestion tool instead of writing the question/)
-    expect(questionsContext()).toContain("Ask the same way before an action that needs the user's go-ahead")
-    expect(questionsContext()).not.toContain('only offering a next step')
+    expect(questionsContext()).toContain('Before an outward or irreversible action, ask one Yes or No question')
+    expect(questionsContext()).toContain('Never end a turn with a question')
+  })
+
+  it('tells agents to go on without a go-ahead on reversible work and to take a clear recommendation', () => {
+    const text = questionsContext()
+    expect(text).toContain('Do not ask for a go-ahead on work that is reversible and inside what the user asked')
+    expect(text).toContain('When one option is clearly the one you recommend, take it and name the choice')
+    for (const reason of ['cannot be undone', 'acts outward', 'changes the scope', 'genuinely balanced']) {
+      expect(text).toContain(reason)
+    }
+    for (const outward of ['sends', 'publishes', 'deletes', 'spends', 'deploys']) {
+      expect(text).toContain(outward)
+    }
+    expect(text).not.toContain('if you have a next step to offer, ask it')
+    expect(text.length).toBeLessThan(1900)
+  })
+
+  it('keeps the asking rules out of the built-in roles, so no agent pays for them twice', () => {
+    for (const role of BUILTIN_ROLES) {
+      expect(role.text).not.toMatch(/AskUserQuestion|go-ahead/)
+    }
   })
 })

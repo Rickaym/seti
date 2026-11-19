@@ -66,6 +66,8 @@ export interface TaskListEntry extends Task {
   /** The todo list the agent keeps with Claude Code's own tools; empty when it keeps none. */
   todos: AgentTodo[]
   pr_states: PrStates
+  /** The question its last turn ended on, on one line, while it asks the user; null otherwise. */
+  question: string | null
 }
 
 /** The list's view of a task's subtasks: counts of all of them, and the running ones. */
@@ -131,6 +133,7 @@ const taskListEntrySchema = z.object({
     }),
     { by_url: {}, any_merged: false },
   ),
+  question: orDefault('question', z.string().nullable(), null),
 }) satisfies ResponseSchema<TaskListEntry>
 
 /** The task list; an entry too broken to show drops out instead of breaking the list. */

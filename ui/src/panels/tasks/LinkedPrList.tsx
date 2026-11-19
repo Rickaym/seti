@@ -12,9 +12,17 @@ import { refreshTasks } from '@/hooks/useTasks'
 import { relativeTime } from '@/lib/time'
 import { TOUCH_TARGET } from '@/lib/touch'
 import { cn } from '@/lib/utils'
+import { AgentFixCi } from '@/panels/tasks/FixCi'
 import { PrChips } from '@/panels/tasks/PrChips'
-import { FailingChecks, type PrAgent } from '@/panels/tasks/PrCiFailure'
-import { filterLinkedPrs, LINKED_PR_GROUPS, type LinkedPr, type LinkedPrGroup } from '@/panels/tasks/linked-prs'
+import { FailingChecks } from '@/panels/tasks/PrCiFailure'
+import type { PrAgent } from '@/panels/tasks/fix-ci'
+import {
+  failingPrs,
+  filterLinkedPrs,
+  LINKED_PR_GROUPS,
+  type LinkedPr,
+  type LinkedPrGroup,
+} from '@/panels/tasks/linked-prs'
 import { CiBadge, Tag, ThreadsBadge } from '@/panels/tasks/pr-badges'
 import { keepForToasts, unlinkWithUndo } from '@/panels/tasks/pr-links'
 
@@ -143,8 +151,17 @@ type ListProps = Omit<RowProps, 'item'> & { prs: readonly LinkedPr[] }
 function LinkedPrList({ prs, ...rest }: ListProps) {
   const [query, setQuery] = useState('')
   const matches = useMemo(() => filterLinkedPrs(prs, query), [prs, query])
+  const failing = failingPrs(prs)
   return (
     <>
+      {failing.length > 0 && (
+        <div className="flex shrink-0 items-center justify-between gap-2 border-b border-border px-3 py-1.5 text-xs">
+          <span className="min-w-0 truncate text-muted-foreground">
+            CI is failing on {failing.length === 1 ? '1 PR' : `${String(failing.length)} PRs`}
+          </span>
+          <AgentFixCi agent={rest.agent} prs={failing} onSent={rest.onSent} />
+        </div>
+      )}
       <div className="shrink-0 border-b border-border p-2">
         <Input
           aria-label="Filter linked PRs"
@@ -163,6 +180,15 @@ function LinkedPrList({ prs, ...rest }: ListProps) {
       </div>
     </>
   )
+}
+
+/** Opens the list with the filter focused, whatever sits above it. */
+function focusFilter(event: Event): void {
+  const filter = event.currentTarget instanceof HTMLElement ? event.currentTarget.querySelector('input') : null
+  if (filter !== null) {
+    event.preventDefault()
+    filter.focus()
+  }
 }
 
 interface SheetProps {
@@ -327,6 +353,7 @@ export function MoreLinkedPrs({ prs, hidden, shown, toFix, bare = false, onOpen,
         className="flex max-h-[min(32rem,var(--radix-popover-content-available-height))] w-[30rem] max-w-[calc(100vw-1rem)] flex-col p-0"
         onPointerDownOutside={keepForToasts}
         onFocusOutside={keepForToasts}
+        onOpenAutoFocus={focusFilter}
       >
         <div className="shrink-0 border-b border-border px-3 py-1.5 text-xs font-medium">{title}</div>
         {list}

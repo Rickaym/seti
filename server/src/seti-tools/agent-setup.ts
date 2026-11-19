@@ -1,129 +1,14 @@
-import os from 'node:os'
-import path from 'node:path'
-import { contextPackInput, prUrl, taskRepoInput, type Task } from '@seti/shared'
+import { contextPackInput, prUrl, type Task } from '@seti/shared'
 import { z } from 'zod'
 import { createPack, setTaskPacks, setTaskRole } from '../context-changes.js'
-import { repos } from '../db.js'
 import { openQuerySince } from '../runner.js'
 import { contextPacks, taskContextPacks } from '../store/context.js'
 import { subtaskBriefs } from '../subtask-cache.js'
-import { linkSubtaskPrUrl, unlinkSubtaskPrUrl, updateTask } from '../task-actions.js'
-import { addTaskDir, addTaskRepo, removeTaskDir, removeTaskRepo } from '../task-location.js'
+import { linkSubtaskPrUrl, unlinkSubtaskPrUrl } from '../task-actions.js'
 import { linkTaskPr, requireTask, unlinkTaskPr } from '../tasks.js'
 import { AGENT_INFO_TOOLS } from './agent-info.js'
 import { liveTask, pickOne, taskRef } from './refs.js'
-import { done, setiTool, ToolRefusal, type ToolContext } from './tool.js'
-
-const NEXT_TURN = 'from its next turn'
-
-/** One of the agent's repos or plain directories, with the directory it has. */
-interface Place {
-  repo_id: string | null
-  name: string
-  dir: string
-}
-
-const placesOf = (task: Task): Place[] => [
-  ...task.repos.map((repo) => ({ repo_id: repo.id, name: repo.slug, dir: repo.dir })),
-  ...task.dirs.map((dir) => ({ repo_id: null, name: dir, dir })),
-]
-
-const placeRef = z.string().trim().min(1).describe('A repo slug or id, or a directory path, the agent has.')
-
-function findPlace(task: Task, ref: string): Place {
-  const places = placesOf(task)
-  const wanted = ref.trim()
-  return (
-    places.find((place) => place.dir === wanted || `${place.dir}/` === wanted) ??
-    pickOne(places, ref, `repo or directory of ${task.title}`, (place) => [place.repo_id ?? place.dir, place.name])
-  )
-}
-
-function expandHome(raw: string): string {
-  if (raw === '~') {
-    return os.homedir()
-  }
-  return raw.startsWith('~/') ? path.join(os.homedir(), raw.slice(2)) : raw
-}
-
-/** A directory the caller can reach itself; an agent never widens another past its own reach. */
-function insideCaller(ctx: ToolContext, raw: string): string {
-  const dir = path.resolve(expandHome(raw))
-  const mine = [ctx.caller.cwd, ...ctx.caller.repos.map((repo) => repo.dir), ...ctx.caller.dirs].map((d) =>
-    path.resolve(d),
-  )
-  if (!mine.some((root) => dir === root || dir.startsWith(`${root}${path.sep}`))) {
-    throw new ToolRefusal(
-      `You can add only a directory inside one of your own: ${mine.join(', ')}. Ask @user for others.`,
-    )
-  }
-  return dir
-}
-
-const addAgentRepo = setiTool({
-  name: 'add_agent_repo',
-  description:
-    'Let an agent read and edit a registered repo besides where it works, from its next turn: the checkout itself, or a fresh worktree of its own.',
-  input: {
-    task: taskRef,
-    repo: z.string().trim().min(1).describe("The registered repo's slug or id."),
-    worktree: taskRepoInput.shape.worktree,
-    ref: taskRepoInput.shape.ref.describe('Worktree only: the branch to start from.'),
-  },
-  run: async ({ task: ref, repo: repoRef, worktree, ref: start }) => {
-    const task = await liveTask(ref)
-    const repo = pickOne(await repos.list(), repoRef, 'repo', (r) => [r.id, r.slug])
-    await addTaskRepo(task, { repo_id: repo.id, worktree, ...(worktree && start !== undefined ? { ref: start } : {}) })
-    return done(`Added ${repo.slug} to ${task.title}${worktree ? ' as a worktree' : ''}; it applies ${NEXT_TURN}.`)
-  },
-})
-
-const addAgentDirectory = setiTool({
-  name: 'add_agent_directory',
-  description:
-    'Let an agent read and edit an existing directory that is not a registered repo, from its next turn. Only a directory inside one of your own; not a dot folder or Seti data.',
-  input: { task: taskRef, path: z.string().trim().min(1).describe('An absolute path, or one starting with ~/.') },
-  run: async ({ task: ref, path: raw }, ctx) => {
-    const task = await liveTask(ref)
-    const dir = insideCaller(ctx, raw)
-    await addTaskDir(task, dir)
-    return done(`Added the directory ${dir} to ${task.title}; it applies ${NEXT_TURN}.`)
-  },
-})
-
-const removeFromAgent = setiTool({
-  name: 'remove_from_agent',
-  description:
-    'Take a repo or directory off an agent from its next turn. Nothing on disk is deleted; not possible for its working directory.',
-  input: { task: taskRef, what: placeRef },
-  run: async ({ task: ref, what }) => {
-    const task = await liveTask(ref)
-    const place = findPlace(task, what)
-    if (place.dir === task.cwd) {
-      throw new ToolRefusal(
-        `${place.name} is where ${task.title} works; make another of its places its working directory first.`,
-      )
-    }
-    await (place.repo_id === null ? removeTaskDir(task, place.dir) : removeTaskRepo(task, place.repo_id))
-    return done(`Took ${place.name} off ${task.title}; its files stay.`)
-  },
-})
-
-const setAgentWorkingDirectory = setiTool({
-  name: 'set_agent_working_directory',
-  description:
-    "Make one of an agent's repos or directories its working directory, such as a repo added to an agent that started without one. The old one stays attached and the conversation carries on at the next turn.",
-  input: { task: taskRef, where: placeRef },
-  run: async ({ task: ref, where }) => {
-    const task = await liveTask(ref)
-    const place = findPlace(task, where)
-    if (place.dir === task.cwd) {
-      return done(`${task.title} already works in ${place.dir}.`)
-    }
-    await updateTask(task.id, { cwd: place.dir })
-    return done(`${task.title} works in ${place.dir} ${NEXT_TURN} and keeps its conversation.`)
-  },
-})
+import { done, setiTool, ToolRefusal } from './tool.js'
 
 const subagentRef = z.string().trim().min(1).optional().describe('A subagent by tool use id or description.')
 
@@ -245,10 +130,6 @@ const setAgentRole = setiTool({
 })
 
 export const AGENT_SETUP_TOOLS = [
-  addAgentRepo,
-  addAgentDirectory,
-  removeFromAgent,
-  setAgentWorkingDirectory,
   linkPr,
   unlinkPr,
   linkContextPack,

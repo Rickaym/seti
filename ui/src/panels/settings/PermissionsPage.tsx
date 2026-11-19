@@ -12,6 +12,7 @@ import { useTasks } from '@/hooks/useTasks'
 import { navigate } from '@/lib/route'
 import { toolLabel } from '@/lib/tool-label'
 import { InheritedRules, RuleEditor, RuleGroups } from './PermissionRules'
+import { RequestTimeout } from './RequestTimeout'
 import { SettingsBody, SettingsCard, SettingsHeader } from './layout'
 
 const APPLIES: Record<BuiltInScope, string> = {
@@ -89,6 +90,7 @@ export function PermissionsPage() {
     <SettingsBody narrow header={header}>
       <div className="flex flex-col gap-4">
         {waiting.length > 0 && <Waiting requests={waiting} />}
+        <RequestTimeout onChange={load} />
         <SettingsCard title="Global rules">
           <RuleEditor
             rules={policy.rules}

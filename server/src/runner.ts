@@ -1,7 +1,7 @@
 import type { SDKMessage, SDKResultMessage } from '@anthropic-ai/claude-agent-sdk'
 import type { MessageBody, MessageRow, PromptAttachment, Task, TaskSession, TaskStatus } from '@seti/shared'
 import { outsideRequest } from './access.js'
-import { LiveSession, outcomeOf, type NextMessage, type SendOutcome } from './agent-session.js'
+import { LiveSession, outcomeOf, type SendOutcome } from './agent-session.js'
 import { refuseArchived } from './archive-guard.js'
 import { audit } from './audit.js'
 import { inBackground, onShutdown } from './background.js'
@@ -12,6 +12,7 @@ import { linkCreatedPrs } from './created-prs.js'
 import { messages, tasks } from './db.js'
 import { HttpError } from './http.js'
 import { watchSessionMcp } from './mcp-session-status.js'
+import type { NextMessage } from './next-message.js'
 import { outwardToolUses } from './outward.js'
 import { followQueue, markQueued, settleQueued } from './queued-prompts.js'
 import { resumeSession } from './rewind.js'
@@ -108,15 +109,18 @@ export async function runTurn(taskId: string, prompt: string, options: TurnOptio
 
 /**
  * Hands the agent the pending prefaces with no user text, in a new turn or queued for a turn of
- * their own after the running one, or sooner with a priority; returns their count.
+ * their own after the running one, or sooner with a priority; returns their count. With `held`,
+ * the updates that wait for the user's next message go too.
  */
-export async function runAutoTurn(taskId: string, priority?: NextMessage['priority']): Promise<number> {
-  const message = priority === undefined ? { prompt: null } : { prompt: null, priority }
-  return (await inLane(taskId, async () => startTurn(taskId, message, false))).count
+export async function runAutoTurn(taskId: string, how: Pick<NextMessage, 'priority' | 'held'> = {}): Promise<number> {
+  return (await inLane(taskId, async () => startTurn(taskId, { prompt: null, ...how }, false))).count
 }
 
-/** Why pending updates cannot queue behind the running turn, or null when none runs or they can. */
-export function autoQueueBlocker(taskId: string): string | null {
+/**
+ * Why pending updates cannot queue for the running turn, or null when none runs or they can.
+ * Updates that join the turn at its next step do not wait behind the ones queued for its end.
+ */
+export function autoQueueBlocker(taskId: string, joining = false): string | null {
   const session = live.get(taskId)
   if (session?.running !== true) {
     return null
@@ -124,7 +128,7 @@ export function autoQueueBlocker(taskId: string): string | null {
   if (!session.accepting) {
     return 'The running turn is starting or being cut short'
   }
-  return session.autoQueued ? 'Updates already wait for the running turn to end' : null
+  return session.autoQueued && !joining ? 'Updates already wait for the running turn to end' : null
 }
 
 /** Starts the session's process; a pending rewind makes it resume from the rewind point. */
@@ -163,7 +167,7 @@ async function openTurn(
 
 async function send(taskId: string, session: LiveSession, next: NextMessage): Promise<void> {
   const { content, promptId } = await openTurn(taskId, next, false)
-  session.send(content, promptId)
+  session.send(content, promptId, next.prompt === null ? 'updates' : 'user')
 }
 
 async function enqueue(taskId: string, session: LiveSession, next: NextMessage): Promise<void> {
@@ -306,7 +310,9 @@ async function endTurn(taskId: string, session: LiveSession, m: SDKResultMessage
 
 async function closeTurn(taskId: string, session: LiveSession, error: string | null): Promise<void> {
   const ending = session.endTurn()
-  if (ending !== null && session.backlog.length > 0) {
+  if (session.restartCut) {
+    session.close()
+  } else if (ending !== null && session.backlog.length > 0) {
     await sendBacklog(taskId, session)
   } else if (session.queuedUuids.length > 0) {
     session.carryOn()
@@ -369,9 +375,9 @@ async function finish(taskId: string, session: LiveSession, lastError: string | 
   if (failedStart) {
     keepUnstarted(taskId, backlog)
     await reportEnd(taskId, 'error', lastError)
-  } else if (backlog.length > 0 && (await tasks.get(taskId))) {
+  } else if (!session.restartCut && backlog.length > 0 && (await tasks.get(taskId))) {
     openSession(taskId, session, backlog)
-  } else if (running) {
+  } else if (running && !session.restartCut) {
     await reportEnd(taskId, endedBySeti ? 'stopped' : endStatus(lastError), lastError)
   }
   session.turnReported()
@@ -471,26 +477,6 @@ onShutdown(async () => {
     await endSession(taskId)
   }
 })
-
-/** Takes a message back from Claude Code's queue before the agent reads it. */
-export async function removeQueued(taskId: string, promptId: number): Promise<void> {
-  const session = live.get(taskId)
-  const uuid = session?.uuidOf(promptId) ?? null
-  if (session === undefined || uuid === null) {
-    throw new HttpError(409, 'That message is not waiting in the queue')
-  }
-  const cancelled = await session.cancelQueued(uuid)
-  if (cancelled === null) {
-    throw new HttpError(409, 'This Claude Code version cannot take back a queued message')
-  }
-  if (!cancelled) {
-    throw new HttpError(409, 'The agent already picked up that message')
-  }
-  const settled = session.settle(uuid)
-  if (settled !== null) {
-    await inLane(taskId, async () => markQueued(taskId, settled, 'removed'))
-  }
-}
 
 /** Closes the task's session if nothing runs in it; false when a turn or background work runs. */
 export async function closeIdleSession(taskId: string): Promise<boolean> {

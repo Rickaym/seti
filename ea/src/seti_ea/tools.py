@@ -27,6 +27,7 @@ from seti_ea.format import (
     PR_URL,
     ago,
     and_list,
+    asked,
     clip,
     duration,
     headings,
@@ -38,6 +39,7 @@ from seti_ea.format import (
     pr_label,
     pr_line,
     preview_word,
+    question_note,
     repo_name,
     size_words,
     status_note,
@@ -425,32 +427,16 @@ TOOL_SPECS: list[ToolSpec] = [
     ),
     ToolSpec(
         "start_task",
-        "Start a new task: a Claude Code agent working on the prompt. Seti's planner titles it and "
-        "picks repos, context packs and MCP servers from the prompt for whatever you leave out; "
-        "with no repo it gets a fresh folder under ~/work. Unclear permissions are not given: it "
-        "runs sandboxed with SSH hosts and AWS only as their defaults say; only the user grants "
-        "more. Everything can be changed later. Confirm the prompt, and the repos if the user "
-        "named any, with the user first.",
+        "Start a new task: a Claude Code agent working on the prompt. It works in a fresh folder "
+        "of its own and clones the repos it needs, so name them in the prompt. Seti's planner titles "
+        "it and picks context packs and MCP servers from the prompt. Unclear permissions are not "
+        "given: it runs sandboxed with SSH hosts and AWS only as their defaults say; only the user "
+        "grants more. Confirm the prompt with the user first.",
         {
             "prompt": {"type": "string", "description": "The full instructions for the agent."},
             "title": {
                 "type": "string",
                 "description": "Only when the user names the task; otherwise Seti titles it.",
-            },
-            "repos": {
-                "type": "array",
-                "items": {"type": "string"},
-                "description": "Only repos the user named, as slugs or names, the one the agent runs in "
-                "first. Leave out to let Seti pick.",
-            },
-            "worktree": {
-                "type": "boolean",
-                "description": "With named repos: false to work in the checkout itself. Worktrees are "
-                "the default so parallel tasks do not collide.",
-            },
-            "directory": {
-                "type": "string",
-                "description": "Without repos only: an existing directory to work in, absolute or ~/.",
             },
             "workspace": {
                 "type": "string",
@@ -616,16 +602,26 @@ TOOL_SPECS: list[ToolSpec] = [
         "post's text with the user first. With to, it is a direct message to that one agent: it "
         "joins its running turn at once or starts a turn, and only you, that agent and the user see "
         "it. It never cuts a turn short; stop_task does that. To hear when the agent is done, use "
-        "watch_task.",
+        "watch_task. With fix_ci and no text, it is Seti's Fix CI: each agent with failing CI on an "
+        "open PR linked to it gets one short direct message naming only its own failing PRs, or "
+        "with to, that agent alone. Archived and stopped agents and failing PRs with no agent are "
+        "skipped and named in the result. Before it reaches more than one agent, tell the user how "
+        "many and get a yes.",
         {
-            "text": {"type": "string", "description": "The message, short and self-contained."},
+            "text": {
+                "type": "string",
+                "description": "The message, short and self-contained. Leave out with fix_ci.",
+            },
             "to": {
                 "type": "string",
                 "description": "For a direct message: the agent's @handle, title or id. Leave out "
-                "for a public post.",
+                "for a public post, or with fix_ci to reach every agent with failing PRs.",
+            },
+            "fix_ci": {
+                "type": "boolean",
+                "description": "True to send the short Fix CI message instead of text.",
             },
         },
-        ["text"],
     ),
     ToolSpec(
         "reply_team_chat",
@@ -1087,10 +1083,9 @@ class EaTools:
                 "" if ref or len(names) < 2 else f" in {names.get(str(t.get('workspace_id')), 'a workspace')}"
             )
             seen = ", not seen yet" if t.get("unseen") is True else ""
+            state = f"{status_word(shown_status(t))}{question_note(t)}{status_note(t)}{seen}"
             lines.append(
-                f"- {title_of(t)}{where}: {status_word(shown_status(t))}{status_note(t)}{seen}, "
-                f"{task_repos(t)}, "
-                f"updated {ago(t.get('updated_at'), now)}"
+                f"- {title_of(t)}{where}: {state}, {task_repos(t)}, updated {ago(t.get('updated_at'), now)}"
             )
         if len(tasks) > LIST_LIMIT:
             lines.append(f"And {len(tasks) - LIST_LIMIT} older ones not listed.")
@@ -1162,6 +1157,8 @@ class EaTools:
         todos = todo_line(task)
         if todos is not None:
             lines.append(todos)
+        if asked(task):
+            lines.append(f'Its turn ended by asking you: "{asked(task)}"')
         if task.get("status_line"):
             since = ago(task.get("status_line_at"), now)
             lines.append(f'Its status line reads "{task.get("status_line")}", set {since}.')
@@ -1656,20 +1653,6 @@ class EaTools:
     async def start_task(self, args: Mapping[str, Any]) -> ToolResult:
         prompt = arg_str(args, "prompt")
         title = arg_str(args, "title", required=False)
-        raw = args.get("repos")
-        refs = [
-            r
-            for r in (raw if isinstance(raw, list) else [raw] if isinstance(raw, str) else [])
-            if isinstance(r, str) and r.strip()
-        ]
-        repo_ids: list[str] = []
-        if refs:
-            repos = await self._repos()
-            for ref in refs:
-                repo_id = str(resolve_repo(repos, ref).get("id"))
-                if repo_id not in repo_ids:
-                    repo_ids.append(repo_id)
-        directory = "" if repo_ids else arg_str(args, "directory", required=False)
         body: dict[str, Any] = {"prompt": prompt}
         workspace_ref = arg_str(args, "workspace", required=False)
         if workspace_ref:
@@ -1678,28 +1661,17 @@ class EaTools:
             )
         if title:
             body["title"] = title
-        if repo_ids:
-            body["repo_ids"] = repo_ids
-            if "worktree" in args:
-                body["worktree"] = arg_bool(args, "worktree")
-        elif directory:
-            body["cwd"] = directory
         notify = arg_bool(args, "notify_when_done")
         if notify:
             body["notify_when_done"] = True
         created = await self._seti.post("/tasks/start", body)
         task = created if isinstance(created, dict) else {}
         title = str(task.get("title") or title or "the new task")
-        slugs = [str(r.get("slug")) for r in dicts(task.get("repos"))]
-        if slugs:
-            where = ", ".join(repo_name(s) for s in slugs)
-        else:
-            where = directory or f"a fresh folder, {task.get('cwd')}, with no repo"
-        worktree = " in a worktree" if task.get("worktree") else ""
         setup = task.get("setup")
         note = setup_note(setup) if isinstance(setup, dict) else ""
         return ToolResult(
-            f"Started task {title} in {where}{worktree}. It is {status_word(task.get('status', 'running'))}."
+            f"Started task {title} in its own folder, {task.get('cwd')}. "
+            f"It is {status_word(task.get('status', 'running'))}."
             f"{note}{NOTIFY_NOTE if notify else ''}",
             f"Started agent {clip(title, 60)}",
         )
@@ -2220,15 +2192,48 @@ class EaTools:
         member = found or await self._seti.get(f"/team/members/{task.get('id')}")
         return str(member.get("handle")) if isinstance(member, dict) else wanted
 
+    async def _fix_ci(self, to: str) -> ToolResult:
+        """Sends each agent in Seti's Fix CI plan its short message, as a direct message."""
+        only: dict[str, str | int] | None = None
+        if to:
+            only = {"task": str((await self.resolve_task(to)).get("id"))}
+        plan = await self._seti.get("/prs/fix-ci", only)
+        fields = plan if isinstance(plan, dict) else {}
+        lines: list[str] = []
+        nudges = dicts(fields.get("nudges"))
+        for nudge in nudges:
+            task = (dicts([nudge.get("task")]) or [{}])[0]
+            message = str(nudge.get("message", ""))
+            await self._post_direct(message, await self._handle_of(str(task.get("id"))))
+            lines.append(f'- {title_of(task)}: "{message}"')
+        for skip in dicts(fields.get("skipped")):
+            task = (dicts([skip.get("task")]) or [{}])[0]
+            lines.append(f"- Skipped {title_of(task)}: it is {skip.get('reason')}.")
+        unlinked = fields.get("unlinked")
+        if isinstance(unlinked, int) and unlinked > 0:
+            lines.append(f"- Skipped {plural(unlinked, 'failing PR')} with no agent linked.")
+        if fields.get("error"):
+            lines.append(f"GitHub gave no PR list, so some may be missing: {clip(str(fields['error']), 120)}")
+        if not nudges:
+            where = f"linked to {to}" if to else "linked to an agent that takes messages"
+            return ToolResult(
+                "\n".join([f"No open PR {where} has failing CI.", *lines]), "No failing CI to fix"
+            )
+        summary = f"Asked {plural(len(nudges), 'agent')} to fix CI"
+        return ToolResult("\n".join([f"{summary}, each by direct message:", *lines]), summary)
+
     async def post_team_chat(self, args: Mapping[str, Any]) -> ToolResult:
-        text = arg_str(args, "text")
         to = arg_str(args, "to", required=False)
+        fix_ci = args.get("fix_ci") is True
+        text = "" if fix_ci else arg_str(args, "text")
         if not to and DIRECT_ONLY.get():
             raise ToolError(
                 "Here you may only send a direct message to one agent, with to; a public post waits "
                 "for the user's yes.",
                 "Direct messages only",
             )
+        if fix_ci:
+            return await self._fix_ci(to)
         if to:
             return await self._post_direct(text, await self._handle_of(to))
         posted = await self._seti.post("/team/messages", {"text": text})
@@ -2367,7 +2372,8 @@ class EaTools:
             parts.append("none running")
         parts.append(f"{idle} idle")
         if asking:
-            parts.append(f"{len(asking)} asking you ({', '.join(title_of(t) for t in asking[:3])})")
+            asks = ", ".join(f"{title_of(t)}{question_note(t).replace(',', ':', 1)}" for t in asking[:3])
+            parts.append(f"{len(asking)} asking you ({asks})")
         blocked = [t for t in tasks if shown_status(t) == "blocked"]
         if blocked:
             waits = ", ".join(f"{title_of(t)}: {t.get('blocked')}" for t in blocked[:3])

@@ -36,6 +36,7 @@ function task(id: string, title: string, status: TaskStatus, extra: Partial<Task
     cwd: '/tmp',
     worktree: false,
     sandbox: true,
+    home_access: false,
     profile_id: 'default',
     seti_control: 'self',
     bypass_until: null,

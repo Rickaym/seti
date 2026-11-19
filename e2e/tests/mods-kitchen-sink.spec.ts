@@ -13,7 +13,7 @@ import {
   type ModManifestInput,
   type Task,
 } from '@seti/shared'
-import { EA_HEADERS, paths } from './support/env.js'
+import { EA_HEADERS } from './support/env.js'
 import { setiPrompt } from './support/fake-claude.js'
 import { apiData, expect, toasts, unique } from './support/fixtures.js'
 import { builderAgent, KITCHEN_SINK, sinkConnection } from './support/kitchen-sink.js'
@@ -124,7 +124,6 @@ test('runs its command from the palette, the composer, the EA and an agent, each
     data: {
       title: unique('Sink caller'),
       prompt: 'Say hello',
-      cwd: paths.checkout,
       sandbox: false,
       seti_control: 'full',
     },

@@ -4,18 +4,9 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { performance } from 'node:perf_hooks'
 import { promisify } from 'node:util'
-import {
-  warmCacheNote,
-  type AuditActor,
-  type Repo,
-  type Task,
-  type WarmCacheSeed,
-  type WarmCacheSettings,
-} from '@seti/shared'
-import { audit } from './audit.js'
+import type { Repo, WarmCacheSeed, WarmCacheSettings } from '@seti/shared'
 import { WORKTREE_ROOT } from './config.js'
 import { listWorktrees } from './git.js'
-import { recordWarmCacheSeed, warmCacheSettings } from './store/warm-caches.js'
 
 const exec = promisify(execFile)
 
@@ -367,62 +358,6 @@ export async function seedCaches(request: SeedRequest): Promise<WarmCacheSeed> {
     }
     return done({ outcome: 'failed', reason: errorText(e).split('\n')[0] ?? 'failed' })
   }
-}
-
-/** Seeds a worktree Seti just made with the repo's saved settings; never throws. */
-async function seedWorktree(repo: Repo, dest: string): Promise<WarmCacheSeed> {
-  try {
-    return await seedCaches({ repo, dest, settings: await warmCacheSettings.get(repo.id) })
-  } catch (e) {
-    return { ...emptySeed(repo.slug), outcome: 'failed', reason: errorText(e) }
-  }
-}
-
-export interface SeedTarget {
-  repo: Repo
-  dir: string
-}
-
-export async function seedWorktrees(targets: readonly SeedTarget[]): Promise<WarmCacheSeed[]> {
-  return Promise.all(targets.map(async (target) => seedWorktree(target.repo, target.dir)))
-}
-
-const total = (seeds: readonly WarmCacheSeed[], key: 'paths' | 'bytes' | 'skipped') =>
-  seeds.reduce((sum, seed) => sum + seed[key], 0)
-
-/** Keeps each seed with its worktree and audits it, unless seeding was off or found nothing. */
-export async function recordSeeds(
-  task: Pick<Task, 'id' | 'title'>,
-  targets: readonly SeedTarget[],
-  seeds: readonly WarmCacheSeed[],
-  actor: AuditActor,
-): Promise<void> {
-  for (const [i, target] of targets.entries()) {
-    const seed = seeds[i]
-    if (seed !== undefined) {
-      await recordWarmCacheSeed(task.id, target.dir, seed)
-    }
-  }
-  const note = warmCacheNote(seeds)
-  if (note === null) {
-    return
-  }
-  await audit.record({
-    actor,
-    kind: 'task.caches_seeded',
-    subject_type: 'task',
-    subject_id: task.id,
-    summary: `${note} for task "${task.title}"`,
-    detail: {
-      title: task.title,
-      outcomes: seeds.map((seed) => `${seed.repo}: ${seed.outcome}`),
-      sources: seeds.flatMap((seed) => (seed.source_dir === null ? [] : [seed.source_dir])),
-      paths: total(seeds, 'paths'),
-      bytes: total(seeds, 'bytes'),
-      skipped: total(seeds, 'skipped'),
-      ms: Math.max(0, ...seeds.map((seed) => seed.ms)),
-    },
-  })
 }
 
 const INCREMENTAL = /"(?:incremental|composite)"\s*:\s*true/

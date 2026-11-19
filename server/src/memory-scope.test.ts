@@ -3,7 +3,7 @@ import { once } from 'node:events'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { MEMORY_CAP_DEFAULTS } from '@seti/shared'
+import { defaultMemoryCap } from '@seti/shared'
 import { describe, expect, it, vi } from 'vitest'
 import { messages, tasks } from './db.js'
 import { recordMemoryEvents } from './memory-notes.js'
@@ -22,10 +22,12 @@ import { kernelOomKills, TOOL_OOM_ADJ } from './oom-guard.js'
 import { applyCaps, scopeMemory } from './scope-limits.js'
 import { agentEnv } from './session-options.js'
 
+const SIX_GB = defaultMemoryCap(8192)
+
 describe('scope arguments', () => {
   it('holds the scope to the cap, keeps the rest of the tree on an OOM kill and stops after Seti', () => {
     const args = scopeArgs(
-      { unit: 'seti-x-agent-t-1.scope', cap: MEMORY_CAP_DEFAULTS, cpu: null, bindTo: 'seti.service' },
+      { unit: 'seti-x-agent-t-1.scope', cap: SIX_GB, cpu: null, bindTo: 'seti.service' },
       '/usr/bin/bwrap',
       ['--die-with-parent', '--', 'claude', '--print'],
     )

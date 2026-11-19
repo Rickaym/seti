@@ -6,9 +6,19 @@ import { connectionRows } from './store/connections.js'
 import { profiles } from './store/credentials.js'
 import { sandboxPolicy } from './store/sandbox.js'
 
+/** Where a sandboxed agent's files live: a private home, or for an older agent the user's too. */
+const homeLines = (task: Task) =>
+  task.home_access
+    ? [
+        "You run in Seti's sandbox. The home directory shows the user's code checkouts at their usual paths.",
+        'Create new worktrees or clones under ~/work/<name>; other new folders in ~ stay inside the sandbox.',
+      ]
+    : [
+        "You run in Seti's sandbox, in a private home that holds none of the user's files or checkouts.",
+        'Only your own folders reach the host; anything else you write in ~ stays inside the sandbox.',
+      ]
+
 const SANDBOX_LINES = [
-  "You run in Seti's sandbox. The home directory shows the user's code checkouts at their usual paths.",
-  'Create new worktrees or clones under ~/work/<name>; other new folders in ~ stay inside the sandbox.',
   'Dotfiles, ~/.seti, ~/.ssh, cloud credentials and the Docker socket are not available.',
   "Seti's proxy adds the credentials for GitHub and the Claude API: use https remotes and do not look for tokens.",
 ]
@@ -58,5 +68,5 @@ export async function sandboxPrompt(taskId: string): Promise<string | null> {
     ...((await taskAws(task.id)) ? [await awsLine(task)] : []),
     ...(ssh.length === 0 ? [] : [sshLine(ssh)]),
   ]
-  return [...SANDBOX_LINES, ...extra].join('\n')
+  return [...homeLines(task), ...SANDBOX_LINES, ...extra].join('\n')
 }
