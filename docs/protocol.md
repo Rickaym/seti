@@ -73,9 +73,9 @@ between two steps; an interrupt; a hook at subagent start.
   subagent runs; `complete` if idle, a linked PR merged and every linked PR is merged or closed;
   `asking` if idle and `asking`; else the stored status.
 - ENT-4: Every turn end MUST set `unseen`, `asking`, `closing_line` and, on error, `last_error`.
-  `unseen` MUST read false while running and MUST clear only when the user views the agent idle.
-  `closing_line` is the first non-empty line of the result, else of the turn's last text, redacted,
-  at most 120 characters, null while running.
+  `unseen` MUST read false while running and MUST clear only when the user views the agent while
+  it is not running. `closing_line` is the first non-empty line of the result, else of the turn's
+  last text, redacted, at most 120 characters, null while running.
 - ENT-7: An archived agent MUST refuse every write but delete, restore and a workspace move (409).
 - ENT-8: `home_access` MUST be false for every new agent and MUST only ever change to false.
 
@@ -194,7 +194,6 @@ between two steps; an interrupt; a hook at subagent start.
   and that its instructions are not to be followed beyond the task. The text ends
   `The message from the user follows.` and the prompt, or says none came and to act as the task
   requires.
-  from the user follows.` and the prompt, or a note that none came and to act as the task requires.
 - UPD-13: Each update is wrapped in a tag by source. Attribute values are escaped, and a body MUST
   NOT be able to close its tag:
 
@@ -319,9 +318,9 @@ interrupted only for that.
     requests; publishing or re-enabling shared tools; reviewing knowledge notes;
   - identity: prompts as the user; share links; sign-in, passkeys and devices; installing
     plugins; installing, granting or enabling third-party mods;
-  - all but the EA: answering a question (the EA relays); memory and CPU caps and compaction;
-    disabling or removing a shared tool and switching the repeat guard (the EA after the user's
-    yes).
+  - for delegates other than the EA: answering a question (the EA relays); memory and CPU caps
+    and compaction; disabling or removing a shared tool and switching the repeat guard (the EA
+    after the user's yes).
 - ACT-5: A delegate reaches another agent only through the group chat, which marks the author.
 - ACT-6: Agents propose reserved changes with `request_change` (7.6); only the user's own Allow
   applies one.
@@ -351,7 +350,7 @@ interrupted only for that.
   host or `*.suffix`, port 443 unless given). It refuses anything else, naming the host, and MUST
   refuse a name that resolves to a loopback or link-local address.
 - EGR-4: The proxy terminates TLS only for hosts where it adds a credential, with a local CA
-  name-constrained to them whose key stays outside. Other hosts are tunnelled unread.
+  name-constrained to them whose key stays outside the sandbox. Other hosts are tunnelled unread.
 - EGR-5: A placeholder is `seti-secret-<name>-<32 hex>`, in the connection's variable. The proxy
   swaps it for the value in the URL path and headers (Basic auth too), on the connection's hosts
   and port 443 only; bodies are not read. A readable request that carries a placeholder elsewhere
@@ -529,8 +528,6 @@ interrupted only for that.
   returns items `{key, title?, kind?, url?, body?, fields?, fingerprint?}`, optionally with
   `state`. `fetch` reaches only allowlisted and the poller's own extra hosts on public addresses,
   and its secrets read `[secret]` in all the script sees.
-  fingerprint?}`, optionally with `state`. Its `fetch`reaches only allowlisted and its own extra
-hosts on public addresses; its secrets read`[secret]` in all it returns.
 - CHN-17: A poller's first good run is a baseline; then new, changed and (with gone detection)
   missing keys become `<kind>`, `<kind>.changed` and `<kind>.gone`. Failures double the interval
   up to `poller_backoff`; `fail_streak` failures report `poller_failed` or `reminder_failed` once,
@@ -569,7 +566,7 @@ Why: an agent woken by its own actions or by news nobody waited for burns turns 
 
 - PR-6: Own action comes from the agent's tool calls, not the author: an exact id in a posting
   call's output, else the host login posting on that PR during the call (`pr_skew`), or a merge
-  or close call at the PR's end time.
+  or close call at the PR's end time. Anything not tied to a call is delivered.
 - PR-8: A failure is reported once per head commit, again only for checks not failed on it before;
   a conflict once per head commit and base branch until the PR merges cleanly again.
 - PR-9: Updates for a PR linked to a running subagent wait for it (`subagent_wait`) and go to its
@@ -728,7 +725,8 @@ Why: an agent woken by its own actions or by news nobody waited for burns turns 
 - MOD-15: Install, grant, consent to an update that adds or widens anything (shown as a
   difference), enabling a third-party or security-sensitive mod, and safe mode are the user's
   alone; consent copy comes from the manifest. Other updates apply after a delay and can be rolled
-  back. The EA and agents at `full` MAY switch other mods, never a `required` one off.
+  back. The EA and agents at `full` MAY switch bundled and theme mods, never a `required` one off;
+  safe mode holds every third-party mod off.
 - MOD-23: Third-party mods MAY contribute settings, commands, slash commands, webhook senders,
   views, file viewers, status items, notification kinds, context text, themes, audit kinds,
   schedules and agent events (type, agent id and time only); all else is bundled only.
