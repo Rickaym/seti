@@ -61,6 +61,7 @@ const POSTGRES_ONLY: Readonly<Record<string, readonly string[]>> = {
     'bypass_until',
     'closing_line',
     'model_fallback',
+    'home_access',
   ],
   task_context_pack: ['linked'],
   ea_settings: ['join_on_open', 'form_of_address', 'language'],
@@ -259,9 +260,13 @@ export async function resetSequences(source: DatabaseSync, tx: Db): Promise<void
   }
 }
 
-/** Fills the Postgres-only tables that follow from imported rows, such as task worktrees. */
+/**
+ * Fills what follows from imported rows: the task worktrees, and home access, which every agent
+ * from before private sandboxes keeps.
+ */
 export async function deriveRows(tx: Db): Promise<void> {
   await tx.unsafe(TASK_WORKTREE_BACKFILL)
+  await tx`UPDATE task SET home_access = TRUE`
 }
 
 /** Row counts of every table; the import refuses a target that holds any rows. */

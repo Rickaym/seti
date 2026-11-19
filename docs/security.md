@@ -80,11 +80,11 @@ private key off the host. The sandbox model is in [Architecture](architecture.md
   their actor, and urgent cannot be set below a toast.
 - Seti control is a per-agent level that only the user changes: Off, Self (the default) or Full.
   It decides which `seti` MCP tools the agent gets; they run inside the server as that agent, so no
-  token enters its sandbox, and the audit log names the agent as actor. Off leaves its status line
-  and file handoffs. Self adds tools that read Seti (context packs, CLAUDE.md files, channels,
+  token enters its sandbox, and the audit log names the agent as actor. Off leaves its status line,
+  its working directory and file handoffs. Self adds tools that read Seti (context packs, CLAUDE.md files, channels,
   repos, MCP servers, plugins, caps and the sandbox policy) and change only the agent itself (its
-  title, colour, pin, update mode, repos, directories, PRs, packs, role, group chat handle and
-  channel subscriptions). Full gives the EA's Seti actions. At no level do they change access,
+  title, colour, pin, update mode, PRs, packs, role, group chat handle and channel
+  subscriptions). Full gives the EA's Seti actions. At no level do they change access,
   sandbox, credentials, connections, SSH, memory or CPU caps or Seti control of any agent; Full
   never stops, archives or restarts the calling agent, and starts agents with at most the
   caller's access and Seti control Self.
@@ -141,6 +141,28 @@ private key off the host. The sandbox model is in [Architecture](architecture.md
   in Settings, Lifecycle; the EA changes it only with the user's yes (`set_auto_archive`), and
   agents' Seti tools and mods are refused (`refuseAgent` in `updateAutoArchive`), so an agent
   cannot turn off the guard that stops it. A change is audited as `system.repeat_guard_changed`.
+- A permission request nobody answers is denied after the request timeout, so an agent never waits
+  on the user for ever. The timeout is one install-wide setting in Settings, Permissions: Off, 15
+  min, 1 h, 4 h or 24 h, 1 h by default, kept in `permission_settings`. Each request stores its
+  deadline (`timeout_at`, counted from when it was raised), and `server/src/permission-timeout.ts`
+  arms a timer per request this process waits on. At the deadline Seti settles that one request as
+  denied with `timed_out` set, through the same `resolveRequest` path as the user's Deny, and the
+  agent reads that nobody answered in time, that it is no judgement on the action, and to carry on
+  or ask again. A timeout adds no rule, never counts as an always answer and touches no other
+  request, a subagent's request runs on the same clock as any other, and Bypass, questions and
+  change requests are unaffected. The denial is audited as `task.permission_timed_out` with the
+  task, tool, call summary and the rules the request offered, and noted in the agent's transcript.
+  Once four fifths of the time has passed, and at least five minutes before the end, the agent's
+  reason line ends with "times out soon", which pushes one more needs-you notification. A request
+  whose session is gone (the agent stopped or was archived) closes as cancelled with nothing sent.
+  A request a restart of Seti kept runs on the same clock: startup arms whatever is still pending
+  from its stored deadline and ends what is overdue, and that denial resumes the agent as the
+  user's answer would. The setting is the user's: `PUT /api/permissions/timeout` refuses the EA in the
+  route and agents' Seti tools and mods in `setPermissionTimeout` (`refuseAgent`), and a change is
+  audited as `system.permission_timeout_changed` with the old and new value. A new value applies
+  to requests already waiting, counted from when each was raised, so one older than it is denied
+  at once. The EA reads the setting and each request's deadline through `search_seti` in
+  `requests`.
 - Review rules hold each call of the MCP tools they name until the user allows or denies it, in
   Bypass too, because they run as a PreToolUse hook. When Seti cannot read its review rules the
   hook denies the call rather than let it run unchecked, and a call a deny rule names is left to
@@ -200,6 +222,75 @@ private key off the host. The sandbox model is in [Architecture](architecture.md
   filled in by Seti and replaced with `[secret]` in everything the script, its logs and its events
   see. Only the user gives a poller extra hosts or connections (see [Pollers](pollers.md)).
 
+## Agent sandboxes
+
+A sandboxed agent works in a private home. Its sandbox holds its own folder under `~/work`,
+read-write, its Seti workspace, the package caches, and the toolchains and Claude Code
+configuration read-only. No other folder of the user's home is mounted, read-only or otherwise:
+not a checkout, not another agent's folder. The agent clones what it needs through the egress
+proxy, which adds the GitHub token outside the sandbox. [Architecture](architecture.md) has the
+mount list.
+
+| Agent                        | Files it can read and write                                        |
+| ---------------------------- | ------------------------------------------------------------------ |
+| Sandboxed, new               | Its own folder, its workspace, package caches                      |
+| Sandboxed, with home folders | The same, and every top-level non-dot folder of the user's home    |
+| Unsandboxed                  | Everything the Seti user can, credentials and Seti's data included |
+
+Home folders is a marker on agents made before private sandboxes, which work in checkouts and
+worktrees in the user's home. No request can set it: new agents never have it, and an agent's
+settings show it as one line with one control, which takes it away from the next turn and cannot
+give it back. Only the user's own session does that; the EA gets 403 on the route, agents' Seti
+tools and mods are refused in the server, and the change is audited as `task.access_changed`.
+
+An agent moves its own session with `set_working_directory`, to a directory that exists inside
+the folders it already has. The path is resolved through its symlinks first, so a link out of the
+folder is refused, and the move is audited as `task.cwd_changed` with the agent as actor. Moving
+into a clone makes Claude Code load that repo's `.mcp.json`, settings and hooks, which the agent
+could already write; in the sandbox they run inside it.
+
+### An agent's clone is hostile input
+
+Seti treats everything in an agent's own folder as input the agent wrote, and never lets it run
+code on the host. The agent may change its clone's `.git/config`, hooks and attributes freely;
+the rule is on Seti's side:
+
+- Seti runs git on the host in a folder an agent can write only through one helper, `agentGit`
+  in `server/src/git.ts`. It sets no hooks path, no fsmonitor, no pager, editor, ssh or proxy
+  command, no askpass or credential helper and no external diff, ignores the system and user
+  config, allows no transport, and formats diffs with `--no-ext-diff --no-textconv`. It serves
+  the archive's check for uncommitted work and the patch that saves it, the delete rule's check,
+  and the removal of a stray worktree. Clean and smudge filters cannot be switched off without
+  changing what git reports for Git LFS, so those commands run only in worktrees Seti made from
+  a registered repo, whose config the sandbox keeps read-only.
+- The main checkout of a worktree is read from its `.git` files, without running git.
+- A `.git` file can name any repository as the one behind a folder. Seti follows it only when
+  that repository records the folder: a worktree whose admin folder lies in the repository's
+  `worktrees` and points back at it, or a submodule under a checkout that holds its git
+  directory. Otherwise the folder counts as no repository (`gitDirs` in
+  `server/src/sandbox-mounts.ts`). Without home access the sandbox also follows a recorded
+  pointer only for a worktree Seti made, or when it stays inside the task's own folders. A forged
+  pointer therefore mounts nothing of the user's, and the folder's local MCP servers and Claude
+  Code memory are its own alone.
+- The capability probe is Claude Code started to list a folder's commands, subagents and MCP
+  servers. Project settings start hooks, and `.mcp.json` starts server commands. For the folder a
+  sandboxed agent works in, the probe therefore runs inside that agent's sandbox, started the way
+  its session is, so whatever the folder configures runs there and the composer menu and
+  Capabilities still show the folder's own commands and servers. For any other folder such an
+  agent has, and for the folders of archived sandboxed agents, the probe runs on the host and
+  loads the user's settings only, so the folder's commands and servers are not listed. Folders of
+  unsandboxed agents and folders no agent has are probed as before
+  (`server/src/probe-launch.ts`).
+- `gh` runs in Seti's own working directory with explicit repository arguments, never in a task
+  folder, and file search runs ripgrep, which executes nothing a folder configures.
+- An MCP sign-in runs `claude mcp login` on the host in the folder whose config names the server,
+  when the user starts it. It runs no hook and no server command, and refuses a server from
+  `.mcp.json` that the user has not approved in Claude Code.
+
+The probe and the recorded pointer hold for every sandboxed agent. Beyond those, agents that keep
+home access are outside this rule: they write to the user's checkouts, which the user then uses on
+the host. Unsandboxed agents run on the host by definition.
+
 ## Knowledge notes
 
 Knowledge notes carry text from one agent into every other agent's system prompt, which makes them
@@ -255,6 +346,14 @@ message, not of a security setting. The EA may relay answers; agents and mods ma
 - Question text and option descriptions are stored with secrets redacted. The audit log records
   that a question was asked, answered, dismissed or expired, with who answered, the type, the
   option labels picked and the length of the own-words answer, never its text.
+- A restart of Seti keeps open questions and pending permission requests, and the user's answer
+  then resumes the agent's session as a message from Seti (`server/src/restart-waits.ts`). The
+  routes, their checks and who may answer are the same as before the restart. Allowing a tool call
+  after a restart allows that one call only: Seti keeps a SHA-256 hash of the tool name and its
+  whole input on the request row, never a second copy of the input, and lets the agent's next call
+  with the same hash run once within fifteen minutes; any other call asks again. The grant lives in
+  the server's memory and is gone after another restart. Such a request cannot be edited, and a
+  secret question still expires, since its value never passes through a message.
 
 ### The Requests panel
 
@@ -302,7 +401,7 @@ audit log, the server log or the EA.
 
 ## Agent files
 
-The Files view reads an agent's working directory, repos, extra directories and Seti workspace, and
+The Files view reads an agent's working directory, its other folders and its Seti workspace, and
 nothing else. Every path resolves through its symlinks and must stay inside its root; the sandbox's
 hidden paths, Claude Code's data and Seti's own data outside the agent's worktree and workspace are
 refused, and dot files open only when asked for. The user can save text files but not delete or
@@ -655,8 +754,7 @@ mod's own text, and notify the user; it expires after 10 minutes, and a mod keep
 Only the user's own session or local token answers it through `POST /api/mod-asks/<id>`: the EA,
 agents, mods and paired devices get 403, and each ask takes one answer. Allow runs exactly the
 recorded call as the mod, only while the mod runs now (installed, on, its files matching and not
-held by safe mode). An ask to start an agent in a repo names the repo, which must be one Seti has,
-and an
+held by safe mode). An
 agent it starts is sandboxed at Seti control Self on the default credential, with its first message
 marked as the mod's.
 

@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import type { AgentProcesses, TerminalStatus, WorkspaceEntry } from '@seti/shared'
+import type { AgentProcesses, Task, TerminalStatus, WorkspaceEntry } from '@seti/shared'
 import { openSeedDb } from './support/db.js'
 import { paths } from './support/env.js'
 import { apiData, expect, test, unique } from './support/fixtures.js'
@@ -34,7 +34,7 @@ test('with an agent open alone, the button opens a terminal alone in its folder 
   await expect(terminal.getByText('on this machine')).toBeVisible()
   await run(terminal, 'echo seti-alone && pwd')
   await expect(screenOf(terminal)).toContainText(/echo seti-alone.*seti-alone/u)
-  await expect(screenOf(terminal)).toContainText(paths.checkout)
+  await expect(screenOf(terminal)).toContainText((await apiData<Task>(request, `/tasks/${id}`)).cwd)
   const shells = async () => (await apiData<AgentProcesses>(request, `/tasks/${id}/processes`)).terminals
   await expect.poll(shells).toMatchObject([{ attached: true, sandboxed: false, shell: '/bin/bash' }])
   const [{ pid }] = (await shells()) as [TerminalStatus]

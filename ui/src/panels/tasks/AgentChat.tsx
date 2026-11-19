@@ -9,6 +9,7 @@ import { Composer } from '@/panels/tasks/Composer'
 import { TaskFailure } from '@/panels/tasks/FailureNotice'
 import { PendingSends } from '@/panels/tasks/PendingSends'
 import { PermissionRequests } from '@/panels/tasks/PermissionRequests'
+import { QuickReplies } from '@/panels/tasks/QuickReplies'
 import { ShellLive } from '@/panels/tasks/ShellEntry'
 import { QueuedInputs } from '@/panels/tasks/TaskInputs'
 import { TranscriptPane } from '@/panels/tasks/TranscriptPane'
@@ -73,6 +74,9 @@ export function AgentChat({
       >
         <PermissionRequests taskId={task.id} blocked={task.blocked} version={permissions} />
         <ChangeRequests taskId={task.id} blocked={task.blocked} version={permissions} />
+        {task.asking && status === 'idle' && (
+          <QuickReplies key={task.updated_at} taskId={task.id} messages={messages} />
+        )}
         {(status === 'error' || status === 'interrupted') && (
           <TaskFailure task={task} status={status} onChanged={onChanged} />
         )}

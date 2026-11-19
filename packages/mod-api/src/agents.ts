@@ -90,6 +90,8 @@ export interface ModAgentsLayout {
   newTerminal?: () => void
   /** The workspace the agent list shows, and the first one, for a layout kept per workspace. */
   showWorkspace?: (workspace: { id: string; first: string | null }) => void
+  /** Whether the agents list hides while the layout shows; its own controls bring the list back. */
+  hidesList?: () => boolean
 }
 
 /** Terminals a mod keeps, such as a layout's panels; Seti lists them beside the device's own. */

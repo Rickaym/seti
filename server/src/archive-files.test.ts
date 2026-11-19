@@ -15,7 +15,6 @@ import { sweepArchiveLifecycle } from './retention.js'
 import { writeSecretFile } from './secret-delivery.js'
 import { taskArchives } from './store/archive.js'
 import { auditEvents } from './store/audit.js'
-import { taskLocation } from './store/task-location.js'
 import { deleteTask } from './task-actions.js'
 import { createScratchDir } from './task-location.js'
 import { USER_AUTH } from './test-auth.js'
@@ -251,7 +250,8 @@ describe('archive bundle', () => {
 
   it('keeps a deleted agent folder that another agent still uses', async () => {
     const { task, scratch } = await scratchTask('Delete shared')
-    await taskLocation.addDir((await insertTask('Holder', OUTSIDE)).id, scratch)
+    const holder = await insertTask('Holder', OUTSIDE)
+    await sql`INSERT INTO task_dir (task_id, dir) VALUES (${holder.id}, ${scratch})`
 
     expect(await removeTaskFolders(task)).toEqual([expect.stringMatching(/^agent .* uses/)])
     expect(fs.existsSync(scratch)).toBe(true)

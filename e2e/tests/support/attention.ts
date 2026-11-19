@@ -1,7 +1,6 @@
 import type { APIRequestContext, Page } from '@playwright/test'
 import type { AttentionState, Envelope, Task } from '@seti/shared'
-import { paths } from './env.js'
-import { ASK_PROMPT } from './fake-claude.js'
+import { ASK_PROMPT } from './fake-replies.js'
 import { apiData, expect } from './fixtures.js'
 import { FAKE_CLAUDE_ENV } from './processes.js'
 
@@ -24,7 +23,7 @@ async function setVisible(page: Page, visible: boolean): Promise<void> {
 export async function finishedAgent(request: APIRequestContext, title: string, ask = false): Promise<string> {
   const prompt = ask ? ASK_PROMPT : `Say hello for ${title}`
   const response = await request.post('/api/tasks', {
-    data: { title, prompt, cwd: paths.checkout, sandbox: false },
+    data: { title, prompt, sandbox: false },
   })
   expect(response.ok(), 'POST /api/tasks').toBe(true)
   const { id } = ((await response.json()) as Envelope<Task>).data

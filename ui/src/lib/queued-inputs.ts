@@ -1,4 +1,4 @@
-import { WAKING_SOURCES, sourceCounts, type InputMode, type TaskInput } from '@seti/shared'
+import { WAKING_SOURCES, heldForMessage, sourceCounts, type InputMode, type TaskInput } from '@seti/shared'
 import { clockTime } from '@/components/account/format'
 
 /** What holds the waiting updates: your next message, the running turn, a burst pause, or nothing. */
@@ -11,11 +11,14 @@ export function waitingReason(
   pausedUntil: string | null,
   inputs: readonly TaskInput[],
 ): { kind: WaitingKind; text: string } {
-  if (mode !== 'wake' || !inputs.some((input) => WAKING_SOURCES.includes(input.source))) {
+  const waking = inputs.filter((input) => WAKING_SOURCES.includes(input.source) && !heldForMessage(input))
+  if (mode !== 'wake' || waking.length === 0) {
     return { kind: 'message', text: 'They go with your next message.' }
   }
   if (running) {
-    return { kind: 'turn', text: 'The agent gets them when this turn ends.' }
+    const joins = waking.some((input) => input.source === 'channel' && input.delivery === 'now')
+    const when = joins ? 'at the next step of this turn' : 'when this turn ends'
+    return { kind: 'turn', text: `The agent gets them ${when}.` }
   }
   if (pausedUntil !== null) {
     return {

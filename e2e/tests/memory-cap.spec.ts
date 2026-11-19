@@ -1,3 +1,4 @@
+import type { APIRequestContext } from '@playwright/test'
 import type { AgentProcesses, MemoryCapSettings, TaskMemoryCap } from '@seti/shared'
 import { openAgentSettings } from './support/agent-settings.js'
 import { apiData, expect, test, toasts } from './support/fixtures.js'
@@ -7,33 +8,38 @@ test.use({ serverEnv: FAKE_CLAUDE_ENV })
 
 const GIB = 1024 ** 3
 
+/** The default cap in GB, which follows the memory of the host the suite runs on. */
+const defaultGb = async (request: APIRequestContext) =>
+  (await apiData<MemoryCapSettings>(request, '/resources/memory')).defaults.max_mb / 1024
+
 test('the resources page sets the memory cap of every agent and goes back to the defaults', async ({
   page,
   request,
 }) => {
+  const gb = await defaultGb(request)
   await page.goto('/#settings/resources')
   const card = page.getByRole('region', { name: 'Memory cap' })
-  await expect(card).toContainText('Defaults: 6 GB RAM, 1 GB swap')
+  await expect(card).toContainText(`Defaults: ${String(gb)} GB RAM, 1 GB swap`)
   const cap = card.getByRole('spinbutton', { name: 'RAM cap' })
   const throttle = card.getByRole('spinbutton', { name: 'Soft cap' })
-  await expect(cap).toHaveValue('6')
+  await expect(cap).toHaveValue(String(gb))
   await expect(card.getByRole('spinbutton', { name: 'Swap cap' })).toHaveValue('1')
   await expect(throttle).toHaveCount(0)
 
   await card.getByRole('button', { name: 'Soft cap' }).click()
-  await expect(throttle).toHaveValue('4')
-  await throttle.fill('9')
+  await expect(throttle).toHaveValue(String(Math.round((gb * 200) / 3) / 100))
+  await throttle.fill(String(gb + 1))
   await card.getByRole('button', { name: 'Save' }).click()
   await expect(toasts(page).filter({ hasText: 'cannot be above the RAM cap' })).toBeVisible()
 
-  await cap.fill('10')
+  await cap.fill(String(gb + 2))
   await card.getByRole('button', { name: 'Save' }).click()
   await expect(toasts(page).filter({ hasText: 'Memory cap saved' })).toBeVisible()
   const saved = await apiData<MemoryCapSettings>(request, '/resources/memory')
-  expect(saved.cap).toEqual({ high_mb: 9216, max_mb: 10240, swap_max_mb: 1024 })
+  expect(saved.cap).toEqual({ high_mb: (gb + 1) * 1024, max_mb: (gb + 2) * 1024, swap_max_mb: 1024 })
 
   await card.getByRole('button', { name: 'Defaults' }).click()
-  await expect(cap).toHaveValue('6')
+  await expect(cap).toHaveValue(String(gb))
   await expect(throttle).toHaveCount(0)
   await card.getByRole('button', { name: 'Save' }).click()
   await expect
@@ -46,11 +52,12 @@ test('an agent gets a memory cap of its own from its settings, at once, and the 
   request,
 }) => {
   const { enforced } = await apiData<MemoryCapSettings>(request, '/resources/memory')
+  const byDefault = `${String(await defaultGb(request))} GB (default)`
   const id = await startShellAgent(request)
   await page.goto(`/#agents/${id}`)
   await openAgentSettings(page, 'Session')
   const details = page.getByRole('dialog').getByLabel('Agent details')
-  await expect(details).toContainText(enforced ? '6 GB (default)' : '6 GB (default), not enforced here')
+  await expect(details).toContainText(enforced ? byDefault : `${byDefault}, not enforced here`)
 
   await details.getByRole('button', { name: 'Change memory cap' }).click()
   await details.getByRole('spinbutton', { name: 'RAM cap' }).fill('2')
@@ -66,7 +73,7 @@ test('an agent gets a memory cap of its own from its settings, at once, and the 
 
   await details.getByRole('button', { name: 'Change memory cap' }).click()
   await details.getByRole('button', { name: 'Default' }).click()
-  await expect(details).toContainText('6 GB (default)')
+  await expect(details).toContainText(byDefault)
   expect((await apiData<TaskMemoryCap>(request, `/tasks/${id}/memory`)).override).toBeNull()
 })
 
@@ -82,10 +89,13 @@ test('the processes panel shows what the agent uses against its memory cap', asy
     await expect(memory).toHaveCount(0)
     return
   }
-  await expect(memory.getByRole('meter', { name: /^Agent: .+ of its 6\.0 GB cap$/ })).toBeVisible()
+  const gb = await defaultGb(request)
+  await expect(
+    memory.getByRole('meter', { name: new RegExp(`^Agent: .+ of its ${String(gb)}\\.0 GB cap$`) }),
+  ).toBeVisible()
   const view = await apiData<AgentProcesses>(request, `/tasks/${id}/processes`)
   expect(view.memory).toEqual([
-    expect.objectContaining({ kind: 'agent', max_bytes: 6 * GIB, high_bytes: 6 * GIB, oom_kills: 0 }),
+    expect.objectContaining({ kind: 'agent', max_bytes: gb * GIB, high_bytes: gb * GIB, oom_kills: 0 }),
   ])
   expect(view.memory[0]?.current_bytes).toBeGreaterThan(0)
 })

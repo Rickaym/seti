@@ -21,17 +21,60 @@ keep running. The open sessions live in the server's memory (the `live` map in
 `server/src/runner.ts`), so one server process owns them all: a restart marks running turns interrupted
 (the next message resumes the session), and a second process cannot steer another's sessions.
 
-With Resume after restart on (the Lifecycle settings page, on by default), Seti sends each agent a
-restart cut off one message in its own session once it is listening again, two seconds apart:
-"Seti restarted while your last turn ran. Check what finished before the cut, without repeating
-any step that may already have run, then continue." It goes the way a follow-up from the user goes,
-marked as written by Seti, and is audited as `task.resumed_after_restart` with the actor `system`.
-`markRestartCut` in `server/src/restart-resume.ts` picks the agents before startup clears their
-reason lines: an agent that was waiting on the user (a permission request, a change request, an MCP
-sign-in or a stall) or is archived stays interrupted for the user, as does every agent while the
-setting is off. An agent picked to resume is left seen, so it raises no Needs you row or push; one
-whose resume cannot start falls back to the interrupted notice. An agent the user messaged first is
-skipped, and each agent resumes at most once per start.
+A stop of Seti (SIGTERM or SIGINT, as `systemctl --user restart seti` sends) first records what
+it cuts off. `cutRunningTurns` in `server/src/restart-cut.ts` writes one `restart_cut` row per
+running turn with what started it (`user` for a written message, `updates` for a turn Seti started
+for updates, `wake` for a turn background work started by reporting back) and how many background
+commands and subagents ran in its session, audits the stop as `system.stopping`, and interrupts
+each turn, so Claude Code ends it and writes its session file before the process closes. It runs
+beside the poller drain and is bounded at seven seconds (Claude Code gets five to answer the
+interrupt before its process is closed), so a stop takes no longer than before and stays far
+inside systemd's stop timeout, which `deploy/seti.service` leaves at the default. The tasks stay
+`running` in the database, and a question or permission request the turn waited on is left open.
+A crash or a kill leaves no rows; startup then treats every task still marked running the same
+way, without knowing what kind of turn it was.
+
+With Resume after restart on (the Lifecycle settings page, on by default), startup resumes each
+cut turn by itself once Seti listens again. `markRestartCut` in `server/src/restart-resume.ts`
+marks the cut tasks interrupted and picks those to resume; `resumeInterrupted` then sends each one
+message in its own session, marked as written by Seti: "Seti restarted while you were working.
+Continue where you left off; check the state of anything you had running before repeating it."
+An agent whose session had background work is also told that the restart stopped it, since those
+processes live in the session's process tree (and in its memory scope, which is bound to Seti's
+unit) and end with it; other agents are not told. The transcript gets a Seti note, "Seti restarted
+during this turn and resumed it", and the audit log a `task.resumed_after_restart` event with the
+actor `system`, the kind of turn and the background count. Updates that waited through the restart
+reach a resumed agent with that message instead of in a turn of their own. Turns the user waits on
+resume first,
+then wake-ups, then updates. Three sessions start two seconds apart, the next three follow twenty
+seconds later, and so on, so a restart that cut many turns does not start them all at once.
+
+Startup resumes nothing for an agent that is archived, that the user stopped (its turn was not
+running), that the user messaged first, or while the setting is off; those cut off stay
+interrupted and notify. An agent that waited on the user's answer is not resumed either, and
+nothing is lost for it: `keepLeftoverRequests` in `server/src/restart-waits.ts` keeps its open
+questions and pending permission requests, the agent stays in Needs you with the same reason
+line, and the answer resumes its session. Claude Code cannot take an answer for a tool call of a
+process that ended, so the answer arrives as a message from Seti instead: the questions with the
+user's answers, or the user's decision on the call. An allowed call runs once without a second
+request when the agent makes exactly the same call again within fifteen minutes; Seti matches it
+by a hash of the tool and its input (`server/src/permission-grants.ts`), kept on the request row.
+A request a restart cut off cannot be edited, because its input went with the process. It still
+times out from when it was raised (`server/src/permission-timeout.ts`), and that denial resumes the
+agent as the user's answer would. A secret
+question does expire at startup, since its value only ever goes to the call that waited. When the
+agent starts a turn for any other reason, what the restart left open for it is expired.
+
+An agent that restarts keep cutting off is not resumed forever. Each resume counts in
+`restart_cut`, a turn that ends by itself sets the count back to zero, and after three resumes
+within thirty minutes with no finished turn in between startup leaves the agent interrupted, in
+Needs you with the reason "Not resumed: restarts cut it off 3 times in 30 minutes before it
+finished a turn", audited as `task.resume_held`. The next turn anyone starts clears that. An agent
+whose resume cannot start falls back to the interrupted notice.
+
+A restart still loses what only the process held: messages queued behind the cut turn (they show
+as taken back), background commands and subagents, and the wake-up an idle agent expected from
+background work, since no turn of its own was running to resume.
 
 Restarting a session from the agent's settings ends its process with the background work in it and
 opens the next one at once, resuming the same session id, so its MCP servers reconnect and report
@@ -139,7 +182,8 @@ directories go ahead. A classifier model then allows or turns down each other ca
 turns down never reaches the user: the agent gets the reason, the transcript shows the failed
 call, and the audit log records it. A call the classifier cannot decide, or one an ask rule
 matches, waits as a permission request until the user answers it, and the agent shows in Needs
-you meanwhile. Where auto mode is unavailable, Claude Code starts in the `default` mode, and every
+you meanwhile. A request nobody answers within the request timeout (Settings, Permissions; 1 h by
+default) is denied by Seti, and the agent is told it timed out and goes on. Where auto mode is unavailable, Claude Code starts in the `default` mode, and every
 call no rule allows waits as a request, edits in the agent's directories included. In auto mode
 Claude Code drops broad shell allow rules, such as `Bash` alone or an interpreter prefix, so the
 classifier also reviews a sandboxed agent's shell commands. Unsandboxed agents get no prefix rules
@@ -193,12 +237,19 @@ file they can reach, and run any shell command the classifier allows, so the san
 boundary for them. The whole Claude Code process of a task, and each `!` command,
 runs under bubblewrap with its own pid, network, IPC and UTS namespaces:
 
-- It sees the system read-only, its own home root and `/tmp`, the task's directories, the
-  top-level non-dot folders of the home directory and package caches read-write, and toolchains
-  and Claude Code configuration read-only. Dotfiles, `~/.seti`, `~/.ssh`, cloud and GitHub
-  credentials, `/run/user` and the database sockets are not mounted.
-- `.git/config` and `.git/hooks` are read-only in every mounted repo, since they run code when the
-  repo is used outside the sandbox.
+- It sees the system read-only, its own home root and `/tmp`, the task's own folder and package
+  caches read-write, and toolchains and Claude Code configuration read-only. Nothing else of the
+  user's home is mounted: no checkout, no other agent's folder under `~/work`, and no dotfiles,
+  `~/.seti`, `~/.ssh`, cloud and GitHub credentials, `/run/user` or database sockets.
+- An agent made before private sandboxes keeps its mounts: the top-level non-dot folders of the
+  home directory and the shared `~/work`, read-write, because it works in checkouts and worktrees
+  there. The task row marks it (`task.home_access`, migration 110: on for the rows that existed,
+  off for every new one). The user can turn it off in the agent's settings, never on again.
+- A clone in the agent's own folder is the agent's: its `.git/config` and hooks stay writable,
+  so `git remote add`, `git config` and `git push -u` work. In a checkout of the user's that an
+  older agent works in, `.git/config` and `.git/hooks` are read-only, since they run code when
+  the user uses the repo outside the sandbox. A `.git` file that points outside the task's
+  folders is followed only in a worktree Seti made.
 - A repo's records of worktrees the sandbox cannot see, such as other agents' worktrees, are
   read-only, so `git worktree prune` inside cannot drop them for looking deleted. A worktree the
   agent made in its own home, such as `~/feature` beside the repo, lives in that agent's private
@@ -255,10 +306,15 @@ stdin, and returns stdout as text, and as structured content when it is a JSON o
 
 Seti starts an agent's Claude Code process, sandboxed or not, each `!` command and the short-lived
 rewind helper through `systemd-run --user --scope`, so the process tree lives in a transient scope
-of its own with `MemoryMax` and `MemorySwapMax` set (by default 6 GB and 1 GB; Settings, Resources
-sets the default and an agent's settings can override it, and a change reaches running scopes at
-once through `systemctl set-property`). Above `MemoryMax` the OOM killer stops a process inside
-that scope instead of earlyoom picking a large process anywhere on the host.
+of its own with `MemoryMax` and `MemorySwapMax` set (Settings, Resources sets the default and an
+agent's settings can override it, and a change reaches running scopes at once through
+`systemctl set-property`). Above `MemoryMax` the OOM killer stops a process inside that scope
+instead of earlyoom picking a large process anywhere on the host.
+
+Until a cap is saved in Settings, Resources, the default follows the host (`defaultMemoryCap` in
+`shared/src/memory.ts`): 30% of its memory in whole GB, at least 6 GB and at most 16 GB, so 10 GB on
+a 32 GB host, with 1 GB of swap. A larger cap means fewer `tsc` runs stopped at it and more risk
+to the host when several agents peak together. A saved cap always wins over the computed one.
 
 - `OOMPolicy=continue` keeps the rest of the tree running when one process, such as `tsc`, is
   killed, so Claude Code sees the failed command and goes on.
@@ -369,6 +425,14 @@ on GitHub, and every open PR linked to an agent, whether the agent opened it or 
 it. A PR needs no registered repo to show its title, CI, review threads, owning agents and Fix CI.
 Open PRs that other people wrote appear only once an agent links them.
 
+Fix CI sends an agent one short message as the user, such as "CI is failing on #482 and #915.
+Please fix them.", with the repo before each number when the PRs span several; the agent reads the
+checks itself. `GET /api/prs/fix-ci` plans it for every agent, or for one with `?task=`
+(`planFixCi` in `shared/src/pr-fix-ci.ts`): each agent linked to an open PR with failing CI gets
+one message naming only its own PRs, archived and stopped agents are skipped, and failing PRs with
+no agent are counted. The Agents list's Fix CI button shows that plan and asks before it sends, and
+the EA sends the same messages as direct messages through `post_team_chat` with `fix_ci`.
+
 The list and the detail of a PR are read apart, because GitHub answers them at very different
 speeds. The list is two searches for `is:pr is:open author:@me sort:updated-desc` with pages of
 100, run side by side (`server/src/github-list.ts`): the rows (number, title, repo, branches,
@@ -404,6 +468,56 @@ a PR in a repo that login cannot read shows without a status.
 
 Starting an agent on a PR's branch still needs a checkout, so `start_agent_from_pr` refuses a PR
 whose repo Seti has none of.
+
+## PR updates wake an agent only for news
+
+The PR poller (`server/src/pr-inputs.ts`) reads every PR linked to an agent once a minute, compares
+it with the last snapshot in `pr_watch` and turns each change into an update for the linked agents:
+CI failed or passed, a review, a comment, a conflict, a merge or a close. Updates from one poll
+reach an agent as one batch, and batches that follow within a few seconds join the same turn.
+
+Three kinds of update are recorded without starting a turn. Each still shows in the agent's
+transcript, greyed and marked with the reason, and the PR views show the same state as before.
+
+| Mark                     | When                                                                    | What the agent gets          |
+| ------------------------ | ----------------------------------------------------------------------- | ---------------------------- |
+| not sent: own action     | the agent posted the comment or review, or merged or closed the PR      | nothing                      |
+| not sent: repeat         | checks ran again on a commit and ended as Seti reported them before     | nothing                      |
+| no wake: nothing pending | CI passed, no failure was reported before it, and the agent pushed none | the pass, with its next turn |
+
+A batch in which every update is quiet starts no turn; a mixed batch wakes the agent with the rest.
+Quiet updates never count as waiting, so they raise no "queued" bar and cannot be dismissed. Other
+agents linked to the same PR, and the EA when it watches one of them, are told what an agent did
+as before.
+
+An agent and the user often act as the same GitHub login, so the author of an event does not say
+who acted. Seti reads the agent's own tool calls instead (`server/src/pr-self.ts`):
+
+- A comment or review is the agent's when the output of one of its posting calls (`gh pr comment`,
+  `gh pr review`, a `gh api` write to comments, reviews or replies, a GitHub MCP comment or review
+  tool) links it by its id. This match is exact.
+- When that output links nothing, a post is the agent's if the host's `gh` login wrote it on the PR
+  the call names, or on any linked PR when the call names none, while the call ran, with 5 seconds
+  allowed for clock difference. A comment the user writes under the same login on the same PR in
+  those seconds is taken for the agent's.
+- A merge or close is the agent's when one of its calls (`gh pr merge`, `gh pr close`, the matching
+  `gh api` and GitHub MCP calls) ran on that PR at the time GitHub gives for the PR's end, with the
+  same allowance. A merge that `gh pr merge --auto` lands later is news and wakes the agent.
+
+Anything Seti cannot tie to a call of that agent is delivered, so a script that posts through
+other means comes back as an update.
+
+A pass wakes the agent when the last CI result Seti reported for the PR was a failure, or when the
+agent pushed or opened a PR since Seti last gave it a CI result for this PR (`git push`,
+`gh pr create`, a GitHub MCP push): it started the run, so it waits for the result. Any other pass,
+such as one after someone else updated the branch, is recorded quietly. A failure always wakes.
+
+A failure is reported once per head commit, and again only for checks that had not failed on it
+before. A conflict is reported once per head commit and base branch, until GitHub finds the PR
+merging cleanly again. GitHub recomputes mergeability whenever the base branch moves and reports it
+unknown in between; the same commit still conflicts after that, so it is not reported again. A new
+head commit that still conflicts, a PR retargeted to another base branch, and a conflict that comes
+back after a clean merge state are news.
 
 ## Mods add to Seti through registries with disposers
 
@@ -586,11 +700,35 @@ calls for its own commands, storage and settings to `/api/mod-frames/<id>/call`,
 as the mod. Status items and theme tokens of a running third-party mod reach the UI through
 `/api/mod-live`, as text Seti draws and token CSS Seti rebuilt.
 
+## Every agent starts in its own folder
+
+Starting an agent takes a message and nothing about where it works. `startTask`
+(`server/src/tasks.ts`) makes the folder `SCRATCH_ROOT/<title slug>-<id8>` and runs the session
+there; the request shapes carry no repo, branch or directory, and a request that still sends them
+has them stripped. The agent's prompt (`taskFolderContext` in `server/src/task-location.ts`) names
+the folder and tells it to clone the repos it needs there with `git clone` or `gh repo clone` and to
+make worktrees inside it.
+
+Claude Code reads a repo's own `.mcp.json`, `.claude/settings.json`, hooks and commands only from
+the directory its session starts in; in a subfolder only `CLAUDE.md` and skills load, and only once
+the agent touches a file there. So every agent has one tool of its own, `set_working_directory`,
+which moves its session into a directory inside its own folders from its next turn and keeps the
+conversation. Seti resolves the path through its symlinks and refuses anything outside the agent's
+folders; the folder it came from stays attached. The user and the EA have no such control.
+
+GitHub requests that name no owner get the default token of the agent's credential; a request to
+`github.com/<owner>/...` gets that owner's token when the credential has one
+(`server/src/github-token.ts`).
+
+Agents made earlier, in a repo checkout, a worktree Seti created or with extra directories, keep
+all of them in their session and sandbox until they are archived. Their settings show the folders
+read-only.
+
 ## Archiving packs an agent's folders, deleting removes them
 
-An agent has three kinds of folders Seti made for it: a scratch folder `SCRATCH_ROOT/<title
-slug>-<id8>` when it started without a repo or directory (default `~/work`), its workspace
-`~/.seti/workspace/<task id>`, and its worktrees in `~/.seti/worktrees`. Archiving moves the
+An agent has up to three kinds of folders Seti made for it: its own folder `SCRATCH_ROOT/<title
+slug>-<id8>` (default `~/work`), its workspace `~/.seti/workspace/<task id>`, and, for an agent
+from before agents cloned for themselves, its worktrees in `~/.seti/worktrees`. Archiving moves the
 transcript into a compressed row (`task_archive`) and hands the folders to
 `server/src/archive-files.ts`, which runs in the background so a large folder does not hold up the
 request:
@@ -695,15 +833,45 @@ call's own input with `answers` added, keyed by each question's text: the label,
 or, for a multi-answer question, the list of both. Claude Code's host-answer check requires that
 shape: an unchanged input, keys that are question texts, and a list only for `multiSelect`. A
 dismissed question reads as dismissed; a group the user only dismissed is turned down with a note
-to go on with the agent's own judgment. A stopped turn or an ended session expires the group, and
-startup expires what a restart cut off.
+to go on with the agent's own judgment. A stopped turn or an ended session expires the group. A
+restart of Seti does not: the group stays open, and its answers resume the agent's session as a
+message from Seti.
 
 Open questions set the agent's reason line in Needs you through `server/src/task-blocked.ts`,
 such as `Asks 2 questions: Which checks should I run first?`, after a permission request and
 before a change request. `questionsContext`, registered with `registerContextProvider`, tells
-every agent to ask through AskUserQuestion instead of in its reply. The guess that a turn ended on
-a question (`server/src/turn-asking.ts`) reads only the prose after the last tool use, the
-fallback for an agent that asks in text.
+every agent to ask through AskUserQuestion instead of in its reply, and when not to ask at all: no
+go-ahead for reversible work inside the request, and a clearly recommended option is taken and
+named. It asks only for a choice that cannot be undone, acts outward, changes the scope or is
+genuinely balanced. `houseRulesContext` (`server/src/house-rules.ts`), registered the same way,
+states the rules the shell guard and Claude Code enforce: no foreground sleep or polling, stopping
+a process by PID, `rm -r` on literal paths and the exact tool name `Bash`. A `SubagentStart` hook
+of every session gives the same rules to each subagent, which does not read its parent's system
+prompt. An agent that asks in its reply all the same is caught by a detector that reads only the
+prose after the turn's last tool use and calls no model (`proseQuestion` in
+`shared/src/prose-question.ts`, fed by `server/src/turn-asking.ts`). The reply asks when its last
+paragraph outside fenced code ends with a question, or when a question and a list of answers end
+it together. It does not ask when the question mark sits in code, in quotes, in a quote block or
+in a heading, when the reply goes on after the question, when a list under the question reads as
+the agent's own answer, when the agent puts the question to itself ("Why did it fail?") or when it
+is a closing courtesy such as "Anything else?". The detector also returns the question on one line
+and up to four answers the reply listed: a numbered or lettered list right after the question, or
+a list right before a question that asks which one. Its limits are kept as rows of the table in
+`server/src/prose-question.test.ts`: a question followed by a remark reads as answered, and a
+rhetorical question that ends the reply reads as asked.
+
+An agent whose turn ended this way shows the status `asking` and the reason line "Asked in its
+reply". Its push reads `Asks:` and the question. Under its last message the agent view offers
+quick replies (`ui/src/panels/tasks/QuickReplies.tsx`): Yes and No when either answers the
+question, and one per listed answer. A tap sends that answer as the reply box would, and the
+quick replies go once any message starts the next turn. If the agent is still unanswered 15
+minutes after its turn ended, Seti pushes once more, `Still waits:` and the question, under the
+same rules as the first push: none for a muted or archived agent, one the EA carries or one a
+device shows (`server/src/asking-reminder.ts`). The reminder is a timer set at the turn end.
+Startup sets it again, for the rest of the wait, only for a turn that ended less than 15 minutes
+earlier, so a restart never reminds twice, and a question that came due while Seti was down gets
+none. The task list carries each asking agent's `question`, which the EA's `list_tasks`,
+`get_task` and `seti_overview` and an agent's own `list_tasks` read.
 
 Open questions are answered in the Requests panel and in an agent's Requests drawer, both
 described under [Requests wait in one panel](#requests-wait-in-one-panel). The panel lists every
@@ -1001,8 +1169,7 @@ midnight:
 | Turns           | turn results in `task_message`                                                                            |
 | Time running    | each turn's reported `duration_ms`                                                                        |
 | Cost            | each turn's own cost, stored with its result                                                              |
-| MCP servers     | `mcp__<server>__` tool calls in the agent's messages                                                      |
-| Calls right now | the runner's in-memory open tool calls, with their MCP server and subagent                                |
+| Calls right now | the runner's in-memory open tool calls, with their subagent                                               |
 
 The counts come per day as well as for the week and the month, so the EA can report today and
 compare the week with the 7 days before. The latest merges are the six newest PRs
@@ -1012,15 +1179,15 @@ A PR linked to two agents counts once in the totals and once for each agent, and
 dismissed before the merge does not count. The streak is the run of days with a merge, ending
 today or, while today has none yet, yesterday. Archived agents keep their merged PRs; their turns
 moved into the archive and are left out. The counts are reused until a message is stored or a PR
-merges, and redone at most every 5 seconds. The MCP count reads only the messages stored since the
-last read, so a busy install pays for each message once.
+merges, and redone at most every 5 seconds.
 
 ## Every stall goes through Needs you
 
 An agent that cannot go on without the user shows in Needs you with a reason line on its row, and
 its devices get a high-urgency push. Turn ends set three states: `error` (a failed turn, a rate
 limit, a lost login), `interrupted` (a restart cut the turn off) and `asking` (the turn ended on a
-question in its prose). An AskUserQuestion call waits as questions instead, as above. Everything
+question in its prose, with the reason line "Asked in its reply"). An AskUserQuestion call waits
+as questions instead, as above. Everything
 that holds an agent up without ending its turn sets `task.blocked`, which
 `server/src/task-blocked.ts` keeps. It shows as the `blocked` status, which stays in Needs you
 while the agent is open, until it clears:
@@ -1033,7 +1200,7 @@ while the agent is open, until it clears:
 | An MCP server's sign-in tool                                                                  | `Sign in to the linear MCP server in Seti`                               | a sign-in finishes, or the next turn starts |
 | A running turn with no message for 20 minutes, not counting time a request waited on the user | `No output for 20 min while running`, or the API error it keeps retrying | the session speaks again, or the turn ends  |
 
-A permission request outranks open questions, which outrank a change request, which outranks a stall; the watchdog (`server/src/stall-watch.ts`) checks the
+A permission request outranks open questions, which outrank a change request, which outranks the reason startup stopped resuming an agent after restarts, which outranks a stall; the watchdog (`server/src/stall-watch.ts`) checks the
 open sessions once a minute.
 
 ## Requests wait in one panel
@@ -1092,7 +1259,8 @@ change here. Each goes through the attention router first, which sends it to a p
 page has focus and the EA does not carry the agent. The Needs you group and its counts use
 `waitsOnYou`, which adds that the user has not opened the agent since its turn ended;
 notifications do not, since a turn end is always unseen. Startup notifies the agents a restart cut
-off, and marks them unseen. Pushes use Web Push with a VAPID key
+off and it does not resume, and marks them unseen; an agent that still waits on an answer is not
+notified again. Pushes use Web Push with a VAPID key
 pair that Seti makes on first start and seals in the secret store; the `web-push` library encrypts
 each payload to the device's keys, and Seti sends it itself, only to known push services. Each
 notification carries the agent's id as its tag and push topic, so a newer one replaces an older
@@ -1105,3 +1273,19 @@ agent wrote in that turn, with credentials redacted. A turn that wrote nothing r
 without a reply".
 Each agent push also carries the Needs you count, which the service worker puts on the app icon
 with the Badging API; an open page keeps that badge in step with its status bar.
+
+## An open tab reloads once when a deploy replaced its build
+
+The UI loads each panel as its own file, named after a hash of its content. A deploy replaces
+those files, so a tab opened before it asks for a file the server no longer has. Seti hears of the
+failure twice: Vite's `vite:preloadError` event, and the error boundary that catches the failed
+panel (`ui/src/components/ErrorBoundary.tsx`). Both call `recoverFromStaleBuild` in
+`ui/src/components/stale-build-recovery.tsx`, and `planRecovery` in `ui/src/lib/stale-build.ts`
+decides what happens:
+
+- The page reloads on the same view when the server answers a ping and no form holds unsaved
+  changes. Unsent composer text survives, since drafts live in `localStorage`.
+- With unsaved changes the page stays, and a New version notice offers Reload.
+- A tab gets one automatic reload per build and per minute, recorded in `sessionStorage`. A panel
+  that still fails after it, a server that gives no answer and storage that cannot keep the record
+  all leave the reload to the user: the panel says it did not load and offers Reload.

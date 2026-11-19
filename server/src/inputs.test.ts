@@ -4,7 +4,8 @@ import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vites
 import { createApp } from './app.js'
 import { messages, tasks } from './db.js'
 import { fakeTimers } from './fake-timers.js'
-import { AUTO_TURN_BURST, WAKE_DEBOUNCE, deliverInputs, inputPreface, wakeWaiting } from './inputs.js'
+import { inputPreface } from './input-preface.js'
+import { AUTO_TURN_BURST, WAKE_DEBOUNCE, deliverInputs, wakeWaiting } from './inputs.js'
 import { isRunning, stopTurn } from './runner.js'
 import { auditEvents } from './store/audit.js'
 import { eaContextStore } from './store/ea-context.js'
@@ -186,6 +187,8 @@ describe('task inputs', () => {
     const held = await newTask('queue')
     await deliverInputs(held, [passed])
     await tasks.setInputMode(held, 'wake')
+    await wakeWaiting([held])
+    expect(await prompts(held)).toEqual([])
     await wakeWaiting()
     await waitIdle(held)
     expect(await prompts(held)).toEqual([{ text: '', auto: true, inputs: 1 }])
@@ -399,6 +402,58 @@ describe('task inputs', () => {
     expect(again.status).toBe(409)
   })
 
+  describe('quiet PR updates', () => {
+    const own: PrInput = { ...failing, kind: 'review', title: 'octocat reviewed acme/web#7', quiet: 'own_action' }
+    const repeat: PrInput = { ...failing, quiet: 'repeat' }
+    const idle: PrInput = { ...passed, quiet: 'nothing_pending' }
+
+    it('records a batch of only quiet updates and starts no turn for it', async () => {
+      await fakeTimers(['Date', 'setTimeout', 'clearTimeout'])
+      const id = await newTask()
+      expect(await deliverInputs(id, [own, repeat, idle])).toEqual({
+        outcome: 'ignored',
+        reason: 'Recorded without starting a turn',
+      })
+      await quietSpell(id)
+      await wakeWaiting()
+      await waitIdle(id)
+      expect(await prompts(id)).toEqual([])
+      expect((await inputRows(id)).map((row) => (row.payload.source === 'pr' ? row.payload.quiet : null))).toEqual([
+        'own_action',
+        'repeat',
+        'nothing_pending',
+      ])
+      expect(await taskInputs.waking(id, ['pr'])).toBeNull()
+      expect((await eaContextStore.waitingUpdates()).get(id)).toBeUndefined()
+      expect((await request('POST', `/${id}/inputs/dismiss`, { up_to: 1_000_000 })).status).toBe(409)
+    })
+
+    it('hands a pass nobody waited for to the agent with its next turn, and never its own action or a repeat', async () => {
+      const id = await newTask()
+      await deliverInputs(id, [own, repeat, idle])
+      expect((await request('POST', `/${id}/messages`, { prompt: 'status?' })).status).toBe(200)
+      await waitIdle(id)
+      const sent = sdk.state.prompts[0] ?? ''
+      expect(sent.match(/<update /g)).toHaveLength(1)
+      expect(sent).toContain('kind="ci_passed"')
+      expect(await prompts(id)).toEqual([{ text: 'status?', inputs: 1 }])
+    })
+
+    it('wakes for a mixed batch and hands over only what is new', async () => {
+      await fakeTimers(['Date', 'setTimeout', 'clearTimeout'])
+      const id = await newTask()
+      const review: PrInput = { ...failing, kind: 'review', title: 'alice reviewed acme/web#7', body: 'Rename it' }
+      expect(await deliverInputs(id, [own, review, repeat])).toMatchObject({ outcome: 'delivered' })
+      await quietSpell(id)
+      const sent = sdk.state.prompts[0] ?? ''
+      expect(sent.match(/<update /g)).toHaveLength(1)
+      expect(sent).toContain('alice reviewed acme/web#7')
+      expect(sent).not.toContain('octocat reviewed')
+      expect(await prompts(id)).toEqual([{ text: '', auto: true, inputs: 1 }])
+      expect(await inputRows(id)).toHaveLength(3)
+    })
+  })
+
   it('refuses to dismiss when nothing is waiting, and a bad up_to', async () => {
     const id = await newTask('queue')
     const res = await request('POST', `/${id}/inputs/dismiss`, { up_to: 1 })
@@ -476,7 +531,7 @@ describe('task inputs', () => {
       await quietSpell(id)
       expect(await prompts(id)).toEqual([
         { text: 'look', inputs: 1 },
-        { text: '', auto: true, inputs: 1 },
+        { text: '', auto: true, held: true, inputs: 1 },
       ])
     })
   })

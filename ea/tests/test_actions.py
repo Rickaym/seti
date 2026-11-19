@@ -59,10 +59,6 @@ def test_every_confirm_tool_takes_confirmed_and_every_action_is_held_in_inbox_re
         "delete_context_pack",
         "update_repo",
         "remove_repo",
-        "add_agent_repo",
-        "add_agent_directory",
-        "remove_from_agent",
-        "set_agent_working_directory",
         "set_agent_role",
         "change_my_context_packs",
         "set_mcp_default",
@@ -461,28 +457,31 @@ async def test_start_agent_from_pr_sends_what_the_pr_page_sends(tools: EaTools, 
     args = {"pr": "seti PR 28", "instructions": "Fix the failing e2e test"}
     asked, done = await confirm(tools, "start_agent_from_pr", args)
     assert (
-        'This starts a new agent "PR #28: fix: login redirect" in a worktree of seti PR 28\'s branch feat/x'
+        'This starts a new agent "PR #28: fix: login redirect" that clones the repo and checks out '
+        "seti PR 28's branch feat/x"
     ) in asked.text
     assert done.ok
     [(method, path, _, body)] = fake_seti.writes()
     assert (method, path) == ("POST", "/api/tasks/start")
     assert body["title"] == "PR #28: fix: login redirect"
-    assert body["repo_ids"] == [REPO_SETI]
-    assert body["worktree"] is True
-    assert body["ref"] == "feat/x"
+    assert not {"repo_ids", "worktree", "ref", "cwd"} & set(body)
     assert body["pr_urls"] == [PR_SETI]
     assert body["prompt"].startswith("Work on pull request #28 in Octocat/seti: fix: login redirect")
-    assert "git push origin HEAD:feat/x" in body["prompt"]
+    assert (
+        "Clone Octocat/seti into your working folder and check out the PR's branch, feat/x."
+        in (body["prompt"])
+    )
     assert body["prompt"].endswith("Task: Fix the failing e2e test")
 
 
-async def test_start_agent_from_pr_needs_a_checkout_of_the_repo(tools: EaTools, fake_seti: FakeSeti) -> None:
+async def test_start_agent_from_pr_needs_no_checkout_of_the_repo(tools: EaTools, fake_seti: FakeSeti) -> None:
     far = "https://github.com/initech/billing/pull/4"
     fake_seti.prs["prs"].append(pr(far, "fix: totals", repo_slug="initech/billing"))
-    refused = await tools.call("start_agent_from_pr", {"pr": far, "instructions": "Fix it"})
-    assert not refused.ok
-    assert refused.text == "Seti has no checkout of initech/billing to start an agent in. Add the repo first."
-    assert not fake_seti.writes()
+    _, done = await confirm(tools, "start_agent_from_pr", {"pr": far, "instructions": "Fix it"})
+    assert done.ok
+    [(_, path, _, body)] = fake_seti.writes()
+    assert path == "/api/tasks/start"
+    assert body["prompt"].startswith("Work on pull request #4 in initech/billing: fix: totals")
 
 
 async def test_preview_label_needs_a_yes_and_the_previews_mod(tools: EaTools, fake_seti: FakeSeti) -> None:

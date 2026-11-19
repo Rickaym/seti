@@ -1,12 +1,6 @@
-import type { TaskStatus } from '@seti/shared'
+import { closingQuestion, type ProseQuestion, type Task, type TaskStatus, type TurnBlock } from '@seti/shared'
 import { messages } from './db.js'
-
-/** A content block of an assistant message, as far as the classifier reads it. */
-export interface TurnBlock {
-  type: string
-  text?: string | undefined
-  name?: string | undefined
-}
+import { redactSecrets } from './scrub.js'
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -34,60 +28,38 @@ function blocksOf(payload: string): TurnBlock[] {
 /** The content blocks of stored assistant messages, in order; unreadable ones are left out. */
 export const turnBlocks = (payloads: readonly string[]): TurnBlock[] => payloads.flatMap(blocksOf)
 
-const FENCE = /^ {0,3}(`{3,}|~{3,})/
-
-/** The text with fenced code blocks taken out; an unclosed fence runs to the end. */
-function withoutCode(text: string): string {
-  const kept: string[] = []
-  let fence: string | null = null
-  for (const line of text.split('\n')) {
-    const marker = FENCE.exec(line)?.[1]
-    if (fence === null && marker !== undefined) {
-      fence = marker
-    } else if (fence !== null && marker?.startsWith(fence.charAt(0)) === true && marker.length >= fence.length) {
-      fence = null
-    } else if (fence === null) {
-      kept.push(line)
-    }
-  }
-  return kept.join('\n')
-}
-
-/** Markdown and punctuation that may close a sentence after its question mark. */
-const CLOSERS = new Set([' ', '*', '_', '"', "'", ')', ']'])
-
-function withoutClosers(paragraph: string): string {
-  let end = paragraph.length
-  while (end > 0 && CLOSERS.has(paragraph.charAt(end - 1))) {
-    end -= 1
-  }
-  return paragraph.slice(0, end)
-}
-
-/** Whether the prose's last paragraph, outside code blocks, ends with a question mark. */
-export function endsWithQuestion(text: string): boolean {
-  const paragraphs = withoutCode(text)
-    .split(/\n\s*\n/)
-    .map((paragraph) => paragraph.trim())
-    .filter((paragraph) => paragraph !== '')
-  const last = paragraphs.at(-1)
-  return last !== undefined && withoutClosers(last).endsWith('?')
-}
-
-/**
- * Whether a turn ends by asking the user something in prose: the text it wrote after its last
- * tool use ends with a question. AskUserQuestion calls wait as questions instead. Blocks come
- * oldest first.
- */
-export function endsAsking(blocks: readonly TurnBlock[]): boolean {
-  const lastTool = blocks.findLastIndex((block) => block.type === 'tool_use')
-  const closing = blocks
-    .slice(lastTool + 1)
-    .flatMap((block) => (block.type === 'text' && block.text !== undefined ? [block.text] : []))
-  return endsWithQuestion(closing.join('\n\n'))
-}
+/** What the task's last turn ended by asking the user in prose. */
+const turnQuestion = async (taskId: string): Promise<ProseQuestion> =>
+  closingQuestion(turnBlocks(await messages.turnEnding(taskId)))
 
 /** Whether a turn that ended in `status` asked the user something; only a clean end can. */
 export async function turnAsks(taskId: string, status: TaskStatus): Promise<boolean> {
-  return status === 'idle' && endsAsking(turnBlocks(await messages.turnEnding(taskId)))
+  return status === 'idle' && (await turnQuestion(taskId)).asks
+}
+
+/** The question each asking agent ended on, kept until its task changes again. */
+const asked = new Map<string, { at: string; question: string | null }>()
+const ASKED_KEPT = 500
+
+/** The question an asking agent's turn ended on, on one line with credentials redacted. */
+export async function askedQuestion(task: Pick<Task, 'id' | 'asking' | 'updated_at'>): Promise<string | null> {
+  if (!task.asking) {
+    asked.delete(task.id)
+    return null
+  }
+  const known = asked.get(task.id)
+  if (known?.at === task.updated_at) {
+    return known.question
+  }
+  const found = (await turnQuestion(task.id)).question
+  const question = found === '' ? null : redactSecrets(found)
+  asked.delete(task.id)
+  asked.set(task.id, { at: task.updated_at, question })
+  for (const old of asked.keys()) {
+    if (asked.size <= ASKED_KEPT) {
+      break
+    }
+    asked.delete(old)
+  }
+  return question
 }

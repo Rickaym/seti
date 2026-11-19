@@ -26,15 +26,16 @@ import { HttpError } from './http.js'
 import { setInputMode } from './inputs.js'
 import { slashRefusal } from './mods/commands.js'
 import { setTaskNotificationsMuted } from './notifications.js'
-import { endSession, openQuerySince, removeQueued, runTurn, sessionState, stopSessionTask } from './runner.js'
+import { removeQueued } from './queued-removal.js'
+import { endSession, openQuerySince, runTurn, sessionState, stopSessionTask } from './runner.js'
 import { changeSetiControl } from './seti-control-note.js'
 import { closeAgentChats } from './side-chat/chats.js'
 import { prWatch } from './store/pr-watch.js'
 import { workspaceRows } from './store/workspaces.js'
 import { agentTodos, forgetSubtasks, subtaskBriefs, subtaskOf } from './subtask-cache.js'
 import { linkSubtaskPr, publishSubtasks, unlinkSubtaskPr } from './subtask-prs.js'
-import { setTaskCwd } from './task-location.js'
 import {
+  dropTaskHomeAccess,
   linkTaskPr,
   renameTask,
   requireTask,
@@ -44,6 +45,7 @@ import {
   setTaskSandbox,
 } from './tasks.js'
 import { endAgentTerminals } from './terminal.js'
+import { askedQuestion } from './turn-asking.js'
 import { placeAttachments, refuseCommandAttachments } from './uploads.js'
 import { countWorkspaces, setTaskWorkspace } from './workspaces.js'
 
@@ -62,6 +64,7 @@ export async function taskListEntries(): Promise<TaskListEntry[]> {
         ...listedSubtasks(subtasks),
         todos: await agentTodos(task.id),
         pr_states: prStates(states.get(task.id) ?? {}, shown),
+        question: await askedQuestion(task),
       }
     }),
   )
@@ -81,7 +84,7 @@ export async function updateTask(id: string, input: z.output<typeof updateTaskIn
     [input.title, async (task) => renameTask(task, input.title ?? task.title)],
     [input.input_mode, async (task) => setInputMode(task, input.input_mode ?? task.input_mode)],
     [input.sandbox, async (task) => setTaskSandbox(task, input.sandbox ?? task.sandbox)],
-    [input.cwd, async (task) => setTaskCwd(task, input.cwd ?? task.cwd)],
+    [input.home_access, dropTaskHomeAccess],
     [input.profile_id, async (task) => setTaskProfile(task, input.profile_id ?? task.profile_id)],
     [input.seti_control, async (task) => changeSetiControl(task, input.seti_control ?? task.seti_control)],
     [input.color, async (task) => setTaskColor(task, input.color === undefined ? task.color : input.color)],

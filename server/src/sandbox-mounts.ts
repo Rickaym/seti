@@ -22,6 +22,10 @@ export interface SandboxLayout {
   cwd: string
   /** Further directories the task works in, read-write like cwd. */
   dirs: readonly string[]
+  /** An older agent's sandbox also shows the user's top-level home folders, writable. */
+  homeAccess?: boolean
+  /** Where Seti makes each agent's own folder; a repository in there is the agent's to change. */
+  ownRoot?: string
   /** The task's Seti workspace, read-write although it lives in Seti's own data. */
   workspace?: string | null
   /** Read-only extras such as the Claude Code binary and local plugin folders. */
@@ -135,7 +139,35 @@ function gitDirs(dir: string): GitDirs | null {
   const own = path.resolve(dir, pointer)
   const commonFile = path.join(own, 'commondir')
   const common = exists(commonFile) ? path.resolve(own, fs.readFileSync(commonFile, 'utf8').trim()) : own
-  return { common, own, linked: true }
+  return recorded(dir, own, common) ? { common, own, linked: true } : null
+}
+
+const real = (file: string) => {
+  try {
+    return fs.realpathSync(file)
+  } catch {
+    return file
+  }
+}
+
+/**
+ * Whether the repository a `.git` file names holds this folder as its own. Anyone who can write
+ * the folder can write that file, so alone it proves nothing: a worktree counts when its admin
+ * folder lies in the repository's `worktrees` and points back at it, and a submodule when its git
+ * directory lies in the `.git/modules` of a checkout above it.
+ */
+function recorded(dir: string, own: string, common: string): boolean {
+  if (own === common) {
+    const marker = `${path.sep}.git${path.sep}modules${path.sep}`
+    const at = own.indexOf(marker)
+    return at > 0 && dir.startsWith(own.slice(0, at) + path.sep)
+  }
+  const back = path.join(own, 'gitdir')
+  if (!within(own, path.join(common, 'worktrees')) || !exists(back)) {
+    return false
+  }
+  const claimed = path.resolve(own, fs.readFileSync(back, 'utf8').trim())
+  return real(claimed) === real(path.join(dir, '.git'))
 }
 
 interface GitMounts {
@@ -236,10 +268,14 @@ function pathDirs(layout: SandboxLayout): string[] {
 export const WORK_DIR = 'work'
 
 /**
- * The home directory's top-level folders without a dot, where the user keeps code checkouts, and
- * the shared work folder. Files and dot folders at the top level are never among them.
+ * For an agent with home access only: the home directory's top-level folders without a dot, where
+ * the user keeps code checkouts, and the shared work folder. Files and dot folders at the top
+ * level are never among them. Every other agent sees none of them.
  */
 function homeDirs(layout: SandboxLayout): string[] {
+  if (layout.homeAccess !== true) {
+    return []
+  }
   fs.mkdirSync(path.join(layout.home, WORK_DIR), { recursive: true })
   return fs
     .readdirSync(layout.home, { withFileTypes: true })
@@ -247,6 +283,28 @@ function homeDirs(layout: SandboxLayout): string[] {
     .map((entry) => path.join(layout.home, entry.name))
     .filter((dir) => !layout.hidden.some((secret) => within(dir, secret)))
     .filter((dir) => !within(layout.setiHome, dir) && !within(layout.claudeHome, dir))
+}
+
+const NO_GIT: GitMounts = { writable: [], guards: [], common: null }
+
+/**
+ * What a work directory's repository adds to a sandbox without home access. A clone in the
+ * agent's own folder is its own: no cover on its config and hooks, which Seti never runs. A
+ * `.git` file that points outside the task's folders is honoured only in a worktree Seti made,
+ * since the agent could write that pointer itself to reach a folder of the user's.
+ */
+function privateGitMounts(dir: string, layout: SandboxLayout, workDirs: readonly string[]): GitMounts {
+  const git = gitMounts(dir)
+  if (git.common === null) {
+    return git
+  }
+  const common = git.common
+  const mine = workDirs.some((root) => within(common, root))
+  const own = layout.ownRoot !== undefined && dir !== layout.ownRoot && within(dir, layout.ownRoot)
+  if (mine && own) {
+    return { ...git, guards: [] }
+  }
+  return mine || within(dir, layout.worktreeRoot) ? git : NO_GIT
 }
 
 interface HostBinds {
@@ -260,7 +318,10 @@ function hostBinds(layout: SandboxLayout): HostBinds {
   const shown = (dir: string) => exists(dir) && !layout.hidden.some((secret) => within(dir, secret))
   const workDirs = [layout.cwd, ...layout.dirs]
   const code = homeDirs(layout)
-  const git = [...workDirs, ...code].map(gitMounts)
+  const git =
+    layout.homeAccess === true
+      ? [...workDirs, ...code].map(gitMounts)
+      : workDirs.map((dir) => privateGitMounts(dir, layout, workDirs))
   const commons = git.flatMap((entry) => entry.writable).filter((dir) => mountProblem(dir, layout) === null)
   const writable = [...workDirs, ...code, ...commons, ...CACHES.map((dir) => path.join(layout.home, dir)).filter(shown)]
   const secrets = layout.hidden.filter((entry) => !(layout.excluded ?? []).includes(entry))
@@ -280,15 +341,33 @@ function hostBinds(layout: SandboxLayout): HostBinds {
   return { writable, readOnly, guards: [...new Set(guards)] }
 }
 
+type Trust = Pick<SandboxLayout, 'cwd' | 'dirs' | 'homeAccess' | 'worktreeRoot'>
+
+/**
+ * The checkout whose Claude Code state a task directory shares. Without home access one outside
+ * the task's folders counts only for a worktree Seti made: the agent writes its other `.git`
+ * pointers itself, and could aim one at a repository of the user's.
+ */
+export function checkoutOf(dir: string, layout: Trust): string | null {
+  const root = canonicalRoot(dir)
+  if (root === null || layout.homeAccess === true || within(dir, layout.worktreeRoot)) {
+    return root
+  }
+  return [layout.cwd, ...layout.dirs].some((work) => within(root, work)) ? root : null
+}
+
 /**
  * The auto memory folders of the main checkouts behind the task's directories, which Claude Code
- * uses from worktrees too; the task's own project folder already holds its memory.
+ * uses from worktrees too; the task's own project folder already holds its memory. Without home
+ * access a checkout outside the task's folders counts only for a worktree Seti made.
  */
 function memoryDirs(layout: SandboxLayout): string[] {
   const own = projectSlug(layout.cwd)
   const slugs = [layout.cwd, ...layout.dirs]
-    .map(canonicalRoot)
-    .flatMap((root) => (root === null ? [] : [projectSlug(root)]))
+    .flatMap((dir) => {
+      const root = checkoutOf(dir, layout)
+      return root === null ? [] : [projectSlug(root)]
+    })
     .filter((slug) => slug !== own)
   return [...new Set(slugs)].map((slug) => path.join('projects', slug, 'memory'))
 }

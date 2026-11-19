@@ -2,21 +2,12 @@ import type { AuditPage } from '@seti/shared'
 import { EA_HEADERS } from './support/env.js'
 import { apiData, expect, test, toasts, unique, waitForToastsToClear } from './support/fixtures.js'
 import { FAKE_CLAUDE_ENV } from './support/processes.js'
-import {
-  proposeTool,
-  removeToolScript,
-  sharedTool,
-  startToolsmith,
-  TOOL_DESCRIPTION,
-  TOOL_REASON,
-} from './support/shared-tools.js'
+import { proposeTool, sharedTool, startToolsmith, TOOL_DESCRIPTION, TOOL_REASON } from './support/shared-tools.js'
 
 const FIRST = '#!/usr/bin/env python3\nimport json, sys\nprint("invoices of", json.load(sys.stdin)["customer"])\n'
 const SECOND = '#!/usr/bin/env python3\nimport json, sys\nprint("open invoices of", json.load(sys.stdin)["customer"])\n'
 
 test.use({ serverEnv: FAKE_CLAUDE_ENV })
-
-test.afterEach(removeToolScript)
 
 test('an agent proposes a tool, its card shows arguments and code, and it is published, updated and removed', async ({
   page,

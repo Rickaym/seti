@@ -1,7 +1,6 @@
 import type { APIRequestContext, Page } from '@playwright/test'
 import { DEFAULT_TIERS, type Envelope, type Task } from '@seti/shared'
 import { openAgentSettings } from './support/agent-settings.js'
-import { paths } from './support/env.js'
 import { apiData, expect, test, toasts, unique } from './support/fixtures.js'
 import { FAKE_CLAUDE_ENV } from './support/processes.js'
 import { mockPushManager, PUSH_ENV, startPushService, type PushService } from './support/push.js'
@@ -39,7 +38,7 @@ async function turnOnPush(page: Page): Promise<void> {
 
 async function finishAgent(request: APIRequestContext, title: string): Promise<string> {
   const response = await request.post('/api/tasks', {
-    data: { title, prompt: `Say hello for ${title}`, cwd: paths.checkout, sandbox: false },
+    data: { title, prompt: `Say hello for ${title}`, sandbox: false },
   })
   expect(response.ok(), 'POST /api/tasks').toBe(true)
   const { id } = ((await response.json()) as Envelope<Task>).data

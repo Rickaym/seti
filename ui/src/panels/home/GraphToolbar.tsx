@@ -7,7 +7,7 @@ import type { GraphFilters } from './graph-model'
 
 const TOGGLES: [key: keyof GraphFilters, label: string, icon: LucideIcon, hint: string][] = [
   ['repos', 'Repos', FolderGit2, 'Show the repos agents work in'],
-  ['tools', 'Tools', Plug, 'Show the MCP servers agents called in 30 days, and tool calls running now'],
+  ['tools', 'Tools', Plug, 'Show the tool calls running now'],
   ['subagents', 'Subagents', Workflow, 'Show the subagents running now'],
   ['archived', 'Archived', Archive, 'Show archived agents'],
   ['cost', 'Cost', CircleDollarSign, 'Size agents by cost over 30 days instead of turns'],

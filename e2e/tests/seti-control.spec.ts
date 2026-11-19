@@ -1,7 +1,6 @@
 import type { APIRequestContext } from '@playwright/test'
 import type { AuditPage, Envelope, MessagePage, Task, TeamMember } from '@seti/shared'
 import { openAgentSettings } from './support/agent-settings.js'
-import { paths } from './support/env.js'
 import { NO_SETI_TOOLS, setiPrompt } from './support/fake-claude.js'
 import { apiData, expect, test, toasts, unique } from './support/fixtures.js'
 import { FAKE_CLAUDE_ENV } from './support/processes.js'
@@ -11,7 +10,7 @@ test.use({ serverEnv: FAKE_CLAUDE_ENV })
 
 async function startAgent(request: APIRequestContext, title: string): Promise<Task> {
   const response = await request.post('/api/tasks', {
-    data: { title, prompt: 'Say hello', cwd: paths.checkout, sandbox: false },
+    data: { title, prompt: 'Say hello', sandbox: false },
   })
   expect(response.ok(), 'POST /api/tasks').toBe(true)
   const task = ((await response.json()) as Envelope<Task>).data

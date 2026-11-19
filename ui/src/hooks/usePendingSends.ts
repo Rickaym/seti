@@ -43,9 +43,27 @@ function pendingStore(taskId: string): PendingStore {
   return store
 }
 
-/** Sends text to the task as the user's own message, as its reply box does, queued while it runs. */
-export function sendAsUser(taskId: string, text: string): void {
-  pendingStore(taskId).add({ text, prompt: text, attachments: [], files: [], interrupt: false })
+/** Resolves null once the server took the message, or with why it gave up on it. */
+async function settled(store: PendingStore, clientId: string): Promise<string | null> {
+  return new Promise((resolve) => {
+    const stop = store.subscribe(() => {
+      const send = store.snapshot().sends.find((other) => other.clientId === clientId)
+      if (send?.state === 'sending' || send?.state === 'retrying') {
+        return
+      }
+      stop()
+      resolve(send?.state === 'failed' ? (send.error ?? 'The message could not be sent') : null)
+    })
+  })
+}
+
+/**
+ * Sends text to the task as the user's own message, as its reply box does, queued while it runs.
+ * Resolves null once the server took it, or with the reason when it could not be sent.
+ */
+export async function sendAsUser(taskId: string, text: string): Promise<string | null> {
+  const store = pendingStore(taskId)
+  return settled(store, store.add({ text, prompt: text, attachments: [], files: [], interrupt: false }))
 }
 
 /** Sends a message from the Share page as the user's own, through the reply box's queue. */

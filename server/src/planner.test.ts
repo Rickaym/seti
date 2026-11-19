@@ -4,10 +4,6 @@ import { asksForAws, asksForHost, checkPlan, fallbackTitle, type PlannerCatalog 
 import { extractJson, planAgent, plannerRequest, planTitle, setPlannerModel, type PlannerModel } from './planner.js'
 
 const CATALOG: PlannerCatalog = {
-  repos: [
-    { id: 'r-api', slug: 'acme/api', description: 'The public API' },
-    { id: 'r-web', slug: 'acme/web', description: '', path: '/code/web' },
-  ],
   packs: [
     { id: 'p-guide', name: 'Seti guide', description: 'How Seti runs agents', linked_by_default: true, builtin: true },
     { id: 'p-style', name: 'Style', description: 'House style', linked_by_default: true, builtin: false },
@@ -63,8 +59,8 @@ describe('the prompt', () => {
     const request = plannerRequest('Deploy to k8s', CATALOG)
     expect(request.system).toContain('Unclear permissions are NOT given')
     expect(request.system).toContain('"ssh_hosts": string[]')
-    expect(request.prompt).toContain('- acme/api: The public API')
-    expect(request.prompt).toContain('- acme/web\n')
+    expect(request.system).not.toContain('repos')
+    expect(request.prompt).not.toContain('Repos:')
     expect(request.prompt).toContain('- Seti guide: How Seti runs agents [linked by default]')
     expect(request.prompt).toContain('- clickup [off by default]')
     expect(request.prompt).toContain('SSH hosts:\n- k8s [off by default]\n- voip [off by default]')
@@ -74,7 +70,7 @@ describe('the prompt', () => {
 
   it('asks for a title alone without the lists', () => {
     const request = plannerRequest('Fix it', CATALOG, true)
-    expect(request.prompt).not.toContain('acme/api')
+    expect(request.prompt).not.toContain('Seti guide')
     expect(request.prompt).toContain('Only the title matters here')
   })
 
@@ -85,25 +81,11 @@ describe('the prompt', () => {
 })
 
 describe('the rules', () => {
-  it('takes only repos that exist, by slug or name, and worktrees them by default', () => {
-    const result = plan('work on api and web', { repos: ['acme/api', 'web', 'acme/ghost', 'ACME/API'] })
-    expect(result.repo_ids).toEqual(['r-api', 'r-web'])
-    expect(result.worktree).toBe(true)
-    expect(result.setup.repos).toEqual(['acme/api', 'acme/web'])
-    expect(result.setup.withheld).toEqual(['unknown repo acme/ghost'])
-  })
-
-  it('gives no repo a fresh folder and no worktree', () => {
-    const result = plan('write a poem', { repos: [], worktree: true })
-    expect(result.repo_ids).toEqual([])
-    expect(result.worktree).toBe(false)
-  })
-
-  it('keeps pinned repos and their worktree choice over the answer', () => {
-    const pinned = plan('x', { repos: ['acme/web'], worktree: true }, { repo_ids: ['r-api'], worktree: false })
-    expect(pinned.repo_ids).toEqual(['r-api'])
-    expect(pinned.worktree).toBe(false)
-    expect(plan('x', { repos: ['acme/web'] }, { cwd: '/tmp' }).repo_ids).toEqual([])
+  it('plans no place: an answer that still names repos is ignored', () => {
+    const result = plan('work on api', plannerOutput.parse({ repos: ['acme/api'], worktree: true }))
+    expect(Object.keys(result)).not.toContain('repo_ids')
+    expect(result.setup).not.toHaveProperty('repos')
+    expect(result.setup.withheld).toEqual([])
   })
 
   it('links default packs, adds known ones and never drops the built-in guide', () => {
@@ -129,9 +111,6 @@ describe('the rules', () => {
     const named = plan('look it up with web-staging', { enable_mcp: ['web-staging'] })
     expect(named.mcp_enabled).toEqual(['web-staging'])
     expect(named.setup.withheld).toEqual([])
-    const inRepo = plan('check the staging data', { repos: ['acme/web'], enable_mcp: ['web-staging'] })
-    expect(inRepo.mcp_enabled).toEqual([])
-    expect(inRepo.setup.withheld).toEqual([])
   })
 
   it('never grants SSH hosts or AWS the message does not explicitly ask for', () => {
@@ -195,7 +174,6 @@ describe('planning with the model', () => {
     setPlannerModel(async () => Promise.reject(new Error('not logged in')))
     const failed = await planAgent('fix the login page')
     expect(failed.title).toBe('Fix the login page')
-    expect(failed.repo_ids).toEqual([])
     expect(failed.setup).toMatchObject({ planner: 'fallback', fallback_reason: 'not logged in', access: [] })
 
     let aborted = false

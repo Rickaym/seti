@@ -1,9 +1,10 @@
-import { describeChange, type ChangeRequest, type PermissionRequest, type Question } from '@seti/shared'
+import { describeChange, timesOutSoon, type ChangeRequest, type PermissionRequest, type Question } from '@seti/shared'
 import { inBackground } from './background.js'
 import { tasks } from './db.js'
 import { changeRequests } from './store/change-requests.js'
 import { permissionRequests } from './store/permissions.js'
 import { questions } from './store/questions.js'
+import { restartCuts } from './store/restart.js'
 import { onAnyTaskEvent, publish } from './task-events.js'
 
 const LINE_CHARS = 120
@@ -17,7 +18,7 @@ export type StallSource = (typeof STALL_SOURCES)[number]
 /** Each task's stalls by source, held in memory: a restart ends the sessions they come from. */
 const stalls = new Map<string, Map<StallSource, string>>()
 
-/** The reason line of the oldest pending request, with how many more wait behind it. */
+/** The reason line of the oldest pending request: how many more wait, and a timeout that is near. */
 function permissionLine(pending: readonly PermissionRequest[]): string | null {
   const [first] = pending
   if (first === undefined) {
@@ -27,7 +28,8 @@ function permissionLine(pending: readonly PermissionRequest[]): string | null {
   const asked = first.summary === '' || first.tool_name === 'ExitPlanMode' ? what : `${what}: ${first.summary}`
   const line = first.kind === 'repeat' ? (first.reason ?? asked) : asked
   const more = pending.length > 1 ? ` (+${String(pending.length - 1)} more)` : ''
-  return `${clip(line, LINE_CHARS)}${more}`
+  const soon = timesOutSoon(first) ? ', times out soon' : ''
+  return `${clip(line, LINE_CHARS)}${more}${soon}`
 }
 
 /** The reason line of the agent's open questions, with the first one's text. */
@@ -66,6 +68,7 @@ async function refresh(taskId: string): Promise<string | null> {
     permissionLine(await permissionRequests.pending(taskId)) ??
     questionLine(await questions.openList(taskId)) ??
     changeLine(await changeRequests.pending(taskId)) ??
+    (await restartCuts.held(taskId)) ??
     stallLine(taskId)
   if (await tasks.setBlocked(taskId, blocked)) {
     publish(taskId, { type: 'blocked', blocked })
@@ -75,7 +78,8 @@ async function refresh(taskId: string): Promise<string | null> {
 
 /**
  * Sets the task's reason line from what it waits on: a permission request first, then its open
- * questions, then a change the agent asked for, else a stall.
+ * questions, then a change the agent asked for, then restarts that keep cutting it off, else a
+ * stall.
  * A change tells the task's views, and a new reason pushes a needs-you notification.
  */
 export async function refreshBlocked(taskId: string): Promise<string | null> {

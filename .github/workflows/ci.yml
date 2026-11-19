@@ -129,7 +129,7 @@ jobs:
     needs: changes
     if: needs.changes.outputs.e2e == 'true'
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
@@ -163,6 +163,8 @@ jobs:
           echo "SETI_TEST_DATABASE_URL=postgres://postgres:postgres@localhost:${{ job.services.postgres.ports['5432'] }}/postgres" >> "$GITHUB_ENV"
           echo "SETI_TEST_REDIS_URL=redis://localhost:${{ job.services.redis.ports['6379'] }}" >> "$GITHUB_ENV"
       - uses: ./.github/actions/setup
+        with:
+          playwright-deps: 'true'
       - id: playwright
         run: echo "version=$(pnpm --filter @seti/e2e exec playwright --version | awk '{print $2}')" >> "$GITHUB_OUTPUT"
       - id: browsers
@@ -171,9 +173,7 @@ jobs:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}-chromium
       - if: steps.browsers.outputs.cache-hit != 'true'
-        run: pnpm --filter @seti/e2e exec playwright install --with-deps chromium
-      - if: steps.browsers.outputs.cache-hit == 'true'
-        run: pnpm --filter @seti/e2e exec playwright install-deps chromium
+        run: pnpm --filter @seti/e2e exec playwright install chromium
       - run: pnpm build
       - run: pnpm e2e --shard=${{ matrix.shard }}/4
         env:

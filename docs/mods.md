@@ -203,7 +203,7 @@ Every call on `seti` is one request to Seti, which checks it as the mod, within 
 | `fetch(url, init?)`                                                                            | `net.fetch`, or `connection` with `init.connection` |
 | `tasks.list({ status?, limit? })`, `get(id)`, `transcript(id, { limit?, before? })`, `prs(id)` | `tasks.read`                                        |
 | `tasks.rename`, `pin`, `setColor`, `linkPr`, `unlinkPr`                                        | `tasks.manage` with that action                     |
-| `tasks.start({ title, prompt, repo? })`, `tasks.stop(id)`                                      | `tasks.manage` with that action; asks the user      |
+| `tasks.start({ title, prompt })`, `tasks.stop(id)`                                             | `tasks.manage` with that action; asks the user      |
 | `chat.post(text)`, `chat.post(text, { to })`                                                   | `chat.post` with `public`, or `direct`              |
 | `files.list(agentId, dir)`, `files.read(agentId, path)`                                        | `files.read`                                        |
 | `statusBar.set(item, { text })`                                                                | an item in `statusBar`                              |
@@ -659,7 +659,8 @@ agents at once for a view in `agentsLayout`: the Agents section shows it instead
 it is on, at most one layout is on, and a view with `phone: false` never shows on a narrow screen.
 `registerTerminalSource` lists the mod's terminals beside the device's own. `api.agents` and
 `api.terminals` give a layout Seti's agent view, frame, Files dock, list pieces and terminal
-views; `api.panels.markers` mark its panels for the focus API. The server half's
+views; `api.panels.markers` mark its panels for the focus API. A layout's
+`hidesList` hides the agents list while it shows. The server half's
 `api.workspaces.grids` keeps a layout per workspace with the bundled-only `workspaces.layout`
 capability, and a route's `request.caller` says whether the user, the EA or an agent sent it.
 `mods/grid/` is the example: a core mod, on by default, that shows agents and terminals side by

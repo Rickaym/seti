@@ -83,7 +83,7 @@ describe('nearbyDirs', () => {
       stdio: 'pipe',
     })
 
-  it('names the main checkout of a worktree before home, and only home elsewhere', async () => {
+  it('names the main checkout of a worktree before home, and only home elsewhere', () => {
     const main = path.join(scratch, 'main')
     const worktree = path.join(scratch, 'main-worktree')
     const plain = path.join(scratch, 'plain')
@@ -93,8 +93,8 @@ describe('nearbyDirs', () => {
     git(main, 'commit', '--allow-empty', '-m', 'chore: seed')
     git(main, 'worktree', 'add', '--detach', worktree)
 
-    expect(await nearbyDirs(worktree)).toEqual([fs.realpathSync(main), os.homedir()])
-    expect(await nearbyDirs(main)).toEqual([os.homedir()])
-    expect(await nearbyDirs(plain)).toEqual([os.homedir()])
+    expect(nearbyDirs(worktree)).toEqual([fs.realpathSync(main), os.homedir()])
+    expect(nearbyDirs(main)).toEqual([os.homedir()])
+    expect(nearbyDirs(plain)).toEqual([os.homedir()])
   })
 })

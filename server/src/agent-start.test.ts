@@ -1,17 +1,10 @@
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import {
-  auditQuery,
-  type ContextPackSummary,
-  type Repo,
-  type Task,
-  type TaskAccessView,
-  type UserSettings,
-} from '@seti/shared'
+import { auditQuery, type ContextPackSummary, type Task, type TaskAccessView, type UserSettings } from '@seti/shared'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createApp } from './app.js'
-import { repos } from './db.js'
+import { SCRATCH_ROOT } from './config.js'
 import { setPlannerModel, type PlannerRequest } from './planner.js'
 import { auditEvents } from './store/audit.js'
 import { EA_AUTH, USER_AUTH } from './test-auth.js'
@@ -64,15 +57,6 @@ async function send<T>(
   return { status: res.status, data: json.data, error: json.error }
 }
 
-async function checkout(slug: string): Promise<Repo> {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), `seti-agent-start-${slug.replace('/', '-')}-`))
-  fs.writeFileSync(path.join(dir, 'README.md'), '# Title\n\n![badge](x)\nBilling service for invoices.\n')
-  const repo: Repo = { id: crypto.randomUUID(), slug, path: dir, base_branch: 'main', created_at: '2026-01-01' }
-  await repos.insert(repo)
-  return repo
-}
-
-const billing = await checkout('acme/billing')
 const requests: PlannerRequest[] = []
 
 function answer(reply: Record<string, unknown>): void {
@@ -89,25 +73,24 @@ afterEach(() => {
 
 describe('POST /api/tasks/start', () => {
   it('creates the agent the planner set up, sandboxed, and records the plan', async () => {
-    answer({ title: 'Fix invoice rounding', repos: ['acme/billing'], worktree: false, aws: true, role: 'Lead' })
+    answer({ title: 'Fix invoice rounding', repos: ['acme/billing'], worktree: true, aws: true, role: 'Lead' })
     const { status, data: task } = await send<Task>('POST', '/tasks/start', {
       prompt: 'The invoices round the wrong way, fix it',
     })
     expect(status).toBe(200)
-    expect(requests[0]?.prompt).toContain('- acme/billing: Billing service for invoices.')
-    expect(task).toMatchObject({ title: 'Fix invoice rounding', cwd: billing.path, sandbox: true })
+    expect(requests[0]?.prompt).not.toContain('Repos:')
+    expect(task).toMatchObject({ title: 'Fix invoice rounding', sandbox: true, repos: [], worktree: false })
+    expect(path.dirname(task.cwd)).toBe(SCRATCH_ROOT)
     const packs = (await send<ContextPackSummary[]>('GET', `/tasks/${task.id}/context-packs`)).data
     expect(packs.filter((pack) => pack.kind === 'role')).toEqual([])
     expect(task.setup).toMatchObject({
       planner: 'model',
-      repos: ['acme/billing'],
-      worktree: false,
       access: [],
       withheld: ['AWS: not configured'],
     })
     const [created] = (await auditEvents.page(auditQuery.parse({ kind: 'task.created', limit: 1 }))).events
     expect(created?.subject_id).toBe(task.id)
-    expect(created?.summary).toContain('planned: repo acme/billing')
+    expect(created?.summary).toContain('planned: fresh folder')
     expect(created?.detail).toMatchObject({ planner: 'model', withheld: ['AWS: not configured'] })
   })
 
@@ -132,10 +115,8 @@ describe('POST /api/tasks/start', () => {
     const { data: task } = await send<Task>('POST', '/tasks/start', {
       prompt: 'review it',
       title: 'Review PR 7',
-      repo_ids: [billing.id],
-      worktree: false,
     })
-    expect(task).toMatchObject({ title: 'Review PR 7', repo_id: billing.id })
+    expect(task).toMatchObject({ title: 'Review PR 7', repo_id: null })
   })
 
   it('grants an SSH host the message names through the agent access', async () => {
@@ -176,7 +157,7 @@ describe('POST /api/tasks without a title', () => {
     expect(task.title).toBe('Tidy the changelog')
     expect(task.repos).toEqual([])
     expect(task.setup).toBeNull()
-    expect(requests[0]?.prompt).not.toContain('acme/billing')
+    expect(requests[0]?.prompt).toContain('Only the title matters here')
   })
 })
 

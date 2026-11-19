@@ -1,6 +1,6 @@
 import type { APIRequestContext, Page } from '@playwright/test'
 import type { AuditPage, Envelope, ModActionResult, Task } from '@seti/shared'
-import { EA_HEADERS, paths } from './support/env.js'
+import { EA_HEADERS } from './support/env.js'
 import { NO_SETI_TOOLS, setiPrompt } from './support/fake-claude.js'
 import { apiData, expect, test, toasts, unique } from './support/fixtures.js'
 import { resetSampleMod, sampleToggle, setModEnabled } from './support/mods.js'
@@ -15,7 +15,7 @@ test.afterEach(async ({ request }) => {
 
 async function startAgent(request: APIRequestContext): Promise<Task> {
   const response = await request.post('/api/tasks', {
-    data: { title: unique('Mod commands'), prompt: 'Say hello', cwd: paths.checkout, sandbox: false },
+    data: { title: unique('Mod commands'), prompt: 'Say hello', sandbox: false },
   })
   expect(response.ok(), 'POST /api/tasks').toBe(true)
   const task = ((await response.json()) as Envelope<Task>).data

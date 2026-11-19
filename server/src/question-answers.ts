@@ -11,7 +11,9 @@ import {
 import { audit } from './audit.js'
 import { fromEa, refuseAgent } from './ea-guard.js'
 import { HttpError } from './http.js'
+import { releaseHeld } from './inputs.js'
 import { expireGroup, resumeGroup, waiterOf } from './questions.js'
+import { deliverLateAnswers, isLateGroup } from './restart-waits.js'
 import { credentialFindings } from './scrub.js'
 import { dismissSecret } from './secret-questions.js'
 import { questions } from './store/questions.js'
@@ -24,12 +26,11 @@ export const SECRET_ANSWER =
 
 const DISMISSED_ONE = 'The user dismissed this question without answering. Decide yourself and say what you assumed.'
 
-const DISMISSED_ALL: PermissionResult = {
-  behavior: 'deny',
-  message:
-    'The user dismissed your questions without answering. Go on with your best judgment and say what you ' +
-    'assumed, or end your turn if you cannot go on without an answer.',
-}
+const DISMISSED_TEXT =
+  'The user dismissed your questions without answering. Go on with your best judgment and say what you ' +
+  'assumed, or end your turn if you cannot go on without an answer.'
+
+const DISMISSED_ALL: PermissionResult = { behavior: 'deny', message: DISMISSED_TEXT }
 
 const named = (question: Question) => `"${question.header}"`
 
@@ -125,6 +126,22 @@ function groupResult(group: readonly Question[], input: Record<string, unknown>)
   return { behavior: 'allow', updatedInput: { ...input, answers } }
 }
 
+const LATE_ANSWERS =
+  "Seti restarted while you waited for the user's answers, so your AskUserQuestion call ended without them."
+
+/** What the agent reads when the answers come after a restart ended the call that asked. */
+function lateAnswersText(group: readonly Question[]): string {
+  if (group.every((question) => question.status === 'dismissed')) {
+    return `${LATE_ANSWERS} ${DISMISSED_TEXT}`
+  }
+  const answers = group.map((question) => `- ${question.prompt}\n  Answer: ${answerValue(question).join(', ')}`)
+  return [
+    `${LATE_ANSWERS} The user has answered since:`,
+    answers.join('\n'),
+    'Continue where you left off with these answers; do not ask the same questions again.',
+  ].join('\n\n')
+}
+
 /** Turns down the call of a dismissed secret question; true when an agent still waited on it. */
 async function deliverSecret(question: Question): Promise<boolean> {
   if (dismissSecret(question.id)) {
@@ -148,6 +165,9 @@ async function deliverGroup(groupId: string): Promise<boolean> {
     return deliverSecret(first)
   }
   const waiter = waiterOf(groupId)
+  if (waiter === undefined && isLateGroup(groupId)) {
+    return deliverLateAnswers(groupId, lateAnswersText(group))
+  }
   if (waiter === undefined) {
     await expireGroup(groupId, 'no session waits on it')
     return false
@@ -200,6 +220,9 @@ export async function answerQuestions(input: AnswerQuestionsInput): Promise<Answ
       result.resumed.push({ task_id: question.task_id, task_title: question.task_title })
     }
     await refreshBlocked(question.task_id)
+    if (resumed) {
+      await releaseHeld(question.task_id)
+    }
   }
   return result
 }

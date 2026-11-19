@@ -1,12 +1,11 @@
 import type { APIRequestContext, Locator, Page } from '@playwright/test'
 import type { Envelope, MessagePage, Task } from '@seti/shared'
-import { paths } from './env.js'
 import { apiData, expect, toasts, unique } from './fixtures.js'
 
 /** Starts an agent on a question prompt and waits until its questions hold it in Needs you. */
 export async function askingAgent(request: APIRequestContext, name: string, prompt: string): Promise<Task> {
   const response = await request.post('/api/tasks', {
-    data: { title: unique(name), prompt, cwd: paths.checkout, sandbox: false },
+    data: { title: unique(name), prompt, sandbox: false },
   })
   expect(response.ok(), 'POST /api/tasks').toBe(true)
   const task = ((await response.json()) as Envelope<Task>).data

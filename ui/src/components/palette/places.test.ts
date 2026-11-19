@@ -21,6 +21,7 @@ function task(id: string, extra: Partial<TaskListEntry> = {}): TaskListEntry {
     cwd: `/work/${id}`,
     worktree: false,
     sandbox: true,
+    home_access: false,
     profile_id: 'default',
     seti_control: 'self',
     bypass_until: null,
@@ -53,6 +54,7 @@ function task(id: string, extra: Partial<TaskListEntry> = {}): TaskListEntry {
     ...listedSubtasks([]),
     todos: [],
     pr_states: prStates({}),
+    question: null,
     ...extra,
   }
 }

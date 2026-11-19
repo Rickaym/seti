@@ -46,9 +46,6 @@ async function startPlanned(input: StartAgentRequest, cap?: AccessCap): Promise<
   const onCreated = await firstTurnWait(input.notify_when_done)
   const plan = await planAgent(input.prompt, {
     title: input.title,
-    repo_ids: input.repo_ids,
-    worktree: input.worktree,
-    cwd: input.cwd,
     fromEa: fromEa(),
     fromAgent: cap !== undefined,
   })
@@ -58,10 +55,6 @@ async function startPlanned(input: StartAgentRequest, cap?: AccessCap): Promise<
     {
       title: plan.title,
       prompt: input.prompt,
-      repo_ids: plan.repo_ids,
-      ...(input.cwd === undefined ? {} : { cwd: input.cwd }),
-      worktree: plan.worktree,
-      ...(input.ref === undefined ? {} : { ref: input.ref }),
       ...(input.pr_urls === undefined ? {} : { pr_urls: input.pr_urls }),
       context_pack_ids: plan.context_pack_ids,
       disabled_plugin_ids: capped?.disabled_plugin_ids ?? [],

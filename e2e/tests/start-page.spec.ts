@@ -1,4 +1,6 @@
 import { randomUUID } from 'node:crypto'
+import fs from 'node:fs'
+import path from 'node:path'
 import type { APIRequestContext, Page } from '@playwright/test'
 import { AGENT_COLOR_PRESETS, type AuditPage, type StartAgentInput, type Task, type TaskAccessView } from '@seti/shared'
 import { openAgentSettings } from './support/agent-settings.js'
@@ -148,29 +150,28 @@ test('the start button looks off until there is a message, then takes the primar
   await expect.poll(async () => (await look(send)).background).toBe(background)
 })
 
-test('Enter starts a planned agent in its repo without a setup line', async ({ page, request }) => {
-  const [api, web] = await addScratchRepos(request)
-  const name = api.slug.split('/')[1] ?? ''
+test('Enter starts a planned agent in a fresh folder of its own, without a setup line', async ({ page, request }) => {
   await page.goto('/#agents/new')
   await expect(page.getByRole('button', { name: 'Start agent' })).toBeDisabled()
+  await expect(main(page).getByText('It works in its own folder and clones what it needs.')).toBeVisible()
   await message(page).fill('First line')
   await message(page).press('Control+Enter')
   await expect(message(page)).toHaveValue('First line\n')
 
-  const id = await start(page, `Fix the flaky test in ${name}`)
-  await expect(main(page).getByRole('heading', { name: `Planned: Fix the flaky test in ${name}` })).toBeVisible()
-  await expect(main(page)).toContainText(api.slug)
+  const id = await start(page, 'Fix the flaky test in the api repo')
+  await expect(main(page).getByRole('heading', { name: 'Planned: Fix the flaky test in the api repo' })).toBeVisible()
   await expect(main(page).getByLabel('Setup', { exact: true })).toBeHidden()
   await expect(main(page)).not.toContainText('Set up:')
   const task = await apiData<Task>(request, `/tasks/${id}`)
-  expect(task).toMatchObject({ repo_id: api.id, worktree: true, sandbox: true })
+  expect(task).toMatchObject({ repo_id: null, repos: [], dirs: [], worktree: false, sandbox: true, home_access: false })
+  expect(path.dirname(task.cwd)).toBe(path.join(paths.home, 'work'))
+  expect(fs.statSync(task.cwd).isDirectory()).toBe(true)
   expect(await grantedAccess(request, id)).toEqual([])
 
   const events = await apiData<AuditPage>(request, '/audit?kind=task.created&limit=20')
   const created = events.events.find((event) => event.subject_id === id)
-  expect(created?.detail).toMatchObject({ planner: 'model', planned: `repo ${api.slug} (worktree)` })
+  expect(created?.detail).toMatchObject({ planner: 'model', planned: 'fresh folder', cwd: task.cwd })
   await remove(page, id)
-  await removeRepos(request, [api, web])
 })
 
 test('access the message does not clearly ask for is not given, and the agent settings say so', async ({
@@ -205,14 +206,14 @@ test('a planner that fails still starts the agent with defaults and a title from
   await remove(page, id)
 })
 
-test('a recent repo chip pins the agent to that repo', async ({ page, request }) => {
+test('the start page offers no repo, branch or directory, and sends the message alone', async ({ page, request }) => {
   const [api, web] = await addScratchRepos(request)
   const db = openSeedDb()
   const seeded = randomUUID()
   const at = new Date().toISOString()
-  await db.idleTask(seeded, 'E2E recent repo', paths.home, at)
+  await db.idleTask(seeded, 'E2E older repo agent', paths.checkout, at)
+  await db.run('UPDATE task SET repo_id = ? WHERE id = ?', api.id, seeded)
   await db.close()
-  expect((await request.post(`/api/tasks/${seeded}/repos`, { data: { repo_id: api.id } })).ok()).toBe(true)
 
   const sent: StartAgentInput[] = []
   await page.route('**/api/tasks/start', async (route) => {
@@ -220,18 +221,39 @@ test('a recent repo chip pins the agent to that repo', async ({ page, request })
     await route.fulfill({ json: { data: { id: 'e2e-intercepted' }, meta: {} } })
   })
   await page.goto('/#agents/new')
-  const chip = page.getByRole('group', { name: 'Recent repos' }).getByRole('button', { name: api.slug })
-  await expect(chip).toHaveAttribute('aria-pressed', 'false')
-  await chip.click()
-  await expect(chip).toHaveAttribute('aria-pressed', 'true')
+  await expect(message(page)).toBeEditable()
+  await expect(page.getByRole('group', { name: 'Recent repos' })).toHaveCount(0)
+  await expect(main(page).getByRole('button', { name: api.slug })).toHaveCount(0)
+  await expect(main(page).locator('select')).toHaveCount(0)
   await message(page).fill('Bump the dependencies')
   await message(page).press('Enter')
   await expect(page).toHaveURL(/#agents\/e2e-intercepted$/)
   const { workspace_id } = await apiData<Task>(request, `/tasks/${seeded}`)
-  expect(sent).toEqual([
-    { prompt: 'Bump the dependencies', repo_ids: [api.id], workspace_id, client_id: expect.any(String) },
-  ])
+  expect(sent).toEqual([{ prompt: 'Bump the dependencies', workspace_id, client_id: expect.any(String) }])
   await page.unroute('**/api/tasks/start')
   await remove(page, seeded)
+  await removeRepos(request, [api, web])
+})
+
+test('a start request from an older tab that still names a repo and a directory is not refused', async ({
+  page,
+  request,
+}) => {
+  const [api, web] = await addScratchRepos(request)
+  const old = { repo_ids: [api.id], worktree: true, ref: 'main', prompt: 'planner down: carry on from the old tab' }
+  const response = await request.post('/api/tasks/start', { data: old })
+  expect(response.ok()).toBe(true)
+  const task = ((await response.json()) as { data: Task }).data
+  expect(task).toMatchObject({ repo_id: null, repos: [], worktree: false })
+  expect(path.dirname(task.cwd)).toBe(path.join(paths.home, 'work'))
+  const direct = await request.post('/api/tasks', {
+    data: { title: 'Old script', prompt: 'Say hello', cwd: paths.checkout, repo_id: web.id, sandbox: false },
+  })
+  expect(direct.ok()).toBe(true)
+  const scripted = ((await direct.json()) as { data: Task }).data
+  expect(scripted.cwd).not.toBe(paths.checkout)
+  expect(scripted.repos).toEqual([])
+  await remove(page, task.id)
+  await remove(page, scripted.id)
   await removeRepos(request, [api, web])
 })

@@ -49,7 +49,7 @@ and review threads, so a red check or a new comment becomes their next turn, not
 - **Needs you, first.** One list of the agents that cannot go on without you, each with its
   reason.
 - **Full control on a phone.** Permissions, terminals with a key row, files and every setting.
-- **A live graph of the team.** Home links every agent to its repos, MCP servers and subagents.
+- **A live graph of the team.** Home links every agent to its repos and subagents.
 - **Pull requests that close the loop.** CI, previews and reviews reach the agent as input.
 - **[Channels](docs/pollers.md).** Webhooks, reminders and pollers turn any service into events
   that wake an agent or the EA.
@@ -103,7 +103,7 @@ Every flow works on a phone, and the EA can do almost everything you can, except
   </tr>
   <tr>
     <td align="center" valign="top" colspan="2" width="50%">
-      <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/home-dark.webp"><img alt="Home: a graph of agents linked to their repos and MCP servers, a merge streak and the agents ranked by PRs merged" src="docs/screenshots/home-light.webp" width="100%"></picture>
+      <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/home-dark.webp"><img alt="Home: a graph of agents linked to their repos, a merge streak and the agents ranked by PRs merged" src="docs/screenshots/home-light.webp" width="100%"></picture>
       <br><sub>Home</sub>
     </td>
     <td align="center" valign="top" colspan="2" width="50%">
@@ -131,7 +131,7 @@ the [install script](scripts/install.sh) before you run it.
 2. Open `http://seti.localhost:3006`. From another machine, forward the port first:
    `ssh -L 3006:127.0.0.1:3006 <host>`.
 3. Sign in with the token that `cat ~/.seti/credentials/local-token-user` prints.
-4. Add a repo in Settings, Repos, then start an agent.
+4. Start an agent: say what it should do and which repos to clone.
 
 [Setup](docs/setup.md) covers every option, remote access and upgrades. `pnpm run doctor` in
 `~/seti` says what is wrong and how to fix it.

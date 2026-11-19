@@ -1,6 +1,7 @@
-import { Eraser, Lock, LockOpen, Rows3, Terminal } from 'lucide-react'
+import { Eraser, Lock, LockOpen, PanelLeft, Rows3, Terminal } from 'lucide-react'
 import { clearGrid, lockGrid, setPerScreen, tidyGrid } from './grid-actions'
 import { PER_SCREEN, templateAcross, templateRows } from './grid-layout'
+import { gridPrefs, useGridPrefs } from './grid-prefs'
 import { useGrid } from './grid-store'
 import {
   Button,
@@ -87,9 +88,10 @@ function TemplatePicker() {
   )
 }
 
-/** Terminal, Lock, Tidy and Clear along the top of the grid, level with the Agents list header. */
+/** The grid's controls along its top, level with the Agents list header: List first. */
 export function GridToolbar() {
   const { locked, panels, perScreen } = useGrid()
+  const { listHidden } = useGridPrefs()
   const count = panels.length
   return (
     <div
@@ -97,6 +99,16 @@ export function GridToolbar() {
       aria-label="Grid layout"
       className="flex shrink-0 items-center gap-1.5 border-b border-border bg-background px-3 py-2"
     >
+      <ToggleButton
+        pressed={!listHidden}
+        onPressedChange={(shown) => {
+          gridPrefs.set({ listHidden: !shown })
+        }}
+        icon={<PanelLeft />}
+        label="List"
+        iconOnly
+        hint={listHidden ? 'Show the agents list beside the grid' : 'Hide the agents list, so the grid gets its room'}
+      />
       <p className="mr-auto min-w-0 truncate text-xs text-muted-foreground tabular-nums">{panelCount(count)}</p>
       <Hint text="Add a terminal to the grid, in the home folder">
         <Button variant="outline" size="sm" onClick={addTerminalTile}>
