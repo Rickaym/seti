@@ -47,7 +47,7 @@ SOURCE_LABELS = {"poller": "Poller", "reminder": "Reminder"}
 SECRET_STATES = {
     "reveal": "Its secret waits for the user: in Settings, Channels they press Show on this webhook and "
     "copy it into the sender. Seti shows it once, and never to you.",
-    "paste": "Its secret is still missing: the user pastes the client secret {label} issued in Settings, "
+    "paste": "Its secret is still missing: the user pastes the secret {label} issued in Settings, "
     "Channels, with Paste on this webhook. Deliveries are refused until then.",
 }
 MAPPING_FIELDS = ("title", "kind", "severity", "url", "subject", "state")
@@ -983,7 +983,7 @@ class SettingsTools:
             reach = "reporting to you" if deliver else "keeping its events out of your inbox"
             secret = (
                 f"{label} issues its secret: the user puts the webhook URL in {label}, then pastes "
-                "the client secret it gives in Settings, Channels; deliveries are refused until then."
+                "the secret it gives in Settings, Channels; deliveries are refused until then."
                 if source.get("secret") == "sender"
                 else "Seti issues its signing secret; the user copies it once from Settings, Channels, and "
                 "you never see it."
