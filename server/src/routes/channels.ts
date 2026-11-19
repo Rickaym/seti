@@ -6,18 +6,21 @@ import {
   channelRotateInput,
   channelSubscribeInput,
   channelUpdateInput,
+  senderSampleInput,
 } from '@seti/shared'
 import { Hono } from 'hono'
 import { z } from 'zod'
 import { pollerRoutes } from './pollers.js'
 import { reminderRoutes } from './reminders.js'
 import {
+  checkSenderSample,
   createChannel,
   deleteChannel,
   listChannels,
   revealChannelSecret,
   rotateChannel,
   SECRET_VALUES,
+  SENDER_RULES,
   setChannelDelivery,
   setChannelFilter,
   setChannelMode,
@@ -48,11 +51,21 @@ export const channelRoutes = new Hono()
     if (fromEa() && input.secret !== undefined) {
       return refuseEa(c, SECRET_VALUES)
     }
+    if (fromEa() && input.sender !== undefined) {
+      return refuseEa(c, SENDER_RULES)
+    }
     return ok(c, await createChannel(input))
   })
-  .put('/:id', valid('param', idParam), validJson(channelUpdateInput), async (c) =>
-    ok(c, await updateChannel(c.req.valid('param').id, c.req.valid('json'))),
+  .post('/sample', notEa(SECRET_VALUES), validJson(senderSampleInput), async (c) =>
+    ok(c, await checkSenderSample(c.req.valid('json'))),
   )
+  .put('/:id', valid('param', idParam), validJson(channelUpdateInput), async (c) => {
+    const change = c.req.valid('json')
+    if (fromEa() && change.sender !== undefined) {
+      return refuseEa(c, SENDER_RULES)
+    }
+    return ok(c, await updateChannel(c.req.valid('param').id, change))
+  })
   .post('/:id/rotate', valid('param', idParam), validJson(channelRotateInput), async (c) => {
     const given = c.req.valid('json').secret
     if (fromEa() && given !== undefined) {

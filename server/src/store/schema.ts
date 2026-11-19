@@ -75,6 +75,7 @@ import { EA_DOC_NO_DIRECT, TEAM_CHAT, TEAM_DIRECT, TEAM_MESSAGE_SELF_HEADERS } f
 import { DROP_ESLINTCACHE_DEFAULT, WARM_CACHES } from './schema-warm-caches.js'
 import {
   CHANNEL_SECRET_PENDING,
+  CHANNEL_SENDER,
   CHANNEL_SOURCE_MODS,
   CHANNEL_SUBSCRIPTION_DELIVERY,
   CHANNEL_SUBSCRIPTIONS,
@@ -201,4 +202,5 @@ export const MIGRATIONS: readonly Migration[] = [
   { version: 109, name: 'restart_cuts', sql: RESTART_CUTS },
   { version: 110, name: 'task_home_access', sql: TASK_HOME_ACCESS },
   { version: 111, name: 'notify_scope', sql: NOTIFY_SCOPE },
+  { version: 112, name: 'channel_sender', sql: CHANNEL_SENDER },
 ]

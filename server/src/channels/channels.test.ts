@@ -271,7 +271,8 @@ describe('webhook routes', () => {
   })
 
   it('takes a sender-issued secret for Sentry and refuses secrets where Seti generates them', async () => {
-    expect((await api('POST', '', { name: 'S', preset: 'sentry' })).status).toBe(400)
+    const waiting = await api<ChannelSecret>('POST', '', { name: 'S', preset: 'sentry' })
+    expect(waiting.data).toMatchObject({ secret: null, channel: { secret_pending: 'paste' } })
     expect((await api('POST', '', { name: 'G', preset: 'generic', secret: SENTRY_SECRET })).status).toBe(400)
     const sentry = await api<ChannelSecret>('POST', '', {
       name: 'Sentry',

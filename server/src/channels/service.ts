@@ -1,6 +1,7 @@
 import {
   CHANNEL_ACTIVITY_SHOWN,
   CORE_WEBHOOK_SOURCE,
+  CUSTOM_WEBHOOK_SOURCE,
   HOOKS_PREFIX,
   type ChannelSecret,
   type ChannelSecretPending,
@@ -15,8 +16,9 @@ import { now } from '../db.js'
 import { HttpError } from '../http.js'
 import { createReceiver } from './receiver.js'
 import { routeEvent } from './router.js'
+import { channelSender, channelSource } from './sender-info.js'
 import { newHookId, newSecret } from './signature.js'
-import { requireWebhookSource, webhookSender } from './source-info.js'
+import { requireWebhookSource } from './source-info.js'
 import { channelSubscriptions } from '../store/channel-subscriptions.js'
 import { channelStore, type ChannelRecord } from '../store/channels.js'
 import { signalWorkspaces } from '../workspace/dir.js'
@@ -35,15 +37,16 @@ export function signalTasks(taskIds: readonly string[]): void {
 }
 
 async function info(record: ChannelRecord): Promise<WebhookChannelInfo> {
-  const { id, name, preset, mapping, created_at, updated_at, secret_rotated_at, secret_pending } = record
+  const { id, name, preset, mapping, sender, created_at, updated_at, secret_rotated_at, secret_pending } = record
   const path = `${HOOKS_PREFIX}${id}`
   return {
     source: 'webhook',
     id,
     name,
     preset,
-    ...webhookSender(preset),
+    ...channelSender(record),
     mapping,
+    sender_definition: preset === CUSTOM_WEBHOOK_SOURCE ? sender : null,
     created_at,
     updated_at,
     secret_rotated_at,
@@ -89,7 +92,7 @@ function secretFor(
     if (given !== undefined) {
       return { secret: given, shown: null, pending: null }
     }
-    if (forEa && creating) {
+    if (creating) {
       return { secret: newSecret(), shown: null, pending: 'paste' }
     }
     throw new HttpError(400, `Paste the secret ${label} issued for this webhook`)
@@ -107,7 +110,12 @@ export const webhooks = {
     Promise.all((await channelStore.list()).map(async (record) => info(record))),
   info: async (id: string): Promise<WebhookChannelInfo> => info(await recordOf(id)),
   create: async (input: z.output<typeof channelCreateInput>, requester = USER): Promise<ChannelSecret> => {
-    const { info: sender } = requireWebhookSource(input.preset)
+    const custom = input.preset === CUSTOM_WEBHOOK_SOURCE ? (input.sender ?? null) : null
+    const source = channelSource({ name: input.name, preset: input.preset, sender: custom })
+    if (input.preset === CUSTOM_WEBHOOK_SOURCE ? custom === null : input.sender !== undefined) {
+      throw new HttpError(400, 'A custom webhook, and only a custom one, takes a sender definition')
+    }
+    const { info: sender } = source ?? requireWebhookSource(input.preset)
     const { secret, shown, pending } = secretFor(sender, input.secret, requester, true)
     const record = await channelStore.create({
       id: newHookId(),
@@ -115,6 +123,7 @@ export const webhooks = {
       preset: input.preset,
       secret,
       mapping: input.preset === CORE_WEBHOOK_SOURCE ? input.mapping : {},
+      sender: custom,
       created_at: now(),
       secret_pending: pending,
     })
@@ -123,7 +132,7 @@ export const webhooks = {
         channel_id: record.id,
         target: 'ea',
         task_id: null,
-        events: null,
+        events: input.ea_events ?? null,
         created_at: now(),
       })
     }
@@ -134,6 +143,9 @@ export const webhooks = {
     if (change.mapping !== undefined && current.preset !== CORE_WEBHOOK_SOURCE) {
       throw new HttpError(400, 'Only generic webhooks take a field mapping')
     }
+    if (change.sender !== undefined && current.preset !== CUSTOM_WEBHOOK_SOURCE) {
+      throw new HttpError(400, 'Only a custom webhook takes a sender definition')
+    }
     const updated = (await channelStore.update(id, change, now())) ?? current
     if (updated.name !== current.name) {
       signalTasks(await subscribedTasks(id))
@@ -142,7 +154,7 @@ export const webhooks = {
   },
   rotate: async (id: string, given: string | undefined, requester = USER): Promise<ChannelSecret> => {
     const current = await recordOf(id)
-    const { secret, shown, pending } = secretFor(webhookSender(current.preset).sender, given, requester, false)
+    const { secret, shown, pending } = secretFor(channelSender(current).sender, given, requester, false)
     const rotated = await channelStore.rotate(id, secret, pending, now())
     return { channel: await info(rotated ?? current), secret: shown }
   },
@@ -167,7 +179,9 @@ export const webhooks = {
   },
   sendTest: async (id: string): Promise<WebhookChannelInfo> => {
     const current = await recordOf(id)
-    requireWebhookSource(current.preset)
+    if (channelSource(current) === undefined) {
+      requireWebhookSource(current.preset)
+    }
     const result = await receiver.sendTest(current)
     if (result.status === 'rejected') {
       throw new HttpError(500, `The test delivery was refused: ${result.reason}`)

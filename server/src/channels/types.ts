@@ -52,9 +52,11 @@ interface SampleDelivery {
 
 /** How one kind of sender signs, identifies and shapes its deliveries. */
 export interface WebhookPresetAdapter {
-  verify: (request: WebhookRequest, secret: string) => Verdict
+  verify: (request: WebhookRequest, secret: string, nowMs: number) => Verdict
   /** The sender's own id for this delivery, when it sends one. */
-  deliveryId: (headers: Headers) => string | null
+  deliveryId: (request: WebhookRequest) => string | null
+  /** The text a verified URL check of the sender asks Seti to send back; null for a delivery. */
+  handshake?: (payload: unknown) => string | null
   /** The JSON payload, or a reason to refuse the body. */
   decode: (request: WebhookRequest) => { ok: true; payload: unknown } | { ok: false; status: 400 | 415; reason: string }
   parse: (payload: unknown, headers: Headers, context: ParseContext) => Parsed | Promise<Parsed>

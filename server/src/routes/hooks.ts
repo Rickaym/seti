@@ -16,6 +16,9 @@ export const hookRoutes = new Hono()
     if (result.http >= 400) {
       return fail(c, result.http, result.status === 'not_found' ? 'Not found' : 'Refused', result.reason)
     }
+    if (result.echo !== undefined) {
+      return c.text(result.echo)
+    }
     return ok(c, { status: result.status, reason: result.reason })
   })
   .all('*', (c) => fail(c, 404, 'Not found'))

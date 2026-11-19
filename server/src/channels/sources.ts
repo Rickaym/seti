@@ -4,12 +4,17 @@ import {
   CORE_WEBHOOK_SOURCE,
   modScoped,
   Registry,
+  senderHeader,
+  SERVICE_ICON_KEYS,
+  WEBHOOK_SENDERS,
   type ModWebhookSource,
   type PollerTemplateInfo,
+  type WebhookSender,
   type WebhookSourceInfo,
 } from '@seti/shared'
 import { decodeJson, parseJsonText } from './payload.js'
 import { genericPreset } from './preset-generic.js'
+import { senderAdapter } from './sender-adapter.js'
 import { hmacHex, verifyHmac } from './signature.js'
 import type { WebhookPresetAdapter, WebhookRequest } from './types.js'
 
@@ -29,7 +34,7 @@ webhookSources.register({
   info: {
     id: CORE_WEBHOOK_SOURCE,
     mod: null,
-    label: 'Generic',
+    label: 'Seti signature',
     description: 'Any JSON sender. Sign the body with HMAC-SHA256, or send the secret as a bearer token.',
     signature: 'X-Seti-Signature',
     secret: 'generated',
@@ -38,9 +43,31 @@ webhookSources.register({
       'The sender posts JSON to the URL and signs each request with X-Seti-Signature: sha256= and the hex ' +
       'HMAC-SHA256 of the body, keyed with the secret; a sender that cannot sign sends ' +
       'Authorization: Bearer and the secret instead.',
+    icon: null,
+    secret_label: 'Secret',
+    steps: [],
   },
   adapter: genericPreset,
 })
+
+/** A catalog sender as the user reads it. */
+const catalogInfo = (sender: WebhookSender): WebhookSourceInfo => ({
+  id: sender.id,
+  mod: null,
+  label: sender.title,
+  description: sender.description,
+  signature: senderHeader(sender.definition),
+  secret: sender.definition.secret,
+  kinds: [...sender.kinds],
+  setup: sender.steps.join(' '),
+  icon: sender.icon,
+  secret_label: sender.secret_label,
+  steps: [...sender.steps],
+})
+
+for (const sender of WEBHOOK_SENDERS) {
+  webhookSources.register({ info: catalogInfo(sender), adapter: senderAdapter(sender.title, sender.definition) })
+}
 
 pollerTemplates.register({
   id: CORE_POLLER_TEMPLATE,
@@ -63,6 +90,9 @@ export const modWebhookInfo = (mod: string, declared: ModWebhookSource): Webhook
   secret: declared.secret,
   kinds: [...declared.kinds],
   setup: declared.setup,
+  icon: SERVICE_ICON_KEYS.find((key) => key === declared.id) ?? null,
+  secret_label: declared.secret === 'sender' ? 'Client secret' : 'Secret',
+  steps: [],
 })
 
 const FORM = /^application\/x-www-form-urlencoded\b/i
@@ -89,7 +119,7 @@ export function modWebhookChecks(
   const { header, prefix } = declared.signature
   return {
     verify: (request, secret) => verifyHmac(request.headers.get(header), prefix, request.body, secret),
-    deliveryId: (headers) => (declared.delivery === undefined ? null : headers.get(declared.delivery)),
+    deliveryId: ({ headers }) => (declared.delivery === undefined ? null : headers.get(declared.delivery)),
     decode: declared.formPayload ? decodeForm : decodeJson,
     sample: (secret, nonce) => {
       const { headers, body } = sample()

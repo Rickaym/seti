@@ -201,14 +201,16 @@ SETTINGS_SPECS: list[ToolSpec] = [
     ToolSpec(
         "create_channel",
         "Create a webhook channel. Seti issues its signing secret, which only the user sees, once, in "
-        "Settings; for Sentry the user pastes the secret Sentry issues. Needs the user's yes. Its events "
+        "Settings; for an app that issues its own, such as Linear, Stripe or Sentry, the user pastes that "
+        "secret in Settings instead. Needs the user's yes. Its events "
         "reach your inbox only with subscribe_ea; subscribe agents to it with subscribe_channel.",
         {
             "name": {"type": "string", "description": "A short name, such as Uptime or Payments CI."},
             "preset": {
                 "type": "string",
                 "description": "generic for any JSON sender (default), or a webhook source by its id or "
-                "name, such as GitHub or Sentry, while the mod that adds it is on.",
+                "name: an app Seti lists, such as Linear, Stripe, Slack or GitLab, or one a mod adds, such "
+                "as GitHub or Sentry, while that mod is on. Only the user makes a custom sender.",
             },
             "subscribe_ea": {
                 "type": "boolean",

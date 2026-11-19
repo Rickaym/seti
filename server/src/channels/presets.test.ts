@@ -1,4 +1,4 @@
-import { timeOf, type WebhookMapping } from '@seti/shared'
+import { isDataSender, timeOf, type WebhookMapping } from '@seti/shared'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { atPointer } from './payload.js'
 import { parseGeneric } from './preset-generic.js'
@@ -67,35 +67,42 @@ describe('signatures', () => {
   it('generic: HMAC in X-Seti-Signature, or the secret as a bearer token', () => {
     const { verify } = adapterOf(SOURCE_IDS.generic)
     const body = '{"title":"x"}'
-    expect(verify(request(body, { 'x-seti-signature': `sha256=${hmacHex(SECRET, body)}` }), SECRET)).toEqual({
+    expect(
+      verify(request(body, { 'x-seti-signature': `sha256=${hmacHex(SECRET, body)}` }), SECRET, Date.now()),
+    ).toEqual({
       ok: true,
     })
     expect(
-      verify(request(body, { 'x-seti-signature': `SHA256=${hmacHex(SECRET, body).toUpperCase()}` }), SECRET).ok,
+      verify(request(body, { 'x-seti-signature': `SHA256=${hmacHex(SECRET, body).toUpperCase()}` }), SECRET, Date.now())
+        .ok,
     ).toBe(true)
-    expect(verify(request(body, { 'x-seti-signature': `sha256=${hmacHex(OTHER, body)}` }), SECRET)).toEqual({
-      ok: false,
-      reason: 'signature mismatch',
-    })
-    expect(verify(request(body, { 'x-seti-signature': hmacHex(SECRET, body) }), SECRET).ok).toBe(false)
-    expect(verify(request(body), SECRET)).toEqual({ ok: false, reason: 'missing signature' })
-    expect(verify(request(body, { authorization: `Bearer ${SECRET}` }), SECRET)).toEqual({ ok: true })
-    expect(verify(request(body, { authorization: `Bearer ${OTHER}` }), SECRET)).toEqual({
+    expect(verify(request(body, { 'x-seti-signature': `sha256=${hmacHex(OTHER, body)}` }), SECRET, Date.now())).toEqual(
+      {
+        ok: false,
+        reason: 'signature mismatch',
+      },
+    )
+    expect(verify(request(body, { 'x-seti-signature': hmacHex(SECRET, body) }), SECRET, Date.now()).ok).toBe(false)
+    expect(verify(request(body), SECRET, Date.now())).toEqual({ ok: false, reason: 'missing signature' })
+    expect(verify(request(body, { authorization: `Bearer ${SECRET}` }), SECRET, Date.now())).toEqual({ ok: true })
+    expect(verify(request(body, { authorization: `Bearer ${OTHER}` }), SECRET, Date.now())).toEqual({
       ok: false,
       reason: 'bearer secret mismatch',
     })
     const both = { authorization: `Bearer ${SECRET}`, 'x-seti-signature': 'sha256=00' }
-    expect(verify(request(body, both), SECRET).ok).toBe(false)
+    expect(verify(request(body, both), SECRET, Date.now()).ok).toBe(false)
   })
 
   it('github: X-Hub-Signature-256 over the raw body', () => {
     const { verify } = adapterOf(SOURCE_IDS.github)
     const body = '{"zen":"Keep it logically awesome."}'
-    expect(verify(request(body, { 'x-hub-signature-256': `sha256=${hmacHex(SECRET, body)}` }), SECRET).ok).toBe(true)
-    expect(verify(request(`${body} `, { 'x-hub-signature-256': `sha256=${hmacHex(SECRET, body)}` }), SECRET).ok).toBe(
-      false,
-    )
-    expect(verify(request(body, { 'x-hub-signature': `sha1=${hmacHex(SECRET, body)}` }), SECRET)).toEqual({
+    expect(
+      verify(request(body, { 'x-hub-signature-256': `sha256=${hmacHex(SECRET, body)}` }), SECRET, Date.now()).ok,
+    ).toBe(true)
+    expect(
+      verify(request(`${body} `, { 'x-hub-signature-256': `sha256=${hmacHex(SECRET, body)}` }), SECRET, Date.now()).ok,
+    ).toBe(false)
+    expect(verify(request(body, { 'x-hub-signature': `sha1=${hmacHex(SECRET, body)}` }), SECRET, Date.now())).toEqual({
       ok: false,
       reason: 'missing signature',
     })
@@ -104,20 +111,21 @@ describe('signatures', () => {
   it('sentry: bare hex in Sentry-Hook-Signature', () => {
     const { verify } = adapterOf(SOURCE_IDS.sentry)
     const body = '{"action":"created"}'
-    expect(verify(request(body, { 'sentry-hook-signature': hmacHex(SECRET, body) }), SECRET).ok).toBe(true)
-    expect(verify(request(body, { 'sentry-hook-signature': hmacHex(OTHER, body) }), SECRET).ok).toBe(false)
-    expect(verify(request(body), SECRET).ok).toBe(false)
+    expect(verify(request(body, { 'sentry-hook-signature': hmacHex(SECRET, body) }), SECRET, Date.now()).ok).toBe(true)
+    expect(verify(request(body, { 'sentry-hook-signature': hmacHex(OTHER, body) }), SECRET, Date.now()).ok).toBe(false)
+    expect(verify(request(body), SECRET, Date.now()).ok).toBe(false)
   })
 
   it('every preset verifies and reads its own test sample', () => {
-    expect(webhookSources.list().map((source) => source.info.id)).toEqual(Object.values(SOURCE_IDS))
+    const listed = webhookSources.list().map((source) => source.info.id)
+    expect(listed.filter((id) => !isDataSender(id))).toEqual(Object.values(SOURCE_IDS))
     for (const id of Object.values(SOURCE_IDS)) {
       const preset = adapterOf(id)
       const sample = preset.sample(SECRET, 'nonce-1')
       const sent = request(sample.body, sample.headers)
-      expect(preset.verify(sent, SECRET), id).toEqual({ ok: true })
-      expect(preset.verify(sent, OTHER).ok, id).toBe(false)
-      expect(preset.deliveryId(sent.headers), id).toBe('nonce-1')
+      expect(preset.verify(sent, SECRET, Date.now()), id).toEqual({ ok: true })
+      expect(preset.verify(sent, OTHER, Date.now()).ok, id).toBe(false)
+      expect(preset.deliveryId(sent), id).toBe('nonce-1')
       const decoded = preset.decode(sent)
       expect(decoded.ok, id).toBe(true)
       const fields = fieldsOf(preset.parse(decoded.ok ? decoded.payload : null, sent.headers, context()))

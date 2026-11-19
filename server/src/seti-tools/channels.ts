@@ -124,7 +124,8 @@ const createChannelTool = setiTool({
   name: 'create_channel',
   description:
     'Create a webhook channel. Seti issues its signing secret, which only the user sees, once, in Settings; ' +
-    "for Sentry the user pastes the secret Sentry issues. Its events reach the EA's inbox only with " +
+    'for an app that issues its own, such as Linear, Stripe or Sentry, the user pastes that secret in ' +
+    "Settings instead. Its events reach the EA's inbox only with " +
     'subscribe_ea; subscribe agents to it with subscribe_channel.',
   input: {
     name: channelCreateInput.shape.name,
@@ -136,7 +137,8 @@ const createChannelTool = setiTool({
       .default(CORE_WEBHOOK_SOURCE)
       .describe(
         'The kind of sender: generic for any JSON sender (the default), or a webhook source by its id or ' +
-          'name, such as GitHub or Sentry, while the mod that adds it is on.',
+          'name: an app Seti lists, such as Linear, Stripe, Slack or GitLab, or one a mod adds, such as ' +
+          'GitHub or Sentry, while that mod is on. Only the user makes a custom sender.',
       ),
     subscribe_ea: channelCreateInput.shape.subscribe_ea,
     mapping: mappingInput,

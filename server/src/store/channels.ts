@@ -1,4 +1,5 @@
 import {
+  senderDefinition,
   webhookMapping,
   type ChannelSecretPending,
   type ChannelDelivery,
@@ -7,6 +8,7 @@ import {
   type ChannelRoute,
   type ChannelSource,
   type ChannelState,
+  type SenderDefinition,
   type WebhookMapping,
 } from '@seti/shared'
 import type { ChannelEventDraft } from '../channels/types.js'
@@ -23,15 +25,23 @@ export interface ChannelRecord {
   /** Null when the stored secret does not open with the current key, so no delivery verifies. */
   secret: string | null
   mapping: WebhookMapping
+  /** How a custom webhook verifies and reads its sender; null for every other source. */
+  sender: SenderDefinition | null
   created_at: string
   updated_at: string
   secret_rotated_at: string | null
   secret_pending: ChannelSecretPending | null
 }
 
-type Row = Omit<ChannelRecord, 'mapping' | 'secret'> & {
+type Row = Omit<ChannelRecord, 'mapping' | 'secret' | 'sender'> & {
   mapping: string
   secret: string
+  sender: string | null
+}
+
+function storedSender(text: string | null): SenderDefinition | null {
+  const parsed = text === null ? null : senderDefinition.safeParse(JSON.parse(text))
+  return parsed?.success === true ? parsed.data : null
 }
 
 const secretContext = (id: string) => `channel:${id}`
@@ -57,6 +67,7 @@ function toRecord(row: Row): ChannelRecord {
     ...row,
     secret: openSecret(row),
     mapping: mapping.success ? mapping.data : {},
+    sender: storedSender(row.sender),
   }
 }
 
@@ -65,6 +76,7 @@ export type NewChannel = Omit<ChannelRecord, 'updated_at' | 'secret_rotated_at' 
 export interface ChannelChange {
   name?: string | undefined
   mapping?: WebhookMapping | undefined
+  sender?: SenderDefinition | undefined
 }
 
 export interface NewDelivery {
@@ -126,10 +138,12 @@ export const channelStore = {
     return row && toRecord(row)
   },
   create: async (channel: NewChannel): Promise<ChannelRecord> => {
+    const sender = channel.sender === null ? null : JSON.stringify(channel.sender)
     const [row] = await sql<Row[]>`INSERT INTO channel (id, name, preset, secret, mapping,
-        created_at, updated_at, secret_pending)
+        created_at, updated_at, secret_pending, sender)
       VALUES (${channel.id}, ${channel.name}, ${channel.preset}, ${seal(channel.id, channel.secret)},
-        ${JSON.stringify(channel.mapping)}, ${channel.created_at}, ${channel.created_at}, ${channel.secret_pending})
+        ${JSON.stringify(channel.mapping)}, ${channel.created_at}, ${channel.created_at}, ${channel.secret_pending},
+        ${sender})
       RETURNING *`
     if (row === undefined) {
       throw new Error('Channel was not created')
@@ -138,8 +152,10 @@ export const channelStore = {
   },
   update: async (id: string, change: ChannelChange, at: string): Promise<ChannelRecord | undefined> => {
     const mapping = change.mapping === undefined ? null : JSON.stringify(change.mapping)
+    const sender = change.sender === undefined ? null : JSON.stringify(change.sender)
     const [row] = await sql<Row[]>`UPDATE channel SET name = COALESCE(${change.name ?? null}, name),
         mapping = COALESCE(${mapping}, mapping),
+        sender = COALESCE(${sender}, sender),
         updated_at = ${at}
       WHERE id = ${id} RETURNING *`
     return row && toRecord(row)

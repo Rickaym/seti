@@ -4,10 +4,9 @@ import type { ContentfulStatusCode } from 'hono/utils/http-status'
 import { redactSecrets } from '../scrub.js'
 import { clip, eventDraft, publishEvent, routedReason, type RouteEvent } from './publish.js'
 import { createRateLimiter } from './rate-limit.js'
+import { channelSender, channelSource } from './sender-info.js'
 import { HOOK_ID, sha256Hex } from './signature.js'
-import { webhookSender } from './source-info.js'
-import { webhookSources } from './sources.js'
-import type { WebhookRequest } from './types.js'
+import type { WebhookPresetAdapter, WebhookRequest } from './types.js'
 import { channelStore, type Accepted, type ChannelRecord } from '../store/channels.js'
 
 export const HOOK_BODY_MAX = 256 * 1024
@@ -20,6 +19,8 @@ export interface HookResult {
   status: ChannelDeliveryStatus | 'not_found'
   reason: string
   retryAfterS?: number
+  /** The text a sender's verified URL check asked for, which is the whole answer. */
+  echo?: string
 }
 
 type Recorded = HookResult & { status: ChannelDeliveryStatus }
@@ -40,6 +41,7 @@ const DEFAULT_LIMITS: RateLimits = { perChannel: 60, global: 600, windowMs: 60_0
 
 const NOT_FOUND: HookResult = { http: 404, status: 'not_found', reason: 'no such webhook' }
 const UNREADABLE_SECRET = 'the stored secret does not open with the current key; rotate it'
+const URL_CHECK = "answered the sender's URL check"
 const SECRET_TO_PASTE = "the sender's secret is not pasted yet; paste it in Settings, Channels"
 
 /** Reads at most `max` bytes; null when the body is larger, whatever Content-Length said. */
@@ -81,6 +83,46 @@ function outcomeOf(accepted: Accepted, routes: readonly ChannelRoute[]): Omit<Re
   }
 }
 
+const unavailable = (channel: ChannelRecord): Recorded => ({
+  http: 503,
+  status: 'rejected',
+  reason: channelSender(channel).unavailable ?? 'no source reads it',
+})
+
+/** Why a delivery does not verify: no usable secret, or a signature or age the sender fails. */
+function unsigned(
+  channel: ChannelRecord,
+  preset: WebhookPresetAdapter,
+  request: WebhookRequest,
+  at: string,
+): Recorded | null {
+  if (channel.secret === null) {
+    return { http: 401, status: 'rejected', reason: UNREADABLE_SECRET }
+  }
+  if (channel.secret_pending === 'paste') {
+    return { http: 401, status: 'rejected', reason: SECRET_TO_PASTE }
+  }
+  const verdict = preset.verify(request, channel.secret, Date.parse(at))
+  return verdict.ok ? null : { http: 401, status: 'rejected', reason: verdict.reason }
+}
+
+/** A delivery's verified payload with the source that reads it, or why it is refused. */
+function open(channel: ChannelRecord, request: WebhookRequest, at: string) {
+  const preset = channelSource(channel)?.adapter
+  if (preset === undefined) {
+    return unavailable(channel)
+  }
+  const refusal = unsigned(channel, preset, request, at)
+  if (refusal !== null) {
+    return refusal
+  }
+  const decoded = preset.decode(request)
+  if (!decoded.ok) {
+    return { http: decoded.status, status: 'rejected', reason: decoded.reason } satisfies Recorded
+  }
+  return { preset, decoded }
+}
+
 /** Verifies, dedupes, parses and stores webhook deliveries, and records every one of them. */
 export function createReceiver(deps: ReceiverDeps) {
   const limits = deps.limits ?? DEFAULT_LIMITS
@@ -114,27 +156,17 @@ export function createReceiver(deps: ReceiverDeps) {
 
   /** Everything after the body is read; the test button enters here with a signed sample. */
   async function handle(channel: ChannelRecord, request: WebhookRequest, at: string): Promise<HookResult> {
-    const preset = webhookSources.get(channel.preset)?.adapter
-    if (preset === undefined) {
-      const reason = webhookSender(channel.preset).unavailable ?? 'no source reads it'
-      return finish(channel, at, { http: 503, status: 'rejected', reason })
+    const opened = open(channel, request, at)
+    if ('status' in opened) {
+      return finish(channel, at, opened)
     }
-    if (channel.secret === null) {
-      return finish(channel, at, { http: 401, status: 'rejected', reason: UNREADABLE_SECRET })
-    }
-    if (channel.secret_pending === 'paste') {
-      return finish(channel, at, { http: 401, status: 'rejected', reason: SECRET_TO_PASTE })
-    }
-    const verdict = preset.verify(request, channel.secret)
-    if (!verdict.ok) {
-      return finish(channel, at, { http: 401, status: 'rejected', reason: verdict.reason })
-    }
-    const decoded = preset.decode(request)
-    if (!decoded.ok) {
-      return finish(channel, at, { http: decoded.status, status: 'rejected', reason: decoded.reason })
+    const { preset, decoded } = opened
+    const echo = preset.handshake?.(decoded.payload) ?? null
+    if (echo !== null) {
+      return { ...(await finish(channel, at, { http: 200, status: 'ignored', reason: URL_CHECK })), echo }
     }
     const excerpt = clip(redactSecrets(JSON.stringify(decoded.payload)), EXCERPT_MAX)
-    const sent = preset.deliveryId(request.headers)?.trim() ?? ''
+    const sent = preset.deliveryId(request)?.trim() ?? ''
     const deliveryId = sent === '' ? `sha256:${sha256Hex(request.body)}` : clip(sent, TEXT_MAX.id)
     const parsed = await preset.parse(decoded.payload, request.headers, {
       channelName: channel.name,
@@ -192,7 +224,7 @@ export function createReceiver(deps: ReceiverDeps) {
       if (channel.secret === null) {
         return finish(channel, now().toISOString(), { http: 401, status: 'rejected', reason: UNREADABLE_SECRET })
       }
-      const source = webhookSources.get(channel.preset)
+      const source = channelSource(channel)
       if (source === undefined) {
         return handle(channel, { headers: new Headers(), body: Buffer.alloc(0) }, now().toISOString())
       }
