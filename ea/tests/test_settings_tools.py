@@ -600,7 +600,7 @@ async def test_a_new_webhook_never_carries_its_secret_to_the_ea(tools: EaTools, 
         )
     ]
     sentry = await confirm(tools, "create_channel", {"name": "Errors", "preset": "sentry"})
-    assert "pastes the client secret Sentry issued in Settings, Channels" in sentry[1].text
+    assert "pastes the secret Sentry issued in Settings, Channels" in sentry[1].text
     rotate = await tools.call("rotate_channel_secret", {"channel": "errors"})
     assert not rotate.ok
     assert "Sentry issues the secret of Errors" in rotate.text

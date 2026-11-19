@@ -8,11 +8,14 @@ import {
   type channelCreateInput,
   type channelSubscribeInput,
   type channelUpdateInput,
+  type SenderSampleResult,
+  type senderSampleInput,
   type WebhookChannelInfo,
 } from '@seti/shared'
 import type { z } from 'zod'
 import { audit } from '../audit.js'
 import { fromDelegate, refuseAgent, refuseAtSelf, refuseOtherAgent } from '../ea-guard.js'
+import { checkSample } from './sender-sample.js'
 import { webhooks } from './service.js'
 import { subscriptions } from './subscriptions.js'
 import { pollers } from '../pollers/service.js'
@@ -20,6 +23,7 @@ import { reminders } from '../reminders/service.js'
 import { channelStore } from '../store/channels.js'
 
 export const SECRET_VALUES = 'handle webhook secrets'
+export const SENDER_RULES = 'say how a webhook verifies its sender'
 
 /** The EA and agents never see a secret Seti issues; the user takes it from Settings. */
 const requester = () => ({ forEa: fromDelegate() })
@@ -68,6 +72,9 @@ export async function createChannel(input: z.output<typeof channelCreateInput>):
   if (input.secret !== undefined) {
     refuseAgent(SECRET_VALUES)
   }
+  if (input.sender !== undefined) {
+    refuseAgent(SENDER_RULES)
+  }
   const created = await webhooks.create(input, requester())
   const { id, name, preset, sender } = created.channel
   await audit.record({
@@ -81,13 +88,24 @@ export async function createChannel(input: z.output<typeof channelCreateInput>):
   return created
 }
 
+/** Checks a pasted request with a secret; it changes nothing, and stays the user's tool. */
+export async function checkSenderSample(input: z.output<typeof senderSampleInput>): Promise<SenderSampleResult> {
+  refuseAgent(SECRET_VALUES)
+  return checkSample(input)
+}
+
+const CHANGED_WORDS = { name: 'name', mapping: 'mapping', sender_definition: 'sender' } as const
+
 export async function updateChannel(
   id: string,
   change: z.output<typeof channelUpdateInput>,
 ): Promise<WebhookChannelInfo> {
+  if (change.sender !== undefined) {
+    refuseAgent(SENDER_RULES)
+  }
   const before = await webhooks.info(id)
   const after = await webhooks.update(id, change)
-  const changed = (['name', 'mapping'] as const).filter(
+  const changed = (['name', 'mapping', 'sender_definition'] as const).filter(
     (key) => JSON.stringify(before[key]) !== JSON.stringify(after[key]),
   )
   if (changed.length > 0) {
@@ -96,8 +114,8 @@ export async function updateChannel(
       kind: 'system.channel_changed',
       subject_type: 'system',
       subject_id: id,
-      summary: `Changed the webhook ${after.name}: ${changed.join(', ')}`,
-      detail: { channel: after.name, changed: [...changed] },
+      summary: `Changed the webhook ${after.name}: ${changed.map((key) => CHANGED_WORDS[key]).join(', ')}`,
+      detail: { channel: after.name, changed: changed.map((key) => CHANGED_WORDS[key]) },
     })
   }
   return after

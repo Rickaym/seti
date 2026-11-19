@@ -70,6 +70,26 @@ private key off the host. The sandbox model is in [Architecture](architecture.md
   `Authorization: Bearer <secret>`. A bearer delivery proves who sent it but not that the body
   arrived unchanged, and it puts the secret on the wire with every delivery, so prefer the
   signature where the sender can compute one.
+- A webhook's sender is a mod's, Seti's own signature, or a definition held as data: a catalog
+  entry (`shared/src/webhook-sender-catalog.ts`) or one the user described. A definition names a
+  header, an HMAC (SHA-256, SHA-1 or SHA-512, hex or base64) or a shared token, one of four fixed
+  templates of the signed text, and dot paths into the JSON body; it holds no expression and no
+  code. Seti computes the HMAC over the raw request bytes and compares digests in constant time,
+  refuses a timestamp older than the definition's limit (5 minutes unless set) or as far in the
+  future, and takes each delivery id once in 24 hours. A refused delivery gets the same 401 as
+  before and is logged with its reason and without its body. A shared token has the limits of a
+  bearer secret above, so it is for apps that cannot sign. The one reply that carries sender
+  text is a URL check such as Slack's: only after the signature verified, Seti sends back one
+  string field of that request, at most 256 characters, as `text/plain`. An unsigned check is
+  refused like any unsigned delivery, so senders that need one answered are not supported.
+- The definition of a custom sender decides how a public path authenticates, so it is the user's:
+  the EA, agents' Seti tools and mods get 403 for creating or changing one, for giving a secret,
+  and for the sample check (`POST /api/channels/sample`), which verifies a pasted request with a
+  typed or stored secret and stores nothing. They may create a webhook for a catalog sender; its
+  secret then waits for the user in Settings, and deliveries are refused until it is there.
+  Creating a webhook, changing its sender and rotating its secret are audited without values.
+  What a verified payload contributes to an agent's update, its title, link and capped text, is
+  credential-redacted and marked as channel content like every other webhook payload.
 - The EA answers only calls that carry its token, apart from `/health`.
 - The EA's think tool hands a question to a reasoning model with only the EA's read tools
   (`THINK_TOOLS` in `ea/src/seti_ea/think.py`); it refuses any other tool, never asks Seti to probe
@@ -959,7 +979,7 @@ learns what the user copied elsewhere.
 | GitHub tokens for agents           | sealed rows per credential and owner     | the egress proxy            |
 | Claude long-lived token            | sealed row                               | the egress proxy            |
 | SSH private keys for agents        | sealed rows                              | each task's ssh-agent       |
-| Webhook signing secrets            | sealed column                            | the webhook receiver        |
+| Webhook signing secrets and tokens | sealed column                            | the webhook receiver        |
 | Connection values                  | sealed rows per connection and slot      | pollers, the egress proxy   |
 | Secrets an unsandboxed agent asked | 0600 file in the agent's workspace       | that agent                  |
 | Push notification key pair         | sealed row, made on first start          | the push sender             |

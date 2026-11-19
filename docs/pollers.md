@@ -1,10 +1,11 @@
 # Pollers
 
-TLDR: a poller is a channel for a service that sends no webhooks. Seti runs its small JavaScript
-module on a schedule in an isolated engine, compares the items it returns with the last run, and
-reports what is new, changed or gone to the channel's subscribers, like a webhook would. No model
-runs and nothing is spent unless something changed. Each subscribed agent gets an update at once,
-after its turn or with the user's next message, as its subscription says.
+TLDR: a webhook channel takes deliveries from an app Seti lists, such as Linear, or from one the
+user describes as data; a poller is a channel for a service that sends no webhooks. Seti runs its
+small JavaScript module on a schedule in an isolated engine, compares the items it returns with the
+last run, and reports what is new, changed or gone to the channel's subscribers, like a webhook
+would. No model runs and nothing is spent unless something changed. Each subscribed agent gets an
+update at once, after its turn or with the user's next message, as its subscription says.
 
 ## Where pollers fit
 
@@ -15,6 +16,106 @@ Settings, Channels, New, Poller creates one from a template, which stays a plain
 Blank is Seti's own; HTTP JSON and RSS/Atom feed come from the bundled Poller templates mod. A
 poller keeps its own copy of the script, so turning that mod off only takes its templates out of
 the menu and stops no poller.
+
+## Webhook senders
+
+Settings, Channels, New, Webhook starts with a picker of the apps that can send. Each app is a
+sender: a description, as data, of how the app signs a delivery and where its event name, title
+and link are. Seti verifies and reads every sender with the same code, so supporting another app
+needs no mod and no code. The picker lists three kinds:
+
+- The catalog in `shared/src/webhook-sender-catalog.ts`: Linear, Bitbucket, Cloudflare, GitLab,
+  Grafana, Jira, Make, PagerDuty, Shopify, Slack, Standard Webhooks, Stripe, Svix, Vercel and
+  Zapier.
+- Senders a mod adds with its own code, such as GitHub and Sentry, which also track states.
+- Seti signature, for a sender that can sign with `X-Seti-Signature` or send a bearer secret.
+
+Custom, at the foot of the picker, describes an app the catalog does not list, with the same
+fields a catalog entry has. Only the user describes a custom sender, pastes a secret or checks a
+sample; the EA and agents create webhooks for catalog senders and leave the secret to the user.
+
+After Create, Seti shows the URL to paste into the app with the app's own setup steps. An app that
+issues the secret, as Linear does once it has the URL, gets a field for it in the same dialog, and
+the webhook refuses deliveries until the secret is saved. Where the app lets the user set the
+secret, Seti makes one and shows it once.
+
+### The sender definition
+
+| Field                     | What it says                                                                                     |
+| ------------------------- | ------------------------------------------------------------------------------------------------ |
+| `signature.scheme`        | `hmac` for a signature, or `token` for an app that sends the secret itself in a header           |
+| `signature.header`        | The header with the signature or the token                                                       |
+| `signature.algorithm`     | `sha256`, `sha1` or `sha512`                                                                     |
+| `signature.encoding`      | `hex` or `base64`                                                                                |
+| `signature.prefix`        | What a signature starts with, such as `sha256=`, `v1=` or `v1,`; other entries are skipped       |
+| `signature.separator`     | `none`, or `comma` or `space` for a header with several signatures; one match is enough          |
+| `signature.signed`        | `{body}`, `{timestamp}.{body}`, `v0:{timestamp}:{body}` or `{id}.{timestamp}.{body}`             |
+| `signature.key`           | `text` uses the secret's characters; `base64` its decoded bytes, after any `whsec_`              |
+| `timestamp`               | Where the sending time is: a header, a body field, or a part of the signature header such as `t` |
+| `max_age_s`               | How old the timestamp may be, 300 seconds unless set                                             |
+| `id`                      | Where the delivery id is: a header or a body field; Seti takes each id once in 24 hours          |
+| `secret`                  | `sender` when the app issues the secret, `generated` when Seti makes it                          |
+| `event`, `action`         | Where the event name is, and a body field appended after a dot, as in `issue.create`             |
+| `title`, `link`, `detail` | Body fields tried in order for the update's title, link and text                                 |
+| `detail_max`              | How many characters of the text, or of the payload when no field holds text, are passed on       |
+| `handshake`               | A signed URL check to answer: the field and value that mark it and the field to send back        |
+
+A body field is a dot path such as `data.title` or `alerts.0.labels.alertname`. The signed text is
+one of the four templates and nothing else: an app that signs something different, such as the
+URL with its form fields, needs a mod. A timestamp is read as epoch seconds, epoch milliseconds or
+an ISO time. An update's title falls back to the sender and the event name, and its link is kept
+only when it is an http or https URL.
+
+### A worked example: Linear
+
+Linear signs the raw body with HMAC-SHA256 and sends the hex digest in `Linear-Signature`. The
+body carries `webhookTimestamp` in milliseconds, which Linear recommends checking within a minute,
+and each delivery has a `Linear-Delivery` id. The catalog entry is therefore:
+
+```ts
+{
+  signature: { scheme: 'hmac', header: 'Linear-Signature' },
+  timestamp: { in: 'body', name: 'webhookTimestamp' },
+  id: { in: 'header', name: 'Linear-Delivery' },
+  max_age_s: 60,
+  event: { in: 'body', name: 'type' },
+  action: 'action',
+  title: ['data.title', 'data.name', 'data.body'],
+  link: ['url'],
+  detail: ['data.description', 'data.body'],
+}
+```
+
+In Linear, Settings, API, New webhook takes the URL; the webhook's detail page then shows the
+signing secret to paste into Seti. A new issue arrives as the event `issue.create` with the
+issue's title and URL, so a subscription filtered to `issue` takes every issue event and one
+filtered to `issue.create` only new issues.
+
+### Checking a sample
+
+Sample, on the card of a webhook with a catalog or custom sender, takes the headers and body of a
+request copied from the app's delivery log. Seti checks it on the server with the stored secret
+and answers whether the signature verifies and which event name, title and link it would produce.
+It stores nothing and reaches no subscriber. A captured request is usually older than the
+sender's limit, so the answer says a live delivery that old would be refused instead of failing.
+The custom form has the same check before the webhook exists, with the secret typed beside it.
+
+### The delivery log
+
+Every request is recorded on the card under Activity with why it was refused: `missing signature`,
+`signature mismatch`, `token mismatch`, `too old`, a duplicate delivery id, or a secret that is
+not pasted yet. A refused delivery is logged without its body.
+
+### What needs a mod
+
+A sender is data only while Seti can verify it with a shared secret and one of the signed
+templates, and answer its URL check by sending back a field of a signed request. These need code
+or a different trust model and are not in the catalog: Twilio (signs the URL and form fields),
+Discord (Ed25519 and a typed reply), Zoom (a computed reply to its URL check), Notion (sends its
+token in an unsigned request), Intercom (checks the URL with a HEAD request), Twitch EventSub
+(signs the id, timestamp and body without separators) and Supabase Auth hooks (expect a reply
+body). GitHub and Sentry stay with their mods, which also follow each workflow, deployment and
+monitor from failing to passing.
 
 ## When an agent gets an update
 

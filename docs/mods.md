@@ -622,7 +622,10 @@ api.registerPollerTemplate('feed', { script: FEED_SCRIPT })
 ```
 
 Each source is named `<mod>.<id>`, such as `github-webhooks.github`; `generic` and `blank` are
-Seti's own. While the mod is off its sources leave the New menus, and its webhooks refuse every
+Seti's own, as are the catalog senders such as `linear` and the user's `custom` ones, which are
+data and need no mod ([Webhook senders](pollers.md#webhook-senders)). Write a mod only for a
+sender that needs code, such as one that tracks states or signs something the definition cannot
+describe. While the mod is off its sources leave the New menus, and its webhooks refuse every
 delivery with "The <mod> mod is off" until it is on again. `mods/github-webhooks/`,
 `mods/sentry-webhooks/` and `mods/poller-templates/` are the examples.
 

@@ -66,6 +66,9 @@ const unknown = (id: string): WebhookSourceInfo => ({
   secret: 'generated',
   kinds: [],
   setup: '',
+  icon: null,
+  secret_label: 'Secret',
+  steps: [],
 })
 
 /** The registered source a new or tested webhook needs; refused with why when there is none. */

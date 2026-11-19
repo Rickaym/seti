@@ -94,3 +94,8 @@ UPDATE channel SET preset = 'sentry-webhooks.sentry' WHERE preset = 'sentry';
 UPDATE channel_poller SET preset = 'poller-templates.http_json' WHERE preset = 'http_json';
 UPDATE channel_poller SET preset = 'poller-templates.feed' WHERE preset = 'feed';
 `
+
+/** A custom webhook keeps how it verifies and reads its sender, as JSON; NULL for other sources. */
+export const CHANNEL_SENDER = `
+ALTER TABLE channel ADD COLUMN sender TEXT;
+`

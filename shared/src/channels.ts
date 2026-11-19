@@ -4,6 +4,7 @@ import { webhookSourceId, type WebhookSourceInfo } from './channel-sources.js'
 import type { EaNoticeSeverity } from './ea.js'
 import { POLLER_EVENT_KINDS, type PollerInfo } from './pollers.js'
 import { REMINDER_EVENT_KINDS, type ReminderInfo } from './reminders.js'
+import { senderDefinition, type SenderDefinition } from './webhook-senders.js'
 
 /** A change a channel reports for one subject, such as a monitor going down. */
 export type ChannelState = 'down' | 'up'
@@ -164,6 +165,8 @@ export interface WebhookChannelInfo extends ChannelCommon {
   /** The full public URL when Seti has a public hostname. */
   public_url: string | null
   mapping: WebhookMapping
+  /** How a custom webhook verifies and reads its sender; null for every other source. */
+  sender_definition: SenderDefinition | null
   secret_rotated_at: string | null
   secret_pending: ChannelSecretPending | null
 }
@@ -188,26 +191,6 @@ export interface ChannelSecret {
   secret: string | null
 }
 
-const channelName = z.string().trim().min(1).max(80)
-const senderSecret = z.string().trim().min(16).max(256)
-
-export const channelCreateInput = z.object({
-  name: channelName,
-  preset: webhookSourceId,
-  subscribe_ea: z.boolean().default(false),
-  secret: senderSecret.optional(),
-  mapping: webhookMapping.default({}),
-})
-export type ChannelCreateInput = z.input<typeof channelCreateInput>
-
-export const channelUpdateInput = z
-  .object({ name: channelName.optional(), mapping: webhookMapping.optional() })
-  .refine((input) => Object.values(input).some((value) => value !== undefined), 'Change at least one field')
-export type ChannelUpdateInput = z.input<typeof channelUpdateInput>
-
-export const channelRotateInput = z.object({ secret: senderSecret.optional() })
-export type ChannelRotateInput = z.input<typeof channelRotateInput>
-
 const eventKind = z
   .string()
   .transform(normalizeEventKind)
@@ -219,6 +202,30 @@ const eventFilter = z
   .max(20)
   .nullable()
   .transform((events) => (events === null || events.length === 0 ? null : [...new Set(events)]))
+
+const channelName = z.string().trim().min(1).max(80)
+const senderSecret = z.string().trim().min(16).max(256)
+
+export const channelCreateInput = z.object({
+  name: channelName,
+  preset: webhookSourceId,
+  subscribe_ea: z.boolean().default(false),
+  secret: senderSecret.optional(),
+  mapping: webhookMapping.default({}),
+  /** A custom webhook's sender, as the user described it. */
+  sender: senderDefinition.optional(),
+  /** The event kinds the EA's inbox takes with subscribe_ea; empty or left out takes every event. */
+  ea_events: eventFilter.optional(),
+})
+export type ChannelCreateInput = z.input<typeof channelCreateInput>
+
+export const channelUpdateInput = z
+  .object({ name: channelName.optional(), mapping: webhookMapping.optional(), sender: senderDefinition.optional() })
+  .refine((input) => Object.values(input).some((value) => value !== undefined), 'Change at least one field')
+export type ChannelUpdateInput = z.input<typeof channelUpdateInput>
+
+export const channelRotateInput = z.object({ secret: senderSecret.optional() })
+export type ChannelRotateInput = z.input<typeof channelRotateInput>
 
 export const channelSubscribeInput = z.discriminatedUnion('target', [
   z.object({

@@ -1,6 +1,7 @@
 import { defineMod } from '@seti/mod-api'
 import {
   channelCreateInput,
+  isDataSender,
   pollerCreateInput,
   type ChannelSecret,
   type ChannelSources,
@@ -63,8 +64,9 @@ const sentryDelivery = async (path: string, secret: string | null, nonce: string
 describe('channel sources', () => {
   it("lists Seti's own sources first, then those of the bundled mods", async () => {
     const { data } = await api<ChannelSources>('GET', '/channels/sources')
-    expect(data.webhooks.map((source) => [source.id, source.mod, source.label])).toEqual([
-      ['generic', null, 'Generic'],
+    const coded = data.webhooks.filter((source) => !isDataSender(source.id))
+    expect(coded.map((source) => [source.id, source.mod, source.label])).toEqual([
+      ['generic', null, 'Seti signature'],
       [GITHUB, 'github-webhooks', 'GitHub'],
       ['sentry-webhooks.sentry', 'sentry-webhooks', 'Sentry'],
     ])
@@ -73,8 +75,15 @@ describe('channel sources', () => {
       'poller-templates.http_json',
       'poller-templates.feed',
     ])
-    expect(data.webhooks[1]).toMatchObject({ signature: 'X-Hub-Signature-256', secret: 'generated' })
-    expect(data.webhooks[2]).toMatchObject({ signature: 'Sentry-Hook-Signature', secret: 'sender' })
+    expect(coded[1]).toMatchObject({ signature: 'X-Hub-Signature-256', secret: 'generated', icon: 'github' })
+    expect(coded[2]).toMatchObject({ signature: 'Sentry-Hook-Signature', secret: 'sender', icon: 'sentry' })
+    expect(data.webhooks.find((source) => source.id === 'linear')).toMatchObject({
+      mod: null,
+      label: 'Linear',
+      signature: 'Linear-Signature',
+      secret: 'sender',
+      secret_label: 'Signing secret',
+    })
   })
 
   it('reads the ids from before mods as the ids of the mods that took them over', () => {
@@ -139,7 +148,10 @@ describe('a webhook whose mod is off', () => {
     expect(card?.deliveries[0]).toMatchObject({ status: 'rejected', reason: 'The Sentry webhooks mod is off' })
     expect(await channelStore.recent(channel.id, 5)).toEqual([])
     const sources = await api<ChannelSources>('GET', '/channels/sources')
-    expect(sources.data.webhooks.map((source) => source.id)).toEqual(['generic', GITHUB])
+    expect(sources.data.webhooks.map((source) => source.id).filter((id) => !isDataSender(id))).toEqual([
+      'generic',
+      GITHUB,
+    ])
     const refused = await api('POST', '/channels', { name: 'Another', preset: 'sentry', secret: SENTRY })
     expect(refused.status).toBe(409)
     expect(refused.error).toContain('The Sentry webhooks mod is off; turn it on in Settings, Mods')
@@ -225,9 +237,9 @@ describe('the mod API for channel sources', () => {
     const sample = adapter.sample('secret-1', 'nonce-1')
     expect(sample.headers['x-probe-signature']).toBe(hmacHex('secret-1', sample.body))
     const request = { headers: new Headers(sample.headers), body: Buffer.from(sample.body) }
-    expect(adapter.verify(request, 'secret-1')).toEqual({ ok: true })
-    expect(adapter.verify(request, 'secret-2')).toEqual({ ok: false, reason: 'signature mismatch' })
-    expect(adapter.verify({ headers: new Headers(), body: request.body }, 'secret-1')).toEqual({
+    expect(adapter.verify(request, 'secret-1', Date.now())).toEqual({ ok: true })
+    expect(adapter.verify(request, 'secret-2', Date.now())).toEqual({ ok: false, reason: 'signature mismatch' })
+    expect(adapter.verify({ headers: new Headers(), body: request.body }, 'secret-1', Date.now())).toEqual({
       ok: false,
       reason: 'missing signature',
     })

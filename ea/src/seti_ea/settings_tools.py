@@ -47,7 +47,7 @@ SOURCE_LABELS = {"poller": "Poller", "reminder": "Reminder"}
 SECRET_STATES = {
     "reveal": "Its secret waits for the user: in Settings, Channels they press Show on this webhook and "
     "copy it into the sender. Seti shows it once, and never to you.",
-    "paste": "Its secret is still missing: the user pastes the client secret {label} issued in Settings, "
+    "paste": "Its secret is still missing: the user pastes the secret {label} issued in Settings, "
     "Channels, with Paste on this webhook. Deliveries are refused until then.",
 }
 MAPPING_FIELDS = ("title", "kind", "severity", "url", "subject", "state")
@@ -201,14 +201,16 @@ SETTINGS_SPECS: list[ToolSpec] = [
     ToolSpec(
         "create_channel",
         "Create a webhook channel. Seti issues its signing secret, which only the user sees, once, in "
-        "Settings; for Sentry the user pastes the secret Sentry issues. Needs the user's yes. Its events "
+        "Settings; for an app that issues its own, such as Linear, Stripe or Sentry, the user pastes that "
+        "secret in Settings instead. Needs the user's yes. Its events "
         "reach your inbox only with subscribe_ea; subscribe agents to it with subscribe_channel.",
         {
             "name": {"type": "string", "description": "A short name, such as Uptime or Payments CI."},
             "preset": {
                 "type": "string",
                 "description": "generic for any JSON sender (default), or a webhook source by its id or "
-                "name, such as GitHub or Sentry, while the mod that adds it is on.",
+                "name: an app Seti lists, such as Linear, Stripe, Slack or GitLab, or one a mod adds, such "
+                "as GitHub or Sentry, while that mod is on. Only the user makes a custom sender.",
             },
             "subscribe_ea": {
                 "type": "boolean",
@@ -981,7 +983,7 @@ class SettingsTools:
             reach = "reporting to you" if deliver else "keeping its events out of your inbox"
             secret = (
                 f"{label} issues its secret: the user puts the webhook URL in {label}, then pastes "
-                "the client secret it gives in Settings, Channels; deliveries are refused until then."
+                "the secret it gives in Settings, Channels; deliveries are refused until then."
                 if source.get("secret") == "sender"
                 else "Seti issues its signing secret; the user copies it once from Settings, Channels, and "
                 "you never see it."

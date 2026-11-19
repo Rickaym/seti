@@ -133,7 +133,7 @@ export const genericPreset: WebhookPresetAdapter = {
     const bearer = authorization.slice('bearer'.length).trim()
     return safeEqual(bearer, secret) ? { ok: true } : { ok: false, reason: 'bearer secret mismatch' }
   },
-  deliveryId: (headers) => headers.get(SETI_DELIVERY)?.trim() ?? null,
+  deliveryId: ({ headers }) => headers.get(SETI_DELIVERY)?.trim() ?? null,
   decode: decodeJson,
   parse: (payload, _headers, context) => parseGeneric(payload, context),
   sample: (secret, nonce) => {
