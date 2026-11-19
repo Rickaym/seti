@@ -91,6 +91,7 @@ interface UnseenRecord {
   created_at: string
   notice_title: string | null
   notice_body: string | null
+  workspace_id: string | null
 }
 
 function textOf(record: UnseenRecord): string {
@@ -105,8 +106,9 @@ function textOf(record: UnseenRecord): string {
 export const eaReplies = {
   unseen: async (at: string): Promise<EaUnseenReplies> => {
     const rows = await sql<UnseenRecord[]>`SELECT h.id, h.kind, h.message, h.created_at,
-        i.title AS notice_title, i.body AS notice_body
+        i.title AS notice_title, i.body AS notice_body, t.workspace_id
       FROM ea_history h LEFT JOIN ea_inbox i ON h.kind = 'inbox' AND i.entry_id = h.id
+        LEFT JOIN task t ON t.id = i.task_id
       WHERE h.unseen ORDER BY h.id DESC LIMIT ${UNSEEN_PAGE}`
     const [count] = await sql<{ total: number }[]>`SELECT COUNT(*)::int AS total FROM ea_history WHERE unseen`
     const ids = rows.map((row) => row.id)
@@ -117,6 +119,7 @@ export const eaReplies = {
       text: clipped(textOf(row)),
       created_at: row.created_at,
       asks: asks.filter((ask) => ask.entry_id === row.id).map((ask) => toAsk(ask, at)),
+      workspace_id: row.workspace_id,
     }))
     return { replies, total: count?.total ?? 0 }
   },

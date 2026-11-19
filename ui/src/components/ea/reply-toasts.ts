@@ -16,6 +16,8 @@ export interface ReplyToastInput {
   chatShown: boolean
   /** The active tier raises toasts; otherwise EA messages wait for the brief. */
   toasts: boolean
+  /** Whether this page interrupts the user about an agent in the workspace. */
+  hears: (workspaceId: string) => boolean
   now: number
 }
 
@@ -44,16 +46,21 @@ function seenOf(ids: number[], beyond: number, oldest: number): EaRepliesSeenInp
   return { ids, ...through }
 }
 
+const heard = (reply: EaUnseenReply, hears: (workspaceId: string) => boolean) =>
+  reply.workspace_id === null || hears(reply.workspace_id)
+
 /**
  * Which toasts the unseen EA messages and the brief raise here: none while a call runs. Questions
  * stand alone. Plain messages fold into one brief toast when a brief waits or more than three
- * do; otherwise each gets its own, while the active tier toasts and the EA chat is off screen.
+ * do; otherwise each gets its own, while the active tier toasts and the EA chat is off screen. A
+ * notice about an agent in a workspace this page is not notified about raises nothing here.
  */
-export function replyToasts({ page, brief, calling, chatShown, toasts, now }: ReplyToastInput): ReplyToast[] {
+export function replyToasts(input: ReplyToastInput): ReplyToast[] {
+  const { page, brief, calling, chatShown, toasts, hears, now } = input
   if (calling) {
     return []
   }
-  const ready = chatShown ? [] : (page?.replies ?? []).filter((reply) => settled(reply, now))
+  const ready = chatShown ? [] : (page?.replies ?? []).filter((reply) => settled(reply, now) && heard(reply, hears))
   const plain = ready.filter((reply) => reply.asks.length === 0)
   const beyond = chatShown || page === undefined ? 0 : page.total - page.replies.length
   const each = toasts ? ready.filter((reply) => reply.asks.length > 0) : []

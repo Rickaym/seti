@@ -19,6 +19,7 @@ const reply = (id: number, extra: Partial<EaUnseenReply> = {}): EaUnseenReply =>
   text: `Reply ${String(id)}`,
   created_at: at(60_000),
   asks: [],
+  workspace_id: null,
   ...extra,
 })
 
@@ -30,6 +31,7 @@ const input = (over: Partial<ReplyToastInput>): ReplyToastInput => ({
   calling: false,
   chatShown: false,
   toasts: true,
+  hears: (workspaceId) => workspaceId === 'ws-open',
   now: NOW,
   ...over,
 })
@@ -90,6 +92,25 @@ describe('EA reply toasts', () => {
     const toasts = replyToasts(input({ page: page([reply(5), reply(6), reply(7), reply(8), asking]) }))
     expect(toasts.map((toast) => toast.key)).toEqual([BRIEF_KEY, replyKey(9)])
     expect(toasts[1]).toMatchObject({ kind: 'reply', reply: { asks: [{ id: 4 }] } })
+  })
+
+  it('raises a notice about an agent only where its workspace is heard, and any other notice anywhere', () => {
+    const replies = [
+      reply(1, { workspace_id: 'ws-open' }),
+      reply(2, { workspace_id: 'ws-other' }),
+      reply(3),
+      reply(4, { workspace_id: 'ws-other', asks: [ask(5)] }),
+    ]
+    expect(keys({ page: page(replies) })).toEqual([replyKey(1), replyKey(3)])
+    expect(keys({ page: page(replies), hears: () => true })).toEqual([
+      replyKey(1),
+      replyKey(2),
+      replyKey(3),
+      replyKey(4),
+    ])
+    expect(replyToasts(input({ page: page(replies), brief: BRIEF }))).toMatchObject([
+      { kind: 'brief', replies: [{ id: 1 }, { id: 3 }], seen: { ids: [1, 3] } },
+    ])
   })
 
   it('names a question with a capital first letter', () => {
