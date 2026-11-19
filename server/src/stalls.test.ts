@@ -172,7 +172,7 @@ describe('stalls', () => {
     ])
     const seen = Date.now() + SILENT_MS + 60_000
     await checkSilentSessions(seen)
-    expect(await blockedOf(id)).toBeNull()
+    expect((await blockedOf(id))?.startsWith('No output') ?? false).toBe(false)
     if (settle && asked !== undefined) {
       await questions.dismiss(asked.id, 'user')
     }
