@@ -1,4 +1,12 @@
-import { attentionTiersInput, DEFAULT_TIERS, type NotificationSettings, type PushDevice } from '@seti/shared'
+import {
+  attentionTiersInput,
+  DEFAULT_NOTIFY_SCOPE,
+  DEFAULT_TIERS,
+  type NotifyScope,
+  type NotifyScopeInput,
+  type NotificationSettings,
+  type PushDevice,
+} from '@seti/shared'
 import { now, sql, transaction } from '../db.js'
 
 /** A device's push subscription as web-push takes it. */
@@ -48,6 +56,39 @@ export const pushDevices = {
   /** Drops a subscription the push service no longer knows, unless the device subscribed again. */
   removeEndpoint: async (deviceId: string, endpoint: string): Promise<void> => {
     await sql`DELETE FROM push_device WHERE device_id = ${deviceId} AND endpoint = ${endpoint}`
+  },
+}
+
+type ScopeRow = NotifyScope & { device_id: string }
+
+const scopeOf = (row: NotifyScope | undefined): NotifyScope =>
+  row === undefined ? DEFAULT_NOTIFY_SCOPE : { workspace_id: row.workspace_id, workspace_only: row.workspace_only }
+
+export const notifyScopes = {
+  get: async (deviceId: string): Promise<NotifyScope> =>
+    scopeOf(
+      (
+        await sql<NotifyScope[]>`SELECT workspace_id, workspace_only FROM notify_scope WHERE device_id = ${deviceId}`
+      ).at(0),
+    ),
+  /** Every device's scope by its id; a device with no entry has the default. */
+  all: async (): Promise<Map<string, NotifyScope>> => {
+    const rows = await sql<ScopeRow[]>`SELECT device_id, workspace_id, workspace_only FROM notify_scope`
+    return new Map(rows.map((row) => [row.device_id, scopeOf(row)]))
+  },
+  /** Saves what the change names and keeps the rest; returns the device's scope after it. */
+  set: async (deviceId: string, change: NotifyScopeInput): Promise<NotifyScope> => {
+    const workspace = change.workspace_id ?? null
+    const only = change.workspace_only ?? null
+    const rows = await sql<NotifyScope[]>`
+      INSERT INTO notify_scope (device_id, workspace_id, workspace_only, updated_at)
+      VALUES (${deviceId}, ${workspace}, COALESCE(${only}::boolean, true), ${now()})
+      ON CONFLICT (device_id) DO UPDATE SET
+        workspace_id = COALESCE(${workspace}::text, notify_scope.workspace_id),
+        workspace_only = COALESCE(${only}::boolean, notify_scope.workspace_only),
+        updated_at = excluded.updated_at
+      RETURNING workspace_id, workspace_only`
+    return scopeOf(rows.at(0))
   },
 }
 

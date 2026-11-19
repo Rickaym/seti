@@ -1,5 +1,5 @@
 import type { NotificationStatus, TestNotificationResult } from '@seti/shared'
-import { BellRing, Send, Trash2, Volume2 } from 'lucide-react'
+import { BellRing, Layers, Send, Trash2, Volume2 } from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { apiDelete, apiPost, errorText } from '@/api'
@@ -7,7 +7,9 @@ import { RelativeTime } from '@/components/RelativeTime'
 import { ToggleButton } from '@/components/ToggleButton'
 import { Button } from '@/components/ui/button'
 import { refreshNotifications, useNotifications } from '@/hooks/useNotifications'
+import { useWorkspaceOnly } from '@/hooks/useNotifyScope'
 import { deviceId } from '@/lib/device'
+import { setWorkspaceOnly } from '@/lib/notify-scope'
 import { playSound, setSoundOn, soundOn } from '@/lib/notify-sound'
 import { disablePush, enablePush, pushBlocker, type PushBlocker } from '@/lib/push'
 import { InstallHint } from './InstallHint'
@@ -111,6 +113,40 @@ function SoundRow() {
   )
 }
 
+function WorkspaceOnlyRow() {
+  const on = useWorkspaceOnly()
+  const [busy, setBusy] = useState(false)
+  const change = async (next: boolean) => {
+    setBusy(true)
+    try {
+      await setWorkspaceOnly(next)
+    } catch (e) {
+      toast.error(errorText(e), { duration: Infinity })
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <SettingRow
+      label="Active workspace only"
+      description={
+        on
+          ? 'On: push, toasts and chimes on this device are about agents in the workspace it has open. The workspace switcher counts agents that need you in the others.'
+          : 'Off: this device hears about agents in every workspace.'
+      }
+    >
+      <ToggleButton
+        pressed={on}
+        disabled={busy}
+        onPressedChange={(next) => void change(next)}
+        icon={Layers}
+        label="Workspace only"
+        hint="Notify this device only about agents in the workspace it has open"
+      />
+    </SettingRow>
+  )
+}
+
 function PushDevicesCard({ status }: { status: NotificationStatus }) {
   const own = deviceId()
   const remove = async (id: string) => {
@@ -167,6 +203,7 @@ export function NotificationsPage() {
         <SettingsCard title="This device">
           <PushRow status={status} subscribed={subscribed} />
           <SoundRow />
+          <WorkspaceOnlyRow />
         </SettingsCard>
         <TiersCard settings={settings} />
         {status !== undefined && <PushDevicesCard status={status} />}

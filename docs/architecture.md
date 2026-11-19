@@ -1274,6 +1274,27 @@ without a reply".
 Each agent push also carries the Needs you count, which the service worker puts on the app icon
 with the Badging API; an open page keeps that badge in step with its status bar.
 
+A device is notified only about the workspace it has open. The open workspace stays the browser's
+choice in `localStorage`, and the page also reports it to the server when it changes and each time
+the page shows again (`PUT /api/notifications/devices/<device id>/scope`), where the `notify_scope`
+table keeps it by the browser's device id, the same id its push subscription and focus reports
+carry. `hearsWorkspace` in `shared/src/notifications.ts` is the one rule, which the server and the
+page both apply: a device hears about an agent in its open workspace, about every agent while it
+has reported no workspace or its "Active workspace only" setting is off, and always about a notice
+that concerns no one agent, such as a mod's, a test push or an EA item without an agent. The
+server reads the agent's workspace and each device's scope when it sends, so a switch or a moved
+agent counts from the next notification on and nothing is sent again. The attention router counts
+only devices that hear about the agent: a focused page on another workspace neither raises a toast
+nor holds back the push to a phone that has the agent's workspace open. A page applies the same
+rule to its toasts and chimes, and a failure it stayed quiet about is marked dismissed, so a later
+switch does not raise it. What the user looks at on purpose keeps every workspace: the Needs you
+count in the status bar and on the app icon, and the workspace switcher, which shows how many
+agents need the user in the other workspaces and in each one. The per-agent mute and the tiers
+apply first. The setting is per device, in Settings, Notifications, on by default and audited;
+the workspace report is view state like a focus report and is not. The phone widgets and the EA
+are not scoped: a widget signs in with its paired device key, which Seti cannot match to a
+browser's device id, and the EA speaks for the whole install.
+
 ## An open tab reloads once when a deploy replaced its build
 
 The UI loads each panel as its own file, named after a hash of its content. A deploy replaces

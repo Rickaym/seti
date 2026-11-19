@@ -1,4 +1,5 @@
 import type { AttentionRoute, AttentionTier, EaInboxItem } from '@seti/shared'
+import { audienceOf, type Audience } from './notify-scope.js'
 import { callLive, lastPresent, pageFocused } from './presence.js'
 import { agentWaits } from './store/agent-waits.js'
 import { eaWatches } from './store/inbox.js'
@@ -26,22 +27,25 @@ export interface AttentionEvent {
   viaEa: boolean
   /** The EA takes it on a live call; an item Seti posts while no call runs passes false. */
   callable?: boolean
+  /** The workspace of the agent it is about, so only devices that hear about it carry it. */
+  workspaceId?: string
 }
 
-const anyPushDevice = async () => (await pushDevices.list()).length > 0
+const anyPushDevice = async (hears: Audience) => (await pushDevices.list()).some((device) => hears(device.device_id))
 
-/** The surface a tier uses while the user is here: the call, else a page with focus. */
-function hereRoute(event: AttentionEvent, at: number): AttentionRoute | null {
+/** The surface a tier uses while the user is here: the call, else a focused page that hears it. */
+function hereRoute(event: AttentionEvent, at: number, hears: Audience): AttentionRoute | null {
   if (event.viaEa && event.callable !== false && callLive(at)) {
     return 'call'
   }
-  return pageFocused(at) ? 'toast' : null
+  return pageFocused(at, hears) ? 'toast' : null
 }
 
 /**
  * The one surface that carries the event. Needs-you is always urgent and never capped; below
  * urgent, a burst past BURST_CAP pushes in BURST_WINDOW_MS of one absence waits for the brief.
- * Away with no push device, the event waits for the brief.
+ * Away with no push device, the event waits for the brief. An event about an agent counts only
+ * the devices that hear about its workspace.
  */
 export async function routeAttention(event: AttentionEvent, at = Date.now()): Promise<AttentionRoute> {
   const tier: AttentionTier = event.needsYou === true ? 'urgent' : event.tier
@@ -52,7 +56,8 @@ export async function routeAttention(event: AttentionEvent, at = Date.now()): Pr
   if (surface === 'brief' || (tier !== 'urgent' && recent(at) >= BURST_CAP)) {
     return 'digest'
   }
-  const route = hereRoute(event, at) ?? (surface === 'push' && (await anyPushDevice()) ? 'push' : 'digest')
+  const hears = await audienceOf(event.workspaceId ?? null)
+  const route = hereRoute(event, at, hears) ?? (surface === 'push' && (await anyPushDevice(hears)) ? 'push' : 'digest')
   if (route === 'push') {
     pushes.push(at)
   }

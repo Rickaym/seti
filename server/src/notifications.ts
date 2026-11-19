@@ -26,6 +26,7 @@ import { tasks } from './db.js'
 import { eaCarries, routeAttention } from './ea-attention.js'
 import { HttpError } from './http.js'
 import { needsYouCount } from './needs-you-count.js'
+import { audienceOf } from './notify-scope.js'
 import { onScreen } from './presence.js'
 import { sealedSecrets, secret, SecretUnreadableError } from './secrets.js'
 import { notificationSettings, pushDevices, type PushTarget } from './store/notifications.js'
@@ -193,6 +194,12 @@ export async function notifyBody(task: Task, kind: AgentNotifyKind): Promise<str
   return task.status === 'interrupted' ? 'Cut off by a restart' : 'Needs you'
 }
 
+/** Devices with push that hear about the agent's workspace and do not show the agent now. */
+async function agentTargets(task: Pick<Task, 'id' | 'workspace_id'>, at: number): Promise<PushTarget[]> {
+  const [targets, hears] = await Promise.all([pushDevices.targets(), audienceOf(task.workspace_id)])
+  return targets.filter((target) => hears(target.device_id) && !onScreen(target.device_id, task.id, at))
+}
+
 /** The last state each agent notified about, so the status event and turn end of one send once. */
 const notified = new Map<string, string>()
 const NOTIFIED_KEPT = 500
@@ -227,11 +234,16 @@ async function pushAgent(task: Task, push: AgentPush, at: number): Promise<numbe
   if (await eaCarries(task.id)) {
     return 0
   }
-  const route = await routeAttention({ tier: 'active', needsYou: push.kind === 'needs_you', viaEa: false }, at)
-  if (route !== 'push') {
+  const event = {
+    tier: 'active',
+    needsYou: push.kind === 'needs_you',
+    viaEa: false,
+    workspaceId: task.workspace_id,
+  } as const
+  if ((await routeAttention(event, at)) !== 'push') {
     return 0
   }
-  const targets = (await pushDevices.targets()).filter((target) => !onScreen(target.device_id, task.id, at))
+  const targets = await agentTargets(task, at)
   if (targets.length === 0) {
     return 0
   }
@@ -253,9 +265,9 @@ async function pushAgent(task: Task, push: AgentPush, at: number): Promise<numbe
 }
 
 /**
- * Pushes the agent's news to every device that does not show it now, when the attention router
- * picks a push: the EA's item carries an agent it watches, and a page with focus raises a toast.
- * Returns how many devices got it.
+ * Pushes the agent's news to every device that hears about its workspace and does not show it
+ * now, when the attention router picks a push: the EA's item carries an agent it watches, and a
+ * page with focus raises a toast. Returns how many devices got it.
  */
 export async function notifyAgent(task: Task, kind: AgentNotifyKind, at = Date.now()): Promise<number> {
   return pushAgent(task, { kind, mark: kind, body: async () => notifyBody(task, kind) }, at)
@@ -402,12 +414,14 @@ export async function sendTestNotification(deviceId?: string): Promise<TestNotif
   return { sent: sent.length, failed: targets.length - sent.length }
 }
 
-/** Pushes an EA item the attention router sent to the phone, in its notice's own words. */
+/**
+ * Pushes an EA item the attention router sent to the phone, in its notice's own words. One about
+ * an agent goes to the devices that hear about its workspace; any other goes to every device.
+ */
 export async function pushEaItem(item: EaInboxItem, at = Date.now()): Promise<number> {
   const taskId = item.task_id
-  const targets = (await pushDevices.targets()).filter(
-    (target) => taskId === null || !onScreen(target.device_id, taskId, at),
-  )
+  const task = taskId === null ? undefined : await tasks.get(taskId)
+  const targets = task === undefined ? await pushDevices.targets() : await agentTargets(task, at)
   const payload: NotificationPayload = {
     title: item.source,
     body: item.title,

@@ -2,6 +2,7 @@ import { listedStatus, failed, type TaskListEntry } from '@seti/shared'
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { toast } from 'sonner'
 import { useAttention } from '@/hooks/useAttention'
+import { useNotifyScope } from '@/hooks/useNotifyScope'
 import { useTasks } from '@/hooks/useTasks'
 import { classifyFailure, INTERRUPTED } from '@/lib/failure'
 import {
@@ -30,17 +31,27 @@ function summaryText(tasks: readonly TaskListEntry[]): string {
 /**
  * Toasts that stay until dismissed for agents that failed off screen; several collapse to one.
  * Needs-you always reaches the user, so no setting turns them off; an agent the EA reports on
- * gets the EA's toast instead.
+ * gets the EA's toast instead. A failure in a workspace this device is not notified about raises
+ * no toast, now or after a switch to it; Needs you and the workspace switcher show it.
  */
 export function FailureToasts({ openId }: { openId: string | null }) {
   const { tasks } = useTasks()
   const { eaTasks } = useAttention()
   const [since] = useState(() => failuresSince())
   const dismissed = useSyncExternalStore(subscribeDismissed, dismissedFailures)
-  const pending = useMemo(
+  const { ready, hears } = useNotifyScope()
+  const failures = useMemo(
     () => pendingFailures(tasks, { since, dismissed, openId }).filter((task) => !eaTasks.has(task.id)),
     [tasks, since, dismissed, openId, eaTasks],
   )
+  const pending = useMemo(() => failures.filter((task) => hears(task.workspace_id)), [failures, hears])
+  const elsewhere = ready ? failures.filter((task) => !hears(task.workspace_id)).map(failureId) : []
+  const elsewhereKey = elsewhere.join(' ')
+  useEffect(() => {
+    if (elsewhereKey !== '') {
+      dismissFailures(elsewhereKey.split(' '))
+    }
+  }, [elsewhereKey])
   const shown = useRef(new Set<string>())
   const closing = useRef(new Set<string>())
 

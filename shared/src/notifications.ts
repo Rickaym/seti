@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { attentionTiersInput, type AttentionTiers } from './attention.js'
+import { workspaceId } from './workspaces.js'
 
 /** What a push is about: a turn that ended, a state that waits on the user, or an EA item. */
 export const NOTIFY_KINDS = ['finished', 'needs_you', 'ea'] as const
@@ -38,6 +39,34 @@ export const pushDeviceInput = z.object({
 export type PushDeviceInput = z.input<typeof pushDeviceInput>
 
 export const pushDeviceParams = z.object({ device_id: deviceId })
+
+/** What a device is notified about: the workspace it has open, and whether it keeps to it. */
+export interface NotifyScope {
+  /** The workspace the device shows; null until it reports one, which counts as every workspace. */
+  workspace_id: string | null
+  /** True notifies the device only about agents in its open workspace. */
+  workspace_only: boolean
+}
+
+/** A device Seti has not heard from: it has no open workspace, so it hears about every agent. */
+export const DEFAULT_NOTIFY_SCOPE: NotifyScope = Object.freeze({ workspace_id: null, workspace_only: true })
+
+/** A device reports the workspace it shows, or changes whether its notifications keep to it. */
+export const notifyScopeInput = z.object({
+  workspace_id: workspaceId.optional(),
+  workspace_only: z.boolean().optional(),
+})
+export type NotifyScopeInput = z.input<typeof notifyScopeInput>
+
+/**
+ * Whether a device with this scope is notified about an agent in `agentWorkspace`. Null is a
+ * notice about no one agent, such as a mod's or the EA's own, which every device gets.
+ */
+export const hearsWorkspace = (scope: NotifyScope, agentWorkspace: string | null): boolean =>
+  agentWorkspace === null ||
+  !scope.workspace_only ||
+  scope.workspace_id === null ||
+  scope.workspace_id === agentWorkspace
 
 const FOCUS_AGENTS_MAX = 64
 
