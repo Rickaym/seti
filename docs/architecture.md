@@ -232,9 +232,12 @@ switch makes a rule for the whole server instead, and one confirm adds the chose
 whose rules cover only some outward tools, which the rules page shows as one line each.
 
 Settings shows the
-rules agents load from Claude Code's own settings files read-only. Sandboxed agents may edit any
-file they can reach, and run any shell command the classifier allows, so the sandbox stays the
-boundary for them. The whole Claude Code process of a task, and each `!` command,
+rules agents load from Claude Code's own settings files read-only. A sandboxed agent's file tools
+are denied the files the sandbox hides and, in any folder, `.claude/settings.json`,
+`.claude/settings.local.json`, `.claude/hooks` and `.mcp.json`. Those deny rules bind the Read and
+Edit tools only: a shell command the classifier allows can still write any file the sandbox
+mounts read-write, those four included, so the sandbox is the boundary for a sandboxed agent, not
+the rules. The whole Claude Code process of a task, and each `!` command,
 runs under bubblewrap with its own pid, network, IPC and UTS namespaces:
 
 - It sees the system read-only, its own home root and `/tmp`, the task's own folder and package
@@ -264,7 +267,10 @@ runs under bubblewrap with its own pid, network, IPC and UTS namespaces:
   with Seti-local CAs that are name-constrained to those hosts and whose keys stay outside, and
   puts the real credential on the request. GitHub tokens come from the task's credential,
   chosen by the owner the request names. A connection's placeholder is swapped for its value only on
-  its hosts, and a request carrying it elsewhere is refused. MCP sign-ins and connection headers share
+  its hosts. The proxy refuses a request that carries it elsewhere when it can read that request:
+  plain HTTP, or HTTPS to a host it terminates TLS for. A connection to any other allowed host is
+  tunnelled unread, and request bodies are never read, so a placeholder sent there passes; it is
+  still only the placeholder, never the value. MCP sign-ins and connection headers share
   one rule path in the proxy; minted tokens are made and cached by the server and retried once after
   a 401.
 - MCP servers an agent leaves out are denied to its Claude Code, left out of its `.claude.json`,
@@ -368,8 +374,9 @@ and a change reaches running scopes at once through `systemctl set-property`).
 ## Reminders run in a locked-down Node process
 
 A reminder's script runs once per run in a fresh child Node process, never in the server. Node
-starts with `--permission` and no grants, so the script cannot read or write files, start
-processes or workers, load addons or WASI, or open the inspector; its environment is empty. Node
+starts with `--permission` and one grant, to read the runner's own files, so the script cannot
+read any other file, write files, start processes or workers, load addons or WASI, or open the
+inspector; its environment is empty. Node
 24's permission model has no network control, so two more layers close it. When bwrap works on the
 host, the process starts inside `bwrap --unshare-all` with a read-only root and empty `/home`,
 `/run` and `/tmp`: no network namespace, no other processes to signal, no unix sockets of Seti's
@@ -466,12 +473,14 @@ Every query runs as the host's `gh` login, the same one the PR poller uses; the 
 of a credential are for agents' own requests through the egress proxy and are never used here, so
 a PR in a repo that login cannot read shows without a status.
 
-Starting an agent on a PR's branch still needs a checkout, so `start_agent_from_pr` refuses a PR
-whose repo Seti has none of.
+Starting an agent on a PR's branch needs no checkout either: `start_agent_from_pr` takes any open
+PR Seti can read and tells the new agent to clone the repo into its own folder and check out the
+PR's branch.
 
 ## PR updates wake an agent only for news
 
-The PR poller (`server/src/pr-inputs.ts`) reads every PR linked to an agent once a minute, compares
+The PR poller (`server/src/pr-inputs.ts`) reads once a minute every PR linked to an agent that is
+not archived and takes updates, or that the EA watches; an agent with Updates off is skipped. It compares
 it with the last snapshot in `pr_watch` and turns each change into an update for the linked agents:
 CI failed or passed, a review, a comment, a conflict, a merge or a close. Updates from one poll
 reach an agent as one batch, and batches that follow within a few seconds join the same turn.
@@ -510,7 +519,8 @@ other means comes back as an update.
 A pass wakes the agent when the last CI result Seti reported for the PR was a failure, or when the
 agent pushed or opened a PR since Seti last gave it a CI result for this PR (`git push`,
 `gh pr create`, a GitHub MCP push): it started the run, so it waits for the result. Any other pass,
-such as one after someone else updated the branch, is recorded quietly. A failure always wakes.
+such as one after someone else updated the branch, is recorded quietly. A failure wakes, except a
+rerun that fails on a commit Seti already reported as failed, which is a repeat.
 
 A failure is reported once per head commit, and again only for checks that had not failed on it
 before. A conflict is reported once per head commit and base branch, until GitHub finds the PR
@@ -820,7 +830,8 @@ that asked if any, the tool use id, the header, the prompt, the options and thei
 whether it takes several answers, and the status: open, answered, dismissed or expired. Shapes and
 limits are in `shared/src/questions.ts`.
 
-There are two answer types, both from AskUserQuestion itself. A choice takes one option or, with
+AskUserQuestion has two answer types; a third kind of question, `secret`, comes from `ask_secret`
+and is described below. A choice takes one option or, with
 `multiSelect`, any number; a question whose options are exactly a yes and a no is a `yes_no` and
 shows as Yes and No buttons. Every question also takes an answer in the user's own words, the
 tool's Other. Seti keeps no number or free-text type of its own and no question that does not
@@ -1075,17 +1086,22 @@ focus, the live EA call, the brief, or nothing beyond the EA's own history. It d
 event's tier, the user's surface for that tier, whether a call is live, whether any Seti page has
 focus (`server/src/presence.ts`), and how many pushes went out since the user was last here.
 
-| Tier    | What lands there                                                             | Default |
-| ------- | ---------------------------------------------------------------------------- | ------- |
-| urgent  | needs-you (asking, blocked, failed, cut off), failed CI, critical alerts     | push    |
-| active  | unwatched agents' finished turns, reminders, mentions, alerts, fallbacks     | push    |
-| digest  | a watched agent's routine news: a finished turn, CI passed, a merge, updates | brief   |
-| passive | what only informs the EA, such as a linked PR                                | off     |
+| Tier    | What lands there                                                                                                       | Default |
+| ------- | ---------------------------------------------------------------------------------------------------------------------- | ------- |
+| urgent  | needs-you (asking, blocked, failed, cut off), failed CI, critical alerts, mentions of the EA and direct messages to it | push    |
+| active  | unwatched agents' finished turns, reminders, follow-ups, alerts, fallbacks                                             | push    |
+| digest  | a watched agent's routine news: a finished turn, CI passed, a merge, updates                                           | brief   |
+| passive | what only informs the EA, such as a linked PR                                                                          | off     |
 
-A tier set to push reaches the live call when one is live and the EA carries the event, a page
-with focus as a toast while one has focus, and the phone otherwise; with no push device it waits
-for the brief. Toast never pushes, so while nobody looks it waits for the brief too. Needs-you is
-always urgent, and urgent offers only push and toast, so it always reaches the user. Below urgent,
+A tier set to push reaches a page with focus as a toast while one has focus, and the phone
+otherwise; with no push device it waits for the brief. Toast never pushes, so while nobody looks it
+waits for the brief too. The router does not pick the live call today: both of its callers rule
+the call out, and an item reaches a call only when the EA itself delivers it by voice, which
+skips the tier's surface and the push count. Needs-you is always urgent, and urgent offers only
+push and toast, so it is never switched off or set to the brief; it still waits for the brief when
+urgent is set to toast and no page has focus, or when no push device hears about the agent's
+workspace. An agent the EA watches whose turn a restart cut off or the user stopped reaches the EA
+as an ordinary watch event, in the digest tier. Below urgent,
 more than five pushes in ten minutes of one absence wait for the brief; coming back starts the
 count over. The tiers live in `notification_settings.tiers`, and Settings, Notifications has one
 select per tier. The EA and agents change them through `set_notifications`, and every change is
@@ -1094,7 +1110,8 @@ audited with its actor.
 An agent the EA watches or waits for gets no push or toast of its own: the EA's inbox item about
 it is its one surface. Seti routes each inbox item when it is delivered (`server/src/ea-deliver.ts`),
 stores the route on the item, pushes it with the `ea` kind when the router says push, and marks it
-unseen only when the router says toast. Pages read `GET /api/attention` for the agents the EA
+unseen only when the router says toast and Seti posted the item itself or the EA asked for it to
+notify. Pages read `GET /api/attention` for the agents the EA
 carries, and leave their turn toasts and failure toasts to it.
 
 ## The brief tells the user what happened while they were away
@@ -1103,10 +1120,11 @@ Away means no Seti page with focus and no live EA call for five minutes (`AWAY_M
 `shared/src/attention.ts`). Every visible page reports its focus every 20 seconds, and the EA
 polls its inbox with `call=1` during a call, so the server knows when the user comes back. The
 first report after an absence builds one brief (`server/src/attention-brief.ts`): the agents that
-need the user now, each with its reason line, then one line per agent whose turn ended since the
+need the user now, each with its reason line, then one line per idle agent that changed since the
 user left, quoting its `closing_line`, then one line per pushed or digest inbox item about
-anything else, quoting the notice's own title. Muted agents and tiers set to off are left out, and
-the brief lists at most eleven lines and counts the rest. A brief still waiting when the user
+anything else, quoting the notice's own title. Muted agents and tiers set to off are left out of
+the agents' own lines; an inbox item about a muted agent is still listed. The brief lists at most
+eleven lines and counts the rest. A brief still waiting when the user
 leaves again grows to cover both absences; Seti keeps it in memory only.
 
 Pages show the brief as one toast that stays until dismissed, with the unseen plain EA messages
@@ -1192,13 +1210,13 @@ that holds an agent up without ending its turn sets `task.blocked`, which
 `server/src/task-blocked.ts` keeps. It shows as the `blocked` status, which stays in Needs you
 while the agent is open, until it clears:
 
-| Stall                                                                                         | Reason line                                                              | Clears when                                 |
-| --------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ | ------------------------------------------- |
-| A tool call no rule allows, or ExitPlanMode                                                   | `Asks to use Bash: make deploy`, `Asks to approve its plan`              | the user answers, or the turn stops         |
-| An AskUserQuestion call                                                                       | `Asks 2 questions: Which checks should I run first?`                     | the user settles them, or the turn stops    |
-| A change the agent asked for with `request_change`                                            | `Asks for access to api.example.com:443`                                 | the user answers it, or it expires in a day |
-| An MCP server's sign-in tool                                                                  | `Sign in to the linear MCP server in Seti`                               | a sign-in finishes, or the next turn starts |
-| A running turn with no message for 20 minutes, not counting time a request waited on the user | `No output for 20 min while running`, or the API error it keeps retrying | the session speaks again, or the turn ends  |
+| Stall                                                                                        | Reason line                                                              | Clears when                                 |
+| -------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ | ------------------------------------------- |
+| A tool call no rule allows, or ExitPlanMode                                                  | `Asks to use Bash: make deploy`, `Asks to approve its plan`              | the user answers, or the turn stops         |
+| An AskUserQuestion call                                                                      | `Asks 2 questions: Which checks should I run first?`                     | the user settles them, or the turn stops    |
+| A change the agent asked for with `request_change`                                           | `Asks for access to api.example.com:443`                                 | the user answers it, or it expires in a day |
+| An MCP server's sign-in tool                                                                 | `Sign in to the linear MCP server in Seti`                               | a sign-in finishes, or the next turn starts |
+| A running turn with no message for 20 minutes, not counting time a permission request waited | `No output for 20 min while running`, or the API error it keeps retrying | the session speaks again, or the turn ends  |
 
 A permission request outranks open questions, which outrank a change request, which outranks the reason startup stopped resuming an agent after restarts, which outranks a stall; the watchdog (`server/src/stall-watch.ts`) checks the
 open sessions once a minute.
@@ -1263,8 +1281,8 @@ off and it does not resume, and marks them unseen; an agent that still waits on 
 notified again. Pushes use Web Push with a VAPID key
 pair that Seti makes on first start and seals in the secret store; the `web-push` library encrypts
 each payload to the device's keys, and Seti sends it itself, only to known push services. Each
-notification carries the agent's id as its tag and push topic, so a newer one replaces an older
-one. A visible Seti page reports what it shows every 20 seconds; the server skips a device whose
+notification carries the agent's id as its tag, and as its push topic with everything but letters
+and digits removed, so a newer one replaces an older one. A visible Seti page reports what it shows every 20 seconds; the server skips a device whose
 page shows the agent, and while any page has focus that page raises its own toast and chime
 instead of a push.
 A finished turn's push and toast both read `task.closing_line`, which the turn end stores
