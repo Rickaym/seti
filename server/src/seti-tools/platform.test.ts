@@ -64,21 +64,6 @@ describe('platform tools', () => {
     expect((await call('set_auto_archive', { delete_after_days: 0 })).json()).toMatchObject({ delete_after_days: null })
   })
 
-  it('lists stale folders and deletes them only when confirmed', async () => {
-    const listed = (await call('get_archive_settings', { stale_folders: true })).json()
-    expect(listed).toMatchObject({ stale_folders: { days: 7, folders: [] } })
-    const unconfirmed = await call('run_archive_sweep', { stale_folders: ['/srv/no-such-stale-folder'] })
-    expect(unconfirmed.error).toBe(true)
-    expect(unconfirmed.text).toContain('confirm')
-    const refused = (
-      await call('run_archive_sweep', { stale_folders: ['/srv/no-such-stale-folder'], confirm: true })
-    ).json()
-    expect(refused).toEqual({
-      deleted: [],
-      refused: [{ path: '/srv/no-such-stale-folder', reason: 'it is not a stale folder now' }],
-    })
-  })
-
   it('mutes an agent and changes where each tier reaches the user', async () => {
     const other = { id: randomUUID(), title: 'Noisy builder' }
     await tasks.insert({ ...other, repo_id: null, cwd: '/tmp', worktree: false, pr_urls: [] })

@@ -81,6 +81,10 @@ const allHidden = (policy: SandboxPolicy, ctx: SandboxContext) => [
   ...policy.hidden_paths.map((entry) => expandHome(ctx, entry)),
 ]
 
+/** What a sandbox's home keeps that the Files view never serves: its logins and Claude data. */
+export const sandboxHomeHidden = (home: string): string[] =>
+  [...HOME_SECRETS, '.claude'].map((secret) => path.join(home, secret))
+
 export const homeExcluded = (ctx: SandboxContext) => HOME_EXCLUDED.map((name) => inHome(ctx, name))
 
 /** How the settings page lists what every task hides, with the home directory as ~. */
