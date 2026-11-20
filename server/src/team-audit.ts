@@ -1,4 +1,4 @@
-import { recipientLabel, type TeamMessage } from '@seti/shared'
+import { activeReach, namedMentions, recipientLabel, type TeamMessage } from '@seti/shared'
 import { audit } from './audit.js'
 import { authorLabel } from './team-author.js'
 import type { TeamAuthor } from './team-recipient.js'
@@ -30,6 +30,12 @@ export async function auditDirect(message: TeamMessage, replyTo?: number): Promi
   })
 }
 
+/** The agents @active reached, by handle, for a message that used it. */
+function activeDetail(message: TeamMessage): { active_reached?: string[] } {
+  const reach = activeReach(message.mentions)
+  return reach === null ? {} : { active_reached: reach.map((mention) => mention.handle) }
+}
+
 export async function auditPost(author: TeamAuthor, message: TeamMessage, replyTo?: number): Promise<void> {
   await audit.record({
     actor: author.kind === 'task' ? 'agent' : 'user',
@@ -41,7 +47,8 @@ export async function auditPost(author: TeamAuthor, message: TeamMessage, replyT
       message_id: String(message.id),
       author: authorLabel(message),
       text: message.text,
-      mentions: message.mentions.map((mention) => mention.handle),
+      mentions: namedMentions(message.mentions).map((mention) => mention.handle),
+      ...activeDetail(message),
       ...(replyTo === undefined ? {} : { reply_to: String(replyTo) }),
     },
   })

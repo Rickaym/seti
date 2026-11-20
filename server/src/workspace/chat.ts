@@ -1,4 +1,12 @@
-import { isDirect, parseMentions, recipientLabel, type TeamDeliveryMode, type TeamMessage } from '@seti/shared'
+import {
+  activeReach,
+  isDirect,
+  namedMentions,
+  parseMentions,
+  recipientLabel,
+  type TeamDeliveryMode,
+  type TeamMessage,
+} from '@seti/shared'
 import { authorLabel } from '../team.js'
 import { frontBoolean, parseFrontMatter, renderFrontMatter } from './front-matter.js'
 import { rejectionLine } from './objects.js'
@@ -46,7 +54,8 @@ function outcome(message: TeamMessage, deliveries: readonly DeliveryLine[]): str
   const extra = [
     ...(handles.has('ea') ? ['@ea inbox'] : []),
     ...(handles.has('user') ? ['@user flagged'] : []),
-    ...message.mentions
+    ...(activeReach(message.mentions)?.length === 0 ? ['@active reached nobody, no agent was active today'] : []),
+    ...namedMentions(message.mentions)
       .filter((mention) => mention.task_id !== null && !delivered.has(mention.handle))
       .map((mention) => `@${mention.handle} not reached (archived or deleted)`),
     ...parseMentions(message.text)

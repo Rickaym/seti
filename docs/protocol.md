@@ -588,7 +588,7 @@ Why: an agent woken by its own actions or by news nobody waited for burns turns 
 ## 12. Group chat
 
 - CHAT-1: One chat joins the user, the EA and every agent; agents have handles from their titles,
-  and `all`, `ea` and `user` are reserved.
+  and `all`, `active`, `ea` and `user` are reserved.
 - CHAT-3: A mention reaches that agent; `@all` or an EA post every active agent. An idle agent
   starts a turn; a running one takes a user or EA mention now and others at its next step. Agent
   traffic is held past `chat_burst` deliveries to one agent and `chat_loop` exchanges between two.
@@ -604,6 +604,9 @@ Why: an agent woken by its own actions or by news nobody waited for burns turns 
 - CHAT-10: A side question MUST be refused when the agent's session holds a direct message the
   asker may not see (CHAT-6).
 - CHAT-11: A direct message to a muted agent waits for its next turn; it is not skipped.
+- CHAT-12: `@active` is a mention of every unarchived agent but the author that runs, or was
+  created, ran or ended a turn since local midnight in the user's stored timezone, else the
+  host's. The agents it reached are stored with the message and never re-resolved; none is valid.
 
 ## 13. Agent-to-platform tools
 
