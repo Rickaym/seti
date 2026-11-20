@@ -20,7 +20,7 @@ export const LINKS = {
 } as const
 
 /** The agent's reply, as the agent wrote it. */
-export const REPLY = [
+const REPLY = [
   `I read the thread at ${LINKS.slack.url} and opened ${LINKS.pr.url}.`,
   `Setup steps are in ${LINKS.plain.url}. The fix also closes ${LINKS.issue.url}.`,
   `See [the changelog](${LINKS.labelled}) for the release note, and \`${LINKS.code}\` for the endpoint.`,
@@ -29,7 +29,7 @@ export const REPLY = [
 ].join('\n\n')
 
 /** What the user asked, with a link of its own. */
-export const PROMPT = `Summarise the discussion in ${LINKS.slack.url} and fix it.`
+const PROMPT = `Summarise the discussion in ${LINKS.slack.url} and fix it.`
 
 const assistant = (content: unknown[]) => ({
   type: 'assistant',
