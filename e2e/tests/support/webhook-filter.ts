@@ -95,7 +95,7 @@ async function retest({ page, press }: Flow, card: Locator, name: string): Promi
   await expect(rows.nth(0)).toContainText('Disk full')
   await expect(rows.nth(1)).toHaveAttribute('data-outcome', 'dropped')
   await expect(rows.nth(1)).toContainText('Deploy shipped')
-  await page.keyboard.press('Escape')
+  await press(dialog.getByRole('button', { name: 'Cancel' }))
   await expect(dialog).toHaveCount(0)
 }
 
