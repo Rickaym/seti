@@ -235,7 +235,7 @@ interrupted only for that.
 | Prose question (`asking`) | `Asked in its reply`                                                               | any turn starts                |
 
 - ATT-5: A turn with no runtime output for `stall_after` is a stall, checked every `stall_check`.
-  Time a permission request was pending MUST NOT count. Every stall MUST surface through Needs
+  Time the agent waited on a request to the user MUST NOT count. Every stall MUST surface through Needs
   you; there is no other place an agent waits.
 
 ### 6.2 Router
@@ -258,14 +258,14 @@ interrupted only for that.
   3. Surface `brief`, or a non-urgent event after `push_cap` pushes within `push_window` of one
      absence -> `digest`.
   4. A page with focus on a device that hears the event (ATT-16) -> `toast`.
-  5. Surface `push` and a push device that hears it -> `push`.
+  5. Surface `push`, or tier `urgent`, and a push device that hears it -> `push`.
   6. Else `digest`.
-- ATT-10: The push count restarts when the user returns. Needs-you is never capped, but rule 6
-  holds for it: on surface `toast` with no focused page, or with no push device that hears it, it
-  waits for the brief.
+- ATT-10: The push count restarts when the user returns. Needs-you is never capped: on surface
+  `toast` with no focused page that hears it, it is pushed; only with no push device that hears it
+  does it wait for the brief.
 - ATT-11: An agent the EA watches or waits for MUST get no push or toast of its own; the EA's
-  inbox item, routed by this section, is its one surface. Its turn ended by a stop or a restart
-  is routine news (`digest`).
+  inbox item, routed by this section, is its one surface. Its turn ended by a stop is routine news
+  (`digest`); a turn a restart cut off is `urgent`, and startup reports each one it did not resume.
 - ATT-13: Tier surfaces are a notification setting, not a security setting: delegates at full
   reach MAY change them. `urgent` MUST NOT be set below `toast`.
 
@@ -294,9 +294,9 @@ interrupted only for that.
   on focus change. A call is live while the EA polls its inbox as on a call (within `call_ttl`).
   The user is away after `away_after` with no focused page and no live call.
 - ATT-25: The first report after an absence builds one brief: up to `brief_needs` agents that need
-  the user, with reason lines; then up to `brief_changes` changes (idle agents that changed since
+  the user, with reason lines; then up to `brief_changes` changes (agents whose turn ended since
   the user left, quoting `closing_line`, then inbox items routed `push` or `digest`); then a count
-  of the rest. Muted agents and tiers set `off` are left out of the agents' own lines only. A
+  of the rest. Muted agents, inbox items about them included, and tiers set `off` are left out. A
   waiting brief grows across absences, is held in memory only, and closes on every device when
   dismissed or when a call takes it.
 
@@ -410,6 +410,8 @@ interrupted only for that.
 - GRD-10: Outward: a tool-server call unless its name reads as a read or the tool declares no
   writes; a shell command that pushes, publishes, deploys, mutates a remote API or opens a remote
   shell; any unknown name. Every outward call MUST be audited and counted on the agent.
+- GRD-12: Only a tool-server call's input MAY be edited (GRD-8); a shell command never is, so no
+  edit passes the shell guard.
 
 ### 7.6 Change requests
 
@@ -443,6 +445,13 @@ interrupted only for that.
 - HST-5: Sandboxed agents' file tools MUST NOT edit runtime settings, hooks or tool-server config
   in any folder; unsandboxed agents are asked. An HTML file an agent wrote MUST render only in an
   opaque-origin frame with no network and no script by default.
+- HST-8: A tool-server sign-in runs on the host only when the user starts it, starts no hook or
+  server command, and MUST refuse a project server the user has not approved.
+- HST-9: The control room serves an agent's files only inside its folders and workspace, symlinks
+  resolved; hidden paths and the runtime's and control room's data are refused. The user MAY save
+  text naming the content it replaces; delegates only read, and the EA never key or env files.
+- HST-10: Attachments are staged outside every sandbox and land in the agent's workspace under a
+  new name; a link planted at the target is replaced, never followed.
 
 ### 7.8 Resource caps
 
@@ -592,6 +601,9 @@ Why: an agent woken by its own actions or by news nobody waited for burns turns 
   Why: a private answer must not land in public by default.
 - CHAT-9: A side question forks the session read-only, without tool servers, and writes nothing
   back.
+- CHAT-10: A side question MUST be refused when the agent's session holds a direct message the
+  asker may not see (CHAT-6).
+- CHAT-11: A direct message to a muted agent waits for its next turn; it is not skipped.
 
 ## 13. Agent-to-platform tools
 
@@ -801,7 +813,7 @@ An implementation is SETI-compatible when it meets all of:
 
 | Profile       | Adds                                                                 |
 | ------------- | -------------------------------------------------------------------- |
-| Sandbox       | all SBX, EGR, HST, CAP, SEC and CHG; PERM-10; GRD-2, GRD-7 to GRD-10 |
+| Sandbox       | all SBX, EGR, HST, CAP, SEC and CHG; PERM-10; GRD-2, GRD-7 to GRD-12 |
 | Shared tools  | all TOOL (requires Sandbox)                                          |
 | Events        | all CHN; PUB-2 (hooks)                                               |
 | Pull requests | all PR                                                               |
@@ -848,8 +860,6 @@ treat every agent as holding the user's access.
   and RES-1 to RES-4.
 - Repository registry removal: agents clone for themselves (TURN-9); the remaining registry fields
   on the agent and repository tools at `full` will go. PR-1 already needs no registry.
-- Attention: needs-you pushes when no page has focus, the brief honours mute, watched agents keep
-  their urgency, and the stall clock skips open questions (ATT-5, ATT-10, ATT-11, ATT-25).
 - Public paths for mods: declared, not available.
 - Third-party mod install stays behind a developer switch until its runtime is reviewed.
 - Native device clients beyond the `widget` scope.
@@ -900,29 +910,3 @@ CHAT-7, LVL-2, LVL-7, LVL-9, LVL-11, LVL-12, LVL-14, EA-2, EA-5, EA-6, EA-9, EA-
 EA-15, RES-2, RES-5, RES-7, RES-13, AUD-3, AUD-4, AUD-6, AUD-9, AUD-11, AUD-13, MOD-2, MOD-4, MOD-5,
 MOD-7, MOD-9, MOD-10, MOD-11, MOD-13, MOD-14, MOD-16, MOD-17, MOD-18, MOD-19, MOD-20, MOD-21,
 MOD-22, MOD-24, PUB-5, PUB-6, PUB-8, PUB-9, API-3, API-5, API-10, API-12, API-13, API-14, API-16.
-
-## Appendix C. Source map
-
-Where the reference implementation keeps each section, for contributors. Paths are under
-`server/src/` unless they start with another top-level folder.
-
-| Section        | Main files                                                                                                                 |
-| -------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| 3 Entities     | `shared/src/tasks.ts`, `shared/src/inputs.ts`, `shared/src/requests.ts`, `db.ts`                                           |
-| 4 Turns        | `runner.ts`, `agent-session.ts`, `input-queue.ts`, `session-restart.ts`, `rewind.ts`, `turn-asking.ts`                     |
-| 5 Updates      | `shared/src/channel-delivery.ts`, `inputs.ts`, `input-preface.ts`                                                          |
-| 6 Attention    | `shared/src/attention.ts`, `task-blocked.ts`, `stall-watch.ts`, `ea-attention.ts`, `notify-scope.ts`, `attention-brief.ts` |
-| 7.1 Actors     | `access.ts`, `ea-guard.ts`                                                                                                 |
-| 7.2 to 7.8     | `sandbox-mounts.ts`, `egress-proxy.ts`, `permission-policy.ts`, `permission-guard.ts`, `repeat-guard.ts`, `oom-guard.ts`   |
-| 8 Secrets      | `secret-box.ts`, `connections.ts`, `scrub.ts`, `secret-questions.ts`                                                       |
-| 9 Shared tools | `shared/src/shared-tools.ts`, `shared-tool-proposals.ts`, `shared-tool-server.ts`                                          |
-| 10 Events      | `shared/src/webhook-senders.ts`, `shared/src/webhook-sender-catalog.ts`, `channels/`, `pollers/`, `reminders/`             |
-| 11 PRs         | `pr-inputs.ts`, `pr-self.ts`, `pr-link.ts`, `shared/src/pr-fix-ci.ts`                                                      |
-| 12 Chat        | `team.ts`, `direct-privacy.ts`, `side-chat/`                                                                               |
-| 13 Tools       | `seti-tools/`, `questions.ts`, `house-rules.ts`, `knowledge.ts`                                                            |
-| 14 Assistant   | `ea/src/seti_ea/` (`gate.py`, `asks.py`, `inbox.py`, `settle.py`), `routes/ea-replies.ts`                                  |
-| 15 Resilience  | `restart-cut.ts`, `restart-resume.ts`, `permission-grants.ts`, `client-sends.ts`, `owned-dirs.ts`                          |
-| 16 Audit       | `audit.ts`, `store/audit.ts`                                                                                               |
-| 17 Mods        | `mods/`, `shared/src/mods.ts`, `packages/mod-api/`                                                                         |
-| 18 Public      | `access.ts`, `routes/share-public.ts`, `rate-limit.ts`, `security-headers.ts`                                              |
-| 19 Client      | `http.ts`, `etag.ts`, `devices.ts`, `shared/src/lenient.ts`, `ui/src/lib/poll-loop.ts`                                     |

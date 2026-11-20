@@ -29,4 +29,5 @@ surfaces (share links, webhooks, the demo) are in scope too.
 Out of scope: attacks that need the owner's own sign-in or shell on the host, an agent the owner
 gave Bypass or an unsandboxed setup, and denial of service from a client the owner admitted.
 
-[docs/security.md](docs/security.md) describes the security model these rest on.
+[The SETI Protocol](docs/protocol.md) specifies the security model these rest on, and
+[docs/security.md](docs/security.md) covers running Seti securely.

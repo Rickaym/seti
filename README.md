@@ -51,7 +51,7 @@ and review threads, so a red check or a new comment becomes their next turn, not
 - **Full control on a phone.** Permissions, terminals with a key row, files and every setting.
 - **A live graph of the team.** Home links every agent to its repos and subagents.
 - **Pull requests that close the loop.** CI, previews and reviews reach the agent as input.
-- **[Channels](docs/pollers.md).** Webhooks, reminders and pollers turn any service into events
+- **[Channels](docs/setup.md#channels-webhooks-pollers-and-reminders).** Webhooks, reminders and pollers turn any service into events
   that wake an agent or the EA.
 - **One group chat.** You, the EA and every agent, where an @mention reaches an agent mid-turn.
 - **Ask aside.** `/btw` asks an agent a question from its context without interrupting its turn,
@@ -149,9 +149,9 @@ the [install script](scripts/install.sh) before you run it.
 5. **Everything is recorded.** PostgreSQL holds the state, and every action lands in an audit log
    kept as a hash chain.
 
-[Architecture](docs/architecture.md) records the decisions behind each part.
-[The SETI Protocol](docs/protocol.md) specifies the same behaviour as numbered requirements that
-another implementation can follow.
+[The SETI Protocol](docs/protocol.md) specifies this behaviour as numbered requirements that
+another implementation can follow, and [Implementation](docs/implementation.md) maps each part of
+it to the code.
 
 ## Security
 
@@ -168,7 +168,7 @@ Agents run code on your machine, so Seti treats every agent as untrusted.
 - **Shares are copies.** A share link serves a frozen copy with no script and no route to the file
   system.
 
-[Security](docs/security.md) has the full model, where each secret lives, and rotation. To report a
+[Security](docs/security.md) has the trust model, hardening steps, where each secret lives, and rotation. To report a
 vulnerability, see [SECURITY.md](SECURITY.md).
 
 ## FAQ
@@ -194,8 +194,8 @@ Claude Code does, and the EA sends what you say to the voice providers you set u
 ## Contributing
 
 Issues and pull requests are welcome. [CONTRIBUTING.md](CONTRIBUTING.md) has the checks, the
-conventions and the security checklist. [Pollers](docs/pollers.md) and [Mods](docs/mods.md) are
-good places to start.
+conventions and the security checklist. [Mods](docs/mods.md) and
+[Channels](docs/setup.md#channels-webhooks-pollers-and-reminders) are good places to start.
 
 ## License
 

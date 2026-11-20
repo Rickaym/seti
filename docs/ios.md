@@ -61,7 +61,7 @@ native shell around the whole UI.
   `GET /api/widget/summary`, the endpoint the Android widgets read.
 - **Device key.** Pairing creates a P-256 key in the Secure Enclave, which never leaves the phone,
   and registers its public key with `platform: "ios"`. Each widget request carries a fresh
-  `Authorization: SetiDevice <proof>`, the ES256 JWS described in [Security](security.md). The app
+  `Authorization: SetiDevice <proof>`, the ES256 JWS of API-11 in [the protocol](protocol.md). The app
   scans the pairing QR code itself, since a universal link would need an
   `apple-app-site-association` file on every user's own domain.
 - **Full UI stays in Safari.** Passkeys in a `WKWebView` need the Associated Domains entitlement
