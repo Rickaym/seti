@@ -187,8 +187,7 @@ class Egress {
     if (ssh !== undefined && (await ssh(`${target.host}:${String(target.port)}`).catch(() => false))) {
       return true
     }
-    const allowed = await this.options.allowed().catch(() => [])
-    return urlAllowed(`https://${target.host}:${String(target.port)}/`, allowed)
+    return urlAllowed(`https://${target.host}:${String(target.port)}/`, await this.options.allowed().catch(() => []))
   }
 
   private refused(host: string): string {
@@ -307,9 +306,10 @@ class Egress {
     }
     const origin = `https://${target.host}:${String(target.port)}`
     const url = keyed.path.startsWith('/') && URL.canParse(keyed.path, origin) ? new URL(keyed.path, origin) : null
+    const own = !builtin && urlAllowed(`${origin}/`, await this.options.allowed().catch(() => []))
     const { headers, applied } = builtin
       ? { headers: injected, applied: [] }
-      : await applyRules(this.rulesFor(target), url, injected)
+      : await applyRules(this.rulesFor(target), url, injected, own)
     headers.host = target.port === 443 ? target.host : `${target.host}:${String(target.port)}`
     return { headers, applied, url }
   }
