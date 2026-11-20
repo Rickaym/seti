@@ -5,8 +5,11 @@ import type { TaskStatus } from './tasks.js'
 export const TEAM_AUTHOR_KINDS = ['user', 'ea', 'task', 'mod'] as const
 export type TeamAuthorKind = (typeof TEAM_AUTHOR_KINDS)[number]
 
-/** Mentions that name no task: every active task, the EA, and the user. */
-export const TEAM_RESERVED_HANDLES = ['all', 'ea', 'user'] as const
+/**
+ * Mentions that name no task: every active task, every task that worked today, the EA, and the
+ * user.
+ */
+export const TEAM_RESERVED_HANDLES = ['all', 'active', 'ea', 'user'] as const
 export type TeamReservedHandle = (typeof TEAM_RESERVED_HANDLES)[number]
 
 export const isReservedHandle = (handle: string): handle is TeamReservedHandle =>
@@ -29,14 +32,29 @@ export const teamHandle = z
       .min(1, 'handle is required')
       .max(TEAM_HANDLE_MAX, `handles are at most ${String(TEAM_HANDLE_MAX)} characters`)
       .regex(HANDLE_PATTERN, 'use lowercase letters, digits and inner hyphens')
-      .refine((value) => !isReservedHandle(value), 'all, ea and user are reserved'),
+      .refine((value) => !isReservedHandle(value), `${TEAM_RESERVED_HANDLES.join(', ')} are reserved`),
   )
 
-/** A handle the text names, and the task it named when the message was posted. */
+/**
+ * A handle the text names, and the task it named when the message was posted. An entry with `via`
+ * is an agent a reserved handle reached rather than one the text names: `active` for @active.
+ */
 export interface TeamMention {
   handle: string
   task_id: string | null
+  via?: 'active'
 }
+
+/** The agents @active reached when the message was posted, or null when it does not use @active. */
+export function activeReach(mentions: readonly TeamMention[]): TeamMention[] | null {
+  return mentions.some((mention) => mention.handle === 'active' && mention.via === undefined)
+    ? mentions.filter((mention) => mention.via === 'active')
+    : null
+}
+
+/** The mentions the text itself names, without the agents a reserved handle reached. */
+export const namedMentions = (mentions: readonly TeamMention[]): TeamMention[] =>
+  mentions.filter((mention) => mention.via === undefined)
 
 /** Who a direct message is for: the EA, or an agent. */
 export type TeamRecipientKind = 'ea' | 'task'
@@ -101,6 +119,8 @@ export interface TeamMember {
   muted: boolean
   /** Running, holding an open session, or busy recently, so @all reaches it. */
   active: boolean
+  /** Started, ran a turn or runs today in the user's timezone, so @active reaches it. */
+  active_today: boolean
 }
 
 /** The one recipient of a direct message: an agent's @handle, or @ea. */
@@ -115,7 +135,7 @@ export const teamRecipient = z
       .min(1, 'name one recipient')
       .max(TEAM_HANDLE_MAX)
       .regex(HANDLE_PATTERN, 'name one @handle')
-      .refine((value) => value !== 'all', 'a direct message goes to one member, not @all')
+      .refine((value) => value !== 'all' && value !== 'active', 'a direct message goes to one member, not a group')
       .refine((value) => value !== 'user', 'the user sees every message; mention @user in a public post'),
   )
 

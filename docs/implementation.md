@@ -65,7 +65,7 @@ with another top-level folder.
 | 9 Shared tools | `shared/src/shared-tools.ts`, `shared-tool-proposals.ts`, `shared-tool-files.ts`, `shared-tool-server.ts`                                                      |
 | 10 Events      | `shared/src/webhook-senders.ts`, `shared/src/webhook-sender-catalog.ts`, `channels/`, `pollers/`, `reminders/`, `quickjs/`                                     |
 | 11 PRs         | `pr-inputs.ts`, `pr-self.ts`, `pr-link.ts`, `github-list.ts`, `pr-details.ts`, `shared/src/pr-fix-ci.ts`                                                       |
-| 12 Chat        | `team.ts`, `direct-privacy.ts`, `side-chat/`, `mods/side-chat/`                                                                                                |
+| 12 Chat        | `team.ts`, `team-active.ts`, `direct-privacy.ts`, `side-chat/`, `mods/side-chat/`                                                                              |
 | 13 Tools       | `seti-tools/`, `questions.ts`, `question-answers.ts`, `house-rules.ts`, `knowledge.ts`, `knowledge-review.ts`                                                  |
 | 14 Assistant   | `ea/src/seti_ea/` (`gate.py`, `asks.py`, `inbox.py`, `settle.py`, `held.py`, `promises.py`), `ea-deliver.ts`, `routes/ea-replies.ts`                           |
 | 15 Resilience  | `restart-cut.ts`, `restart-resume.ts`, `restart-waits.ts`, `permission-grants.ts`, `client-sends.ts`, `model-fallback.ts`, `archive-files.ts`, `owned-dirs.ts` |

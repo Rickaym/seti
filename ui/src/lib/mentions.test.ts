@@ -32,6 +32,15 @@ describe('rankMentions', () => {
     expect(rankMentions(options, '', 3).map((o) => o.handle)).toEqual(['all', 'api-voice', 'billing'])
     expect(rankMentions(options, 'zzz', 5)).toEqual([])
   })
+
+  it('lists reserved handles before agents that match as well', () => {
+    const reserved: MentionOption[] = [
+      { handle: 'agent', detail: 'An agent', quiet: false },
+      { handle: 'all', detail: 'Every active agent', quiet: false, pinned: true },
+      { handle: 'active', detail: '2 agents active today', quiet: false, pinned: true },
+    ]
+    expect(rankMentions(reserved, 'a', 5).map((o) => o.handle)).toEqual(['active', 'all', 'agent'])
+  })
 })
 
 describe('insertMention', () => {

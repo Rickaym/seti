@@ -1,4 +1,4 @@
-import { mentionSpans, type AgentColor, type TeamMention } from '@seti/shared'
+import { mentionSpans, namedMentions, type AgentColor, type TeamMention } from '@seti/shared'
 import type { Nodes, PhrasingContent, Root, Text } from 'mdast'
 import { agentColorAttr } from '@/lib/agent-color-sheet'
 
@@ -71,5 +71,5 @@ function visit(node: Nodes, known: ReadonlyMap<string, TeamMention>, colorOf: Co
 
 /** Marks each @handle a message resolved, linking task handles to their task; code stays as is. */
 export const remarkMentions = (mentions: readonly TeamMention[], colorOf: ColorOf) => () => (tree: Root) => {
-  visit(tree, new Map(mentions.map((mention) => [mention.handle, mention])), colorOf)
+  visit(tree, new Map(namedMentions(mentions).map((mention) => [mention.handle, mention])), colorOf)
 }
