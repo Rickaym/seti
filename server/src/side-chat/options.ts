@@ -2,15 +2,9 @@ import type { Options } from '@anthropic-ai/claude-agent-sdk'
 import type { Task } from '@seti/shared'
 import { connectionEnv, taskConnections } from '../connection-egress.js'
 import { planScope } from '../memory-cap.js'
-import {
-  agentEnv,
-  permissionSettings,
-  sandboxFor,
-  spawnInSandbox,
-  spawnInScope,
-  systemAppend,
-  workingDirs,
-} from '../session-options.js'
+import { sandboxFor } from '../session-options.js'
+import { agentEnv, spawnInSandbox, spawnInScope } from '../session-realise.js'
+import { permissionSettings, systemAppend, workingDirs } from '../session-spec.js'
 
 /** Tools that only read, which a side chat the user or the EA starts may use. */
 export const READ_TOOLS = ['Read', 'Glob', 'Grep']

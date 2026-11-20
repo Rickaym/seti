@@ -20,7 +20,7 @@ import {
 import { oomRun, oomRunBlocked, oomScriptArgs } from './oom-fixtures.js'
 import { kernelOomKills, TOOL_OOM_ADJ } from './oom-guard.js'
 import { applyCaps, scopeMemory } from './scope-limits.js'
-import { agentEnv } from './session-options.js'
+import { agentEnv } from './session-realise.js'
 
 const SIX_GB = defaultMemoryCap(8192)
 

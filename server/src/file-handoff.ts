@@ -17,7 +17,7 @@ import {
 import { audit } from './audit.js'
 import { tasks } from './db.js'
 import { HttpError } from './http.js'
-import { sandboxContext } from './session-options.js'
+import { sandboxContext } from './sandbox-context.js'
 import { sandboxPolicy } from './store/sandbox.js'
 import { teamMembers } from './store/team.js'
 import { fileRules, isHidden, openChecked, pathProblem, taskRoots, within, type FileContext } from './task-files.js'

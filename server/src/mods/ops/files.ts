@@ -3,7 +3,7 @@ import { globCouldContain, globMatches, MOD_LIMITS, type FileEntry, type Task, s
 import { z } from 'zod'
 import { refuseDelegateSecretFile, textForReader } from '../../ea-files.js'
 import { HttpError } from '../../http.js'
-import { sandboxContext } from '../../session-options.js'
+import { sandboxContext } from '../../sandbox-context.js'
 import { sandboxPolicy } from '../../store/sandbox.js'
 import { listDir } from '../../task-files-list.js'
 import { fileRules, locate, readFile, taskRoots, type FileContext, type Located } from '../../task-files.js'

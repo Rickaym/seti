@@ -1,9 +1,9 @@
 import type { SandboxPolicy, SandboxStatus } from '@seti/shared'
 import { claudeCredentialMode } from './claude-credential.js'
 import { githubTokenMode } from './github-token.js'
+import { sandboxContext } from './sandbox-context.js'
 import { sandboxMcpServers } from './sandbox-mcp.js'
 import { builtInHidden } from './sandbox.js'
-import { sandboxContext } from './session-options.js'
 import { sandboxPolicy } from './store/sandbox.js'
 
 /** The sandbox setting, the credentials its proxy uses and what every task hides. */

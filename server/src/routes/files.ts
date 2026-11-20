@@ -25,7 +25,7 @@ import { refuseDelegateSecretFile, searchForReader, textForReader } from '../ea-
 import { eaReadOnly } from '../ea-guard.js'
 import { htmlPreviewHeaders, previewBody, wantsHtmlPreview } from '../html-preview.js'
 import { HttpError, ok, valid, validJson } from '../http.js'
-import { sandboxContext } from '../session-options.js'
+import { sandboxContext } from '../sandbox-context.js'
 import { sandboxPolicy } from '../store/sandbox.js'
 import { listDir, recentFiles, resolveLinked, resolvePath, workspaceOwner } from '../task-files-list.js'
 import { searchFiles, searchOptions } from '../task-files-search.js'

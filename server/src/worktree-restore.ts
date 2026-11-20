@@ -4,7 +4,7 @@ import type { Task } from '@seti/shared'
 import { audit } from './audit.js'
 import { WORKTREE_ROOT } from './config.js'
 import { createWorktree, forgetWorktree } from './git.js'
-import { workingDirs } from './session-options.js'
+import { workingDirs } from './session-spec.js'
 import { taskLocation } from './store/task-location.js'
 
 /** The worktrees Seti made that the agent still works in and that are gone from disk. */

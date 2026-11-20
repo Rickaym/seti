@@ -27,7 +27,7 @@ import {
 } from './process-scan.js'
 import { ComponentProbe } from './resource-components.js'
 import { evaluateRules, type CpuPoint, type TaskCandidate } from './resource-rules.js'
-import { TASK_ID_ENV } from './session-options.js'
+import { TASK_ID_ENV } from './session-realise.js'
 import { sandboxPolicy } from './store/sandbox.js'
 import { currentToolCall, type OpenToolCall } from './tool-calls.js'
 

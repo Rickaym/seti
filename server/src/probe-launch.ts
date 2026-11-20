@@ -4,7 +4,8 @@ import { extraDirs, type Task } from '@seti/shared'
 import type { ProbeLaunch } from './capabilities.js'
 import { tasks } from './db.js'
 import { taskPluginConfigs } from './plugins.js'
-import { sandboxFor, spawnInSandbox } from './session-options.js'
+import { sandboxFor } from './session-options.js'
+import { spawnInSandbox } from './session-realise.js'
 import { sandboxPolicy } from './store/sandbox.js'
 
 const within = (dir: string, root: string) => dir === root || dir.startsWith(root + path.sep)

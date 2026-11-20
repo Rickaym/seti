@@ -14,7 +14,7 @@ import { repos } from './db.js'
 import { fromEa } from './ea-guard.js'
 import { HttpError } from './http.js'
 import { noteTexts, refusePrivateSources, refuseSecrets } from './knowledge-checks.js'
-import { workingDirs } from './session-options.js'
+import { workingDirs } from './session-spec.js'
 import { knowledge } from './store/knowledge.js'
 
 /** Proposals one agent may have waiting for the user at once. */

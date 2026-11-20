@@ -22,7 +22,7 @@ import { allowed, denied, inputText, resolveRequest, waitingInput, waitsFor } fr
 import { deliverLateDecision, isLateRequest } from './restart-waits.js'
 import { reviewCoverage, reviewGaps } from './review-coverage.js'
 import { liveSessions } from './runner.js'
-import { permissionSettings } from './session-options.js'
+import { permissionSettings } from './session-spec.js'
 import { permissionRequests, permissionRules } from './store/permissions.js'
 
 /** Hands every open session the permission rules its task has now, or only the one task's. */

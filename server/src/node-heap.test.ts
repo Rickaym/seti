@@ -1,7 +1,7 @@
 import { defaultMemoryCap } from '@seti/shared'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { agentHeapFlag, agentHeapMb, memoryEnv, withAgentHeap } from './node-heap.js'
-import { agentEnv } from './session-options.js'
+import { agentEnv } from './session-realise.js'
 
 const SIX_GB = defaultMemoryCap(8192)
 

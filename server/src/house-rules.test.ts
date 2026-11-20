@@ -6,7 +6,8 @@ import { tasks } from './db.js'
 import { houseRulesContext, subagentRules } from './house-rules.js'
 import { guardCommand, type GuardScope } from './permission-guard.js'
 import { sandboxPrompt } from './sandbox-prompt.js'
-import { sessionOptions, systemAppend } from './session-options.js'
+import { sessionOptions } from './session-options.js'
+import { systemAppend } from './session-spec.js'
 
 createApp()
 
