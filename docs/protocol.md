@@ -279,7 +279,10 @@ interrupted only for that.
   workspace, its "Active workspace only" setting (default on) is off, or the agent is in the
   workspace it has open. The mute and the tiers apply first. A device MUST be skipped while its
   page shows the agent or has focus (report at most `focus_ttl` old). Counts the user reads on
-  purpose (status bar, app icon, workspace switcher) MUST cover every workspace.
+  purpose (status bar, app icon, workspace switcher) MUST cover every workspace. A page reports
+  its open workspace once when it loads, and after that only when it differs from the one its
+  browser last reported: on a switch, or on showing again after another of the browser's pages
+  reported a different one.
 - ATT-18: Payload: `title`, `body`, `tag` (the agent id; a newer push replaces an older), `url`,
   `kind`, `badge` (Needs you count across workspaces). Body: finished -> `closing_line` or
   `Ended its turn without a reply`; blocked -> reason line; asking -> `Asks: <question>`; error ->
