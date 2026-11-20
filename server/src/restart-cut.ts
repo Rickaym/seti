@@ -1,6 +1,6 @@
 import { audit } from './audit.js'
 import { stopForRestart } from './restart-state.js'
-import { liveSessions } from './runner.js'
+import { cutForRestart, runningTurns } from './session-controls.js'
 import { restartCuts, type CutTurn } from './store/restart.js'
 
 /** How long cut turns get to end and be recorded: Claude Code's interrupt, then its close. */
@@ -16,15 +16,10 @@ const within = async (work: Promise<unknown>, ms: number) =>
  */
 export async function cutRunningTurns(graceMs = CUT_GRACE_MS): Promise<CutTurn[]> {
   stopForRestart()
-  const cut = liveSessions().filter(([, session]) => session.running && !session.closed)
-  if (cut.length === 0) {
+  const turns = runningTurns()
+  if (turns.length === 0) {
     return []
   }
-  const turns = cut.map(([taskId, session]) => ({
-    task_id: taskId,
-    kind: session.turnKind,
-    background: session.backgroundCount,
-  }))
   await restartCuts.record(turns)
   await audit.record({
     actor: 'system',
@@ -38,9 +33,6 @@ export async function cutRunningTurns(graceMs = CUT_GRACE_MS): Promise<CutTurn[]
       background: turns.reduce((sum, turn) => sum + turn.background, 0),
     },
   })
-  for (const [, session] of cut) {
-    session.cutForRestart()
-  }
-  await within(Promise.allSettled(cut.map(async ([, session]) => session.done)), graceMs)
+  await within(cutForRestart(turns.map((turn) => turn.task_id)), graceMs)
   return turns
 }

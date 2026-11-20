@@ -1,5 +1,5 @@
 import { inBackground } from './background.js'
-import { liveSessions } from './runner.js'
+import { restartQuiet, sessionWatches, type SessionWatch } from './session-controls.js'
 import { permissionRequests } from './store/permissions.js'
 import { questions } from './store/questions.js'
 import { setStall, stalledBy } from './task-blocked.js'
@@ -11,15 +11,8 @@ const CHECK_MS = 60_000
 
 const minutes = (ms: number) => `${String(Math.floor(ms / 60_000))} min`
 
-/** What a running session looks like to the watchdog. */
-export interface Watched {
-  running: boolean
-  heardAt: number
-  retrying: string | null
-}
-
 /** Why the session looks stuck, or null while it works or rests. */
-export function silentReason(session: Watched, now: number, limit = SILENT_MS): string | null {
+export function silentReason(session: SessionWatch, now: number, limit = SILENT_MS): string | null {
   const quiet = now - session.heardAt
   if (!session.running || quiet < limit) {
     return null
@@ -38,11 +31,11 @@ const waitsOnAnswer = async (taskId: string): Promise<boolean> =>
  * a session waits on the user's answer is not silence, so its quiet clock starts over meanwhile.
  */
 export async function checkSilentSessions(now = Date.now(), limit = SILENT_MS): Promise<void> {
-  const live = new Map(liveSessions())
+  const live = new Map(sessionWatches())
   for (const [taskId, session] of live) {
     const waiting = await waitsOnAnswer(taskId)
     if (waiting) {
-      session.restartQuiet(now)
+      restartQuiet(taskId, now)
     }
     await setStall(taskId, 'silent', waiting ? null : silentReason(session, now, limit))
   }
@@ -58,9 +51,7 @@ export async function checkSilentSessions(now = Date.now(), limit = SILENT_MS): 
 export function restartQuietOnAnswer(): void {
   onAnyTaskEvent((taskId, event) => {
     if (event.type === 'permission' && event.request.state !== 'pending') {
-      liveSessions()
-        .find(([id]) => id === taskId)?.[1]
-        .restartQuiet()
+      restartQuiet(taskId)
     }
   })
 }

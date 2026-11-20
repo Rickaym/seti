@@ -5,7 +5,8 @@ import { createApp } from './app.js'
 import { tasks } from './db.js'
 import { noteSignedIn } from './mcp-session-status.js'
 import { answerPermission } from './permission-rules.js'
-import { endSession, liveSessions, runTurn, stopTurn } from './runner.js'
+import { endSession, runTurn, stopTurn } from './runner.js'
+import { restartQuiet } from './session-controls.js'
 import { checkSilentSessions, SILENT_MS, silentReason } from './stall-watch.js'
 import { questions } from './store/questions.js'
 import { refreshBlocked, setStall } from './task-blocked.js'
@@ -126,12 +127,8 @@ describe('stalls', () => {
     const asked = announced(id)
     await runTurn(id, 'ask')
     const request = await asked
-    const session = liveSessions().find(([taskId]) => taskId === id)?.[1]
-    if (session === undefined) {
-      throw new Error('no open session')
-    }
     const now = Date.now()
-    session.heardAt = now - SILENT_MS - 60_000
+    restartQuiet(id, now - SILENT_MS - 60_000)
     await checkSilentSessions(now)
     expect(await blockedOf(id)).toBe('Asks to use Bash: make deploy')
     const task = await tasks.get(id)

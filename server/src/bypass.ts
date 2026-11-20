@@ -5,7 +5,8 @@ import { inBackground } from './background.js'
 import { PERMISSION_MODE } from './config.js'
 import { tasks } from './db.js'
 import { refuseAgent } from './ea-guard.js'
-import { appendMessage, liveSessions } from './runner.js'
+import { appendMessage } from './runner.js'
+import { setSessionMode } from './session-controls.js'
 import { bypass } from './store/permissions.js'
 import { inLane } from './task-lane.js'
 
@@ -22,20 +23,8 @@ const NOTES = {
 const timers = new Map<string, ReturnType<typeof setTimeout>>()
 
 /** Switches the agent's open process to the mode; 'next_turn' when it has to restart to take it. */
-async function applyLive(taskId: string, mode: PermissionMode): Promise<BypassState['applied']> {
-  const session = liveSessions().find(([id]) => id === taskId)?.[1]
-  if (session === undefined || session.closed) {
-    return 'now'
-  }
-  const query = session.openQuery
-  if (query === null) {
-    return 'next_turn'
-  }
-  return query.setPermissionMode(mode).then(
-    () => 'now',
-    () => 'next_turn',
-  )
-}
+const applyLive = async (taskId: string, mode: PermissionMode): Promise<BypassState['applied']> =>
+  setSessionMode(taskId, mode)
 
 async function note(task: Task, text: string, on: boolean): Promise<void> {
   if (task.archived_at === null) {

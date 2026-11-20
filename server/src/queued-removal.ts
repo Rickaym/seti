@@ -1,23 +1,21 @@
 import { HttpError } from './http.js'
 import { markQueued } from './queued-prompts.js'
-import { liveSessions } from './runner.js'
+import { cancelQueuedPrompt } from './session-controls.js'
 import { inLane } from './task-lane.js'
 
 /** Takes a message back from Claude Code's queue before the agent reads it. */
 export async function removeQueued(taskId: string, promptId: number): Promise<void> {
-  const session = liveSessions().find(([id]) => id === taskId)?.[1]
-  const uuid = session?.uuidOf(promptId) ?? null
-  if (session === undefined || uuid === null) {
+  const outcome = await cancelQueuedPrompt(taskId, promptId)
+  if (outcome === 'not_queued') {
     throw new HttpError(409, 'That message is not waiting in the queue')
   }
-  const cancelled = await session.cancelQueued(uuid)
-  if (cancelled === null) {
+  if (outcome === 'unsupported') {
     throw new HttpError(409, 'This Claude Code version cannot take back a queued message')
   }
-  if (!cancelled) {
+  if (outcome === 'picked_up') {
     throw new HttpError(409, 'The agent already picked up that message')
   }
-  const settled = session.settle(uuid)
+  const settled = outcome.taken
   if (settled !== null) {
     await inLane(taskId, async () => markQueued(taskId, settled, 'removed'))
   }
