@@ -113,4 +113,6 @@ Shell and host:
 - `mods/<id>/`: bundled mods, which import only `@seti/mod-api` (`packages/mod-api/`); the mod host
   and its registries are in `server/src/mods/`.
 - `e2e/tests/`: Playwright specs, with fakes for Claude, `gh` and the planner in `support/`.
-- `docs/`: setup, architecture, security and pollers. Update them in the PR that changes behaviour.
+- `docs/`: `protocol.md` states Seti's behaviour as numbered requirements; `setup.md`, `mods.md`,
+  `implementation.md` and `security.md` cover installing, extending, the code layout and operator
+  security. A behaviour change updates `docs/protocol.md` in the same PR.

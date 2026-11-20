@@ -16,22 +16,9 @@ import { keepFocus } from '@/lib/keep-focus'
 import { insertMention, mentionAt, rankMentions, type MentionOption } from '@/lib/mentions'
 import { handleWordDelete } from '@/lib/text-edit'
 import { cn } from '@/lib/utils'
+import { mentionOptions } from './mention-options'
 
 const SUGGESTION_LIMIT = 8
-
-const RESERVED: MentionOption[] = [
-  { handle: 'all', detail: 'Every active agent, at its next step', quiet: false },
-  { handle: 'ea', detail: 'The EA', quiet: false },
-]
-
-const optionsOf = (members: readonly TeamMember[]): MentionOption[] => [
-  ...RESERVED,
-  ...members.map((member) => ({
-    handle: member.handle,
-    detail: `${member.title}${member.muted ? ' (muted)' : ''}`,
-    quiet: member.muted || !member.active,
-  })),
-]
 
 /** One line on what the last message did, such as whose running turn it joined. */
 function outcomeText(posted: TeamPosted): string {
@@ -65,7 +52,7 @@ export function TeamComposer({ members }: { members: readonly TeamMember[] }) {
   const box = useRef<HTMLTextAreaElement>(null)
   const find = useFind()
   const listId = useId()
-  const options = useMemo(() => optionsOf(members), [members])
+  const options = useMemo(() => mentionOptions(members), [members])
   const typing = mentionAt(draft, caret)
   const items = typing === null ? [] : rankMentions(options, typing.query, SUGGESTION_LIMIT)
   const open = typing !== null && items.length > 0 && dismissed !== draft

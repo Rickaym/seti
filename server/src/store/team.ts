@@ -242,3 +242,14 @@ export const teamDeliveries = {
     return Number(row?.count ?? 0)
   },
 }
+
+export const teamActivity = {
+  /** Agents not archived that run now, or were created, ran a turn or ended one since `since`. */
+  activeSince: async (since: string): Promise<string[]> =>
+    (
+      await sql<{ id: string }[]>`SELECT t.id FROM task t WHERE t.archived_at IS NULL AND (
+          t.status = 'running' OR t.created_at >= ${since} OR t.turn_ended_at >= ${since}
+          OR EXISTS (SELECT 1 FROM task_message m
+            WHERE m.task_id = t.id AND m.created_at >= ${since} AND m.kind = 'sdk'))`
+    ).map((row) => row.id),
+}

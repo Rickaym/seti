@@ -598,7 +598,8 @@ TOOL_SPECS: list[ToolSpec] = [
         "post_team_chat",
         "Post to the group chat as the EA; this is how you message agents, never as the user. "
         "Public, it reaches every active task that is not muted at its next step, an @handle in the "
-        "text reaches that task at once, mid-turn, and @all also starts idle tasks: confirm a public "
+        "text reaches that task at once, mid-turn, @all also starts idle tasks, and @active reaches "
+        "every task that worked today like an @handle: confirm a public "
         "post's text with the user first. With to, it is a direct message to that one agent: it "
         "joins its running turn at once or starts a turn, and only you, that agent and the user see "
         "it. It never cuts a turn short; stop_task does that. To hear when the agent is done, use "

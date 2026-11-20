@@ -118,8 +118,8 @@ describe('the op table', () => {
     }
   })
 
-  it('lists in docs/security.md exactly the ops the table runs', () => {
-    const doc = fs.readFileSync(path.resolve(import.meta.dirname, '../../../../docs/security.md'), 'utf8')
+  it('lists in docs/mods.md exactly the ops the table runs', () => {
+    const doc = fs.readFileSync(path.resolve(import.meta.dirname, '../../../../docs/mods.md'), 'utf8')
     const section = doc.split('### Operations')[1]?.split('\n### ')[0] ?? ''
     const documented = [...section.matchAll(/^\| `([a-z._]+)` +\|/gm)].map((match) => match[1])
     expect(documented).toEqual(MOD_OP_NAMES)

@@ -21,6 +21,7 @@ import { appendMessage, isRunning, runAutoTurn, sessionState } from './runner.js
 import { eaInbox } from './store/inbox.js'
 import { teamDeliveries, teamMembers, teamMessages, type MemberRow } from './store/team.js'
 import { inLane } from './task-lane.js'
+import { activeToday } from './team-active.js'
 import { auditDirect, auditPost } from './team-audit.js'
 import { authorLabel, paced, speakerOf } from './team-author.js'
 import { publishTeam } from './team-events.js'
@@ -87,22 +88,24 @@ export async function ensureMember(task: Pick<Task, 'id' | 'title'>): Promise<Me
 const isActive = (task: Task, at: number) =>
   task.status === 'running' || sessionState(task.id).open || at - Date.parse(task.updated_at) < ACTIVE_WINDOW_MS
 
-const toMember = (task: Task, member: MemberRow, at: number): TeamMember => ({
+const toMember = (task: Task, member: MemberRow, at: number, today: ReadonlySet<string>): TeamMember => ({
   task_id: task.id,
   handle: member.handle,
   title: task.title,
   status: task.status,
   muted: member.muted,
   active: isActive(task, at),
+  active_today: today.has(task.id),
 })
 
 /** Every task with its handle, active ones first. */
 export async function teamRoster(at = Date.now()): Promise<TeamMember[]> {
   const list = await tasks.list()
   const members = new Map((await teamMembers.list()).map((member) => [member.task_id, member]))
+  const today = await activeToday(new Date(at))
   const roster: TeamMember[] = []
   for (const task of list) {
-    roster.push(toMember(task, members.get(task.id) ?? (await ensureMember(task)), at))
+    roster.push(toMember(task, members.get(task.id) ?? (await ensureMember(task)), at, today))
   }
   return roster.sort((a, b) => Number(b.active) - Number(a.active))
 }
@@ -112,7 +115,7 @@ export async function teamMemberOf(taskId: string): Promise<TeamMember> {
   if (!task) {
     throw new HttpError(404, 'Task not found')
   }
-  return toMember(task, await ensureMember(task), Date.now())
+  return toMember(task, await ensureMember(task), Date.now(), await activeToday())
 }
 
 /** Renames a task's handle or mutes it, for the user or for the task's own agent. */
@@ -166,8 +169,26 @@ export async function authorFields(author: TeamAuthor) {
   return { author_kind: author.kind, author_task_id: task.id, author_handle: handle, author_mod_id: null }
 }
 
+/** Every agent that worked today, as mentions @active made; never the author itself. */
+async function activeReached(authorTaskId: string | null, at: Date): Promise<TeamMention[]> {
+  const today = await activeToday(at)
+  const reached: TeamMention[] = []
+  for (const task of await tasks.list()) {
+    if (today.has(task.id) && task.id !== authorTaskId) {
+      reached.push({ handle: (await ensureMember(task)).handle, task_id: task.id, via: 'active' })
+    }
+  }
+  return reached.sort((a, b) => a.handle.localeCompare(b.handle))
+}
+
+/**
+ * The tasks the handles name, and for @active every agent that worked today besides the author,
+ * stored with the message so the list never changes afterwards.
+ */
 export async function resolveMentions(
   handles: readonly string[],
+  authorTaskId: string | null = null,
+  at = new Date(),
 ): Promise<{ mentions: TeamMention[]; unknown: string[] }> {
   const found = new Map((await teamMembers.byHandles(handles)).map((member) => [member.handle, member.task_id]))
   const mentions: TeamMention[] = []
@@ -180,7 +201,8 @@ export async function resolveMentions(
       unknown.push(handle)
     }
   }
-  return { mentions, unknown }
+  const active = handles.includes('active') ? await activeReached(authorTaskId, at) : []
+  return { mentions: [...mentions, ...active], unknown }
 }
 
 export interface Plan {
@@ -195,7 +217,10 @@ export interface Plan {
   startIdle: boolean
 }
 
-/** Mentioned tasks, plus every active one for @all and for the EA; never the author itself. */
+/**
+ * Mentioned tasks, those @active reached among them, plus every active one for @all and for the
+ * EA; never the author itself.
+ */
 async function plan(author: TeamAuthor, message: TeamMessage, at: number): Promise<Plan[]> {
   const handles = new Set(message.mentions.map((mention) => mention.handle))
   const mentioned = new Set(message.mentions.flatMap((mention) => (mention.task_id === null ? [] : [mention.task_id])))
@@ -387,7 +412,7 @@ export async function postTeamMessage(
   if (options.to !== undefined) {
     return postDirect(author, { ...fields, text }, await recipientOf(author, options.to))
   }
-  const { mentions, unknown } = await resolveMentions(parseMentions(text))
+  const { mentions, unknown } = await resolveMentions(parseMentions(text), fields.author_task_id)
   const archived = await archivedHandles(mentions)
   const message = await teamMessages.insert({ ...fields, text, mentions })
   publishTeam({ type: 'message', message })

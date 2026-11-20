@@ -73,7 +73,13 @@ import {
   TASK_WORKTREE_BACKFILL,
   TRIM_SESSION_INIT,
 } from './schema-tasks.js'
-import { EA_DOC_NO_DIRECT, TEAM_CHAT, TEAM_DIRECT, TEAM_MESSAGE_SELF_HEADERS } from './schema-team.js'
+import {
+  EA_DOC_NO_DIRECT,
+  TEAM_ACTIVE_HANDLE,
+  TEAM_CHAT,
+  TEAM_DIRECT,
+  TEAM_MESSAGE_SELF_HEADERS,
+} from './schema-team.js'
 import { DROP_ESLINTCACHE_DEFAULT, WARM_CACHES } from './schema-warm-caches.js'
 import {
   CHANNEL_SECRET_PENDING,
@@ -206,5 +212,6 @@ export const MIGRATIONS: readonly Migration[] = [
   { version: 111, name: 'notify_scope', sql: NOTIFY_SCOPE },
   { version: 112, name: 'channel_sender', sql: CHANNEL_SENDER },
   { version: 113, name: 'task_turn_ended_at', sql: TASK_TURN_ENDED_AT },
-  { version: 114, name: 'storage_settings', sql: STORAGE_SETTINGS },
+  { version: 114, name: 'team_active_handle', sql: TEAM_ACTIVE_HANDLE },
+  { version: 115, name: 'storage_settings', sql: STORAGE_SETTINGS },
 ]

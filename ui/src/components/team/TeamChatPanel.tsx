@@ -24,6 +24,7 @@ import { cn } from '@/lib/utils'
 import { FileLinksContext, type FileLinks } from '@/panels/files/file-links'
 import { openInTask } from '@/panels/files/open-in-task'
 import { createPathResolver } from '@/panels/files/path-resolver'
+import { ActiveReach } from './ActiveReach'
 import { DirectMark, DirectToggle } from './DirectMark'
 import { MessageText } from './MessageText'
 import { TeamComposer } from './TeamComposer'
@@ -183,6 +184,7 @@ function MessageList({
               <RelativeTime iso={message.created_at} className="text-2xs text-muted-foreground" />
             </div>
             <MessageText message={message} colorOf={colorOf} />
+            <ActiveReach message={message} />
           </li>
         ))}
       </ul>
