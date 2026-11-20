@@ -5,7 +5,7 @@ import { openSeedDb } from './db.js'
 import { paths } from './env.js'
 
 /** The bytes the seeded node_modules holds, which the tree shows as 4 KB. */
-export const DEPENDENCY_BYTES = 4096
+const DEPENDENCY_BYTES = 4096
 
 /** An idle agent whose working folder holds source and a node_modules of a known size. */
 export async function seedTreeAgent(): Promise<{ id: string; label: string }> {
