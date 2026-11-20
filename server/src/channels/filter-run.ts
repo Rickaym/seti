@@ -102,7 +102,7 @@ function readChange(value: object): { change: WebhookFilterChange } | { error: s
 }
 
 /** What the returned value means: drop, keep, keep changed, or an error. */
-export function readVerdict(returned: unknown, logs: string[]): FilterVerdict {
+function readVerdict(returned: unknown, logs: string[]): FilterVerdict {
   if (!isReturn(returned)) {
     return { outcome: 'failed', error: 'The filter engine returned nothing usable', logs }
   }
