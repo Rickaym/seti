@@ -1298,10 +1298,13 @@ Each agent push also carries the Needs you count, which the service worker puts 
 with the Badging API; an open page keeps that badge in step with its status bar.
 
 A device is notified only about the workspace it has open. The open workspace stays the browser's
-choice in `localStorage`, and the page also reports it to the server when it changes and each time
-the page shows again (`PUT /api/notifications/devices/<device id>/scope`), where the `notify_scope`
-table keeps it by the browser's device id, the same id its push subscription and focus reports
-carry. `hearsWorkspace` in `shared/src/notifications.ts` is the one rule, which the server and the
+choice in `localStorage`, and the page also reports it to the server
+(`PUT /api/notifications/devices/<device id>/scope`), where the `notify_scope` table keeps it by
+the browser's device id, the same id its push subscription and focus reports carry. A page reports
+once when it loads, since the answer also carries the device's setting, and after that only when
+its workspace differs from the one the browser last reported: on a switch, or when it shows again
+after another tab of the browser reported a different one. The browser keeps that last report in
+`localStorage`, so its tabs share it. `hearsWorkspace` in `shared/src/notifications.ts` is the one rule, which the server and the
 page both apply: a device hears about an agent in its open workspace, about every agent while it
 has reported no workspace or its "Active workspace only" setting is off, and always about a notice
 that concerns no one agent, such as a mod's, a test push or an EA item without an agent. The
