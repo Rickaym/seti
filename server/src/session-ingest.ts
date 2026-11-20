@@ -1,6 +1,7 @@
 import type { SDKMessage } from '@anthropic-ai/claude-agent-sdk'
 import type { MessageBody, MessageRow, TaskStatus } from '@seti/shared'
 import { audit } from './audit.js'
+import { inBackground } from './background.js'
 import { closingLine } from './closing-line.js'
 import { withContextWindow } from './compact.js'
 import { linkCreatedPrs } from './created-prs.js'
@@ -48,7 +49,7 @@ export async function appendMessage(taskId: string, body: MessageBody, outward: 
   return row
 }
 
-export async function setStatus(taskId: string, status: TaskStatus): Promise<void> {
+async function setStatus(taskId: string, status: TaskStatus): Promise<void> {
   await tasks.setStatus(taskId, status, null)
   publish(taskId, { type: 'status', status })
 }
@@ -65,7 +66,19 @@ async function record(taskId: string, m: SDKMessage): Promise<void> {
   await linkCreatedPrs(taskId, m, openQuerySince(taskId))
 }
 
-async function reportEnd(taskId: string, status: TaskStatus, lastError: string | null): Promise<void> {
+/** How the records side runs what follows a turn's end: in its turn, or detached from it. */
+interface PortOptions {
+  /** Turn-end listeners run on their own, so storing the next entry never waits on a lane. */
+  detachListeners?: boolean
+}
+
+async function runListeners(taskId: string, status: TaskStatus): Promise<void> {
+  for (const listener of turnEndListeners) {
+    await listener(taskId, status)
+  }
+}
+
+async function reportEnd(taskId: string, status: TaskStatus, lastError: string | null, detach = false) {
   await tasks.endTurn(taskId, {
     status,
     last_error: status === 'error' ? lastError : null,
@@ -73,8 +86,10 @@ async function reportEnd(taskId: string, status: TaskStatus, lastError: string |
     closing_line: await closingLine(taskId),
   })
   publish(taskId, { type: 'status', status })
-  for (const listener of turnEndListeners) {
-    await listener(taskId, status)
+  if (detach) {
+    inBackground(`turn end: task ${taskId}`, async () => runListeners(taskId, status))
+  } else {
+    await runListeners(taskId, status)
   }
 }
 
@@ -94,7 +109,7 @@ async function startSpec(taskId: string) {
 }
 
 /** Seti's records side of the session host: every record a session makes is written here. */
-export function createControlPort(commands: () => SessionCommands): ControlPort {
+export function createControlPort(commands: () => SessionCommands, options: PortOptions = {}): ControlPort {
   const mcpStatus = (taskId: string) => async () => commands().mcpStatus(taskId)
   return {
     openTurn: async (taskId, next, queued) => {
@@ -114,7 +129,7 @@ export function createControlPort(commands: () => SessionCommands): ControlPort 
     },
     queued: markQueued,
     working: async (taskId) => setStatus(taskId, 'running'),
-    turnEnded: reportEnd,
+    turnEnded: async (taskId, status, error) => reportEnd(taskId, status, error, options.detachListeners),
     note,
     rewound: async (_taskId, rewindId, refused) => {
       await (refused === null ? rewinds.settle(rewindId, 'applied') : rewinds.settle(rewindId, 'refused', refused))

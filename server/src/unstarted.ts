@@ -18,6 +18,12 @@ export function takeUnstarted(taskId: string): NextMessage[] | null {
   return kept
 }
 
+/** The first kept message of each task that has some, for the records side after a restart. */
+export const unstartedFirsts = (): Record<string, { first: string | null }> =>
+  Object.fromEntries(
+    [...unstarted].map(([taskId, [first]]) => [taskId, { first: first === undefined ? null : (first.prompt ?? '') }]),
+  )
+
 /** The error a session failed with, which says so when the session could not start. */
 export function sessionError(e: unknown, started: boolean): string {
   const text = e instanceof Error ? e.message : String(e)

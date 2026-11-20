@@ -29,6 +29,7 @@ import { KNOWLEDGE } from './schema-knowledge.js'
 import { MEMORY_CAPS } from './schema-memory.js'
 import { MODS_RUNTIME } from './schema-mods-runtime.js'
 import { BLOBS_ONE_STYLE, MODS, PREVIEWS_MOD, REQUIRED_MODS, USER_THEME } from './schema-mods.js'
+import { NODE_LINK } from './schema-nodes.js'
 import { NOTIFY_SCOPE, NOTIFICATIONS } from './schema-notifications.js'
 import { CHANNEL_EVENT_ROUTING, CHANNEL_RUN_DUE, POLLER_CHANNELS } from './schema-pollers.js'
 import { PR_LIST_CACHE } from './schema-prs.js'
@@ -205,4 +206,5 @@ export const MIGRATIONS: readonly Migration[] = [
   { version: 111, name: 'notify_scope', sql: NOTIFY_SCOPE },
   { version: 112, name: 'channel_sender', sql: CHANNEL_SENDER },
   { version: 113, name: 'task_turn_ended_at', sql: TASK_TURN_ENDED_AT },
+  { version: 114, name: 'node_link', sql: NODE_LINK },
 ]
