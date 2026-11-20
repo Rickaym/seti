@@ -1,6 +1,6 @@
 import { FILES_TREE_ROOT, type FileListing, type FileRoot, type FileSort, type RecentFiles } from '@seti/shared'
 import { ArrowDownAZ, Eye, FileCog, FilePlus, RefreshCw, Search, X } from 'lucide-react'
-import { useCallback, useEffect, useEffectEvent, useRef, useState, type ComponentProps } from 'react'
+import { useCallback, useEffect, useEffectEvent, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { apiGet, errorText } from '@/api'
 import { Hint } from '@/components/Hint'
@@ -12,17 +12,16 @@ import { mayLeave } from '@/lib/leave-guard'
 import { PANEL } from '@/lib/panels'
 import { startPolling } from '@/lib/poll-loop'
 import { Breadcrumb } from '@/panels/files/Breadcrumb'
-import { FileList, type ListedEntry } from '@/panels/files/FileList'
+import { BrowseBody, RECENT, type Listing } from '@/panels/files/BrowseBody'
+import type { ListedEntry } from '@/panels/files/FileList'
 import { SearchBar, SearchResults } from '@/panels/files/FileSearch'
-import { FileTree } from '@/panels/files/FileTree'
 import { FileViewer, type OpenFile } from '@/panels/files/FileViewer'
 import { NewFileForm } from '@/panels/files/NewFileForm'
-import { filesLinkUrl, filesPath, parentOf, type FileTarget } from '@/panels/files/files-api'
+import { filesPath, parentOf, type FileTarget } from '@/panels/files/files-api'
 import { storedShowSetiFiles, storeShowSetiFiles } from '@/panels/files/seti-files'
 import { firstPick, useFileSearch, type SearchPick } from '@/panels/files/useFileSearch'
 import { useFileWatch } from '@/panels/files/useFileWatch'
 
-const RECENT = 'recent'
 const RECENT_LIMIT = 100
 const RECENT_POLL_MS = 15_000
 
@@ -48,12 +47,6 @@ const fileOf = (target: FileTarget | null): OpenFile | null =>
 
 const byName = (a: ListedEntry, b: ListedEntry) =>
   a.name.localeCompare(b.name, 'en', { numeric: true, sensitivity: 'base' })
-
-interface Listing {
-  entries: ListedEntry[] | null
-  error: string | null
-  refresh: () => void
-}
 
 interface ListingQuery {
   taskId: string
@@ -113,63 +106,6 @@ function useListing({ taskId, place, sort, dotfiles, setiFiles, showing }: Listi
   }, [showing, place.root, refresh])
 
   return { ...state, refresh }
-}
-
-function ListBody({
-  taskId,
-  listing,
-  roots,
-  recent,
-  onOpen,
-}: {
-  taskId: string
-  listing: Listing
-  roots: readonly FileRoot[]
-  recent: boolean
-  onOpen: (entry: ListedEntry) => void
-}) {
-  if (listing.error !== null) {
-    return <p className="p-4 text-sm text-destructive">{listing.error}</p>
-  }
-  if (listing.entries === null) {
-    return <p className="p-4 text-sm text-muted-foreground">Loading...</p>
-  }
-  return (
-    <FileList
-      entries={listing.entries}
-      roots={roots}
-      showWhere={recent}
-      empty={recent ? 'No files changed since the agent started.' : 'This folder is empty.'}
-      onOpen={onOpen}
-      linkOf={(entry) => filesLinkUrl(taskId, entry)}
-    />
-  )
-}
-
-interface BrowseProps {
-  taskId: string
-  listing: Listing
-  roots: readonly FileRoot[]
-  /** The root the list shows: a root's id, the recent files or the tree. */
-  place: string
-  /** A file is open; the tree stays mounted behind it so its open folders stay open. */
-  hidden: boolean
-  tree: Pick<ComponentProps<typeof FileTree>, 'dotfiles' | 'setiFiles' | 'refreshes'>
-  onOpen: (entry: ListedEntry) => void
-}
-
-/** The tree of every root, or the recent files or one folder, under the open file if any. */
-function BrowseBody({ taskId, listing, roots, place, hidden, tree, onOpen }: BrowseProps) {
-  if (place === FILES_TREE_ROOT) {
-    return (
-      <div className={hidden ? 'hidden' : 'contents'}>
-        <FileTree taskId={taskId} roots={roots} {...tree} onOpenFile={onOpen} />
-      </div>
-    )
-  }
-  return hidden ? null : (
-    <ListBody taskId={taskId} listing={listing} roots={roots} recent={place === RECENT} onOpen={onOpen} />
-  )
 }
 
 interface FilesPanelProps {
@@ -303,12 +239,12 @@ export function FilesPanel({ taskId, request, readOnly, onClose }: FilesPanelPro
           className="max-w-48 min-w-0"
         >
           <NativeSelectOption value={RECENT}>Recent</NativeSelectOption>
-          <NativeSelectOption value={FILES_TREE_ROOT}>Tree</NativeSelectOption>
           {roots.map((entry) => (
             <NativeSelectOption key={entry.id} value={entry.id} disabled={!entry.exists}>
               {entry.label}
             </NativeSelectOption>
           ))}
+          <NativeSelectOption value={FILES_TREE_ROOT}>Tree</NativeSelectOption>
         </NativeSelect>
         <ToggleButton
           pressed={searching}
