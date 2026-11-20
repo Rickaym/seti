@@ -64,6 +64,22 @@ interface CancelsQueued {
 const cancelsQueued = (query: object): query is CancelsQueued =>
   'cancelAsyncMessage' in query && typeof query.cancelAsyncMessage === 'function'
 
+/** What Seti's records side reads of a session: whether it is open, at work and taking messages. */
+export interface SessionView {
+  open: boolean
+  running: boolean
+  /** A running turn takes messages into Claude Code's queue; otherwise they wait in the backlog. */
+  accepting: boolean
+  /** Updates without a user message already wait for the running turn to end. */
+  autoQueued: boolean
+  background: number
+  /** Id of the first prompt the session sent, once recorded. */
+  since: number | null
+  turnKind: CutKind
+  heardAt: number
+  retrying: string | null
+}
+
 /** One long-lived Claude Code process of a task, fed user messages through a streaming prompt. */
 export class LiveSession {
   readonly controller = new AbortController()
@@ -105,11 +121,27 @@ export class LiveSession {
   turnKind: CutKind = 'user'
   /** Seti is stopping, so the next start resumes the turn instead of this one reporting its end. */
   restartCut = false
+  /** Called after each change to what `view` reports. */
+  onChange: () => void = () => undefined
 
   constructor(backlog: NextMessage[]) {
     this.backlog = backlog
     this.running = backlog.length > 0
     this.warm = backlog.length === 0
+  }
+
+  view(): SessionView {
+    return {
+      open: !this.closed,
+      running: this.running,
+      accepting: this.accepting,
+      autoQueued: this.autoQueued,
+      background: this.background.size,
+      since: this.since,
+      turnKind: this.turnKind,
+      heardAt: this.heardAt,
+      retrying: this.retrying,
+    }
   }
 
   /** Background subagents and commands still running. */
@@ -218,6 +250,7 @@ export class LiveSession {
     this.ending = null
     this.opener = randomUUID()
     this.input.push(content, this.opener)
+    this.onChange()
   }
 
   /**
@@ -238,11 +271,13 @@ export class LiveSession {
     this.heardAt = Date.now()
     this.retrying = null
     this.stopOpenerWait()
+    this.onChange()
   }
 
   /** Starts the quiet clock again, as when the user answered what the session waited on. */
   restartQuiet(at = Date.now()): void {
     this.heardAt = at
+    this.onChange()
   }
 
   /** Notes a message of the session: work it reports, or Claude Code retrying the API. */
@@ -251,6 +286,7 @@ export class LiveSession {
       this.heard()
     } else if (m.subtype === 'api_retry') {
       this.retrying = m.error_status === null ? m.error : `${m.error} (${String(m.error_status)})`
+      this.onChange()
     }
   }
 
@@ -287,6 +323,7 @@ export class LiveSession {
     })
     this.queued.set(uuid, { promptId, later: priority === 'later', written: priority === undefined, arrived, arrive })
     this.input.push(content, uuid, priority)
+    this.onChange()
   }
 
   /** Claude Code reported the message in its queue, where it can be taken back. */
@@ -299,6 +336,7 @@ export class LiveSession {
     const entry = this.queued.get(uuid)
     entry?.arrive()
     this.queued.delete(uuid)
+    this.onChange()
     return entry?.promptId ?? null
   }
 
@@ -309,6 +347,7 @@ export class LiveSession {
     for (const entry of entries) {
       entry.arrive()
     }
+    this.onChange()
     return entries.map((entry) => entry.promptId)
   }
 
@@ -343,6 +382,7 @@ export class LiveSession {
    */
   async cutShort(ending: TurnEnding, takenBack: (uuid: string) => void, keepWritten = false): Promise<void> {
     this.ending = ending
+    this.onChange()
     const uuids = [...this.queued].filter(([, entry]) => !(keepWritten && entry.written)).map(([uuid]) => uuid)
     await Promise.all(
       uuids.map(async (uuid) => {
@@ -359,6 +399,7 @@ export class LiveSession {
   /** Cuts the running turn short; a session that cannot be interrupted in time is closed. */
   interrupt(ending: TurnEnding): void {
     this.ending = ending
+    this.onChange()
     if (this.interrupting) {
       return
     }
@@ -404,6 +445,7 @@ export class LiveSession {
   carryOn(): void {
     this.running = true
     this.cancelIdle()
+    this.onChange()
   }
 
   /** Marks the running turn over and returns how it was being ended, if it was. */
@@ -414,6 +456,7 @@ export class LiveSession {
     this.opener = null
     this.stopOpenerWait()
     this.interrupting = false
+    this.onChange()
     return ending
   }
 
@@ -434,6 +477,7 @@ export class LiveSession {
   setBackground(tasks: BackgroundTasks): boolean {
     const before = this.background.size
     this.background = new Set(tasks.filter((task) => task.ambient !== true).map((task) => task.task_id))
+    this.onChange()
     return this.background.size !== before
   }
 
@@ -471,6 +515,7 @@ export class LiveSession {
     this.input.close()
     this.query?.close()
     this.controller.abort()
+    this.onChange()
   }
 
   private cancelIdle(): void {

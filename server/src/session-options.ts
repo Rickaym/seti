@@ -18,9 +18,3 @@ export async function sandboxFor(task: Task): Promise<TaskSandbox | null> {
 /** The options a task's Claude Code process starts with, resuming the task's session if any. */
 export const sessionOptions = async (task: Task, abortController: AbortController): Promise<Options> =>
   realiseSpec((await sessionSpec(task)).spec, abortController, inProcessDecisions)
-
-/** The options a process starts with and the setupKey of what it got, from one read of the setup. */
-export async function sessionStart(task: Task, abortController: AbortController) {
-  const { key, spec } = await sessionSpec(task)
-  return { key, options: await realiseSpec(spec, abortController, inProcessDecisions) }
-}

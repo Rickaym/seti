@@ -20,11 +20,11 @@ import { watchUpdatesWaiting } from './ea-watch.js'
 import { HttpError } from './http.js'
 import type { NextMessage } from './next-message.js'
 import { appendMessage, autoQueueBlocker, isRunning, publish, runAutoTurn } from './runner.js'
+import { startFailed } from './session-mirror.js'
 import { shellTurnGuard } from './shell-context.js'
 import { taskInputs } from './store/inputs.js'
 import { onAnyTaskEvent } from './task-events.js'
 import { inLane, outsideLane } from './task-lane.js'
-import { startFailed } from './unstarted.js'
 import { signalWorkspaces } from './workspace/dir.js'
 
 /** Automatic turns within the window that pause waking, so a runaway loop cannot run on. */

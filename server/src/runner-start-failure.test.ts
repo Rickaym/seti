@@ -5,7 +5,7 @@ import { messages, tasks } from './db.js'
 import { retryLastPrompt } from './dropped-prompt.js'
 import { deliverInputs, wakeTask } from './inputs.js'
 import { onTurnEnd, runTurn, sessionState } from './runner.js'
-import type * as SessionOptions from './session-options.js'
+import type * as SessionRealise from './session-realise.js'
 import { restartSession } from './session-restart.js'
 import { waitIdle } from './wait-idle.js'
 
@@ -26,17 +26,17 @@ vi.mock('@anthropic-ai/claude-agent-sdk', async (importOriginal) => ({
 /** Tasks whose sessions cannot start, as when the sandbox cannot be set up, and their attempts. */
 const starts = vi.hoisted(() => ({ refused: new Set<string>(), attempts: new Map<string, number>() }))
 
-vi.mock('./session-options.js', async (importOriginal) => {
-  const original = await importOriginal<typeof SessionOptions>()
+vi.mock('./session-realise.js', async (importOriginal) => {
+  const original = await importOriginal<typeof SessionRealise>()
   return {
     ...original,
-    sessionStart: async (...args: Parameters<typeof original.sessionStart>) => {
-      const [task] = args
+    realiseSpec: async (...args: Parameters<typeof original.realiseSpec>) => {
+      const [{ task }] = args
       starts.attempts.set(task.id, (starts.attempts.get(task.id) ?? 0) + 1)
       if (starts.refused.has(task.id)) {
         throw new Error('bwrap: setting up uid map: Permission denied')
       }
-      return original.sessionStart(...args)
+      return original.realiseSpec(...args)
     },
   }
 })

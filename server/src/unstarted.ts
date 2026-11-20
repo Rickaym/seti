@@ -11,20 +11,11 @@ export function keepUnstarted(taskId: string, backlog: NextMessage[]): void {
   unstarted.set(taskId, backlog)
 }
 
-/** The kept messages, oldest first, which the session about to open sends before its own. */
-export function takeUnstarted(taskId: string): NextMessage[] {
-  const kept = unstarted.get(taskId) ?? []
+/** The kept messages, oldest first, which the session about to open sends; null when none. */
+export function takeUnstarted(taskId: string): NextMessage[] | null {
+  const kept = unstarted.get(taskId) ?? null
   unstarted.delete(taskId)
   return kept
-}
-
-/** The task's last session could not start, and nothing has tried again since. */
-export const startFailed = (taskId: string) => unstarted.has(taskId)
-
-/** The text of the first kept message, empty for an automatic turn; null when none was kept. */
-export function firstUnstarted(taskId: string): string | null {
-  const first = unstarted.get(taskId)?.[0]
-  return first === undefined ? null : (first.prompt ?? '')
 }
 
 /** The error a session failed with, which says so when the session could not start. */

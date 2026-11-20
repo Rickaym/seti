@@ -1,7 +1,10 @@
 import type { PermissionMode } from '@anthropic-ai/claude-agent-sdk'
 import type { PermissionSettings } from './permission-policy.js'
-import { liveSessions } from './runner.js'
-import type { CutTurn } from './store/restart.js'
+import type { QueuedCancel } from './session-host/port.js'
+import { sessionHost } from './session-link.js'
+import { sessionTaskIds, sessionView } from './session-mirror.js'
+
+export { runningTurns, sessionTaskIds } from './session-mirror.js'
 
 /** What the watchdog reads of an open session: whether a turn runs and when it last spoke. */
 export interface SessionWatch {
@@ -10,69 +13,31 @@ export interface SessionWatch {
   retrying: string | null
 }
 
-const sessionOf = (taskId: string) => liveSessions().find(([id]) => id === taskId)?.[1]
-
-/** Ids of the tasks with a session, open or closing. */
-export const sessionTaskIds = (): string[] => liveSessions().map(([taskId]) => taskId)
-
 /** What the watchdog needs of each session, by task id. */
 export const sessionWatches = (): [string, SessionWatch][] =>
-  liveSessions().map(([taskId, { running, heardAt, retrying }]) => [taskId, { running, heardAt, retrying }])
+  sessionTaskIds().flatMap((taskId) => {
+    const view = sessionView(taskId)
+    return view === undefined
+      ? []
+      : [[taskId, { running: view.running, heardAt: view.heardAt, retrying: view.retrying }]]
+  })
 
 /** Starts the session's quiet clock again, as when the user answered what it waited on. */
 export function restartQuiet(taskId: string, at?: number): void {
-  sessionOf(taskId)?.restartQuiet(at)
+  sessionHost.restartQuiet(taskId, at)
 }
 
 /** Switches the agent's open process to the mode; 'next_turn' when it has to restart to take it. */
-export async function setSessionMode(taskId: string, mode: PermissionMode): Promise<'now' | 'next_turn'> {
-  const session = sessionOf(taskId)
-  if (session === undefined || session.closed) {
-    return 'now'
-  }
-  const query = session.openQuery
-  if (query === null) {
-    return 'next_turn'
-  }
-  return query.setPermissionMode(mode).then(
-    () => 'now',
-    () => 'next_turn',
-  )
-}
+export const setSessionMode = async (taskId: string, mode: PermissionMode): Promise<'now' | 'next_turn'> =>
+  sessionHost.setMode(taskId, mode)
 
 /** Hands the task's running process new permission rules; it applies them to its next call. */
-export async function applySessionPermissions(taskId: string, permissions: PermissionSettings): Promise<void> {
-  await sessionOf(taskId)?.applyPermissions(permissions)
-}
-
-/** How taking a queued message back went; `taken` is the prompt id it settled, if any. */
-export type QueuedCancel = 'not_queued' | 'unsupported' | 'picked_up' | { taken: number | null }
+export const applySessionPermissions = async (taskId: string, permissions: PermissionSettings): Promise<void> =>
+  sessionHost.applyPermissions(taskId, permissions)
 
 /** Takes a message back from Claude Code's queue before the agent reads it. */
-export async function cancelQueuedPrompt(taskId: string, promptId: number): Promise<QueuedCancel> {
-  const session = sessionOf(taskId)
-  const uuid = session?.uuidOf(promptId) ?? null
-  if (session === undefined || uuid === null) {
-    return 'not_queued'
-  }
-  const cancelled = await session.cancelQueued(uuid)
-  if (cancelled === null) {
-    return 'unsupported'
-  }
-  return cancelled ? { taken: session.settle(uuid) } : 'picked_up'
-}
-
-/** The turns running now: what started each and how much background work runs with it. */
-export const runningTurns = (): CutTurn[] =>
-  liveSessions()
-    .filter(([, session]) => session.running && !session.closed)
-    .map(([taskId, session]) => ({ task_id: taskId, kind: session.turnKind, background: session.backgroundCount }))
+export const cancelQueuedPrompt = async (taskId: string, promptId: number): Promise<QueuedCancel> =>
+  sessionHost.cancelQueued(taskId, promptId)
 
 /** Ends each task's turn as Seti stops; resolves once their sessions have ended. */
-export async function cutForRestart(taskIds: readonly string[]): Promise<void> {
-  const cut = liveSessions().filter(([taskId]) => taskIds.includes(taskId))
-  for (const [, session] of cut) {
-    session.cutForRestart()
-  }
-  await Promise.allSettled(cut.map(async ([, session]) => session.done))
-}
+export const cutForRestart = async (taskIds: readonly string[]): Promise<void> => sessionHost.cutForRestart(taskIds)

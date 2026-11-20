@@ -5,8 +5,8 @@ import { inBackground } from './background.js'
 import { messages, tasks } from './db.js'
 import { HttpError } from './http.js'
 import { appendMessage, isRunning, openWarmSession, runTurn, sessionState } from './runner.js'
+import { firstUnstarted } from './session-mirror.js'
 import { inLane } from './task-lane.js'
-import { firstUnstarted } from './unstarted.js'
 
 /** How long a turn that never called the model may sit unanswered before its message goes again. */
 const RECHECK_MS = 8000
