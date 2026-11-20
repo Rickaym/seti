@@ -536,6 +536,22 @@ describe('egress proxy', () => {
     await running.close()
   })
 
+  it("keeps the sandbox's own header where a rule has no value, if the allowlist names the host", async () => {
+    const rule: EgressRule = {
+      hosts: ['api.rules.test'],
+      port: 443,
+      header: 'authorization',
+      value: async () => Promise.resolve(null),
+    }
+    const listed = await proxy(async () => Promise.resolve(['api.rules.test']), both, [rule])
+    const kept = await throughTunnel(listed.socketPath, 'api.rules.test', { authorization: 'Bearer own' })
+    expect(kept).toMatchObject({ status: 200, authorization: 'Bearer own' })
+    const unlisted = await proxy(async () => Promise.resolve([]), both, [rule])
+    const dropped = await throughTunnel(unlisted.socketPath, 'api.rules.test', { authorization: 'Bearer own' })
+    expect(dropped.authorization).toBeUndefined()
+    await Promise.all([listed.close(), unlisted.close()])
+  })
+
   it('retries a 401 once with a freshly minted token and the same body', async () => {
     const issued: string[] = []
     const minter = createTokenMinter({
