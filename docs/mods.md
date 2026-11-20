@@ -4,9 +4,9 @@ TLDR: Seti takes three tiers of mods. A theme mod adds colours and nothing else.
 Seti's own reviewed code in `mods/<id>/`, shipped in the build. A third-party mod is a folder or a
 git repository the user installs; its logic runs in a locked-down QuickJS sandbox outside Seti's
 process, its views run in sandboxed frames, and it reaches Seti only through the capabilities the
-user granted. This guide covers third-party mods first, then bundled and theme mods. How mods fit
-into Seti is in [Architecture](architecture.md), and what they may do is in
-[Security](security.md#mods).
+user granted. This guide covers third-party mods first, then bundled and theme mods. What a mod may
+and may not do is in [section 17 of the protocol](protocol.md#17-mods); this guide is how to build
+one for Seti.
 
 ## Building a third-party mod
 
@@ -250,15 +250,47 @@ constructors are gone. The main limits, from `MOD_LIMITS` in `shared/src/mod-run
 | Compute per day          | 600 s, then the mod pauses until midnight              |
 | Failures                 | 5 in a row back off; 20 in an hour turn the mod off    |
 
+### Operations
+
+Every call on `seti`, and every call a view relays, is one of these operations, from `MOD_OPS` in
+`shared/src/mod-runtime.ts`; nothing else is reachable, and `server/src/mods/ops/ops.test.ts` fails
+when this table and `MOD_OPS` differ. Seti checks the call's size, its event, the grant and the
+strict argument schema before it runs one.
+
+| Op                       | Capability     | Scope check                                                                                                                                      |
+| ------------------------ | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `settings.get`           | none           | The mod's own settings, with defaults                                                                                                            |
+| `audit.record`           | none           | Kinds the manifest declares; detail at most 2 KB                                                                                                 |
+| `status.set`             | none           | Items the manifest declares; 40 characters, once a second                                                                                        |
+| `storage.get`            | `storage`      | The mod's own id from the call, never from its arguments                                                                                         |
+| `storage.keys`           | `storage`      | Its own keys, at most 500                                                                                                                        |
+| `storage.set`            | `storage`      | 64 KB a value, 1 MB a mod, keys of 1 to 200 characters                                                                                           |
+| `storage.delete`         | `storage`      | Its own keys                                                                                                                                     |
+| `notify.send`            | `notify`       | Its declared kinds and the user's switch per kind; 3 an event, 10 an hour; links stay on Seti routes                                             |
+| `net.fetch`              | `net.fetch`    | HTTPS on port 443 to granted hosts; no IP literals or Seti names; public addresses only; redirects checked again; no hop-by-hop or proxy headers |
+| `connection.fetch`       | `connection`   | The bound connection, read at call time; a host in both the grant and the connection; the value set by Seti and redacted from the answer         |
+| `tasks.list`             | `tasks.read`   | Agents the filter covers                                                                                                                         |
+| `tasks.get`              | `tasks.read`   | Agents the filter covers; others answer as missing                                                                                               |
+| `tasks.transcript`       | `tasks.read`   | Direct messages hidden but the mod's own; credentials redacted; 50 entries, 256 KB                                                               |
+| `tasks.prs`              | `tasks.read`   | Agents the filter covers                                                                                                                         |
+| `tasks.manage.rename`    | `tasks.manage` | The action is granted; the agent is within the `tasks.read` filter                                                                               |
+| `tasks.manage.pin`       | `tasks.manage` | The action is granted; the agent is within the `tasks.read` filter                                                                               |
+| `tasks.manage.set_color` | `tasks.manage` | The action is granted; the agent is within the `tasks.read` filter                                                                               |
+| `tasks.manage.link_pr`   | `tasks.manage` | The action is granted; the agent is within the `tasks.read` filter                                                                               |
+| `tasks.manage.unlink_pr` | `tasks.manage` | The action is granted; the agent is within the `tasks.read` filter                                                                               |
+| `tasks.manage.start`     | `tasks.manage` | The action is granted; records an ask the user answers                                                                                           |
+| `tasks.manage.stop`      | `tasks.manage` | The action is granted; records an ask the user answers                                                                                           |
+| `chat.post`              | `chat.post`    | `public` granted; 4000 characters; 3 an event, 30 an hour                                                                                        |
+| `chat.post.direct`       | `chat.post`    | `direct` granted; an agent within the filter, never the user or the EA                                                                           |
+| `files.list`             | `files.read`   | An agent within the filter, an open folder, folders the globs could reach                                                                        |
+| `files.read`             | `files.read`   | The globs on both the path and its real path; no secret files; text only, 512 KB; credentials redacted                                           |
+
 ### Asking the user
 
-`seti.tasks.start` and `seti.tasks.stop` never act by themselves. They record an ask and resolve
-to `{ asked: <id> }`. Seti shows a toast that stays, "<Mod> asks you", with what the Allow does in
-Seti's own words, the full prompt, and Allow and Deny buttons. Only the user answers, from Seti;
-the EA, agents, mods and paired devices are refused. An ask expires after 10 minutes, and a mod
-keeps at most 3 open. On Allow, Seti runs exactly the recorded call as the mod: an agent it starts
-is sandboxed, at Seti control Self, on the default credential, and its first message says it came
-from the mod.
+`seti.tasks.start` and `seti.tasks.stop` never act by themselves (MOD-8). They record an ask and
+resolve to `{ asked: <id> }`. Seti shows a toast that stays, "<Mod> asks you", with what the Allow
+does in Seti's own words, the full prompt, and Allow and Deny buttons. An ask expires after 10
+minutes, and a mod keeps at most 3 open.
 
 ### Commands and where their results go
 
@@ -327,9 +359,8 @@ declarations it checked, so a theme can recolour Seti but never load a URL or st
    page at `#settings/mods/<id>`. With Require passkey on, Seti asks for a fresh passkey check
    first.
 
-An installed mod starts on. Only the user installs, grants, updates, rolls back and uninstalls; the
-EA, agents, mods and paired devices are refused, though agents may write a mod in their workspace
-for the user to install. A git install follows its branch or tag and is checked once a day; a folder
+An installed mod starts on. Only the user installs, grants, updates, rolls back and uninstalls
+(MOD-15), though agents may write a mod in their workspace for the user to install. A git install follows its branch or tag and is checked once a day; a folder
 install updates when the user presses Check. An update that asks for more, including a new host,
 wildcard, agent, glob, action, notification kind, view, schedule, task event, channel source,
 context text or any new or changed command, waits for the user's consent and shows only the difference. Any other update applies
@@ -409,13 +440,10 @@ shadows Seti or another mod. Set `defaultEnabled` for a feature that moved out o
 on until the user turns it off, and `securitySensitive` for a mod only the user may turn on.
 
 Set `required` for a mod that is part of Seti, such as What's new, GitHub webhooks, poller
-templates and Previews. A required mod is always on: Seti refuses to turn it off for the user, the
-API, the EA and agents alike, never uninstalls it, and starts it even when it was stored off.
-Safe mode and a mod bisect leave it on. Its settings still change as an ordinary bundled mod's do,
-so the user, the EA and agents at Seti control Full can still switch one Previews format off.
-Settings, Mods shows it with a Core badge and a lock in place of its switch, and its page says it
-is part of Seti. Only a bundled mod may be required; Check refuses a third-party manifest that sets
-it, and a theme mod cannot set it either.
+templates and Previews. A required mod is always on, for every caller, and starts even when it was
+stored off; safe mode and a mod bisect leave it on, and its settings still change as an ordinary
+bundled mod's do. Settings, Mods shows it with a Core badge and a lock in place of its switch. Only
+a bundled mod may be required.
 
 This Seti offers mod API 1.21.0, which added transcript blocks, `api.transcript.refresh` and
 stored asides (`aside.list`, `remove` and `clear` in place of `close`, and `done` events that
@@ -461,6 +489,51 @@ A third-party package's icon and documents count toward its size limit, and Chec
 the manifest names when it is missing, too large or not a valid icon. A bundled mod keeps
 `README.md` and `CHANGELOG.md` beside its manifest, with a lucide icon and its categories; a test
 fails when one is missing.
+
+### Where each point lives
+
+Each contribution point is a `Registry` (`shared/src/registry.ts`): entries by key, a key taken
+once, and every registration returns a disposer the mod host (`server/src/mods/host.ts`,
+`ui/src/mods/host.ts`) keeps per mod. Core registers its own entries through the same registries.
+`server/src/mods/bundled.ts` lists the bundled mods (`BUNDLED_MODS`, `THEME_MODS`, and `TEST_MODS`
+for `SETI_TEST_MODS=1`), and `bundled.test.ts` fails on a folder that is missing from it.
+
+| Point             | Registry                                                           |
+| ----------------- | ------------------------------------------------------------------ |
+| Slash commands    | `slashCommands` in `server/src/mods/points.ts`                     |
+| Commands          | `modCommands`, run through `server/src/mods/commands.ts`           |
+| Input hooks       | `inputHooks` in `ui/src/lib/input-hooks.ts`                        |
+| Host proxies      | `hostProxies` in `server/src/subdomain-proxy.ts`                   |
+| PR decorators     | `prDecorators` in `server/src/pr-decorators.ts`                    |
+| PR chips          | `prChips` in `ui/src/lib/pr-chips.ts`                              |
+| Status markers    | `statusMarkers` in `ui/src/lib/status-markers.ts`                  |
+| Agent accents     | `agentAccents` in `ui/src/lib/status-markers.ts`                   |
+| Transcript blocks | `transcriptBlockSources` in `ui/src/lib/transcript-blocks.ts`      |
+| Notifications     | `notifyKinds`, with the mod's `<mod>.<kind>`                       |
+| Audit kinds       | `modAuditKinds`, recorded as `mod.<id>.<kind>`                     |
+| File extensions   | `extensionKinds` in `shared/src/files.ts`                          |
+| Kinds, pages      | `kindViewers`, `pageExtensions` in `shared/src/file-viewers.ts`    |
+| Routes            | `modRouteEntries`, under `/api/mods/<id>/`                         |
+| Settings          | the manifest's schema, values in `mod_settings`                    |
+| Sections          | `sectionRegistry` in `ui/src/lib/sections.ts`                      |
+| Settings pages    | `settingsPages` in `ui/src/panels/settings/pages.ts`               |
+| Status bar        | `statusBarItems` in `ui/src/components/status-bar/items.ts`        |
+| Header band       | `headerViews` in `ui/src/lib/mod-views.ts`                         |
+| About parts       | `aboutParts`, with news dots in `newsEntries`                      |
+| File viewers      | `fileViewers` in `ui/src/panels/files/file-viewers.ts`             |
+| Fence renderers   | `fenceRenderers` in `ui/src/lib/fence-renderers.ts`                |
+| Themes            | `themeRegistry` in `ui/src/components/theme/registry.ts`           |
+| Styles            | `MOD_STYLES` in `ui/src/mods/bundled.ts`                           |
+| Agents layouts    | `agentsLayouts` in `ui/src/panels/tasks/agents-layouts.ts`         |
+| Terminals         | `terminalSources` in `ui/src/panels/terminal/terminal-sources.ts`  |
+| Chords            | `modChords` in `ui/src/mods/mod-chords.ts`, checked against Seti's |
+| Agent docks       | `agentDocks` in `ui/src/panels/tasks/agent-docks.ts`               |
+| Context           | `modContexts` in `server/src/mods/ops/context.ts`, new sessions    |
+
+Every point takes effect at once except context, which reaches new sessions. Public paths are
+declared but not available yet. A third-party mod's events go to its `logic.js` through the logic
+pool in `server/src/mods/logic/`, and its views are served by `server/src/routes/mod-frames.ts`
+under the policy in `server/src/mods/frames/policy.ts`.
 
 ### The server half
 
@@ -623,7 +696,7 @@ api.registerPollerTemplate('feed', { script: FEED_SCRIPT })
 
 Each source is named `<mod>.<id>`, such as `github-webhooks.github`; `generic` and `blank` are
 Seti's own, as are the catalog senders such as `linear` and the user's `custom` ones, which are
-data and need no mod ([Webhook senders](pollers.md#webhook-senders)). Write a mod only for a
+data and need no mod ([Webhook senders](setup.md#webhook-senders)). Write a mod only for a
 sender that needs code, such as one that tracks states or signs something the definition cannot
 describe. While the mod is off its sources leave the New menus, and its webhooks refuse every
 delivery with "The <mod> mod is off" until it is on again. `mods/github-webhooks/`,
