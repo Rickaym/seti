@@ -60,6 +60,22 @@ describe('chat.md', () => {
     expect(renderChat({ ...view, messages: [] })).toContain('No messages yet.')
   })
 
+  it('reports what @active reached, or that it reached nobody', () => {
+    const own = { author_kind: 'task', author_task_id: 'me', author_handle: 'voicemail', text: '@active ship' } as const
+    const reached = message(9, {
+      ...own,
+      mentions: [
+        { handle: 'active', task_id: null },
+        { handle: 'webhook', task_id: 'w', via: 'active' },
+      ],
+    })
+    const nobody = message(10, { ...own, mentions: [{ handle: 'active', task_id: null }] })
+    const deliveries = new Map([[9, [{ handle: 'webhook', mode: 'start' as const, reason: null }]]])
+    const text = renderChat({ ...view, messages: [reached, nobody], deliveries })
+    expect(text).toContain('> seti: @webhook started a turn\n')
+    expect(text).toContain('> seti: @active reached nobody, no agent was active today')
+  })
+
   it('shows a rejection note under the header', () => {
     expect(renderChat(view, 'too long')).toContain('\n<!-- seti: rejected: too long -->\n')
   })
