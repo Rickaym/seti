@@ -77,6 +77,7 @@ export const AUDIT_KINDS = [
   'task.archived',
   'task.files_archived',
   'task.file_saved',
+  'task.storage_cleaned',
   'task.file_shared',
   'task.share_updated',
   'task.share_link_rotated',
@@ -243,7 +244,8 @@ export const AUDIT_KINDS = [
   'system.backup_failed',
   'system.auto_archive_changed',
   'system.repeat_guard_changed',
-  'system.stale_folders_deleted',
+  'system.orphans_removed',
+  'system.storage_schedule_changed',
   'system.memory_cap_changed',
   'system.cpu_cap_changed',
   'system.compact_changed',
@@ -309,8 +311,8 @@ export type AuditSubjectType = (typeof AUDIT_SUBJECT_TYPES)[number]
 export type AuditDetailValue = string | number | boolean | null | string[]
 export type AuditDetail = Record<string, AuditDetailValue>
 
-/** Values only past events carry: routines recorded them before Seti removed routines. */
-type RetiredKind = `routine.${string}` | 'seti.routine_updated'
+/** Values only past events carry: routines, and stale folders before orphans replaced them. */
+type RetiredKind = `routine.${string}` | 'seti.routine_updated' | 'system.stale_folders_deleted'
 
 /**
  * A kind a mod declared, recorded as `mod.<id>.<kind>`. Seti records only kinds an enabled mod

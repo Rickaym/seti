@@ -1,4 +1,4 @@
-import { createHash, randomUUID } from 'node:crypto'
+import { createHash } from 'node:crypto'
 import fs from 'node:fs'
 import path from 'node:path'
 import {
@@ -17,7 +17,8 @@ import { CLAUDE_HOME, WORKTREE_ROOT } from './config.js'
 import { contentType } from './content-type.js'
 import { fromEa } from './ea-guard.js'
 import { HttpError } from './http.js'
-import { filesHiddenPaths, setiHomePaths, type SandboxContext } from './sandbox.js'
+import { sandboxDirOf } from './owned-dirs.js'
+import { filesHiddenPaths, sandboxHomeHidden, setiHomePaths, type SandboxContext } from './sandbox.js'
 import { CHAT, SECRETS, SETI_FILES, workspaceDir } from './workspace/dir.js'
 
 /** What decides which paths of a task the Files view serves. */
@@ -29,6 +30,9 @@ export interface FileRules {
   claudeHome: string
   /** The task's own workspace, the one part of Seti's home besides worktrees that opens. */
   workspace: string
+  /** The task's sandbox home and /tmp, which open read-only. */
+  sandboxHome: string
+  sandboxTmp: string
 }
 
 export interface TaskRoot extends FileRoot {
@@ -62,12 +66,15 @@ export function fileRules(taskId: string, policy: SandboxPolicy, ctx: SandboxCon
   const both = (entries: readonly string[]) => [
     ...new Set(entries.flatMap((entry) => (isGlob(entry) ? [entry] : [entry, realOr(entry)]))),
   ]
+  const sandbox = sandboxDirOf(taskId)
   return {
-    hidden: both(filesHiddenPaths(policy, ctx)),
+    hidden: both([...filesHiddenPaths(policy, ctx), ...sandboxHomeHidden(path.join(sandbox, 'home'))]),
     setiHomes: both(setiHomePaths(ctx)),
     worktreeRoot: realOr(WORKTREE_ROOT),
     claudeHome: realOr(CLAUDE_HOME),
     workspace: realOr(workspaceDir(taskId)),
+    sandboxHome: realOr(path.join(sandbox, 'home')),
+    sandboxTmp: realOr(path.join(sandbox, 'tmp')),
   }
 }
 
@@ -92,7 +99,9 @@ export function pathProblem(real: string, rules: FileRules): string | null {
     return "is the agent's chat.md, which holds its direct messages; read the group chat instead"
   }
   const setiData = rules.setiHomes.some((home) => within(real, home))
-  const ownPart = within(real, rules.workspace) || (within(real, rules.worktreeRoot) && real !== rules.worktreeRoot)
+  const ownPart =
+    [rules.workspace, rules.sandboxHome, rules.sandboxTmp].some((own) => within(real, own)) ||
+    (within(real, rules.worktreeRoot) && real !== rules.worktreeRoot)
   if (setiData && !ownPart) {
     return "is part of Seti's own data"
   }
@@ -118,10 +127,21 @@ function rootOf(spec: RootSpec, rules: FileRules): TaskRoot {
   const exists = fs.statSync(spec.path, { throwIfNoEntry: false })?.isDirectory() === true
   const real = exists ? fs.realpathSync(spec.path) : null
   const allowed = real !== null && pathProblem(real, rules) === null
-  return { ...spec, exists: allowed, writable: spec.kind !== 'workspace', real: allowed ? real : null }
+  const writable = spec.kind !== 'workspace' && spec.kind !== 'sandbox'
+  return { ...spec, exists: allowed, writable, real: allowed ? real : null }
 }
 
-/** The task's working directory, its other repos and directories, and its Seti workspace. */
+/** A sandboxed task's private home and /tmp, read-only, when they exist. */
+function sandboxRoots(task: Task, rules: FileRules): TaskRoot[] {
+  const sandbox = sandboxDirOf(task.id)
+  const specs: RootSpec[] = [
+    { id: 'sandbox-home', label: 'Sandbox home', path: path.join(sandbox, 'home'), kind: 'sandbox' },
+    { id: 'sandbox-tmp', label: 'Sandbox /tmp', path: path.join(sandbox, 'tmp'), kind: 'sandbox' },
+  ]
+  return specs.map((spec) => rootOf(spec, rules)).filter((root) => root.exists)
+}
+
+/** The task's working directory, its other repos and directories, its Seti workspace and sandbox. */
 export function taskRoots(task: Task, rules: FileRules): TaskRoot[] {
   const spec = (dir: string, id: string, fallback: TaskRoot['kind']): RootSpec => {
     const slug = task.repos.find((repo) => repo.dir === dir)?.slug
@@ -131,6 +151,7 @@ export function taskRoots(task: Task, rules: FileRules): TaskRoot[] {
     rootOf(spec(task.cwd, 'cwd', 'cwd'), rules),
     ...extraDirs(task).map((dir) => rootOf(spec(dir, rootId(dir), 'dir'), rules)),
     rootOf({ id: 'workspace', label: 'Workspace', path: workspaceDir(task.id), kind: 'workspace' }, rules),
+    ...sandboxRoots(task, rules),
   ]
 }
 
@@ -369,7 +390,7 @@ export function readFile(at: Located, withText: boolean): ReadResult {
   }
 }
 
-const GONE: FileStamp = { exists: false, size: 0, mtime: null, hash: null }
+export const GONE: FileStamp = { exists: false, size: 0, mtime: null, hash: null }
 
 /** The file's state for the change stream; a missing or refused file reads as gone. */
 export function stampOf(files: FileContext, at: Located, dotfiles: boolean): FileStamp {
@@ -379,87 +400,4 @@ export function stampOf(files: FileContext, at: Located, dotfiles: boolean): Fil
   } catch {
     return GONE
   }
-}
-
-/** The save refused because the file changed since the editor loaded it. */
-export class FileConflictError extends Error {
-  readonly current: FileStamp
-
-  constructor(current: FileStamp) {
-    super('The file changed on disk since you opened it')
-    this.current = current
-  }
-}
-
-function writeNew(parent: string, name: string, text: string): void {
-  fs.mkdirSync(parent, { recursive: true })
-  if (fs.realpathSync(parent) !== parent) {
-    throw new HttpError(409, `The folder of ${name} moved while it was created`)
-  }
-  const fd = fs.openSync(path.join(parent, name), 'wx', 0o644)
-  try {
-    fs.writeFileSync(fd, text)
-  } finally {
-    fs.closeSync(fd)
-  }
-}
-
-/** Swaps the file for one holding `text`, keeping its mode; readers never see half a file. */
-function replace(real: string, text: string): void {
-  const mode = fs.statSync(real).mode & 0o7777
-  const tmp = path.join(path.dirname(real), `.${path.basename(real)}.${randomUUID()}.seti-tmp`)
-  const fd = fs.openSync(tmp, 'wx', mode)
-  try {
-    fs.writeFileSync(fd, text)
-    fs.fchmodSync(fd, mode)
-    fs.closeSync(fd)
-    fs.renameSync(tmp, real)
-  } catch (e) {
-    fs.rmSync(tmp, { force: true })
-    throw e
-  }
-}
-
-export interface SaveRequest {
-  text: string
-  baseHash: string | null
-  dotfiles: boolean
-}
-
-function create(files: FileContext, at: Located, save: SaveRequest): void {
-  if (save.baseHash !== null) {
-    throw new FileConflictError(GONE)
-  }
-  try {
-    writeNew(at.parent, path.basename(at.rel), save.text)
-  } catch (e) {
-    if ((e as NodeJS.ErrnoException).code === 'EEXIST') {
-      throw new FileConflictError(stampOf(files, at, save.dotfiles))
-    }
-    throw e
-  }
-}
-
-/** Saves a text file when it still holds what the editor loaded; a null base creates it. */
-export function saveText(files: FileContext, at: Located, save: SaveRequest): { created: boolean; bytes: number } {
-  if (!at.root.writable) {
-    throw new HttpError(403, `${at.root.label} is read-only here`)
-  }
-  const bytes = Buffer.byteLength(save.text)
-  if (bytes > FILE_TEXT_MAX) {
-    throw new HttpError(413, 'The text is larger than the editor saves')
-  }
-  if (at.real === null) {
-    create(files, at, save)
-    return { created: true, bytes }
-  }
-  const { meta } = readFile(at, false)
-  if (!isTextKind(meta.kind) || meta.hash === null) {
-    throw new HttpError(415, `${at.rel} is not a text file the editor can save`)
-  }
-  if (save.baseHash !== meta.hash) {
-    throw new FileConflictError({ exists: true, size: meta.size, mtime: meta.mtime, hash: meta.hash })
-  }
-  replace(at.real, save.text)
-  return { created: false, bytes }
 }
