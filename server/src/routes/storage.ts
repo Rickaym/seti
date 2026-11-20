@@ -22,11 +22,9 @@ export const storageRoutes = new Hono()
     forgetStorage(task.id)
     return ok(c, result)
   })
-  .post('/orphans/remove', validJson(removeOrphansInput), async (c) => {
-    const result = await removeOrphans(c.req.valid('json').paths)
-    forgetStorage(null)
-    return ok(c, result)
-  })
+  .post('/orphans/remove', validJson(removeOrphansInput), async (c) =>
+    ok(c, await removeOrphans(c.req.valid('json').paths)),
+  )
   .put('/schedule', validJson(storageScheduleInput), async (c) =>
     ok(c, await updateStorageSchedule(c.req.valid('json'))),
   )

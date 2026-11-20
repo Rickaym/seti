@@ -128,6 +128,11 @@ export class BackgroundMemo<T> {
     return entry?.value ?? null
   }
 
+  /** Whether a value for `key` was worked out, however old. */
+  has(key: string): boolean {
+    return this.values.has(key)
+  }
+
   forget(key: string): void {
     this.values.delete(key)
   }

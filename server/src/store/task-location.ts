@@ -36,6 +36,16 @@ export const taskLocation = {
   worktreeBases: async (taskId: string) =>
     sql<(TaskWorktree & { base_branch: string })[]>`SELECT w.dir, r.path AS repo_path, r.base_branch
       FROM task_worktree w JOIN repo r ON r.id = w.repo_id WHERE w.task_id = ${taskId} ORDER BY w.dir`,
+  /** Every task's worktree directories, by task id, in one query. */
+  worktreeDirsByTask: async () => {
+    const byTask = new Map<string, string[]>()
+    for (const row of await sql<
+      { task_id: string; dir: string }[]
+    >`SELECT task_id, dir FROM task_worktree ORDER BY dir`) {
+      byTask.set(row.task_id, [...(byTask.get(row.task_id) ?? []), row.dir])
+    }
+    return byTask
+  },
   /** Every worktree directory Seti made, for any task. */
   allWorktreeDirs: async () => (await sql<{ dir: string }[]>`SELECT dir FROM task_worktree`).map((row) => row.dir),
   /** Worktree records of agents not archived; an archived agent keeps its records to restore. */

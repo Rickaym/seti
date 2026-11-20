@@ -16,11 +16,11 @@ export interface AgentFolder {
 const isDir = (dir: string) => fs.lstatSync(dir, { throwIfNoEntry: false })?.isDirectory() === true
 
 /** The folders Seti made for the agent: its scratch folder, worktrees, workspace and sandbox. */
-async function ownedFolders(task: Task): Promise<AgentFolder[]> {
+async function ownedFolders(task: Task, worktreeDirs?: readonly string[]): Promise<AgentFolder[]> {
   const scratch = scratchDirOf(task)
-  const worktrees = (await taskLocation.worktrees(task.id))
-    .map((worktree) => worktree.dir)
-    .filter((dir) => path.dirname(dir) === WORKTREE_ROOT)
+  const worktrees = (worktreeDirs ?? (await taskLocation.worktrees(task.id)).map((worktree) => worktree.dir)).filter(
+    (dir) => path.dirname(dir) === WORKTREE_ROOT,
+  )
   const sandbox = sandboxDirOf(task.id)
   const workspace = workspaceDir(task.id)
   return [
@@ -36,9 +36,10 @@ async function ownedFolders(task: Task): Promise<AgentFolder[]> {
 /**
  * Every folder of the agent that exists: those Seti made for it, and the checkouts and folders it
  * was given, which Clean never touches. A folder inside another of them is counted there.
+ * `worktreeDirs` saves a query when the caller read every agent's worktrees at once.
  */
-export async function agentFolders(task: Task): Promise<AgentFolder[]> {
-  const owned = (await ownedFolders(task)).filter((folder) => isDir(folder.path))
+export async function agentFolders(task: Task, worktreeDirs?: readonly string[]): Promise<AgentFolder[]> {
+  const owned = (await ownedFolders(task, worktreeDirs)).filter((folder) => isDir(folder.path))
   const given = [...new Set(usedDirs(task))]
     .filter((dir) => isDir(dir) && !owned.some((folder) => within(dir, folder.path)))
     .map((dir): AgentFolder => ({ kind: 'checkout', path: dir, owned: null }))

@@ -90,15 +90,25 @@ export interface FoundOrphan extends Orphan {
   record: WorktreeRecord | null
 }
 
-/** Why removing orphans leaves a folder: it changed lately, is busy, or holds unsaved git work. */
-async function keptBecause(dir: string, root: OwnedRoot, all: readonly Task[], changedAgo: number) {
+/** Why a folder holds work removing it would lose, or is in use now; null when neither. */
+export type WorkCheck = (dir: string) => Promise<string | null>
+
+/** A process working in the folder, or work git has not saved in a repository in it. */
+export const workNow: WorkCheck = async (dir) => (await busyReason(dir)) ?? (await folderUnsavedWork(dir))
+
+/** Why removing orphans leaves a folder: its path, a recent change, a process or unsaved work. */
+async function keptBecause(dir: string, root: OwnedRoot, changedAgo: number, work: WorkCheck) {
+  const refusal = removalRefusal(dir, root, [])
+  if (refusal !== null) {
+    return refusal
+  }
   if (changedAgo < GRACE_MS) {
     return 'it changed in the last hour, so an agent may be starting in it'
   }
-  return removalRefusal(dir, root, all) ?? (await busyReason(dir)) ?? (await folderUnsavedWork(dir))
+  return work(dir)
 }
 
-async function orphanFolders(who: Owners, at: number): Promise<FoundOrphan[]> {
+async function orphanFolders(who: Owners, at: number, work: WorkCheck): Promise<FoundOrphan[]> {
   const found: FoundOrphan[] = []
   for (const root of ORPHAN_ROOTS) {
     const rootDir = OWNED_ROOTS[root]
@@ -115,7 +125,7 @@ async function orphanFolders(who: Owners, at: number): Promise<FoundOrphan[]> {
         where: rootDir,
         size: cachedSize(dir),
         modified_at: new Date(changed).toISOString(),
-        kept: await keptBecause(dir, root, who.all, at - changed),
+        kept: await keptBecause(dir, root, at - changed, work),
         root,
         record: null,
       })
@@ -140,9 +150,12 @@ async function staleRecords(): Promise<FoundOrphan[]> {
     }))
 }
 
-/** Folders no agent owns in Seti's roots, and worktree records whose folder is gone. */
-export async function findOrphans(at = Date.now()): Promise<FoundOrphan[]> {
-  const found = [...(await orphanFolders(await owners(), at)), ...(await staleRecords())]
+/**
+ * Folders no agent owns in Seti's roots, and worktree records whose folder is gone. `work` says
+ * why a folder must stay; a listing passes a cached check, a removal the check made now.
+ */
+export async function findOrphans(work: WorkCheck = workNow, at = Date.now()): Promise<FoundOrphan[]> {
+  const found = [...(await orphanFolders(await owners(), at, work)), ...(await staleRecords())]
   return found.sort((a, b) => {
     const order = bySize(a.size, b.size)
     return order !== 0 ? order : a.path.localeCompare(b.path)

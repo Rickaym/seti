@@ -23,6 +23,7 @@ from seti_ea.reminder_tools import (
     upcoming_runs,
 )
 from seti_ea.seti import SetiClient, SetiError
+from seti_ea.storage_tools import CLEAN_ARG, STORAGE_ARGS, StorageTools
 from seti_ea.toolkit import (
     ToolError,
     ToolResult,
@@ -333,16 +334,7 @@ SETTINGS_SPECS: list[ToolSpec] = [
         "The auto-archive rule (on or off, after how many idle days), after how many days archived "
         "agents are deleted, whether agents a restart cut off resume on their own, whether an agent "
         "that repeats a call with the same result stops to ask the user, which agents it would "
-        "archive now, and what the archive holds. With "
-        "stale_folders, also the folders in the scratch and worktree roots no agent owns, with sizes; "
-        "listing them changes nothing.",
-        {
-            "stale_folders": {"type": "boolean", "description": "true to list stale folders too."},
-            "days": {
-                "type": "integer",
-                "description": "Leave out stale folders changed within this many days; default 7.",
-            },
-        },
+        "archive now, and what the archive holds.",
     ),
     ToolSpec(
         "set_auto_archive",
@@ -373,17 +365,9 @@ SETTINGS_SPECS: list[ToolSpec] = [
     ToolSpec(
         "run_archive_sweep",
         "Archive now every complete agent the auto-archive rule would take, even while the rule is off. "
-        "With stale_folders, instead deletes those folders for good, as get_archive_settings listed "
-        "them. Needs the user's yes.",
-        {
-            "stale_folders": {
-                "type": "array",
-                "items": {"type": "string"},
-                "description": "Paths of stale folders to delete, from get_archive_settings.",
-            },
-            "days": {"type": "integer", "description": "The days the stale folders were listed with."},
-            "confirmed": CONFIRMED,
-        },
+        "With clean_agent, instead removes that agent's rebuildable folders to free disk, as "
+        "resource_usage storage shows them. Needs the user's yes.",
+        {**CLEAN_ARG, "confirmed": CONFIRMED},
     ),
     ToolSpec("list_archived_agents", "List archived agents, newest first, with what their archives saved."),
     ToolSpec(
@@ -511,7 +495,9 @@ SETTINGS_SPECS: list[ToolSpec] = [
     ToolSpec(
         "resource_usage",
         "This machine's load: CPU, memory, swap and disks, Seti's services, the agents' processes and "
-        "any resource warnings.",
+        "any resource warnings. With storage, instead what agents' folders take on disk; with agent, "
+        "that agent's folders as a tree with sizes, git state and what is rebuildable.",
+        STORAGE_ARGS,
     ),
     ToolSpec(
         "get_ea_settings",
@@ -818,6 +804,7 @@ class SettingsTools:
         self.handlers.update(WarmCacheTools(seti, confirmations).handlers)
         self.handlers.update(MemoryTools(seti, confirmations, resolve_task).handlers)
         self.handlers.update(ModTools(seti, confirmations).handlers)
+        self._storage = StorageTools(seti, confirmations, now, resolve_task)
 
     async def _cleared(self, args: Mapping[str, Any], key: str) -> bool:
         return await self._gate.cleared(key, arg_bool(args, "confirmed"))
@@ -1308,23 +1295,6 @@ class SettingsTools:
         ]
 
     @staticmethod
-    def _stale_words(report: Mapping[str, Any]) -> list[str]:
-        folders = dicts(report.get("folders"))
-        if not folders:
-            return [f"No stale folder unchanged for {plural(int(report.get('days') or 0), 'day')}."]
-        lines = [
-            f"{plural(len(folders), 'stale folder')} no agent owns, "
-            f"{size_words(report.get('total_bytes'))} in all, largest first:"
-        ]
-        for f in folders[:LIST_LIMIT]:
-            kind = {"repo": ", a checkout", "worktree": ", a worktree"}.get(str(f.get("checkout")), "")
-            busy = f", in use: {f.get('busy')}" if f.get("busy") else ""
-            lines.append(f"- {f.get('path')}: {size_words(f.get('bytes'))}{kind}{busy}")
-        if len(folders) > LIST_LIMIT:
-            lines.append(f"And {len(folders) - LIST_LIMIT} smaller ones not listed.")
-        return lines
-
-    @staticmethod
     def _days_arg(args: Mapping[str, Any], name: str) -> int | None:
         value = args.get(name)
         if isinstance(value, int | str) and not isinstance(value, bool) and str(value).strip().isdigit():
@@ -1358,12 +1328,6 @@ class SettingsTools:
             f"{size_words(archived.get('stored_bytes'))}, and their packed folders take "
             f"{size_words(archived.get('files_bytes'))}.",
         ]
-        if arg_bool(args, "stale_folders"):
-            days = self._days_arg(args, "days")
-            report = await self._seti.get(
-                "/archive/stale-folders", {"days": days} if days is not None else None
-            )
-            lines.extend(self._stale_words(report if isinstance(report, dict) else {}))
         return ToolResult("\n".join(lines), "Read archive settings")
 
     async def set_auto_archive(self, args: Mapping[str, Any]) -> ToolResult:
@@ -1419,35 +1383,9 @@ class SettingsTools:
             "Changed auto-archive",
         )
 
-    async def _delete_stale_folders(self, args: Mapping[str, Any], paths: list[str]) -> ToolResult:
-        days = self._days_arg(args, "days")
-        body: dict[str, Any] = {"paths": paths, "confirm": True}
-        if days is not None:
-            body["days"] = days
-        if not await self._cleared(args, gate_key("run_archive_sweep", body)):
-            effect = (
-                f"This deletes {plural(len(paths), 'folder')} for good: {and_list(paths[:SHOWN])}"
-                f"{f' and {len(paths) - SHOWN} more' if len(paths) > SHOWN else ''}. No agent owns them; "
-                "anything in them that is not pushed is lost."
-            )
-            return ask("run_archive_sweep", args, effect, "delete stale folders")
-        result = await self._refusable(self._seti.post("/archive/stale-folders/delete", body), "Not deleted")
-        fields = result if isinstance(result, dict) else {}
-        deleted = dicts(fields.get("deleted"))
-        refused = dicts(fields.get("refused"))
-        freed = sum(int(d.get("bytes") or 0) for d in deleted)
-        text = f"Deleted {plural(len(deleted), 'folder')}, freeing {size_words(freed)}."
-        if refused:
-            first = refused[0]
-            text += (
-                f" Kept {plural(len(refused), 'folder')}: {first.get('path')} because {first.get('reason')}."
-            )
-        return ToolResult(text, f"Deleted {plural(len(deleted), 'stale folder')}")
-
     async def run_archive_sweep(self, args: Mapping[str, Any]) -> ToolResult:
-        paths = arg_list(args, "stale_folders")
-        if paths:
-            return await self._delete_stale_folders(args, paths)
+        if arg_str(args, "clean_agent", required=False):
+            return await self._storage.clean(args)
         status = await self._archive_status()
         preview = field_dict(status, "preview")
         settings = field_dict(status, "settings")
@@ -1978,6 +1916,9 @@ class SettingsTools:
         return ToolResult(text, f"Imported {plural(len(done), 'session')}")
 
     async def resource_usage(self, args: Mapping[str, Any]) -> ToolResult:
+        storage = await self._storage.usage(args)
+        if storage is not None:
+            return storage
         data = await self._seti.get("/resources")
         res = data if isinstance(data, dict) else {}
         host = field_dict(res, "host")
