@@ -6,7 +6,6 @@ import { HttpError } from './http.js'
 import type { NextMessage } from './next-message.js'
 import { checkSend } from './send-check.js'
 import type { RestartCheck } from './session-host/port.js'
-import { setStatus } from './session-ingest.js'
 import { sessionHost } from './session-link.js'
 import { isRunning, sessionView } from './session-mirror.js'
 import { setupKey } from './session-spec.js'
@@ -84,7 +83,6 @@ async function startTurn(
   const running = view?.running === true
   const count = await checkSend(taskId, message, running)
   await sessionHost.start(taskId, message, interrupt, await restartCheck(task, view))
-  await setStatus(taskId, 'running')
   return { count, outcome: outcomeOf(running, interrupt) }
 }
 
@@ -100,12 +98,7 @@ export async function stopTurn(taskId: string, { deliverQueued = false } = {}): 
  * Opens a process for a task without an open one. It sends the messages a session that could not
  * start kept; with none, it waits for the next turn.
  */
-export async function openWarmSession(taskId: string): Promise<void> {
-  sessionHost.openWarm(taskId)
-  if (isRunning(taskId)) {
-    await setStatus(taskId, 'running')
-  }
-}
+export const openWarmSession = async (taskId: string): Promise<void> => sessionHost.openWarm(taskId)
 
 /** Asks the task's open session to stop one of its subagents or background commands. */
 export const stopSessionTask = async (taskId: string, sdkTaskId: string): Promise<boolean> =>

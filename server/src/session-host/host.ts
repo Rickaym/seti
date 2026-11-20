@@ -1,6 +1,6 @@
 import type { SDKMessage } from '@anthropic-ai/claude-agent-sdk'
 import { outsideRequest } from '../access.js'
-import { LiveSession } from '../agent-session.js'
+import { LiveSession, type SessionView } from '../agent-session.js'
 import { onShutdown } from '../background.js'
 import { CLAUDE_HOME, SESSION_IDLE_MS } from '../config.js'
 import type { NextMessage } from '../next-message.js'
@@ -205,8 +205,11 @@ async function end(host: Host, taskId: string): Promise<void> {
   await session.done
 }
 
+/** The session commands, and what the host reports of its sessions when it says hello. */
+export type SessionHost = SessionCommands & { views: () => Map<string, SessionView> }
+
 /** Runs sessions in this process and reports to Seti's records side through `port`. */
-export function createSessionHost(port: ControlPort, decisions: SessionDecisions): SessionCommands {
+export function createSessionHost(port: ControlPort, decisions: SessionDecisions): SessionHost {
   const host: Host = { live: new Map(), port, decisions }
   onShutdown(async () => {
     for (const taskId of host.live.keys()) {
@@ -214,9 +217,15 @@ export function createSessionHost(port: ControlPort, decisions: SessionDecisions
     }
   })
   return {
-    start: async (taskId, message, interrupt, check) => start(host, taskId, { message, interrupt }, check),
-    openWarm: (taskId) => {
+    start: async (taskId, message, interrupt, check) => {
+      await start(host, taskId, { message, interrupt }, check)
+      await port.working(taskId)
+    },
+    openWarm: async (taskId) => {
       openSession(host, taskId, host.live.get(taskId), [])
+      if (host.live.get(taskId)?.running === true) {
+        await port.working(taskId)
+      }
     },
     stop: async (taskId, deliverQueued) => stop(host, taskId, deliverQueued),
     end: async (taskId) => end(host, taskId),
@@ -231,5 +240,6 @@ export function createSessionHost(port: ControlPort, decisions: SessionDecisions
     stopTask: async (taskId, sdkTaskId) => (await host.live.get(taskId)?.stopTask(sdkTaskId)) ?? false,
     mcpStatus: async (taskId) => (await host.live.get(taskId)?.mcpServerStatus()) ?? null,
     ...sessionControls(host.live),
+    views: () => new Map([...host.live].map(([taskId, session]) => [taskId, session.view()])),
   }
 }

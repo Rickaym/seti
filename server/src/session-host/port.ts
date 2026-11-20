@@ -8,7 +8,7 @@ import type { PendingRewind } from '../store/rewinds.js'
 import type { UserContent } from '../user-content.js'
 
 /** What a new process for the task starts from: its spec, the spec's key and a pending rewind. */
-interface SessionStartSpec {
+export interface SessionStartSpec {
   key: string | null
   spec: SessionSpec
   rewind: PendingRewind | null
@@ -65,14 +65,15 @@ export type QueuedCancel = 'not_queued' | 'unsupported' | 'picked_up' | { taken:
 
 /** What Seti's records side tells the session host to do with a task's session. */
 export interface SessionCommands {
-  /** Sends, queues or interrupts with the message, or opens a process for it. */
+  /** Sends, queues or interrupts with the message, or opens a process for it; reports it working. */
   start: (
     taskId: string,
     message: Omit<NextMessage, 'interrupted'>,
     interrupt: boolean,
     check: RestartCheck | null,
   ) => Promise<void>
-  openWarm: (taskId: string) => void
+  /** Opens a process for the task; reports it working when kept messages start a turn. */
+  openWarm: (taskId: string) => Promise<void>
   /** Interrupts the running turn and waits until its end is reported. */
   stop: (taskId: string, deliverQueued: boolean) => Promise<void>
   /** Closes the session with everything running in it, and waits until it has ended. */
