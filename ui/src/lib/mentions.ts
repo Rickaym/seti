@@ -4,6 +4,8 @@ export interface MentionOption {
   detail: string
   /** Muted tasks and inactive ones rank after the rest. */
   quiet: boolean
+  /** Reserved handles, such as @all, come before agents that match as well. */
+  pinned?: boolean
 }
 
 /** The @word the caret sits in, as typed so far, or null when it is not in one. */
@@ -17,14 +19,15 @@ export function mentionAt(text: string, caret: number): { start: number; query: 
   return { start: caret - query.length - 1, query: query.toLowerCase() }
 }
 
-/** Options whose handle starts with the query first, then those containing it; quiet ones last. */
+/** Prefix matches first, then those containing the query; quiet last, reserved first among equals. */
 export function rankMentions(options: readonly MentionOption[], query: string, limit: number): MentionOption[] {
   const scored = options.flatMap((option) => {
     const at = option.handle.indexOf(query)
     if (at < 0) {
       return []
     }
-    return [{ option, score: (at === 0 ? 0 : 2) + (option.quiet ? 1 : 0) }]
+    const match = (at === 0 ? 0 : 2) + (option.quiet ? 1 : 0)
+    return [{ option, score: match * 2 + (option.pinned === true ? 0 : 1) }]
   })
   return scored
     .toSorted((a, b) => (a.score === b.score ? a.option.handle.localeCompare(b.option.handle) : a.score - b.score))
