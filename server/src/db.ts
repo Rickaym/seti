@@ -300,8 +300,8 @@ export const tasks = {
   },
   /** Records how the task stopped working; the user has not seen how its turn ended yet. */
   endTurn: async (id: string, end: Pick<Task, 'status' | 'last_error' | 'asking' | 'closing_line'>) => {
-    await sql`UPDATE task SET status = ${end.status}, last_error = ${end.last_error}, unseen = true,
-      asking = ${end.asking}, closing_line = ${end.closing_line}, updated_at = ${now()} WHERE id = ${id}`
+    await sql`UPDATE task SET status = ${end.status}, last_error = ${end.last_error}, unseen = true, asking = ${end.asking},
+      closing_line = ${end.closing_line}, turn_ended_at = ${now()}, updated_at = ${now()} WHERE id = ${id}`
   },
   /** Sets why the agent cannot go on without the user, or clears it; true when that changed it. */
   setBlocked: async (id: string, reason: string | null): Promise<boolean> => {

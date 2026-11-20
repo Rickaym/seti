@@ -22,7 +22,7 @@ import { audit } from './audit.js'
 import { inBackground } from './background.js'
 import { capabilityCache } from './capabilities.js'
 import { tasks, toMessage } from './db.js'
-import { refuseAgent } from './ea-guard.js'
+import { refuseAgent, refuseOnSelf } from './ea-guard.js'
 import { HttpError } from './http.js'
 import { endSession, isRunning, publish, sessionState } from './runner.js'
 import { shellTurnGuard } from './shell-context.js'
@@ -176,6 +176,7 @@ async function auditArchived(report: ArchiveReport, options: ArchiveOptions): Pr
  * worktree when nothing would be lost. Refuses a task that is working.
  */
 export async function archiveTask(taskId: string, options: ArchiveOptions): Promise<ArchiveReport> {
+  refuseOnSelf(taskId, 'archive')
   const started = performance.now()
   const task = await requireTask(taskId)
   if (task.archived_at !== null) {

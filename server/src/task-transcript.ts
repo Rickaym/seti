@@ -4,6 +4,7 @@ import { auditTask } from './audit.js'
 import { messages } from './db.js'
 import { buildDigest } from './digest.js'
 import { hideDirect } from './direct-privacy.js'
+import { refuseOnSelf } from './ea-guard.js'
 import { openQuerySince, stopTurn } from './runner.js'
 import { subtaskBriefs } from './subtask-cache.js'
 import { requireTask } from './tasks.js'
@@ -29,6 +30,7 @@ export async function taskDigest(id: string, limit: number): Promise<TaskDigest>
 
 /** Stops the running turn; its queued messages are taken back unless they are to be delivered. */
 export async function stopTask(id: string, options: { deliverQueued?: boolean } = {}): Promise<Task> {
+  refuseOnSelf(id, 'stop')
   await stopTurn(id, options)
   await auditTask('task.stopped', await requireTask(id))
   return requireTask(id)

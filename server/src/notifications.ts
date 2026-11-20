@@ -237,7 +237,6 @@ async function pushAgent(task: Task, push: AgentPush, at: number): Promise<numbe
   const event = {
     tier: 'active',
     needsYou: push.kind === 'needs_you',
-    viaEa: false,
     workspaceId: task.workspace_id,
   } as const
   if ((await routeAttention(event, at)) !== 'push') {
@@ -416,11 +415,15 @@ export async function sendTestNotification(deviceId?: string): Promise<TestNotif
 
 /**
  * Pushes an EA item the attention router sent to the phone, in its notice's own words. One about
- * an agent goes to the devices that hear about its workspace; any other goes to every device.
+ * an agent goes to the devices that hear about its workspace, and to none while the agent is
+ * muted; any other goes to every device.
  */
 export async function pushEaItem(item: EaInboxItem, at = Date.now()): Promise<number> {
   const taskId = item.task_id
   const task = taskId === null ? undefined : await tasks.get(taskId)
+  if (task?.notifications_muted === true) {
+    return 0
+  }
   const targets = task === undefined ? await pushDevices.targets() : await agentTargets(task, at)
   const payload: NotificationPayload = {
     title: item.source,

@@ -1,6 +1,6 @@
 import type { AttentionRoute, AttentionTier, EaInboxItem } from '@seti/shared'
 import { audienceOf, type Audience } from './notify-scope.js'
-import { callLive, lastPresent, pageFocused } from './presence.js'
+import { lastPresent, pageFocused } from './presence.js'
 import { agentWaits } from './store/agent-waits.js'
 import { eaWatches } from './store/inbox.js'
 import { notificationSettings, pushDevices } from './store/notifications.js'
@@ -23,29 +23,20 @@ export interface AttentionEvent {
   tier: AttentionTier
   /** An agent waits on the user; such an event is urgent whatever its tier. */
   needsYou?: boolean
-  /** The EA's inbox carries it, so a live call can speak it and Seti raises its toast. */
-  viaEa: boolean
-  /** The EA takes it on a live call; an item Seti posts while no call runs passes false. */
-  callable?: boolean
   /** The workspace of the agent it is about, so only devices that hear about it carry it. */
   workspaceId?: string
 }
 
 const anyPushDevice = async (hears: Audience) => (await pushDevices.list()).some((device) => hears(device.device_id))
 
-/** The surface a tier uses while the user is here: the call, else a focused page that hears it. */
-function hereRoute(event: AttentionEvent, at: number, hears: Audience): AttentionRoute | null {
-  if (event.viaEa && event.callable !== false && callLive(at)) {
-    return 'call'
-  }
-  return pageFocused(at, hears) ? 'toast' : null
-}
-
 /**
- * The one surface that carries the event. Needs-you is always urgent and never capped; below
- * urgent, a burst past BURST_CAP pushes in BURST_WINDOW_MS of one absence waits for the brief.
- * Away with no push device, the event waits for the brief. An event about an agent counts only
- * the devices that hear about its workspace.
+ * The one surface that carries the event: a toast on a focused page that hears it, else a push.
+ * Needs-you is always urgent and never capped, and an urgent event nobody can see as a toast is
+ * pushed even when the urgent tier is set to toast. Below urgent, a burst past BURST_CAP pushes
+ * in BURST_WINDOW_MS of one absence waits for the brief. With no push device that hears it, the
+ * event waits for the brief. An event about an agent counts only the devices that hear about
+ * its workspace, so a device kept to another workspace stays quiet. A live call is the EA's own
+ * choice when it delivers an item by voice, never the router's.
  */
 export async function routeAttention(event: AttentionEvent, at = Date.now()): Promise<AttentionRoute> {
   const tier: AttentionTier = event.needsYou === true ? 'urgent' : event.tier
@@ -57,11 +48,14 @@ export async function routeAttention(event: AttentionEvent, at = Date.now()): Pr
     return 'digest'
   }
   const hears = await audienceOf(event.workspaceId ?? null)
-  const route = hereRoute(event, at, hears) ?? (surface === 'push' && (await anyPushDevice(hears)) ? 'push' : 'digest')
-  if (route === 'push') {
-    pushes.push(at)
+  if (pageFocused(at, hears)) {
+    return 'toast'
   }
-  return route
+  if ((surface !== 'push' && tier !== 'urgent') || !(await anyPushDevice(hears))) {
+    return 'digest'
+  }
+  pushes.push(at)
+  return 'push'
 }
 
 /** Watch events that only record a link; the EA knows them, nothing shows. */

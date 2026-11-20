@@ -14,7 +14,7 @@ import { needsYouTasks } from './needs-you-count.js'
 import { notifyBody } from './notifications.js'
 import { onReturn } from './presence.js'
 import { eaInbox } from './store/inbox.js'
-import { notificationSettings } from './store/notifications.js'
+import { notificationSettings, turnEndedSince } from './store/notifications.js'
 
 const NEEDS_YOU_LISTED = 5
 const CHANGED_LISTED = 6
@@ -62,18 +62,27 @@ interface Changed {
   updates: AttentionBriefLine[]
 }
 
-/** Agents whose turn ended since the user left, and EA items about anything else, newest first. */
+/**
+ * Agents whose turn ended since the user left, and EA items about anything else, newest first. A
+ * muted agent has no line of either kind.
+ */
 async function changedSince(since: string, skip: ReadonlySet<string>, tiers: AttentionTiers): Promise<Changed> {
-  const [list, carried, items] = await Promise.all([tasks.list(), eaTaskIds(), eaInbox.briefed(since, ITEMS_SCAN)])
+  const [list, carried, items, ended] = await Promise.all([
+    tasks.list(),
+    eaTaskIds(),
+    eaInbox.briefed(since, ITEMS_SCAN),
+    turnEndedSince(since),
+  ])
   const watched = new Set(carried)
+  const muted = new Set(list.filter((task) => task.notifications_muted).map((task) => task.id))
   const finished = list
-    .filter((task) => !skip.has(task.id) && !task.notifications_muted && task.updated_at > since)
+    .filter((task) => !skip.has(task.id) && !muted.has(task.id) && ended.has(task.id))
     .filter((task) => task.status === 'idle' && tiers[watched.has(task.id) ? 'digest' : 'active'] !== 'off')
     .map((task) => agentLine(task, task.closing_line ?? NO_CLOSING_LINE))
   const listed = new Set([...skip, ...finished.flatMap((line) => (line.task_id === null ? [] : [line.task_id]))])
   const updates: AttentionBriefLine[] = []
   for (const item of items) {
-    if (item.task_id === null || !listed.has(item.task_id)) {
+    if (item.task_id === null || (!listed.has(item.task_id) && !muted.has(item.task_id))) {
       updates.push(itemLine(item))
       if (item.task_id !== null) {
         listed.add(item.task_id)

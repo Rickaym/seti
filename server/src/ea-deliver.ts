@@ -1,11 +1,18 @@
 import type { AttentionRoute, EaInboxDelivered, EaInboxItem, EaInboxVia } from '@seti/shared'
 import { audit } from './audit.js'
-import { routeAttention, tierOfItem } from './ea-attention.js'
+import { tasks } from './db.js'
+import { routeAttention, tierOfItem, type AttentionEvent } from './ea-attention.js'
 import { noticeText } from './ea-inbox.js'
 import { pushEaItem } from './notifications.js'
 import { eaInbox } from './store/inbox.js'
 
 const SWEEP_BATCH = 50
+
+/** An item as the router reads it, with the workspace of the agent it is about. */
+async function eventOf(item: EaInboxItem): Promise<AttentionEvent> {
+  const workspaceId = item.task_id === null ? undefined : (await tasks.get(item.task_id))?.workspace_id
+  return workspaceId === undefined ? { tier: tierOfItem(item) } : { tier: tierOfItem(item), workspaceId }
+}
 
 /**
  * Gives each delivered item its one surface. Spoken on a call, the call carried it. Otherwise the
@@ -20,8 +27,7 @@ async function routeDelivered(
 ): Promise<EaInboxItem[]> {
   const routes = new Map<number, AttentionRoute>()
   for (const item of items) {
-    const event = { tier: tierOfItem(item), viaEa: true, callable: false }
-    routes.set(item.id, via === 'voice' ? 'call' : await routeAttention(event, at.getTime()))
+    routes.set(item.id, via === 'voice' ? 'call' : await routeAttention(await eventOf(item), at.getTime()))
   }
   const told = new Set(notify)
   const toast = items.filter((item) => routes.get(item.id) === 'toast' && (via === 'seti' || told.has(item.id)))

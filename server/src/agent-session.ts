@@ -241,8 +241,8 @@ export class LiveSession {
   }
 
   /** Starts the quiet clock again, as when the user answered what the session waited on. */
-  restartQuiet(): void {
-    this.heardAt = Date.now()
+  restartQuiet(at = Date.now()): void {
+    this.heardAt = at
   }
 
   /** Notes a message of the session: work it reports, or Claude Code retrying the API. */

@@ -62,6 +62,7 @@ const POSTGRES_ONLY: Readonly<Record<string, readonly string[]>> = {
     'closing_line',
     'model_fallback',
     'home_access',
+    'turn_ended_at',
   ],
   task_context_pack: ['linked'],
   ea_settings: ['join_on_open', 'form_of_address', 'language'],
@@ -261,12 +262,13 @@ export async function resetSequences(source: DatabaseSync, tx: Db): Promise<void
 }
 
 /**
- * Fills what follows from imported rows: the task worktrees, and home access, which every agent
- * from before private sandboxes keeps.
+ * Fills what follows from imported rows: the task worktrees, home access, which every agent from
+ * before private sandboxes keeps, and when each agent's last turn ended.
  */
 export async function deriveRows(tx: Db): Promise<void> {
   await tx.unsafe(TASK_WORKTREE_BACKFILL)
   await tx`UPDATE task SET home_access = TRUE`
+  await tx`UPDATE task SET turn_ended_at = updated_at WHERE status <> 'running'`
 }
 
 /** Row counts of every table; the import refuses a target that holds any rows. */

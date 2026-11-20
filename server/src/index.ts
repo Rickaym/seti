@@ -31,6 +31,7 @@ import { openDatabase, tasks } from './db.js'
 import { followLiveContext } from './ea-context.js'
 import { startInboxSweeper } from './ea-deliver.js'
 import { startEaIndex } from './ea-index.js'
+import { watchInterrupted } from './ea-turn-watch.js'
 import { importAgentTokenFile } from './github-token.js'
 import { wakeWaiting } from './inputs.js'
 import { startKnowledgeSweep } from './knowledge.js'
@@ -201,6 +202,7 @@ await modHost.start()
 await watchDevMods()
 startModUpdates()
 notifyInterrupted(interrupted.notify)
+watchInterrupted(interrupted.notify)
 await rearmAskingReminders()
 await startEaIndex()
 if (PLANNER_MODULE !== '') {

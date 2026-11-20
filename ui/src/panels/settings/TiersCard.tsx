@@ -55,9 +55,13 @@ const SURFACES: Record<TierSurface, { label: string; icon: LucideIcon; hint: str
   push: {
     label: 'Push',
     icon: BellRing,
-    hint: 'A phone push while you are away, a toast while Seti has focus, the EA call while one is live',
+    hint: 'A phone push while you are away, a toast while Seti has focus',
   },
-  toast: { label: 'Toast', icon: MessageSquare, hint: 'Only a toast while Seti has focus; otherwise the brief' },
+  toast: {
+    label: 'Toast',
+    icon: MessageSquare,
+    hint: 'A toast while Seti has focus; otherwise the brief, or a push when urgent',
+  },
   brief: { label: 'Brief', icon: Newspaper, hint: 'Only the brief when you come back' },
   off: { label: 'Off', icon: BellOff, hint: 'The EA knows; nothing shows' },
 }

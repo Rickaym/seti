@@ -1082,9 +1082,10 @@ runs the recorded call or leaves it, and replies in the chat.
 
 Every event that could reach the user goes through `routeAttention` in
 `server/src/ea-attention.ts`, which picks exactly one surface: a phone push, a toast on a page with
-focus, the live EA call, the brief, or nothing beyond the EA's own history. It decides from the
-event's tier, the user's surface for that tier, whether a call is live, whether any Seti page has
-focus (`server/src/presence.ts`), and how many pushes went out since the user was last here.
+focus, the brief, or nothing beyond the EA's own history. It decides from the event's tier, the
+user's surface for that tier, whether any Seti page has focus (`server/src/presence.ts`), and how
+many pushes went out since the user was last here. The live EA call is a surface too, but the EA
+picks it, not the router: an item the EA speaks on a call is recorded as carried by the call.
 
 | Tier    | What lands there                                                                                                       | Default |
 | ------- | ---------------------------------------------------------------------------------------------------------------------- | ------- |
@@ -1094,14 +1095,16 @@ focus (`server/src/presence.ts`), and how many pushes went out since the user wa
 | passive | what only informs the EA, such as a linked PR                                                                          | off     |
 
 A tier set to push reaches a page with focus as a toast while one has focus, and the phone
-otherwise; with no push device it waits for the brief. Toast never pushes, so while nobody looks it
-waits for the brief too. The router does not pick the live call today: both of its callers rule
-the call out, and an item reaches a call only when the EA itself delivers it by voice, which
-skips the tier's surface and the push count. Needs-you is always urgent, and urgent offers only
-push and toast, so it is never switched off or set to the brief; it still waits for the brief when
-urgent is set to toast and no page has focus, or when no push device hears about the agent's
-workspace. An agent the EA watches whose turn a restart cut off or the user stopped reaches the EA
-as an ordinary watch event, in the digest tier. Below urgent,
+otherwise; with no push device it waits for the brief. Below urgent, toast never pushes, so while
+nobody looks it waits for the brief too. Needs-you is always urgent, and urgent offers only push
+and toast, so it always reaches the user: with urgent set to toast and no page in focus, it goes
+to the phone as a push instead of waiting. One case stays quiet on purpose. A device set to
+"Active workspace only" gets no push and no toast for an agent in another workspace, needs-you
+included, and the router sends nothing to a device like that as a fallback; the workspace
+switcher and the Needs you count show the agent. With no device that hears about the agent at
+all, the event waits for the brief. Asking the EA to watch an agent never lowers the tier of its
+events: a watched agent that a restart cut off reaches the EA as an urgent item, as a failed turn
+does, and startup tells the EA about each one it did not resume. Below urgent,
 more than five pushes in ten minutes of one absence wait for the brief; coming back starts the
 count over. The tiers live in `notification_settings.tiers`, and Settings, Notifications has one
 select per tier. The EA and agents change them through `set_notifications`, and every change is
@@ -1120,11 +1123,13 @@ Away means no Seti page with focus and no live EA call for five minutes (`AWAY_M
 `shared/src/attention.ts`). Every visible page reports its focus every 20 seconds, and the EA
 polls its inbox with `call=1` during a call, so the server knows when the user comes back. The
 first report after an absence builds one brief (`server/src/attention-brief.ts`): the agents that
-need the user now, each with its reason line, then one line per idle agent that changed since the
+need the user now, each with its reason line, then one line per agent whose turn ended since the
 user left, quoting its `closing_line`, then one line per pushed or digest inbox item about
-anything else, quoting the notice's own title. Muted agents and tiers set to off are left out of
-the agents' own lines; an inbox item about a muted agent is still listed. The brief lists at most
-eleven lines and counts the rest. A brief still waiting when the user
+anything else, quoting the notice's own title. Seti keeps the time each turn ended
+(`task.turn_ended_at`), so a rename or a pin does not list an agent as changed. Muted agents and
+tiers set to off are left out: a muted agent has no line of its own and none from the EA's inbox,
+and the EA's item about it is not pushed. The brief lists at most eleven lines and counts the
+rest. A brief still waiting when the user
 leaves again grows to cover both absences; Seti keeps it in memory only.
 
 Pages show the brief as one toast that stays until dismissed, with the unseen plain EA messages
@@ -1210,13 +1215,13 @@ that holds an agent up without ending its turn sets `task.blocked`, which
 `server/src/task-blocked.ts` keeps. It shows as the `blocked` status, which stays in Needs you
 while the agent is open, until it clears:
 
-| Stall                                                                                        | Reason line                                                              | Clears when                                 |
-| -------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ | ------------------------------------------- |
-| A tool call no rule allows, or ExitPlanMode                                                  | `Asks to use Bash: make deploy`, `Asks to approve its plan`              | the user answers, or the turn stops         |
-| An AskUserQuestion call                                                                      | `Asks 2 questions: Which checks should I run first?`                     | the user settles them, or the turn stops    |
-| A change the agent asked for with `request_change`                                           | `Asks for access to api.example.com:443`                                 | the user answers it, or it expires in a day |
-| An MCP server's sign-in tool                                                                 | `Sign in to the linear MCP server in Seti`                               | a sign-in finishes, or the next turn starts |
-| A running turn with no message for 20 minutes, not counting time a permission request waited | `No output for 20 min while running`, or the API error it keeps retrying | the session speaks again, or the turn ends  |
+| Stall                                                                                         | Reason line                                                              | Clears when                                 |
+| --------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ | ------------------------------------------- |
+| A tool call no rule allows, or ExitPlanMode                                                   | `Asks to use Bash: make deploy`, `Asks to approve its plan`              | the user answers, or the turn stops         |
+| An AskUserQuestion call                                                                       | `Asks 2 questions: Which checks should I run first?`                     | the user settles them, or the turn stops    |
+| A change the agent asked for with `request_change`                                            | `Asks for access to api.example.com:443`                                 | the user answers it, or it expires in a day |
+| An MCP server's sign-in tool                                                                  | `Sign in to the linear MCP server in Seti`                               | a sign-in finishes, or the next turn starts |
+| A running turn with no message for 20 minutes, not counting time a request waited on the user | `No output for 20 min while running`, or the API error it keeps retrying | the session speaks again, or the turn ends  |
 
 A permission request outranks open questions, which outrank a change request, which outranks the reason startup stopped resuming an agent after restarts, which outranks a stall; the watchdog (`server/src/stall-watch.ts`) checks the
 open sessions once a minute.
@@ -1309,9 +1314,12 @@ switch does not raise it. What the user looks at on purpose keeps every workspac
 count in the status bar and on the app icon, and the workspace switcher, which shows how many
 agents need the user in the other workspaces and in each one. The per-agent mute and the tiers
 apply first. The setting is per device, in Settings, Notifications, on by default and audited;
-the workspace report is view state like a focus report and is not. The phone widgets and the EA
-are not scoped: a widget signs in with its paired device key, which Seti cannot match to a
-browser's device id, and the EA speaks for the whole install.
+the workspace report is view state like a focus report and is not. The EA's inbox items about an
+agent follow the same rule: `server/src/ea-deliver.ts` routes each one with its agent's workspace,
+and a page raises no toast for one whose agent is in a workspace it is not notified about; the
+notice stays in the EA chat. The phone widgets, the EA's own replies and its live call are not
+scoped: a widget signs in with its paired device key, which Seti cannot match to a browser's
+device id, and the EA speaks for the whole install.
 
 ## An open tab reloads once when a deploy replaced its build
 

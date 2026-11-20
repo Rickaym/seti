@@ -1,5 +1,6 @@
 import type { Task } from '@seti/shared'
 import { auditTask } from './audit.js'
+import { refuseOnSelf } from './ea-guard.js'
 import { HttpError } from './http.js'
 import {
   appendMessage,
@@ -31,6 +32,7 @@ export async function restartPreface(taskId: string): Promise<TurnPreface | null
  * first.
  */
 export async function restartSession(task: Task, input: { interrupt: boolean }): Promise<void> {
+  refuseOnSelf(task.id, 'restart')
   const interrupted = isRunning(task.id)
   if (interrupted && !input.interrupt) {
     throw new HttpError(409, 'The agent is working. Stop its turn and restart, or wait until it finishes.')

@@ -79,7 +79,7 @@ export function lastPresent(): number {
   return presentAt
 }
 
-export function callLive(at = Date.now()): boolean {
+function callLive(at = Date.now()): boolean {
   return callAt !== null && at - callAt <= CALL_TTL_MS
 }
 

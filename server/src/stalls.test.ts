@@ -7,6 +7,7 @@ import { noteSignedIn } from './mcp-session-status.js'
 import { answerPermission } from './permission-rules.js'
 import { endSession, liveSessions, runTurn, stopTurn } from './runner.js'
 import { checkSilentSessions, SILENT_MS, silentReason } from './stall-watch.js'
+import { questions } from './store/questions.js'
 import { refreshBlocked, setStall } from './task-blocked.js'
 import { subscribe } from './task-events.js'
 import { waitIdle } from './wait-idle.js'
@@ -145,6 +146,40 @@ describe('stalls', () => {
     unsubscribe()
     const silent = events.filter((event) => event.type === 'blocked' && event.blocked?.startsWith('No output') === true)
     expect(silent).toEqual([])
+  })
+
+  it.each([
+    { name: 'while a question is open', settle: false, later: SILENT_MS + 60_000, silent: false },
+    { name: 'for the time a settled question waited', settle: true, later: SILENT_MS - 60_000, silent: false },
+    { name: 'again once a settled question is that long past', settle: true, later: SILENT_MS + 60_000, silent: true },
+  ] as const)('count silence $name: $silent', async ({ settle, later, silent }) => {
+    const id = await newTask()
+    await runTurn(id, 'hold')
+    const [asked] = await questions.open([
+      {
+        id: `question-${id}`,
+        group_id: `group-${id}-${String(later)}`,
+        task_id: id,
+        subagent_id: null,
+        tool_use_id: `toolu-${id}`,
+        position: 0,
+        header: 'Checks',
+        prompt: 'Which checks should I run first?',
+        kind: 'choice',
+        multi: false,
+        options: [{ label: 'Unit', description: '' }],
+      },
+    ])
+    const seen = Date.now() + SILENT_MS + 60_000
+    await checkSilentSessions(seen)
+    expect((await blockedOf(id))?.startsWith('No output') ?? false).toBe(false)
+    if (settle && asked !== undefined) {
+      await questions.dismiss(asked.id, 'user')
+    }
+    await checkSilentSessions(seen + later)
+    expect((await blockedOf(id))?.startsWith('No output') ?? false).toBe(silent)
+    await stopTurn(id)
+    await checkSilentSessions()
   })
 
   it('turn an MCP sign-in the agent asks for into a reason the user sees, until a sign-in', async () => {

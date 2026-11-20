@@ -1,7 +1,7 @@
 import { test } from './support/fixtures.js'
 import { FAKE_CLAUDE_ENV } from './support/processes.js'
 import { mockPushManager, PUSH_ENV, startPushService, type PushService } from './support/push.js'
-import { clearScenario, keepsToTheOpenWorkspace } from './support/workspace-notify.js'
+import { clearScenario, eaKeepsToTheOpenWorkspace, keepsToTheOpenWorkspace } from './support/workspace-notify.js'
 
 test.use({ serverEnv: { ...FAKE_CLAUDE_ENV, ...PUSH_ENV }, failureToasts: true })
 
@@ -22,4 +22,9 @@ test.afterEach(async ({ request }) => {
 test('a device hears only about its open workspace until the setting is off', async ({ page, request }) => {
   test.setTimeout(120_000)
   agents = await keepsToTheOpenWorkspace(page, request, service)
+})
+
+test("the EA's item about an agent follows the device's open workspace too", async ({ page, request }) => {
+  test.setTimeout(120_000)
+  agents = await eaKeepsToTheOpenWorkspace(page, request)
 })

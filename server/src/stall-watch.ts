@@ -1,6 +1,7 @@
 import { inBackground } from './background.js'
 import { liveSessions } from './runner.js'
 import { permissionRequests } from './store/permissions.js'
+import { questions } from './store/questions.js'
 import { setStall, stalledBy } from './task-blocked.js'
 import { onAnyTaskEvent } from './task-events.js'
 
@@ -28,11 +29,21 @@ export function silentReason(session: Watched, now: number, limit = SILENT_MS): 
     : `Claude API failing for ${minutes(quiet)}: ${session.retrying.replaceAll('_', ' ')}`
 }
 
-/** Marks each running session that went quiet too long, and clears the ones that spoke since. */
+/** Whether the agent waits on the user's answer to a permission request or a question. */
+const waitsOnAnswer = async (taskId: string): Promise<boolean> =>
+  (await permissionRequests.pending(taskId)).length > 0 || (await questions.openList(taskId)).length > 0
+
+/**
+ * Marks each running session that went quiet too long, and clears the ones that spoke since. Time
+ * a session waits on the user's answer is not silence, so its quiet clock starts over meanwhile.
+ */
 export async function checkSilentSessions(now = Date.now(), limit = SILENT_MS): Promise<void> {
   const live = new Map(liveSessions())
   for (const [taskId, session] of live) {
-    const waiting = (await permissionRequests.pending(taskId)).length > 0
+    const waiting = await waitsOnAnswer(taskId)
+    if (waiting) {
+      session.restartQuiet(now)
+    }
     await setStall(taskId, 'silent', waiting ? null : silentReason(session, now, limit))
   }
   for (const taskId of stalledBy('silent').filter((id) => !live.has(id))) {

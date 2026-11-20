@@ -173,3 +173,9 @@ export const TASK_HOME_ACCESS = `
 ALTER TABLE task ADD COLUMN home_access BOOLEAN NOT NULL DEFAULT TRUE;
 ALTER TABLE task ALTER COLUMN home_access SET DEFAULT FALSE;
 `
+
+/** When an agent's last turn ended, apart from updated_at, which a rename or a pin also moves. */
+export const TASK_TURN_ENDED_AT = `
+ALTER TABLE task ADD COLUMN turn_ended_at TEXT;
+UPDATE task SET turn_ended_at = updated_at WHERE status <> 'running';
+`

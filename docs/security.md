@@ -116,8 +116,9 @@ private key off the host. The sandbox model is in [Architecture](architecture.md
   title, colour, pin, update mode, PRs, packs, role, group chat handle and channel
   subscriptions). Full gives the EA's Seti actions. At no level do they change access,
   sandbox, credentials, connections, SSH, memory or CPU caps or Seti control of any agent; Full
-  never stops, archives or restarts the calling agent, and starts agents with at most the
-  caller's access and Seti control Self.
+  never stops, archives, deletes, rewinds, restarts or retries the calling agent, which the
+  functions behind those tools refuse as well (`refuseOnSelf` in `server/src/ea-guard.ts`), and
+  starts agents with at most the caller's access and Seti control Self.
 - Self is enforced per call, not only by the tool list. Each call checks the level the agent has
   then and refuses a tool beyond it; Self tools take no argument naming an agent, so Seti fills in
   the caller; a reference to another agent is refused without saying which agents exist; and the

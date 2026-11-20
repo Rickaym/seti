@@ -14,11 +14,11 @@ import { tasks } from './db.js'
 import { resetAttention } from './ea-attention.js'
 import { browser, decrypt, subscription, type Browser } from './fake-push.js'
 import { needsYouCount } from './needs-you-count.js'
-import { notifyAgent } from './notifications.js'
+import { notifyAgent, pushEaItem } from './notifications.js'
 import { FOCUS_TTL_MS, recordFocus, resetPresence } from './presence.js'
 import { secret } from './secrets.js'
 import { auditEvents } from './store/audit.js'
-import { eaWatches } from './store/inbox.js'
+import { eaInbox, eaWatches } from './store/inbox.js'
 import { secretRows } from './store/secrets.js'
 import { USER_AUTH } from './test-auth.js'
 import { waitIdle } from './wait-idle.js'
@@ -356,6 +356,30 @@ describe('turn notifications', () => {
     expect(claims.aud).toBe('https://web.push.apple.com')
     expect(String(claims.sub).startsWith('https://') || String(claims.sub).startsWith('mailto:')).toBe(true)
     expect(Number(claims.exp) - Date.now() / 1000).toBeLessThanOrEqual(24 * 60 * 60)
+  })
+
+  it.each([
+    { name: 'an agent that is not muted', muted: false, sent: 1 },
+    { name: 'a muted agent', muted: true, sent: 0 },
+  ] as const)("push the EA's item about $name to $sent device", async ({ muted, sent }) => {
+    await subscribe(browser())
+    const task = await newTask()
+    await send('PATCH', `/tasks/${task.id}`, { notifications_muted: muted })
+    const at = new Date().toISOString()
+    const item = await eaInbox.add({
+      kind: 'watch_event',
+      event: 'needs_you',
+      title: `${task.title} is waiting on you`,
+      body: '',
+      url: null,
+      severity: 'warning',
+      source: task.title,
+      task_id: task.id,
+      urgent: true,
+      due_at: at,
+      created_at: at,
+    })
+    expect(await pushEaItem(item)).toBe(sent)
   })
 
   it('leave an agent the EA watches to its inbox item, so one event surfaces once', async () => {

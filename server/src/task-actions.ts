@@ -21,7 +21,7 @@ import { auditMessage, auditTask } from './audit.js'
 import { sendKey, sendOnce } from './client-sends.js'
 import { messages, tasks } from './db.js'
 import { retryLastPrompt } from './dropped-prompt.js'
-import { refuseOtherAgent, refusePromptAsUser } from './ea-guard.js'
+import { refuseOnSelf, refuseOtherAgent, refusePromptAsUser } from './ea-guard.js'
 import { HttpError } from './http.js'
 import { setInputMode } from './inputs.js'
 import { slashRefusal } from './mods/commands.js'
@@ -146,6 +146,7 @@ async function deliverMessage(id: string, input: z.output<typeof sendMessageInpu
  */
 export async function retryTask(id: string): Promise<Task> {
   refuseOtherAgent(id)
+  refuseOnSelf(id, 'retry the turn of')
   const { prompt, outcome } = await retryLastPrompt(id)
   await auditMessage(await requireTask(id), prompt, outcome, { retry: true })
   return requireTask(id)
@@ -157,6 +158,7 @@ export async function retryTask(id: string): Promise<Task> {
  */
 export async function switchBackModel(id: string): Promise<Task> {
   refuseOtherAgent(id)
+  refuseOnSelf(id, 'switch back the model of')
   const fallback = (await requireTask(id)).model_fallback
   if (fallback === null || !switchableModel(fallback.original_model)) {
     throw new HttpError(409, 'The agent is not on a fallback model')
@@ -180,6 +182,7 @@ export async function takeBackQueued(task: Task, messageId: number): Promise<Tas
 
 /** Ends the task's session with the subagents and commands still running after its turn. */
 export async function endTaskSession(id: string): Promise<Task> {
+  refuseOnSelf(id, 'end the background work of')
   if (!sessionState(id).open) {
     throw new HttpError(409, 'The agent has no open session')
   }
@@ -230,6 +233,7 @@ export async function stopSubtask(id: string, toolUseId: string): Promise<Subtas
 
 /** Deletes the task with its transcript, worktrees and session. */
 export async function deleteTask(task: Task): Promise<void> {
+  refuseOnSelf(task.id, 'delete')
   await endSession(task.id)
   endAgentTerminals(task.id, 'deleted')
   closeAgentChats(task.id)

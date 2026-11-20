@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { dismissBrief, useAttention } from '@/hooks/useAttention'
 import { useNotifications } from '@/hooks/useNotifications'
+import { useNotifyScope } from '@/hooks/useNotifyScope'
 import { navigate } from '@/lib/route'
 import { BriefToast } from './BriefToast'
 import { useEaCall } from './call-context'
@@ -239,7 +240,8 @@ function useSettledNow(wait: number | null): number {
 
 /**
  * Toasts that stay until dismissed for EA messages the user has not seen and for the brief that
- * waits after an absence, while no EA call runs. Dismissing one marks it seen on every device.
+ * waits after an absence, while no EA call runs. Dismissing one marks it seen on every device. A
+ * notice about an agent in a workspace this device is not notified about stays in the EA chat.
  */
 export function EaReplyToasts() {
   const { data, lastOk } = useEaReplies()
@@ -249,10 +251,11 @@ export function EaReplyToasts() {
   const chatShown = useEaChatShown()
   const polledAt = lastOk ?? 0
   const now = Math.max(useSettledNow(nextSettle(data, polledAt)), polledAt)
+  const { hears } = useNotifyScope()
   const toasts = tierToasts(settings, 'active')
   const items = useMemo(
-    () => replyToasts({ page: data, brief, calling, chatShown, toasts, now }),
-    [data, brief, calling, chatShown, toasts, now],
+    () => replyToasts({ page: data, brief, calling, chatShown, toasts, hears, now }),
+    [data, brief, calling, chatShown, toasts, hears, now],
   )
   const shown = useRef(new Set<string>())
   const closing = useRef(new Set<string>())
