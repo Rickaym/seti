@@ -17,13 +17,35 @@ export const taskConnections = async (task: Task): Promise<ConnectionRow[]> => c
 export const connectionEnv = (rows: readonly ConnectionRow[]): Record<string, string> =>
   Object.fromEntries(rows.map((row) => [row.env, row.placeholder]))
 
+/** Where a connection's value comes from: its key or a minted token, and a renewal of the token. */
+export interface ConnectionSource {
+  value: (row: ConnectionRow) => Promise<string | null>
+  /** A fresh token for a minted connection after `refused` was refused; null for a key. */
+  renew: (row: ConnectionRow, refused: string) => Promise<string | null>
+}
+
+/** Values read from the secret store, and tokens minted and renewed by `minter`. */
+export const storedConnections = (minter = tokenMinter): ConnectionSource => ({
+  value: async (row) => {
+    const plan = minterOf(row)
+    return plan === null ? connectionValue(row) : (await minter.token(row.id, plan)).token
+  },
+  renew: async (row, refused) => {
+    const plan = minterOf(row)
+    return plan === null ? null : (await minter.renew(row.id, plan, refused)).token
+  },
+})
+
 /** The connections as the egress proxy swaps them, reading each value when a request needs it. */
-export const connectionPlaceholders = (rows: readonly ConnectionRow[]): EgressPlaceholder[] =>
+export const connectionPlaceholders = (
+  rows: readonly ConnectionRow[],
+  value: ConnectionSource['value'] = connectionValue,
+): EgressPlaceholder[] =>
   rows.map((row) => ({
     name: row.name,
     placeholder: row.placeholder,
     hosts: row.hosts,
-    value: async () => connectionValue(row),
+    value: async () => value(row),
   }))
 
 const safe = (value: string | null) => (value === null || value === '' || HEADER_UNSAFE.test(value) ? null : value)
@@ -38,30 +60,36 @@ function tokenOf(template: string, value: string): string {
 export function connectionRule(
   row: ConnectionRow,
   header: NonNullable<ConnectionRow['header']>,
-  minter = tokenMinter,
+  source: ConnectionSource = storedConnections(),
 ): EgressRule {
   const fill = (value: string | null) => {
     const checked = safe(value)
     return checked === null ? null : header.template.replaceAll(VALUE_PLACEHOLDER, checked)
   }
-  const plan = minterOf(row)
   const base = { hosts: row.hosts, port: HTTPS_PORT, header: header.name.toLowerCase() }
-  if (plan === null) {
-    return { ...base, value: async () => fill(await connectionValue(row)) }
+  const value = async () => fill(await source.value(row))
+  if (minterOf(row) === null) {
+    return { ...base, value }
   }
   return {
     ...base,
-    value: async () => fill((await minter.token(row.id, plan)).token),
-    renew: async (_url, refused) => fill((await minter.renew(row.id, plan, tokenOf(header.template, refused))).token),
+    value,
+    renew: async (_url, refused) => fill(await source.renew(row, tokenOf(header.template, refused))),
   }
 }
 
 /** The headers of the task's connections, which its session's proxy applies first. */
-export const connectionRules = (rows: readonly ConnectionRow[]): EgressRule[] =>
-  rows.flatMap((row) => (row.header === null || row.hosts.length === 0 ? [] : [connectionRule(row, row.header)]))
+export const connectionRules = (rows: readonly ConnectionRow[], source?: ConnectionSource): EgressRule[] =>
+  rows.flatMap((row) =>
+    row.header === null || row.hosts.length === 0 ? [] : [connectionRule(row, row.header, source)],
+  )
 
 /** A request that carried connection placeholders toward a host their connections do not allow. */
-export async function auditBlockedKey(task: Task, host: string, names: readonly string[]): Promise<void> {
+export async function auditBlockedKey(
+  task: Pick<Task, 'id' | 'title'>,
+  host: string,
+  names: readonly string[],
+): Promise<void> {
   await audit
     .record({
       actor: 'agent',

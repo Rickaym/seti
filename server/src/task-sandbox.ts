@@ -5,36 +5,23 @@ import os from 'node:os'
 import path from 'node:path'
 import {
   AWS_CREDENTIALS_PATH,
-  AWS_SETTINGS_DEFAULT,
   DEFAULT_PROFILE_ID,
   extraDirs,
-  type AwsSettings,
   type MemoryCap,
   type SandboxPolicy,
   type Task,
 } from '@seti/shared'
-import { taskSsh } from './agent-access.js'
-import { taskAws } from './aws-access.js'
-import { awsBroker } from './aws-credentials.js'
 import { findBinary } from './binaries.js'
-import { claudeCredential, CONNECTOR_SCOPE, connectorCredential } from './claude-credential.js'
-import { hostLoginKey } from './claude-logins.js'
+import { CONNECTOR_SCOPE } from './claude-credential.js'
 import { CLAUDE_HOME, SCRATCH_ROOT, SETI_HOME, WORKTREE_ROOT } from './config.js'
-import {
-  auditBlockedKey,
-  connectionEnv,
-  connectionPlaceholders,
-  connectionRules,
-  taskConnections,
-} from './connection-egress.js'
+import { connectionEnv, connectionPlaceholders, connectionRules } from './connection-egress.js'
 import type { EgressPlaceholder } from './egress-placeholders.js'
 import { startEgressProxy, type EgressProxy } from './egress-proxy.js'
 import { ruleCaHosts, ruleCovers, type EgressRule } from './egress-rules.js'
-import { agentToken, agentTokenStamp, tokenOwner } from './github-token.js'
-import { taskBorrowedServers } from './mcp-borrowed.js'
-import { connectorIds, taskDeniedServers } from './mcp-selection.js'
+import { tokenOwner } from './github-token.js'
 import { launch, type ScopePlan } from './memory-scope.js'
 import { memoryEnv } from './node-heap.js'
+import type { SandboxAccess, SandboxFact, SandboxSetup } from './sandbox-access.js'
 import { loadSandboxCa, type SandboxCa } from './sandbox-ca.js'
 import { sandboxClaudeJson } from './sandbox-claude-json.js'
 import { gitEnv } from './sandbox-git.js'
@@ -58,9 +45,7 @@ import {
 } from './sandbox-mounts.js'
 import { homeExcluded, type SandboxContext, sandboxHiddenPaths } from './sandbox.js'
 import { SSH_AGENT_SOCKET, stopSshAgent } from './ssh-agent.js'
-import { hostKeys, prepareSandboxSsh } from './ssh-files.js'
-import { allowedFor } from './store/change-requests.js'
-import { profiles } from './store/credentials.js'
+import { prepareSandboxSsh } from './ssh-files.js'
 import { mcpLoginRules } from './task-credentials.js'
 import { toolShellEnv, writeToolShell } from './tool-shell.js'
 import { workspaceDir } from './workspace/dir.js'
@@ -214,7 +199,7 @@ interface SessionAccess {
   login: string | null
 }
 
-const access = new Map<string, SessionAccess>()
+const sessions = new Map<string, SessionAccess>()
 const NO_ACCESS: SessionAccess = {
   profileId: DEFAULT_PROFILE_ID,
   rules: [],
@@ -222,11 +207,7 @@ const NO_ACCESS: SessionAccess = {
   deniedConnectors: new Set(),
   login: null,
 }
-const accessOf = (taskId: string) => access.get(taskId) ?? NO_ACCESS
-
-async function profileAws(profileId: string): Promise<AwsSettings> {
-  return (await profiles.get(profileId))?.aws ?? AWS_SETTINGS_DEFAULT
-}
+const accessOf = (taskId: string) => sessions.get(taskId) ?? NO_ACCESS
 
 /** The task's AWS container authorization token, the same for its proxy and its processes. */
 function awsToken(taskId: string): string {
@@ -243,7 +224,7 @@ const taskDir = (taskId: string) => path.join(SANDBOX_ROOT, taskId)
 /** The host directory a task's sandbox sees as /tmp. */
 export const sandboxTmpDir = (taskId: string) => path.join(taskDir(taskId), 'tmp')
 
-async function taskProxy(task: Task, authority: SandboxCa): Promise<EgressProxy> {
+async function taskProxy(task: Task, authority: SandboxCa, access: SandboxAccess): Promise<EgressProxy> {
   const taskId = task.id
   const existing = proxies.get(taskId)
   if (existing !== undefined) {
@@ -252,29 +233,35 @@ async function taskProxy(task: Task, authority: SandboxCa): Promise<EgressProxy>
   const refused = new Set<string>()
   const started = startEgressProxy({
     socketPath: path.join(taskDir(taskId), 'run', 'proxy.sock'),
-    allowed: async () => allowedFor(taskId),
+    allowed: async () => access.allowedHosts(taskId),
     ca: authority,
     credentials: {
-      claude: async () => (await claudeCredential(accessOf(taskId).login))?.token ?? null,
-      github: async (owner) => agentToken(accessOf(taskId).profileId, owner ?? tokenOwner(task)),
-      connector: async () => Promise.resolve(connectorCredential()),
+      claude: async () => access.claudeToken(accessOf(taskId).login),
+      github: async (owner) => access.githubToken(accessOf(taskId).profileId, owner ?? tokenOwner(task)),
+      connector: async () => access.connectorToken(),
     },
     rules: () => accessOf(taskId).rules,
     placeholders: () => accessOf(taskId).placeholders,
     onBlocked: (host, names) => {
-      void auditBlockedKey(task, host, names)
+      const fact: SandboxFact = {
+        kind: 'key_blocked',
+        task: { id: taskId, title: task.title },
+        host,
+        names: [...names],
+      }
+      access.report(fact).catch(() => undefined)
     },
     connectorAllowed: (id) => !accessOf(taskId).deniedConnectors.has(id),
-    ssh: async (target) => (await taskSsh(taskId)).firstHops.includes(target),
+    ssh: async (target) => (await access.sshFirstHops(taskId)).includes(target),
     aws: {
-      enabled: async () => taskAws(taskId),
+      enabled: async () => access.awsEnabled(taskId),
       token: awsToken(taskId),
-      credentials: async () => awsBroker.credentials(await profileAws(accessOf(taskId).profileId)),
+      credentials: async () => access.awsCredentials(accessOf(taskId).profileId),
     },
     onRefused: (host) => {
       if (!refused.has(host)) {
         refused.add(host)
-        process.stderr.write(`sandbox: task ${taskId} was refused ${host}\n`)
+        access.report({ kind: 'host_refused', taskId, host }).catch(() => undefined)
       }
     },
   })
@@ -288,7 +275,7 @@ export async function removeTaskSandbox(taskId: string): Promise<void> {
   const proxy = proxies.get(taskId)
   proxies.delete(taskId)
   awsTokens.delete(taskId)
-  access.delete(taskId)
+  sessions.delete(taskId)
   await proxy?.then(async (running) => running.close()).catch(() => undefined)
   await stopSshAgent(taskId)
   fs.rmSync(taskDir(taskId), { recursive: true, force: true })
@@ -332,17 +319,26 @@ export interface SandboxRequest {
   readOnly?: readonly string[]
   /** The memory cap that holds the task's process trees, when the host enforces one. */
   memory?: MemoryCap | null
+  /** Where the sandbox and its proxy read Seti's records and secrets. */
+  access: SandboxAccess
+}
+
+/** Where a task's ssh files go, and the socat that bridges its ssh to the proxy. */
+interface SshPlace {
+  taskDir: string
+  home: string
+  socat: string
 }
 
 /** The task's ssh files and agent for its usable hosts; none, and no agent, without any. */
-async function sandboxSsh(taskId: string, dir: string, home: string, socat: string) {
-  const reach = await taskSsh(taskId)
-  if (reach.usable.length === 0) {
+async function sandboxSsh(taskId: string, files: SandboxSetup['ssh'], place: SshPlace, access: SandboxAccess) {
+  if (files === null) {
     await stopSshAgent(taskId)
     return null
   }
-  const keys = async () => hostKeys((await taskSsh(taskId)).hosts)
-  return prepareSandboxSsh({ taskId, taskDir: dir, home, proxy: { socat, port: PROXY_PORT }, reach, keys })
+  const keys = async () => access.sshKeys(taskId)
+  const proxy = { socat: place.socat, port: PROXY_PORT }
+  return prepareSandboxSsh({ taskId, taskDir: place.taskDir, home: place.home, proxy, files, keys })
 }
 
 function prepareDirs(dir: string): void {
@@ -392,36 +388,36 @@ export async function taskSandbox(task: Task, request: SandboxRequest): Promise<
   prepareDirs(dir)
   fs.mkdirSync(workspaceDir(task.id), { recursive: true, mode: 0o700 })
   const projects = [task.cwd, checkoutOf(task.cwd, layout) ?? task.cwd]
-  const denied = new Set(await taskDeniedServers(task.id))
-  const connections = await taskConnections(task)
-  const headerRules = connectionRules(connections)
+  const { access } = request
+  const setup = await access.setup(task)
+  const { connections } = setup
+  const denied = new Set(setup.deniedServers)
+  const headerRules = connectionRules(connections, { value: access.connectionValue, renew: access.renewConnection })
   const rules = [...headerRules, ...mcpLoginRules(denied)]
-  access.set(task.id, {
+  sessions.set(task.id, {
     profileId: task.profile_id,
     rules,
-    placeholders: connectionPlaceholders(connections),
-    deniedConnectors: new Set(connectorIds([...denied])),
-    login: hostLoginKey(),
+    placeholders: connectionPlaceholders(connections, access.connectionValue),
+    deniedConnectors: new Set(setup.deniedConnectors),
+    login: setup.login,
   })
   sandboxClaudeJson(hostClaudeJson(), path.join(dir, 'home', '.claude.json'), {
     signedIn: signedInServers(),
     projects: [...new Set(projects)],
     denied,
     covered: (host) => headerRules.some((rule) => ruleCovers(rule, host, 443)),
-    borrowed: await taskBorrowedServers(task),
+    borrowed: setup.borrowedServers,
   })
   forgetSandboxSignIns(path.join(dir, 'home', '.claude'), proxiedServers(mcpTokens, denied))
   const authority = await sandboxCa()
   await authority.cover([...mcpHosts(), ...ruleCaHosts([...rules, ...connections])])
-  await taskProxy(task, authority)
-  const ssh = await sandboxSsh(task.id, dir, ctx.home, socat)
+  await taskProxy(task, authority, access)
+  const ssh = await sandboxSsh(task.id, setup.ssh, { taskDir: dir, home: ctx.home, socat }, access)
   const ready = { ...layout, caDir: authority.publicDir, systemBundle: authority.systemBundle, ssh }
   const env = sandboxEnv(process.env, ctx.home, {
-    github: (await agentTokenStamp(task.profile_id)) !== null,
-    connectors: connectorCredential() !== null,
-    aws: (await taskAws(task.id))
-      ? { token: awsToken(task.id), region: (await profileAws(task.profile_id)).region }
-      : null,
+    github: setup.github,
+    connectors: setup.connectors,
+    aws: setup.aws === null ? null : { token: awsToken(task.id), region: setup.aws.region },
     ssh: ssh !== null,
     memory: request.memory ?? null,
     connections: connectionEnv(connections),

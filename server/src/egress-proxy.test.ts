@@ -9,7 +9,7 @@ import tls from 'node:tls'
 import { AWS_CREDENTIALS_PATH, mintSettingsInput } from '@seti/shared'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import type { ContainerCredentials } from './aws-credentials.js'
-import { connectionRule } from './connection-egress.js'
+import { connectionRule, storedConnections } from './connection-egress.js'
 import type { EgressAws } from './egress-aws.js'
 import {
   ANTHROPIC_HOST,
@@ -567,7 +567,7 @@ describe('egress proxy', () => {
         updated_at: '',
       },
       header,
-      minter,
+      storedConnections(minter),
     )
     const running = await proxy(async () => Promise.resolve([]), both, [rule])
     const seen = await throughTunnel(running.socketPath, 'minted.rules.test', {}, '/strict')

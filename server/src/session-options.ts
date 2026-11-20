@@ -1,5 +1,6 @@
 import type { Options } from '@anthropic-ai/claude-agent-sdk'
 import type { Task } from '@seti/shared'
+import { inProcessSandboxAccess } from './sandbox-access.js'
 import { inProcessDecisions } from './session-decisions.js'
 import { realiseSpec, sandboxOf, scopeOf } from './session-realise.js'
 import { sandboxSpec, sessionSpec, taskCaps } from './session-spec.js'
@@ -12,7 +13,7 @@ export async function sandboxFor(task: Task): Promise<TaskSandbox | null> {
     return null
   }
   const scope = await scopeOf(task.id, await taskCaps(task.id))
-  return sandboxOf(task, spec, scope?.cap ?? null)
+  return sandboxOf(task, spec, scope?.cap ?? null, inProcessSandboxAccess)
 }
 
 /** The options a task's Claude Code process starts with, resuming the task's session if any. */

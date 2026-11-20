@@ -14,6 +14,7 @@ import { COMMAND_LIMIT_HOURS, subagentRules } from './house-rules.js'
 import { launch, scopeHost, type ScopePlan } from './memory-scope.js'
 import { memoryEnv } from './node-heap.js'
 import { bashGuard, type GuardScope } from './permission-guard.js'
+import type { SandboxAccess } from './sandbox-access.js'
 import { GUARDED_HOME, sandboxContext } from './sandbox-context.js'
 import { setiHomePaths } from './sandbox.js'
 import type { SessionDecisions } from './session-decisions.js'
@@ -64,10 +65,10 @@ export async function scopeOf(taskId: string, caps: SessionSpec['caps']): Promis
 }
 
 /** Prepares the task's sandbox from its spec, or null when it runs without one. */
-export async function sandboxOf(task: Task, spec: SandboxSpec | null, memory: MemoryCap | null) {
+export async function sandboxOf(task: Task, spec: SandboxSpec | null, memory: MemoryCap | null, access: SandboxAccess) {
   return spec === null
     ? null
-    : taskSandbox(task, { ctx: sandboxContext(), policy: spec.policy, readOnly: spec.readOnly, memory })
+    : taskSandbox(task, { ctx: sandboxContext(), policy: spec.policy, readOnly: spec.readOnly, memory, access })
 }
 
 const hasPipes = (child: ChildProcess): child is ChildProcess & { stdin: Writable; stdout: Readable } =>
@@ -152,7 +153,7 @@ function sessionHooks(
 async function placement(spec: SessionSpec, session: AbortSignal, decisions: SessionDecisions) {
   const { task } = spec
   const scope = await scopeOf(task.id, spec.caps)
-  const sandbox = await sandboxOf(task, spec.sandbox, scope?.cap ?? null)
+  const sandbox = await sandboxOf(task, spec.sandbox, scope?.cap ?? null, decisions.sandbox)
   const hooks = sessionHooks(task, sandbox !== null, session, decisions)
   if (sandbox === null) {
     return {

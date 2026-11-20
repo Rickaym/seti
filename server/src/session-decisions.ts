@@ -6,6 +6,7 @@ import { guardRefuses, type GuardScope } from './permission-guard.js'
 import { canUseToolFor } from './permission-requests.js'
 import { repeatHooks } from './repeat-hooks.js'
 import { reviewHook } from './review-hooks.js'
+import { inProcessSandboxAccess, type SandboxAccess } from './sandbox-access.js'
 import { sandboxHooks } from './sandbox.js'
 import { redactSecrets } from './scrub.js'
 import { permissionSettings } from './session-spec.js'
@@ -23,6 +24,8 @@ export interface SessionDecisions {
   compact: (taskId: string) => HookCallbackMatcher
   /** Servers that answer inside Seti, such as the seti tools, keyed by name. */
   servers: (task: Task) => Record<string, McpServerConfig>
+  /** What the task's sandbox and its egress proxy read from Seti's records and secrets. */
+  sandbox: SandboxAccess
 }
 
 /**
@@ -68,4 +71,5 @@ export const inProcessDecisions: SessionDecisions = {
   compact: compactHook,
   servers: (task) =>
     Object.assign({}, ...sessionMcpFactories.map((factory) => factory(task))) as Record<string, McpServerConfig>,
+  sandbox: inProcessSandboxAccess,
 }
