@@ -2,6 +2,7 @@ import type { APIRequestContext } from '@playwright/test'
 import type { AgentProcesses, MemoryCapSettings, TaskMemoryCap } from '@seti/shared'
 import { openAgentSettings } from './support/agent-settings.js'
 import { apiData, expect, test, toasts } from './support/fixtures.js'
+import { HOSTS, expectExplanationWraps, expectWholeValue, memoryCard, onHost } from './support/memory-cap.js'
 import { FAKE_CLAUDE_ENV, startShellAgent } from './support/processes.js'
 
 test.use({ serverEnv: FAKE_CLAUDE_ENV })
@@ -27,7 +28,7 @@ test('the resources page sets the memory cap of every agent and goes back to the
   await expect(throttle).toHaveCount(0)
 
   await card.getByRole('button', { name: 'Soft cap' }).click()
-  await expect(throttle).toHaveValue(String(Math.round((gb * 200) / 3) / 100))
+  await expectWholeValue(throttle, String(Math.floor((gb * 4) / 3) / 2))
   await throttle.fill(String(gb + 1))
   await card.getByRole('button', { name: 'Save' }).click()
   await expect(toasts(page).filter({ hasText: 'cannot be above the RAM cap' })).toBeVisible()
@@ -47,6 +48,44 @@ test('the resources page sets the memory cap of every agent and goes back to the
     .toEqual(saved.defaults)
 })
 
+for (const host of HOSTS) {
+  test(`the memory cap card keeps its description beside the fields and saves on ${host.name}`, async ({
+    page,
+    request,
+  }) => {
+    const { defaults } = await apiData<MemoryCapSettings>(request, '/resources/memory')
+    await onHost(page, host.defaults)
+    await page.goto('/#settings/resources')
+    const card = memoryCard(page)
+    const gb = String(host.defaults.max_mb / 1024)
+    await expect(card).toContainText(`Defaults: ${gb} GB RAM, 1 GB swap`)
+    await expectWholeValue(card.getByRole('spinbutton', { name: 'RAM cap' }), gb)
+    await expect(card.getByRole('button', { name: 'Defaults' })).toBeDisabled()
+    await expect(card.getByRole('button', { name: 'Save' })).toBeDisabled()
+
+    await card.getByRole('button', { name: 'Soft cap' }).click()
+    const soft = card.getByRole('spinbutton', { name: 'Soft cap' })
+    await expectWholeValue(soft, host.softGb)
+    await expectExplanationWraps(card)
+    for (const width of [1440, 1024]) {
+      await page.setViewportSize({ width, height: 900 })
+      const described = await card.getByText(/^Each agent, with everything/).boundingBox()
+      const whole = await card.boundingBox()
+      expect(described?.width ?? 0, `description at ${String(width)} px`).toBeGreaterThan((whole?.width ?? 0) / 4)
+      expect(await card.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true)
+    }
+
+    await expect(card.getByRole('button', { name: 'Defaults' })).toBeEnabled()
+    await card.getByRole('button', { name: 'Save' }).click()
+    await expect(toasts(page).filter({ hasText: 'Memory cap saved' })).toBeVisible()
+    expect((await apiData<MemoryCapSettings>(request, '/resources/memory')).cap).toEqual({
+      ...host.defaults,
+      high_mb: Number(host.softGb) * 1024,
+    })
+    expect((await request.put('/api/resources/memory', { data: defaults })).ok()).toBe(true)
+  })
+}
+
 test('an agent gets a memory cap of its own from its settings, at once, and the default back', async ({
   page,
   request,
@@ -60,6 +99,9 @@ test('an agent gets a memory cap of its own from its settings, at once, and the 
   await expect(details).toContainText(enforced ? byDefault : `${byDefault}, not enforced here`)
 
   await details.getByRole('button', { name: 'Change memory cap' }).click()
+  await details.getByRole('button', { name: 'Soft cap' }).click()
+  await expectExplanationWraps(details)
+  await details.getByRole('button', { name: 'Soft cap' }).click()
   await details.getByRole('spinbutton', { name: 'RAM cap' }).fill('2')
   await details.getByRole('button', { name: 'Save' }).click()
   await expect(details).toContainText('2 GB (own)')

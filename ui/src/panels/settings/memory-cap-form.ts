@@ -11,11 +11,22 @@ export interface MemoryCapForm {
 const gb = (mb: number) => String(Math.round((mb / 1024) * 100) / 100)
 const mb = (text: string) => Math.round(Number(text) * 1024)
 
+/** The size fields step in half GB; a value off that grid shows as invalid. */
+export const STEP_GB = 0.5
+const STEP_MB = STEP_GB * 1024
+const MIN_MB = 256
+
+/** The soft cap the toggle starts at: two thirds of the RAM cap, down to a half GB step. */
+function suggestedHigh(maxMb: number): number {
+  const stepped = Math.floor((maxMb * 2) / 3 / STEP_MB) * STEP_MB
+  return stepped >= MIN_MB ? stepped : maxMb
+}
+
 export const toMemoryForm = (cap: MemoryCap): MemoryCapForm => ({
   max: gb(cap.max_mb),
   swap: gb(cap.swap_max_mb),
   throttle: throttles(cap),
-  high: gb(throttles(cap) ? cap.high_mb : Math.round((cap.max_mb * 2) / 3)),
+  high: gb(throttles(cap) ? cap.high_mb : suggestedHigh(cap.max_mb)),
 })
 
 export function parseMemoryForm(form: MemoryCapForm): { cap: MemoryCap } | { error: string } {
