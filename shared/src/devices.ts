@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-/** Device pairing and proofs for the native app; docs/security.md describes the protocol. */
+/** Device pairing and proofs for the native app; API-11 in docs/protocol.md specifies them. */
 export const DEVICE_PAIR_PATH = '/api/devices/pair'
 export const WIDGET_SUMMARY_PATH = '/api/widget/summary'
 export const PAIR_PAGE_PATH = '/pair'

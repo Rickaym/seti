@@ -4,7 +4,7 @@ const USAGE = `Usage:
   secrets unseal-channels
       Writes webhook secrets back in the clear, for rolling Seti back to a version before the
       secret store. Needs the secret-key credential, so run it under systemd-run; see
-      docs/security.md.
+      docs/security.md, Rolling back past the secret store.
 `
 
 async function main(): Promise<void> {

@@ -159,10 +159,10 @@ they are.
 - `ea/`: the Executive Assistant, a Python process (pipecat) that acts only through Seti's API.
 - `e2e/`: the Playwright suite. `android/`: the Kotlin app with widgets. `deploy/`: systemd units,
   the health check and the demo's container. `scripts/`: installer, upgrade and repo checks.
-- `docs/`: [setup](docs/setup.md), [architecture](docs/architecture.md),
-  [security](docs/security.md), [pollers](docs/pollers.md), [mods](docs/mods.md) and the
-  [public demo](docs/demo.md); [protocol](docs/protocol.md) specifies Seti's behaviour as
-  numbered requirements.
+- `docs/`: the [protocol](docs/protocol.md), which specifies Seti's behaviour as numbered
+  requirements; [setup](docs/setup.md) for installing and operating it; [mods](docs/mods.md) for
+  extending it; [implementation](docs/implementation.md), which maps the protocol to the code;
+  [security](docs/security.md) for operator security policy; and the [public demo](docs/demo.md).
 
 ## Recipes
 
@@ -245,7 +245,7 @@ shares or publishes anything; `parity.test.ts` fails on such names.
    no network and caps its memory, CPU time, output and run time. Never spawn a converter directly.
    A failed run falls back to the source or the download with a message.
 5. Test with fixtures in `share-preview/converters.test.ts` or `text-previews.test.ts`, extend the
-   `share-previews` e2e specs, and add the type to the share links section of `docs/security.md`.
+   `share-previews` e2e specs.
 
 ## Security review
 
@@ -269,7 +269,8 @@ in the PR's "Security model" section when the change adds surface.
   adds them. Logs, transcripts and audit details carry no values (`server/src/scrub.ts`).
 - Is every change audited with its actor?
 - Does a served page set the security headers, run no script and drop cookies?
-- Does `docs/security.md` say what changed?
+- Does `docs/protocol.md` state the new rule, and does `docs/security.md` say what an operator
+  must now know?
 
 Report a vulnerability through GitHub's private vulnerability reporting on
 [rickaym/seti](https://github.com/rickaym/seti), never in a public issue.
@@ -299,8 +300,10 @@ Report a vulnerability through GitHub's private vulnerability reporting on
 
 ## Docs and writing
 
-Docs record what the code does not make obvious: decisions, limits, security boundaries and setup.
-Update them in the PR that changes the behaviour. Write prose first, in plain declarative English
+Docs record what the code does not make obvious. `docs/protocol.md` is the one description of
+Seti's behaviour: a PR that changes behaviour updates its requirements, adding a new id rather than
+reusing one. The other docs cover only installing, operating and extending Seti and how the code
+implements the protocol; they link a requirement instead of restating it. Write prose first, in plain declarative English
 and the present tense, with the answer or outcome in the first sentence. Use a table only to
 compare things and a list only for separate items; give a long doc a TLDR. Name real files,
 commands and settings, and refer to a settings page by its area rather than its exact path.
