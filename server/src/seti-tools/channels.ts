@@ -24,6 +24,7 @@ import {
 } from './reminders.js'
 import { done, setiTool, ToolRefusal, type SetiTool } from './tool.js'
 import { upcomingView } from './upcoming.js'
+import { changeFilter, filterArgs, filterSample, hasFilterArgs, testWebhookFilter } from './webhook-filter.js'
 import { deliveryView, webhookView } from './webhook-view.js'
 import {
   createChannel,
@@ -201,18 +202,22 @@ const updateInput = {
   cron: reminderCron,
   timezone: reminderTimezone,
   active: z.boolean().optional().describe('Reminders only: false pauses it, true resumes it.'),
+  ...filterArgs,
 }
 
 const updateChannelTool = setiTool({
   name: 'update_channel',
   description:
     "Rename a webhook or reminder, subscribe or unsubscribe the EA's inbox, replace a generic webhook's " +
-    "field mapping, or change a reminder's script, interval or cron schedule and pause or resume it. Pollers change with " +
-    'update_poller.',
+    "field mapping, set, switch or remove a webhook's filter code, or change a reminder's script, interval " +
+    'or cron schedule and pause or resume it. Pollers change with update_poller.',
   input: updateInput,
   run: async (args) => {
     const found = await findChannel(args.channel)
     if (found.source === 'reminder') {
+      if (hasFilterArgs(args)) {
+        throw new ToolRefusal('Only webhooks take a filter.')
+      }
       return updateReminderChannel(found, args)
     }
     const info = await findWebhook(args.channel)
@@ -229,7 +234,8 @@ const updateChannelTool = setiTool({
     if (Object.keys(change).length > 0) {
       await updateChannel(info.id, channelUpdateInput.parse(change))
     }
-    if (!(await toggleEa(info, args.subscribe_ea)) && Object.keys(change).length === 0) {
+    const filtered = hasFilterArgs(args) && (await changeFilter(info, args))
+    if (!(await toggleEa(info, args.subscribe_ea)) && Object.keys(change).length === 0 && !filtered) {
       throw new ToolRefusal(`That changes nothing in the webhook ${info.name}.`)
     }
     return webhookView(await webhooks.info(info.id))
@@ -256,21 +262,24 @@ const testChannelScript = setiTool({
   name: 'test_channel_script',
   description:
     'Run a poller or reminder script once without storing or delivering anything, and see what it returns, ' +
-    'its log and any error: a draft script, a saved poller or reminder, or a new script for a saved one.',
+    'its log and any error: a draft script, a saved poller or reminder, or a new script for a saved one. For a webhook, run ' +
+    'its filter, or a draft filter, against its recent deliveries and an optional sample, and see what it keeps, ' +
+    'changes or drops.',
   input: {
-    script: z.string().min(1).optional().describe('The script to try; without a channel, give kind too.'),
+    script: z.string().min(1).optional().describe('The script or filter to try; without a channel, give kind too.'),
     channel: z
       .string()
       .trim()
       .min(1)
       .optional()
-      .describe('A saved poller or reminder to test, or whose settings to use.'),
+      .describe('A saved poller or reminder to test, or whose settings to use; or a webhook whose filter to test.'),
     kind: z.enum(['poller', 'reminder']).optional().describe('What a draft script is for, without a channel.'),
+    sample: filterSample,
   },
-  run: async ({ script, channel, kind }) => {
+  run: async ({ script, channel, kind, sample }) => {
     const saved = channel === undefined ? null : await findChannel(channel)
     if (saved?.source === 'webhook') {
-      throw new ToolRefusal(`${saved.name} is a webhook: send it a sample with test_channel.`)
+      return testWebhookFilter(saved, script, sample)
     }
     const source = saved?.source ?? kind
     if (source === 'reminder') {

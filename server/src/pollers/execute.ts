@@ -2,7 +2,8 @@ import { POLLER_LIMITS, type PollerSettings } from '@seti/shared'
 import { redactSecrets } from '../scrub.js'
 import { redactValues } from './fetch.js'
 import type { ReadOutput } from './items.js'
-import { PoolClosedError, type PollerPool } from './pool.js'
+import type { PollerPool } from './pool.js'
+import { PoolClosedError } from '../quickjs/pool.js'
 
 export interface ExecuteDeps {
   /** The sandbox allowlist, which every poller may reach besides its own extra hosts. */
