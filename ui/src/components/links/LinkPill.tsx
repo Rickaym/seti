@@ -22,8 +22,8 @@ const TOOLTIP_LIMIT = 400
 
 const PILL = [
   'inline-flex max-w-full items-center gap-1 align-bottom',
-  'border border-border bg-muted/60 px-1.5 text-[0.9em] leading-normal text-foreground no-underline',
-  'hover:border-primary/50 hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring',
+  'border border-primary/25 bg-primary/5 px-1.5 text-[0.9em] leading-normal text-primary no-underline',
+  'hover:border-primary/60 hover:bg-primary/10 focus-visible:outline-2 focus-visible:outline-ring',
 ].join(' ')
 
 function Pill({ href, info, children }: { href: string; info: LinkLabel; children: ReactNode }) {
@@ -37,7 +37,7 @@ function Pill({ href, info, children }: { href: string; info: LinkLabel; childre
         data-link-pill={info.service}
         data-link-url={href}
       >
-        <ServiceIcon icon={info.icon} fallback={GLYPHS[info.glyph]} className="size-[1.1em] text-muted-foreground" />
+        <ServiceIcon icon={info.icon} fallback={GLYPHS[info.glyph]} className="size-[1.1em]" />
         <span className="min-w-0 truncate">{children}</span>
       </a>
     </Hint>
