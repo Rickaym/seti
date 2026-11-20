@@ -1,7 +1,7 @@
 import { normalizeEventKind, WEBHOOK_FILTER_LIMITS, type DeliveryFilter, type WebhookFilterChange } from '@seti/shared'
 import { redactCredentials, scrubInput } from '../scrub.js'
 import type { FilterEventInput } from './filter-protocol.js'
-import { filterInput, runFilter, type FilterPool, type FilterVerdict } from './filter-run.js'
+import { filterInput, runFilter, type FilterPool } from './filter-run.js'
 import { clip } from './publish.js'
 import type { EventFields } from './types.js'
 import { webhookFilterStore } from '../store/webhook-filters.js'
@@ -43,16 +43,17 @@ function changed(fields: EventFields, change: WebhookFilterChange): EventFields 
   }
 }
 
-/** Why a delivery stops at the filter: dropped by it, or failed with drop chosen on error. */
-function droppedReason(verdict: FilterVerdict, logged: DeliveryFilter): string {
-  const what = `${logged.event === '' ? 'an event with no name' : logged.event}: ${logged.title}`
-  const reason = verdict.outcome === 'failed' ? `filter failed, dropped: ${verdict.error}` : `filtered out ${what}`
-  return clip(reason, REASON_MAX)
+/** Why a delivery stops at the filter, for the delivery log. */
+function droppedReason(logged: DeliveryFilter): string {
+  return clip(
+    `filtered out ${logged.event === '' ? 'an event with no name' : logged.event}: ${logged.title}`,
+    REASON_MAX,
+  )
 }
 
 /**
  * Runs the channel's filter on a delivery's event, counts what it did and says whether the
- * delivery goes on. A filter that fails keeps the delivery unless its webhook chose drop.
+ * delivery goes on. A filter that fails keeps the delivery unchanged.
  */
 export async function applyFilter(subject: FilterSubject, at: string, workers?: FilterPool): Promise<Filtered> {
   const { fields } = subject
@@ -68,11 +69,10 @@ export async function applyFilter(subject: FilterSubject, at: string, workers?: 
   await webhookFilterStore.record(subject.channel, verdict.outcome, error, at)
   const title = clip(redactCredentials(fields.title), TITLE_MAX)
   const filter: DeliveryFilter = { outcome: verdict.outcome, event, title, error }
-  const drops = verdict.outcome === 'dropped' || (verdict.outcome === 'failed' && saved.on_error === 'drop')
   return {
     fields: verdict.outcome === 'changed' ? changed(fields, verdict.change) : fields,
     filter,
-    dropped: drops ? droppedReason(verdict, filter) : null,
+    dropped: verdict.outcome === 'dropped' ? droppedReason(filter) : null,
     sample,
   }
 }

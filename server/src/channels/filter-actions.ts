@@ -19,7 +19,7 @@ function summaryOf(name: string, before: WebhookFilterRecord | null, after: Webh
   if (before?.script !== after.script) {
     return `Set the filter of the webhook ${name} to ${String(lines(after.script))} lines of code, ${state}`
   }
-  return `Changed the filter of the webhook ${name}: ${state}, on error ${after.on_error}`
+  return `Turned the filter of the webhook ${name} ${state}`
 }
 
 /** Starts a filter worker ahead of the first delivery when any webhook has a filter on. */
@@ -38,8 +38,7 @@ export function warmFilters(): void {
 
 type Saved = WebhookFilterRecord | null
 
-const sameFilter = (a: Saved, b: Saved) =>
-  a?.script === b?.script && a?.enabled === b?.enabled && a?.on_error === b?.on_error
+const sameFilter = (a: Saved, b: Saved) => a?.script === b?.script && a?.enabled === b?.enabled
 
 const auditDetail = (name: string, before: Saved, after: Saved) => ({
   channel: name,
@@ -47,7 +46,6 @@ const auditDetail = (name: string, before: Saved, after: Saved) => ({
   previous_code: before === null ? null : codeHash(before.script),
   lines: after === null ? 0 : lines(after.script),
   enabled: after?.enabled ?? false,
-  on_error: after?.on_error ?? null,
 })
 
 /**

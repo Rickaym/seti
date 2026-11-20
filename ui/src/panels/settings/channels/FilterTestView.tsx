@@ -4,7 +4,7 @@ import { cn } from '@/lib/utils'
 
 const FILTER_TONE: Record<WebhookFilterOutcome, string> = {
   kept: 'text-success',
-  changed: 'text-info',
+  changed: 'text-primary',
   dropped: 'text-muted-foreground',
   failed: 'text-destructive',
 }

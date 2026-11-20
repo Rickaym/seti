@@ -108,11 +108,9 @@ describe('webhook filters', () => {
 
     await setFilter(hook.id, 'export default () => true')
     expect((await webhooks.info(hook.id)).filter).toMatchObject({ failures: 0, last_error: null })
-    await setFilter(hook.id, 'export default () => { throw new Error("x") }', { on_error: 'drop' })
-    expect(await deliver(hook, { title: 'dropped on error', type: 'alert' })).toMatchObject({
-      status: 'filtered',
-      reason: 'filter failed, dropped: Error: x (line 1)',
-    })
+    await setFilter(hook.id, 'export default () => { throw new Error("x") }')
+    expect(await deliver(hook, { title: 'kept on error', type: 'alert' })).toMatchObject({ status: 'accepted' })
+    expect((await channelStore.deliveries(hook.id, 1))[0]?.filter?.error).toBe('Error: x (line 1)')
     await setFilter(hook.id, DROP_DEPLOYS, { enabled: false })
     expect(await deliver(hook, { title: 'off', type: 'deploy' })).toMatchObject({ status: 'accepted' })
     expect((await channelStore.deliveries(hook.id, 1))[0]?.filter).toBeNull()
@@ -161,7 +159,7 @@ describe('webhook filters', () => {
     const hook = await webhook('Audited filter')
     const code = "export default (e) => e.title !== 'secret marker'"
     const saved = await setFilter(hook.id, code)
-    expect(saved.filter).toMatchObject({ script: code, enabled: true, on_error: 'keep' })
+    expect(saved.filter).toMatchObject({ script: code, enabled: true })
     const event = await auditEvents.latest('system.webhook_filter_changed')
     expect(event).toMatchObject({ subject_id: hook.id, actor: 'user' })
     expect(event?.detail).toMatchObject({ channel: 'Audited filter', enabled: true, lines: 1 })

@@ -28,7 +28,6 @@ export const deliveryView = ({ received_at, status, http_status, reason, routes,
 /** A webhook's filter with its code in full, since this is where it can be read before a change. */
 const filterView = (filter: NonNullable<WebhookChannelInfo['filter']>) => ({
   enabled: filter.enabled,
-  on_error: filter.on_error,
   last_24h: filter.day,
   failures_in_a_row: filter.failures,
   ...(filter.failures >= WEBHOOK_FILTER_LIMITS.failuresBeforeWarning

@@ -1,4 +1,4 @@
-import type { WebhookFilterInfo, WebhookFilterOnError, WebhookFilterOutcome } from '@seti/shared'
+import type { WebhookFilterInfo, WebhookFilterOutcome } from '@seti/shared'
 import { sql } from '../db.js'
 
 /** A webhook's filter as stored; the day's counts come from its hourly rows. */
@@ -7,7 +7,6 @@ export type WebhookFilterRecord = Omit<WebhookFilterInfo, 'day'>
 export interface WebhookFilterChange {
   script: string
   enabled: boolean
-  on_error: WebhookFilterOnError
 }
 
 const HOUR_MS = 60 * 60 * 1000
@@ -23,17 +22,17 @@ type DayRow = Record<WebhookFilterOutcome, number>
 /** Webhook filters, how often each ran into an error in a row, and what they did each hour. */
 export const webhookFilterStore = {
   get: async (channel: string): Promise<WebhookFilterRecord | undefined> => {
-    const [row] = await sql<WebhookFilterRecord[]>`SELECT script, enabled, on_error, failures, last_error,
+    const [row] = await sql<WebhookFilterRecord[]>`SELECT script, enabled, failures, last_error,
         last_error_at, updated_at
       FROM webhook_filter WHERE channel = ${channel}`
     return row
   },
   /** Saves the filter; new code starts with a clean failure count. */
   save: async (channel: string, change: WebhookFilterChange, at: string): Promise<void> => {
-    await sql`INSERT INTO webhook_filter (channel, script, enabled, on_error, updated_at)
-      VALUES (${channel}, ${change.script}, ${change.enabled}, ${change.on_error}, ${at})
+    await sql`INSERT INTO webhook_filter (channel, script, enabled, updated_at)
+      VALUES (${channel}, ${change.script}, ${change.enabled}, ${at})
       ON CONFLICT (channel) DO UPDATE SET script = excluded.script, enabled = excluded.enabled,
-        on_error = excluded.on_error, updated_at = excluded.updated_at,
+        updated_at = excluded.updated_at,
         failures = CASE WHEN webhook_filter.script = excluded.script THEN webhook_filter.failures ELSE 0 END,
         last_error = CASE WHEN webhook_filter.script = excluded.script THEN webhook_filter.last_error END,
         last_error_at = CASE WHEN webhook_filter.script = excluded.script THEN webhook_filter.last_error_at END`

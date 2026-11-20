@@ -21,6 +21,7 @@ import { DESTRUCTIVE_ON_INTENT } from '@/components/ui/table-action-buttons'
 import { relativeTime } from '@/lib/time'
 import { SettingRow, SettingsCard } from '../layout'
 import { Activity } from './Activity'
+import { FilterRow } from './FilterRow'
 import { MappingEditor } from './MappingEditor'
 import { SenderRow } from './SenderRow'
 import { Subscribers } from './Subscribers'
@@ -221,6 +222,7 @@ export function WebhookCard({
         </SettingRow>
       )}
       <SenderRow info={info} onChange={onChange} />
+      <FilterRow info={info} onChange={onChange} />
       <Subscribers info={info} onChange={onChange} />
       {info.preset === CORE_WEBHOOK_SOURCE && (
         <MappingEditor

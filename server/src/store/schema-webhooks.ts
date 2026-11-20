@@ -109,7 +109,6 @@ CREATE TABLE webhook_filter (
   channel TEXT PRIMARY KEY REFERENCES channel(id) ON DELETE CASCADE,
   script TEXT NOT NULL,
   enabled BOOLEAN NOT NULL,
-  on_error TEXT NOT NULL DEFAULT 'keep' CHECK (on_error IN ('keep', 'drop')),
   failures INTEGER NOT NULL DEFAULT 0,
   last_error TEXT,
   last_error_at TEXT,

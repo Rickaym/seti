@@ -1,6 +1,5 @@
 import {
   WEBHOOK_FILTER_LIMITS,
-  WEBHOOK_FILTER_ON_ERROR,
   webhookFilterInput,
   webhookFilterTestInput,
   type WebhookChannelInfo,
@@ -15,7 +14,7 @@ const FILTER_API =
   'and returns null or false to drop the delivery, true to keep it, or an object replacing any of event, ' +
   'title, link and detail. It may be async, and runs in an isolated engine with no network or files, in ' +
   `${String(WEBHOOK_FILTER_LIMITS.memoryMb)} MB and ${String(WEBHOOK_FILTER_LIMITS.timeoutMs / 1000)} s. ` +
-  'A filter that fails keeps the delivery unless on error is drop.'
+  'A filter that throws, times out or returns anything else keeps the delivery unchanged.'
 
 export const filterArgs = {
   filter: z
@@ -24,20 +23,14 @@ export const filterArgs = {
     .optional()
     .describe(`Webhooks only: the whole filter code, which turns it on; an empty string removes it. ${FILTER_API}`),
   filter_enabled: z.boolean().optional().describe("Webhooks only: false turns the webhook's filter off, true on."),
-  filter_on_error: z
-    .enum(WEBHOOK_FILTER_ON_ERROR)
-    .optional()
-    .describe('Webhooks only: what a failing filter does with the delivery; keep (the default) or drop.'),
 }
 
 export interface FilterArgs {
   filter?: string | undefined
   filter_enabled?: boolean | undefined
-  filter_on_error?: (typeof WEBHOOK_FILTER_ON_ERROR)[number] | undefined
 }
 
-export const hasFilterArgs = (args: FilterArgs) =>
-  args.filter !== undefined || args.filter_enabled !== undefined || args.filter_on_error !== undefined
+export const hasFilterArgs = (args: FilterArgs) => args.filter !== undefined || args.filter_enabled !== undefined
 
 type FilterInfo = WebhookChannelInfo['filter']
 
@@ -53,7 +46,6 @@ function nextFilter(info: WebhookChannelInfo, args: FilterArgs) {
   return webhookFilterInput.parse({
     script,
     enabled: removing ? false : (args.filter_enabled ?? turnedOn),
-    on_error: args.filter_on_error ?? current?.on_error ?? 'keep',
   })
 }
 
@@ -62,9 +54,7 @@ export async function changeFilter(info: WebhookChannelInfo, args: FilterArgs): 
   const next = nextFilter(info, args)
   const current = info.filter
   const unchanged =
-    current === null
-      ? next.script.trim() === ''
-      : current.script === next.script && current.enabled === next.enabled && current.on_error === next.on_error
+    current === null ? next.script.trim() === '' : current.script === next.script && current.enabled === next.enabled
   if (unchanged) {
     return false
   }

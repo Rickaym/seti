@@ -55,9 +55,12 @@ export const WEBHOOK_FILTER_HEADER_REFUSED = /auth|sign|token|secret|cookie|pass
 export const WEBHOOK_FILTER_OUTCOMES = ['kept', 'changed', 'dropped', 'failed'] as const
 export type WebhookFilterOutcome = (typeof WEBHOOK_FILTER_OUTCOMES)[number]
 
-/** What a failing filter does with the delivery: deliver it unchanged, or drop it. */
-export const WEBHOOK_FILTER_ON_ERROR = ['keep', 'drop'] as const
-export type WebhookFilterOnError = (typeof WEBHOOK_FILTER_ON_ERROR)[number]
+/** The code a new filter starts from: it keeps every delivery until edited. */
+export const WEBHOOK_FILTER_TEMPLATE = `export default function filter(event) {
+  // Return false to drop the delivery, true to keep it, or { title: '...' } to change it.
+  return true
+}
+`
 
 export const WEBHOOK_FILTER_API_DOC = [
   'export default function filter(event, { log }) { ... }',
@@ -74,8 +77,8 @@ export const WEBHOOK_FILTER_API_DOC = [
   '',
   `A filter runs in an isolated engine with no network, files, timers or Node, in ${String(WEBHOOK_FILTER_LIMITS.memoryMb)} MB`,
   `and ${String(WEBHOOK_FILTER_LIMITS.timeoutMs / 1000)} s.`,
-  'When it throws, times out or returns something else, the delivery goes through unchanged',
-  'unless On error is set to drop, and the delivery log says why.',
+  'When it throws, times out or returns anything else, the delivery goes through unchanged',
+  'and the delivery log says why.',
 ].join('\n')
 
 /** Saves a webhook's filter; empty code removes it. */
@@ -83,7 +86,6 @@ export const webhookFilterInput = z
   .object({
     script: z.string().max(WEBHOOK_FILTER_LIMITS.scriptMaxChars),
     enabled: z.boolean(),
-    on_error: z.enum(WEBHOOK_FILTER_ON_ERROR).default('keep'),
   })
   .refine((input) => input.script.trim() !== '' || !input.enabled, 'Write the filter function before turning it on')
 export type WebhookFilterInput = z.input<typeof webhookFilterInput>
@@ -105,7 +107,6 @@ export type WebhookFilterTestInput = z.input<typeof webhookFilterTestInput>
 export interface WebhookFilterInfo {
   script: string
   enabled: boolean
-  on_error: WebhookFilterOnError
   /** Failures in a row; the card warns from failuresBeforeWarning. */
   failures: number
   last_error: string | null
