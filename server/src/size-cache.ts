@@ -31,7 +31,7 @@ async function drain(): Promise<void> {
 }
 
 /** Queues a job unless the same one waits already; a full queue drops it until the next read. */
-export function schedule(key: string, run: () => Promise<void>): void {
+function schedule(key: string, run: () => Promise<void>): void {
   if (queued.has(key) || jobs.length >= JOBS_MAX) {
     return
   }

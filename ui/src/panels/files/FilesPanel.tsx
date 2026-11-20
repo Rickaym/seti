@@ -1,6 +1,6 @@
-import type { FileListing, FileRoot, FileSort, RecentFiles } from '@seti/shared'
-import { ArrowDownAZ, ChevronRight, Eye, FileCog, FilePlus, RefreshCw, Search, X } from 'lucide-react'
-import { useCallback, useEffect, useEffectEvent, useRef, useState } from 'react'
+import { FILES_TREE_ROOT, type FileListing, type FileRoot, type FileSort, type RecentFiles } from '@seti/shared'
+import { ArrowDownAZ, Eye, FileCog, FilePlus, RefreshCw, Search, X } from 'lucide-react'
+import { useCallback, useEffect, useEffectEvent, useRef, useState, type ComponentProps } from 'react'
 import { toast } from 'sonner'
 import { apiGet, errorText } from '@/api'
 import { Hint } from '@/components/Hint'
@@ -11,8 +11,10 @@ import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 import { mayLeave } from '@/lib/leave-guard'
 import { PANEL } from '@/lib/panels'
 import { startPolling } from '@/lib/poll-loop'
+import { Breadcrumb } from '@/panels/files/Breadcrumb'
 import { FileList, type ListedEntry } from '@/panels/files/FileList'
 import { SearchBar, SearchResults } from '@/panels/files/FileSearch'
+import { FileTree } from '@/panels/files/FileTree'
 import { FileViewer, type OpenFile } from '@/panels/files/FileViewer'
 import { NewFileForm } from '@/panels/files/NewFileForm'
 import { filesLinkUrl, filesPath, parentOf, type FileTarget } from '@/panels/files/files-api'
@@ -47,44 +49,6 @@ const fileOf = (target: FileTarget | null): OpenFile | null =>
 const byName = (a: ListedEntry, b: ListedEntry) =>
   a.name.localeCompare(b.name, 'en', { numeric: true, sensitivity: 'base' })
 
-function Breadcrumb({ root, dir, onGo }: { root: FileRoot | undefined; dir: string; onGo: (dir: string) => void }) {
-  if (root === undefined) {
-    return <span className="text-muted-foreground">Changed since the agent started</span>
-  }
-  const parts = dir === '' ? [] : dir.split('/')
-  return (
-    <nav aria-label="Folder" className="flex min-w-0 flex-wrap items-center gap-0.5">
-      <button
-        type="button"
-        className="hover:underline"
-        title={root.path}
-        onClick={() => {
-          onGo('')
-        }}
-      >
-        {root.label}
-      </button>
-      {parts.map((part, index) => {
-        const to = parts.slice(0, index + 1).join('/')
-        return (
-          <span key={to} className="flex items-center gap-0.5">
-            <ChevronRight className="size-3 text-muted-foreground" />
-            <button
-              type="button"
-              className="hover:underline"
-              onClick={() => {
-                onGo(to)
-              }}
-            >
-              {part}
-            </button>
-          </span>
-        )
-      })}
-    </nav>
-  )
-}
-
 interface Listing {
   entries: ListedEntry[] | null
   error: string | null
@@ -110,6 +74,9 @@ function useListing({ taskId, place, sort, dotfiles, setiFiles, showing }: Listi
   }, [])
 
   useEffect(() => {
+    if (place.root === FILES_TREE_ROOT) {
+      return undefined
+    }
     let live = true
     const loading =
       place.root === RECENT
@@ -136,7 +103,7 @@ function useListing({ taskId, place, sort, dotfiles, setiFiles, showing }: Listi
     }
   }, [taskId, place, sort, dotfiles, setiFiles, tick])
 
-  const browsing = showing && place.root !== RECENT
+  const browsing = showing && place.root !== RECENT && place.root !== FILES_TREE_ROOT
   useFileWatch(browsing ? { taskId, root: place.root, path: place.dir, dotfiles } : null, refresh)
   useEffect(() => {
     if (!showing || place.root !== RECENT) {
@@ -179,6 +146,32 @@ function ListBody({
   )
 }
 
+interface BrowseProps {
+  taskId: string
+  listing: Listing
+  roots: readonly FileRoot[]
+  /** The root the list shows: a root's id, the recent files or the tree. */
+  place: string
+  /** A file is open; the tree stays mounted behind it so its open folders stay open. */
+  hidden: boolean
+  tree: Pick<ComponentProps<typeof FileTree>, 'dotfiles' | 'setiFiles' | 'refreshes'>
+  onOpen: (entry: ListedEntry) => void
+}
+
+/** The tree of every root, or the recent files or one folder, under the open file if any. */
+function BrowseBody({ taskId, listing, roots, place, hidden, tree, onOpen }: BrowseProps) {
+  if (place === FILES_TREE_ROOT) {
+    return (
+      <div className={hidden ? 'hidden' : 'contents'}>
+        <FileTree taskId={taskId} roots={roots} {...tree} onOpenFile={onOpen} />
+      </div>
+    )
+  }
+  return hidden ? null : (
+    <ListBody taskId={taskId} listing={listing} roots={roots} recent={place === RECENT} onOpen={onOpen} />
+  )
+}
+
 interface FilesPanelProps {
   taskId: string
   request: FilesRequest
@@ -196,6 +189,8 @@ export function FilesPanel({ taskId, request, readOnly, onClose }: FilesPanelPro
   const [dotfiles, setDotfiles] = useState(false)
   const [setiFiles, setSetiFiles] = useState(storedShowSetiFiles)
   const [naming, setNaming] = useState(false)
+  const [refreshes, setRefreshes] = useState(0)
+  const tree = place.root === FILES_TREE_ROOT
   const listing = useListing({ taskId, place, sort, dotfiles, setiFiles, showing: open === null })
   const search = useFileSearch(taskId, { dotfiles, setiFiles })
   const [resultsShown, setResultsShown] = useState(false)
@@ -308,6 +303,7 @@ export function FilesPanel({ taskId, request, readOnly, onClose }: FilesPanelPro
           className="max-w-48 min-w-0"
         >
           <NativeSelectOption value={RECENT}>Recent</NativeSelectOption>
+          <NativeSelectOption value={FILES_TREE_ROOT}>Tree</NativeSelectOption>
           {roots.map((entry) => (
             <NativeSelectOption key={entry.id} value={entry.id} disabled={!entry.exists}>
               {entry.label}
@@ -372,7 +368,15 @@ export function FilesPanel({ taskId, request, readOnly, onClose }: FilesPanelPro
           </Hint>
         )}
         <Hint text="Refresh">
-          <Button variant="outline" size="icon-sm" aria-label="Refresh" onClick={listing.refresh}>
+          <Button
+            variant="outline"
+            size="icon-sm"
+            aria-label="Refresh"
+            onClick={() => {
+              listing.refresh()
+              setRefreshes((n) => n + 1)
+            }}
+          >
             <RefreshCw />
           </Button>
         </Hint>
@@ -395,7 +399,7 @@ export function FilesPanel({ taskId, request, readOnly, onClose }: FilesPanelPro
         </Hint>
       </div>
       <div className="shrink-0 border-b border-border px-3 py-1.5 text-xs">
-        <Breadcrumb root={root} dir={place.dir} onGo={(dir) => void go({ root: place.root, dir }, null)} />
+        <Breadcrumb root={root} tree={tree} dir={place.dir} onGo={(dir) => void go({ root: place.root, dir }, null)} />
       </div>
       {naming && (
         <NewFileForm
@@ -410,9 +414,16 @@ export function FilesPanel({ taskId, request, readOnly, onClose }: FilesPanelPro
       )}
       {showResults && <SearchResults search={search} roots={roots} onPick={pick} />}
       <div className={showResults ? 'hidden' : 'contents'}>
-        {open === null ? (
-          <ListBody taskId={taskId} listing={listing} roots={roots} recent={place.root === RECENT} onOpen={openEntry} />
-        ) : (
+        <BrowseBody
+          taskId={taskId}
+          listing={listing}
+          roots={roots}
+          place={place.root}
+          hidden={open !== null}
+          tree={{ dotfiles, setiFiles, refreshes }}
+          onOpen={openEntry}
+        />
+        {open !== null && (
           <FileViewer
             key={`${open.target.root}:${open.target.path}`}
             taskId={taskId}
