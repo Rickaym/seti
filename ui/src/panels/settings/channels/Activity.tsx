@@ -21,6 +21,7 @@ const DELIVERY_TONE: Record<ChannelDeliveryStatus, string> = {
   accepted: 'text-success',
   duplicate: 'text-muted-foreground',
   ignored: 'text-muted-foreground',
+  filtered: 'text-muted-foreground',
   rejected: 'text-destructive',
   rate_limited: 'text-warning-text',
 }
