@@ -12,7 +12,7 @@ export interface EgressRule {
   port: number
   /** Lowercase header name. */
   header: string
-  /** The header value for a request, or null to send the request without one. */
+  /** The header value for a request, or null when the rule has none for it. */
   value: (url: URL) => Promise<string | null>
   /** A fresh value after the upstream answered 401 to `refused`; absent when it cannot renew. */
   renew?: (url: URL, refused: string) => Promise<string | null>
@@ -32,20 +32,28 @@ export interface Applied {
   value: string
 }
 
-/** The headers with each matching rule's header set, first rule first, and the values it sent. */
+/**
+ * The headers with each matching rule's header set, first rule first, and the values it sent. A
+ * rule with no value for the request drops the sandbox's header, unless `keepOwn` (the host is on
+ * the task's own allowlist, so the sandbox may send its own credential there).
+ */
 export async function applyRules(
   rules: readonly EgressRule[],
   url: URL | null,
   sent: OutgoingHttpHeaders,
+  keepOwn = false,
 ): Promise<{ headers: OutgoingHttpHeaders; applied: Applied[] }> {
-  const replaced = new Set(rules.map((rule) => rule.header))
-  const headers = Object.fromEntries(Object.entries(sent).filter(([name]) => !replaced.has(name)))
+  const headers: OutgoingHttpHeaders = { ...sent }
   const applied: Applied[] = []
+  const set = new Set<string>()
   for (const rule of rules) {
-    const value = url === null || rule.header in headers ? null : await rule.value(url).catch(() => null)
+    const value = url === null || set.has(rule.header) ? null : await rule.value(url).catch(() => null)
     if (value !== null) {
       headers[rule.header] = value
+      set.add(rule.header)
       applied.push({ rule, value })
+    } else if (!keepOwn && !set.has(rule.header)) {
+      Reflect.deleteProperty(headers, rule.header)
     }
   }
   return { headers, applied }

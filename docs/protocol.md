@@ -358,7 +358,8 @@ interrupted only for that.
 - EGR-7: A header "added by the proxy" is set from its template on every request to the
   connection's hosts, first matching rule winning. The code-host token is the credential's one for
   the owner named, else its default, never another credential's; minted tokens are cached until
-  near expiry and renewed on 401.
+  near expiry and renewed on 401. When a rule has no value for a request, the agent's own header
+  passes only if the agent's allowlist names the host; otherwise it is dropped.
 - EGR-10: Cloud credentials are short-lived, from the credential's role, served by the proxy,
   never the host's own. SSH is off by default; a host is usable only with a login in the
   credential for it and every jump host, with pinned host keys and only those logins' keys.
