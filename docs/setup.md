@@ -102,19 +102,14 @@ itself. A production run never creates a secret; the installer does.
 
 ## Signing in
 
-Every API call needs a credential:
+On loopback (`seti.localhost`, `localhost`, `127.0.0.1`) the local token always works, so it is
+the way back in. On the public hostname (`SETI_PUBLIC_URL`) Seti takes a passkey session, or a
+Cloudflare Access login it verifies itself when Access guards the hostname (API-9 in
+[the protocol](protocol.md#19-client-contract)). Add passkeys in Settings, Sign-in from a browser
+that is already signed in; `pnpm setup-code` on the host prints a one-time code that enrolls the
+first passkey from anywhere.
 
-- On loopback (`seti.localhost`, `localhost`, `127.0.0.1`), the local token, as
-  `Authorization: Bearer <token>` or the session cookie the sign-in page sets, or a passkey
-  session. The local token always works on loopback, so it is the way back in.
-- On the public hostname (`SETI_PUBLIC_URL`), a passkey session, or a Cloudflare Access login that
-  Seti verifies itself when Access guards the hostname.
-
-Add passkeys in Settings, Sign-in from a browser that is already signed in. `pnpm setup-code` on
-the host prints a one-time code that enrolls the first passkey from anywhere.
-
-Only `/api/ping` and the sign-in calls answer without one. Scripts send the token with curl's `-K`,
-so it stays out of the process list:
+Scripts send the token with curl's `-K`, so it stays out of the process list:
 
 ```sh
 curl -s -K <(printf 'header = "Authorization: Bearer %s"\n' "$(cat ~/.seti/credentials/local-token-user)") \
@@ -125,28 +120,12 @@ To sign every browser out, rotate the token: see [Security](security.md#rotating
 
 ## Sharing to Seti from a phone
 
-On Android, Seti appears in other apps' share menus once it is installed, so a photo, a PDF, any
-other file, some text or a link goes to an agent with a message of your own. Install it either way:
-
-- **The app.** Install the Seti app and pair it with your server. An app installed before share
-  support needs the new release, or a new build of `android/`, before it shows in the share menu.
-- **The web app.** In Chrome, open Seti and choose Install app (or Add to Home screen). Chrome reads
-  the share target from Seti's manifest when it installs, so a web app installed earlier needs to
-  be removed and installed again.
-
-A share opens Seti's Share page. The files show as attachments you can remove, and shared text or
-a link fills the message box. Pick an agent (those that need you and the latest come first, and
-Search finds the rest) and tap Send, or tap New agent to start one with the files and message on
-the start page. Cancel discards the share. When the browser is signed out, Seti asks you to sign in
-first and keeps the share meanwhile.
-
-The share stays on the phone until you send it: the service worker keeps it in the browser's cache,
-and the Share page uploads the files through the signed-in session, as Attach does. The same limits
-apply: 25 MB a file, 20 files and 50 MB a message. Files over them stay out, and the Share page says
-which and why.
-
-iOS does not support web share targets, so Seti cannot appear in the iPhone share sheet. Save the
-file to Files and use Attach in Seti instead.
+On Android, Seti appears in other apps' share menus once the Seti app is paired, or once Seti is
+installed as a web app from Chrome (Install app); a web app installed before share support must be
+removed and installed again. A share opens Seti's Share page with the files as attachments and any
+text in the message box; pick an agent, or New agent, and Send. The share stays in the browser's
+cache on the phone until you send it, under the limits of Attach: 25 MB a file, 20 files and 50 MB
+a message. iOS has no web share targets, so on an iPhone save the file to Files and use Attach.
 
 ## Exposing Seti remotely
 
@@ -261,6 +240,7 @@ Seti would refuse.
 | `SETI_ANDROID_PACKAGE`, `SETI_ANDROID_CERT_SHA256` | unset                        | A self-built Android app to trust until Settings sets one         |
 | `SETI_CLAUDE_HOME`, `SETI_CLAUDE_BIN`              | `~/.claude`, see below       | Claude Code config, and the binary sessions run                   |
 | `SETI_SCRATCH_ROOT`                                | `~/work`                     | Where each new agent gets its own folder                          |
+| `SETI_SOURCE_DIR`                                  | the clone Seti runs from     | The checkout whose git history What's new reads                   |
 | `SETI_SESSION_IDLE_MINUTES`                        | `15`                         | How long an idle agent's process stays open                       |
 | `SETI_MEMORY_SCOPES`                               | on                           | `off` runs agents without systemd memory and CPU caps             |
 | `SETI_AUDIT_RETENTION_DAYS`                        | `365`                        | Days the audit log keeps events                                   |
@@ -283,9 +263,11 @@ Seti would refuse.
 Without `SETI_DATABASE_URL`, a `SETI_HOME` other than `~/.seti` gets its own database, named after
 the directory, so a scratch instance never shares the live one.
 
-The memory cap of an agent has no environment variable: it follows the host, at 30% of its memory
-between 6 GB and 16 GB, until you save one in Settings, Resources. A larger cap means fewer `tsc`
-runs stopped at it and more risk when several agents peak together.
+The memory cap of an agent has no environment variable: it follows the host (`mem_cap` in
+[Appendix A](protocol.md#appendix-a-reference-constants)) until you save one in Settings,
+Resources. A larger cap means fewer `tsc` runs stopped at it and more risk when several agents
+peak together. [Implementation](implementation.md#reference-values) lists the other protocol
+values an install can change.
 
 ### Secrets
 
@@ -349,12 +331,9 @@ key; calls also need Deepgram and ElevenLabs, and the TURN keys for calls from o
 models and Address as: the title or name the EA calls you now and then, empty for no title, which
 is the default.
 
-Language on the same page sets what the EA listens, speaks and writes in: English by default, one
-of the 31 other languages that both Deepgram Nova-3 and ElevenLabs Flash v2.5 cover, or
-Multilingual, which hears any of them and answers in the one you last used. A change applies to a
-live call at once, and saying "speak Turkish" to the EA changes it too. The wake phrase stays in
-English words whatever the language, because the wake word model on the host only knows English
-sounds.
+Language on the same page sets what the EA listens, speaks and writes in: English, one of the 31
+other languages both Deepgram Nova-3 and ElevenLabs Flash v2.5 cover, or Multilingual. The wake
+phrase stays in English words, since the wake word model knows only English sounds.
 
 To add a key later, write it to its file and restart both services:
 
@@ -363,22 +342,13 @@ To add a key later, write it to its file and restart both services:
 systemctl --user restart seti.service seti-ea.service
 ```
 
-A call keeps going while Seti is in the background, as when you switch apps on a phone. The page
-pings the EA from a worker every second, since the EA drops its voice three seconds after the last
-ping and a background page slows its own timers. A network stall ends the call only once the
-browser declares the path failed, after about 30 seconds. While a call is live, the phone shows it
-as media with Mute and Hang up. Each call end goes to the audit log as `ea.call_ended`, with its
-reason, its length, whether Seti was in the background, the kinds of microphone it used (such as
-`default` or `bluetooth`, never a device name) and how often it rerouted, but no audio or words;
-Settings, EA shows the last one.
+A call keeps going while Seti is in the background, as when you switch apps on a phone, and ends
+only once the browser declares the network path failed, after about 30 seconds. Each call end is
+audited as `ea.call_ended` with its reason and length, never audio or words.
 
 On Android, Chrome sends call audio to a Bluetooth headset only when Chrome may use Nearby devices
-(Android settings, Apps, Chrome, Permissions). Chrome picks the headset when the call opens the
-microphone, and its output follows the microphone. So a call follows a headset that connects or
-wakes mid-call by reopening the microphone and the EA's voice once the device list settles, and
-the Audio button in the call does the same on demand. A saved microphone that is not Bluetooth
-gives way to the system default while a Bluetooth headset is listed, since only the default
-follows the headset there.
+(Android settings, Apps, Chrome, Permissions). A headset that connects mid-call takes over once the
+device list settles, and the Audio button in the call does the same on demand.
 
 ### Redis
 
@@ -417,18 +387,15 @@ service needs, in the service's own words, and fills in the hosts, header, token
   and Sentry. Twilio and Jira Cloud take the key as a Basic auth password, which the agent sends
   and the proxy swaps in.
 
-A service's connections are added together or not at all, under names and variables nothing else
-uses, and the audit log records the template they came from, never what was typed. Custom opens
-the form with every field for a service the list does not have. The list is
+Custom opens the form with every field for a service the list does not have. The list is
 `shared/src/connection-key-services.ts` and `shared/src/connection-template-list.ts`.
 
 A connection is one service's access, made in Settings, Connections: its name, the hosts it may
 reach (exact or `*.suffix`), how Seti signs in, and the values that takes. Agents see its variable,
-such as `STRIPE`, holding a placeholder. The proxy swaps the placeholder for the value in headers
-and URLs on the connection's hosts only, and refuses a request that carries it anywhere else when
-it can read that request ([Security](security.md#where-each-secret-lives) says when it cannot). With
-"Seti adds it" on, the proxy also sets a header from a template (`Bearer {{value}}`) on every
-request to those hosts, so the agent never sends it. A connection signs in one of four ways:
+such as `STRIPE`, holding a placeholder that the proxy swaps for the value on those hosts only
+(EGR-5 in [the protocol](protocol.md#73-egress)). With "Seti adds it" on, the proxy also sets a
+header from a template (`Bearer {{value}}`) on every request to those hosts (EGR-7). A connection
+signs in one of four ways:
 
 - A key the user pastes.
 - OAuth client credentials, with a client secret, Basic auth or a private key JWT (Entra
@@ -438,10 +405,9 @@ request to those hosts, so the agent never sends it. A connection signs in one o
   and trades it for a token, as Salesforce and Okta take it. With no issuer, a Google service
   account key file supplies both, and Seti checks the file can sign when it is pasted.
 
-For the OAuth kinds Seti mints a short-lived token, caches it until shortly before it expires and
-mints again after a 401; Test mints one without showing it. A connection can be added without its
-values, which the user fills in later; until then it says what it needs. Values are write-only:
-Seti stores them sealed and never shows them again. Pollers send a connection by its name.
+For the OAuth kinds Seti mints a short-lived token and mints again after a 401; Test mints one
+without showing it. A connection can be added without its values, which you fill in later. Values
+are write-only. Pollers send a connection by its name.
 
 A credential is the bundle an agent picks, managed in Settings, Credentials. The built-in Default
 holds what Seti had before credentials; more of them let different agents use different access. A
@@ -455,26 +421,23 @@ credential carries:
 - Connections: each connection is switched on per credential, from either page, and a new one is in
   none.
 
-Each agent picks a credential in the New agent dialog or its details; a change restarts its
-session at the next turn. Credentials apply to sandboxed agents only: an unsandboxed agent uses the
-host's own access. The EA may move an agent to another credential but never sees or edits one, and
-it has no tool for connections.
+Each agent picks a credential in the New agent dialog or its details; a change applies from its
+next turn. Credentials apply to sandboxed agents only (SEC-1 in
+[the protocol](protocol.md#8-secrets-and-connections)); an unsandboxed agent uses the host's own
+access.
 
 ### MCP servers for agents
 
 Settings, MCP servers turns each server off or on by default for every agent without its own
 choice, claude.ai connectors and plugin servers included. An agent can turn servers on or off for
-itself in the Access list of the New agent dialog or the agent's details. Seti passes the servers an agent leaves out to Claude Code as denied servers, and a
-sandboxed agent's proxy neither adds sign-in tokens for them nor reaches their connectors.
+itself in the Access list of the New agent dialog or the agent's details, and Seti denies the rest
+to that agent (EGR-12 in [the protocol](protocol.md#73-egress)).
 
-Add server opens a catalog. Common connectors (Gmail, Slack, Supabase, Notion, Linear and other
-vendor-run servers) list first, and typing searches the
-[MCP Registry](https://registry.modelcontextprotocol.io) as well. Picking one fills the add form
-with its URL or package, the headers or variables it needs, and its config name; values stay
-yours to enter. Slack installs as the official Slack plugin. Google Workspace servers take your
-own OAuth client, so the form asks for its client ID and secret; Seti passes the secret to
-`claude mcp add` through `MCP_CLIENT_SECRET`, never on the command line. Servers that sign in with
-OAuth show Sign in once added.
+Add server opens a catalog of common connectors and searches the
+[MCP Registry](https://registry.modelcontextprotocol.io) (`SETI_MCP_REGISTRY_URL`); picking one
+fills the form, and the values stay yours to enter. Google Workspace servers take your own OAuth
+client; Seti passes its secret to `claude mcp add` through `MCP_CLIENT_SECRET`, never on the
+command line. Servers that sign in with OAuth show Sign in once added.
 
 ### Plugins for agents
 
@@ -482,41 +445,19 @@ Settings, Plugins lists two kinds of plugin. Seti defaults are local plugin fold
 Seti loads into its agents without changing Claude Code. Claude Code plugins live in
 Claude Code's user settings, so the terminal and every agent see the same ones.
 
-Add opens a searchable list of the plugins the configured marketplaces offer, with installed ones
-marked. Opening one shows what its marketplace says it brings (skills, commands, agents, hooks, MCP
-and LSP servers) and Install runs `claude plugin install <name>@<marketplace>` at user scope.
-Plugins run third-party code on the host as the Seti user, so install only ones you trust. Each
-installed plugin has an enable switch, Update and Uninstall. Marketplaces lists the marketplaces
-Claude Code knows with their plugin counts; Add takes a GitHub `owner/repo`, a git URL or a local
-path, and each one has Update and Remove. Built-in marketplaces can only be updated.
-
-Running agents pick up a change in their next session. The page notices installs made with
-`claude plugin` in a terminal on its own; Refresh reads everything again. Only the user changes
-plugins and marketplaces: the EA and paired devices are refused, agents have no tool for it, and
-the audit log records every change.
+Add lists the plugins the configured marketplaces offer, and Install runs
+`claude plugin install <name>@<marketplace>` at user scope. Plugins run third-party code on the host
+as the Seti user, so install only ones you trust. Marketplaces takes a GitHub `owner/repo`, a git
+URL or a local path. Running agents pick up a change in their next session.
 
 ### Shared tools
 
-A script an agent wrote that proved useful can become a shared tool: a typed tool every agent can
-call. The agent proposes it with `request_change`; the request card shows the tool's arguments,
-whether it says it writes anything, the whole script, its hash, the variables it reads and the
-hosts it sends them to, and Allow publishes it. From its next turn every agent whose credential
-carries a connection for each variable gets the tool as `mcp__shared__<name>`; a tool that needs
-none loads for every agent. An agent whose credential lacks a variable can see the tool and what
-is missing, and ask you for the key.
-
-In a sandboxed agent the script runs inside the sandbox, like the agent's own commands. In an
-agent without the sandbox it runs with that agent's access to this machine, and each call asks
-you first unless one of your permission rules allows it.
-
-The script reads its arguments as one JSON object on stdin and prints its result to stdout, as
-JSON when it has structure. A non-zero exit is an error that carries what the script wrote to
-stderr. A call is stopped after 120 seconds unless the proposal sets another limit, up to 600.
-
-Settings, Plugins lists the shared tools with who proposed each one and when. Code shows the
-arguments and the script, the switch turns a tool off for every agent, and Remove deletes it;
-both apply from each agent's next turn. An agent proposes a new version under the same name, and
-its card shows the changes against the published one.
+A script an agent wrote that proved useful can become a shared tool every agent can call
+([section 9 of the protocol](protocol.md#9-shared-tools)). The agent proposes it, the request card
+shows the whole script, and Allow publishes it. Settings, Plugins lists the shared tools with who
+proposed each one and when; Code shows the arguments and the script, the switch turns a tool off
+for every agent, and Remove deletes it. A script reads its arguments as one JSON object on stdin,
+prints its result to stdout, and is stopped after 120 seconds unless the proposal sets up to 600.
 
 ### Access: defaults and per-agent choices
 
@@ -526,48 +467,22 @@ New agent dialog or its details, turns any of them on or off for that agent alon
 to the default. A choice equal to the default is not stored, so the agent follows later changes of
 the default.
 
-Settings, SSH lists the keys first, then the hosts that pick them. SSH keys are defined once: Seti
-generates one, seals a pasted private key, or reads a key file on this machine (such as
-`~/.ssh/id_ed25519`) when an agent needs it. A key's private half is never shown again. SSH hosts
-each have an alias, address, port, the user ssh logs in as, one selected key, an optional jump host
-(another host, chains allowed) and a short list of safe ssh options. A host is saved only with a
-key, picked or made in its form, and a key's page lists its hosts and adds a new one with it. Check
-host, once the host has a key, fetches its host keys to trust and logs in with that key from this
-machine; saving a host with a key checks it too, and nothing contacts a host before. Each host pins
-the host keys trusted after a check. Swapping a key's private half, by pasting a new key or pointing
-it at another file, changes it for every host that selects it. Keys and hosts are renamed in place
-from their page titles; renaming a host carries its credentials, defaults, agents' choices and
-the hosts that jump through it to the new alias, and agents use the new name from their next turn.
-
-An agent reaches a host when its Access turns the host on (or the host's Default does), or when its
-credential bundles the host. A bundled host stays on for every agent using the set. Each jump
-host on the way needs a key too; the Access dialog says when one is missing. The sandbox gets an
-ssh config, known_hosts and its own ssh-agent with only the keys of its hosts, never a key file. New
-hosts and AWS start off by default. Deleting a host drops its default, every agent's choice for it
-and its place in any set. Changes restart the affected sessions at their next turn.
-AWS uses the role of the agent's credential, and picking a set with a role turns AWS on
-for that agent. The agent's settings keep only its grants and a link to its credential, where
-what the set holds is managed. The EA may read hosts, the sets that
-bundle them and an agent's SSH hosts and AWS but never change them, keys or trusted host keys.
-
-The upgrade that brought hosts and logins turns the old free-text ssh config into hosts and gives
-Default a login for each, with the block's User and the key the old shared agent most likely used;
-the audit log's `system.ssh_migrated` event lists every guess and every dropped line. The next
-upgrade moves each login onto its host. When credentials logged in to one host differently, the
-login of Default (or of the most sets) keeps the alias and each other login becomes a copy of the
-host named after its user, such as `k8s-ubuntu`. Every agent keeps the hosts it reached, through
-its own Access choices.
+Settings, SSH holds keys and hosts. Seti generates a key, seals a pasted private key, or reads a
+key file on this machine (such as `~/.ssh/id_ed25519`) when an agent needs it, and never shows a
+private half again. A host has an alias, address, port, login user, one key, an optional jump host
+and a few safe ssh options; Check host fetches its host keys to pin and logs in once, and nothing
+contacts a host before that. An agent reaches a host when its Access or the host's Default turns
+it on, or when its credential bundles the host, and every jump host needs a key too (EGR-10 in
+[the protocol](protocol.md#73-egress)). New hosts and AWS start off. AWS uses the role of the
+agent's credential. An install upgraded from free-text ssh config had its hosts made from that
+config; the audit log's `system.ssh_migrated` event lists every guess and every dropped line.
 
 ### Permission requests
 
-A tool call no rule allows waits for you as a permission request: in the agent's chat, in Needs
-you and in Requests, with Allow, Always and Deny. Settings, Permissions holds the rules and the
-Request timeout: Off, 15 min, 1 h, 4 h or 24 h, 1 h by default. A request nobody answers in that
-time is denied, and the agent is told that it timed out, not that you refused, so it carries on
-without the call or asks again. The card shows the time left, the agent's reason line says "times
-out soon" near the end, and the transcript and the audit log record the timeout. A timeout adds no
-rule. A new value applies to requests already waiting, counted from when each was raised. Off
-keeps a request waiting until you answer it.
+Settings, Permissions holds the permission rules and the Request timeout, 1 h by default; a request
+nobody answers in that time is denied as timed out (PERM-7 and PERM-8 in
+[the protocol](protocol.md#74-permission-rules-and-requests)). Off keeps a request waiting until
+you answer it.
 
 ### Backups
 
@@ -589,6 +504,135 @@ pnpm --filter @seti/server backup restore /abs/backup.pgdump.enc seti_restored -
 ```
 
 A restored database also needs the secret store key; see [Security](security.md).
+
+## Channels: webhooks, pollers and reminders
+
+Settings, Channels holds the sources of events: webhooks that apps send, pollers for services that
+send none, and reminders. All three feed one event path with the same subscribers, filters,
+delivery log and agent updates ([section 10 of the protocol](protocol.md#10-inbound-events)). No
+model runs for a channel; only an event wakes the EA or a subscribed agent.
+
+Each agent's subscription says when it gets an update: Agent default (the agent's Updates
+setting), Now, After turn or With message, which are the timings of UPD-2 in
+[the protocol](protocol.md#5-updates-and-delivery). The channel's subscriber list and the
+Channels row of the agent's settings both set it. Only you give a poller extra hosts or secrets,
+describe a custom sender, paste a webhook secret or check a sample (CHN-19); the EA and agents at
+Seti control Full create and change the rest, the EA after your yes.
+
+### Webhook senders
+
+New, Webhook starts with a picker of the apps that can send. Each app is a sender: a description,
+as data, of how it signs a delivery and where its event name, title and link are. The picker lists:
+
+- The catalog in `shared/src/webhook-sender-catalog.ts`: Linear, Bitbucket, Cloudflare, GitLab,
+  Grafana, Jira, Make, PagerDuty, Shopify, Slack, Standard Webhooks, Stripe, Svix, Vercel and
+  Zapier.
+- Senders a mod adds with its own code, such as GitHub and Sentry, which also track states.
+- Seti signature, for a sender that can sign with `X-Seti-Signature` or send a bearer secret.
+- Custom, at the foot of the picker, for an app the catalog does not list, with the fields below.
+
+After Create, Seti shows the URL to paste into the app with the app's own setup steps. An app that
+issues the secret, as Linear does once it has the URL, gets a field for it in the same dialog, and
+the webhook refuses deliveries until the secret is saved. Where the app lets you set the secret,
+Seti makes one and shows it once. Behind Cloudflare Access, `/hooks/` needs a Bypass application
+([Cloudflare Tunnel and Access](#cloudflare-tunnel-and-access)).
+
+| Field                     | What it says                                                                                     |
+| ------------------------- | ------------------------------------------------------------------------------------------------ |
+| `signature.scheme`        | `hmac` for a signature, or `token` for an app that sends the secret itself in a header           |
+| `signature.header`        | The header with the signature or the token                                                       |
+| `signature.algorithm`     | `sha256`, `sha1` or `sha512`                                                                     |
+| `signature.encoding`      | `hex` or `base64`                                                                                |
+| `signature.prefix`        | What a signature starts with, such as `sha256=`, `v1=` or `v1,`; other entries are skipped       |
+| `signature.separator`     | `none`, or `comma` or `space` for a header with several signatures; one match is enough          |
+| `signature.signed`        | `{body}`, `{timestamp}.{body}`, `v0:{timestamp}:{body}` or `{id}.{timestamp}.{body}`             |
+| `signature.key`           | `text` uses the secret's characters; `base64` its decoded bytes, after any `whsec_`              |
+| `timestamp`               | Where the sending time is: a header, a body field, or a part of the signature header such as `t` |
+| `max_age_s`               | How old the timestamp may be, 300 seconds unless set                                             |
+| `id`                      | Where the delivery id is: a header or a body field                                               |
+| `secret`                  | `sender` when the app issues the secret, `generated` when Seti makes it                          |
+| `event`, `action`         | Where the event name is, and a body field appended after a dot, as in `issue.create`             |
+| `title`, `link`, `detail` | Body fields tried in order for the update's title, link and text                                 |
+| `detail_max`              | How many characters of the text, or of the payload when no field holds text, are passed on       |
+| `handshake`               | A signed URL check to answer: the field and value that mark it and the field to send back        |
+
+A body field is a dot path such as `data.title` or `alerts.0.labels.alertname`. A timestamp is
+read as epoch seconds, epoch milliseconds or an ISO time. An update's title falls back to the
+sender and the event name, and its link is kept only when it is an http or https URL.
+
+Linear, for example, signs the raw body with HMAC-SHA256 in `Linear-Signature`, carries
+`webhookTimestamp` in milliseconds and sends a `Linear-Delivery` id; its entry in the catalog file
+sets those three, `max_age_s: 60`, the event from `type` and `action`, and title, link and detail
+paths. In Linear, Settings, API, New webhook takes the URL, and the webhook's page then shows the
+signing secret to paste into Seti. A new issue arrives as `issue.create`, so a subscription
+filtered to `issue` takes every issue event and one filtered to `issue.create` only new issues.
+
+Sample, on the card of a webhook with a catalog or custom sender, takes the headers and body of a
+request copied from the app's delivery log and says whether the signature verifies and what event,
+title and link it would produce; it stores nothing and reaches no subscriber. A captured request
+is usually older than `max_age_s`, so the answer says a live delivery that old would be refused.
+The card's Activity lists every request with why it was refused: `missing signature`,
+`signature mismatch`, `token mismatch`, `too old`, a duplicate delivery id, or a secret that is not
+pasted yet.
+
+A sender is data only while a shared secret and one of the four signed templates verify it. These
+need a mod instead: Twilio (signs the URL and form fields), Discord (Ed25519 and a typed reply),
+Zoom (a computed reply to its URL check), Notion (an unsigned token request), Intercom (a HEAD URL
+check), Twitch EventSub (no separators in the signed text) and Supabase Auth hooks (a reply body).
+[Mods](mods.md#channel-sources) shows how to write one.
+
+### Pollers
+
+New, Poller starts from a template that stays a plain script to edit: Blank is Seti's own, and
+HTTP JSON and RSS/Atom feed come from the bundled Poller templates mod. A poller keeps its own copy
+of the script, so turning that mod off stops no poller.
+
+```js
+export default async function poll({ fetch, parseFeed, log, state, since }) {
+  const res = await fetch('https://api.example.com/items', {
+    secretHeaders: { Authorization: 'Bearer {{my_token}}' },
+  })
+  const data = await res.json()
+  return data.items.map((item) => ({ key: String(item.id), title: item.name, url: item.url }))
+}
+```
+
+The script returns an array of items, or `{ items, state }` to keep up to 16 KB of JSON for the
+next run. An item has `key` (required, a stable id) and optionally `title`, `kind`, `url`, `body`
+or `summary`, `fields` (an object) and `fingerprint`. It runs with no Node APIs, files,
+environment, timers or CLIs, only what it is given (CHN-12):
+
+- `fetch(url, init)` takes `method`, `headers`, `body`, `secretHeaders` and `secretQuery`, and
+  returns `status`, `ok`, `url`, `headers.get()`, `text()` and `json()`. It reaches hosts on the
+  sandbox allowlist plus the poller's extra hosts on public addresses. Parsed JSON takes several
+  times its text size, so a script that runs out of memory should keep less.
+- `secretHeaders` and `secretQuery` take templates such as `'Bearer {{my_token}}'`. Seti fills in
+  the connections the poller may use, by name, and the Default credential's GitHub tokens, sends
+  them only to the origin the script named, and shows the script `[secret]` in their place.
+- `parseFeed(text)` reads RSS 2.0, RSS 1.0 or Atom into entries with `id`, `title`, `link`,
+  `summary`, `published` and `updated`.
+- `log(...)` keeps up to 50 lines per run, and `since` is the time of the last good run.
+
+The first good run is a baseline (CHN-17). After it a new key reports the item's kind or `new`, a
+changed fingerprint `<kind>.changed` with the fields that changed, and, with Report gone items on,
+a key a complete run no longer returns `<kind>.gone`. The fingerprint is the item's own, else a
+hash of the fingerprint fields set on the poller, else a hash of the whole item. A key unseen for
+30 days, or past the newest 10,000, counts as new if it comes back, and a run with unusable items
+reports nothing as gone. Runs are kept 30 days, the latest 50 with their logs. The limits are
+`poller_limits` in [Appendix A](protocol.md#appendix-a-reference-constants), plus a jitter under 5
+seconds on each interval and 10% on backoff.
+
+The card shows the status (pending, ok, erroring, failing, paused), the last and next run, recent
+runs with their logs, Poll to run now, a pause switch, and Edit, whose Test run executes the script
+once and shows its items, notes, log and error without storing or reporting anything.
+
+### Schedule
+
+The Schedule tab lists the coming runs of pollers, reminders and the EA's follow-ups for the next
+24 hours, 7 days or 30 days, grouped by day in your timezone; a channel with more than 6 runs in a
+day shows as one line with the count. Interval runs are projected from the stored next run, so a
+poller's real runs differ by its jitter and move back while it backs off. The EA and agents read
+the same with `list_channels` and `upcoming`.
 
 ## Upgrading
 
@@ -665,6 +709,7 @@ cd ~/seti && pnpm run doctor
 | PRs never show up                                                       | `gh auth login`                                                                                               |
 | Port 3006 is taken                                                      | Set `SETI_PORT` in `~/.seti/seti.env`, or run the installer with `--port`                                     |
 | macOS: every agent fails to start                                       | Turn the sandbox off in Settings, Sandbox; bubblewrap is Linux-only                                           |
+| Doctor: `memory caps only: the user manager has no cpu controller`      | Add `Delegate=cpu cpuset io memory pids` in a drop-in for `user@.service`                                     |
 
 ### Sandbox
 
@@ -686,20 +731,18 @@ sudo apparmor_parser -r /etc/apparmor.d/bwrap
 bwrap --unshare-user --unshare-pid --unshare-net --ro-bind / / --dev /dev --proc /proc true && echo sandbox ok
 ```
 
-A task fails to start when the sandbox does not work; it never falls back to running unsandboxed.
+An agent fails to start when the sandbox does not work; it never falls back to running
+unsandboxed. An older agent with home folders may keep worktrees in its private home that the host
+cannot see, so run `git worktree prune` in a main checkout only when no such agent works on it.
 
 ## Why there is no Docker image
 
-The sandbox is the point of Seti's security model: every agent runs in bubblewrap with its own user,
-PID and network namespaces behind a per-task egress proxy, inside a systemd scope that caps its
-memory and CPU. In a container, bubblewrap needs unprivileged user namespaces, which Docker's default
-seccomp and AppArmor profiles block; making it work takes `--privileged`, or `CAP_SYS_ADMIN` with
-seccomp and AppArmor unconfined, and the memory caps need a systemd user manager inside the
-container as well. That trades the container's isolation away to get the sandbox back, so the image
-would protect nothing a native install does not. Seti also works on the host itself: your repos, git
-worktrees, Claude Code login and SSH, all of which a container would have to bind-mount from the
-home directory anyway. The native install is the supported path. PostgreSQL can still run in a
-container: pass its URL with `--database-url`.
+Every agent runs in bubblewrap with its own user, PID and network namespaces inside a systemd scope
+that caps its memory and CPU. In a container, bubblewrap needs unprivileged user namespaces, which
+Docker's default seccomp and AppArmor profiles block, and the caps need a systemd user manager
+inside it; making both work takes `--privileged` or its equivalent, which trades the container's
+isolation away. The native install is the supported path. PostgreSQL can still run in a container:
+pass its URL with `--database-url`.
 
 ## Manual install
 
@@ -760,7 +803,9 @@ NODE_ENV=development SETI_HOME=/tmp/seti-scratch SETI_PORT=3106 SETI_REDIS_URL=o
 | `~/.seti/dev-credentials/`   | The same for development and test runs                          |
 | `~/.seti/seti.env`, `ea.env` | Non-secret settings of Seti and the EA                          |
 | `~/.seti/pg-dumps/`          | Database dumps `scripts/upgrade.sh` takes before a restart      |
-| `~/.seti/worktrees/`         | Agent worktrees                                                 |
+| `~/.seti/worktrees/`         | Worktrees of agents made before agents cloned for themselves    |
+| `~/.seti/archive/`           | Archived agents' folders, one bundle per archiving              |
+| `~/.seti/shared-tools/`      | Published shared tools, one folder per version                  |
 | `~/.seti/workspace/<task>/`  | Each agent's workspace of live Markdown files                   |
 | `~/.seti/sandbox/`           | Per-task sandbox homes and each task's ssh-agent socket         |
 | `~/.seti/sandbox-ca/`        | The name-constrained CAs the egress proxy signs with            |
@@ -769,5 +814,8 @@ NODE_ENV=development SETI_HOME=/tmp/seti-scratch SETI_PORT=3106 SETI_REDIS_URL=o
 | PostgreSQL database `seti`   | Tasks, transcripts, PRs, channels, the audit log, sealed tokens |
 | `~/.claude/projects/`        | Claude Code sessions, which Seti resumes                        |
 | `~/work/`                    | One folder per agent, holding its clones and worktrees          |
+
+Settings, Lifecycle lists folders under `~/work` and `~/.seti/worktrees` that no agent owns and
+that have not changed for 7 days, and deletes only the ones you pick.
 
 Seti keeps `~/.seti` owner-only and tightens anything more open at startup.

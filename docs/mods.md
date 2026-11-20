@@ -230,25 +230,21 @@ A refused or failed call throws an `Error` whose `code` says why:
 Each event gets a fresh engine, so module variables never survive; keep state in `storage`.
 Settings are read-only from logic. Storage writes land per call, not per event, so a handler that
 fails halfway keeps the writes it made. Code cannot be compiled from text: `eval` and the Function
-constructors are gone. The main limits, from `MOD_LIMITS` in `shared/src/mod-runtime.ts`:
+constructors are gone. The engine limits are `mod_limits` in
+[Appendix A](protocol.md#appendix-a-reference-constants); the rest of `MOD_LIMITS` in
+`shared/src/mod-runtime.ts`:
 
-| Limit                    | Value                                                  |
-| ------------------------ | ------------------------------------------------------ |
-| Memory per event         | 32 MB                                                  |
-| Compute without awaiting | 500 ms                                                 |
-| Compute per event        | 5 s                                                    |
-| Wall time per event      | 10 s, 30 s for a schedule                              |
-| Calls per event          | 50, of which 10 fetches                                |
-| A call's arguments       | 64 KB                                                  |
-| A fetch                  | 15 s, 1 MB a response, 4 MB an event, 64 KB a body     |
-| A handler's result       | 64 KB                                                  |
-| Log                      | 50 lines of 500 characters an event                    |
-| Storage                  | 64 KB a value, 1 MB a mod, keys of 1 to 200 characters |
-| Chat posts               | 4000 characters; 3 an event, 30 an hour                |
-| Notifications            | 3 an event, 10 an hour                                 |
-| Events                   | 60 a minute, 20 queued                                 |
-| Compute per day          | 600 s, then the mod pauses until midnight              |
-| Failures                 | 5 in a row back off; 20 in an hour turn the mod off    |
+| Limit                    | Value                                              |
+| ------------------------ | -------------------------------------------------- |
+| Compute without awaiting | 500 ms                                             |
+| A call's arguments       | 64 KB                                              |
+| A fetch                  | 15 s, 1 MB a response, 4 MB an event, 64 KB a body |
+| A handler's result       | 64 KB                                              |
+| Log                      | 50 lines of 500 characters an event                |
+| Compute per day          | 600 s, then the mod pauses until midnight          |
+| Failures                 | 5 in a row back off                                |
+
+Storage, posts and notifications are capped per operation, below.
 
 ### Operations
 
@@ -496,40 +492,9 @@ Each contribution point is a `Registry` (`shared/src/registry.ts`): entries by k
 once, and every registration returns a disposer the mod host (`server/src/mods/host.ts`,
 `ui/src/mods/host.ts`) keeps per mod. Core registers its own entries through the same registries.
 `server/src/mods/bundled.ts` lists the bundled mods (`BUNDLED_MODS`, `THEME_MODS`, and `TEST_MODS`
-for `SETI_TEST_MODS=1`), and `bundled.test.ts` fails on a folder that is missing from it.
-
-| Point             | Registry                                                           |
-| ----------------- | ------------------------------------------------------------------ |
-| Slash commands    | `slashCommands` in `server/src/mods/points.ts`                     |
-| Commands          | `modCommands`, run through `server/src/mods/commands.ts`           |
-| Input hooks       | `inputHooks` in `ui/src/lib/input-hooks.ts`                        |
-| Host proxies      | `hostProxies` in `server/src/subdomain-proxy.ts`                   |
-| PR decorators     | `prDecorators` in `server/src/pr-decorators.ts`                    |
-| PR chips          | `prChips` in `ui/src/lib/pr-chips.ts`                              |
-| Status markers    | `statusMarkers` in `ui/src/lib/status-markers.ts`                  |
-| Agent accents     | `agentAccents` in `ui/src/lib/status-markers.ts`                   |
-| Transcript blocks | `transcriptBlockSources` in `ui/src/lib/transcript-blocks.ts`      |
-| Notifications     | `notifyKinds`, with the mod's `<mod>.<kind>`                       |
-| Audit kinds       | `modAuditKinds`, recorded as `mod.<id>.<kind>`                     |
-| File extensions   | `extensionKinds` in `shared/src/files.ts`                          |
-| Kinds, pages      | `kindViewers`, `pageExtensions` in `shared/src/file-viewers.ts`    |
-| Routes            | `modRouteEntries`, under `/api/mods/<id>/`                         |
-| Settings          | the manifest's schema, values in `mod_settings`                    |
-| Sections          | `sectionRegistry` in `ui/src/lib/sections.ts`                      |
-| Settings pages    | `settingsPages` in `ui/src/panels/settings/pages.ts`               |
-| Status bar        | `statusBarItems` in `ui/src/components/status-bar/items.ts`        |
-| Header band       | `headerViews` in `ui/src/lib/mod-views.ts`                         |
-| About parts       | `aboutParts`, with news dots in `newsEntries`                      |
-| File viewers      | `fileViewers` in `ui/src/panels/files/file-viewers.ts`             |
-| Fence renderers   | `fenceRenderers` in `ui/src/lib/fence-renderers.ts`                |
-| Themes            | `themeRegistry` in `ui/src/components/theme/registry.ts`           |
-| Styles            | `MOD_STYLES` in `ui/src/mods/bundled.ts`                           |
-| Agents layouts    | `agentsLayouts` in `ui/src/panels/tasks/agents-layouts.ts`         |
-| Terminals         | `terminalSources` in `ui/src/panels/terminal/terminal-sources.ts`  |
-| Chords            | `modChords` in `ui/src/mods/mod-chords.ts`, checked against Seti's |
-| Agent docks       | `agentDocks` in `ui/src/panels/tasks/agent-docks.ts`               |
-| Context           | `modContexts` in `server/src/mods/ops/context.ts`, new sessions    |
-
+for `SETI_TEST_MODS=1`), and `bundled.test.ts` fails on a folder that is missing from it. Each
+point's registry sits beside the code it extends, such as `slashCommands` in
+`server/src/mods/points.ts` or `statusBarItems` in `ui/src/components/status-bar/items.ts`.
 Every point takes effect at once except context, which reaches new sessions. Public paths are
 declared but not available yet. A third-party mod's events go to its `logic.js` through the logic
 pool in `server/src/mods/logic/`, and its views are served by `server/src/routes/mod-frames.ts`
@@ -631,51 +596,28 @@ host that is a subdomain of `seti.localhost`. A host proxy answers only with the
 subdomain is served from; Seti itself proxies each request, so the mod never sees one. The first
 two points are open to bundled mods only, and `mods/pr-previews/` uses all three.
 
-### Status markers
+### Status markers and agent accents
 
-A bundled mod can draw the small status marker beside each agent, in the agent list, Needs you,
-paused grid panels, the grid's agent picker and the legend. Declare a `statusMarkers` entry, then
-register the component:
-
-```tsx
-api.registerStatusMarker({ id: 'blobs', view: Blob })
-```
-
-The view gets the agent's `status`, the `agent` it stands for (`id` and `color`, or null in the
-legend) and its `place`: `list`, `needsYou`, `grid`, `legend`, `header` (the phone agent header) or
-`home`. Seti keeps the marker's slot, its accessible name and its tooltip, so the view is only
-decoration: it sets `currentColor` to the status colour and `--agent-stripe` to the agent's colour,
-and falls back to its own shape when the view throws or renders nothing, so a mod can leave a place
-to Seti. The first marker registered draws them all, and turning its mod off brings Seti's shapes
-back at once. `mods/blobs/` is the example: flat blobs in the agent's colour whose faces show the state,
-moving only while the agent runs and not at all with reduced motion.
-
-`agent.color` is the `#rrggbb` the user chose, the same in every theme, while `--agent-stripe` is
-that colour fitted to the current theme. A view that should look the same in light and dark mode
-draws with `agent.color` and works out the rest with the colour helpers `@seti/mod-api` exports:
-`oklch`, `rgbOfOklch`, `rgbOf`, `hexOf` and `contrast`. `mods/blobs/paint.ts` picks each face this
-way.
-
-### Agent accents
-
-A bundled mod can draw an accent at the left edge of each row in the agent list, Needs you
-included, in place of the agent's colour bar. Declare an `agentAccents` entry, then register the
+A bundled mod can draw the status marker beside each agent (in the list, Needs you, the grid, its
+picker, the legend, the phone header and Home), and an accent at the left edge of each agent row
+in place of the colour bar. Declare a `statusMarkers` or `agentAccents` entry, then register the
 component:
 
 ```tsx
+api.registerStatusMarker({ id: 'blobs', view: Blob })
 api.registerAgentAccent({ id: 'blobs', view: BlobBookmark })
 ```
 
-The view gets the agent's `status`, the `agent` (`id` and `color`) and its row's `place`, `list` or
-`needsYou`. It fills a slot that starts 6 px inside the row's left edge and may grow into the row's
-vertical padding, so a view up to the row's inner height (36 px with a mouse, 43 px on a touch
-screen) keeps rows at their height; the view sets its own size. The accent carries the status, so Seti hides the row's status marker from sight while
-screen readers still read its name, and gives the accent the marker's tooltip. It sets
-`currentColor` to the status colour and `--agent-stripe` to the agent's colour. The first accent
-registered draws them all; turning its mod off, or a view that throws or renders nothing, brings
-back the bar and the marker at once. A view that renders only an element with `data-accent-blank`
-brings them back too but keeps that element's width, so titles still line up with rows that show
-the accent. `mods/blobs/` draws its blobs as bookmarks this way.
+A view gets the agent's `status`, the `agent` (`id` and `color`, or null in the legend) and its
+`place`. Seti keeps the slot, the accessible name and the tooltip, so the view is decoration: it
+gets `currentColor` as the status colour and `--agent-stripe` as the agent's colour fitted to the
+theme, while `agent.color` is the `#rrggbb` the user chose. The first one registered draws them
+all, and a view that throws or renders nothing, or turning its mod off, brings Seti's own back. An
+accent fills a slot 6 px inside the row's left edge, up to the row's inner height (36 px with a
+mouse, 43 px on touch); while it shows, Seti hides the row's marker from sight but not from screen
+readers, and a view that renders only an element with `data-accent-blank` keeps its width with
+Seti's bar and marker back. The colour helpers `oklch`, `rgbOfOklch`, `rgbOf`, `hexOf` and
+`contrast` come from `@seti/mod-api`. `mods/blobs/` is the example of both.
 
 ### Channel sources
 
@@ -762,17 +704,12 @@ api.registerTranscriptBlocks({
 ```
 
 Seti calls `watch` while the agent's transcript shows and the stop it returns once it goes, so the
-mod fetches its blocks from its own routes only then. `blocks` lists the agent's blocks as
-`{ id, at }`, oldest first and the same array until they change, and `subscribe` says when they
-do for that agent alone, so one agent's change never redraws another's transcript; Seti redraws
-only when `blocks` hands over a new array. Seti places each block before the first row stored after its `at`, or after the newest row,
-and draws it with `view`, which gets `{ agent, id }` and keeps its content in the mod; a block
-from before the loaded rows waits for the earlier page. Each block sits behind its own error
-boundary. The server half calls `api.transcript.refresh(task)` after it changes the agent's
-blocks: Seti sends a `blocks` event with the mod's id on the transcript's stream, and the UI calls
-that mod's `refresh` for the agent. The event carries no content, and a change made while the
-stream was away shows the next time the transcript opens. With the mod off its source is gone, so its blocks do not show and the
-transcript draws as before. `mods/side-chat/` is the example.
+mod fetches its blocks only then. `blocks` lists the agent's blocks as `{ id, at }`, oldest first
+and the same array until they change, and `subscribe` says when they change for that agent alone.
+Seti places each block before the first row stored after its `at` and draws it with `view`
+(`{ agent, id }`) behind its own error boundary. After the server half changes an agent's blocks,
+`api.transcript.refresh(task)` sends a content-free `blocks` event on the transcript's stream and
+the UI calls the mod's `refresh`. `mods/side-chat/` is the example.
 
 ### File viewers
 
@@ -815,52 +752,21 @@ with no restart. A file whose viewer is switched off falls back as above, and it
 switch and opens the mod's settings at it. Only a bundled mod's viewers take a switch, and a page
 viewer never does.
 
-`mods/previews/` is the bundled one for Seti's own kinds: PDFs, CSV files and workbooks, and
-Mermaid diagrams, each format behind its own switch (`pdf`, `sheets` and `mermaid`) and loaded as
-its own chunk the first time such a file opens, so pdf.js, SheetJS and Mermaid load only for a file
-that needs them. It holds the `mermaid` kind, so `.mmd` and `.mermaid` files open as diagrams, and
-draws `mermaid` fences in Markdown files and transcripts; with Mermaid off those files open as
-text and the fences as code. A share made while Mermaid is on shows each fence and a diagram
-file as a light and dark image with Fit, 100% and 200% zoom; made while it is off, the share shows
-the code.
-It reads workbooks in a Web Worker it starts with
-`new Worker(new URL('./sheet-worker.ts', import.meta.url))`. Vite builds the worker as a file of
-its own, and `ON_DEMAND_ASSET` in `ui/vite.config.ts` keeps it out of the precache by name.
-
+`mods/previews/` is the bundled viewer of Seti's own kinds (PDFs, CSV files and workbooks, and
+Mermaid diagrams, each behind its own switch and loaded as its own chunk), and reads workbooks in
+a Web Worker that `ON_DEMAND_ASSET` in `ui/vite.config.ts` keeps out of the precache.
 `mods/html-preview/` is the `page` viewer of `.html` and `.htm`: the frame and its Scripts toggle
-are the mod's, while the route that serves the page and its security policy stay Seti's. With it
-off, those files open as source and `?preview=1` answers 403.
+are the mod's, while the route that serves the page and its security policy stay Seti's.
 
 ### Theme mods
 
 A theme mod adds colours and nothing else: a folder with `package.json`, `seti-mod.json` and a CSS
-file of token values, with no code. `mods/catppuccin/` and `mods/claude-theme/` are two.
+file of token values, with no code. `mods/claude-theme/` is the one to copy, and
+`mods/catppuccin/` adds flavours and accents. The manifest's `themes` entry names the theme's
+`id`, `title`, `tokens` file and a light and dark `swatch` of `background`, `primary` and
+`foreground` in hex.
 
-```json
-{
-  "id": "dusk",
-  "name": "Dusk",
-  "version": "1.0.0",
-  "seti": "^1.0",
-  "description": "Deep blues at night, paper white by day.",
-  "defaultEnabled": true,
-  "contributes": {
-    "themes": [
-      {
-        "id": "dusk",
-        "title": "Dusk",
-        "tokens": "tokens.css",
-        "swatch": {
-          "light": { "background": "#ffffff", "primary": "#2a4a8a", "foreground": "#111111" },
-          "dark": { "background": "#0d1320", "primary": "#8fb0ff", "foreground": "#e8ecf4" }
-        }
-      }
-    ]
-  }
-}
-```
-
-The theme's id is `<mod>.<theme>`, here `dusk.dusk`, and every rule in `tokens.css` starts with
+The theme's id is `<mod>.<theme>`, such as `dusk.dusk`, and every rule in `tokens.css` starts with
 `:root[data-theme='dusk.dusk']`, adding `.dark` for dark values. It defines every token
 `ui/src/components/theme/themes/default.css` defines. A theme may offer `flavours` (dark palettes,
 set as `data-flavour`) and `accents` (set as `data-accent`), each a list of options with a
