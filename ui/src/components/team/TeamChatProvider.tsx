@@ -1,12 +1,11 @@
 import type { TeamMember, TeamMessage } from '@seti/shared'
 import { MessagesSquare } from 'lucide-react'
 import { useEffect, useState, useSyncExternalStore, type ReactNode } from 'react'
-import { apiGet } from '@/api'
 import { useCommands } from '@/components/palette/useCommands'
 import { isNarrow } from '@/hooks/useMedia'
 import { openEventStream } from '@/lib/event-stream'
 import { liveStream } from '@/lib/live-stream'
-import { isTeamShortcut, offerGroupChat, TEAM_SHORTCUT, TeamChatContext } from './team-context'
+import { isTeamShortcut, offerGroupChat, refreshMembers, TEAM_SHORTCUT, TeamChatContext } from './team-context'
 import { TeamChatStore } from './team-store'
 
 /** Follows the group chat for the whole app, so the badge counts while the panel is closed. */
@@ -55,22 +54,7 @@ export function TeamChatProvider({ children }: { children: ReactNode }) {
   }, [store])
 
   // Each connection fetches the roster again, since member changes made while away are not resent.
-  useEffect(() => {
-    if (!open || !connected) {
-      return
-    }
-    let current = true
-    apiGet<TeamMember[]>('/team/members')
-      .then((members) => {
-        if (current) {
-          store.setMembers(members)
-        }
-      })
-      .catch(() => undefined)
-    return () => {
-      current = false
-    }
-  }, [open, connected, store])
+  useEffect(() => (open && connected ? refreshMembers(store) : undefined), [open, connected, store])
 
   useEffect(() => offerGroupChat(store), [store])
 

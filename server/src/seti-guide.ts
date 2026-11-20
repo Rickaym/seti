@@ -45,7 +45,7 @@ const OUTSIDE = 'Seti changes outside your task: channels, plugins, MCP servers 
 
 const chat = (setiTools: boolean) => [
   '## Group chat',
-  '- Append to chat.md to post. @handle reaches that agent at its next step, @all reaches all, @ea the EA, @user the user.',
+  '- Append to chat.md to post. @handle reaches that agent at its next step, @all reaches all, @active those that ran a turn today, @ea the EA, @user the user.',
   '- Private: start the append with the line `direct @handle`, text below; answer one the same way.',
   ...(setiTools ? ['- With seti tools, post_team_chat with to sends a direct message.'] : []),
   '- Post only when it helps, in 1 to 3 sentences, never just to acknowledge; mention only who must act.',

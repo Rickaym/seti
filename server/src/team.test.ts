@@ -7,8 +7,8 @@ import { inputPreface } from './input-preface.js'
 import { endSession, isRunning, runTurn } from './runner.js'
 import { auditEvents } from './store/audit.js'
 import { eaInbox } from './store/inbox.js'
-import { teamMessages } from './store/team.js'
-import { ensureMember, postTeamMessage, TEAM_BURST, TEAM_LOOP } from './team.js'
+import { teamMembers, teamMessages } from './store/team.js'
+import { ensureMember, postTeamMessage, TEAM_BURST, TEAM_LOOP, teamMemberOf } from './team.js'
 import { USER_AUTH, EA_AUTH } from './test-auth.js'
 import { waitIdle } from './wait-idle.js'
 
@@ -499,5 +499,114 @@ describe('team routes', () => {
     const reset = await opening(seen.message.id)
     expect(reset.event).toBe('reset')
     expect(reset.data).toHaveLength(50)
+  })
+})
+
+describe('@active', () => {
+  /** Turns of earlier tests started long ago, so only the ones a test records count as today's. */
+  beforeEach(async () => {
+    await sql`UPDATE task_message SET created_at = '2000-01-01T00:00:00.000Z' WHERE kind = 'prompt'`
+  })
+
+  async function workedToday(...ids: string[]): Promise<void> {
+    for (const id of ids) {
+      await sql`INSERT INTO task_message (task_id, kind, payload, outward, created_at)
+        VALUES (${id}, 'prompt', '{"text":"Work on it"}', '[]', ${new Date().toISOString()})`
+    }
+  }
+
+  const waitAll = async (posted: TeamPosted) => {
+    for (const delivery of posted.deliveries) {
+      await waitIdle(delivery.task_id)
+    }
+  }
+
+  it('is reserved, so no agent takes it as a handle', async () => {
+    expect(handleCandidates('Active sessions cleanup')).toEqual(['active-task', 'active-task-sessions'])
+    const id = await newTask('Rename target')
+    const res = await app.request(`/api/team/members/${id}`, {
+      method: 'PATCH',
+      headers: LOCAL,
+      body: JSON.stringify({ handle: 'active' }),
+    })
+    expect(res.status).toBe(400)
+    expect(await res.text()).toMatch(/all, active, ea and user are reserved/)
+  })
+
+  it('starts every agent that ran a turn today for the user, and none that did not', async () => {
+    const ledger = await newTask('Ledger today')
+    const payroll = await newTask('Payroll today')
+    const dormant = await newTask('Dormant yesterday')
+    await sql`UPDATE task SET updated_at = ${new Date().toISOString()} WHERE id = ${dormant}`
+    await workedToday(ledger, payroll)
+    const posted = await postTeamMessage({ kind: 'user' }, '@active standup in five')
+    expect(posted.message.mentions).toEqual([{ handle: 'active', task_id: null }])
+    expect(posted.unknown).toEqual([])
+    expect(modes(posted)).toEqual({ [ledger]: 'start', [payroll]: 'start' })
+    expect((await teamMemberOf(ledger)).worked_today).toBe(true)
+    expect((await teamMemberOf(dormant)).worked_today).toBe(false)
+    await waitAll(posted)
+    expect(turnsOf(ledger).at(-1)?.text).toContain('standup in five')
+    expect(turnsOf(dormant)).toEqual([])
+  })
+
+  it('from an agent, reaches running ones at their next step and holds idle ones, never the author', async () => {
+    const author = await newTask('Rebaser today')
+    const running = await newTask('Running today')
+    const idle = await newTask('Resting today')
+    await workedToday(author, idle)
+    await busy(running)
+    const posted = await postTeamMessage({ kind: 'task', taskId: author }, '@active I rebased main')
+    expect(modes(posted)).toEqual({ [running]: 'next', [idle]: 'held' })
+    expect(posted.deliveries.find((d) => d.task_id === idle)?.reason).toBe('idle')
+    expect(await inputRows(author)).toEqual([])
+    await release(running)
+  })
+
+  it('reaches each agent once when combined with @name and @all', async () => {
+    const both = await newTask('Overlap today')
+    const recent = await newTask('Recent only')
+    const named = await newTask('Named only')
+    await sql`UPDATE task SET updated_at = ${new Date().toISOString()} WHERE id = ${recent}`
+    await workedToday(both)
+    const posted = await postTeamMessage({ kind: 'user' }, `@active @all @${await handleOf(both)} @named sync up`)
+    expect(modes(posted)).toEqual({ [both]: 'start', [recent]: 'start', [named]: 'start' })
+    expect(posted.deliveries).toHaveLength(3)
+    expect(await inputRows(both)).toHaveLength(1)
+    await waitAll(posted)
+  })
+
+  it('skips muted agents and treats update modes as @all does', async () => {
+    const muted = await newTask('Quiet today')
+    const off = await newTask('Offmode today')
+    const queue = await newTask('Queuemode today')
+    await teamMembers.setMuted(muted, true)
+    await sql`UPDATE task SET input_mode = 'off' WHERE id = ${off}`
+    await sql`UPDATE task SET input_mode = 'queue' WHERE id = ${queue}`
+    await sql`UPDATE task SET updated_at = ${new Date().toISOString()} WHERE id IN (${muted}, ${off}, ${queue})`
+    await workedToday(muted, off, queue)
+    const active = await postTeamMessage({ kind: 'user' }, '@active freeze merges')
+    expect(active.deliveries.find((d) => d.task_id === muted)).toMatchObject({ mode: 'skipped', reason: 'muted' })
+    expect(modes(active)).toEqual({ [muted]: 'skipped', [off]: 'start', [queue]: 'start' })
+    expect(await inputRows(muted)).toEqual([])
+    await waitAll(active)
+    const all = await postTeamMessage({ kind: 'user' }, '@all merges are open again')
+    expect(modes(all)).toEqual(modes(active))
+    await waitAll(all)
+  })
+
+  it('lets the EA start every agent that ran a turn today', async () => {
+    const worker = await newTask('Worker today')
+    const recent = await newTask('Recent idle')
+    await sql`UPDATE task SET updated_at = ${new Date().toISOString()} WHERE id IN (${worker}, ${recent})`
+    await workedToday(worker)
+    const response = await app.request('/api/team/messages', {
+      method: 'POST',
+      headers: { ...LOCAL, ...EA_AUTH },
+      body: JSON.stringify({ text: '@active the user asks for a status line' }),
+    })
+    const posted = ((await response.json()) as { data: TeamPosted }).data
+    expect(modes(posted)).toEqual({ [worker]: 'start', [recent]: 'held' })
+    await waitAll(posted)
   })
 })

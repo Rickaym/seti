@@ -1,4 +1,6 @@
+import type { TeamMember } from '@seti/shared'
 import { createContext, useContext, useSyncExternalStore } from 'react'
+import { apiGet } from '@/api'
 import type { TeamChatStore, TeamState } from './team-store'
 
 export const TeamChatContext = createContext<TeamChatStore | null>(null)
@@ -18,6 +20,21 @@ export function offerGroupChat(store: TeamChatStore): () => void {
 /** Opens or closes the group chat from code outside React, such as a mod's keys. */
 export const toggleGroupChat = (): void => {
   shown?.toggle()
+}
+
+/** Fetches the roster into the store; the function it returns drops a reply that comes too late. */
+export function refreshMembers(store: TeamChatStore): () => void {
+  let current = true
+  apiGet<TeamMember[]>('/team/members')
+    .then((members) => {
+      if (current) {
+        store.setMembers(members)
+      }
+    })
+    .catch(() => undefined)
+  return () => {
+    current = false
+  }
 }
 
 export function useTeamChatStore(): TeamChatStore {

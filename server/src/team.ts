@@ -21,6 +21,7 @@ import { appendMessage, isRunning, runAutoTurn, sessionState } from './runner.js
 import { eaInbox } from './store/inbox.js'
 import { teamDeliveries, teamMembers, teamMessages, type MemberRow } from './store/team.js'
 import { inLane } from './task-lane.js'
+import { workedToday } from './team-active.js'
 import { auditDirect, auditPost } from './team-audit.js'
 import { authorLabel, paced, speakerOf } from './team-author.js'
 import { publishTeam } from './team-events.js'
@@ -87,22 +88,24 @@ export async function ensureMember(task: Pick<Task, 'id' | 'title'>): Promise<Me
 const isActive = (task: Task, at: number) =>
   task.status === 'running' || sessionState(task.id).open || at - Date.parse(task.updated_at) < ACTIVE_WINDOW_MS
 
-const toMember = (task: Task, member: MemberRow, at: number): TeamMember => ({
+const toMember = (task: Task, member: MemberRow, at: number, today: ReadonlySet<string>): TeamMember => ({
   task_id: task.id,
   handle: member.handle,
   title: task.title,
   status: task.status,
   muted: member.muted,
   active: isActive(task, at),
+  worked_today: today.has(task.id),
 })
 
 /** Every task with its handle, active ones first. */
 export async function teamRoster(at = Date.now()): Promise<TeamMember[]> {
   const list = await tasks.list()
   const members = new Map((await teamMembers.list()).map((member) => [member.task_id, member]))
+  const today = await workedToday(at)
   const roster: TeamMember[] = []
   for (const task of list) {
-    roster.push(toMember(task, members.get(task.id) ?? (await ensureMember(task)), at))
+    roster.push(toMember(task, members.get(task.id) ?? (await ensureMember(task)), at, today))
   }
   return roster.sort((a, b) => Number(b.active) - Number(a.active))
 }
@@ -112,7 +115,8 @@ export async function teamMemberOf(taskId: string): Promise<TeamMember> {
   if (!task) {
     throw new HttpError(404, 'Task not found')
   }
-  return toMember(task, await ensureMember(task), Date.now())
+  const at = Date.now()
+  return toMember(task, await ensureMember(task), at, await workedToday(at))
 }
 
 /** Renames a task's handle or mutes it, for the user or for the task's own agent. */
@@ -173,7 +177,7 @@ export async function resolveMentions(
   const mentions: TeamMention[] = []
   const unknown: string[] = []
   for (const handle of handles) {
-    const taskId = found.get(handle)
+    const taskId = isReservedHandle(handle) ? undefined : found.get(handle)
     if (isReservedHandle(handle) || taskId !== undefined) {
       mentions.push({ handle, task_id: taskId ?? null })
     } else {
@@ -195,28 +199,37 @@ export interface Plan {
   startIdle: boolean
 }
 
-/** Mentioned tasks, plus every active one for @all and for the EA; never the author itself. */
+/**
+ * Mentioned tasks, plus every active one for @all and for the EA and every one that started a
+ * turn today for @active; never the author itself. A task the text reaches twice gets it once.
+ */
 async function plan(author: TeamAuthor, message: TeamMessage, at: number): Promise<Plan[]> {
   const handles = new Set(message.mentions.map((mention) => mention.handle))
   const mentioned = new Set(message.mentions.flatMap((mention) => (mention.task_id === null ? [] : [mention.task_id])))
   const toAll = handles.has('all') || author.kind === 'ea'
+  const today = handles.has('active') ? await workedToday(at) : new Set<string>()
   const members = new Map((await teamMembers.list()).map((member) => [member.task_id, member]))
   const plans: Plan[] = []
   for (const task of await tasks.list()) {
     const isMention = mentioned.has(task.id)
-    if ((author.kind === 'task' && author.taskId === task.id) || !(isMention || (toAll && isActive(task, at)))) {
+    const called = (handles.has('all') && isActive(task, at)) || today.has(task.id)
+    if (
+      (author.kind === 'task' && author.taskId === task.id) ||
+      !(isMention || called || (toAll && isActive(task, at)))
+    ) {
       continue
     }
     const member = members.get(task.id) ?? (await ensureMember(task))
-    plans.push(await planFor(author, handles, { task, member, isMention }, at))
+    plans.push(await planFor(author, handles, { task, member, isMention, called }, at))
   }
   return plans
 }
 
+/** A task's plan; `called` is a task @all or @active names, which starts a turn for a person. */
 async function planFor(
   author: TeamAuthor,
   handles: Set<string>,
-  { task, member, isMention }: { task: Task; member: MemberRow; isMention: boolean },
+  { task, member, isMention, called }: { task: Task; member: MemberRow; isMention: boolean; called: boolean },
   at: number,
 ): Promise<Plan> {
   const escalated = handles.has('user')
@@ -227,7 +240,7 @@ async function planFor(
     priority: isMention && !paced(author) ? 'now' : 'next',
     skip: member.muted ? 'muted' : null,
     hold: (await holdReason(author, task, at)) ?? (isMention && !escalated ? await loopReason(author, task, at) : null),
-    startIdle: isMention || (handles.has('all') && !paced(author)),
+    startIdle: isMention || (called && !paced(author)),
   }
 }
 

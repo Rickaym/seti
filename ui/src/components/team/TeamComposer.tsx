@@ -1,6 +1,6 @@
 import type { TeamMember, TeamPosted, TeamPostInput } from '@seti/shared'
 import { Send } from 'lucide-react'
-import { useId, useMemo, useRef, useState, type KeyboardEvent } from 'react'
+import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import { toast } from 'sonner'
 import { apiSend, errorText } from '@/api'
 import { MessageFindBar } from '@/components/find/FindBar'
@@ -16,16 +16,23 @@ import { keepFocus } from '@/lib/keep-focus'
 import { insertMention, mentionAt, rankMentions, type MentionOption } from '@/lib/mentions'
 import { handleWordDelete } from '@/lib/text-edit'
 import { cn } from '@/lib/utils'
+import { refreshMembers, useTeamChatStore } from './team-context'
 
 const SUGGESTION_LIMIT = 8
 
-const RESERVED: MentionOption[] = [
-  { handle: 'all', detail: 'Every active agent, at its next step', quiet: false },
-  { handle: 'ea', detail: 'The EA', quiet: false },
-]
+/** How many agents @active reaches now: those that ran a turn today and are not muted. */
+function activeDetail(members: readonly TeamMember[]): string {
+  const count = members.filter((member) => member.worked_today && !member.muted).length
+  if (count === 0) {
+    return 'No agent has run a turn today'
+  }
+  return `${String(count)} ${count === 1 ? 'agent' : 'agents'} that ran a turn today`
+}
 
 const optionsOf = (members: readonly TeamMember[]): MentionOption[] => [
-  ...RESERVED,
+  { handle: 'all', detail: 'Every active agent, at its next step', quiet: false },
+  { handle: 'active', detail: activeDetail(members), quiet: false },
+  { handle: 'ea', detail: 'The EA', quiet: false },
   ...members.map((member) => ({
     handle: member.handle,
     detail: `${member.title}${member.muted ? ' (muted)' : ''}`,
@@ -67,9 +74,13 @@ export function TeamComposer({ members }: { members: readonly TeamMember[] }) {
   const listId = useId()
   const options = useMemo(() => optionsOf(members), [members])
   const typing = mentionAt(draft, caret)
+  const suggesting = typing !== null
+  const store = useTeamChatStore()
   const items = typing === null ? [] : rankMentions(options, typing.query, SUGGESTION_LIMIT)
   const open = typing !== null && items.length > 0 && dismissed !== draft
   const current = Math.min(active, Math.max(items.length - 1, 0))
+
+  useEffect(() => (suggesting ? refreshMembers(store) : undefined), [suggesting, store])
 
   const pick = (option: MentionOption) => {
     if (typing === null) {
@@ -208,7 +219,7 @@ export function TeamComposer({ members }: { members: readonly TeamMember[] }) {
         {(clientSend.retrying ? RETRYING_LABEL : status) ??
           (touch
             ? '@ mentions an agent and reaches it mid-turn'
-            : '@agent reaches it mid-turn; @all reaches every active agent')}
+            : '@agent reaches it mid-turn; @all every active agent; @active all that ran today')}
       </p>
     </div>
   )

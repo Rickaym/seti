@@ -72,7 +72,7 @@ const findInTeamChat = setiTool({
 const postTeamChat = setiTool({
   name: 'post_team_chat',
   description:
-    'Post to the group chat as yourself. It reaches every active agent that is not muted at its next step; an @handle reaches that agent at once, @all also starts idle agents, @ea the EA and @user the user. ' +
+    'Post to the group chat as yourself. It reaches every active agent that is not muted at its next step; an @handle reaches that agent at once, @all also starts idle agents, @active reaches every agent that started a turn today, @ea the EA and @user the user. ' +
     'With to, the post is a direct message instead: it reaches only that agent, or ea, at its next step, and only you, they and the user see it. Answer a direct message with to set to its author, so the answer stays private.',
   input: {
     text: teamPostInput.shape.text,

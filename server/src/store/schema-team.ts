@@ -62,3 +62,12 @@ DELETE FROM ea_doc d USING task_message m
 WHERE d.message_id = m.id AND m.kind = 'input'
   AND (m.payload::json ->> 'source') = 'team' AND (m.payload::json ->> 'kind') = 'direct';
 `
+
+/** Frees the handle active, which @active now names, from the one agent that may hold it. */
+export const TEAM_ACTIVE_HANDLE = `
+UPDATE team_member SET
+  handle = CASE WHEN EXISTS (SELECT 1 FROM team_member WHERE handle = 'active-task')
+    THEN 'active-task-' || left(md5(task_id), 6) ELSE 'active-task' END,
+  updated_at = to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')
+WHERE handle = 'active';
+`

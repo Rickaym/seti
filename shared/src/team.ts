@@ -5,8 +5,8 @@ import type { TaskStatus } from './tasks.js'
 export const TEAM_AUTHOR_KINDS = ['user', 'ea', 'task', 'mod'] as const
 export type TeamAuthorKind = (typeof TEAM_AUTHOR_KINDS)[number]
 
-/** Mentions that name no task: every active task, the EA, and the user. */
-export const TEAM_RESERVED_HANDLES = ['all', 'ea', 'user'] as const
+/** Mentions that name no task: every active task, every task that worked today, the EA, the user. */
+export const TEAM_RESERVED_HANDLES = ['all', 'active', 'ea', 'user'] as const
 export type TeamReservedHandle = (typeof TEAM_RESERVED_HANDLES)[number]
 
 export const isReservedHandle = (handle: string): handle is TeamReservedHandle =>
@@ -29,7 +29,7 @@ export const teamHandle = z
       .min(1, 'handle is required')
       .max(TEAM_HANDLE_MAX, `handles are at most ${String(TEAM_HANDLE_MAX)} characters`)
       .regex(HANDLE_PATTERN, 'use lowercase letters, digits and inner hyphens')
-      .refine((value) => !isReservedHandle(value), 'all, ea and user are reserved'),
+      .refine((value) => !isReservedHandle(value), 'all, active, ea and user are reserved'),
   )
 
 /** A handle the text names, and the task it named when the message was posted. */
@@ -101,6 +101,8 @@ export interface TeamMember {
   muted: boolean
   /** Running, holding an open session, or busy recently, so @all reaches it. */
   active: boolean
+  /** Started a turn today in the user's timezone, so @active reaches it. */
+  worked_today: boolean
 }
 
 /** The one recipient of a direct message: an agent's @handle, or @ea. */
@@ -115,7 +117,10 @@ export const teamRecipient = z
       .min(1, 'name one recipient')
       .max(TEAM_HANDLE_MAX)
       .regex(HANDLE_PATTERN, 'name one @handle')
-      .refine((value) => value !== 'all', 'a direct message goes to one member, not @all')
+      .refine(
+        (value) => value !== 'all' && value !== 'active',
+        'a direct message goes to one member, not @all or @active',
+      )
       .refine((value) => value !== 'user', 'the user sees every message; mention @user in a public post'),
   )
 

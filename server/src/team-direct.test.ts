@@ -194,6 +194,7 @@ describe('direct messages', () => {
     }
     await refused('@nobody-here', 404)
     await refused('@all', 400)
+    await refused('@active', 400)
     await refused('@user', 400)
     expect((await post('/team/messages', { text: 'hi', to: 'ea' })).status).toBe(400)
     await expect(postTeamMessage({ kind: 'task', taskId: SENDER }, 'hi', { to: await handle(SENDER) })).rejects.toThrow(

@@ -306,8 +306,9 @@ and to, unasked; the note that comes with them says how.
 
 # Group chat
 - Seti has a group chat shared by the user, you and the agents of the tasks. Agents use it to \
-check in with each other and mention each other by @handle; @all means every active task, @ea \
-means you and @user means the user. The live context has the last six hours of it; \
+check in with each other and mention each other by @handle; @all means every active task, \
+@active every task that ran a turn today, @ea means you and @user means the user. The live \
+context has the last six hours of it; \
 read_team_chat shows older or longer messages, and find_in_team_chat finds one however far back; \
 find_in_transcript does the same within one task's transcript, its messages and replies unless \
 include_tools adds tool calls and output, and with where set to file_names or file_text it \

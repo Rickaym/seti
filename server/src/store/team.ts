@@ -41,6 +41,15 @@ export const teamMembers = {
     const [row] = await sql<MemberRecord[]>`SELECT * FROM team_member WHERE task_id = ${taskId}`
     return row && toMember(row)
   },
+  /** Unarchived tasks whose latest turn started at or after `since`; a queued message starts none. */
+  workedSince: async (since: string): Promise<string[]> =>
+    (
+      await sql<{ id: string }[]>`SELECT t.id FROM task t
+        CROSS JOIN LATERAL (SELECT m.created_at FROM task_message m
+          WHERE m.task_id = t.id AND m.kind = 'prompt' AND (m.payload::json ->> 'queued') IS NULL
+          ORDER BY m.id DESC LIMIT 1) AS turn
+        WHERE t.archived_at IS NULL AND turn.created_at >= ${since}`
+    ).map((row) => row.id),
   byHandles: async (handles: readonly string[]): Promise<MemberRow[]> =>
     handles.length === 0
       ? []

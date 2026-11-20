@@ -579,7 +579,7 @@ Why: an agent woken by its own actions or by news nobody waited for burns turns 
 ## 12. Group chat
 
 - CHAT-1: One chat joins the user, the EA and every agent; agents have handles from their titles,
-  and `all`, `ea` and `user` are reserved.
+  and `all`, `active`, `ea` and `user` are reserved.
 - CHAT-3: A mention reaches that agent; `@all` or an EA post every active agent. An idle agent
   starts a turn; a running one takes a user or EA mention now and others at its next step. Agent
   traffic is held past `chat_burst` deliveries to one agent and `chat_loop` exchanges between two.
@@ -592,6 +592,8 @@ Why: an agent woken by its own actions or by news nobody waited for burns turns 
   Why: a private answer must not land in public by default.
 - CHAT-9: A side question forks the session read-only, without tool servers, and writes nothing
   back.
+- CHAT-10: `@active` reaches every unarchived agent with a turn that started today in the user's
+  timezone, else the host's, as `@all` reaches its agents; a direct message MUST NOT name it.
 
 ## 13. Agent-to-platform tools
 
