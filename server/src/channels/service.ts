@@ -6,6 +6,7 @@ import {
   type ChannelSecret,
   type ChannelSecretPending,
   type WebhookChannelInfo,
+  type WebhookFilterInfo,
   type WebhookSourceInfo,
   type channelCreateInput,
   type channelUpdateInput,
@@ -21,6 +22,7 @@ import { newHookId, newSecret } from './signature.js'
 import { requireWebhookSource } from './source-info.js'
 import { channelSubscriptions } from '../store/channel-subscriptions.js'
 import { channelStore, type ChannelRecord } from '../store/channels.js'
+import { webhookFilterStore } from '../store/webhook-filters.js'
 import { signalWorkspaces } from '../workspace/dir.js'
 
 /** The receiver behind /hooks; its events go to each channel's subscribers. */
@@ -34,6 +36,12 @@ export function signalTasks(taskIds: readonly string[]): void {
   for (const taskId of taskIds) {
     signalWorkspaces('task', taskId)
   }
+}
+
+/** A webhook's filter with what it did over the last 24 hours; null without one. */
+async function filterInfo(channel: string): Promise<WebhookFilterInfo | null> {
+  const saved = await webhookFilterStore.get(channel)
+  return saved === undefined ? null : { ...saved, day: await webhookFilterStore.day(channel, now()) }
 }
 
 async function info(record: ChannelRecord): Promise<WebhookChannelInfo> {
@@ -56,6 +64,7 @@ async function info(record: ChannelRecord): Promise<WebhookChannelInfo> {
     subscriptions: await channelSubscriptions.forChannel(id),
     recent: await channelStore.recent(id, CHANNEL_ACTIVITY_SHOWN),
     deliveries: await channelStore.deliveries(id, CHANNEL_ACTIVITY_SHOWN),
+    filter: await filterInfo(id),
   }
 }
 

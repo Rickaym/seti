@@ -1,5 +1,6 @@
 import type { EngineInput, EngineLimits } from './engine.js'
 import type { ReadOutput } from './items.js'
+import type { PoolMessage } from '../quickjs/pool.js'
 
 /** What the worker's fetch may reach and how much it reads; Seti's guards apply in the worker. */
 interface FetchSettings {
@@ -27,8 +28,7 @@ export interface RunRequest {
 /** A finished run, with every secret value already replaced. */
 export type RunResult = { ok: true; output: ReadOutput; logs: string[] } | { ok: false; error: string; logs: string[] }
 
-/** Worker to server: ready once loaded, then one reply per run; `retire` asks for a new worker. */
-export type WorkerMessage =
-  | { type: 'ready' }
-  | { type: 'result'; runId: number; result: RunResult; retire?: true }
-  | { type: 'error'; runId: number; error: string }
+export type WorkerMessage = PoolMessage<RunResult>
+
+/** One run as the pool takes it; the pool numbers it. */
+export type PollRequest = Omit<RunRequest, 'runId'>

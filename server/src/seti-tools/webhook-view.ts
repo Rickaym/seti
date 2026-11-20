@@ -1,4 +1,4 @@
-import type { ChannelDelivery, ChannelEvent, WebhookChannelInfo } from '@seti/shared'
+import { WEBHOOK_FILTER_LIMITS, type ChannelDelivery, type ChannelEvent, type WebhookChannelInfo } from '@seti/shared'
 import { subscriberView } from './channel-refs.js'
 
 const ACTIVITY_SHOWN = 5
@@ -16,12 +16,25 @@ const eventView = ({ title, kind, severity, url, created_at }: ChannelEvent) => 
   created_at,
 })
 
-export const deliveryView = ({ received_at, status, http_status, reason, routes }: ChannelDelivery) => ({
+export const deliveryView = ({ received_at, status, http_status, reason, routes, filter }: ChannelDelivery) => ({
   received_at,
   status,
   http_status,
   reason,
   routes: routes.map(({ target, task_id, outcome, reason: why }) => ({ target, task_id, outcome, reason: why })),
+  ...(filter === null ? {} : { filter }),
+})
+
+/** A webhook's filter with its code in full, since this is where it can be read before a change. */
+const filterView = (filter: NonNullable<WebhookChannelInfo['filter']>) => ({
+  enabled: filter.enabled,
+  on_error: filter.on_error,
+  last_24h: filter.day,
+  failures_in_a_row: filter.failures,
+  ...(filter.failures >= WEBHOOK_FILTER_LIMITS.failuresBeforeWarning
+    ? { warning: `The filter failed its last ${String(filter.failures)} runs: ${filter.last_error ?? ''}` }
+    : {}),
+  code: filter.script,
 })
 
 /** A webhook as an agent needs it: where senders post, how it signs, and never its secret. */
@@ -38,6 +51,7 @@ export const webhookView = (info: WebhookChannelInfo, shown = ACTIVITY_SHOWN) =>
   secret: info.secret_pending === null ? 'set' : SECRET_STATES[info.secret_pending],
   secret_rotated_at: info.secret_rotated_at,
   subscribers: info.subscriptions.map(subscriberView),
+  filter: info.filter === null ? null : filterView(info.filter),
   recent_events: info.recent.slice(0, shown).map(eventView),
   deliveries: info.deliveries.slice(0, shown).map(deliveryView),
 })
