@@ -582,6 +582,54 @@ Zoom (a computed reply to its URL check), Notion (an unsigned token request), In
 check), Twitch EventSub (no separators in the signed text) and Supabase Auth hooks (a reply body).
 [Mods](mods.md#channel-sources) shows how to write one.
 
+### Webhook filters
+
+A filter is a short piece of JavaScript that runs on each verified delivery before any subscriber
+or the EA sees it, for when a webhook sends more than you want (CHN-32). Add, in the Filter row of
+the webhook's card, opens the editor with the full contract under Filter API. The function gets the event as
+the sender produced it: `event` (such as `issue.create`), `action`, `title`, `link`, `detail`,
+`headers` (a few that name the event, such as `x-github-event`; never a signature or token) and
+`payload`, the parsed body. It returns `false` or `null` to drop the delivery, `true` to keep it,
+or an object that replaces any of `event`, `title`, `link` and `detail`. It may be async, and
+`log(...)` writes lines that Test shows.
+
+Drop Linear issue events that are not assigned to you, where `ME` is your Linear user id (the
+`id` that Linear's GraphQL query `{ viewer { id } }` returns):
+
+```js
+const ME = 'your-linear-user-id'
+
+export default function filter({ event, payload }) {
+  if (!event.startsWith('issue')) return true
+  return payload.data?.assigneeId === ME
+}
+```
+
+Keep only failed GitHub check runs, with a title that says which:
+
+```js
+export default function filter({ event, payload }) {
+  if (event !== 'check_run.completed') return false
+  const run = payload.check_run
+  if (run.conclusion !== 'failure') return false
+  return { title: `${run.name} failed in ${payload.repository.full_name}`, link: run.html_url }
+}
+```
+
+Test runs the code as edited against the newest 20 deliveries and, optionally, a request pasted
+under Sample, and shows for each whether it would be kept, changed, dropped or fail, with the log;
+it stores and sends nothing. The switch beside Filter turns the filter off without losing the
+code, and clearing the code and saving removes it.
+
+The card shows what the filter did over the last 24 hours. Activity marks a dropped delivery as
+`filtered out` and one the filter reshaped as `changed by filter`. A filter that throws, runs past
+its second, uses more than 32 MB or returns anything else never loses a delivery: the delivery goes
+on unchanged, Activity says `filter failed` with the error, and after three failures in a row the
+card shows a warning until a run succeeds or the code changes. The EA, after your yes, and agents
+at Seti control Full may write a filter, as they may a poller script without secrets; every change
+is in the audit log with a hash of the code, and `update_channel` and `test_channel_script` carry
+the same contract for them.
+
 ### Pollers
 
 New, Poller starts from a template that stays a plain script to edit: Blank is Seti's own, and

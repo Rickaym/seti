@@ -13,7 +13,7 @@ their own. Seti uses the reference values in the protocol's Appendix A.
                           |-- routes, store (PostgreSQL), audit chain
                           |-- runner: one Claude Code process per open agent, each under bwrap
                           |   in a systemd scope, with an egress proxy reached by a unix socket
-                          |-- poller worker threads (QuickJS in WebAssembly)
+                          |-- poller and webhook filter worker threads (QuickJS in WebAssembly)
                           |-- schedulers: PR poller, reminders, backups, retention, EA inbox
                           |-- children: reminder runs, mod logic runner, file converters
                           '-- Redis: shared caches and event relay
@@ -26,6 +26,7 @@ their own. Seti uses the reference values in the protocol's Appendix A.
 | Agent sessions        | Claude Code through the Claude Agent SDK, one process of about 300 MB each | 3.2, 7.2, 7.8 |
 | `seti-ea.service`     | The EA in `ea/`, a pipecat process with its own token                      | 14            |
 | Poller workers        | Worker threads in the server (`SETI_POLLER_WORKERS`, 2 by default)         | CHN-12        |
+| Filter workers        | Two worker threads in the server, a fresh QuickJS engine per delivery      | CHN-32        |
 | Reminder runs         | A fresh `node --permission` child per run, inside `bwrap --unshare-all`    | CHN-20        |
 | Mod logic runner      | Long-lived children (`SETI_MOD_WORKERS`), a fresh QuickJS engine per event | MOD-12        |
 | Converters            | poppler, LibreOffice, ffmpeg, ffprobe and resvg for share pages, sandboxed | PUB-7         |
@@ -129,7 +130,9 @@ the AppArmor profile for `bwrap` that the installer adds ([Setup](setup.md#sandb
 - **Script engines.** Pollers run in QuickJS compiled to WebAssembly, a fresh engine per run on a
   worker thread; memory is capped by the WebAssembly maximum, a worker has a 128 MB heap and is
   terminated 2 seconds past its run's timeout, and the worker replaces every secret value in what
-  it returns. Reminders run in a child Node with `--permission`, an empty environment and a module
+  it returns. Webhook filters use the same engine and worker pool code
+  (`server/src/quickjs/pool.ts`) on workers of their own with no host functions but `log`, warmed
+  at startup when any filter is on, so a delivery starts no process. Reminders run in a child Node with `--permission`, an empty environment and a module
   hook that admits only pure builtins, inside `bwrap --unshare-all`; `server/src/script-sandbox.ts`
   builds that command for reminders and mod logic alike.
 - **Converters.** `server/src/converter.ts` runs each converter in bwrap with every namespace

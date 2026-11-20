@@ -7,6 +7,8 @@ import {
   channelSubscribeInput,
   channelUpdateInput,
   senderSampleInput,
+  webhookFilterInput,
+  webhookFilterTestInput,
 } from '@seti/shared'
 import { Hono } from 'hono'
 import { z } from 'zod'
@@ -28,6 +30,8 @@ import {
   unsubscribeChannel,
   updateChannel,
 } from '../channels/actions.js'
+import { setWebhookFilter } from '../channels/filter-actions.js'
+import { testFilter } from '../channels/filter-test.js'
 import { channelsSummary } from '../channels/health.js'
 import { webhooks } from '../channels/service.js'
 import { HOOK_ID } from '../channels/signature.js'
@@ -82,6 +86,12 @@ export const channelRoutes = new Hono()
     return ok(c, { id })
   })
   .post('/:id/test', valid('param', idParam), async (c) => ok(c, await webhooks.sendTest(c.req.valid('param').id)))
+  .put('/:id/filter', valid('param', idParam), validJson(webhookFilterInput), async (c) =>
+    ok(c, await setWebhookFilter(c.req.valid('param').id, c.req.valid('json'))),
+  )
+  .post('/:id/filter/test', valid('param', idParam), validJson(webhookFilterTestInput), async (c) =>
+    ok(c, await testFilter(c.req.valid('param').id, c.req.valid('json'))),
+  )
   .get('/:id/subscriptions', valid('param', idParam), async (c) =>
     ok(c, await subscriptions.list(c.req.valid('param').id)),
   )

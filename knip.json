@@ -7,6 +7,7 @@
     "server": {
       "entry": [
         "src/pollers/worker.ts",
+        "src/channels/filter-worker.ts",
         "src/reminders/runner.ts",
         "src/shared-tool-server.ts",
         "src/mods/logic/runner.ts",

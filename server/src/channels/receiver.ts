@@ -2,6 +2,8 @@ import { randomUUID } from 'node:crypto'
 import type { ChannelDeliveryStatus, ChannelRoute } from '@seti/shared'
 import type { ContentfulStatusCode } from 'hono/utils/http-status'
 import { redactSecrets } from '../scrub.js'
+import { applyFilter, type Filtered } from './filter-apply.js'
+import type { FilterPool } from './filter-run.js'
 import { clip, eventDraft, publishEvent, routedReason, type RouteEvent } from './publish.js'
 import { createRateLimiter } from './rate-limit.js'
 import { channelSender, channelSource } from './sender-info.js'
@@ -25,6 +27,15 @@ export interface HookResult {
 
 type Recorded = HookResult & { status: ChannelDeliveryStatus }
 
+/** What the delivery log keeps besides the outcome; a filtered-out delivery keeps no excerpt. */
+interface Extra {
+  delivery_id?: string | null
+  event_id?: number
+  excerpt?: string
+  routes?: ChannelRoute[]
+  filtered?: Filtered
+}
+
 interface RateLimits {
   perChannel: number
   global: number
@@ -35,6 +46,8 @@ export interface ReceiverDeps {
   route: RouteEvent
   limits?: RateLimits
   now?: () => Date
+  /** The workers webhook filters run on; tests give their own. */
+  filters?: FilterPool
 }
 
 const DEFAULT_LIMITS: RateLimits = { perChannel: 60, global: 600, windowMs: 60_000 }
@@ -131,12 +144,7 @@ export function createReceiver(deps: ReceiverDeps) {
   const channelLimit = createRateLimiter(limits.perChannel, limits.windowMs, clock)
   const globalLimit = createRateLimiter(limits.global, limits.windowMs, clock)
 
-  async function finish(
-    channel: ChannelRecord,
-    at: string,
-    result: Recorded,
-    extra: { delivery_id?: string | null; event_id?: number; excerpt?: string; routes?: ChannelRoute[] } = {},
-  ): Promise<HookResult> {
+  async function finish(channel: ChannelRecord, at: string, result: Recorded, extra: Extra = {}): Promise<HookResult> {
     await channelStore.delivered({
       channel: channel.id,
       received_at: at,
@@ -147,6 +155,8 @@ export function createReceiver(deps: ReceiverDeps) {
       event_id: extra.event_id ?? null,
       excerpt: extra.excerpt ?? '',
       routes: extra.routes ?? [],
+      filter: extra.filtered?.filter ?? null,
+      sample: extra.filtered?.sample ?? null,
     })
     if (result.status === 'rejected') {
       process.stderr.write(`hooks: refused a delivery to ${channel.name}: ${result.reason}\n`)
@@ -179,13 +189,19 @@ export function createReceiver(deps: ReceiverDeps) {
       const result: Recorded = { http: 200, status: 'ignored', reason: clip(parsed.reason, TEXT_MAX.title) }
       return finish(channel, at, result, { delivery_id: deliveryId, excerpt })
     }
+    const subject = { channel: channel.id, fields: parsed.fields, headers: request.headers, payload: decoded.payload }
+    const filtered = await applyFilter(subject, at, deps.filters)
+    if (filtered.dropped !== null) {
+      const result: Recorded = { http: 200, status: 'filtered', reason: filtered.dropped }
+      return finish(channel, at, result, { delivery_id: deliveryId, filtered })
+    }
     const since = new Date(Date.parse(at) - DEDUPE_WINDOW_MS).toISOString()
-    const draft = eventDraft(parsed.fields, `${deliveryId}@${at}`)
+    const draft = eventDraft(filtered.fields, `${deliveryId}@${at}`)
     const claim = { id: deliveryId, since }
     const { accepted, routes } = await publishEvent(channel.id, draft, { at, route: deps.route, claim })
     const eventId = accepted.kind === 'event' ? { event_id: accepted.event.id } : {}
     const result: Recorded = { http: 200, ...outcomeOf(accepted, routes) }
-    return finish(channel, at, result, { delivery_id: deliveryId, excerpt, routes, ...eventId })
+    return finish(channel, at, result, { delivery_id: deliveryId, excerpt, routes, filtered, ...eventId })
   }
 
   return {

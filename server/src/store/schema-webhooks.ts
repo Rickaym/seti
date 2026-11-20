@@ -99,3 +99,36 @@ UPDATE channel_poller SET preset = 'poller-templates.feed' WHERE preset = 'feed'
 export const CHANNEL_SENDER = `
 ALTER TABLE channel ADD COLUMN sender TEXT;
 `
+
+/**
+ * A webhook's filter, its hourly counts for the card, and on each delivery what the filter did
+ * plus the redacted sample a test run replays, kept on the newest deliveries only.
+ */
+export const WEBHOOK_FILTERS = `
+CREATE TABLE webhook_filter (
+  channel TEXT PRIMARY KEY REFERENCES channel(id) ON DELETE CASCADE,
+  script TEXT NOT NULL,
+  enabled BOOLEAN NOT NULL,
+  failures INTEGER NOT NULL DEFAULT 0,
+  last_error TEXT,
+  last_error_at TEXT,
+  updated_at TEXT NOT NULL
+);
+
+CREATE TABLE webhook_filter_hour (
+  channel TEXT NOT NULL REFERENCES channel(id) ON DELETE CASCADE,
+  hour TEXT NOT NULL,
+  kept INTEGER NOT NULL DEFAULT 0,
+  changed INTEGER NOT NULL DEFAULT 0,
+  dropped INTEGER NOT NULL DEFAULT 0,
+  failed INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (channel, hour)
+);
+
+ALTER TABLE channel_delivery ADD COLUMN filter TEXT
+  CHECK (filter IN ('kept', 'changed', 'dropped', 'failed'));
+ALTER TABLE channel_delivery ADD COLUMN filter_error TEXT;
+ALTER TABLE channel_delivery ADD COLUMN event_kind TEXT NOT NULL DEFAULT '';
+ALTER TABLE channel_delivery ADD COLUMN event_title TEXT NOT NULL DEFAULT '';
+ALTER TABLE channel_delivery ADD COLUMN sample TEXT;
+`

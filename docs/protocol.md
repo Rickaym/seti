@@ -279,7 +279,10 @@ interrupted only for that.
   workspace, its "Active workspace only" setting (default on) is off, or the agent is in the
   workspace it has open. The mute and the tiers apply first. A device MUST be skipped while its
   page shows the agent or has focus (report at most `focus_ttl` old). Counts the user reads on
-  purpose (status bar, app icon, workspace switcher) MUST cover every workspace.
+  purpose (status bar, app icon, workspace switcher) MUST cover every workspace. A page reports
+  its open workspace once when it loads, and after that only when it differs from the one its
+  browser last reported: on a switch, or on showing again after another of the browser's pages
+  reported a different one.
 - ATT-18: Payload: `title`, `body`, `tag` (the agent id; a newer push replaces an older), `url`,
   `kind`, `badge` (Needs you count across workspaces). Body: finished -> `closing_line` or
   `Ended its turn without a reply`; blocked -> reason line; asking -> `Asks: <question>`; error ->
@@ -515,7 +518,8 @@ interrupted only for that.
   `up`, null), `dedupe_key` and `occurred_at`, redacted. It is unique per channel and
   `dedupe_key`; per subject a repeated state is a duplicate and a first `up` a baseline.
 - CHN-6: Webhooks take `POST /hooks/<id>` (18 random bytes, URL-safe); anything else is 404.
-  Answers: 200 `{status: accepted | duplicate | ignored, reason}`, 400, 401, 413, 415, 429 with
+  Answers: 200 `{status: accepted | duplicate | ignored | filtered, reason}`, 400, 401, 413, 415,
+  429 with
   `Retry-After`, 503.
 - CHN-7: A delivery MUST prove the channel's secret, compared in constant time, before any parser
   reads it. The sender is a mod's (it names the header; 503 while the mod is off), the control
@@ -530,6 +534,19 @@ interrupted only for that.
   event, title, link and detail. A timestamp beyond `max_age_s`, past or future, MUST be refused.
   A URL check is answered only after the signature verifies, with one string field of it, at most
   256 characters, as text.
+- CHN-32: A webhook MAY have a filter, a JavaScript module whose default export (possibly async)
+  gets `{event, action, title, link, detail, headers, payload}` after verification and parsing and
+  before any subscriber. `headers` is an allowlist of headers naming the event, never one about
+  authorization, signatures, tokens or cookies. It returns `false` or `null` to drop the delivery
+  (`filtered`, no event stored), `true` to keep it, or an object replacing any of `event`, `title`,
+  `link` (http or https) and `detail` with strings. It runs with no network, files, timers or
+  processes (`filter_limits`). A throw, timeout or any other return keeps the delivery unchanged;
+  the log says `filter failed` with the error, never the payload, and `filter_warn` failures in a
+  row warn on the webhook. Each delivery logs what the filter did, and each webhook counts kept,
+  changed, dropped and failed deliveries for 24 hours. A test runs code against the newest
+  `filter_samples` deliveries and a pasted request and stores and sends nothing. Delegates write a
+  filter as they write a poller script without secrets (CHN-19); approval and the tools show its
+  code in full, and the audit records its hash.
 - CHN-19: Only the user gives a poller extra hosts or secrets, edits a poller that sends secrets,
   writes a custom sender, supplies a webhook secret, or checks a sample. Delegates MAY create a
   webhook for a catalog sender; it refuses deliveries until the user supplies the secret.
@@ -884,6 +901,7 @@ others.
 | Shared tools | `tool_schema` 30 properties, depth 4, 8 KB; description 20 to 1500; timeout 1 to 600 s (default 120); 5 needs of 1 to 5 hosts. `tool_script` 64 KB. `tool_output` 256 KB.                 |
 | Events       | Event `title` 200, `detail` 2000, `kind` 80. Subscription `events` 20 kinds. Log excerpt 1000. `route_retry` 30 s to 1 h, 12 attempts.                                                    |
 | Webhooks     | `hook_replay` 24 h. `hook_limits`: body 256 KB, 60 a minute per channel, 600 overall. Sender `max_age_s` 30 s to 1 day (default 300 s); detail 0 to 2000 characters (default 1000).       |
+| Filters      | `filter_limits`: code 10,000 characters; 32 MB; compute and wall 1 s; 2 workers, 2 s wait for one; output 16 KB; 20 log lines. `filter_warn` 3. `filter_samples` 20, each at most 256 KB. |
 | Pollers      | `poller_limits`: interval 1 min to 1 day (default 5 min); timeout 5 to 120 s (default 30); compute 1 s unawaited, 10 s a run; 48 MB; 500 items; output 1 MB; state 16 KB; 3 runs at once. |
 | Poller fetch | 20 requests a run, 5 redirects, 4 MB each, 12 MB a run. `poller_backoff` 6 h. `fail_streak` 5 (reminders 3).                                                                              |
 | Reminders    | `reminder_limits`: interval 1 min to 7 days; 5 s; 256 MB; message 2000; state 16 KB. `cron_catchup` 1 h.                                                                                  |

@@ -236,6 +236,7 @@ export const AUDIT_KINDS = [
   'system.channel_subscribed',
   'system.channel_unsubscribed',
   'system.channel_filter_changed',
+  'system.webhook_filter_changed',
   'system.channel_mode_changed',
   'system.channel_delivery_changed',
   'system.channel_polled',
