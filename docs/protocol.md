@@ -318,9 +318,10 @@ interrupted only for that.
     requests; publishing or re-enabling shared tools; reviewing knowledge notes;
   - identity: prompts as the user; share links; sign-in, passkeys and devices; installing
     plugins; installing, granting or enabling third-party mods;
+  - storage: removing orphans (RES-17); the automatic clean (RES-18);
   - for delegates other than the EA: answering a question (the EA relays); memory and CPU caps
-    and compaction; disabling or removing a shared tool and switching the repeat guard (the EA
-    after the user's yes).
+    and compaction; disabling or removing a shared tool, switching the repeat guard and cleaning
+    an agent's folders (the EA after the user's yes).
 - ACT-5: A delegate reaches another agent only through the group chat, which marks the author.
 - ACT-6: Agents propose reserved changes with `request_change` (7.6); only the user's own Allow
   applies one.
@@ -681,6 +682,17 @@ Why: an agent woken by its own actions or by news nobody waited for burns turns 
 - RES-15: Archive packs the agent's folders and transcript; restore puts them back; delete removes
   them, without a shell, and only a real directory one level below an owned root that no other
   agent uses.
+- RES-16: Clean removes only rebuildable folders (dependencies, virtualenvs, caches by name; build
+  output only where its repository ignores it) inside folders the control room made for one agent,
+  and only those both its preview and the confirm name. It MUST NOT remove a folder version control
+  tracks files in, reach through a symlink, or run while the agent runs a turn or background work.
+- RES-17: An orphan is a folder in a control-room root that no agent, live or archived, owns, or a
+  worktree record whose folder is gone. One that changed within `orphan_grace`, is in use, or holds
+  uncommitted changes or unpushed commits MUST NOT be removed; it is listed with the reason.
+- RES-18: The automatic clean is off by default. When on, it cleans agents idle past 7, 14 or 30
+  days and archived agents, never a running one, and records what it freed.
+- RES-19: Sizes are measured in the background within `size_walk`; a read MUST NOT wait for a walk,
+  and a walk cut short reports its size as a floor.
 
 ## 16. Audit
 
@@ -810,6 +822,7 @@ An implementation is SETI-compatible when it meets all of:
 | Mods          | all MOD                                                              |
 | Sharing       | PUB-4, PUB-7                                                         |
 | Devices       | API-11                                                               |
+| Storage       | RES-16 to RES-19                                                     |
 
 An implementation without the Sandbox profile MUST NOT claim that agents are untrusted, and MUST
 treat every agent as holding the user's access.
@@ -878,6 +891,7 @@ others.
 | Questions    | Answer batch 100 items. `notes_waiting` 10. Index 1500 characters. `note_stale` 3 failed checks in a row, or unverified 30 days (fact, environment) or 90 days (how-to, gotcha).          |
 | Assistant    | `ask_ttl` 10 min. `settle` quiet 45 s, at most 3 min. `call_silence` 30 s. `wake_phrase` 2 to 40 characters, at most 4 words. `keep_awake_seconds` 5 to 600.                              |
 | Resilience   | `stop_grace` 7 s. `resume_pace` 3 starts 2 s apart, 20 s between groups. `grant_ttl` 15 min. `send_window` 24 h.                                                                          |
+| Storage      | `orphan_grace` 1 h. `size_walk` 400,000 entries or 20 s per folder.                                                                                                                       |
 | Audit        | `audit_keep` 365 days. Summary 300. Detail string 500.                                                                                                                                    |
 | Mods         | Storage 64 KB a value, 1 MB a mod. Ask 10 min, 3 open a mod. Update delay 24 h. Command timeout 1 to 600 s. Schedule 5 min to 1 day.                                                      |
 | Mod engine   | `mod_limits`: 32 MB; compute 5 s; wall 10 s (schedule 30 s); 50 calls; 10 fetches; queue 20; 60 events a minute; 20 failures an hour turn the mod off.                                    |
@@ -922,6 +936,7 @@ Where the reference implementation keeps each section, for contributors. Paths a
 | 13 Tools       | `seti-tools/`, `questions.ts`, `house-rules.ts`, `knowledge.ts`                                                            |
 | 14 Assistant   | `ea/src/seti_ea/` (`gate.py`, `asks.py`, `inbox.py`, `settle.py`), `routes/ea-replies.ts`                                  |
 | 15 Resilience  | `restart-cut.ts`, `restart-resume.ts`, `permission-grants.ts`, `client-sends.ts`, `owned-dirs.ts`                          |
+| 15 Storage     | `storage-clean.ts`, `storage-orphans.ts`, `storage-schedule.ts`, `rebuildable.ts`, `dir-size.ts`, `size-cache.ts`          |
 | 16 Audit       | `audit.ts`, `store/audit.ts`                                                                                               |
 | 17 Mods        | `mods/`, `shared/src/mods.ts`, `packages/mod-api/`                                                                         |
 | 18 Public      | `access.ts`, `routes/share-public.ts`, `rate-limit.ts`, `security-headers.ts`                                              |

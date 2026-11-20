@@ -432,12 +432,23 @@ audit log, the server log or the EA.
 
 ## Agent files
 
-The Files view reads an agent's working directory, its other folders and its Seti workspace, and
-nothing else. Every path resolves through its symlinks and must stay inside its root; the sandbox's
-hidden paths, Claude Code's data and Seti's own data outside the agent's worktree and workspace are
-refused, and dot files open only when asked for. The user can save text files but not delete or
-rename them, each save must name the content it replaces and is audited without its text, and the
-EA can read but not save.
+The Files view reads an agent's working directory, its other folders, its Seti workspace and, for a
+sandboxed agent, its private sandbox home and `/tmp`, and nothing else. Every path resolves through
+its symlinks and must stay inside its root; the sandbox's hidden paths, Claude Code's data and
+Seti's own data outside the agent's worktree, workspace and sandbox home and `/tmp` are refused,
+the sandbox home's logins and Claude data are hidden like the user's own, and dot files open only
+when asked for. The user can save text files but not delete or rename them, each save must name
+the content it replaces and is audited without its text, and the EA can read but not save. The
+workspace and the sandbox roots are read-only.
+
+Storage removes folders only through `server/src/owned-dirs.ts`. Clean removes a folder with a
+rebuildable name inside a folder Seti made for that agent, reached through no symlink, holding no
+file git tracks, and never while the agent runs; the EA may clean one agent after the user's yes,
+and agents get no tool for it. Removing orphans and the automatic clean are the user's alone: the
+functions refuse the EA, agents and mods, and an orphan with uncommitted changes or unpushed
+commits is never removed. The git commands that check this run through `agentGit`, so a
+repository's config, hooks and helpers run nothing. Every removal is audited with its path and the
+bytes freed, never file contents.
 
 The EA reads an agent's files through these same routes, with two more limits enforced on the
 server (`server/src/ea-files.ts`): files whose names mark keys, credentials or env files, the list

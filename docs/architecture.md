@@ -756,10 +756,11 @@ repo's base branch the next time the agent's process starts, because the sandbox
 missing folder. `server/src/worktree-restore.ts` does this, notes it in the transcript and audits it
 as `task.worktree_restored`. Commits on a branch survive; uncommitted changes from before do not.
 
-The bundle leaves out dependencies, virtual environments, build outputs and caches
-(`node_modules`, `.venv`, `dist`, `build`, `target`, `.cache` and the like), which a reinstall or
-build remakes. Each archiving gets its own bundle name, so a leftover bundle never stands in for a
-newer folder; the bundle is read back in full before any original is removed.
+The bundle leaves out the rebuildable folders Storage names (`REBUILDABLE_DIRS` and
+`REBUILDABLE_IF_IGNORED` in `shared/src/storage.ts`: `node_modules`, `.venv`, `dist`, `build`,
+`target`, `.cache` and the like), which a reinstall or build remakes. Each archiving gets its own
+bundle name, so a leftover bundle never stands in for a newer folder; the bundle is read back in
+full before any original is removed.
 
 Every removal goes through `server/src/owned-dirs.ts`. A folder is removed only when its path is
 plain and absolute, it sits exactly one level below its root, it is a real directory rather than a
@@ -767,23 +768,62 @@ symlink, its real path stays in that root, the root is neither `/` nor the home 
 agent, live or archived, has it or anything in it as a working directory, added directory or repo.
 The scratch folder is the one named for the task's own id among its working and added directories,
 so a directory the user picked is never touched. A folder a process works in (read from
-`/proc/*/cwd`) or that git holds a lock in stays, and its agent's files are left pending. Removal is
-`fs.rm` on that checked path; no shell runs.
+`/proc/*/cwd`) or that git holds a lock in stays, and its agent's files are left pending. A linked
+worktree goes through its main checkout's `git worktree remove`; anything else is `fs.rm` on that
+checked path, and no shell runs. `removeNestedDir` removes one rebuildable folder inside such a
+folder: the agent folder passes the same checks, the target has a rebuildable name (or is the
+sandbox's own `tmp`), and its real path is the agent folder's real path joined with the target's
+relative path, so no symlink on the way leads elsewhere.
 
 An hourly lifecycle sweep (`server/src/retention.ts`, beside the auto-archive sweep) packs the
 folders of archived agents that are pending, including agents archived before bundles existed,
 frees worktrees a process held at archive time, and deletes archived agents past the delete rule.
 The delete rule (`archive_settings.delete_after_days`) is off by default; it skips pinned agents
-and ones with uncommitted changes in a worktree.
+and ones with uncommitted changes in a worktree. The EA's `archive_agent` and `delete_agent` call
+the same routes as the UI, so they pack and remove the same folders.
 
-Agents also leave folders no task records, such as ad-hoc clones in `~/work` and stray worktrees.
-`GET /api/archive/stale-folders` lists the folders in the scratch and worktree roots that no agent
-owns or is named for and that nothing changed for 7 days, with sizes, and changes nothing.
-`POST /api/archive/stale-folders/delete` takes the paths and `confirm: true`, checks each again and
-deletes only those still stale; a linked worktree goes through its main checkout's `git worktree
-remove`. The EA reaches both through `get_archive_settings` and `run_archive_sweep`, and its
-`archive_agent` and `delete_agent` call the same routes as the UI, so they pack and remove the same
-folders.
+## Storage measures folders in the background and cleans only what can be rebuilt
+
+`GET /api/storage` (`server/src/storage-overview.ts`) answers at once from what is measured so far:
+each agent's folders (`server/src/storage-folders.ts`: its scratch folder, worktrees, workspace and
+sandbox folder, which Seti made, and checkouts it was given, which it did not), their sizes, what
+Clean would free, the orphans, the disk's free space and the automatic clean's settings, with
+`measuring` while background work is pending. Sizes come from `server/src/dir-size.ts`, a walk that
+follows no symlink, counts each hard-linked file once and stops after `SIZE_CAPS` (400,000 entries
+or 20 seconds), marking a size it cut short as `capped`, which the UI shows as "about". One walk
+also gives the size of every folder directly inside, so expanding the tree finds those cached.
+`server/src/size-cache.ts` runs every walk and plan one at a time in a background queue, keeps
+sizes for 10 minutes and serves the old value while a new one is measured; a read never waits for
+a walk. The Files view's tree (`GET /api/tasks/:id/files/tree`, `server/src/task-files-tree.ts`)
+lists one folder through the same checks as `files/list`, with each folder's cached size, a git
+badge from `git status --porcelain=v2 --branch` (`server/src/git-state.ts`, cached for 30
+seconds, 3-second limit) and a rebuildable mark. Every git command there runs through `agentGit`,
+which ignores the repository's config, hooks and helpers. A sandboxed agent's private home and
+`/tmp` are read-only roots of the Files view; the home's logins and Claude data
+(`sandboxHomeHidden`) are hidden like the user's own.
+
+Clean (`server/src/storage-clean.ts`) works only in the folders Seti made for the agent.
+`server/src/rebuildable.ts` finds candidates up to six levels down without entering a `.git`
+folder, a symlink or a candidate, then asks each candidate's repository with one `git ls-files`
+and one `git check-ignore` per batch: a folder git tracks files in stays, and build output stays
+unless git ignores it. A candidate outside any repository counts only when its name always means
+rebuildable. Clean is refused (409) while the agent runs a turn or background work, re-plans on
+confirm, removes only the folders both the plan and the request name, and records one
+`task.storage_cleaned` event with each folder's path in its agent folder and the bytes freed.
+
+Orphans (`server/src/storage-orphans.ts`) are folders in the scratch, worktree, workspace,
+sandbox and archive roots that no agent, live or archived, owns, is named for or works in, plus
+worktree records of agents not archived whose folder is gone. One that changed in the last hour,
+is in use, or holds a repository (a few levels down) with uncommitted changes or commits on no
+remote stays; the listing runs that git check in the background and a removal runs it again.
+Removal goes through `removeOwnedDir` and records `system.orphans_removed`; a record is dropped
+from `task_worktree` and from its checkout. The automatic clean (`server/src/storage-schedule.ts`,
+`storage_settings`) is off by default; when on, an hourly sweep cleans agents idle past 7, 14 or
+30 days and every archived agent, skips running ones and stores the time and bytes of its last
+run. Only the user removes orphans or changes the schedule: `refuseDelegates` refuses the EA,
+agents and mods in those functions. The EA reads the page and trees through `resource_usage` and
+cleans one agent through `run_archive_sweep`'s `clean_agent` after the user's yes; agents get no
+storage tool, and `cleanAgent` refuses them.
 
 ## Knowledge notes reach agents only after the user approves them
 
