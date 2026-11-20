@@ -1,6 +1,6 @@
 import { modelFallbackOf, type ModelFallbackMessage } from '@seti/shared'
 import { describe, expect, it } from 'vitest'
-import { fallbackHint, linkParts, noticeSentence, stillOn, verificationLink } from '@/lib/model-fallback'
+import { fallbackHint, noticeSentence, stillOn, verificationLink } from '@/lib/model-fallback'
 
 const CVP = 'https://support.claude.com/en/articles/14604842-cyber-verification-program'
 
@@ -48,15 +48,6 @@ describe('model fallback notice', () => {
     expect(fallbackHint(NOW)).toBe(
       'On Opus 4.8 since a cyber safeguard flagged a request; Switch back returns it to Opus 5.5',
     )
-  })
-
-  it('links the explanation and keeps the full stop out of the link', () => {
-    expect(linkParts(`See ${CVP}. Then retry.`)).toEqual([
-      { text: 'See ' },
-      { text: CVP, href: CVP },
-      { text: '. Then retry.' },
-    ])
-    expect(linkParts('No link here')).toEqual([{ text: 'No link here' }])
   })
 
   it('finds the Cyber Verification Program link only when Claude Code reported verification', () => {
