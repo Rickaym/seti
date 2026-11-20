@@ -9,8 +9,8 @@ key off the host.
 
 ## Trust model
 
-- The user is the only principal with reserved powers; the EA, agents' Seti tools and mods are
-  delegates the server refuses them in the function that makes the change
+- The user is the only principal with reserved powers. The EA, agents' Seti tools and mods are
+  delegates, and the server refuses them those powers in the function that makes the change
   ([7.1 Actors](protocol.md#71-actors), `server/src/ea-guard.ts`).
 - The sandbox, not the permission rules, is the boundary for an agent
   ([7.2 Sandbox](protocol.md#72-sandbox), [7.3 Egress](protocol.md#73-egress)). An unsandboxed
@@ -58,7 +58,7 @@ Report it privately through GitHub's private vulnerability reporting, never in a
 | Process                          | Runs as                           | Listens                                         |
 | -------------------------------- | --------------------------------- | ----------------------------------------------- |
 | `seti.service`                   | the Seti user (systemd user unit) | `127.0.0.1:3006`; refuses a `Host` not its own  |
-| `seti-ea.service`                | the Seti user                     | `127.0.0.1:3007`; only its token, but `/health` |
+| `seti-ea.service`                | the Seti user                     | `127.0.0.1:3007`; its token only, but `/health` |
 | Agents, terminals, `!` commands  | the Seti user, in bubblewrap      | nothing; loopback to their own egress proxy     |
 | Converters, reminders, mod logic | the Seti user, in bubblewrap      | nothing                                         |
 | `seti-redis@<user>` (optional)   | a system unit, `--with-redis`     | a unix socket only the Seti user opens; no TCP  |

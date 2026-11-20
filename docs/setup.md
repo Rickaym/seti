@@ -515,7 +515,8 @@ model runs for a channel; only an event wakes the EA or a subscribed agent.
 Each agent's subscription says when it gets an update: Agent default (the agent's Updates
 setting), Now, After turn or With message, which are the timings of UPD-2 in
 [the protocol](protocol.md#5-updates-and-delivery). The channel's subscriber list and the
-Channels row of the agent's settings both set it. Only you give a poller extra hosts or secrets,
+Channels row of the agent's settings both set it, and the EA and agents set it with the `delivery`
+argument of `subscribe_channel`. Only you give a poller extra hosts or secrets,
 describe a custom sender, paste a webhook secret or check a sample (CHN-19); the EA and agents at
 Seti control Full create and change the rest, the EA after your yes.
 
