@@ -2,7 +2,8 @@ import http from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { afterAll, describe, expect, it } from 'vitest'
 import { execute } from './execute.js'
-import { createPollerPool, type PollerPool, type PollRequest } from './pool.js'
+import { createPollerPool, type PollerPool } from './pool.js'
+import type { PollRequest } from './worker-protocol.js'
 
 const SECRET = ['poller', 'test', 'secret', 'pool'].join('-')
 

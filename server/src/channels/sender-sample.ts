@@ -56,7 +56,7 @@ async function checkerOf(input: z.output<typeof senderSampleInput>): Promise<Che
 }
 
 /** Headers as copied from a request log: one `Name: value` a line; other lines are skipped. */
-function pastedHeaders(text: string): Headers {
+export function pastedHeaders(text: string): Headers {
   const headers = new Headers()
   for (const line of text.split('\n')) {
     const at = line.indexOf(':')

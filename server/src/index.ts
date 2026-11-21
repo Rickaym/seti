@@ -13,6 +13,7 @@ import { resumeBypass } from './bypass.js'
 import { capabilityCache } from './capabilities.js'
 import { startRequestExpiry } from './change-requests.js'
 import { stopChannelRuns } from './channels/drain.js'
+import { warmFilters } from './channels/filter-actions.js'
 import { startRouteRetries } from './channels/router.js'
 import { startLoginKeeper } from './claude-logins.js'
 import {
@@ -197,6 +198,7 @@ startLoginKeeper()
 resourceSampler.start()
 startInboxSweeper()
 startRouteRetries()
+warmFilters()
 watchSilentSessions()
 followLiveContext()
 await preparePush()

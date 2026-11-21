@@ -2,8 +2,10 @@ import {
   senderDefinition,
   webhookMapping,
   type ChannelSecretPending,
+  WEBHOOK_FILTER_LIMITS,
   type ChannelDelivery,
   type ChannelDeliveryStatus,
+  type DeliveryFilter,
   type ChannelEvent,
   type ChannelRoute,
   type ChannelSource,
@@ -89,9 +91,32 @@ export interface NewDelivery {
   event_id?: number | null
   excerpt?: string
   routes?: ChannelRoute[]
+  filter?: DeliveryFilter | null
+  /** What a filter test replays, as redacted JSON; kept on the newest deliveries only. */
+  sample?: string | null
 }
 
-type DeliveryRow = Omit<ChannelDelivery, 'routes'> & { routes: string }
+type DeliveryRow = Omit<ChannelDelivery, 'routes' | 'filter'> & {
+  routes: string
+  filter: DeliveryFilter['outcome'] | null
+  filter_error: string | null
+  event_kind: string
+  event_title: string
+}
+
+/** A delivery a filter test can replay: what the sender produced and the redacted sample. */
+export interface DeliverySample {
+  received_at: string
+  sample: string
+}
+
+function toDelivery({ filter, filter_error, event_kind, event_title, routes, ...row }: DeliveryRow): ChannelDelivery {
+  return {
+    ...row,
+    routes: JSON.parse(routes) as ChannelRoute[],
+    filter: filter === null ? null : { outcome: filter, event: event_kind, title: event_title, error: filter_error },
+  }
+}
 
 /** What became of a verified delivery: a new event, or why none was stored. */
 export type Accepted =
@@ -227,20 +252,33 @@ export const channelStore = {
     }),
   /** Records one delivery and keeps only the newest DELIVERIES_KEPT per channel. */
   delivered: async (delivery: NewDelivery): Promise<void> => {
+    const { channel, filter = null, sample = null } = delivery
     await sql`INSERT INTO channel_delivery (channel, received_at, status, http_status, reason, delivery_id,
-        event_id, excerpt, routes)
-      VALUES (${delivery.channel}, ${delivery.received_at}, ${delivery.status}, ${delivery.http_status},
+        event_id, excerpt, routes, filter, filter_error, event_kind, event_title, sample)
+      VALUES (${channel}, ${delivery.received_at}, ${delivery.status}, ${delivery.http_status},
         ${delivery.reason}, ${delivery.delivery_id}, ${delivery.event_id ?? null}, ${delivery.excerpt ?? ''},
-        ${JSON.stringify(delivery.routes ?? [])})`
-    await sql`DELETE FROM channel_delivery WHERE channel = ${delivery.channel} AND id < (
-        SELECT min(id) FROM (SELECT id FROM channel_delivery WHERE channel = ${delivery.channel}
+        ${JSON.stringify(delivery.routes ?? [])}, ${filter?.outcome ?? null}, ${filter?.error ?? null},
+        ${filter?.event ?? ''}, ${filter?.title ?? ''}, ${sample})`
+    await sql`DELETE FROM channel_delivery WHERE channel = ${channel} AND id < (
+        SELECT min(id) FROM (SELECT id FROM channel_delivery WHERE channel = ${channel}
           ORDER BY id DESC LIMIT ${DELIVERIES_KEPT}) AS kept)`
+    if (sample !== null) {
+      await sql`UPDATE channel_delivery SET sample = NULL WHERE channel = ${channel} AND sample IS NOT NULL
+        AND id < (SELECT min(id) FROM (SELECT id FROM channel_delivery WHERE channel = ${channel}
+          AND sample IS NOT NULL ORDER BY id DESC LIMIT ${WEBHOOK_FILTER_LIMITS.samplesKept}) AS kept)`
+    }
   },
   deliveries: async (channel: string, limit: number): Promise<ChannelDelivery[]> =>
     (
-      await sql<DeliveryRow[]>`SELECT * FROM channel_delivery WHERE channel = ${channel}
-        ORDER BY id DESC LIMIT ${limit}`
-    ).map((row) => ({ ...row, routes: JSON.parse(row.routes) as ChannelRoute[] })),
+      await sql<DeliveryRow[]>`SELECT id, channel, received_at, status, http_status, reason, delivery_id,
+          event_id, excerpt, routes, filter, filter_error, event_kind, event_title
+        FROM channel_delivery WHERE channel = ${channel} ORDER BY id DESC LIMIT ${limit}`
+    ).map(toDelivery),
+  /** The newest deliveries a filter test can replay, newest first. */
+  samples: async (channel: string): Promise<DeliverySample[]> => [
+    ...(await sql<DeliverySample[]>`SELECT received_at, sample FROM channel_delivery
+      WHERE channel = ${channel} AND sample IS NOT NULL ORDER BY id DESC LIMIT ${WEBHOOK_FILTER_LIMITS.samplesKept}`),
+  ],
   recent: async (channel: string, limit: number): Promise<ChannelEvent[]> => [
     ...(await sql<ChannelEvent[]>`SELECT * FROM channel_event WHERE channel = ${channel} ORDER BY id DESC
       LIMIT ${limit}`),

@@ -89,6 +89,7 @@ import {
   CHANNEL_SUBSCRIPTIONS,
   EA_CHANNEL_MODE,
   WEBHOOK_CHANNELS,
+  WEBHOOK_FILTERS,
 } from './schema-webhooks.js'
 import { WORKSPACE_GRIDS, WORKSPACES } from './schema-workspaces.js'
 
@@ -213,5 +214,6 @@ export const MIGRATIONS: readonly Migration[] = [
   { version: 112, name: 'channel_sender', sql: CHANNEL_SENDER },
   { version: 113, name: 'task_turn_ended_at', sql: TASK_TURN_ENDED_AT },
   { version: 114, name: 'team_active_handle', sql: TEAM_ACTIVE_HANDLE },
-  { version: 115, name: 'storage_settings', sql: STORAGE_SETTINGS },
+  { version: 116, name: 'webhook_filters', sql: WEBHOOK_FILTERS },
+  { version: 117, name: 'storage_settings', sql: STORAGE_SETTINGS },
 ]

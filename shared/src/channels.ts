@@ -4,6 +4,7 @@ import { webhookSourceId, type WebhookSourceInfo } from './channel-sources.js'
 import type { EaNoticeSeverity } from './ea.js'
 import { POLLER_EVENT_KINDS, type PollerInfo } from './pollers.js'
 import { REMINDER_EVENT_KINDS, type ReminderInfo } from './reminders.js'
+import type { DeliveryFilter, WebhookFilterInfo } from './webhook-filter.js'
 import { senderDefinition, type SenderDefinition } from './webhook-senders.js'
 
 /** A change a channel reports for one subject, such as a monitor going down. */
@@ -57,7 +58,15 @@ export type WebhookMapping = z.output<typeof webhookMapping>
 /** How many of its newest runs, events and deliveries each channel lists. */
 export const CHANNEL_ACTIVITY_SHOWN = 3
 
-export const CHANNEL_DELIVERY_STATUSES = ['accepted', 'duplicate', 'ignored', 'rejected', 'rate_limited'] as const
+/** filtered: the webhook's filter dropped it, so no event was stored. */
+export const CHANNEL_DELIVERY_STATUSES = [
+  'accepted',
+  'duplicate',
+  'ignored',
+  'filtered',
+  'rejected',
+  'rate_limited',
+] as const
 export type ChannelDeliveryStatus = (typeof CHANNEL_DELIVERY_STATUSES)[number]
 
 /** An event kind as Seti stores and filters it: lowercase, with runs of spaces as one underscore. */
@@ -137,6 +146,8 @@ export interface ChannelDelivery {
   excerpt: string
   /** Where the event went, one entry per subscriber; empty when no event was stored. */
   routes: ChannelRoute[]
+  /** What the webhook's filter did with it; null when no filter ran. */
+  filter: DeliveryFilter | null
 }
 
 /** reveal: a secret Seti issued for the EA, shown once in Settings; paste: the sender's is due. */
@@ -169,6 +180,8 @@ export interface WebhookChannelInfo extends ChannelCommon {
   sender_definition: SenderDefinition | null
   secret_rotated_at: string | null
   secret_pending: ChannelSecretPending | null
+  /** The code that drops or reshapes deliveries before subscribers get them; null without one. */
+  filter: WebhookFilterInfo | null
 }
 
 export interface PollerChannelInfo extends ChannelCommon {

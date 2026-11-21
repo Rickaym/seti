@@ -48,6 +48,48 @@ async function setVisible(page: Page, visible: boolean): Promise<void> {
   await reported
 }
 
+/**
+ * The page tells Seti its workspace once when it loads and again only when the workspace changes:
+ * moving around the app, polls and showing the page again on the same workspace send nothing.
+ */
+export async function reportsOncePerChange(page: Page, request: APIRequestContext): Promise<void> {
+  const tag = unique('report')
+  await createWorkspace(request, `Report A ${tag}`)
+  const b = await createWorkspace(request, `Report B ${tag}`)
+  const reports: NotifyScopeInput[] = []
+  page.on('request', (req) => {
+    if (req.method() === 'PUT' && req.url().endsWith('/scope')) {
+      reports.push(req.postDataJSON() as NotifyScopeInput)
+    }
+  })
+  const loaded = scopeSaved(page, () => true)
+  await page.goto('/#agents')
+  await loaded
+  expect(reports).toHaveLength(1)
+
+  for (const view of ['#settings/resources', '#agents', '#settings/notifications', '#agents']) {
+    await page.evaluate((hash) => {
+      window.location.hash = hash
+    }, view)
+    await expect(page).toHaveURL(new RegExp(`${view}$`))
+  }
+  await setVisible(page, false)
+  await setVisible(page, true)
+  expect(reports).toHaveLength(1)
+
+  const onB = scopeSaved(page, (change) => change.workspace_id === b.id)
+  await switchWorkspace(page, b.name)
+  await onB
+  await setVisible(page, false)
+  await setVisible(page, true)
+  expect(reports.map((report) => report.workspace_id)).toEqual([reports[0]?.workspace_id, b.id])
+
+  const reloaded = scopeSaved(page, (change) => change.workspace_id === b.id)
+  await page.reload()
+  await reloaded
+  expect(reports).toHaveLength(3)
+}
+
 const workspaceOnly = (page: Page) =>
   page.getByRole('main').getByRole('button', { name: 'Workspace only', exact: true })
 
