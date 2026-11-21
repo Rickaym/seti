@@ -52,6 +52,7 @@ import { SHARED_TOOLS } from './schema-shared-tools.js'
 import { SHARE_PREVIEWS, SHARES } from './schema-shares.js'
 import { loginsToHosts, SSH_HOST_KEYS } from './schema-ssh-keys.js'
 import { importSshHosts, SSH_HOSTS } from './schema-ssh.js'
+import { STORAGE_SETTINGS } from './schema-storage.js'
 import {
   AGENT_START,
   AGENT_WAITS,
@@ -214,4 +215,5 @@ export const MIGRATIONS: readonly Migration[] = [
   { version: 113, name: 'task_turn_ended_at', sql: TASK_TURN_ENDED_AT },
   { version: 114, name: 'team_active_handle', sql: TEAM_ACTIVE_HANDLE },
   { version: 116, name: 'webhook_filters', sql: WEBHOOK_FILTERS },
+  { version: 117, name: 'storage_settings', sql: STORAGE_SETTINGS },
 ]

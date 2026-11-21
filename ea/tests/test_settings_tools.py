@@ -115,6 +115,7 @@ class SettingsFake(FakeSeti):
         self.mods_off: set[str] = set()
         self.archive = {"enabled": True, "days": 3, "updated_at": None}
         self.unseen: list[dict[str, Any]] = []
+        self.clean_plan: dict[str, Any] = dict(CLEAN_PLAN)
         self.revisions: dict[tuple[str, str], list[dict[str, Any]]] = {}
         self.warm: dict[str, dict[str, Any]] = {}
         self.memory: dict[str, Any] = {
@@ -337,29 +338,20 @@ class SettingsFake(FakeSeti):
                     "files_bytes": 50_000_000,
                 }
                 return ok({"settings": self.archive, "preview": preview, "archived": archived})
-            case "GET", ["archive", "stale-folders"]:
-                folders = [
-                    {
-                        "path": "/home/u/work/old-clone",
-                        "bytes": 3_000_000_000,
-                        "checkout": "repo",
-                        "busy": None,
-                    },
-                    {
-                        "path": "/home/u/work/notes",
-                        "bytes": 2_000,
-                        "checkout": None,
-                        "busy": "process 7 works in it",
-                    },
-                ]
-                return ok(
-                    {"days": int(params.get("days") or 7), "folders": folders, "total_bytes": 3_000_002_000}
-                )
-            case "POST", ["archive", "stale-folders", "delete"]:
+            case "GET", ["storage"]:
+                return ok(STORAGE)
+            case "GET", ["tasks", task_id, "files", "roots"]:
+                return ok(ROOTS) if task_id == TASK_LOGOUT else None
+            case "GET", ["tasks", task_id, "files", "tree"]:
+                return ok(tree(params.get("root"), params.get("path"))) if task_id == TASK_LOGOUT else None
+            case "GET", ["storage", "agents", task_id, "clean"]:
+                return ok(self.clean_plan)
+            case "POST", ["storage", "agents", task_id, "clean"]:
                 return ok(
                     {
-                        "deleted": [{"path": "/home/u/work/old-clone", "bytes": 3_000_000_000}],
-                        "refused": [{"path": "/home/u/work/notes", "reason": "process 7 works in it"}],
+                        "removed": [{"path": body["dirs"][0], "bytes": 900_000_000}],
+                        "refused": [{"path": body["dirs"][1], "reason": "process 7 works in it"}],
+                        "freed_bytes": 900_000_000,
                     }
                 )
             case "PUT", ["archive", "settings"]:
@@ -444,6 +436,96 @@ class SettingsFake(FakeSeti):
             case _:
                 return None
 
+
+STORAGE = {
+    "disk": {"path": "/home/u/work", "total_bytes": 500_000_000_000, "free_bytes": 120_000_000_000},
+    "total_bytes": 40_000_000_000,
+    "rebuildable_bytes": 9_000_000_000,
+    "agents": [
+        {
+            "task_id": TASK_LOGOUT,
+            "title": "Fix the logout button",
+            "state": "idle",
+            "last_activity": "2026-09-27T10:00:00.000Z",
+            "size": {"bytes": 30_000_000_000, "files": 400_000, "capped": True},
+            "rebuildable_bytes": 9_000_000_000,
+            "folders": [],
+        }
+    ],
+    "orphans": [
+        {
+            "path": "/home/u/work/old-clone",
+            "kind": "folder",
+            "where": "/home/u/work",
+            "size": {"bytes": 3_000_000_000, "files": 10, "capped": False},
+            "modified_at": "2026-09-01T10:00:00.000Z",
+            "kept": "it has 2 commit(s) that are not pushed",
+        }
+    ],
+    "measuring": False,
+    "schedule": {"enabled": False, "idle_days": 14, "last_run_at": None, "last_freed_bytes": None},
+}
+ROOTS = [
+    {"id": "cwd", "label": "logout", "path": "/home/u/work/logout", "kind": "cwd", "exists": True},
+    {"id": "workspace", "label": "Workspace", "path": "/s/ws", "kind": "workspace", "exists": True},
+]
+
+
+def tree(root: str | None, path: str | None) -> dict[str, Any]:
+    entries = [
+        {
+            "name": "node_modules",
+            "path": "node_modules",
+            "type": "dir",
+            "mtime": "2026",
+            "size": {"bytes": 900_000_000, "files": 12_000, "capped": False},
+            "git": None,
+            "rebuildable": True,
+        },
+        {
+            "name": "app",
+            "path": "app",
+            "type": "dir",
+            "mtime": "2026",
+            "size": {"bytes": 2_000_000_000, "files": 30, "capped": True},
+            "git": {"branch": "main", "dirty": 2, "ahead": 1, "behind": 0},
+            "rebuildable": False,
+        },
+        {"name": "notes.md", "path": "notes.md", "type": "file", "mtime": "2026", "size": {"bytes": 2000}},
+    ]
+    size = {"bytes": 3_000_000_000, "files": 12_031, "capped": True}
+    return {
+        "root": root,
+        "path": path,
+        "size": size,
+        "entries": entries if root == "cwd" else [],
+        "measuring": False,
+    }
+
+
+CLEAN_TARGETS: list[dict[str, Any]] = [
+    {
+        "dir": "/home/u/work/logout/node_modules",
+        "base": "/home/u/work/logout",
+        "path": "node_modules",
+        "bytes": 900_000_000,
+    },
+    {
+        "dir": "/home/u/work/logout/app/dist",
+        "base": "/home/u/work/logout",
+        "path": "app/dist",
+        "bytes": 1000,
+    },
+]
+CLEAN_PLAN: dict[str, Any] = {
+    "task_id": TASK_LOGOUT,
+    "title": "Fix the logout button",
+    "targets": CLEAN_TARGETS,
+    "bytes": 900_001_000,
+    "refused": None,
+    "kept": [],
+    "measuring": False,
+}
 
 RESOURCES = {
     "host": {
@@ -856,26 +938,6 @@ async def test_archive_settings_sweep_and_list(tools: EaTools, fake: SettingsFak
     assert swept.text == "Archived 1 agent: Old spike."
 
 
-async def test_stale_folders_listed_and_deleted_on_yes(tools: EaTools, fake: SettingsFake) -> None:
-    read = await tools.call("get_archive_settings", {"stale_folders": True, "days": 14})
-    assert read.text.splitlines()[-3:] == [
-        "2 stale folders no agent owns, 3 GB in all, largest first:",
-        "- /home/u/work/old-clone: 3 GB, a checkout",
-        "- /home/u/work/notes: 2 KB, in use: process 7 works in it",
-    ]
-    paths = ["/home/u/work/old-clone", "/home/u/work/notes"]
-    asked, done = await confirm(tools, "run_archive_sweep", {"stale_folders": paths, "days": 14})
-    assert "This deletes 2 folders for good" in asked.text
-    assert done.text == (
-        "Deleted 1 folder, freeing 3 GB. Kept 1 folder: /home/u/work/notes because process 7 works in it."
-    )
-    assert writes(fake)[-1] == (
-        "POST",
-        "/api/archive/stale-folders/delete",
-        {"paths": paths, "confirm": True, "days": 14},
-    )
-
-
 async def test_context_file_write_uses_the_hash_it_read(tools: EaTools, fake: SettingsFake) -> None:
     asked, done = await confirm(tools, "write_context_file", {"file": "user", "append": "Always be brief."})
     assert "This changes user-level CLAUDE.md: it adds at its end" in asked.text
@@ -1239,3 +1301,64 @@ async def test_compaction_changes_after_a_yes_for_every_agent_or_one(
     _, refused = await confirm(tools, "set_memory_cap", {"compact_window_k": 0, "compact_at_pct": 70})
     assert not refused.ok
     assert "only to a window you set" in refused.text
+
+
+async def test_storage_overview_is_read_from_resource_usage(tools: EaTools) -> None:
+    read = await tools.call("resource_usage", {"storage": True})
+    assert read.text.splitlines() == [
+        "Agents' folders and orphans take 40 GB; Clean could free 9 GB of rebuildable folders.",
+        "The disk holding /home/u/work has 120 GB free of 500 GB.",
+        "Largest agents: Fix the logout button about 30 GB, 9 GB rebuildable "
+        "(idle, last active 2 hours ago).",
+        "1 orphan folder no agent owns, 3 GB in all. 1 of them stays when orphans are removed, such as "
+        "/home/u/work/old-clone because it has 2 commit(s) that are not pushed. Only the user removes "
+        "orphans, in Settings, Storage.",
+        "The automatic clean is off; only the user turns it on.",
+    ]
+
+
+async def test_an_agents_tree_is_read_with_sizes_and_git(tools: EaTools) -> None:
+    read = await tools.call("resource_usage", {"agent": "logout button", "path": "logout"})
+    assert read.text.splitlines() == [
+        "Folders of Fix the logout button:",
+        "logout: about 3 GB, 3 entries.",
+        "- node_modules/: 900 MB, 12000 files, rebuildable",
+        "- app/: about 2 GB, 30 files, git on main, 2 changed files, 1 ahead",
+        "- notes.md: 2 KB",
+    ]
+    missing = await tools.call("resource_usage", {"agent": "logout button", "path": "Nowhere/x"})
+    assert missing.text == "No root of that agent is called that; its roots: logout and Workspace."
+
+
+async def test_clean_asks_first_and_removes_exactly_the_planned_folders(
+    tools: EaTools, fake: SettingsFake
+) -> None:
+    asked, done = await confirm(tools, "run_archive_sweep", {"clean_agent": "logout button"})
+    assert "removes 2 rebuildable folders of Fix the logout button, freeing about 900 MB" in asked.text
+    assert done.text == (
+        "Cleaned 1 rebuildable folder of Fix the logout button, freeing 900 MB. Kept 1 folder: "
+        "/home/u/work/logout/app/dist because process 7 works in it."
+    )
+    posts = [w for w in writes(fake) if w[0] == "POST"]
+    assert posts == [
+        (
+            "POST",
+            f"/api/storage/agents/{TASK_LOGOUT}/clean",
+            {"dirs": [t["dir"] for t in CLEAN_TARGETS], "confirm": True},
+        )
+    ]
+
+
+async def test_clean_reports_a_refused_or_empty_plan(tools: EaTools, fake: SettingsFake) -> None:
+    fake.clean_plan = {
+        **CLEAN_PLAN,
+        "refused": 'Agent "Fix the logout button" is running; Clean waits until it stops',
+    }
+    refused = await tools.call("run_archive_sweep", {"clean_agent": "logout button"})
+    assert (
+        refused.text == 'Not cleaned: Agent "Fix the logout button" is running; Clean waits until it stops.'
+    )
+    fake.clean_plan = {**CLEAN_PLAN, "targets": [], "bytes": 0}
+    empty = await tools.call("run_archive_sweep", {"clean_agent": "logout button"})
+    assert empty.text == "Fix the logout button has no rebuildable folder to clean."
+    assert not [w for w in writes(fake) if w[0] == "POST"]

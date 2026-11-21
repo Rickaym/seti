@@ -4,9 +4,7 @@ import {
   autoArchiveInput,
   autoArchivePreviewQuery,
   bulkArchiveInput,
-  deleteStaleFoldersInput,
   isRecord,
-  staleFoldersQuery,
   type BulkArchiveResult,
 } from '@seti/shared'
 import { Hono, type Context, type MiddlewareHandler } from 'hono'
@@ -20,7 +18,6 @@ import {
 } from '../archive.js'
 import { tasks } from '../db.js'
 import { fail, ok, valid, validJson } from '../http.js'
-import { deleteStaleFolders, staleFolders } from '../stale-folders.js'
 
 const errorText = (e: unknown) => (e instanceof Error ? e.message : String(e))
 
@@ -53,12 +50,6 @@ export const archiveRoutes = new Hono()
     return ok(c, await autoArchiveStatus())
   })
   .post('/sweep', async (c) => ok(c, await sweepAutoArchive('user')))
-  .get('/stale-folders', valid('query', staleFoldersQuery), async (c) =>
-    ok(c, await staleFolders(c.req.valid('query').days)),
-  )
-  .post('/stale-folders/delete', validJson(deleteStaleFoldersInput), async (c) =>
-    ok(c, await deleteStaleFolders(c.req.valid('json'))),
-  )
 
 const OPEN_WHILE_ARCHIVED = /\/(?:archive|unarchive)$/
 

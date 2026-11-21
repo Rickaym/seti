@@ -6,6 +6,12 @@ export interface TaskWorktree {
   repo_path: string
 }
 
+/** A worktree record with the agent it belongs to. */
+export interface WorktreeRecord extends TaskWorktree {
+  task_id: string
+  title: string
+}
+
 /** Where a task's working directory moves: a repo's directory, or a plain one without repo_id. */
 export interface CwdMove {
   from: { repo_id: string | null; cwd: string }
@@ -30,8 +36,27 @@ export const taskLocation = {
   worktreeBases: async (taskId: string) =>
     sql<(TaskWorktree & { base_branch: string })[]>`SELECT w.dir, r.path AS repo_path, r.base_branch
       FROM task_worktree w JOIN repo r ON r.id = w.repo_id WHERE w.task_id = ${taskId} ORDER BY w.dir`,
+  /** Every task's worktree directories, by task id, in one query. */
+  worktreeDirsByTask: async () => {
+    const byTask = new Map<string, string[]>()
+    for (const row of await sql<
+      { task_id: string; dir: string }[]
+    >`SELECT task_id, dir FROM task_worktree ORDER BY dir`) {
+      byTask.set(row.task_id, [...(byTask.get(row.task_id) ?? []), row.dir])
+    }
+    return byTask
+  },
   /** Every worktree directory Seti made, for any task. */
   allWorktreeDirs: async () => (await sql<{ dir: string }[]>`SELECT dir FROM task_worktree`).map((row) => row.dir),
+  /** Worktree records of agents not archived; an archived agent keeps its records to restore. */
+  liveWorktreeRecords: async () => [
+    ...(await sql<WorktreeRecord[]>`SELECT w.task_id, t.title, w.dir, r.path AS repo_path FROM task_worktree w
+      JOIN task t ON t.id = w.task_id JOIN repo r ON r.id = w.repo_id WHERE t.archived_at IS NULL ORDER BY w.dir`),
+  ],
+  /** Drops one worktree record, whose folder is gone. */
+  forgetWorktree: async (taskId: string, dir: string) => {
+    await sql`DELETE FROM task_worktree WHERE task_id = ${taskId} AND dir = ${dir}`
+  },
   /** Makes another of the task's directories its working directory; the old one stays attached. */
   moveCwd: async (taskId: string, { from, to, keep }: CwdMove) => {
     await transaction(async (tx) => {

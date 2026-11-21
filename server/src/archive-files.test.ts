@@ -2,12 +2,12 @@ import { execFileSync, spawn } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
 import fs from 'node:fs'
 import path from 'node:path'
-import type { AutoArchiveStatus, StaleFolderDeleteResult, StaleFolderReport, Task } from '@seti/shared'
+import type { AutoArchiveStatus, Task } from '@seti/shared'
 import { afterAll, describe, expect, it } from 'vitest'
 import { createApp } from './app.js'
 import { bundleDir, bundleTaskFiles, removeTaskFolders } from './archive-files.js'
 import { archiveTask, unarchiveTask, updateAutoArchive } from './archive.js'
-import { ARCHIVE_ROOT, SCRATCH_ROOT, WORKTREE_ROOT } from './config.js'
+import { ARCHIVE_ROOT, SCRATCH_ROOT } from './config.js'
 import { repos, sql, tasks } from './db.js'
 import { createWorktree } from './git.js'
 import { busyReason, removalRefusal, scratchDirOf } from './owned-dirs.js'
@@ -369,61 +369,5 @@ describe('delete rule', () => {
     expect((await data<AutoArchiveStatus>(off)).settings.delete_after_days).toBeNull()
     const [applied] = await sql`SELECT name FROM schema_migration WHERE version = 59`
     expect(applied).toEqual({ name: 'archive_files' })
-  })
-})
-
-describe('stale folders', () => {
-  const aged = (dir: string) => {
-    const when = new Date(Date.now() - 30 * DAY)
-    fs.utimesSync(dir, when, when)
-    for (const name of fs.readdirSync(dir)) {
-      fs.utimesSync(path.join(dir, name), when, when)
-    }
-    return dir
-  }
-
-  it('lists old folders no agent owns with sizes, and deletes only those on confirm', async () => {
-    const orphan = path.join(SCRATCH_ROOT, 'orphan-clone')
-    write(path.join(orphan, 'big.bin'), 'x'.repeat(10_000))
-    aged(orphan)
-    const recent = path.join(SCRATCH_ROOT, 'recent-clone')
-    write(path.join(recent, 'a.txt'), 'a')
-    const { scratch: ownedScratch } = await scratchTask('Owned and old')
-    aged(ownedScratch)
-    const strayWorktree = path.join(WORKTREE_ROOT, 'stray-old')
-    write(path.join(strayWorktree, 'file.txt'), 'stray')
-    aged(strayWorktree)
-    fs.symlinkSync(OUTSIDE, path.join(SCRATCH_ROOT, 'old-link'))
-
-    const report = await data<StaleFolderReport>(await request('GET', '/archive/stale-folders?days=7'))
-
-    const listed = report.folders.map((folder) => folder.path)
-    expect(listed).toEqual(expect.arrayContaining([orphan, strayWorktree]))
-    expect(listed).not.toContain(recent)
-    expect(listed).not.toContain(ownedScratch)
-    expect(listed).not.toContain(path.join(SCRATCH_ROOT, 'old-link'))
-    expect(report.folders.find((folder) => folder.path === orphan)?.bytes).toBeGreaterThanOrEqual(10_000)
-
-    const unconfirmed = await request('POST', '/archive/stale-folders/delete', { paths: [orphan] })
-    expect(unconfirmed.status).toBe(400)
-    expect(fs.existsSync(orphan)).toBe(true)
-
-    const result = await data<StaleFolderDeleteResult>(
-      await request('POST', '/archive/stale-folders/delete', {
-        paths: [orphan, recent, ownedScratch, SCRATCH_ROOT, `${orphan}/..`, path.join(SCRATCH_ROOT, 'old-link')],
-        confirm: true,
-      }),
-    )
-
-    expect(result.deleted.map((entry) => entry.path)).toEqual([orphan])
-    expect(result.refused.map((entry) => entry.path)).toEqual([
-      recent,
-      ownedScratch,
-      SCRATCH_ROOT,
-      `${orphan}/..`,
-      path.join(SCRATCH_ROOT, 'old-link'),
-    ])
-    expect(fs.existsSync(orphan)).toBe(false)
-    expect(fs.existsSync(recent) && fs.existsSync(ownedScratch) && fs.existsSync(OUTSIDE)).toBe(true)
   })
 })
