@@ -292,7 +292,8 @@ test('the drawer, group chat and EA sheet fit a phone', async ({ page, data: _da
 
   await page.getByRole('banner').getByTestId('team-chat-toggle').click()
   const chat = page.getByRole('dialog', { name: 'Group chat' })
-  await expect(chat.getByText(`See ${URL_TEXT}`)).toBeVisible()
+  const linked = chat.getByRole('link').and(chat.locator(`[href="${URL_TEXT}"]`))
+  await expect(linked).toBeVisible()
   await expectFitsPhone(page, 'group chat')
   await chat.getByRole('button', { name: 'Close group chat' }).click()
 
