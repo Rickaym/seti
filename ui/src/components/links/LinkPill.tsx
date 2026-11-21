@@ -22,7 +22,7 @@ const TOOLTIP_LIMIT = 400
 
 const PILL = [
   'inline-flex max-w-full items-center gap-1 align-bottom',
-  'border border-primary/25 bg-primary/5 px-1.5 text-[0.9em] leading-normal text-primary no-underline',
+  'border border-primary/25 bg-primary/5 px-1.5 text-[max(0.9em,11px)] leading-normal text-primary no-underline',
   'hover:border-primary/60 hover:bg-primary/10 focus-visible:outline-2 focus-visible:outline-ring',
 ].join(' ')
 
