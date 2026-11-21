@@ -1,8 +1,9 @@
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import type { Task } from '@seti/shared'
-import { ARCHIVE_ROOT, MOD_FETCH_ROOT, SCRATCH_ROOT, SHARED_TOOLS_ROOT, WORKTREE_ROOT } from './config.js'
+import { REBUILDABLE_DIRS, REBUILDABLE_IF_IGNORED, type Task } from '@seti/shared'
+import { ARCHIVE_ROOT, MOD_FETCH_ROOT, SANDBOX_ROOT, SCRATCH_ROOT, SHARED_TOOLS_ROOT, WORKTREE_ROOT } from './config.js'
+import { removeLinkedWorktree } from './git.js'
 import { WORKSPACE_ROOT } from './workspace/dir.js'
 
 /** The roots Seti makes folders of its own in, each folder exactly one level below its root. */
@@ -10,6 +11,7 @@ export const OWNED_ROOTS = {
   scratch: SCRATCH_ROOT,
   worktrees: WORKTREE_ROOT,
   workspace: WORKSPACE_ROOT,
+  sandbox: SANDBOX_ROOT,
   archive: ARCHIVE_ROOT,
   modFetch: MOD_FETCH_ROOT,
   sharedTools: SHARED_TOOLS_ROOT,
@@ -21,6 +23,9 @@ export type OwnedRoot = keyof typeof OWNED_ROOTS
 type DirUser = Pick<Task, 'id' | 'cwd' | 'dirs' | 'repos'>
 
 const SCRATCH_NAME = /^[a-z0-9-]+$/
+
+/** The folder that holds a sandboxed agent's private home, /tmp and run files. */
+export const sandboxDirOf = (taskId: string) => path.join(SANDBOX_ROOT, taskId)
 
 export const usedDirs = (task: DirUser): string[] => [task.cwd, ...task.dirs, ...task.repos.map((repo) => repo.dir)]
 
@@ -144,6 +149,67 @@ export async function busyReason(dir: string): Promise<string | null> {
 /** Removes a folder after checking it again; returns why it refused instead when it must not. */
 export async function removeOwnedDir(dir: string, root: OwnedRoot, others: readonly DirUser[]): Promise<string | null> {
   const refusal = removalRefusal(dir, root, others) ?? (await busyReason(dir))
+  if (refusal !== null) {
+    return refusal
+  }
+  if (gitDirOf(dir) !== null && fs.lstatSync(path.join(dir, '.git')).isFile()) {
+    try {
+      if (await removeLinkedWorktree(dir)) {
+        return null
+      }
+    } catch {
+      // git could not remove it; the folder goes below and git prunes its record later
+    }
+  }
+  await fs.promises.rm(dir, { recursive: true, maxRetries: 2 })
+  return null
+}
+
+const REBUILDABLE_NAMES = new Set<string>([...REBUILDABLE_DIRS, ...REBUILDABLE_IF_IGNORED])
+
+/** Where a rebuildable folder lies: an agent's own folder, one level below an owned root. */
+export interface NestedIn {
+  base: string
+  root: OwnedRoot
+}
+
+/** The one folder with no rebuildable name that Clean empties: a sandbox's own /tmp. */
+const isSandboxTmp = (dir: string, { base, root }: NestedIn) => root === 'sandbox' && dir === path.join(base, 'tmp')
+
+/**
+ * Why Seti must not remove `dir`, a rebuildable folder in the agent folder `base`, or null
+ * when it may: `base` passes the same checks as a folder Seti removes whole, and `dir` is a
+ * plain path inside it with a rebuildable name, a real directory reached through no symlink.
+ */
+export function nestedRefusal(dir: string, inside: NestedIn, others: readonly DirUser[]): string | null {
+  const baseRefusal = removalRefusal(inside.base, inside.root, others)
+  if (baseRefusal !== null) {
+    return baseRefusal
+  }
+  if (!path.isAbsolute(dir) || path.normalize(dir) !== dir || dir === inside.base || !within(dir, inside.base)) {
+    return `${dir} is not a plain path inside ${inside.base}`
+  }
+  if (!REBUILDABLE_NAMES.has(path.basename(dir)) && !isSandboxTmp(dir, inside)) {
+    return `${dir} is not a rebuildable folder`
+  }
+  const stat = fs.lstatSync(dir, { throwIfNoEntry: false })
+  if (stat?.isDirectory() !== true) {
+    return `${dir} is not a directory`
+  }
+  const realBase = realOrNull(inside.base)
+  if (realBase === null || realOrNull(dir) !== path.join(realBase, path.relative(inside.base, dir))) {
+    return `${dir} is reached through a symlink`
+  }
+  return null
+}
+
+/** Removes a rebuildable folder in an agent's folder after checking both again; else why not. */
+export async function removeNestedDir(
+  dir: string,
+  inside: NestedIn,
+  others: readonly DirUser[],
+): Promise<string | null> {
+  const refusal = nestedRefusal(dir, inside, others) ?? (await busyReason(inside.base)) ?? (await busyReason(dir))
   if (refusal !== null) {
     return refusal
   }

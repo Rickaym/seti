@@ -222,6 +222,9 @@ function unseenWorktrees(commons: readonly string[], seen: (worktree: string) =>
   })
 }
 
+/** Whether `dir` tops a repository: a `.git` folder, or a `.git` file its repository records. */
+export const isRepoRoot = (dir: string): boolean => gitDirs(dir) !== null
+
 /** The repository Claude Code files a directory's memory under: a worktree's main checkout. */
 export function canonicalRoot(dir: string): string | null {
   for (let current = dir; ; current = path.dirname(current)) {

@@ -10,8 +10,6 @@ export const AUTO_ARCHIVE_DEFAULTS = {
 } as const
 export const AUTO_ARCHIVE_DAYS_MAX = 365
 export const ARCHIVE_DELETE_DAYS_MAX = 3650
-export const STALE_FOLDER_DAYS_DEFAULT = 7
-const STALE_FOLDERS_MAX = 500
 export const ARCHIVE_BULK_MAX = 200
 
 /** Why an archived agent takes no work; the same words for every refusal. */
@@ -181,41 +179,4 @@ export interface ArchiveSweepResult {
 export interface ArchiveExpiryResult {
   deleted: { task_id: string; title: string }[]
   kept: { task_id: string; reason: string }[]
-}
-
-export const staleFoldersQuery = z.object({
-  /** Folders changed more recently than this many days are left out. */
-  days: z.coerce.number().int().min(0).max(AUTO_ARCHIVE_DAYS_MAX).default(STALE_FOLDER_DAYS_DEFAULT),
-})
-
-export const deleteStaleFoldersInput = z.object({
-  paths: z.array(z.string().min(1)).min(1, 'pick at least one folder').max(STALE_FOLDERS_MAX),
-  days: z.number().int().min(0).max(AUTO_ARCHIVE_DAYS_MAX).default(STALE_FOLDER_DAYS_DEFAULT),
-  /** Deleting cannot be undone, so the caller says it means it. */
-  confirm: z.literal(true, 'confirm the delete'),
-})
-export type DeleteStaleFoldersInput = z.input<typeof deleteStaleFoldersInput>
-
-/** A folder in the scratch or worktree root that no agent, live or archived, owns. */
-export interface StaleFolder {
-  path: string
-  root: 'scratch' | 'worktrees'
-  bytes: number | null
-  modified_at: string
-  /** A checkout or a worktree of one; deleting it loses what is not pushed. */
-  checkout: 'repo' | 'worktree' | null
-  /** Why it cannot be deleted now, such as a process working in it; null when it can. */
-  busy: string | null
-}
-
-export interface StaleFolderReport {
-  roots: { scratch: string; worktrees: string }
-  days: number
-  folders: StaleFolder[]
-  total_bytes: number
-}
-
-export interface StaleFolderDeleteResult {
-  deleted: { path: string; bytes: number | null }[]
-  refused: { path: string; reason: string }[]
 }

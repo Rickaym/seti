@@ -35,6 +35,7 @@ import { taskBorrowedServers } from './mcp-borrowed.js'
 import { connectorIds, taskDeniedServers } from './mcp-selection.js'
 import { launch, type ScopePlan } from './memory-scope.js'
 import { memoryEnv } from './node-heap.js'
+import { sandboxDirOf } from './owned-dirs.js'
 import { loadSandboxCa, type SandboxCa } from './sandbox-ca.js'
 import { sandboxClaudeJson } from './sandbox-claude-json.js'
 import { gitEnv } from './sandbox-git.js'
@@ -73,7 +74,6 @@ const PROXY_URL = `http://127.0.0.1:${String(PROXY_PORT)}`
 export const CLAUDE_PLACEHOLDER = 'sk-ant-oat01-seti-sandbox-placeholder'
 export const GITHUB_PLACEHOLDER = 'seti-sandbox-placeholder'
 
-const SANDBOX_ROOT = path.join(SETI_HOME, 'sandbox')
 const CA_DIR = path.join(SETI_HOME, 'sandbox-ca')
 
 /** Variables a sandbox inherits from the server; the rest, secrets among them, stay outside. */
@@ -238,7 +238,7 @@ function awsToken(taskId: string): string {
   return token
 }
 
-const taskDir = (taskId: string) => path.join(SANDBOX_ROOT, taskId)
+const taskDir = sandboxDirOf
 
 /** The host directory a task's sandbox sees as /tmp. */
 export const sandboxTmpDir = (taskId: string) => path.join(taskDir(taskId), 'tmp')
