@@ -23,8 +23,9 @@ test('files in agent replies show as chips and cards that open Files, and other 
   await expect(card.locator('[data-file-head]')).toHaveText(/^export function greet\(name: string\) \{/)
   await expect(transcript.getByText('seti.example.com')).toHaveCount(0)
 
-  const other = transcript.getByRole('link', { name: OTHER_LINK })
+  const other = transcript.getByRole('link', { name: 'example.com/docs/guide.md' })
   await expect(other).toHaveAttribute('href', OTHER_LINK)
+  await expect(other).toHaveAttribute('data-link-pill', 'web')
   await expect(other).toHaveAttribute('target', '_blank')
   await expect(other).not.toHaveAttribute('data-file-link')
 
