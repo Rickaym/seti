@@ -3,7 +3,7 @@ import { useId } from 'react'
 import { Hint } from '@/components/Hint'
 import { ToggleButton } from '@/components/ToggleButton'
 import { Input } from '@/components/ui/input'
-import type { MemoryCapForm } from './memory-cap-form'
+import { STEP_GB, type MemoryCapForm } from './memory-cap-form'
 
 type SizeKey = 'max' | 'swap' | 'high'
 
@@ -43,14 +43,14 @@ function SizeField({
           type="number"
           inputMode="decimal"
           min={0}
-          step={0.5}
+          step={STEP_GB}
           value={form[field]}
           aria-invalid={invalid}
           disabled={disabled}
           onChange={(event) => {
             onChange({ ...form, [field]: event.target.value })
           }}
-          className="h-7 w-16"
+          className="h-7 w-20"
         />
       </Hint>
       <span className="text-muted-foreground">GB</span>
@@ -73,7 +73,7 @@ export function MemoryCapFields({
   const props = { form, invalid, disabled, onChange }
   const explained = useId()
   return (
-    <div className="space-y-1.5">
+    <div className="space-y-1.5 md:max-w-md">
       <div role="group" aria-describedby={explained} className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
         <SizeField field="max" {...props} />
         <SizeField field="swap" {...props} />
@@ -88,7 +88,7 @@ export function MemoryCapFields({
         />
         {form.throttle && <SizeField field="high" {...props} />}
       </div>
-      <p id={explained} className="text-2xs text-muted-foreground">
+      <p id={explained} className="text-2xs break-normal text-muted-foreground contain-inline-size">
         {EXPLAIN.sizes} {form.throttle ? EXPLAIN.on : EXPLAIN.off}
       </p>
     </div>

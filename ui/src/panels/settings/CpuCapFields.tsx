@@ -57,7 +57,7 @@ export function CpuCapFields({
           </label>
         )}
       </div>
-      <p id={explained} className="text-2xs text-muted-foreground">
+      <p id={explained} className="text-2xs break-normal text-muted-foreground contain-inline-size">
         {form.limited
           ? 'At the cap the kernel pauses the agent until the next tenth of a second, so it runs slower instead of starving the rest.'
           : 'No cap: the agent may use every core, and only shares them fairly when others want them too.'}

@@ -3,6 +3,7 @@ import type {
   ChannelDeliveryStatus,
   ChannelEvent,
   ChannelInfo,
+  DeliveryFilter,
   PollerRun,
   ReminderRun,
   ReminderRunOutcome,
@@ -21,6 +22,7 @@ const DELIVERY_TONE: Record<ChannelDeliveryStatus, string> = {
   accepted: 'text-success',
   duplicate: 'text-muted-foreground',
   ignored: 'text-muted-foreground',
+  filtered: 'text-muted-foreground',
   rejected: 'text-destructive',
   rate_limited: 'text-warning-text',
 }
@@ -138,12 +140,37 @@ function Routes({ delivery }: { delivery: ChannelDelivery }) {
   )
 }
 
+const STATUS_LABEL: Partial<Record<ChannelDeliveryStatus, string>> = {
+  filtered: 'filtered out',
+  rate_limited: 'rate limited',
+}
+
+/** What the webhook's filter did to a delivery it let through: changed it, or failed on it. */
+function FilterNote({ filter }: { filter: DeliveryFilter | null }) {
+  if (filter === null || (filter.outcome !== 'changed' && filter.outcome !== 'failed')) {
+    return null
+  }
+  const sent = `${filter.event === '' ? 'no name' : filter.event}: ${filter.title}`
+  return (
+    <span className="mt-1 pl-34 break-words max-md:pl-0" data-testid="delivery-filter">
+      {filter.outcome === 'changed' ? (
+        <span className="font-semibold text-primary">changed by filter</span>
+      ) : (
+        <span className="font-semibold text-warning-text">filter failed</span>
+      )}
+      <span className="text-muted-foreground">
+        {filter.outcome === 'changed' ? `, sent as ${sent}` : `, delivered unchanged: ${filter.error ?? ''}`}
+      </span>
+    </span>
+  )
+}
+
 function DeliveryLine({ delivery }: { delivery: ChannelDelivery }) {
   const summary = (
     <span className="flex min-w-0 flex-1 flex-col">
       <span className="flex min-w-0 items-start gap-2">
         <span className={cn('w-24 shrink-0 font-semibold uppercase', DELIVERY_TONE[delivery.status])}>
-          {delivery.status.replace('_', ' ')}
+          {STATUS_LABEL[delivery.status] ?? delivery.status}
         </span>
         <span className="w-8 shrink-0 font-mono text-muted-foreground">
           {delivery.http_status === 0 ? 'poll' : delivery.http_status}
@@ -151,6 +178,7 @@ function DeliveryLine({ delivery }: { delivery: ChannelDelivery }) {
         <span className="min-w-0 flex-1 break-words">{delivery.reason}</span>
         <span className="shrink-0 text-muted-foreground">{relativeTime(delivery.received_at)}</span>
       </span>
+      <FilterNote filter={delivery.filter} />
       <Routes delivery={delivery} />
     </span>
   )

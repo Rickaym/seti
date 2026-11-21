@@ -27,9 +27,10 @@ export function useNotifyScope(): PageScope {
 }
 
 /**
- * Tells Seti the workspace this page shows, when it changes and each time the page shows again,
- * so the tab the user looks at decides what the device is notified about. The public demo has no
- * devices, so its pages do not report.
+ * Tells Seti the workspace this page shows: once when the page loads, then when the workspace
+ * changes or the page shows again while the device last reported another one, so the tab the
+ * user looks at decides what the device is notified about. The public demo has no devices, so
+ * its pages do not report.
  */
 export function useWorkspaceReport(): void {
   const { current } = useCurrentWorkspace()

@@ -1,3 +1,4 @@
+import { filterWorkers } from './filter-run.js'
 import { pollerScheduler, pollerWorkers } from '../pollers/service.js'
 import { stopReminderScripts } from '../reminders/sandbox.js'
 import { reminderTicker } from '../reminders/service.js'
@@ -21,6 +22,6 @@ export async function stopChannelRuns(): Promise<void> {
   reminderTicker.stop()
   await within(runsDone(), FINISH_MS)
   stopReminderScripts()
-  await pollerWorkers.close()
+  await Promise.all([pollerWorkers.close(), filterWorkers.close()])
   await within(runsDone(), NOTE_MS)
 }

@@ -41,6 +41,15 @@ from seti_ea.toolkit import (
     title_of,
 )
 from seti_ea.warm_cache_tools import WARM_CACHE_SPECS, WarmCacheTools
+from seti_ea.webhook_filter_tools import (
+    FILTER_PROPS,
+    SAMPLE,
+    filter_change,
+    filter_code,
+    filter_lines,
+    has_filter_args,
+    try_filter,
+)
 
 GENERIC = "generic"
 SOURCE_LABELS = {"poller": "Poller", "reminder": "Reminder"}
@@ -65,6 +74,7 @@ DELIVERY_WORDS = {
     "ignored": "ignored",
     "rejected": "refused",
     "rate_limited": "rate limited",
+    "filtered": "filtered out",
 }
 MCP_SCOPES = {
     "user": "every agent",
@@ -224,8 +234,9 @@ SETTINGS_SPECS: list[ToolSpec] = [
     ToolSpec(
         "update_channel",
         "Rename a webhook or reminder, subscribe or unsubscribe your inbox, change a generic webhook's "
-        "field mapping, or change a reminder's script, interval or cron schedule and pause or resume it. "
-        "Pollers change with update_poller. Needs the user's yes.",
+        "field mapping, set, switch or remove a webhook's filter code, or change a reminder's script, "
+        "interval or cron schedule and pause or resume it. Pollers change with update_poller. Needs the "
+        "user's yes.",
         {
             "channel": {
                 "type": "string",
@@ -242,6 +253,7 @@ SETTINGS_SPECS: list[ToolSpec] = [
             "cron": REMINDER_CRON,
             "timezone": REMINDER_TIMEZONE,
             "active": {"type": "boolean", "description": "Reminders only: false pauses it, true resumes it."},
+            **FILTER_PROPS,
             "confirmed": CONFIRMED,
         },
         ["channel"],
@@ -263,21 +275,24 @@ SETTINGS_SPECS: list[ToolSpec] = [
         "test_channel_script",
         "Run a poller or reminder script once without storing or delivering anything, and see what it "
         "returns, its log and any error: a draft script, a saved poller or reminder, or a new script for "
-        "a saved one.",
+        "a saved one. For a webhook, run its filter, or a draft filter, against its recent deliveries and "
+        "an optional sample, and see what it keeps, changes or drops.",
         {
             "script": {
                 "type": "string",
-                "description": "The script to try; without a channel, give kind too.",
+                "description": "The script or filter to try; without a channel, give kind too.",
             },
             "channel": {
                 "type": "string",
-                "description": "A saved poller or reminder to test, or whose settings to use.",
+                "description": "A saved poller or reminder to test, or whose settings to use; or a "
+                "webhook whose filter to test.",
             },
             "kind": {
                 "type": "string",
                 "enum": ["poller", "reminder"],
                 "description": "What a draft script is for, without a channel.",
             },
+            "sample": SAMPLE,
         },
     ),
     ToolSpec(
@@ -951,6 +966,7 @@ class SettingsTools:
                 lines.append(f"The latest event went to: {_routes_words(routed)}.")
         else:
             lines.append("No delivery has reached it yet.")
+        lines += filter_lines(info)
         return ToolResult(
             "\n".join(line for line in lines if line), f"Read webhook {clip(name_of(info), 50)}"
         )
@@ -1023,7 +1039,7 @@ class SettingsTools:
         if kind == "reminder":
             return await self._reminders.test(args, info)
         if info is not None:
-            raise ToolError(f"{name_of(info)} is a webhook: send it a sample with test_channel.", "No script")
+            return await try_filter(self._seti.post, self._refusable, info, args)
         raise ToolError(
             "Say whether the script is for a poller or a reminder, or name a saved one.", "Nothing to test"
         )
@@ -1050,6 +1066,8 @@ class SettingsTools:
                 "sends its events to your inbox" if subscribe_ea else "keeps its events out of your inbox"
             )
         if kind == "reminder":
+            if has_filter_args(args):
+                raise ToolError("Only webhooks take a filter.", "Not a webhook")
             extra, more = reminder_changes(info, args)
             body |= extra
             changes += more
@@ -1062,10 +1080,13 @@ class SettingsTools:
             if mapping != info.get("mapping"):
                 body["mapping"] = mapping
                 changes.append(f"makes it read {_mapping_words(mapping)}")
+        filter_body, filter_words = filter_change(info, args) if kind == "webhook" else (None, [])
+        changes += filter_words
         if not changes:
             raise ToolError(f"That changes nothing in the {kind} {name}.", "Nothing to change")
-        if not await self._cleared(args, gate_key("update_channel", info.get("id"), body, subscribe_ea)):
-            effect = f"This changes the {kind} {name}: it {and_list(changes)}."
+        key = gate_key("update_channel", info.get("id"), body, subscribe_ea, filter_body)
+        if not await self._cleared(args, key):
+            effect = f"This changes the {kind} {name}: it {and_list(changes)}.{filter_code(filter_body)}"
             return ask("update_channel", args, effect, f"change {kind} {name}")
         if body:
             path = (
@@ -1074,6 +1095,9 @@ class SettingsTools:
                 else f"/channels/{info.get('id')}"
             )
             await self._refusable(self._seti.put(path, body), f"{kind.capitalize()} not changed")
+        if filter_body is not None:
+            path = f"/channels/{info.get('id')}/filter"
+            await self._refusable(self._seti.put(path, filter_body), "Filter not changed")
         base = f"/channels/{info.get('id')}/subscriptions"
         if subscribe_ea is True:
             await self._refusable(self._seti.post(base, {"target": "ea"}), "Not subscribed")
