@@ -1,5 +1,6 @@
-import type { Options, Query, SDKMessage, SessionMessage } from '@anthropic-ai/claude-agent-sdk'
+import type { Options, SDKMessage, SessionMessage } from '@anthropic-ai/claude-agent-sdk'
 import type { RewindTarget, TaskRewind } from '@seti/shared'
+import type { DefaultSession } from './runtimes/registry.js'
 import { rewinds, type PendingRewind, type RewindRow } from './store/rewinds.js'
 
 /** Error texts of a truncated resume that Claude Code will refuse again, so it is never retried. */
@@ -159,26 +160,26 @@ async function* rewoundSession(
 
 /**
  * Runs a task's session like `query`, from the pending rewind point; a refused rewind resumes
- * plainly. `open` starts one query with the given options each time it is called.
+ * plainly. `open` starts one session with the given options each time it is called.
  */
 export async function* resumeSession(
   taskId: string,
   options: Options,
-  open: (options: Options) => Query,
+  open: (options: Options) => Promise<DefaultSession>,
 ): AsyncGenerator<SDKMessage, void> {
   const pending = await rewinds.pending(taskId)
   if (pending === undefined) {
-    yield* open(options)
+    yield* (await open(options)).events
     return
   }
-  const rewound = open(rewoundOptions(options, pending))
-  const refused = yield* rewoundSession(rewound, pending.id)
+  const rewound = await open(rewoundOptions(options, pending))
+  const refused = yield* rewoundSession(rewound.events, pending.id)
   if (refused === null) {
     return
   }
   rewound.close()
   await rewinds.settle(pending.id, 'refused', refused)
   if (options.abortController?.signal.aborted !== true) {
-    yield* open(options)
+    yield* (await open(options)).events
   }
 }
