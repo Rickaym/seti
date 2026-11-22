@@ -168,7 +168,8 @@ the AppArmor profile for `bwrap` that the installer adds ([Setup](setup.md#sandb
   beside Claude Code in shadow and changes no outcome: its hook answers at once and decides on a
   later turn of the event loop. `shadow-hooks.ts` counts how the two compare per day, kind, step
   and rule ref in `policy_shadow`, with no input, command, path or rule text, and also counts
-  decisions that failed or took over 50 ms; `pnpm doctor` shows the last seven days.
+  decisions that failed or took over 50 ms (PERM-12). `pnpm doctor` shows the last seven days,
+  and `GET /permissions/shadow` and `seti_overview` with `permissions` read the counts.
 - **Memory and CPU.** Each agent's process tree starts through `systemd-run --user --scope` with
   `MemoryMax`, 1 GB of `MemorySwapMax`, `OOMPolicy=continue`, `CPUWeight=50`, `CPUQuota` and
   `BindsTo=` the server's unit, so agents end with Seti (CAP-5). Every 100 ms Seti raises the
