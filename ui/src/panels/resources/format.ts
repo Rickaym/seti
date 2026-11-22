@@ -31,3 +31,11 @@ export function ageLabel(seconds: number | null): string {
   }
   return `${String(Math.floor(hours / 24))}d ${String(hours % 24)}h`
 }
+
+/** A measured folder size: "312 MB", "about 2.4 GB" when the walk stopped early, else "Measuring". */
+export function sizeLabel(size: { bytes: number; capped: boolean } | null): string {
+  if (size === null) {
+    return 'Measuring'
+  }
+  return size.capped ? `about ${bytesLabel(size.bytes)}` : bytesLabel(size.bytes)
+}

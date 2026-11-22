@@ -23,7 +23,7 @@ export const NOISE_DIRS = [
   'target',
 ] as const
 
-export type FileRootKind = 'cwd' | 'repo' | 'dir' | 'workspace'
+export type FileRootKind = 'cwd' | 'repo' | 'dir' | 'workspace' | 'sandbox'
 
 /** A directory of a task that the Files view browses. */
 export interface FileRoot {

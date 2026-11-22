@@ -1,5 +1,6 @@
 import type { EaInboxKind, EaNotice, EaNoticeSeverity } from '@seti/shared'
 import { AlarmClock, BellRing, ExternalLink, Eye, MessagesSquare, RadioTower, type LucideIcon } from 'lucide-react'
+import { LinkedText } from '@/components/links/LinkedText'
 import { cn } from '@/lib/utils'
 
 const KIND: Record<EaInboxKind, { icon: LucideIcon; label: (notice: EaNotice) => string }> = {
@@ -47,7 +48,7 @@ export function NoticeEntry({ notice }: { notice: EaNotice }) {
       </div>
       {notice.body !== '' && (
         <div className="max-h-40 overflow-y-auto border-t border-border px-2 py-1.5 whitespace-pre-wrap text-foreground">
-          {notice.body}
+          <LinkedText text={notice.body} />
         </div>
       )}
     </div>

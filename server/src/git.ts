@@ -63,7 +63,13 @@ function guarded(cwd: string, args: readonly string[]): string[] {
  * and nothing they name runs. Local commands only; the repository's remotes are never contacted.
  */
 export async function agentGit(cwd: string, ...args: string[]): Promise<string> {
-  const { stdout } = await exec('git', guarded(cwd, args), { maxBuffer: 16 * 1024 * 1024, env: closedEnv() })
+  return agentGitWithin(0, cwd, ...args)
+}
+
+/** Like agentGit, stopping git after `timeoutMs`; 0 waits for as long as it takes. */
+export async function agentGitWithin(timeoutMs: number, cwd: string, ...args: string[]): Promise<string> {
+  const options = { maxBuffer: 16 * 1024 * 1024, env: closedEnv(), timeout: timeoutMs, killSignal: 'SIGKILL' as const }
+  const { stdout } = await exec('git', guarded(cwd, args), options)
   return stdout.trim()
 }
 

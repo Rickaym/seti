@@ -9,6 +9,7 @@ import { TeamChatProvider } from '@/components/team/TeamChatProvider'
 import { ThemeProvider } from '@/components/theme/theme-provider'
 import { ConfirmProvider } from '@/components/ui/confirm-dialog'
 import { TooltipProvider } from '@/components/ui/tooltip'
+import { installLinkPillCopy } from '@/lib/links/pill-copy'
 import { registerServiceWorker } from '@/lib/service-worker'
 import { installThemeTokens } from '@/mods/themes'
 import { App } from './App'
@@ -16,6 +17,7 @@ import './App.css'
 
 installThemeTokens()
 watchStaleBuild()
+installLinkPillCopy()
 
 const rootEl = document.getElementById('root')
 if (!rootEl) {

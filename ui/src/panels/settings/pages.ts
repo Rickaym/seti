@@ -7,6 +7,7 @@ import {
   FolderGit2,
   Gauge,
   Hand,
+  HardDrive,
   Headset,
   Info,
   KeyRound,
@@ -36,6 +37,7 @@ export type SettingsPageKey =
   | 'agents'
   | 'repos'
   | 'resources'
+  | 'storage'
   | 'channels'
   | 'account'
   | 'mcp'
@@ -93,10 +95,16 @@ const CORE_GROUPS: { group: SettingsGroup; pages: (Omit<SettingsPage, 'group'> &
         key: 'agents',
         label: 'Lifecycle',
         icon: BotMessageSquare,
-        keywords: 'agents compaction compact restart resume repeat loop archive delete stale folders',
+        keywords: 'agents compaction compact restart resume repeat loop archive delete',
       },
       { key: 'repos', label: 'Repos', icon: FolderGit2, keywords: 'repositories checkouts warm caches' },
       { key: 'resources', label: 'Resources', icon: Gauge, keywords: 'memory cpu cap host usage' },
+      {
+        key: 'storage',
+        label: 'Storage',
+        icon: HardDrive,
+        keywords: 'disk space size clean rebuildable node_modules orphans stale folders',
+      },
       { key: 'channels', label: 'Channels', icon: RadioTower, keywords: 'webhooks pollers reminders' },
     ],
   },
