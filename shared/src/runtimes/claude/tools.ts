@@ -69,13 +69,19 @@ const webFetch: Reader = (input) => ({ web: { ...some('url', str(input, 'url')) 
 
 const subagent: Reader = (input, callId) => ({
   subagent: {
-    label: str(input, 'description') ?? 'Subagent',
-    ...some('prompt', str(input, 'prompt')),
-    ...some('agentType', str(input, 'subagent_type')),
+    label: filled(input, 'description') ?? 'Subagent',
+    ...some('prompt', filled(input, 'prompt')),
+    ...some('agentType', filled(input, 'subagent_type')),
     ...some('background', bool(input, 'run_in_background')),
+    ...some('name', filled(input, 'name')),
     thread: callId,
   },
 })
+
+const sendMessage: Reader = (input) => {
+  const to = filled(input, 'to')
+  return to === undefined ? {} : { send: { to } }
+}
 
 const PLAN_STATUSES = new Set(['pending', 'in_progress', 'completed'])
 
@@ -114,15 +120,19 @@ const taskUpdate: Reader = (input) => {
   return {
     plan: {
       update: {
-        id: str(input, 'taskId') ?? '',
+        id: filled(input, 'taskId') ?? '',
         ...(status !== undefined && UPDATE_STATUSES.has(status) ? { status: status as PlanStatus | 'deleted' } : {}),
-        ...some('text', str(input, 'subject')),
+        ...some('text', filled(input, 'subject')),
+        ...some('activeText', filled(input, 'activeForm')),
       },
     },
   }
 }
 
-const proposal: Reader = (input) => ({ plan: { ...some('proposal', str(input, 'plan')) } })
+const proposal: Reader = (input) => ({ plan: { proposal: str(input, 'plan') ?? '' } })
+
+/** A call that reads the plan; its result reports the list or the item. */
+const readPlan: Reader = () => ({ plan: {} })
 
 const question: Reader = (input) => ({
   question: {
@@ -137,8 +147,6 @@ const question: Reader = (input) => ({
     })),
   },
 })
-
-const none: Reader = () => ({})
 
 /** Claude Code's built-in tools by name: what each does and how its input reads. */
 const TOOLS: ReadonlyMap<string, [ToolKind, Reader]> = new Map<string, [ToolKind, Reader]>([
@@ -163,10 +171,11 @@ const TOOLS: ReadonlyMap<string, [ToolKind, Reader]> = new Map<string, [ToolKind
   ['TodoWrite', ['plan', todoWrite]],
   ['TaskCreate', ['plan', taskCreate]],
   ['TaskUpdate', ['plan', taskUpdate]],
-  ['TaskList', ['plan', none]],
-  ['TaskGet', ['plan', none]],
+  ['TaskList', ['plan', readPlan]],
+  ['TaskGet', ['plan', readPlan]],
   ['ExitPlanMode', ['plan', proposal]],
   ['AskUserQuestion', ['question', question]],
+  ['SendMessage', ['other', sendMessage]],
 ])
 
 /** An MCP tool's server and name from Claude Code's `mcp__<server>__<tool>`, or null. */

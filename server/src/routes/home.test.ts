@@ -1,4 +1,4 @@
-import type { HomeSummary } from '@seti/shared'
+import { projectClaude, type HomeSummary } from '@seti/shared'
 import { beforeAll, describe, expect, it } from 'vitest'
 import { createApp } from '../app.js'
 import { sql } from '../db.js'
@@ -79,11 +79,14 @@ describe('GET /api/home', () => {
   })
 
   it('shows the calls running now, with the subagent they belong to', async () => {
-    trackToolCalls('home-b', {
-      type: 'assistant',
-      parent_tool_use_id: 'toolu_agent',
-      message: { content: [{ type: 'tool_use', id: 'toolu_live', name: 'mcp__github__merge', input: {} }] },
-    } as never)
+    trackToolCalls(
+      'home-b',
+      projectClaude({
+        type: 'assistant',
+        parent_tool_use_id: 'toolu_agent',
+        message: { content: [{ type: 'tool_use', id: 'toolu_live', name: 'mcp__github__merge', input: {} }] },
+      } as never),
+    )
     const { data } = (await (await get('?zone=UTC')).json()) as { data: HomeSummary }
     expect(data.live).toEqual([
       expect.objectContaining({
