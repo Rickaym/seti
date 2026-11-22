@@ -44,6 +44,7 @@ import { inputPreface } from './input-preface.js'
 import { wakeAfterTurn, wakeWhenUnblocked } from './inputs.js'
 import { knowledgeContext } from './knowledge-index.js'
 import { defaultLocalAuth } from './local-auth.js'
+import { mcpOffContext } from './mcp-off-context.js'
 import { forgetGoneServersLater } from './mcp-presence.js'
 import { memoryPrompt } from './memory-cap.js'
 import { recordMemoryEvents } from './memory-notes.js'
@@ -349,6 +350,7 @@ export function createApp(access: AccessGuardOptions = defaultAccess(), eaUrl: s
   registerContextProvider(memoryPrompt)
   registerContextProvider(cpuPrompt)
   registerContextProvider(setiToolsContext)
+  registerContextProvider(mcpOffContext)
   registerContextProvider(knowledgeContext)
   registerContextProvider(houseRulesContext)
   registerContextProvider(questionsContext)

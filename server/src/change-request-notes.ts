@@ -1,7 +1,8 @@
 import { describeChange, hostEntry, sharedToolCallName, type ChangeRequest, type SetiInput } from '@seti/shared'
 import { audit } from './audit.js'
 import { tasks } from './db.js'
-import { deliverInputs } from './inputs.js'
+import { deliverInputs, wakeTask } from './inputs.js'
+import { mcpToolPrefix, probedTools } from './mcp-off-context.js'
 import { auditTool } from './shared-tools.js'
 import { refreshBlocked } from './task-blocked.js'
 
@@ -11,6 +12,20 @@ type Outcome = SetiInput['kind']
 const keyText = (env: string, keySet: boolean) =>
   `From your next turn your session has $${env}, holding a placeholder that Seti's proxy swaps for the ` +
   `key on its hosts${keySet ? '' : ' once the user pastes it'}. You never see the value; never print or ask for it.`
+
+const NAMED_TOOLS = 5
+
+/** Where the agent finds the server's tools, since the turn that brings the note has them. */
+function serverText(server: string): string {
+  const tools = probedTools(server)
+  const more = tools.length > NAMED_TOOLS ? ` and ${String(tools.length - NAMED_TOOLS)} more` : ''
+  const named = tools.length === 0 ? '' : ` (${tools.slice(0, NAMED_TOOLS).join(', ')}${more})`
+  return (
+    `Your session restarted with it for this turn: its tools start with ${mcpToolPrefix(server)}${named}; ` +
+    'carry on with what needed them. If none is there, background commands of yours still hold the old ' +
+    'session or the server did not connect: say so, and do not search for another way.'
+  )
+}
 
 function allowedText(request: ChangeRequest, keySet: boolean): { title: string; body: string } {
   const { change } = request
@@ -28,10 +43,7 @@ function allowedText(request: ChangeRequest, keySet: boolean): { title: string; 
         body: keyText(change.env, keySet),
       }
     case 'mcp_server':
-      return {
-        title: `The user turned on the MCP server ${change.server} for you`,
-        body: 'Its tools load when your session restarts at your next turn.',
-      }
+      return { title: `The user turned on the MCP server ${change.server} for you`, body: serverText(change.server) }
     case 'shared_tool':
       return {
         title: `The user published your shared tool ${change.name}`,
@@ -96,8 +108,8 @@ async function auditOutcome(request: ChangeRequest, outcome: Outcome, title: str
 
 /**
  * Records how a request ended, tells the agent as an update, and takes it off the agent's reason
- * line. An expiry is Seti's; an answer is the user's. keySet means the user pasted the key on
- * Allow.
+ * line. An expiry is Seti's; an answer is the user's, so the agent gets it without the wait that
+ * groups updates. keySet means the user pasted the key on Allow.
  */
 export async function closeRequest(request: ChangeRequest, outcome: Outcome, keySet = false): Promise<void> {
   const task = await tasks.get(request.task_id)
@@ -116,4 +128,7 @@ export async function closeRequest(request: ChangeRequest, outcome: Outcome, key
   }
   await deliverInputs(request.task_id, [input])
   await refreshBlocked(request.task_id)
+  if (outcome !== 'expired') {
+    await wakeTask(request.task_id)
+  }
 }

@@ -5,6 +5,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { FallbackPlayer } from './fake-fallback.js'
 import { Inbox, Outbox, type Message, type UserMessage } from './fake-inbox.js'
+import { asksForServers, loadedServers, type FakeSettings } from './fake-mcp-servers.js'
 import { InProcessClient, type SdkServer } from './fake-mcp.js'
 import { actPermission, PERMISSION_PROMPT, PLAN_APPROVAL_PROMPT, type CanUseTool } from './fake-permission.js'
 import { actQuestions, QUESTION_PROMPT } from './fake-question.js'
@@ -61,6 +62,7 @@ interface Options {
   /** Seti's hooks, which Claude Code calls around each tool call. */
   hooks?: FakeHooks
   mcpServers?: Record<string, SdkServer>
+  settings?: FakeSettings
   cwd?: string
   resume?: string
   /** A side chat forks the session instead of resuming it. */
@@ -352,11 +354,17 @@ class FakeClaude {
       await this.hold()
     } else if (prompt.includes(SESSION_PROMPT)) {
       this.whichSession()
-    } else if (prompt.includes(SYSTEM_PROMPT_PROMPT)) {
-      this.assistant([{ type: 'text', text: this.options.systemPrompt?.append ?? '' }])
     } else {
-      this.assistant([{ type: 'text', text: plainReply(prompt) }])
+      this.assistant([{ type: 'text', text: this.spoken(prompt) }])
     }
+  }
+
+  /** What a turn that only speaks says: its MCP servers, its system prompt or a plain reply. */
+  private spoken(prompt: string): string {
+    if (asksForServers(prompt)) {
+      return loadedServers(this.options.settings)
+    }
+    return prompt.includes(SYSTEM_PROMPT_PROMPT) ? (this.options.systemPrompt?.append ?? '') : plainReply(prompt)
   }
 
   stopTask(shellId: string, summary = SHELL_DESCRIPTION): void {

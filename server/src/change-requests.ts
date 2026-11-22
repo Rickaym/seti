@@ -39,7 +39,9 @@ const SANDBOX_ONLY = 'You run unsandboxed, so the network allowlist and API key 
 
 async function mcpItem(task: Task, server: string) {
   const items = (await effectiveAccess(task)).items.filter((item) => item.kind === 'mcp')
-  const item = items.find((entry) => entry.id === server || entry.name === server)
+  const loose = items.filter((entry) => entry.name.toLowerCase() === server.toLowerCase())
+  const item =
+    items.find((entry) => entry.id === server || entry.name === server) ?? (loose.length === 1 ? loose[0] : undefined)
   if (item === undefined) {
     const names = items.map((entry) => entry.name).join(', ')
     throw new HttpError(404, `No MCP server is named ${server}; Seti has ${names === '' ? 'none' : names}.`)
@@ -78,10 +80,18 @@ async function checkRate(task: Task): Promise<void> {
   }
 }
 
+/** The change as Seti keeps it: a tool with the script read now, a server by its exact name. */
+async function storedChange(task: Task, asked: FileChangeRequest['change']): Promise<RequestedChange> {
+  if (asked.kind === 'shared_tool') {
+    return snapshotProposal(task, asked)
+  }
+  return asked.kind === 'mcp_server' ? { ...asked, server: (await mcpItem(task, asked.server)).name } : asked
+}
+
 /** Files the agent's request for the user to allow or deny, once per pending change. */
 export async function fileChangeRequest(task: Task, input: FileChangeRequest): Promise<Filed> {
   refuseArchived(task)
-  const change = input.change.kind === 'shared_tool' ? await snapshotProposal(task, input.change) : input.change
+  const change = await storedChange(task, input.change)
   const already = await alreadyHas(task, change)
   if (already !== null) {
     return { outcome: 'already', text: already }
