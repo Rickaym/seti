@@ -1,4 +1,4 @@
-import type { RuntimeId, RuntimeSession } from './adapter.js'
+import type { RuntimeId, RuntimeSession, SessionHost } from './adapter.js'
 import { claudeAdapter } from './claude/adapter.js'
 import type { ClaudeShapes } from './claude/session.js'
 
@@ -16,6 +16,9 @@ export type DefaultShapes = ClaudeShapes
 
 /** An open session of the default runtime. */
 export type DefaultSession = RuntimeSession<DefaultShapes>
+
+/** What Seti answers for a session of the default runtime. */
+export type DefaultHost = SessionHost<DefaultShapes>
 
 /** The adapter that drives the runtime. */
 export const adapterFor = <Id extends RuntimeId>(id: Id): Adapters[Id] => ADAPTERS[id]

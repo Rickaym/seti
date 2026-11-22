@@ -1,4 +1,15 @@
-import type { McpServerStatus, Options, PermissionMode, Query, query, SDKMessage } from '@anthropic-ai/claude-agent-sdk'
+import type {
+  CanUseTool,
+  HookCallbackMatcher,
+  HookEvent,
+  McpServerConfig,
+  McpServerStatus,
+  Options,
+  PermissionMode,
+  Query,
+  query,
+  SDKMessage,
+} from '@anthropic-ai/claude-agent-sdk'
 import type { RuntimeSession } from '../adapter.js'
 import type { ClaudeVendor } from './realise.js'
 
@@ -16,6 +27,9 @@ interface ClaudePolicy {
 export interface ClaudeShapes {
   vendor: ClaudeVendor
   realised: Options
+  decide: CanUseTool
+  hooks: Partial<Record<HookEvent, HookCallbackMatcher[]>>
+  hostServers: Record<string, McpServerConfig>
   start: Parameters<typeof query>[0]
   message: SDKMessage
   toolServer: McpServerStatus

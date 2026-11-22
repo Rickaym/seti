@@ -1,28 +1,17 @@
-import type {
-  HookCallbackMatcher,
-  HookEvent,
-  McpServerConfig,
-  Options,
-  PermissionMode,
-  SdkPluginConfig,
-} from '@anthropic-ai/claude-agent-sdk'
-import type { Task } from '@seti/shared'
-import { audit } from '../../audit.js'
-import { compactHook, compactSetup } from '../../compact.js'
-import { COMMAND_LIMIT_HOURS, subagentRules } from '../../house-rules.js'
+import type { McpServerConfig, Options, PermissionMode, SdkPluginConfig } from '@anthropic-ai/claude-agent-sdk'
+import { compactSetup } from '../../compact.js'
+import { COMMAND_LIMIT_HOURS } from '../../house-rules.js'
 import type { Launcher } from '../../launcher.js'
 import { taskBorrowedServers } from '../../mcp-borrowed.js'
-import { bashGuard, guardRefuses } from '../../permission-guard.js'
-import { canUseToolFor } from '../../permission-requests.js'
-import { repeatHooks } from '../../repeat-hooks.js'
-import { reviewHook } from '../../review-hooks.js'
-import { sandboxHooks } from '../../sandbox.js'
-import { redactSecrets } from '../../scrub.js'
-import { guardScope, inProcessServers, permissionSettings, TASK_ID_ENV } from '../../session-options.js'
+import { TASK_ID_ENV } from '../../session-options.js'
 import type { SessionSpec } from '../../session-spec.js'
 import { sharedToolServer } from '../../shared-tools.js'
-import { allowedFor } from '../../store/change-requests.js'
 import { workspaceDir, WORKSPACE_ENV } from '../../workspace/dir.js'
+import type { SessionHost } from '../adapter.js'
+import type { ClaudeShapes } from './session.js'
+
+/** What Seti answers for a Claude Code session. */
+type ClaudeHost = SessionHost<ClaudeShapes>
 
 /** What a spec carries for Claude Code alone. */
 export interface ClaudeVendor {
@@ -69,36 +58,6 @@ const deniedMcpSettings = (names: readonly string[]) => ({
   deniedMcpServers: names.map((serverName) => ({ serverName })),
 })
 
-const COMMAND_CHARS = 500
-
-/** The guard's refusals go to the audit log, so the user sees what an agent tried. */
-const auditRefusal = (task: Task) => async (command: string, reason: string) => {
-  const shown = redactSecrets(command).slice(0, COMMAND_CHARS)
-  await audit.record({
-    actor: 'system',
-    kind: 'task.permission_denied',
-    subject_type: 'task',
-    subject_id: task.id,
-    summary: `Refused a command of task "${task.title}": ${reason}`,
-    detail: { title: task.title, tool: 'Bash', command: shown, guard: true },
-  })
-}
-
-/** Hooks of every task: the guards, a sandboxed one's WebFetch allowlist, rules for subagents. */
-function sessionHooks(
-  task: Task,
-  sandboxed: boolean,
-  session: AbortSignal,
-): Partial<Record<HookEvent, HookCallbackMatcher[]>> {
-  const scope = guardScope(task, sandboxed)
-  const guard = bashGuard(scope, auditRefusal(task))
-  const sandbox = sandboxed ? (sandboxHooks(async () => allowedFor(task.id)).PreToolUse ?? []) : []
-  const repeat = repeatHooks({ task, session, refused: (tool, input) => guardRefuses(tool, input, scope) })
-  const review = reviewHook({ taskId: task.id, session, denyRules: async () => (await permissionSettings(task)).deny })
-  const PreToolUse = [guard, ...sandbox, review, ...(repeat.PreToolUse ?? [])]
-  return { ...repeat, PreToolUse, SubagentStart: [subagentRules()] }
-}
-
 /** The launcher as the SDK takes it: the environment, and the spawn when Seti holds the process. */
 export const claudeLaunch = (launcher: Launcher) => ({
   env: launcher.env,
@@ -106,20 +65,21 @@ export const claudeLaunch = (launcher: Launcher) => ({
 })
 
 /** Rules for every task, the launcher, and an unsandboxed task's borrowed MCP servers. */
-async function sandboxOptions(spec: SessionSpec, launcher: Launcher, task: Task, session: AbortSignal) {
+async function sandboxOptions(spec: SessionSpec, launcher: Launcher) {
   const settings = { ...deniedMcpSettings(spec.deniedToolServers), permissions: spec.rules }
-  const borrowed = launcher.sandboxed ? {} : ((await taskBorrowedServers(task)) as Record<string, McpServerConfig>)
+  const borrowed = launcher.sandboxed
+    ? {}
+    : ((await taskBorrowedServers({ id: spec.taskId, cwd: spec.cwd })) as Record<string, McpServerConfig>)
   return {
     settings,
-    hooks: sessionHooks(task, launcher.sandboxed, session),
     ...claudeLaunch(launcher),
     ...(Object.keys(borrowed).length === 0 ? {} : { mcpServers: borrowed }),
   } satisfies Options
 }
 
-/** The borrowed servers of an unsandboxed task and the in-process ones, when there are any. */
-function withInProcessServers(task: Task, servers: Record<string, McpServerConfig> = {}) {
-  const all = { ...servers, ...inProcessServers(task) }
+/** The borrowed servers of an unsandboxed task and the host's own, when there are any. */
+function withHostServers(host: ClaudeHost, servers: Record<string, McpServerConfig>) {
+  const all = { ...servers, ...host.toolServers }
   return Object.keys(all).length === 0 ? {} : { mcpServers: all }
 }
 
@@ -127,36 +87,36 @@ function withInProcessServers(task: Task, servers: Record<string, McpServerConfi
 export async function realise(
   spec: SessionSpec,
   launcher: Launcher,
-  task: Task,
+  host: ClaudeHost,
   abortController: AbortController,
 ): Promise<Options> {
-  const sandbox = await sandboxOptions(spec, launcher, task, abortController.signal)
+  const sandbox = await sandboxOptions(spec, launcher)
   const compact = compactSetup(spec.compaction)
   return {
     ...claudeSetup(spec),
     permissionMode: spec.mode,
     ...(spec.resume === null ? {} : { resume: spec.resume }),
     enableFileCheckpointing: true,
-    title: task.title,
+    title: spec.title,
     abortController,
-    canUseTool: canUseToolFor(task.id, abortController.signal),
+    canUseTool: host.decide,
     perTaskStopAffordance: true,
     settingSources: ['user', 'project', 'local'],
     ...sandbox,
-    ...withInProcessServers(task, {
+    ...withHostServers(host, {
       ...('mcpServers' in sandbox ? sandbox.mcpServers : {}),
       ...sharedToolServer(spec.toolServers.shared),
     }),
     settings: { ...sandbox.settings, ...compact.settings },
-    hooks: { ...sandbox.hooks, PreCompact: [compactHook(task.id)] },
+    hooks: host.hooks,
     env: {
       ...BACKGROUND_LIMIT,
       ...TODO_TOOLS,
       ...sandbox.env,
       ...BASH_SHELL,
       ...compact.env,
-      [TASK_ID_ENV]: task.id,
-      [WORKSPACE_ENV]: workspaceDir(task.id),
+      [TASK_ID_ENV]: spec.taskId,
+      [WORKSPACE_ENV]: workspaceDir(spec.taskId),
     },
   }
 }
