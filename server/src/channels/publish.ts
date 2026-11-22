@@ -1,7 +1,7 @@
 import { EA_NOTICE_SEVERITIES, normalizeEventKind, type ChannelEvent, type ChannelRoute } from '@seti/shared'
 import { redactCredentials } from '../scrub.js'
-import type { ChannelEventDraft, EventFields } from './types.js'
 import { channelStore, type Accepted } from '../store/channels.js'
+import type { ChannelEventDraft, EventFields } from './types.js'
 
 const TEXT_MAX = { title: 200, detail: 2000, source: 100 } as const
 

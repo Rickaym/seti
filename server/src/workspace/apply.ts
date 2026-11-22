@@ -7,11 +7,11 @@ import { tasks } from '../db.js'
 import { HttpError } from '../http.js'
 import { byAgent, type ChangeSource } from '../revisions.js'
 import { packForTask } from '../seti-guide.js'
+import { taskContextPacks } from '../store/context.js'
 import { explain } from './files.js'
 import { addNote } from './notes.js'
 import { parseContextFile, parsePack, type PackEdit } from './objects.js'
 import { loadPacks, packStamp } from './render.js'
-import { taskContextPacks } from '../store/context.js'
 
 /** What Seti did with an edit: applied it, put its own version back, or left the edit with a note. */
 export type Outcome = { kind: 'applied' } | { kind: 'restore'; reason: string } | { kind: 'keep'; reason: string }

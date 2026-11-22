@@ -1,5 +1,5 @@
-import type { PollRequest, RunResult } from './worker-protocol.js'
 import { createWorkerPool, type WorkerPool, type WorkerPoolOptions } from '../quickjs/pool.js'
+import type { PollRequest, RunResult } from './worker-protocol.js'
 
 export type PollerPool = WorkerPool<PollRequest, RunResult>
 

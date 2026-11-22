@@ -8,7 +8,8 @@ import type { LocalAuth } from '../local-auth.js'
 
 /** Signs a local browser in with the user's local token, into an HttpOnly session cookie. */
 export function localSessionRoutes(local: LocalAuth): Hono {
-  return new Hono()
+  const app = new Hono()
+  app
     .use('*', notEa('sign browsers in or out'))
     .post('/', validJson(localSessionInput), async (c) => {
       if (currentPublicHost() !== null) {
@@ -32,4 +33,5 @@ export function localSessionRoutes(local: LocalAuth): Hono {
       local.endSession(c)
       return ok(c, { required: true } satisfies LocalSession)
     })
+  return app
 }

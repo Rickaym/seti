@@ -1,7 +1,7 @@
 import { parentPort } from 'node:worker_threads'
-import type { FilterReply, FilterRequest } from './filter-protocol.js'
 import { runModule, type ModuleEntry } from '../quickjs/engine.js'
 import type { PoolMessage } from '../quickjs/pool.js'
+import type { FilterReply, FilterRequest } from './filter-protocol.js'
 
 /** Calls the filter with the event and a log function, and says what type it returned. */
 const PRELUDE = `(host, input, filter) => {

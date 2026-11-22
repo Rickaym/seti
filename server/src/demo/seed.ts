@@ -3,13 +3,13 @@ import path from 'node:path'
 import { SANDBOX_POLICY_DEFAULT } from '@seti/shared'
 import type { Hono } from 'hono'
 import { readLocalTokens } from '../local-auth.js'
-import { addDemoPr, registerDemoRepo } from './github.js'
 import { seedAgents, seedTeamChat, stampChannels, stampEaChat, type SeedPlan } from '../store/demo-seed.js'
 import { demoSeedRun } from '../store/demo.js'
 import { sandboxPolicy } from '../store/sandbox.js'
 import { userSettings } from '../store/user.js'
 import { GUIDE_MARKDOWN, REPOS, type DemoRepo } from './content/cast.js'
 import { seedChannels, seedEaChat, type SeedApi } from './content/flows.js'
+import { addDemoPr, registerDemoRepo } from './github.js'
 
 /** A few files per repo, so the Files panel has something to open. */
 const REPO_FILES: Record<DemoRepo, Record<string, string>> = {

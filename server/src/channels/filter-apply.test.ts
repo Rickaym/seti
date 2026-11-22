@@ -1,13 +1,13 @@
 import type { ChannelEvent, WebhookChannelInfo, WebhookFilterTestResult } from '@seti/shared'
 import { afterAll, describe, expect, it } from 'vitest'
 import { createApp } from '../app.js'
+import { auditEvents } from '../store/audit.js'
+import { channelStore } from '../store/channels.js'
+import { EA_AUTH, USER_AUTH } from '../test-auth.js'
 import { createFilterPool } from './filter-run.js'
 import { createReceiver } from './receiver.js'
 import { webhooks } from './service.js'
 import { hmacHex } from './signature.js'
-import { auditEvents } from '../store/audit.js'
-import { channelStore } from '../store/channels.js'
-import { EA_AUTH, USER_AUTH } from '../test-auth.js'
 
 const workers = createFilterPool(1)
 const routed: ChannelEvent[] = []

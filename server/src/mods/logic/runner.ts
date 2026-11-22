@@ -1,8 +1,8 @@
 import { writeSync } from 'node:fs'
 import { registerHooks } from 'node:module'
 import type { ModEngineLimits, ModEvent, ModEventContext } from '@seti/shared'
-import type { RunnerConfig } from './engine-files.js'
 import type { ModuleOutcome } from '../../quickjs/engine.js'
+import type { RunnerConfig } from './engine-files.js'
 
 /** The parent's messages as this child reads them; the parent validated them before sending. */
 type Incoming =

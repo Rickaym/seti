@@ -1,9 +1,9 @@
 import { modManifest } from '@seti/shared'
 import { describe, expect, it } from 'vitest'
+import { HttpError } from '../../http.js'
 import { checkViewCall } from './calls.js'
 import { frameBody, framePolicy, frameHeaders, inlineScriptHashes, scriptHash } from './policy.js'
 import { VIEW_SHIM } from './shim.js'
-import { HttpError } from '../../http.js'
 
 const manifest = modManifest.parse({
   id: 'linear',

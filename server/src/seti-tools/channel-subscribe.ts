@@ -6,6 +6,7 @@ import {
   type ChannelSubscription,
 } from '@seti/shared'
 import { z } from 'zod'
+import { setChannelDelivery, setChannelFilter, subscribeChannel, unsubscribeChannel } from '../channels/actions.js'
 import {
   channelRef,
   existingSubscription,
@@ -15,7 +16,6 @@ import {
   subscriberView,
 } from './channel-refs.js'
 import { done, setiTool, ToolRefusal } from './tool.js'
-import { setChannelDelivery, setChannelFilter, subscribeChannel, unsubscribeChannel } from '../channels/actions.js'
 
 /** What the caller asked for an existing subscription, with undefined for what stays. */
 interface Wanted {

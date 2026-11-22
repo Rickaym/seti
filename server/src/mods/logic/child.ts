@@ -7,9 +7,9 @@ import {
   type ModEvent,
   type ModEventContext,
 } from '@seti/shared'
+import { isolation, sandboxCommand, treeRss, type Isolation, type SandboxEntry } from '../../script-sandbox.js'
 import { cleanText, type EventCall, type EventCounters, type ModEventRun, type OpReply } from './dispatch.js'
 import { runnerFiles } from './engine-files.js'
-import { isolation, sandboxCommand, treeRss, type Isolation, type SandboxEntry } from '../../script-sandbox.js'
 
 /** One event for one mod, with everything Seti verified: the script by its hash, the grants. */
 export interface ModLogicJob {

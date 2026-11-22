@@ -12,8 +12,8 @@ import { audit } from '../audit.js'
 import { now } from '../db.js'
 import { decideAsk } from '../ea-asks.js'
 import { HttpError, ok, valid, validJson } from '../http.js'
-import { botOnly } from './ea-state.js'
 import { eaAsks, eaReplies } from '../store/ea-replies.js'
+import { botOnly } from './ea-state.js'
 
 /** EA messages the user has not seen, and the questions the EA asks before a tool acts. */
 export const eaReplyRoutes = new Hono()

@@ -2,12 +2,12 @@ import { randomUUID } from 'node:crypto'
 import { nextRunTimes, type SetiControlLevel } from '@seti/shared'
 import { describe, expect, it } from 'vitest'
 import { tasks } from '../db.js'
-import { SETI_TOOLS } from './catalog.js'
-import { callSetiTool } from './server.js'
 import { createPoller } from '../pollers/actions.js'
 import { auditEvents } from '../store/audit.js'
 import { channelStore } from '../store/channels.js'
 import { keyConnection } from '../test-connections.js'
+import { SETI_TOOLS } from './catalog.js'
+import { callSetiTool } from './server.js'
 
 async function newTask(title: string, setiControl: SetiControlLevel): Promise<string> {
   const id = randomUUID()

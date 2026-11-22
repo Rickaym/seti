@@ -1,5 +1,5 @@
-import { ADMIN_DATABASE_URL, DATABASE_PREFIX, DATABASE_URL, DEMO_DATABASE_PREFIX, DEMO_DATABASE_URL } from './env.js'
 import { connect, databaseOf, forceDrop } from '../../../server/src/pg.js'
+import { ADMIN_DATABASE_URL, DATABASE_PREFIX, DATABASE_URL, DEMO_DATABASE_PREFIX, DEMO_DATABASE_URL } from './env.js'
 
 export type SeedValue = string | number | null
 

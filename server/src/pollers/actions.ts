@@ -11,8 +11,8 @@ import type { z } from 'zod'
 import { audit } from '../audit.js'
 import { requirePollerTemplate } from '../channels/source-info.js'
 import { refuseAgent } from '../ea-guard.js'
-import { pollers } from './service.js'
 import type { PollerRecord } from '../store/pollers.js'
+import { pollers } from './service.js'
 
 const REACH = "change a poller's extra hosts or secrets"
 const SECRET_SCRIPT = 'change the script of a poller that uses secrets'

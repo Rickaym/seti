@@ -1,10 +1,10 @@
 import { normalizeEventKind, WEBHOOK_FILTER_LIMITS, type DeliveryFilter, type WebhookFilterChange } from '@seti/shared'
 import { redactCredentials, scrubInput } from '../scrub.js'
+import { webhookFilterStore } from '../store/webhook-filters.js'
 import type { FilterEventInput } from './filter-protocol.js'
 import { filterInput, runFilter, type FilterPool } from './filter-run.js'
 import { clip } from './publish.js'
 import type { EventFields } from './types.js'
-import { webhookFilterStore } from '../store/webhook-filters.js'
 
 const TITLE_MAX = 200
 const REASON_MAX = 200
