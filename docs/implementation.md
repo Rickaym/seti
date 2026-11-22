@@ -22,7 +22,7 @@ their own. Seti uses the reference values in the protocol's Appendix A.
 
 | Process               | What it is                                                                 | Protocol      |
 | --------------------- | -------------------------------------------------------------------------- | ------------- |
-| `seti.service`        | The Hono server in `server/`; holds the open sessions in `runner.ts`       | ENT-13        |
+| `seti.service`        | The Hono server in `server/`; holds the open sessions in `session-host.ts` | ENT-13        |
 | Agent sessions        | Claude Code via `runtimes/claude/` and the Agent SDK, about 300 MB each    | 3.2, 7.2, 7.8 |
 | `seti-ea.service`     | The EA in `ea/`, a pipecat process with its own token                      | 14            |
 | Poller workers        | Worker threads in the server (`SETI_POLLER_WORKERS`, 2 by default)         | CHN-12        |
@@ -52,7 +52,8 @@ with another top-level folder.
 | Section        | Main files                                                                                                                                                                                       |
 | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | 3 Entities     | `shared/src/tasks.ts`, `shared/src/inputs.ts`, `shared/src/requests.ts`, `db.ts`, `pending-requests.ts`                                                                                          |
-| 4 Turns        | `runner.ts`, `session-spec.ts`, `runtime-host.ts`, `runtimes/`, `agent-session.ts`, `input-queue.ts`, `session-restart.ts`, `rewind.ts`, `turn-asking.ts`, `closing-line.ts`, `task-location.ts` |
+| 4 Turns        | `runner.ts`, `session-host.ts`, `session-ingest.ts`, `session-spec.ts`, `runtime-host.ts`, `runtimes/`, `agent-session.ts`, `rewind.ts`, `turn-asking.ts`, `closing-line.ts`, `task-location.ts` |
+| 4 Restarts     | `session-restart.ts`, `input-queue.ts`                                                                                                                                                           |
 | 5 Updates      | `shared/src/channel-delivery.ts`, `inputs.ts`, `input-preface.ts`                                                                                                                                |
 | 6 Attention    | `shared/src/attention.ts`, `task-blocked.ts`, `stall-watch.ts`, `ea-attention.ts`, `notifications.ts`, `notify-scope.ts`, `presence.ts`, `attention-brief.ts`                                    |
 | 7.1 Actors     | `access.ts`, `ea-guard.ts`                                                                                                                                                                       |
