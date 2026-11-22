@@ -57,6 +57,10 @@
   --queued: oklch(0.68 0.18 155);
   --voice-user: oklch(0.68 0.18 155);
   --voice-bot: var(--primary);
+  --hype-1: oklch(0.62 0.17 155);
+  --hype-2: oklch(0.65 0.14 215);
+  --hype-3: oklch(0.58 0.2 290);
+  --hype-4: oklch(0.62 0.23 350);
   --diff-add: var(--success);
   --diff-del: var(--destructive);
   --code: var(--muted);
@@ -139,6 +143,10 @@
   --queued: oklch(0.74 0.16 155);
   --voice-user: oklch(0.74 0.16 155);
   --voice-bot: var(--primary);
+  --hype-1: oklch(0.78 0.17 155);
+  --hype-2: oklch(0.8 0.13 215);
+  --hype-3: oklch(0.72 0.17 290);
+  --hype-4: oklch(0.74 0.2 350);
   --diff-add: var(--success);
   --diff-del: var(--destructive);
   --code: var(--muted);

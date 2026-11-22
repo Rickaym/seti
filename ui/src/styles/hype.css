@@ -1,0 +1,53 @@
+/* CPU and memory meters: busy reads as good. Only the sweep's transform animates. */
+.hype-meter {
+  background-color: var(--hype-track, var(--muted));
+}
+
+.hype-fill {
+  position: relative;
+  height: 100%;
+  overflow: hidden;
+  background-color: var(--hype-1);
+}
+
+.hype-meter[data-hype='warning'] .hype-fill {
+  background-color: var(--hype-trouble, var(--warning-fill));
+}
+
+/* Twice the fill's width and two gradient periods, so a shift by one period loops unseen. */
+.hype-sweep {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 200%;
+  background-repeat: repeat-x;
+  background-size: 50% 100%;
+  transform: translateX(-50%);
+}
+
+.hype-meter[data-hype='flow'] .hype-sweep {
+  background-image: linear-gradient(90deg, var(--hype-1), var(--hype-2), var(--hype-1));
+}
+
+.hype-meter[data-hype='rage'] .hype-sweep {
+  background-image: linear-gradient(90deg, var(--hype-1), var(--hype-2), var(--hype-3), var(--hype-4), var(--hype-1));
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .hype-sweep {
+    will-change: transform;
+  }
+
+  .hype-meter[data-hype='flow'] .hype-sweep {
+    animation: hype-sweep 6s linear infinite;
+  }
+
+  .hype-meter[data-hype='rage'] .hype-sweep {
+    animation: hype-sweep 1.2s linear infinite;
+  }
+}
+
+@keyframes hype-sweep {
+  to {
+    transform: translateX(0);
+  }
+}
