@@ -9,11 +9,14 @@ const HOURS = String(REQUEST_TTL_MS / 3_600_000)
 const requestChange = setiTool({
   name: 'request_change',
   description:
-    'Ask the user for access you lack, with the exact change and why; the user allows or denies it with one ' +
-    'tap, and Seti tells you the answer as an update. Kinds: allow_host (a host and port on the network ' +
+    'Ask the user for access you lack, with the exact change and why, as soon as a task needs it and without ' +
+    'searching for another way first; the user allows or denies it with one tap, and Seti tells you the ' +
+    'answer as an update. Kinds: allow_host (a host and port on the network ' +
     `allowlist, ${String(HTTPS_PORT)} by default; the user picks you or every agent), api_key (a connection by ` +
     'its variable name and hosts; the user pastes the key into the request in Seti as they allow it, and you ' +
-    'only ever hold a placeholder), mcp_server (an MCP server Seti has, for you), shared_tool (one script ' +
+    'only ever hold a placeholder), mcp_server (an MCP server this install has that is off for you, by the ' +
+    'name your system prompt or list_mcp_servers gives; your session restarts with its tools for the turn ' +
+    'that brings the answer), shared_tool (one script ' +
     'file of yours, at most 64 KB, that proved useful, as a typed tool for every agent: name it, describe ' +
     'what it does, give its arguments as a JSON Schema object in input, say in writes whether it changes or ' +
     'sends anything outside the workspace, and list the variables it reads with their hosts in needs. The ' +

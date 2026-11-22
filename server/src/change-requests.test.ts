@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
+import type * as Sdk from '@anthropic-ai/claude-agent-sdk'
 import { auditQuery, type ChangeRequest, type SetiControlLevel, type Task } from '@seti/shared'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { asAgent } from './access.js'
 import { createApp } from './app.js'
 import { answerChangeRequest, expireChangeRequests, PENDING_MAX } from './change-requests.js'
@@ -15,6 +16,15 @@ import { connectionRows } from './store/connections.js'
 import { profiles } from './store/credentials.js'
 import { sandboxPolicy } from './store/sandbox.js'
 import { EA_AUTH, USER_AUTH } from './test-auth.js'
+
+/** Allow and Deny hand the agent its update at once, which starts a turn of this fake session. */
+vi.mock('@anthropic-ai/claude-agent-sdk', async (importOriginal) => {
+  const { FakeSdk, fakeResult } = await import('./fake-sdk.js')
+  const fake = new FakeSdk(function* () {
+    yield fakeResult()
+  })
+  return { ...(await importOriginal<typeof Sdk>()), query: fake.query }
+})
 
 const app = createApp()
 const [requestChange] = REQUEST_TOOLS

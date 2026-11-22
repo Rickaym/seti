@@ -435,6 +435,18 @@ interrupted only for that.
   agent gets one `seti` update with the outcome and whether a value is set.
 - CHG-7: The pasted value MUST travel only in the user's Allow and MUST NOT enter the request, the
   update, the transcript, events, errors or the audit.
+- CHG-10: An agent at `self` or `full` is told: when a task needs access it lacks, file
+  `request_change` at once and carry on meanwhile; never search memory, transcripts or files for
+  how it was done before.
+- CHG-11: While MCP servers are off for an agent, its prompt lists them: `mcp_off_listed` by exact
+  name, each with up to three words taken from its tool names, and the rest as a count. The list
+  MUST carry only names and tool-name words, MUST count rather than show a name with characters
+  beyond letters, digits, space and `_ . : @ -`, and is absent when no server is off. An
+  `mcp_server` request matches a name whatever its case and is stored under the exact name.
+- CHG-12: The update of an allowed or denied request is handed over without `wake_debounce`
+  (UPD-5); a running turn still ends first. The turn that brings an allowed server starts a new
+  session that has it once no background work holds the old one, and the update names the
+  server's tool prefix and up to five of its tools.
 
 ### 7.7 Hostile repositories
 
@@ -913,7 +925,7 @@ others.
 | Updates      | `wake_debounce` 5 s. `wake_max` 30 s. `batch_updates` 20. `update_body` 6000 characters. `auto_turns` 20 in `auto_window` 60 min.                                                         |
 | Attention    | `stall_after` 20 min. `stall_check` 1 min. `push_cap` 5 in `push_window` 10 min. `focus_ttl` 45 s. `focus_report` 20 s. `call_ttl` 15 s. `away_after` 5 min. `ask_remind` 15 min.         |
 | Brief        | `brief_needs` 5. `brief_changes` 6.                                                                                                                                                       |
-| Changes      | `chg_pending` 5. `chg_hourly` 10. `chg_expiry` 24 h.                                                                                                                                      |
+| Changes      | `chg_pending` 5. `chg_hourly` 10. `chg_expiry` 24 h. `mcp_off_listed` 8.                                                                                                                  |
 | Caps         | `mem_cap` 30% of host RAM in whole GB, 6 to 16 GB. `cpu_cap` 3 cores at half the control room's weight.                                                                                   |
 | Shared tools | `tool_schema` 30 properties, depth 4, 8 KB; description 20 to 1500; timeout 1 to 600 s (default 120); 5 needs of 1 to 5 hosts. `tool_script` 64 KB. `tool_output` 256 KB.                 |
 | Events       | Event `title` 200, `detail` 2000, `kind` 80. Subscription `events` 20 kinds. Log excerpt 1000. `route_retry` 30 s to 1 h, 12 attempts.                                                    |
