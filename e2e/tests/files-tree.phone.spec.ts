@@ -1,6 +1,6 @@
 import { seedTreeAgent, treeRow } from './support/files-tree.js'
 import { expect, test } from './support/fixtures.js'
-import { expectFitsPhone } from './support/phone-layout.js'
+import { expectFitsPhone, expectTouchTarget } from './support/phone-layout.js'
 import { filesPanel } from './support/viewer-files.js'
 
 test('the tree fits the files sheet with rows a finger can tap', async ({ page }) => {
@@ -13,7 +13,7 @@ test('the tree fits the files sheet with rows a finger can tap', async ({ page }
   const tree = panel.getByRole('list', { name: 'Folder tree' })
 
   const root = tree.getByRole('button', { name: treeRow(label) })
-  expect((await root.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(44)
+  await expectTouchTarget(root)
   await root.tap()
   await expect(tree.getByRole('button', { name: 'node_modules, rebuildable, 4 KB' })).toBeVisible({
     timeout: 20_000,

@@ -6,6 +6,7 @@ import { paths } from './support/env.js'
 import { PERMISSION_COMMAND, PERMISSION_PROMPT } from './support/fake-permission.js'
 import { apiData, expect, test, unique } from './support/fixtures.js'
 import { mainGrid } from './support/grid.js'
+import { expectTouchTarget } from './support/phone-layout.js'
 import { FAKE_CLAUDE_ENV } from './support/processes.js'
 import { run, screenOf, screenRows, shellRows, terminalIn, terminalInput } from './support/terminal.js'
 
@@ -95,7 +96,7 @@ test('typing on a phone hands the transcript and reply box the room, then gives 
   const send = page.getByRole('button', { name: 'Send' })
   await expect.poll(async () => inViewport(page, reply(page))).toBe(true)
   await expect.poll(async () => inViewport(page, send)).toBe(true)
-  expect(await height(send)).toBeGreaterThanOrEqual(44)
+  await expectTouchTarget(send)
   await expect.poll(async () => atLatest(page)).toBe(true)
 
   await reply(page).blur()

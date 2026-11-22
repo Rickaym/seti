@@ -1,6 +1,6 @@
 import type { Page } from '@playwright/test'
-import { AGENTS } from './seed.js'
 import { expect } from '../tests/support/fixtures.js'
+import { AGENTS } from './seed.js'
 
 const main = (page: Page) => page.getByRole('main')
 

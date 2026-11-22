@@ -7,11 +7,11 @@ import { messages, repos, tasks } from '../db.js'
 import { setPlannerModel } from '../planner.js'
 import { prDecorators } from '../pr-decorators.js'
 import type * as Prs from '../prs.js'
-import { SETI_TOOLS } from './catalog.js'
 import { accessDefaults, taskAccess } from '../store/access.js'
 import { auditEvents } from '../store/audit.js'
 import { sshHostStore } from '../store/ssh.js'
 import { waitIdle } from '../wait-idle.js'
+import { SETI_TOOLS } from './catalog.js'
 import { callSetiTool } from './server.js'
 
 const sdk = await vi.hoisted(async () => {

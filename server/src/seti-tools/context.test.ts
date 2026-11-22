@@ -1,11 +1,11 @@
 import { randomUUID } from 'node:crypto'
 import { describe, expect, it } from 'vitest'
 import { tasks } from '../db.js'
-import { SETI_TOOLS } from './catalog.js'
-import { callSetiTool } from './server.js'
 import { auditEvents } from '../store/audit.js'
 import { contextPacks } from '../store/context.js'
 import { revisions } from '../store/revisions.js'
+import { SETI_TOOLS } from './catalog.js'
+import { callSetiTool } from './server.js'
 
 const caller = randomUUID()
 await tasks.insert({

@@ -1,5 +1,6 @@
 import type { Page } from '@playwright/test'
 import { expect, test } from './support/fixtures.js'
+import { expectTouchTarget } from './support/phone-layout.js'
 
 /** Phones have no Ctrl+K: the shortcut guide in the menu drawer offers the palette too. */
 async function openFromGuide(page: Page) {
@@ -18,8 +19,7 @@ test('opens the palette as a full screen sheet with one tap on the header search
   await page.goto('/#agents')
   const viewport = page.viewportSize() ?? { width: 0, height: 0 }
   const search = page.getByRole('banner').getByRole('button', { name: 'Search' })
-  const target = await search.boundingBox()
-  expect(Math.min(target?.width ?? 0, target?.height ?? 0)).toBeGreaterThanOrEqual(44)
+  await expectTouchTarget(search, 'Search', 'both')
   await search.tap()
   const palette = page.getByRole('dialog', { name: 'Search Seti' })
   await expect(palette).toBeVisible()

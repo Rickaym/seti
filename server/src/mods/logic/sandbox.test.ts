@@ -4,10 +4,10 @@ import os from 'node:os'
 import path from 'node:path'
 import type { ModEvent } from '@seti/shared'
 import { afterAll, describe, expect, it, vi } from 'vitest'
+import { isolation, type Isolation } from '../../script-sandbox.js'
 import type { ModLogicJob } from './child.js'
 import { dispatchModOp, UNAVAILABLE_OPS, type OpTable } from './dispatch.js'
 import { createModLogicPool, type ModLogicPool, type ModLogicPoolOptions } from './pool.js'
-import { isolation, type Isolation } from '../../script-sandbox.js'
 
 const HASH = 'a'.repeat(64)
 let events = 0

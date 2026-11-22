@@ -2,13 +2,13 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { AGENT_COLOR_ALIASES, AGENT_COLOR_PRESETS, modManifest, modToolName } from '@seti/shared'
 import { describe, expect, it } from 'vitest'
+import { BUNDLED_MODS, modHost, TEST_MODS } from '../mods/bundled.js'
+import { modCommands } from '../mods/points.js'
 import { SETI_TOOLS } from './catalog.js'
 import { KNOWLEDGE_TOOLS } from './knowledge.js'
 import { modActionTools } from './mod-actions.js'
 import { REQUEST_TOOLS, SECRET_TOOLS } from './requests.js'
 import { HANDOFF_TOOLS } from './team.js'
-import { BUNDLED_MODS, modHost, TEST_MODS } from '../mods/bundled.js'
-import { modCommands } from '../mods/points.js'
 
 const EA_SOURCES = path.resolve(import.meta.dirname, '../../../ea/src/seti_ea')
 

@@ -1,5 +1,5 @@
 import { expect, test, toasts, unique, waitForToastsToClear } from './support/fixtures.js'
-import { expectFitsPhone } from './support/phone-layout.js'
+import { expectFitsPhone, expectTouchTarget } from './support/phone-layout.js'
 import { FAKE_CLAUDE_ENV } from './support/processes.js'
 import { proposeTool, sharedTool, startToolsmith } from './support/shared-tools.js'
 
@@ -24,7 +24,7 @@ test('a phone reviews a proposed tool, allows it, reads its code, turns it off a
   await card.scrollIntoViewIfNeeded()
   await expectFitsPhone(page, 'shared tool proposal')
   const allow = card.getByRole('button', { name: 'Allow', exact: true })
-  expect((await allow.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(44)
+  await expectTouchTarget(allow)
   await allow.tap()
   await expect(card).toHaveCount(0)
   expect(await sharedTool(request, name)).toMatchObject({ enabled: true })

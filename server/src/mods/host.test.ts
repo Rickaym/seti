@@ -14,6 +14,7 @@ import {
 import { afterEach, describe, expect, it } from 'vitest'
 import { asMod } from '../access.js'
 import { refuseAgent, refusePromptAsUser } from '../ea-guard.js'
+import { modStates } from '../store/mods.js'
 import { serverApi } from './api.js'
 import { ModHost } from './host.js'
 import {
@@ -25,7 +26,6 @@ import {
   setiCommands,
   slashCommands,
 } from './points.js'
-import { modStates } from '../store/mods.js'
 
 const snapshot = () => ({
   slash: slashCommands.list(),

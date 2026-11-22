@@ -7,10 +7,10 @@ import {
   modManifest,
   type ModManifest,
 } from '@seti/shared'
+import { themeTokensCss } from '../theme-tokens.js'
 import { logicProblem, pageScripts, textOf } from './files.js'
 import { packageHash } from './hash.js'
 import { iconData } from './icon.js'
-import { themeTokensCss } from '../theme-tokens.js'
 
 /** Why Seti refuses a package, in words the user reads on the consent screen. */
 export class PackageProblem extends Error {}

@@ -17,9 +17,9 @@
     "migrate-from-sqlite": "tsx src/migrate-from-sqlite.ts"
   },
   "dependencies": {
-    "@anthropic-ai/claude-agent-sdk": "^0.3.325",
-    "@aws-sdk/client-sts": "^3.1169.0",
-    "@hono/node-server": "^2.1.8",
+    "@anthropic-ai/claude-agent-sdk": "^0.3.327",
+    "@aws-sdk/client-sts": "^3.1171.0",
+    "@hono/node-server": "^2.1.9",
     "@hono/zod-validator": "^0.9.1",
     "@jitl/quickjs-wasmfile-release-sync": "^0.32.0",
     "@redis/client": "^6.3.1",
@@ -44,9 +44,9 @@
     "@simplewebauthn/server": "^14.1.0",
     "acorn": "^8.19.0",
     "fast-xml-parser": "^5.12.1",
-    "hono": "^4.13.18",
+    "hono": "^4.13.19",
     "jose": "^6.2.17",
-    "marked": "^18.2.0",
+    "marked": "^18.2.1",
     "node-pty": "1.1.0",
     "parse5": "^8.1.1",
     "postgres": "^4.1.1",
@@ -61,6 +61,6 @@
     "@types/web-push": "^3.6.4",
     "@types/ws": "^8.18.2",
     "typescript": "~6.0.3",
-    "vitest": "^5.1.0"
+    "vitest": "^5.1.1"
   }
 }

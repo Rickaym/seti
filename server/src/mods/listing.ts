@@ -1,8 +1,8 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { MOD_PACKAGE_LIMITS, isIconFile, modDocFiles, type ModDocs, type ModIcon, type ModManifest } from '@seti/shared'
-import type { HostedMod } from './host.js'
 import { modVersions } from '../store/mod-packages.js'
+import type { HostedMod } from './host.js'
 import { textOf } from './package/files.js'
 import { iconData } from './package/icon.js'
 

@@ -1,19 +1,12 @@
 import { randomUUID } from 'node:crypto'
-import type { Locator } from '@playwright/test'
 import type { Task } from '@seti/shared'
 import { expandColors, openAgentSettings } from './support/agent-settings.js'
 import { openSeedDb } from './support/db.js'
 import { paths } from './support/env.js'
 import { apiData, expect, test, unique } from './support/fixtures.js'
 import { tapMoreAction } from './support/phone-agent.js'
+import { expectTouchTarget } from './support/phone-layout.js'
 import { SEEDS, seedTask } from './support/subtasks.js'
-
-const TARGET_PX = 44
-
-const smallest = async (locator: Locator) => {
-  const box = await locator.boundingBox()
-  return Math.min(box?.width ?? 0, box?.height ?? 0)
-}
 
 test('a phone colours an agent with a preset or a typed hex and the header takes it', async ({ page, request }) => {
   const title = unique('Phone painted')
@@ -24,12 +17,12 @@ test('a phone colours an agent with a preset or a typed hex and the header takes
   await page.goto(`/#agents/${id}`)
   const sheet = await openAgentSettings(page)
   const chip = sheet.getByRole('button', { name: 'Colour None' })
-  expect(await smallest(chip)).toBeGreaterThanOrEqual(TARGET_PX)
+  await expectTouchTarget(chip, 'Colour', 'both')
   await expandColors(sheet)
   const pink = sheet.getByRole('group', { name: 'Color' }).getByRole('button', { name: 'Pink', exact: true })
   const hex = sheet.getByRole('textbox', { name: 'Hex colour' })
   for (const target of [pink, hex, sheet.getByLabel('Pick any colour')]) {
-    expect(await smallest(target)).toBeGreaterThanOrEqual(TARGET_PX)
+    await expectTouchTarget(target, 'colour control', 'both')
   }
   await pink.click()
   await expect(pink).toHaveAttribute('aria-pressed', 'true')
@@ -56,7 +49,7 @@ test('a phone opens the subagents from the More sheet with touch-sized rows', as
   const rows = sheet.getByTestId('subagent-row')
   await expect(rows).toHaveCount(4)
   await sheet.evaluate(async (el) => Promise.all(el.getAnimations().map(async (run) => run.finished)))
-  expect((await rows.first().boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(TARGET_PX)
+  await expectTouchTarget(rows.first())
   const width = page.viewportSize()?.width ?? 0
   expect((await sheet.boundingBox())?.width ?? 0).toBeGreaterThan(width - 32)
   await rows.first().click()

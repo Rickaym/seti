@@ -1,11 +1,11 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { devices, type Browser, type BrowserContext, type Page } from '@playwright/test'
+import { USER_HEADERS } from '../tests/support/env.js'
+import { loadAssetsThroughNode } from '../tests/support/fixtures.js'
 import { NOW } from './clock.js'
 import type { Encoder, ImageType } from './encoder.js'
 import { mockLiveServices } from './mocks.js'
-import { USER_HEADERS } from '../tests/support/env.js'
-import { loadAssetsThroughNode } from '../tests/support/fixtures.js'
 
 const OUT_DIR = process.env.SETI_SHOTS_DIR ?? path.join(import.meta.dirname, '../../docs/screenshots')
 

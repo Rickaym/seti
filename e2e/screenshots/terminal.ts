@@ -4,11 +4,11 @@ import fs from 'node:fs'
 import path from 'node:path'
 import type { Locator, Page } from '@playwright/test'
 import type { WorkspaceEntry } from '@seti/shared'
-import { NOW } from './clock.js'
-import { AGENTS } from './seed.js'
 import { paths } from '../tests/support/env.js'
 import { apiData, expect } from '../tests/support/fixtures.js'
 import { run, screenOf, terminalIn, tileIn } from '../tests/support/terminal.js'
+import { NOW } from './clock.js'
+import { AGENTS } from './seed.js'
 
 const REPO = path.join(paths.home, 'storefront')
 const BRANCH = 'fix/checkout-capture-retry'

@@ -6,10 +6,10 @@ import {
   type WebhookFilterChange,
   type WebhookFilterField,
 } from '@seti/shared'
+import { createWorkerPool, type WorkerPool } from '../quickjs/pool.js'
 import { redactSecrets } from '../scrub.js'
 import type { FilterEventInput, FilterReply, FilterRequest, FilterReturn } from './filter-protocol.js'
 import { clip } from './publish.js'
-import { createWorkerPool, type WorkerPool } from '../quickjs/pool.js'
 
 export type FilterPool = Pick<WorkerPool<FilterRequest, FilterReply>, 'run'>
 

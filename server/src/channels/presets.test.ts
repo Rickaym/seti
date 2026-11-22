@@ -1,12 +1,12 @@
 import { isDataSender, timeOf, type WebhookMapping } from '@seti/shared'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { modHost } from '../mods/bundled.js'
 import { atPointer } from './payload.js'
 import { parseGeneric } from './preset-generic.js'
 import { createRateLimiter } from './rate-limit.js'
 import { hmacHex, newHookId, newSecret, safeEqual, HOOK_ID } from './signature.js'
 import { webhookSources } from './sources.js'
 import type { Parsed, WebhookRequest } from './types.js'
-import { modHost } from '../mods/bundled.js'
 
 beforeAll(async () => {
   await modHost.start()

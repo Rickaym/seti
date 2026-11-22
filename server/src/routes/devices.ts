@@ -50,7 +50,8 @@ async function deviceOf(c: Context): Promise<DeviceRow> {
 
 /** Paired devices: the app pairs with a one-time code; Settings lists, renames and revokes them. */
 export function deviceRoutes(access: PublicAccess | null): Hono {
-  return new Hono()
+  const app = new Hono()
+  app
     .use('*', notEa('pair, rename or revoke devices'))
     .post('/pair', validJson(devicePairInput), async (c) => {
       if (!perClient.take(clientOf(c))) {
@@ -159,4 +160,5 @@ export function deviceRoutes(access: PublicAccess | null): Hono {
       })
       return ok(c, await androidAppSettings())
     })
+  return app
 }

@@ -1,5 +1,6 @@
 import { query } from '@anthropic-ai/claude-agent-sdk'
 import type { RuntimeAdapter } from '../adapter.js'
+import { realise } from './realise.js'
 import { claudeSession, type ClaudeShapes } from './session.js'
 
 /** Starts Claude Code through the SDK; a development server may load a fake instead. */
@@ -8,6 +9,7 @@ let transport: typeof query = query
 /** Claude Code through the Claude Agent SDK, one process per session. */
 export const claudeAdapter: RuntimeAdapter<ClaudeShapes> = {
   id: 'claude',
+  realise,
   open: async (start) => Promise.resolve(claudeSession(transport(start))),
 }
 

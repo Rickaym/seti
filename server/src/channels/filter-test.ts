@@ -7,12 +7,12 @@ import {
 import type { z } from 'zod'
 import { HttpError } from '../http.js'
 import { redactCredentials } from '../scrub.js'
+import { channelStore, type ChannelRecord } from '../store/channels.js'
 import type { FilterEventInput } from './filter-protocol.js'
 import { filterInput, runFilter, type FilterPool, type FilterVerdict } from './filter-run.js'
 import { clip } from './publish.js'
 import { channelSource } from './sender-info.js'
 import { pastedHeaders } from './sender-sample.js'
-import { channelStore, type ChannelRecord } from '../store/channels.js'
 
 const TITLE_MAX = 200
 

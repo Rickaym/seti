@@ -1,9 +1,9 @@
 import { modCapability, type ModCapability } from '@seti/shared'
 import { audit } from '../audit.js'
-import type { InstalledMod } from './host.js'
 import { modDevMode } from '../store/mod-lifecycle.js'
 import { modLogs } from '../store/mod-logic.js'
 import { modGrants, modInstalls, modVersions, type ModInstallRow } from '../store/mod-packages.js'
+import type { InstalledMod } from './host.js'
 import { packageHash } from './package/hash.js'
 
 export const FILES_CHANGED = 'Its files changed since you installed it'

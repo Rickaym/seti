@@ -1,7 +1,7 @@
-import { filterWorkers } from './filter-run.js'
 import { pollerScheduler, pollerWorkers } from '../pollers/service.js'
 import { stopReminderScripts } from '../reminders/sandbox.js'
 import { reminderTicker } from '../reminders/service.js'
+import { filterWorkers } from './filter-run.js'
 
 /** How long runs going at shutdown get to finish before Seti stops them. */
 const FINISH_MS = 5000

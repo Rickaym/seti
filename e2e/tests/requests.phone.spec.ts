@@ -4,7 +4,7 @@ import { PLAN_STARTED, PLAN_TEXT } from './support/fake-permission.js'
 import { PUSH_PROMPT, PUSH_QUESTION } from './support/fake-question.js'
 import { apiData, expect, test, unique } from './support/fixtures.js'
 import { proposeAsAgent } from './support/knowledge.js'
-import { expectFitsPhone } from './support/phone-layout.js'
+import { expectFitsPhone, expectTouchTarget } from './support/phone-layout.js'
 import { FAKE_CLAUDE_ENV } from './support/processes.js'
 import { askingAgent, lastReply, openRequestsFromMenu, requestsSection, sectionCount } from './support/questions.js'
 import { kindFilter, pendingTotal, planningAgent, requestsGroup, settleOthers } from './support/requests.js'
@@ -37,7 +37,7 @@ test('on a phone one thumb answers a question, an access request, a plan and a n
   await expect(page.getByRole('main').getByRole('region', { name: /^Requests from / })).toHaveCount(4)
   await expectFitsPhone(page, 'Requests with every kind')
   for (const chip of await kindFilter(page).getByRole('button').all()) {
-    expect((await chip.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(44)
+    await expectTouchTarget(chip)
   }
 
   const change = requestsGroup(page, access.title).getByRole('region', { name: /^Change request: / })

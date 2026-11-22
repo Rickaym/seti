@@ -1,12 +1,9 @@
 import { randomUUID } from 'node:crypto'
-import type { Locator } from '@playwright/test'
 import { openAgentSettings, showSection, type SettingsSection } from './support/agent-settings.js'
 import { openSeedDb } from './support/db.js'
 import { paths } from './support/env.js'
 import { expect, test } from './support/fixtures.js'
-import { expectFitsPhone } from './support/phone-layout.js'
-
-const TARGET_PX = 44
+import { expectFitsPhone, expectTouchTarget } from './support/phone-layout.js'
 
 async function seedAgent(title: string): Promise<string> {
   const db = openSeedDb()
@@ -16,18 +13,13 @@ async function seedAgent(title: string): Promise<string> {
   return id
 }
 
-async function smallest(locator: Locator): Promise<number> {
-  const box = await locator.boundingBox()
-  return Math.min(box?.width ?? 0, box?.height ?? 0)
-}
-
 test('the Agents header on a phone holds new and the menu, fits, and its menu reaches import', async ({ page }) => {
   await seedAgent('Phone list header')
   await page.goto('/#agents')
   const header = page.getByRole('heading', { name: 'Agents', level: 1 }).locator('..')
   await expect(header.getByRole('button')).toHaveCount(3)
   for (const name of ['Filter agents', 'New agent', 'More list actions']) {
-    expect(await smallest(header.getByRole('button', { name })), name).toBeGreaterThanOrEqual(TARGET_PX)
+    await expectTouchTarget(header.getByRole('button', { name }), name, 'both')
   }
   expect(await header.evaluate((element) => element.scrollWidth - element.clientWidth)).toBe(0)
   await expectFitsPhone(page, 'agent list header')
@@ -39,13 +31,11 @@ test('the Agents header on a phone holds new and the menu, fits, and its menu re
     page.getByRole('menuitem', { name: 'Import sessions' }),
   ]) {
     await expect(item).toBeInViewport({ ratio: 0.99 })
-    await expect.poll(async () => Math.round((await item.boundingBox())?.height ?? 0)).toBeGreaterThanOrEqual(TARGET_PX)
+    await expectTouchTarget(item)
   }
   await page.getByRole('menuitemcheckbox', { name: 'Archived' }).tap()
   await expect(page.getByRole('main').getByText('Archived, read-only')).toBeVisible()
-  expect(
-    await smallest(page.getByRole('main').getByRole('button', { name: 'Active', exact: true })),
-  ).toBeGreaterThanOrEqual(TARGET_PX)
+  await expectTouchTarget(page.getByRole('main').getByRole('button', { name: 'Active', exact: true }), 'Active', 'both')
 })
 
 test('every settings tab is reachable on a phone with touch-sized tabs and the actions in view', async ({ page }) => {
@@ -56,7 +46,7 @@ test('every settings tab is reachable on a phone with touch-sized tabs and the a
   for (const name of sections) {
     const tab = sheet.getByRole('tab', { name })
     await expect(tab).toBeInViewport({ ratio: 1 })
-    expect((await tab.boundingBox())?.height ?? 0, name).toBeGreaterThanOrEqual(TARGET_PX)
+    await expectTouchTarget(tab, name)
     const panel = await showSection(sheet, name)
     await expect(panel.locator('dt').first()).toBeInViewport()
     await expect(sheet.getByRole('button', { name: 'Archive', exact: true })).toBeInViewport({ ratio: 1 })

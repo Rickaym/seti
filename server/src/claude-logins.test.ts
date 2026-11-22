@@ -15,7 +15,7 @@ import {
   switchLogin,
 } from './claude-logins.js'
 import { sql, tasks } from './db.js'
-import { setupKey } from './session-options.js'
+import { setupKey } from './session-spec.js'
 import { auditEvents } from './store/audit.js'
 import { secretRows } from './store/secrets.js'
 import { EA_AUTH, USER_AUTH } from './test-auth.js'

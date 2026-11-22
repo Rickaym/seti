@@ -13,9 +13,9 @@ import {
 import { PUBLIC_ACCESS } from '../config.js'
 import { tasks } from '../db.js'
 import { HttpError } from '../http.js'
-import type { ModCall } from './capabilities.js'
 import { rolePacksByTask } from '../store/context.js'
 import { teamMembers } from '../store/team.js'
+import type { ModCall } from './capabilities.js'
 
 /** What a mod holds, from its grant rows: each capability, and the connection the user bound. */
 export function grantedFrom(rows: readonly { capability: ModCapability; connection_id: string | null }[]): {

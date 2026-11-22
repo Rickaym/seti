@@ -1,11 +1,11 @@
 import { Hono } from 'hono'
 import { describe, expect, it } from 'vitest'
 import { createApp } from '../app.js'
+import { modHost } from '../mods/bundled.js'
 import { DEMO_ALLOWLIST } from './allowlist.js'
 import { DEMO_REFUSED_TITLE, demoGuard, routeKey } from './guard.js'
 import { demoShell } from './login.js'
 import { demoApp } from './serve.js'
-import { modHost } from '../mods/bundled.js'
 
 const inner = createApp()
 const app = demoApp(inner, new Date(Date.now() + 3_600_000))

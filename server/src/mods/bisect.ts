@@ -1,10 +1,10 @@
 import type { ModBisectState } from '@seti/shared'
 import { audit } from '../audit.js'
 import { HttpError } from '../http.js'
+import { modBisectRows, type BisectRow } from '../store/mod-lifecycle.js'
 import { modHost } from './bundled.js'
 import { requireUserConsent } from './consent-guard.js'
 import { isRequired } from './host.js'
-import { modBisectRows, type BisectRow } from '../store/mod-lifecycle.js'
 
 const stateOf = (row: BisectRow): ModBisectState => ({
   step: row.step,
