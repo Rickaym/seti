@@ -1,7 +1,10 @@
 import type { Options, SDKMessage, SessionMessage } from '@anthropic-ai/claude-agent-sdk'
 import type { RewindTarget, TaskRewind } from '@seti/shared'
 import type { DefaultSession } from './runtimes/registry.js'
-import { rewinds, type PendingRewind, type RewindRow } from './store/rewinds.js'
+import type { PendingRewind, RewindRow } from './store/rewinds.js'
+
+/** Records how Claude Code took a rewind point: applied, or refused with its reason. */
+type SettleRewind = (id: number, state: 'applied' | 'refused', reason: string | null) => Promise<void>
 
 /** Error texts of a truncated resume that Claude Code will refuse again, so it is never retried. */
 const REFUSALS = ['Resume rejected by --resume-drops-turn:', 'No message found with message.uuid of:']
@@ -134,6 +137,7 @@ export function refusalOf(m: SDKMessage | Error): string | null {
 async function* rewoundSession(
   session: AsyncIterable<SDKMessage>,
   rewindId: number,
+  settle: SettleRewind,
 ): AsyncGenerator<SDKMessage, string | null> {
   let applied = false
   try {
@@ -143,7 +147,7 @@ async function* rewoundSession(
         return refused
       }
       if (!applied && m.type === 'system' && m.subtype === 'init') {
-        await rewinds.settle(rewindId, 'applied')
+        await settle(rewindId, 'applied', null)
         applied = true
       }
       yield m
@@ -163,22 +167,22 @@ async function* rewoundSession(
  * plainly. `open` starts one session with the given options each time it is called.
  */
 export async function* resumeSession(
-  taskId: string,
   options: Options,
+  pending: PendingRewind | null,
+  settle: SettleRewind,
   open: (options: Options) => Promise<DefaultSession>,
 ): AsyncGenerator<SDKMessage, void> {
-  const pending = await rewinds.pending(taskId)
-  if (pending === undefined) {
+  if (pending === null) {
     yield* (await open(options)).events
     return
   }
   const rewound = await open(rewoundOptions(options, pending))
-  const refused = yield* rewoundSession(rewound.events, pending.id)
+  const refused = yield* rewoundSession(rewound.events, pending.id, settle)
   if (refused === null) {
     return
   }
   rewound.close()
-  await rewinds.settle(pending.id, 'refused', refused)
+  await settle(pending.id, 'refused', refused)
   if (options.abortController?.signal.aborted !== true) {
     yield* (await open(options)).events
   }
