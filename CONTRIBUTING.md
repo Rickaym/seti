@@ -126,7 +126,9 @@ pnpm e2e share-links --project=pixel-7
 
 Playwright has three projects. `desktop` runs every `*.spec.ts` at 1440 by 900. `iphone-15` and
 `pixel-7` run every `*.phone.spec.ts` with the phone's viewport, touch and user agent. A UI change
-gets a phone spec beside its desktop one, because every flow must work on a phone. Workers default
+gets a phone spec beside its desktop one, because every flow must work on a phone. A phone spec
+checks a 44px touch target with `expectTouchTarget` from `e2e/tests/support/phone-layout.ts`, which
+reads the box once animations end, never with `boundingBox()` directly. Workers default
 to half the cores, at most four; `SETI_E2E_WORKERS` sets them. Failed runs leave traces and the HTML
 report in `e2e/playwright-report` (`pnpm --filter @seti/e2e exec playwright show-report`).
 
