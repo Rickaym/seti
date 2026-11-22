@@ -1,10 +1,30 @@
 import type { MessageBody } from '@seti/shared'
-import { now, sql } from '../db.js'
+import { now, rowFilter, sql } from '../db.js'
+import { eventsOf, payloadEvents } from '../events/read.js'
 
 /** A transcript row as stored, its payload still JSON text. */
 export interface StoredRow {
   kind: MessageBody['kind']
   payload: string
+}
+
+type IdRow = StoredRow & { id: number }
+
+/** The first result of each call after the row that made it, up to `upTo`. */
+async function firstResults(
+  taskId: string,
+  upTo: number,
+  asked: readonly { after: number; call: string }[],
+): Promise<IdRow[]> {
+  if (asked.length === 0) {
+    return []
+  }
+  return sql<IdRow[]>`SELECT r.id, r.kind, r.payload
+    FROM unnest(${asked.map((one) => one.after)}::bigint[], ${asked.map((one) => one.call)}::text[]) AS c(after, call)
+    CROSS JOIN LATERAL (SELECT id, kind, payload FROM task_message
+      WHERE task_id = ${taskId} AND id > c.after AND id <= ${upTo} AND kind = 'sdk' AND ${rowFilter.resultRow}
+        AND strpos(payload, c.call) > 0
+      ORDER BY id LIMIT 1) AS r`
 }
 
 export const prDiscoveryStore = {
@@ -25,32 +45,20 @@ export const prDiscoveryStore = {
       WHERE task_id = ${taskId} AND id > ${after} AND id <= ${upTo} AND strpos(payload, '/pull/') > 0 ORDER BY id`),
   ],
   /** Rows up to `upTo` that may show the task opening or pushing to a PR: calls, results, reports. */
-  evidenceRows: async (taskId: string, upTo: number) => [
-    ...(await sql<StoredRow[]>`WITH calls AS (
-        SELECT id, kind, payload FROM task_message
-        WHERE task_id = ${taskId} AND id <= ${upTo} AND kind = 'sdk' AND strpos(payload, '"tool_use"') > 0
-          AND (strpos(payload, 'git push') > 0 OR strpos(payload, 'gh pr create') > 0
-            OR strpos(payload, '/pulls') > 0 OR strpos(payload, 'create_pull_request') > 0)
-      ), published AS (
-        SELECT id, kind, payload FROM task_message
-        WHERE task_id = ${taskId} AND id <= ${upTo} AND kind = 'sdk'
-          AND strpos(payload, '"subtype":"code_change_published"') > 0
-      ), ids AS (
-        SELECT calls.id AS after, block ->> 'id' AS tool_use_id FROM calls, json_array_elements(
-          CASE WHEN json_typeof(payload::json -> 'message' -> 'content') = 'array'
-            THEN payload::json -> 'message' -> 'content' ELSE '[]'::json END) AS block
-        WHERE block ->> 'type' = 'tool_use'
-      ), results AS (
-        SELECT result.id, result.kind, result.payload FROM ids CROSS JOIN LATERAL (
-          SELECT id, kind, payload FROM task_message
-          WHERE task_id = ${taskId} AND id > ids.after AND id <= ${upTo} AND kind = 'sdk'
-            AND strpos(payload, '"tool_result"') > 0
-            AND strpos(payload, '"tool_use_id":"' || ids.tool_use_id || '"') > 0
-          ORDER BY id LIMIT 1) AS result
-      )
-      SELECT kind, payload FROM (SELECT * FROM calls UNION SELECT * FROM published UNION SELECT * FROM results)
-        AS evidence ORDER BY id`),
-  ],
+  evidenceRows: async (taskId: string, upTo: number): Promise<StoredRow[]> => {
+    const calls = await sql<IdRow[]>`SELECT id, kind, payload FROM task_message
+      WHERE task_id = ${taskId} AND id <= ${upTo} AND kind = 'sdk' AND ${rowFilter.callRow}
+        AND (strpos(payload, 'git push') > 0 OR strpos(payload, 'gh pr create') > 0
+          OR strpos(payload, '/pulls') > 0 OR strpos(payload, 'create_pull_request') > 0)`
+    const published = await sql<IdRow[]>`SELECT id, kind, payload FROM task_message
+      WHERE task_id = ${taskId} AND id <= ${upTo} AND kind = 'sdk' AND ${rowFilter.published}`
+    const asked = calls.flatMap((row) =>
+      eventsOf(payloadEvents(row.payload), 'tool.started').map((event) => ({ after: row.id, call: event.call.callId })),
+    )
+    const results = await firstResults(taskId, upTo, asked)
+    const rows = new Map([...calls, ...published, ...results].map((row) => [row.id, row]))
+    return [...rows.values()].sort((a, b) => a.id - b.id).map(({ kind, payload }) => ({ kind, payload }))
+  },
   /** Every task that is not archived, most recently updated first. */
   taskIds: async () =>
     (await sql<{ id: string }[]>`SELECT id FROM task WHERE archived_at IS NULL ORDER BY updated_at DESC, id`).map(
