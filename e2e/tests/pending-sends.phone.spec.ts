@@ -1,9 +1,8 @@
 import { randomUUID } from 'node:crypto'
-import type { Page } from '@playwright/test'
 import { openSeedDb } from './support/db.js'
 import { paths } from './support/env.js'
 import { expect, test } from './support/fixtures.js'
-import { expectFitsPhone } from './support/phone-layout.js'
+import { expectFitsPhone, expectTouchTarget } from './support/phone-layout.js'
 
 test.use({ allowedHttpStatuses: [409] })
 
@@ -16,9 +15,6 @@ async function seedTask(): Promise<string> {
   await db.close()
   return id
 }
-
-const heightOf = async (page: Page, name: string) =>
-  (await page.locator('[data-pending-send]').getByRole('button', { name }).boundingBox())?.height ?? 0
 
 test('a message tapped out on a phone shows at once and a refused one offers Retry, Edit and Delete', async ({
   page,
@@ -49,9 +45,9 @@ test('a message tapped out on a phone shows at once and a refused one offers Ret
   await expectFitsPhone(page, 'pending message')
 
   await expect(row).toHaveAttribute('data-state', 'failed')
-  expect(await heightOf(page, 'Retry')).toBeGreaterThanOrEqual(44)
-  expect(await heightOf(page, 'Edit')).toBeGreaterThanOrEqual(44)
-  expect(await heightOf(page, 'Delete')).toBeGreaterThanOrEqual(44)
+  await expectTouchTarget(page.locator('[data-pending-send]').getByRole('button', { name: 'Retry' }), 'Retry')
+  await expectTouchTarget(page.locator('[data-pending-send]').getByRole('button', { name: 'Edit' }), 'Edit')
+  await expectTouchTarget(page.locator('[data-pending-send]').getByRole('button', { name: 'Delete' }), 'Delete')
   await expectFitsPhone(page, 'failed message')
 
   refuse = false

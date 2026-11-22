@@ -1,9 +1,8 @@
 import type { Locator } from '@playwright/test'
 import { paths } from './support/env.js'
 import { expect, test, unique } from './support/fixtures.js'
+import { expectTouchTarget } from './support/phone-layout.js'
 import { SEEDS, seedTask } from './support/subtasks.js'
-
-const TARGET_PX = 44
 
 const labels = async (locator: Locator) => locator.evaluateAll((els) => els.map((el) => el.getAttribute('aria-label')))
 
@@ -14,7 +13,7 @@ test("a phone shows the agent's todos full width under its header", async ({ pag
   const toggle = strip.getByRole('button', { name: 'Todos: 1/3 done; now: Fixing the bug' })
   const width = page.viewportSize()?.width ?? 0
   expect((await strip.boundingBox())?.width ?? 0).toBeGreaterThanOrEqual(width - 1)
-  expect((await toggle.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(TARGET_PX)
+  await expectTouchTarget(toggle)
   await expect(strip.getByTestId('todo-counts')).toHaveText('1/3 done')
   await toggle.click()
   const rows = strip.getByTestId('todo-row')

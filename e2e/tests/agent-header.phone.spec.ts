@@ -6,14 +6,13 @@ import { openSeedDb } from './support/db.js'
 import { paths } from './support/env.js'
 import { apiData, expect, test } from './support/fixtures.js'
 import { openAgentPrs } from './support/phone-agent.js'
-import { edgesAtRest, expectFitsPhone } from './support/phone-layout.js'
+import { edgesAtRest, expectFitsPhone, expectTouchTarget } from './support/phone-layout.js'
 
 const TITLE = 'Migrate the dashboard websocket reconnection logic to the exponential backoff helper'
 const PR = 'https://github.com/e2e/dashboard/pull/412'
 const LINKED = 'https://github.com/e2e/dashboard/pull/413'
 /** The terminal bar's 44px row and its rule, which the phone agent header shares. */
 const HEADER_PX = 45
-const TARGET_PX = 44
 
 async function seedAgent(): Promise<string> {
   const db = openSeedDb()
@@ -49,8 +48,8 @@ test('the agent header is the terminal bar: back, status, title and two actions 
   expect(await title.evaluate((h) => h.scrollWidth > h.clientWidth)).toBe(true)
   const titleBox = await box(title)
   for (const name of ['Back to agents', 'Agent settings', 'More actions']) {
+    await expectTouchTarget(header.getByRole('button', { name }), name, 'both')
     const button = await box(header.getByRole('button', { name }))
-    expect(Math.min(button.width, button.height), name).toBeGreaterThanOrEqual(TARGET_PX)
     expect(Math.abs(button.y + button.height / 2 - (titleBox.y + titleBox.height / 2)), name).toBeLessThan(2)
   }
   await expect(header.getByText('checkout', { exact: true })).toHaveCount(0)
@@ -66,8 +65,7 @@ test('linked PRs open from the More sheet with touch-sized rows and unlink', asy
     ['Row', row],
     ['Unlink', row.getByRole('button', { name: 'Unlink dashboard#412' })],
   ] as const) {
-    const found = await box(target)
-    expect(Math.min(found.width, found.height), name).toBeGreaterThanOrEqual(TARGET_PX)
+    await expectTouchTarget(target, name, 'both')
   }
   await expectFitsPhone(page, 'linked PRs sheet')
   await sheet.getByRole('button', { name: 'Close linked PRs' }).tap()
@@ -86,7 +84,7 @@ test('with no PR linked the Pull requests sheet offers Link PR, and a pasted URL
   const sheet = await openAgentPrs(page)
   await expect(sheet.getByRole('textbox', { name: 'Filter linked PRs' })).toHaveCount(0)
   const link = sheet.getByRole('button', { name: 'Link PR' })
-  expect((await box(link)).height).toBeGreaterThanOrEqual(TARGET_PX)
+  await expectTouchTarget(link)
   await link.tap()
   await sheet.getByRole('textbox', { name: 'Pull request URL' }).fill(LINKED)
   await sheet.getByRole('button', { name: 'Link', exact: true }).tap()
@@ -107,7 +105,7 @@ test('agent settings open as a bottom sheet with every row and action in reach',
   for (const name of ['Restart session', 'Archive']) {
     const button = sheet.getByRole('button', { name, exact: true })
     await expect(button).toBeInViewport({ ratio: 1 })
-    expect((await box(button)).height, name).toBeGreaterThanOrEqual(TARGET_PX)
+    await expectTouchTarget(button, name)
   }
   const role = sheet.getByRole('combobox', { name: 'Role' })
   await role.scrollIntoViewIfNeeded()

@@ -9,12 +9,10 @@ import {
   startAgent,
 } from './support/many-prs.js'
 import { openAgentPrs } from './support/phone-agent.js'
-import { expectFitsPhone } from './support/phone-layout.js'
+import { expectFitsPhone, expectTouchTarget } from './support/phone-layout.js'
 import { FAKE_CLAUDE_ENV } from './support/processes.js'
 
 test.use({ serverEnv: FAKE_CLAUDE_ENV })
-
-const TARGET_PX = 44
 
 test('150 linked PRs open from More in a sheet of touch-sized rows, and the reply box stays', async ({
   page,
@@ -34,7 +32,7 @@ test('150 linked PRs open from More in a sheet of touch-sized rows, and the repl
   const rows = sheet.getByRole('listitem')
   await expect(rows.first()).toBeVisible()
   for (const row of (await rows.all()).slice(0, 5)) {
-    expect((await boxOf(row)).height).toBeGreaterThanOrEqual(TARGET_PX)
+    await expectTouchTarget(row)
   }
   const sheetBox = await boxOf(sheet)
   expect(sheetBox.y).toBeGreaterThan(0)
@@ -49,7 +47,7 @@ test('150 linked PRs open from More in a sheet of touch-sized rows, and the repl
   const row = sheet.getByRole('listitem', { name: `Pull request many#${String(LOGIN_PR)}` })
   await expect(rows).toHaveCount(1)
   const unlink = row.getByRole('button', { name: `Unlink many#${String(LOGIN_PR)}` })
-  expect(Math.min((await boxOf(unlink)).width, (await boxOf(unlink)).height)).toBeGreaterThanOrEqual(TARGET_PX)
+  await expectTouchTarget(unlink, 'Unlink', 'both')
   await unlink.tap()
   await expect(row).toBeHidden()
   await expect.poll(async () => linkedCount(request, many.id)).toBe(MANY_PRS - 1)

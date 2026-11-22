@@ -2,7 +2,7 @@ import type { AgentPermissions, PermissionPolicy } from '@seti/shared'
 import { seedIdleAgent } from './support/agent-chrome.js'
 import { openAgentSettings } from './support/agent-settings.js'
 import { apiData, expect, test, unique } from './support/fixtures.js'
-import { expectFitsPhone } from './support/phone-layout.js'
+import { expectFitsPhone, expectTouchTarget } from './support/phone-layout.js'
 import { chatServer, mockChatServer, removeChatRules } from './support/review-coverage.js'
 
 test('the review checklist fits a phone and adds the chosen rules with taps', async ({ page, request }) => {
@@ -19,8 +19,8 @@ test('the review checklist fits a phone and adds the chosen rules with taps', as
     const upload = dialog.getByRole('checkbox', { name: 'complete_file_upload' })
     await expect(upload).toBeChecked()
     await expectFitsPhone(page, 'review checklist')
-    const row = await dialog.getByRole('listitem').filter({ hasText: 'schedule_message' }).boundingBox()
-    expect(row?.height ?? 0, 'a row is tall enough for a finger').toBeGreaterThanOrEqual(44)
+    const row = dialog.getByRole('listitem').filter({ hasText: 'schedule_message' })
+    await expectTouchTarget(row, 'a row is tall enough for a finger')
     await dialog.getByRole('checkbox', { name: 'schedule_message' }).tap()
     await dialog.getByRole('button', { name: 'Add 2' }).tap()
     await expect(dialog).toHaveCount(0)
