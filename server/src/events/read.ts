@@ -26,7 +26,8 @@ export function payloadEvents(payload: string): readonly RuntimeEvent[] {
   }
 }
 
-type Of<T extends RuntimeEvent['type']> = Extract<RuntimeEvent, { type: T }>
+/** The event of one type. */
+export type Of<T extends RuntimeEvent['type']> = Extract<RuntimeEvent, { type: T }>
 
 /** The events of one type, in order. */
 export const eventsOf = <T extends RuntimeEvent['type']>(events: readonly RuntimeEvent[], type: T): Of<T>[] =>
@@ -48,3 +49,7 @@ export function toolEnds(rows: readonly MessageRow[]): Map<string, Of<'tool.ende
   }
   return ends
 }
+
+/** The text when it holds more than white space, else null. */
+export const nonBlank = (value: string | undefined): string | null =>
+  value === undefined || value.trim() === '' ? null : value

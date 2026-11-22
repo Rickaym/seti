@@ -25,7 +25,7 @@ interface PlanItem {
 interface PlanChange {
   replace?: PlanItem[]
   add?: Omit<PlanItem, 'id'>
-  update?: { id: string; status?: PlanStatus | 'deleted'; text?: string }
+  update?: { id: string; status?: PlanStatus | 'deleted'; text?: string; activeText?: string }
   proposal?: string
 }
 
@@ -56,10 +56,28 @@ export interface ToolCall {
   search?: { pattern?: string; path?: string; tools?: boolean }
   web?: { url?: string; query?: string }
   mcp?: { server: string; tool: string }
-  /** `thread` is the thread the subagent's own events carry. */
-  subagent?: { label: string; prompt?: string; agentType?: string; background?: boolean; thread: string }
+  /** `thread` is the thread the subagent's own events carry; `name` is what messages address it by. */
+  subagent?: { label: string; prompt?: string; agentType?: string; background?: boolean; name?: string; thread: string }
+  /** A message to a subagent already started, addressed by its name or id. */
+  send?: { to: string }
   question?: { questions: Question[] }
   plan?: PlanChange
+}
+
+/** What a subagent call returned: its id, its text without the id line, and its report once done. */
+interface AgentResult {
+  id?: string
+  text: string
+  done: boolean
+  report?: string
+  usage?: JobUsage
+}
+
+/** The plan as a call's result reports it: the whole list, one item, or that nothing changed. */
+interface PlanReport {
+  items?: PlanItem[]
+  item?: { id: string; status: PlanStatus; text?: string }
+  unchanged?: boolean
 }
 
 /**
@@ -71,13 +89,15 @@ export interface ToolResult {
   images: number
   exitCode?: number
   job?: { id: string | null; output?: string }
+  agent?: AgentResult
   planId?: string
+  plan?: PlanReport
   structured?: unknown
 }
 
 type JobKind = 'subagent' | 'shell' | 'other'
 
-interface JobUsage {
+export interface JobUsage {
   tokens: number
   toolUses: number
   durationMs: number
@@ -112,9 +132,27 @@ export type RuntimeEvent = EventBase &
     | { type: 'tool.progress'; callId: string; elapsedMs: number }
     | { type: 'tool.ended'; callId: string; status: 'ok' | 'error' | 'denied' | 'cancelled'; result: ToolResult }
     | { type: 'plan'; items: PlanItem[] }
-    | { type: 'job.started'; jobId: string; callId: string | null; kind: JobKind; label: string; background?: boolean }
-    | { type: 'job.progress'; jobId: string; callId: string | null; label: string; lastTool?: string; usage: JobUsage }
-    | { type: 'job.updated'; jobId: string; status?: string; endedAt?: string; error?: string }
+    | {
+        type: 'job.started'
+        jobId: string
+        callId: string | null
+        kind: JobKind
+        label: string
+        background?: boolean
+        agentType?: string
+        /** A subagent, not the agent itself, started it. */
+        bySubagent?: boolean
+      }
+    | {
+        type: 'job.progress'
+        jobId: string
+        callId: string | null
+        label: string
+        lastTool?: string
+        summary?: string
+        usage: JobUsage
+      }
+    | { type: 'job.updated'; jobId: string; status?: string; background?: boolean; endedAt?: string; error?: string }
     | {
         type: 'job.ended'
         jobId: string
@@ -123,6 +161,8 @@ export type RuntimeEvent = EventBase &
         summary: string
         output?: string
         exitCode?: number
+        /** Why the runtime stopped it on its own. */
+        stopCause?: 'time_limit' | 'low_memory'
         usage?: JobUsage
       }
     | { type: 'background.changed'; jobs: { id: string; kind: JobKind; label: string }[] }

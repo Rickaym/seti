@@ -3,7 +3,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import type { SDKMessage } from '@anthropic-ai/claude-agent-sdk'
-import { resourcesSchema, resourceSummarySchema } from '@seti/shared'
+import { projectClaude, resourcesSchema, resourceSummarySchema } from '@seti/shared'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createApp } from './app.js'
 import { tasks } from './db.js'
@@ -179,7 +179,7 @@ describe('the sampler on a fixture /proc', () => {
 
   it('flags a Bash call that spins with no child process, and clears it once a child runs', async () => {
     spin(0)
-    trackToolCalls(taskId, bashCall('git status'), T0)
+    trackToolCalls(taskId, projectClaude(bashCall('git status')), T0)
     const sampler = new ResourceSampler(new Proc(fixture.root), SERVER)
     const hung = await sampleEvery10s(sampler, 7, 700)
     expect(hung.tasks[0]).toMatchObject({ tool: { name: 'Bash', command: 'git status', age_s: 70 } })
@@ -192,7 +192,7 @@ describe('the sampler on a fixture /proc', () => {
     const running = await sampler.sample()
     expect(running.tasks[0]?.flags).not.toContain('hang')
     expect(running.tasks[0]?.children.map((c) => c.name)).toEqual(['node', 'zsh'])
-    trackToolCalls(taskId, { type: 'result' } as unknown as SDKMessage)
+    trackToolCalls(taskId, projectClaude({ type: 'result' } as unknown as SDKMessage))
   })
 
   it('finds the EA by its listening socket and reports the other components', async () => {
