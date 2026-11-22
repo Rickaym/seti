@@ -92,7 +92,8 @@ interface RuleSources {
   fixedDeny: readonly string[]
 }
 
-const appliesTo = (rule: BuiltInRule, sandboxed: boolean) =>
+/** Whether a built-in rule applies to an agent inside or outside the sandbox. */
+export const appliesTo = (rule: BuiltInRule, sandboxed: boolean) =>
   rule.applies === 'all' || (rule.applies === 'sandboxed') === sandboxed
 
 /** Every rule an agent runs with, by behavior, each once. */
