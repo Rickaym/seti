@@ -169,7 +169,6 @@ function PrChipRow({ urls, states, homeSlug, path, owner, agent, limit, picker, 
         prs={ordered}
         hidden={hidden}
         shown={shown}
-        toFix={ordered.slice(shown).filter((item) => item.group === 'fix').length}
         path={path}
         owner={owner}
         agent={agent}
