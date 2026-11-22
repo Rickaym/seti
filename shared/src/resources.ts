@@ -127,10 +127,11 @@ export type Resources = z.infer<typeof resourcesSchema>
 export const resourceSummarySchema = z.object({
   sampled_at: z.string(),
   memory_percent: z.number(),
+  memory_total_bytes: bytes,
   cpu_percent: z.number().nullable(),
   anomalies: z.number().int().nonnegative(),
   severity: z.enum(['ok', 'warning', 'critical']),
-  /** Each rule broken now, once, so a meter knows whether its own reading is the trouble. */
+  /** Each rule broken now, once, so the bar knows whether CPU or memory is the trouble. */
   rules: z.array(z.enum(ANOMALY_RULES)),
   /** The first anomaly's message, for the status bar tooltip. */
   headline: z.string().nullable(),

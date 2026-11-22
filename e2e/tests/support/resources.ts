@@ -163,6 +163,7 @@ const RESOURCES: Resources = {
 const SUMMARY: ResourceSummary = {
   sampled_at: RESOURCES.sampled_at,
   memory_percent: 73,
+  memory_total_bytes: RESOURCES.host.memory.total_bytes,
   cpu_percent: 91,
   anomalies: RESOURCES.anomalies.length,
   severity: 'critical',
@@ -218,6 +219,7 @@ export async function mockHost(page: Page, { cpu, memory, rules }: HostLoad): Pr
   const summary: ResourceSummary = {
     sampled_at: RESOURCES.sampled_at,
     memory_percent: memory,
+    memory_total_bytes: total,
     cpu_percent: cpu,
     anomalies: anomalies.length,
     severity: anomalies.length > 0 ? 'warning' : 'ok',
