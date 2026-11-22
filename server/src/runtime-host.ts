@@ -11,6 +11,7 @@ import type { DefaultHost, DefaultShapes } from './runtimes/registry.js'
 import { sandboxHooks } from './sandbox.js'
 import { redactSecrets } from './scrub.js'
 import { guardScope, permissionSettings } from './session-options.js'
+import { shadowHooks } from './shadow-hooks.js'
 import { allowedFor } from './store/change-requests.js'
 
 /**
@@ -58,9 +59,23 @@ function sessionHooks(task: Task, sandboxed: boolean, session: AbortSignal): Def
   return { ...repeat, PreToolUse, SubagentStart: [subagentRules()], PreCompact: [compactHook(task.id)] }
 }
 
-/** What Seti answers for a task's session while its turns wait, until the session ends. */
-export const sessionHost = (task: Task, sandboxed: boolean, session: AbortSignal): DefaultHost => ({
-  decide: canUseToolFor(task.id, session),
-  hooks: sessionHooks(task, sandboxed, session),
-  toolServers: inProcessServers(task),
-})
+type Hooks = DefaultShapes['hooks']
+
+/** Both sets of hooks, each event's matchers in order. */
+function withHooks(first: Hooks, second: Hooks): Hooks {
+  const events = [...new Set([...Object.keys(first), ...Object.keys(second)])] as (keyof Hooks)[]
+  return Object.fromEntries(events.map((event) => [event, [...(first[event] ?? []), ...(second[event] ?? [])]]))
+}
+
+/**
+ * What Seti answers for a task's session while its turns wait, until the session ends. Seti's own
+ * permission evaluator runs beside, in shadow, and changes no answer.
+ */
+export const sessionHost = (task: Task, sandboxed: boolean, session: AbortSignal): DefaultHost => {
+  const shadow = shadowHooks(task, sandboxed, session)
+  return {
+    decide: shadow.observe(canUseToolFor(task.id, session)),
+    hooks: withHooks(sessionHooks(task, sandboxed, session), shadow.hooks),
+    toolServers: inProcessServers(task),
+  }
+}

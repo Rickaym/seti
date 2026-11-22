@@ -5,11 +5,13 @@ import { extraDirs, type MemoryCap, type Task } from '@seti/shared'
 import { taskSsh } from './agent-access.js'
 import { taskAws } from './aws-access.js'
 import { CLAUDE_HOME, CREDENTIALS, DATABASE_URL, REDIS_URL, SETI_HOME } from './config.js'
+import { projectSettingsRules, userSettingsRules } from './inherited-rules.js'
 import { planScope } from './memory-cap.js'
 import { memoryEnv } from './node-heap.js'
 import type { GuardScope } from './permission-guard.js'
 import { builtInRules, composeRules, type PermissionSettings } from './permission-policy.js'
 import { taskPluginConfigs } from './plugins.js'
+import type { RuleSources } from './policy/sources.js'
 import { mcpTargets } from './sandbox-mcp.js'
 import { secretDenyRules, setiHomePaths, unsandboxedHookRules, type SandboxContext } from './sandbox.js'
 import { sharedToolFolders, TOOL_SERVER } from './shared-tools.js'
@@ -133,25 +135,43 @@ const GUARDED_HOME = ['.ssh', '.aws', '.config']
 const guardedEdits = (home: string) =>
   GUARDED_HOME.flatMap((dir) => [`Edit(/${path.join(home, dir)})`, `Edit(/${path.join(home, dir)}/**)`])
 
+/** Seti's own rules for the task's agent, by source, without Claude Code's settings files. */
+async function setiRules(task: Task): Promise<Omit<RuleSources, 'inherited'>> {
+  const policy = await sandboxPolicy.get()
+  const sandboxed = policy.enabled && task.sandbox
+  const ctx = sandboxContext()
+  const secrets = [...secretDenyRules(policy, ctx), ...guardedEdits(ctx.home)]
+  return {
+    builtIn: builtInRules(),
+    sandboxed,
+    workspace: `Edit(/${workspaceDir(task.id)}/**)`,
+    stored: [...(await permissionRules.list(null)), ...(await permissionRules.list(task.id))],
+    fixedDeny: sandboxed ? [...secrets, ...unsandboxedHookRules()] : secrets,
+    cwd: task.cwd,
+  }
+}
+
+/** Every rule the task's agent runs with, by source, Claude Code's settings files included. */
+export async function ruleSources(task: Task): Promise<RuleSources> {
+  const inherited = [
+    ...userSettingsRules().map((rule) => ({ ...rule, anchor: CLAUDE_HOME })),
+    ...projectSettingsRules(task.cwd).map((rule) => ({ ...rule, anchor: task.cwd })),
+  ]
+  return { ...(await setiRules(task)), inherited }
+}
+
 /**
  * The allow, ask and deny rules the task's agent runs with: built-in, edits in its workspace,
  * global and its own, with the deny rules that keep credentials out of every task and hooks out
  * of sandboxed ones.
  */
 export async function permissionSettings(task: Task): Promise<PermissionSettings> {
-  const policy = await sandboxPolicy.get()
-  const sandboxed = policy.enabled && task.sandbox
-  const ctx = sandboxContext()
-  const secrets = [...secretDenyRules(policy, ctx), ...guardedEdits(ctx.home)]
+  const own = await setiRules(task)
   return composeRules({
-    builtIn: builtInRules(),
-    sandboxed,
-    stored: [
-      { behavior: 'allow', rule: `Edit(/${workspaceDir(task.id)}/**)` },
-      ...(await permissionRules.list(null)),
-      ...(await permissionRules.list(task.id)),
-    ],
-    fixedDeny: sandboxed ? [...secrets, ...unsandboxedHookRules()] : secrets,
+    builtIn: own.builtIn,
+    sandboxed: own.sandboxed,
+    stored: [{ behavior: 'allow', rule: own.workspace }, ...own.stored],
+    fixedDeny: own.fixedDeny,
   })
 }
 

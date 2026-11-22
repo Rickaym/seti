@@ -30,6 +30,7 @@ import { MEMORY_CAPS } from './schema-memory.js'
 import { MODS_RUNTIME } from './schema-mods-runtime.js'
 import { BLOBS_ONE_STYLE, MODS, PREVIEWS_MOD, REQUIRED_MODS, USER_THEME } from './schema-mods.js'
 import { NOTIFY_SCOPE, NOTIFICATIONS } from './schema-notifications.js'
+import { POLICY_SHADOW } from './schema-policy.js'
 import { CHANNEL_EVENT_ROUTING, CHANNEL_RUN_DUE, POLLER_CHANNELS } from './schema-pollers.js'
 import { PR_LIST_CACHE } from './schema-prs.js'
 import { QUESTION_SECRETS, QUESTIONS } from './schema-questions.js'
@@ -216,4 +217,5 @@ export const MIGRATIONS: readonly Migration[] = [
   { version: 114, name: 'team_active_handle', sql: TEAM_ACTIVE_HANDLE },
   { version: 116, name: 'webhook_filters', sql: WEBHOOK_FILTERS },
   { version: 117, name: 'storage_settings', sql: STORAGE_SETTINGS },
+  { version: 118, name: 'policy_shadow', sql: POLICY_SHADOW },
 ]
