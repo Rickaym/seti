@@ -1,13 +1,8 @@
 import { randomUUID, type UUID } from 'node:crypto'
-import type {
-  McpServerStatus,
-  Query,
-  SDKMessage,
-  SDKResultMessage,
-  SDKUserMessage,
-} from '@anthropic-ai/claude-agent-sdk'
+import type { SDKMessage, SDKResultMessage, SDKUserMessage } from '@anthropic-ai/claude-agent-sdk'
 import { InputQueue } from './input-queue.js'
 import type { NextMessage, QueuePriority } from './next-message.js'
+import type { DefaultSession, DefaultShapes } from './runtimes/registry.js'
 import type { CutKind } from './store/restart.js'
 import type { UserContent } from './user-content.js'
 
@@ -15,8 +10,6 @@ import type { UserContent } from './user-content.js'
 const INTERRUPT_GRACE_MS = 5000
 /** How long taking a message back waits for Claude Code to report that it has the message. */
 const ARRIVAL_WAIT_MS = 2000
-/** How long reading the context window may take before a compaction is stored without it. */
-const CONTEXT_WAIT_MS = 3000
 
 type BackgroundTasks = Extract<SDKMessage, { subtype: 'background_tasks_changed' }>['tasks']
 
@@ -56,14 +49,6 @@ async function within(promise: Promise<void>, ms: number): Promise<void> {
   clearTimeout(timer)
 }
 
-/** The SDK sends cancel_async_message from this method, which its Query type does not declare. */
-interface CancelsQueued {
-  cancelAsyncMessage: (uuid: string) => Promise<unknown>
-}
-
-const cancelsQueued = (query: object): query is CancelsQueued =>
-  'cancelAsyncMessage' in query && typeof query.cancelAsyncMessage === 'function'
-
 /** One long-lived Claude Code process of a task, fed user messages through a streaming prompt. */
 export class LiveSession {
   readonly controller = new AbortController()
@@ -83,7 +68,7 @@ export class LiveSession {
   /** Resolves once the session has ended and its messages are recorded. */
   done: Promise<void> = Promise.resolve()
   private input = new InputQueue()
-  private query: Query | null = null
+  private runtime: DefaultSession | null = null
   private interrupting = false
   private background = new Set<string>()
   private idleTimer: ReturnType<typeof setTimeout> | null = null
@@ -153,50 +138,42 @@ export class LiveSession {
 
   /** The prompt for a new query; a query started over gets the messages sent so far again. */
   openInput(): AsyncIterable<SDKUserMessage> {
-    if (this.query !== null) {
+    if (this.runtime !== null) {
       this.input = this.input.replay()
     }
     return this.input
   }
 
-  attach(query: Query): void {
-    this.query = query
+  attach(runtime: DefaultSession): void {
+    this.runtime = runtime
     if (this.closed) {
-      query.close()
+      runtime.close()
     }
   }
 
   /** How the process's MCP servers connected; null before it started or once it ended. */
-  async mcpServerStatus(): Promise<McpServerStatus[] | null> {
-    return this.query === null || this.closed ? null : this.query.mcpServerStatus()
+  async mcpServerStatus(): Promise<DefaultShapes['toolServer'][] | null> {
+    const servers = this.closed ? undefined : this.runtime?.toolServers
+    return servers === undefined ? null : servers()
   }
 
-  /** The context window Claude Code measures usage against; null when it cannot say in time. */
+  /** The context window the runtime measures usage against; null when it cannot say in time. */
   async contextWindow(): Promise<number | null> {
-    const query = this.query
-    if (query === null || this.closed || typeof query.getContextUsage !== 'function') {
-      return null
-    }
-    const late = new Promise<null>((resolve) => {
-      setTimeout(resolve, CONTEXT_WAIT_MS, null).unref()
-    })
-    const usage = query.getContextUsage({ detail: 'summary' }).then(
-      (u) => u.rawMaxTokens,
-      () => null,
-    )
-    return Promise.race([usage, late])
+    const read = this.closed ? undefined : this.runtime?.contextWindow
+    return read === undefined ? null : read()
   }
 
-  /** Hands the running process new permission rules; Claude Code applies them to its next call. */
-  async applyPermissions(permissions: { allow: string[]; ask: string[]; deny: string[] }): Promise<void> {
-    if (this.query !== null && !this.closed && typeof this.query.applyFlagSettings === 'function') {
-      await this.query.applyFlagSettings({ permissions })
+  /** Hands the running process new permission rules; the runtime applies them to its next call. */
+  async applyPermissions(permissions: DefaultShapes['policy']): Promise<void> {
+    const apply = this.closed ? undefined : this.runtime?.setPolicy
+    if (apply !== undefined) {
+      await apply(permissions)
     }
   }
 
   /** The running process's controls; null before it starts or once it closed. */
-  get openQuery(): Query | null {
-    return this.closed ? null : this.query
+  get openRuntime(): DefaultSession | null {
+    return this.closed ? null : this.runtime
   }
 
   startWith(setup: string | null): void {
@@ -321,9 +298,9 @@ export class LiveSession {
    * when the agent already took it.
    */
   async cancelQueued(uuid: string): Promise<boolean | null> {
-    const query = this.query
+    const retract = this.runtime?.retract
     const entry = this.queued.get(uuid)
-    if (query === null || !cancelsQueued(query)) {
+    if (retract === undefined) {
       return null
     }
     if (entry === undefined) {
@@ -333,7 +310,7 @@ export class LiveSession {
     if (this.closed) {
       return null
     }
-    return this.queued.has(uuid) && (await query.cancelAsyncMessage(uuid)) === true
+    return this.queued.has(uuid) && (await retract(uuid))
   }
 
   /**
@@ -363,8 +340,8 @@ export class LiveSession {
       return
     }
     this.interrupting = true
-    const query = this.query
-    if (query === null) {
+    const runtime = this.runtime
+    if (runtime === null) {
       this.close()
       return
     }
@@ -374,7 +351,7 @@ export class LiveSession {
     void this.turnOver().then(() => {
       clearTimeout(timer)
     })
-    query.interrupt().catch(() => {
+    runtime.interrupt().catch(() => {
       this.close()
     })
   }
@@ -383,7 +360,7 @@ export class LiveSession {
   cutForRestart(): void {
     this.restartCut = true
     this.backlog = []
-    if (this.started && this.query !== null) {
+    if (this.started && this.runtime !== null) {
       this.interrupt('stop')
     } else {
       this.close()
@@ -438,10 +415,11 @@ export class LiveSession {
   }
 
   async stopTask(sdkTaskId: string): Promise<boolean> {
-    if (this.closed || this.query === null) {
+    const stop = this.closed ? undefined : this.runtime?.stopBackground
+    if (stop === undefined) {
       return false
     }
-    await this.query.stopTask(sdkTaskId)
+    await stop(sdkTaskId)
     return true
   }
 
@@ -469,7 +447,7 @@ export class LiveSession {
     this.cancelIdle()
     this.stopOpenerWait()
     this.input.close()
-    this.query?.close()
+    this.runtime?.close()
     this.controller.abort()
   }
 

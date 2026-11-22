@@ -99,7 +99,7 @@ async function runFork(task: Task, fork: ForkPoint, prompt: string, run: Running
   const file = sessionFile(fork.session_id, task.cwd)
   const saved = savedTotal(file)
   const options = await sideChatOptions(task, fork, { reads: run.reads, abortController: run.abort })
-  const query = adapterFor(DEFAULT_RUNTIME).open({ prompt: once(prompt), options })
+  const asked = await adapterFor(DEFAULT_RUNTIME).open({ prompt: once(prompt), options })
   const stream = new AnswerStream()
   const outcome = async (m: SDKResultMessage): Promise<Outcome> => {
     const cost = await countCost(task, m, Math.max(saved, savedTotal(file)))
@@ -107,7 +107,7 @@ async function runFork(task: Task, fork: ForkPoint, prompt: string, run: Running
   }
   let skipped: SDKResultMessage | null = null
   try {
-    for await (const m of query) {
+    for await (const m of asked.events) {
       if (m.type === 'result' && isWaitingNotice(m, stream)) {
         skipped = m
       } else if (m.type === 'result') {
@@ -127,7 +127,7 @@ async function runFork(task: Task, fork: ForkPoint, prompt: string, run: Running
     const why = run.abort.signal.aborted ? 'The side chat was closed' : `The side chat stopped: ${String(e)}`
     return { text: stream.text, cost: null, error: clipped(why) }
   } finally {
-    query.close()
+    asked.close()
   }
 }
 
