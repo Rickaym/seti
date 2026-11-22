@@ -10,22 +10,17 @@ import { tasks } from './db.js'
 import { HttpError } from './http.js'
 import { watchSessionMcp } from './mcp-session-status.js'
 import type { NextMessage } from './next-message.js'
-import { followQueue, markQueued, settleQueued } from './queued-prompts.js'
+import { nodeLink } from './node-link.js'
+import { followQueue, settleQueued } from './queued-prompts.js'
 import { resumeSession } from './rewind.js'
 import { adapterFor, DEFAULT_RUNTIME } from './runtimes/registry.js'
 import { checkSend } from './send-check.js'
 import { moveSessionTo } from './session-files.js'
 import { sessionOpening } from './session-hooks.js'
-import { answerSince, appendMessage, journal } from './session-ingest.js'
 import { sessionStart, setupKey } from './session-spec.js'
 import { recordSessionStart, unstored } from './session-start.js'
 import { rewinds } from './store/rewinds.js'
-import { hadRunningSubtask } from './subtask-cache.js'
-import { publishSubtasks } from './subtask-prs.js'
-import { publish } from './task-events.js'
 import { inLane, outsideLane } from './task-lane.js'
-import { forgetToolCalls } from './tool-calls.js'
-import { promptFor } from './turn-prompt.js'
 import { keepUnstarted, sessionError, takeUnstarted } from './unstarted.js'
 import { userContent, type UserContent } from './user-content.js'
 import { restoreMissingWorktrees } from './worktree-restore.js'
@@ -33,19 +28,14 @@ import { restoreMissingWorktrees } from './worktree-restore.js'
 /** Each task's open Claude Code session, from its first message until it is closed. */
 const live = new Map<string, LiveSession>()
 
-/** First message of the task's open session, which may still run subagents it started. */
-export const openQuerySince = (taskId: string): number | null => live.get(taskId)?.since ?? null
-
-answerSince(openQuerySince)
-
 /** Whether the task has a Claude Code process open, and how much background work runs in it. */
 export function sessionState(taskId: string): TaskSession {
   const session = live.get(taskId)
   return { open: session !== undefined && !session.closed, background: session?.backgroundCount ?? 0 }
 }
 
-function publishSession(taskId: string): void {
-  publish(taskId, { type: 'session', session: sessionState(taskId) })
+async function publishSession(taskId: string): Promise<void> {
+  await nodeLink.journal(taskId, { type: 'session.state', ...sessionState(taskId) })
 }
 
 /** Whether a turn is in progress; a session open only for background work does not count. */
@@ -101,7 +91,7 @@ export function autoQueueBlocker(taskId: string, joining = false): string | null
 
 /** Starts the session's process; a pending rewind makes it resume from the rewind point. */
 async function sessionMessages(session: LiveSession, task: Task): Promise<AsyncIterable<SDKMessage>> {
-  await restoreMissingWorktrees(task, async (error) => appendMessage(task.id, { kind: 'seti', payload: { error } }))
+  await restoreMissingWorktrees(task, async (error) => nodeLink.journal(task.id, { type: 'note', error }))
   const { key, options } = await sessionStart(task, session.controller)
   session.startWith(key)
   if (task.session_id !== null) {
@@ -128,14 +118,17 @@ async function openTurn(
   next: NextMessage,
   queued: boolean,
 ): Promise<{ content: UserContent; promptId: number }> {
-  const { payload, text } = await promptFor(taskId, next, queued)
-  const content = userContent(taskId, text, next.attachments ?? [])
-  return { content, promptId: (await appendMessage(taskId, { kind: 'prompt', payload })).id }
+  const { promptId, text } = await nodeLink.ask(taskId, 'prompt.open', { next, queued })
+  return { content: userContent(taskId, text, next.attachments ?? []), promptId }
 }
 
 async function send(taskId: string, session: LiveSession, next: NextMessage): Promise<void> {
   const { content, promptId } = await openTurn(taskId, next, false)
+  const first = session.since === null
   session.send(content, promptId, next.prompt === null ? 'updates' : 'user')
+  if (first && live.get(taskId) === session) {
+    await nodeLink.journal(taskId, { type: 'session.since', promptId })
+  }
 }
 
 async function enqueue(taskId: string, session: LiveSession, next: NextMessage): Promise<void> {
@@ -160,7 +153,9 @@ const takenBack = (taskId: string, session: LiveSession) => (uuid: string) => {
   const promptId = session.settle(uuid)
   if (promptId !== null) {
     inBackground(`session: task ${taskId}`, async () =>
-      outsideLane(async () => inLane(taskId, async () => markQueued(taskId, promptId, 'removed'))),
+      outsideLane(async () =>
+        inLane(taskId, async () => nodeLink.journal(taskId, { type: 'queued.settled', promptId, state: 'removed' })),
+      ),
     )
   }
 }
@@ -210,7 +205,7 @@ async function startTurn(
   } else {
     await send(taskId, session, next)
   }
-  await journal.turnStarted(taskId)
+  await nodeLink.journal(taskId, { type: 'turn.started' })
   return { count, outcome: outcomeOf(running, interrupt) }
 }
 
@@ -221,6 +216,7 @@ async function startTurn(
 function openSession(taskId: string, previous: LiveSession | undefined, backlog: NextMessage[]): void {
   const session = new LiveSession([...takeUnstarted(taskId), ...backlog])
   live.set(taskId, session)
+  void nodeLink.journal(taskId, { type: 'session.opened' })
   previous?.close()
   const opened = async () => outsideLane(async () => sessionOpening(taskId).then(async () => consume(taskId, session)))
   session.done = (previous?.done ?? Promise.resolve()).then(async () => outsideRequest(opened))
@@ -256,7 +252,8 @@ async function closeTurn(taskId: string, session: LiveSession, error: string | n
   } else if (session.queuedUuids.length > 0) {
     session.carryOn()
   } else {
-    await journal.turnEnded(taskId, ending === 'stop' ? 'stopped' : endStatus(error), error)
+    const status = ending === 'stop' ? 'stopped' : endStatus(error)
+    await nodeLink.journal(taskId, { type: 'turn.ended', status, error })
     session.closeWhenIdle(SESSION_IDLE_MS)
   }
   session.turnReported()
@@ -266,17 +263,25 @@ async function closeTurn(taskId: string, session: LiveSession, error: string | n
 const startsWork = (m: SDKMessage) =>
   (m.type === 'assistant' && m.parent_tool_use_id === null) || (m.type === 'system' && m.subtype === 'init')
 
+/** The error a turn's result reports, or null for any other message. */
+function resultError(m: SDKMessage): string | null {
+  if (m.type !== 'result' || !m.is_error) {
+    return null
+  }
+  return m.subtype === 'success' ? m.result : m.subtype
+}
+
 /** Follows the session: results end turns, and background work reporting back starts new ones. */
 async function follow(taskId: string, session: LiveSession, m: SDKMessage, error: string | null): Promise<void> {
   if (m.type === 'result') {
     await endTurn(taskId, session, m, error)
   } else if (m.type === 'system' && m.subtype === 'background_tasks_changed') {
     if (session.setBackground(m.tasks)) {
-      publishSession(taskId)
+      await publishSession(taskId)
     }
     session.closeWhenIdle(SESSION_IDLE_MS)
   } else if (startsWork(m) && session.resumeWork()) {
-    await journal.turnStarted(taskId)
+    await nodeLink.journal(taskId, { type: 'turn.started' })
   }
 }
 
@@ -286,8 +291,10 @@ async function take(taskId: string, session: LiveSession, m: SDKMessage): Promis
   if ((await unstored(taskId, m)) || (await followQueue(taskId, session, m))) {
     return null
   }
-  const error = await journal.message(taskId, await withContextWindow(m, async () => session.contextWindow()))
+  const payload = await withContextWindow(m, async () => session.contextWindow())
+  await nodeLink.journal(taskId, { type: 'message', runtime: DEFAULT_RUNTIME, payload })
   await recordSessionStart(taskId, m, async () => session.mcpServerStatus())
+  const error = resultError(m)
   await follow(taskId, session, m, error)
   return error
 }
@@ -300,30 +307,28 @@ async function finish(taskId: string, session: LiveSession, lastError: string | 
   const endedBySeti = session.closed
   session.close()
   for (const promptId of session.settleAll()) {
-    await markQueued(taskId, promptId, 'removed')
+    await nodeLink.journal(taskId, { type: 'queued.settled', promptId, state: 'removed' })
   }
   if (live.get(taskId) !== session) {
     session.turnReported()
     return
   }
   live.delete(taskId)
-  forgetToolCalls(taskId)
+  await nodeLink.journal(taskId, { type: 'session.closed', since: session.since })
   const { running } = session
   session.endTurn()
   const backlog = session.takeBacklog()
   if (failedStart) {
     keepUnstarted(taskId, backlog)
-    await journal.turnEnded(taskId, 'error', lastError)
+    await nodeLink.journal(taskId, { type: 'turn.ended', status: 'error', error: lastError })
   } else if (!session.restartCut && backlog.length > 0 && (await tasks.get(taskId))) {
     openSession(taskId, session, backlog)
   } else if (running && !session.restartCut) {
-    await journal.turnEnded(taskId, endedBySeti ? 'stopped' : endStatus(lastError), lastError)
+    const status = endedBySeti ? 'stopped' : endStatus(lastError)
+    await nodeLink.journal(taskId, { type: 'turn.ended', status, error: lastError })
   }
   session.turnReported()
-  publishSession(taskId)
-  if (session.since !== null && (await hadRunningSubtask(taskId, session.since))) {
-    await publishSubtasks(taskId, openQuerySince(taskId))
-  }
+  await publishSession(taskId)
 }
 
 /** Opens the process and sends the messages that waited for it; the SDK starts it on first read. */
@@ -334,7 +339,7 @@ async function startSession(taskId: string, session: LiveSession): Promise<Async
   }
   const messagesOfSession = await sessionMessages(session, task)
   await sendBacklog(taskId, session)
-  publishSession(taskId)
+  await publishSession(taskId)
   session.closeWhenIdle(SESSION_IDLE_MS)
   return messagesOfSession
 }
@@ -356,7 +361,7 @@ async function consume(taskId: string, session: LiveSession): Promise<void> {
     if (!session.closed) {
       const error = sessionError(e, opened)
       lastError = error
-      await inLane(taskId, async () => appendMessage(taskId, { kind: 'seti', payload: { error } }))
+      await inLane(taskId, async () => nodeLink.journal(taskId, { type: 'note', error }))
     }
   } finally {
     const failedStart = !opened && lastError !== null
@@ -389,7 +394,7 @@ export async function stopTurn(taskId: string, { deliverQueued = false } = {}): 
 export async function openWarmSession(taskId: string): Promise<void> {
   openSession(taskId, live.get(taskId), [])
   if (isRunning(taskId)) {
-    await journal.turnStarted(taskId)
+    await nodeLink.journal(taskId, { type: 'turn.started' })
   }
 }
 

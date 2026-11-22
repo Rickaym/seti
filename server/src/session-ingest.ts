@@ -1,16 +1,20 @@
 import type { SDKMessage } from '@anthropic-ai/claude-agent-sdk'
-import type { MessageBody, MessageRow, TaskStatus } from '@seti/shared'
+import type { JournalEntry, MessageBody, MessageRow, TaskStatus } from '@seti/shared'
 import { audit } from './audit.js'
 import { closingLine } from './closing-line.js'
 import { linkCreatedPrs } from './created-prs.js'
 import { messages, tasks } from './db.js'
+import { serveNode } from './node-link.js'
 import { outwardToolUses } from './outward.js'
+import { markQueued } from './queued-prompts.js'
 import { storedForm } from './session-start.js'
 import { withTurnCost } from './store/cost.js'
-import { publishFolded } from './subtask-prs.js'
+import { hadRunningSubtask } from './subtask-cache.js'
+import { publishFolded, publishSubtasks } from './subtask-prs.js'
 import { publish } from './task-events.js'
-import { trackToolCalls } from './tool-calls.js'
+import { forgetToolCalls, trackToolCalls } from './tool-calls.js'
 import { turnAsks } from './turn-asking.js'
+import { promptFor } from './turn-prompt.js'
 
 /**
  * Called once the task stops working, with the status it ended in. A turn that a new message cut
@@ -25,19 +29,16 @@ export function onTurnEnd(listener: TurnEndListener): void {
   turnEndListeners.push(listener)
 }
 
-type SinceQuery = (taskId: string) => number | null
+/** The first prompt each task's open session sent, as its node reported it. */
+const sessionSince = new Map<string, number>()
 
-let sessionSince: SinceQuery = (_taskId) => null
-
-/** Lets the session half answer when each task's open session sent its first message. */
-export function answerSince(query: SinceQuery): void {
-  sessionSince = query
-}
+/** First message of the task's open session, which may still run subagents it started. */
+export const openQuerySince = (taskId: string): number | null => sessionSince.get(taskId) ?? null
 
 export async function appendMessage(taskId: string, body: MessageBody, outward: string[] = []): Promise<MessageRow> {
   const row = await messages.insert(taskId, body, outward)
   publish(taskId, { type: 'message', row })
-  await publishFolded(taskId, sessionSince(taskId))
+  await publishFolded(taskId, openQuerySince(taskId))
   return row
 }
 
@@ -46,7 +47,7 @@ async function setStatus(taskId: string, status: TaskStatus): Promise<void> {
   publish(taskId, { type: 'status', status })
 }
 
-async function record(taskId: string, m: SDKMessage): Promise<string | null> {
+async function record(taskId: string, m: SDKMessage): Promise<void> {
   const outward = outwardToolUses(m)
   trackToolCalls(taskId, m)
   await appendMessage(taskId, { kind: 'sdk', payload: storedForm(await withTurnCost(taskId, m)) }, outward)
@@ -55,11 +56,7 @@ async function record(taskId: string, m: SDKMessage): Promise<string | null> {
   if (outward.length > 0) {
     await tasks.addOutward(taskId, outward.length)
   }
-  await linkCreatedPrs(taskId, m, sessionSince(taskId))
-  if (m.type !== 'result' || !m.is_error) {
-    return null
-  }
-  return m.subtype === 'success' ? m.result : m.subtype
+  await linkCreatedPrs(taskId, m, openQuerySince(taskId))
 }
 
 async function reportEnd(taskId: string, status: TaskStatus, lastError: string | null): Promise<void> {
@@ -75,12 +72,45 @@ async function reportEnd(taskId: string, status: TaskStatus, lastError: string |
   }
 }
 
-/** What the session half reports as its sessions run; each call mirrors a node journal entry. */
-export const journal = {
-  /** Stores a message of the session; returns the error a result reports. */
-  message: record,
-  /** The task works: a turn started, or background work reported back. */
-  turnStarted: async (taskId: string) => setStatus(taskId, 'running'),
-  /** The task stopped working, with the status it ended in; the turn-end listeners follow. */
-  turnEnded: reportEnd,
+/** Forgets the ended session, and shows its subtasks again if one was still running. */
+async function sessionClosed(taskId: string, since: number | null): Promise<void> {
+  sessionSince.delete(taskId)
+  forgetToolCalls(taskId)
+  if (since !== null && (await hadRunningSubtask(taskId, since))) {
+    await publishSubtasks(taskId, openQuerySince(taskId))
+  }
 }
+
+type EntryOf<T extends JournalEntry['type']> = Extract<JournalEntry, { type: T }>
+type Ingest = { [T in JournalEntry['type']]: (taskId: string, entry: EntryOf<T>) => unknown }
+
+/** What the control plane does with each entry a node reports. */
+const ingest: Ingest = {
+  // The runtime adapter of the session wrote the payload.
+  message: async (taskId, { payload }) => record(taskId, payload as SDKMessage),
+  'turn.started': async (taskId) => setStatus(taskId, 'running'),
+  'turn.ended': async (taskId, { status, error }) => reportEnd(taskId, status, error),
+  note: async (taskId, { error }) => appendMessage(taskId, { kind: 'seti', payload: { error } }),
+  'queued.settled': async (taskId, { promptId, state }) => markQueued(taskId, promptId, state),
+  'session.opened': (taskId) => sessionSince.delete(taskId),
+  'session.since': (taskId, { promptId }) => sessionSince.set(taskId, promptId),
+  'session.closed': async (taskId, { since }) => sessionClosed(taskId, since),
+  'session.state': (taskId, { open, background }) => {
+    publish(taskId, { type: 'session', session: { open, background } })
+  },
+}
+
+async function journal<T extends JournalEntry['type']>(taskId: string, entry: EntryOf<T>): Promise<void> {
+  const take = ingest[entry.type] as (taskId: string, entry: EntryOf<T>) => unknown
+  await take(taskId, entry)
+}
+
+serveNode({
+  journal,
+  answer: {
+    'prompt.open': async (taskId, { next, queued }) => {
+      const { payload, text } = await promptFor(taskId, next, queued)
+      return { promptId: (await appendMessage(taskId, { kind: 'prompt', payload })).id, text }
+    },
+  },
+})
