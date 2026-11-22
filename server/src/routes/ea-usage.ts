@@ -4,8 +4,8 @@ import { audit } from '../audit.js'
 import { now } from '../db.js'
 import { readerZone } from '../home.js'
 import { ok, valid, validJson } from '../http.js'
-import { botOnly } from './ea-state.js'
 import { eaUsage } from '../store/ea-usage.js'
+import { botOnly } from './ea-state.js'
 
 /**
  * The EA's token use and latency: the bot reports them, the settings page and tools read them.

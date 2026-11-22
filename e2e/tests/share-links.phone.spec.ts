@@ -1,5 +1,5 @@
 import { expect, test } from './support/fixtures.js'
-import { expectFitsPhone } from './support/phone-layout.js'
+import { expectFitsPhone, expectTouchTarget } from './support/phone-layout.js'
 import { openShare, seedShareAgent, setSharing, shareByApi, stranger } from './support/shares.js'
 import { filesPanel, openViewerFile } from './support/viewer-files.js'
 
@@ -20,7 +20,7 @@ test('a phone shares a file from Files, and the link reads well on a phone', asy
   await openViewerFile(page, 'notes.md')
 
   const share = filesPanel(page).getByTestId('viewer-header').getByRole('button', { name: 'Share' })
-  expect((await share.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(44)
+  await expectTouchTarget(share)
   await share.tap()
   const dialog = page.getByRole('dialog', { name: 'Share notes.md' })
   await expectFitsPhone(page, 'the share dialog')

@@ -4,6 +4,7 @@ import type { SideAnswer, SideChatEvent, SideChatInput, Task } from '@seti/share
 import { refuseArchived } from '../archive-guard.js'
 import { CLAUDE_HOME } from '../config.js'
 import { now } from '../db.js'
+import { refuseHiddenDirect } from '../direct-privacy.js'
 import { refuseOtherAgent } from '../ea-guard.js'
 import { HttpError } from '../http.js'
 import { sessionState } from '../runner.js'
@@ -18,7 +19,6 @@ import { done, followUp, openChat, type SideChat } from './chats.js'
 import { promptOf, storeAside } from './history.js'
 import { sideChatOptions, type ForkPoint } from './options.js'
 import { savedTotal, sessionFile } from './saved-cost.js'
-import { refuseHiddenDirect } from '../direct-privacy.js'
 
 /** Longest an answer may take before its fork is stopped. */
 const ANSWER_MS = 5 * 60_000

@@ -1,5 +1,8 @@
 import { MOD_LIMITS } from '@seti/shared'
 import { afterAll, describe, expect, it, vi } from 'vitest'
+import { readModWorkers } from '../../config.js'
+import { auditEvents } from '../../store/audit.js'
+import { modLogs, modUsage } from '../../store/mod-logic.js'
 import { UNAVAILABLE_OPS } from './dispatch.js'
 import type { ModLogicTarget } from './events.js'
 import { scheduleMod } from './schedule.js'
@@ -13,9 +16,6 @@ import {
   stopModLogic,
   type ModLogicHost,
 } from './service.js'
-import { readModWorkers } from '../../config.js'
-import { auditEvents } from '../../store/audit.js'
-import { modLogs, modUsage } from '../../store/mod-logic.js'
 
 const KEY = ['sink', 'token', 'value', '42xyz'].join('-')
 

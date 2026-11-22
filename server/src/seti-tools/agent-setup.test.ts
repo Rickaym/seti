@@ -10,10 +10,10 @@ import type {
 } from '@seti/shared'
 import { afterAll, describe, expect, it, vi } from 'vitest'
 import { tasks } from '../db.js'
+import { teamMessages, USER_READER } from '../store/team.js'
 import { SETI_TOOLS } from './catalog.js'
 import { toolsFor } from './levels.js'
 import { callSetiTool } from './server.js'
-import { teamMessages, USER_READER } from '../store/team.js'
 
 const scratch = await vi.hoisted(async () => {
   const { mkdtempSync } = await import('node:fs')

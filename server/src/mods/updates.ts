@@ -13,6 +13,8 @@ import { audit } from '../audit.js'
 import { inBackground } from '../background.js'
 import { HttpError } from '../http.js'
 import { pushToEveryDevice } from '../notifications.js'
+import { modLogs } from '../store/mod-logic.js'
+import { modFootprint, modInstalls, modVersions, switchVersion, type ModInstallRow } from '../store/mod-packages.js'
 import { modHost } from './bundled.js'
 import { requireUserConsent } from './consent-guard.js'
 import { boundByVariable, connectionChoices } from './consent.js'
@@ -26,8 +28,6 @@ import {
   versionDetail,
 } from './install.js'
 import { storedGrants } from './installed.js'
-import { modLogs } from '../store/mod-logic.js'
-import { modFootprint, modInstalls, modVersions, switchVersion, type ModInstallRow } from '../store/mod-packages.js'
 import { readOrigin } from './package/read.js'
 import type { ValidPackage } from './package/validate.js'
 

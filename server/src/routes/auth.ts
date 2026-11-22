@@ -168,7 +168,8 @@ const currentSessionId = () => {
 
 /** Seti's own sign-in: passkeys, browser sessions, host setup codes and the enforcement switch. */
 export function authRoutes(access: PublicAccess | null): Hono {
-  return new Hono()
+  const app = new Hono()
+  app
     .use('*', notEa('change sign-in, passkeys or sessions'))
     .get('/', async (c) => ok(c, await stateOf(c)))
     .post('/signin/options', async (c) => limited(c) ?? ok(c, await signInOptions(relyingParty(c))))
@@ -342,4 +343,5 @@ export function authRoutes(access: PublicAccess | null): Hono {
       })
       return ok(c, { removed: true })
     })
+  return app
 }

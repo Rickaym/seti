@@ -1,9 +1,9 @@
 import { MOD_TASK_ARG, modCommandArgShape, modToolName, type SetiControlLevel } from '@seti/shared'
 import { z } from 'zod'
-import type { SetiTool } from './tool.js'
 import { runModAction } from '../mods/commands.js'
 import { modOutput, modWords } from '../mods/mod-text.js'
 import { modCommands, type ModCommandEntry } from '../mods/points.js'
+import type { SetiTool } from './tool.js'
 
 const argsOf = (args: unknown): Record<string, unknown> =>
   typeof args === 'object' && args !== null ? { ...(args as Record<string, unknown>) } : {}

@@ -1,5 +1,5 @@
 import { expect, test } from './support/fixtures.js'
-import { expectFitsPhone } from './support/phone-layout.js'
+import { expectFitsPhone, expectTouchTarget } from './support/phone-layout.js'
 import { fileRow, seedNestedAgent } from './support/seti-files.js'
 import { filesPanel } from './support/viewer-files.js'
 
@@ -14,7 +14,7 @@ test('the files sheet hides what Seti writes behind a touch-size toggle', async 
   await expect(list.getByRole('button', { name: fileRow('members.md') })).toHaveCount(0)
 
   const toggle = panel.getByRole('button', { name: 'Seti files' })
-  expect((await toggle.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(44)
+  await expectTouchTarget(toggle)
   await expectFitsPhone(page, 'the files sheet toolbar')
   await toggle.tap()
   await expect(toggle).toHaveAttribute('aria-pressed', 'true')

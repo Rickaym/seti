@@ -6,9 +6,9 @@ import type {
   WebhookChannelInfo,
 } from '@seti/shared'
 import { z } from 'zod'
+import { listChannels } from '../channels/actions.js'
 import { anyTask, liveTask, pickOne } from './refs.js'
 import { ToolRefusal } from './tool.js'
-import { listChannels } from '../channels/actions.js'
 
 export const channelRef = z
   .string()

@@ -4,10 +4,10 @@ import os from 'node:os'
 import path from 'node:path'
 import { MOD_POINTS } from '@seti/shared'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { SETI_HOME } from '../../config.js'
 import { packageHash } from './hash.js'
 import { folderSource } from './read-folder.js'
 import { mapReader, readPackage, type ValidPackage } from './validate.js'
-import { SETI_HOME } from '../../config.js'
 
 const BUNDLED = new Set(['weather', 'whats-new'])
 

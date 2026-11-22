@@ -2,10 +2,10 @@ import type { WebhookChannelInfo, webhookFilterInput } from '@seti/shared'
 import type { z } from 'zod'
 import { audit } from '../audit.js'
 import { now } from '../db.js'
+import { webhookFilterStore, type WebhookFilterRecord } from '../store/webhook-filters.js'
 import { filterWorkers } from './filter-run.js'
 import { webhooks } from './service.js'
 import { sha256Hex } from './signature.js'
-import { webhookFilterStore, type WebhookFilterRecord } from '../store/webhook-filters.js'
 
 const codeHash = (script: string) => `sha256:${sha256Hex(script)}`
 

@@ -1,6 +1,6 @@
 import { MOD_LIMITS, modCommandArgs, type ModFrameCallInput, type ModManifest } from '@seti/shared'
-import type { ModViewCall } from './runtime.js'
 import { describeIssues, HttpError } from '../../http.js'
+import type { ModViewCall } from './runtime.js'
 
 /** Whether the manifest declares the view or viewer the call came from. */
 const declaresPage = (manifest: ModManifest, name: string) =>

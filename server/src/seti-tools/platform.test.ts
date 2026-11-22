@@ -8,10 +8,10 @@ import { tasks } from '../db.js'
 import { addMcpServer } from '../mcp-actions.js'
 import { setMcpDefault } from '../mcp-selection.js'
 import { addDefaultPlugin, setDefaultPluginEnabled } from '../plugins.js'
-import { SETI_TOOLS } from './catalog.js'
-import { callSetiTool } from './server.js'
 import { auditEvents } from '../store/audit.js'
 import { setiPlugins } from '../store/plugins.js'
+import { SETI_TOOLS } from './catalog.js'
+import { callSetiTool } from './server.js'
 
 const caller = { id: randomUUID(), title: 'Platform keeper', seti_control: 'full' as const }
 await tasks.insert({ ...caller, repo_id: null, cwd: '/tmp', worktree: false, pr_urls: [] })

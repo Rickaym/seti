@@ -1,8 +1,8 @@
 /* eslint-disable sonarjs/no-hardcoded-ip -- fake DNS answers and the private addresses mods never reach */
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
-import { callAs, probeManifest, valueOf } from './test-probe.js'
 import { sql } from '../../db.js'
 import { clearConnections, keyConnection } from '../../test-connections.js'
+import { callAs, probeManifest, valueOf } from './test-probe.js'
 
 interface SeenRequest {
   host: string

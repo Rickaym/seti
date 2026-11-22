@@ -1,8 +1,6 @@
 import { expect, test } from './support/fixtures.js'
 import { seedOlderAgent } from './support/older-agent.js'
-import { expectFitsPhone } from './support/phone-layout.js'
-
-const TARGET_PX = 44
+import { expectFitsPhone, expectTouchTarget } from './support/phone-layout.js'
 
 test("a phone reads an older agent's folders and takes its home folders away", async ({ page, request }) => {
   const { id, slug, notes } = await seedOlderAgent('Phone older agent')
@@ -12,7 +10,7 @@ test("a phone reads an older agent's folders and takes its home folders away", a
   for (const name of [slug, notes]) {
     const copy = sheet.getByRole('group', { name }).getByRole('button', { name: /^Copy path of / })
     await expect(copy).toBeVisible()
-    expect((await copy.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(TARGET_PX)
+    await expectTouchTarget(copy)
   }
   for (const gone of [/^Add/, /^Work in /, /^Remove /]) {
     await expect(sheet.getByRole('button', { name: gone })).toHaveCount(0)

@@ -2,10 +2,10 @@ import { spawn } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
 import { MOD_PACKAGE_LIMITS } from '@seti/shared'
-import type { PackageSource } from './read-folder.js'
-import { PackageProblem } from './validate.js'
 import { binaryPath } from '../../binaries.js'
 import { OWNED_ROOTS, removeOwnedDir } from '../../owned-dirs.js'
+import type { PackageSource } from './read-folder.js'
+import { PackageProblem } from './validate.js'
 
 /** No prompts, config, hooks, submodules, LFS or redirects; https only. */
 const CONFIG = [

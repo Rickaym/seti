@@ -1,7 +1,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { expect, test } from './support/fixtures.js'
-import { expectFitsPhone } from './support/phone-layout.js'
+import { expectFitsPhone, expectTouchTarget } from './support/phone-layout.js'
 import { prompts, seedAgent, shareToSeti, shareWaits, underServiceWorker } from './support/share-target.js'
 
 test.use({ serviceWorkers: 'allow' })
@@ -27,11 +27,11 @@ test('a phone share picks an agent by touch and sends the files with the message
   await expectFitsPhone(page, 'share page')
 
   const agent = page.getByRole('radio', { name: /Phone share agent/ })
-  expect((await agent.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(44)
+  await expectTouchTarget(agent)
   await agent.tap()
   await expect(agent).toHaveAttribute('aria-checked', 'true')
   const send = page.getByRole('button', { name: 'Send', exact: true })
-  expect((await send.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(44)
+  await expectTouchTarget(send)
   await send.tap()
 
   await page.waitForURL(new RegExp(`#agents/${id}$`))
@@ -44,7 +44,7 @@ test('Cancel on a phone discards the share and New agent is a finger-sized row',
   await underServiceWorker(page)
   await shareToSeti(page, { text: 'Never mind' })
   const newAgent = page.getByRole('button', { name: 'New agent' })
-  expect((await newAgent.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(44)
+  await expectTouchTarget(newAgent)
   await page.getByRole('button', { name: 'Cancel' }).tap()
   await page.waitForURL(/#home$/)
   expect(await shareWaits(page)).toBe(false)

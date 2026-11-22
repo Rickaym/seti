@@ -3,6 +3,7 @@ import type { EaHealth } from '@seti/shared'
 import { audioSpy, deviceId, spyOnAudio } from './support/audio.js'
 import { fakeEa } from './support/fake-ea.js'
 import { expect, test } from './support/fixtures.js'
+import { expectTouchTarget } from './support/phone-layout.js'
 
 test.use({ permissions: ['microphone'] })
 
@@ -62,7 +63,7 @@ test('the EA page starts a call with thumb-sized buttons, and ending it there en
   await expect(card.getByTestId('ea-call-status')).toHaveText('Listening')
   await expect(eaItem(page).getByTestId('ea-bar-status')).toHaveText('Listening')
   const hangUp = card.getByRole('button', { name: 'Hang up', exact: true })
-  expect((await hangUp.boundingBox())?.height).toBeGreaterThanOrEqual(44)
+  await expectTouchTarget(hangUp)
   expect(await horizontalOverflow(page)).toBeLessThanOrEqual(0)
 
   await hangUp.tap()

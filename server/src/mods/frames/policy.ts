@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
-import { VIEW_SHIM } from './shim.js'
 import { HttpError } from '../../http.js'
+import { VIEW_SHIM } from './shim.js'
 
 /** A CSP source for one inline script: `sha256-` and the base64 digest of its exact text. */
 const SCRIPT_HASH = /^sha256-[A-Za-z0-9+/]{43}=$/

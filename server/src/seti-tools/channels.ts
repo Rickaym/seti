@@ -8,6 +8,21 @@ import {
   type ReminderChannelInfo,
 } from '@seti/shared'
 import { z } from 'zod'
+import {
+  createChannel,
+  deleteChannel,
+  listChannels,
+  rotateChannel,
+  subscribeChannel,
+  unsubscribeChannel,
+  updateChannel,
+} from '../channels/actions.js'
+import { webhooks } from '../channels/service.js'
+import { channelSources } from '../channels/source-info.js'
+import { pollNow } from '../pollers/actions.js'
+import { pollers } from '../pollers/service.js'
+import { runReminderNow, updateReminder } from '../reminders/actions.js'
+import { reminders } from '../reminders/service.js'
 import { channelRef, existingSubscription, findChannel, findWebhook, webhookRef } from './channel-refs.js'
 import { subscribeChannelTool, unsubscribeChannelTool } from './channel-subscribe.js'
 import { POLLER_TOOLS, pollerRunView, pollerView, testPollerScript } from './pollers.js'
@@ -26,21 +41,6 @@ import { done, setiTool, ToolRefusal, type SetiTool } from './tool.js'
 import { upcomingView } from './upcoming.js'
 import { changeFilter, filterArgs, filterSample, hasFilterArgs, testWebhookFilter } from './webhook-filter.js'
 import { deliveryView, webhookView } from './webhook-view.js'
-import {
-  createChannel,
-  deleteChannel,
-  listChannels,
-  rotateChannel,
-  subscribeChannel,
-  unsubscribeChannel,
-  updateChannel,
-} from '../channels/actions.js'
-import { webhooks } from '../channels/service.js'
-import { channelSources } from '../channels/source-info.js'
-import { pollNow } from '../pollers/actions.js'
-import { pollers } from '../pollers/service.js'
-import { runReminderNow, updateReminder } from '../reminders/actions.js'
-import { reminders } from '../reminders/service.js'
 
 function channelView(info: ChannelInfo, shown?: number) {
   if (info.source === 'poller') {

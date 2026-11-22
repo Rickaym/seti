@@ -1,7 +1,7 @@
 import { sourceMod, type ChannelSources, type PollerTemplateInfo, type WebhookSourceInfo } from '@seti/shared'
 import { HttpError } from '../http.js'
-import { modWebhookInfo, pollerTemplates, webhookSources, type WebhookSource } from './sources.js'
 import { modHost } from '../mods/bundled.js'
+import { modWebhookInfo, pollerTemplates, webhookSources, type WebhookSource } from './sources.js'
 
 /** The sources a new channel can come from now. */
 export const channelSources = (): ChannelSources => ({

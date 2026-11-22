@@ -12,11 +12,6 @@ import {
 } from '@seti/shared'
 import { audit } from '../audit.js'
 import { HttpError } from '../http.js'
-import { modHost } from './bundled.js'
-import { requireUserConsent } from './consent-guard.js'
-import { bindGrants, boundByVariable, previewOf, type PackageOrigin } from './consent.js'
-import { isRequired, requiredReason } from './host.js'
-import { installedMod, storedGrants } from './installed.js'
 import { modDevMode } from '../store/mod-lifecycle.js'
 import {
   modInstalls,
@@ -27,6 +22,11 @@ import {
   type ModGrantRow,
   type StoredVersion,
 } from '../store/mod-packages.js'
+import { modHost } from './bundled.js'
+import { requireUserConsent } from './consent-guard.js'
+import { bindGrants, boundByVariable, previewOf, type PackageOrigin } from './consent.js'
+import { isRequired, requiredReason } from './host.js'
+import { installedMod, storedGrants } from './installed.js'
 import { packageHash } from './package/hash.js'
 import { readFrom } from './package/read.js'
 import type { ValidPackage } from './package/validate.js'

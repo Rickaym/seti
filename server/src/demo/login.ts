@@ -27,7 +27,8 @@ function sameSite(c: Context): boolean {
 
 /** Signs a visitor in for the demo with a session no passkey started; it ends at the next reset. */
 export function demoLoginRoutes(): Hono {
-  return new Hono().post(DEMO_SESSION_PATH, async (c) => {
+  const app = new Hono()
+  app.post(DEMO_SESSION_PATH, async (c) => {
     if (!sameSite(c)) {
       return fail(c, 403, 'Forbidden', 'Enter the demo from its own page')
     }
@@ -49,6 +50,7 @@ export function demoLoginRoutes(): Hono {
     })
     return ok(c, { signed_in: true })
   })
+  return app
 }
 
 const META = 'seti-demo'

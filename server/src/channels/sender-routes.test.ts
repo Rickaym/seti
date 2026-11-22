@@ -10,13 +10,13 @@ import { describe, expect, it } from 'vitest'
 import { asAgent } from '../access.js'
 import { createApp } from '../app.js'
 import { tasks } from '../db.js'
-import { checkSenderSample, createChannel, updateChannel } from './actions.js'
-import { createReceiver } from './receiver.js'
-import { webhooks } from './service.js'
 import { auditEvents } from '../store/audit.js'
 import { channelStore } from '../store/channels.js'
 import { EA_AUTH, USER_AUTH } from '../test-auth.js'
 import { withBundledMods } from '../test-mods.js'
+import { checkSenderSample, createChannel, updateChannel } from './actions.js'
+import { createReceiver } from './receiver.js'
+import { webhooks } from './service.js'
 
 withBundledMods()
 

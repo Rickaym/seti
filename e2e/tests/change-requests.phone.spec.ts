@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto'
 import type { Connection, TaskAccessView } from '@seti/shared'
 import { expectKeyStaysSecret, seedChangeRequest } from './support/change-requests.js'
 import { apiData, expect, test } from './support/fixtures.js'
-import { expectFitsPhone } from './support/phone-layout.js'
+import { expectFitsPhone, expectTouchTarget } from './support/phone-layout.js'
 
 test('a change request fits the phone and is allowed with a tap', async ({ page, request }) => {
   const change = { kind: 'allow_host', host: 'phone.fixtures.example.com', port: 8443 }
@@ -35,7 +35,7 @@ test('a key pasted on the phone adds the connection with its key in one tap', as
   await card.scrollIntoViewIfNeeded()
   await expectFitsPhone(page, 'key request')
   for (const target of [box, toggle]) {
-    expect((await target.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(44)
+    await expectTouchTarget(target)
   }
   await box.fill(key)
   await toggle.tap()

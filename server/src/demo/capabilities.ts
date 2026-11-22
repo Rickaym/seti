@@ -37,10 +37,12 @@ function snapshot(): CapabilitiesSnapshot {
  */
 export function demoCapabilityRoutes(access: PublicAccess | null): Hono {
   const headers = securityHeaders(access)
-  return new Hono()
+  const app = new Hono()
+  app
     .get('/api/capabilities', headers, (c) => ok(c, snapshot()))
     .get('/api/capabilities/summary', headers, (c) => ok(c, summarizeCapabilities(snapshot())))
     .get('/api/tasks/:id/commands', headers, (c) =>
       ok(c, commandCatalog({ snapshot: snapshot(), exact: true, fresh: true })),
     )
+  return app
 }

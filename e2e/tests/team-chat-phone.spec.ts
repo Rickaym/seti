@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { openSeedDb } from './support/db.js'
 import { paths } from './support/env.js'
 import { expect, test } from './support/fixtures.js'
+import { expectTouchTarget } from './support/phone-layout.js'
 
 test('opens the group chat as a full-height sheet on a phone', async ({ page }) => {
   await page.goto('/#agents')
@@ -66,7 +67,7 @@ test('Copy reply shows without hover on a phone and copies the message source', 
   const message = sheet.getByTestId('team-message').filter({ hasText: 'Phone copy' })
   const copy = message.getByRole('button', { name: 'Copy reply' })
   await expect(copy).toHaveCSS('opacity', '1')
-  expect((await copy.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(44)
+  await expectTouchTarget(copy)
   await copy.tap()
   await expect.poll(async () => page.evaluate(async () => navigator.clipboard.readText())).toBe(text)
 })

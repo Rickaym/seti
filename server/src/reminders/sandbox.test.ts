@@ -1,7 +1,7 @@
 import { spawnSync } from 'node:child_process'
 import { describe, expect, it } from 'vitest'
-import type { ReminderContext } from './protocol.js'
 import { isolation, nodeArgs, type Isolation } from '../script-sandbox.js'
+import type { ReminderContext } from './protocol.js'
 import { runSandboxed, type SandboxLimits } from './sandbox.js'
 
 const LIMITS: SandboxLimits = {

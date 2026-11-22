@@ -3,8 +3,6 @@ import { auditQuery, channelCreateInput, type SetiControlLevel, type Task } from
 import { describe, expect, it } from 'vitest'
 import { asAgent } from '../access.js'
 import { createApp } from '../app.js'
-import { KNOWLEDGE_TOOLS } from './knowledge.js'
-import { EVERY_AGENT, ON_ONE_AGENT, READS_SETI, toolsFor } from './levels.js'
 import { createChannel, subscribeChannel } from '../channels/actions.js'
 import { createPack } from '../context-changes.js'
 import { tasks } from '../db.js'
@@ -13,10 +11,12 @@ import { askAside } from '../side-chat/ask.js'
 import { auditEvents } from '../store/audit.js'
 import { updateTask } from '../task-actions.js'
 import { linkTaskPr } from '../tasks.js'
+import { withBundledMods } from '../test-mods.js'
 import { SETI_TOOLS } from './catalog.js'
+import { KNOWLEDGE_TOOLS } from './knowledge.js'
+import { EVERY_AGENT, ON_ONE_AGENT, READS_SETI, toolsFor } from './levels.js'
 import { REQUEST_TOOLS } from './requests.js'
 import { callSetiTool, sessionTools } from './server.js'
-import { withBundledMods } from '../test-mods.js'
 
 createApp()
 withBundledMods()

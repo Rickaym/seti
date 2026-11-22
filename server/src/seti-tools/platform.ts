@@ -19,10 +19,10 @@ import { pluginCatalog, removeDefaultPlugin } from '../plugins.js'
 import { sandboxStatus } from '../sandbox-status.js'
 import { sharedToolsFor } from '../shared-tools.js'
 import { sshStatus } from '../ssh.js'
+import { setiPlugins } from '../store/plugins.js'
 import { updateTask } from '../task-actions.js'
 import { liveTask, pickOne, taskRef } from './refs.js'
 import { done, setiTool, ToolRefusal } from './tool.js'
-import { setiPlugins } from '../store/plugins.js'
 
 const serverRef = z.string().trim().min(1).describe('The MCP server name as list_mcp_servers shows it.')
 const repoRef = z

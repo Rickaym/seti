@@ -1,7 +1,10 @@
 import { MOD_LIMITS, MOD_OP_NAMES, type ModError, type ModErrorCode, type ModManifest, type ModOp } from '@seti/shared'
+import { audit } from '../../audit.js'
+import { describeIssues, HttpError } from '../../http.js'
 import { mayAuditRefusal } from '../../rate-limit.js'
 import { redactSecrets } from '../../scrub.js'
 import { modCall, requireOp } from '../capabilities.js'
+import type { OpTable } from '../logic/dispatch.js'
 import { basicOps } from './basics.js'
 import { chatOps } from './chat.js'
 import { connectionOps } from './connection.js'
@@ -11,9 +14,6 @@ import { manageOps } from './manage.js'
 import { netOps } from './net.js'
 import { storageOps } from './storage.js'
 import { taskReadOps } from './tasks.js'
-import { audit } from '../../audit.js'
-import { describeIssues, HttpError } from '../../http.js'
-import type { OpTable } from '../logic/dispatch.js'
 
 /** Every op a mod can call, one handler each; `MOD_OPS` names them and nothing else is reachable. */
 const MOD_OP_TABLE: Readonly<Record<ModOp, OpDefinition>> = {
