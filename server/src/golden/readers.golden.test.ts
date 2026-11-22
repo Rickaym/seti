@@ -2,6 +2,7 @@ import { closingQuestion, projectClaude, type MessageRow } from '@seti/shared'
 import { describe, expect, it } from 'vitest'
 import { ShellIndex } from '../background-shells.js'
 import { buildDigest, toolLabel } from '../digest.js'
+import { rowEvents } from '../events/read.js'
 import { outwardToolUses } from '../outward.js'
 import { transcriptEvidence } from '../pr-evidence.js'
 import { deriveSubtasks } from '../subtasks.js'
@@ -44,8 +45,8 @@ function render({ rows }: GoldenTranscript) {
     outward: payloads.flatMap(outwardToolUses),
     prs: { created: [...evidence.created], pushedTo: [...evidence.pushedTo], pushes: evidence.pushes },
     asks: closingQuestion(turnBlocks(own.map((m) => JSON.stringify(m)))),
-    labels: payloads.flatMap((m) =>
-      m.type === 'assistant' ? m.message.content.flatMap((b) => (b.type === 'tool_use' ? [toolLabel(b)] : [])) : [],
+    labels: rows.flatMap((row) =>
+      rowEvents(row).flatMap((e) => (e.type === 'tool.started' ? [toolLabel(e.call)] : [])),
     ),
   }
 }

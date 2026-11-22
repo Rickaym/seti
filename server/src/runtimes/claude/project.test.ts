@@ -232,6 +232,17 @@ describe('Claude results', () => {
     ])
     const apiError = { ...fakeResult(), is_error: true, result: 'API Error: 401', api_error_status: 401, uuid: 'r3' }
     expect(raw(apiError)).toMatchObject([{ status: 'error', error: 'API Error: 401', apiStatus: 401 }])
+    expect(raw(apiError)[0]).not.toHaveProperty('ending')
+  })
+
+  it('says why a turn stopped short of its answer', () => {
+    const ended = (subtype: string) => raw({ ...fakeResult(true), subtype, uuid: 'r6' })[0]
+    expect(ended('error_during_execution')).toMatchObject({ ending: 'error' })
+    expect(ended('error_max_turns')).toMatchObject({ ending: 'turn_limit' })
+    expect(ended('error_max_budget_usd')).toMatchObject({ ending: 'budget_limit' })
+    expect(ended('error_max_structured_output_retries')).toMatchObject({ ending: 'retry_limit' })
+    expect(ended('error_new_kind')).toMatchObject({ ending: 'other', error: 'error_new_kind' })
+    expect(raw({ ...fakeResult(), uuid: 'r7' })[0]).not.toHaveProperty('ending')
   })
 
   it('reads a background turn, its steps, usage and the messages it answered', () => {

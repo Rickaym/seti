@@ -26,6 +26,13 @@ const LOGIN_ERRORS = new Set([
   'cloud_credential_error',
 ])
 
+const ENDINGS = new Map<string, 'error' | 'turn_limit' | 'budget_limit' | 'retry_limit'>([
+  ['error_during_execution', 'error'],
+  ['error_max_turns', 'turn_limit'],
+  ['error_max_budget_usd', 'budget_limit'],
+  ['error_max_structured_output_retries', 'retry_limit'],
+])
+
 const LOCAL_OUTPUT = /^<local-command-stdout>([\s\S]*)<\/local-command-stdout>$/
 const INTERRUPTED = '[Request interrupted by user'
 
@@ -110,6 +117,7 @@ function result(m: SDKResultMessage): Event {
     status: m.is_error ? 'error' : 'ok',
     result: text,
     ...(m.is_error ? { error: m.subtype === 'success' ? text : m.subtype } : {}),
+    ...(m.subtype === 'success' ? {} : { ending: ENDINGS.get(m.subtype) ?? 'other' }),
     cause: m.origin?.kind === 'task-notification' ? 'background' : 'input',
     steps: m.num_turns,
     ...some('costUsd', num(m, TURN_COST_KEY)),
