@@ -40,8 +40,11 @@ function unsafe(call: PolicyCall, ctx: PolicyContext): 'critical' | 'protected' 
   return call.kind === 'edit' && writes.some(isProtected) ? 'protected' : null
 }
 
+/** Modes that hand undecided calls to the classifier, which drop the broad allow rules first. */
+const classified = (mode: PolicyMode) => mode === 'auto' || mode === 'plan'
+
 function allowRule(call: PolicyCall, rules: readonly Prepared[], ctx: PolicyContext): Prepared | undefined {
-  const usable = ctx.mode === 'auto' ? rules.filter((prepared) => !droppedInAuto(prepared.target)) : rules
+  const usable = classified(ctx.mode) ? rules.filter((prepared) => !droppedInAuto(prepared.target)) : rules
   if (call.command !== undefined) {
     return shellAllow(call.command, call.interactive === true, usable, ctx)
   }
@@ -90,6 +93,9 @@ function afterRules(call: PolicyCall, rules: readonly Prepared[], ctx: PolicyCon
   }
   if (risk === 'protected') {
     return decision(PROTECTED[ctx.mode], 'safety', 'It writes repository state or configuration that runs code')
+  }
+  if (ctx.mode === 'plan' && call.kind === 'edit') {
+    return decision('ask', 'plan', 'Plan mode edits nothing until the user approves the plan')
   }
   const allow = allowRule(call, ofBehavior(rules, 'allow'), ctx)
   return allow === undefined ? byMode(call, ctx) : decision('allow', 'allow-rule', 'An allow rule matches', allow)
