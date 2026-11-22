@@ -10,7 +10,7 @@ import { messages, sql, tasks } from './db.js'
 import { sessionMcp, sessionState, watchSessionMcp } from './mcp-session-status.js'
 import { runTurn } from './runner.js'
 import { hostClaudeJson } from './sandbox-mcp.js'
-import { setupKey } from './session-options.js'
+import { setupKey } from './session-spec.js'
 import { USER_AUTH } from './test-auth.js'
 import { waitIdle } from './wait-idle.js'
 

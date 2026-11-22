@@ -10,7 +10,7 @@ export type PrAgent = Pick<TaskListEntry, 'id' | 'title'>
 export const prCount = (count: number) => `${String(count)} ${count === 1 ? 'PR' : 'PRs'}`
 
 /** Sends the short Fix CI message as the user; a send that fails raises a toast that stays. */
-export function askToFixCi(agent: PrAgent, message: string): void {
+function askToFixCi(agent: PrAgent, message: string): void {
   void sendAsUser(agent.id, message).then((error) => {
     if (error !== null) {
       toast.error(`${agent.title} was not asked to fix CI`, { description: error, duration: Infinity })
