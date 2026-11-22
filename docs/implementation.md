@@ -51,7 +51,7 @@ with another top-level folder.
 
 | Section        | Main files                                                                                                                                                                                       |
 | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| 3 Entities     | `shared/src/tasks.ts`, `shared/src/inputs.ts`, `shared/src/requests.ts`, `db.ts`, `pending-requests.ts`                                                                                          |
+| 3 Entities     | `shared/src/tasks.ts`, `shared/src/inputs.ts`, `shared/src/requests.ts`, `shared/src/events.ts`, `shared/src/runtimes/`, `db.ts`, `pending-requests.ts`                                          |
 | 4 Turns        | `runner.ts`, `session-host.ts`, `session-ingest.ts`, `session-spec.ts`, `runtime-host.ts`, `runtimes/`, `agent-session.ts`, `rewind.ts`, `turn-asking.ts`, `closing-line.ts`, `task-location.ts` |
 | 4 Restarts     | `session-restart.ts`, `input-queue.ts`                                                                                                                                                           |
 | 5 Updates      | `shared/src/channel-delivery.ts`, `inputs.ts`, `input-preface.ts`                                                                                                                                |
