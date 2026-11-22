@@ -16,7 +16,7 @@ import type { NextMessage } from './next-message.js'
 import { outwardToolUses } from './outward.js'
 import { followQueue, markQueued, settleQueued } from './queued-prompts.js'
 import { resumeSession } from './rewind.js'
-import { startQuery } from './sdk-query.js'
+import { adapterFor, DEFAULT_RUNTIME } from './runtimes/registry.js'
 import { checkSend } from './send-check.js'
 import { moveSessionTo } from './session-files.js'
 import { sessionOpening } from './session-hooks.js'
@@ -140,7 +140,7 @@ async function sessionMessages(session: LiveSession, task: Task): Promise<AsyncI
     moveSessionTo(CLAUDE_HOME, task.session_id, task.cwd)
   }
   return resumeSession(task.id, options, (sent) => {
-    const started = startQuery({ prompt: session.openInput(), options: sent })
+    const started = adapterFor(DEFAULT_RUNTIME).open({ prompt: session.openInput(), options: sent })
     session.attach(started)
     if (session.warm) {
       void watchSessionMcp(task.id, async () => session.mcpServerStatus())
