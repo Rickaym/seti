@@ -1,6 +1,6 @@
 import { checkMessageBody } from '@seti/shared'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { readOutward, readPayload, readStoredBody, storedFields, storedJson } from './stored-rows.js'
+import { readOutward, readPayload, readStoredBody, storedJson } from './stored-rows.js'
 
 const ROW = { task_id: 't', id: 1 }
 const REPLACEMENT = String.fromCodePoint(0xfffd)
@@ -64,11 +64,9 @@ describe('reading stored rows', () => {
     expect(readPayload({ ...ROW, id: 2 }, 'seti', '{"error":1}')).toBeNull()
   })
 
-  it('reads outward actions and top-level fields leniently', () => {
+  it('reads outward actions leniently', () => {
     expect(readOutward('["gh pr create", 5]')).toEqual(['gh pr create'])
     expect(readOutward('{')).toEqual([])
-    expect(storedFields('{"subtype":"task_progress"}')).toEqual({ subtype: 'task_progress' })
-    expect([storedFields('null'), storedFields('[1]'), storedFields('{')]).toEqual([{}, {}, {}])
   })
 
   it('stores NUL and unpaired surrogates as U+FFFD and keeps pairs', () => {

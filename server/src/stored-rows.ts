@@ -64,14 +64,6 @@ export function readPayload<K extends keyof Payloads>(row: RowRef, kind: K, payl
   return body.payload as Payloads[K]
 }
 
-/** The top-level fields of a stored payload, as the SQL filters see them; none unless an object. */
-export function storedFields(payload: string): Partial<Record<string, unknown>> {
-  const parsed = parseJson(payload)
-  return parsed.ok && typeof parsed.value === 'object' && parsed.value !== null && !Array.isArray(parsed.value)
-    ? parsed.value
-    : {}
-}
-
 /** The outward actions a row recorded; anything but a list of strings reads as none. */
 export function readOutward(outward: string): string[] {
   const parsed = parseJson(outward)
