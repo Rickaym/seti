@@ -35,7 +35,8 @@ import { keepUnstarted, sessionError, takeUnstarted } from './unstarted.js'
 import { userContent, type UserContent } from './user-content.js'
 import { restoreMissingWorktrees } from './worktree-restore.js'
 
-export { agentEnv, registerContextProvider, registerSessionMcpServers } from './session-options.js'
+export { registerSessionMcpServers } from './runtime-host.js'
+export { agentEnv, registerContextProvider } from './session-options.js'
 export { publish, subscribe } from './task-events.js'
 export { registerTurnPreface, type TurnPreface } from './turn-prompt.js'
 

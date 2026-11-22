@@ -8,6 +8,7 @@ import { taskDeniedServers } from './mcp-selection.js'
 import { tokenServers } from './mcp-sign-in.js'
 import type { PermissionSettings } from './permission-policy.js'
 import { taskPluginConfigs } from './plugins.js'
+import { sessionHost } from './runtime-host.js'
 import type { RuntimeId } from './runtimes/adapter.js'
 import { claudeSetup } from './runtimes/claude/realise.js'
 import { adapterFor, DEFAULT_RUNTIME, type DefaultShapes } from './runtimes/registry.js'
@@ -18,6 +19,8 @@ import { sharedToolFolders } from './shared-tools.js'
 /** What a task's session starts from, read from the database; it holds no secret values. */
 export interface SessionSpec {
   runtime: RuntimeId
+  taskId: string
+  title: string
   /** The runtime's session to resume, or null for a new one. */
   resume: string | null
   cwd: string
@@ -66,6 +69,8 @@ async function liveSpec(task: Task) {
 async function sessionSpec(task: Task): Promise<SessionSpec> {
   return {
     runtime: DEFAULT_RUNTIME,
+    taskId: task.id,
+    title: task.title,
     resume: task.session_id,
     cwd: task.cwd,
     dirs: workingDirs(task),
@@ -96,8 +101,11 @@ function specKey(spec: SessionSpec): string {
 /** Compares the setup a process started with to what the task needs now. */
 export const setupKey = async (task: Task) => specKey(await sessionSpec(task))
 
-const realise = async (spec: SessionSpec, task: Task, abortController: AbortController) =>
-  adapterFor(spec.runtime).realise(spec, await taskLauncher(task, 'agent', true), task, abortController)
+async function realise(spec: SessionSpec, task: Task, abortController: AbortController) {
+  const launcher = await taskLauncher(task, 'agent', true)
+  const host = sessionHost(task, launcher.sandboxed, abortController.signal)
+  return adapterFor(spec.runtime).realise(spec, launcher, host, abortController)
+}
 
 /** The options a task's process starts with, resuming the task's session if any. */
 export const sessionOptions = async (task: Task, abortController: AbortController) =>

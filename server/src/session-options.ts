@@ -1,7 +1,6 @@
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import type { McpServerConfig } from '@anthropic-ai/claude-agent-sdk'
 import { extraDirs, type MemoryCap, type Task } from '@seti/shared'
 import { taskSsh } from './agent-access.js'
 import { taskAws } from './aws-access.js'
@@ -35,22 +34,6 @@ const contextProviders: ContextProvider[] = []
 export function registerContextProvider(provider: ContextProvider): void {
   contextProviders.push(provider)
 }
-
-/**
- * Builds MCP servers that run inside Seti's own process for a task's session, keyed by name.
- * @public
- */
-export type SessionMcpServers = (task: Task) => Record<string, McpServerConfig>
-
-const sessionMcpFactories: SessionMcpServers[] = []
-
-/** @public */
-export function registerSessionMcpServers(factory: SessionMcpServers): void {
-  sessionMcpFactories.push(factory)
-}
-
-export const inProcessServers = (task: Task): Record<string, McpServerConfig> =>
-  Object.assign({}, ...sessionMcpFactories.map((factory) => factory(task))) as Record<string, McpServerConfig>
 
 export async function systemAppend(taskId: string): Promise<string> {
   const extra = await Promise.all(contextProviders.map(async (provider) => provider(taskId)))
