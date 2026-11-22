@@ -1,10 +1,9 @@
-import type { McpServerConfig } from '@anthropic-ai/claude-agent-sdk'
 import type { SetiControlLevel, Task } from '@seti/shared'
 import { z } from 'zod'
 import { asAgent } from '../access.js'
 import { tasks } from '../db.js'
 import { describeIssues } from '../http.js'
-import { inProcessServer } from '../runtimes/claude/tool-server.js'
+import type { HostTool } from '../runtimes/claude/tool-server.js'
 import { scrubValue } from '../scrub.js'
 import { toolsFor } from './levels.js'
 import { noteProcessControl } from './process-control.js'
@@ -59,21 +58,18 @@ export async function callSetiTool(entry: SetiTool, taskId: string, args: unknow
 /** The seti tools a session gets at the agent's Seti control level. */
 export const sessionTools = (task: Pick<Task, 'seti_control'>): readonly SetiTool[] => toolsFor(task.seti_control)
 
-/** The in-process seti MCP server of one agent's session; every call acts as that agent. */
-function setiMcpServer(task: Task): McpServerConfig {
-  return inProcessServer(
-    SETI_SERVER,
-    sessionTools(task).map((entry) => ({
-      name: entry.name,
-      description: entry.description,
-      input: entry.input,
-      call: async (args, signal) => callSetiTool(entry, task.id, args, signal),
-    })),
-  )
+/** The seti MCP server's tools of one agent's session; every call acts as that agent. */
+function setiMcpServer(task: Task): readonly HostTool[] {
+  return sessionTools(task).map((entry) => ({
+    name: entry.name,
+    description: entry.description,
+    input: entry.input,
+    call: async (args, signal) => callSetiTool(entry, task.id, args, signal),
+  }))
 }
 
 /** Every session gets the seti server; its tools depend on the agent's Seti control level. */
-export function sessionSetiServers(task: Task): Record<string, McpServerConfig> {
+export function sessionSetiServers(task: Task): Record<string, readonly HostTool[]> {
   noteProcessControl(task)
   return { [SETI_SERVER]: setiMcpServer(task) }
 }

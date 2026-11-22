@@ -38,6 +38,7 @@ export const journalEntry = z.discriminatedUnion('type', [
   z.object({ type: z.literal('queued.settled'), promptId: z.int(), state: z.enum(['delivered', 'removed']) }),
   z.object({ type: z.literal('session.opened') }),
   z.object({ type: z.literal('session.started'), warm: z.boolean() }),
+  z.object({ type: z.literal('guard.refused'), command: z.string(), reason: z.string() }),
   z.object({
     type: z.literal('rewind.settled'),
     id: z.int(),
@@ -57,6 +58,9 @@ export const journalEntry = z.discriminatedUnion('type', [
   }),
 ])
 export type JournalEntry = z.infer<typeof journalEntry>
+
+/** A tool call of the agent, as the runtime hands it to a hook. */
+const toolCall = z.object({ tool: z.string(), input: z.record(z.string(), z.unknown()) })
 
 const askSchemas = {
   /** Records the prompt row of a message going out, or queued when a turn runs. */
@@ -89,6 +93,38 @@ const askSchemas = {
       z.object({ rewind: z.literal(true) }),
       z.object({ rewind: z.literal(false), key: z.string() }),
     ]),
+  },
+  /** Decides a tool call the runtime would ask about: the user answers a request or a question. */
+  'permission.ask': {
+    ask: z.object({ tool: z.string(), input: z.record(z.string(), z.unknown()), options: z.unknown() }),
+    answer: z.object({ result: z.unknown() }),
+  },
+  /** Holds an MCP call a review rule names until the user answers; the hook's output. */
+  'review.ask': { ask: toolCall, answer: z.object({ output: z.unknown() }) },
+  /** Asks the user about a call the agent repeats with the same result, `results` times so far. */
+  'repeat.ask': {
+    ask: toolCall.extend({ results: z.int().positive() }),
+    answer: z.discriminatedUnion('outcome', [
+      z.object({ outcome: z.literal('off') }),
+      z.object({ outcome: z.literal('denied'), message: z.string() }),
+      z.object({ outcome: z.literal('allowed'), always: z.boolean() }),
+    ]),
+  },
+  /** The instructions the agent's compaction keeps, or null for the runtime's own. */
+  'hook.compact': { ask: z.object({}), answer: z.object({ instructions: z.string().nullable() }) },
+  /** The hosts a sandboxed agent may fetch from. */
+  'sandbox.hosts': { ask: z.object({}), answer: z.object({ hosts: z.array(z.string()) }) },
+  /** The tools Seti serves the agent's process itself, by MCP server, as each server lists them. */
+  'tools.list': {
+    ask: z.object({}),
+    answer: z.object({
+      servers: z.array(z.object({ name: z.string(), tools: z.array(z.looseObject({ name: z.string() })) })),
+    }),
+  },
+  /** Runs one of those tools as the agent and answers its MCP result. */
+  'tool.call': {
+    ask: z.object({ server: z.string(), tool: z.string(), args: z.record(z.string(), z.unknown()) }),
+    answer: z.object({ result: z.unknown() }),
   },
 }
 export type NodeAskType = keyof typeof askSchemas
