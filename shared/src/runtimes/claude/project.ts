@@ -120,6 +120,12 @@ function result(m: SDKResultMessage): Event {
   }
 }
 
+/** A message's type and subtype, as a vendor event names it. */
+function vendorName(m: unknown): string {
+  const name = [str(m, 'type'), str(m, 'subtype')].filter((part) => part !== undefined).join('/')
+  return name === '' ? 'unknown' : name
+}
+
 const vendor = (name: string): Event => ({ v: 1, thread: '', type: 'vendor', name })
 
 function progress(m: SDKToolProgressMessage): Event {
@@ -149,10 +155,8 @@ function events(m: SDKMessage): Event[] {
   if (m.type === 'tool_progress') {
     return [progress(m)]
   }
-  return [m.type === 'rate_limit_event' ? rateLimit(m) : vendor(m.type)]
+  return [m.type === 'rate_limit_event' ? rateLimit(m) : vendor(vendorName(m))]
 }
-
-const vendorName = (m: unknown) => [str(m, 'type'), str(m, 'subtype')].filter((part) => part !== undefined).join('/')
 
 /**
  * The neutral events of one stored Claude Code message, in the order it holds them. Pure and
@@ -163,7 +167,6 @@ export function projectClaude(m: SDKMessage): RuntimeEvent[] {
   try {
     return events(m)
   } catch {
-    const name = vendorName(m)
-    return [vendor(name === '' ? 'unknown' : name)]
+    return [vendor(vendorName(m))]
   }
 }
