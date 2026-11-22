@@ -1,22 +1,17 @@
 import fs from 'node:fs'
-import { forkSession, getSessionInfo, getSessionMessages, listSessions } from '@anthropic-ai/claude-agent-sdk'
 import { inBackground } from './background.js'
 import { repos, tasks } from './db.js'
 import { listWorktrees } from './git.js'
 import { planTitle } from './planner.js'
 import { prDiscovery } from './pr-discovery.js'
 import { cachedOpenPrs } from './prs.js'
+import { claudeStoredSessions } from './runtimes/claude/stored-sessions.js'
 import { createSessionService } from './session-service.js'
 import { sessionLinks } from './store/sessions.js'
 import { createImportedTask } from './tasks.js'
 
 export const sessionService = createSessionService({
-  sdk: {
-    listSessions,
-    getSessionInfo: async (sessionId) => getSessionInfo(sessionId),
-    getSessionMessages: async (sessionId) => getSessionMessages(sessionId),
-    forkSession,
-  },
+  sdk: claudeStoredSessions,
   repos: repos.list,
   worktrees: listWorktrees,
   openPrs: cachedOpenPrs,

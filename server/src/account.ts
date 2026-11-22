@@ -1,5 +1,4 @@
-import os from 'node:os'
-import { query, type AccountInfo, type SDKControlInitializeResponse } from '@anthropic-ai/claude-agent-sdk'
+import type { AccountInfo, SDKControlInitializeResponse } from '@anthropic-ai/claude-agent-sdk'
 import {
   NO_LOGINS,
   type AccountHealth,
@@ -17,6 +16,7 @@ import { audit } from './audit.js'
 import { idlePrompt, probeEnv, withTimeout } from './capabilities.js'
 import { hostLoginKey, loginsView } from './claude-logins.js'
 import { cache } from './redis.js'
+import { openAccountProbe } from './runtimes/claude/probes.js'
 import { accountSignals, type StoredTaskMessage } from './store/account.js'
 import { auditEvents } from './store/audit.js'
 
@@ -81,11 +81,7 @@ export async function probeAccount(start: StartAccountSession, timing: AccountTi
   }
 }
 
-const startSdkSession: StartAccountSession = (signal) =>
-  query({
-    prompt: idlePrompt(signal),
-    options: { cwd: os.homedir(), settingSources: ['user', 'project', 'local'], env: probeEnv() },
-  })
+const startSdkSession: StartAccountSession = (signal) => openAccountProbe(idlePrompt(signal), probeEnv())
 
 const SHARED_KEY = 'account:probe'
 const SHARED_TTL_S = 60 * 60

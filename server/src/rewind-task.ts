@@ -1,10 +1,4 @@
-import {
-  getSessionMessages,
-  query,
-  type RewindFilesResult,
-  type SDKUserMessage,
-  type SessionMessage,
-} from '@anthropic-ai/claude-agent-sdk'
+import type { RewindFilesResult } from '@anthropic-ai/claude-agent-sdk'
 import type { RewindFilesPreview, RewindRestore, RewindResult, RewindTarget, Task } from '@seti/shared'
 import { audit } from './audit.js'
 import { refuseOnSelf } from './ea-guard.js'
@@ -12,13 +6,12 @@ import { HttpError } from './http.js'
 import { taskLauncher } from './launcher.js'
 import { matchChain, rewindPoints, type ChainMatch, type RewindPoint } from './rewind.js'
 import { closeIdleSession, isRunning } from './runner.js'
-import { claudeLaunch } from './runtimes/claude/realise.js'
+import { rewindFiles, sessionChain } from './runtimes/claude/rewind-files.js'
 import { adapterFor, DEFAULT_RUNTIME } from './runtimes/registry.js'
 import { shellTurnGuard } from './shell-context.js'
 import { rewinds } from './store/rewinds.js'
 import { requireTask } from './tasks.js'
 
-const FILES_TIMEOUT_MS = 60_000
 const PREVIEW_CHARS = 200
 
 const pointsOf = async (task: Task) =>
@@ -49,13 +42,6 @@ async function requirePoint(task: Task, messageId: number): Promise<RewindPoint>
   return point
 }
 
-async function sessionChain(sessionId: string | null): Promise<SessionMessage[]> {
-  if (sessionId === null) {
-    return []
-  }
-  return getSessionMessages(sessionId).catch(() => [])
-}
-
 async function locate(task: Task, point: RewindPoint): Promise<ChainMatch> {
   const match = matchChain(await sessionChain(task.session_id), point)
   if (!match.keep_found) {
@@ -64,48 +50,13 @@ async function locate(task: Task, point: RewindPoint): Promise<ChainMatch> {
   return match
 }
 
-async function* idle(signal: AbortSignal): AsyncGenerator<SDKUserMessage> {
-  await new Promise((resolve) => {
-    signal.addEventListener('abort', resolve, { once: true })
-  })
-  yield* []
-}
-
-/** Lists, and unless dryRun puts back, the files as they were at a prompt. */
-async function rewindFiles(task: Task, promptUuid: string, dryRun: boolean): Promise<RewindFilesResult> {
+/** Lists, and unless dryRun puts back, the task's files as they were at a prompt. */
+async function filesAt(task: Task, promptUuid: string, dryRun: boolean): Promise<RewindFilesResult> {
   if (task.session_id === null) {
     return { canRewind: false, error: 'This agent has no session yet' }
   }
-  const abortController = new AbortController()
-  const launcher = claudeLaunch(await taskLauncher(task, 'agent', false))
-  const session = query({
-    prompt: idle(abortController.signal),
-    options: {
-      cwd: task.cwd,
-      resume: task.session_id,
-      enableFileCheckpointing: true,
-      settingSources: [],
-      abortController,
-      ...launcher,
-    },
-  })
-  const timer = setTimeout(() => {
-    abortController.abort()
-  }, FILES_TIMEOUT_MS)
-  try {
-    const planned = await session.rewindFiles(promptUuid, { dryRun: true })
-    if (dryRun || !planned.canRewind) {
-      return planned
-    }
-    const done = await session.rewindFiles(promptUuid)
-    return { ...done, filesChanged: done.filesChanged ?? planned.filesChanged ?? [] }
-  } catch (e) {
-    return { canRewind: false, error: e instanceof Error ? e.message : String(e) }
-  } finally {
-    clearTimeout(timer)
-    abortController.abort()
-    session.close()
-  }
+  const launcher = await taskLauncher(task, 'agent', false)
+  return rewindFiles({ cwd: task.cwd, id: task.session_id, launcher }, promptUuid, dryRun)
 }
 
 const NO_CHECKPOINT = 'Claude Code has no file checkpoint for this prompt'
@@ -130,7 +81,7 @@ async function plannedFiles(task: Task, match: ChainMatch): Promise<RewindFilesR
   }
   return match.prompt_uuid === null
     ? { canRewind: false, error: NO_CHECKPOINT }
-    : rewindFiles(task, match.prompt_uuid, true)
+    : filesAt(task, match.prompt_uuid, true)
 }
 
 /** What restoring code to just before a prompt would change; nothing is written. */
@@ -151,7 +102,7 @@ async function restoreFiles(task: Task, match: ChainMatch): Promise<string[]> {
   if (match.prompt_uuid === null) {
     throw new HttpError(409, NO_CHECKPOINT)
   }
-  const result = await rewindFiles(task, match.prompt_uuid, false)
+  const result = await filesAt(task, match.prompt_uuid, false)
   if (!result.canRewind) {
     throw new HttpError(409, result.error ?? NO_CHECKPOINT)
   }
