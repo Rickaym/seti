@@ -71,6 +71,11 @@ describe('control link', () => {
       'queued.retract': ({ promptId }) => ({ outcome: 'removed', promptId }),
       'quiet.restart': () => ({}),
       'sessions.view': () => ({ sessions: [{ agent: TASK, running: true, heardAt: 5, retrying: null }] }),
+      'turn.send': ({ interrupt }) => ({ outcome: interrupt ? 'interrupted' : 'queued' }),
+      'turn.stop': () => ({ stopped: true }),
+      'session.open': () => ({}),
+      'session.close': ({ onlyIdle }) => ({ closed: !onlyIdle }),
+      'background.stop': () => ({ stopped: false }),
     }
     serveControl(end)
     await expect(controlLink.command('mode.set', { agent: TASK, mode: 'default' })).resolves.toEqual({
@@ -81,6 +86,14 @@ describe('control link', () => {
       promptId: 4,
     })
     await expect(controlLink.command('queued.retract', { agent: '', promptId: 4 })).rejects.toThrow()
+    const message = { prompt: 'hi', priority: 'now' as const }
+    await expect(controlLink.command('turn.send', { agent: TASK, message, interrupt: true })).resolves.toEqual({
+      outcome: 'interrupted',
+    })
+    await expect(controlLink.command('session.close', { agent: TASK, onlyIdle: true })).resolves.toEqual({
+      closed: false,
+    })
+    await expect(controlLink.command('background.stop', { agent: TASK, task: '' })).rejects.toThrow()
     serveControl({ ...end, 'quiet.restart': () => ({ late: true }) as unknown as Record<string, never> })
     await expect(controlLink.command('quiet.restart', { agent: TASK, at: null })).resolves.toEqual({})
     serveControl({ ...end, 'mode.set': () => ({ applied: 'later' }) as unknown as { applied: 'now' } })

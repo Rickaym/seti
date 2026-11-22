@@ -1,20 +1,17 @@
 import type { SDKMessage, SDKResultMessage } from '@anthropic-ai/claude-agent-sdk'
-import type { PromptAttachment, Task, TaskSession, TaskStatus } from '@seti/shared'
+import type { JournalEntry, Task, TaskStatus } from '@seti/shared'
 import { outsideRequest } from './access.js'
 import { LiveSession, outcomeOf, type SendOutcome } from './agent-session.js'
-import { refuseArchived } from './archive-guard.js'
 import { inBackground, onShutdown } from './background.js'
 import { withContextWindow } from './compact.js'
 import { CLAUDE_HOME, OPENER_WAIT_MS, SESSION_IDLE_MS } from './config.js'
 import { tasks } from './db.js'
-import { HttpError } from './http.js'
 import { watchSessionMcp } from './mcp-session-status.js'
 import type { NextMessage } from './next-message.js'
 import { nodeLink } from './node-link.js'
 import { followQueue, settleQueued } from './queued-prompts.js'
 import { resumeSession } from './rewind.js'
 import { adapterFor, DEFAULT_RUNTIME } from './runtimes/registry.js'
-import { checkSend } from './send-check.js'
 import { moveSessionTo } from './session-files.js'
 import { sessionOpening } from './session-hooks.js'
 import { sessionStart, setupKey } from './session-spec.js'
@@ -28,65 +25,56 @@ import { restoreMissingWorktrees } from './worktree-restore.js'
 /** Each task's open Claude Code session, from its first message until it is closed. */
 const live = new Map<string, LiveSession>()
 
-/** Whether the task has a Claude Code process open, and how much background work runs in it. */
-export function sessionState(taskId: string): TaskSession {
-  const session = live.get(taskId)
-  return { open: session !== undefined && !session.closed, background: session?.backgroundCount ?? 0 }
+type SessionChanged = Extract<JournalEntry, { type: 'session.changed' }>
+
+function changedEntry(session: LiveSession | undefined): SessionChanged {
+  return {
+    type: 'session.changed',
+    open: session !== undefined && !session.closed,
+    running: session?.running === true,
+    accepting: session?.accepting === true,
+    autoQueued: session?.autoQueued === true,
+    background: session?.backgroundCount ?? 0,
+  }
+}
+
+/** The last state each agent's session reported, so only a change is reported. */
+const reported = new Map<string, string>()
+const NOTHING = JSON.stringify(changedEntry(undefined))
+
+/**
+ * Reports the state of the task's session when it changed. The report goes out before this
+ * returns, so the control plane's reads stay as fresh as the session itself.
+ */
+function reportState(taskId: string): void {
+  const entry = changedEntry(live.get(taskId))
+  const key = JSON.stringify(entry)
+  if (key === (reported.get(taskId) ?? NOTHING)) {
+    return
+  }
+  if (key === NOTHING) {
+    reported.delete(taskId)
+  } else {
+    reported.set(taskId, key)
+  }
+  nodeLink.journal(taskId, entry).catch((e: unknown) => {
+    process.stderr.write(`session: task ${taskId}: state not reported: ${e instanceof Error ? e.message : String(e)}\n`)
+  })
 }
 
 async function publishSession(taskId: string): Promise<void> {
-  await nodeLink.journal(taskId, { type: 'session.state', ...sessionState(taskId) })
-}
-
-/** Whether a turn is in progress; a session open only for background work does not count. */
-export const isRunning = (taskId: string) => live.get(taskId)?.running === true
-
-interface TurnOptions {
-  /** Cut a running turn short instead of queueing the message for it. */
-  interrupt?: boolean
-  attachments?: PromptAttachment[]
-  /** Sends the user's last message again, which only an idle agent takes. */
-  retry?: boolean
-  /** The browser's id for the send, kept on the prompt row so the browser can match it. */
-  clientId?: string
-  /** Who wrote the message when not the user. */
-  from?: string | undefined
-}
-
-/** Sends the user's prompt and its files to the task's agent, after what the turn prefaces report. */
-export async function runTurn(taskId: string, prompt: string, options: TurnOptions = {}): Promise<SendOutcome> {
-  const message = {
-    prompt,
-    ...(options.attachments === undefined ? {} : { attachments: options.attachments }),
-    ...(options.retry === true ? { retry: true } : {}),
-    ...(options.clientId === undefined ? {} : { client_id: options.clientId }),
-    ...(options.from === undefined ? {} : { from: options.from }),
-  }
-  return (await inLane(taskId, async () => startTurn(taskId, message, options.interrupt === true))).outcome
-}
-
-/**
- * Hands the agent the pending prefaces with no user text, in a new turn or queued for a turn of
- * their own after the running one, or sooner with a priority; returns their count. With `held`,
- * the updates that wait for the user's next message go too.
- */
-export async function runAutoTurn(taskId: string, how: Pick<NextMessage, 'priority' | 'held'> = {}): Promise<number> {
-  return (await inLane(taskId, async () => startTurn(taskId, { prompt: null, ...how }, false))).count
-}
-
-/**
- * Why pending updates cannot queue for the running turn, or null when none runs or they can.
- * Updates that join the turn at its next step do not wait behind the ones queued for its end.
- */
-export function autoQueueBlocker(taskId: string, joining = false): string | null {
   const session = live.get(taskId)
-  if (session?.running !== true) {
-    return null
-  }
-  if (!session.accepting) {
-    return 'The running turn is starting or being cut short'
-  }
-  return session.autoQueued && !joining ? 'Updates already wait for the running turn to end' : null
+  const background = session?.backgroundCount ?? 0
+  await nodeLink.journal(taskId, { type: 'session.state', open: session !== undefined && !session.closed, background })
+}
+
+/** Hands a message to the task's session in its lane and says what it did. */
+export async function sendTurn(
+  taskId: string,
+  message: Omit<NextMessage, 'interrupted'>,
+  interrupt: boolean,
+): Promise<SendOutcome> {
+  return inLane(taskId, async () => startTurn(taskId, message, interrupt))
 }
 
 /** Starts the session's process; a pending rewind makes it resume from the rewind point. */
@@ -108,9 +96,16 @@ async function sessionMessages(session: LiveSession, task: Task): Promise<AsyncI
 }
 
 /** A pending rewind or changed settings need a new process, which waits for background work. */
-const needsNewProcess = async (session: LiveSession, task: Task) =>
-  session.backgroundCount === 0 &&
-  ((await rewinds.pending(task.id)) !== undefined || !session.startedWith(await setupKey(task)))
+async function needsNewProcess(session: LiveSession, taskId: string): Promise<boolean> {
+  if (session.backgroundCount > 0) {
+    return false
+  }
+  const task = await tasks.get(taskId)
+  if (!task) {
+    return false
+  }
+  return (await rewinds.pending(taskId)) !== undefined || !session.startedWith(await setupKey(task))
+}
 
 /** Records the prompt and returns it with the text the agent gets, prefaces included. */
 async function openTurn(
@@ -185,17 +180,11 @@ async function startTurn(
   taskId: string,
   message: Omit<NextMessage, 'interrupted'>,
   interrupt: boolean,
-): Promise<{ count: number; outcome: SendOutcome }> {
-  const task = await tasks.get(taskId)
-  if (!task) {
-    throw new HttpError(404, 'Task not found')
-  }
-  refuseArchived(task)
+): Promise<SendOutcome> {
   const session = live.get(taskId)
   const running = session?.running === true
-  const count = await checkSend(taskId, message, running)
   const next: NextMessage = { ...message, interrupted: running && interrupt }
-  if (session === undefined || session.closed || (!running && (await needsNewProcess(session, task)))) {
+  if (session === undefined || session.closed || (!running && (await needsNewProcess(session, taskId)))) {
     const held = interrupt ? [] : (session?.takeBacklog() ?? [])
     openSession(taskId, session, [...held, next])
   } else if (running && interrupt) {
@@ -206,7 +195,7 @@ async function startTurn(
     await send(taskId, session, next)
   }
   await nodeLink.journal(taskId, { type: 'turn.started' })
-  return { count, outcome: outcomeOf(running, interrupt) }
+  return outcomeOf(running, interrupt)
 }
 
 /**
@@ -216,6 +205,12 @@ async function startTurn(
 function openSession(taskId: string, previous: LiveSession | undefined, backlog: NextMessage[]): void {
   const session = new LiveSession([...takeUnstarted(taskId), ...backlog])
   live.set(taskId, session)
+  session.watch(() => {
+    if (live.get(taskId) === session) {
+      reportState(taskId)
+    }
+  })
+  reportState(taskId)
   void nodeLink.journal(taskId, { type: 'session.opened' })
   previous?.close()
   const opened = async () => outsideLane(async () => sessionOpening(taskId).then(async () => consume(taskId, session)))
@@ -314,6 +309,7 @@ async function finish(taskId: string, session: LiveSession, lastError: string | 
     return
   }
   live.delete(taskId)
+  reportState(taskId)
   await nodeLink.journal(taskId, { type: 'session.closed', since: session.since })
   const { running } = session
   session.endTurn()
@@ -372,10 +368,10 @@ async function consume(taskId: string, session: LiveSession): Promise<void> {
 }
 
 /** Interrupts the running turn and waits; queued messages go back, or on with `deliverQueued`. */
-export async function stopTurn(taskId: string, { deliverQueued = false } = {}): Promise<void> {
+export async function stopTurn(taskId: string, deliverQueued: boolean): Promise<boolean> {
   const session = live.get(taskId)
   if (session?.running !== true) {
-    throw new HttpError(409, 'Task is not running')
+    return false
   }
   const over = session.turnOver()
   session.backlog = deliverQueued ? session.backlog.filter((next) => next.prompt !== null) : []
@@ -385,6 +381,7 @@ export async function stopTurn(taskId: string, { deliverQueued = false } = {}): 
     session.close()
   }
   await over
+  return true
 }
 
 /**
@@ -393,7 +390,7 @@ export async function stopTurn(taskId: string, { deliverQueued = false } = {}): 
  */
 export async function openWarmSession(taskId: string): Promise<void> {
   openSession(taskId, live.get(taskId), [])
-  if (isRunning(taskId)) {
+  if (live.get(taskId)?.running === true) {
     await nodeLink.journal(taskId, { type: 'turn.started' })
   }
 }

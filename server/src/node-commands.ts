@@ -2,7 +2,15 @@ import type { NodeReply } from '@seti/shared'
 import type { LiveSession } from './agent-session.js'
 import { serveControl } from './node-link.js'
 import type { DefaultShapes } from './runtimes/registry.js'
-import { liveSessions } from './session-host.js'
+import {
+  closeIdleSession,
+  endSession,
+  liveSessions,
+  openWarmSession,
+  sendTurn,
+  stopSessionTask,
+  stopTurn,
+} from './session-host.js'
 
 const sessionOf = (agent: string): LiveSession | undefined => liveSessions().find(([id]) => id === agent)?.[1]
 
@@ -35,6 +43,20 @@ async function retract(session: LiveSession | undefined, promptId: number): Prom
 }
 
 serveControl({
+  'turn.send': async ({ agent, message, interrupt }) => ({ outcome: await sendTurn(agent, message, interrupt) }),
+  'turn.stop': async ({ agent, deliverQueued }) => ({ stopped: await stopTurn(agent, deliverQueued) }),
+  'session.open': async ({ agent }) => {
+    await openWarmSession(agent)
+    return {}
+  },
+  'session.close': async ({ agent, onlyIdle }) => {
+    if (onlyIdle) {
+      return { closed: await closeIdleSession(agent) }
+    }
+    await endSession(agent)
+    return { closed: true }
+  },
+  'background.stop': async ({ agent, task }) => ({ stopped: await stopSessionTask(agent, task) }),
   // The control plane read the mode and rules for this runtime.
   'mode.set': async ({ agent, mode }) => ({ applied: await setMode(sessionOf(agent), mode as DefaultShapes['mode']) }),
   'policy.set': async ({ agent, policy }) => {
