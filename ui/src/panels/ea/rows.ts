@@ -1,6 +1,5 @@
 import type { SDKAssistantMessage, SDKUserMessage } from '@anthropic-ai/claude-agent-sdk'
 import type { EaChatEvent, EaHistoryEntry, EaNotice, MessageRow } from '@seti/shared'
-import type { ToolUseBlock } from '@/lib/transcript'
 import type { TranscriptMarks, TranscriptNote } from '@/panels/tasks/TranscriptMarks'
 
 /** One step of the reply that is still streaming: text as written, or a tool call. */
@@ -38,6 +37,7 @@ const SUMMARY_PREFIX = /^Summary of the earlier conversation with the user:\s*/
 const LIVE_BASE = Number.MAX_SAFE_INTEGER - 10_000
 
 type AssistantBlock = SDKAssistantMessage['message']['content'][number]
+type ToolUseBlock = Extract<AssistantBlock, { type: 'tool_use' }>
 type ToolResultBlock = Extract<Exclude<SDKUserMessage['message']['content'], string>[number], { type: 'tool_result' }>
 
 const asAssistant = (value: object) => value as SDKAssistantMessage

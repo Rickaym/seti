@@ -15,14 +15,16 @@ const PLAN_STATUSES = new Set(['pending', 'in_progress', 'completed'])
 type PlanStatus = 'pending' | 'in_progress' | 'completed'
 
 /** A tool result's text parts, those that are not a subagent's id line, and its image count. */
-function contentOf(content: unknown): { texts: string[]; kept: string[]; images: number } {
+function contentOf(content: unknown): { texts: string[]; kept: string[]; images: number; shown?: string } {
   if (typeof content === 'string') {
     return { texts: [content], kept: [content], images: 0 }
   }
   const parts = Array.isArray(content) ? content.filter(isRecord) : []
   const texts = parts.flatMap((part) => (part.type === 'text' && typeof part.text === 'string' ? [part.text] : []))
   const kept = texts.filter((part) => !part.startsWith(AGENT_TRAILER))
-  return { texts, kept, images: parts.filter((part) => part.type === 'image').length }
+  const others = parts.some((part) => part.type !== 'text')
+  const shown = parts.map((part) => (part.type === 'text' ? String(part.text) : `[${String(part.type)}]`)).join('\n')
+  return { texts, kept, images: parts.filter((part) => part.type === 'image').length, ...(others ? { shown } : {}) }
 }
 
 /** Where a call's work went on in the background: a shell's id and output, or an agent's id. */
@@ -116,7 +118,7 @@ export function toolResults(content: unknown, thread: string, structured: unknow
     : []
   const own = blocks.length === 1 ? structured : undefined
   return blocks.map((block) => {
-    const { texts, kept, images } = contentOf(isRecord(block) ? block.content : undefined)
+    const { texts, kept, images, shown } = contentOf(isRecord(block) ? block.content : undefined)
     const text = texts.join('\n')
     const result: ToolResult = {
       text,
@@ -126,6 +128,7 @@ export function toolResults(content: unknown, thread: string, structured: unknow
       ...some('agent', agentOf(texts, kept, structured)),
       ...some('planId', filled(obj(own, 'task'), 'id') ?? CREATED.exec(text)?.[1]),
       ...some('plan', planOf(own)),
+      ...some('shown', shown),
       ...some('structured', structured),
     }
     const failed = isRecord(block) && block.is_error === true
