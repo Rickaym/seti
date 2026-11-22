@@ -380,7 +380,8 @@ describe('saving', () => {
     const saves = events.events.filter((event: AuditEvent) => event.subject_id === TASK)
     expect(saves.map((event) => event.detail.created)).toEqual([false, true])
     expect(saves[0]?.detail).toMatchObject({ path: 'drafts/plan.md', root: cwd })
-    expect(JSON.stringify(saves)).not.toContain('v2')
+    // The escaped newline keeps a temp folder name such as files-Qgv297 from matching.
+    expect(JSON.stringify(saves)).not.toContain('v2\\n')
   })
 
   it('keeps the mode of the file it replaces', async () => {
