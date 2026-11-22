@@ -1,13 +1,14 @@
-import type { MessagePage, MessageRow } from '@seti/shared'
+import type { WirePage, WireRow } from '@seti/shared'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { apiGet, errorText } from '@/api'
+import { asEvents } from '@/lib/wire'
 import type { TranscriptSource } from '@/panels/tasks/TranscriptPane'
 
 const PAGE = 150
 
 interface Loaded {
-  messages: readonly MessageRow[]
+  messages: readonly WireRow[]
   hasOlder: boolean
 }
 
@@ -23,7 +24,7 @@ export function useArchivedTranscript(
 
   useEffect(() => {
     let current = true
-    apiGet<MessagePage>(`/tasks/${taskId}/messages?limit=${String(PAGE)}`).then(
+    apiGet<WirePage>(asEvents(`/tasks/${taskId}/messages?limit=${String(PAGE)}`)).then(
       (page) => {
         if (current) {
           setState({ messages: page.messages, hasOlder: page.has_older })
@@ -53,7 +54,9 @@ export function useArchivedTranscript(
     loading.current = true
     setLoadingOlder(true)
     try {
-      const page = await apiGet<MessagePage>(`/tasks/${taskId}/messages?limit=${String(PAGE)}&before=${String(oldest)}`)
+      const page = await apiGet<WirePage>(
+        asEvents(`/tasks/${taskId}/messages?limit=${String(PAGE)}&before=${String(oldest)}`),
+      )
       setState((prev) => ({ messages: [...page.messages, ...(prev?.messages ?? [])], hasOlder: page.has_older }))
       return page.messages.length > 0
     } catch (e) {
