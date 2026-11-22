@@ -8,6 +8,7 @@ import {
   type TaskStatus,
 } from '@seti/shared'
 import { messages } from './db.js'
+import { eventsOf, rowEvents } from './events/read.js'
 import { openQuerySince } from './runner.js'
 import { prWatch } from './store/pr-watch.js'
 import { subtaskBriefs } from './subtask-cache.js'
@@ -17,11 +18,7 @@ const RESULT_SCAN = 40
 /** The agent's closing words of its last turn, from the result message. */
 export async function lastResult(taskId: string): Promise<string> {
   const page = await messages.page(taskId, RESULT_SCAN)
-  const result = page.messages.findLast((row) => row.kind === 'sdk' && row.payload.type === 'result')
-  if (result?.kind !== 'sdk' || result.payload.type !== 'result' || result.payload.subtype !== 'success') {
-    return ''
-  }
-  return result.payload.result
+  return page.messages.flatMap((row) => eventsOf(rowEvents(row), 'turn.ended')).at(-1)?.result ?? ''
 }
 
 /** What a task's state means for the user: a needs-you state, a finished turn, or nothing. */

@@ -77,7 +77,7 @@ describe('Claude tool calls', () => {
       search: { pattern: 'TODO', path: 'src' },
     })
     expect(call('Glob', { pattern: '**/*.ts' }).search).toEqual({ pattern: '**/*.ts' })
-    expect(call('ToolSearch', { query: 'select:Read' }).search).toEqual({ pattern: 'select:Read' })
+    expect(call('ToolSearch', { query: 'select:Read' }).search).toEqual({ pattern: 'select:Read', tools: true })
     expect(call('WebSearch', { query: 'zod 4' })).toMatchObject({ kind: 'web', web: { query: 'zod 4' } })
     expect(call('WebFetch', { url: 'https://example.com', prompt: 'p' }).web).toEqual({ url: 'https://example.com' })
   })

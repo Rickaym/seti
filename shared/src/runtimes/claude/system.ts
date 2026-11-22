@@ -6,8 +6,9 @@ import type {
   SDKTaskStartedMessage,
   SDKTaskUpdatedMessage,
 } from '@anthropic-ai/claude-agent-sdk'
+import { CONTEXT_WINDOW_KEY } from '../../compact.js'
 import type { RuntimeEvent } from '../../events.js'
-import { list, some, str } from './fields.js'
+import { list, num, some, str } from './fields.js'
 
 type SystemMessage = Extract<SDKMessage, { type: 'system' }>
 type Of<S extends SystemMessage['subtype']> = Extract<SystemMessage, { subtype: S }>
@@ -116,6 +117,7 @@ const compacted = (m: Of<'compact_boundary'>): Event => ({
   phase: 'done',
   trigger: m.compact_metadata.trigger,
   before: m.compact_metadata.pre_tokens,
+  ...some('window', num(m, CONTEXT_WINDOW_KEY)),
 })
 
 const retry = (m: Of<'api_retry'>): Event => ({
