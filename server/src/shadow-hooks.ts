@@ -5,14 +5,14 @@ import type {
   HookCallbackMatcher,
   PreToolUseHookInput,
 } from '@anthropic-ai/claude-agent-sdk'
-import { urlAllowed, WEBFETCH_BLOCKED, type Task } from '@seti/shared'
+import { claudeToolCall, urlAllowed, WEBFETCH_BLOCKED, type Task } from '@seti/shared'
 import { guardCommand, type GuardScope } from './permission-guard.js'
-import { claudeCall, policyMode } from './policy/claude-call.js'
+import { policyMode } from './policy/claude-call.js'
 import { decide } from './policy/evaluate.js'
 import { ShadowTracker, type ShadowRecord } from './policy/shadow.js'
 import { sourcedRules } from './policy/sources.js'
+import { policyCall } from './policy/tool-call.js'
 import type { PolicyCall, PolicyContext } from './policy/types.js'
-import { asRecord } from './repeat-hooks.js'
 import { guardScope, ruleSources, workingDirs } from './session-options.js'
 import { allowedFor } from './store/change-requests.js'
 import { policyShadow } from './store/policy-shadow.js'
@@ -100,7 +100,7 @@ export function shadowHooks(task: Task, sandboxed: boolean, session: AbortSignal
   }
 
   const judge = async (input: PreToolUseHookInput) => {
-    const call = claudeCall(input.tool_name, asRecord(input.tool_input))
+    const call = policyCall(claudeToolCall(input.tool_use_id, input.tool_name, input.tool_input))
     const mode = policyMode(input.permission_mode)
     const ctx = { ...(await rules()), mode }
     const started = performance.now()

@@ -1,9 +1,9 @@
-import type { PermissionRule } from '@seti/shared'
+import { claudeToolCall, type PermissionRule } from '@seti/shared'
 import { guardCommand, type GuardScope } from '../permission-guard.js'
 import { builtInRules } from '../permission-policy.js'
-import { claudeCall } from './claude-call.js'
 import { decide } from './evaluate.js'
 import { sourcedRules } from './sources.js'
+import { policyCall } from './tool-call.js'
 import type { Decision, PolicyContext, PolicyMode } from './types.js'
 
 export const HOME = '/home/me'
@@ -58,6 +58,10 @@ export function contextOf(setup: Setup = {}): PolicyContext {
       : {}),
   }
 }
+
+/** A Claude Code tool call as the evaluator reads it. */
+export const claudeCall = (tool: string, input: Record<string, unknown>) =>
+  policyCall(claudeToolCall('toolu_1', tool, input))
 
 /** Seti's decision on a Claude Code tool call in the given setup. */
 export const decideClaude = (tool: string, input: Record<string, unknown>, setup: Setup = {}): Decision =>
