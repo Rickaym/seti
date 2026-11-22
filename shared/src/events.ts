@@ -52,7 +52,8 @@ export interface ToolCall {
   }
   read?: { paths: string[] }
   edit?: { changes: EditChange[] }
-  search?: { pattern?: string; path?: string }
+  /** `tools` marks a search of the tools the agent can load rather than of its files. */
+  search?: { pattern?: string; path?: string; tools?: boolean }
   web?: { url?: string; query?: string }
   mcp?: { server: string; tool: string }
   /** `thread` is the thread the subagent's own events carry. */
@@ -92,6 +93,8 @@ interface Usage {
 
 type TurnCause = 'input' | 'background'
 
+type TurnEnding = 'error' | 'turn_limit' | 'budget_limit' | 'retry_limit' | 'other'
+
 /** `thread` is empty for the agent itself, else the id of the subagent thread it belongs to. */
 interface EventBase {
   v: 1
@@ -129,6 +132,8 @@ export type RuntimeEvent = EventBase &
         phase: 'started' | 'stopped' | 'done' | 'failed'
         trigger?: 'auto' | 'manual'
         before?: number
+        /** The context window `before` was measured against, in tokens, where known. */
+        window?: number
         error?: string
       }
     | { type: 'model.changed'; from: string; to: string; reason: 'user' | 'fallback' | 'refusal'; text?: string }
@@ -140,6 +145,8 @@ export type RuntimeEvent = EventBase &
         status: 'ok' | 'error' | 'interrupted'
         result: string
         error?: string
+        /** Why a turn stopped short of its answer; absent for a turn that ran to its end. */
+        ending?: TurnEnding
         cause: TurnCause
         steps?: number
         costUsd?: number

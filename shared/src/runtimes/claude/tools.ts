@@ -61,6 +61,8 @@ const search: Reader = (input) => ({
   search: { ...some('pattern', str(input, 'pattern') ?? str(input, 'query')), ...some('path', str(input, 'path')) },
 })
 
+const toolSearch: Reader = (input) => ({ search: { ...some('pattern', str(input, 'query')), tools: true } })
+
 const webSearch: Reader = (input) => ({ web: { ...some('query', str(input, 'query')) } })
 
 const webFetch: Reader = (input) => ({ web: { ...some('url', str(input, 'url')) } })
@@ -153,7 +155,7 @@ const TOOLS: ReadonlyMap<string, [ToolKind, Reader]> = new Map<string, [ToolKind
   ['NotebookEdit', ['edit', notebookEdit]],
   ['Grep', ['search', search]],
   ['Glob', ['search', search]],
-  ['ToolSearch', ['search', search]],
+  ['ToolSearch', ['search', toolSearch]],
   ['WebSearch', ['web', webSearch]],
   ['WebFetch', ['web', webFetch]],
   ['Agent', ['subagent', subagent]],

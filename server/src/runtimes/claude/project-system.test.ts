@@ -1,5 +1,5 @@
 import type { SDKMessage } from '@anthropic-ai/claude-agent-sdk'
-import { projectClaude, type MessageBody } from '@seti/shared'
+import { CONTEXT_WINDOW_KEY, projectClaude, type MessageBody } from '@seti/shared'
 import { describe, expect, it } from 'vitest'
 import { fakeBackground, fakeMessage } from '../../fake-sdk.js'
 import { backgroundChanged, shellNotification, shellStarted, shellUpdated } from '../../shell-fixtures.js'
@@ -56,6 +56,8 @@ describe('Claude session and compaction messages', () => {
     expect(system('compact_boundary', { compact_metadata: { trigger: 'auto', pre_tokens: 190_000 } })).toEqual([
       { v: 1, thread: '', type: 'compaction', phase: 'done', trigger: 'auto', before: 190_000 },
     ])
+    const measured = { compact_metadata: { trigger: 'manual', pre_tokens: 82_000 }, [CONTEXT_WINDOW_KEY]: 100_000 }
+    expect(system('compact_boundary', measured)).toMatchObject([{ phase: 'done', before: 82_000, window: 100_000 }])
   })
 
   it('reads retries, model fallbacks, runtime denials and slash command output', () => {
