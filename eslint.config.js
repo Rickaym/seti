@@ -145,6 +145,24 @@ export default defineConfig(
     },
   },
   {
+    files: ['server/src/**/*.ts'],
+    ignores: ['server/src/runtimes/claude/**', 'server/src/**/*.test.ts'],
+    rules: {
+      '@typescript-eslint/no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: '@anthropic-ai/claude-agent-sdk',
+              allowTypeImports: true,
+              message: 'Reach Claude Code through its runtime adapter in server/src/runtimes/claude/.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
     files: ['mods/*/ui.tsx'],
     rules: { 'react-refresh/only-export-components': 'off' },
   },

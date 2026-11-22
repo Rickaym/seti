@@ -1,9 +1,10 @@
-import { createSdkMcpServer, tool, type McpServerConfig } from '@anthropic-ai/claude-agent-sdk'
+import type { McpServerConfig } from '@anthropic-ai/claude-agent-sdk'
 import type { SetiControlLevel, Task } from '@seti/shared'
 import { z } from 'zod'
 import { asAgent } from '../access.js'
 import { tasks } from '../db.js'
 import { describeIssues } from '../http.js'
+import { inProcessServer } from '../runtimes/claude/tool-server.js'
 import { scrubValue } from '../scrub.js'
 import { toolsFor } from './levels.js'
 import { noteProcessControl } from './process-control.js'
@@ -58,23 +59,17 @@ export async function callSetiTool(entry: SetiTool, taskId: string, args: unknow
 /** The seti tools a session gets at the agent's Seti control level. */
 export const sessionTools = (task: Pick<Task, 'seti_control'>): readonly SetiTool[] => toolsFor(task.seti_control)
 
-/** The abort signal of an MCP call, which fires when Claude Code cancels it or the session closes. */
-const signalOf = (extra: unknown): AbortSignal | undefined =>
-  typeof extra === 'object' && extra !== null && 'signal' in extra && extra.signal instanceof AbortSignal
-    ? extra.signal
-    : undefined
-
 /** The in-process seti MCP server of one agent's session; every call acts as that agent. */
 function setiMcpServer(task: Task): McpServerConfig {
-  return createSdkMcpServer({
-    name: SETI_SERVER,
-    version: '1.0.0',
-    tools: sessionTools(task).map((entry) =>
-      tool(entry.name, entry.description, entry.input, async (args, extra: unknown) =>
-        callSetiTool(entry, task.id, args, signalOf(extra)),
-      ),
-    ),
-  })
+  return inProcessServer(
+    SETI_SERVER,
+    sessionTools(task).map((entry) => ({
+      name: entry.name,
+      description: entry.description,
+      input: entry.input,
+      call: async (args, signal) => callSetiTool(entry, task.id, args, signal),
+    })),
+  )
 }
 
 /** Every session gets the seti server; its tools depend on the agent's Seti control level. */

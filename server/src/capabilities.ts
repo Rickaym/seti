@@ -1,15 +1,14 @@
 import { createHash } from 'node:crypto'
 import path from 'node:path'
-import {
-  query,
-  type McpServerStatus,
-  type McpServerStatusConfig,
-  type Options,
-  type SdkPluginConfig,
-  type SettingSource,
-  type SDKControlInitializeResponse,
-  type SDKUserMessage,
-  type SlashCommand,
+import type {
+  McpServerStatus,
+  McpServerStatusConfig,
+  Options,
+  SdkPluginConfig,
+  SettingSource,
+  SDKControlInitializeResponse,
+  SDKUserMessage,
+  SlashCommand,
 } from '@anthropic-ai/claude-agent-sdk'
 import {
   mcpSignIn,
@@ -21,6 +20,7 @@ import {
 } from '@seti/shared'
 import { PROBE_DELAY_MS } from './config.js'
 import { cache } from './redis.js'
+import { openFolderProbe } from './runtimes/claude/probes.js'
 
 /** The slice of an SDK Query the probe uses, so tests can inject a fake. */
 export interface ProbeSession {
@@ -257,15 +257,11 @@ export function setProbeLauncher(launcher: ProbeLauncher): void {
 const startSdkProbe: StartProbe = async (cwd, signal) => {
   const launch = (await probeLaunch(cwd)) ?? { settingSources: ['user', 'project', 'local'] }
   const { env = probeEnv(), plugins = loadedPlugins, spawnClaudeCodeProcess, settingSources } = launch
-  return query({
-    prompt: idlePrompt(signal),
-    options: {
-      cwd,
-      settingSources,
-      env,
-      plugins,
-      ...(spawnClaudeCodeProcess === undefined ? {} : { spawnClaudeCodeProcess }),
-    },
+  return openFolderProbe(cwd, idlePrompt(signal), {
+    settingSources,
+    env,
+    plugins,
+    ...(spawnClaudeCodeProcess === undefined ? {} : { spawnClaudeCodeProcess }),
   })
 }
 

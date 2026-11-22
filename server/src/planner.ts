@@ -1,11 +1,10 @@
-import os from 'node:os'
-import { query } from '@anthropic-ai/claude-agent-sdk'
 import { AWS_ACCESS_ID, DEFAULT_PROFILE_ID, PLANNED_TITLE_MAX, plannerOutput, type PlannerOutput } from '@seti/shared'
 import { z } from 'zod'
 import { probeEnv, withTimeout } from './capabilities.js'
 import { localServers, readHostConfig } from './mcp-borrowed.js'
 import { mcpCatalog } from './mcp-selection.js'
 import { checkPlan, cleanTitle, type PlannerAnswer, type PlannerCatalog, type PlanPins } from './planner-rules.js'
+import { askOnce } from './runtimes/claude/probes.js'
 import { accessDefaults } from './store/access.js'
 import { contextPacks } from './store/context.js'
 import { profiles } from './store/credentials.js'
@@ -122,40 +121,17 @@ export function extractJson(text: string): unknown {
 }
 
 const sdkPlanner: PlannerModel = async (request, signal) => {
-  const abortController = new AbortController()
-  signal.addEventListener('abort', () => {
-    abortController.abort()
-  })
-  const session = query({
-    prompt: request.prompt,
-    options: {
-      model: PLANNER_MODEL,
-      systemPrompt: request.system,
-      tools: [],
-      mcpServers: {},
-      strictMcpConfig: true,
-      settingSources: [],
-      persistSession: false,
-      maxTurns: 1,
-      thinking: { type: 'disabled' },
-      cwd: os.tmpdir(),
-      env: probeEnv(),
-      abortController,
-    },
-  })
-  try {
-    for await (const message of session) {
-      if (message.type === 'result') {
-        if (message.subtype !== 'success') {
-          throw new Error(`The planner stopped: ${message.subtype}`)
-        }
-        return extractJson(message.result)
-      }
-    }
-  } finally {
-    session.close()
+  const result = await askOnce(
+    { model: PLANNER_MODEL, system: request.system, prompt: request.prompt, env: probeEnv() },
+    signal,
+  )
+  if (result === null) {
+    throw new Error('The planner ended without an answer')
   }
-  throw new Error('The planner ended without an answer')
+  if (result.subtype !== 'success') {
+    throw new Error(`The planner stopped: ${result.subtype}`)
+  }
+  return extractJson(result.result)
 }
 
 let plannerModel: PlannerModel = sdkPlanner
