@@ -28,14 +28,15 @@ export const doctorProbes = {
     }
     return (await db`SELECT 1 FROM secret WHERE name = ${name}`).length > 0
   },
-  /** Calls Seti's permission shadow compared since the day, by outcome; empty before its table. */
+  /** Calls Seti's permission shadow compared since the day, by outcome, and how many were slow. */
   policyShadow: async (db: Db, since: string): Promise<Record<string, number>> => {
     const [table] = await db<{ name: string | null }[]>`SELECT to_regclass('policy_shadow')::text AS name`
     if (table?.name === null || table === undefined) {
       return {}
     }
     const rows = await db<{ result: string; calls: string }[]>`SELECT result, SUM(calls) AS calls
-      FROM policy_shadow WHERE day >= ${since} GROUP BY result`
+      FROM policy_shadow WHERE day >= ${since} GROUP BY result
+      UNION ALL SELECT 'slow', COALESCE(SUM(calls), 0) FROM policy_shadow WHERE day >= ${since} AND slow`
     return Object.fromEntries(rows.map((row) => [row.result, Number(row.calls)]))
   },
   /** Whether pgvector is installed in this database, available to install, or neither. */

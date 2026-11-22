@@ -11,6 +11,8 @@ export interface CallFacts {
   tool: string
   mode: PolicyMode
   sandboxed: boolean
+  /** Whether Seti took longer than it should to decide. */
+  slow: boolean
 }
 
 /** One compared call, as counted: no input, no command, no path, no rule text. */
@@ -32,8 +34,18 @@ interface Open {
 /** Calls of one session waiting for both sides, at most this many; the oldest go first. */
 const OPEN_MAX = 1000
 
+/** A call Seti's own hooks refuse or hold never reaches the runtime's rules, so is not compared. */
+const setiHook = (decision: Decision) => decision.step === 'guard' || decision.verdict === 'review'
+
+function resultOf(decision: Decision, runtime: Observed | 'unobserved'): ShadowRecord['result'] {
+  if (runtime !== 'interrupted' && runtime !== 'unobserved') {
+    return compareOutcomes(decision, runtime)
+  }
+  return setiHook(decision) ? 'seti-hook' : runtime
+}
+
 function recordOf(facts: CallFacts, decision: Decision, runtime: Observed | 'unobserved'): ShadowRecord {
-  const result = runtime === 'interrupted' || runtime === 'unobserved' ? runtime : compareOutcomes(decision, runtime)
+  const result = resultOf(decision, runtime)
   return { ...facts, verdict: decision.verdict, step: decision.step, rule: decision.rule ?? '', runtime, result }
 }
 

@@ -207,11 +207,14 @@ export function shadowCheck(counts: Readonly<Record<string, number>>): Check {
   const of = (result: string) => counts[result] ?? 0
   const compared = ['agree', 'deferred', 'tighter', 'looser'].reduce((sum, result) => sum + of(result), 0)
   const days = `last ${String(SHADOW_DAYS)} days`
+  const trouble = ['failed', 'slow'].filter((what) => of(what) > 0).map((what) => `${String(of(what))} ${what}`)
+  const state = trouble.length > 0 ? 'warn' : 'info'
+  const tail = trouble.length > 0 ? `; ${trouble.join(', ')}` : ''
   if (compared === 0) {
-    return { section: 'Permissions', state: 'info', label: `no tool calls compared with Claude Code in the ${days}` }
+    return { section: 'Permissions', state, label: `no tool calls compared with Claude Code in the ${days}${tail}` }
   }
-  const label =
-    `${days}: Seti's own decision matched Claude Code on ${String(of('agree'))} of ${String(compared)} calls; ` +
-    `${String(of('deferred'))} left to its classifier, ${String(of('tighter'))} stricter, ${String(of('looser'))} looser`
-  return { section: 'Permissions', state: 'info', label }
+  const matched = `Seti's own decision matched Claude Code on ${String(of('agree'))} of ${String(compared)} calls`
+  const differed = `${String(of('deferred'))} left to its classifier, ${String(of('tighter'))} stricter`
+  const label = `${days}: ${matched}; ${differed}, ${String(of('looser'))} looser${tail}`
+  return { section: 'Permissions', state, label }
 }

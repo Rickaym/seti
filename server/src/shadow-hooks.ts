@@ -46,8 +46,12 @@ async function rulesOf(task: Task, sandboxed: boolean): Promise<Rules> {
 
 const today = () => new Date().toISOString().slice(0, 10)
 
-const complain = (task: Task) => (e: unknown) => {
-  process.stderr.write(`policy shadow: task ${task.id}: ${String(e)}\n`)
+/** A decision that took longer counts as slow; it ran after the hook had answered either way. */
+const SLOW_MS = 50
+
+/** Names what went wrong without its message, which could quote a call's input or a rule. */
+const complain = (task: Task, what: string) => (e: unknown) => {
+  process.stderr.write(`policy shadow: task ${task.id}: ${what}: ${e instanceof Error ? e.name : 'error'}\n`)
 }
 
 export interface Shadow {
@@ -59,17 +63,31 @@ export interface Shadow {
 /**
  * Computes Seti's own decision on each of the session's calls beside Claude Code's and counts
  * how the two compare. It never answers a hook or a callback differently: Claude Code decides.
+ * Every hook answers at once; the decision runs on a later turn of the event loop, and a failure
+ * there is counted and logged, never thrown.
  */
 export function shadowHooks(task: Task, sandboxed: boolean, session: AbortSignal): Shadow {
-  const failed = complain(task)
-  const record = (entry: ShadowRecord) => {
-    policyShadow.count(entry, today()).catch(failed)
+  const unsaved = complain(task, 'count not saved')
+  const failed = (e: unknown) => {
+    complain(task, 'decision failed')(e)
+    policyShadow.failed(today()).catch(unsaved)
   }
-  const tracker = new ShadowTracker(record)
+  const quietly = (work: () => void) => {
+    try {
+      work()
+    } catch (e) {
+      failed(e)
+    }
+  }
+  const tracker = new ShadowTracker((entry: ShadowRecord) => {
+    policyShadow.count(entry, today()).catch(unsaved)
+  })
   session.addEventListener(
     'abort',
     () => {
-      tracker.close()
+      quietly(() => {
+        tracker.close()
+      })
     },
     { once: true },
   )
@@ -84,26 +102,33 @@ export function shadowHooks(task: Task, sandboxed: boolean, session: AbortSignal
   const judge = async (input: PreToolUseHookInput) => {
     const call = claudeCall(input.tool_name, asRecord(input.tool_input))
     const mode = policyMode(input.permission_mode)
-    const decision = decide(call, { ...(await rules()), mode })
-    const facts = { kind: call.kind, tool: call.mcp === undefined ? call.name : 'mcp', mode, sandboxed }
+    const ctx = { ...(await rules()), mode }
+    const started = performance.now()
+    const decision = decide(call, ctx)
+    const slow = performance.now() - started > SLOW_MS
+    const facts = { kind: call.kind, tool: call.mcp === undefined ? call.name : 'mcp', mode, sandboxed, slow }
     tracker.decided(input.tool_use_id, facts, decision)
   }
 
   const before: HookCallback = async (input) => {
     if (input.hook_event_name === 'PreToolUse') {
-      judge(input).catch(failed)
+      setImmediate(() => {
+        judge(input).catch(failed)
+      })
     }
     return Promise.resolve({})
   }
 
   const after: HookCallback = async (input) => {
-    if (input.hook_event_name === 'PostToolUse') {
-      tracker.observed(input.tool_use_id, 'allow')
-    } else if (input.hook_event_name === 'PostToolUseFailure') {
-      tracker.observed(input.tool_use_id, input.is_interrupt === true ? 'interrupted' : 'allow')
-    } else if (input.hook_event_name === 'PermissionDenied') {
-      tracker.observed(input.tool_use_id, 'deny')
-    }
+    quietly(() => {
+      if (input.hook_event_name === 'PostToolUse') {
+        tracker.observed(input.tool_use_id, 'allow')
+      } else if (input.hook_event_name === 'PostToolUseFailure') {
+        tracker.observed(input.tool_use_id, input.is_interrupt === true ? 'interrupted' : 'allow')
+      } else if (input.hook_event_name === 'PermissionDenied') {
+        tracker.observed(input.tool_use_id, 'deny')
+      }
+    })
     return Promise.resolve({})
   }
 
@@ -115,7 +140,9 @@ export function shadowHooks(task: Task, sandboxed: boolean, session: AbortSignal
       PermissionDenied: [{ hooks: [after] }],
     },
     observe: (decideCall) => async (tool, input, options) => {
-      tracker.observed(options.toolUseID, 'ask')
+      quietly(() => {
+        tracker.observed(options.toolUseID, 'ask')
+      })
       return decideCall(tool, input, options)
     },
   }

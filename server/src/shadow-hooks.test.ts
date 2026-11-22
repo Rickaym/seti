@@ -97,4 +97,19 @@ describe('the permission shadow', () => {
     expect(stored).not.toContain('shadow-secret')
     expect(stored).not.toContain('make shadow-check')
   })
+
+  it('answers at once and counts a decision that fails, without throwing it', async () => {
+    const shadow = shadowHooks(await newTask(), false, new AbortController().signal)
+    const failed = async () =>
+      (
+        await sql<{ calls: number }[]>`SELECT COALESCE(SUM(calls), 0)::int AS calls FROM policy_shadow
+        WHERE result = 'failed'`
+      )[0]?.calls ?? 0
+    const before = await failed()
+    const broken = { ...base, hook_event_name: 'PreToolUse', tool_name: null, tool_input: {}, tool_use_id: 'x1' }
+    expect(await fire(shadow.hooks.PreToolUse, broken as unknown as HookInput)).toEqual([{}])
+    await vi.waitFor(async () => {
+      expect(await failed()).toBe(before + 1)
+    })
+  })
 })

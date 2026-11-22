@@ -3,7 +3,7 @@ import { shadowCheck, shadowSince } from '../doctor.js'
 import { ShadowTracker, type CallFacts, type ShadowRecord } from './shadow.js'
 import type { Decision } from './types.js'
 
-const facts: CallFacts = { kind: 'shell', tool: 'Bash', mode: 'auto', sandboxed: true }
+const facts: CallFacts = { kind: 'shell', tool: 'Bash', mode: 'auto', sandboxed: true, slow: false }
 const allow: Decision = { verdict: 'allow', step: 'allow-rule', rule: 'rule:1', reason: '' }
 const defer: Decision = { verdict: 'defer', step: 'mode', rule: null, reason: '' }
 
@@ -44,6 +44,13 @@ describe('pairing decisions with what the runtime did', () => {
     tracker.close()
     expect(records.map((record) => record.result)).toEqual(['interrupted', 'unobserved'])
   })
+
+  it("keeps a call Seti's own hooks refused apart, even when the runtime shows nothing of it", () => {
+    const { tracker, records } = tracked()
+    tracker.decided('a', facts, { verdict: 'deny', step: 'guard', rule: null, reason: '' })
+    tracker.close()
+    expect(records.map((record) => [record.runtime, record.result])).toEqual([['unobserved', 'seti-hook']])
+  })
 })
 
 describe('the doctor line', () => {
@@ -60,5 +67,18 @@ describe('the doctor line', () => {
         '3 stricter, 1 looser',
     })
     expect(shadowCheck({}).label).toBe('no tool calls compared with Claude Code in the last 7 days')
+  })
+
+  it('warns when decisions failed or ran slow', () => {
+    expect(shadowCheck({ agree: 5, failed: 2, slow: 1 })).toEqual({
+      section: 'Permissions',
+      state: 'warn',
+      label:
+        "last 7 days: Seti's own decision matched Claude Code on 5 of 5 calls; 0 left to its classifier, " +
+        '0 stricter, 0 looser; 2 failed, 1 slow',
+    })
+    expect(shadowCheck({ failed: 3 }).label).toBe(
+      'no tool calls compared with Claude Code in the last 7 days; 3 failed',
+    )
   })
 })
