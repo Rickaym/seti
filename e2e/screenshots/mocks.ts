@@ -73,6 +73,7 @@ const PERMISSION: PermissionRequest = {
 const CALM: ResourceSummary = {
   sampled_at: at(0),
   memory_percent: 38,
+  memory_total_bytes: 32 * 1024 ** 3,
   cpu_percent: 22,
   anomalies: 0,
   severity: 'ok',

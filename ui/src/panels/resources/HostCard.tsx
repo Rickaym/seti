@@ -2,7 +2,7 @@ import type { Anomaly, AnomalyRule, DiskUsage, HistoryPoint, HostResources } fro
 import type { ReactNode } from 'react'
 import { Sparkline } from '@/components/Sparkline'
 import { HypeMeter } from '@/components/resources/HypeMeter'
-import { inTrouble } from '@/components/resources/hype'
+import { inTrouble, meterState } from '@/components/resources/hype'
 import { cn } from '@/lib/utils'
 import { ageLabel, bytesLabel, percentLabel } from '@/panels/resources/format'
 import { SettingsCard } from '@/panels/settings/layout'
@@ -95,7 +95,7 @@ export function HostCard({
           <HypeMeter
             label="Host CPU"
             percent={host.cpu_percent}
-            trouble={inTrouble('cpu', rules)}
+            state={meterState(host.cpu_percent, inTrouble('cpu', rules))}
             className="mb-2 w-full"
           />
           <Sparkline
@@ -114,7 +114,7 @@ export function HostCard({
           <HypeMeter
             label="Host memory"
             percent={memoryPercent}
-            trouble={inTrouble('memory', rules)}
+            state={meterState(memoryPercent, inTrouble('memory', rules))}
             className="mb-2 w-full"
           />
           <Sparkline

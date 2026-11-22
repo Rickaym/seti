@@ -30,7 +30,7 @@ const BAR: readonly [LucideIcon | 'dot', string, string][] = [
   [Headset, 'EA', 'Voice assistant; press to call'],
   [CircleAlert, 'need you', 'Agents in the Needs you group'],
   [UserRound, 'Usage', '5-hour fill over dimmed weekly'],
-  [Cpu, 'Resources', 'CPU and memory; colour: busy'],
+  [Cpu, 'Resources', 'CPU or memory, the busier; colour: busy'],
   [Blocks, 'MCP', 'Servers connected of all'],
   ['dot', 'API', 'Connection to the Seti server'],
   [ShieldCheck, 'Sandbox', 'On or off for agent commands'],

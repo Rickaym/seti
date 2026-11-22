@@ -1,22 +1,21 @@
 import { cn } from '@/lib/utils'
-import { meterState } from './hype'
+import type { MeterState } from './hype'
 
 /**
- * A CPU or memory meter that reads busy as good: the fill flows with colour from half use and
- * rages near full. Trouble holds it still in the warning colour.
+ * A host meter that reads busy as good: the fill flows with colour from half use and rages near
+ * full. Trouble holds it still in the warning colour.
  */
 export function HypeMeter({
   label,
   percent,
-  trouble,
+  state,
   className,
 }: {
   label: string
   percent: number | null
-  trouble: boolean
+  state: MeterState
   className?: string
 }) {
-  const state = meterState(percent, trouble)
   const value = Math.min(100, Math.max(0, percent ?? 0))
   return (
     <div

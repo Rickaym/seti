@@ -1,21 +1,28 @@
 import type { ResourceSummary } from '@seti/shared'
-import { Cpu, MemoryStick, TriangleAlert, type LucideIcon } from 'lucide-react'
+import { Cpu, TriangleAlert } from 'lucide-react'
 import { useContext } from 'react'
 import { HypeMeter } from '@/components/resources/HypeMeter'
-import { inTrouble } from '@/components/resources/hype'
+import { powerBar, type HostMeter, type Power } from '@/components/resources/hype'
 import { StatusBarItem } from '@/components/status-bar/StatusBarItem'
 import { resourcesTone, RowContext } from '@/components/status-bar/tone'
 import { useResourceSummary } from '@/hooks/useResources'
 import { navigate } from '@/lib/route'
+import { cn } from '@/lib/utils'
+import { bytesLabel, percentLabel } from '@/panels/resources/format'
 
-const percentText = (value: number | null) => (value === null ? '-' : `${String(Math.round(value))}%`)
+const DRIVER: Record<HostMeter, string> = { cpu: 'CPU', memory: 'Memory' }
 
-function Tooltip({ summary }: { summary: ResourceSummary }) {
+function Tooltip({ summary, power }: { summary: ResourceSummary; power: Power }) {
   const count = summary.anomalies
+  const warning = power.reasons.length > 0 ? ` as a warning: ${power.reasons.join(', ')}` : ''
   return (
     <span className="grid gap-0.5">
       <span>
-        Host memory {percentText(summary.memory_percent)} used, CPU {percentText(summary.cpu_percent)}.
+        CPU {percentLabel(summary.cpu_percent)}, memory {percentLabel(summary.memory_percent)} of{' '}
+        {bytesLabel(summary.memory_total_bytes)}.
+      </span>
+      <span>
+        {DRIVER[power.driver]} drives the bar{warning}.
       </span>
       {count > 0 && (
         <span>
@@ -27,55 +34,36 @@ function Tooltip({ summary }: { summary: ResourceSummary }) {
   )
 }
 
-interface BarProps {
-  icon: LucideIcon
-  label: string
-  percent: number | null
-  trouble: boolean
-}
-
-/** Takes the item's colour for track and trouble; steps, since each frame redraws the screen. */
-function Bar({ icon: Icon, label, percent, trouble }: BarProps) {
-  return (
-    <span className="flex items-center gap-1">
-      <Icon className="size-3 shrink-0" aria-hidden />
-      <HypeMeter
-        label={label}
-        percent={percent}
-        trouble={trouble}
-        className="w-7 [--hype-flow-pace:steps(12)] [--hype-rage-pace:steps(8)] [--hype-track:color-mix(in_oklch,currentColor_22%,transparent)] [--hype-trouble:currentColor]"
-      />
-    </span>
-  )
-}
-
-/** Host CPU and memory as bars that liven up with use; anomalies add a count, filled if critical. */
+/** Host CPU and memory as one bar that livens up when either is busy; anomalies add a count. */
 export function ResourcesItem() {
   const { data } = useResourceSummary()
   const row = useContext(RowContext) !== null
   if (!data) {
     return null
   }
-  const flagged = data.anomalies > 0
+  const power = powerBar({ cpu: data.cpu_percent, memory: data.memory_percent, rules: data.rules })
   return (
     <StatusBarItem
       label="Resources"
       tone={resourcesTone(data)}
-      tooltip={<Tooltip summary={data} />}
+      tooltip={<Tooltip summary={data} power={power} />}
       onClick={() => {
         navigate('settings', 'resources')
       }}
     >
-      <span className={row ? 'grid gap-1' : 'flex items-center gap-1.5'}>
-        <Bar icon={Cpu} label="Host CPU" percent={data.cpu_percent} trouble={inTrouble('cpu', data.rules)} />
-        <Bar
-          icon={MemoryStick}
-          label="Host memory"
-          percent={data.memory_percent}
-          trouble={inTrouble('memory', data.rules)}
+      <span className={cn('flex items-center gap-1', row && 'min-w-0 flex-1')}>
+        <Cpu className="size-3 shrink-0" aria-hidden />
+        <HypeMeter
+          label="Host CPU and memory"
+          percent={power.percent}
+          state={power.state}
+          className={cn(
+            'min-w-6 [--hype-flow-pace:steps(12)] [--hype-rage-pace:steps(8)] [--hype-track:color-mix(in_oklch,currentColor_22%,transparent)] [--hype-trouble:currentColor]',
+            row ? 'flex-1' : 'w-14',
+          )}
         />
       </span>
-      {flagged && (
+      {data.anomalies > 0 && (
         <span className="flex items-center gap-0.5" data-testid="resource-anomalies">
           <TriangleAlert className="size-3" aria-hidden />
           {data.anomalies}
