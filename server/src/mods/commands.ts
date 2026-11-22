@@ -11,10 +11,10 @@ import { currentRequestSource } from '../access.js'
 import { audit } from '../audit.js'
 import { refuseMod } from '../ea-guard.js'
 import { describeIssues, HttpError } from '../http.js'
+import { liveTask } from '../seti-tools/refs.js'
 import { modHost } from './bundled.js'
 import type { HostedMod } from './host.js'
 import { modCommands, setiCommandRefusal, type ModCommandEntry } from './points.js'
-import { liveTask } from '../seti-tools/refs.js'
 
 type Caller = ModCommandCall['caller']
 

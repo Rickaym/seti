@@ -12,6 +12,7 @@ import { demoModRoute } from '../mods/points.js'
 import { loadPlannerModule } from '../planner.js'
 import { runTurn } from '../runner.js'
 import { loadSdkModule } from '../sdk-query.js'
+import { dropDemoDatabase } from '../store/demo.js'
 import { DEMO_ALLOWLIST } from './allowlist.js'
 import { demoCapabilityRoutes } from './capabilities.js'
 import { AGENTS } from './content/cast.js'
@@ -19,7 +20,6 @@ import { startDemoEa } from './ea.js'
 import { demoGuard } from './guard.js'
 import { demoLoginRoutes, demoShell } from './login.js'
 import { seedDemo } from './seed.js'
-import { dropDemoDatabase } from '../store/demo.js'
 
 /** Seti subdomains, such as PR previews, proxy to the web; the demo answers them with nothing. */
 const noSubdomains: MiddlewareHandler = async (c, next) => {

@@ -1,8 +1,8 @@
 import { MOD_LIMITS } from '@seti/shared'
 import { z } from 'zod'
-import { defineOp } from './define.js'
 import { HttpError } from '../../http.js'
 import { ModDataFull, modData } from '../../store/mods.js'
+import { defineOp } from './define.js'
 
 const key = z.string().min(1).max(MOD_LIMITS.storageKeyChars)
 

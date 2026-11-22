@@ -11,6 +11,8 @@ import {
 import { asMod, forAsker } from '../access.js'
 import { modWebhookAdapter, modWebhookInfo, pollerTemplates, webhookSources } from '../channels/sources.js'
 import { HttpError } from '../http.js'
+import { cache } from '../redis.js'
+import { MOD_DATA_KEY_MAX } from '../store/mods.js'
 import { asideApi } from './aside.js'
 import { requireOp } from './capabilities.js'
 import { runModOp } from './ops/table.js'
@@ -19,8 +21,6 @@ import { hostProxyApi, prsApi } from './pr-api.js'
 import { transcriptApi } from './transcript.js'
 import { versionApi } from './version.js'
 import { workspacesApi } from './workspace-layouts.js'
-import { cache } from '../redis.js'
-import { MOD_DATA_KEY_MAX } from '../store/mods.js'
 
 /** How long and how large a mod's cached values may be, so no mod fills Redis. */
 const CACHE_LIMITS = { ttlMaxSeconds: 24 * 3600, valueMaxBytes: 256 * 1024 }

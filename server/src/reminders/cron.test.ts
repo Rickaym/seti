@@ -1,8 +1,8 @@
 import type { CronSchedule, ReminderSettings } from '@seti/shared'
 import { describe, expect, it } from 'vitest'
 import { sql } from '../db.js'
-import { createReminderTicker } from './ticker.js'
 import { after, reminderStore } from '../store/reminders.js'
+import { createReminderTicker } from './ticker.js'
 
 const BERLIN_9AM: CronSchedule = { cron: '0 9 * * *', timezone: 'Europe/Berlin' }
 const HOURLY: CronSchedule = { cron: '0 * * * *', timezone: 'UTC' }

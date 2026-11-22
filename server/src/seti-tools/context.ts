@@ -19,10 +19,10 @@ import { listContextFiles, readContextFile } from '../context-files.js'
 import { revertRevision } from '../revert.js'
 import { byAgent } from '../revisions.js'
 import { packForDisplay } from '../seti-guide.js'
-import { pickOne } from './refs.js'
-import { done, setiTool, ToolRefusal, type ToolContext } from './tool.js'
 import { contextPacks } from '../store/context.js'
 import { revisions } from '../store/revisions.js'
+import { pickOne } from './refs.js'
+import { done, setiTool, ToolRefusal, type ToolContext } from './tool.js'
 
 const HISTORY_LIMIT = 30
 const MATCH_LIMIT = 20

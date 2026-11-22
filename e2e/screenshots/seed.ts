@@ -1,11 +1,11 @@
 import fs from 'node:fs'
 import path from 'node:path'
-import { NOW } from './clock.js'
 import { GUIDE_MARKDOWN, type DemoRepo } from '../../server/src/demo/content/cast.js'
 import { seedAgents as seedCast, type SeedPlan } from '../../server/src/store/demo-seed.js'
 import { openSeedDb, type SeedDb } from '../tests/support/db.js'
 import { paths } from '../tests/support/env.js'
 import { makePdf } from '../tests/support/share-files.js'
+import { NOW } from './clock.js'
 
 export { AGENTS, PR_URL } from '../../server/src/demo/content/cast.js'
 

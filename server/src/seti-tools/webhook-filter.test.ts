@@ -2,10 +2,10 @@ import { randomUUID } from 'node:crypto'
 import type { SetiControlLevel } from '@seti/shared'
 import { describe, expect, it } from 'vitest'
 import { tasks } from '../db.js'
+import { auditEvents } from '../store/audit.js'
 import { SETI_TOOLS } from './catalog.js'
 import { toolsFor } from './levels.js'
 import { callSetiTool } from './server.js'
-import { auditEvents } from '../store/audit.js'
 
 async function newTask(title: string, setiControl: SetiControlLevel): Promise<string> {
   const id = randomUUID()

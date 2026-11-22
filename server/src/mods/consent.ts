@@ -9,9 +9,9 @@ import {
 } from '@seti/shared'
 import { HttpError } from '../http.js'
 import { isolation } from '../script-sandbox.js'
-import { packageDocs, packageIcon } from './listing.js'
 import { connectionRows, type ConnectionRow } from '../store/connections.js'
 import { modFootprint, modInstalls, type ModGrantRow } from '../store/mod-packages.js'
+import { packageDocs, packageIcon } from './listing.js'
 import type { ValidPackage } from './package/validate.js'
 
 /** Where a package came from, as the install records it and the consent screen names it. */

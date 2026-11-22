@@ -1,8 +1,8 @@
 import { MOD_LIMITS, MOD_OP_NAMES } from '@seti/shared'
 import { describe, expect, it } from 'vitest'
-import { dispatchModOp, EventCounters, UNAVAILABLE_OPS, type ModEventRun, type OpTable } from './dispatch.js'
 import { currentRequestSource } from '../../access.js'
 import { HttpError } from '../../http.js'
+import { dispatchModOp, EventCounters, UNAVAILABLE_OPS, type ModEventRun, type OpTable } from './dispatch.js'
 
 const RUN: ModEventRun = {
   modId: 'linear',

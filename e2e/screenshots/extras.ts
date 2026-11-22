@@ -1,12 +1,12 @@
 import type { APIRequestContext } from '@playwright/test'
 import type { Envelope } from '@seti/shared'
-import { seedChannels } from './channels.js'
-import { seedPlan } from './seed.js'
-import type { Sources } from './sources.js'
 import { seedEaChat, type SeedApi } from '../../server/src/demo/content/flows.js'
 import { seedTeamChat, stampEaChat } from '../../server/src/store/demo-seed.js'
 import { openSeedDb } from '../tests/support/db.js'
 import { EA_HEADERS } from '../tests/support/env.js'
+import { seedChannels } from './channels.js'
+import { seedPlan } from './seed.js'
+import type { Sources } from './sources.js'
 
 /** The worker's server through the page's request context, as the user or as the EA. */
 function seedApi(request: APIRequestContext, baseURL: string): SeedApi {

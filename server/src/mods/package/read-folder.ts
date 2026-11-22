@@ -1,8 +1,8 @@
 import fs from 'node:fs'
 import path from 'node:path'
-import { PackageProblem, type PackageReader } from './validate.js'
 import { CREDENTIALS, SETI_HOME } from '../../config.js'
 import { within } from '../../owned-dirs.js'
+import { PackageProblem, type PackageReader } from './validate.js'
 
 /** A package source Seti can read file by file, and how the UI names where it came from. */
 export interface PackageSource {

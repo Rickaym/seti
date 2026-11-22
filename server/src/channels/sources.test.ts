@@ -8,14 +8,14 @@ import {
   type WebhookChannelInfo,
 } from '@seti/shared'
 import { afterEach, describe, expect, it } from 'vitest'
-import { hmacHex } from './signature.js'
-import { pollerTemplates, webhookSources } from './sources.js'
 import { createApp } from '../app.js'
 import { ModHost } from '../mods/host.js'
 import { channelStore } from '../store/channels.js'
 import { USER_AUTH } from '../test-auth.js'
 import { migrateWith } from '../test-migration.js'
 import { withBundledMods } from '../test-mods.js'
+import { hmacHex } from './signature.js'
+import { pollerTemplates, webhookSources } from './sources.js'
 
 withBundledMods()
 

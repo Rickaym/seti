@@ -9,10 +9,10 @@ import {
 import type { z } from 'zod'
 import { HttpError } from '../http.js'
 import { redactCredentials } from '../scrub.js'
+import { channelStore } from '../store/channels.js'
 import { readSenderEvent } from './sender-adapter.js'
 import { checkSender } from './sender-verify.js'
 import type { WebhookRequest } from './types.js'
-import { channelStore } from '../store/channels.js'
 
 interface Checker {
   definition: SenderDefinition

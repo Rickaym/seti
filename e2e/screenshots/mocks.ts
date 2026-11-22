@@ -8,9 +8,9 @@ import type {
   ResourceSummary,
   SandboxStatus,
 } from '@seti/shared'
+import { INFRA_COMMAND } from '../../server/src/demo/content/cast.js'
 import { mockChannels } from './channel-mocks.js'
 import { AGENTS, at, PR_URL } from './seed.js'
-import { INFRA_COMMAND } from '../../server/src/demo/content/cast.js'
 
 const envelope = <T>(data: T) => ({ data, meta: {} })
 

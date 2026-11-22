@@ -1,10 +1,10 @@
 import { createHmac } from 'node:crypto'
 import type { APIRequestContext } from '@playwright/test'
 import type { ChannelInfo, ChannelSecret, ChannelSubscribeInput, Envelope } from '@seti/shared'
-import { AGENTS, at } from './seed.js'
-import type { ServiceName, Sources } from './sources.js'
 import { openSeedDb } from '../tests/support/db.js'
 import { EA_HEADERS } from '../tests/support/env.js'
+import { AGENTS, at } from './seed.js'
+import type { ServiceName, Sources } from './sources.js'
 
 async function post<T>(request: APIRequestContext, path: string, data: unknown): Promise<T> {
   const response = await request.post(`/api${path}`, { data })

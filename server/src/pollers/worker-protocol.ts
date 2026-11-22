@@ -1,6 +1,6 @@
+import type { PoolMessage } from '../quickjs/pool.js'
 import type { EngineInput, EngineLimits } from './engine.js'
 import type { ReadOutput } from './items.js'
-import type { PoolMessage } from '../quickjs/pool.js'
 
 /** What the worker's fetch may reach and how much it reads; Seti's guards apply in the worker. */
 interface FetchSettings {

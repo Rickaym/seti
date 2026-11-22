@@ -1,4 +1,6 @@
 import type { Page } from '@playwright/test'
+import { test } from '../tests/support/fixtures.js'
+import { setSharing, shareByApi } from '../tests/support/shares.js'
 import { newPage, openContext, shoot, type Device, type Theme } from './capture.js'
 import { showHostsAs } from './channel-mocks.js'
 import { SHOTS_SERVER_ENV } from './clock.js'
@@ -10,8 +12,6 @@ import * as scenes from './scenes.js'
 import { AGENTS, seedAgents, stampShares } from './seed.js'
 import { startSources } from './sources.js'
 import { gridTerminal, phoneTerminal, seedTerminalHome } from './terminal.js'
-import { test } from '../tests/support/fixtures.js'
-import { setSharing, shareByApi } from '../tests/support/shares.js'
 
 /** Each frame of the README: its file name, the device it shows and how to reach it. */
 const FRAMES: [name: string, device: Device, scene: (page: Page) => Promise<void>][] = [

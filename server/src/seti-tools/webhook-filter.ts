@@ -5,9 +5,9 @@ import {
   type WebhookChannelInfo,
 } from '@seti/shared'
 import { z } from 'zod'
-import { ToolRefusal } from './tool.js'
 import { setWebhookFilter } from '../channels/filter-actions.js'
 import { testFilter } from '../channels/filter-test.js'
+import { ToolRefusal } from './tool.js'
 
 const FILTER_API =
   'export default function filter(event, { log }) gets { event, action, title, link, detail, headers, payload } ' +

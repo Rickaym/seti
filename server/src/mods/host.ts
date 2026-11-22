@@ -13,13 +13,13 @@ import {
   type ModManifest,
   type ModTier,
 } from '@seti/shared'
+import { pollerTemplates, webhookSources } from '../channels/sources.js'
+import { modHostSettings, modStates } from '../store/mods.js'
 import { serverApi } from './api.js'
 import { registerModContext } from './ops/context.js'
 import { modAuditKinds, modCommands, notifyKinds, slashCommands } from './points.js'
 import { runningMods } from './running.js'
 import { startThirdParty } from './third-party-run.js'
-import { pollerTemplates, webhookSources } from '../channels/sources.js'
-import { modHostSettings, modStates } from '../store/mods.js'
 
 /** A mod as the host holds it: its manifest once valid, the user's choice and what it registered. */
 export interface HostedMod {

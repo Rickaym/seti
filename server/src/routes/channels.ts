@@ -12,8 +12,6 @@ import {
 } from '@seti/shared'
 import { Hono } from 'hono'
 import { z } from 'zod'
-import { pollerRoutes } from './pollers.js'
-import { reminderRoutes } from './reminders.js'
 import {
   checkSenderSample,
   createChannel,
@@ -39,6 +37,8 @@ import { channelSources } from '../channels/source-info.js'
 import { subscriptions } from '../channels/subscriptions.js'
 import { fromEa, notEa, refuseEa } from '../ea-guard.js'
 import { ok, valid, validJson } from '../http.js'
+import { pollerRoutes } from './pollers.js'
+import { reminderRoutes } from './reminders.js'
 
 const idParam = z.object({ id: z.string().regex(HOOK_ID) })
 const subscriptionParam = idParam.extend({ sub: z.coerce.number().int().positive() })

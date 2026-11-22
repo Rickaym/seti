@@ -1,5 +1,10 @@
 import { randomUUID } from 'node:crypto'
 import { MOD_LIMITS, type ModEvent } from '@seti/shared'
+import { audit } from '../../audit.js'
+import { MOD_WORKERS } from '../../config.js'
+import { now } from '../../db.js'
+import { mayAuditRefusal } from '../../rate-limit.js'
+import { modLogs, modUsage, type ModLogEntry } from '../../store/mod-logic.js'
 import type { ModEventResult } from './child.js'
 import {
   dispatchModOp,
@@ -12,11 +17,6 @@ import {
 import { createModEvents, type ModEventOrigin, type ModLogicTarget } from './events.js'
 import { createModLogicPool } from './pool.js'
 import { scheduleMod, type ModSchedule } from './schedule.js'
-import { audit } from '../../audit.js'
-import { MOD_WORKERS } from '../../config.js'
-import { now } from '../../db.js'
-import { mayAuditRefusal } from '../../rate-limit.js'
-import { modLogs, modUsage, type ModLogEntry } from '../../store/mod-logic.js'
 
 /** What the mod host gives the logic runtime: which mods run now, and how Seti stops one. */
 export interface ModLogicHost {

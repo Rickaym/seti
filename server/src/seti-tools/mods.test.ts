@@ -2,12 +2,12 @@ import { randomUUID } from 'node:crypto'
 import { afterAll, describe, expect, it } from 'vitest'
 import { asAgent } from '../access.js'
 import { tasks } from '../db.js'
-import { SETI_TOOLS } from './catalog.js'
-import { callSetiTool } from './server.js'
 import { changeMod } from '../mods/actions.js'
 import { modHost } from '../mods/bundled.js'
 import { auditEvents } from '../store/audit.js'
 import { currentSettings } from '../user-settings.js'
+import { SETI_TOOLS } from './catalog.js'
+import { callSetiTool } from './server.js'
 
 const full = { id: randomUUID(), title: 'Mod keeper', seti_control: 'full' as const }
 const self = { id: randomUUID(), title: 'Mod watcher', seti_control: 'self' as const }

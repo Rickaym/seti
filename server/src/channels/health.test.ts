@@ -1,9 +1,9 @@
 import { CHANNEL_RUN_HISTORY_DAYS, POLLER_LIMITS, type PollerRun, type ReminderRun } from '@seti/shared'
 import { afterAll, describe, expect, it, vi } from 'vitest'
 import { sql } from '../db.js'
-import { channelHealth, channelsSummary, onTimeToleranceS } from './health.js'
 import { pollerStore } from '../store/pollers.js'
 import { reminderStore } from '../store/reminders.js'
+import { channelHealth, channelsSummary, onTimeToleranceS } from './health.js'
 
 const scratch = await vi.hoisted(async () => {
   const { mkdtempSync } = await import('node:fs')
