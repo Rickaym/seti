@@ -139,8 +139,8 @@ async function sessionMessages(session: LiveSession, task: Task): Promise<AsyncI
   if (task.session_id !== null) {
     moveSessionTo(CLAUDE_HOME, task.session_id, task.cwd)
   }
-  return resumeSession(task.id, options, (sent) => {
-    const started = adapterFor(DEFAULT_RUNTIME).open({ prompt: session.openInput(), options: sent })
+  return resumeSession(task.id, options, async (sent) => {
+    const started = await adapterFor(DEFAULT_RUNTIME).open({ prompt: session.openInput(), options: sent })
     session.attach(started)
     if (session.warm) {
       void watchSessionMcp(task.id, async () => session.mcpServerStatus())
