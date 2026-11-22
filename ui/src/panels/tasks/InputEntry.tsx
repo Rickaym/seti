@@ -33,6 +33,7 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { lazy, Suspense } from 'react'
+import { LinkedText } from '@/components/links/LinkedText'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { navigate } from '@/lib/route'
 import { subtaskRouteId } from '@/lib/subtasks'
@@ -108,7 +109,7 @@ function TeamEntry({ input, queued }: { input: TeamInput; queued: boolean }) {
         <StateBadge input={input} queued={queued} />
       </div>
       <div className="border-t border-border px-2 py-2 break-words whitespace-pre-wrap text-foreground">
-        {input.body}
+        <LinkedText text={input.body} />
       </div>
     </div>
   )
@@ -124,7 +125,7 @@ function WorkspaceEntry({ input, queued }: { input: WorkspaceInput; queued: bool
         <StateBadge input={input} queued={queued} />
       </div>
       <div className="border-t border-border px-2 py-2 break-words whitespace-pre-wrap text-foreground">
-        {input.body}
+        <LinkedText text={input.body} />
       </div>
     </div>
   )
@@ -151,7 +152,7 @@ function SetiEntry({ input, queued }: { input: SetiInput; queued: boolean }) {
         <StateBadge input={input} queued={queued} />
       </div>
       <div className="border-t border-border px-2 py-2 break-words whitespace-pre-wrap text-foreground">
-        {input.body}
+        <LinkedText text={input.body} />
       </div>
     </div>
   )
@@ -196,7 +197,7 @@ function ChannelEntry({ input, queued }: { input: ChannelInput; queued: boolean 
       </div>
       {input.body !== '' && (
         <div className="max-h-72 overflow-y-auto border-t border-border px-2 py-2 break-words whitespace-pre-wrap text-foreground">
-          {input.body}
+          <LinkedText text={input.body} />
         </div>
       )}
     </div>

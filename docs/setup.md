@@ -505,6 +505,37 @@ pnpm --filter @seti/server backup restore /abs/backup.pgdump.enc seti_restored -
 
 A restored database also needs the secret store key; see [Security](security.md).
 
+### Storage
+
+Settings, Storage shows what each agent's folders take on disk, largest first, with the total
+and the disk's free space at the top. Each agent's folders are its folder in `~/work`, its
+worktrees, its workspace and its sandbox (`~/.seti/sandbox/<task>`), plus any checkout it was
+given. Sizes come from a walk in the background that stops after 400,000 entries or 20 seconds
+per folder; a size it cut short reads "about". An agent's name opens its Files view as a tree,
+one level at a time, with each folder's size, a git badge on repositories and a "rebuildable"
+mark.
+
+Rebuildable folders are what a reinstall, a build or the tool that made them makes again:
+`node_modules`, virtualenvs (`.venv` or `venv` with a `pyvenv.cfg`), `__pycache__`, tool caches
+such as `.pytest_cache`, `.next`, `.turbo`, `.gradle`, `.cache` and `.npm`, and a sandbox's
+`/tmp`. Build output (`dist`, `build`, `target`, `coverage`) counts only inside a git repository
+that ignores it.
+
+- Clean, on each agent's row, lists the rebuildable folders it would remove with their sizes and
+  removes them once you confirm. It works only in folders Seti made for the agent, never in a
+  checkout you gave it, never on a folder git tracks files in, and never while the agent runs.
+- Orphans lists folders in Seti's folders that no agent owns, such as those of deleted agents
+  and failed starts, and worktree records whose folder is gone. A folder that changed in the last
+  hour, or holds a repository with uncommitted changes or unpushed commits, stays; copy its path
+  to look at it in a terminal.
+- Automatic clean is off until you turn it on. Then an hourly sweep cleans the agents idle longer
+  than 7, 14 or 30 days, archived agents included, and records what it freed.
+
+Every removal is in the audit log with the folder, its path there and the bytes freed. The EA
+can read this page and an agent's tree, and clean one agent once you say yes; only you remove
+orphans or change the automatic clean (RES-16 to RES-19 in
+[the protocol](protocol.md#15-resilience)).
+
 ## Channels: webhooks, pollers and reminders
 
 Settings, Channels holds the sources of events: webhooks that apps send, pollers for services that
@@ -856,7 +887,7 @@ NODE_ENV=development SETI_HOME=/tmp/seti-scratch SETI_PORT=3106 SETI_REDIS_URL=o
 | `~/.seti/archive/`           | Archived agents' folders, one bundle per archiving              |
 | `~/.seti/shared-tools/`      | Published shared tools, one folder per version                  |
 | `~/.seti/workspace/<task>/`  | Each agent's workspace of live Markdown files                   |
-| `~/.seti/sandbox/`           | Per-task sandbox homes and each task's ssh-agent socket         |
+| `~/.seti/sandbox/`           | Per-task sandbox homes, /tmp and each task's ssh-agent socket   |
 | `~/.seti/sandbox-ca/`        | The name-constrained CAs the egress proxy signs with            |
 | `~/.seti/backups/`           | Encrypted database backups                                      |
 | `~/.seti/pre-credentials-*/` | Env files and units as `migrate-secrets.sh` found them          |

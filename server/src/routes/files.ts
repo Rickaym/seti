@@ -10,6 +10,7 @@ import {
   recentFilesQuery,
   resolvePathsQuery,
   saveFileInput,
+  treeQuery,
   type FileConflict,
   type FileQuery,
   type FileUrlTarget,
@@ -28,15 +29,15 @@ import { HttpError, ok, valid, validJson } from '../http.js'
 import { sandboxContext } from '../session-options.js'
 import { sandboxPolicy } from '../store/sandbox.js'
 import { listDir, recentFiles, resolveLinked, resolvePath, workspaceOwner } from '../task-files-list.js'
+import { FileConflictError, saveText } from '../task-files-save.js'
 import { searchFiles, searchOptions } from '../task-files-search.js'
+import { listTree } from '../task-files-tree.js'
 import {
-  FileConflictError,
   fileRules,
   locate,
   openChecked,
   publicRoot,
   readFile,
-  saveText,
   stampOf,
   taskRoots,
   type FileContext,
@@ -229,6 +230,12 @@ export const taskFileRoutes = new Hono()
     const files = await fileContext(c.req.param('id'))
     const at = locate(files, query.root, query.path, { dotfiles: query.dotfiles })
     return ok(c, listDir(at, files, query))
+  })
+  .get('/:id/files/tree', valid('query', treeQuery), async (c) => {
+    const query = c.req.valid('query')
+    const files = await fileContext(c.req.param('id'))
+    const at = locate(files, query.root, query.path, { dotfiles: query.dotfiles })
+    return ok(c, await listTree(at, files, { dotfiles: query.dotfiles, setiFiles: query.seti_files }))
   })
   .get('/:id/files/recent', valid('query', recentFilesQuery), async (c) => {
     const query = c.req.valid('query')

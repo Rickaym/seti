@@ -1,25 +1,10 @@
 import type { ModelFallbackMessage } from '@seti/shared'
 import { ShieldAlert, ShieldCheck } from 'lucide-react'
 import { Hint } from '@/components/Hint'
+import { LinkedText } from '@/components/links/LinkedText'
 import { useTasks } from '@/hooks/useTasks'
-import { linkParts, noticeSentence, stillOn, verificationLink } from '@/lib/model-fallback'
+import { noticeSentence, stillOn, verificationLink } from '@/lib/model-fallback'
 import { SwitchBackButton } from '@/panels/tasks/FallbackMark'
-
-function Explanation({ text }: { text: string }) {
-  return (
-    <p className="break-words text-muted-foreground">
-      {linkParts(text).map((part, index) =>
-        part.href === undefined ? (
-          <span key={index}>{part.text}</span>
-        ) : (
-          <a key={index} href={part.href} target="_blank" rel="noreferrer" className="underline hover:text-foreground">
-            {part.text}
-          </a>
-        ),
-      )}
-    </p>
-  )
-}
 
 /** Claude Code moved the agent to a fallback model after a safeguard refused a request. */
 export function ModelFallbackNotice({ taskId, message }: { taskId: string; message: ModelFallbackMessage }) {
@@ -36,7 +21,11 @@ export function ModelFallbackNotice({ taskId, message }: { taskId: string; messa
           {message.api_refusal_category !== null && message.api_refusal_category !== undefined && (
             <p className="text-muted-foreground">Category: {message.api_refusal_category}</p>
           )}
-          {explanation !== '' && <Explanation text={explanation} />}
+          {explanation !== '' && (
+            <p className="break-words text-muted-foreground">
+              <LinkedText text={explanation} />
+            </p>
+          )}
           {(stillOn(message, current) || verify !== null) && (
             <div className="flex flex-wrap items-center gap-2 pt-0.5">
               {stillOn(message, current) && (
