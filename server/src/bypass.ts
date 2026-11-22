@@ -27,11 +27,11 @@ async function applyLive(taskId: string, mode: PermissionMode): Promise<BypassSt
   if (session === undefined || session.closed) {
     return 'now'
   }
-  const query = session.openQuery
-  if (query === null) {
+  const setMode = session.openRuntime?.setMode
+  if (setMode === undefined) {
     return 'next_turn'
   }
-  return query.setPermissionMode(mode).then(
+  return setMode(mode).then(
     () => 'now',
     () => 'next_turn',
   )
