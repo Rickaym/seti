@@ -35,6 +35,14 @@ describe('what each mode does with a call no rule decides', () => {
     expect(decideClaude('NotebookRead', { notebook_path: `${CWD}/n.ipynb` }, plan).verdict).toBe('allow')
   })
 
+  it('lets no allow rule approve an edit in plan mode, and drops the broad ones as auto does', () => {
+    const plan = { sandboxed: true, mode: 'plan' } as const
+    expect(decideClaude('Edit', { file_path: `${CWD}/a.ts` }, plan)).toMatchObject({ verdict: 'ask', step: 'plan' })
+    expect(decideClaude('Write', { file_path: `${CWD}/b.ts` }, plan)).toMatchObject({ verdict: 'ask', step: 'plan' })
+    expect(bash('make', plan)).toMatchObject({ verdict: 'defer', step: 'mode' })
+    expect(bash('make', { ...plan, rules: [['allow', 'Bash(make)']] })).toMatchObject({ verdict: 'allow' })
+  })
+
   it('never asks about tools that track the agent own work', () => {
     for (const tool of ['TodoWrite', 'TaskUpdate', 'EnterPlanMode', 'BashOutput']) {
       expect(decideClaude(tool, {}, { ...unsandboxed, mode: 'ask' }).verdict).toBe('allow')
