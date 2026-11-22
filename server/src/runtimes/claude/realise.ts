@@ -9,26 +9,16 @@ import type {
 import type { Task } from '@seti/shared'
 import { audit } from '../../audit.js'
 import { compactHook, compactSetup } from '../../compact.js'
-import { connectionEnv, taskConnections } from '../../connection-egress.js'
 import { COMMAND_LIMIT_HOURS, subagentRules } from '../../house-rules.js'
+import type { Launcher } from '../../launcher.js'
 import { taskBorrowedServers } from '../../mcp-borrowed.js'
-import { planScope } from '../../memory-cap.js'
 import { bashGuard, guardRefuses } from '../../permission-guard.js'
 import { canUseToolFor } from '../../permission-requests.js'
 import { repeatHooks } from '../../repeat-hooks.js'
 import { reviewHook } from '../../review-hooks.js'
 import { sandboxHooks } from '../../sandbox.js'
 import { redactSecrets } from '../../scrub.js'
-import {
-  agentEnv,
-  guardScope,
-  inProcessServers,
-  permissionSettings,
-  sandboxFor,
-  spawnInSandbox,
-  spawnInScope,
-  TASK_ID_ENV,
-} from '../../session-options.js'
+import { guardScope, inProcessServers, permissionSettings, TASK_ID_ENV } from '../../session-options.js'
 import type { SessionSpec } from '../../session-spec.js'
 import { sharedToolServer } from '../../shared-tools.js'
 import { allowedFor } from '../../store/change-requests.js'
@@ -109,26 +99,21 @@ function sessionHooks(
   return { ...repeat, PreToolUse, SubagentStart: [subagentRules()] }
 }
 
-/** Rules for every task, a sandbox's launcher and env, else the borrowed MCP servers. */
-async function sandboxOptions(spec: SessionSpec, task: Task, session: AbortSignal) {
+/** The launcher as the SDK takes it: the environment, and the spawn when Seti holds the process. */
+export const claudeLaunch = (launcher: Launcher) => ({
+  env: launcher.env,
+  ...(launcher.spawn === undefined ? {} : { spawnClaudeCodeProcess: launcher.spawn }),
+})
+
+/** Rules for every task, the launcher, and an unsandboxed task's borrowed MCP servers. */
+async function sandboxOptions(spec: SessionSpec, launcher: Launcher, task: Task, session: AbortSignal) {
   const settings = { ...deniedMcpSettings(spec.deniedToolServers), permissions: spec.rules }
-  const sandbox = await sandboxFor(task)
-  const scope = await planScope(task.id, 'agent')
-  if (sandbox === null) {
-    const borrowed = (await taskBorrowedServers(task)) as Record<string, McpServerConfig>
-    return {
-      settings,
-      hooks: sessionHooks(task, false, session),
-      env: { ...agentEnv(scope?.cap ?? null), ...connectionEnv(await taskConnections(task)) },
-      ...(Object.keys(borrowed).length === 0 ? {} : { mcpServers: borrowed }),
-      ...(scope === null ? {} : { spawnClaudeCodeProcess: spawnInScope(scope) }),
-    } satisfies Options
-  }
+  const borrowed = launcher.sandboxed ? {} : ((await taskBorrowedServers(task)) as Record<string, McpServerConfig>)
   return {
     settings,
-    hooks: sessionHooks(task, true, session),
-    env: sandbox.env,
-    spawnClaudeCodeProcess: spawnInSandbox(sandbox, task.id, scope),
+    hooks: sessionHooks(task, launcher.sandboxed, session),
+    ...claudeLaunch(launcher),
+    ...(Object.keys(borrowed).length === 0 ? {} : { mcpServers: borrowed }),
   } satisfies Options
 }
 
@@ -139,8 +124,13 @@ function withInProcessServers(task: Task, servers: Record<string, McpServerConfi
 }
 
 /** The SDK options a task's Claude Code process starts with, resuming the spec's session if any. */
-export async function realise(spec: SessionSpec, task: Task, abortController: AbortController): Promise<Options> {
-  const sandbox = await sandboxOptions(spec, task, abortController.signal)
+export async function realise(
+  spec: SessionSpec,
+  launcher: Launcher,
+  task: Task,
+  abortController: AbortController,
+): Promise<Options> {
+  const sandbox = await sandboxOptions(spec, launcher, task, abortController.signal)
   const compact = compactSetup(spec.compaction)
   return {
     ...claudeSetup(spec),

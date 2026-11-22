@@ -9,10 +9,10 @@ import type { RewindFilesPreview, RewindRestore, RewindResult, RewindTarget, Tas
 import { audit } from './audit.js'
 import { refuseOnSelf } from './ea-guard.js'
 import { HttpError } from './http.js'
-import { planScope } from './memory-cap.js'
+import { taskLauncher } from './launcher.js'
 import { matchChain, rewindPoints, type ChainMatch, type RewindPoint } from './rewind.js'
-import { agentEnv, closeIdleSession, isRunning } from './runner.js'
-import { sandboxFor, spawnInSandbox, spawnInScope } from './session-options.js'
+import { closeIdleSession, isRunning } from './runner.js'
+import { claudeLaunch } from './runtimes/claude/realise.js'
 import { shellTurnGuard } from './shell-context.js'
 import { rewinds } from './store/rewinds.js'
 import { requireTask } from './tasks.js'
@@ -76,8 +76,7 @@ async function rewindFiles(task: Task, promptUuid: string, dryRun: boolean): Pro
     return { canRewind: false, error: 'This agent has no session yet' }
   }
   const abortController = new AbortController()
-  const sandbox = await sandboxFor(task)
-  const scope = await planScope(task.id, 'agent')
+  const launcher = claudeLaunch(await taskLauncher(task, 'agent', false))
   const session = query({
     prompt: idle(abortController.signal),
     options: {
@@ -86,12 +85,7 @@ async function rewindFiles(task: Task, promptUuid: string, dryRun: boolean): Pro
       enableFileCheckpointing: true,
       settingSources: [],
       abortController,
-      ...(sandbox === null
-        ? {
-            env: agentEnv(scope?.cap ?? null),
-            ...(scope === null ? {} : { spawnClaudeCodeProcess: spawnInScope(scope) }),
-          }
-        : { env: sandbox.env, spawnClaudeCodeProcess: spawnInSandbox(sandbox, task.id, scope) }),
+      ...launcher,
     },
   })
   const timer = setTimeout(() => {

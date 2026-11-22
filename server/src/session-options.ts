@@ -1,15 +1,12 @@
-import { spawn, type ChildProcess } from 'node:child_process'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import type { Readable, Writable } from 'node:stream'
-import type { McpServerConfig, SpawnedProcess, SpawnOptions } from '@anthropic-ai/claude-agent-sdk'
+import type { McpServerConfig } from '@anthropic-ai/claude-agent-sdk'
 import { extraDirs, type MemoryCap, type Task } from '@seti/shared'
 import { taskSsh } from './agent-access.js'
 import { taskAws } from './aws-access.js'
 import { CLAUDE_HOME, CREDENTIALS, DATABASE_URL, REDIS_URL, SETI_HOME } from './config.js'
 import { planScope } from './memory-cap.js'
-import { launch, type ScopePlan } from './memory-scope.js'
 import { memoryEnv } from './node-heap.js'
 import type { GuardScope } from './permission-guard.js'
 import { builtInRules, composeRules, type PermissionSettings } from './permission-policy.js'
@@ -121,55 +118,6 @@ export async function sandboxFor(task: Task): Promise<TaskSandbox | null> {
   const memory = (await planScope(task.id, 'agent'))?.cap ?? null
   return taskSandbox(task, { ctx: sandboxContext(), policy, readOnly, memory })
 }
-
-const hasPipes = (child: ChildProcess): child is ChildProcess & { stdin: Writable; stdout: Readable } =>
-  child.stdin !== null && child.stdout !== null
-
-const STDERR_TAIL = 4000
-
-/** Drains stderr, which the SDK never reads from a process it did not start, and logs its end. */
-function piped(child: ChildProcess, label: 'sandbox' | 'scope', taskId: string): SpawnedProcess {
-  if (!hasPipes(child)) {
-    throw new Error(`The ${label === 'sandbox' ? 'sandboxed' : 'scoped'} Claude Code process has no stdio pipes`)
-  }
-  let tail = ''
-  child.stderr?.on('data', (chunk: Buffer) => {
-    tail = `${tail}${chunk.toString('utf8')}`.slice(-STDERR_TAIL)
-  })
-  child.on('exit', (code) => {
-    if (code !== null && code !== 0 && tail.trim() !== '') {
-      process.stderr.write(`${label}: Claude Code of task ${taskId} exited with ${String(code)}: ${tail.trim()}\n`)
-    }
-  })
-  return child
-}
-
-/** Runs the SDK's Claude Code process in the sandbox, in a scope held to its memory cap if any. */
-export const spawnInSandbox =
-  (sandbox: TaskSandbox, taskId: string, scope: ScopePlan | null = null) =>
-  (options: SpawnOptions): SpawnedProcess =>
-    piped(
-      sandbox.spawn(options.command, options.args, { env: options.env, signal: options.signal, scope }),
-      'sandbox',
-      taskId,
-    )
-
-/** Runs the SDK's Claude Code process on the host in a scope held to the task's memory cap. */
-export const spawnInScope =
-  (scope: ScopePlan) =>
-  (options: SpawnOptions): SpawnedProcess =>
-    piped(
-      launch(scope, options.command, options.args, (command, args) =>
-        spawn(command, args, {
-          cwd: options.cwd,
-          env: { ...options.env, XDG_RUNTIME_DIR: scope.host.runtimeDir },
-          stdio: ['pipe', 'pipe', 'pipe'],
-          signal: options.signal,
-        }),
-      ),
-      'scope',
-      scope.taskId,
-    )
 
 /** The ssh hosts a task can use, with the hosts, keys and host keys its files render. */
 async function sshSetup(taskId: string) {

@@ -282,8 +282,6 @@ interface MoreProps {
   hidden: number
   /** How many chips the row shows; with none, the button names the total instead. */
   shown: number
-  /** Left-out PRs that need a fix, flagged on the button. */
-  toFix: number
   path: string
   owner: string
   agent: PrAgent
@@ -294,7 +292,7 @@ interface MoreProps {
 }
 
 /** "+N more": every linked PR in a filterable list, a popover on desktop and a sheet on phones. */
-export function MoreLinkedPrs({ prs, hidden, shown, toFix, bare = false, onOpen, ...rest }: MoreProps) {
+export function MoreLinkedPrs({ prs, hidden, shown, bare = false, onOpen, ...rest }: MoreProps) {
   const narrow = useNarrow()
   const [open, setOpen] = useState(false)
   const changeOpen = (next: boolean) => {
@@ -324,7 +322,6 @@ export function MoreLinkedPrs({ prs, hidden, shown, toFix, bare = false, onOpen,
     >
       <List className="size-3" />
       {shown === 0 ? count : `+${String(hidden)} more`}
-      {toFix > 0 && <Tag tone="failure">{`${String(toFix)} to fix`}</Tag>}
     </button>
   )
   if (bare) {
