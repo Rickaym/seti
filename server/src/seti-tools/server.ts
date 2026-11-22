@@ -83,6 +83,11 @@ export function sessionSetiServers(task: Task): Record<string, McpServerConfig> 
   return { [SETI_SERVER]: setiMcpServer(task) }
 }
 
+const ASK_AT_ONCE =
+  'When a task needs access you lack (an MCP server, a host, an API key, a shared tool), call request_change ' +
+  'for it at once and carry on with what you can do meanwhile; the user answers with one tap and pastes a key ' +
+  'there, never in chat. Do not search memory, transcripts or the filesystem for how it was done before.'
+
 const SHARED_TOOLS =
   'A script of yours that other agents would reuse can become a shared tool the same way: request_change, ' +
   'kind shared_tool.'
@@ -93,18 +98,16 @@ const CONTEXT: Record<SetiControlLevel, string | null> = {
     'Your Seti control is Self: the seti MCP tools read Seti (context packs, channels, repos, MCP ' +
     'servers, plugins, the sandbox allowlist) and change only you (title, colour, repos, ' +
     'directories, PRs, packs, role, channel subscriptions). They never reach other agents or shared ' +
-    'settings. For access you lack (a host, an API key, an MCP server) call request_change; the user ' +
-    'answers with one tap and pastes a key there, never in chat.',
+    'settings.',
   full:
     'You have Seti control: the seti MCP tools act on Seti as the EA does (agents, transcripts, ' +
     'group chat, PRs, packs, channels, plugins, MCP servers, settings). Use them for ' +
-    'Seti actions instead of asking @ea. For access you lack (a host, an API key, an MCP server) call ' +
-    'request_change; the user answers with one tap and pastes a key there, never in chat.',
+    'Seti actions instead of asking @ea.',
 }
 
 /** What the agent's system prompt says its seti tools can do, by its Seti control level. */
 export async function setiToolsContext(taskId: string): Promise<string | null> {
   const task = await tasks.get(taskId)
   const context = task === undefined ? null : CONTEXT[task.seti_control]
-  return context === null ? null : `${context} ${SHARED_TOOLS}`
+  return context === null ? null : `${context} ${ASK_AT_ONCE} ${SHARED_TOOLS}`
 }
