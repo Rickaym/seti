@@ -43,14 +43,14 @@ test('the resources page shows the host, tasks and components, and stops a hung 
   await expect(main).toContainText('each sample takes 6.2 ms, 5.1 ms of it on the CPU')
 })
 
-test('the status bar meters keep their numbers in the hint, fill once an anomaly is critical and open the page', async ({
+test('the status bar keeps both host numbers in the hint, fills once an anomaly is critical and open the page', async ({
   page,
 }) => {
   await mockResources(page)
   await page.goto('/#agents')
   const item = page.getByRole('contentinfo').getByRole('button', { name: 'Resources' })
   await item.hover()
-  await expect(page.getByRole('tooltip')).toContainText('Host memory 73% used, CPU 91%.')
+  await expect(page.getByRole('tooltip')).toContainText('CPU 91%, memory 73% of 30.0 GB.')
   await expect(item.getByTestId('resource-anomalies')).toHaveText('5')
   await expect(item).toHaveAttribute('data-tone', 'critical')
   await item.click()
@@ -64,5 +64,5 @@ test('the real server answers both resource routes in their shapes', async ({ re
   resourceSummarySchema.parse(await apiData(request, '/resources/summary'))
   await page.goto('/#agents')
   const item = page.getByRole('contentinfo').getByRole('button', { name: 'Resources' })
-  await expect(item.getByRole('meter', { name: 'Host memory' })).toHaveAttribute('aria-valuenow', /^\d+$/)
+  await expect(item.getByRole('meter', { name: 'Host CPU and memory' })).toHaveAttribute('aria-valuenow', /^\d+$/)
 })
