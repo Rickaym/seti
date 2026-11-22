@@ -134,3 +134,11 @@ export const eaSecurityAccessRefusal = (c: Context, kinds: readonly AccessKind[]
 
 /** SSH hosts, keys and trusted host keys are security settings the EA may only view. */
 export const eaSshReadOnly = eaReadOnly('change ssh hosts, keys or trusted host keys')
+
+/** What only the user does, refused for the EA, agents and mods in the function that does it. */
+export function refuseDelegates(what: string): void {
+  refuseAgent(what)
+  if (fromEa()) {
+    throw new HttpError(403, `The EA cannot ${what}; the user does that in Seti`)
+  }
+}

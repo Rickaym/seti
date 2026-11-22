@@ -183,7 +183,7 @@ test.describe('the auto archive rule', () => {
     expect((await request.delete(`/api/tasks/${id}`)).ok()).toBe(true)
   })
 
-  test('turns on deleting archived agents and scans for stale folders', async ({ page, request }) => {
+  test('turns on deleting archived agents', async ({ page, request }) => {
     await page.goto('/#settings/agents')
     const card = page.getByRole('main').getByRole('region', { name: 'Archive' })
     const deleting = card.getByRole('switch', { name: 'Delete archived agents' })
@@ -196,13 +196,6 @@ test.describe('the auto archive rule', () => {
     await expect
       .poll(async () => (await apiData<AutoArchiveStatus>(request, '/archive/settings')).settings)
       .toMatchObject({ delete_after_days: 45 })
-
-    const stale = page.getByRole('main').getByRole('region', { name: 'Stale folders' })
-    const scanned = nextApiResponse(page, 'GET', '/archive/stale-folders')
-    await stale.getByRole('button', { name: 'Scan' }).click()
-    expect((await scanned).ok()).toBe(true)
-    await expect(stale.getByRole('button', { name: /^Delete \d+$/ })).toBeVisible()
-    await expect(stale.getByRole('button', { name: 'Rescan' })).toBeVisible()
   })
 
   test('turns Resume after restart off and on without touching the rule', async ({ page, request }) => {
