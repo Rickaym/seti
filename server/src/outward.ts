@@ -1,4 +1,4 @@
-import type { SDKMessage } from '@anthropic-ai/claude-agent-sdk'
+import type { RuntimeEvent, ToolCall } from '@seti/shared'
 import { sharedToolWrites } from './shared-tool-writes.js'
 
 const WRITE_WORDS = new Set([
@@ -86,15 +86,11 @@ function words(s: string): string[] {
     .filter(Boolean)
 }
 
-export function bashCommand(input: unknown): string {
-  if (typeof input !== 'object' || input === null || !('command' in input)) {
-    return ''
-  }
-  return typeof input.command === 'string' ? input.command : ''
-}
+/** The command line a call runs in a shell, or '' for any other call. */
+export const shellCommand = (call: ToolCall): string => (call.shell?.action === 'run' ? (call.shell.command ?? '') : '')
 
 /** Seti tools that change only the calling agent's own row in Seti. */
-const OWN_ROW_TOOLS = new Set(['mcp__seti__set_status', 'mcp__seti__set_working_directory'])
+const OWN_ROW_TOOLS = new Set(['set_status', 'set_working_directory'])
 
 /** What the words of an MCP tool's name say it does; a write word beats a read word. */
 export function mcpNameKind(name: string): 'write' | 'read' | 'unknown' {
@@ -106,25 +102,17 @@ export function mcpNameKind(name: string): 'write' | 'read' | 'unknown' {
 }
 
 /** True when a tool call can change something outside this machine. Unknown MCP tools count. */
-export function isOutward(name: string, input: unknown): boolean {
-  if (OWN_ROW_TOOLS.has(name)) {
-    return false
+export function isOutward(call: ToolCall): boolean {
+  if (call.mcp !== undefined) {
+    if (call.mcp.server === 'seti' && OWN_ROW_TOOLS.has(call.mcp.tool)) {
+      return false
+    }
+    return sharedToolWrites(call.name) ?? mcpNameKind(call.mcp.tool) !== 'read'
   }
-  if (name.startsWith('mcp__')) {
-    return sharedToolWrites(name) ?? mcpNameKind(name) !== 'read'
-  }
-  if (name === 'Bash') {
-    const cmd = bashCommand(input)
-    return OUTWARD_BASH.some((re) => re.test(cmd))
-  }
-  return false
+  const command = shellCommand(call)
+  return OUTWARD_BASH.some((re) => re.test(command))
 }
 
-export function outwardToolUses(m: SDKMessage): string[] {
-  if (m.type !== 'assistant') {
-    return []
-  }
-  return m.message.content.flatMap((block) =>
-    block.type === 'tool_use' && isOutward(block.name, block.input) ? [block.id] : [],
-  )
-}
+/** The ids of the calls in these events that can change something outside this machine. */
+export const outwardCalls = (events: readonly RuntimeEvent[]): string[] =>
+  events.flatMap((event) => (event.type === 'tool.started' && isOutward(event.call) ? [event.call.callId] : []))

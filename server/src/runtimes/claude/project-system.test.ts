@@ -108,12 +108,19 @@ describe('Claude session and compaction messages', () => {
         callId: 'toolu_9',
         tool: 'Bash',
         by: 'runtime',
+        classifier: true,
         reason: 'Deletes files outside the project',
+        text: 'Permission denied',
       },
     ])
-    expect(system('permission_denied', { ...denial, decision_reason: undefined })).toMatchObject([
-      { reason: 'Permission denied' },
+    const ruled = system('permission_denied', { ...denial, decision_reason: undefined, decision_reason_type: 'rule' })
+    expect(ruled).toMatchObject([{ text: 'Permission denied' }])
+    expect(ruled[0]).not.toHaveProperty('reason')
+    expect(ruled[0]).not.toHaveProperty('classifier')
+    expect(system('code_change_published', { url: 'https://github.com/o/r/pull/1', action: 'created' })).toEqual([
+      { v: 1, thread: '', type: 'change.published', url: 'https://github.com/o/r/pull/1', action: 'created' },
     ])
+    expect(system('code_change_published', { action: 'created' })).toMatchObject([{ type: 'vendor' }])
     expect(system('local_command_output', { content: 'Cost: $0.10' })).toMatchObject([
       { type: 'message', role: 'command', text: 'Cost: $0.10' },
     ])
