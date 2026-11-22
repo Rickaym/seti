@@ -2,6 +2,7 @@ import type { CompactRule, Task } from '@seti/shared'
 import { permissionModeOf } from './bypass-mode.js'
 import { hostLoginKey } from './claude-logins.js'
 import { compactSetup, effectiveCompact } from './compact.js'
+import { taskLauncher } from './launcher.js'
 import { borrowedStamp, taskBorrowedServers } from './mcp-borrowed.js'
 import { taskDeniedServers } from './mcp-selection.js'
 import { tokenServers } from './mcp-sign-in.js'
@@ -96,7 +97,7 @@ function specKey(spec: SessionSpec): string {
 export const setupKey = async (task: Task) => specKey(await sessionSpec(task))
 
 const realise = async (spec: SessionSpec, task: Task, abortController: AbortController) =>
-  adapterFor(spec.runtime).realise(spec, task, abortController)
+  adapterFor(spec.runtime).realise(spec, await taskLauncher(task, 'agent', true), task, abortController)
 
 /** The options a task's process starts with, resuming the task's session if any. */
 export const sessionOptions = async (task: Task, abortController: AbortController) =>
