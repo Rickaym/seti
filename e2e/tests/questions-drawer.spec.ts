@@ -55,7 +55,9 @@ test("an agent's header opens a drawer with only its questions, which takes turn
   await agentQuestions(page, pusher).getByRole('button', { name: 'Dismiss Push' }).click()
   await expect(drawer).toHaveCount(0)
   await expect(sentToast(page, 'dismissed 1 question')).toBeVisible()
-  expect(await apiData<Question[]>(request, '/questions')).toEqual([])
+  for (const agent of [checker, pusher]) {
+    expect(await apiData<Question[]>(request, `/questions?task_id=${agent.id}`)).toEqual([])
+  }
 })
 
 test('the drawer closes itself when the agent has no questions left, however they were settled', async ({
