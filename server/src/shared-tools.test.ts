@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import type * as Sdk from '@anthropic-ai/claude-agent-sdk'
 import {
   auditQuery,
   SHARED_TOOL_BYTES_MAX,
@@ -13,7 +14,7 @@ import {
   type SharedToolDefinition,
   type Task,
 } from '@seti/shared'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { asAgent } from './access.js'
 import { createApp } from './app.js'
 import { findBinary } from './binaries.js'
@@ -49,6 +50,15 @@ const bwrapWorks = (() => {
     return false
   }
 })()
+
+/** Allow and Deny hand the agent its update at once, which starts a turn of this fake session. */
+vi.mock('@anthropic-ai/claude-agent-sdk', async (importOriginal) => {
+  const { FakeSdk, fakeResult } = await import('./fake-sdk.js')
+  const fake = new FakeSdk(function* () {
+    yield fakeResult()
+  })
+  return { ...(await importOriginal<typeof Sdk>()), query: fake.query }
+})
 
 const app = createApp()
 const [requestChange] = REQUEST_TOOLS
