@@ -131,9 +131,11 @@ export class ResourceSampler {
     return {
       sampled_at: latest.sampled_at,
       memory_percent: percentOf(memory.used_bytes, memory.total_bytes),
+      memory_total_bytes: memory.total_bytes,
       cpu_percent: latest.host.cpu_percent,
       anomalies: latest.anomalies.length,
       severity: first?.severity ?? 'ok',
+      rules: [...new Set(latest.anomalies.map((anomaly) => anomaly.rule))],
       headline: first?.message ?? null,
     }
   }

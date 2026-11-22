@@ -195,9 +195,11 @@ test('warnings colour their item on the bar, only a critical one fills it, and i
   const summary = (severity: 'warning' | 'critical') => ({
     sampled_at: at(0),
     memory_percent: 60,
+    memory_total_bytes: 32 * 1024 ** 3,
     cpu_percent: 30,
     anomalies: 2,
     severity,
+    rules: ['load' as const],
     headline: 'Load 17.2 on 8 CPUs',
   })
   let severity: 'warning' | 'critical' = 'warning'

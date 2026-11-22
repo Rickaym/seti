@@ -1,5 +1,5 @@
 import type { Page } from '@playwright/test'
-import type { Envelope, Resources, ResourceSummary, TaskProcess } from '@seti/shared'
+import type { AnomalyRule, Envelope, Resources, ResourceSummary, TaskProcess } from '@seti/shared'
 
 const GB = 1024 ** 3
 const MB = 1024 ** 2
@@ -163,9 +163,11 @@ const RESOURCES: Resources = {
 const SUMMARY: ResourceSummary = {
   sampled_at: RESOURCES.sampled_at,
   memory_percent: 73,
+  memory_total_bytes: RESOURCES.host.memory.total_bytes,
   cpu_percent: 91,
   anomalies: RESOURCES.anomalies.length,
   severity: 'critical',
+  rules: [...new Set(RESOURCES.anomalies.map((anomaly) => anomaly.rule))],
   headline: RESOURCES.anomalies[0]?.message ?? null,
 }
 
@@ -181,4 +183,49 @@ export async function mockResources(page: Page): Promise<string[]> {
     await route.fulfill({ json: envelope({ ok: true }) })
   })
   return stopped
+}
+
+interface HostLoad {
+  cpu: number
+  memory: number
+  /** The host rules broken, such as `host_memory` under pressure; none for a healthy host. */
+  rules: readonly AnomalyRule[]
+}
+
+/** Serves a host this busy on both resource routes, with only the named anomalies. */
+export async function mockHost(page: Page, { cpu, memory, rules }: HostLoad): Promise<void> {
+  const anomalies = rules.map((rule) => ({
+    rule,
+    severity: 'warning' as const,
+    message: `Rule ${rule} broken`,
+    task_id: null,
+    component: null,
+    mount: null,
+  }))
+  const total = RESOURCES.host.memory.total_bytes
+  const used = (total * memory) / 100
+  const resources: Resources = {
+    ...RESOURCES,
+    host: {
+      ...RESOURCES.host,
+      load: [6, 5, 4],
+      cpu_percent: cpu,
+      memory: { total_bytes: total, used_bytes: used, available_bytes: total - used },
+      swap: { total_bytes: 8 * GB, used_bytes: 0 },
+    },
+    tasks: [],
+    anomalies,
+  }
+  const summary: ResourceSummary = {
+    sampled_at: RESOURCES.sampled_at,
+    memory_percent: memory,
+    memory_total_bytes: total,
+    cpu_percent: cpu,
+    anomalies: anomalies.length,
+    severity: anomalies.length > 0 ? 'warning' : 'ok',
+    rules: [...rules],
+    headline: anomalies[0]?.message ?? null,
+  }
+  await page.route('**/api/resources', async (route) => route.fulfill({ json: envelope(resources) }))
+  await page.route('**/api/resources/summary', async (route) => route.fulfill({ json: envelope(summary) }))
 }

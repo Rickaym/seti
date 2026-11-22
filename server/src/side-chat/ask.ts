@@ -8,8 +8,8 @@ import { refuseHiddenDirect } from '../direct-privacy.js'
 import { refuseOtherAgent } from '../ea-guard.js'
 import { HttpError } from '../http.js'
 import { sessionState } from '../runner.js'
+import { adapterFor, DEFAULT_RUNTIME } from '../runtimes/registry.js'
 import { redactSecrets } from '../scrub.js'
-import { startQuery } from '../sdk-query.js'
 import { moveSessionTo } from '../session-files.js'
 import { addSideChatCost } from '../store/cost.js'
 import { rewinds } from '../store/rewinds.js'
@@ -99,7 +99,7 @@ async function runFork(task: Task, fork: ForkPoint, prompt: string, run: Running
   const file = sessionFile(fork.session_id, task.cwd)
   const saved = savedTotal(file)
   const options = await sideChatOptions(task, fork, { reads: run.reads, abortController: run.abort })
-  const query = startQuery({ prompt: once(prompt), options })
+  const query = adapterFor(DEFAULT_RUNTIME).open({ prompt: once(prompt), options })
   const stream = new AnswerStream()
   const outcome = async (m: SDKResultMessage): Promise<Outcome> => {
     const cost = await countCost(task, m, Math.max(saved, savedTotal(file)))

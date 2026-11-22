@@ -1,0 +1,23 @@
+import { query, type Query } from '@anthropic-ai/claude-agent-sdk'
+import type { RuntimeAdapter } from '../adapter.js'
+
+/** What a Claude Code session starts from: the SDK's streaming prompt and its options. */
+type ClaudeStart = Parameters<typeof query>[0]
+
+/** Starts Claude Code through the SDK; a development server may load a fake instead. */
+let transport: typeof query = query
+
+/** Claude Code through the Claude Agent SDK, one process per session. */
+export const claudeAdapter: RuntimeAdapter<ClaudeStart, Query> = {
+  id: 'claude',
+  open: (start) => transport(start),
+}
+
+/** Replaces the SDK's query with the one a module exports, such as the e2e suite's fake. */
+export async function loadSdkModule(file: string): Promise<void> {
+  const loaded = (await import(file)) as { query?: unknown }
+  if (typeof loaded.query !== 'function') {
+    throw new Error(`${file} exports no query function`)
+  }
+  transport = loaded.query as typeof query
+}

@@ -228,5 +228,8 @@ describe('GET /api/resources', () => {
     const { data } = (await res.json()) as { data: unknown }
     const summary = resourceSummarySchema.parse(data)
     expect(summary.memory_percent).toBeGreaterThan(0)
+    expect(summary.memory_total_bytes).toBeGreaterThan(0)
+    expect(new Set(summary.rules).size).toBe(summary.rules.length)
+    expect(summary.rules.length).toBeLessThanOrEqual(summary.anomalies)
   })
 })

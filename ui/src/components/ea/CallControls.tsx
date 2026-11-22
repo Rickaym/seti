@@ -24,8 +24,9 @@ function Control({ hint, touch, ...props }: ComponentProps<typeof Button> & { hi
   return touch ? button : <Hint text={hint}>{button}</Hint>
 }
 
-/** A phone too narrow for four thumb-sized buttons wraps them instead of overflowing. */
-const row = (touch: boolean, className?: string) => cn('flex gap-2 px-3 pb-3', touch && 'flex-wrap gap-1.5', className)
+/** The row wraps rather than run past a narrow popover, sheet or card. */
+const row = (touch: boolean, className?: string) =>
+  cn('flex flex-wrap px-3 pb-3', touch ? 'gap-1.5' : 'gap-2', className)
 
 async function reroute(store: EaCallStore): Promise<void> {
   if (!(await store.reroute())) {
@@ -93,11 +94,13 @@ export function CallControls({ call, canStart, touch, className }: CallControlsP
         touch={touch}
         hint="Move the call to your headset or the output in use now"
         variant="outline"
+        className={touch ? undefined : 'w-8 flex-none px-0'}
+        aria-label="Audio"
         disabled={!connected}
         onClick={() => void reroute(store)}
       >
         <Headphones />
-        Audio
+        {touch && 'Audio'}
       </Control>
       <Control
         touch={touch}

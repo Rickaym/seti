@@ -1,6 +1,8 @@
 import type { Anomaly, AnomalyRule, DiskUsage, HistoryPoint, HostResources } from '@seti/shared'
 import type { ReactNode } from 'react'
 import { Sparkline } from '@/components/Sparkline'
+import { HypeMeter } from '@/components/resources/HypeMeter'
+import { inTrouble, meterState } from '@/components/resources/hype'
 import { cn } from '@/lib/utils'
 import { ageLabel, bytesLabel, percentLabel } from '@/panels/resources/format'
 import { SettingsCard } from '@/panels/settings/layout'
@@ -76,7 +78,9 @@ export function HostCard({
   history: readonly HistoryPoint[]
   anomalies: readonly Anomaly[]
 }) {
-  const has = (rule: AnomalyRule) => anomalies.some((a) => a.rule === rule)
+  const rules = anomalies.map((a) => a.rule)
+  const has = (rule: AnomalyRule) => rules.includes(rule)
+  const memoryPercent = percentOf(host.memory.used_bytes, host.memory.total_bytes)
   const { memory, swap } = host
   const [one, five, fifteen] = host.load.map((v) => v.toFixed(1))
   return (
@@ -88,6 +92,12 @@ export function HostCard({
           detail={`${String(host.cpus)} CPUs, load ${one ?? '-'} ${five ?? '-'} ${fifteen ?? '-'}`}
           flagged={has('load')}
         >
+          <HypeMeter
+            label="Host CPU"
+            percent={host.cpu_percent}
+            state={meterState(host.cpu_percent, inTrouble('cpu', rules))}
+            className="mb-2 w-full"
+          />
           <Sparkline
             label="Host CPU, last hour"
             points={history.map((p) => ({ at: p.at, value: p.cpu_percent }))}
@@ -97,10 +107,16 @@ export function HostCard({
         </Tile>
         <Tile
           label="Memory"
-          value={percentLabel(percentOf(memory.used_bytes, memory.total_bytes))}
+          value={percentLabel(memoryPercent)}
           detail={`${bytesLabel(memory.used_bytes)} of ${bytesLabel(memory.total_bytes)}, ${bytesLabel(memory.available_bytes)} available`}
           flagged={has('host_memory')}
         >
+          <HypeMeter
+            label="Host memory"
+            percent={memoryPercent}
+            state={meterState(memoryPercent, inTrouble('memory', rules))}
+            className="mb-2 w-full"
+          />
           <Sparkline
             label="Host memory, last hour"
             points={history.map((p) => ({ at: p.at, value: p.memory_percent }))}
