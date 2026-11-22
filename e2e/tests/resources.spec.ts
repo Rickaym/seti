@@ -43,7 +43,7 @@ test('the resources page shows the host, tasks and components, and stops a hung 
   await expect(main).toContainText('each sample takes 6.2 ms, 5.1 ms of it on the CPU')
 })
 
-test('the status bar bar keeps both numbers in the hint, fill once an anomaly is critical and open the page', async ({
+test('the status bar keeps both host numbers in the hint, fills once an anomaly is critical and open the page', async ({
   page,
 }) => {
   await mockResources(page)
