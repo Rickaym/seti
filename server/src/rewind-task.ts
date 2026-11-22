@@ -13,6 +13,7 @@ import { taskLauncher } from './launcher.js'
 import { matchChain, rewindPoints, type ChainMatch, type RewindPoint } from './rewind.js'
 import { closeIdleSession, isRunning } from './runner.js'
 import { claudeLaunch } from './runtimes/claude/realise.js'
+import { adapterFor, DEFAULT_RUNTIME } from './runtimes/registry.js'
 import { shellTurnGuard } from './shell-context.js'
 import { rewinds } from './store/rewinds.js'
 import { requireTask } from './tasks.js'
@@ -108,15 +109,35 @@ async function rewindFiles(task: Task, promptUuid: string, dryRun: boolean): Pro
 }
 
 const NO_CHECKPOINT = 'Claude Code has no file checkpoint for this prompt'
+const NO_FILE_REWIND = "This agent's runtime cannot put files back"
+
+const canRewind = () => adapterFor(DEFAULT_RUNTIME).capabilities.rewind
+
+/** Refuses a rewind of a part the agent's runtime cannot put back. */
+function refuseUnsupported(restore: RewindRestore): void {
+  const { conversation, code } = canRewind()
+  if (restore !== 'code' && !conversation) {
+    throw new HttpError(409, "This agent's runtime cannot resume from an earlier prompt")
+  }
+  if (restore !== 'conversation' && !code) {
+    throw new HttpError(409, NO_FILE_REWIND)
+  }
+}
+
+async function plannedFiles(task: Task, match: ChainMatch): Promise<RewindFilesResult> {
+  if (!canRewind().code) {
+    return { canRewind: false, error: NO_FILE_REWIND }
+  }
+  return match.prompt_uuid === null
+    ? { canRewind: false, error: NO_CHECKPOINT }
+    : rewindFiles(task, match.prompt_uuid, true)
+}
 
 /** What restoring code to just before a prompt would change; nothing is written. */
 export async function previewRewindFiles(taskId: string, messageId: number): Promise<RewindFilesPreview> {
   const task = await requireTask(taskId)
   const match = await locate(task, await requirePoint(task, messageId))
-  const result: RewindFilesResult =
-    match.prompt_uuid === null
-      ? { canRewind: false, error: NO_CHECKPOINT }
-      : await rewindFiles(task, match.prompt_uuid, true)
+  const result = await plannedFiles(task, match)
   return {
     can_rewind: result.canRewind,
     error: result.canRewind ? null : (result.error ?? NO_CHECKPOINT),
@@ -142,6 +163,7 @@ const preview = (text: string) => (text.length > PREVIEW_CHARS ? `${text.slice(0
 /** Goes back to just before an earlier prompt: its conversation on the next turn, its files now. */
 export async function rewindTask(taskId: string, messageId: number, restore: RewindRestore): Promise<RewindResult> {
   refuseOnSelf(taskId, 'rewind')
+  refuseUnsupported(restore)
   const task = await requireTask(taskId)
   assertIdle(task.id)
   const point = await requirePoint(task, messageId)

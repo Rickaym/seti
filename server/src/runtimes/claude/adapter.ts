@@ -9,6 +9,11 @@ let transport: typeof query = query
 /** Claude Code through the Claude Agent SDK, one process per session. */
 export const claudeAdapter: RuntimeAdapter<ClaudeShapes> = {
   id: 'claude',
+  capabilities: {
+    gate: { rewriteInput: true },
+    session: { fork: 'ephemeral' },
+    rewind: { conversation: true, code: true },
+  },
   realise,
   open: async (start) => Promise.resolve(claudeSession(transport(start))),
 }

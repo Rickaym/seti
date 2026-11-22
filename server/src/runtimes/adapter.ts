@@ -5,6 +5,19 @@ import type { SessionSpec } from '../session-spec.js'
 export type RuntimeId = 'claude'
 
 /**
+ * What a runtime can do where Seti would otherwise assume Claude Code. A session whose runtime
+ * version lacks a control leaves that control off instead.
+ */
+interface Capabilities {
+  /** A decision can change the call's input, as an edit before allowing a held call does. */
+  gate: { rewriteInput: boolean }
+  /** Whether a session can fork, and whether the fork can stay off disk. */
+  session: { fork: 'none' | 'persistent' | 'ephemeral' }
+  /** A later turn can resume from an earlier prompt, and files can go back to a prompt. */
+  rewind: { conversation: boolean; code: boolean }
+}
+
+/**
  * The values a runtime's sessions take and give that are still the runtime's own: what a spec
  * carries for it alone, what it realises a spec into, how Seti decides and checks its tool calls
  * and serves its own tools, what a session starts from, the messages it streams, its tool server
@@ -70,6 +83,7 @@ export interface SessionHost<S extends RuntimeShapes> {
 /** Seti's driver for one agent runtime, the only code that starts the runtime's sessions. */
 export interface RuntimeAdapter<S extends RuntimeShapes> {
   readonly id: RuntimeId
+  readonly capabilities: Capabilities
   /** What a session of the spec starts from, run by the launcher and answered by the host. */
   realise(
     spec: SessionSpec,
