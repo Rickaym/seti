@@ -1,7 +1,5 @@
 import { z } from 'zod'
-import { lenientArray, orDefault, type ResponseSchema } from './lenient.js'
 import type { LinkedTask, PrRow } from './prs.js'
-import { TASK_STATUSES } from './tasks.js'
 
 /** A PR as the Fix CI message names it. */
 export type FixCiPr = Pick<PrRow, 'repo_slug' | 'number'>
@@ -34,8 +32,6 @@ export interface FixCiPlan {
 
 /** Limits the plan to one agent, by id. */
 export const fixCiQuery = z.object({ task: z.string().trim().min(1).max(100).optional() })
-
-const plural = (count: number, one: string, many: string) => `${String(count)} ${count === 1 ? one : many}`
 
 const listed = (items: readonly string[]) =>
   items.length < 2 ? items.join('') : `${items.slice(0, -1).join(', ')} and ${items.at(-1) ?? ''}`
@@ -106,40 +102,3 @@ export function planFixCi(
   }
   return { nudges, skipped, unlinked }
 }
-
-/** How many distinct PRs the plan's messages name. */
-export function fixCiPrCount({ nudges }: Pick<FixCiPlan, 'nudges'>): number {
-  const keys = nudges.flatMap(({ prs }) => prs.map((pr) => `${pr.repo_slug.toLowerCase()}#${String(pr.number)}`))
-  return new Set(keys).size
-}
-
-/** `3 agents about 5 PRs`: what sending the plan reaches. */
-export const fixCiReach = (plan: Pick<FixCiPlan, 'nudges'>) =>
-  `${plural(plan.nudges.length, 'agent', 'agents')} about ${plural(fixCiPrCount(plan), 'PR', 'PRs')}`
-
-/** What the plan leaves out, as sentences; empty when it covers every failing PR. */
-export function fixCiSkipped({ skipped, unlinked }: Pick<FixCiPlan, 'skipped' | 'unlinked'>): string {
-  const agents = skipped.map(({ task, reason }) => `${task.title} (${reason})`)
-  return [
-    agents.length > 0 ? `Skipped ${listed(agents)}.` : '',
-    unlinked > 0 ? `Skipped ${plural(unlinked, 'failing PR', 'failing PRs')} with no agent.` : '',
-  ]
-    .filter((line) => line !== '')
-    .join(' ')
-}
-
-const linkedTask = z.object({ id: z.string(), title: z.string(), status: z.enum(TASK_STATUSES) })
-
-export const fixCiPlanSchema = z.object({
-  nudges: lenientArray(
-    'fix ci nudge',
-    z.object({
-      task: linkedTask,
-      prs: z.array(z.object({ repo_slug: z.string(), number: z.number() })),
-      message: z.string(),
-    }),
-  ),
-  skipped: lenientArray('fix ci skip', z.object({ task: linkedTask, reason: z.enum(['archived', 'stopped']) })),
-  unlinked: orDefault('unlinked', z.number().int().nonnegative(), 0),
-  error: orDefault('fix ci error', z.string().nullable(), null),
-}) satisfies ResponseSchema<FixCiPlan>

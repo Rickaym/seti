@@ -1,4 +1,4 @@
-import { fixCiNudge, fixCiReach, fixCiSkipped, planFixCi, type LinkedTask, type PrRow } from '@seti/shared'
+import { fixCiNudge, planFixCi, type LinkedTask, type PrRow } from '@seti/shared'
 import { describe, expect, it } from 'vitest'
 
 const task = (id: string, status: LinkedTask['status'] = 'idle'): LinkedTask => ({ id, title: `Agent ${id}`, status })
@@ -76,7 +76,6 @@ describe('planFixCi', () => {
         message: 'CI is failing on acme/app#2 and acme/docs#3. Please fix them.',
       },
     ])
-    expect(fixCiReach(plan)).toBe('2 agents about 3 PRs')
   })
 
   it('skips archived and stopped agents and counts failing PRs with no agent', () => {
@@ -85,22 +84,17 @@ describe('planFixCi', () => {
       { task: halted, reason: 'stopped' },
     ])
     expect(plan.unlinked).toBe(1)
-    expect(fixCiSkipped(plan)).toBe(
-      'Skipped Agent gone (archived) and Agent halted (stopped). Skipped 1 failing PR with no agent.',
-    )
   })
 
   it('covers one agent alone when asked for it', () => {
     const only = planFixCi(rows, new Set(['gone']), 'b')
     expect(only.nudges.map((nudge) => nudge.task.id)).toEqual(['b'])
     expect(only).toMatchObject({ skipped: [], unlinked: 0 })
-    expect(fixCiReach(only)).toBe('1 agent about 2 PRs')
     expect(planFixCi(rows, new Set(['gone']), 'gone').skipped).toEqual([{ task: gone, reason: 'archived' }])
   })
 
   it('plans nothing when no PR fails', () => {
     const quiet = planFixCi([row('acme/app', 4, 'success', [a])], new Set())
     expect(quiet).toEqual({ nudges: [], skipped: [], unlinked: 0 })
-    expect(fixCiSkipped(quiet)).toBe('')
   })
 })
