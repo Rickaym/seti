@@ -20,15 +20,15 @@ interface Props {
   onImport: () => void
 }
 
-/** The Agents list title with layout toggles, the filter, new agent and the list menu. */
+/** The Agents list title with the filter, layout toggles, new agent and the list menu. */
 export function AgentsHeader(props: Props) {
   const { narrow, searching, onSearching, archived, onArchived, archiving, onArchiving, onImport } = props
   return (
     <div className="flex items-center justify-between gap-2 border-b border-border px-3 py-2">
       <h1 className="min-w-0 truncate text-sm font-semibold">Agents</h1>
       <div className="flex shrink-0 gap-1.5">
-        <LayoutToggles narrow={narrow} />
         {searching !== null && <AgentSearchButton open={searching} onOpen={onSearching} />}
+        <LayoutToggles narrow={narrow} />
         <Hint text={`New agent (${chordLabel(CHORDS.newAgent)})`}>
           <Button
             size="icon-sm"
