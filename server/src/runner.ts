@@ -9,7 +9,6 @@ export {
   stopSessionTask,
   stopTurn,
 } from './session-control.js'
-export { liveSessions } from './session-host.js'
 export { appendMessage, onTurnEnd, openQuerySince } from './session-ingest.js'
 export { autoQueueBlocker, isRunning, sessionState } from './session-mirror.js'
 export { agentEnv, registerContextProvider } from './session-options.js'

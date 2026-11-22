@@ -172,4 +172,52 @@ describe('node journal', () => {
     await settled()
     expect(applied).toEqual(['task-1:n1', 'task-1:n2'])
   })
+
+  it('keeps each cursor before acknowledging, so a restart never applies an entry twice', async () => {
+    const { sent, applied, outbox } = link()
+    const kept: { agent: string; epoch: string; seq: number }[] = []
+    const apply = async (agent: string, entry: JournalEntry) => {
+      applied.push(`${agent}:${entry.type === 'note' ? entry.error : entry.type}`)
+      await flushed()
+    }
+    const first = new JournalInbox(
+      apply,
+      () => undefined,
+      async (cursor) => {
+        kept.push(cursor)
+        await flushed()
+      },
+    )
+    outbox.append(AGENT, note(1))
+    first.receive(only(sent))
+    await settled()
+    expect(kept).toEqual([{ agent: AGENT, epoch: outbox.positions()[0]?.epoch, seq: 1 }])
+    outbox.disconnected()
+    outbox.append(AGENT, note(2))
+    const restarted = new JournalInbox(apply, () => undefined)
+    restarted.restore(kept)
+    expect(outbox.positions().every((position) => restarted.hello(position))).toBe(true)
+    outbox.resume(restarted.positions())
+    restarted.receive(only(sent))
+    await settled()
+    expect(applied).toEqual(['task-1:n1', 'task-1:n2'])
+  })
+
+  it('lets the node wait until the control plane stored every entry before it stops', async () => {
+    const { sent, outbox, inbox, deliverReplies } = link()
+    let drained = false
+    outbox.append(AGENT, note(1))
+    outbox.append(AGENT, note(2))
+    void outbox.drained().then(() => {
+      drained = true
+    })
+    for (const frame of sent.splice(0)) {
+      inbox.receive(frame)
+    }
+    await settled()
+    expect(drained).toBe(false)
+    deliverReplies()
+    await settled()
+    expect(drained).toBe(true)
+  })
 })

@@ -4,6 +4,13 @@ import type { JournalPosition } from './node-outbox.js'
 /** How long the control plane keeps an ask's answer, so a retried ask never runs twice. */
 const ANSWER_KEEP_MS = 24 * 60 * 60 * 1000
 
+/** A cursor as the control plane keeps it across its restarts. */
+interface SavedCursor {
+  agent: string
+  epoch: string
+  seq: number
+}
+
 /** Where the control plane stands in one agent's journal. */
 class Cursor {
   readonly epoch: string
@@ -51,10 +58,24 @@ export class JournalInbox {
   private readonly cursors = new Map<string, Cursor>()
   private readonly apply: (agent: string, entry: JournalEntry) => Promise<void>
   private readonly reply: (frame: JournalReply) => void
+  private readonly saved: (cursor: SavedCursor) => Promise<void>
 
-  constructor(apply: (agent: string, entry: JournalEntry) => Promise<void>, reply: (frame: JournalReply) => void) {
+  /** `saved` keeps each cursor before its entry is acknowledged, so a restart takes up from it. */
+  constructor(
+    apply: (agent: string, entry: JournalEntry) => Promise<void>,
+    reply: (frame: JournalReply) => void,
+    saved: (cursor: SavedCursor) => Promise<void> = async () => Promise.resolve(),
+  ) {
     this.apply = apply
     this.reply = reply
+    this.saved = saved
+  }
+
+  /** Takes up from the cursors kept before a restart; a node's hello is checked against them. */
+  restore(saved: readonly SavedCursor[]): void {
+    for (const { agent, epoch, seq } of saved) {
+      this.cursors.set(agent, new Cursor(epoch, seq))
+    }
   }
 
   /** What the node must send again from, per agent. */
@@ -113,6 +134,11 @@ export class JournalInbox {
       await this.apply(agent, entry)
     } catch (e) {
       process.stderr.write(`node link: agent ${agent}: entry ${String(seq)} failed: ${String(e)}\n`)
+    }
+    try {
+      await this.saved({ agent, epoch, seq })
+    } catch (e) {
+      process.stderr.write(`node link: agent ${agent}: cursor ${String(seq)} not kept: ${String(e)}\n`)
     }
     this.reply({ type: 'journal.ack', agent, epoch, seq })
   }
