@@ -1,6 +1,6 @@
 import type { Connection } from '@seti/shared'
 import { apiData, expect, test } from './support/fixtures.js'
-import { expectFitsPhone } from './support/phone-layout.js'
+import { expectFitsPhone, expectTouchTarget } from './support/phone-layout.js'
 
 const TENANT = '0000aaaa-11bb-22cc-33dd-444444eeeeee'
 const APP = '1111bbbb-22cc-33dd-44ee-555555ffffff'
@@ -21,7 +21,7 @@ test('a service is picked by name, filled in and added on a phone', async ({ pag
   await expectFitsPhone(page, 'service picker')
   const stripe = picker.getByRole('button', { name: 'Stripe' })
   await expect(stripe.locator('svg[data-service-icon="stripe"]')).toBeVisible()
-  expect((await stripe.boundingBox())?.height).toBeGreaterThanOrEqual(44)
+  await expectTouchTarget(stripe)
   await picker.getByLabel('Search services').fill('entra')
   await expect(picker.getByRole('button', { name: 'Microsoft Entra app' }).locator('svg.lucide-cloud')).toBeVisible()
   await picker.getByRole('button', { name: 'Microsoft Entra app' }).tap()

@@ -3,6 +3,7 @@ import { once } from 'node:events'
 import fs from 'node:fs'
 import path from 'node:path'
 import type { Readable } from 'node:stream'
+import { setTimeout as delay } from 'node:timers/promises'
 import { SOURCE_HISTORY, UPSTREAM_HISTORY } from './changelog.js'
 import { dropDatabases } from './db.js'
 import { DEMO_DATABASE_URL, LOCAL_TOKENS, paths, PLUGIN, serverEnv } from './env.js'
@@ -11,6 +12,10 @@ import { seedSessions } from './sessions.js'
 const SERVER_DIR = path.join(import.meta.dirname, '../../../server')
 const START_TIMEOUT_MS = 60_000
 const STOP_TIMEOUT_MS = 10_000
+const GROUP_GRACE_MS = 2_000
+const GROUP_POLL_MS = 20
+const REMOVE_RETRIES = 5
+const REMOVE_RETRY_MS = 100
 const LISTENING = /seti (?:demo )?listening on (http:\/\/\S+)/
 
 const GIT_ENV = {
@@ -114,17 +119,35 @@ async function listeningOrigin(child: ServerProcess): Promise<string> {
 
 const running = (child: ChildProcess) => child.exitCode === null && child.signalCode === null
 
-/** Ends the server's process group, which also holds the Claude Code probes it started. */
-async function stop(child: ChildProcess, pid: number): Promise<void> {
-  if (!running(child)) {
-    return
+/** Signals every process of the group; false once none is left. Signal 0 only asks. */
+function signalGroup(pid: number, signal: NodeJS.Signals | 0): boolean {
+  try {
+    return process.kill(-pid, signal)
+  } catch {
+    return false
   }
-  const exited = once(child, 'exit')
-  process.kill(-pid, 'SIGTERM')
+}
+
+/** Resolves once the group is empty, or after the wait a group that was killed never needs. */
+async function groupGone(pid: number): Promise<void> {
+  const deadline = Date.now() + STOP_TIMEOUT_MS + GROUP_GRACE_MS
+  while (signalGroup(pid, 0) && Date.now() < deadline) {
+    await delay(GROUP_POLL_MS)
+  }
+}
+
+/**
+ * Ends the server's process group and waits for all of it. The Claude Code probes in the group
+ * outlive the server by a moment and write to the worker's home as they exit.
+ */
+async function stop(child: ChildProcess, pid: number): Promise<void> {
+  const exited = running(child) ? once(child, 'exit') : Promise.resolve()
+  signalGroup(pid, 'SIGTERM')
   const timer = setTimeout(() => {
-    process.kill(-pid, 'SIGKILL')
+    signalGroup(pid, 'SIGKILL')
   }, STOP_TIMEOUT_MS)
   await exited
+  await groupGone(pid)
   clearTimeout(timer)
 }
 
@@ -166,7 +189,7 @@ async function start(args: string[], env: NodeJS.ProcessEnv): Promise<Started> {
 async function launch(args: string[], env: NodeJS.ProcessEnv, drop: 'worker' | 'demo'): Promise<WorkerServer> {
   const cleanUp = async () => {
     await dropDatabases(drop)
-    fs.rmSync(paths.root, { recursive: true, force: true })
+    fs.rmSync(paths.root, { recursive: true, force: true, maxRetries: REMOVE_RETRIES, retryDelay: REMOVE_RETRY_MS })
   }
   let current = await start(args, env).catch(async (e: unknown) => {
     await cleanUp()

@@ -5,6 +5,7 @@ import { openSeedDb } from './support/db.js'
 import { paths } from './support/env.js'
 import { botClosed, fakeEa } from './support/fake-ea.js'
 import { expect, test } from './support/fixtures.js'
+import { expectTouchTarget } from './support/phone-layout.js'
 import { HUNG_TASK, mockResources } from './support/resources.js'
 
 test.use({ permissions: ['microphone'] })
@@ -115,7 +116,7 @@ test('tasks show the list or the detail, and back returns to the list', async ({
   await page.goto('/#agents')
   const main = page.getByRole('main')
   const listed = main.getByRole('button', { name: new RegExp(title) })
-  expect((await listed.boundingBox())?.height).toBeGreaterThanOrEqual(44)
+  await expectTouchTarget(listed)
   await expect(listed.locator('time'), 'rows show no age').toHaveCount(0)
   await listed.tap()
   await expect(page).toHaveURL(new RegExp(`#agents/${id}$`))
@@ -191,8 +192,7 @@ test('the composer stays visible when the keyboard shrinks the viewport', async 
   await reply.fill('Checked from a phone')
   await expect.poll(async () => inViewport(page, reply)).toBe(true)
   await expect.poll(async () => inViewport(page, send)).toBe(true)
-  const sendBox = await send.boundingBox()
-  expect(sendBox?.height ?? 0).toBeGreaterThanOrEqual(44)
+  await expectTouchTarget(send)
   expect(await horizontalOverflow(page)).toBeLessThanOrEqual(0)
 })
 
@@ -204,12 +204,12 @@ test('a tap on EA opens a sheet whose call lasts across sections and the drawer'
   await expect(eaSheet(page)).toBeVisible()
   await expect(eaSheet(page)).not.toContainText('Ctrl+Shift+E')
   const call = eaSheet(page).getByRole('button', { name: 'Call', exact: true })
-  expect((await call.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(44)
+  await expectTouchTarget(call)
   await call.tap()
   await expect(eaSheet(page).getByTestId('ea-status')).toHaveText('Listening')
   for (const name of ['Mute', 'Sleep', 'Audio', 'Hang up']) {
     const button = eaSheet(page).getByRole('button', { name, exact: true })
-    expect((await button.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(44)
+    await expectTouchTarget(button)
   }
   await eaSheet(page).getByRole('button', { name: 'Close' }).tap()
   await expect(eaSheet(page)).toBeHidden()
@@ -252,7 +252,7 @@ test('settings is a list whose pages open full screen with a back button', async
   await expect(main.getByRole('heading', { name: 'Settings', level: 1 })).toBeVisible()
   await expect(list.locator('[aria-current="page"]')).toHaveCount(0)
   const general = list.getByRole('button', { name: 'General' })
-  expect((await general.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(44)
+  await expectTouchTarget(general)
 
   await general.tap()
   await expect(page).toHaveURL(/#settings\/general$/)

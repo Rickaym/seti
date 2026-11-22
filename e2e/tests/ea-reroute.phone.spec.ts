@@ -3,7 +3,7 @@ import type { EaHealth } from '@seti/shared'
 import { audioSpy, plugHeadset, spyOnAudio } from './support/audio.js'
 import { fakeEa } from './support/fake-ea.js'
 import { expect, test } from './support/fixtures.js'
-import { expectFitsPhone } from './support/phone-layout.js'
+import { expectFitsPhone, expectTouchTarget } from './support/phone-layout.js'
 
 test.use({ permissions: ['microphone'] })
 
@@ -43,7 +43,7 @@ test('a headset that connects and Audio in the call sheet both move the call wit
   await expect.poll(async () => sent(page)).toEqual(['default'])
 
   const reroute = eaSheet(page).getByRole('button', { name: 'Audio', exact: true })
-  expect((await reroute.boundingBox())?.height).toBeGreaterThanOrEqual(44)
+  await expectTouchTarget(reroute)
   await expectButtonsInside(page)
   const size = page.viewportSize()
   for (const width of PHONE_WIDTHS) {
@@ -54,9 +54,8 @@ test('a headset that connects and Audio in the call sheet both move the call wit
       CONTROLS.map(async (name) => eaSheet(page).getByRole('button', { name, exact: true }).boundingBox()),
     )
     expect(new Set(boxes.map((box) => box?.y)).size, `one row at ${String(width)}px`).toBe(1)
-    for (const box of boxes) {
-      expect(box?.height).toBeGreaterThanOrEqual(44)
-      expect(box?.width).toBeGreaterThanOrEqual(44)
+    for (const name of CONTROLS) {
+      await expectTouchTarget(eaSheet(page).getByRole('button', { name, exact: true }), name, 'both')
     }
   }
   await page.setViewportSize({ width: NARROW_PHONE, height: size?.height ?? 800 })

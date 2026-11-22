@@ -1,8 +1,6 @@
 import { seedMentions } from './support/file-mentions.js'
 import { expect, test, unique } from './support/fixtures.js'
-import { expectFitsPhone } from './support/phone-layout.js'
-
-const TARGET_PX = 44
+import { expectFitsPhone, TARGET_PX } from './support/phone-layout.js'
 
 test('a tap on a file chip or card opens Files, and the chip is a full touch target', async ({ page }) => {
   const { id } = await seedMentions(unique('Mentions phone'))

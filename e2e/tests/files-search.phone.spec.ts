@@ -1,5 +1,5 @@
 import { expect, test } from './support/fixtures.js'
-import { expectFitsPhone } from './support/phone-layout.js'
+import { expectFitsPhone, expectTouchTarget } from './support/phone-layout.js'
 import { seedSearchAgent } from './support/search-files.js'
 import { filesPanel } from './support/viewer-files.js'
 
@@ -13,7 +13,7 @@ test('the files sheet puts search on top and its results fill the sheet', async 
   await expect(panel.getByRole('button', { name: /notes\.md/ })).toBeVisible()
   await expect(search).toHaveCount(0)
   const open = panel.getByRole('button', { name: 'Search files' })
-  expect((await open.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(44)
+  await expectTouchTarget(open)
   await open.tap()
   const field = search.getByRole('textbox', { name: 'Search files by name' })
   await expect(field).toBeFocused()

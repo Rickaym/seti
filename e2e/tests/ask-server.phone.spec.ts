@@ -1,6 +1,6 @@
 import { addOffServer, allowAndTime, askingForServer, removeServer, requestCard } from './support/ask-server.js'
 import { expect, test } from './support/fixtures.js'
-import { expectFitsPhone } from './support/phone-layout.js'
+import { expectFitsPhone, expectTouchTarget } from './support/phone-layout.js'
 import { FAKE_CLAUDE_ENV } from './support/processes.js'
 
 test.use({ serverEnv: FAKE_CLAUDE_ENV })
@@ -20,7 +20,7 @@ test('on a phone one tap on Allow gives the asking agent the server in its next 
     await requestCard(page).scrollIntoViewIfNeeded()
     await expectFitsPhone(page, 'server request')
     const allow = requestCard(page).getByRole('button', { name: 'Allow', exact: true })
-    expect((await allow.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(44)
+    await expectTouchTarget(allow)
     await allowAndTime(page, { task, server: SERVER, tap: true }, info)
   } finally {
     await removeServer(request, SERVER)

@@ -2,7 +2,7 @@ import type { Envelope, MessagePage, Task } from '@seti/shared'
 import { paths } from './support/env.js'
 import { ASK_PROMPT, CHOICE_OPTIONS, CHOICE_PROMPT } from './support/fake-replies.js'
 import { apiData, expect, test, unique } from './support/fixtures.js'
-import { expectFitsPhone } from './support/phone-layout.js'
+import { expectFitsPhone, expectTouchTarget } from './support/phone-layout.js'
 import { FAKE_CLAUDE_ENV } from './support/processes.js'
 
 test.use({ serverEnv: FAKE_CLAUDE_ENV })
@@ -44,8 +44,7 @@ test('quick replies fit the phone and send the whole answer on a tap', async ({ 
   const replies = page.getByRole('main').getByRole('group', { name: 'Quick replies' })
   await expect(replies.getByRole('button')).toHaveCount(4)
   for (const button of await replies.getByRole('button').all()) {
-    const box = await button.boundingBox()
-    expect(box?.height, 'a quick reply is a touch target').toBeGreaterThanOrEqual(44)
+    await expectTouchTarget(button, 'a quick reply is a touch target')
   }
   await expectFitsPhone(page, 'quick replies under a question')
 

@@ -8,6 +8,7 @@ import {
   savedLogins,
 } from './support/claude-logins.js'
 import { expect, test, toasts } from './support/fixtures.js'
+import { expectTouchTarget } from './support/phone-layout.js'
 
 test.use({ serverEnv: LOGINS_ENV })
 
@@ -30,7 +31,7 @@ test('switches the Claude login from the status bar on a phone, and the logins f
 
   await accountItem(page).tap()
   const work = page.getByRole('menu').getByRole('menuitem', { name: 'Switch to Work' })
-  await expect.poll(async () => (await work.boundingBox())?.height).toBeGreaterThanOrEqual(44)
+  await expectTouchTarget(work)
   await work.tap()
   await expect(toasts(page).filter({ hasText: 'Using Work' })).toBeVisible()
   await expect(activeLoginName(page)).toHaveText('Work')

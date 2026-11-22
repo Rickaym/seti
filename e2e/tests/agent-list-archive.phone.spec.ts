@@ -4,9 +4,7 @@ import type { ArchivedTaskEntry, TaskListEntry } from '@seti/shared'
 import { openSeedDb } from './support/db.js'
 import { paths } from './support/env.js'
 import { apiData, expect, test, toasts, unique } from './support/fixtures.js'
-import { expectFitsPhone } from './support/phone-layout.js'
-
-const TARGET_PX = 44
+import { expectFitsPhone, expectTouchTarget } from './support/phone-layout.js'
 
 async function seedAgent(title: string): Promise<string> {
   const db = openSeedDb()
@@ -41,16 +39,16 @@ test('on a phone the list menu puts Archive on each row, one tap archives and Un
 
   await main(page).getByRole('button', { name: 'More list actions' }).tap()
   const item = page.getByRole('menuitemcheckbox', { name: 'Archive agents' })
-  await expect.poll(async () => Math.round((await box(item)).height)).toBeGreaterThanOrEqual(TARGET_PX)
+  await expectTouchTarget(item)
   await item.tap()
   const archive = archiveOf(page, title)
   await expect(archive).toBeVisible()
+  await expectTouchTarget(archive, 'Archive', 'both')
   const [button, line, light] = [
     await box(archive),
     await box(row(page, id)),
     await box(row(page, id).locator('[data-status-light]')),
   ]
-  expect(Math.min(button.width, button.height)).toBeGreaterThanOrEqual(TARGET_PX)
   expect(button.height, 'the row keeps its height').toBeLessThanOrEqual(line.height)
   expect(button.x + button.width, 'Archive sits beside the light').toBeLessThanOrEqual(light.x)
   await expect(row(page, id).getByText(title)).toBeVisible()
@@ -69,7 +67,7 @@ test('on a phone the list menu puts Archive on each row, one tap archives and Un
   expect((await apiData<TaskListEntry[]>(request, '/tasks')).map((task) => task.id)).toContain(id)
 
   const done = main(page).getByRole('button', { name: 'Done', exact: true })
-  expect((await box(done)).height).toBeGreaterThanOrEqual(TARGET_PX)
+  await expectTouchTarget(done)
   await done.tap()
   await expect(archiveOf(page, title)).toBeHidden()
 })

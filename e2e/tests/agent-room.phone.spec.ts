@@ -5,9 +5,8 @@ import { paths } from './support/env.js'
 import { expect, test, unique } from './support/fixtures.js'
 import { expectClear, PORTRAIT, safeAreas } from './support/ios.js'
 import { moreRow, tapMoreAction } from './support/phone-agent.js'
-import { edgesAtRest, expectFitsPhone, settled } from './support/phone-layout.js'
+import { edgesAtRest, expectFitsPhone, expectTouchTarget, settled } from './support/phone-layout.js'
 
-const TARGET_PX = 44
 /** The terminal bar's 44px row and its rule, which the agent header shares. */
 const HEADER_MAX_PX = 45
 /** One line of reply box plus its padding and rule. */
@@ -73,11 +72,6 @@ async function heightOf(page: Page, locator: Locator): Promise<number> {
   return (await edgesAtRest(page, locator)).height
 }
 
-async function expectTouchSized(locator: Locator, name: string): Promise<void> {
-  const box = await locator.boundingBox()
-  expect(Math.min(box?.width ?? 0, box?.height ?? 0), name).toBeGreaterThanOrEqual(TARGET_PX)
-}
-
 test('the agent view keeps the status bar and still gives the chat most of the screen', async ({ page }) => {
   await openAgent(page, unique('Room budget'))
   await expect(page.getByRole('banner')).toBeVisible()
@@ -128,7 +122,7 @@ test('the More sheet keeps search, the group chat and the agent tools in reach',
     'Search Seti',
     'Group chat',
   ]) {
-    await expectTouchSized(moreRow(page, name), name)
+    await expectTouchTarget(moreRow(page, name), name, 'both')
   }
   await actions.getByRole('button', { name: 'Search Seti' }).tap()
   const palette = page.getByRole('dialog', { name: 'Search Seti' })
@@ -152,7 +146,7 @@ test('a busy agent on a 320px phone keeps its title, Stop and every control at 4
   for (const name of ['Back to agents', 'Stop', 'Agent settings', 'More actions']) {
     const button = row.getByRole('button', { name, exact: true })
     await expect(button).toBeInViewport({ ratio: 1 })
-    await expectTouchSized(button, name)
+    await expectTouchTarget(button, name, 'both')
   }
   await expect(row.getByRole('img', { name: 'running' })).toBeVisible()
   expect(await heightOf(page, row)).toBeLessThanOrEqual(HEADER_MAX_PX)

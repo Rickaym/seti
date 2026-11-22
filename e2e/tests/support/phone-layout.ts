@@ -76,6 +76,21 @@ export const settled = async (page: Page) =>
     await Promise.all(finite.map(async (animation) => animation.finished.catch(() => undefined)))
   })
 
+/** The smallest side a control needs for a finger. */
+export const TARGET_PX = 44
+
+/** The control reaches the touch target at rest; a box read mid-slide can lose a float step. */
+export async function expectTouchTarget(
+  locator: Locator,
+  name = 'touch target',
+  side: 'height' | 'width' | 'both' = 'height',
+): Promise<void> {
+  await settled(locator.page())
+  const { width = 0, height = 0 } = (await locator.boundingBox()) ?? {}
+  const reach = { height, width, both: Math.min(width, height) }[side]
+  expect(reach, name).toBeGreaterThanOrEqual(TARGET_PX)
+}
+
 interface Edges {
   top: number
   bottom: number

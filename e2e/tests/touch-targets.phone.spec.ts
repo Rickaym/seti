@@ -1,25 +1,14 @@
 import { randomUUID } from 'node:crypto'
-import type { Locator } from '@playwright/test'
 import type { PullRequest, Task } from '@seti/shared'
 import { openSeedDb } from './support/db.js'
 import { paths } from './support/env.js'
 import { apiData, expect, test, unique } from './support/fixtures.js'
 import { openAgentPrs } from './support/phone-agent.js'
-import { settled } from './support/phone-layout.js'
+import { expectTouchTarget, TARGET_PX } from './support/phone-layout.js'
 import { BURST, seedToolBurst } from './support/tool-groups.js'
 
-const TARGET_PX = 44
 const SLUG = 'e2e/touch'
 const PR_URL = `https://github.com/${SLUG}/pull/7`
-
-async function size(locator: Locator): Promise<{ width: number; height: number }> {
-  const box = await locator.boundingBox()
-  return { width: box?.width ?? 0, height: box?.height ?? 0 }
-}
-
-async function expectTall(locator: Locator, name: string): Promise<void> {
-  expect((await size(locator)).height, name).toBeGreaterThanOrEqual(TARGET_PX)
-}
 
 async function seedTask(title: string, status: 'idle' | 'error' = 'idle'): Promise<string> {
   const db = openSeedDb()
@@ -64,14 +53,13 @@ test('tool group rows, the Monitor row and Send reach 44px', async ({ page }) =>
   await expect(pane.getByText(BURST.outro)).toBeVisible()
   const burst = pane.getByTestId('tool-group').first()
   const header = burst.getByRole('button', { name: /Ran 10 commands/ })
-  await expectTall(header, 'tool group header')
+  await expectTouchTarget(header, 'tool group header')
   await header.tap()
-  await expectTall(burst.locator('summary').first(), 'tool call row')
+  await expectTouchTarget(burst.locator('summary').first(), 'tool call row')
   const monitor = pane.locator('summary').filter({ hasText: 'watching' })
-  await expectTall(monitor, 'Monitor row')
+  await expectTouchTarget(monitor, 'Monitor row')
   const send = page.getByRole('button', { name: 'Send', exact: true })
-  const box = await size(send)
-  expect(Math.min(box.width, box.height), 'Send').toBeGreaterThanOrEqual(TARGET_PX)
+  await expectTouchTarget(send, 'Send', 'both')
 })
 
 test('the Needs you header reaches 44px', async ({ page }) => {
@@ -80,7 +68,7 @@ test('the Needs you header reaches 44px', async ({ page }) => {
   await page.goto('/#agents')
   const header = page.getByRole('main').getByRole('region', { name: 'Needs you' }).getByRole('button').first()
   await expect(header).toBeVisible()
-  await expectTall(header, 'Needs you header')
+  await expectTouchTarget(header, 'Needs you header')
   await page.request.delete(`/api/tasks/${id}`)
 })
 
@@ -95,11 +83,9 @@ test('linked PR rows reach 44px and an unlink can be undone', async ({ page, req
   const row = sheet.getByRole('listitem', { name: 'Pull request touch#7' })
   const unlink = row.getByRole('button', { name: 'Unlink touch#7' })
   await expect(unlink).toBeVisible()
-  await settled(page)
-  await expectTall(row, 'PR row')
-  await expectTall(row.getByRole('button', { name: 'Fix CI' }), 'Fix CI')
-  const box = await size(unlink)
-  expect(Math.min(box.width, box.height), 'Unlink').toBeGreaterThanOrEqual(TARGET_PX)
+  await expectTouchTarget(row, 'PR row')
+  await expectTouchTarget(row.getByRole('button', { name: 'Fix CI' }), 'Fix CI')
+  await expectTouchTarget(unlink, 'Unlink', 'both')
 
   const linked = async () => (await apiData<Task>(request, `/tasks/${id}`)).pr_urls
   await unlink.tap()
