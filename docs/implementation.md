@@ -69,6 +69,7 @@ with another top-level folder.
 | 13 Tools       | `seti-tools/`, `questions.ts`, `question-answers.ts`, `house-rules.ts`, `knowledge.ts`, `knowledge-review.ts`                                                  |
 | 14 Assistant   | `ea/src/seti_ea/` (`gate.py`, `asks.py`, `inbox.py`, `settle.py`, `held.py`, `promises.py`), `ea-deliver.ts`, `routes/ea-replies.ts`                           |
 | 15 Resilience  | `restart-cut.ts`, `restart-resume.ts`, `restart-waits.ts`, `permission-grants.ts`, `client-sends.ts`, `model-fallback.ts`, `archive-files.ts`, `owned-dirs.ts` |
+| 15 Storage     | `storage-overview.ts`, `storage-clean.ts`, `storage-orphans.ts`, `storage-schedule.ts`, `rebuildable.ts`, `dir-size.ts`, `size-cache.ts`                       |
 | 16 Audit       | `audit.ts`, `store/audit.ts`                                                                                                                                   |
 | 17 Mods        | `mods/`, `shared/src/mods.ts`, `packages/mod-api/`; [Mods](mods.md) is the authoring guide                                                                     |
 | 18 Public      | `access.ts`, `routes/share-public.ts`, `share-preview/`, `converter.ts`, `rate-limit.ts`, `security-headers.ts`                                                |
@@ -88,14 +89,51 @@ with another top-level folder.
   `LoadCredential=`. Values set in the UI are sealed into PostgreSQL by `server/src/secret-box.ts`
   under the `secret-key` file (SEC-5). [Security](security.md#where-each-secret-lives) lists each.
 - Archiving packs an agent's folder and workspace into
-  `~/.seti/archive/<task id>/files-<stamp>.tar.zst`, leaving out dependencies, virtual
-  environments, build outputs and caches, and reads the bundle back in full before it removes an
-  original. Its transcript moves into a compressed `task_archive` row.
+  `~/.seti/archive/<task id>/files-<stamp>.tar.zst`, leaving out the rebuildable folders Storage
+  names (`REBUILDABLE_DIRS` and `REBUILDABLE_IF_IGNORED` in `shared/src/storage.ts`), and reads
+  the bundle back in full before it removes an original. Its transcript moves into a compressed
+  `task_archive` row.
 - A published shared tool is written to `shared-tools/<name>-<hash>` under Seti's home (`tool.json`
   and the script); startup rewrites missing folders from the `shared_tool` table and removes the
   rest. Each session gets one stdio MCP server, `shared`, which is `server/src/shared-tool-server.ts`.
 
 [Setup](setup.md#where-data-lives) lists every path on disk.
+
+## Folder sizes, Clean and orphans
+
+- **Sizes.** `GET /api/storage` (`server/src/storage-overview.ts`) answers at once from what is
+  measured so far, with `measuring` while background work is pending. An agent's folders
+  (`server/src/storage-folders.ts`) are its scratch folder, worktrees, workspace and sandbox
+  folder, which Seti made, and checkouts it was given, which it did not. `server/src/dir-size.ts`
+  walks a folder without following symlinks, counts each hard-linked file once, stops at
+  `SIZE_CAPS` and marks such a size `capped`; one walk also sizes every folder directly inside.
+  `server/src/size-cache.ts` runs walks and plans one at a time in a background queue, keeps sizes
+  for 10 minutes and serves the old value while a new one is measured (RES-19).
+- **Tree.** `GET /api/tasks/:id/files/tree` (`server/src/task-files-tree.ts`) lists one folder
+  through the same checks as `files/list`, with each folder's cached size, a rebuildable mark and
+  a git badge from `git status --porcelain=v2 --branch` (`server/src/git-state.ts`, cached for 30
+  seconds, 3-second limit) through `agentGit`. A sandboxed agent's private home and `/tmp` are
+  read-only roots; the home's logins and Claude data (`sandboxHomeHidden`) are hidden (HST-9).
+- **Clean.** `server/src/rebuildable.ts` finds candidates up to six levels down without entering a
+  `.git` folder, a symlink or a candidate, then asks each candidate's repository with one
+  `git ls-files` and one `git check-ignore` per batch. `server/src/storage-clean.ts` refuses with
+  409 while the agent runs, re-plans on confirm, removes only what both the plan and the request
+  name, and records one `task.storage_cleaned` event (RES-16).
+- **Removal.** Every removal goes through `server/src/owned-dirs.ts`. A linked worktree goes
+  through its main checkout's `git worktree remove`; anything else is `fs.rm` on the checked path.
+  `removeNestedDir` removes one rebuildable folder inside an agent folder that passes the same
+  checks, and only when its real path is the agent folder's real path joined with the target's
+  relative path, so no symlink on the way leads elsewhere.
+- **Orphans.** `server/src/storage-orphans.ts` lists folders in the scratch, worktree, workspace,
+  sandbox and archive roots that no agent owns, is named for or works in, plus `task_worktree`
+  records of agents not archived whose folder is gone. It runs the git check for uncommitted or
+  unpushed work in the background and again before a removal, which records
+  `system.orphans_removed` (RES-17).
+- **Automatic clean.** `server/src/storage-schedule.ts` keeps its settings in `storage_settings`;
+  an hourly sweep cleans agents idle past the chosen days and archived agents, skips running ones
+  and stores the time and bytes of its last run (RES-18). `refuseDelegates` guards orphan removal
+  and the schedule; the EA reads the page and trees through `resource_usage` and cleans one agent
+  through `run_archive_sweep`'s `clean_agent`, and `cleanAgent` refuses agents.
 
 ## Sandbox mechanism
 

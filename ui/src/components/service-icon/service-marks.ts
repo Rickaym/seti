@@ -2,8 +2,10 @@ import type { ServiceIconKey } from '@seti/shared'
 import {
   siAirtable,
   siAtlassian,
+  siClaude,
   siClickup,
   siCloudflare,
+  siDatadog,
   siDeepgram,
   siElevenlabs,
   siFathom,
@@ -12,7 +14,11 @@ import {
   siGmail,
   siGoogle,
   siGooglecalendar,
+  siGoogledocs,
   siGoogledrive,
+  siGooglesheets,
+  siGoogleslides,
+  siGrafana,
   siHuggingface,
   siIntercom,
   siJira,
@@ -30,14 +36,17 @@ import {
   siSupabase,
   siVercel,
   siWebflow,
+  siYoutube,
 } from 'simple-icons'
 
 /** One 24 by 24 path per service, from Simple Icons; drawn in the text colour, never the brand's. */
 const SERVICE_MARKS: Record<ServiceIconKey, string> = {
   airtable: siAirtable.path,
   atlassian: siAtlassian.path,
+  claude: siClaude.path,
   clickup: siClickup.path,
   cloudflare: siCloudflare.path,
+  datadog: siDatadog.path,
   deepgram: siDeepgram.path,
   elevenlabs: siElevenlabs.path,
   fathom: siFathom.path,
@@ -46,7 +55,11 @@ const SERVICE_MARKS: Record<ServiceIconKey, string> = {
   gmail: siGmail.path,
   google: siGoogle.path,
   googlecalendar: siGooglecalendar.path,
+  googledocs: siGoogledocs.path,
   googledrive: siGoogledrive.path,
+  googlesheets: siGooglesheets.path,
+  googleslides: siGoogleslides.path,
+  grafana: siGrafana.path,
   huggingface: siHuggingface.path,
   intercom: siIntercom.path,
   jira: siJira.path,
@@ -64,6 +77,7 @@ const SERVICE_MARKS: Record<ServiceIconKey, string> = {
   supabase: siSupabase.path,
   vercel: siVercel.path,
   webflow: siWebflow.path,
+  youtube: siYoutube.path,
 }
 
 const BY_KEY: ReadonlyMap<string, string> = new Map(Object.entries(SERVICE_MARKS))
