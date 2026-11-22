@@ -1,6 +1,7 @@
 import type { Page } from '@playwright/test'
 import { expect, test, unique } from './support/fixtures.js'
 import { ask, reply, REPLIES, seedAsks, seedOwnMessages } from './support/own-messages.js'
+import { expectTouchTarget } from './support/phone-layout.js'
 
 const transcript = (page: Page) => page.getByRole('region', { name: 'Transcript' })
 const own = (page: Page, turn: number) =>
@@ -16,9 +17,7 @@ test('taps back through your own messages with full-size targets', async ({ page
   const back = nav.getByRole('button', { name: 'Previous message of yours' })
   const forward = nav.getByRole('button', { name: 'Next message of yours' })
   for (const button of [back, forward]) {
-    const box = await button.boundingBox()
-    expect(box?.width).toBeGreaterThanOrEqual(44)
-    expect(box?.height).toBeGreaterThanOrEqual(44)
+    await expectTouchTarget(button, 'message step', 'both')
   }
 
   await back.tap()

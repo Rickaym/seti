@@ -3,6 +3,7 @@ import path from 'node:path'
 import type { Locator, Page } from '@playwright/test'
 import { expect, test } from './support/fixtures.js'
 import { Gboard } from './support/gboard.js'
+import { expectTouchTarget } from './support/phone-layout.js'
 import { FAKE_CLAUDE_ENV } from './support/processes.js'
 import { run, screenOf, terminalIn, terminalInput, typedInput } from './support/terminal.js'
 
@@ -62,9 +63,7 @@ test('the key bar sends Termius-style keys, with Ctrl and Alt for the next key o
     '',
   ])
   for (const button of await keys.getByRole('button').all()) {
-    const box = await button.boundingBox()
-    expect(box?.height).toBeGreaterThanOrEqual(44)
-    expect(box?.width).toBeGreaterThanOrEqual(44)
+    await expectTouchTarget(button, 'terminal key', 'both')
   }
 
   const start = sent.length

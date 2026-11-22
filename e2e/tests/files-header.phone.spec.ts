@@ -2,7 +2,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { CODE_FILES, seedCodeAgent } from './support/code-files.js'
 import { expect, test } from './support/fixtures.js'
-import { expectFitsPhone } from './support/phone-layout.js'
+import { expectFitsPhone, expectTouchTarget } from './support/phone-layout.js'
 import { filesPanel, openViewerFile } from './support/viewer-files.js'
 
 test('the viewer header holds Edit and then Save at touch size on a phone', async ({ page }) => {
@@ -15,12 +15,12 @@ test('the viewer header holds Edit and then Save at touch size on a phone', asyn
 
   const header = panel.getByTestId('viewer-header')
   const edit = header.getByRole('button', { name: 'Edit', exact: true })
-  expect((await edit.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(44)
+  await expectTouchTarget(edit)
   await edit.tap()
   const save = header.getByRole('button', { name: 'Save' })
   const stop = header.getByRole('button', { name: 'Stop editing' })
-  expect((await save.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(44)
-  expect((await stop.boundingBox())?.width ?? 0).toBeGreaterThanOrEqual(44)
+  await expectTouchTarget(save)
+  await expectTouchTarget(stop, 'Stop', 'width')
   await expectFitsPhone(page, 'the viewer header while editing')
 
   await panel.getByRole('textbox', { name: 'Edit docs/app.ts' }).tap()

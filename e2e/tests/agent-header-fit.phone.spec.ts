@@ -3,12 +3,11 @@ import type { PullRequest } from '@seti/shared'
 import { openSeedDb } from './support/db.js'
 import { paths } from './support/env.js'
 import { expect, test, unique } from './support/fixtures.js'
-import { edgesAtRest, expectFitsPhone } from './support/phone-layout.js'
+import { edgesAtRest, expectFitsPhone, expectTouchTarget } from './support/phone-layout.js'
 import { SEEDS, seedTask } from './support/subtasks.js'
 
 const TITLE = 'Upgrade the dashboard websocket reconnection logic to the exponential backoff helper'
 const NARROWEST = { width: 360, height: 780 }
-const TARGET_PX = 44
 /** The terminal bar's 44px row and its rule, which the phone agent header shares. */
 const HEADER_PX = 45
 /** Characters of the title a phone must show before it truncates. */
@@ -119,7 +118,6 @@ test('the busiest agent header keeps one 44px row on a 360px phone with its titl
   for (const name of ['Back to agents', 'Stop', 'Agent settings', 'More actions']) {
     const button = header.getByRole('button', { name, exact: true })
     await expect(button).toBeInViewport({ ratio: 1 })
-    const box = await button.boundingBox()
-    expect(Math.min(box?.width ?? 0, box?.height ?? 0), name).toBeGreaterThanOrEqual(TARGET_PX)
+    await expectTouchTarget(button, name, 'both')
   }
 })

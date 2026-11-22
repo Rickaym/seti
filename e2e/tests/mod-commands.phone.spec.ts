@@ -5,7 +5,7 @@ import { paths } from './support/env.js'
 import { expect, test, toasts } from './support/fixtures.js'
 import { resetSampleMod } from './support/mods.js'
 import { tapMoreAction } from './support/phone-agent.js'
-import { expectFitsPhone } from './support/phone-layout.js'
+import { expectFitsPhone, expectTouchTarget } from './support/phone-layout.js'
 
 test.afterEach(async ({ request }) => {
   await resetSampleMod(request)
@@ -39,8 +39,7 @@ test("the phone's composer says a mod is off, turns it on with one tap, then run
   await reply.fill('/sample from the phone')
   await expect(status(page)).toContainText('Sample is off')
   const turnOn = status(page).getByRole('button', { name: 'Turn on' })
-  const box = await turnOn.boundingBox()
-  expect(box?.height ?? 0).toBeGreaterThanOrEqual(44)
+  await expectTouchTarget(turnOn)
   await expectFitsPhone(page, 'the off notice in the composer')
 
   await turnOn.tap()

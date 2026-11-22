@@ -3,6 +3,7 @@ import type { EaHealth } from '@seti/shared'
 import { audioSpy, plugHeadset, spyOnAudio } from './support/audio.js'
 import { fakeEa } from './support/fake-ea.js'
 import { expect, test } from './support/fixtures.js'
+import { expectTouchTarget } from './support/phone-layout.js'
 
 test.use({ permissions: ['microphone'] })
 
@@ -40,7 +41,7 @@ test('a headset that connects and Audio in the call sheet both move the call wit
   await expect.poll(async () => sent(page)).toEqual(['default'])
 
   const reroute = eaSheet(page).getByRole('button', { name: 'Audio', exact: true })
-  expect((await reroute.boundingBox())?.height).toBeGreaterThanOrEqual(44)
+  await expectTouchTarget(reroute)
   await expectButtonsInside(page)
   const size = page.viewportSize()
   await page.setViewportSize({ width: NARROW_PHONE, height: size?.height ?? 800 })

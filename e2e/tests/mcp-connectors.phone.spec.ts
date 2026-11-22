@@ -1,6 +1,6 @@
 import { expect, test } from './support/fixtures.js'
 import { mockSignInServers } from './support/mcp-sign-in.js'
-import { expectFitsPhone } from './support/phone-layout.js'
+import { expectFitsPhone, expectTouchTarget } from './support/phone-layout.js'
 
 test('a phone picks a common connector and reads its add form', async ({ page }) => {
   await mockSignInServers(page)
@@ -10,7 +10,7 @@ test('a phone picks a common connector and reads its add form', async ({ page })
   await expect(catalog.getByRole('button', { name: 'Notion' })).toBeVisible()
   const notion = catalog.getByRole('button', { name: 'Notion' })
   await expect(notion.locator('svg[data-service-icon="notion"]')).toBeVisible()
-  expect((await notion.boundingBox())?.height).toBeGreaterThanOrEqual(44)
+  await expectTouchTarget(notion)
   await expect(catalog.getByRole('button', { name: 'Slack' }).locator('svg.lucide-plug')).toBeVisible()
   await expectFitsPhone(page, 'connector catalog')
   await catalog.getByRole('button', { name: 'Notion' }).click()
