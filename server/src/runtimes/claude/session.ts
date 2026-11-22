@@ -1,5 +1,6 @@
-import type { McpServerStatus, PermissionMode, Query, query, SDKMessage } from '@anthropic-ai/claude-agent-sdk'
+import type { McpServerStatus, Options, PermissionMode, Query, query, SDKMessage } from '@anthropic-ai/claude-agent-sdk'
 import type { RuntimeSession } from '../adapter.js'
+import type { ClaudeVendor } from './realise.js'
 
 /** How long reading the context window may take before a compaction is stored without it. */
 const CONTEXT_WAIT_MS = 3000
@@ -11,8 +12,10 @@ interface ClaudePolicy {
   deny: string[]
 }
 
-/** Claude Code's own shapes: the SDK's start arguments, messages, MCP reports and modes. */
+/** Claude Code's own shapes: plugins, SDK options and start arguments, messages, MCP reports. */
 export interface ClaudeShapes {
+  vendor: ClaudeVendor
+  realised: Options
   start: Parameters<typeof query>[0]
   message: SDKMessage
   toolServer: McpServerStatus

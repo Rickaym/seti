@@ -1,11 +1,17 @@
+import type { Task } from '@seti/shared'
+import type { SessionSpec } from '../session-spec.js'
+
 /** Names an agent runtime; Claude Code is the only one so far. */
 export type RuntimeId = 'claude'
 
 /**
- * The values a runtime's sessions take and give that are still the runtime's own: what a session
- * starts from, the messages it streams, its tool server reports, rules and permission modes.
+ * The values a runtime's sessions take and give that are still the runtime's own: what a spec
+ * carries for it alone, what it realises a spec into, what a session starts from, the messages it
+ * streams, its tool server reports, rules and permission modes.
  */
 interface RuntimeShapes {
+  vendor: unknown
+  realised: unknown
   start: unknown
   message: unknown
   toolServer: unknown
@@ -47,6 +53,8 @@ export interface RuntimeSession<S extends RuntimeShapes> {
 /** Seti's driver for one agent runtime, the only code that starts the runtime's sessions. */
 export interface RuntimeAdapter<S extends RuntimeShapes> {
   readonly id: RuntimeId
+  /** What a session of the spec starts from; the task gives the hooks and launcher for now. */
+  realise(spec: SessionSpec, task: Task, abortController: AbortController): Promise<S['realised']>
   /** Starts or resumes a session; it begins work when its events are first read. */
   open(start: S['start']): Promise<RuntimeSession<S>>
 }

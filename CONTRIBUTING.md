@@ -138,8 +138,8 @@ they are.
 ## Code map
 
 - `server/src/`: the Node server (Hono). `app.ts` builds the app and mounts every router;
-  `runner.ts` owns the open Claude Code sessions, which it starts through the runtime adapter in
-  `runtimes/`; `tasks.ts` starts tasks.
+  `runner.ts` owns the open Claude Code sessions, which it starts from the spec `session-spec.ts`
+  builds through the runtime adapter in `runtimes/`; `tasks.ts` starts tasks.
 - `server/src/routes/<area>.ts`: one router per area.
 - `server/src/store/`: SQL. `<area>.ts` holds typed queries, `schema-<area>.ts` the migration SQL,
   and `schema.ts` the ordered `MIGRATIONS` list.
