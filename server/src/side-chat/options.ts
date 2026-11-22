@@ -1,16 +1,8 @@
 import type { Options } from '@anthropic-ai/claude-agent-sdk'
 import type { Task } from '@seti/shared'
-import { connectionEnv, taskConnections } from '../connection-egress.js'
-import { planScope } from '../memory-cap.js'
-import {
-  agentEnv,
-  permissionSettings,
-  sandboxFor,
-  spawnInSandbox,
-  spawnInScope,
-  systemAppend,
-  workingDirs,
-} from '../session-options.js'
+import { taskLauncher } from '../launcher.js'
+import { claudeLaunch } from '../runtimes/claude/realise.js'
+import { permissionSettings, systemAppend, workingDirs } from '../session-options.js'
 
 /** Tools that only read, which a side chat the user or the EA starts may use. */
 export const READ_TOOLS = ['Read', 'Glob', 'Grep']
@@ -34,19 +26,6 @@ function sideNote(reads: boolean): string {
     'the session: the agent never sees them, and its work may still be in progress, so a tool call',
     `without a result is still running. ${tools} Answer briefly and directly.`,
   ].join(' ')
-}
-
-/** How the fork's process starts: in the agent's sandbox, else on the host, in its own scope. */
-async function launcher(task: Task) {
-  const sandbox = await sandboxFor(task)
-  const scope = await planScope(task.id, 'side_chat')
-  if (sandbox !== null) {
-    return { env: sandbox.env, spawnClaudeCodeProcess: spawnInSandbox(sandbox, task.id, scope) }
-  }
-  return {
-    env: { ...agentEnv(scope?.cap ?? null), ...connectionEnv(await taskConnections(task)) },
-    ...(scope === null ? {} : { spawnClaudeCodeProcess: spawnInScope(scope) }),
-  }
 }
 
 /**
@@ -81,6 +60,6 @@ export async function sideChatOptions(
     includePartialMessages: true,
     maxTurns: reads ? READING_TURNS : 1,
     abortController,
-    ...(await launcher(task)),
+    ...claudeLaunch(await taskLauncher(task, 'side_chat', true)),
   }
 }

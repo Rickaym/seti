@@ -60,7 +60,7 @@ with another top-level folder.
 | 7.4, 7.5       | `permission-policy.ts`, `permission-requests.ts`, `permission-timeout.ts`, `permission-guard.ts`, `repeat-hooks.ts`, `review-hooks.ts`, `outward.ts`                          |
 | 7.6 Changes    | `change-requests.ts`, `change-request-notes.ts`, `mcp-off-context.ts`, `shared/src/change-requests.ts`                                                                        |
 | 7.7 Hostile    | `git.ts`, `probe-launch.ts`, `task-files.ts`, `html-preview.ts`, `uploads.ts`                                                                                                 |
-| 7.8 Caps       | `memory-scope.ts`, `scope-cpu.ts`, `oom-guard.ts`                                                                                                                             |
+| 7.8 Caps       | `launcher.ts`, `memory-scope.ts`, `scope-cpu.ts`, `oom-guard.ts`                                                                                                              |
 | 8 Secrets      | `secret-box.ts`, `connections.ts`, `scrub.ts`, `secret-questions.ts`, `secret-delivery.ts`                                                                                    |
 | 9 Shared tools | `shared/src/shared-tools.ts`, `shared-tool-proposals.ts`, `shared-tool-files.ts`, `shared-tool-server.ts`                                                                     |
 | 10 Events      | `shared/src/webhook-senders.ts`, `shared/src/webhook-sender-catalog.ts`, `channels/`, `pollers/`, `reminders/`, `quickjs/`                                                    |
