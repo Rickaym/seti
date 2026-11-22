@@ -33,9 +33,13 @@ export interface Ask {
 }
 
 const NO_CONVERSATION = 'This agent has no conversation to ask about yet'
+const NO_FORK = "This agent's runtime cannot fork its conversation for a side chat"
 
 /** The agent's conversation as its next turn sees it: the session, or a pending rewind point. */
 async function forkPoint(task: Task): Promise<ForkPoint> {
+  if (adapterFor(DEFAULT_RUNTIME).capabilities.session.fork === 'none') {
+    throw new HttpError(409, NO_FORK)
+  }
   const pending = await rewinds.pending(task.id)
   if (task.session_id === null || pending?.resume_at === null) {
     throw new HttpError(409, NO_CONVERSATION)

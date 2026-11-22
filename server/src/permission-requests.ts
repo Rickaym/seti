@@ -8,6 +8,7 @@ import { callHash, takeGrant } from './permission-grants.js'
 import { alwaysRules } from './permission-policy.js'
 import { ASK_TOOL, askQuestions } from './questions.js'
 import { stoppingForRestart } from './restart-state.js'
+import { adapterFor, DEFAULT_RUNTIME } from './runtimes/registry.js'
 import { redactSecrets, scrubValue } from './scrub.js'
 import { permissionRequests, timeoutSettings } from './store/permissions.js'
 import { setStall, refreshBlocked } from './task-blocked.js'
@@ -178,7 +179,7 @@ async function askUser(taskId: string, ask: Ask, signals: readonly AbortSignal[]
       input: inputText(ask.input),
       reason: ask.reason,
       suggestions: ask.suggestions,
-      editable: ask.kind !== 'repeat' && isEditable(ask.tool, ask.input),
+      editable: ask.kind !== 'repeat' && rewritesInput() && isEditable(ask.tool, ask.input),
       input_hash: hash,
       timeout_minutes: (await timeoutSettings.get()).request_timeout_minutes,
     })
@@ -193,6 +194,9 @@ async function askUser(taskId: string, ask: Ask, signals: readonly AbortSignal[]
     waiting.delete(id)
   }
 }
+
+/** Whether the agent's runtime runs a call with the input a decision hands back. */
+const rewritesInput = () => adapterFor(DEFAULT_RUNTIME).capabilities.gate.rewriteInput
 
 /** Claude Code's stand-in tools of an MCP server that needs a sign-in; Seti signs in instead. */
 const SIGN_IN_TOOLS = ['authenticate', 'complete_authentication']
