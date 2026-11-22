@@ -34,7 +34,7 @@ interface BarProps {
   trouble: boolean
 }
 
-/** The bar takes the item's own colour for its track and for trouble, so it shows on any tone. */
+/** Takes the item's colour for track and trouble; steps, since each frame redraws the screen. */
 function Bar({ icon: Icon, label, percent, trouble }: BarProps) {
   return (
     <span className="flex items-center gap-1">
@@ -43,7 +43,7 @@ function Bar({ icon: Icon, label, percent, trouble }: BarProps) {
         label={label}
         percent={percent}
         trouble={trouble}
-        className="w-7 [--hype-track:color-mix(in_oklch,currentColor_22%,transparent)] [--hype-trouble:currentColor]"
+        className="w-7 [--hype-flow-pace:steps(12)] [--hype-rage-pace:steps(8)] [--hype-track:color-mix(in_oklch,currentColor_22%,transparent)] [--hype-trouble:currentColor]"
       />
     </span>
   )

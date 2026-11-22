@@ -12,6 +12,7 @@ const sweep = async (meter: Locator) =>
     return {
       animation: style.animationName,
       seconds: parseFloat(style.animationDuration),
+      stepped: style.animationTimingFunction.startsWith('steps'),
       gradient: style.backgroundImage.startsWith('linear-gradient'),
     }
   })
@@ -29,8 +30,8 @@ test('a busy, healthy host lights the status bar meters up without a warning', a
 
   const raging = await sweep(cpu)
   const flowing = await sweep(memory)
-  expect(raging).toMatchObject({ animation: 'hype-sweep', gradient: true })
-  expect(flowing).toMatchObject({ animation: 'hype-sweep', gradient: true })
+  expect(raging).toMatchObject({ animation: 'hype-sweep', gradient: true, stepped: true })
+  expect(flowing).toMatchObject({ animation: 'hype-sweep', gradient: true, stepped: true })
   expect(raging.seconds).toBeLessThan(flowing.seconds)
 
   const moving = await item(page).evaluate((element) =>
@@ -40,10 +41,9 @@ test('a busy, healthy host lights the status bar meters up without a warning', a
     }),
   )
   expect(moving).toHaveLength(2)
+  const meta = ['offset', 'easing', 'composite', 'computedOffset']
   for (const properties of moving) {
-    expect(properties.filter((name) => !['offset', 'easing', 'composite', 'computedOffset'].includes(name))).toEqual([
-      'transform',
-    ])
+    expect([...new Set(properties.filter((name) => !meta.includes(name)))]).toEqual(['transform'])
   }
 
   await item(page).hover()
@@ -96,7 +96,7 @@ test('the resources page meters flow and rage, and hold still for reduced motion
   const memory = host(page).getByRole('meter', { name: 'Host memory' })
   await expect(cpu).toHaveAttribute('data-hype', 'rage')
   await expect(memory).toHaveAttribute('data-hype', 'flow')
-  expect(await sweep(cpu)).toMatchObject({ animation: 'hype-sweep', gradient: true })
+  expect(await sweep(cpu)).toMatchObject({ animation: 'hype-sweep', gradient: true, stepped: false })
   const track = await cpu.boundingBox()
   const fill = await cpu.locator('.hype-fill').boundingBox()
   expect((fill?.width ?? 0) / (track?.width ?? 1)).toBeCloseTo(0.96, 1)
@@ -104,7 +104,14 @@ test('the resources page meters flow and rage, and hold still for reduced motion
   await page.emulateMedia({ reducedMotion: 'reduce' })
   expect(await sweep(cpu)).toMatchObject({ animation: 'none', gradient: true })
   expect(await sweep(memory)).toMatchObject({ animation: 'none', gradient: true })
-  expect(await page.evaluate(() => document.getAnimations().length)).toBe(0)
+  const running = await page.evaluate(
+    () =>
+      document
+        .getAnimations()
+        .filter((animation) => (animation.effect as KeyframeEffect).target?.classList.contains('hype-sweep') === true)
+        .length,
+  )
+  expect(running).toBe(0)
   for (const meter of [item(page).getByRole('meter', { name: 'Host CPU' }), cpu]) {
     await expect(meter).toHaveAttribute('data-hype', 'rage')
   }

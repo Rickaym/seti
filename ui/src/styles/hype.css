@@ -1,4 +1,4 @@
-/* CPU and memory meters: busy reads as good. Only the sweep's transform animates. */
+/* Busy reads as good. Only the sweep's transform animates; an always-shown meter sets a steps() pace. */
 .hype-meter {
   background-color: var(--hype-track, var(--muted));
 }
@@ -38,11 +38,11 @@
   }
 
   .hype-meter[data-hype='flow'] .hype-sweep {
-    animation: hype-sweep 6s linear infinite;
+    animation: hype-sweep 6s var(--hype-flow-pace, linear) infinite;
   }
 
   .hype-meter[data-hype='rage'] .hype-sweep {
-    animation: hype-sweep 1.2s linear infinite;
+    animation: hype-sweep 1.2s var(--hype-rage-pace, linear) infinite;
   }
 }
 
