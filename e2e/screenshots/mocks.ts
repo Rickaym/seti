@@ -76,6 +76,7 @@ const CALM: ResourceSummary = {
   cpu_percent: 22,
   anomalies: 0,
   severity: 'ok',
+  rules: [],
   headline: null,
 }
 

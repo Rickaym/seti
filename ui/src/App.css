@@ -4,6 +4,7 @@
 @import '@fontsource-variable/jetbrains-mono';
 @import './components/theme/themes/default.css';
 @import './components/theme/themes/swatches.css';
+@import './styles/hype.css';
 
 @source '../../mods';
 

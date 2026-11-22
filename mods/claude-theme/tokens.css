@@ -77,6 +77,10 @@
   --queued: var(--claude-teal);
   --voice-user: var(--claude-teal);
   --voice-bot: var(--primary);
+  --hype-1: var(--claude-green);
+  --hype-2: var(--claude-teal);
+  --hype-3: var(--claude-blue);
+  --hype-4: var(--claude-violet);
   --diff-add: var(--success);
   --diff-del: var(--destructive);
   --code: var(--muted);
@@ -175,6 +179,10 @@
   --queued: var(--claude-teal);
   --voice-user: var(--claude-teal);
   --voice-bot: var(--primary);
+  --hype-1: var(--claude-green);
+  --hype-2: var(--claude-teal);
+  --hype-3: var(--claude-blue);
+  --hype-4: var(--claude-violet);
   --diff-add: var(--success);
   --diff-del: var(--destructive);
   --code: var(--muted);

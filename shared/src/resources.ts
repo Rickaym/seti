@@ -130,6 +130,8 @@ export const resourceSummarySchema = z.object({
   cpu_percent: z.number().nullable(),
   anomalies: z.number().int().nonnegative(),
   severity: z.enum(['ok', 'warning', 'critical']),
+  /** Each rule broken now, once, so a meter knows whether its own reading is the trouble. */
+  rules: z.array(z.enum(ANOMALY_RULES)),
   /** The first anomaly's message, for the status bar tooltip. */
   headline: z.string().nullable(),
 })

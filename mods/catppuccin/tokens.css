@@ -99,6 +99,10 @@
   --queued: var(--ctp-teal);
   --voice-user: var(--ctp-teal);
   --voice-bot: var(--primary);
+  --hype-1: var(--ctp-green);
+  --hype-2: var(--ctp-sky);
+  --hype-3: var(--ctp-mauve);
+  --hype-4: var(--ctp-pink);
   --diff-add: var(--success);
   --diff-del: var(--destructive);
   --code: var(--muted);
@@ -207,6 +211,10 @@
   --queued: var(--ctp-teal);
   --voice-user: var(--ctp-teal);
   --voice-bot: var(--primary);
+  --hype-1: var(--ctp-green);
+  --hype-2: var(--ctp-sky);
+  --hype-3: var(--ctp-mauve);
+  --hype-4: var(--ctp-pink);
   --diff-add: var(--success);
   --diff-del: var(--destructive);
   --code: var(--muted);
