@@ -165,14 +165,6 @@ function published(m: SystemMessage): Event | null {
   return url === undefined ? null : { ...base, type: 'change.published', url, action: str(m, 'action') ?? '' }
 }
 
-const commandOutput = (m: Of<'local_command_output'>): Event => ({
-  ...base,
-  type: 'message',
-  id: m.uuid,
-  role: 'command',
-  text: m.content,
-})
-
 type Handled =
   | 'init'
   | 'status'
@@ -180,7 +172,6 @@ type Handled =
   | 'api_retry'
   | 'model_refusal_fallback'
   | 'permission_denied'
-  | 'local_command_output'
   | 'task_started'
   | 'task_progress'
   | 'task_updated'
@@ -194,7 +185,6 @@ const HANDLERS: { [S in Handled]: (m: Of<S>) => Event } = {
   api_retry: retry,
   model_refusal_fallback: fallback,
   permission_denied: denied,
-  local_command_output: commandOutput,
   task_started: started,
   task_progress: progressed,
   task_updated: updated,

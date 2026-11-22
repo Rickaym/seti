@@ -13,6 +13,7 @@ import { isAgentTool } from '@/lib/subtasks'
 import { rowRole, transcriptViews, type RoleContext, type Segment, type TranscriptView } from '@/lib/tool-groups'
 import { startsBackground } from '@/lib/tool-summary'
 import {
+  assertReadable,
   indexTranscript,
   localCommandOutput,
   queuedInputIds,
@@ -214,6 +215,7 @@ function RowBody(props: RowProps) {
   if (row.kind !== 'sdk') {
     return <PlainRow props={props} row={row} />
   }
+  assertReadable(row)
   const { payload } = row
   if (payload.type === 'system' && payload.subtype === 'init') {
     return <InitLine message={payload} />
@@ -239,7 +241,7 @@ function RowBody(props: RowProps) {
       </Line>
     )
   }
-  const local = payload.type === 'user' ? localCommandOutput(payload) : null
+  const local = localCommandOutput(row)
   if (local !== null) {
     return (
       <Line icon={Terminal}>

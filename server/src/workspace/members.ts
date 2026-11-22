@@ -1,6 +1,5 @@
-import { roleLabel, type MessageRow, type TeamMember } from '@seti/shared'
+import { roleLabel, type MessageRow, type TeamMember, agentTexts, rowEvents } from '@seti/shared'
 import { messages } from '../db.js'
-import { agentTexts, rowEvents } from '../events/read.js'
 import { packForDisplay } from '../seti-guide.js'
 import { rolePacksByTask } from '../store/context.js'
 import { teamRoster } from '../team.js'

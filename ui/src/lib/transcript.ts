@@ -1,6 +1,14 @@
-import type { SDKAssistantMessage, SDKResultMessage, SDKUserMessage } from '@anthropic-ai/claude-agent-sdk'
-import { SHELL_CONTEXT_RUNS, heldForMessage, quietReason, type MessageRow } from '@seti/shared'
-import { compactFailure } from '@/lib/compacting'
+import type { SDKAssistantMessage, SDKUserMessage } from '@anthropic-ai/claude-agent-sdk'
+import {
+  SHELL_CONTEXT_RUNS,
+  eventsOf,
+  heldForMessage,
+  quietReason,
+  rowEvents,
+  type EventOf,
+  type MessageRow,
+  type RuntimeEvent,
+} from '@seti/shared'
 
 type AssistantBlock = SDKAssistantMessage['message']['content'][number]
 export type ToolUseBlock = Extract<AssistantBlock, { type: 'tool_use' }>
@@ -99,20 +107,16 @@ const PATCH_STATUS: Partial<Record<string, BackgroundStatus>> = {
   killed: 'killed',
 }
 
-/** Follows task_started, task_updated and task_notification to each process's latest status. */
-function trackBackground(row: MessageRow, owners: Map<string, string>, background: Map<string, BackgroundStatus>) {
-  if (row.kind !== 'sdk' || row.payload.type !== 'system') {
-    return
-  }
-  const { payload } = row
-  if (payload.subtype === 'task_started' && payload.tool_use_id !== undefined) {
-    owners.set(payload.task_id, payload.tool_use_id)
-    background.set(payload.tool_use_id, 'running')
-  } else if (payload.subtype === 'task_notification' && payload.tool_use_id !== undefined) {
-    background.set(payload.tool_use_id, payload.status)
-  } else if (payload.subtype === 'task_updated') {
-    const owner = owners.get(payload.task_id)
-    const status = PATCH_STATUS[payload.patch.status ?? '']
+/** Follows each job's start, updates and end to the latest status of the call that started it. */
+function trackBackground(event: RuntimeEvent, owners: Map<string, string>, background: Map<string, BackgroundStatus>) {
+  if (event.type === 'job.started' && event.callId !== null) {
+    owners.set(event.jobId, event.callId)
+    background.set(event.callId, 'running')
+  } else if (event.type === 'job.ended' && event.callId !== null) {
+    background.set(event.callId, event.status)
+  } else if (event.type === 'job.updated') {
+    const owner = owners.get(event.jobId)
+    const status = PATCH_STATUS[event.status ?? '']
     if (owner !== undefined && status !== undefined) {
       background.set(owner, status)
     }
@@ -127,32 +131,28 @@ export function indexTranscript(rows: readonly MessageRow[]): TranscriptIndex {
   const background = new Map<string, BackgroundStatus>()
   let session: string | null = null
   for (const row of rows) {
-    trackBackground(row, owners, background)
+    for (const event of rowEvents(row)) {
+      trackBackground(event, owners, background)
+      if (event.type === 'session.started') {
+        if (event.sessionId === session) {
+          hiddenInits.add(row.id)
+        }
+        session = event.sessionId
+      }
+    }
     for (const ref of rowResults(row)) {
       results.set(ref.block.tool_use_id, ref)
     }
     for (const call of rowCalls(row)) {
       calls.add(call.id)
     }
-    if (row.kind === 'sdk' && row.payload.type === 'system' && row.payload.subtype === 'init') {
-      if (row.payload.session_id === session) {
-        hiddenInits.add(row.id)
-      }
-      session = row.payload.session_id
-    }
   }
   return { results, calls, hiddenInits, background }
 }
 
-const LOCAL_OUTPUT = /^<local-command-stdout>([\s\S]*)<\/local-command-stdout>$/
-
-/** What a slash command that runs without the model printed, or null for other user messages. */
-export function localCommandOutput(message: SDKUserMessage): string | null {
-  const { content } = message.message
-  const text = typeof content === 'string' ? content : content.map((b) => (b.type === 'text' ? b.text : '')).join('')
-  const match = LOCAL_OUTPUT.exec(text.trim())
-  return match ? (match[1] ?? '').trim() : null
-}
+/** What a slash command that runs without the model printed, or null for other rows. */
+export const localCommandOutput = (row: MessageRow): string | null =>
+  eventsOf(rowEvents(row), 'message').find((event) => event.role === 'command')?.text ?? null
 
 /** Whether a row shows up in the transcript, so counts of new messages skip bookkeeping rows. */
 export function rendersContent(row: MessageRow): boolean {
@@ -163,37 +163,52 @@ export function rendersContent(row: MessageRow): boolean {
   }
 }
 
-/** A turn Claude Code ran for a background notice without a step, as a resumed session does. */
-const emptyNoticeTurn = (result: SDKResultMessage) =>
-  result.origin?.kind === 'task-notification' && result.num_turns === 0 && !result.is_error
+/** A turn the runtime ran for a background notice without a step, as a resumed session does. */
+const emptyNoticeTurn = (end: EventOf<'turn.ended'>) =>
+  end.cause === 'background' && end.steps === 0 && end.status !== 'error'
 
-function shows(row: MessageRow): boolean {
-  if (row.kind !== 'sdk') {
-    return true
+/** Whether one runtime event shows: words, a call, a turn's end, a compaction, a model switch. */
+function showsEvent(event: RuntimeEvent): boolean {
+  if (event.type === 'message') {
+    return event.role === 'command' || (event.role === 'agent' && event.text.trim() !== '')
   }
-  const { payload } = row
-  if (payload.type === 'assistant') {
-    return payload.message.content.some(
-      (block) => block.type === 'tool_use' || (block.type === 'text' && block.text.trim() !== ''),
-    )
+  if (event.type === 'turn.ended') {
+    return !emptyNoticeTurn(event)
   }
-  if (payload.type === 'user') {
-    return localCommandOutput(payload) !== null
+  if (event.type === 'compaction') {
+    return event.phase === 'done' || event.phase === 'failed'
   }
-  return (
-    (payload.type === 'result' && !emptyNoticeTurn(payload)) ||
-    (payload.type === 'system' && payload.subtype === 'compact_boundary') ||
-    (payload.type === 'system' && payload.subtype === 'model_refusal_fallback') ||
-    compactFailure(row) !== null
-  )
+  if (event.type === 'vendor') {
+    return event.unreadable === true
+  }
+  return event.type === 'tool.started' || (event.type === 'model.changed' && event.reason === 'refusal')
 }
 
-/** The Agent call a subagent's message belongs to, or null for the task agent's own messages. */
-export function subagentOf(row: MessageRow): string | null {
-  if (row.kind !== 'sdk' || (row.payload.type !== 'assistant' && row.payload.type !== 'user')) {
-    return null
+/** Throws for a runtime row its projector could not read, so the row shows that it failed. */
+export function assertReadable(row: MessageRow): void {
+  const unreadable = eventsOf(rowEvents(row), 'vendor').find((event) => event.unreadable === true)
+  if (unreadable !== undefined) {
+    throw new Error(`Stored ${unreadable.name} message does not fit its runtime`)
   }
-  return row.payload.parent_tool_use_id
+}
+
+function shows(row: MessageRow): boolean {
+  return row.kind !== 'sdk' || rowEvents(row).some(showsEvent)
+}
+
+/** Events of what an agent said, did and was told, which carry the thread of the agent. */
+const THREADED: ReadonlySet<RuntimeEvent['type']> = new Set([
+  'message',
+  'reasoning',
+  'tool.started',
+  'tool.ended',
+  'notice',
+])
+
+/** The subagent thread a row's runtime messages belong to, or null for the task agent's own. */
+export function subagentOf(row: MessageRow): string | null {
+  const thread = rowEvents(row).find((event) => THREADED.has(event.type))?.thread
+  return thread === undefined || thread === '' ? null : thread
 }
 
 /** The Agent call of the subagent a PR update was routed to on behalf of, if any. */
@@ -313,36 +328,35 @@ export function shellDeliveries(rows: readonly MessageRow[]): Map<number, ShellD
   return new Map(pending.map((id, index) => [id, index < sent ? 'dropped' : 'next']))
 }
 
-const applyBlock = (tail: readonly string[], block: AssistantBlock): readonly string[] => {
-  if (block.type === 'tool_use') {
-    return []
-  }
-  return block.type === 'text' && block.text.trim() !== '' ? [...tail, block.text] : tail
-}
-
-/** The texts the task agent wrote since its last tool call, with this row's blocks applied. */
-function replyTail(row: MessageRow, tail: readonly string[]): readonly string[] {
-  if (row.kind !== 'sdk' || row.payload.type !== 'assistant' || row.payload.parent_tool_use_id !== null) {
+/** The texts the task agent wrote since its last tool call, with this event applied. */
+function replyTail(event: RuntimeEvent, tail: readonly string[]): readonly string[] {
+  if (event.thread !== '') {
     return tail
   }
-  const { message } = row.payload
-  return tolerant(() => message.content.reduce(applyBlock, tail), tail)
+  if (event.type === 'tool.started') {
+    return []
+  }
+  return event.type === 'message' && event.role === 'agent' && event.text.trim() !== '' ? [...tail, event.text] : tail
 }
 
-/** Each turn's reply by its result row: the Markdown of its text blocks after the last tool call. */
+/** Each turn's reply by its result row: the Markdown of its texts after the last tool call. */
 export function turnReplies(rows: readonly MessageRow[]): Map<number, string> {
   const replies = new Map<number, string>()
   let tail: readonly string[] = []
   for (const row of rows) {
     if (row.kind === 'prompt') {
       tail = []
-    } else if (row.kind === 'sdk' && row.payload.type === 'result') {
-      if (tail.length > 0) {
-        replies.set(row.id, tail.join('\n\n'))
+      continue
+    }
+    for (const event of rowEvents(row)) {
+      if (event.type === 'turn.ended') {
+        if (tail.length > 0) {
+          replies.set(row.id, tail.join('\n\n'))
+        }
+        tail = []
+      } else {
+        tail = replyTail(event, tail)
       }
-      tail = []
-    } else {
-      tail = replyTail(row, tail)
     }
   }
   return replies

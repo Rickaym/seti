@@ -207,7 +207,8 @@ export type RuntimeEvent = EventBase &
         answered: string[]
         apiStatus?: number
       }
-    | { type: 'vendor'; name: string }
+    /** `unreadable` marks a message of a known type whose shape the projector could not read. */
+    | { type: 'vendor'; name: string; unreadable?: true }
   )
 
 interface ServerStatus {
