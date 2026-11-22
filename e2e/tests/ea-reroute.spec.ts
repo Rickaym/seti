@@ -34,6 +34,28 @@ async function hangUp(page: Page) {
   await expect(status(page)).toHaveCount(0)
 }
 
+/** Every control sits inside the popover and nothing in it scrolls sideways. */
+async function expectControlsFit(page: Page) {
+  const details = eaItem(page).getByRole('region', { name: 'EA call' })
+  const box = await details.boundingBox()
+  expect(box?.width).toBe(320)
+  expect(await details.evaluate((element) => element.scrollWidth - element.clientWidth)).toBeLessThanOrEqual(0)
+  const buttons = await details.getByRole('button').all()
+  expect(buttons).toHaveLength(5)
+  for (const button of buttons) {
+    const inner = await button.boundingBox()
+    expect(inner?.x ?? 0).toBeGreaterThanOrEqual(box?.x ?? 0)
+    expect((inner?.x ?? 0) + (inner?.width ?? 0)).toBeLessThanOrEqual((box?.x ?? 0) + (box?.width ?? 0) - 12)
+    expect(await button.evaluate((element) => element.scrollWidth - element.clientWidth)).toBeLessThanOrEqual(0)
+  }
+  const tops = await Promise.all(
+    ['Mute', 'Sleep', 'Audio', 'Hang up'].map(
+      async (name) => (await details.getByRole('button', { name, exact: true }).boundingBox())?.y,
+    ),
+  )
+  expect(new Set(tops).size).toBe(1)
+}
+
 test('a headset that connects mid-call reopens the microphone once and keeps the call', async ({ page }) => {
   await spyOnAudio(page)
   const { offers } = await mockEa(page)
@@ -57,7 +79,9 @@ test('a headset that connects mid-call reopens the microphone once and keeps the
   expect(ends[0]).toMatchObject({ reason: 'hang-up', inputs: ['default'], reroutes: 1 })
 })
 
-test('Audio in the call details reopens the microphone and the voice on demand', async ({ page }) => {
+test('Audio fits the call details as an icon with a hint, and reopens the microphone and the voice', async ({
+  page,
+}) => {
   await spyOnAudio(page)
   const { offers } = await mockEa(page)
   const ends = callEnds(page)
@@ -67,6 +91,7 @@ test('Audio in the call details reopens the microphone and the voice on demand',
 
   await eaItem(page).getByTestId('ea-bar').hover()
   const details = eaItem(page).getByRole('region', { name: 'EA call' })
+  await expectControlsFit(page)
   await details.getByRole('button', { name: 'Audio' }).hover()
   await expect(page.getByText('Move the call to your headset or the output in use now')).toBeVisible()
   await details.getByRole('button', { name: 'Audio' }).click()

@@ -3,11 +3,13 @@ import type { EaHealth } from '@seti/shared'
 import { audioSpy, plugHeadset, spyOnAudio } from './support/audio.js'
 import { fakeEa } from './support/fake-ea.js'
 import { expect, test } from './support/fixtures.js'
-import { expectTouchTarget } from './support/phone-layout.js'
+import { expectFitsPhone, expectTouchTarget } from './support/phone-layout.js'
 
 test.use({ permissions: ['microphone'] })
 
 const NARROW_PHONE = 340
+const PHONE_WIDTHS = [360, 390, 412]
+const CONTROLS = ['Mute', 'Sleep', 'Audio', 'Hang up']
 const READY: EaHealth = { ok: true, configured: true, missing: [], model: 'gpt-4.1-mini', turn: true }
 
 async function mockEa(page: Page) {
@@ -44,6 +46,18 @@ test('a headset that connects and Audio in the call sheet both move the call wit
   await expectTouchTarget(reroute)
   await expectButtonsInside(page)
   const size = page.viewportSize()
+  for (const width of PHONE_WIDTHS) {
+    await page.setViewportSize({ width, height: size?.height ?? 800 })
+    await expectFitsPhone(page, `the call sheet at ${String(width)}px`)
+    await expectButtonsInside(page)
+    const boxes = await Promise.all(
+      CONTROLS.map(async (name) => eaSheet(page).getByRole('button', { name, exact: true }).boundingBox()),
+    )
+    expect(new Set(boxes.map((box) => box?.y)).size, `one row at ${String(width)}px`).toBe(1)
+    for (const name of CONTROLS) {
+      await expectTouchTarget(eaSheet(page).getByRole('button', { name, exact: true }), name, 'both')
+    }
+  }
   await page.setViewportSize({ width: NARROW_PHONE, height: size?.height ?? 800 })
   await expectButtonsInside(page)
   await page.setViewportSize(size ?? { width: 393, height: 800 })

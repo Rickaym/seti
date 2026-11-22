@@ -134,6 +134,7 @@ export class ResourceSampler {
       cpu_percent: latest.host.cpu_percent,
       anomalies: latest.anomalies.length,
       severity: first?.severity ?? 'ok',
+      rules: [...new Set(latest.anomalies.map((anomaly) => anomaly.rule))],
       headline: first?.message ?? null,
     }
   }
