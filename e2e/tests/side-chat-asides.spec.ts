@@ -129,7 +129,7 @@ test('an answer streams into the transcript as it comes, and Clear in the dock r
   await confirm.getByRole('button', { name: 'Clear all' }).click()
   await expect(asides).toHaveCount(0)
   await expect(dock.getByTestId('side-chat-exchange')).toHaveCount(0)
-  expect(await storedAsides(request, id)).toEqual([])
+  await expect.poll(async () => storedAsides(request, id)).toEqual([])
   const audit = await apiData<AuditPage>(request, '/audit?kind=task.asides_cleared&limit=20')
   expect(audit.events.find((event) => event.subject_id === id)?.detail).toMatchObject({ count: 2 })
 })
