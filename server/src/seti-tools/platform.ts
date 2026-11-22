@@ -1,9 +1,7 @@
 import {
   ARCHIVE_DELETE_DAYS_MAX,
   autoArchiveInput,
-  deleteStaleFoldersInput,
   isRemovableScope,
-  staleFoldersQuery,
   TIER_SURFACES,
   URGENT_SURFACES,
   type McpServer,
@@ -21,7 +19,6 @@ import { pluginCatalog, removeDefaultPlugin } from '../plugins.js'
 import { sandboxStatus } from '../sandbox-status.js'
 import { sharedToolsFor } from '../shared-tools.js'
 import { sshStatus } from '../ssh.js'
-import { deleteStaleFolders, staleFolders } from '../stale-folders.js'
 import { updateTask } from '../task-actions.js'
 import { liveTask, pickOne, taskRef } from './refs.js'
 import { done, setiTool, ToolRefusal } from './tool.js'
@@ -178,15 +175,9 @@ const startMcpSignInTool = setiTool({
 const getArchiveSettings = setiTool({
   name: 'get_archive_settings',
   description:
-    'The auto-archive rule (on or off, after how many idle days), after how many days archived agents are deleted, which agents it would archive now, and what the archive holds. With stale_folders, also lists folders in the scratch and worktree roots no agent owns, with sizes; that list changes nothing.',
-  input: {
-    stale_folders: z.boolean().default(false).describe('Also list stale folders no agent owns, with sizes.'),
-    days: staleFoldersQuery.shape.days.describe('Stale folders changed within this many days are left out.'),
-  },
-  run: async ({ stale_folders: stale, days }) => {
-    const status = await autoArchiveStatus()
-    return stale ? { ...status, stale_folders: await staleFolders(days) } : status
-  },
+    'The auto-archive rule (on or off, after how many idle days), after how many days archived agents are deleted, which agents it would archive now, and what the archive holds.',
+  input: {},
+  run: async () => autoArchiveStatus(),
 })
 
 const setAutoArchive = setiTool({
@@ -221,21 +212,9 @@ const setAutoArchive = setiTool({
 const runArchiveSweep = setiTool({
   name: 'run_archive_sweep',
   description:
-    'Archive now every complete agent the auto-archive rule would take, even while the rule is off. Never yourself. With stale_folders, instead deletes those folders from get_archive_settings stale_folders for good; only once the user said yes.',
-  input: {
-    stale_folders: deleteStaleFoldersInput.shape.paths
-      .optional()
-      .describe('Paths of stale folders to delete, as get_archive_settings listed them.'),
-    days: staleFoldersQuery.shape.days.describe('The days the stale folders were listed with.'),
-    confirm: z.boolean().default(false).describe('true once the user said yes to deleting the stale folders.'),
-  },
-  run: async ({ stale_folders: paths, days, confirm }, ctx) => {
-    if (paths !== undefined) {
-      if (!confirm) {
-        throw new ToolRefusal('Deleting folders cannot be undone; ask the user, then send confirm: true.')
-      }
-      return deleteStaleFolders({ paths, days })
-    }
+    'Archive now every complete agent the auto-archive rule would take, even while the rule is off. Never yourself.',
+  input: {},
+  run: async (_input, ctx) => {
     const { preview } = await autoArchiveStatus()
     if (preview.count === 0) {
       throw new ToolRefusal('No agent is due for archiving now.')

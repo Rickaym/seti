@@ -5,7 +5,14 @@ import readline from 'node:readline'
 import type { Readable, Writable } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
 import zlib from 'node:zlib'
-import type { ArchivedFolder, RestoredFolder, Task, TaskFilesBundle } from '@seti/shared'
+import {
+  REBUILDABLE_DIRS,
+  REBUILDABLE_IF_IGNORED,
+  type ArchivedFolder,
+  type RestoredFolder,
+  type Task,
+  type TaskFilesBundle,
+} from '@seti/shared'
 import { audit } from './audit.js'
 import { binaryPath } from './binaries.js'
 import { ARCHIVE_ROOT } from './config.js'
@@ -20,29 +27,7 @@ import { removeTaskSandbox } from './task-sandbox.js'
 import { releaseWorkspace, SECRETS, workspaceDir } from './workspace/dir.js'
 
 /** Dependencies, virtualenvs, build outputs and caches, which a reinstall or build remakes. */
-const BUNDLE_EXCLUDES = [
-  'node_modules',
-  '.venv',
-  'venv',
-  '__pycache__',
-  '.pytest_cache',
-  '.mypy_cache',
-  '.ruff_cache',
-  '.tox',
-  '.nox',
-  '.next',
-  '.nuxt',
-  '.svelte-kit',
-  '.turbo',
-  '.parcel-cache',
-  '.gradle',
-  '.cache',
-  '.pnpm-store',
-  'dist',
-  'build',
-  'target',
-  'coverage',
-] as const
+const BUNDLE_EXCLUDES = [...REBUILDABLE_DIRS, ...REBUILDABLE_IF_IGNORED]
 
 const ZSTD_LEVEL = 6
 

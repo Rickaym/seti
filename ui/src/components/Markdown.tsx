@@ -8,9 +8,12 @@ import remarkGfm from 'remark-gfm'
 import { CODE_COPY, CODE_COPY_ROOM, CopyIconButton } from '@/components/CopyButton'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { HighlightedCode } from '@/components/highlight/HighlightedCode'
+import { LinkPill } from '@/components/links/LinkPill'
 import { MarkdownImagesContext } from '@/components/markdown-images'
 import { useFenceRenderer } from '@/lib/fence-renderers'
 import { pathOfHref, remarkFilePaths } from '@/lib/file-paths'
+import { textIsUrl } from '@/lib/links/bare-urls'
+import { pillOf } from '@/lib/links/link-label'
 import { cn } from '@/lib/utils'
 import { useViewTheme } from '@/lib/view-theme'
 
@@ -19,11 +22,25 @@ const MINOR_HEADING = `${HEADING} text-xs tracking-wide text-muted-foreground up
 const CELL = 'border border-border px-2 py-1 text-left align-top'
 const NO_LIGATURES = '[font-variant-ligatures:none]'
 
-/** In-page links stay in the page; the rest open in a new tab. */
-function Anchor({ node: _node, children, ...props }: ComponentProps<'a'> & ExtraProps) {
-  return props.href?.startsWith('#') === true ? (
-    <a {...props}>{children}</a>
-  ) : (
+/** The text of a link that holds nothing but text; null when it holds code or other markup. */
+function plainText(node: ExtraProps['node']): string | null {
+  const children = node?.children ?? []
+  const texts = children.flatMap((child) => (child.type === 'text' ? [child.value] : []))
+  return children.length > 0 && texts.length === children.length ? texts.join('') : null
+}
+
+/** In-page links stay in the page; a bare URL shows as a pill; the rest open in a new tab. */
+function Anchor({ node, children, ...props }: ComponentProps<'a'> & ExtraProps) {
+  const { href } = props
+  if (href?.startsWith('#') === true) {
+    return <a {...props}>{children}</a>
+  }
+  const text = plainText(node)
+  const pill = href !== undefined && text !== null && textIsUrl(text, href) ? pillOf(href) : null
+  if (pill !== null && href !== undefined) {
+    return <LinkPill href={href} info={pill} />
+  }
+  return (
     <a
       {...props}
       target="_blank"

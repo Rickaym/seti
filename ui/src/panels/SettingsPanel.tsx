@@ -22,6 +22,7 @@ import { ResourcesPage } from '@/panels/settings/ResourcesPage'
 import { SandboxPage } from '@/panels/settings/SandboxPage'
 import { SharingPage } from '@/panels/settings/SharingPage'
 import { SignInPage } from '@/panels/settings/SignInPage'
+import { StoragePage } from '@/panels/settings/StoragePage'
 import { ConnectionsPage } from '@/panels/settings/connections/ConnectionsPage'
 import { CredentialSetsPage } from '@/panels/settings/credentials/CredentialSetsPage'
 import { ModsPage } from '@/panels/settings/mods/ModsPage'
@@ -45,6 +46,7 @@ const PAGES: Record<Exclude<SettingsPageKey, ProbedPageKey>, (detail: string | n
   repos: () => <ReposPage />,
   ea: () => <EaPage />,
   resources: () => <ResourcesPage />,
+  storage: () => <StoragePage />,
   channels: (detail) => <ChannelsPage detail={detail} />,
   about: () => <AboutPage />,
   account: () => <AccountPage />,

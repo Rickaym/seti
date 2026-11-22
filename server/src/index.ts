@@ -64,6 +64,7 @@ import { signInHint } from './seti-auth.js'
 import { syncSharedTools } from './shared-tools.js'
 import { stopLeftoverScopes } from './stale-scopes.js'
 import { watchSilentSessions } from './stall-watch.js'
+import { startStorageSchedule } from './storage-schedule.js'
 import { auditEvents } from './store/audit.js'
 import { channelStore } from './store/channels.js'
 import { backfillMessageSearch } from './store/search.js'
@@ -191,6 +192,7 @@ startBackups(DATABASE_URL, BACKUP_DIR, BACKUP)
 startTaskRetention(TASK_RETENTION_DAYS)
 startAutoArchive()
 startArchiveLifecycle()
+startStorageSchedule()
 startMcpLoginKeeper()
 startLoginKeeper()
 resourceSampler.start()

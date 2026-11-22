@@ -35,7 +35,9 @@ export async function expectNotice(page: Page): Promise<Locator> {
   const notice = fallbackNotice(page)
   await expect(notice).toContainText(NOTICE_TEXT)
   await expect(notice).toContainText('Category: cyber')
-  await expect(notice.getByRole('link', { name: CVP_URL })).toHaveAttribute('href', CVP_URL)
+  const explained = notice.getByRole('link', { name: /^support\.claude\.com\// })
+  await expect(explained).toHaveAttribute('href', CVP_URL)
+  await expect(explained).toHaveAttribute('data-link-pill', 'web')
   const program = notice.getByRole('link', { name: 'Verification', exact: true })
   await expect(program).toHaveAttribute('href', CVP_URL)
   return notice

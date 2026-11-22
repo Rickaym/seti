@@ -2,8 +2,10 @@
 export const SERVICE_ICON_KEYS = [
   'airtable',
   'atlassian',
+  'claude',
   'clickup',
   'cloudflare',
+  'datadog',
   'deepgram',
   'elevenlabs',
   'fathom',
@@ -12,7 +14,11 @@ export const SERVICE_ICON_KEYS = [
   'gmail',
   'google',
   'googlecalendar',
+  'googledocs',
   'googledrive',
+  'googlesheets',
+  'googleslides',
+  'grafana',
   'huggingface',
   'intercom',
   'jira',
@@ -30,5 +36,6 @@ export const SERVICE_ICON_KEYS = [
   'supabase',
   'vercel',
   'webflow',
+  'youtube',
 ] as const
 export type ServiceIconKey = (typeof SERVICE_ICON_KEYS)[number]
