@@ -203,6 +203,48 @@ describe('node journal', () => {
     expect(applied).toEqual(['task-1:n1', 'task-1:n2'])
   })
 
+  it.each([
+    ['as it keeps the cursor', 'keep', ['n1', 'n2', 'n3']],
+    ['once the cursor is kept', 'kept', ['n1', 'n3']],
+    ['during the apply', 'apply', ['n1', 'n2', 'n3']],
+  ])('never applies an entry twice when the control plane crashes %s', async (_when, at, expected) => {
+    const { sent, applied, outbox } = link()
+    const hang = async () => new Promise<void>(() => undefined)
+    let crashing = true
+    const isTwo = (seq: number) => crashing && seq === 2
+    const kept = new Map<string, { agent: string; epoch: string; seq: number }>()
+    const keep = async (cursor: { agent: string; epoch: string; seq: number }) => {
+      if (at === 'keep' && isTwo(cursor.seq)) {
+        await hang()
+      }
+      kept.set(cursor.agent, cursor)
+      await (at === 'kept' && isTwo(cursor.seq) ? hang() : flushed())
+    }
+    const apply = async (agent: string, entry: JournalEntry) => {
+      applied.push(`${agent}:${entry.type === 'note' ? entry.error : entry.type}`)
+      await (at === 'apply' && crashing && entry.type === 'note' && entry.error === 'n2' ? hang() : flushed())
+    }
+    const crashed = new JournalInbox(apply, () => undefined, keep)
+    outbox.append(AGENT, note(1))
+    outbox.append(AGENT, note(2))
+    sent.splice(0).forEach((frame) => {
+      crashed.receive(frame)
+    })
+    await settled()
+    outbox.disconnected()
+    crashing = false
+    const restarted = new JournalInbox(apply, () => undefined, keep)
+    restarted.restore([...kept.values()])
+    expect(outbox.positions().every((position) => restarted.hello(position))).toBe(true)
+    outbox.resume(restarted.positions())
+    outbox.append(AGENT, note(3))
+    sent.splice(0).forEach((frame) => {
+      restarted.receive(frame)
+    })
+    await settled()
+    expect(applied).toEqual(expected.map((name) => `${AGENT}:${name}`))
+  })
+
   it('lets the node wait until the control plane stored every entry before it stops', async () => {
     const { sent, outbox, inbox, deliverReplies } = link()
     let drained = false

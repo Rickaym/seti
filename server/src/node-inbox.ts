@@ -60,7 +60,7 @@ export class JournalInbox {
   private readonly reply: (frame: JournalReply) => void
   private readonly saved: (cursor: SavedCursor) => Promise<void>
 
-  /** `saved` keeps each cursor before its entry is acknowledged, so a restart takes up from it. */
+  /** `saved` keeps each cursor before its entry is applied, so a restart takes up after it. */
   constructor(
     apply: (agent: string, entry: JournalEntry) => Promise<void>,
     reply: (frame: JournalReply) => void,
@@ -129,16 +129,20 @@ export class JournalInbox {
     return fresh
   }
 
+  /**
+   * Keeps the cursor before applying, so a crash during the apply never applies the entry twice:
+   * a restart takes up after it, as a crash of the single process loses what it was storing.
+   */
   private async applyOne(agent: string, epoch: string, seq: number, entry: JournalEntry): Promise<void> {
-    try {
-      await this.apply(agent, entry)
-    } catch (e) {
-      process.stderr.write(`node link: agent ${agent}: entry ${String(seq)} failed: ${String(e)}\n`)
-    }
     try {
       await this.saved({ agent, epoch, seq })
     } catch (e) {
       process.stderr.write(`node link: agent ${agent}: cursor ${String(seq)} not kept: ${String(e)}\n`)
+    }
+    try {
+      await this.apply(agent, entry)
+    } catch (e) {
+      process.stderr.write(`node link: agent ${agent}: entry ${String(seq)} failed: ${String(e)}\n`)
     }
     this.reply({ type: 'journal.ack', agent, epoch, seq })
   }
