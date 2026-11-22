@@ -145,7 +145,8 @@ async function relayChat(c: Context, target: EaTarget, input: { text: string }) 
 /** Forwards the EA endpoints to the voice bot at `target`; bodies are validated, then sent as is. */
 export function eaRoutes(url: string, token: string | null = credential('local-token-ea')): Hono {
   const target: EaTarget = { url, token }
-  return new Hono()
+  const app = new Hono()
+  app
     .get('/health', async (c) => relay(c, target, { method: 'GET', path: '/health', body: null }, reportNotRunning))
     .get('/ice', async (c) => relay(c, target, { method: 'GET', path: '/ice', body: null }))
     .post('/offer', limit, validJson(eaOfferInput), async (c) =>
@@ -171,4 +172,5 @@ export function eaRoutes(url: string, token: string | null = credential('local-t
       }
       return key === null ? res : recordChatReply(res, key)
     })
+  return app
 }
