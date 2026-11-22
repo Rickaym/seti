@@ -1,6 +1,6 @@
 import type { JournalEntry } from '@seti/shared'
 import { describe, expect, it, vi } from 'vitest'
-import { nodeLink, serveNode, type ControlEnd } from './node-link.js'
+import { controlLink, nodeLink, serveControl, serveNode, type ControlEnd, type NodeEnd } from './node-link.js'
 
 const TASK = 'task-1'
 
@@ -56,5 +56,34 @@ describe('node link', () => {
     controlEnd(async () => Promise.resolve({ promptId: 1.5, text: '' }))
     const next = { prompt: null, interrupted: false }
     await expect(nodeLink.ask(TASK, 'prompt.open', { next, queued: false })).rejects.toThrow()
+  })
+})
+
+describe('control link', () => {
+  it('refuses to command before a node serves it', async () => {
+    await expect(controlLink.command('sessions.view', {})).rejects.toThrow(/No node/)
+  })
+
+  it('hands the node each command as the protocol states it and checks its answer', async () => {
+    const end: NodeEnd = {
+      'mode.set': () => ({ applied: 'next_turn' }),
+      'policy.set': () => ({}),
+      'queued.retract': ({ promptId }) => ({ outcome: 'removed', promptId }),
+      'quiet.restart': () => ({}),
+      'sessions.view': () => ({ sessions: [{ agent: TASK, running: true, heardAt: 5, retrying: null }] }),
+    }
+    serveControl(end)
+    await expect(controlLink.command('mode.set', { agent: TASK, mode: 'default' })).resolves.toEqual({
+      applied: 'next_turn',
+    })
+    await expect(controlLink.command('queued.retract', { agent: TASK, promptId: 4 })).resolves.toEqual({
+      outcome: 'removed',
+      promptId: 4,
+    })
+    await expect(controlLink.command('queued.retract', { agent: '', promptId: 4 })).rejects.toThrow()
+    serveControl({ ...end, 'quiet.restart': () => ({ late: true }) as unknown as Record<string, never> })
+    await expect(controlLink.command('quiet.restart', { agent: TASK, at: null })).resolves.toEqual({})
+    serveControl({ ...end, 'mode.set': () => ({ applied: 'later' }) as unknown as { applied: 'now' } })
+    await expect(controlLink.command('mode.set', { agent: TASK, mode: 'plan' })).rejects.toThrow()
   })
 })

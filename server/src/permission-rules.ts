@@ -16,21 +16,23 @@ import { tasks } from './db.js'
 import { refuseAgent } from './ea-guard.js'
 import { HttpError } from './http.js'
 import { projectSettingsRules, userSettingsRules } from './inherited-rules.js'
+import { controlLink } from './node-link.js'
 import { changedFields, withFields } from './permission-edits.js'
 import { builtInRules, GUARDS } from './permission-policy.js'
 import { allowed, denied, inputText, resolveRequest, waitingInput, waitsFor } from './permission-requests.js'
 import { deliverLateDecision, isLateRequest } from './restart-waits.js'
 import { reviewCoverage, reviewGaps } from './review-coverage.js'
-import { liveSessions } from './runner.js'
 import { permissionSettings } from './session-options.js'
 import { permissionRequests, permissionRules } from './store/permissions.js'
 
 /** Hands every open session the permission rules its task has now, or only the one task's. */
 async function refreshPermissions(taskId?: string): Promise<void> {
-  for (const [id, session] of liveSessions()) {
+  const { sessions } = await controlLink.command('sessions.view', {})
+  for (const { agent: id } of sessions) {
     const task = taskId === undefined || id === taskId ? await tasks.get(id) : undefined
     if (task !== undefined) {
-      await session.applyPermissions(await permissionSettings(task)).catch((e: unknown) => {
+      const policy = await permissionSettings(task)
+      await controlLink.command('policy.set', { agent: id, policy }).catch((e: unknown) => {
         process.stderr.write(`permissions: task ${id}: could not update its session: ${String(e)}\n`)
       })
     }
