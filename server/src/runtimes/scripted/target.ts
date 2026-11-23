@@ -9,10 +9,10 @@ import type { ScriptedShapes } from './session.js'
 export const scriptedTarget: ConformanceTarget<ScriptedShapes, 'scripted'> = {
   adapter: scriptedAdapter,
   profile: {
-    events: { turnStart: true, reasoning: true },
+    events: { turnStart: true, reasoning: true, threads: true, plan: true, compaction: true, modelFallback: true },
     usage: { tokens: true, costUsd: 'reported' },
     input: { steer: 'next_step', retract: true },
-    background: { jobs: true, stop: true },
+    background: { jobs: true, stop: true, subagents: true },
     gated: { shell: true, edit: true, mcp: true },
     parsesOutput: true,
   },

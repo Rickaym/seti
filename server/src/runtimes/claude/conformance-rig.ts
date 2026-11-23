@@ -4,6 +4,7 @@ import type { Launcher } from '../../launcher.js'
 import { FakeProcess, launcherOf } from '../conformance/process.js'
 import { echoOf, type Script, type ScriptCall, type Step } from '../conformance/script.js'
 import type { Rig, SpawnRecord } from '../conformance/target.js'
+import { answered, claudeTool, isGated } from './conformance-tools.js'
 
 /** What the SDK's query takes, as the rig answers it. */
 interface QueryArgs {
@@ -30,50 +31,16 @@ export class QuerySlot {
 type TurnScript = ConstructorParameters<typeof FakeSdk>[0]
 type FakeTurn = Parameters<TurnScript>[0]
 type Message = ReturnType<typeof fakeMessage>
-type Args = Record<string, unknown>
 
-/** The script's questions as AskUserQuestion takes them. */
-const claudeQuestions = (questions: unknown) =>
-  (Array.isArray(questions) ? (questions as { text: string; options: string[] }[]) : []).map((q) => ({
-    question: q.text,
-    header: 'Question',
-    options: q.options.map((label) => ({ label, description: '' })),
-    multiSelect: false,
-  }))
-
-/** What Claude Code tells the model once the user answered its questions. */
-const answered = (input: Args | undefined): string =>
-  `User has answered your questions: ${Object.entries((input?.answers ?? {}) as Record<string, string>)
-    .map(([question, answer]) => `"${question}"="${answer}"`)
-    .join(', ')}`
-
-/** The script's tools as Claude Code names them, with Claude Code's input for the same call. */
-const TOOLS = new Map<string, (args: Args) => [string, Args]>([
-  [
-    'sh',
-    (args) => [
-      'Bash',
-      { command: args.cmd, description: 'Run it', ...(args.background === true ? { run_in_background: true } : {}) },
-    ],
-  ],
-  ['cat', (args) => ['Read', { file_path: args.path }]],
-  ['patch', (args) => ['Edit', { file_path: args.path, old_string: 'a', new_string: 'b' }]],
-  ['grep', (args) => ['Grep', { pattern: args.pattern }]],
-  ['fetch', (args) => ['WebFetch', { url: args.url, prompt: 'Read it' }]],
-  ['ask', (args) => ['AskUserQuestion', { questions: claudeQuestions(args.questions) }]],
-])
-
-const claudeTool = (call: ScriptCall): [string, Args] => {
-  const mcp = /^([\w-]+)\.([\w-]+)$/.exec(call.tool)
-  if (mcp !== null) {
-    return [`mcp__${mcp[1] ?? ''}__${mcp[2] ?? ''}`, call.args]
-  }
-  return TOOLS.get(call.tool)?.(call.args) ?? [call.tool, call.args]
-}
-
-/** Tools Claude Code asks about in its default mode when no rule allows them. */
-const isGated = (name: string) =>
-  ['Bash', 'Edit', 'Write', 'WebFetch', 'AskUserQuestion'].includes(name) || name.startsWith('mcp__')
+/** Steps that are neither talk, calls nor waits. */
+type OtherStep =
+  | { plan: unknown }
+  | { compact: unknown }
+  | { fallback: string }
+  | { malformed: true }
+  | { unknown: string }
+  | { garbage: string }
+  | { exit: number }
 
 /** A conversation Claude Code saved: its id and every input it read. */
 interface Saved {
@@ -161,6 +128,8 @@ class Machine {
 /** Plays one script step as the messages Claude Code writes for it. */
 class TurnPlayer {
   reply = ''
+  /** The subagent whose steps play now, by the call that started it; the agent's own when null. */
+  private thread: string | null = null
   private readonly machine: Machine
   private readonly turn: FakeTurn
   private readonly session: Saved
@@ -172,7 +141,7 @@ class TurnPlayer {
   }
 
   message(type: string, extra: Record<string, unknown>): Message {
-    return fakeMessage(type, { session_id: this.session.id, parent_tool_use_id: null, ...extra })
+    return fakeMessage(type, { session_id: this.session.id, parent_tool_use_id: this.thread, ...extra })
   }
 
   assistant(content: unknown[]): Message {
@@ -181,19 +150,39 @@ class TurnPlayer {
 
   async *play(step: Step): AsyncGenerator<Message> {
     if ('say' in step || 'recall' in step) {
-      this.reply = 'say' in step ? step.say : this.session.history.join('|')
-      yield this.assistant([{ type: 'text', text: this.reply }])
+      const text = 'say' in step ? step.say : this.session.history.join('|')
+      this.reply = this.thread === null ? text : this.reply
+      yield this.assistant([{ type: 'text', text }])
     } else if ('think' in step) {
       yield this.assistant([{ type: 'thinking', thinking: step.think, signature: '' }])
     } else if ('call' in step) {
       yield* this.call(step.call)
     } else if ('job' in step) {
       yield* this.job(step.job)
+    } else if ('subagent' in step) {
+      yield* this.subagent(step.subagent)
     } else if ('hold' in step) {
       await aborted(this.turn.signal)
     } else if ('awaitInput' in step) {
       await Promise.race([this.turn.queued(), aborted(this.turn.signal)])
       this.session.history.push(...(this.turn.signal.aborted ? [] : this.turn.fold()))
+    } else {
+      yield* this.other(step)
+    }
+  }
+
+  /** Plays a plan change, a compaction, or a step that misbehaves. */
+  private async *other(step: Extract<Step, OtherStep>): AsyncGenerator<Message> {
+    if ('plan' in step) {
+      yield* this.call({ tool: 'todo', args: { items: step.plan } })
+    } else if ('fallback' in step) {
+      const models = { original_model: 'claude-fake', fallback_model: step.fallback }
+      yield this.message('system', { subtype: 'model_refusal_fallback', ...models, request_id: null, content: 'moved' })
+    } else if ('compact' in step) {
+      yield this.message('system', { subtype: 'status', status: 'compacting' })
+      const metadata = { trigger: step.compact.trigger, pre_tokens: step.compact.before }
+      yield this.message('system', { subtype: 'compact_boundary', compact_metadata: metadata })
+      yield this.message('system', { subtype: 'status', status: null })
     } else if ('malformed' in step) {
       yield this.message('assistant', { message: null })
     } else if ('unknown' in step) {
@@ -203,6 +192,37 @@ class TurnPlayer {
     } else {
       throw new Error(`Claude Code process exited with code ${String(step.exit)}`)
     }
+  }
+
+  /** Plays a subagent through the Task tool; its messages name the call as their parent. */
+  private async *subagent(agent: Extract<Step, { subagent: unknown }>['subagent']): AsyncGenerator<Message> {
+    const background = agent.background === true
+    const id = this.machine.nextId('toolu_')
+    const input = { description: agent.label, prompt: agent.label, ...(background ? { run_in_background: true } : {}) }
+    yield this.assistant([{ type: 'tool_use', id, name: 'Task', input }])
+    const task = this.machine.nextId('agent_')
+    const job = { task, call: id, label: agent.label }
+    if (background) {
+      yield this.result(id, `Async agent launched successfully. agentId: ${task}`, false)
+      const started = { subtype: 'task_started', task_id: task, tool_use_id: id, description: agent.label }
+      yield this.message('system', { ...started, task_type: 'local_agent' })
+    }
+    const outer = this.thread
+    this.thread = id
+    let report = ''
+    for (const step of agent.steps) {
+      report = 'say' in step ? step.say : report
+      yield* this.play(step)
+    }
+    this.thread = outer
+    yield background ? jobEnded(job, 'completed') : this.result(id, report, false)
+  }
+
+  /** Claude Code's report of a call's result, in the thread playing now. */
+  private result(id: string, content: string, isError: boolean): Message {
+    return this.message('user', {
+      message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: id, content, is_error: isError }] },
+    })
   }
 
   private async *job(label: string): AsyncGenerator<Message> {
@@ -228,10 +248,7 @@ class TurnPlayer {
     const [name, input] = claudeTool(call)
     yield this.assistant([{ type: 'tool_use', id, name, input }])
     const ask = this.turn.session.options.canUseTool
-    const result = (content: string, isError: boolean) =>
-      this.message('user', {
-        message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: id, content, is_error: isError }] },
-      })
+    const result = (content: string, isError: boolean) => this.result(id, content, isError)
     const { signal } = this.turn
     const asked =
       isGated(name) && ask !== undefined

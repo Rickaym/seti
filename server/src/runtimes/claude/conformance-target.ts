@@ -24,10 +24,10 @@ const decideWith =
 export const claudeTarget = (slot: QuerySlot): ConformanceTarget<ClaudeShapes, 'claude'> => ({
   adapter: claudeAdapter,
   profile: {
-    events: { turnStart: false, reasoning: true },
+    events: { turnStart: false, reasoning: true, threads: true, plan: true, compaction: true, modelFallback: true },
     usage: { tokens: true, costUsd: 'reported' },
     input: { steer: 'next_step', retract: true },
-    background: { jobs: true, stop: true },
+    background: { jobs: true, stop: true, subagents: true },
     gated: { shell: true, edit: true, mcp: true },
     parsesOutput: false,
   },

@@ -62,6 +62,8 @@ export class ScriptedRuntime {
   private readonly pending = new Map<number, (verdict: Verdict) => void>()
   private readonly jobs = new Map<string, { call: string; label: string }>()
   private inputArrived: (() => void) | null = null
+  /** The subagent thread whose steps play now; the agent's own when null. */
+  private thread: string | null = null
   private ids = 0
   private dead = false
   private readonly machine: MachineState
@@ -167,11 +169,15 @@ export class ScriptedRuntime {
   private async play(step: Step, history: string[], turn: Turn): Promise<string | null> {
     if ('say' in step || 'recall' in step) {
       const text = 'say' in step ? step.say : history.join('|')
-      this.io.write({ t: 'say', id: this.next('msg'), text })
-      return text
+      this.io.write({ t: 'say', id: this.next('msg'), text, ...this.inThread() })
+      return this.thread === null ? text : null
     }
     if ('think' in step) {
-      this.io.write({ t: 'think', id: this.next('think'), text: step.think })
+      this.io.write({ t: 'think', id: this.next('think'), text: step.think, ...this.inThread() })
+    } else if ('subagent' in step) {
+      await this.subagent(step.subagent, history, turn)
+    } else if ('plan' in step || 'compact' in step || 'fallback' in step) {
+      this.narrate(step)
     } else if ('call' in step) {
       await this.call(step.call, turn.abort.signal)
     } else if ('job' in step) {
@@ -184,6 +190,56 @@ export class ScriptedRuntime {
       this.misbehave(step)
     }
     return null
+  }
+
+  /** The thread field of a line the runtime writes now. */
+  private inThread(): { thread?: string } {
+    return this.thread === null ? {} : { thread: this.thread }
+  }
+
+  /** Reports a plan change, a move to another model, or a compaction from its start to its end. */
+  private narrate(step: Extract<Step, { plan: unknown } | { compact: unknown } | { fallback: string }>): void {
+    if ('plan' in step) {
+      this.io.write({ t: 'plan', items: step.plan })
+      return
+    }
+    if ('fallback' in step) {
+      this.io.write({ t: 'model', from: MODEL, to: step.fallback })
+      return
+    }
+    const { trigger, before } = step.compact
+    this.io.write({ t: 'compact', phase: 'started', trigger })
+    this.io.write({ t: 'compact', phase: 'done', trigger, before })
+  }
+
+  /** Runs a subagent's steps in its thread; in the background its call ends first, then its job. */
+  private async subagent(
+    agent: Extract<Step, { subagent: unknown }>['subagent'],
+    history: string[],
+    turn: Turn,
+  ): Promise<void> {
+    const id = this.next('call')
+    const background = agent.background === true
+    const args = { label: agent.label, ...(background ? { background } : {}) }
+    this.io.write({ t: 'call', call: { id, tool: 'agent', args }, ...this.inThread() })
+    const job = { job: this.next('job'), call: id, label: agent.label, kind: 'subagent' as const }
+    if (background) {
+      this.io.write({ t: 'done', id, status: 'ok', output: `started ${agent.label}` })
+      this.io.write({ t: 'job', ...job, phase: 'start' })
+    }
+    const outer = this.thread
+    this.thread = id
+    let report = ''
+    for (const step of agent.steps) {
+      report = 'say' in step ? step.say : report
+      await this.play(step, history, turn)
+    }
+    this.thread = outer
+    if (background) {
+      this.io.write({ t: 'job', ...job, phase: 'end', status: 'completed' })
+    } else {
+      this.io.write({ t: 'done', id, status: 'ok', output: report, ...this.inThread() })
+    }
   }
 
   private misbehave(
@@ -236,26 +292,27 @@ export class ScriptedRuntime {
   /** Runs a call; returns its id when it ran to its end. */
   private async call(call: ScriptCall, signal: AbortSignal): Promise<string | null> {
     const id = this.next('call')
-    this.io.write({ t: 'call', call: { id, tool: call.tool, args: call.args } })
+    const thread = this.inThread()
+    this.io.write({ t: 'call', call: { id, tool: call.tool, args: call.args }, ...thread })
     const verdict = isGated(call.tool) ? await this.ask(id, call, signal) : { allow: true as const }
     if (verdict === null) {
-      this.io.write({ t: 'done', id, status: 'cancelled', output: '' })
+      this.io.write({ t: 'done', id, status: 'cancelled', output: '', ...thread })
       return null
     }
     if (!verdict.allow) {
-      this.io.write({ t: 'done', id, status: 'denied', output: verdict.message })
+      this.io.write({ t: 'done', id, status: 'denied', output: verdict.message, ...thread })
       return null
     }
     this.machine.effects.push(`${call.tool} ${JSON.stringify(verdict.args ?? call.args)}`)
     if (call.hold === true) {
       await orAbort(forever, signal)
-      this.io.write({ t: 'done', id, status: 'cancelled', output: '' })
+      this.io.write({ t: 'done', id, status: 'cancelled', output: '', ...thread })
       return null
     }
     const status = call.fails === true ? 'error' : 'ok'
     const exit = call.tool === 'sh' ? { exit: call.fails === true ? 1 : 0 } : {}
     const output = call.tool === 'ask' ? JSON.stringify(verdict.args?.answers ?? {}) : (call.output ?? '')
-    this.io.write({ t: 'done', id, status, output, ...exit })
+    this.io.write({ t: 'done', id, status, output, ...exit, ...thread })
     return id
   }
 
