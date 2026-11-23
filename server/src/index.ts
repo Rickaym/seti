@@ -28,7 +28,7 @@ import {
   SETI_HOME,
   TASK_RETENTION_DAYS,
 } from './config.js'
-import { openDatabase, tasks } from './db.js'
+import { openDatabase, sql, tasks } from './db.js'
 import { followLiveContext } from './ea-context.js'
 import { startInboxSweeper } from './ea-deliver.js'
 import { startEaIndex } from './ea-index.js'
@@ -67,6 +67,7 @@ import { watchSilentSessions } from './stall-watch.js'
 import { startStorageSchedule } from './storage-schedule.js'
 import { auditEvents } from './store/audit.js'
 import { channelStore } from './store/channels.js'
+import { fillEventColumns } from './store/event-columns.js'
 import { backfillMessageSearch } from './store/search.js'
 import { relayTaskEvents } from './task-events.js'
 import { relayTeamEvents } from './team-events.js'
@@ -144,6 +145,19 @@ function indexOlderMessages(): void {
     })
 }
 
+/** Fills the event columns of transcript rows stored before them, without holding up startup. */
+function fillOlderRows(): void {
+  fillEventColumns(sql)
+    .then((rows) => {
+      if (rows > 0) {
+        process.stdout.write(`events: filled the event columns of ${String(rows)} older messages\n`)
+      }
+    })
+    .catch((e: unknown) => {
+      process.stderr.write(`events: filling older messages failed: ${e instanceof Error ? e.message : String(e)}\n`)
+    })
+}
+
 /** Records and ends the running turns, for the next start to resume; a failure only logs. */
 async function cutTurns(): Promise<void> {
   try {
@@ -170,6 +184,7 @@ stopOn('SIGINT')
 enforcePrivateHome(SETI_HOME, BACKUP_DIR)
 await openDatabase()
 indexOlderMessages()
+fillOlderRows()
 await sealLegacySecrets()
 relayTaskEvents()
 relayTeamEvents()

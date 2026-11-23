@@ -18,9 +18,11 @@ import {
   type TaskStatus,
 } from '@seti/shared'
 import { DATABASE_URL } from './config.js'
+import { messageColumns } from './events/columns.js'
 import { pickAgentColor } from './new-agent-color.js'
 import { connect, ensureDatabase, migrate, type Db } from './pg.js'
 import { scrubValue } from './scrub.js'
+import { eventFilters } from './store/event-filters.js'
 import { readBody, readOutward, readPayload, readStoredBody, storedJson } from './stored-rows.js'
 
 export type { Db, Pool } from './pg.js'
@@ -182,10 +184,7 @@ interface DroppedPrompt {
   from: string | undefined
 }
 
-interface PromptRecord {
-  id: number
-  payload: string
-}
+type PromptRecord = Pick<MessageRecord, 'id' | 'payload'>
 
 function sentPrompt(taskId: string, row: PromptRecord): DroppedPrompt | null {
   const prompt = readPayload({ task_id: taskId, id: row.id }, 'prompt', row.payload)
@@ -202,12 +201,13 @@ interface NewMessage {
 /** Stores a message with its credentials redacted, so the database never holds them. */
 async function insertMessage(db: Db, { taskId, body, outward, createdAt }: NewMessage) {
   const payload = storedJson(scrubValue(body.payload))
-  const [row] = await db<{ id: number }[]>`INSERT INTO task_message (task_id, kind, payload, outward, created_at)
-    VALUES (${taskId}, ${body.kind}, ${payload}, ${JSON.stringify(outward)}, ${createdAt}) RETURNING id`
-  if (row === undefined) {
+  const row = { task_id: taskId, kind: body.kind, payload, outward: JSON.stringify(outward), created_at: createdAt }
+  const [stored] = await db<{ id: number }[]>`INSERT INTO task_message ${db({ ...row, ...messageColumns(body) })}
+    RETURNING id`
+  if (stored === undefined) {
     throw new Error('Message was not recorded')
   }
-  return row.id
+  return stored.id
 }
 
 export const tasks = {
@@ -341,9 +341,7 @@ export const tasks = {
 const QUEUED = sql`(payload::json ->> 'queued')`
 /** Enough of a turn's last own messages to find its closing text and its last tool use. */
 const TURN_ENDING_ROWS = 40
-/** Rows the task's own transcript shows: no subagent messages and no per-step progress reports. */
-export const OWN_ROW = sql`(kind <> 'sdk' OR ((payload::json ->> 'parent_tool_use_id') IS NULL
-  AND (payload::json ->> 'subtype') IS DISTINCT FROM 'task_progress'))`
+export const rowFilter = eventFilters(sql)
 
 export const messages = {
   insert: async (taskId: string, body: MessageBody, outward: string[]): Promise<MessageRow> => {
@@ -362,22 +360,22 @@ export const messages = {
   page: async (taskId: string, limit: number, before = Number.MAX_SAFE_INTEGER): Promise<MessagePage> => {
     const rows = (
       await sql<MessageRecord[]>`SELECT * FROM (SELECT * FROM task_message
-        WHERE task_id = ${taskId} AND id < ${before} AND ${OWN_ROW}
+        WHERE task_id = ${taskId} AND id < ${before} AND ${rowFilter.ownRow}
         ORDER BY id DESC LIMIT ${limit}) AS page ORDER BY id`
     ).map(toMessage)
     const oldest = rows[0]?.id ?? before
     const [older] = await sql<{ found: boolean }[]>`SELECT EXISTS (
-      SELECT 1 FROM task_message WHERE task_id = ${taskId} AND id < ${oldest} AND ${OWN_ROW}) AS found`
+      SELECT 1 FROM task_message WHERE task_id = ${taskId} AND id < ${oldest} AND ${rowFilter.ownRow}) AS found`
     return { messages: rows, has_older: older?.found === true }
   },
   /** The task's own `limit` messages just after `after`, oldest first. */
   pageAfter: async (taskId: string, limit: number, after: number): Promise<MessagePage> => {
     const rows = (
       await sql<MessageRecord[]>`SELECT * FROM task_message
-        WHERE task_id = ${taskId} AND id > ${after} AND ${OWN_ROW} ORDER BY id LIMIT ${limit + 1}`
+        WHERE task_id = ${taskId} AND id > ${after} AND ${rowFilter.ownRow} ORDER BY id LIMIT ${limit + 1}`
     ).map(toMessage)
     const [older] = await sql<{ found: boolean }[]>`SELECT EXISTS (
-      SELECT 1 FROM task_message WHERE task_id = ${taskId} AND id <= ${after} AND ${OWN_ROW}) AS found`
+      SELECT 1 FROM task_message WHERE task_id = ${taskId} AND id <= ${after} AND ${rowFilter.ownRow}) AS found`
     return { messages: rows.slice(0, limit), has_older: older?.found === true, has_newer: rows.length > limit }
   },
   /** About `limit` of the task's own messages centred on `id`, oldest first, for a jump far back. */
@@ -385,9 +383,9 @@ export const messages = {
     const half = Math.floor(limit / 2)
     const [older, newer] = await Promise.all([
       sql<MessageRecord[]>`SELECT * FROM task_message
-        WHERE task_id = ${taskId} AND id < ${id} AND ${OWN_ROW} ORDER BY id DESC LIMIT ${half + 1}`,
+        WHERE task_id = ${taskId} AND id < ${id} AND ${rowFilter.ownRow} ORDER BY id DESC LIMIT ${half + 1}`,
       sql<MessageRecord[]>`SELECT * FROM task_message
-        WHERE task_id = ${taskId} AND id >= ${id} AND ${OWN_ROW} ORDER BY id LIMIT ${limit - half + 1}`,
+        WHERE task_id = ${taskId} AND id >= ${id} AND ${rowFilter.ownRow} ORDER BY id LIMIT ${limit - half + 1}`,
     ])
     const before = older.slice(0, half).reverse()
     const after = newer.slice(0, limit - half)
@@ -408,9 +406,9 @@ export const messages = {
       SELECT latest.id, latest.payload FROM latest
       WHERE latest.text <> '' AND left(latest.text, 1) NOT IN ('/', '!')
         AND EXISTS (SELECT 1 FROM task_message r WHERE r.task_id = ${taskId} AND r.id > latest.id AND r.kind = 'sdk'
-          AND r.payload::json ->> 'type' = 'result' AND r.payload::json ->> 'num_turns' = '0')
+          AND ${rowFilter.emptyTurnEnd})
         AND NOT EXISTS (SELECT 1 FROM task_message a WHERE a.task_id = ${taskId} AND a.id > latest.id AND a.kind = 'sdk'
-          AND a.payload::json ->> 'type' = 'assistant' AND (a.payload::json ->> 'parent_tool_use_id') IS NULL)
+          AND ${rowFilter.agentRow} AND ${rowFilter.ownThread})
         AND NOT EXISTS (SELECT 1 FROM task_message n WHERE n.task_id = ${taskId} AND n.id < latest.id AND n.kind = 'seti'
           AND n.payload::json ->> 'error' = ${resentNote}
           AND n.id > COALESCE((SELECT MAX(q.id) FROM task_message q
@@ -432,8 +430,7 @@ export const messages = {
     (
       await sql<{ payload: string }[]>`SELECT payload FROM (
         SELECT id, payload FROM task_message
-        WHERE task_id = ${taskId} AND kind = 'sdk' AND payload::json ->> 'type' = 'assistant'
-          AND (payload::json ->> 'parent_tool_use_id') IS NULL
+        WHERE task_id = ${taskId} AND kind = 'sdk' AND ${rowFilter.agentRow} AND ${rowFilter.ownThread}
           AND id > COALESCE((SELECT MAX(p.id) FROM task_message p WHERE p.task_id = ${taskId} AND p.kind = 'prompt'), 0)
         ORDER BY id DESC LIMIT ${TURN_ENDING_ROWS}
       ) AS ending ORDER BY id`
