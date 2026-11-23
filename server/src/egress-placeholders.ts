@@ -1,5 +1,6 @@
 import type { IncomingHttpHeaders } from 'node:http'
 import { hostMatches } from '@seti/shared'
+import { noValue } from './egress-answers.js'
 
 /** A connection the agent holds as a placeholder; the proxy swaps the value in on its hosts only. */
 export interface EgressPlaceholder {
@@ -82,7 +83,7 @@ export async function swapPlaceholders(
   }
   let swapped = { path, headers }
   for (const entry of found) {
-    const value = await entry.value().catch(() => null)
+    const value = await entry.value().catch(noValue)
     if (value === null || value === '' || HEADER_UNSAFE.test(value)) {
       return { kind: 'unreadable', name: entry.name }
     }

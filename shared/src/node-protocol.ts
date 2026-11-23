@@ -356,3 +356,6 @@ export type NodeReply<K extends NodeCommandType> = z.infer<(typeof commandSchema
 export const NODE_COMMANDS: {
   [K in NodeCommandType]: { body: z.ZodType<NodeCommand<K>>; answer: z.ZodType<NodeReply<K>> }
 } = commandSchemas
+
+/** The commands whose answers carry a secret value; like value asks, only a local node gets them. */
+export const VALUE_COMMANDS: ReadonlySet<NodeCommandType> = new Set<NodeCommandType>(['aws.token'])

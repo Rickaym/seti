@@ -11,6 +11,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import type { ContainerCredentials } from './aws-credentials.js'
 import { grantConnection } from './connection-egress.js'
 import { connectionToken } from './connection-values.js'
+import { refusalText, ControlLate } from './egress-answers.js'
 import type { EgressAws } from './egress-aws.js'
 import { connectionRule, mcpLoginRules } from './egress-connections.js'
 import {
@@ -23,7 +24,7 @@ import {
   MCP_PROXY_HOST,
 } from './egress-hosts.js'
 import { swapPlaceholders, type EgressPlaceholder } from './egress-placeholders.js'
-import { refusalText, startEgressProxy, type EgressOptions, type EgressProxy } from './egress-proxy.js'
+import { startEgressProxy, type EgressOptions, type EgressProxy } from './egress-proxy.js'
 import type { EgressRule } from './egress-rules.js'
 import type { McpTokens } from './mcp-oauth.js'
 import { loadSandboxCa, type SandboxCa } from './sandbox-ca.js'
@@ -389,6 +390,22 @@ describe('egress proxy', () => {
     const res = await viaSocket(running.socketPath, { method: 'POST', path: '/v1/messages' }, '{}')
     expect(res.status).toBe(401)
     expect(res.body).toContain('Seti has no Claude credential')
+    await running.close()
+  })
+
+  it('answers 503, which clients retry, when the control plane does not answer in time', async () => {
+    const late = async () => Promise.reject(new ControlLate())
+    const running = await proxy(allowAll, { ...both, claude: late })
+    const res = await viaSocket(running.socketPath, { method: 'POST', path: '/v1/messages' }, '{}')
+    expect(res.status).toBe(503)
+    expect(res.body).toContain('did not answer in time')
+    await running.close()
+  })
+
+  it('answers a CONNECT 503, not a refusal, when the allowlist does not arrive in time', async () => {
+    const running = await proxy(async () => Promise.reject(new ControlLate()), both)
+    expect(await connectStatus(running, 'example.com:443')).toBe(503)
+    expect(refused).not.toContain('example.com')
     await running.close()
   })
 
