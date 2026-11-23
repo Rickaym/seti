@@ -1,10 +1,14 @@
 import {
   journalEntry,
   NODE_ASKS,
+  NODE_COMMANDS,
   type JournalEntry,
   type NodeAnswer,
   type NodeAsk,
   type NodeAskType,
+  type NodeCommand,
+  type NodeCommandType,
+  type NodeReply,
 } from '@seti/shared'
 
 /** What the control plane does with what a node reports and asks about one agent. */
@@ -40,5 +44,27 @@ export const nodeLink = {
     const { answer } = controlEnd()
     const schemas = NODE_ASKS[type]
     return schemas.answer.parse(await answer[type](taskId, schemas.ask.parse(ask)))
+  },
+}
+
+/** What a node does for each command of the control plane. */
+export type NodeEnd = { [K in NodeCommandType]: (command: NodeCommand<K>) => Promise<NodeReply<K>> | NodeReply<K> }
+
+let node: NodeEnd | null = null
+
+/** Connects the node's end of the link; sessions run in this process. */
+export function serveControl(end: NodeEnd): void {
+  node = end
+}
+
+/** The control plane's end of the link, the only way it acts on a node's sessions. */
+export const controlLink = {
+  /** Tells the node to act and waits for its answer. */
+  command: async <K extends NodeCommandType>(type: K, command: NodeCommand<K>): Promise<NodeReply<K>> => {
+    if (node === null) {
+      throw new Error('No node serves the control link')
+    }
+    const schemas = NODE_COMMANDS[type]
+    return schemas.answer.parse(await node[type](schemas.body.parse(command)))
   },
 }

@@ -95,3 +95,39 @@ export const askReply = z.discriminatedUnion('type', [
   z.object({ type: z.literal('ask.error'), id: z.uuid(), error: z.string() }),
 ])
 export type AskReply = z.infer<typeof askReply>
+
+const done = z.object({})
+
+const commandSchemas = {
+  /** Switches the agent's open process to a permission mode; `next_turn` when it cannot now. */
+  'mode.set': {
+    body: z.object({ agent, mode: z.string() }),
+    answer: z.object({ applied: z.enum(['now', 'next_turn']) }),
+  },
+  /** Hands the agent's open process the permission rules its task has now. */
+  'policy.set': { body: z.object({ agent, policy: z.unknown() }), answer: done },
+  /** Takes back a queued message before the agent reads it, and says how that went. */
+  'queued.retract': {
+    body: z.object({ agent, promptId: z.int() }),
+    answer: z.object({ outcome: z.enum(['missing', 'unsupported', 'taken', 'removed']), promptId: z.int().nullable() }),
+  },
+  /** Starts the agent's quiet clock again, from `at` or from now. */
+  'quiet.restart': { body: z.object({ agent, at: z.number().nullable() }), answer: done },
+  /** The open sessions, with how long each has been quiet and why. */
+  'sessions.view': {
+    body: done,
+    answer: z.object({
+      sessions: z.array(
+        z.object({ agent, running: z.boolean(), heardAt: z.number(), retrying: z.string().nullable() }),
+      ),
+    }),
+  },
+}
+export type NodeCommandType = keyof typeof commandSchemas
+export type NodeCommand<K extends NodeCommandType> = z.infer<(typeof commandSchemas)[K]['body']>
+export type NodeReply<K extends NodeCommandType> = z.infer<(typeof commandSchemas)[K]['answer']>
+
+/** What the control plane tells a node to do, with what the node answers. */
+export const NODE_COMMANDS: {
+  [K in NodeCommandType]: { body: z.ZodType<NodeCommand<K>>; answer: z.ZodType<NodeReply<K>> }
+} = commandSchemas
