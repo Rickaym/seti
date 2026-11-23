@@ -30,6 +30,7 @@
     "@seti/mod-blobs": "workspace:*",
     "@seti/mod-catppuccin": "workspace:*",
     "@seti/mod-claude-theme": "workspace:*",
+    "@seti/mod-dreaming": "workspace:*",
     "@seti/mod-github-webhooks": "workspace:*",
     "@seti/mod-grid": "workspace:*",
     "@seti/mod-html-preview": "workspace:*",

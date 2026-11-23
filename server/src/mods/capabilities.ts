@@ -7,6 +7,7 @@ const BUNDLED_OPS = {
   'seti.version': 'seti.version',
   'workspaces.layout': 'workspaces.layout',
   'tasks.ask': 'tasks.ask',
+  'tasks.dream': 'tasks.dream',
 } as const satisfies Record<string, ModCapabilityName>
 
 /** Every call a mod can make into Seti; the op table in `MOD_OPS` is the whole third-party set. */

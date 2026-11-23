@@ -5,6 +5,7 @@ import claudeTheme from '@seti/mod-claude-theme/tokens.css?inline'
 /** The UI half of each bundled mod that has one, loaded as its own chunk when the mod is on. */
 export const UI_MODS: Readonly<Record<string, () => Promise<ModDefinition>>> = {
   blobs: async () => import('@seti/mod-blobs/ui').then((m) => m.blobsUi),
+  dreaming: async () => import('@seti/mod-dreaming/ui').then((m) => m.dreamingUi),
   grid: async () => import('@seti/mod-grid/ui').then((m) => m.gridUi),
   'html-preview': async () => import('@seti/mod-html-preview/ui').then((m) => m.htmlPreviewUi),
   'pr-previews': async () => import('@seti/mod-pr-previews/ui').then((m) => m.prPreviewsUi),

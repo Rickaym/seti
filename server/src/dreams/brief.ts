@@ -1,8 +1,8 @@
 import type { AttentionBriefLine, DreamRun } from '@seti/shared'
 import { dreamNights, nightRuns } from '../store/dream-nights.js'
 
-/** Where a tap on the night's line opens Seti: Dreaming's settings, with last night. */
-const DREAMS_URL = '/#settings/agents'
+/** Where a tap on the night's line opens Seti: the Dreaming mod's Dreams view. */
+const DREAMS_URL = '/#dreaming.dreams'
 
 const plural = (count: number, one: string, many = `${one}s`) => `${String(count)} ${count === 1 ? one : many}`
 
