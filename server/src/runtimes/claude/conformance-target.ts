@@ -1,4 +1,4 @@
-import type { CanUseTool } from '@anthropic-ai/claude-agent-sdk'
+import type { CanUseTool, SDKMessage } from '@anthropic-ai/claude-agent-sdk'
 import { claudeToolCall, projectClaude } from '@seti/shared'
 import type { ConformanceTarget, NeutralHost } from '../conformance/target.js'
 import { claudeAdapter } from './adapter.js'
@@ -32,7 +32,7 @@ export const claudeTarget = (slot: QuerySlot): ConformanceTarget<ClaudeShapes, '
       "Claude Code reports the session's running total; the turn's share is worked out after the " +
       'adapter (store/cost.ts), so turn.ended carries no cost',
   },
-  project: projectClaude,
+  project: (message) => projectClaude(message as SDKMessage),
   host: (neutral) => ({ decide: decideWith(neutral), hooks: {}, toolServers: {} }),
   rig: (script) => claudeRig(slot, script),
 })

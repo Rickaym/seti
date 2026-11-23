@@ -3,13 +3,8 @@ import { tasks } from './db.js'
 import { noteSessionInit, watchSessionMcp } from './mcp-session-status.js'
 import { noteModelFallback, replayedFallback, settleModelFallback } from './model-fallback.js'
 
-/** A message as Seti stores it: a session start without the tool, command and skill lists. */
-export const storedForm = (m: SDKMessage): SDKMessage =>
-  m.type === 'system' && m.subtype === 'init' ? { ...m, tools: [], slash_commands: [], skills: [] } : m
-
-/** Messages Seti does not store: thinking token estimates, which nothing shows, and replays. */
-export const unstored = async (taskId: string, m: SDKMessage): Promise<boolean> =>
-  (m.type === 'system' && m.subtype === 'thinking_tokens') || (await replayedFallback(taskId, m))
+/** Messages Seti does not store: a fallback notice a replayed stream repeats. */
+export const unstored = async (taskId: string, m: SDKMessage): Promise<boolean> => replayedFallback(taskId, m)
 
 /**
  * Records a fallback notice, and on a session's init stores its id, mode and model, ends a

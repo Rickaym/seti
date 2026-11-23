@@ -1,4 +1,5 @@
-import type { RuntimeEvent } from '@seti/shared'
+import { eventsOf, isAgentOutput, type RuntimeEvent } from '@seti/shared'
+import type { SessionMessage } from '../adapter.js'
 import { conversationLines, type ScriptedLine } from './dialect.js'
 import { scriptedToolCall } from './tools.js'
 
@@ -94,4 +95,17 @@ export function projectScripted(raw: unknown): RuntimeEvent[] {
   }
   const handler = HANDLERS[parsed.data.t] as (line: ScriptedLine) => RuntimeEvent
   return [handler(parsed.data)]
+}
+
+/** A line as a session report: the runtime speaks only of the agent at work and its turns. */
+export function scriptedReport(raw: unknown): SessionMessage {
+  const events = projectScripted(raw)
+  return {
+    type: 'message',
+    raw,
+    events,
+    work: true,
+    byAgent: events.some((event) => event.thread === '' && isAgentOutput(event)),
+    delivered: eventsOf(events, 'turn.ended').flatMap((end) => end.answered),
+  }
 }
