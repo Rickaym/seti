@@ -5,8 +5,8 @@ export type ClaudeOutcome = 'allow' | 'classifier' | 'ask' | 'deny'
 
 /**
  * How Seti's decision stands to Claude Code's: the same, looser (Seti would let through what
- * Claude Code stopped), tighter, deferred (Seti hands to the classifier a call Claude Code ran,
- * which may have been the classifier's own allow), or decided by Seti's hooks before Claude Code.
+ * Claude Code stopped), tighter, deferred (Seti hands to the classifier a call Claude Code ran or
+ * denied, which may have been the classifier's own answer), or decided by Seti's hooks first.
  */
 export type ShadowClass = 'agree' | 'looser' | 'tighter' | 'deferred' | 'seti-hook'
 
@@ -17,7 +17,7 @@ export function compareOutcomes(seti: Decision, claude: ClaudeOutcome): ShadowCl
   if (seti.step === 'guard' || seti.verdict === 'review') {
     return 'seti-hook'
   }
-  if (seti.verdict === 'defer' && claude === 'allow') {
+  if (seti.verdict === 'defer' && (claude === 'allow' || claude === 'deny')) {
     return 'deferred'
   }
   const difference = SETI_RANK[seti.verdict] - CLAUDE_RANK[claude]

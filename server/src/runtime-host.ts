@@ -22,6 +22,7 @@ import { ASK_TIMEOUT_S, asRecord, repeatHooks } from './repeat-hooks.js'
 import type { DefaultHost, DefaultShapes } from './runtimes/registry.js'
 import { sandboxHooks } from './sandbox.js'
 import { guardScope } from './session-options.js'
+import { shadowHooks } from './shadow-hooks.js'
 
 /** Decides each tool call the runtime would ask about by asking the control plane. */
 const decideByAsking =
@@ -102,12 +103,24 @@ function hostedServer(taskId: string, { name, tools }: ListedServer): McpServerC
   return { type: 'sdk', name, instance }
 }
 
-/** What Seti answers for a task's session while its turns wait, until the session ends. */
+type Hooks = DefaultShapes['hooks']
+
+/** Both sets of hooks, each event's matchers in order. */
+function withHooks(first: Hooks, second: Hooks): Hooks {
+  const events = [...new Set([...Object.keys(first), ...Object.keys(second)])] as (keyof Hooks)[]
+  return Object.fromEntries(events.map((event) => [event, [...(first[event] ?? []), ...(second[event] ?? [])]]))
+}
+
+/**
+ * What Seti answers for a task's session while its turns wait, until the session ends. Seti's own
+ * permission evaluator runs beside, in shadow, and changes no answer.
+ */
 export async function sessionHost(task: Task, sandboxed: boolean, session: AbortSignal): Promise<DefaultHost> {
   const { servers } = await nodeLink.ask(task.id, 'tools.list', {})
+  const shadow = shadowHooks(task, sandboxed, session)
   return {
-    decide: decideByAsking(task.id, session),
-    hooks: sessionHooks(task, sandboxed, session),
+    decide: shadow.observe(decideByAsking(task.id, session)),
+    hooks: withHooks(sessionHooks(task, sandboxed, session), shadow.hooks),
     toolServers: Object.fromEntries(servers.map((server) => [server.name, hostedServer(task.id, server)])),
   }
 }
