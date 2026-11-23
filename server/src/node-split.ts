@@ -9,6 +9,7 @@ import { setNodePid } from './node-pid.js'
 import { notifyInterrupted } from './notifications.js'
 import { recordAndCut } from './restart-cut.js'
 import { markRestartCut, resumeInterrupted } from './restart-resume.js'
+import { keepLeftoverRequests } from './restart-waits.js'
 import { openQuerySince } from './session-ingest.js'
 import { mirroredAgents } from './session-mirror.js'
 import { stopLeftoverScopes } from './stale-scopes.js'
@@ -44,6 +45,19 @@ async function takeUpLostTurns(): Promise<() => void> {
 
 const uid = process.getuid?.() ?? -1
 
+let leftoversKept = false
+
+/**
+ * The first node to take this control plane says which asks it still waits on: their requests
+ * stay with those asks, and the rest are kept for a late answer, as a restart keeps them.
+ */
+async function keepLeftovers(asks: readonly string[]): Promise<void> {
+  if (!leftoversKept) {
+    leftoversKept = true
+    await keepLeftoverRequests(new Set(asks))
+  }
+}
+
 /** Runs sessions on the node process behind the socket instead of in this one. */
 export async function connectNode(): Promise<void> {
   const client = new NodeClient({
@@ -52,10 +66,11 @@ export async function connectNode(): Promise<void> {
       checkNodeSocket(socket, uid)
     },
     journal: nodeLink.journal,
-    answer: async ({ agent, ask, body }, signal) => nodeLink.answer(agent, ask, body, signal),
+    answer: nodeLink.answer,
     cursors: nodeCursors,
     fresh: takeUpLostTurns,
     took: setNodePid,
+    waiting: keepLeftovers,
     stopping: async () => {
       await recordAndCut("Seti's node")
     },

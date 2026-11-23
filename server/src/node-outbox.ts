@@ -234,6 +234,11 @@ export class AskOutbox {
     }
   }
 
+  /** The ids of the asks still waiting for an answer. */
+  waitingIds(): string[] {
+    return [...this.waiting.keys()]
+  }
+
   /** The link is back: every ask still waiting goes out again with its own id. */
   resume(): void {
     for (const { frame } of this.waiting.values()) {

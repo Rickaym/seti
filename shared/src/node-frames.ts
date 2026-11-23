@@ -29,6 +29,8 @@ export const helloFrame = z.object({
   /** No control plane welcomed this node process yet: the sessions of an earlier one are gone. */
   fresh: z.boolean(),
   journals: z.array(journalPosition),
+  /** The asks the node still waits on, which go out again once it is welcomed. */
+  asks: z.array(id),
   sessions: z.array(z.object({ agent, state: sessionChanged, since: z.int().nullable() })),
 })
 export type HelloFrame = z.infer<typeof helloFrame>

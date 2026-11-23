@@ -75,6 +75,7 @@ function controlPlane(
     },
     fresh,
     took: () => undefined,
+    waiting: async () => Promise.resolve(),
     stopping: async () => Promise.resolve(),
     ...end,
   })
@@ -181,7 +182,7 @@ describe('the node over its socket', () => {
     })
   })
 
-  it('answers an ask the node sent while no control plane was connected, once one is', async () => {
+  it('names the asks it waits on as it connects, and answers each once a control plane is there', async () => {
     const node = await startNode()
     const answer = vi.fn(async () => Promise.resolve({ promptId: 4, text: 'hello' }))
     const asked = node.service.control.ask(
@@ -190,10 +191,13 @@ describe('the node over its socket', () => {
       { next: {}, queued: false },
       new AbortController().signal,
     )
-    const control = controlPlane(node.socket, new Map(), [], { answer })
+    const waiting = vi.fn(async () => Promise.resolve())
+    const control = controlPlane(node.socket, new Map(), [], { answer, waiting })
     await control.client.start()
     await expect(asked).resolves.toEqual({ promptId: 4, text: 'hello' })
     expect(answer).toHaveBeenCalledTimes(1)
+    const [[askId]] = answer.mock.calls as unknown as [[{ id: string }]]
+    expect(waiting).toHaveBeenCalledWith([askId.id])
   })
 
   it('has the control plane record the turns of a stopping node before it cuts them', async () => {

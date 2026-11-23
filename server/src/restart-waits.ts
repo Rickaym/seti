@@ -23,14 +23,17 @@ export const isLateRequest = (requestId: string) => lateRequests.has(requestId)
 /**
  * Startup keeps what agents asked the user before the restart: questions stay open and permission
  * requests stay pending, and the answer resumes the agent's session with it. Secret questions
- * expire, since their value only ever goes to the call that waited.
+ * expire, since their value only ever goes to the call that waited. Those of `asked`, asks a
+ * separate node still waits on, stay with their call, which the node sends again.
  */
-export async function keepLeftoverRequests(): Promise<void> {
-  await expireLeftoverSecrets()
+export async function keepLeftoverRequests(asked: ReadonlySet<string> = new Set()): Promise<void> {
+  await expireLeftoverSecrets(asked)
   for (const question of await questions.openList()) {
-    lateGroups.set(question.group_id, question.task_id)
+    if (!asked.has(question.group_id)) {
+      lateGroups.set(question.group_id, question.task_id)
+    }
   }
-  for (const request of await permissionRequests.orphan()) {
+  for (const request of await permissionRequests.orphan([...asked])) {
     lateRequests.set(request.id, request.task_id)
   }
 }

@@ -756,7 +756,9 @@ store, the audit chain and every record.
   applies, so a dropped link or a restart of either side neither repeats nor reorders one. A
   cursor it cannot keep stops it applying, with an error, until a restart takes up from there.
 - NODE-3: An ask carries an id the node made; a repeat gets the first answer, and an ask the
-  node stops waiting for aborts the answer in progress.
+  node stops waiting for aborts the answer in progress. A request the user answers takes the
+  ask's id, so an ask the node still waits on when a control plane starts keeps its one request,
+  and the user's answer reaches the call once.
 - NODE-4: A restart of the control plane MUST NOT cut running turns. A node that started anew
   says so as it connects, and the turns of the node before count as cut by a restart (RES-3 to
   RES-8).

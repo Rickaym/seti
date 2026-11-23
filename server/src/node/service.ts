@@ -88,6 +88,7 @@ export class NodeService {
       pid: process.pid,
       fresh: this.fresh,
       journals: this.journal.positions(),
+      asks: this.asks.waitingIds(),
       sessions: this.sessions.snapshot(),
     }
     this.send(hello)
