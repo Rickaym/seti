@@ -51,7 +51,7 @@ with another top-level folder.
 
 | Section        | Main files                                                                                                                                                                                       |
 | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| 3 Entities     | `shared/src/tasks.ts`, `shared/src/inputs.ts`, `shared/src/requests.ts`, `shared/src/events.ts`, `shared/src/runtimes/`, `db.ts`, `pending-requests.ts`                                          |
+| 3 Entities     | `shared/src/tasks.ts`, `shared/src/inputs.ts`, `shared/src/requests.ts`, `shared/src/events.ts`, `shared/src/runtimes/`, `events/`, `db.ts`, `pending-requests.ts`                               |
 | 4 Turns        | `runner.ts`, `session-host.ts`, `session-ingest.ts`, `session-spec.ts`, `runtime-host.ts`, `runtimes/`, `agent-session.ts`, `rewind.ts`, `turn-asking.ts`, `closing-line.ts`, `task-location.ts` |
 | 4 Restarts     | `session-restart.ts`, `input-queue.ts`                                                                                                                                                           |
 | 4 Node link    | `node-link.ts`, `node-commands.ts`, `session-control.ts`, `session-mirror.ts`, `session-setup.ts`, `shared/src/node-protocol.ts`                                                                 |
@@ -59,7 +59,7 @@ with another top-level folder.
 | 6 Attention    | `shared/src/attention.ts`, `task-blocked.ts`, `stall-watch.ts`, `ea-attention.ts`, `notifications.ts`, `notify-scope.ts`, `presence.ts`, `attention-brief.ts`                                    |
 | 7.1 Actors     | `access.ts`, `ea-guard.ts`                                                                                                                                                                       |
 | 7.2, 7.3       | `sandbox.ts`, `sandbox-mounts.ts`, `egress-proxy.ts`, `egress-rules.ts`, `egress-placeholders.ts`, `sandbox-ca.ts`, `ssh-agent.ts`, `agent-access.ts`                                            |
-| 7.4, 7.5       | `permission-policy.ts`, `permission-requests.ts`, `permission-timeout.ts`, `permission-guard.ts`, `repeat-hooks.ts`, `review-hooks.ts`, `outward.ts`                                             |
+| 7.4, 7.5       | `permission-policy.ts`, `policy/`, `permission-requests.ts`, `permission-timeout.ts`, `permission-guard.ts`, `repeat-hooks.ts`, `review-hooks.ts`, `outward.ts`                                  |
 | 7.6 Changes    | `change-requests.ts`, `change-request-notes.ts`, `mcp-off-context.ts`, `shared/src/change-requests.ts`                                                                                           |
 | 7.7 Hostile    | `git.ts`, `probe-launch.ts`, `task-files.ts`, `html-preview.ts`, `uploads.ts`                                                                                                                    |
 | 7.8 Caps       | `launcher.ts`, `memory-scope.ts`, `scope-cpu.ts`, `oom-guard.ts`                                                                                                                                 |

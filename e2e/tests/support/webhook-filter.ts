@@ -64,11 +64,21 @@ async function deliver(baseURL: string, created: ChannelSecret, payload: object)
   expect(sent.status).toBe(200)
 }
 
+/** Replaces the code as a user does: focus the loaded editor, select all, then type. */
+async function replaceCode(page: Page, press: Press, code: Locator, text: string): Promise<void> {
+  await expect(code).toHaveAttribute('contenteditable', 'true')
+  await press(code)
+  await expect(code).toBeFocused()
+  await page.keyboard.press('ControlOrMeta+A')
+  await page.keyboard.insertText(text)
+  await expect(code.locator('.cm-line')).toHaveText(text.split('\n'))
+}
+
 /** Writes the filter in the editor, tries it on a pasted sample, and saves it. */
 async function writeFilter({ page, press, phone }: Flow, card: Locator, name: string): Promise<void> {
   await press(card.getByRole('button', { name: 'Add', exact: true }))
   const dialog = page.getByRole('dialog', { name: `Filter for ${name}` })
-  await dialog.getByRole('textbox', { name: 'Filter code' }).fill(DROP_DEPLOYS)
+  await replaceCode(page, press, dialog.getByRole('textbox', { name: 'Filter code' }), DROP_DEPLOYS)
   await press(dialog.getByText('Sample', { exact: true }))
   await dialog.getByRole('textbox', { name: 'Sample body' }).fill('{"type":"deploy","title":"Sample deploy"}')
   await press(dialog.getByRole('button', { name: 'Test' }))

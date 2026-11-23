@@ -71,6 +71,20 @@ describe('buildAgenda', () => {
     expect(week.days[2]?.entries.filter((entry) => entry.name === 'Nudge')).toHaveLength(6)
   })
 
+  it.each([
+    { clock: '12:00', now: local(1, 12), rows: 8 },
+    { clock: '23:20', now: local(1, 23, 20), rows: 8 },
+    { clock: '23:30', now: local(1, 23, 30), rows: 12 },
+    { clock: '23:58', now: local(1, 23, 58), rows: 7 },
+    { clock: '00:00', now: local(2, 0), rows: 7 },
+    { clock: '00:10', now: local(2, 0, 10), rows: 9 },
+    { clock: '00:40', now: local(2, 0, 40), rows: 8 },
+  ])('lists a part day with few runs left one by one: a week from $clock has $rows lines', ({ now, rows }) => {
+    const feed = poller('Feed', 300, new Date(now.getTime() + 300_000))
+    const week = buildAgenda({ channels: [feed], followups: [], now, hours: 168, timezone: ZONE })
+    expect(week.days.flatMap((day) => day.entries)).toHaveLength(rows)
+  })
+
   it('leaves paused channels out with their names, and webhooks out altogether', () => {
     const agenda = buildAgenda({ channels: CHANNELS, followups: [], now: NOW, hours: 24, timezone: ZONE })
     expect(agenda.paused).toEqual([{ id: 'Resting', name: 'Resting', kind: 'poller' }])
