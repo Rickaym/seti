@@ -54,6 +54,7 @@ const BROKEN: [string, Target][] = [
       ),
     ),
   ],
+  ['SA-1', reprojected((events) => events.map((e) => ({ ...e, thread: '' })))],
   [
     'EV-7',
     reprojected((events) => {

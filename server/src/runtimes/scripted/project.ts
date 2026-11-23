@@ -42,7 +42,7 @@ const HANDLERS: { [T in ScriptedLine['t']]: (line: Of<T>) => RuntimeEvent } = {
           type: 'job.started',
           jobId: line.job,
           callId: line.call,
-          kind: 'shell',
+          kind: line.kind ?? 'shell',
           label: line.label,
           background: true,
         }
@@ -55,6 +55,21 @@ const HANDLERS: { [T in ScriptedLine['t']]: (line: Of<T>) => RuntimeEvent } = {
           status: line.status ?? 'completed',
           summary: line.label,
         },
+  plan: (line) => ({
+    v: 1,
+    thread: '',
+    type: 'plan',
+    items: line.items.map((item, index) => ({ id: String(index + 1), ...item })),
+  }),
+  model: (line) => ({ v: 1, thread: '', type: 'model.changed', from: line.from, to: line.to, reason: 'fallback' }),
+  compact: (line) => ({
+    v: 1,
+    thread: '',
+    type: 'compaction',
+    phase: line.phase,
+    trigger: line.trigger,
+    ...(line.before === undefined ? {} : { before: line.before }),
+  }),
   end: (line) => ({
     v: 1,
     thread: '',

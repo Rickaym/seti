@@ -29,8 +29,20 @@ export const conversationLines = {
     job: z.string(),
     call: z.string(),
     label: z.string(),
+    kind: z.enum(['shell', 'subagent']).optional(),
     phase: z.enum(['start', 'end']),
     status: z.enum(['completed', 'failed', 'stopped']).optional(),
+  }),
+  plan: z.object({
+    t: z.literal('plan'),
+    items: z.array(z.object({ text: z.string(), status: z.enum(['pending', 'in_progress', 'completed']) })),
+  }),
+  model: z.object({ t: z.literal('model'), from: z.string(), to: z.string() }),
+  compact: z.object({
+    t: z.literal('compact'),
+    phase: z.enum(['started', 'done']),
+    trigger: z.enum(['auto', 'manual']),
+    before: z.number().optional(),
   }),
   end: z.object({
     t: z.literal('end'),

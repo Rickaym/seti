@@ -12,12 +12,20 @@ export interface Profile {
     /** The runtime marks a turn's start (`turn.started`). */
     turnStart: boolean
     reasoning: boolean
+    /** Subagents' events carry their own thread. */
+    threads: boolean
+    /** The runtime reports its plan, as a plan call or a plan event. */
+    plan: boolean
+    /** The runtime reports when it compacts the conversation. */
+    compaction: boolean
+    /** The runtime can move to another model by itself, and says so. */
+    modelFallback: boolean
   }
   usage: { tokens: boolean; costUsd: 'reported' | 'priced' | 'none' }
   /** Input sent during a turn joins it at its next step, or waits for the turn's end. */
   input: { steer: 'next_step' | 'after_turn'; retract: boolean }
-  /** Commands keep running in the background after their call ends, and can be stopped. */
-  background: { jobs: boolean; stop: boolean }
+  /** Commands and subagents keep running in the background after their call ends; jobs can stop. */
+  background: { jobs: boolean; stop: boolean; subagents: boolean }
   /** The kinds whose calls Seti decides before they run (gate `before` or `request`). */
   gated: { shell: boolean; edit: boolean; mcp: boolean }
   /** The adapter reads the runtime's output itself, rather than through the vendor's library. */
