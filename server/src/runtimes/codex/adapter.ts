@@ -4,7 +4,7 @@ import { realiseCodex, type CodexProvider } from './realise.js'
 import { codexSession, type CodexShapes } from './session.js'
 
 /** Codex through `codex app-server`, one process per session, in Seti's sandbox only. */
-export const codexAdapterFor = (binary: string, provider: CodexProvider): RuntimeAdapter<CodexShapes, 'codex'> => ({
+export const codexAdapterFor = (binary: string, provider?: CodexProvider): RuntimeAdapter<CodexShapes, 'codex'> => ({
   id: 'codex',
   capabilities: {
     gate: { rewriteInput: false, classifier: false },
@@ -14,6 +14,13 @@ export const codexAdapterFor = (binary: string, provider: CodexProvider): Runtim
   },
   project: projectCodex,
   realise: async (spec, launcher, host, abortController) =>
-    Promise.resolve(realiseCodex(spec, launcher, { decide: host.decide, abortController, binary, provider })),
+    Promise.resolve(
+      realiseCodex(spec, launcher, {
+        decide: host.decide,
+        abortController,
+        binary,
+        ...(provider === undefined ? {} : { provider }),
+      }),
+    ),
   open: async (realised, input) => Promise.resolve(codexSession(realised, input)),
 })

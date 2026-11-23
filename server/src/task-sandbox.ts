@@ -14,11 +14,12 @@ import { memoryEnv } from './node-heap.js'
 import { sandboxDirOf } from './owned-dirs.js'
 import { modelProxyHere, proxyAwsToken, proxyGone, proxyHere, sshAgentHere } from './proxy-owner.js'
 import { awsToken } from './sandbox-aws-token.js'
+import { bwrapArgs } from './sandbox-bwrap.js'
 import { sandboxClaudeJson } from './sandbox-claude-json.js'
+import { CODEX_DIR, EMPTY_DIR, MODEL_KEY_ENV } from './sandbox-codex.js'
 import { gitEnv } from './sandbox-git.js'
 import { forgetSandboxSignIns, hostClaudeJson, mcpTokens, proxiedServers, signedInServers } from './sandbox-mcp.js'
 import {
-  bwrapArgs,
   checkoutOf,
   mountProblem,
   SANDBOX_CA,
@@ -98,10 +99,29 @@ export interface SandboxEnvOptions {
   memory?: MemoryCap | null
   /** Connection variables and the placeholders they hold, which the proxy swaps on their hosts. */
   connections?: Readonly<Record<string, string>>
+  /** A Codex agent: its runtime's home, and the connection variable that holds its OpenAI key. */
+  codex?: { modelKey: string | null }
 }
 
 /** Where the sandbox sees the prefix its tools start through, in its read-only run directory. */
 const SANDBOX_TOOL_SHELL = `${SANDBOX_RUN}/tool-shell`
+
+/** Claude Code's model settings, or a Codex agent's home and its key's placeholder. */
+function runtimeEnv(home: string, options: SandboxEnvOptions): Record<string, string> {
+  if (options.codex === undefined) {
+    return {
+      ANTHROPIC_BASE_URL: PROXY_URL,
+      CLAUDE_CODE_OAUTH_TOKEN: CLAUDE_PLACEHOLDER,
+      ...(options.connectors ? { CLAUDE_CODE_OAUTH_SCOPES: `user:inference ${CONNECTOR_SCOPE}` } : {}),
+    }
+  }
+  const { modelKey } = options.codex
+  const placeholder = modelKey === null ? undefined : options.connections?.[modelKey]
+  return {
+    CODEX_HOME: path.join(home, CODEX_DIR),
+    ...(placeholder === undefined ? {} : { [MODEL_KEY_ENV]: placeholder }),
+  }
+}
 
 /** AWS tools inside fetch the set's role's credentials from the proxy, never from EC2. */
 function awsEnv(aws: SandboxEnvOptions['aws']): Record<string, string> {
@@ -140,9 +160,7 @@ export function sandboxEnv(
     SHELL: '/bin/bash',
     TMPDIR: '/tmp',
     SETI_SANDBOX: '1',
-    ANTHROPIC_BASE_URL: PROXY_URL,
-    CLAUDE_CODE_OAUTH_TOKEN: CLAUDE_PLACEHOLDER,
-    ...(options.connectors ? { CLAUDE_CODE_OAUTH_SCOPES: `user:inference ${CONNECTOR_SCOPE}` } : {}),
+    ...runtimeEnv(home, options),
     HTTPS_PROXY: PROXY_URL,
     HTTP_PROXY: PROXY_URL,
     https_proxy: PROXY_URL,
@@ -260,6 +278,7 @@ async function grantedReach(task: Task, request: SandboxRequest, at: { dir: stri
     ssh: ssh !== null,
     memory: request.memory ?? null,
     connections: connectionEnv(plan.grant.connections),
+    ...(plan.codex === undefined ? {} : { codex: plan.codex }),
   }
   return { ssh, options }
 }
@@ -269,6 +288,34 @@ async function modelReach(task: Task, request: SandboxRequest): Promise<Reach> {
   const { login } = request.plan.grant
   await modelProxyHere(task.id, login, async () => openModelProxy(task.id, login))
   return { ssh: null, options: { github: false, connectors: false, memory: request.memory ?? null } }
+}
+
+/** Claude Code's configuration in the agent's private home, filtered to what the agent may use. */
+function prepareClaude(task: Task, plan: SandboxPlan, layout: SandboxLayout): void {
+  const projects = [task.cwd, checkoutOf(task.cwd, layout) ?? task.cwd]
+  const denied = new Set(plan.denied)
+  sandboxClaudeJson(hostClaudeJson(), path.join(layout.taskDir, 'home', '.claude.json'), {
+    signedIn: signedInServers(),
+    projects: [...new Set(projects)],
+    denied,
+    covered: (host) =>
+      plan.grant.connections.some(
+        (each) => each.header !== null && each.hosts.some((pattern) => hostMatches(pattern, host)),
+      ),
+    borrowed: borrowedServers(readHostConfig(), ownProjects(task.cwd), (name) => plan.borrowed.includes(name)),
+  })
+  forgetSandboxSignIns(path.join(layout.taskDir, 'home', '.claude'), proxiedServers(mcpTokens, denied))
+}
+
+/** Codex's home in the agent's private home, with the places its locked files are mounted on. */
+function prepareCodex(dir: string): void {
+  const home = path.join(dir, 'home', CODEX_DIR)
+  for (const folder of [home, path.join(home, 'rules'), path.join(dir, EMPTY_DIR)]) {
+    fs.mkdirSync(folder, { recursive: true, mode: 0o700 })
+  }
+  for (const file of ['config.toml', '.env']) {
+    fs.closeSync(fs.openSync(path.join(home, file), 'a', 0o600))
+  }
 }
 
 /**
@@ -281,7 +328,7 @@ export async function taskSandbox(task: Task, request: SandboxRequest): Promise<
   const setpriv = findBinary('setpriv')
   const envBinary = findBinary('env')
   const { ctx, plan } = request
-  const { policy, grant } = plan
+  const { policy } = plan
   const maintenance = request.maintenance
   const dir = maintenance === undefined ? taskDir(task.id) : maintenanceDirOf(task.id)
   const layout: SandboxLayout = {
@@ -303,6 +350,7 @@ export async function taskSandbox(task: Task, request: SandboxRequest): Promise<
     pathEnv: process.env.PATH ?? '',
     sessionId: maintenance === undefined ? task.session_id : null,
     ...(maintenance === undefined ? {} : { maintenance }),
+    ...(plan.codex === undefined ? {} : { codex: true }),
   }
   for (const workDir of [layout.cwd, ...layout.dirs]) {
     const problem = mountProblem(workDir, layout)
@@ -312,19 +360,11 @@ export async function taskSandbox(task: Task, request: SandboxRequest): Promise<
   }
   prepareDirs(dir)
   fs.mkdirSync(workspaceDir(task.id), { recursive: true, mode: 0o700 })
-  const projects = [task.cwd, checkoutOf(task.cwd, layout) ?? task.cwd]
-  const denied = new Set(plan.denied)
-  sandboxClaudeJson(hostClaudeJson(), path.join(dir, 'home', '.claude.json'), {
-    signedIn: signedInServers(),
-    projects: [...new Set(projects)],
-    denied,
-    covered: (host) =>
-      grant.connections.some(
-        (each) => each.header !== null && each.hosts.some((pattern) => hostMatches(pattern, host)),
-      ),
-    borrowed: borrowedServers(readHostConfig(), ownProjects(task.cwd), (name) => plan.borrowed.includes(name)),
-  })
-  forgetSandboxSignIns(path.join(dir, 'home', '.claude'), proxiedServers(mcpTokens, denied))
+  if (plan.codex === undefined) {
+    prepareClaude(task, plan, layout)
+  } else {
+    prepareCodex(dir)
+  }
   const reach =
     maintenance === undefined
       ? await grantedReach(task, request, { dir, home: ctx.home, socat })

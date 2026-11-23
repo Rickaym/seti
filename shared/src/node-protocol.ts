@@ -97,6 +97,8 @@ export type GrantConnection = z.infer<typeof grantConnection>
 export const proxyGrant = z.object({
   /** The Claude login the agent's session signs in with. */
   login: z.string().nullable(),
+  /** Whether the agent's runtime talks to Anthropic, so its hosts and the login are in reach. */
+  anthropic: z.boolean().default(true),
   connections: z.array(grantConnection),
   /** host:port of the MCP servers the host signed in to that the agent may use. */
   mcp: z.array(z.string()),
