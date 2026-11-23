@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { claudeCall, policyMode } from './claude-call.js'
+import { policyMode } from './claude-call.js'
 import { decide } from './evaluate.js'
-import { bash, contextOf, CWD, decideClaude, HOME } from './policy-fixtures.js'
+import { bash, claudeCall, contextOf, CWD, decideClaude, HOME } from './policy-fixtures.js'
 
 const unsandboxed = { sandboxed: false } as const
 
@@ -83,6 +83,10 @@ describe('reading Claude Code calls', () => {
     })
     expect(claudeCall('Task', {})).toMatchObject({ kind: 'subagent', agentType: 'general-purpose' })
     expect(claudeCall('Skill', { skill: 'x', nested: { a: 1 } }).params).toEqual({ skill: 'x' })
+    expect(claudeCall('MultiEdit', { file_path: 'a.ts', edits: [{}, {}] }).writes).toEqual(['a.ts'])
+    expect(claudeCall('Edit', { file_path: '' }).writes).toEqual([])
+    expect(claudeCall('ToolSearch', { query: 'slack' })).toMatchObject({ kind: 'search', reads: [] })
+    expect(claudeCall('Monitor', { command: 'tail -f x' }).command).toBeUndefined()
   })
 
   it('reads Claude Code modes as Seti modes, any other as ask', () => {
