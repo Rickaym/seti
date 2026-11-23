@@ -170,6 +170,12 @@ the AppArmor profile for `bwrap` that the installer adds ([Setup](setup.md#sandb
   and rule ref in `policy_shadow`, with no input, command, path or rule text, and also counts
   decisions that failed or took over 50 ms (PERM-12). `pnpm doctor` shows the last seven days,
   and `GET /permissions/shadow` and `seti_overview` with `permissions` read the counts.
+- **Runtimes without a classifier.** An adapter declares in `capabilities.gate.classifier` whether
+  its runtime has a classifier to defer to. Without one the evaluator asks where it would defer,
+  keeps the sandbox's built-in shell allow in auto mode only for a line it fully reads, and lets a
+  line run that its own read-only list (`policy/read-only.ts`) passes: listed commands run
+  directly, reading inside the working directories, with no redirect, substitution, variable or
+  wrapper. Claude Code has a classifier, so this changes nothing while it is the only runtime.
 - **Memory and CPU.** Each agent's process tree starts through `systemd-run --user --scope` with
   `MemoryMax`, 1 GB of `MemorySwapMax`, `OOMPolicy=continue`, `CPUWeight=50`, `CPUQuota` and
   `BindsTo=` the server's unit, so agents end with Seti (CAP-5). Every 100 ms Seti raises the
