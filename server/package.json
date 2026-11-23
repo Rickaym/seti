@@ -22,6 +22,7 @@
     "@hono/node-server": "^2.1.9",
     "@hono/zod-validator": "^0.9.1",
     "@jitl/quickjs-wasmfile-release-sync": "^0.32.0",
+    "@modelcontextprotocol/sdk": "^1.32.1",
     "@redis/client": "^6.3.1",
     "@seti/mod-api": "workspace:*",
     "@seti/mod-blobs": "workspace:*",

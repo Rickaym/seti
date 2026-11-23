@@ -10,12 +10,14 @@ import { markQueued } from './queued-prompts.js'
 import { mirrorSession } from './session-mirror.js'
 import { processStarted, recordStart, settleRewind, setupAnswers } from './session-setup.js'
 import { storedForm, unstored } from './session-start.js'
+import { forgetSessionTools } from './session-tools.js'
 import { withTurnCost } from './store/cost.js'
 import { hadRunningSubtask } from './subtask-cache.js'
 import { publishFolded, publishSubtasks } from './subtask-prs.js'
 import { publish } from './task-events.js'
 import { forgetToolCalls, trackToolCalls } from './tool-calls.js'
 import { turnAsks } from './turn-asking.js'
+import { auditRefusal, turnAnswers } from './turn-asks.js'
 import { promptFor } from './turn-prompt.js'
 
 /**
@@ -88,6 +90,7 @@ async function reportEnd(taskId: string, status: TaskStatus, lastError: string |
 async function sessionClosed(taskId: string, since: number | null): Promise<void> {
   sessionSince.delete(taskId)
   forgetToolCalls(taskId)
+  forgetSessionTools(taskId)
   if (since !== null && (await hadRunningSubtask(taskId, since))) {
     await publishSubtasks(taskId, openQuerySince(taskId))
   }
@@ -108,6 +111,7 @@ const ingest: Ingest = {
   'session.started': (taskId, { warm }) => {
     processStarted(taskId, warm)
   },
+  'guard.refused': async (taskId, { command, reason }) => auditRefusal(taskId, command, reason),
   'rewind.settled': async (_taskId, { id, state, reason }) => settleRewind(id, state, reason),
   'session.since': (taskId, { promptId }) => sessionSince.set(taskId, promptId),
   'session.closed': async (taskId, { since }) => sessionClosed(taskId, since),
@@ -132,5 +136,6 @@ serveNode({
       return { promptId: (await appendMessage(taskId, { kind: 'prompt', payload })).id, text }
     },
     ...setupAnswers,
+    ...turnAnswers,
   },
 })

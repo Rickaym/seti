@@ -104,7 +104,7 @@ export const setupKey = async (task: Task) => specKey(await sessionSpec(task))
 /** The options a process of the task starts with from the spec it is handed. */
 export async function realise(spec: SessionSpec, task: Task, abortController: AbortController) {
   const launcher = await taskLauncher(task, 'agent', true)
-  const host = sessionHost(task, launcher.sandboxed, abortController.signal)
+  const host = await sessionHost(task, launcher.sandboxed, abortController.signal)
   return adapterFor(spec.runtime).realise(spec, launcher, host, abortController)
 }
 

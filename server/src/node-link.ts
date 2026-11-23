@@ -14,8 +14,12 @@ import {
 /** What the control plane does with what a node reports and asks about one agent. */
 export interface ControlEnd {
   journal(taskId: string, entry: JournalEntry): Promise<void>
-  answer: { [K in NodeAskType]: (taskId: string, ask: NodeAsk<K>) => Promise<NodeAnswer<K>> }
+  /** Answers an ask; `signal` aborts once the node stops waiting for the answer. */
+  answer: { [K in NodeAskType]: (taskId: string, ask: NodeAsk<K>, signal: AbortSignal) => Promise<NodeAnswer<K>> }
 }
+
+/** The signal of an ask the node waits on until it is answered. */
+const UNTIL_ANSWERED = new AbortController().signal
 
 let control: ControlEnd | null = null
 
@@ -39,11 +43,16 @@ export const nodeLink = {
   /** Reports what happened in the agent's session; resolves once the control plane took it. */
   journal: async (taskId: string, entry: JournalEntry): Promise<void> =>
     controlEnd().journal(taskId, journalEntry.parse(entry)),
-  /** Asks the control plane and waits for its answer. */
-  ask: async <K extends NodeAskType>(taskId: string, type: K, ask: NodeAsk<K>): Promise<NodeAnswer<K>> => {
+  /** Asks the control plane and waits for its answer, or until `signal` aborts. */
+  ask: async <K extends NodeAskType>(
+    taskId: string,
+    type: K,
+    ask: NodeAsk<K>,
+    signal: AbortSignal = UNTIL_ANSWERED,
+  ): Promise<NodeAnswer<K>> => {
     const { answer } = controlEnd()
     const schemas = NODE_ASKS[type]
-    return schemas.answer.parse(await answer[type](taskId, schemas.ask.parse(ask)))
+    return schemas.answer.parse(await answer[type](taskId, schemas.ask.parse(ask), signal))
   },
 }
 

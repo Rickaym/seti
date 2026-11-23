@@ -1,15 +1,8 @@
-import type { HookCallback, HookCallbackMatcher, HookJSONOutput } from '@anthropic-ai/claude-agent-sdk'
+import type { HookJSONOutput } from '@anthropic-ai/claude-agent-sdk'
+import type { Task } from '@seti/shared'
 import { askForReview } from './permission-requests.js'
-import { ASK_TIMEOUT_S, asRecord } from './repeat-hooks.js'
+import { permissionSettings } from './session-options.js'
 import { permissionRules } from './store/permissions.js'
-
-export interface ReviewScope {
-  taskId: string
-  /** Aborts when the session closes, which drops a review still open. */
-  session: AbortSignal
-  /** The deny rules the agent runs with; a call one refuses is left to it, never reviewed. */
-  denyRules: () => Promise<readonly string[]>
-}
 
 /** Whether a rule names the MCP tool: the tool itself, or its server, bare or as server__*. */
 export function namesTool(rule: string, tool: string): boolean {
@@ -27,33 +20,22 @@ const decide = (
   extra: { permissionDecisionReason?: string; updatedInput?: Record<string, unknown> },
 ): HookJSONOutput => ({ hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision, ...extra } })
 
-const UNCHECKED = 'Seti could not check its review rules, so it held this call back. Tell the user.'
-
 /**
- * A PreToolUse hook that holds each MCP call a review rule names until the user allows it, with
- * their edits, or denies it; as a hook it asks in Bypass too.
+ * Holds an MCP call a review rule names until the user allows it, with their edits, or denies it,
+ * and answers what the agent's review hook returns; as a hook it asks in Bypass too. A call the
+ * agent's deny rules refuse is left to them, never reviewed.
  */
-export function reviewHook(scope: ReviewScope): HookCallbackMatcher {
-  const check = async (tool: string, input: Record<string, unknown>, signal: AbortSignal) => {
-    if (!(await reviewed(scope.taskId, tool)) || (await scope.denyRules()).some((rule) => namesTool(rule, tool))) {
-      return {}
-    }
-    const answer = await askForReview(scope.taskId, { tool, input }, [signal, scope.session])
-    return answer.behavior === 'deny'
-      ? decide('deny', { permissionDecisionReason: answer.message })
-      : decide('allow', { updatedInput: answer.updatedInput ?? input })
+export async function reviewCall(
+  task: Task,
+  call: { tool: string; input: Record<string, unknown> },
+  signal: AbortSignal,
+): Promise<HookJSONOutput> {
+  const { tool, input } = call
+  if (!(await reviewed(task.id, tool)) || (await permissionSettings(task)).deny.some((rule) => namesTool(rule, tool))) {
+    return {}
   }
-
-  const hook: HookCallback = async (input, _toolUseId, { signal }) => {
-    if (input.hook_event_name !== 'PreToolUse') {
-      return {}
-    }
-    try {
-      return await check(input.tool_name, asRecord(input.tool_input), signal)
-    } catch (e) {
-      process.stderr.write(`review hook: task ${scope.taskId}: ${String(e)}\n`)
-      return decide('deny', { permissionDecisionReason: UNCHECKED })
-    }
-  }
-  return { matcher: 'mcp__.*', hooks: [hook], timeout: ASK_TIMEOUT_S }
+  const answer = await askForReview(task.id, call, [signal])
+  return answer.behavior === 'deny'
+    ? decide('deny', { permissionDecisionReason: answer.message })
+    : decide('allow', { updatedInput: answer.updatedInput ?? input })
 }
