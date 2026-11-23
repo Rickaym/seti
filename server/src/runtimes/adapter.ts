@@ -9,8 +9,11 @@ export type RuntimeId = 'claude'
  * version lacks a control leaves that control off instead.
  */
 interface Capabilities {
-  /** A decision can change the call's input, as an edit before allowing a held call does. */
-  gate: { rewriteInput: boolean }
+  /**
+   * A decision can change the call's input, as an edit before allowing a held call does; and the
+   * runtime has its own classifier that decides the calls no rule decides in its auto mode.
+   */
+  gate: { rewriteInput: boolean; classifier: boolean }
   /** Whether a session can fork, and whether the fork can stay off disk. */
   session: { fork: 'none' | 'persistent' | 'ephemeral' }
   /** A later turn can resume from an earlier prompt, and files can go back to a prompt. */

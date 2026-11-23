@@ -1,6 +1,6 @@
-import { RESENT_NOTE, type MessageRow } from '@seti/shared'
+import { RESENT_NOTE, type WireRow } from '@seti/shared'
 
-export type SetiPayload = Extract<MessageRow, { kind: 'seti' }>['payload']
+export type SetiPayload = Extract<WireRow, { kind: 'seti' }>['payload']
 
 export const isFailureNote = (note: SetiPayload) =>
   note.memory === undefined &&
@@ -13,7 +13,7 @@ export const isFailureNote = (note: SetiPayload) =>
   note.error !== RESENT_NOTE
 
 /** The failed turn no message has followed yet, which the notice under the transcript shows. */
-export function openFailure(messages: readonly MessageRow[]): number | null {
+export function openFailure(messages: readonly WireRow[]): number | null {
   for (const row of messages.toReversed()) {
     if (row.kind === 'prompt') {
       return null

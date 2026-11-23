@@ -1,9 +1,9 @@
-import type { MessageRow, TaskRewind } from '@seti/shared'
+import type { WireRow, TaskRewind } from '@seti/shared'
 
 /** A transcript entry: a message, the messages one rewind folded away, or a note about a rewind. */
 export type TranscriptItem =
-  | { type: 'row'; row: MessageRow }
-  | { type: 'rewound'; rewind: TaskRewind; rows: MessageRow[]; count: number }
+  | { type: 'row'; row: WireRow }
+  | { type: 'rewound'; rewind: TaskRewind; rows: WireRow[]; count: number }
   | { type: 'note'; rewind: TaskRewind }
 
 /** Conversation rewinds fold their rows; code-only and refused ones leave a note instead. */
@@ -28,7 +28,7 @@ const groupCount = (outer: TaskRewind, folding: readonly TaskRewind[]) =>
     .filter((r) => r.prompt_message_id >= outer.prompt_message_id && r.prompt_message_id <= outer.last_message_id)
     .reduce((sum, r) => sum + r.message_count, 0)
 
-export function transcriptItems(rows: readonly MessageRow[], rewinds: readonly TaskRewind[]): TranscriptItem[] {
+export function transcriptItems(rows: readonly WireRow[], rewinds: readonly TaskRewind[]): TranscriptItem[] {
   const folding = rewinds.filter(folds)
   const notes = rewinds.filter((rewind) => !folds(rewind))
   const items: TranscriptItem[] = []

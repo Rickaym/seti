@@ -1,0 +1,854 @@
+[
+  {
+    "transcript": "checkout",
+    "tool": "Read",
+    "target": "src/checkout/payment.ts",
+    "decisions": {
+      "sandboxed": "allow allow-rule builtin:allow:Read",
+      "unsandboxed": "allow allow-rule builtin:allow:Read",
+      "ask": "allow allow-rule builtin:allow:Read",
+      "bypass": "allow allow-rule builtin:allow:Read",
+      "plan": "allow allow-rule builtin:allow:Read"
+    }
+  },
+  {
+    "transcript": "checkout",
+    "tool": "Grep",
+    "target": "src",
+    "decisions": {
+      "sandboxed": "allow allow-rule builtin:allow:Grep",
+      "unsandboxed": "allow allow-rule builtin:allow:Grep",
+      "ask": "allow allow-rule builtin:allow:Grep",
+      "bypass": "allow allow-rule builtin:allow:Grep",
+      "plan": "allow allow-rule builtin:allow:Grep"
+    }
+  },
+  {
+    "transcript": "checkout",
+    "tool": "Edit",
+    "target": "src/checkout/payment.ts",
+    "decisions": {
+      "sandboxed": "allow allow-rule builtin:allow:Edit",
+      "unsandboxed": "allow mode",
+      "ask": "ask mode",
+      "bypass": "allow mode",
+      "plan": "ask plan"
+    }
+  },
+  {
+    "transcript": "checkout",
+    "tool": "Bash",
+    "target": "git diff src/checkout/payment.ts",
+    "decisions": {
+      "sandboxed": "allow allow-rule builtin:allow:Bash",
+      "unsandboxed": "allow read-only",
+      "ask": "allow read-only",
+      "bypass": "allow mode",
+      "plan": "allow read-only"
+    }
+  },
+  {
+    "transcript": "checkout",
+    "tool": "Bash",
+    "target": "pnpm vitest run src/checkout",
+    "decisions": {
+      "sandboxed": "allow allow-rule builtin:allow:Bash",
+      "unsandboxed": "ask mode",
+      "ask": "ask mode",
+      "bypass": "allow mode",
+      "plan": "ask mode"
+    }
+  },
+  {
+    "transcript": "checkout",
+    "tool": "Bash",
+    "target": "gh pr create --title \"fix(checkout): retry card captures on gateway timeouts\"",
+    "decisions": {
+      "sandboxed": "allow allow-rule builtin:allow:Bash",
+      "unsandboxed": "ask mode",
+      "ask": "ask mode",
+      "bypass": "allow mode",
+      "plan": "ask mode"
+    }
+  },
+  {
+    "transcript": "checkout",
+    "tool": "Edit",
+    "target": "src/checkout/payment.test.ts",
+    "decisions": {
+      "sandboxed": "allow allow-rule builtin:allow:Edit",
+      "unsandboxed": "allow mode",
+      "ask": "ask mode",
+      "bypass": "allow mode",
+      "plan": "ask plan"
+    }
+  },
+  {
+    "transcript": "checkout",
+    "tool": "Bash",
+    "target": "pnpm vitest run src/checkout/payment.test.ts",
+    "decisions": {
+      "sandboxed": "allow allow-rule builtin:allow:Bash",
+      "unsandboxed": "ask mode",
+      "ask": "ask mode",
+      "bypass": "allow mode",
+      "plan": "ask mode"
+    }
+  },
+  {
+    "transcript": "orders",
+    "tool": "TodoWrite",
+    "target": "",
+    "decisions": {
+      "sandboxed": "allow allow-rule builtin:allow:TodoWrite",
+      "unsandboxed": "allow allow-rule builtin:allow:TodoWrite",
+      "ask": "allow allow-rule builtin:allow:TodoWrite",
+      "bypass": "allow allow-rule builtin:allow:TodoWrite",
+      "plan": "allow allow-rule builtin:allow:TodoWrite"
+    }
+  },
+  {
+    "transcript": "orders",
+    "tool": "Read",
+    "target": "src/routes/orders.ts",
+    "decisions": {
+      "sandboxed": "allow allow-rule builtin:allow:Read",
+      "unsandboxed": "allow allow-rule builtin:allow:Read",
+      "ask": "allow allow-rule builtin:allow:Read",
+      "bypass": "allow allow-rule builtin:allow:Read",
+      "plan": "allow allow-rule builtin:allow:Read"
+    }
+  },
+  {
+    "transcript": "orders",
+    "tool": "Edit",
+    "target": "src/routes/orders.ts",
+    "decisions": {
+      "sandboxed": "allow allow-rule builtin:allow:Edit",
+      "unsandboxed": "allow mode",
+      "ask": "ask mode",
+      "bypass": "allow mode",
+      "plan": "ask plan"
+    }
+  },
+  {
+    "transcript": "orders",
+    "tool": "Bash",
+    "target": "pnpm test -- orders",
+    "decisions": {
+      "sandboxed": "allow allow-rule builtin:allow:Bash",
+      "unsandboxed": "ask mode",
+      "ask": "ask mode",
+      "bypass": "allow mode",
+      "plan": "ask mode"
+    }
+  },
+  {
+    "transcript": "orders",
+    "tool": "Agent",
+    "target": "general-purpose",
+    "decisions": {
+      "sandboxed": "ask mode",
+      "unsandboxed": "ask mode",
+      "ask": "ask mode",
+      "bypass": "allow mode",
+      "plan": "ask mode"
+    }
+  },
+  {
+    "transcript": "orders",
+    "tool": "Edit",
+    "target": "openapi/orders.yaml",
+    "decisions": {
+      "sandboxed": "allow allow-rule builtin:allow:Edit",
+      "unsandboxed": "allow mode",
+      "ask": "ask mode",
+      "bypass": "allow mode",
+      "plan": "ask plan"
+    }
+  },
+  {
+    "transcript": "infra",
+    "tool": "Bash",
+    "target": "terraform -chdir=envs/staging init -upgrade",
+    "decisions": {
+      "sandboxed": "allow allow-rule builtin:allow:Bash",
+      "unsandboxed": "ask mode",
+      "ask": "ask mode",
+      "bypass": "allow mode",
+      "plan": "ask mode"
+    }
+  },
+  {
+    "transcript": "infra",
+    "tool": "Edit",
+    "target": "modules/postgres/main.tf",
+    "decisions": {
+      "sandboxed": "allow allow-rule builtin:allow:Edit",
+      "unsandboxed": "allow mode",
+      "ask": "ask mode",
+      "bypass": "allow mode",
+      "plan": "ask plan"
+    }
+  },
+  {
+    "transcript": "infra",
+    "tool": "Bash",
+    "target": "terraform plan -target=module.postgres -var-file=staging.tfvars",
+    "decisions": {
+      "sandboxed": "allow allow-rule builtin:allow:Bash",
+      "unsandboxed": "ask mode",
+      "ask": "ask mode",
+      "bypass": "allow mode",
+      "plan": "ask mode"
+    }
+  },
+  {
+    "transcript": "infra",
+    "tool": "Bash",
+    "target": "terraform apply -target=module.postgres -var-file=staging.tfvars",
+    "decisions": {
+      "sandboxed": "allow allow-rule builtin:allow:Bash",
+      "unsandboxed": "ask mode",
+      "ask": "ask mode",
+      "bypass": "allow mode",
+      "plan": "ask mode"
+    }
+  },
+  {
+    "transcript": "cart",
+    "tool": "Bash",
+    "target": "pnpm playwright test cart.spec.ts --repeat-each=20",
+    "decisions": {
+      "sandboxed": "allow allow-rule builtin:allow:Bash",
+      "unsandboxed": "ask mode",
+      "ask": "ask mode",
+      "bypass": "allow mode",
+      "plan": "ask mode"
+    }
+  },
+  {
+    "transcript": "cart",
+    "tool": "Grep",
+    "target": "src/cart",
+    "decisions": {
+      "sandboxed": "allow allow-rule builtin:allow:Grep",
+      "unsandboxed": "allow allow-rule builtin:allow:Grep",
+      "ask": "allow allow-rule builtin:allow:Grep",
+      "bypass": "allow allow-rule builtin:allow:Grep",
+      "plan": "allow allow-rule builtin:allow:Grep"
+    }
+  },
+  {
+    "transcript": "cart",
+    "tool": "Read",
+    "target": "src/cart/PriceBadge.tsx",
+    "decisions": {
+      "sandboxed": "allow allow-rule builtin:allow:Read",
+      "unsandboxed": "allow allow-rule builtin:allow:Read",
+      "ask": "allow allow-rule builtin:allow:Read",
+      "bypass": "allow allow-rule builtin:allow:Read",
+      "plan": "allow allow-rule builtin:allow:Read"
+    }
+  },
+  {
+    "transcript": "guide",
+    "tool": "Read",
+    "target": "openapi/v2.yaml",
+    "decisions": {
+      "sandboxed": "allow allow-rule builtin:allow:Read",
+      "unsandboxed": "allow allow-rule builtin:allow:Read",
+      "ask": "allow allow-rule builtin:allow:Read",
+      "bypass": "allow allow-rule builtin:allow:Read",
+      "plan": "allow allow-rule builtin:allow:Read"
+    }
+  },
+  {
+    "transcript": "guide",
+    "tool": "Write",
+    "target": "docs/migration-v2.md",
+    "decisions": {
+      "sandboxed": "allow allow-rule builtin:allow:Edit",
+      "unsandboxed": "allow mode",
+      "ask": "ask mode",
+      "bypass": "allow mode",
+      "plan": "ask plan"
+    }
+  },
+  {
+    "transcript": "guide",
+    "tool": "Bash",
+    "target": "pandoc docs/migration-v2.md -o docs/migration-v2.pdf",
+    "decisions": {
+      "sandboxed": "allow allow-rule builtin:allow:Bash",
+      "unsandboxed": "ask mode",
+      "ask": "ask mode",
+      "bypass": "allow mode",
+      "plan": "ask mode"
+    }
+  },
+  {
+    "transcript": "fleet-5a1c7f20",
+    "tool": "mcp__linear__get_issue",
+    "target": "",
+    "decisions": {
+      "sandboxed": "ask mode",
+      "unsandboxed": "ask mode",
+      "ask": "ask mode",
+      "bypass": "allow mode",
+      "plan": "ask mode"
+    }
+  },
+  {
+    "transcript": "fleet-5a1c7f20",
+    "tool": "mcp__github__create_pull_request",
+    "target": "",
+    "decisions": {
+      "sandboxed": "ask mode",
+      "unsandboxed": "ask mode",
+      "ask": "ask mode",
+      "bypass": "allow mode",
+      "plan": "ask mode"
+    }
+  },
+  {
+    "transcript": "fleet-5a1c7f20",
+    "tool": "mcp__linear__get_issue",
+    "target": "",
+    "decisions": {
+      "sandboxed": "ask mode",
+      "unsandboxed": "ask mode",
+      "ask": "ask mode",
+      "bypass": "allow mode",
+      "plan": "ask mode"
+    }
+  },
+  {
+    "transcript": "fleet-5a1c7f20",
+    "tool": "mcp__github__create_pull_request",
+    "target": "",
+    "decisions": {
+      "sandboxed": "ask mode",
+      "unsandboxed": "ask mode",
+      "ask": "ask mode",
+      "bypass": "allow mode",
+      "plan": "ask mode"
+    }
+  },
+  {
+    "transcript": "fleet-5a1c7f20",
+    "tool": "mcp__linear__get_issue",
+    "target": "",
+    "decisions": {
+      "sandboxed": "ask mode",
+      "unsandboxed": "ask mode",
+      "ask": "ask mode",
+      "bypass": "allow mode",
+      "plan": "ask mode"
+    }
+  },
+  {
+    "transcript": "fleet-5a1c7f20",
+    "tool": "mcp__github__create_pull_request",
+    "target": "",
+    "decisions": {
+      "sandboxed": "ask mode",
+      "unsandboxed": "ask mode",
+      "ask": "ask mode",
+      "bypass": "allow mode",
+      "plan": "ask mode"
+    }
+  },
+  {
+    "transcript": "fleet-5a1c7f20",
+    "tool": "mcp__linear__get_issue",
+    "target": "",
+    "decisions": {
+      "sandboxed": "ask mode",
+      "unsandboxed": "ask mode",
+      "ask": "ask mode",
+      "bypass": "allow mode",
+      "plan": "ask mode"
+    }
+  },
+  {
+    "transcript": "fleet-5a1c7f20",
+    "tool": "mcp__github__create_pull_request",
+    "target": "",
+    "decisions": {
+      "sandboxed": "ask mode",
+      "unsandboxed": "ask mode",
+      "ask": "ask mode",
+      "bypass": "allow mode",
+      "plan": "ask mode"
+    }
+  },
+  {
+    "transcript": "fleet-5a1c7f20",
+    "tool": "mcp__linear__get_issue",
+    "target": "",
+    "decisions": {
+      "sandboxed": "ask mode",
+      "unsandboxed": "ask mode",
+      "ask": "ask mode",
+      "bypass": "allow mode",
+      "plan": "ask mode"
+    }
+  },
+  {
+    "transcript": "fleet-5a1c7f20",
+    "tool": "mcp__github__create_pull_request",
+    "target": "",
+    "decisions": {
+      "sandboxed": "ask mode",
+      "unsandboxed": "ask mode",
+      "ask": "ask mode",
+      "bypass": "allow mode",
+      "plan": "ask mode"
+    }
+  },
+  {
+    "transcript": "fleet-5a1c7f20",
+    "tool": "mcp__linear__get_issue",
+    "target": "",
+    "decisions": {
+      "sandboxed": "ask mode",
+      "unsandboxed": "ask mode",
+      "ask": "ask mode",
+      "bypass": "allow mode",
+      "plan": "ask mode"
+    }
+  },
+  {
+    "transcript": "fleet-5a1c7f20",
+    "tool": "mcp__github__create_pull_request",
+    "target": "",
+    "decisions": {
+      "sandboxed": "ask mode",
+      "unsandboxed": "ask mode",
+      "ask": "ask mode",
+      "bypass": "allow mode",
+      "plan": "ask mode"
+    }
+  },
+  {
+    "transcript": "fleet-5a1c7f20",
+    "tool": "mcp__linear__get_issue",
+    "target": "",
+    "decisions": {
+      "sandboxed": "ask mode",
+      "unsandboxed": "ask mode",
+      "ask": "ask mode",
+      "bypass": "allow mode",
+      "plan": "ask mode"
+    }
+  },
+  {
+    "transcript": "fleet-5a1c7f20",
+    "tool": "mcp__github__create_pull_request",
+    "target": "",
+    "decisions": {
+      "sandboxed": "ask mode",
+      "unsandboxed": "ask mode",
+      "ask": "ask mode",
+      "bypass": "allow mode",
+      "plan": "ask mode"
+    }
+  },
+  {
+    "transcript": "fleet-6b2d8a31",
+    "tool": "mcp__github__create_pull_request",
+    "target": "",
+    "decisions": {
+      "sandboxed": "ask mode",
+      "unsandboxed": "ask mode",
+      "ask": "ask mode",
+      "bypass": "allow mode",
+      "plan": "ask mode"
+    }
+  },
+  {
+    "transcript": "fleet-6b2d8a31",
+    "tool": "mcp__sentry__search_issues",
+    "target": "",
+    "decisions": {
+      "sandboxed": "ask mode",
+      "unsandboxed": "ask mode",
+      "ask": "ask mode",
+      "bypass": "allow mode",
+      "plan": "ask mode"
+    }
+  },
+  {
+    "transcript": "fleet-6b2d8a31",
+    "tool": "mcp__github__create_pull_request",
+    "target": "",
+    "decisions": {
+      "sandboxed": "ask mode",
+      "unsandboxed": "ask mode",
+      "ask": "ask mode",
+      "bypass": "allow mode",
+      "plan": "ask mode"
+    }
+  },
+  {
+    "transcript": "fleet-6b2d8a31",
+    "tool": "mcp__sentry__search_issues",
+    "target": "",
+    "decisions": {
+      "sandboxed": "ask mode",
+      "unsandboxed": "ask mode",
+      "ask": "ask mode",
+      "bypass": "allow mode",
+      "plan": "ask mode"
+    }
+  },
+  {
+    "transcript": "fleet-6b2d8a31",
+    "tool": "mcp__github__create_pull_request",
+    "target": "",
+    "decisions": {
+      "sandboxed": "ask mode",
+      "unsandboxed": "ask mode",
+      "ask": "ask mode",
+      "bypass": "allow mode",
+      "plan": "ask mode"
+    }
+  },
+  {
+    "transcript": "fleet-6b2d8a31",
+    "tool": "mcp__sentry__search_issues",
+    "target": "",
+    "decisions": {
+      "sandboxed": "ask mode",
+      "unsandboxed": "ask mode",
+      "ask": "ask mode",
+      "bypass": "allow mode",
+      "plan": "ask mode"
+    }
+  },
+  {
+    "transcript": "fleet-6b2d8a31",
+    "tool": "mcp__github__create_pull_request",
+    "target": "",
+    "decisions": {
+      "sandboxed": "ask mode",
+      "unsandboxed": "ask mode",
+      "ask": "ask mode",
+      "bypass": "allow mode",
+      "plan": "ask mode"
+    }
+  },
+  {
+    "transcript": "fleet-6b2d8a31",
+    "tool": "mcp__sentry__search_issues",
+    "target": "",
+    "decisions": {
+      "sandboxed": "ask mode",
+      "unsandboxed": "ask mode",
+      "ask": "ask mode",
+      "bypass": "allow mode",
+      "plan": "ask mode"
+    }
+  },
+  {
+    "transcript": "fleet-6b2d8a31",
+    "tool": "mcp__github__create_pull_request",
+    "target": "",
+    "decisions": {
+      "sandboxed": "ask mode",
+      "unsandboxed": "ask mode",
+      "ask": "ask mode",
+      "bypass": "allow mode",
+      "plan": "ask mode"
+    }
+  },
+  {
+    "transcript": "fleet-6b2d8a31",
+    "tool": "mcp__sentry__search_issues",
+    "target": "",
+    "decisions": {
+      "sandboxed": "ask mode",
+      "unsandboxed": "ask mode",
+      "ask": "ask mode",
+      "bypass": "allow mode",
+      "plan": "ask mode"
+    }
+  },
+  {
+    "transcript": "fleet-6b2d8a31",
+    "tool": "mcp__github__create_pull_request",
+    "target": "",
+    "decisions": {
+      "sandboxed": "ask mode",
+      "unsandboxed": "ask mode",
+      "ask": "ask mode",
+      "bypass": "allow mode",
+      "plan": "ask mode"
+    }
+  },
+  {
+    "transcript": "shells",
+    "tool": "Bash",
+    "target": "pnpm dev",
+    "decisions": {
+      "sandboxed": "allow allow-rule builtin:allow:Bash",
+      "unsandboxed": "ask mode",
+      "ask": "ask mode",
+      "bypass": "allow mode",
+      "plan": "ask mode"
+    }
+  },
+  {
+    "transcript": "shells",
+    "tool": "Monitor",
+    "target": "kubectl rollout status deploy/api -w",
+    "decisions": {
+      "sandboxed": "ask mode",
+      "unsandboxed": "ask mode",
+      "ask": "ask mode",
+      "bypass": "allow mode",
+      "plan": "ask mode"
+    }
+  },
+  {
+    "transcript": "shells",
+    "tool": "Bash",
+    "target": "pnpm build",
+    "decisions": {
+      "sandboxed": "allow allow-rule builtin:allow:Bash",
+      "unsandboxed": "ask mode",
+      "ask": "ask mode",
+      "bypass": "allow mode",
+      "plan": "ask mode"
+    }
+  },
+  {
+    "transcript": "shells",
+    "tool": "BashOutput",
+    "target": "",
+    "decisions": {
+      "sandboxed": "allow mode",
+      "unsandboxed": "allow mode",
+      "ask": "allow mode",
+      "bypass": "allow mode",
+      "plan": "allow mode"
+    }
+  },
+  {
+    "transcript": "shells",
+    "tool": "KillShell",
+    "target": "",
+    "decisions": {
+      "sandboxed": "ask mode",
+      "unsandboxed": "ask mode",
+      "ask": "ask mode",
+      "bypass": "allow mode",
+      "plan": "ask mode"
+    }
+  },
+  {
+    "transcript": "subagents",
+    "tool": "Agent",
+    "target": "general-purpose",
+    "decisions": {
+      "sandboxed": "ask mode",
+      "unsandboxed": "ask mode",
+      "ask": "ask mode",
+      "bypass": "allow mode",
+      "plan": "ask mode"
+    }
+  },
+  {
+    "transcript": "subagents",
+    "tool": "Agent",
+    "target": "general-purpose",
+    "decisions": {
+      "sandboxed": "ask mode",
+      "unsandboxed": "ask mode",
+      "ask": "ask mode",
+      "bypass": "allow mode",
+      "plan": "ask mode"
+    }
+  },
+  {
+    "transcript": "subagents",
+    "tool": "Bash",
+    "target": "ls docs",
+    "decisions": {
+      "sandboxed": "allow allow-rule builtin:allow:Bash",
+      "unsandboxed": "allow read-only",
+      "ask": "allow read-only",
+      "bypass": "allow mode",
+      "plan": "allow read-only"
+    }
+  },
+  {
+    "transcript": "subagents",
+    "tool": "Agent",
+    "target": "general-purpose",
+    "decisions": {
+      "sandboxed": "ask mode",
+      "unsandboxed": "ask mode",
+      "ask": "ask mode",
+      "bypass": "allow mode",
+      "plan": "ask mode"
+    }
+  },
+  {
+    "transcript": "todos",
+    "tool": "TodoWrite",
+    "target": "",
+    "decisions": {
+      "sandboxed": "allow allow-rule builtin:allow:TodoWrite",
+      "unsandboxed": "allow allow-rule builtin:allow:TodoWrite",
+      "ask": "allow allow-rule builtin:allow:TodoWrite",
+      "bypass": "allow allow-rule builtin:allow:TodoWrite",
+      "plan": "allow allow-rule builtin:allow:TodoWrite"
+    }
+  },
+  {
+    "transcript": "todos",
+    "tool": "TodoWrite",
+    "target": "",
+    "decisions": {
+      "sandboxed": "allow allow-rule builtin:allow:TodoWrite",
+      "unsandboxed": "allow allow-rule builtin:allow:TodoWrite",
+      "ask": "allow allow-rule builtin:allow:TodoWrite",
+      "bypass": "allow allow-rule builtin:allow:TodoWrite",
+      "plan": "allow allow-rule builtin:allow:TodoWrite"
+    }
+  },
+  {
+    "transcript": "todos",
+    "tool": "TaskCreate",
+    "target": "",
+    "decisions": {
+      "sandboxed": "allow mode",
+      "unsandboxed": "allow mode",
+      "ask": "allow mode",
+      "bypass": "allow mode",
+      "plan": "allow mode"
+    }
+  },
+  {
+    "transcript": "todos",
+    "tool": "TaskUpdate",
+    "target": "",
+    "decisions": {
+      "sandboxed": "allow mode",
+      "unsandboxed": "allow mode",
+      "ask": "allow mode",
+      "bypass": "allow mode",
+      "plan": "allow mode"
+    }
+  },
+  {
+    "transcript": "todos",
+    "tool": "TaskUpdate",
+    "target": "",
+    "decisions": {
+      "sandboxed": "allow mode",
+      "unsandboxed": "allow mode",
+      "ask": "allow mode",
+      "bypass": "allow mode",
+      "plan": "allow mode"
+    }
+  },
+  {
+    "transcript": "todos",
+    "tool": "TaskList",
+    "target": "",
+    "decisions": {
+      "sandboxed": "allow mode",
+      "unsandboxed": "allow mode",
+      "ask": "allow mode",
+      "bypass": "allow mode",
+      "plan": "allow mode"
+    }
+  },
+  {
+    "transcript": "turns",
+    "tool": "Bash",
+    "target": "git push -u origin fix/retry",
+    "decisions": {
+      "sandboxed": "allow allow-rule builtin:allow:Bash",
+      "unsandboxed": "ask mode",
+      "ask": "ask mode",
+      "bypass": "allow mode",
+      "plan": "ask mode"
+    }
+  },
+  {
+    "transcript": "turns",
+    "tool": "Bash",
+    "target": "gh pr create --fill",
+    "decisions": {
+      "sandboxed": "allow allow-rule builtin:allow:Bash",
+      "unsandboxed": "ask mode",
+      "ask": "ask mode",
+      "bypass": "allow mode",
+      "plan": "ask mode"
+    }
+  },
+  {
+    "transcript": "turns",
+    "tool": "mcp__github__add_issue_comment",
+    "target": "",
+    "decisions": {
+      "sandboxed": "ask mode",
+      "unsandboxed": "ask mode",
+      "ask": "ask mode",
+      "bypass": "allow mode",
+      "plan": "ask mode"
+    }
+  },
+  {
+    "transcript": "turns",
+    "tool": "WebFetch",
+    "target": "https://example.com/notes",
+    "decisions": {
+      "sandboxed": "allow allow-rule builtin:allow:WebFetch",
+      "unsandboxed": "ask mode",
+      "ask": "ask mode",
+      "bypass": "allow mode",
+      "plan": "allow allow-rule builtin:allow:WebFetch"
+    }
+  },
+  {
+    "transcript": "turns",
+    "tool": "Bash",
+    "target": "sleep 600",
+    "decisions": {
+      "sandboxed": "allow allow-rule builtin:allow:Bash",
+      "unsandboxed": "ask mode",
+      "ask": "ask mode",
+      "bypass": "allow mode",
+      "plan": "ask mode"
+    }
+  },
+  {
+    "transcript": "turns",
+    "tool": "AskUserQuestion",
+    "target": "",
+    "decisions": {
+      "sandboxed": "ask question",
+      "unsandboxed": "ask question",
+      "ask": "ask question",
+      "bypass": "ask question",
+      "plan": "ask question"
+    }
+  },
+  {
+    "transcript": "turns",
+    "tool": "ExitPlanMode",
+    "target": "",
+    "decisions": {
+      "sandboxed": "ask plan",
+      "unsandboxed": "ask plan",
+      "ask": "ask plan",
+      "bypass": "ask plan",
+      "plan": "ask plan"
+    }
+  }
+]

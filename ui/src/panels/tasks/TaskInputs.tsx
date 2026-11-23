@@ -1,4 +1,4 @@
-import { INPUT_MODES, type InputMode, type InputPause, type MessageRow, type Task } from '@seti/shared'
+import { INPUT_MODES, type InputMode, type InputPause, type WireRow, type Task } from '@seti/shared'
 import { Forward, Hourglass, Inbox, LoaderCircle, Pause, X, type LucideIcon } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { toast } from 'sonner'
@@ -82,7 +82,7 @@ export function QueuedInputs({
   running,
 }: {
   task: Task
-  messages: readonly MessageRow[]
+  messages: readonly WireRow[]
   running: boolean
 }) {
   const queued = useMemo(() => queuedInputs(messages), [messages])

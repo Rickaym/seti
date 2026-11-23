@@ -1,4 +1,4 @@
-import type { MessageRow } from '@seti/shared'
+import type { WireRow } from '@seti/shared'
 import { Check, Reply, X, type LucideIcon } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { Hint } from '@/components/Hint'
@@ -33,7 +33,7 @@ const optionReply = (text: string): QuickReply => ({
  * One-tap answers to the question the agent's reply ended on: Yes and No when either answers it,
  * and the answers the reply listed. A tap sends the answer as the reply box would.
  */
-export function QuickReplies({ taskId, messages }: { taskId: string; messages: readonly MessageRow[] }) {
+export function QuickReplies({ taskId, messages }: { taskId: string; messages: readonly WireRow[] }) {
   const asked = useMemo(() => askedInRows(messages), [messages])
   const [sent, setSent] = useState(false)
   const replies = [...(asked.closed ? [YES, NO] : []), ...asked.options.map(optionReply)]
