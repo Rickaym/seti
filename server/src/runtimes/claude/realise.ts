@@ -120,7 +120,7 @@ export async function realise(
       ...('mcpServers' in sandbox ? sandbox.mcpServers : {}),
       ...sharedToolServer(spec.toolServers.shared),
     }),
-    settings: { ...sandbox.settings, ...compact.settings },
+    settings: { ...sandbox.settings, ...compact.settings, ...(spec.setiDreams ? { autoDreamEnabled: false } : {}) },
     hooks: host.hooks,
     env: {
       ...BACKGROUND_LIMIT,

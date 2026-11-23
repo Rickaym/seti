@@ -2,6 +2,7 @@ import type { CompactRule, Task } from '@seti/shared'
 import { permissionModeOf } from './bypass-mode.js'
 import { hostLoginKey } from './claude-logins.js'
 import { effectiveCompact } from './compact.js'
+import { dreamsOn } from './dreams/settings.js'
 import { launchPlan } from './launch-plan.js'
 import { borrowedStamp, taskBorrowedServers } from './mcp-borrowed.js'
 import { taskDeniedServers } from './mcp-selection.js'
@@ -39,6 +40,8 @@ export interface SessionSpec<Id extends string = RuntimeId> {
   }
   setiControl: Task['seti_control']
   compaction: CompactRule
+  /** Seti's nightly dreams tidy this agent's memory, so the runtime's own consolidation stays off. */
+  setiDreams: boolean
   sandbox: Awaited<ReturnType<typeof sandboxStamp>>
   /** The login the host's runtime process signs in with. */
   account: string | null
@@ -77,6 +80,7 @@ async function sessionSpec(task: Task): Promise<SessionSpec> {
     mode: permissionModeOf(task),
     instructions: { append: await systemAppend(task.id) },
     setiControl: task.seti_control,
+    setiDreams: await dreamsOn(task),
     vendor: { plugins: await taskPluginConfigs(task.id) },
     ...(await liveSpec(task)),
   }

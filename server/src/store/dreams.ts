@@ -1,16 +1,20 @@
 import type { DreamReport, DreamRun, DreamState } from '@seti/shared'
 import { now, sql } from '../db.js'
 
-type DreamRecord = Omit<DreamRun, 'cost_usd' | 'report'> & { cost_usd: number | string; report: DreamReport | null }
+export type DreamRecord = Omit<DreamRun, 'cost_usd' | 'report'> & {
+  cost_usd: number | string
+  report: DreamReport | null
+  not_before?: string | null
+}
 
-const toRun = (record: DreamRecord): DreamRun => ({
+export const toRun = ({ not_before: _planned, ...record }: DreamRecord): DreamRun => ({
   ...record,
   cost_usd: Number(record.cost_usd),
 })
 
 /** How a dream ended, as it is stored. */
 export interface DreamEnd {
-  state: Exclude<DreamState, 'running'>
+  state: Exclude<DreamState, 'running' | 'planned' | 'skipped'>
   reason: string | null
   cost_usd: number
   steps: number
@@ -40,11 +44,12 @@ export const dreamRuns = {
     const [row] = await sql<DreamRecord[]>`SELECT * FROM dream_run WHERE id = ${id}`
     return row && toRun(row)
   },
-  /** The agent's dreams, newest first. */
+  /** The agent's dreams that started, newest first. */
   forTask: async (taskId: string, limit: number) =>
-    (await sql<DreamRecord[]>`SELECT * FROM dream_run WHERE task_id = ${taskId} ORDER BY id DESC LIMIT ${limit}`).map(
-      toRun,
-    ),
+    (
+      await sql<DreamRecord[]>`SELECT * FROM dream_run WHERE task_id = ${taskId}
+        AND state NOT IN ('planned', 'skipped') ORDER BY started_at DESC, id DESC LIMIT ${limit}`
+    ).map(toRun),
   /** The dream of the agent that runs now, if any. */
   running: async (taskId: string) => {
     const [row] = await sql<DreamRecord[]>`SELECT * FROM dream_run WHERE task_id = ${taskId} AND state = 'running'`

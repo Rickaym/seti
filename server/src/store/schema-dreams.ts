@@ -22,3 +22,40 @@ CREATE TABLE dream_run (
 CREATE INDEX dream_run_task ON dream_run(task_id, id);
 CREATE UNIQUE INDEX dream_run_nightly ON dream_run(task_id, night) WHERE kind = 'nightly';
 `
+
+/**
+ * Nightly Dreaming: its settings (off until the user turns it on), the agents and workspaces
+ * switched out of it, each night's plan, and the planned and retried dreams of a night.
+ */
+export const DREAM_NIGHTS = `
+CREATE TABLE dream_settings (
+  id INTEGER PRIMARY KEY CHECK (id = 1),
+  enabled BOOLEAN NOT NULL DEFAULT false,
+  window_start TEXT NOT NULL DEFAULT '01:00',
+  window_end TEXT NOT NULL DEFAULT '05:00',
+  zone TEXT,
+  model TEXT NOT NULL DEFAULT 'claude-sonnet-5-5',
+  dream_budget_usd DOUBLE PRECISION NOT NULL DEFAULT 1,
+  night_budget_usd DOUBLE PRECISION NOT NULL DEFAULT 5,
+  at_once INTEGER NOT NULL DEFAULT 1,
+  updated_at TEXT NOT NULL
+);
+CREATE TABLE dream_opt_out (
+  task_id TEXT UNIQUE REFERENCES task(id) ON DELETE CASCADE,
+  workspace_id TEXT UNIQUE REFERENCES workspace(id) ON DELETE CASCADE,
+  created_at TEXT NOT NULL,
+  CHECK ((task_id IS NULL) <> (workspace_id IS NULL))
+);
+CREATE TABLE dream_night (
+  night TEXT PRIMARY KEY,
+  zone TEXT NOT NULL,
+  window_start TEXT NOT NULL,
+  window_end TEXT NOT NULL,
+  state TEXT NOT NULL,
+  skipped JSONB NOT NULL DEFAULT '{}',
+  created_at TEXT NOT NULL,
+  ended_at TEXT
+);
+ALTER TABLE dream_run ADD COLUMN attempt INTEGER NOT NULL DEFAULT 1, ADD COLUMN not_before TEXT;
+CREATE INDEX dream_run_planned ON dream_run(not_before) WHERE state = 'planned';
+`
