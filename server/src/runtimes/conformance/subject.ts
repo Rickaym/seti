@@ -6,7 +6,7 @@ import type { Script } from './script.js'
 import type { ConformanceTarget, NeutralHost, Profile, Rig } from './target.js'
 
 /** The folder every suite session works in; no adapter may touch it, since the runtime is fake. */
-const SUITE_CWD = '/work/conformance'
+export const SUITE_CWD = '/work/conformance'
 
 /** A spec with nothing in it but what a case varies; no adapter reads the sandbox stamp. */
 function specFor(resume: string | null): SessionSpec {

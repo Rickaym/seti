@@ -1,6 +1,6 @@
 import type { ChildProcess } from 'node:child_process'
 import { once } from 'node:events'
-import { createInterface } from 'node:readline'
+import { createInterface, type Interface } from 'node:readline'
 import type { ToolCall } from '@seti/shared'
 import type { Launcher } from '../../launcher.js'
 import type { RuntimeSession, SessionInput, SessionReport } from '../adapter.js'
@@ -18,7 +18,6 @@ export interface ScriptedShapes {
   decide: ScriptedDecide
   hooks: null
   hostServers: Record<string, never>
-  toolServer: never
   policy: never
   mode: never
 }
@@ -57,6 +56,7 @@ class Driver {
   private over = false
   private rid = 0
   private stderr = ''
+  private lines: Interface | null = null
   private readonly acks = new Map<number, { resolve: (taken: boolean) => void; reject: (e: Error) => void }>()
   private readonly asks = new Map<number, AbortController>()
   private readonly exited: Promise<unknown[]>
@@ -79,8 +79,9 @@ class Driver {
   }
 
   async *messages(): AsyncGenerator<SessionReport> {
-    if (this.child.stdout !== null) {
-      for await (const line of createInterface({ input: this.child.stdout })) {
+    if (this.child.stdout !== null && !this.closing) {
+      this.lines = createInterface({ input: this.child.stdout })
+      for await (const line of this.lines) {
         const message = parsed(line)
         const control = controlLine.safeParse(message)
         if (control.success) {
@@ -90,9 +91,12 @@ class Driver {
         }
       }
     }
+    if (this.closing) {
+      return
+    }
     const [code, signal] = await this.exited
     this.ended()
-    if (!this.closing && code !== 0) {
+    if (code !== 0) {
       throw new Error(`The scripted runtime exited with ${String(code ?? signal)}: ${this.stderr.trim()}`)
     }
   }
@@ -111,9 +115,11 @@ class Driver {
     return acked
   }
 
+  /** Stops reading at once: a process that ignores the kill must not hold the events open. */
   close(): void {
     this.closing = true
     this.ended()
+    this.lines?.close()
     this.child.kill()
   }
 

@@ -29,8 +29,12 @@ export const claudeTarget = (slot: QuerySlot): ConformanceTarget<ClaudeShapes, '
     input: { steer: 'next_step', retract: true },
     background: { jobs: true, stop: true },
     gated: { shell: true, edit: true, mcp: true },
+    parsesOutput: false,
   },
   gaps: {
+    'LN-3':
+      'realise hands the SDK no spawn when the launcher has none, so the SDK starts Claude Code on ' +
+      'the host even for a launcher that says it is sandboxed',
     'PM-3':
       'a call Seti denied through canUseTool comes back as a tool_result with is_error and the ' +
       'message, the same as a failed call, so tool.ended says error',

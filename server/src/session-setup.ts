@@ -1,9 +1,9 @@
-import type { McpServerStatus, SDKMessage } from '@anthropic-ai/claude-agent-sdk'
-import type { NodeAnswer, NodeAsk } from '@seti/shared'
+import type { NodeAnswer, NodeAsk, RuntimeEvent } from '@seti/shared'
 import { tasks } from './db.js'
 import { launchPlan } from './launch-plan.js'
 import { watchSessionMcp } from './mcp-session-status.js'
 import { controlLink } from './node-link.js'
+import type { ToolServerState } from './runtimes/adapter.js'
 import { sessionOpening } from './session-hooks.js'
 import { rereadKey, setupKey, startingSpec, type SessionSpec } from './session-spec.js'
 import { recordSessionStart } from './session-start.js'
@@ -18,10 +18,10 @@ async function taskOf(taskId: string) {
 }
 
 /** Reads how the MCP servers of the agent's open process connected, from its node. */
-const mcpStatus = (taskId: string) => async (): Promise<McpServerStatus[] | null> => {
+const mcpStatus = (taskId: string) => async (): Promise<ToolServerState[] | null> => {
   const { servers } = await controlLink.command('mcp.status', { agent: taskId })
   // The node read them from the runtime's own status call.
-  return servers as McpServerStatus[] | null
+  return servers as ToolServerState[] | null
 }
 
 /** What the control plane answers a node about to start an agent's process. */
@@ -54,9 +54,9 @@ export function processStarted(taskId: string, warm: boolean): void {
   }
 }
 
-/** Records a session's start from its first message, with how its MCP servers connect. */
-export const recordStart = async (taskId: string, m: SDKMessage): Promise<void> =>
-  recordSessionStart(taskId, m, mcpStatus(taskId))
+/** Records a session's start from a message's events, with how its MCP servers connect. */
+export const recordStart = async (taskId: string, events: readonly RuntimeEvent[]): Promise<void> =>
+  recordSessionStart(taskId, events, mcpStatus(taskId))
 
 /** Records how Claude Code took the rewind point a process started at. */
 export const settleRewind = async (id: number, state: 'applied' | 'refused', reason: string | null): Promise<void> =>
