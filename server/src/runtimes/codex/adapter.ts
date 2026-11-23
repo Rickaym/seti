@@ -10,6 +10,7 @@ export const codexAdapterFor = (binary: string, provider: CodexProvider): Runtim
     gate: { rewriteInput: false, classifier: false },
     session: { fork: 'none' },
     rewind: { conversation: false, code: false },
+    dream: null,
   },
   project: projectCodex,
   realise: async (spec, launcher, host, abortController) =>
