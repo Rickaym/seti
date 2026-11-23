@@ -3,7 +3,7 @@ import { CHECKS_PROMPT, PUSH_PROMPT } from './support/fake-question.js'
 import { apiData, expect, test } from './support/fixtures.js'
 import { expectFitsPhone } from './support/phone-layout.js'
 import { FAKE_CLAUDE_ENV } from './support/processes.js'
-import { agentQuestions, askingAgent, lastReply, requestsDrawer, sentToast } from './support/questions.js'
+import { agentQuestions, askingAgent, lastReply, requestsDrawer, expectNoSentToast } from './support/questions.js'
 
 test.use({ serverEnv: FAKE_CLAUDE_ENV })
 
@@ -33,8 +33,8 @@ test('on a phone the Requests drawer covers the screen, holds one agent and clos
   await expect(drawer.getByRole('status')).toHaveText('2 of 2 answered')
   await drawer.getByRole('button', { name: 'Submit', exact: true }).tap()
   await expect(drawer).toHaveCount(0)
-  await expect(sentToast(page, 'Sent 2 answers')).toBeVisible()
   await expect(page.getByTestId('agent-header')).toBeVisible()
+  await expectNoSentToast(page)
   await expect.poll(async () => lastReply(request, checker.id)).toContain('E2E')
 
   await page.getByRole('button', { name: 'Back to agents' }).tap()

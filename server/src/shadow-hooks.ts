@@ -6,17 +6,18 @@ import type {
   PreToolUseHookInput,
 } from '@anthropic-ai/claude-agent-sdk'
 import { claudeToolCall, urlAllowed, WEBFETCH_BLOCKED, type Task } from '@seti/shared'
+import { nodeLink } from './node-link.js'
 import { guardCommand, type GuardScope } from './permission-guard.js'
 import { policyMode } from './policy/claude-call.js'
 import { decide } from './policy/evaluate.js'
+import { namedPaths } from './policy/named-paths.js'
 import { ShadowTracker, type ShadowRecord } from './policy/shadow.js'
 import { sourcedRules } from './policy/sources.js'
 import { policyCall } from './policy/tool-call.js'
 import type { PolicyCall, PolicyContext } from './policy/types.js'
+import { resolvePaths } from './resolve-paths.js'
 import { adapterFor, DEFAULT_RUNTIME } from './runtimes/registry.js'
 import { guardScope, ruleSources, workingDirs } from './session-options.js'
-import { allowedFor } from './store/change-requests.js'
-import { policyShadow } from './store/policy-shadow.js'
 
 /** How long one read of an agent's rules serves its calls; a rule changed meanwhile counts late. */
 const RULES_TTL_MS = 5000
@@ -35,7 +36,7 @@ function refusal(call: PolicyCall, scope: GuardScope, allowed: readonly string[]
 
 async function rulesOf(task: Task, sandboxed: boolean): Promise<Rules> {
   const scope = guardScope(task, sandboxed)
-  const allowed = sandboxed ? await allowedFor(task.id) : []
+  const allowed = sandboxed ? (await nodeLink.ask(task.id, 'sandbox.hosts', {})).hosts : []
   return {
     rules: sourcedRules(await ruleSources(task)),
     cwd: task.cwd,
@@ -45,8 +46,6 @@ async function rulesOf(task: Task, sandboxed: boolean): Promise<Rules> {
     guard: (call) => refusal(call, scope, allowed),
   }
 }
-
-const today = () => new Date().toISOString().slice(0, 10)
 
 /** A decision that took longer counts as slow; it ran after the hook had answered either way. */
 const SLOW_MS = 50
@@ -69,10 +68,13 @@ export interface Shadow {
  * there is counted and logged, never thrown.
  */
 export function shadowHooks(task: Task, sandboxed: boolean, session: AbortSignal): Shadow {
-  const unsaved = complain(task, 'count not saved')
+  const unsent = complain(task, 'count not sent')
+  const report = (count: ShadowRecord | null) => {
+    nodeLink.journal(task.id, { type: 'policy.compared', count }).catch(unsent)
+  }
   const failed = (e: unknown) => {
     complain(task, 'decision failed')(e)
-    policyShadow.failed(today()).catch(unsaved)
+    report(null)
   }
   const quietly = (work: () => void) => {
     try {
@@ -81,9 +83,7 @@ export function shadowHooks(task: Task, sandboxed: boolean, session: AbortSignal
       failed(e)
     }
   }
-  const tracker = new ShadowTracker((entry: ShadowRecord) => {
-    policyShadow.count(entry, today()).catch(unsaved)
-  })
+  const tracker = new ShadowTracker(report)
   session.addEventListener(
     'abort',
     () => {
@@ -102,9 +102,11 @@ export function shadowHooks(task: Task, sandboxed: boolean, session: AbortSignal
   }
 
   const judge = async (input: PreToolUseHookInput) => {
-    const call = policyCall(claudeToolCall(input.tool_use_id, input.tool_name, input.tool_input))
+    const given = policyCall(claudeToolCall(input.tool_use_id, input.tool_name, input.tool_input))
     const mode = policyMode(input.permission_mode)
     const ctx = { ...(await rules()), mode }
+    const resolved = await resolvePaths(namedPaths(given, ctx), [ctx.cwd, ...ctx.dirs, ctx.home])
+    const call = resolved.size === 0 ? given : { ...given, resolved }
     const started = performance.now()
     const decision = decide(call, ctx)
     const slow = performance.now() - started > SLOW_MS

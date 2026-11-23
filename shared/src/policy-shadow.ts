@@ -8,6 +8,27 @@ export const policyShadowQuery = z.object({
   days: z.coerce.number().int().min(1).max(30).default(POLICY_SHADOW_DAYS),
 })
 
+const fact = z.string().max(200)
+
+/**
+ * One call Seti's shadow compared, as the node reports it: kinds, outcomes and a rule's ref,
+ * never the call's input or a rule's text.
+ */
+export const policyShadowCount = z.object({
+  kind: fact,
+  /** The tool's name, or `mcp` for any tool-server tool. */
+  tool: fact,
+  mode: fact,
+  sandboxed: z.boolean(),
+  slow: z.boolean(),
+  verdict: fact,
+  step: fact,
+  rule: fact,
+  runtime: fact,
+  result: fact,
+})
+export type PolicyShadowCount = z.infer<typeof policyShadowCount>
+
 /** Calls where Seti's own decision and Claude Code's differed, counted by what kind and why. */
 export interface PolicyShadowDifference {
   /** `looser`: Seti would allow what Claude Code stopped; `tighter`: the reverse. */

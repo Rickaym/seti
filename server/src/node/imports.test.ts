@@ -27,7 +27,6 @@ const STILL_REACHING: Readonly<Record<string, readonly string[]>> = {
   'session-host.ts': ['db.ts'],
   'session-options.ts': ['store/permissions.ts', 'store/sandbox.ts'],
   'seti-auth.ts': ['store/auth.ts'],
-  'shadow-hooks.ts': ['store/change-requests.ts', 'store/policy-shadow.ts'],
   'shared-tools.ts': ['audit.ts', 'store/connections.ts', 'store/shared-tools.ts'],
   'worktree-restore.ts': ['audit.ts', 'store/task-location.ts'],
 }

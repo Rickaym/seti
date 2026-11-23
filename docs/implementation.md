@@ -83,7 +83,7 @@ with another top-level folder.
 | 16 Audit       | `audit.ts`, `store/audit.ts`                                                                                                                                                                                                                                     |
 | 17 Mods        | `mods/`, `shared/src/mods.ts`, `packages/mod-api/`; [Mods](mods.md) is the authoring guide                                                                                                                                                                       |
 | 18 Public      | `access.ts`, `routes/share-public.ts`, `share-preview/`, `converter.ts`, `rate-limit.ts`, `security-headers.ts`                                                                                                                                                  |
-| 19 Client      | `http.ts`, `etag.ts`, `devices.ts`, `shared/src/lenient.ts`, `ui/src/lib/poll-loop.ts`, `ui/src/lib/stale-build.ts`                                                                                                                                              |
+| 19 Client      | `http.ts`, `etag.ts`, `devices.ts`, `shared/src/lenient.ts`, `ui/src/lib/poll-loop.ts`, `ui/src/lib/stale-build.ts`, `ui/src/lib/uploader.ts`                                                                                                                    |
 
 ## Storage
 
@@ -176,17 +176,22 @@ the AppArmor profile for `bwrap` that the installer adds ([Setup](setup.md#sandb
   request. Bypass is Claude Code's `bypassPermissions` mode, which still applies ask rules and deny
   rules. The repeat guard and review rules are `PreToolUse` hooks, so they hold in Bypass. Seti's
   own evaluator (`policy/`) decides each call beside Claude Code in shadow and changes no outcome:
-  its hook answers at once and decides on a later turn of the event loop. `shadow-hooks.ts` counts
-  how the two compare per day, kind, step and rule ref in `policy_shadow`, with no input, command,
-  path or rule text, and also counts decisions that failed or took over 50 ms (PERM-12).
-  `pnpm doctor` shows the last seven days, and `GET /permissions/shadow` and `seti_overview` with
-  `permissions` read the counts.
+  its hook answers at once and decides on a later turn of the event loop. `shadow-hooks.ts` reports
+  each comparison to the control plane as a `policy.compared` journal entry, which `policy_shadow`
+  counts per day, kind, step and rule ref, with no input, command, path or rule text; it also
+  counts decisions that failed or took over 50 ms (PERM-12). `pnpm doctor` shows the last seven
+  days, and `GET /permissions/shadow` and `seti_overview` with `permissions` read the counts.
 - **Runtimes without a classifier.** An adapter declares in `capabilities.gate.classifier` whether
   its runtime has a classifier to defer to. Without one the evaluator asks where it would defer,
   keeps the sandbox's built-in shell allow in auto mode only for a line it fully reads, and lets a
   line run that its own read-only list (`policy/read-only.ts`) passes: listed commands run
   directly, reading inside the working directories, with no redirect, substitution, variable or
   wrapper. Claude Code has a classifier, so this changes nothing while it is the only runtime.
+- **Symlinks.** `decide` reads no disk. Before it runs, the shadow lists the paths a call names
+  (`policy/named-paths.ts`) and resolves them where the session runs (`resolve-paths.ts`); links
+  above a working directory or home do not count. A deny or ask rule matches a path as given or
+  where it leads; an allow rule and the working directories need both, and a path that leads
+  nowhere known, such as a link loop, is never allowed by a rule.
 - **Memory and CPU.** Each agent's process tree starts through `systemd-run --user --scope` with
   `MemoryMax`, 1 GB of `MemorySwapMax`, `OOMPolicy=continue`, `CPUWeight=50`, `CPUQuota` and
   `BindsTo=` the server's unit, so agents end with Seti (CAP-5). Every 100 ms Seti raises the
