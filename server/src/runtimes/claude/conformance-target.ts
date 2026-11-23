@@ -1,0 +1,44 @@
+import type { CanUseTool, SDKUserMessage } from '@anthropic-ai/claude-agent-sdk'
+import { claudeToolCall, projectClaude } from '@seti/shared'
+import type { ConformanceTarget, NeutralHost, SuiteInput } from '../conformance/target.js'
+import { claudeAdapter } from './adapter.js'
+import { claudeRig, type QuerySlot } from './conformance-rig.js'
+import type { ClaudeShapes } from './session.js'
+
+/** Seti's inputs as the user messages Claude Code reads. */
+async function* userMessages(inputs: AsyncIterable<SuiteInput>): AsyncGenerator<SDKUserMessage> {
+  for await (const input of inputs) {
+    yield {
+      type: 'user',
+      message: { role: 'user', content: input.text },
+      parent_tool_use_id: null,
+      session_id: '',
+      uuid: input.id as SDKUserMessage['uuid'] & string,
+    }
+  }
+}
+
+/** Claude Code's permission callback, answered by the neutral host. */
+const decideWith =
+  (neutral: NeutralHost): CanUseTool =>
+  async (toolName, input, options) => {
+    const decision = await neutral.decide(claudeToolCall(options.toolUseID, toolName, input), options.signal)
+    return decision.allow
+      ? { behavior: 'allow', updatedInput: decision.input ?? input }
+      : { behavior: 'deny', message: decision.message }
+  }
+
+/** The Claude adapter as the suite drives it, over `FakeSdk` behind the slot the mock routes to. */
+export const claudeTarget = (slot: QuerySlot): ConformanceTarget<ClaudeShapes, 'claude'> => ({
+  adapter: claudeAdapter,
+  profile: { events: { turnStart: false, reasoning: true }, usage: { tokens: true, costUsd: 'reported' } },
+  gaps: {
+    'EV-4':
+      "Claude Code reports the session's running total; the turn's share is worked out after the " +
+      'adapter (store/cost.ts), so turn.ended carries no cost',
+  },
+  project: projectClaude,
+  start: (realised, inputs) => ({ prompt: userMessages(inputs), options: realised }),
+  host: (neutral) => ({ decide: decideWith(neutral), hooks: {}, toolServers: {} }),
+  rig: (script) => claudeRig(slot, script),
+})
