@@ -758,11 +758,11 @@ store, the audit chain and every record.
 - NODE-3: An ask carries an id the node made; a repeat gets the first answer, and an ask the
   node stops waiting for aborts the answer in progress. A request the user answers takes the
   ask's id, so an ask the node still waits on when a control plane starts keeps its one request,
-  and the user's answer reaches the call once.
+  and the user's answer reaches the call once. The prompt row of a message going out is stored
+  with its ask's id in one transaction, so the same ask after a restart gets that row back.
 - NODE-4: A restart of the control plane MUST NOT cut running turns, and the tool calls they have
-  open show as open again. A node that started anew
-  says so as it connects, and the turns of the node before count as cut by a restart (RES-3 to
-  RES-8).
+  open show as open again. A node that started anew says so as it connects, and the turns of the
+  node before count as cut by a restart (RES-3 to RES-8).
 - NODE-5: A stopping node first has the control plane record and audit its running turns
   (RES-1), then cuts them and waits until its entries are stored.
 - NODE-6: The answer to a command about an agent is read only once the control plane applied
