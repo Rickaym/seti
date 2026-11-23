@@ -31,6 +31,7 @@ function overrides(provider: CodexProvider, model: string): string[] {
     [`model_providers.${PROVIDER}.env_key`, provider.envKey],
     [`model_providers.${PROVIDER}.wire_api`, 'responses'],
     ['features.unified_exec_tty', false],
+    ['features.default_mode_request_user_input', true],
     ['features.hooks', false],
     ['features.plugins', false],
     ['features.apps', false],

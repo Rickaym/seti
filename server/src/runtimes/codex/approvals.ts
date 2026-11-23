@@ -1,4 +1,4 @@
-import type { ToolCall } from '@seti/shared'
+import { projectCodex, type ToolCall } from '@seti/shared'
 import { z } from 'zod'
 
 /** How Seti answers a call Codex asks about: run it, or refuse it with a reason the model reads. */
@@ -95,9 +95,10 @@ function answersOf(verdict: CodexVerdict): Map<string, string> {
 
 function question(params: unknown, started: Started): Asked {
   const request = questionRequest.parse(params)
-  const call = started(request.itemId)
+  const [asked] = projectCodex({ root: '', message: { method: 'item/tool/requestUserInput', params } })
+  const call = started(request.itemId) ?? (asked?.type === 'tool.started' ? asked.call : undefined)
   if (call === undefined) {
-    throw new Error('A question reached Seti before its call')
+    throw new Error('Codex asked a question Seti cannot read')
   }
   const reply = (verdict: CodexVerdict) => {
     const given = answersOf(verdict)

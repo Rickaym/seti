@@ -55,9 +55,17 @@ export class ReportQueue implements AsyncIterable<SessionReport> {
 /** Methods that report the agent or a subagent at work, rather than news about the session. */
 const WORK = /^(?:turn\/|item\/)/
 
-/** A message Codex sent, as the session reports it: stored with the agent's thread, and projected. */
-export function codexReport(root: string, message: CodexCall, delivered: readonly string[] = []): SessionMessage {
-  const raw: CodexMessage = { root, message }
+/**
+ * A message Codex sent, as the session reports it: stored with the agent's thread, and projected.
+ * With `reply`, the row records Seti's answer to that request.
+ */
+export function codexReport(
+  root: string,
+  message: CodexCall,
+  delivered: readonly string[] = [],
+  reply?: unknown,
+): SessionMessage {
+  const raw: CodexMessage = reply === undefined ? { root, message } : { root, message, reply }
   const events = projectCodex(raw)
   return {
     type: 'message',

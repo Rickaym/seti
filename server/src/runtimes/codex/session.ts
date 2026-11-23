@@ -4,7 +4,8 @@ import type { ToolCall } from '@seti/shared'
 import { z } from 'zod'
 import type { Launcher } from '../../launcher.js'
 import type { InputContent, RuntimeSession, SessionInput, SessionReport } from '../adapter.js'
-import { askedOf, type CodexDecide } from './approvals.js'
+import type { CodexDecide } from './approvals.js'
+import { Asks } from './asks.js'
 import { codexReport, ReportQueue } from './reports.js'
 import { CodexRpc, RpcError, type CodexCall } from './rpc.js'
 
@@ -62,7 +63,7 @@ class Driver {
   private sending: Promise<void> = Promise.resolve()
   private readonly steered = new Map<string, SessionInput>()
   private readonly calls = new Map<string, ToolCall>()
-  private readonly asks = new Map<number | string, AbortController>()
+  private readonly asks: Asks
   private readonly rpc: CodexRpc
   private readonly realised: CodexRealised
   private readonly child: ChildProcess
@@ -71,6 +72,13 @@ class Driver {
     this.child = child
     this.realised = realised
     this.rpc = new CodexRpc(child)
+    this.asks = new Asks({
+      rpc: this.rpc,
+      reports: this.reports,
+      decide: realised.decide,
+      root: () => this.root,
+      started: (itemId) => this.calls.get(itemId),
+    })
   }
 
   /** Reads Codex's output, opens the thread, then takes inputs; reports go to `reports`. */
@@ -82,7 +90,7 @@ class Driver {
           this.notified(message)
         },
         asked: (message) => {
-          this.asked(message)
+          this.asks.take(message)
         },
         garbled: () => {
           this.reports.push({
@@ -116,7 +124,7 @@ class Driver {
       return
     }
     this.closing = true
-    this.abortAsks()
+    this.asks.dropAll()
     this.rpc.end(new Error('The Codex session was closed'))
     this.reports.end()
     this.child.kill()
@@ -235,7 +243,7 @@ class Driver {
     }
     if (message.method === 'serverRequest/resolved') {
       const done = resolvedNote.safeParse(message.params).data?.requestId
-      this.abortAsk(done)
+      this.asks.drop(done)
       return []
     }
     this.trackItem(message)
@@ -271,56 +279,8 @@ class Driver {
     }
   }
 
-  private asked(message: CodexCall & { id: number | string }): void {
-    let asked
-    try {
-      asked = askedOf(message.method, message.params, (itemId) => this.calls.get(itemId))
-    } catch (e) {
-      this.rpc.refuse(message.id, e instanceof Error ? e.message : String(e))
-      return
-    }
-    if (asked === null) {
-      this.rpc.refuse(message.id, `Seti does not answer ${message.method}`)
-      return
-    }
-    if (message.method === 'item/tool/requestUserInput') {
-      this.reports.push(codexReport(this.root, message))
-    }
-    const control = new AbortController()
-    this.asks.set(message.id, control)
-    const answer = (reply: unknown) => {
-      if (this.asks.get(message.id) === control) {
-        this.asks.delete(message.id)
-        this.rpc.answer(message.id, reply)
-      }
-    }
-    this.realised.decide(asked.call, control.signal).then(
-      (verdict) => {
-        answer(control.signal.aborted ? asked.cancelled : asked.reply(verdict))
-      },
-      (e: unknown) => {
-        answer(asked.reply({ allow: false, message: e instanceof Error ? e.message : String(e) }))
-      },
-    )
-  }
-
-  private abortAsk(id: number | string | undefined): void {
-    if (id === undefined) {
-      return
-    }
-    this.asks.get(id)?.abort()
-    this.asks.delete(id)
-  }
-
-  private abortAsks(): void {
-    for (const control of this.asks.values()) {
-      control.abort()
-    }
-    this.asks.clear()
-  }
-
   private ended([code, signal]: [number | null, NodeJS.Signals | null]): void {
-    this.abortAsks()
+    this.asks.dropAll()
     if (this.closing) {
       return
     }

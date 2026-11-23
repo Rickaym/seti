@@ -119,4 +119,10 @@ export const turnParams = z.looseObject({ turn })
 export const stored = z.looseObject({
   root: text,
   message: z.looseObject({ method: text, params: z.unknown().optional() }),
+  reply: z.unknown().optional(),
+})
+
+/** Seti's answer to `item/tool/requestUserInput`: each question's answers by its id. */
+export const userInputAnswer = z.looseObject({
+  answers: z.record(text, z.looseObject({ answers: z.array(text) })),
 })

@@ -181,6 +181,11 @@ describe('Codex calls', () => {
       type: 'tool.started',
       call: { callId: 'q1', kind: 'question', question: { questions: [{ text: 'Which one?', options: ['A', 'B'] }] } },
     })
+    const answered = (reply: unknown) => projectCodex({ ...stored('item/tool/requestUserInput', params), reply })
+    expect(answered({ answers: { a: { answers: ['B'] } } })).toEqual([
+      { v: 1, thread: '', type: 'tool.ended', callId: 'q1', status: 'ok', result: { text: 'Which one? B', images: 0 } },
+    ])
+    expect(answered({ answers: {} })).toMatchObject([{ type: 'tool.ended', status: 'cancelled' }])
   })
 })
 

@@ -31,8 +31,6 @@ export const CODEX_GAPS: Partial<Record<string, string>> = {
   'INT-3': 'a command still running when its turn ends is not reported as a background job yet',
   'INT-6': 'the adapter cannot stop a background terminal yet',
   'TL-4': 'a command still running when its turn ends is not reported as a background job yet',
-  'Q-1': 'questions through request_user_input are not played by the rig yet',
-  'Q-2': 'questions through request_user_input are not played by the rig yet',
   'RP-2': "the rig does not play Codex's collaboration agents yet",
   'SA-1': "the rig does not play Codex's collaboration agents yet",
   'PL-1': 'the tools this Codex version offers the model include no plan tool',

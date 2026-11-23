@@ -56,6 +56,17 @@ const patchOf = (args: Record<string, unknown>): string =>
     '',
   ].join('\n')
 
+/** A script's questions as `request_user_input` takes them: each with an id, header and options. */
+function questionsOf(args: Record<string, unknown>): unknown[] {
+  const asked = Array.isArray(args.questions) ? (args.questions as { text: string; options: string[] }[]) : []
+  return asked.map((one, index) => ({
+    id: `q${String(index + 1)}`,
+    header: one.text,
+    question: one.text,
+    options: one.options.map((label) => ({ label, description: label })),
+  }))
+}
+
 /** The model's call for a script call, by the tools this Codex offers. */
 export function codexCall(call: ScriptCall): ModelCall {
   const command = commandOf(call)
@@ -64,6 +75,9 @@ export function codexCall(call: ScriptCall): ModelCall {
   }
   if (call.tool === 'patch') {
     return { name: 'apply_patch', input: patchOf(call.args) }
+  }
+  if (call.tool === 'ask') {
+    return { name: 'request_user_input', args: { questions: questionsOf(call.args) } }
   }
   const dot = call.tool.indexOf('.')
   if (dot > 0) {
