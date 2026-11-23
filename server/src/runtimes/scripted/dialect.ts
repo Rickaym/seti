@@ -24,6 +24,14 @@ export const conversationLines = {
     exit: z.number().optional(),
     thread,
   }),
+  job: z.object({
+    t: z.literal('job'),
+    job: z.string(),
+    call: z.string(),
+    label: z.string(),
+    phase: z.enum(['start', 'end']),
+    status: z.enum(['completed', 'failed', 'stopped']).optional(),
+  }),
   end: z.object({
     t: z.literal('end'),
     turn: z.string(),
@@ -43,7 +51,13 @@ export type ScriptedLine = { [T in keyof Lines]: z.infer<Lines[T]> }[keyof Lines
 /** A line only the driver reads: a request from the runtime, or its answer to a command. */
 export const controlLine = z.discriminatedUnion('t', [
   z.object({ t: z.literal('request'), rid: z.number(), call }),
-  z.object({ t: z.literal('ack'), rid: z.number(), ok: z.boolean(), error: z.string().optional() }),
+  z.object({
+    t: z.literal('ack'),
+    rid: z.number(),
+    ok: z.boolean(),
+    error: z.string().optional(),
+    taken: z.boolean().optional(),
+  }),
 ])
 
 export type ControlLine = z.infer<typeof controlLine>
@@ -56,4 +70,6 @@ export type ScriptedCommand =
   | { t: 'open'; resume: string | null; cwd: string }
   | { t: 'input'; id: string; text: string }
   | { t: 'interrupt'; rid: number }
+  | { t: 'retract'; rid: number; id: string }
+  | { t: 'stop'; rid: number; job: string }
   | { t: 'verdict'; rid: number; verdict: Verdict }

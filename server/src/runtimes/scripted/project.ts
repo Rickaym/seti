@@ -33,6 +33,27 @@ const HANDLERS: { [T in ScriptedLine['t']]: (line: Of<T>) => RuntimeEvent } = {
     status: line.status,
     result: { text: line.output, images: 0, ...(line.exit === undefined ? {} : { exitCode: line.exit }) },
   }),
+  job: (line) =>
+    line.phase === 'start'
+      ? {
+          v: 1,
+          thread: '',
+          type: 'job.started',
+          jobId: line.job,
+          callId: line.call,
+          kind: 'shell',
+          label: line.label,
+          background: true,
+        }
+      : {
+          v: 1,
+          thread: '',
+          type: 'job.ended',
+          jobId: line.job,
+          callId: line.call,
+          status: line.status ?? 'completed',
+          summary: line.label,
+        },
   end: (line) => ({
     v: 1,
     thread: '',
