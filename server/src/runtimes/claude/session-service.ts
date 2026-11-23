@@ -17,10 +17,10 @@ import type {
   SuggestedPr,
   Task,
 } from '@seti/shared'
-import type { OpenPr } from './github.js'
-import { HttpError } from './http.js'
-import { sessionHistory, sessionPrs, sessionSpan } from './runtimes/claude/session-history.js'
-import type { ImportedTaskInput } from './tasks.js'
+import type { OpenPr } from '../../github.js'
+import { HttpError } from '../../http.js'
+import type { ImportedTaskInput } from '../../tasks.js'
+import { sessionHistory, sessionPrs, sessionSpan } from './session-history.js'
 
 interface SessionSdk {
   listSessions: (options: ListSessionsOptions) => Promise<SDKSessionInfo[]>
