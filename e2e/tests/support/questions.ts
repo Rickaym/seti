@@ -51,8 +51,10 @@ export const sentLine = (page: Page) => page.getByRole('main').getByRole('status
 /** The Requests drawer beside an agent, which holds only that agent's requests. */
 export const requestsDrawer = (page: Page) => page.getByRole('region', { name: 'Agent requests' })
 
-/** The toast a send that settled every question shows as it closes the page or the drawer. */
-export const sentToast = (page: Page, text: string | RegExp) => toasts(page).filter({ hasText: text })
+/** A send raises no toast: the questions leave and the agent goes on. */
+export async function expectNoSentToast(page: Page): Promise<void> {
+  await expect(toasts(page).filter({ hasText: /Sent \d+ answer|dismissed \d+ question/ })).toHaveCount(0)
+}
 
 /** The Requests row in the sidebar, or in the phone menu while it is open. */
 export const requestsSection = (page: Page) =>
