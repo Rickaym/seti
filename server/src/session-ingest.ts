@@ -5,7 +5,7 @@ import { closingLine } from './closing-line.js'
 import { linkCreatedPrs } from './created-prs.js'
 import { messages, tasks } from './db.js'
 import { serveNode } from './node-link.js'
-import { outwardToolUses } from './outward.js'
+import { outwardCalls } from './outward.js'
 import { markQueued } from './queued-prompts.js'
 import { mirrorSession } from './session-mirror.js'
 import { processStarted, recordStart, settleRewind, setupAnswers } from './session-setup.js'
@@ -52,15 +52,16 @@ async function setStatus(taskId: string, status: TaskStatus): Promise<void> {
 }
 
 async function record(taskId: string, m: SDKMessage): Promise<void> {
-  const outward = outwardToolUses(m)
-  trackToolCalls(taskId, projectClaude(m))
+  const events = projectClaude(m)
+  const outward = outwardCalls(events)
+  trackToolCalls(taskId, events)
   await appendMessage(taskId, { kind: 'sdk', payload: storedForm(await withTurnCost(taskId, m)) }, outward)
-  await audit.outwardCalls(taskId, m, outward)
-  await audit.classifierDenial(taskId, m)
+  await audit.outwardCalls(taskId, events, outward)
+  await audit.classifierDenial(taskId, events)
   if (outward.length > 0) {
     await tasks.addOutward(taskId, outward.length)
   }
-  await linkCreatedPrs(taskId, m, openQuerySince(taskId))
+  await linkCreatedPrs(taskId, events, openQuerySince(taskId))
 }
 
 /** Stores a message of the session, unless Seti does not keep it, and notes a session's start. */

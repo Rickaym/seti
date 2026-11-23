@@ -1,9 +1,5 @@
-import type { SDKMessage, SDKUserMessage } from '@anthropic-ai/claude-agent-sdk'
-import { findPrUrls } from '@seti/shared'
-import { bashCommand, isOutward } from './outward.js'
-
-type UserBlock = Exclude<SDKUserMessage['message']['content'], string>[number]
-type ToolResult = Extract<UserBlock, { type: 'tool_result' }>
+import { findPrUrls, type RuntimeEvent, type ToolCall } from '@seti/shared'
+import { isOutward, shellCommand } from './outward.js'
 
 const GH_PR_CREATE = /\bgh\s+pr\s+create\b/
 const GH_API_PULLS = /\bgh\s+api\b[^\n|;&]*\brepos\/[\w.-]+\/[\w.-]+\/pulls(?![\w/])/
@@ -26,12 +22,17 @@ const COMMENT_TOOL = /comment|review/i
 const GH_GRAPHQL = /\bgh\s+api\s+graphql\b/
 const GRAPHQL_POST = /\b(?:addComment|addPullRequestReview\w*|submitPullRequestReview)\b/
 
+/** The MCP tool a call names, or null for a call of another kind. */
+const mcpTool = (call: ToolCall): string | null => call.mcp?.tool ?? null
+
+const isShell = (call: ToolCall): boolean => call.shell?.action === 'run'
+
 /** A tool call that may post a comment or review on a PR, by gh or a GitHub MCP server. */
-export function postsPrCommentCall(name: string, input: unknown): boolean {
-  if (name !== 'Bash') {
-    return COMMENT_TOOL.test(name.split('__').at(-1) ?? '') && isOutward(name, input)
+export function postsPrCommentCall(call: ToolCall): boolean {
+  if (!isShell(call)) {
+    return COMMENT_TOOL.test(mcpTool(call)?.split('__').at(-1) ?? '') && isOutward(call)
   }
-  const command = bashCommand(input)
+  const command = shellCommand(call)
   if (GH_COMMENT.test(command)) {
     return true
   }
@@ -52,11 +53,12 @@ const closesByField = (input: unknown) =>
   typeof input === 'object' && input !== null && 'state' in input && input.state === 'closed'
 
 /** A tool call that may merge or close a PR, by gh or a GitHub MCP server. */
-export function endsPrCall(name: string, input: unknown): boolean {
-  if (name !== 'Bash') {
-    return END_TOOL.test(name) || (UPDATE_TOOL.test(name) && closesByField(input))
+export function endsPrCall(call: ToolCall): boolean {
+  if (!isShell(call)) {
+    const tool = mcpTool(call) ?? ''
+    return END_TOOL.test(tool) || (UPDATE_TOOL.test(tool) && closesByField(call.input))
   }
-  const command = bashCommand(input)
+  const command = shellCommand(call)
   if (GH_GRAPHQL.test(command)) {
     return GRAPHQL_END.test(command)
   }
@@ -65,32 +67,9 @@ export function endsPrCall(name: string, input: unknown): boolean {
   return GH_END.test(command) || (ends && !READS_ONLY.test(command))
 }
 
-/** A tool call that opens a PR: a PR-creating Bash command or a GitHub MCP create_pull_request. */
-export function createsPrCall(name: string, input: unknown): boolean {
-  return name === 'Bash' ? createsPr(bashCommand(input)) : MCP_CREATE_PR.test(name)
-}
-
-function prCreateCalls(m: SDKMessage): string[] {
-  if (m.type !== 'assistant') {
-    return []
-  }
-  return m.message.content.flatMap((block) =>
-    block.type === 'tool_use' && createsPrCall(block.name, block.input) ? [block.id] : [],
-  )
-}
-
-export function toolResults(m: SDKMessage): ToolResult[] {
-  if (m.type !== 'user' || typeof m.message.content === 'string') {
-    return []
-  }
-  return m.message.content.filter((block): block is ToolResult => block.type === 'tool_result')
-}
-
-export function resultText(result: ToolResult): string {
-  if (typeof result.content === 'string') {
-    return result.content
-  }
-  return (result.content ?? []).map((part) => (part.type === 'text' ? part.text : '')).join('\n')
+/** A tool call that opens a PR: a PR-creating shell command or a GitHub MCP create_pull_request. */
+export function createsPrCall(call: ToolCall): boolean {
+  return isShell(call) ? createsPr(shellCommand(call)) : MCP_CREATE_PR.test(mcpTool(call) ?? '')
 }
 
 /** A PR a tool call reported, and the subagent call it ran under; null for the task's own agent. */
@@ -103,20 +82,20 @@ export interface CreatedPr {
 export function createPrWatcher() {
   const pending = new Map<string, Map<string, string | null>>()
 
-  return (taskId: string, m: SDKMessage): CreatedPr[] => {
+  return (taskId: string, events: readonly RuntimeEvent[]): CreatedPr[] => {
     const calls = pending.get(taskId) ?? new Map<string, string | null>()
-    for (const id of prCreateCalls(m)) {
-      calls.set(id, m.type === 'assistant' ? m.parent_tool_use_id : null)
-    }
     pending.set(taskId, calls)
     const created = new Map<string, string | null>()
-    for (const result of toolResults(m)) {
-      if (!calls.has(result.tool_use_id)) {
+    for (const event of events) {
+      if (event.type === 'tool.started' && createsPrCall(event.call)) {
+        calls.set(event.call.callId, event.thread === '' ? null : event.thread)
+      }
+      if (event.type !== 'tool.ended' || !calls.has(event.callId)) {
         continue
       }
-      const parent = calls.get(result.tool_use_id) ?? null
-      calls.delete(result.tool_use_id)
-      for (const url of findPrUrls(resultText(result)).filter((found) => !created.has(found))) {
+      const parent = calls.get(event.callId) ?? null
+      calls.delete(event.callId)
+      for (const url of findPrUrls(event.result.text).filter((found) => !created.has(found))) {
         created.set(url, parent)
       }
     }
