@@ -28,7 +28,6 @@ const STILL_REACHING: Readonly<Record<string, readonly string[]>> = {
   ],
   'aws-access.ts': ['store/access.ts', 'store/credentials.ts', 'store/sandbox.ts'],
   'claude-logins.ts': ['audit.ts', 'db.ts', 'store/claude-logins.ts'],
-  'compact.ts': ['audit.ts', 'store/compact.ts'],
   'context-changes.ts': ['audit.ts', 'store/context.ts'],
   'context-files.ts': ['db.ts'],
   'devices.ts': ['store/devices.ts'],
