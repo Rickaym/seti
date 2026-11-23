@@ -11,7 +11,7 @@ import {
   rowEvents,
   type EventOf,
 } from '@seti/shared'
-import { trimText } from './transcript.js'
+import { trimText } from './wire-text.js'
 
 type JobEvent = EventOf<'job.started'> | EventOf<'job.progress'> | EventOf<'job.updated'> | EventOf<'job.ended'>
 
