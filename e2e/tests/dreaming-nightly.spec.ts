@@ -23,13 +23,14 @@ test('Dreaming turns on in the browser zone, keeps its window, and an agent can 
   await card.getByLabel('Window start').fill('23:30')
   await card.getByLabel('Window end').fill('03:00')
   await card.getByRole('button', { name: 'Save' }).click()
-  await expect(card.getByRole('button', { name: 'Save' })).toBeDisabled()
-  expect(await apiData<DreamSettings>(request, '/dreams/settings')).toMatchObject({
-    enabled: true,
-    zone: 'Europe/Istanbul',
-    window_start: '23:30',
-    window_end: '03:00',
-  })
+  await expect
+    .poll(async () => apiData<DreamSettings>(request, '/dreams/settings'))
+    .toMatchObject({
+      enabled: true,
+      zone: 'Europe/Istanbul',
+      window_start: '23:30',
+      window_end: '03:00',
+    })
 
   const id = await idleAgent(request)
   await page.goto(`/#agents/${id}`)

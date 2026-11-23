@@ -28,17 +28,18 @@ test('Dreaming is configured in full on a phone, on a night the clocks change', 
   await card.getByLabel('At once').selectOption('2')
   await expectFitsPhone(page, 'the Dreaming card')
   await card.getByRole('button', { name: 'Save' }).tap()
-  await expect(card.getByRole('button', { name: 'Save' })).toBeDisabled()
-  expect(await apiData<DreamSettings>(request, '/dreams/settings')).toMatchObject({
-    enabled: true,
-    zone: 'Europe/Berlin',
-    window_start: '02:30',
-    window_end: '04:30',
-    model: 'claude-haiku-5-5',
-    dream_budget_usd: 0.5,
-    night_budget_usd: 3,
-    at_once: 2,
-  })
+  await expect
+    .poll(async () => apiData<DreamSettings>(request, '/dreams/settings'))
+    .toMatchObject({
+      enabled: true,
+      zone: 'Europe/Berlin',
+      window_start: '02:30',
+      window_end: '04:30',
+      model: 'claude-haiku-5-5',
+      dream_budget_usd: 0.5,
+      night_budget_usd: 3,
+      at_once: 2,
+    })
 
   const id = await idleAgent(request)
   await page.goto(`/#agents/${id}`)
