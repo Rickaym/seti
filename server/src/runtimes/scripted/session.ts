@@ -3,18 +3,12 @@ import { once } from 'node:events'
 import { createInterface } from 'node:readline'
 import type { ToolCall } from '@seti/shared'
 import type { Launcher } from '../../launcher.js'
-import type { RuntimeSession } from '../adapter.js'
+import type { RuntimeSession, SessionInput } from '../adapter.js'
 import { controlLine, type ControlLine, type ScriptedCommand, type Verdict } from './dialect.js'
 import { scriptedToolCall } from './tools.js'
 
 /** How Seti decides a call the scripted runtime asks about, until the signal aborts. */
 type ScriptedDecide = (call: ToolCall, signal: AbortSignal) => Promise<Verdict>
-
-/** An input as the scripted runtime reads it. */
-interface ScriptedInput {
-  id: string
-  text: string
-}
 
 /** The scripted runtime's own shapes: a neutral decision, JSON lines, and no hooks or modes. */
 export interface ScriptedShapes {
@@ -23,7 +17,6 @@ export interface ScriptedShapes {
   decide: ScriptedDecide
   hooks: null
   hostServers: Record<string, never>
-  start: { realised: ScriptedRealised; inputs: AsyncIterable<ScriptedInput> }
   message: unknown
   toolServer: never
   policy: never
@@ -120,9 +113,9 @@ class Driver {
     this.child.kill()
   }
 
-  async pump(inputs: AsyncIterable<ScriptedInput>): Promise<void> {
+  async pump(inputs: AsyncIterable<SessionInput>): Promise<void> {
     for await (const input of inputs) {
-      this.write({ t: 'input', id: input.id, text: input.text })
+      this.write({ t: 'input', id: input.id, text: input.content.text })
     }
   }
 
@@ -159,8 +152,10 @@ class Driver {
 }
 
 /** Starts a process of the scripted runtime through the launcher and opens or resumes its session. */
-export function scriptedSession(start: ScriptedShapes['start']): RuntimeSession<ScriptedShapes> {
-  const { realised } = start
+export function scriptedSession(
+  realised: ScriptedRealised,
+  inputs: AsyncIterable<SessionInput>,
+): RuntimeSession<ScriptedShapes> {
   const child = realised.spawn({
     command: realised.command,
     args: realised.args,
@@ -170,7 +165,7 @@ export function scriptedSession(start: ScriptedShapes['start']): RuntimeSession<
   })
   const driver = new Driver(child, realised.decide, once(child, 'exit'))
   driver.write({ t: 'open', resume: realised.resume, cwd: realised.cwd })
-  void driver.pump(start.inputs)
+  void driver.pump(inputs)
   realised.signal.addEventListener('abort', () => {
     driver.close()
   })
