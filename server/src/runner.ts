@@ -1,3 +1,5 @@
+import './node-commands.js'
+
 export { registerSessionMcpServers } from './runtime-host.js'
 export {
   autoQueueBlocker,
