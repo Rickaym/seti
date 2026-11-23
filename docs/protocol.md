@@ -391,6 +391,11 @@ interrupted only for that.
   `ask` rules and the classifier do not apply; deny rules, guards, review rules, the repeat guard
   and the sandbox still hold. Turning it off or its expiry MUST take effect at once. Each change
   is audited and noted in the transcript.
+- PERM-12: An implementation MAY compute its own decision on each call beside the runtime's, in
+  shadow. The shadow MUST NOT change, delay or fail any call, and keeps only counts per day: the
+  call's kind and tool, the mode, both outcomes, the deciding step and rule id, never the call's
+  input or a rule's text. The user and the EA read them with `GET /permissions/shadow?days=` (1
+  to 30, default 7).
 
 ### 7.5 Guards
 

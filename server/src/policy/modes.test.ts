@@ -98,10 +98,9 @@ describe('reading Claude Code calls', () => {
     const refs = contextOf({ rules: [['allow', 'Bash(secret-ish)']], inherited: [['deny', 'Read(~/x)']] }).rules.map(
       (rule) => rule.ref,
     )
-    expect(refs).toEqual(
-      expect.arrayContaining(['rule:1', 'workspace', 'fixed:0', 'inherited:~/.claude/settings.json:0']),
-    )
+    expect(refs).toEqual(expect.arrayContaining(['rule:1', 'workspace', 'fixed:0', 'inherited:user:0']))
     expect(refs.join(' ')).not.toContain('secret-ish')
     expect(refs.join(' ')).not.toContain(HOME)
+    expect(refs.join(' ')).not.toContain('settings.json')
   })
 })
