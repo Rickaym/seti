@@ -32,7 +32,11 @@ function specFor(resume: string | null): SessionSpec {
 }
 
 /** Allows every call as asked. */
-const ALLOW_ALL: NeutralHost = { decide: async () => Promise.resolve({ allow: true }) }
+const ALLOW_ALL: NeutralHost = {
+  decide: async () => Promise.resolve({ allow: true }),
+  ask: async (questions) =>
+    Promise.resolve(Object.fromEntries(questions.map((question) => [question.text, question.options[0] ?? '']))),
+}
 
 /** How a case opens a session. */
 interface OpenOptions {

@@ -58,7 +58,7 @@ class Driver {
   private rid = 0
   private stderr = ''
   private readonly acks = new Map<number, { resolve: (taken: boolean) => void; reject: (e: Error) => void }>()
-  private readonly asks = new AbortController()
+  private readonly asks = new Map<number, AbortController>()
   private readonly exited: Promise<unknown[]>
   private readonly child: ChildProcess
   private readonly decide: ScriptedDecide
@@ -134,8 +134,16 @@ class Driver {
       }
       return
     }
-    void this.decide(scriptedToolCall(line.call), this.asks.signal).then(
+    if (line.t === 'withdraw') {
+      this.asks.get(line.rid)?.abort()
+      this.asks.delete(line.rid)
+      return
+    }
+    const ask = new AbortController()
+    this.asks.set(line.rid, ask)
+    void this.decide(scriptedToolCall(line.call), ask.signal).then(
       (verdict) => {
+        this.asks.delete(line.rid)
         this.write({ t: 'verdict', rid: line.rid, verdict })
       },
       (e: unknown) => {
@@ -147,7 +155,10 @@ class Driver {
   /** Settles what waits on the process once it ended or Seti closed it. */
   private ended(): void {
     this.over = true
-    this.asks.abort()
+    for (const ask of this.asks.values()) {
+      ask.abort()
+    }
+    this.asks.clear()
     for (const waiting of this.acks.values()) {
       waiting.reject(new Error('The scripted runtime ended before it answered'))
     }

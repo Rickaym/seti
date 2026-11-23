@@ -51,6 +51,7 @@ export type ScriptedLine = { [T in keyof Lines]: z.infer<Lines[T]> }[keyof Lines
 /** A line only the driver reads: a request from the runtime, or its answer to a command. */
 export const controlLine = z.discriminatedUnion('t', [
   z.object({ t: z.literal('request'), rid: z.number(), call }),
+  z.object({ t: z.literal('withdraw'), rid: z.number() }),
   z.object({
     t: z.literal('ack'),
     rid: z.number(),

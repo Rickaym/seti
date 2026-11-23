@@ -9,7 +9,12 @@ import type { ClaudeShapes } from './session.js'
 const decideWith =
   (neutral: NeutralHost): CanUseTool =>
   async (toolName, input, options) => {
-    const decision = await neutral.decide(claudeToolCall(options.toolUseID, toolName, input), options.signal)
+    const call = claudeToolCall(options.toolUseID, toolName, input)
+    if (call.kind === 'question') {
+      const answers = await neutral.ask(call.question?.questions ?? [], options.signal)
+      return { behavior: 'allow', updatedInput: { ...input, answers } }
+    }
+    const decision = await neutral.decide(call, options.signal)
     return decision.allow
       ? { behavior: 'allow', updatedInput: decision.input ?? input }
       : { behavior: 'deny', message: decision.message }
@@ -23,8 +28,12 @@ export const claudeTarget = (slot: QuerySlot): ConformanceTarget<ClaudeShapes, '
     usage: { tokens: true, costUsd: 'reported' },
     input: { steer: 'next_step', retract: true },
     background: { jobs: true, stop: true },
+    gated: { shell: true, edit: true, mcp: true },
   },
   gaps: {
+    'PM-3':
+      'a call Seti denied through canUseTool comes back as a tool_result with is_error and the ' +
+      'message, the same as a failed call, so tool.ended says error',
     'INT-1':
       "Claude Code's result after an interrupt is error_during_execution with no mark of the " +
       'interrupt, which arrives as a separate notice row, so turn.ended says error',
