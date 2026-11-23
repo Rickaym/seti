@@ -15,7 +15,7 @@ import {
   type StartProbe,
 } from './capabilities.js'
 import { sql, tasks } from './db.js'
-import { sandboxedProbeLaunch } from './probe-launch.js'
+import { sandboxedProbeLaunch } from './runtimes/claude/probe-launch.js'
 import { sandboxPolicy } from './store/sandbox.js'
 import { removeTaskSandbox } from './task-sandbox.js'
 

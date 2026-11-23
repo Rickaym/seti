@@ -12,7 +12,7 @@ import {
   sessionTitle,
   suggestPr,
   type SessionDeps,
-} from './session-service.js'
+} from './runtimes/claude/session-service.js'
 import { auditEvents } from './store/audit.js'
 import { sessionLinks } from './store/sessions.js'
 import { createImportedTask } from './tasks.js'
