@@ -361,6 +361,15 @@ class SettingsFake(FakeSeti):
                 return ok({"archived": [{"task_id": "t-old", "title": "Old spike"}], "failed": []})
             case "GET", ["revisions", "unseen"]:
                 return ok(self.unseen)
+            case "GET", ["revisions"] if "task_id" in params:
+                return ok(
+                    [
+                        r
+                        for (kind, object_id), revs in self.revisions.items()
+                        if kind == params["object_type"] and object_id.startswith(f"{params['task_id']}:")
+                        for r in revs
+                    ]
+                )
             case "GET", ["revisions"]:
                 return ok(self.revisions.get((params["object_type"], params["object_id"]), []))
             case "POST", ["revisions", "seen"]:
@@ -979,6 +988,52 @@ async def test_changes_by_agents_are_listed_reverted_and_marked_seen(
     assert writes(fake) == [
         ("POST", "/api/revisions/7/revert", {}),
         ("POST", "/api/revisions/seen", {"object_type": "context_pack", "object_id": PACK_TRIAGE}),
+    ]
+
+
+async def test_dream_memory_changes_are_listed_reverted_and_marked_seen(
+    tools: EaTools, fake: SettingsFake
+) -> None:
+    memory = f"{TASK_LOGOUT}:MEMORY.md"
+    change = {
+        "id": 12,
+        "at": "2026-09-27T10:00:00.000Z",
+        "actor": "system",
+        "task_id": TASK_LOGOUT,
+        "task_title": "Fix the logout button",
+        "object_type": "memory_file",
+        "object_id": memory,
+        "kind": "updated",
+        "before": {"text": "- a", "sha256": "1"},
+        "after": {"text": "- b", "sha256": "2"},
+        "reason": "dream 2026-09-27",
+    }
+    created = {**change, "id": 11, "object_id": f"{TASK_LOGOUT}:topics/new.md"}
+    created["before"] = {"text": "", "sha256": "", "deleted": True}
+    fake.revisions[("memory_file", memory)] = [change]
+    fake.revisions[("memory_file", f"{TASK_LOGOUT}:topics/new.md")] = [created]
+    fake.unseen = [{"object_type": "memory_file", "object_id": memory, "revision_id": 12, "at": change["at"]}]
+    listed = await tools.call("list_changes", {})
+    assert listed.text.splitlines()[1] == (
+        "- memory file MEMORY.md: change 12, 2 hours ago: Seti's dream rewrote memory file MEMORY.md, "
+        'saying "dream 2026-09-27"'
+    )
+    history = await tools.call("list_changes", {"memory": "logout"})
+    assert history.text.splitlines()[0] == "Changes to the memory of Fix the logout button, newest first:"
+    assert "created memory file topics/new.md" in history.text.splitlines()[2]
+    asked, done = await confirm(tools, "revert_change", {"memory": "logout"})
+    assert "This undoes change 12" in asked.text
+    assert done.ok
+    _, seen = await confirm(tools, "mark_changes_seen", {"memory": "logout"})
+    assert seen.ok
+    assert writes(fake) == [
+        ("POST", "/api/revisions/12/revert", {}),
+        ("POST", "/api/revisions/seen", {"object_type": "memory_file", "object_id": memory}),
+        (
+            "POST",
+            "/api/revisions/seen",
+            {"object_type": "memory_file", "object_id": f"{TASK_LOGOUT}:topics/new.md"},
+        ),
     ]
 
 
