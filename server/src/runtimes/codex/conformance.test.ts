@@ -24,6 +24,12 @@ async function benchFor(binary: string): Promise<CodexBench | null> {
 
 const bench = await benchFor(process.env.SETI_CODEX_BIN ?? '')
 
+describe.runIf(process.env.CI === 'true')('the Codex conformance run in CI', () => {
+  it('has the pinned binary, so the cases below run instead of skipping', () => {
+    expect(bench, 'CI must set SETI_CODEX_BIN (scripts/codex-binary.mjs)').not.toBeNull()
+  })
+})
+
 describe.skipIf(bench === null)('Codex over the binary SETI_CODEX_BIN names', () => {
   if (bench !== null) {
     describeAdapter(codexTarget(bench))
