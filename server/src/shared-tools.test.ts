@@ -22,6 +22,7 @@ import { answerChangeRequest } from './change-requests.js'
 import { SETI_HOME, SHARED_TOOLS_ROOT } from './config.js'
 import { createConnectionPlaceholder, setConnectionProfiles } from './connections.js'
 import { messages, tasks } from './db.js'
+import { claudeCall } from './fake-sdk.js'
 import { isOutward } from './outward.js'
 import { permissionSettings, sandboxFor } from './session-options.js'
 import { sessionOptions, setupKey } from './session-spec.js'
@@ -330,7 +331,7 @@ describe('answering a proposal', () => {
     expect(sameCode.change.snapshot.replaces?.content).toBe(second)
     expect((await answer(caller, sameCode.id, 'allow')).status).toBe(200)
     expect(await sharedTools.get(name)).toMatchObject({ writes: true, sha256: sameCode.change.snapshot.sha256 })
-    expect(isOutward(`mcp__shared__${name}`, {})).toBe(true)
+    expect(isOutward(claudeCall(`mcp__shared__${name}`, {}))).toBe(true)
     await sharedTools.remove(name)
   })
 

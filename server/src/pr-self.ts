@@ -1,9 +1,10 @@
-import type { SDKMessage } from '@anthropic-ai/claude-agent-sdk'
+import type { ToolCall } from '@seti/shared'
+import { payloadEvents } from './events/read.js'
 import type { WatchedPr } from './github.js'
-import { bashCommand } from './outward.js'
+import { shellCommand } from './outward.js'
 import type { PrPost } from './pr-events.js'
 import { pushTargets } from './pr-evidence.js'
-import { createsPrCall, endsPrCall, postsPrCommentCall, resultText, toolResults } from './pr-link.js'
+import { createsPrCall, endsPrCall, postsPrCommentCall } from './pr-link.js'
 import { postTargets, targetsPr, type PrTarget } from './pr-target.js'
 import { prWatch, type StoredCall } from './store/pr-watch.js'
 
@@ -25,35 +26,22 @@ const ANCHOR = /#(issuecomment-|pullrequestreview-|discussion_r)(\d+)/g
 
 const anchorsIn = (text: string) => [...text.matchAll(ANCHOR)].map((match) => `${match[1] ?? ''}${match[2] ?? ''}`)
 
-type Acts = (name: string, input: unknown) => boolean
-
-/** The calls an assistant message makes that `acts` picks, by tool call id. */
-function callsIn(row: StoredCall, message: SDKMessage, acts: Acts): [string, AgentCall][] {
-  if (message.type !== 'assistant') {
-    return []
-  }
-  return message.message.content.flatMap((block): [string, AgentCall][] => {
-    if (block.type !== 'tool_use' || !acts(block.name, block.input)) {
-      return []
-    }
-    const targets = postTargets(block.name, block.input)
-    return [[block.id, { task_id: row.task_id, at: Date.parse(row.created_at), until: null, anchors: [], targets }]]
-  })
-}
+type Acts = (call: ToolCall) => boolean
 
 /** The calls among stored transcript rows that `acts` picks, with the anchors their output links. */
 function agentCalls(rows: readonly StoredCall[], acts: Acts): AgentCall[] {
   const calls = new Map<string, AgentCall>()
   for (const row of rows) {
-    const message = JSON.parse(row.payload) as SDKMessage
-    for (const [id, call] of callsIn(row, message, acts)) {
-      calls.set(id, call)
-    }
-    for (const result of toolResults(message)) {
-      const call = calls.get(result.tool_use_id)
-      if (call !== undefined) {
-        call.until = Date.parse(row.created_at)
-        call.anchors.push(...anchorsIn(resultText(result)))
+    const at = Date.parse(row.created_at)
+    for (const event of payloadEvents(row.payload)) {
+      if (event.type === 'tool.started' && acts(event.call)) {
+        const targets = postTargets(event.call)
+        calls.set(event.call.callId, { task_id: row.task_id, at, until: null, anchors: [], targets })
+      }
+      const call = event.type === 'tool.ended' ? calls.get(event.callId) : undefined
+      if (event.type === 'tool.ended' && call !== undefined) {
+        call.until = at
+        call.anchors.push(...anchorsIn(event.result.text))
       }
     }
   }
@@ -143,19 +131,15 @@ export async function agentEnders(pr: WatchedPr): Promise<Set<string>> {
 
 const MCP_PUSH = /(?:^|__)(?:push_files|create_or_update_file)$/i
 
-const pushesCall = (name: string, input: unknown): boolean =>
-  createsPrCall(name, input) || (name === 'Bash' ? pushTargets(bashCommand(input)) !== null : MCP_PUSH.test(name))
+const pushesCall = (call: ToolCall): boolean =>
+  createsPrCall(call) ||
+  (call.shell?.action === 'run' ? pushTargets(shellCommand(call)) !== null : MCP_PUSH.test(call.mcp?.tool ?? ''))
 
 /** Whether any of the stored calls pushed commits or opened a PR. */
-export function pushed(rows: readonly StoredCall[]): boolean {
-  return rows.some((row) => {
-    const message = JSON.parse(row.payload) as SDKMessage
-    return (
-      message.type === 'assistant' &&
-      message.message.content.some((block) => block.type === 'tool_use' && pushesCall(block.name, block.input))
-    )
-  })
-}
+export const pushed = (rows: readonly StoredCall[]): boolean =>
+  rows.some((row) =>
+    payloadEvents(row.payload).some((event) => event.type === 'tool.started' && pushesCall(event.call)),
+  )
 
 /**
  * Whether the task has a CI result to wait for on the PR: it pushed or opened a PR since Seti

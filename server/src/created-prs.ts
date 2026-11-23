@@ -1,4 +1,4 @@
-import type { SDKMessage } from '@anthropic-ai/claude-agent-sdk'
+import type { RuntimeEvent } from '@seti/shared'
 import { auditPrLink } from './audit.js'
 import { tasks } from './db.js'
 import { watchPrLinked } from './ea-watch.js'
@@ -13,8 +13,12 @@ const watchPrCreation = createPrWatcher()
  * Links the PRs the agent opened to the task, and those a subagent of the session open since
  * prompt `since` opened to it as well.
  */
-export async function linkCreatedPrs(taskId: string, m: SDKMessage, since: number | null): Promise<void> {
-  const created = watchPrCreation(taskId, m)
+export async function linkCreatedPrs(
+  taskId: string,
+  events: readonly RuntimeEvent[],
+  since: number | null,
+): Promise<void> {
+  const created = watchPrCreation(taskId, events)
   const dismissed = created.length === 0 ? new Set<string>() : await prDismissals.list(taskId)
   const kept = created.filter((pr) => !dismissed.has(pr.url))
   const linked: string[] = []

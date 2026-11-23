@@ -154,8 +154,16 @@ const denied = (m: Of<'permission_denied'>): Event => ({
   callId: m.tool_use_id,
   tool: m.tool_name,
   by: 'runtime',
-  reason: m.decision_reason ?? m.message,
+  ...(m.decision_reason_type === 'classifier' ? { classifier: true } : {}),
+  ...some('reason', m.decision_reason),
+  text: m.message,
 })
+
+/** Claude Code's own report that the session opened a PR or pushed to one; not in the SDK types. */
+function published(m: SystemMessage): Event | null {
+  const url = str(m, 'url')
+  return url === undefined ? null : { ...base, type: 'change.published', url, action: str(m, 'action') ?? '' }
+}
 
 const commandOutput = (m: Of<'local_command_output'>): Event => ({
   ...base,
@@ -198,6 +206,10 @@ const isHandled = (subtype: string): subtype is Handled => Object.hasOwn(HANDLER
 
 /** The event of one Claude Code system message; a subtype Seti does not read is `vendor`. */
 export function systemEvent(m: SystemMessage): Event {
+  const change = (m.subtype as string) === 'code_change_published' ? published(m) : null
+  if (change !== null) {
+    return change
+  }
   if (!isHandled(m.subtype)) {
     return { ...base, type: 'vendor', name: `system/${m.subtype}` }
   }
