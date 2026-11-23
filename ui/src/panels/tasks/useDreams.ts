@@ -1,7 +1,7 @@
-import type { DreamRun, Revision } from '@seti/shared'
+import type { DreamRun, DreamSettings, Revision } from '@seti/shared'
 import { useCallback, useEffect, useState } from 'react'
 import { toast } from 'sonner'
-import { apiGet, apiPost, errorText } from '@/api'
+import { apiGet, apiPost, apiPut, errorText } from '@/api'
 
 const WHILE_DREAMING_MS = 3000
 
@@ -60,4 +60,34 @@ export function useDreams(taskId: string, open: boolean) {
   }, [])
 
   return { latest, changes, dreamNow, undo }
+}
+
+/** Whether nightly Dreaming covers the agent: Dreaming's switch, and the agent's own. */
+export function useNightly(taskId: string, open: boolean) {
+  const [state, setState] = useState<{ enabled: boolean; on: boolean } | null>(null)
+
+  useEffect(() => {
+    if (!open) {
+      return
+    }
+    Promise.all([apiGet<DreamSettings>('/dreams/settings'), apiGet<{ tasks: string[] }>('/dreams/off')]).then(
+      ([settings, off]) => {
+        setState({ enabled: settings.enabled, on: !off.tasks.includes(taskId) })
+      },
+      (e: unknown) => toast.error(errorText(e)),
+    )
+  }, [taskId, open])
+
+  const switchTo = useCallback(
+    (on: boolean) => {
+      apiPut(`/tasks/${taskId}/dreaming`, { on })
+        .then(() => {
+          setState((current) => current && { ...current, on })
+        })
+        .catch((e: unknown) => toast.error(errorText(e)))
+    },
+    [taskId],
+  )
+
+  return { nightly: state, switchTo }
 }

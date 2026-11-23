@@ -835,10 +835,32 @@ store, the audit chain and every record.
 
 Optional and off by default: a maintenance session per agent that consolidates its memory.
 
+- DRM-1: Nightly Dreaming is off by default. Its settings: on, a window (local start and end), an
+  IANA zone saved explicitly, a model, a budget per dream and per night, and dreams at once (1 to
+  3). Turning it on needs a zone. Each agent and each workspace has a switch, default on. The
+  settings are the user's and the EA's after the user's yes; agents and mods MUST be refused,
+  since the settings hold the caps every dream runs under. An agent below `full` changes no
+  switch, and no agent switches itself. Every change is audited with its old and new values.
+- DRM-2: A night is the local date its window starts on, in the saved zone. A start or end the
+  clock skips moves to the next valid minute; one it repeats takes the first occurrence. An end at
+  or before the start ends on the next day.
+- DRM-3: At the window's start, or at the first tick inside it, the night is planned once: one
+  dream for each unarchived agent switched in with its workspace, sandboxed, whose runtime
+  declares dreams and that had a user message or a turn with tool calls since its last finished
+  dream, the busiest first. Agents left out are counted by reason. An agent dreams at most once a
+  night by the schedule. While Dreaming is on for an agent, its runtime's own memory
+  consolidation is turned off in its sessions, so one consolidator owns the folder.
 - DRM-4: A dream starts only while the agent is unarchived and sandboxed, its runtime declares
   dreams, it runs no turn or background work, holds no open question, permission or change
   request, has no dream running, and the runtime's own consolidation did not run in the last hour;
-  otherwise it is refused with the reason.
+  otherwise it is refused with the reason. A nightly dream refused for work or an open request is
+  tried again every `dream_retry` until the window ends, then skipped with its last reason. None
+  starts after the end; one running at the end is stopped.
+- DRM-5: Nightly starts are at most the setting at once and `dream_gap` apart, and wait while plan
+  use, host load or free disk on the root disk and on Seti's data disk is past `dream_gates`, or
+  while the night's spend leaves less than one dream's budget. Turning Dreaming off ends the
+  night: running dreams stop and planned ones are skipped. A night Seti was down for is recorded
+  once as missed and is not caught up.
 - DRM-6: A dream is a new session of the agent's runtime that resumes nothing (RT-8), in the
   agent's maintenance sandbox (SBX-12) with egress to the model provider only (EGR-13), writable
   only in its memory folder and the night's dream folder of its workspace. It reads a digest of
@@ -854,9 +876,14 @@ Optional and off by default: a maintenance session per agent that consolidates i
   of a file changed since, or of a text kept only redacted, MUST be refused (409). Every change
   and revert is audited with the path and line counts, never the text.
 - DRM-12: A turn of the agent that starts during its dream cuts the dream. A restart cuts it too;
-  the memory changes it made before the cut are still recorded.
-- DRM-13: A dream stops at `dream_budget`, `dream_steps` or `dream_time`. Its cost is stored on the
-  dream, not on the agent's turns.
+  the memory changes it made before the cut are still recorded. A cut nightly dream is planned
+  once more within its window; cut again, it has failed.
+- DRM-13: A dream stops at its budget per dream (`dream_budget` by default), `dream_steps` or
+  `dream_time`, and runs on the model the settings name. Its cost is stored on the dream, not on
+  the agent's turns.
+- DRM-14: The first brief after a night's window holds one line for the night: agents dreamt, how
+  many want the user, the cost. It never counts toward Needs you, and nothing about dreams
+  notifies at night.
 - DRM-15: Text a dream reads is data. A memory write that carries a credential, a hidden file or a
   file that is not text MUST be refused, and so MUST every tool call the gate does not allow.
   Added memory lines that name a new host, pipe into an interpreter or read as commands are listed
@@ -1050,34 +1077,34 @@ treat every agent as holding the user's access.
 Values the reference implementation uses for the named constants. An implementation MAY choose
 others.
 
-| Area         | Constant: reference value                                                                                                                                                                 |
-| ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Sessions     | `idle_close` 15 min. `interrupt_grace` 5 s.                                                                                                                                               |
-| Updates      | `wake_debounce` 5 s. `wake_max` 30 s. `batch_updates` 20. `update_body` 6000 characters. `auto_turns` 20 in `auto_window` 60 min.                                                         |
-| Attention    | `stall_after` 20 min. `stall_check` 1 min. `push_cap` 5 in `push_window` 10 min. `focus_ttl` 45 s. `focus_report` 20 s. `call_ttl` 15 s. `away_after` 5 min. `ask_remind` 15 min.         |
-| Brief        | `brief_needs` 5. `brief_changes` 6.                                                                                                                                                       |
-| Changes      | `chg_pending` 5. `chg_hourly` 10. `chg_expiry` 24 h. `mcp_off_listed` 8.                                                                                                                  |
-| Caps         | `mem_cap` 30% of host RAM in whole GB, 6 to 16 GB. `cpu_cap` 3 cores at half the control room's weight.                                                                                   |
-| Shared tools | `tool_schema` 30 properties, depth 4, 8 KB; description 20 to 1500; timeout 1 to 600 s (default 120); 5 needs of 1 to 5 hosts. `tool_script` 64 KB. `tool_output` 256 KB.                 |
-| Events       | Event `title` 200, `detail` 2000, `kind` 80. Subscription `events` 20 kinds. Log excerpt 1000. `route_retry` 30 s to 1 h, 12 attempts.                                                    |
-| Webhooks     | `hook_replay` 24 h. `hook_limits`: body 256 KB, 60 a minute per channel, 600 overall. Sender `max_age_s` 30 s to 1 day (default 300 s); detail 0 to 2000 characters (default 1000).       |
-| Filters      | `filter_limits`: code 10,000 characters; 32 MB; compute and wall 1 s; 2 workers, 2 s wait for one; output 16 KB; 20 log lines. `filter_warn` 3. `filter_samples` 20, each at most 256 KB. |
-| Pollers      | `poller_limits`: interval 1 min to 1 day (default 5 min); timeout 5 to 120 s (default 30); compute 1 s unawaited, 10 s a run; 48 MB; 500 items; output 1 MB; state 16 KB; 3 runs at once. |
-| Poller fetch | 20 requests a run, 5 redirects, 4 MB each, 12 MB a run. `poller_backoff` 6 h. `fail_streak` 5 (reminders 3).                                                                              |
-| Reminders    | `reminder_limits`: interval 1 min to 7 days; 5 s; 256 MB; message 2000; state 16 KB. `cron_catchup` 1 h.                                                                                  |
-| PRs          | Create request 50 links. `pr_poll` 60 s. `pr_skew` 5 s. `subagent_wait` 30 min.                                                                                                           |
-| Chat         | Message 4000. Active agent: running, session open, or updated within 12 h. `chat_burst` 12 in 15 min. `chat_loop` 6 in 15 min.                                                            |
-| Questions    | Answer batch 100 items. `notes_waiting` 10. Index 1500 characters. `note_stale` 3 failed checks in a row, or unverified 30 days (fact, environment) or 90 days (how-to, gotcha).          |
-| Assistant    | `ask_ttl` 10 min. `settle` quiet 45 s, at most 3 min. `call_silence` 30 s. `wake_phrase` 2 to 40 characters, at most 4 words. `keep_awake_seconds` 5 to 600.                              |
-| Resilience   | `stop_grace` 7 s. `resume_pace` 3 starts 2 s apart, 20 s between groups. `grant_ttl` 15 min. `send_window` 24 h.                                                                          |
-| Storage      | `orphan_grace` 1 h. `size_walk` 400,000 entries or 20 s per folder.                                                                                                                       |
-| Audit        | `audit_keep` 365 days. Summary 300. Detail string 500.                                                                                                                                    |
-| Mods         | Storage 64 KB a value, 1 MB a mod. Ask 10 min, 3 open a mod. Update delay 24 h. Command timeout 1 to 600 s. Schedule 5 min to 1 day.                                                      |
-| Mod engine   | `mod_limits`: 32 MB; compute 5 s; wall 10 s (schedule 30 s); 50 calls; 10 fetches; queue 20; 60 events a minute; 20 failures an hour turn the mod off.                                    |
-| Sharing      | Preview pages 1 to 50. `share_rate` a minute per client: 30 misses, 120 pages or downloads, 600 images. `share_size` 10 MB. Expiry 1, 7 or 30 days.                                       |
-| Client       | `sse_keepalive` 15 s. `body_max` 8 MB. `session_life` idle 7 days, absolute 30 days. Setup code 15 min. Attempts per 10 min: 20 sign-in, 20 setup, 10 pairing. `pair_ttl` 5 min.          |
-| Uploads      | `upload_file` 25 MB. `upload_stall` 30 s. `upload_idle` 60 s. `upload_time` 30 min.                                                                                                       |
-| Dreams       | `dream_steps` 60. `dream_time` 20 min. `dream_budget` $1. `dream_digest` 40,000 characters. Memory folder 512 KB, 100 files.                                                              |
+| Area         | Constant: reference value                                                                                                                                                                                                                                                                 |
+| ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Sessions     | `idle_close` 15 min. `interrupt_grace` 5 s.                                                                                                                                                                                                                                               |
+| Updates      | `wake_debounce` 5 s. `wake_max` 30 s. `batch_updates` 20. `update_body` 6000 characters. `auto_turns` 20 in `auto_window` 60 min.                                                                                                                                                         |
+| Attention    | `stall_after` 20 min. `stall_check` 1 min. `push_cap` 5 in `push_window` 10 min. `focus_ttl` 45 s. `focus_report` 20 s. `call_ttl` 15 s. `away_after` 5 min. `ask_remind` 15 min.                                                                                                         |
+| Brief        | `brief_needs` 5. `brief_changes` 6.                                                                                                                                                                                                                                                       |
+| Changes      | `chg_pending` 5. `chg_hourly` 10. `chg_expiry` 24 h. `mcp_off_listed` 8.                                                                                                                                                                                                                  |
+| Caps         | `mem_cap` 30% of host RAM in whole GB, 6 to 16 GB. `cpu_cap` 3 cores at half the control room's weight.                                                                                                                                                                                   |
+| Shared tools | `tool_schema` 30 properties, depth 4, 8 KB; description 20 to 1500; timeout 1 to 600 s (default 120); 5 needs of 1 to 5 hosts. `tool_script` 64 KB. `tool_output` 256 KB.                                                                                                                 |
+| Events       | Event `title` 200, `detail` 2000, `kind` 80. Subscription `events` 20 kinds. Log excerpt 1000. `route_retry` 30 s to 1 h, 12 attempts.                                                                                                                                                    |
+| Webhooks     | `hook_replay` 24 h. `hook_limits`: body 256 KB, 60 a minute per channel, 600 overall. Sender `max_age_s` 30 s to 1 day (default 300 s); detail 0 to 2000 characters (default 1000).                                                                                                       |
+| Filters      | `filter_limits`: code 10,000 characters; 32 MB; compute and wall 1 s; 2 workers, 2 s wait for one; output 16 KB; 20 log lines. `filter_warn` 3. `filter_samples` 20, each at most 256 KB.                                                                                                 |
+| Pollers      | `poller_limits`: interval 1 min to 1 day (default 5 min); timeout 5 to 120 s (default 30); compute 1 s unawaited, 10 s a run; 48 MB; 500 items; output 1 MB; state 16 KB; 3 runs at once.                                                                                                 |
+| Poller fetch | 20 requests a run, 5 redirects, 4 MB each, 12 MB a run. `poller_backoff` 6 h. `fail_streak` 5 (reminders 3).                                                                                                                                                                              |
+| Reminders    | `reminder_limits`: interval 1 min to 7 days; 5 s; 256 MB; message 2000; state 16 KB. `cron_catchup` 1 h.                                                                                                                                                                                  |
+| PRs          | Create request 50 links. `pr_poll` 60 s. `pr_skew` 5 s. `subagent_wait` 30 min.                                                                                                                                                                                                           |
+| Chat         | Message 4000. Active agent: running, session open, or updated within 12 h. `chat_burst` 12 in 15 min. `chat_loop` 6 in 15 min.                                                                                                                                                            |
+| Questions    | Answer batch 100 items. `notes_waiting` 10. Index 1500 characters. `note_stale` 3 failed checks in a row, or unverified 30 days (fact, environment) or 90 days (how-to, gotcha).                                                                                                          |
+| Assistant    | `ask_ttl` 10 min. `settle` quiet 45 s, at most 3 min. `call_silence` 30 s. `wake_phrase` 2 to 40 characters, at most 4 words. `keep_awake_seconds` 5 to 600.                                                                                                                              |
+| Resilience   | `stop_grace` 7 s. `resume_pace` 3 starts 2 s apart, 20 s between groups. `grant_ttl` 15 min. `send_window` 24 h.                                                                                                                                                                          |
+| Storage      | `orphan_grace` 1 h. `size_walk` 400,000 entries or 20 s per folder.                                                                                                                                                                                                                       |
+| Audit        | `audit_keep` 365 days. Summary 300. Detail string 500.                                                                                                                                                                                                                                    |
+| Mods         | Storage 64 KB a value, 1 MB a mod. Ask 10 min, 3 open a mod. Update delay 24 h. Command timeout 1 to 600 s. Schedule 5 min to 1 day.                                                                                                                                                      |
+| Mod engine   | `mod_limits`: 32 MB; compute 5 s; wall 10 s (schedule 30 s); 50 calls; 10 fetches; queue 20; 60 events a minute; 20 failures an hour turn the mod off.                                                                                                                                    |
+| Sharing      | Preview pages 1 to 50. `share_rate` a minute per client: 30 misses, 120 pages or downloads, 600 images. `share_size` 10 MB. Expiry 1, 7 or 30 days.                                                                                                                                       |
+| Client       | `sse_keepalive` 15 s. `body_max` 8 MB. `session_life` idle 7 days, absolute 30 days. Setup code 15 min. Attempts per 10 min: 20 sign-in, 20 setup, 10 pairing. `pair_ttl` 5 min.                                                                                                          |
+| Uploads      | `upload_file` 25 MB. `upload_stall` 30 s. `upload_idle` 60 s. `upload_time` 30 min.                                                                                                                                                                                                       |
+| Dreams       | Window 01:00 to 05:00. `dream_gap` 2 min. `dream_retry` 10 min. `dream_steps` 60. `dream_time` 20 min. `dream_budget` $1. Night budget $5. `dream_gates`: five-hour use 60%, weekly 85%, load 0.75 x cores, 5 GB free. `dream_digest` 40,000 characters. Memory folder 512 KB, 100 files. |
 
 ## Appendix B. Retired identifiers
 
