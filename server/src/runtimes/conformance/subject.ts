@@ -1,7 +1,7 @@
 import { COMPACT_DEFAULTS } from '@seti/shared'
 import type { SessionSpec } from '../../session-spec.js'
 import type { RuntimeShapes, SessionInput } from '../adapter.js'
-import { Channel, Run, type RunView } from './run.js'
+import { CASE_BOUND_MS, Channel, Run, within, type RunView } from './run.js'
 import type { Script } from './script.js'
 import type { ConformanceTarget, NeutralHost, Profile, Rig } from './target.js'
 
@@ -51,10 +51,13 @@ export interface Subject {
   rig: (script: Script) => Rig
   /** Realises a spec on the rig's launcher and opens the session; rejects as the adapter does. */
   open: (rig: Rig, options?: OpenOptions) => Promise<RunView>
+  /** The promise's value, or a rejection once it took longer than this runtime may take. */
+  within: <T>(promise: Promise<T>, label: string) => Promise<T>
 }
 
 /** The subject the cases drive for one target. */
 export function subjectOf<S extends RuntimeShapes, Id extends string>(target: ConformanceTarget<S, Id>): Subject {
+  const bound = target.boundMs ?? CASE_BOUND_MS
   return {
     id: target.adapter.id,
     profile: target.profile,
@@ -70,7 +73,8 @@ export function subjectOf<S extends RuntimeShapes, Id extends string>(target: Co
       )
       const inputs = new Channel<SessionInput>()
       const session = await target.adapter.open(realised, inputs, null)
-      return new Run(session, target.adapter.project, inputs, controller).start()
+      return new Run(session, target.adapter.project, inputs, { controller, bound }).start()
     },
+    within: async (promise, label) => within(promise, label, bound),
   }
 }
