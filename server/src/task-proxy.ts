@@ -39,10 +39,17 @@ interface SessionAccess {
   placeholders: readonly EgressPlaceholder[]
   deniedConnectors: ReadonlySet<string>
   login: string | null
+  anthropic: boolean
 }
 
 const access = new Map<string, SessionAccess>()
-const NO_ACCESS: SessionAccess = { rules: [], placeholders: [], deniedConnectors: new Set(), login: null }
+const NO_ACCESS: SessionAccess = {
+  rules: [],
+  placeholders: [],
+  deniedConnectors: new Set(),
+  login: null,
+  anthropic: true,
+}
 const accessOf = (taskId: string) => access.get(taskId) ?? NO_ACCESS
 
 /** A credential the control plane hands the proxy for one request; the node keeps none. */
@@ -64,6 +71,11 @@ export async function openTaskSsh(taskId: string): Promise<void> {
   })
 }
 
+/** An Anthropic credential, only for an agent whose runtime talks to Anthropic; else none is sent. */
+async function anthropic(taskId: string, ask: NodeAsk<'secret.mint'>): Promise<string | null> {
+  return accessOf(taskId).anthropic ? mint(taskId, ask) : null
+}
+
 async function taskProxy(taskId: string, authority: SandboxCa): Promise<EgressProxy> {
   const existing = proxies.get(taskId)
   if (existing !== undefined) {
@@ -75,9 +87,9 @@ async function taskProxy(taskId: string, authority: SandboxCa): Promise<EgressPr
     allowed: async () => (await askInTime(taskId, 'sandbox.hosts', {})).hosts,
     ca: authority,
     credentials: {
-      claude: async () => mint(taskId, { kind: 'claude', login: accessOf(taskId).login }),
+      claude: async () => anthropic(taskId, { kind: 'claude', login: accessOf(taskId).login }),
       github: async (owner) => mint(taskId, { kind: 'github', owner }),
-      connector: async () => mint(taskId, { kind: 'connector' }),
+      connector: async () => anthropic(taskId, { kind: 'connector' }),
     },
     rules: () => accessOf(taskId).rules,
     placeholders: () => accessOf(taskId).placeholders,
@@ -112,6 +124,7 @@ function applyGrant(taskId: string, grant: ProxyGrant): void {
     placeholders: connectionPlaceholders(grant.connections, value),
     deniedConnectors: new Set(grant.deniedConnectors),
     login: grant.login,
+    anthropic: grant.anthropic,
   })
 }
 

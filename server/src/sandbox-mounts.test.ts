@@ -2,9 +2,9 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
+import { bwrapArgs } from './sandbox-bwrap.js'
 import { sandboxClaudeJson, sandboxServers } from './sandbox-claude-json.js'
 import {
-  bwrapArgs,
   canonicalRoot,
   mountProblem,
   projectSlug,
@@ -634,5 +634,20 @@ describe('sandboxClaudeJson', () => {
     sandboxClaudeJson(path.join(root, 'missing.json'), copy)
     expect(JSON.parse(fs.readFileSync(copy, 'utf8'))).toEqual({ hasCompletedOnboarding: true, mcpServers: {} })
     expect(sandboxServers('nope', new Set())).toEqual({})
+  })
+})
+
+describe("a Codex agent's mounts", () => {
+  it("leave out Claude Code's configuration and lock Codex's settings, variables and command rules", () => {
+    const mounts = sandboxMounts(layout({ codex: true }))
+    expect(dests(mounts).filter((dest) => dest.startsWith(path.join(home, '.claude')))).toEqual([])
+    const codex = path.join(home, '.codex')
+    expect(find(mounts, path.join(codex, 'config.toml'))).toEqual([
+      { kind: 'mask', dest: path.join(codex, 'config.toml') },
+    ])
+    expect(find(mounts, path.join(codex, '.env'))).toEqual([{ kind: 'mask', dest: path.join(codex, '.env') }])
+    expect(find(mounts, path.join(codex, 'rules'))).toEqual([
+      { kind: 'ro-bind', src: path.join(taskDir, 'empty'), dest: path.join(codex, 'rules') },
+    ])
   })
 })

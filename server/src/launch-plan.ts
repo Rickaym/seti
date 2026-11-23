@@ -2,6 +2,7 @@ import type { CpuCap, MemoryCap, ProxyGrant, SandboxPolicy, Task } from '@seti/s
 import { taskSsh } from './agent-access.js'
 import { profileAws, taskAws } from './aws-access.js'
 import { connectorCredential } from './claude-credential.js'
+import { codexKeyConnection } from './codex-key.js'
 import { effectiveCpuCap } from './cpu-cap.js'
 import { agentTokenStamp } from './github-token.js'
 import { launcherFrom, sandboxFrom } from './launcher.js'
@@ -9,7 +10,7 @@ import { taskBorrowedServers } from './mcp-borrowed.js'
 import { effectiveCap } from './memory-cap.js'
 import type { ScopeKind } from './memory-scope.js'
 import { taskPluginConfigs } from './plugins.js'
-import { proxyGrant } from './proxy-grant.js'
+import { proxyGrant, type PlannedRuntime } from './proxy-grant.js'
 import { sharedToolFolders, TOOL_SERVER } from './shared-tools.js'
 import { knownHostsText, publicKeys } from './ssh-files.js'
 import { sandboxPolicy } from './store/sandbox.js'
@@ -37,6 +38,11 @@ export interface SandboxPlan {
   github: boolean
   connectors: boolean
   aws: { region: string } | null
+  /**
+   * Present for a Codex agent, whose sandbox holds no Claude configuration: the variable of the
+   * connection that carries its OpenAI key, or null when it has none.
+   */
+  codex?: { modelKey: string | null }
 }
 
 /**
@@ -63,10 +69,19 @@ async function sshPlan(taskId: string): Promise<SshPlan | null> {
   }
 }
 
+/** A Codex agent's part of its plan, which leaves out Claude's plugins, servers and connectors. */
+async function codexPart(task: Task) {
+  return { codex: { modelKey: (await codexKeyConnection(task))?.env ?? null }, connectors: false, borrowed: [] }
+}
+
 /** What the agent's sandbox is made of under this policy. */
-export async function sandboxPlanFor(task: Task, policy: SandboxPolicy): Promise<SandboxPlan> {
-  const { grant, denied } = await proxyGrant(task)
-  const plugins = (await taskPluginConfigs(task.id)).map((plugin) => plugin.path)
+export async function sandboxPlanFor(
+  task: Task,
+  policy: SandboxPolicy,
+  runtime: PlannedRuntime = 'claude',
+): Promise<SandboxPlan> {
+  const { grant, denied } = await proxyGrant(task, runtime)
+  const plugins = runtime === 'codex' ? [] : (await taskPluginConfigs(task.id)).map((plugin) => plugin.path)
   const tools = await sharedToolFolders(task)
   return {
     policy,
@@ -78,18 +93,19 @@ export async function sandboxPlanFor(task: Task, policy: SandboxPolicy): Promise
     github: (await agentTokenStamp(task.profile_id)) !== null,
     connectors: connectorCredential() !== null,
     aws: (await taskAws(task.id)) ? { region: (await profileAws(task.profile_id)).region } : null,
+    ...(runtime === 'codex' ? await codexPart(task) : {}),
   }
 }
 
 /** The agent's launch plan, read from the store and the host's settings. */
-export async function launchPlan(task: Task): Promise<LaunchPlan> {
+export async function launchPlan(task: Task, runtime: PlannedRuntime = 'claude'): Promise<LaunchPlan> {
   const policy = await sandboxPolicy.get()
-  const sandbox = policy.enabled && task.sandbox ? await sandboxPlanFor(task, policy) : null
+  const sandbox = policy.enabled && task.sandbox ? await sandboxPlanFor(task, policy, runtime) : null
   return {
     memory: await effectiveCap(task.id),
     cpu: await effectiveCpuCap(task.id),
     sandbox,
-    grant: sandbox?.grant ?? (await proxyGrant(task)).grant,
+    grant: sandbox?.grant ?? (await proxyGrant(task, runtime)).grant,
   }
 }
 

@@ -26,6 +26,7 @@ import { oomRun, oomRunBlocked, oomScriptArgs } from './oom-fixtures.js'
 import { TOOL_OOM_ADJ } from './oom-guard.js'
 import { Proc } from './proc.js'
 import './runner.js'
+import type { PlannedRuntime } from './proxy-grant.js'
 import { loadSandboxCa, type SandboxCa } from './sandbox-ca.js'
 import { hostClaudeJson } from './sandbox-mcp.js'
 import { projectSlug } from './sandbox-mounts.js'
@@ -94,6 +95,20 @@ describe('sandboxEnv', () => {
     expect(env.CLAUDE_CODE_SHELL_PREFIX).toBeUndefined()
   })
 
+  it("gives a Codex agent its home and its key's placeholder, and nothing of Claude Code's", () => {
+    const connections = { OPENAI_API_KEY: 'seti-placeholder-openai' }
+    const env = sandboxEnv({}, '/home/me', {
+      github: false,
+      connectors: true,
+      connections,
+      codex: { modelKey: 'OPENAI_API_KEY' },
+    })
+    expect(env).toMatchObject({ CODEX_HOME: '/home/me/.codex', SETI_MODEL_KEY: 'seti-placeholder-openai' })
+    expect(Object.keys(env).filter((name) => name.startsWith('ANTHROPIC_') || name.startsWith('CLAUDE_'))).toEqual([])
+    const keyless = sandboxEnv({}, '/home/me', { github: false, connectors: false, codex: { modelKey: null } })
+    expect(keyless.SETI_MODEL_KEY).toBeUndefined()
+  })
+
   it('asks Claude Code for connectors only when the host login can reach them', () => {
     const env = sandboxEnv({}, '/home/me', { github: true, connectors: true })
     expect(env.CLAUDE_CODE_OAUTH_SCOPES?.split(' ')).toEqual(['user:inference', 'user:mcp_servers'])
@@ -133,13 +148,14 @@ describe.skipIf(!available)('a real task sandbox', () => {
     script: string,
     scope: ScopePlan | null = null,
     as: Partial<Task> = {},
-    maintenance?: { writable: readonly string[] },
+    session: { maintenance?: { writable: readonly string[] }; runtime?: PlannedRuntime } = {},
   ): Promise<{ code: number | null; out: string }> {
+    const { maintenance, runtime = 'claude' } = session
     const ctx = { ...sandboxContext(), home }
     const sandboxed = { ...task, ...as }
     const sandbox = await taskSandbox(sandboxed, {
       ctx,
-      plan: await sandboxPlanFor(sandboxed, await sandboxPolicy.get()),
+      plan: await sandboxPlanFor(sandboxed, await sandboxPolicy.get(), runtime),
       ...(maintenance === undefined ? {} : { maintenance }),
     })
     const child = sandbox.spawn('/bin/bash', ['-c', script], { stdin: 'ignore', scope })
@@ -687,7 +703,7 @@ describe.skipIf(!available)('a real task sandbox', () => {
       'echo "gh=${GH_TOKEN:-none} ssh=${SSH_AUTH_SOCK:-none}"',
       'echo "proxy=$(ls /run/seti)"',
     ].join('\n')
-    const { out } = await inSandbox(script, null, {}, { writable: [night] })
+    const { out } = await inSandbox(script, null, {}, { maintenance: { writable: [night] } })
     expect(out).toContain('work read-only')
     expect(out).toContain('workspace read-only')
     expect(out).toContain('memory writable')
@@ -698,6 +714,25 @@ describe.skipIf(!available)('a real task sandbox', () => {
     expect(fs.existsSync(path.join(work, 'dreamt'))).toBe(false)
     expect(fs.readFileSync(path.join(CLAUDE_HOME, memory.slice('.claude/'.length), 'MEMORY.md'), 'utf8')).toBe('note\n')
     expect(fs.existsSync(path.join(SETI_HOME, 'sandbox', 'bwrap-task', 'maintenance', 'run', 'proxy.sock'))).toBe(true)
+  })
+
+  it("runs a Codex agent with Codex's home, its settings and rules locked, and no Claude configuration", async () => {
+    const script = [
+      'echo "codex=${CODEX_HOME:-none} claude=${CLAUDE_CODE_OAUTH_TOKEN:-none} base=${ANTHROPIC_BASE_URL:-none}"',
+      'for f in config.toml .env rules/default.rules; do',
+      '  if echo x >> "$CODEX_HOME/$f" 2>/dev/null; then echo "wrote $f"; else echo "locked $f"; fi',
+      'done',
+      'touch "$CODEX_HOME/sessions-ok" && echo "home writable"',
+      'test -e "$HOME/.claude.json" && echo "claude json" || echo "no claude json"',
+    ].join('\n')
+    const { out } = await inSandbox(script, null, { id: 'bwrap-codex' }, { runtime: 'codex' })
+    await removeTaskSandbox('bwrap-codex')
+    expect(out).toContain(`codex=${path.join(home, '.codex')} claude=none base=none`)
+    expect(out).toContain('locked config.toml')
+    expect(out).toContain('locked .env')
+    expect(out).toContain('locked rules/default.rules')
+    expect(out).toContain('home writable')
+    expect(out).toContain('no claude json')
   })
 
   it('has its own process table', async () => {

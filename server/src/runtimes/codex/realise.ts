@@ -1,4 +1,5 @@
 import type { Launcher } from '../../launcher.js'
+import { MODEL_KEY_ENV } from '../../sandbox-codex.js'
 import type { SessionSpec } from '../../session-spec.js'
 import type { CodexDecide } from './approvals.js'
 import type { CodexRealised } from './session.js'
@@ -10,6 +11,9 @@ export interface CodexProvider {
 }
 
 const PROVIDER = 'seti-openai'
+
+/** OpenAI's API, with the key the egress proxy puts in place of the sandbox's placeholder. */
+const OPENAI: CodexProvider = { baseUrl: 'https://api.openai.com/v1', envKey: MODEL_KEY_ENV }
 
 /** The model a Codex agent uses until it picks one; without a model Codex offers no tools. */
 const DEFAULT_MODEL = 'gpt-5.5'
@@ -38,6 +42,8 @@ function overrides(provider: CodexProvider, model: string): string[] {
     ['features.remote_plugin', false],
     ['features.image_generation', false],
     ['features.skill_mcp_dependency_install', false],
+    ['features.multi_agent', false],
+    ['features.multi_agent_v2', false],
     ['analytics.enabled', false],
     ['web_search', 'disabled'],
   ]
@@ -49,17 +55,21 @@ interface Answering {
   decide: CodexDecide
   abortController: AbortController
   binary: string
-  provider: CodexProvider
+  /** OpenAI's API through the proxy unless a test bench names its own. */
+  provider?: CodexProvider
 }
 
 /** What starts one app-server: the program, where it works and what answers its asks. */
 export function realiseCodex(
   spec: SessionSpec<'codex'>,
   launcher: Launcher,
-  { decide, abortController, binary, provider }: Answering,
+  { decide, abortController, binary, provider = OPENAI }: Answering,
 ): CodexRealised {
   if (!launcher.sandboxed || launcher.spawn === undefined) {
     throw new Error("Codex runs only in Seti's sandbox, started through its launcher")
+  }
+  if (launcher.env[provider.envKey] === undefined) {
+    throw new Error('This Codex agent has no OpenAI key: its credential needs a connection for api.openai.com')
   }
   return {
     command: binary,
