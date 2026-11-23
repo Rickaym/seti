@@ -10,9 +10,10 @@ import {
   type SandboxPolicy,
   type Task,
 } from '@seti/shared'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { tasks } from './db.js'
 import { readTokenFile } from './github-token.js'
+import { adapterFor, DEFAULT_RUNTIME } from './runtimes/registry.js'
 import { builtInHidden, sandboxHooks, secretDenyRules, unsandboxedHookRules, type SandboxContext } from './sandbox.js'
 import { githubTokens } from './secrets.js'
 import './session-ingest.js'
@@ -228,6 +229,16 @@ describe('sessionOptions', () => {
       const task = await newTask(sandbox)
       expect((await options(task)).env?.SETI_TASK_ID).toBe(task.id)
     }
+  })
+
+  it('hands the runtime a launcher that names the task, so no adapter has to', async () => {
+    const realise = vi.spyOn(adapterFor(DEFAULT_RUNTIME), 'realise')
+    for (const sandbox of [true, false]) {
+      const task = await newTask(sandbox)
+      await options(task)
+      expect(realise.mock.lastCall?.[1].env.SETI_TASK_ID).toBe(task.id)
+    }
+    realise.mockRestore()
   })
 
   it("sets a connection's variable to its placeholder, sandboxed or not, never to the key", async () => {
