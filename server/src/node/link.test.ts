@@ -152,7 +152,7 @@ describe('the node over its socket', () => {
 
   it('refuses commands while the node is not connected', async () => {
     const control = controlPlane(path.join(os.tmpdir(), 'seti-no-node', 'node.sock'), new Map(), [])
-    await control.client.start()
+    await control.client.start(0)
     await expect(control.client.command('quiet.restart', { agent: AGENT, at: null })).rejects.toThrow(/not connected/)
   })
 })

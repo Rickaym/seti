@@ -17,6 +17,8 @@ import type { NodeCursor } from './store/node-cursors.js'
 const FIRST_RETRY_MS = 1000
 const LAST_RETRY_MS = 30_000
 const PING_MS = 15_000
+/** How long startup waits for a node that is up to take this control plane. */
+const FIRST_WELCOME_MS = 10_000
 
 /** What the control plane does with what its node sends. */
 export interface NodeClientEnd {
@@ -53,6 +55,10 @@ export class NodeClient {
   private readonly inbox: JournalInbox
   private readonly ledger: AskLedger
   private readonly end: NodeClientEnd
+  private tookUs: () => void = () => undefined
+  private readonly firstWelcome = new Promise<void>((resolve) => {
+    this.tookUs = resolve
+  })
 
   constructor(end: NodeClientEnd) {
     this.end = end
@@ -66,9 +72,11 @@ export class NodeClient {
     this.ledger = new AskLedger(end.answer)
   }
 
-  async start(): Promise<void> {
+  /** Connects, and waits a moment for a node that is up, so the first commands reach it. */
+  async start(waitMs = FIRST_WELCOME_MS): Promise<void> {
     this.inbox.restore(await this.end.cursors.list())
     this.connect()
+    await Promise.race([this.firstWelcome, new Promise((resolve) => setTimeout(resolve, waitMs).unref())])
   }
 
   /** Stops connecting; commands waiting for an answer fail. */
@@ -228,6 +236,7 @@ export class NodeClient {
     this.send({ type: 'welcome', protocol: NODE_PROTOCOL, cursors })
     this.welcomed = true
     this.retryMs = FIRST_RETRY_MS
+    this.tookUs()
     after?.()
   }
 }
