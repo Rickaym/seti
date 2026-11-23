@@ -5,6 +5,7 @@ import { cpuFill, cpuUseLabel, throttleHint } from './cpu-use'
 const SCOPE_LABEL: Record<CpuScope['kind'], string> = {
   agent: 'Agent',
   side_chat: 'Side chat',
+  dream: 'Dream',
   shell: 'Shell command',
   terminal: 'Terminal',
 }

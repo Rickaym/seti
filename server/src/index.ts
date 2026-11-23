@@ -31,6 +31,7 @@ import {
   TASK_RETENTION_DAYS,
 } from './config.js'
 import { openDatabase, sql, tasks } from './db.js'
+import { cutDreamsAtStart } from './dreams/start.js'
 import { followLiveContext } from './ea-context.js'
 import { startInboxSweeper } from './ea-deliver.js'
 import { startEaIndex } from './ea-index.js'
@@ -207,6 +208,7 @@ startRequestExpiry()
 startKnowledgeSweep()
 // A separate node keeps its turns across this restart and reports any it lost as it connects.
 const interrupted = NODE_SPLIT ? { notify: [], resume: [] } : await markRestartCut()
+await cutDreamsAtStart()
 await retireBundledPlugins()
 await syncSharedTools()
 audit.startRetention()

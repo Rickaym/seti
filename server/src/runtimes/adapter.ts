@@ -112,7 +112,7 @@ interface DreamSession {
 }
 
 /** How a runtime runs dreams: where its agents keep memory, and a dream session. */
-interface DreamSupport {
+export interface DreamSupport {
   /** The folder the agent's own sessions keep their memory in, for its working folder. */
   memory: (cwd: string) => string
   /**

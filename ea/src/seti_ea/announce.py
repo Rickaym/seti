@@ -37,6 +37,7 @@ ACTION_LINES = {
     "dismiss_updates": "Very good. Dismissing those.",
     "stop_background_work": "Very good. Stopping its background work.",
     "restart_agent_session": "Very good. Restarting its session.",
+    "dream_agent": "Very good. Starting its dream.",
     "retry_agent_turn": "Certainly. Sending its last message again.",
     "stop_subagent": "Very good. Stopping that subagent.",
     "stop_process": "Very good. Stopping that process.",

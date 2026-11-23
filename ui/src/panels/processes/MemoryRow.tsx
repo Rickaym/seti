@@ -6,6 +6,7 @@ import { bytesLabel } from '@/panels/resources/format'
 const SCOPE_LABEL: Record<MemoryScope['kind'], string> = {
   agent: 'Agent',
   side_chat: 'Side chat',
+  dream: 'Dream',
   shell: 'Shell command',
   terminal: 'Terminal',
 }

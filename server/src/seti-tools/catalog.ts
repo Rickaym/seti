@@ -2,6 +2,7 @@ import { AGENT_SETUP_TOOLS } from './agent-setup.js'
 import { AGENT_TOOLS } from './agents.js'
 import { CHANNEL_TOOLS } from './channels.js'
 import { CONTEXT_TOOLS } from './context.js'
+import { DREAM_TOOLS } from './dreams.js'
 import { HISTORY_TOOLS } from './history.js'
 import { MOD_TOOLS } from './mods.js'
 import { PLATFORM_TOOLS } from './platform.js'
@@ -24,4 +25,5 @@ export const SETI_TOOLS: readonly SetiTool[] = [
   ...CHANNEL_TOOLS,
   ...WORKSPACE_TOOLS,
   ...MOD_TOOLS,
+  ...DREAM_TOOLS,
 ]

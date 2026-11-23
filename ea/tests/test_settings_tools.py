@@ -117,6 +117,7 @@ class SettingsFake(FakeSeti):
         self.unseen: list[dict[str, Any]] = []
         self.clean_plan: dict[str, Any] = dict(CLEAN_PLAN)
         self.revisions: dict[tuple[str, str], list[dict[str, Any]]] = {}
+        self.dreams: list[dict[str, Any]] = []
         self.warm: dict[str, dict[str, Any]] = {}
         self.memory: dict[str, Any] = {
             "cap": MEMORY_DEFAULTS,
@@ -359,6 +360,10 @@ class SettingsFake(FakeSeti):
                 return ok({"settings": self.archive, "preview": {"count": 0, "tasks": []}, "archived": {}})
             case "POST", ["archive", "sweep"]:
                 return ok({"archived": [{"task_id": "t-old", "title": "Old spike"}], "failed": []})
+            case "GET", ["tasks", _, "dreams"]:
+                return ok(self.dreams)
+            case "POST", ["tasks", _, "dream"]:
+                return ok({"id": 1, "state": "running"})
             case "GET", ["revisions", "unseen"]:
                 return ok(self.unseen)
             case "GET", ["revisions"] if "task_id" in params:
@@ -1039,6 +1044,31 @@ async def test_dream_memory_changes_are_listed_reverted_and_marked_seen(
             {"object_type": "memory_file", "object_id": f"{TASK_LOGOUT}:topics/new.md"},
         ),
     ]
+
+
+async def test_dreams_are_read_and_one_started_after_a_yes(tools: EaTools, fake: SettingsFake) -> None:
+    none = await tools.call("dream_agent", {"task": "logout"})
+    assert none.text == "Fix the logout button has not dreamt yet."
+    fake.dreams = [
+        {
+            "night": "2026-11-23",
+            "state": "done",
+            "reason": None,
+            "memory_changes": 2,
+            "cost_usd": 0.24,
+            "report": {"summary": "Merged the deploy notes", "tidied": ["MEMORY.md: one rule"], "asks": []},
+        }
+    ]
+    read = await tools.call("dream_agent", {"task": "logout"})
+    assert read.text.splitlines()[1:] == [
+        "- Night of 2026-11-23: done, 2 memory files changed, $0.24",
+        "  Merged the deploy notes",
+        "  Tidied: MEMORY.md: one rule",
+    ]
+    asked, started = await confirm(tools, "dream_agent", {"task": "logout", "start": True})
+    assert "sandboxed session" in asked.text
+    assert started.ok
+    assert writes(fake)[-1][0:2] == ("POST", f"/api/tasks/{TASK_LOGOUT}/dream")
 
 
 async def test_plugins_are_added_switched_and_removed(tools: EaTools, fake: SettingsFake) -> None:

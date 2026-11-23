@@ -4,6 +4,7 @@ from collections.abc import Awaitable, Callable, Mapping
 from datetime import datetime
 from typing import Any
 
+from seti_ea.dream_tools import DREAM_SPECS, DreamTools
 from seti_ea.format import ago, and_list, clip, plural, repo_name, size_words
 from seti_ea.gate import CONFIRMED, Confirmations, ask, gate_key
 from seti_ea.language import LANGUAGES, MULTI, find_language, language_of
@@ -348,6 +349,7 @@ SETTINGS_SPECS: list[ToolSpec] = [
     *REMINDER_SPECS,
     *WARM_CACHE_SPECS,
     *MEMORY_SPECS,
+    *DREAM_SPECS,
     *MOD_SPECS,
     ToolSpec(
         "get_archive_settings",
@@ -846,6 +848,7 @@ class SettingsTools:
         self.handlers.update(self._reminders.handlers)
         self.handlers.update(WarmCacheTools(seti, confirmations).handlers)
         self.handlers.update(MemoryTools(seti, confirmations, resolve_task).handlers)
+        self.handlers.update(DreamTools(seti, confirmations, resolve_task).handlers)
         self.handlers.update(ModTools(seti, confirmations).handlers)
         self._storage = StorageTools(seti, confirmations, now, resolve_task)
 

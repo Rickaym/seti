@@ -85,6 +85,29 @@ async function scopeFrom(taskId: string, kind: ScopeKind, plan: LaunchPlan): Pro
   return host === null ? null : { host, taskId, kind, cap: plan.memory, cpu: plan.cpu }
 }
 
+/**
+ * Where a maintenance session of the task starts: a sandbox of its own that reads the agent's
+ * folders and writes only its memory folder and `writable`, in a dream scope; null unsandboxed.
+ */
+export async function maintenanceLauncher(
+  task: Task,
+  writable: readonly string[],
+  plan: LaunchPlan,
+): Promise<Launcher | null> {
+  if (plan.sandbox === null) {
+    return null
+  }
+  const scope = await scopeFrom(task.id, 'dream', plan)
+  const maintenance = { writable }
+  const sandbox = await taskSandbox(task, {
+    ctx: sandboxContext(),
+    plan: plan.sandbox,
+    memory: scope?.cap ?? null,
+    maintenance,
+  })
+  return { sandboxed: true, env: sandbox.env, spawn: spawnInSandbox(sandbox, task.id, scope) }
+}
+
 /** The task's sandbox as its plan describes it, or null when it runs unsandboxed. */
 export async function sandboxFrom(task: Task, plan: LaunchPlan): Promise<TaskSandbox | null> {
   if (plan.sandbox === null) {
