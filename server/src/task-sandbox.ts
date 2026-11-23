@@ -16,7 +16,7 @@ import { modelProxyHere, proxyAwsToken, proxyGone, proxyHere, sshAgentHere } fro
 import { awsToken } from './sandbox-aws-token.js'
 import { bwrapArgs } from './sandbox-bwrap.js'
 import { sandboxClaudeJson } from './sandbox-claude-json.js'
-import { CODEX_DIR, EMPTY_DIR, MODEL_KEY_ENV } from './sandbox-codex.js'
+import { CODEX_DIR, codexMountPoints, EMPTY_DIR, MODEL_KEY_ENV } from './sandbox-codex.js'
 import { gitEnv } from './sandbox-git.js'
 import { forgetSandboxSignIns, hostClaudeJson, mcpTokens, proxiedServers, signedInServers } from './sandbox-mcp.js'
 import {
@@ -309,12 +309,12 @@ function prepareClaude(task: Task, plan: SandboxPlan, layout: SandboxLayout): vo
 
 /** Codex's home in the agent's private home, with the places its locked files are mounted on. */
 function prepareCodex(dir: string): void {
-  const home = path.join(dir, 'home', CODEX_DIR)
-  for (const folder of [home, path.join(home, 'rules'), path.join(dir, EMPTY_DIR)]) {
+  const { files, dirs } = codexMountPoints(path.join(dir, 'home'))
+  for (const folder of [path.join(dir, 'home', CODEX_DIR), path.join(dir, EMPTY_DIR), ...dirs]) {
     fs.mkdirSync(folder, { recursive: true, mode: 0o700 })
   }
-  for (const file of ['config.toml', '.env']) {
-    fs.closeSync(fs.openSync(path.join(home, file), 'a', 0o600))
+  for (const file of files) {
+    fs.closeSync(fs.openSync(file, 'a', 0o600))
   }
 }
 

@@ -4,6 +4,7 @@ import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { bwrapArgs } from './sandbox-bwrap.js'
 import { sandboxClaudeJson, sandboxServers } from './sandbox-claude-json.js'
+import { codexLocks } from './sandbox-codex.js'
 import {
   canonicalRoot,
   mountProblem,
@@ -649,5 +650,29 @@ describe("a Codex agent's mounts", () => {
     expect(find(mounts, path.join(codex, 'rules'))).toEqual([
       { kind: 'ro-bind', src: path.join(taskDir, 'empty'), dest: path.join(codex, 'rules') },
     ])
+  })
+
+  it("cover Codex's sign-in, environments, instructions, roles, skills and the shell's startup files", () => {
+    const mounts = sandboxMounts(layout({ codex: true }))
+    const codex = path.join(home, '.codex')
+    const masked = ['auth.json', 'environments.toml', 'AGENTS.md', 'AGENTS.override.md'].map((name) =>
+      path.join(codex, name),
+    )
+    const startup = ['.zshenv', '.zshenv.zwc', '.zprofile', '.zlogin', '.zshrc', '.bash_profile', '.profile', '.bashrc']
+    for (const dest of [...masked, ...startup.map((name) => path.join(home, name))]) {
+      expect(find(mounts, dest)).toEqual([{ kind: 'mask', dest }])
+    }
+    for (const dest of [path.join(codex, 'agents'), path.join(home, '.agents')]) {
+      expect(find(mounts, dest)).toEqual([{ kind: 'ro-bind', src: path.join(taskDir, 'empty'), dest }])
+    }
+  })
+
+  it("cover the machine's own Codex settings only where the machine has them", () => {
+    const hostConfig = make(root, 'etc-codex')
+    const empty = path.join(taskDir, 'empty')
+    expect(find(codexLocks(layout({ codex: true }), hostConfig), hostConfig)).toEqual([
+      { kind: 'ro-bind', src: empty, dest: hostConfig },
+    ])
+    expect(find(codexLocks(layout({ codex: true }), path.join(root, 'none')), path.join(root, 'none'))).toEqual([])
   })
 })

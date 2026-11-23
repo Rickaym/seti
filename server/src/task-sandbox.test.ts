@@ -44,6 +44,18 @@ import { workspaceDir } from './workspace/dir.js'
 
 const SIX_GB = defaultMemoryCap(8192)
 
+/** Files a Codex agent's sandbox keeps from it, as its shell names them. */
+const LOCKED = [
+  ...['config.toml', '.env', 'auth.json', 'environments.toml', 'AGENTS.md', 'AGENTS.override.md'],
+  ...['rules/default.rules', 'agents/reviewer.toml'],
+]
+  .map((name) => `"$CODEX_HOME/${name}"`)
+  .concat(
+    ['.zshenv', '.zshenv.zwc', '.zprofile', '.zlogin', '.bashrc', '.profile', '.agents/SKILL.md'].map(
+      (name) => `"$HOME/${name}"`,
+    ),
+  )
+
 const available = (() => {
   try {
     findBinary('bwrap')
@@ -716,21 +728,22 @@ describe.skipIf(!available)('a real task sandbox', () => {
     expect(fs.existsSync(path.join(SETI_HOME, 'sandbox', 'bwrap-task', 'maintenance', 'run', 'proxy.sock'))).toBe(true)
   })
 
-  it("runs a Codex agent with Codex's home, its settings and rules locked, and no Claude configuration", async () => {
+  it("runs a Codex agent with Codex's home, what changes how it runs locked, and no Claude configuration", async () => {
     const script = [
       'echo "codex=${CODEX_HOME:-none} claude=${CLAUDE_CODE_OAUTH_TOKEN:-none} base=${ANTHROPIC_BASE_URL:-none}"',
-      'for f in config.toml .env rules/default.rules; do',
-      '  if echo x >> "$CODEX_HOME/$f" 2>/dev/null; then echo "wrote $f"; else echo "locked $f"; fi',
+      `for f in ${LOCKED.join(' ')}; do`,
+      '  if echo x >> "$f" 2>/dev/null; then echo "wrote $f"; else echo "locked $f"; fi',
       'done',
+      'echo y > "$CODEX_HOME/new" && mv -f "$CODEX_HOME/new" "$CODEX_HOME/config.toml" 2>/dev/null && echo "replaced"',
+      'rm -f "$HOME/.zshenv" 2>/dev/null && echo "removed"',
       'touch "$CODEX_HOME/sessions-ok" && echo "home writable"',
       'test -e "$HOME/.claude.json" && echo "claude json" || echo "no claude json"',
     ].join('\n')
     const { out } = await inSandbox(script, null, { id: 'bwrap-codex' }, { runtime: 'codex' })
     await removeTaskSandbox('bwrap-codex')
     expect(out).toContain(`codex=${path.join(home, '.codex')} claude=none base=none`)
-    expect(out).toContain('locked config.toml')
-    expect(out).toContain('locked .env')
-    expect(out).toContain('locked rules/default.rules')
+    expect(out).not.toMatch(/wrote|replaced|removed/)
+    expect(out.match(/locked /g)?.length).toBe(LOCKED.length)
     expect(out).toContain('home writable')
     expect(out).toContain('no claude json')
   })
