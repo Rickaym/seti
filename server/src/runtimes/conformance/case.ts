@@ -1,8 +1,12 @@
 import type { EventOf, RuntimeEvent } from '@seti/shared'
 import { expect } from 'vitest'
+import type { RuntimeAdapter, RuntimeShapes } from '../adapter.js'
 import { isTurnEnd, type RunView } from './run.js'
 import type { Subject } from './subject.js'
 import type { Profile } from './target.js'
+
+/** What an adapter's own `Capabilities` declare. */
+type Declared = RuntimeAdapter<RuntimeShapes>['capabilities']
 
 /** One conformance case: what it proves, when it applies, and how it runs against a subject. */
 export interface Case {
@@ -11,7 +15,7 @@ export interface Case {
   /** The protocol requirement or interface member the case proves. */
   proves: string
   /** Why the case does not apply to a runtime with this profile; absent or null when it does. */
-  skip?: (profile: Profile) => string | null
+  skip?: (profile: Profile, declared: Declared) => string | null
   run: (subject: Subject) => Promise<void>
 }
 
