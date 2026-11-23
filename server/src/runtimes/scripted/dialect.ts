@@ -64,6 +64,7 @@ export type ScriptedLine = { [T in keyof Lines]: z.infer<Lines[T]> }[keyof Lines
 export const controlLine = z.discriminatedUnion('t', [
   z.object({ t: z.literal('request'), rid: z.number(), call }),
   z.object({ t: z.literal('withdraw'), rid: z.number() }),
+  z.object({ t: z.literal('inputState'), id: z.string(), state: z.enum(['queued', 'started', 'cancelled']) }),
   z.object({
     t: z.literal('ack'),
     rid: z.number(),

@@ -83,11 +83,14 @@ class Driver {
       this.lines = createInterface({ input: this.child.stdout })
       for await (const line of this.lines) {
         const message = parsed(line)
-        const control = controlLine.safeParse(message)
-        if (control.success) {
-          this.control(control.data)
-        } else {
+        const parsedControl = controlLine.safeParse(message)
+        const control = parsedControl.success ? parsedControl.data : null
+        if (control === null) {
           yield scriptedReport(message)
+        } else if (control.t === 'inputState') {
+          yield { type: 'input', id: control.id, state: control.state }
+        } else {
+          this.control(control)
         }
       }
     }
@@ -129,7 +132,7 @@ class Driver {
     }
   }
 
-  private control(line: ControlLine): void {
+  private control(line: Exclude<ControlLine, { t: 'inputState' }>): void {
     if (line.t === 'ack') {
       const waiting = this.acks.get(line.rid)
       this.acks.delete(line.rid)

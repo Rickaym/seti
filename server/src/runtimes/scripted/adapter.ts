@@ -1,4 +1,5 @@
 import type { RuntimeAdapter } from '../adapter.js'
+import { projectScripted } from './project.js'
 import { scriptedSession, type ScriptedShapes } from './session.js'
 
 /** The scripted runtime's program; only a scripted machine's launcher knows how to start it. */
@@ -15,6 +16,7 @@ export const scriptedAdapter: RuntimeAdapter<ScriptedShapes, 'scripted'> = {
     session: { fork: 'none' },
     rewind: { conversation: false, code: false },
   },
+  project: projectScripted,
   realise: async (spec, launcher, host, abortController) => {
     if (launcher.spawn === undefined) {
       throw new Error('The scripted runtime starts only through a launcher that spawns it')

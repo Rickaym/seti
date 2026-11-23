@@ -2,7 +2,6 @@ import type { ConformanceTarget } from '../conformance/target.js'
 import { scriptedAdapter } from './adapter.js'
 import type { Verdict } from './dialect.js'
 import { scriptedMachine } from './machine.js'
-import { projectScripted } from './project.js'
 import type { ScriptedShapes } from './session.js'
 
 /** The scripted adapter as the suite drives it; it declares everything the suite reads. */
@@ -11,12 +10,11 @@ export const scriptedTarget: ConformanceTarget<ScriptedShapes, 'scripted'> = {
   profile: {
     events: { turnStart: true, reasoning: true, threads: true, plan: true, compaction: true, modelFallback: true },
     usage: { tokens: true, costUsd: 'reported' },
-    input: { steer: 'next_step', retract: true },
+    input: { steer: 'next_step', retract: true, reports: true },
     background: { jobs: true, stop: true, subagents: true },
     gated: { shell: true, edit: true, mcp: true },
     parsesOutput: true,
   },
-  project: projectScripted,
   host: (neutral) => ({
     decide: async (call, signal): Promise<Verdict> => {
       if (call.kind === 'question') {

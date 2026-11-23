@@ -132,6 +132,10 @@ between two steps; an interrupt; a hook at subagent start.
 
 ### 3.5 Runtime
 
+- RT-2: Every runtime MUST offer a resumable session id, an interrupt, and a stream that marks
+  each turn's end and each tool call's start and end. It MUST start through the control room's
+  launcher with no credential but the placeholders the launcher sets, and MUST refuse to start
+  where the launcher cannot start it.
 - RT-6: The transcript stores each runtime message unchanged and serves neutral events computed
   from it. Event types and tool kinds (`shell`, `read`, `edit`, `search`, `web`, `mcp`,
   `subagent`, `question`, `plan`, `think`, `other`) are closed lists. A message with no mapping
@@ -813,6 +817,8 @@ store, the audit chain and every record.
   hands it with no value in it: the caps, and for a sandboxed agent its policy, read-only folders,
   proxy grant, MCP choices, ssh files and switches. A sandbox the control plane builds uses the
   same plan.
+- NODE-14: The node never loads the secret store, so it runs without the store key; every value it
+  uses reaches it as NODE-10 says.
 
 ### 15.2 Dreams
 
@@ -934,7 +940,7 @@ Optional and off by default: a maintenance session per agent that consolidates i
 
 An implementation is SETI-compatible when it meets all of:
 
-1. Agent state and derived status: ENT-1 to ENT-4, ENT-13 to ENT-15, ENT-20 to ENT-22; RT-6.
+1. Agent state and derived status: ENT-1 to ENT-4, ENT-13 to ENT-15, ENT-20 to ENT-22; RT-2, RT-6.
 2. Turn lifecycle: TURN-1 to TURN-8, TURN-11 to TURN-14, TURN-18.
 3. Update delivery: UPD-1 to UPD-8, UPD-11, UPD-13.
 4. Attention: ATT-1 to ATT-11, ATT-14 to ATT-18, ATT-21, ATT-23, ATT-25.

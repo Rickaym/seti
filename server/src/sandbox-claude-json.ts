@@ -1,4 +1,5 @@
 import fs from 'node:fs'
+import { replaceFile } from './mcp-oauth.js'
 
 /** Keys of ~/.claude.json a sandbox gets: onboarding state and the account profile, no keys. */
 const KEPT_KEYS = [
@@ -128,6 +129,5 @@ export function sandboxClaudeJson(
   }
   delete next.primaryApiKey
   delete next.customApiKeyResponses
-  fs.writeFileSync(sandboxFile, `${JSON.stringify(next, null, 2)}\n`, { mode: 0o600 })
-  fs.chmodSync(sandboxFile, 0o600)
+  replaceFile(sandboxFile, `${JSON.stringify(next, null, 2)}\n`, 0o600)
 }

@@ -11,13 +11,14 @@ import { taskPluginConfigs } from './plugins.js'
 import type { RuntimeId } from './runtimes/adapter.js'
 import { DEFAULT_RUNTIME, type DefaultShapes } from './runtimes/registry.js'
 import { signedInServers } from './sandbox-mcp.js'
-import { permissionSettings, sandboxStamp, systemAppend, workingDirs } from './session-options.js'
+import { sandboxStamp } from './sandbox-stamp.js'
+import { permissionSettings, systemAppend, workingDirs } from './session-options.js'
 import { realise } from './session-realise.js'
 import { sharedToolFolders } from './shared-tools.js'
 
 /** What a task's session starts from, read from the database; it holds no secret values. */
-export interface SessionSpec {
-  runtime: RuntimeId
+export interface SessionSpec<Id extends string = RuntimeId> {
+  runtime: Id
   taskId: string
   title: string
   /** The runtime's session to resume, or null for a new one. */

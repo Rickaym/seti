@@ -9,24 +9,42 @@ type Target = typeof scriptedTarget
 
 type Change = (events: RuntimeEvent[]) => RuntimeEvent[]
 
-async function* changed(reports: AsyncIterable<SessionReport>, change: Change): AsyncGenerator<SessionReport> {
-  for await (const report of reports) {
-    yield report.type === 'message' ? { ...report, events: change([...report.events]) } : report
-  }
-}
-
 /** The scripted target with every projection, live and stored, changed the same way. */
 const reprojected = (change: Change): Target => ({
   ...scriptedTarget,
-  project: (message) => change(scriptedTarget.project(message)),
+  adapter: {
+    ...scriptedTarget.adapter,
+    project: (message) => change(scriptedTarget.adapter.project(message)),
+    open: async (realised, input, rewind) => {
+      const session = await scriptedTarget.adapter.open(realised, input, rewind)
+      return {
+        ...session,
+        events: mapped(session.events, (r) => (r.type === 'message' ? { ...r, events: change([...r.events]) } : r)),
+      }
+    },
+  },
+})
+
+/** The scripted target with every report changed the same way. */
+const rereported = (change: (report: SessionReport) => SessionReport): Target => ({
+  ...scriptedTarget,
   adapter: {
     ...scriptedTarget.adapter,
     open: async (realised, input, rewind) => {
       const session = await scriptedTarget.adapter.open(realised, input, rewind)
-      return { ...session, events: changed(session.events, change) }
+      return { ...session, events: mapped(session.events, change) }
     },
   },
 })
+
+async function* mapped(
+  reports: AsyncIterable<SessionReport>,
+  change: (report: SessionReport) => SessionReport,
+): AsyncGenerator<SessionReport> {
+  for await (const report of reports) {
+    yield change(report)
+  }
+}
 
 let calls = 0
 
@@ -54,6 +72,8 @@ const BROKEN: [string, Target][] = [
       ),
     ),
   ],
+  ['RP-1', rereported((r) => (r.type === 'message' ? { ...r, delivered: [] } : r))],
+  ['RP-3', rereported((r) => (r.type === 'input' ? { ...r, state: 'other' } : r))],
   ['SA-1', reprojected((events) => events.map((e) => ({ ...e, thread: '' })))],
   [
     'EV-7',

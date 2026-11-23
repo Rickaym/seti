@@ -169,3 +169,6 @@ export async function writeHostProfile(paths: LoginPaths, account: Json): Promis
 /** A digest of a token, so Seti can tell whose it is without holding it in the clear. */
 export const tokenKey = (value: unknown): string | null =>
   typeof value === 'string' && value !== '' ? createHash('sha256').update(value).digest('hex') : null
+
+/** The scope an OAuth token needs to list and reach claude.ai connectors. */
+export const CONNECTOR_SCOPE = 'user:mcp_servers'
