@@ -5,6 +5,7 @@ import { Hint } from '@/components/Hint'
 import { ToggleButton } from '@/components/ToggleButton'
 import { Button } from '@/components/ui/button'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
+import { DreamProposals } from './DreamProposals'
 import { useDreams, useNightly } from './useDreams'
 
 const CONSEQUENCE = 'text-2xs text-muted-foreground'
@@ -140,6 +141,7 @@ export function DreamActions({ taskId, open }: { taskId: string; open: boolean }
         Tidies its memory in a sandbox; changes nothing else
       </p>
       {latest !== null && <LastDream run={latest} changes={changes} onUndo={undo} />}
+      <DreamProposals taskId={taskId} open={open} latest={`${String(latest?.id)}:${latest?.state ?? ''}`} />
     </div>
   )
 }

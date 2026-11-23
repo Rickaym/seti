@@ -1,5 +1,5 @@
 import { DREAM_MODELS, type DreamModel, type DreamNight, type DreamSettings } from '@seti/shared'
-import { Moon, Save } from 'lucide-react'
+import { Moon, Save, Trash2 } from 'lucide-react'
 import { useEffect, useId, useState, type ReactNode } from 'react'
 import { toast } from 'sonner'
 import { apiGet, apiPut, errorText } from '@/api'
@@ -118,6 +118,20 @@ function DreamingForm({ initial, night }: { initial: DreamSettings; night: Dream
           icon={Moon}
           label="Dreaming"
           hint={saved.enabled ? 'Turn nightly dreams off' : 'Turn nightly dreams on in the window below'}
+        />
+      </SettingRow>
+      <SettingRow
+        label="Clean-ups"
+        stack
+        description="Dreams may propose a leftover to remove; you allow each one, and it waits 14 days in the trash."
+      >
+        <ToggleButton
+          pressed={saved.cleanups}
+          disabled={busy || dirty}
+          onPressedChange={(cleanups) => void put({ cleanups })}
+          icon={Trash2}
+          label="Propose"
+          hint={saved.cleanups ? 'Dreams only report; they propose nothing' : 'Let dreams propose clean-ups for you'}
         />
       </SettingRow>
       <Field label="Window">

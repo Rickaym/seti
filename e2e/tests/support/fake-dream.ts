@@ -5,6 +5,8 @@ import { InProcessClient, type SdkServer } from './fake-mcp.js'
 
 /** The line every fake dream adds to the agent's MEMORY.md. */
 const DREAM_LINE = '- The user wants short replies [user 2026-11-23]'
+/** The leftover a fake dream proposes to trash when clean-ups are on. */
+export const LEFTOVER = 'old-notes.md'
 /** The summary every fake dream reports. */
 export const DREAM_SUMMARY = 'Kept one rule about replies'
 
@@ -15,6 +17,7 @@ interface UserMessage {
 type Hook = (input: object, id: string, options: { signal: AbortSignal }) => Promise<unknown>
 
 interface DreamOptions {
+  cwd?: string
   mcpServers?: Record<string, SdkServer>
   hooks?: { PreToolUse?: { hooks: Hook[] }[] }
 }
@@ -52,8 +55,13 @@ async function* dream(prompt: AsyncIterable<UserMessage>, options: DreamOptions)
       fs.writeFileSync(file, content)
     }
     const server = options.mcpServers?.dream?.instance
-    if (server !== undefined) {
-      await new InProcessClient(server).call('dream_report', {
+    const client = server === undefined ? null : new InProcessClient(server)
+    if (client !== null && textOf(m).includes('dream_propose') && options.cwd !== undefined) {
+      const target = path.join(options.cwd, LEFTOVER)
+      await client.call('dream_propose', { kind: 'trash', target, reason: 'Stale notes' })
+    }
+    if (client !== null) {
+      await client.call('dream_report', {
         summary: DREAM_SUMMARY,
         tidied: ['MEMORY.md: one rule'],
       })

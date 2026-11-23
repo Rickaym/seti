@@ -3,6 +3,7 @@ import { bytesLabel } from '@/panels/resources/format'
 import { OrphansCard } from './OrphansCard'
 import { StorageAgentsCard } from './StorageAgentsCard'
 import { StorageScheduleCard } from './StorageScheduleCard'
+import { TrashCard } from './TrashCard'
 import { SettingsBody, SettingsHeader } from './layout'
 
 /** What each agent's folders take on disk, what Clean can free, and folders no agent owns. */
@@ -45,6 +46,7 @@ export function StoragePage() {
           <StorageScheduleCard schedule={data.schedule} />
           <StorageAgentsCard agents={data.agents} />
           <OrphansCard orphans={data.orphans} />
+          <TrashCard />
         </div>
       )}
     </SettingsBody>
