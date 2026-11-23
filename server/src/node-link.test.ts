@@ -87,6 +87,7 @@ describe('control link', () => {
     const end: NodeEnd = {
       'mode.set': () => ({ applied: 'next_turn' }),
       'policy.set': () => ({}),
+      'proxy.model': () => ({}),
       'queued.retract': ({ promptId }) => ({ outcome: 'removed', promptId }),
       'quiet.restart': () => ({}),
       'sessions.view': () => ({

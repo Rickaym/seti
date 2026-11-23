@@ -12,7 +12,7 @@ import { borrowedServers, ownProjects, readHostConfig } from './mcp-borrowed.js'
 import { launch, type ScopePlan } from './memory-scope.js'
 import { memoryEnv } from './node-heap.js'
 import { sandboxDirOf } from './owned-dirs.js'
-import { proxyAwsToken, proxyGone, proxyHere, sshAgentHere } from './proxy-owner.js'
+import { modelProxyHere, proxyAwsToken, proxyGone, proxyHere, sshAgentHere } from './proxy-owner.js'
 import { awsToken } from './sandbox-aws-token.js'
 import { sandboxClaudeJson } from './sandbox-claude-json.js'
 import { gitEnv } from './sandbox-git.js'
@@ -30,7 +30,14 @@ import {
 import { prepareSandboxSsh } from './sandbox-ssh-files.js'
 import { homeExcluded, type SandboxContext, sandboxHiddenPaths } from './sandbox.js'
 import { SSH_AGENT_SOCKET, stopSshAgent } from './ssh-agent.js'
-import { closeTaskProxy, openTaskSsh, sandboxCaPublic, startProxy } from './task-proxy.js'
+import {
+  closeTaskProxy,
+  maintenanceDirOf,
+  openModelProxy,
+  openTaskSsh,
+  sandboxCaPublic,
+  startProxy,
+} from './task-proxy.js'
 import { toolShellEnv, writeToolShell } from './tool-shell.js'
 import { workspaceDir } from './workspace/dir.js'
 
@@ -206,6 +213,12 @@ export interface SandboxRequest {
   plan: SandboxPlan
   /** The memory cap that holds the task's process trees, when the host enforces one. */
   memory?: MemoryCap | null
+  /**
+   * A maintenance session, such as a dream: its work folders read-only but its memory folder and
+   * these, its own home and /tmp, and egress to the model provider only, with no credential but
+   * the agent's Claude login.
+   */
+  maintenance?: { writable: readonly string[] }
 }
 
 /** The task's ssh files and agent for its usable hosts; none, and no agent, without any. */
@@ -227,6 +240,37 @@ function prepareDirs(dir: string): void {
   writeToolShell(path.join(dir, 'run', path.basename(SANDBOX_TOOL_SHELL)))
 }
 
+interface Reach {
+  ssh: { dir: string; agentDir: string } | null
+  options: SandboxEnvOptions
+}
+
+/** The agent's proxy, ssh and environment as its plan grants them. */
+async function grantedReach(task: Task, request: SandboxRequest, at: { dir: string; home: string; socat: string }) {
+  const { plan } = request
+  await proxyHere(task.id, plan.grant, async () => startProxy(task.id, plan.grant))
+  const ssh = await sandboxSsh(task.id, plan.ssh, at)
+  const options: SandboxEnvOptions = {
+    github: plan.github,
+    connectors: plan.connectors,
+    aws:
+      plan.aws === null
+        ? null
+        : { token: await proxyAwsToken(task.id, () => awsToken(task.id)), region: plan.aws.region },
+    ssh: ssh !== null,
+    memory: request.memory ?? null,
+    connections: connectionEnv(plan.grant.connections),
+  }
+  return { ssh, options }
+}
+
+/** A maintenance session's reach: the model provider through its own proxy, and nothing else. */
+async function modelReach(task: Task, request: SandboxRequest): Promise<Reach> {
+  const { login } = request.plan.grant
+  await modelProxyHere(task.id, login, async () => openModelProxy(task.id, login))
+  return { ssh: null, options: { github: false, connectors: false, memory: request.memory ?? null } }
+}
+
 /**
  * Prepares a task's sandbox: its state directories, filtered Claude Code config and egress
  * proxy. Throws when a sandbox tool is missing or a task directory cannot be mounted.
@@ -238,7 +282,8 @@ export async function taskSandbox(task: Task, request: SandboxRequest): Promise<
   const envBinary = findBinary('env')
   const { ctx, plan } = request
   const { policy, grant } = plan
-  const dir = taskDir(task.id)
+  const maintenance = request.maintenance
+  const dir = maintenance === undefined ? taskDir(task.id) : maintenanceDirOf(task.id)
   const layout: SandboxLayout = {
     home: ctx.home,
     setiHome: SETI_HOME,
@@ -256,7 +301,8 @@ export async function taskSandbox(task: Task, request: SandboxRequest): Promise<
     hidden: sandboxHiddenPaths(policy, ctx),
     excluded: homeExcluded(ctx),
     pathEnv: process.env.PATH ?? '',
-    sessionId: task.session_id,
+    sessionId: maintenance === undefined ? task.session_id : null,
+    ...(maintenance === undefined ? {} : { maintenance }),
   }
   for (const workDir of [layout.cwd, ...layout.dirs]) {
     const problem = mountProblem(workDir, layout)
@@ -279,21 +325,13 @@ export async function taskSandbox(task: Task, request: SandboxRequest): Promise<
     borrowed: borrowedServers(readHostConfig(), ownProjects(task.cwd), (name) => plan.borrowed.includes(name)),
   })
   forgetSandboxSignIns(path.join(dir, 'home', '.claude'), proxiedServers(mcpTokens, denied))
-  await proxyHere(task.id, grant, async () => startProxy(task.id, grant))
+  const reach =
+    maintenance === undefined
+      ? await grantedReach(task, request, { dir, home: ctx.home, socat })
+      : await modelReach(task, request)
   const authority = await sandboxCaPublic()
-  const ssh = await sandboxSsh(task.id, plan.ssh, { dir, home: ctx.home, socat })
-  const ready = { ...layout, caDir: authority.publicDir, systemBundle: authority.systemBundle, ssh }
-  const env = sandboxEnv(process.env, ctx.home, {
-    github: plan.github,
-    connectors: plan.connectors,
-    aws:
-      plan.aws === null
-        ? null
-        : { token: await proxyAwsToken(task.id, () => awsToken(task.id)), region: plan.aws.region },
-    ssh: ssh !== null,
-    memory: request.memory ?? null,
-    connections: connectionEnv(grant.connections),
-  })
+  const ready = { ...layout, caDir: authority.publicDir, systemBundle: authority.systemBundle, ssh: reach.ssh }
+  const env = sandboxEnv(process.env, ctx.home, reach.options)
   const command = (program: string, args: readonly string[], options: SandboxCommandOptions = {}) => {
     const extra = path.isAbsolute(program) ? [program] : []
     const mounts = sandboxMounts({ ...ready, readOnly: [...ready.readOnly, ...extra] })

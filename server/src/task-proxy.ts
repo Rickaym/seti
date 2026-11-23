@@ -1,8 +1,10 @@
+import fs from 'node:fs'
 import path from 'node:path'
 import type { NodeAsk, ProxyGrant } from '@seti/shared'
 import { askInTime } from './ask-in-time.js'
 import { SETI_HOME } from './config.js'
 import { connectionPlaceholders, connectionRules, mcpLoginRules, type ConnectionValue } from './egress-connections.js'
+import { modelOnly } from './egress-hosts.js'
 import type { EgressPlaceholder } from './egress-placeholders.js'
 import { startEgressProxy, type EgressProxy } from './egress-proxy.js'
 import type { EgressRule } from './egress-rules.js'
@@ -128,12 +130,45 @@ export async function openTaskProxy(taskId: string, grant: ProxyGrant): Promise<
   }
 }
 
-/** Stops a deleted task's proxy and ssh agent and forgets what they held. */
+/** Where a maintenance sandbox of the agent keeps its own home, /tmp and proxy socket. */
+export const maintenanceDirOf = (taskId: string) => path.join(sandboxDirOf(taskId), 'maintenance')
+
+const modelProxies = new Map<string, Promise<EgressProxy>>()
+const modelLogins = new Map<string, string | null>()
+
+/**
+ * Opens the proxy of the agent's maintenance sandbox, which reaches the model provider with the
+ * agent's login and nothing else: no allowlist, connection, connector, cloud or ssh.
+ */
+export async function openModelProxy(taskId: string, login: string | null): Promise<void> {
+  modelLogins.set(taskId, login)
+  if (modelProxies.has(taskId)) {
+    return
+  }
+  const run = path.join(maintenanceDirOf(taskId), 'run')
+  fs.mkdirSync(run, { recursive: true, mode: 0o700 })
+  const started = sandboxCa().then(async (authority) =>
+    startEgressProxy({
+      socketPath: path.join(run, 'proxy.sock'),
+      ca: authority,
+      ...modelOnly(async () => mint(taskId, { kind: 'claude', login: modelLogins.get(taskId) ?? null })),
+    }),
+  )
+  modelProxies.set(taskId, started)
+  started.catch(() => modelProxies.delete(taskId))
+  await started
+}
+
+/** Stops a deleted task's proxies and ssh agent and forgets what they held. */
 export async function closeTaskProxy(taskId: string): Promise<void> {
-  const proxy = proxies.get(taskId)
+  const running = [proxies.get(taskId), modelProxies.get(taskId)]
   proxies.delete(taskId)
+  modelProxies.delete(taskId)
+  modelLogins.delete(taskId)
   forgetAwsToken(taskId)
   access.delete(taskId)
-  await proxy?.then(async (running) => running.close()).catch(() => undefined)
+  for (const proxy of running) {
+    await proxy?.then(async (open) => open.close()).catch(() => undefined)
+  }
   await stopSshAgent(taskId)
 }
