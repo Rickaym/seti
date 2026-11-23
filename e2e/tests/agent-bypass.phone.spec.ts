@@ -17,6 +17,7 @@ test('the Bypass switch fits a phone and turns on and off with a tap', async ({ 
   const bypass = panel.getByTestId('bypass')
   await bypass.scrollIntoViewIfNeeded()
   await expect(bypass).toBeInViewport()
+  await expect(bypass).toContainText('Runs tools without asking, except ask rules.')
   await expectFitsPhone(page, 'agent settings with Bypass')
   const toggle = bypass.getByRole('switch', { name: 'Bypass' })
   await expect(toggle).not.toBeChecked()

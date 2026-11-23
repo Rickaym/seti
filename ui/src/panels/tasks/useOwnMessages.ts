@@ -1,4 +1,4 @@
-import type { MessageRow, OwnMessageStep } from '@seti/shared'
+import type { WireRow, OwnMessageStep } from '@seti/shared'
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react'
 import { toast } from 'sonner'
 import { errorText } from '@/api'
@@ -25,7 +25,7 @@ const HIDDEN: OwnNav = { show: false, back: null, forward: null, position: null 
 interface OwnMessagesOptions {
   scroller: RefObject<HTMLElement | null>
   content: RefObject<HTMLElement | null>
-  messages: readonly MessageRow[]
+  messages: readonly WireRow[]
   hasOlder: boolean
   loadingOlder: boolean
   /** Loads `limit` rows before the oldest row, keeping the view still; null when none starts. */

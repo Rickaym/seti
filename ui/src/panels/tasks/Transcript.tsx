@@ -1,9 +1,11 @@
 import {
   eventsOf,
   isAgentOutput,
+  isRuntimeRow,
   rowEvents,
-  type MessageRow,
+  type WireRow,
   type RuntimeEvent,
+  type RuntimeRow,
   type SubtaskBrief,
   type TaskRewind,
 } from '@seti/shared'
@@ -84,7 +86,7 @@ export function AgentText({ text }: { text: string }) {
 
 interface RowProps {
   taskId: string
-  row: MessageRow
+  row: WireRow
   /** Left out: a repeated session start, or the failure the notice under the transcript shows. */
   hidden: boolean
   /** Results of this row's tool calls, in call order. */
@@ -174,7 +176,7 @@ function rowVisible({ row, hidden, orphans, subagentRows }: RowProps): boolean {
   if (hidden) {
     return false
   }
-  if (row.kind !== 'sdk') {
+  if (!isRuntimeRow(row)) {
     return true
   }
   if (!subagentRows && subagentOf(row) !== null) {
@@ -192,8 +194,8 @@ function shown(props: RowProps): boolean {
   }
 }
 
-/** A row that is not an SDK message: a prompt, an update, a notice, an error or a shell run. */
-function PlainRow({ props, row }: { props: RowProps; row: Exclude<MessageRow, { kind: 'sdk' }> }) {
+/** A row that is not the runtime's: a prompt, an update, a notice, an error or a shell run. */
+function PlainRow({ props, row }: { props: RowProps; row: Exclude<WireRow, RuntimeRow> }) {
   switch (row.kind) {
     case 'prompt':
       return <PromptEntry taskId={props.taskId} row={row} voice={props.voice} />
@@ -212,7 +214,7 @@ function PlainRow({ props, row }: { props: RowProps; row: Exclude<MessageRow, { 
 
 function RowBody(props: RowProps) {
   const { row, taskId, orphans } = props
-  if (row.kind !== 'sdk') {
+  if (!isRuntimeRow(row)) {
     return <PlainRow props={props} row={row} />
   }
   assertReadable(row)
@@ -232,7 +234,7 @@ function RowBody(props: RowProps) {
 }
 
 /** The session start a row reports, if it reports one. */
-const startOf = (row: MessageRow) => eventsOf(rowEvents(row), 'session.started')[0]
+const startOf = (row: WireRow) => eventsOf(rowEvents(row), 'session.started')[0]
 
 const sameItems = <T,>(a: readonly T[], b: readonly T[]) =>
   a.length === b.length && a.every((item, index) => item === b[index])
@@ -280,7 +282,7 @@ export const Transcript = memo(function TranscriptList({
   edges = ALL_LOADED,
 }: {
   taskId: string
-  messages: readonly MessageRow[]
+  messages: readonly WireRow[]
   rewinds: readonly TaskRewind[]
   running: boolean
   subtasks: readonly SubtaskBrief[]
@@ -315,7 +317,7 @@ export const Transcript = memo(function TranscriptList({
       ? calls.map((call) => (startsBackground(call) ? index.background.get(call.callId) : undefined))
       : NO_BACKGROUND
 
-  const renderRow = (row: MessageRow) => {
+  const renderRow = (row: WireRow) => {
     const calls = rowCalls(row)
     const results = calls.length === 0 ? NONE : calls.map((call) => index.results.get(call.callId))
     const started = calls.some((call) => isAgentTool(call)) ? calls.map((call) => byCall.get(call.callId)) : NO_SUBTASKS
