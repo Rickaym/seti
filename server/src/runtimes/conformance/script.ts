@@ -42,3 +42,17 @@ export interface Script {
 
 /** The reply of a turn the script has no steps for: its inputs' text, joined by `|`. */
 export const echoOf = (inputs: readonly string[]): string => `heard: ${inputs.join('|')}`
+
+/** A turn that uses most of what a runtime reports: reasoning, text, and calls of several kinds. */
+export const VARIED: Step[] = [
+  { think: 'plan the work' },
+  { say: 'looking around' },
+  { call: { tool: 'sh', args: { cmd: 'ls' }, output: 'README.md' } },
+  { call: { tool: 'cat', args: { path: 'README.md' }, output: '# Readme' } },
+  { call: { tool: 'grep', args: { pattern: 'TODO' }, output: 'none' } },
+  { call: { tool: 'fetch', args: { url: 'https://example.com/' }, output: 'page' } },
+  { call: { tool: 'patch', args: { path: 'README.md', diff: '-a\n+b\n' }, output: 'patched' } },
+  { call: { tool: 'seti.list_agents', args: {}, output: '[]' } },
+  { call: { tool: 'frobnicate', args: { level: 3 }, output: 'frobbed' } },
+  { say: 'all done' },
+]

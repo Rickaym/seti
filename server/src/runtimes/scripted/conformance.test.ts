@@ -5,6 +5,8 @@ import { scriptedTarget } from './target.js'
 describeAdapter(scriptedTarget)
 
 it('runs every case: the scripted adapter declares all the suite reads and has no known gap', () => {
-  expect(CASES.filter((each) => (each.skip?.(scriptedTarget.profile) ?? null) !== null)).toEqual([])
+  expect(
+    CASES.filter((each) => (each.skip?.(scriptedTarget.profile, scriptedTarget.adapter.capabilities) ?? null) !== null),
+  ).toEqual([])
   expect(scriptedTarget.gaps).toBeUndefined()
 })
