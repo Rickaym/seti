@@ -100,6 +100,7 @@ test('the sidebar is a drawer that closes on a section change', async ({ page })
     'Requests',
     'Context',
     'Settings',
+    'Dreams',
   ])
   await drawer(page).getByRole('button', { name: 'Close' }).tap()
   await openSection(page, 'Context')
