@@ -25,7 +25,7 @@ test('a turn a restart cuts off resumes by itself, marked in the transcript', as
 })
 
 test('a question survives a restart, and its answer resumes the agent', async ({ page, request, setiServer }) => {
-  test.skip(SPLIT_NODE, 'a separate node keeps the asking turn and asks the restarted server again')
+  test.skip(SPLIT_NODE, 'a separate node keeps the asking turn; the split spec below checks it')
   const asker = await askingAgent(request, 'Asker', PUSH_PROMPT)
   await setiServer.restart()
 
@@ -68,4 +68,27 @@ test('a restart keeps a running turn going when agents run in a separate node', 
   expect(messages.filter((row) => row.kind === 'prompt')).toHaveLength(1)
   expect(messages.filter((row) => row.kind === 'sdk' && row.payload.type === 'assistant')).toHaveLength(1)
   expect(JSON.stringify(messages)).not.toContain(RESUMED_NOTE)
+})
+
+test('a question asked before a restart stays one request when agents run in a separate node', async ({
+  page,
+  request,
+  setiServer,
+}) => {
+  test.skip(!SPLIT_NODE, 'only a separate node keeps the asking turn across a restart')
+  const asker = await askingAgent(request, 'Asker', PUSH_PROMPT)
+  await setiServer.restart()
+
+  expect((await apiData<Task>(request, `/tasks/${asker.id}`)).status).toBe('running')
+  await page.goto('/#requests')
+  await expect(agentQuestions(page, asker).getByRole('radiogroup')).toHaveCount(1)
+  await agentQuestions(page, asker).getByRole('radio', { name: 'Yes' }).click()
+  await page.getByRole('button', { name: 'Submit all' }).click()
+
+  await expect.poll(async () => (await apiData<Task>(request, `/tasks/${asker.id}`)).status).toBe('idle')
+  expect(await lastReply(request, asker.id)).toBe(`Got your answers. ${PUSH_QUESTION} Yes`)
+  const { messages } = await apiData<MessagePage>(request, `/tasks/${asker.id}/messages?limit=50`)
+  expect(messages.filter((row) => row.kind === 'prompt')).toHaveLength(1)
+  expect(JSON.stringify(messages).split('Got your answers')).toHaveLength(2)
+  expect(JSON.stringify(messages)).not.toContain('Seti restarted while you waited')
 })
