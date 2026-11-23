@@ -75,6 +75,7 @@ export async function connectNode(): Promise<void> {
     check: (socket) => {
       checkNodeSocket(socket, uid)
     },
+    local: true,
     journal: nodeLink.journal,
     answer: nodeLink.answer,
     cursors: nodeCursors,
@@ -96,6 +97,12 @@ export async function connectNode(): Promise<void> {
       })
     },
     awsToken: async (agent) => (await controlLink.command('aws.token', { agent })).token,
+    sshOpen: async (agent) => {
+      await controlLink.command('ssh.open', { agent })
+    },
+    sshReload: async () => {
+      await controlLink.command('ssh.reload', {})
+    },
   })
   reachNode({
     command: async (type, body) => client.command(type, body),

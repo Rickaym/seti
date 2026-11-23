@@ -20,6 +20,8 @@ function controlEnd(answer: ControlEnd['answer']['prompt.open']) {
     'sandbox.hosts': none,
     'secret.mint': none,
     'aws.credentials': none,
+    'connection.value': none,
+    'ssh.keys': none,
     'tools.list': none,
     'tool.call': none,
   }
@@ -101,6 +103,8 @@ describe('control link', () => {
       'proxy.open': () => ({}),
       'proxy.close': () => ({}),
       'aws.token': () => ({ token: 'token' }),
+      'ssh.open': () => ({}),
+      'ssh.reload': () => ({}),
       'scopes.cap': () => ({}),
     }
     serveControl(end)

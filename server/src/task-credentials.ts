@@ -9,9 +9,13 @@ const HTTPS_PORT = 443
 
 /**
  * The host's MCP sign-ins as rules: one per host and port, putting the OAuth token of the server
- * a request goes to on it, unless the task turned that server off.
+ * a request goes to on it, unless the task turned that server off. `token` reads it per request.
  */
-export function mcpLoginRules(denied: ReadonlySet<string>, tokens = mcpTokens): EgressRule[] {
+export function mcpLoginRules(
+  denied: ReadonlySet<string>,
+  token: (url: URL) => Promise<string | null>,
+  tokens = mcpTokens,
+): EgressRule[] {
   const targets = new Map<string, { host: string; port: number }>()
   for (const login of tokens.logins()) {
     if (login.url.protocol !== 'https:' || denied.has(login.name)) {
@@ -25,8 +29,8 @@ export function mcpLoginRules(denied: ReadonlySet<string>, tokens = mcpTokens): 
     port,
     header: 'authorization',
     value: async (url) => {
-      const token = await tokens.tokenFor(url, (login) => !denied.has(login.name))
-      return token === null ? null : `Bearer ${token}`
+      const found = await token(url)
+      return found === null ? null : `Bearer ${found}`
     },
   }))
 }

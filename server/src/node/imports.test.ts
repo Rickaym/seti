@@ -30,7 +30,6 @@ const STILL_REACHING: Readonly<Record<string, readonly string[]>> = {
   'claude-logins.ts': ['audit.ts', 'db.ts', 'store/claude-logins.ts'],
   'compact.ts': ['audit.ts', 'store/compact.ts'],
   'connection-egress.ts': ['audit.ts', 'db.ts', 'store/connections.ts', 'store/sandbox.ts'],
-  'connection-values.ts': ['store/connections.ts'],
   'context-changes.ts': ['audit.ts', 'store/context.ts'],
   'context-files.ts': ['db.ts'],
   'cpu-cap.ts': ['audit.ts', 'store/cpu.ts'],

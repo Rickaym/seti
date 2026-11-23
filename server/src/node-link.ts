@@ -5,6 +5,7 @@ import {
   NODE_ASKS,
   NODE_COMMANDS,
   type JournalEntry,
+  VALUE_ASKS,
   type NodeAnswer,
   type NodeAsk,
   type NodeAskType,
@@ -54,9 +55,23 @@ function controlEnd(): ControlEnd {
   return control
 }
 
+/** Runs one side of an ask; an ask that carries values fails without saying what went wrong. */
+async function valueSafe<T>(type: NodeAskType, run: () => Promise<T>): Promise<T> {
+  if (!VALUE_ASKS.has(type)) {
+    return run()
+  }
+  try {
+    return await run()
+  } catch {
+    throw new Error(`The control plane could not answer ${type}`)
+  }
+}
+
 async function answerHere<K extends NodeAskType>(taskId: string, type: K, ask: unknown, signal: AbortSignal) {
   const schemas = NODE_ASKS[type]
-  return schemas.answer.parse(await controlEnd().answer[type](taskId, schemas.ask.parse(ask), signal))
+  return valueSafe(type, async () =>
+    schemas.answer.parse(await controlEnd().answer[type](taskId, schemas.ask.parse(ask), signal)),
+  )
 }
 
 /**
@@ -80,7 +95,10 @@ export const nodeLink = {
     if (remoteControl === null) {
       return answerHere(taskId, type, ask, signal)
     }
-    return schemas.answer.parse(await remoteControl.ask(taskId, type, schemas.ask.parse(ask), signal))
+    const remote = remoteControl
+    return valueSafe(type, async () =>
+      schemas.answer.parse(await remote.ask(taskId, type, schemas.ask.parse(ask), signal)),
+    )
   },
   /**
    * Answers an ask a node sent over the socket, checking it as an ask made here. A request the

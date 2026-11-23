@@ -14,7 +14,8 @@ import {
   stopSessionTask,
   stopTurn,
 } from './session-host.js'
-import { closeTaskProxy, openTaskProxy } from './task-proxy.js'
+import { reloadSshAgents } from './ssh-agent.js'
+import { closeTaskProxy, openTaskProxy, openTaskSsh } from './task-proxy.js'
 
 const sessionOf = (agent: string): LiveSession | undefined => liveSessions().find(([id]) => id === agent)?.[1]
 
@@ -104,6 +105,14 @@ serveControl({
   'aws.token': ({ agent }) => ({ token: awsToken(agent) }),
   'proxy.close': async ({ agent }) => {
     await closeTaskProxy(agent)
+    return {}
+  },
+  'ssh.open': async ({ agent }) => {
+    await openTaskSsh(agent)
+    return {}
+  },
+  'ssh.reload': async () => {
+    await reloadSshAgents()
     return {}
   },
   'scopes.agents': () => ({ agents: [...new Set(liveScopes().map((scope) => scope.plan.taskId))] }),

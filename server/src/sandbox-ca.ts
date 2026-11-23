@@ -129,8 +129,14 @@ function replaceFile(file: string, text: string): void {
   fs.renameSync(next, file)
 }
 
+/** Where a sandbox finds the CA files, without writing them: the process that runs proxies does. */
+export const sandboxCaFiles = (root: string): Pick<SandboxCa, 'publicDir' | 'systemBundle'> => ({
+  publicDir: path.join(root, 'public'),
+  systemBundle: SYSTEM_BUNDLES.find((file) => fs.existsSync(file)) ?? null,
+})
+
 function writePublic(root: string, authorities: readonly Authority[], systemBundle: string | null): string {
-  const publicDir = path.join(root, 'public')
+  const publicDir = sandboxCaFiles(root).publicDir
   fs.mkdirSync(publicDir, { recursive: true, mode: 0o755 })
   const certs = authorities.map((ca) => fs.readFileSync(path.join(ca.dir, 'ca.pem'), 'utf8').trimEnd()).join('\n')
   const system = systemBundle === null ? '' : fs.readFileSync(systemBundle, 'utf8')
@@ -157,7 +163,7 @@ export async function loadSandboxCa(root: string): Promise<SandboxCa> {
   }
   const key = fs.readFileSync(leafKey)
   const authorities: Authority[] = [{ dir: root, permitted: PERMITTED_DOMAINS }, ...readExtras(root)]
-  const systemBundle = SYSTEM_BUNDLES.find((file) => fs.existsSync(file)) ?? null
+  const { systemBundle } = sandboxCaFiles(root)
   const publicDir = writePublic(root, authorities, systemBundle)
   const contexts = new Map<string, Promise<tls.SecureContext>>()
   let adding: Promise<boolean> = Promise.resolve(false)

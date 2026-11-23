@@ -2,9 +2,11 @@ import fs from 'node:fs'
 import type http from 'node:http'
 import os from 'node:os'
 import path from 'node:path'
-import type { HelloFrame, JournalEntry, NodeCommandType } from '@seti/shared'
+import { NODE_ASKS, type HelloFrame, type JournalEntry, type NodeCommandType } from '@seti/shared'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { WebSocket } from 'ws'
 import { NodeClient, type NodeClientEnd } from '../node-client.js'
+import { nodeLink, reachControl, serveNode, type ControlEnd } from '../node-link.js'
 import type { NodeCursor } from '../store/node-cursors.js'
 import { NodeService, type NodeSessions } from './service.js'
 import { checkNodeSocket, listenNode } from './socket.js'
@@ -61,6 +63,7 @@ function controlPlane(
     check: (at) => {
       checkNodeSocket(at, uid)
     },
+    local: true,
     journal: async (agent, entry) => {
       applied.push(`${agent}:${entry.type === 'note' ? entry.error : entry.type}`)
       return Promise.resolve()
@@ -238,5 +241,63 @@ describe('the node over its socket', () => {
     const control = controlPlane(path.join(os.tmpdir(), 'seti-no-node', 'node.sock'), new Map(), [])
     await control.client.start(0)
     await expect(control.client.command('quiet.restart', { agent: AGENT, at: null })).rejects.toThrow(/not connected/)
+  })
+
+  it("hands values only over this machine's owner-only socket", async () => {
+    const node = await startNode()
+    const answer = vi.fn(async () => Promise.resolve({ token: 'minted' }))
+    const control = controlPlane(node.socket, new Map(), [], { answer, local: false })
+    await control.client.start()
+    await welcomed(control.client)
+    const ask = async (type: 'secret.mint' | 'session.opening') =>
+      node.service.control.ask(
+        AGENT,
+        type,
+        type === 'secret.mint' ? { kind: 'connector' } : {},
+        new AbortController().signal,
+      )
+    await expect(ask('secret.mint')).rejects.toThrow(/cross only to a node on this machine/)
+    expect(answer).not.toHaveBeenCalled()
+    await expect(ask('session.opening')).resolves.toEqual({ token: 'minted' })
+  })
+
+  it('never names a value in an error or a log on either end', async () => {
+    const value = ['value', 'that', 'never', 'shows'].join('-')
+    const fail = async () => Promise.reject(new Error(`failed with ${value}`))
+    const answers = Object.fromEntries(
+      Object.keys(NODE_ASKS).map((type) => [type, fail]),
+    ) as unknown as ControlEnd['answer']
+    serveNode({
+      journal: async () => Promise.resolve(),
+      answer: {
+        ...answers,
+        'connection.value': async () => Promise.resolve({ value: { wrapped: value } as unknown as string }),
+        'ssh.keys': async () => Promise.resolve({ keys: [value] }),
+      },
+    })
+    const logged = vi.spyOn(process.stderr, 'write')
+    const node = await startNode()
+    reachControl(node.service.control)
+    const control = controlPlane(node.socket, new Map(), [], { answer: nodeLink.answer })
+    await control.client.start()
+    await welcomed(control.client)
+    const failures = await Promise.all([
+      nodeLink.ask(AGENT, 'secret.mint', { kind: 'connector' }).catch((e: unknown) => e),
+      nodeLink.ask(AGENT, 'connection.value', { connection: 'c', refused: value }).catch((e: unknown) => e),
+    ])
+    expect(failures.map(String)).toEqual([
+      'Error: The control plane could not answer secret.mint',
+      'Error: The control plane could not answer connection.value',
+    ])
+    await expect(nodeLink.ask(AGENT, 'ssh.keys', {})).resolves.toEqual({ keys: [value] })
+    const raw = new WebSocket(`ws+unix://${node.socket}:/`)
+    await new Promise((resolve) => raw.once('open', resolve))
+    raw.send(JSON.stringify({ type: 'ask.answer', id: 'not-an-id', answer: { token: value } }))
+    raw.close()
+    await vi.waitFor(() => {
+      expect(logged.mock.calls.flat().join('')).toContain('does not fit the protocol')
+    })
+    expect(logged.mock.calls.flat().join('')).not.toContain(value)
+    logged.mockRestore()
   })
 })

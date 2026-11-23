@@ -783,8 +783,17 @@ store, the audit chain and every record.
   carrying a connection's placeholder toward a host the connection does not allow, reach the
   control plane as journal entries, which it audits once.
 - NODE-10: The node's egress proxy asks the control plane for each Claude, GitHub, claude.ai
-  connector and AWS credential it puts on a request, and keeps none. A sandbox the control plane
-  builds gets the AWS token of the node's proxy.
+  connector, MCP sign-in, connection and AWS value it puts on a request, and the node's ssh agents
+  ask for their keys on each load; the node keeps none between requests. A changed or removed
+  connection therefore applies to the next request, with no delay, and a changed ssh key or host
+  reloads the node's ssh agents. A sandbox the control plane builds gets the AWS token of the
+  node's proxy.
+- NODE-11: Values cross only to a node on the same machine, over the owner-only socket of NODE-1;
+  the control plane refuses every ask that carries values on any other link, so a node on another
+  machine needs a sealed path. No error, log or frame dump names a value.
+- NODE-12: The node owns each agent's ssh agent and the sandbox CA files as it owns the proxy: a
+  sandbox the control plane builds has the node start the ssh agent, and only the node loads and
+  writes the CA.
 
 ## 16. Audit
 

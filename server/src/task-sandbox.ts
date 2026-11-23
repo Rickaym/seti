@@ -15,7 +15,7 @@ import { taskBorrowedServers } from './mcp-borrowed.js'
 import { launch, type ScopePlan } from './memory-scope.js'
 import { memoryEnv } from './node-heap.js'
 import { sandboxDirOf } from './owned-dirs.js'
-import { proxyAwsToken, proxyGone, proxyHere } from './proxy-owner.js'
+import { proxyAwsToken, proxyGone, proxyHere, sshAgentHere } from './proxy-owner.js'
 import { awsToken } from './sandbox-aws-token.js'
 import { sandboxClaudeJson } from './sandbox-claude-json.js'
 import { gitEnv } from './sandbox-git.js'
@@ -32,8 +32,8 @@ import {
 } from './sandbox-mounts.js'
 import { homeExcluded, type SandboxContext, sandboxHiddenPaths } from './sandbox.js'
 import { SSH_AGENT_SOCKET, stopSshAgent } from './ssh-agent.js'
-import { hostKeys, prepareSandboxSsh } from './ssh-files.js'
-import { grantAccess, profileAws, sandboxCa, startProxy, closeTaskProxy } from './task-proxy.js'
+import { prepareSandboxSsh } from './ssh-files.js'
+import { closeTaskProxy, grantAccess, openTaskSsh, profileAws, sandboxCaPublic, startProxy } from './task-proxy.js'
 import { toolShellEnv, writeToolShell } from './tool-shell.js'
 import { workspaceDir } from './workspace/dir.js'
 
@@ -169,7 +169,6 @@ export const sandboxTmpDir = (taskId: string) => path.join(taskDir(taskId), 'tmp
 /** Stops a deleted task's proxy and removes its sandbox state. */
 export async function removeTaskSandbox(taskId: string): Promise<void> {
   await proxyGone(taskId, async () => closeTaskProxy(taskId))
-  await stopSshAgent(taskId)
   fs.rmSync(taskDir(taskId), { recursive: true, force: true })
 }
 
@@ -220,8 +219,9 @@ async function sandboxSsh(taskId: string, dir: string, home: string, socat: stri
     await stopSshAgent(taskId)
     return null
   }
-  const keys = async () => hostKeys((await taskSsh(taskId)).hosts)
-  return prepareSandboxSsh({ taskId, taskDir: dir, home, proxy: { socat, port: PROXY_PORT }, reach, keys })
+  const ssh = await prepareSandboxSsh({ taskDir: dir, home, proxy: { socat, port: PROXY_PORT }, reach })
+  await sshAgentHere(taskId, async () => openTaskSsh(taskId))
+  return ssh
 }
 
 function prepareDirs(dir: string): void {
@@ -281,7 +281,7 @@ export async function taskSandbox(task: Task, request: SandboxRequest): Promise<
   })
   forgetSandboxSignIns(path.join(dir, 'home', '.claude'), proxiedServers(mcpTokens, denied))
   await proxyHere(task, async () => startProxy(task, ruleCaHosts([...rules, ...connections])))
-  const authority = await sandboxCa()
+  const authority = await sandboxCaPublic()
   const ssh = await sandboxSsh(task.id, dir, ctx.home, socat)
   const ready = { ...layout, caDir: authority.publicDir, systemBundle: authority.systemBundle, ssh }
   const env = sandboxEnv(process.env, ctx.home, {
