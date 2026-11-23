@@ -107,7 +107,7 @@ export async function restoreFromTrash(id: number): Promise<TrashItem> {
 }
 
 /** Removes trash items for good: those past `trash_keep`, or every one when `all`. */
-export async function purgeTrash(all: boolean): Promise<{ count: number; bytes: number }> {
+async function purgeTrash(all: boolean): Promise<{ count: number; bytes: number }> {
   let count = 0
   let bytes = 0
   for (const row of await trashItems.due(all ? null : new Date().toISOString())) {

@@ -147,6 +147,12 @@ describe('clean-up proposals', () => {
     expect((await send('POST', `/trash/${String(item?.id)}/restore`, undefined, EA_AUTH)).status).toBe(200)
     expect(fs.readFileSync(notes, 'utf8')).toBe('stale\n')
     expect((await send('DELETE', '/trash', undefined, EA_AUTH)).status).toBe(403)
-    expect((await send<{ count: number }>('DELETE', '/trash')).data).toMatchObject({ count: 0 })
+    const modules = path.join(repo, 'node_modules')
+    expect(await fileProposal(task, run, { kind: 'trash', target: modules, reason: 'rebuildable' })).toMatch(/^Filed/)
+    const [rebuildable] = (await send<DreamProposal[]>('GET', `/dreams/proposals?task=${task.id}`)).data ?? []
+    await send('POST', `/dreams/proposals/${String(rebuildable?.id)}`, { decision: 'allow' })
+    expect(fs.existsSync(modules)).toBe(false)
+    expect((await send<{ count: number }>('DELETE', '/trash')).data).toMatchObject({ count: 1 })
+    expect(fs.readdirSync(path.join(process.env.SETI_HOME ?? '', 'trash'))).toEqual([])
   })
 })
