@@ -1,5 +1,4 @@
 import { createHash } from 'node:crypto'
-import type { SDKMessage } from '@anthropic-ai/claude-agent-sdk'
 import {
   findPrUrls,
   type EaDocKind,
@@ -9,6 +8,7 @@ import {
   type Task,
   type TaskInput,
 } from '@seti/shared'
+import { rowEvents, type Of } from './events/read.js'
 import type { OpenPr } from './github.js'
 import { redactCredentials } from './scrub.js'
 import type { IndexDoc } from './store/ea-index.js'
@@ -85,64 +85,30 @@ function docsOf(source: Source, text: string): IndexDoc[] {
   }))
 }
 
-interface ContentBlock {
-  type: string
-  text?: string
-  tool_use_id?: string
-  content?: unknown
-}
-
-/** Claude Code ends a subagent's report with its id and usage; neither is worth searching. */
-function withoutTrailer(text: string): string {
-  const usage = text.indexOf('<usage>')
-  const body = usage === -1 ? text : text.slice(0, usage)
-  return body
-    .split('\n')
-    .filter((line) => !line.startsWith('agentId: '))
-    .join('\n')
-}
-
-function blockText(content: unknown): string {
-  if (typeof content === 'string') {
-    return content
-  }
-  if (!Array.isArray(content)) {
-    return ''
-  }
-  const parts = (content as ContentBlock[]).map((part) =>
-    part.type === 'text' && typeof part.text === 'string' ? part.text : '',
-  )
-  return withoutTrailer(parts.join('\n'))
-}
-
 const long = (text: string, min: number) => text.trim().length >= min
 
 type Subagents = ReadonlyMap<string, string>
 
-function reportDocs(task: TaskRef, row: MessageRow, blocks: readonly ContentBlock[], subagents: Subagents) {
-  return blocks.flatMap((block, index) => {
-    const about = block.type === 'tool_result' ? subagents.get(block.tool_use_id ?? '') : undefined
-    const report = about === undefined ? '' : blockText(block.content)
+/** A subagent's report, without the id and usage lines the runtime adds; worth no search. */
+const reportOf = (end: Of<'tool.ended'>) => end.result.agent?.text ?? end.result.text
+
+/** The agent's own words, the turn's reply, and the reports its subagents gave it, by part. */
+function eventDocs(task: TaskRef, row: MessageRow, subagents: Subagents): IndexDoc[] {
+  return rowEvents(row).flatMap((event, index): IndexDoc[] => {
+    if (event.thread !== '') {
+      return []
+    }
+    if (event.type === 'message' && event.role === 'agent' && long(event.text, MIN_AGENT_CHARS)) {
+      return docsOf({ task, row, part: String(index), kind: 'agent' }, event.text)
+    }
+    if (event.type === 'turn.ended' && long(event.result, MIN_AGENT_CHARS)) {
+      return docsOf({ task, row, part: 'result', kind: 'result' }, event.result)
+    }
+    const about = event.type === 'tool.ended' ? subagents.get(event.callId) : undefined
+    const report = event.type === 'tool.ended' && about !== undefined ? reportOf(event) : ''
     const source: Source = { task, row, part: String(index), kind: 'subagent' }
     return long(report, MIN_AGENT_CHARS) ? docsOf(source, `Subagent report, ${about ?? ''}:\n\n${report}`) : []
   })
-}
-
-function sdkDocs(task: TaskRef, row: MessageRow, m: SDKMessage, subagents: Subagents): IndexDoc[] {
-  if (m.type === 'assistant' && m.parent_tool_use_id === null) {
-    return m.message.content.flatMap((block, index) =>
-      block.type === 'text' && long(block.text, MIN_AGENT_CHARS)
-        ? docsOf({ task, row, part: String(index), kind: 'agent' }, block.text)
-        : [],
-    )
-  }
-  if (m.type === 'result' && m.subtype === 'success' && long(m.result, MIN_AGENT_CHARS)) {
-    return docsOf({ task, row, part: 'result', kind: 'result' }, m.result)
-  }
-  if (m.type !== 'user' || m.parent_tool_use_id !== null || typeof m.message.content === 'string') {
-    return []
-  }
-  return reportDocs(task, row, m.message.content, subagents)
 }
 
 function promptDocs(task: TaskRef, row: MessageRow, prompt: PromptPayload): IndexDoc[] {
@@ -168,7 +134,7 @@ export function taskDocs(task: TaskRef, rows: readonly MessageRow[], subagents: 
       case 'prompt':
         return promptDocs(task, row, row.payload)
       case 'sdk':
-        return sdkDocs(task, row, row.payload, subagents)
+        return eventDocs(task, row, subagents)
       case 'input':
         return inputDocs(task, row, row.payload)
       case 'seti':

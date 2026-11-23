@@ -13,6 +13,8 @@ import {
   portBusy,
   redact,
   runQuiet,
+  shadowCheck,
+  shadowSince,
   within,
   type Check,
 } from './doctor.js'
@@ -149,7 +151,8 @@ export async function databaseChecks(): Promise<{ checks: Check[]; claudeToken: 
       major >= PG_TESTED
         ? check(s, 'ok', `PostgreSQL ${String(major)} at ${redact(DATABASE_URL)}`)
         : check(s, 'warn', `PostgreSQL ${String(major)} is older than the tested ${String(PG_TESTED)}`)
-    const checks = [version, ...(await schemaChecks(pool, major))]
+    const shadow = await within(DB_TIMEOUT_MS, doctorProbes.policyShadow(pool, shadowSince()))
+    const checks = [version, ...(await schemaChecks(pool, major)), shadowCheck(shadow)]
     const claudeToken = await within(DB_TIMEOUT_MS, doctorProbes.hasSecret(pool, 'claude_oauth_token'))
     return { checks, claudeToken }
   } catch (e) {

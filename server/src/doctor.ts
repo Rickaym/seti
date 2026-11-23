@@ -195,3 +195,26 @@ export async function within<T>(ms: number, work: Promise<T>): Promise<T> {
     clearTimeout(timer)
   }
 }
+
+const SHADOW_DAYS = 7
+
+/** The first day the permission shadow line counts, as `YYYY-MM-DD`. */
+export const shadowSince = (now = new Date()): string =>
+  new Date(now.getTime() - (SHADOW_DAYS - 1) * 86_400_000).toISOString().slice(0, 10)
+
+/** How Seti's own permission decisions compared with Claude Code's over the last week. */
+export function shadowCheck(counts: Readonly<Record<string, number>>): Check {
+  const of = (result: string) => counts[result] ?? 0
+  const compared = ['agree', 'deferred', 'tighter', 'looser'].reduce((sum, result) => sum + of(result), 0)
+  const days = `last ${String(SHADOW_DAYS)} days`
+  const trouble = ['failed', 'slow'].filter((what) => of(what) > 0).map((what) => `${String(of(what))} ${what}`)
+  const state = trouble.length > 0 ? 'warn' : 'info'
+  const tail = trouble.length > 0 ? `; ${trouble.join(', ')}` : ''
+  if (compared === 0) {
+    return { section: 'Permissions', state, label: `no tool calls compared with Claude Code in the ${days}${tail}` }
+  }
+  const matched = `Seti's own decision matched Claude Code on ${String(of('agree'))} of ${String(compared)} calls`
+  const differed = `${String(of('deferred'))} left to its classifier, ${String(of('tighter'))} stricter`
+  const label = `${days}: ${matched}; ${differed}, ${String(of('looser'))} looser${tail}`
+  return { section: 'Permissions', state, label }
+}

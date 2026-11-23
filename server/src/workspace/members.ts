@@ -1,5 +1,6 @@
 import { roleLabel, type MessageRow, type TeamMember } from '@seti/shared'
 import { messages } from '../db.js'
+import { agentTexts, rowEvents } from '../events/read.js'
 import { packForDisplay } from '../seti-guide.js'
 import { rolePacksByTask } from '../store/context.js'
 import { teamRoster } from '../team.js'
@@ -28,9 +29,10 @@ const clip = (text: string) => (text.length <= LINE_CHARS ? text : `${text.slice
 /** The first line of the agent's latest words, as a hint of what the task is doing. */
 export function latestLine(rows: readonly MessageRow[]): string | null {
   for (const row of rows.toReversed()) {
-    if (row.kind === 'sdk' && row.payload.type === 'assistant' && row.payload.parent_tool_use_id === null) {
-      const text = row.payload.message.content.flatMap((block) => (block.type === 'text' ? [block.text] : [])).join(' ')
-      const line = text
+    const texts = agentTexts(rowEvents(row))
+    if (texts.length > 0) {
+      const line = texts
+        .join(' ')
         .split('\n')
         .map((part) => part.trim())
         .find((part) => part !== '')
