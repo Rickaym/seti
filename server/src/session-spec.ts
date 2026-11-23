@@ -13,7 +13,7 @@ import type { RuntimeId } from './runtimes/adapter.js'
 import { claudeSetup } from './runtimes/claude/realise.js'
 import { adapterFor, DEFAULT_RUNTIME, type DefaultShapes } from './runtimes/registry.js'
 import { signedInServers } from './sandbox-mcp.js'
-import { permissionSettings, sandboxStamp, systemAppend, workingDirs } from './session-options.js'
+import { permissionSettings, sandboxStamp, systemAppend, TASK_ID_ENV, workingDirs } from './session-options.js'
 import { sharedToolFolders } from './shared-tools.js'
 
 /** What a task's session starts from, read from the database; it holds no secret values. */
@@ -101,9 +101,13 @@ function specKey(spec: SessionSpec): string {
 /** Compares the setup a process started with to what the task needs now. */
 export const setupKey = async (task: Task) => specKey(await sessionSpec(task))
 
-/** The options a process of the task starts with from the spec it is handed. */
+/**
+ * The options a process of the task starts with from the spec it is handed. The launcher names
+ * the task in the environment, so the resource views find the process whatever its runtime.
+ */
 export async function realise(spec: SessionSpec, task: Task, abortController: AbortController) {
-  const launcher = await taskLauncher(task, 'agent', true)
+  const started = await taskLauncher(task, 'agent', true)
+  const launcher = { ...started, env: { ...started.env, [TASK_ID_ENV]: task.id } }
   const host = await sessionHost(task, launcher.sandboxed, abortController.signal)
   return adapterFor(spec.runtime).realise(spec, launcher, host, abortController)
 }
