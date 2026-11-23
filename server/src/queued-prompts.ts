@@ -3,6 +3,7 @@ import type { QueueState } from '@seti/shared'
 import { z } from 'zod'
 import type { LiveSession } from './agent-session.js'
 import { messages } from './db.js'
+import { nodeLink } from './node-link.js'
 import { publish } from './task-events.js'
 
 /** Marks a queued prompt delivered or removed, once, and tells open transcripts. */
@@ -26,7 +27,7 @@ export async function settleQueued(
 ): Promise<void> {
   const promptId = session.settle(uuid)
   if (promptId !== null) {
-    await markQueued(taskId, promptId, state)
+    await nodeLink.journal(taskId, { type: 'queued.settled', promptId, state })
   }
 }
 
