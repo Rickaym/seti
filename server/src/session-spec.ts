@@ -1,7 +1,7 @@
 import type { CompactRule, Task } from '@seti/shared'
 import { permissionModeOf } from './bypass-mode.js'
 import { hostLoginKey } from './claude-logins.js'
-import { compactSetup, effectiveCompact } from './compact.js'
+import { effectiveCompact } from './compact.js'
 import { launchPlan } from './launch-plan.js'
 import { borrowedStamp, taskBorrowedServers } from './mcp-borrowed.js'
 import { taskDeniedServers } from './mcp-selection.js'
@@ -9,7 +9,6 @@ import { tokenServers } from './mcp-sign-in.js'
 import type { PermissionSettings } from './permission-policy.js'
 import { taskPluginConfigs } from './plugins.js'
 import type { RuntimeId } from './runtimes/adapter.js'
-import { claudeSetup } from './runtimes/claude/realise.js'
 import { DEFAULT_RUNTIME, type DefaultShapes } from './runtimes/registry.js'
 import { signedInServers } from './sandbox-mcp.js'
 import { sandboxStamp } from './sandbox-stamp.js'
@@ -83,19 +82,54 @@ async function sessionSpec(task: Task): Promise<SessionSpec> {
   }
 }
 
-/** A digest of the spec, in the shape the setup key had before there was a spec. */
+/**
+ * What a process of the spec starts with that needs a new process when it changes. The mode is
+ * left out except for bypass, which only a start can turn on; a running process switches modes.
+ */
+const setupOf = (spec: SessionSpec) => ({
+  cwd: spec.cwd,
+  dirs: spec.dirs,
+  bypass: spec.mode === 'bypassPermissions',
+  vendor: spec.vendor,
+  instructions: spec.instructions.append,
+  deniedToolServers: spec.deniedToolServers,
+  toolServers: spec.toolServers,
+  setiControl: spec.setiControl,
+  compaction: spec.compaction,
+  account: spec.account,
+  sandbox: spec.sandbox,
+})
+
+/** The compaction rule in the form keys have always held it. */
+const compactionKey = (rule: CompactRule) => ({
+  settings: {
+    autoCompactEnabled: rule.auto,
+    ...(rule.window_k === null ? {} : { autoCompactWindow: rule.window_k * 1000 }),
+  },
+  env: rule.threshold_pct === null ? {} : { CLAUDE_AUTOCOMPACT_PCT_OVERRIDE: String(rule.threshold_pct) },
+})
+
+/**
+ * A digest of the spec's setup. Its layout is the one keys had before runtimes existed, so a
+ * process started by an earlier release keeps its key, and its session, across a deploy.
+ */
 function specKey(spec: SessionSpec): string {
+  const setup = setupOf(spec)
   return JSON.stringify({
-    ...claudeSetup(spec),
-    mcp_denied: spec.deniedToolServers,
-    shared_tools: spec.toolServers.shared,
-    mcp_borrowed: spec.toolServers.borrowed,
-    mcp_signed_in: spec.toolServers.signedIn,
-    mcp_tokens: spec.toolServers.tokens,
-    seti_control: spec.setiControl,
-    compact: compactSetup(spec.compaction),
-    claude_login: spec.account,
-    sandbox: spec.sandbox,
+    cwd: setup.cwd,
+    ...(setup.dirs.length === 0 ? {} : { additionalDirectories: setup.dirs }),
+    ...(setup.bypass ? { allowDangerouslySkipPermissions: true } : {}),
+    plugins: setup.vendor.plugins,
+    systemPrompt: { type: 'preset', preset: 'claude_code', append: setup.instructions },
+    mcp_denied: setup.deniedToolServers,
+    shared_tools: setup.toolServers.shared,
+    mcp_borrowed: setup.toolServers.borrowed,
+    mcp_signed_in: setup.toolServers.signedIn,
+    mcp_tokens: setup.toolServers.tokens,
+    seti_control: setup.setiControl,
+    compact: compactionKey(setup.compaction),
+    claude_login: setup.account,
+    sandbox: setup.sandbox,
   })
 }
 

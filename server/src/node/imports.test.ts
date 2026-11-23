@@ -19,7 +19,6 @@ const controlOnly = (file: string) =>
  * read task rows, settings and connections until the control plane hands the node all of it.
  */
 const STILL_REACHING: Readonly<Record<string, readonly string[]>> = {
-  'compact.ts': ['audit.ts', 'store/compact.ts'],
   'devices.ts': ['store/devices.ts'],
   'mcp-borrowed.ts': ['store/mcp.ts'],
   'pg.ts': ['store/schema.ts'],

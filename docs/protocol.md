@@ -816,6 +816,15 @@ store, the audit chain and every record.
 - NODE-14: The node never loads the secret store, so it runs without the store key; every value it
   uses reaches it as NODE-10 says.
 
+### 15.2 Dreams
+
+Optional and off by default: a maintenance session per agent that consolidates its memory.
+
+- DRM-8: Every memory file a dream changes is recorded as a revision with its text before and
+  after, credentials redacted. The user, and the EA after the user's yes, MAY revert it; a revert
+  of a file changed since, or of a text kept only redacted, MUST be refused (409). Every change
+  and revert is audited with the path and line counts, never the text.
+
 ## 16. Audit
 
 - AUD-1: Every change by the user, a delegate or the control room MUST be audited. A failed audit

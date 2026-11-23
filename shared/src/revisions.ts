@@ -1,9 +1,10 @@
 import { z } from 'zod'
 
-export const REVISION_OBJECT_TYPES = ['context_pack', 'context_file', 'knowledge_note'] as const
+export const REVISION_OBJECT_TYPES = ['context_pack', 'context_file', 'knowledge_note', 'memory_file'] as const
 export type RevisionObjectType = (typeof REVISION_OBJECT_TYPES)[number]
 
-export const REVISION_ACTORS = ['user', 'agent'] as const
+/** `system` is Seti itself, such as a dream recording the memory files it changed. */
+export const REVISION_ACTORS = ['user', 'agent', 'system'] as const
 export type RevisionActor = (typeof REVISION_ACTORS)[number]
 
 export type RevisionValue = string | number | boolean | null | string[]
@@ -42,9 +43,29 @@ export const REVISION_NOTE_MAX = 2000
 
 export const revisionObjectRef = z.object({
   object_type: z.enum(REVISION_OBJECT_TYPES),
-  object_id: z.string().trim().min(1).max(200),
+  object_id: z.string().trim().min(1).max(300),
 })
 export type RevisionObjectRef = z.infer<typeof revisionObjectRef>
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
+
+/** One object's history, or every memory file of one agent. */
+export const revisionQuery = z.union([
+  revisionObjectRef,
+  z.object({ object_type: z.literal('memory_file'), task_id: z.string().regex(UUID) }),
+])
+export type RevisionQuery = z.infer<typeof revisionQuery>
+
+/** A memory file's object id: the agent's id and the file's path inside its memory folder. */
+export const memoryFileId = (taskId: string, file: string) => `${taskId}:${file}`
+
+/** The parts of a memory file's object id, or null when it is not one. */
+export function memoryFileOf(objectId: string): { taskId: string; file: string } | null {
+  const at = objectId.indexOf(':')
+  const taskId = objectId.slice(0, at)
+  const file = objectId.slice(at + 1)
+  return at === -1 || !UUID.test(taskId) || file === '' ? null : { taskId, file }
+}
 
 export const revisionParams = z.object({ id: z.coerce.number().int().positive() })
 

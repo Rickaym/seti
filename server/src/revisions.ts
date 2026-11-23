@@ -8,9 +8,9 @@ import {
 import { redactSecrets } from './scrub.js'
 import { revisions } from './store/revisions.js'
 
-/** Who makes a change: the user in the UI, or an agent through a Seti tool with its stated reason. */
+/** Who makes a change: the user, an agent through a Seti tool, or Seti itself, with the reason. */
 export interface ChangeSource {
-  actor: Extract<AuditActor, 'user' | 'agent'>
+  actor: AuditActor
   taskId: string | null
   reason: string | null
 }
@@ -24,6 +24,8 @@ export interface Saved<T> {
 export const byUser = (reason: string | null = null): ChangeSource => ({ actor: 'user', taskId: null, reason })
 
 export const byAgent = (taskId: string, reason: string): ChangeSource => ({ actor: 'agent', taskId, reason })
+
+export const bySystem = (taskId: string, reason: string): ChangeSource => ({ actor: 'system', taskId, reason })
 
 /** Stores a revision unless nothing changed; returns its id, or null when before equals after. */
 export async function recordRevision(
