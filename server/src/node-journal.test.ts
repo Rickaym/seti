@@ -245,6 +245,53 @@ describe('node journal', () => {
     expect(applied).toEqual(expected.map((name) => `${AGENT}:${name}`))
   })
 
+  it('stops applying once a cursor cannot be kept, so a restart applies that entry once', async () => {
+    const { sent, replies, applied, outbox } = link()
+    const kept = new Map<string, { agent: string; epoch: string; seq: number }>()
+    let failing = true
+    const keep = async (cursor: { agent: string; epoch: string; seq: number }) => {
+      if (failing && cursor.seq === 2) {
+        throw new Error('the database is gone')
+      }
+      kept.set(cursor.agent, cursor)
+      return Promise.resolve()
+    }
+    const apply = async (agent: string, entry: JournalEntry) => {
+      applied.push(`${agent}:${entry.type === 'note' ? entry.error : entry.type}`)
+      await flushed()
+    }
+    const stops: string[] = []
+    const inbox = new JournalInbox(
+      apply,
+      (reply) => replies.push(reply),
+      keep,
+      (error) => stops.push(error.message),
+    )
+    for (const n of [1, 2, 3]) {
+      outbox.append(AGENT, note(n))
+    }
+    sent.splice(0).forEach((frame) => {
+      inbox.receive(frame)
+    })
+    await settled()
+    expect(applied).toEqual(['task-1:n1'])
+    expect(replies.map((reply) => (reply.type === 'journal.ack' ? reply.seq : -1))).toEqual([1])
+    expect(stops).toEqual([expect.stringContaining('cursor 2 was not kept: Error: the database is gone')])
+    expect(inbox.halted?.message).toBe(stops[0])
+
+    failing = false
+    outbox.disconnected()
+    const restarted = new JournalInbox(apply, () => undefined, keep)
+    restarted.restore([...kept.values()])
+    expect(outbox.positions().every((position) => restarted.hello(position))).toBe(true)
+    outbox.resume(restarted.positions())
+    sent.splice(0).forEach((frame) => {
+      restarted.receive(frame)
+    })
+    await settled()
+    expect(applied).toEqual(['task-1:n1', 'task-1:n2', 'task-1:n3'])
+  })
+
   it('lets the node wait until the control plane stored every entry before it stops', async () => {
     const { sent, outbox, inbox, deliverReplies } = link()
     let drained = false
