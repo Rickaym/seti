@@ -31,8 +31,5 @@ export function useFixCi(agent: PrAgent): (prs: readonly FixCiPr[]) => void {
     if (!framed && !viewing(agent.id)) {
       navigate('agents', agent.id)
     }
-    const [only] = prs
-    const what = prs.length === 1 && only !== undefined ? `#${String(only.number)}` : prCount(prs.length)
-    toast.success(`Asked ${agent.title} to fix CI on ${what}`)
   }
 }

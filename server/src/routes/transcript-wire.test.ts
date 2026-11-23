@@ -4,7 +4,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { createApp } from '../app.js'
 import { messages, tasks } from '../db.js'
 import { bash, toolResult } from '../subtask-fixtures.js'
-import { USER_AUTH } from '../test-auth.js'
+import { EA_AUTH, USER_AUTH } from '../test-auth.js'
 import { wireRow } from '../transcript.js'
 
 const scratch = await vi.hoisted(async () => {
@@ -21,11 +21,11 @@ const TASK = 'wire-task'
 const app = createApp()
 const stored: MessageRow[] = []
 
-const get = async (path: string) =>
-  app.request(`/api/tasks/${TASK}${path}`, { headers: { host: 'localhost', ...USER_AUTH } })
+const get = async (path: string, auth: Record<string, string> = USER_AUTH) =>
+  app.request(`/api/tasks/${TASK}${path}`, { headers: { host: 'localhost', ...auth } })
 
-async function data<T>(path: string): Promise<T> {
-  const res = await get(path)
+async function data<T>(path: string, auth: Record<string, string> = USER_AUTH): Promise<T> {
+  const res = await get(path, auth)
   expect(res.status).toBe(200)
   return ((await res.json()) as { data: T }).data
 }
@@ -118,6 +118,11 @@ describe('transcript reads in the form the client asks for', () => {
     expect(events.messages).toEqual(stored.map(asEvents))
     const raw = JSON.parse(await firstEvent(await get('/stream'))) as WirePage
     expect(raw.messages).toEqual(stored.map(wireRow))
+  })
+
+  it('sends the EA events whether or not it asks', async () => {
+    const page = await data<WirePage>('/messages', EA_AUTH)
+    expect(page.messages).toEqual(stored.map(asEvents))
   })
 
   it('refuses a form it does not know', async () => {
