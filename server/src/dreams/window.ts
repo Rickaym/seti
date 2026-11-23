@@ -9,7 +9,7 @@ const MINUTE = 60_000
 const HOUR = 60 * MINUTE
 
 /** The wall clock in a zone at an instant, as `YYYY-MM-DD HH:MM`. */
-export function wallClock(at: Date, zone: string): string {
+function wallClock(at: Date, zone: string): string {
   const parts = new Intl.DateTimeFormat('en-CA', {
     timeZone: zone,
     year: 'numeric',

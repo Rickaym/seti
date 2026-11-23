@@ -5,7 +5,7 @@ import { accountStatus } from '../account.js'
 import { SETI_HOME } from '../config.js'
 
 /** When a nightly dream waits (`dream_gates`): plan use, host load and free disk. */
-export const DREAM_GATES = { fiveHour: 60, weekly: 85, loadPerCore: 0.75, freeBytes: 5 * 1024 ** 3 }
+const DREAM_GATES = { fiveHour: 60, weekly: 85, loadPerCore: 0.75, freeBytes: 5 * 1024 ** 3 }
 
 /** Why the plan's use holds dreams back, or null; without plan windows only the dollar caps apply. */
 export function planGate(windows: readonly UsageWindow[]): string | null {

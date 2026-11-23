@@ -47,7 +47,7 @@ export interface DreamRefusal {
 }
 
 /** Why the agent cannot dream now, or null when it can. */
-export async function dreamRefusal(task: Task): Promise<DreamRefusal | null> {
+async function dreamRefusal(task: Task): Promise<DreamRefusal | null> {
   const dream = adapterFor(DEFAULT_RUNTIME).capabilities.dream
   const checks: [boolean | (() => Promise<boolean>), string, boolean][] = [
     [task.archived_at !== null, 'The agent is archived.', false],
