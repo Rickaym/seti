@@ -1,24 +1,16 @@
 import path from 'node:path'
-import { AWS_SETTINGS_DEFAULT, DEFAULT_PROFILE_ID, type AwsSettings, type NodeAsk, type Task } from '@seti/shared'
-import { taskSsh } from './agent-access.js'
-import { taskAws } from './aws-access.js'
-import { hostLoginKey } from './claude-logins.js'
+import type { NodeAsk, ProxyGrant } from '@seti/shared'
 import { SETI_HOME } from './config.js'
-import { connectionPlaceholders, connectionRules, taskConnections, type ConnectionValue } from './connection-egress.js'
+import { connectionPlaceholders, connectionRules, mcpLoginRules, type ConnectionValue } from './egress-connections.js'
 import type { EgressPlaceholder } from './egress-placeholders.js'
 import { startEgressProxy, type EgressProxy } from './egress-proxy.js'
-import { ruleCaHosts, type EgressRule } from './egress-rules.js'
-import { connectorIds, taskDeniedServers } from './mcp-selection.js'
+import type { EgressRule } from './egress-rules.js'
 import { nodeLink } from './node-link.js'
 import { sandboxDirOf } from './owned-dirs.js'
 import { proxyCa } from './proxy-owner.js'
 import { awsToken, forgetAwsToken } from './sandbox-aws-token.js'
 import { loadSandboxCa, sandboxCaFiles, type SandboxCa } from './sandbox-ca.js'
-import { mcpHosts } from './sandbox-mcp.js'
 import { sshAgentSocket, stopSshAgent } from './ssh-agent.js'
-import { allowedFor } from './store/change-requests.js'
-import { profiles } from './store/credentials.js'
-import { mcpLoginRules } from './task-credentials.js'
 
 const CA_DIR = path.join(SETI_HOME, 'sandbox-ca')
 
@@ -38,9 +30,8 @@ export const sandboxCaPublic = async () => proxyCa(sandboxCa, () => sandboxCaFil
 
 const proxies = new Map<string, Promise<EgressProxy>>()
 
-/** What a task's session started with: its credential, connection headers, MCP choices and login. */
+/** What a task's session started with: its connection headers, MCP choices and login. */
 interface SessionAccess {
-  profileId: string
   rules: readonly EgressRule[]
   placeholders: readonly EgressPlaceholder[]
   deniedConnectors: ReadonlySet<string>
@@ -48,18 +39,8 @@ interface SessionAccess {
 }
 
 const access = new Map<string, SessionAccess>()
-const NO_ACCESS: SessionAccess = {
-  profileId: DEFAULT_PROFILE_ID,
-  rules: [],
-  placeholders: [],
-  deniedConnectors: new Set(),
-  login: null,
-}
+const NO_ACCESS: SessionAccess = { rules: [], placeholders: [], deniedConnectors: new Set(), login: null }
 const accessOf = (taskId: string) => access.get(taskId) ?? NO_ACCESS
-
-export async function profileAws(profileId: string): Promise<AwsSettings> {
-  return (await profiles.get(profileId))?.aws ?? AWS_SETTINGS_DEFAULT
-}
 
 /** A credential the control plane hands the proxy for one request; the node keeps none. */
 const mint = async (taskId: string, ask: NodeAsk<'secret.mint'>) =>
@@ -68,8 +49,11 @@ const mint = async (taskId: string, ask: NodeAsk<'secret.mint'>) =>
 /** A connection's value, asked for each request, so a changed or removed one applies at once. */
 export const connectionValueAsk =
   (taskId: string): ConnectionValue =>
-  async (row, refused) =>
-    (await nodeLink.ask(taskId, 'connection.value', { connection: row.id, refused })).value
+  async (connection, refused) =>
+    (await nodeLink.ask(taskId, 'connection.value', { connection: connection.id, refused })).value
+
+/** Where the agent may open ssh to and whether it gets AWS credentials, asked when it matters. */
+const reach = async (taskId: string) => nodeLink.ask(taskId, 'access.reach', {})
 
 /** Starts the agent's ssh agent, which asks for the keys of its usable hosts on every load. */
 export async function openTaskSsh(taskId: string): Promise<void> {
@@ -78,8 +62,7 @@ export async function openTaskSsh(taskId: string): Promise<void> {
   })
 }
 
-async function taskProxy(task: Task, authority: SandboxCa): Promise<EgressProxy> {
-  const taskId = task.id
+async function taskProxy(taskId: string, authority: SandboxCa): Promise<EgressProxy> {
   const existing = proxies.get(taskId)
   if (existing !== undefined) {
     return existing
@@ -87,7 +70,7 @@ async function taskProxy(task: Task, authority: SandboxCa): Promise<EgressProxy>
   const refused = new Set<string>()
   const started = startEgressProxy({
     socketPath: path.join(sandboxDirOf(taskId), 'run', 'proxy.sock'),
-    allowed: async () => allowedFor(taskId),
+    allowed: async () => (await nodeLink.ask(taskId, 'sandbox.hosts', {})).hosts,
     ca: authority,
     credentials: {
       claude: async () => mint(taskId, { kind: 'claude', login: accessOf(taskId).login }),
@@ -100,9 +83,9 @@ async function taskProxy(task: Task, authority: SandboxCa): Promise<EgressProxy>
       void nodeLink.journal(taskId, { type: 'egress.blocked', host, names: [...names] }).catch(() => undefined)
     },
     connectorAllowed: (id) => !accessOf(taskId).deniedConnectors.has(id),
-    ssh: async (target) => (await taskSsh(taskId)).firstHops.includes(target),
+    ssh: async (target) => (await reach(taskId)).sshHops.includes(target),
     aws: {
-      enabled: async () => taskAws(taskId),
+      enabled: async () => (await reach(taskId)).aws,
       token: awsToken(taskId),
       credentials: async () => (await nodeLink.ask(taskId, 'aws.credentials', {})).credentials,
     },
@@ -118,34 +101,30 @@ async function taskProxy(task: Task, authority: SandboxCa): Promise<EgressProxy>
   return started
 }
 
-/** What the task's sandbox and proxy take from its connections and MCP choices. */
-export async function grantAccess(task: Task) {
-  const denied = new Set(await taskDeniedServers(task.id))
-  const connections = await taskConnections(task)
-  const headerRules = connectionRules(connections, connectionValueAsk(task.id))
-  const rules = [...headerRules, ...mcpLoginRules(denied, async (url) => mint(task.id, { kind: 'mcp', url: url.href }))]
-  access.set(task.id, {
-    profileId: task.profile_id,
-    rules,
-    placeholders: connectionPlaceholders(connections, connectionValueAsk(task.id)),
-    deniedConnectors: new Set(connectorIds([...denied])),
-    login: hostLoginKey(),
+/** Hands the agent's proxy what it applies from now on. */
+function applyGrant(taskId: string, grant: ProxyGrant): void {
+  const value = connectionValueAsk(taskId)
+  const mcp = async (url: URL) => mint(taskId, { kind: 'mcp', url: url.href })
+  access.set(taskId, {
+    rules: [...connectionRules(grant.connections, value), ...mcpLoginRules(grant.mcp, mcp)],
+    placeholders: connectionPlaceholders(grant.connections, value),
+    deniedConnectors: new Set(grant.deniedConnectors),
+    login: grant.login,
   })
-  return { denied, connections, headerRules, rules }
 }
 
-/** Starts the task's proxy, its CA first covering every host the proxy intercepts. */
-export async function startProxy(task: Task, intercepted: readonly string[]): Promise<void> {
+/** Starts the task's proxy with this grant, its CA first covering every host the proxy intercepts. */
+export async function startProxy(taskId: string, grant: ProxyGrant): Promise<void> {
+  applyGrant(taskId, grant)
   const authority = await sandboxCa()
-  await authority.cover([...mcpHosts(), ...intercepted])
-  await taskProxy(task, authority)
+  await authority.cover(grant.caHosts)
+  await taskProxy(taskId, authority)
 }
 
 /** Opens the task's proxy for a sandbox another process builds; a running one stays as it is. */
-export async function openTaskProxy(task: Task): Promise<void> {
-  if (!proxies.has(task.id)) {
-    const { rules, connections } = await grantAccess(task)
-    await startProxy(task, ruleCaHosts([...rules, ...connections]))
+export async function openTaskProxy(taskId: string, grant: ProxyGrant): Promise<void> {
+  if (!proxies.has(taskId)) {
+    await startProxy(taskId, grant)
   }
 }
 

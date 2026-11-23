@@ -59,7 +59,6 @@ const STILL_REACHING: Readonly<Record<string, readonly string[]>> = {
     'store/restart.ts',
   ],
   'task-credentials.ts': ['store/credentials.ts'],
-  'task-proxy.ts': ['store/change-requests.ts', 'store/credentials.ts'],
   'worktree-restore.ts': ['audit.ts', 'store/task-location.ts'],
 }
 
