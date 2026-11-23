@@ -1,6 +1,6 @@
-import type { AuditDetail } from '@seti/shared'
-import { bashCommand } from './outward.js'
-import { scrubInput } from './scrub.js'
+import type { AuditDetail, ToolCall } from '@seti/shared'
+import { shellCommand } from './outward.js'
+import { redactSecrets, scrubInput } from './scrub.js'
 
 /** Characters of tool input text an outward audit event keeps, shared by every string field. */
 export const INPUT_TEXT_BUDGET = 2000
@@ -14,7 +14,7 @@ const MAX_DEPTH = 4
 const TARGET_KEYS = ['channel_id', 'channel', 'to', 'recipient', 'recipients', 'email'] as const
 const TEXT_KEYS = ['text', 'message', 'body', 'content', 'subject', 'markdown', 'comment', 'command'] as const
 const THREAD_KEY = 'thread_ts'
-const DIRECT_TOOL = 'mcp__seti__post_team_chat'
+const DIRECT_TOOL = 'post_team_chat'
 
 type Fields = Record<string, unknown>
 
@@ -90,14 +90,12 @@ function shortServer(rawServer: string): string {
   return doubled ? halves.slice(0, half).join('_') : server
 }
 
-/** `mcp__plugin_slack_slack__slack_send_message` reads as `Slack send_message`; others as named. */
-export function toolDisplayName(name: string): string {
-  const parts = name.split('__')
-  const [prefix, rawServer, ...rest] = parts
-  if (prefix !== 'mcp' || rawServer === undefined || rest.length === 0) {
-    return name
+/** MCP server `plugin_slack_slack`'s `slack_send_message` reads as `Slack send_message`. */
+export function toolDisplayName(call: ToolCall): string {
+  if (call.mcp === undefined) {
+    return call.name
   }
-  const tool = rest.join('__')
+  const { server: rawServer, tool } = call.mcp
   const prefixed = `${shortServer(rawServer).toLowerCase()}_`
   const action = tool.toLowerCase().startsWith(prefixed) ? tool.slice(prefixed.length) : tool
   return `${serverDisplayName(rawServer)} ${action}`
@@ -170,23 +168,25 @@ function inputJson(rest: unknown, budget: Budget): string {
 }
 
 /** A direct group chat message keeps its text out of the audit log, as Seti's own record does. */
-function directRecord(name: string, input: unknown): OutwardRecord | null {
-  if (name !== DIRECT_TOOL || !isFields(input) || typeof input.to !== 'string' || input.to.trim() === '') {
+function directRecord(call: ToolCall): OutwardRecord | null {
+  const { input } = call
+  const direct = call.mcp?.server === 'seti' && call.mcp.tool === DIRECT_TOOL
+  if (!direct || !isFields(input) || typeof input.to !== 'string' || input.to.trim() === '') {
     return null
   }
   const length = typeof input.text === 'string' ? input.text.length : 0
   const target = input.to.slice(0, MAX_TARGET)
-  const summary = `${toolDisplayName(name)} \u2192 ${target}: a direct message of ${String(length)} characters`
+  const summary = `${toolDisplayName(call)} \u2192 ${target}: a direct message of ${String(length)} characters`
   return { summary, detail: { target, length } }
 }
 
 /** What an outward tool call sent and where, scrubbed and bounded, and a one-line summary of it. */
-export function outwardRecord(name: string, input: unknown): OutwardRecord {
-  const direct = directRecord(name, input)
+export function outwardRecord(call: ToolCall): OutwardRecord {
+  const direct = directRecord(call)
   if (direct !== null) {
     return direct
   }
-  const scrubbed = scrubInput(input)
+  const scrubbed = scrubInput(call.input)
   const budget = new Budget()
   const { target, text, rest, shown } = split(scrubbed, budget)
   const detail: AuditDetail = {
@@ -197,14 +197,14 @@ export function outwardRecord(name: string, input: unknown): OutwardRecord {
   if (budget.truncated) {
     detail.truncated = true
   }
-  return { summary: summaryOf(name, target, shown, scrubbed), detail }
+  return { summary: summaryOf(call, target, shown), detail }
 }
 
-function summaryOf(name: string, target: string | null, shown: string | null, input: unknown): string {
-  if (name === 'Bash') {
-    return `Bash: ${bashCommand(input)}`
+function summaryOf(call: ToolCall, target: string | null, shown: string | null): string {
+  if (call.shell?.action === 'run') {
+    return `${call.name}: ${redactSecrets(shellCommand(call))}`
   }
   const where = target === null ? '' : ` \u2192 ${target}`
   const what = shown === null ? '' : `: "${preview(shown)}"`
-  return `${toolDisplayName(name)}${where}${what}`
+  return `${toolDisplayName(call)}${where}${what}`
 }

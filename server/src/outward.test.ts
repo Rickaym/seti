@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { claudeCall } from './fake-sdk.js'
 import { isOutward } from './outward.js'
 
 describe('isOutward', () => {
@@ -21,6 +22,6 @@ describe('isOutward', () => {
     ['Bash', { command: 'ls -la' }, false],
     ['Edit', { file_path: 'src/app.ts' }, false],
   ])('%s %j -> %s', (name, input, expected) => {
-    expect(isOutward(name, input)).toBe(expected)
+    expect(isOutward(claudeCall(name, input))).toBe(expected)
   })
 })

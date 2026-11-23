@@ -1,4 +1,5 @@
-import { bashCommand } from './outward.js'
+import type { ToolCall } from '@seti/shared'
+import { shellCommand } from './outward.js'
 
 /** A PR a tool call names: its number, and its owner/repo when the call says it. */
 export interface PrTarget {
@@ -115,11 +116,11 @@ function mcpTarget(input: unknown): PrTarget | null {
 }
 
 /** The PRs a call acts on; empty when it names none, such as `gh pr comment` on the branch. */
-export function postTargets(name: string, input: unknown): PrTarget[] {
-  if (name === 'Bash') {
-    return bashTargets(bashCommand(input))
+export function postTargets(call: ToolCall): PrTarget[] {
+  if (call.shell?.action === 'run') {
+    return bashTargets(shellCommand(call))
   }
-  const target = mcpTarget(input)
+  const target = mcpTarget(call.input)
   return target === null ? [] : [target]
 }
 
