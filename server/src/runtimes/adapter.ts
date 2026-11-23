@@ -105,7 +105,7 @@ export interface DreamHost {
 }
 
 /** A dream session: its reports until it ends, and the controls to stop it. */
-interface DreamSession {
+export interface DreamSession {
   readonly events: AsyncIterable<SessionReport>
   interrupt(): Promise<void>
   close(): void
