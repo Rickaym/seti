@@ -90,7 +90,10 @@ export async function connectNode(): Promise<void> {
       await controlLink.command('proxy.open', { agent: task.id, task })
     },
     close: async (agent) => {
-      await controlLink.command('proxy.close', { agent })
+      await controlLink.command('proxy.close', { agent }).catch((e: unknown) => {
+        const why = e instanceof Error ? e.message : String(e)
+        process.stderr.write(`node link: the node keeps the proxy of ${agent} until it restarts: ${why}\n`)
+      })
     },
   })
   reachNode({
