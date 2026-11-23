@@ -1,6 +1,7 @@
 import { query, type Options, type Query, type SDKMessage } from '@anthropic-ai/claude-agent-sdk'
 import { projectClaude } from '@seti/shared'
 import type { RuntimeAdapter, SessionInput } from '../adapter.js'
+import { claudeMemory, dreamOptions } from './dream.js'
 import { claudePrompt } from './input.js'
 import { realise } from './realise.js'
 import { rewoundOptions } from './resume.js'
@@ -16,6 +17,13 @@ export const claudeAdapter: RuntimeAdapter<ClaudeShapes> = {
     gate: { rewriteInput: true, classifier: true },
     session: { fork: 'ephemeral' },
     rewind: { conversation: true, code: true },
+    dream: {
+      memory: claudeMemory,
+      open: async (spec, launcher, host, abortController) => {
+        const options = dreamOptions(spec, launcher, host, abortController)
+        return Promise.resolve(claudeSession(transport({ prompt: claudePrompt(once(spec.prompt)), options }), false))
+      },
+    },
   },
   // Claude Code wrote it, live or as Seti stored it.
   project: (raw) => projectClaude(raw as SDKMessage),
@@ -24,6 +32,11 @@ export const claudeAdapter: RuntimeAdapter<ClaudeShapes> = {
     const started = rewind === null ? options : rewoundOptions(options, rewind)
     return Promise.resolve(claudeSession(transport({ prompt: claudePrompt(input), options: started }), rewind !== null))
   },
+}
+
+/** One input of text, after which the session ends. */
+async function* once(text: string): AsyncIterable<SessionInput> {
+  yield await Promise.resolve({ id: 'dream', content: { text, images: [] } })
 }
 
 /** Runs one Claude Code query outside a session, as a side chat does, and streams its messages. */

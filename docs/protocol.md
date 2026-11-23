@@ -143,6 +143,11 @@ between two steps; an interrupt; a hook at subagent start.
   `wire=events` on transcript pages, messages and streams; without it, runtime rows come as
   stored.
 - RT-7: Delegates and mods receive neutral events only.
+- RT-8: A runtime declares dreams, or none: where its agents' sessions keep memory, and a session
+  that resumes nothing and saves nothing, with the runtime's read, search, edit and shell tools and
+  the control room's own, and no question tool, subagents, web tools, plugins, hooks or tool
+  servers of the user's. Every tool call passes the control room's gate first, which allows or
+  denies it and never asks; the runtime's own memory consolidation is off in it.
 
 ## 4. Turn lifecycle
 

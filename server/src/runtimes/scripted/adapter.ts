@@ -15,6 +15,7 @@ export const scriptedAdapter: RuntimeAdapter<ScriptedShapes, 'scripted'> = {
     gate: { rewriteInput: true, classifier: false },
     session: { fork: 'none' },
     rewind: { conversation: false, code: false },
+    dream: null,
   },
   project: projectScripted,
   realise: async (spec, launcher, host, abortController) => {

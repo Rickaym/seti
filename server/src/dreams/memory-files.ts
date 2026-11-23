@@ -3,16 +3,10 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import type { RevisionState } from '@seti/shared'
 import { z } from 'zod'
-import { CLAUDE_HOME } from '../config.js'
-import { projectSlug } from '../sandbox-mounts.js'
 import { redactCredentials } from '../scrub.js'
 
 /** The most a memory folder may hold for a dream to snapshot it, and to grow to during one. */
 export const MEMORY_CAP = { bytes: 512 * 1024, files: 100 }
-
-/** The agent's own Claude Code memory folder, in the project folder of its working folder. */
-export const ownMemoryDir = (cwd: string, claudeHome = CLAUDE_HOME) =>
-  path.join(claudeHome, 'projects', projectSlug(cwd), 'memory')
 
 export const sha256 = (text: string | Buffer) => createHash('sha256').update(text).digest('hex')
 
