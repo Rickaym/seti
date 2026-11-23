@@ -62,7 +62,7 @@ test('a restart keeps a running turn going when agents run in a separate node', 
   await setiServer.restart()
 
   expect((await apiData<Task>(request, `/tasks/${id}`)).status).toBe('running')
-  expect((await request.post(`/api/tasks/${id}/stop`)).ok()).toBe(true)
+  expect((await request.post(`/api/tasks/${id}/stop`, { data: {} })).ok()).toBe(true)
   await expect.poll(async () => (await apiData<Task>(request, `/tasks/${id}`)).status).toBe('stopped')
   const { messages } = await apiData<MessagePage>(request, `/tasks/${id}/messages?limit=50`)
   expect(messages.filter((row) => row.kind === 'prompt')).toHaveLength(1)
