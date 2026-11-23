@@ -24,7 +24,7 @@ function questionsOf(value: unknown): { text: string; options: string[] }[] {
 }
 
 /** The scripted runtime's tools: each one's kind and the part of the call its kind reads. */
-const TOOLS = new Map<string, [ToolKind, (args: Args) => Partial<ToolCall>]>([
+const TOOLS = new Map<string, [ToolKind, (args: Args, id: string) => Partial<ToolCall>]>([
   ['sh', ['shell', (args) => ({ shell: { action: 'run', command: textOf(args, 'cmd') } })]],
   ['cat', ['read', (args) => ({ read: { paths: [textOf(args, 'path')] } })]],
   [
@@ -40,6 +40,13 @@ const TOOLS = new Map<string, [ToolKind, (args: Args) => Partial<ToolCall>]>([
   ],
   ['fetch', ['web', (args) => ({ web: field(args, 'url', 'url') })]],
   ['ask', ['question', (args) => ({ question: { questions: questionsOf(args.questions) } })]],
+  [
+    'agent',
+    [
+      'subagent',
+      (args, id) => ({ subagent: { label: textOf(args, 'label'), background: args.background === true, thread: id } }),
+    ],
+  ],
 ])
 
 /** A tool of a tool server, which the scripted runtime names `<server>.<tool>`. */
@@ -58,5 +65,5 @@ export function scriptedToolCall(call: ScriptedCall): ToolCall {
     return { ...base, kind: 'mcp', mcp: { server: mcp[1] ?? '', tool: mcp[2] ?? '' } }
   }
   const known = TOOLS.get(call.tool)
-  return known === undefined ? { ...base, kind: 'other' } : { ...base, kind: known[0], ...known[1](call.args) }
+  return known === undefined ? { ...base, kind: 'other' } : { ...base, kind: known[0], ...known[1](call.args, call.id) }
 }
