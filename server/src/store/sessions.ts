@@ -1,4 +1,4 @@
-import { sql } from '../db.js'
+import { rowFilter, sql } from '../db.js'
 
 export const sessionLinks = {
   known: async (): Promise<Set<string>> =>
@@ -20,8 +20,7 @@ export interface SessionInit {
 /** The latest session start of a task, as recorded: its time and its init message. */
 export async function latestSessionInit(taskId: string): Promise<SessionInit | undefined> {
   const rows = await sql<SessionInit[]>`SELECT id, task_id, created_at AS at, payload FROM task_message
-    WHERE task_id = ${taskId} AND kind = 'sdk' AND payload::json ->> 'type' = 'system'
-      AND payload::json ->> 'subtype' = 'init'
+    WHERE task_id = ${taskId} AND kind = 'sdk' AND ${rowFilter.sessionStart}
     ORDER BY id DESC LIMIT 1`
   return rows[0]
 }

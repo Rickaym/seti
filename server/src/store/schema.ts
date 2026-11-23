@@ -24,6 +24,7 @@ import {
   EA_REPLIES,
   EA_USAGE,
 } from './schema-ea.js'
+import { MESSAGE_EVENTS } from './schema-events.js'
 import { INITIAL } from './schema-initial.js'
 import { KNOWLEDGE } from './schema-knowledge.js'
 import { MEMORY_CAPS } from './schema-memory.js'
@@ -217,6 +218,7 @@ export const MIGRATIONS: readonly Migration[] = [
   { version: 114, name: 'team_active_handle', sql: TEAM_ACTIVE_HANDLE },
   { version: 116, name: 'webhook_filters', sql: WEBHOOK_FILTERS },
   { version: 117, name: 'storage_settings', sql: STORAGE_SETTINGS },
-  { version: 118, name: 'node_cursors', sql: NODE_CURSORS },
-  { version: 119, name: 'node_prompts', sql: NODE_PROMPTS },
+  { version: 118, name: 'message_events', sql: MESSAGE_EVENTS },
+  { version: 119, name: 'node_cursors', sql: NODE_CURSORS },
+  { version: 120, name: 'node_prompts', sql: NODE_PROMPTS },
 ]

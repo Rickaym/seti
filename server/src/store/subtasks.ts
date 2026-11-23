@@ -1,5 +1,5 @@
 import type { MessagePage } from '@seti/shared'
-import { now, sql, toMessage, type MessageRecord } from '../db.js'
+import { now, rowFilter, sql, toMessage, type MessageRecord } from '../db.js'
 
 /** Who linked a PR to a subagent: the subagent by opening it, or the user. */
 type SubtaskPrSource = 'agent' | 'user'
@@ -19,7 +19,7 @@ export const subtaskMessages = {
     const newest = (
       await sql<MessageRecord[]>`
         SELECT * FROM task_message
-        WHERE task_id = ${taskId} AND kind = 'sdk' AND (payload::json ->> 'parent_tool_use_id') = ANY(${ids})
+        WHERE task_id = ${taskId} AND kind = 'sdk' AND ${rowFilter.inThreads(ids)}
           AND id < ${before}
         UNION ALL
         SELECT * FROM task_message
