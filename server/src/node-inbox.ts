@@ -203,6 +203,9 @@ export class JournalInbox {
     } catch (e) {
       this.stopped = new Error(`agent ${agent}'s cursor ${String(seq)} was not kept: ${String(e)}`)
       process.stderr.write(`node link: stopped applying the node's entries: ${this.stopped.message}\n`)
+      for (const cursor of this.cursors.values()) {
+        cursor.release()
+      }
       this.stop(this.stopped)
       return
     }
