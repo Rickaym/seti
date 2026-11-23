@@ -47,7 +47,17 @@ describe('Claude session and compaction messages', () => {
           { name: 'seti', status: 'connected' },
           { name: 'github', status: 'failed' },
         ],
+        cwd: '/w',
+        plugins: [],
+        pluginErrors: [],
       },
+    ])
+    const plugins = {
+      plugins: [{ name: 'p', path: '/p', version: '1' }],
+      plugin_errors: [{ plugin: 'q', message: 'x' }],
+    }
+    expect(system('init', { model: 'haiku', ...plugins })).toMatchObject([
+      { plugins: [{ name: 'p', path: '/p', version: '1' }], pluginErrors: [{ plugin: 'q', message: 'x' }] },
     ])
     expect(system('init', { model: 'haiku' })).toMatchObject([{ mode: null, servers: [] }])
   })
@@ -66,6 +76,8 @@ describe('Claude session and compaction messages', () => {
     ])
     const measured = { compact_metadata: { trigger: 'manual', pre_tokens: 82_000 }, [CONTEXT_WINDOW_KEY]: 100_000 }
     expect(system('compact_boundary', measured)).toMatchObject([{ phase: 'done', before: 82_000, window: 100_000 }])
+    const timed = { compact_metadata: { trigger: 'auto', pre_tokens: 9, post_tokens: 3, duration_ms: 1200 } }
+    expect(system('compact_boundary', timed)).toMatchObject([{ before: 9, after: 3, durationMs: 1200 }])
   })
 
   it('reads retries, model fallbacks, runtime denials and slash command output', () => {
@@ -91,6 +103,19 @@ describe('Claude session and compaction messages', () => {
         to: 'claude-sonnet-5',
         reason: 'refusal',
         text: 'Switched to Sonnet for this request.',
+      },
+    ])
+    const refused = {
+      ...fallback,
+      scope: 'local',
+      request_id: 'req_1',
+      api_refusal_category: 'cyber',
+      api_refusal_explanation: 'Flagged.',
+      api_refusal_cyber_verification: { type: 'inactive' },
+    }
+    expect(system('model_refusal_fallback', refused)).toMatchObject([
+      {
+        refusal: { requestId: 'req_1', scope: 'local', category: 'cyber', explanation: 'Flagged.', verification: {} },
       },
     ])
     const denial = {
@@ -122,7 +147,7 @@ describe('Claude session and compaction messages', () => {
     ])
     expect(system('code_change_published', { action: 'created' })).toMatchObject([{ type: 'vendor' }])
     expect(system('local_command_output', { content: 'Cost: $0.10' })).toMatchObject([
-      { type: 'message', role: 'command', text: 'Cost: $0.10' },
+      { type: 'vendor', name: 'system/local_command_output' },
     ])
   })
 

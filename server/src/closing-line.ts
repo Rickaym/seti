@@ -1,6 +1,5 @@
-import type { MessageRow } from '@seti/shared'
+import { type MessageRow, agentTexts, eventsOf, rowEvents } from '@seti/shared'
 import { messages } from './db.js'
-import { agentTexts, eventsOf, rowEvents } from './events/read.js'
 import { redactSecrets } from './scrub.js'
 
 const LINE_CHARS = 120

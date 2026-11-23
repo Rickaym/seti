@@ -1,11 +1,11 @@
-import { modelFallbackOf, type ModelFallbackMessage } from '@seti/shared'
+import { eventsOf, payloadEvents } from '@seti/shared'
 import { describe, expect, it } from 'vitest'
-import { fallbackHint, noticeSentence, stillOn, verificationLink } from '@/lib/model-fallback'
+import { fallbackHint, noticeSentence, stillOn, verificationLink, type RefusalChange } from '@/lib/model-fallback'
 
 const CVP = 'https://support.claude.com/en/articles/14604842-cyber-verification-program'
 
-function notice(extra: Record<string, unknown> = {}): ModelFallbackMessage {
-  const parsed = modelFallbackOf({
+function notice(extra: Record<string, unknown> = {}): RefusalChange {
+  const message = {
     type: 'system',
     subtype: 'model_refusal_fallback',
     trigger: 'refusal',
@@ -19,11 +19,14 @@ function notice(extra: Record<string, unknown> = {}): ModelFallbackMessage {
     api_refusal_cyber_verification: { type: 'inactive' },
     content: 'flagged',
     ...extra,
-  })
-  if (parsed === null) {
+  }
+  const change = eventsOf(payloadEvents(JSON.stringify(message)), 'model.changed').find(
+    (event): event is RefusalChange => event.refusal !== undefined,
+  )
+  if (change === undefined) {
     throw new Error('not a fallback notice')
   }
-  return parsed
+  return change
 }
 
 const NOW = {
