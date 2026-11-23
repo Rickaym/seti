@@ -56,6 +56,8 @@ interface FakeTurn {
    * those sent with priority 'later' wait for the next turn.
    */
   fold: () => string[]
+  /** Resolves once a message is queued for the process, at once if one waits already. */
+  queued: () => Promise<void>
 }
 
 /** Yields the messages of one turn; a turn that ends without a result gets an interrupted one. */
@@ -165,6 +167,7 @@ export class FakeSession {
   private readonly queue: QueuedInput[] = []
   private inputDone = false
   private readonly wakeup = new Wakeup()
+  private readonly arrivals = new Wakeup()
   private turns = 0
   private turn: AbortController | null = null
   private consumed: string[] = []
@@ -253,6 +256,7 @@ export class FakeSession {
       this.queue.push({ text: textOf(m), uuid, priority: m.priority })
       this.outbox.push(lifecycle(uuid, 'queued'))
       this.wakeup.poke()
+      this.arrivals.poke()
     }
     this.inputDone = true
     this.wakeup.poke()
@@ -293,7 +297,8 @@ export class FakeSession {
     }
     let ended = false
     try {
-      for await (const m of script({ text, signal: turn.signal, session: this, fold })) {
+      const queued = async () => (this.queue.length > 0 ? Promise.resolve() : this.arrivals.wait())
+      for await (const m of script({ text, signal: turn.signal, session: this, fold, queued })) {
         ended ||= m.type === 'result'
         this.outbox.push(m.type === 'result' ? { ...m, user_message_uuids: this.consumed } : m)
       }

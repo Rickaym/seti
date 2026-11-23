@@ -1,10 +1,10 @@
 import { randomUUID, type UUID } from 'node:crypto'
-import type { SDKMessage, SDKResultMessage, SDKUserMessage } from '@anthropic-ai/claude-agent-sdk'
+import type { SDKMessage, SDKResultMessage } from '@anthropic-ai/claude-agent-sdk'
 import { InputQueue } from './input-queue.js'
-import type { NextMessage, QueuePriority } from './next-message.js'
+import type { NextMessage } from './next-message.js'
+import type { InputContent, InputPriority, SessionInput } from './runtimes/adapter.js'
 import type { DefaultSession, DefaultShapes } from './runtimes/registry.js'
 import type { CutKind } from './store/restart.js'
-import type { UserContent } from './user-content.js'
 
 /** How long an interrupted turn may take to end before its session is closed. */
 const INTERRUPT_GRACE_MS = 5000
@@ -142,8 +142,8 @@ export class LiveSession {
     this.backlog = [next]
   }
 
-  /** The prompt for a new query; a query started over gets the messages sent so far again. */
-  openInput(): AsyncIterable<SDKUserMessage> {
+  /** The inputs of a new process; a process started over gets the messages sent so far again. */
+  openInput(): AsyncIterable<SessionInput> {
     if (this.runtime !== null) {
       this.input = this.input.replay()
     }
@@ -191,7 +191,7 @@ export class LiveSession {
   }
 
   /** Sends a message into the session, which starts a turn. */
-  send(content: UserContent, promptId: number, kind: CutKind = 'user'): void {
+  send(content: InputContent, promptId: number, kind: CutKind = 'user'): void {
     this.turnKind = kind
     this.since ??= promptId
     this.heardAt = Date.now()
@@ -263,7 +263,7 @@ export class LiveSession {
    * Sends a message during a turn, which Claude Code queues. The user's messages join the running
    * turn at its next step; updates wait for the turn to end unless they ask for sooner.
    */
-  enqueue(content: UserContent, promptId: number, priority?: QueuePriority): void {
+  enqueue(content: InputContent, promptId: number, priority?: InputPriority): void {
     const uuid = randomUUID()
     let arrive = (): void => undefined
     const arrived = new Promise<void>((resolve) => {

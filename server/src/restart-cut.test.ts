@@ -47,10 +47,10 @@ async function workingTask(id: string, prompt: string): Promise<string> {
 describe('a session notes what started its turn', () => {
   it('a written message, updates, or background work reporting back', () => {
     const session = new LiveSession([])
-    session.send('hello', 1)
+    session.send({ text: 'hello', images: [] }, 1)
     expect(session.turnKind).toBe('user')
     session.endTurn()
-    session.send('updates', 2, 'updates')
+    session.send({ text: 'updates', images: [] }, 2, 'updates')
     expect(session.turnKind).toBe('updates')
     session.endTurn()
     expect(session.resumeWork()).toBe(true)

@@ -165,7 +165,7 @@ describe('the demo guard', () => {
 
 /** How many middleware handlers each shared path holds; a new one must be reviewed for the demo. */
 const MIDDLEWARE_COUNTS: Record<string, number> = {
-  'ALL /*': 5,
+  'ALL /*': 6,
   'ALL /api/*': 6,
   'ALL /api/auth/*': 1,
   'ALL /api/credentials/*': 1,

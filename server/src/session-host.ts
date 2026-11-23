@@ -10,12 +10,13 @@ import type { NextMessage } from './next-message.js'
 import { nodeLink } from './node-link.js'
 import { followQueue, settleQueued } from './queued-prompts.js'
 import { resumeSession } from './rewind.js'
+import type { InputContent } from './runtimes/adapter.js'
 import { adapterFor, DEFAULT_RUNTIME } from './runtimes/registry.js'
 import { moveSessionTo } from './session-files.js'
 import { realise, type SessionSpec } from './session-spec.js'
 import { inLane, outsideLane } from './task-lane.js'
 import { keepUnstarted, sessionError, takeUnstarted } from './unstarted.js'
-import { userContent, type UserContent } from './user-content.js'
+import { userContent } from './user-content.js'
 import { restoreMissingWorktrees } from './worktree-restore.js'
 
 /** Each task's open Claude Code session, from its first message until it is closed. */
@@ -94,7 +95,7 @@ async function sessionMessages(session: LiveSession, task: Task): Promise<AsyncI
   const settle = async (id: number, state: 'applied' | 'refused', reason: string | null) =>
     nodeLink.journal(taskId, { type: 'rewind.settled', id, state, reason })
   return resumeSession(options, rewind, settle, async (sent) => {
-    const started = await adapterFor(DEFAULT_RUNTIME).open({ prompt: session.openInput(), options: sent })
+    const started = await adapterFor(DEFAULT_RUNTIME).open(sent, session.openInput())
     session.attach(started)
     await nodeLink.journal(taskId, { type: 'session.started', warm: session.warm })
     return started
@@ -115,7 +116,7 @@ async function openTurn(
   taskId: string,
   next: NextMessage,
   queued: boolean,
-): Promise<{ content: UserContent; promptId: number }> {
+): Promise<{ content: InputContent; promptId: number }> {
   const { promptId, text } = await nodeLink.ask(taskId, 'prompt.open', { next, queued })
   return { content: userContent(taskId, text, next.attachments ?? []), promptId }
 }
