@@ -1,6 +1,5 @@
 import type { EventOf, RuntimeEvent } from '@seti/shared'
-import type { RuntimeSession, RuntimeShapes } from '../adapter.js'
-import type { SuiteInput } from './target.js'
+import type { RuntimeSession, RuntimeShapes, SessionInput } from '../adapter.js'
 
 /** How long anything a case waits on may take; every case settles in milliseconds when it passes. */
 const CASE_BOUND_MS = 2000
@@ -96,13 +95,13 @@ export class Run<S extends RuntimeShapes> implements RunView {
   private readonly waiters = new Set<() => void>()
   private readonly session: RuntimeSession<S>
   private readonly project: (message: S['message']) => RuntimeEvent[]
-  private readonly input: Channel<SuiteInput>
+  private readonly input: Channel<SessionInput>
   private readonly controller: AbortController
 
   constructor(
     session: RuntimeSession<S>,
     project: (message: S['message']) => RuntimeEvent[],
-    input: Channel<SuiteInput>,
+    input: Channel<SessionInput>,
     controller: AbortController,
   ) {
     this.session = session
@@ -120,7 +119,7 @@ export class Run<S extends RuntimeShapes> implements RunView {
   send(text: string): string {
     inputs += 1
     const id = `input-${String(inputs)}`
-    this.input.push({ id, text })
+    this.input.push({ id, content: { text, images: [] } })
     return id
   }
 

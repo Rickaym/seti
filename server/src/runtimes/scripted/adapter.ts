@@ -30,5 +30,5 @@ export const scriptedAdapter: RuntimeAdapter<ScriptedShapes, 'scripted'> = {
       signal: abortController.signal,
     })
   },
-  open: async (start) => Promise.resolve(scriptedSession(start)),
+  open: async (realised, input) => Promise.resolve(scriptedSession(realised, input)),
 }

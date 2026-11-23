@@ -1,5 +1,6 @@
 import { query } from '@anthropic-ai/claude-agent-sdk'
 import type { RuntimeAdapter } from '../adapter.js'
+import { claudePrompt } from './input.js'
 import { realise } from './realise.js'
 import { claudeSession, type ClaudeShapes } from './session.js'
 
@@ -15,7 +16,7 @@ export const claudeAdapter: RuntimeAdapter<ClaudeShapes> = {
     rewind: { conversation: true, code: true },
   },
   realise,
-  open: async (start) => Promise.resolve(claudeSession(transport(start))),
+  open: async (options, input) => Promise.resolve(claudeSession(transport({ prompt: claudePrompt(input), options }))),
 }
 
 /** Replaces the SDK's query with the one a module exports, such as the e2e suite's fake. */
