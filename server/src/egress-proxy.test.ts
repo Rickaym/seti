@@ -11,7 +11,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import type { ContainerCredentials } from './aws-credentials.js'
 import { connectionRule } from './connection-egress.js'
 import { connectionToken } from './connection-values.js'
-import { refusalText, ValueLate } from './egress-answers.js'
+import { refusalText, ControlLate } from './egress-answers.js'
 import type { EgressAws } from './egress-aws.js'
 import {
   ANTHROPIC_HOST,
@@ -391,12 +391,12 @@ describe('egress proxy', () => {
     await running.close()
   })
 
-  it('answers 503, which clients retry, when the control plane hands over no credential in time', async () => {
-    const late = async () => Promise.reject(new ValueLate())
+  it('answers 503, which clients retry, when the control plane does not answer in time', async () => {
+    const late = async () => Promise.reject(new ControlLate())
     const running = await proxy(allowAll, { ...both, claude: late })
     const res = await viaSocket(running.socketPath, { method: 'POST', path: '/v1/messages' }, '{}')
     expect(res.status).toBe(503)
-    expect(res.body).toContain('did not hand over a credential in time')
+    expect(res.body).toContain('did not answer in time')
     await running.close()
   })
 

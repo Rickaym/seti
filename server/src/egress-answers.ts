@@ -44,16 +44,16 @@ export function refuseSocket(socket: Duplex, status: number, reason: string, bod
   )
 }
 
-/** The control plane did not hand over a value in time, as while it restarts; clients retry a 503. */
-export class ValueLate extends Error {
+/** The control plane did not answer in time, as while it restarts; clients retry a 503. */
+export class ControlLate extends Error {
   constructor() {
-    super("Seti sandbox proxy: Seti's control plane did not hand over a credential in time. Retry in a moment.")
+    super("Seti sandbox proxy: Seti's control plane did not answer in time. Retry in a moment.")
   }
 }
 
 /** An unreadable value counts as none, unless it is late: then the request waits no more. */
 export const noValue = (e: unknown): null => {
-  if (e instanceof ValueLate) {
+  if (e instanceof ControlLate) {
     throw e
   }
   return null
@@ -62,7 +62,7 @@ export const noValue = (e: unknown): null => {
 /** Runs a request or a WebSocket handshake; one whose value came too late gets a 503 to retry. */
 export async function answerLate(to: ServerResponse | Duplex, run: () => Promise<void>): Promise<void> {
   await run().catch((e: unknown) => {
-    if (!(e instanceof ValueLate)) {
+    if (!(e instanceof ControlLate)) {
       throw e
     }
     if (to instanceof ServerResponse) {

@@ -1,6 +1,7 @@
 import path from 'node:path'
 import { AWS_SETTINGS_DEFAULT, DEFAULT_PROFILE_ID, type AwsSettings, type NodeAsk, type Task } from '@seti/shared'
 import { taskSsh } from './agent-access.js'
+import { askInTime } from './ask-in-time.js'
 import { taskAws } from './aws-access.js'
 import { hostLoginKey } from './claude-logins.js'
 import { SETI_HOME } from './config.js'
@@ -19,7 +20,6 @@ import { sshAgentSocket, stopSshAgent } from './ssh-agent.js'
 import { allowedFor } from './store/change-requests.js'
 import { profiles } from './store/credentials.js'
 import { mcpLoginRules } from './task-credentials.js'
-import { askValue } from './value-wait.js'
 
 const CA_DIR = path.join(SETI_HOME, 'sandbox-ca')
 
@@ -63,18 +63,18 @@ export async function profileAws(profileId: string): Promise<AwsSettings> {
 }
 
 /** A credential the control plane hands the proxy for one request; the node keeps none. */
-const mint = async (taskId: string, ask: NodeAsk<'secret.mint'>) => (await askValue(taskId, 'secret.mint', ask)).token
+const mint = async (taskId: string, ask: NodeAsk<'secret.mint'>) => (await askInTime(taskId, 'secret.mint', ask)).token
 
 /** A connection's value, asked for each request, so a changed or removed one applies at once. */
 export const connectionValueAsk =
   (taskId: string): ConnectionValue =>
   async (row, refused) =>
-    (await askValue(taskId, 'connection.value', { connection: row.id, refused })).value
+    (await askInTime(taskId, 'connection.value', { connection: row.id, refused })).value
 
 /** Starts the agent's ssh agent, which asks for the keys of its usable hosts on every load. */
 export async function openTaskSsh(taskId: string): Promise<void> {
   await sshAgentSocket(taskId, path.join(sandboxDirOf(taskId), 'ssh-agent'), async () => {
-    return (await askValue(taskId, 'ssh.keys', {})).keys
+    return (await askInTime(taskId, 'ssh.keys', {})).keys
   })
 }
 
@@ -104,7 +104,7 @@ async function taskProxy(task: Task, authority: SandboxCa): Promise<EgressProxy>
     aws: {
       enabled: async () => taskAws(taskId),
       token: awsToken(taskId),
-      credentials: async () => (await askValue(taskId, 'aws.credentials', {})).credentials,
+      credentials: async () => (await askInTime(taskId, 'aws.credentials', {})).credentials,
     },
     onRefused: (host) => {
       if (!refused.has(host)) {

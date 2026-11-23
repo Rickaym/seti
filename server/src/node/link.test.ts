@@ -5,11 +5,11 @@ import path from 'node:path'
 import { NODE_ASKS, type HelloFrame, type JournalEntry, type NodeCommandType } from '@seti/shared'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { WebSocket } from 'ws'
-import { ValueLate } from '../egress-answers.js'
+import { askInTime } from '../ask-in-time.js'
+import { ControlLate } from '../egress-answers.js'
 import { NodeClient, type NodeClientEnd } from '../node-client.js'
 import { nodeLink, reachControl, serveNode, type ControlEnd } from '../node-link.js'
 import type { NodeCursor } from '../store/node-cursors.js'
-import { askValue } from '../value-wait.js'
 import { NodeService, type NodeSessions } from './service.js'
 import { checkNodeSocket, listenNode } from './socket.js'
 
@@ -271,8 +271,8 @@ describe('the node over its socket', () => {
     await first.client.start()
     await welcomed(first.client)
     first.client.close()
-    await expect(askValue(AGENT, 'secret.mint', { kind: 'connector' }, 100)).rejects.toBeInstanceOf(ValueLate)
-    const waiting = askValue(AGENT, 'secret.mint', { kind: 'connector' }, 10_000)
+    await expect(askInTime(AGENT, 'secret.mint', { kind: 'connector' }, 100)).rejects.toBeInstanceOf(ControlLate)
+    const waiting = askInTime(AGENT, 'secret.mint', { kind: 'connector' }, 10_000)
     await new Promise((resolve) => setTimeout(resolve, 300))
     const answer = vi.fn(async () => Promise.resolve({ token: 'minted' }))
     const taking = vi.fn(async (_hello: HelloFrame) => Promise.resolve())
