@@ -11,6 +11,7 @@ import {
   type NodeCommandType,
   type NodeFrame,
   VALUE_ASKS,
+  VALUE_COMMANDS,
 } from '@seti/shared'
 import { WebSocket, type RawData } from 'ws'
 import { readFrame } from './node/wire.js'
@@ -123,6 +124,9 @@ export class NodeClient {
     }
     if (!this.welcomed) {
       throw new Error('The node is not connected; Seti retries the link.')
+    }
+    if (!this.end.local && VALUE_COMMANDS.has(type)) {
+      throw new Error(`${type} carries values, which cross only from a node on this machine`)
     }
     const id = randomUUID()
     const waits = !holdsLane() && !this.inbox.inApply()

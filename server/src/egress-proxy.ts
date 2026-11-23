@@ -11,19 +11,23 @@ import tls from 'node:tls'
 import { urlAllowed } from '@seti/shared'
 import {
   answer,
+  answerLate,
   connectorOff,
   NO_CLAUDE_CREDENTIAL,
   parseAuthority,
+  refusalText,
   refuseSocket,
   type Target,
+  unlessLate,
 } from './egress-answers.js'
-import { isAwsCredentialsPath, isAwsHost, serveAwsCredentials, type EgressAws } from './egress-aws.js'
+import { isAwsCredentialsPath, serveAwsCredentials, type EgressAws } from './egress-aws.js'
 import {
   ANTHROPIC_HOST,
   ANTHROPIC_HOSTS,
   builtinCredential,
   connectorOf,
   directAddress,
+  openHost,
   type EgressCredentials,
   injectCredentials,
   INTERCEPTED_HOSTS,
@@ -86,10 +90,6 @@ interface Outgoing {
   url: URL | null
 }
 
-/** Why a host was refused, in the words a command's error output shows the agent. */
-export const refusalText = (host: string) =>
-  `Seti sandbox: ${host} is not on the allowed hosts list. Ask the user to add it in Settings, Sandbox.`
-
 /** One HTTP proxy per sandboxed task, on a unix socket only that task's sandbox mounts. */
 class Egress {
   private readonly options: EgressOptions
@@ -104,16 +104,16 @@ class Egress {
     this.options = options
     this.upstream = options.upstream ?? DIRECT
     this.server = http.createServer({ requestTimeout: 0 }, (req, res) => {
-      void this.onRequest(req, res)
+      void answerLate(res, async () => this.onRequest(req, res))
     })
     this.intercepted = http.createServer({ requestTimeout: 0 }, (req, res) => {
       this.onIntercepted(req, res)
     })
     this.intercepted.on('upgrade', (req: IncomingMessage, socket: Duplex, head: Buffer) => {
-      void this.onUpgrade(req, socket, head)
+      void answerLate(socket, async () => this.onUpgrade(req, socket, head))
     })
     this.server.on('connect', (req: IncomingMessage, socket: Duplex, head: Buffer) => {
-      void this.onConnect(req, socket, head)
+      void answerLate(socket, async () => this.onConnect(req, socket, head))
     })
     for (const server of [this.server, this.intercepted]) {
       server.on('clientError', (_e, socket) => {
@@ -180,14 +180,7 @@ class Egress {
     if ((target.port === 443 && ANTHROPIC_HOSTS.includes(target.host)) || this.hasRule(target)) {
       return true
     }
-    const { aws, ssh } = this.options
-    if (aws !== undefined && target.port === 443 && isAwsHost(target.host)) {
-      return aws.enabled().catch(() => false)
-    }
-    if (ssh !== undefined && (await ssh(`${target.host}:${String(target.port)}`).catch(() => false))) {
-      return true
-    }
-    return urlAllowed(`https://${target.host}:${String(target.port)}/`, await this.options.allowed().catch(() => []))
+    return openHost(target, this.options)
   }
 
   private refused(host: string): string {
@@ -243,7 +236,7 @@ class Egress {
       answer(res, 400, 'Seti sandbox proxy: unknown connection')
       return
     }
-    void this.forward(target, req, res)
+    void answerLate(res, async () => this.forward(target, req, res))
   }
 
   /** WebSocket handshakes on intercepted hosts get the same keys, credentials and checks. */
@@ -306,7 +299,7 @@ class Egress {
     }
     const origin = `https://${target.host}:${String(target.port)}`
     const url = keyed.path.startsWith('/') && URL.canParse(keyed.path, origin) ? new URL(keyed.path, origin) : null
-    const own = !builtin && urlAllowed(`${origin}/`, await this.options.allowed().catch(() => []))
+    const own = !builtin && urlAllowed(`${origin}/`, await this.options.allowed().catch(unlessLate([])))
     const { headers, applied } = builtin
       ? { headers: injected, applied: [] }
       : await applyRules(this.rulesFor(target), url, injected, own)

@@ -1,7 +1,9 @@
 import dns from 'node:dns/promises'
 import type { IncomingHttpHeaders, OutgoingHttpHeaders } from 'node:http'
 import net from 'node:net'
-import { isGitHubOwner } from '@seti/shared'
+import { isGitHubOwner, urlAllowed } from '@seti/shared'
+import { noValue, type Target, unlessLate } from './egress-answers.js'
+import { isAwsHost } from './egress-aws.js'
 
 /** Claude Code talks to this host; the proxy always lets it through with the real credential. */
 export const ANTHROPIC_HOST = 'api.anthropic.com'
@@ -141,8 +143,26 @@ export async function builtinCredential(
 ): Promise<string | null> {
   const account = host === MCP_PROXY_HOST || ACCOUNT_PATHS.some((prefix) => requestPath.startsWith(prefix))
   if (ANTHROPIC_HOSTS.includes(host)) {
-    const connector = account ? await credentials.connector().catch(() => null) : null
-    return connector ?? credentials.claude().catch(() => null)
+    const connector = account ? await credentials.connector().catch(noValue) : null
+    return connector ?? credentials.claude().catch(noValue)
   }
-  return credentials.github(githubOwnerOf(host, requestPath)).catch(() => null)
+  return credentials.github(githubOwnerOf(host, requestPath)).catch(noValue)
+}
+
+/** What decides whether a host no rule covers is open to the agent. */
+interface HostChecks {
+  allowed: () => Promise<readonly string[]>
+  aws?: { enabled: () => Promise<boolean> }
+  ssh?: (authority: string) => Promise<boolean>
+}
+
+/** An AWS host while the agent has AWS, a first hop of its ssh hosts, or a host on the allowlist. */
+export async function openHost(target: Target, { allowed, aws, ssh }: HostChecks): Promise<boolean> {
+  if (aws !== undefined && target.port === 443 && isAwsHost(target.host)) {
+    return aws.enabled().catch(unlessLate(false))
+  }
+  if (ssh !== undefined && (await ssh(`${target.host}:${String(target.port)}`).catch(unlessLate(false)))) {
+    return true
+  }
+  return urlAllowed(`https://${target.host}:${String(target.port)}/`, await allowed().catch(unlessLate([])))
 }

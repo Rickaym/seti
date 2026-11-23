@@ -1,5 +1,6 @@
 import path from 'node:path'
 import type { NodeAsk, ProxyGrant } from '@seti/shared'
+import { askInTime } from './ask-in-time.js'
 import { SETI_HOME } from './config.js'
 import { connectionPlaceholders, connectionRules, mcpLoginRules, type ConnectionValue } from './egress-connections.js'
 import type { EgressPlaceholder } from './egress-placeholders.js'
@@ -43,22 +44,21 @@ const NO_ACCESS: SessionAccess = { rules: [], placeholders: [], deniedConnectors
 const accessOf = (taskId: string) => access.get(taskId) ?? NO_ACCESS
 
 /** A credential the control plane hands the proxy for one request; the node keeps none. */
-const mint = async (taskId: string, ask: NodeAsk<'secret.mint'>) =>
-  (await nodeLink.ask(taskId, 'secret.mint', ask)).token
+const mint = async (taskId: string, ask: NodeAsk<'secret.mint'>) => (await askInTime(taskId, 'secret.mint', ask)).token
 
 /** A connection's value, asked for each request, so a changed or removed one applies at once. */
 export const connectionValueAsk =
   (taskId: string): ConnectionValue =>
   async (connection, refused) =>
-    (await nodeLink.ask(taskId, 'connection.value', { connection: connection.id, refused })).value
+    (await askInTime(taskId, 'connection.value', { connection: connection.id, refused })).value
 
 /** Where the agent may open ssh to and whether it gets AWS credentials, asked when it matters. */
-const reach = async (taskId: string) => nodeLink.ask(taskId, 'access.reach', {})
+const reach = async (taskId: string) => askInTime(taskId, 'access.reach', {})
 
 /** Starts the agent's ssh agent, which asks for the keys of its usable hosts on every load. */
 export async function openTaskSsh(taskId: string): Promise<void> {
   await sshAgentSocket(taskId, path.join(sandboxDirOf(taskId), 'ssh-agent'), async () => {
-    return (await nodeLink.ask(taskId, 'ssh.keys', {})).keys
+    return (await askInTime(taskId, 'ssh.keys', {})).keys
   })
 }
 
@@ -70,7 +70,7 @@ async function taskProxy(taskId: string, authority: SandboxCa): Promise<EgressPr
   const refused = new Set<string>()
   const started = startEgressProxy({
     socketPath: path.join(sandboxDirOf(taskId), 'run', 'proxy.sock'),
-    allowed: async () => (await nodeLink.ask(taskId, 'sandbox.hosts', {})).hosts,
+    allowed: async () => (await askInTime(taskId, 'sandbox.hosts', {})).hosts,
     ca: authority,
     credentials: {
       claude: async () => mint(taskId, { kind: 'claude', login: accessOf(taskId).login }),
@@ -87,7 +87,7 @@ async function taskProxy(taskId: string, authority: SandboxCa): Promise<EgressPr
     aws: {
       enabled: async () => (await reach(taskId)).aws,
       token: awsToken(taskId),
-      credentials: async () => (await nodeLink.ask(taskId, 'aws.credentials', {})).credentials,
+      credentials: async () => (await askInTime(taskId, 'aws.credentials', {})).credentials,
     },
     onRefused: (host) => {
       if (!refused.has(host)) {
