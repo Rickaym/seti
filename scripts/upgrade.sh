@@ -8,8 +8,9 @@ Usage: scripts/upgrade.sh [--ref <ref>] [--no-backup] [--no-restart] [--force]
 
 Fetches the new version, installs and builds it, dumps the database to SETI_HOME/pg-dumps
 (keeping the newest 10), restarts seti.service and seti-ea.service when they run, and waits for
-the health check. Seti applies database migrations itself when it starts. When the build or the
-health check fails, it puts the previous version back and says how to restore the dump.
+the health check. A separate node (seti-node.service) restarts only when what it runs changed.
+Seti applies database migrations itself when it starts. When the build or the health check
+fails, it puts the previous version back and says how to restore the dump.
 
 Options:
   --ref <ref>    what to upgrade to (default origin/main)
@@ -73,13 +74,25 @@ install_and_build() {
 refresh_units() {
   local unit refreshed=0
   systemd_user || return 0
-  for unit in seti.service seti-ea.service; do
+  for unit in seti.service seti-node.service seti-ea.service; do
     if unit_ours "$unit"; then
       render_unit "$unit" >/dev/null
       refreshed=1
     fi
   done
   [[ $refreshed -eq 0 ]] || systemctl --user daemon-reload
+}
+
+# A split Seti's node restarts only when what it runs changed, since its restart cuts turns.
+restart_node() {
+  local recorded="${SETI_HOME_DIR}/run/node.build" running=''
+  unit_enabled seti-node.service || return 0
+  [[ ! -r $recorded ]] || running="$(<"$recorded")"
+  if [[ $running == "$(node_build_id "$SETI_ROOT")" ]]; then
+    ok 'the node runs this build already; its turns go on'
+    return 0
+  fi
+  systemctl --user restart seti-node.service
 }
 
 restart_units() {
@@ -89,6 +102,7 @@ restart_units() {
   if [[ ${#units[@]} -eq 0 ]]; then
     return 1
   fi
+  restart_node
   systemctl --user restart "${units[@]}"
 }
 
