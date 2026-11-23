@@ -1,10 +1,15 @@
-import { REVISION_NOTE_MAX, type RevisionObjectRef } from '@seti/shared'
+import { REVISION_NOTE_MAX, type RevisionObjectRef, type RevisionObjectType } from '@seti/shared'
 import { audit } from '../audit.js'
 import { byAgent, sourceDetail } from '../revisions.js'
 import { revisions } from '../store/revisions.js'
 
 /** Records an agent's note in the history of a pack, audited as the agent. */
-export async function addNote(taskId: string, ref: RevisionObjectRef, label: string, text: string): Promise<number> {
+export async function addNote(
+  taskId: string,
+  ref: RevisionObjectRef & { object_type: Exclude<RevisionObjectType, 'memory_file'> },
+  label: string,
+  text: string,
+): Promise<number> {
   const clipped = text.slice(0, REVISION_NOTE_MAX)
   const source = byAgent(taskId, clipped)
   const note = await revisions.insert({

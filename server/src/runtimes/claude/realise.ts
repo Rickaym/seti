@@ -1,5 +1,5 @@
 import type { McpServerConfig, Options, PermissionMode, SdkPluginConfig } from '@anthropic-ai/claude-agent-sdk'
-import { compactSetup } from '../../compact.js'
+import type { CompactRule } from '@seti/shared'
 import { COMMAND_LIMIT_HOURS } from '../../house-rules.js'
 import type { Launcher } from '../../launcher.js'
 import { taskBorrowedServers } from '../../mcp-borrowed.js'
@@ -39,11 +39,20 @@ const BASH_SHELL = { CLAUDE_CODE_SHELL: '/bin/bash', SHELL: '/bin/bash' }
 const bypassLaunch = (mode: PermissionMode) =>
   mode === 'bypassPermissions' ? { allowDangerouslySkipPermissions: true } : {}
 
+/** What a compaction rule starts a Claude Code process with; a change takes a new process. */
+export const compactSetup = (rule: CompactRule) => ({
+  settings: {
+    autoCompactEnabled: rule.auto,
+    ...(rule.window_k === null ? {} : { autoCompactWindow: rule.window_k * 1000 }),
+  },
+  env: rule.threshold_pct === null ? {} : { CLAUDE_AUTOCOMPACT_PCT_OVERRIDE: String(rule.threshold_pct) },
+})
+
 /**
  * Everything a Claude Code process starts with that needs a new process when it changes. The mode
  * is left out: Seti switches a running process's mode without a restart.
  */
-export const claudeSetup = (spec: SessionSpec) =>
+const claudeSetup = (spec: SessionSpec) =>
   ({
     cwd: spec.cwd,
     ...(spec.dirs.length === 0 ? {} : { additionalDirectories: spec.dirs }),
@@ -57,11 +66,16 @@ const deniedMcpSettings = (names: readonly string[]) => ({
   deniedMcpServers: names.map((serverName) => ({ serverName })),
 })
 
-/** The launcher as the SDK takes it: the environment, and the spawn when Seti holds the process. */
-export const claudeLaunch = (launcher: Launcher) => ({
-  env: launcher.env,
-  ...(launcher.spawn === undefined ? {} : { spawnClaudeCodeProcess: launcher.spawn }),
-})
+/**
+ * The launcher as the SDK takes it: the environment, and the spawn when Seti holds the process.
+ * Without a spawn the SDK starts Claude Code on the host, which no sandboxed launcher allows.
+ */
+export function claudeLaunch(launcher: Launcher) {
+  if (launcher.spawn === undefined && launcher.sandboxed) {
+    throw new Error('A sandboxed launcher must start Claude Code itself, and this one cannot')
+  }
+  return { env: launcher.env, ...(launcher.spawn === undefined ? {} : { spawnClaudeCodeProcess: launcher.spawn }) }
+}
 
 /** Rules for every task, the launcher, and an unsandboxed task's borrowed MCP servers. */
 async function sandboxOptions(spec: SessionSpec, launcher: Launcher) {
