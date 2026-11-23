@@ -1,5 +1,6 @@
 import type { OutgoingHttpHeaders } from 'node:http'
 import { hostMatches } from '@seti/shared'
+import { noValue } from './egress-answers.js'
 
 /**
  * A header the egress proxy sets on a task's HTTPS requests to some hosts, after dropping
@@ -47,7 +48,7 @@ export async function applyRules(
   const applied: Applied[] = []
   const set = new Set<string>()
   for (const rule of rules) {
-    const value = url === null || set.has(rule.header) ? null : await rule.value(url).catch(() => null)
+    const value = url === null || set.has(rule.header) ? null : await rule.value(url).catch(noValue)
     if (value !== null) {
       headers[rule.header] = value
       set.add(rule.header)

@@ -45,6 +45,19 @@ export async function connectionValue(row: ConnectionRow): Promise<string | null
   return name === undefined ? null : ((await secret(name))?.trim() ?? null)
 }
 
+/** A connection's value for one request; with `refused`, the minted token renewed in its place. */
+export async function connectionToken(
+  row: ConnectionRow,
+  refused: string | null,
+  minter = tokenMinter,
+): Promise<string | null> {
+  const plan = minterOf(row)
+  if (plan === null) {
+    return connectionValue(row)
+  }
+  return (await (refused === null ? minter.token(row.id, plan) : minter.renew(row.id, plan, refused))).token
+}
+
 /** Drops stored values no connection holds any more, inside the caller's transaction. */
 export async function dropUnused(db: Db, names: readonly StoredSecretName[]): Promise<void> {
   for (const name of new Set(names)) {

@@ -10,6 +10,8 @@ import { AWS_CREDENTIALS_PATH, mintSettingsInput } from '@seti/shared'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import type { ContainerCredentials } from './aws-credentials.js'
 import { connectionRule } from './connection-egress.js'
+import { connectionToken } from './connection-values.js'
+import { refusalText, ControlLate } from './egress-answers.js'
 import type { EgressAws } from './egress-aws.js'
 import {
   ANTHROPIC_HOST,
@@ -21,7 +23,7 @@ import {
   MCP_PROXY_HOST,
 } from './egress-hosts.js'
 import { swapPlaceholders, type EgressPlaceholder } from './egress-placeholders.js'
-import { refusalText, startEgressProxy, type EgressOptions, type EgressProxy } from './egress-proxy.js'
+import { startEgressProxy, type EgressOptions, type EgressProxy } from './egress-proxy.js'
 import type { EgressRule } from './egress-rules.js'
 import type { McpTokens } from './mcp-oauth.js'
 import { loadSandboxCa, type SandboxCa } from './sandbox-ca.js'
@@ -80,6 +82,10 @@ const mcpLogins: McpTokens = {
   tokenFor: async (url) => mcpToken(url),
   state: () => 'ok',
 }
+
+/** The token the control plane answers for a signed-in server the task did not turn off. */
+const signedIn = (denied: ReadonlySet<string>) => async (url: URL) =>
+  mcpLogins.tokenFor(url, (login) => !denied.has(login.name))
 
 async function proxy(
   allowed: () => Promise<readonly string[]>,
@@ -385,6 +391,15 @@ describe('egress proxy', () => {
     await running.close()
   })
 
+  it('answers 503, which clients retry, when the control plane does not answer in time', async () => {
+    const late = async () => Promise.reject(new ControlLate())
+    const running = await proxy(allowAll, { ...both, claude: late })
+    const res = await viaSocket(running.socketPath, { method: 'POST', path: '/v1/messages' }, '{}')
+    expect(res.status).toBe(503)
+    expect(res.body).toContain('did not answer in time')
+    await running.close()
+  })
+
   it('refuses CONNECT to hosts outside the allowlist with a reason', async () => {
     const running = await proxy(allowAll, both)
     const { status, socket } = await connect(running.socketPath, 'example.com:443')
@@ -474,7 +489,11 @@ describe('egress proxy', () => {
   })
 
   it('adds the MCP token for a signed-in server, even off the allowlist, and only on its paths', async () => {
-    const running = await proxy(async () => Promise.resolve([]), both, mcpLoginRules(new Set(), mcpLogins))
+    const running = await proxy(
+      async () => Promise.resolve([]),
+      both,
+      mcpLoginRules(new Set(), signedIn(new Set()), mcpLogins),
+    )
     const mcp = await throughTunnel(running.socketPath, MCP_HOST, { authorization: 'Bearer own' }, '/mcp')
     expect(mcp).toMatchObject({ host: MCP_HOST, path: '/mcp', authorization: `Bearer ${MCP}` })
     const other = await throughTunnel(running.socketPath, MCP_HOST, { authorization: 'Bearer own' }, '/other')
@@ -523,7 +542,11 @@ describe('egress proxy', () => {
   })
 
   it('refuses the host of a signed-in MCP server the task turned off', async () => {
-    const off = await proxy(async () => Promise.resolve([]), both, mcpLoginRules(new Set(['tracker']), mcpLogins))
+    const off = await proxy(
+      async () => Promise.resolve([]),
+      both,
+      mcpLoginRules(new Set(['tracker']), signedIn(new Set(['tracker'])), mcpLogins),
+    )
     expect(await connectStatus(off, `${MCP_HOST}:443`)).toBe(403)
     await off.close()
   })
@@ -593,7 +616,7 @@ describe('egress proxy', () => {
         updated_at: '',
       },
       header,
-      minter,
+      async (row, renewing) => connectionToken(row, renewing, minter),
     )
     const running = await proxy(async () => Promise.resolve([]), both, [rule])
     const seen = await throughTunnel(running.socketPath, 'minted.rules.test', {}, '/strict')

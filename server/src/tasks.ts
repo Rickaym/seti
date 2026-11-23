@@ -21,8 +21,8 @@ import { watchPrLinked } from './ea-watch.js'
 import { HttpError } from './http.js'
 import { errorCode } from './pg.js'
 import { taskPluginNames } from './plugins.js'
+import { sshKeysChanged } from './proxy-owner.js'
 import { publish, runTurn } from './runner.js'
-import { reloadSshAgents } from './ssh-agent.js'
 import { contextPacks, taskContextPacks } from './store/context.js'
 import { profiles } from './store/credentials.js'
 import { taskMcpChoices } from './store/mcp.js'
@@ -305,7 +305,7 @@ export async function setTaskProfile(task: Task, profileId: string, actor: Audit
     detail: { title: task.title, profile: profile.name, profile_id: profile.id },
   })
   await awsWithProfile({ ...task, profile_id: profileId }, actor)
-  await reloadSshAgents()
+  await sshKeysChanged()
 }
 
 /** Links a PR by hand, which also lifts an earlier dismissal of it. */

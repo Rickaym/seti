@@ -10,6 +10,7 @@ import { createPoller } from './pollers/actions.js'
 import { sandboxPrompt } from './sandbox-prompt.js'
 import { setupKey } from './session-spec.js'
 import { auditEvents } from './store/audit.js'
+import { connectionValueAsk } from './task-proxy.js'
 import { EA_AUTH, USER_AUTH } from './test-auth.js'
 import { clearConnections } from './test-connections.js'
 
@@ -116,7 +117,7 @@ describe('connections', () => {
       detail: { connection: 'vendor', env: 'VENDOR_KEY', credentials: ['Default', 'Work'], values: ['value'] },
     })
     const task = await newTask(work.id)
-    const [placeholder] = connectionPlaceholders(await taskConnections(task))
+    const [placeholder] = connectionPlaceholders(await taskConnections(task), connectionValueAsk(task.id))
     expect(placeholder?.placeholder).toMatch(/^seti-secret-vendor-[0-9a-f]{32}$/)
     expect(await placeholder?.value()).toBe(KEY)
     expect(await connectionContext(task.id)).toContain('VENDOR_KEY (api.vendor.test, *.vendor-cdn.test)')
@@ -139,9 +140,14 @@ describe('connections', () => {
     const task = await newTask(a.id)
     const plain = await newTask()
     const url = new URL('https://api.vendor.test/v1/things')
-    const valueOf = async (target: Task) => connectionRules(await taskConnections(target))[0]?.value(url) ?? null
+    const valueOf = async (target: Task) =>
+      connectionRules(await taskConnections(target), connectionValueAsk(target.id))[0]?.value(url) ?? null
     expect(await valueOf(task)).toBe(KEY)
     expect(await valueOf(plain)).toBeNull()
+    const [started] = connectionRules(await taskConnections(task), connectionValueAsk(task.id))
+    const replaced = `${KEY}-next`
+    await data('PUT', `/connections/${made.id}/values/value`, { value: replaced })
+    expect(await started?.value(url)).toBe(replaced)
     expect(await sandboxPrompt(task.id)).toContain('signs requests to api.vendor.test, *.vendor-cdn.test')
 
     const before = await setupKey(task)
@@ -151,6 +157,7 @@ describe('connections', () => {
     await data('PUT', `/connections/${made.id}/credentials`, { profile_ids: [] })
     expect(await setupKey(task)).not.toBe(changed)
     expect(await valueOf(task)).toBeNull()
+    expect(await started?.value(url)).toBeNull()
     expect(await auditEvents.latest('system.connection_changed')).toMatchObject({
       detail: { change: 'credentials', credentials: [], removed: ['A'] },
     })

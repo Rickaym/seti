@@ -56,34 +56,34 @@ PR poller and reminder ticker on one elected process; the storage split below al
 protocol section to the files that implement it. Paths are under `server/src/` unless they start
 with another top-level folder.
 
-| Section        | Main files                                                                                                                                                                                       |
-| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| 3 Entities     | `shared/src/tasks.ts`, `shared/src/inputs.ts`, `shared/src/requests.ts`, `shared/src/events.ts`, `shared/src/runtimes/`, `events/`, `db.ts`, `pending-requests.ts`                               |
-| 4 Turns        | `runner.ts`, `session-host.ts`, `session-ingest.ts`, `session-spec.ts`, `runtime-host.ts`, `runtimes/`, `agent-session.ts`, `rewind.ts`, `turn-asking.ts`, `closing-line.ts`, `task-location.ts` |
-| 4 Restarts     | `session-restart.ts`, `input-queue.ts`                                                                                                                                                           |
-| 4 Node link    | `node-link.ts`, `node-commands.ts`, `session-control.ts`, `session-mirror.ts`, `session-setup.ts`, `session-tools.ts`, `turn-asks.ts`, `shared/src/node-protocol.ts`                             |
-| 15.1 Node      | `node/`, `node-client.ts`, `node-split.ts`, `node-inbox.ts`, `node-outbox.ts`, `node-pid.ts`, `tool-calls-restore.ts`, `prompt-open.ts`, `store/node-*.ts`, `shared/src/node-frames.ts`          |
-| 5 Updates      | `shared/src/channel-delivery.ts`, `inputs.ts`, `input-preface.ts`                                                                                                                                |
-| 6 Attention    | `shared/src/attention.ts`, `task-blocked.ts`, `stall-watch.ts`, `ea-attention.ts`, `notifications.ts`, `notify-scope.ts`, `presence.ts`, `attention-brief.ts`                                    |
-| 7.1 Actors     | `access.ts`, `ea-guard.ts`                                                                                                                                                                       |
-| 7.2, 7.3       | `sandbox.ts`, `sandbox-mounts.ts`, `egress-*.ts`, `sandbox-ca.ts`, `sandbox-aws-token.ts`, `task-proxy.ts`, `proxy-owner.ts`, `ssh-agent.ts`, `agent-access.ts`                                  |
-| 7.4, 7.5       | `permission-policy.ts`, `policy/`, `permission-requests.ts`, `permission-timeout.ts`, `permission-guard.ts`, `repeat-hooks.ts`, `review-hooks.ts`, `shadow-hooks.ts`, `outward.ts`               |
-| 7.6 Changes    | `change-requests.ts`, `change-request-notes.ts`, `mcp-off-context.ts`, `shared/src/change-requests.ts`                                                                                           |
-| 7.7 Hostile    | `git.ts`, `runtimes/claude/probe-launch.ts`, `task-files.ts`, `html-preview.ts`, `uploads.ts`                                                                                                    |
-| 7.8 Caps       | `launcher.ts`, `memory-scope.ts`, `scope-cpu.ts`, `scope-limits.ts`, `scope-control.ts`, `oom-guard.ts`                                                                                          |
-| 8 Secrets      | `secret-box.ts`, `connections.ts`, `scrub.ts`, `secret-questions.ts`, `secret-delivery.ts`                                                                                                       |
-| 9 Shared tools | `shared/src/shared-tools.ts`, `shared-tool-proposals.ts`, `shared-tool-files.ts`, `shared-tool-server.ts`                                                                                        |
-| 10 Events      | `shared/src/webhook-senders.ts`, `shared/src/webhook-sender-catalog.ts`, `channels/`, `pollers/`, `reminders/`, `quickjs/`                                                                       |
-| 11 PRs         | `pr-inputs.ts`, `pr-self.ts`, `pr-link.ts`, `github-list.ts`, `pr-details.ts`, `shared/src/pr-fix-ci.ts`                                                                                         |
-| 12 Chat        | `team.ts`, `team-active.ts`, `direct-privacy.ts`, `side-chat/`, `mods/side-chat/`                                                                                                                |
-| 13 Tools       | `seti-tools/`, `questions.ts`, `question-answers.ts`, `house-rules.ts`, `knowledge.ts`, `knowledge-review.ts`                                                                                    |
-| 14 Assistant   | `ea/src/seti_ea/` (`gate.py`, `asks.py`, `inbox.py`, `settle.py`, `held.py`, `promises.py`), `ea-deliver.ts`, `routes/ea-replies.ts`                                                             |
-| 15 Resilience  | `restart-cut.ts`, `restart-resume.ts`, `restart-waits.ts`, `permission-grants.ts`, `client-sends.ts`, `model-fallback.ts`, `archive-files.ts`, `owned-dirs.ts`                                   |
-| 15 Storage     | `storage-overview.ts`, `storage-clean.ts`, `storage-orphans.ts`, `storage-schedule.ts`, `rebuildable.ts`, `dir-size.ts`, `size-cache.ts`                                                         |
-| 16 Audit       | `audit.ts`, `store/audit.ts`                                                                                                                                                                     |
-| 17 Mods        | `mods/`, `shared/src/mods.ts`, `packages/mod-api/`; [Mods](mods.md) is the authoring guide                                                                                                       |
-| 18 Public      | `access.ts`, `routes/share-public.ts`, `share-preview/`, `converter.ts`, `rate-limit.ts`, `security-headers.ts`                                                                                  |
-| 19 Client      | `http.ts`, `etag.ts`, `devices.ts`, `shared/src/lenient.ts`, `ui/src/lib/poll-loop.ts`, `ui/src/lib/stale-build.ts`, `ui/src/lib/uploader.ts`                                                    |
+| Section        | Main files                                                                                                                                                                                          |
+| -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 3 Entities     | `shared/src/tasks.ts`, `shared/src/inputs.ts`, `shared/src/requests.ts`, `shared/src/events.ts`, `shared/src/runtimes/`, `events/`, `db.ts`, `pending-requests.ts`                                  |
+| 4 Turns        | `runner.ts`, `session-host.ts`, `session-ingest.ts`, `session-spec.ts`, `runtime-host.ts`, `runtimes/`, `agent-session.ts`, `rewind.ts`, `turn-asking.ts`, `closing-line.ts`, `task-location.ts`    |
+| 4 Restarts     | `session-restart.ts`, `input-queue.ts`                                                                                                                                                              |
+| 4 Node link    | `node-link.ts`, `node-commands.ts`, `session-control.ts`, `session-mirror.ts`, `session-setup.ts`, `session-tools.ts`, `turn-asks.ts`, `shared/src/node-protocol.ts`                                |
+| 15.1 Node      | `node/`, `node-client.ts`, `node-split.ts`, `node-inbox.ts`, `node-outbox.ts`, `node-pid.ts`, `tool-calls-restore.ts`, `prompt-open.ts`, `store/node-*.ts`, `shared/src/node-frames.ts`             |
+| 5 Updates      | `shared/src/channel-delivery.ts`, `inputs.ts`, `input-preface.ts`                                                                                                                                   |
+| 6 Attention    | `shared/src/attention.ts`, `task-blocked.ts`, `stall-watch.ts`, `ea-attention.ts`, `notifications.ts`, `notify-scope.ts`, `presence.ts`, `attention-brief.ts`                                       |
+| 7.1 Actors     | `access.ts`, `ea-guard.ts`                                                                                                                                                                          |
+| 7.2, 7.3       | `sandbox.ts`, `sandbox-mounts.ts`, `egress-*.ts`, `sandbox-ca.ts`, `sandbox-aws-token.ts`, `task-proxy.ts`, `proxy-owner.ts`, `secret-asks.ts`, `ask-in-time.ts`, `ssh-agent.ts`, `agent-access.ts` |
+| 7.4, 7.5       | `permission-policy.ts`, `policy/`, `permission-requests.ts`, `permission-timeout.ts`, `permission-guard.ts`, `repeat-hooks.ts`, `review-hooks.ts`, `shadow-hooks.ts`, `outward.ts`                  |
+| 7.6 Changes    | `change-requests.ts`, `change-request-notes.ts`, `mcp-off-context.ts`, `shared/src/change-requests.ts`                                                                                              |
+| 7.7 Hostile    | `git.ts`, `runtimes/claude/probe-launch.ts`, `task-files.ts`, `html-preview.ts`, `uploads.ts`                                                                                                       |
+| 7.8 Caps       | `launcher.ts`, `memory-scope.ts`, `scope-cpu.ts`, `scope-limits.ts`, `scope-control.ts`, `oom-guard.ts`                                                                                             |
+| 8 Secrets      | `secret-box.ts`, `connections.ts`, `scrub.ts`, `secret-questions.ts`, `secret-delivery.ts`                                                                                                          |
+| 9 Shared tools | `shared/src/shared-tools.ts`, `shared-tool-proposals.ts`, `shared-tool-files.ts`, `shared-tool-server.ts`                                                                                           |
+| 10 Events      | `shared/src/webhook-senders.ts`, `shared/src/webhook-sender-catalog.ts`, `channels/`, `pollers/`, `reminders/`, `quickjs/`                                                                          |
+| 11 PRs         | `pr-inputs.ts`, `pr-self.ts`, `pr-link.ts`, `github-list.ts`, `pr-details.ts`, `shared/src/pr-fix-ci.ts`                                                                                            |
+| 12 Chat        | `team.ts`, `team-active.ts`, `direct-privacy.ts`, `side-chat/`, `mods/side-chat/`                                                                                                                   |
+| 13 Tools       | `seti-tools/`, `questions.ts`, `question-answers.ts`, `house-rules.ts`, `knowledge.ts`, `knowledge-review.ts`                                                                                       |
+| 14 Assistant   | `ea/src/seti_ea/` (`gate.py`, `asks.py`, `inbox.py`, `settle.py`, `held.py`, `promises.py`), `ea-deliver.ts`, `routes/ea-replies.ts`                                                                |
+| 15 Resilience  | `restart-cut.ts`, `restart-resume.ts`, `restart-waits.ts`, `permission-grants.ts`, `client-sends.ts`, `model-fallback.ts`, `archive-files.ts`, `owned-dirs.ts`                                      |
+| 15 Storage     | `storage-overview.ts`, `storage-clean.ts`, `storage-orphans.ts`, `storage-schedule.ts`, `rebuildable.ts`, `dir-size.ts`, `size-cache.ts`                                                            |
+| 16 Audit       | `audit.ts`, `store/audit.ts`                                                                                                                                                                        |
+| 17 Mods        | `mods/`, `shared/src/mods.ts`, `packages/mod-api/`; [Mods](mods.md) is the authoring guide                                                                                                          |
+| 18 Public      | `access.ts`, `routes/share-public.ts`, `share-preview/`, `converter.ts`, `rate-limit.ts`, `security-headers.ts`                                                                                     |
+| 19 Client      | `http.ts`, `etag.ts`, `devices.ts`, `shared/src/lenient.ts`, `ui/src/lib/poll-loop.ts`, `ui/src/lib/stale-build.ts`, `ui/src/lib/uploader.ts`                                                       |
 
 ## Storage
 

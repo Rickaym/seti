@@ -2,6 +2,7 @@ import { hostAllowed, hostsWithin, VALUE_PLACEHOLDER } from '@seti/shared'
 import { z } from 'zod'
 import { audit } from '../../audit.js'
 import { connectionRule } from '../../connection-egress.js'
+import { connectionToken } from '../../connection-values.js'
 import { HttpError } from '../../http.js'
 import { redactValues, type PollResponse } from '../../pollers/fetch.js'
 import { connectionRows, type ConnectionRow } from '../../store/connections.js'
@@ -69,7 +70,11 @@ async function connectionFetch(
     throw new HttpError(403, `${url.hostname} is not a host of the ${row.env} connection`)
   }
   const header = row.header?.name.toLowerCase() ?? ''
-  const rule = connectionRule(row, { name: header, template: row.header?.template ?? VALUE_PLACEHOLDER })
+  const rule = connectionRule(
+    row,
+    { name: header, template: row.header?.template ?? VALUE_PLACEHOLDER },
+    async (target, refused) => connectionToken(target, refused),
+  )
   const headers = Object.fromEntries(
     Object.entries(args.headers ?? {}).filter(([name]) => name.toLowerCase() !== header),
   )

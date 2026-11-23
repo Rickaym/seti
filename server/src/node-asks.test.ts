@@ -75,4 +75,27 @@ describe('node asks', () => {
     await ledger.receive(frame)
     expect(run).toHaveBeenCalledTimes(2)
   })
+
+  it('keeps no answer that carries a value once it is sent, so a retry asks again', async () => {
+    const run = vi.fn(async (_frame: AskFrame) => Promise.resolve({ token: 'minted' }))
+    const ledger = new AskLedger(run)
+    const valueFrame = askFrame.parse({
+      type: 'ask',
+      id: crypto.randomUUID(),
+      agent: 'task-1',
+      ask: 'secret.mint',
+      body: { kind: 'connector' },
+    })
+    const plainFrame = askFrame.parse({
+      type: 'ask',
+      id: crypto.randomUUID(),
+      agent: 'task-1',
+      ask: 'prompt.open',
+      body: BODY,
+    })
+    for (const frame of [valueFrame, plainFrame, valueFrame, plainFrame]) {
+      await ledger.receive(frame)
+    }
+    expect(run.mock.calls.map(([frame]) => frame.ask)).toEqual(['secret.mint', 'prompt.open', 'secret.mint'])
+  })
 })
