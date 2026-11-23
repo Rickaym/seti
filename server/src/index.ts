@@ -147,10 +147,15 @@ function indexOlderMessages(): void {
 
 /** Fills the event columns of transcript rows stored before them, without holding up startup. */
 function fillOlderRows(): void {
-  fillEventColumns(sql)
+  const started = performance.now()
+  const minutes = () => ((performance.now() - started) / 60_000).toFixed(1)
+  const onProgress = (rows: number) => {
+    process.stdout.write(`events: filling older messages, ${String(rows)} so far after ${minutes()} min\n`)
+  }
+  fillEventColumns(sql, { onProgress })
     .then((rows) => {
       if (rows > 0) {
-        process.stdout.write(`events: filled the event columns of ${String(rows)} older messages\n`)
+        process.stdout.write(`events: filled the event columns of ${String(rows)} older messages in ${minutes()} min\n`)
       }
     })
     .catch((e: unknown) => {
