@@ -710,3 +710,58 @@ async def test_read_tools_never_write(tools: EaTools, fake_seti: FakeSeti) -> No
         assert result.ok, (name, result.text)
         assert "{" not in result.text
     assert {r.method for r in fake_seti.requests} == {"GET"}
+
+
+async def test_overview_permissions_reads_the_shadow_counts(tools: EaTools, fake_seti: FakeSeti) -> None:
+    fake_seti.policy_shadow = {
+        "since": "2026-09-21",
+        "results": {"agree": 90, "deferred": 6, "tighter": 3, "looser": 1, "unobserved": 4, "failed": 2},
+        "slow": 1,
+        "differences": [
+            {
+                "result": "tighter",
+                "kind": "shell",
+                "tool": "Bash",
+                "mode": "auto",
+                "verdict": "ask",
+                "step": "mode",
+                "rule": "",
+                "runtime": "allow",
+                "calls": 3,
+            },
+            {
+                "result": "looser",
+                "kind": "edit",
+                "tool": "Edit",
+                "mode": "auto",
+                "verdict": "allow",
+                "step": "allow-rule",
+                "rule": "rule:12",
+                "runtime": "ask",
+                "calls": 1,
+            },
+        ],
+    }
+    result = await tools.call("seti_overview", {"permissions": True})
+    assert result.ok
+    assert result.text.splitlines() == [
+        "Seti's own permission evaluator runs in shadow: it decides every tool call beside Claude Code "
+        "and changes no outcome.",
+        "Since 2026-09-21: matched Claude Code on 90 of 100 calls; 6 left to its classifier, "
+        "3 stricter, 1 looser.",
+        "Not compared: 4 unobserved.",
+        "Decisions that went wrong: 2 failed and 1 slow.",
+        "Most frequent differences:",
+        "- tighter: Bash in auto mode, Seti would ask at step mode (no rule), "
+        "Claude Code chose to allow: 3 calls.",
+        "- looser: Edit in auto mode, Seti would allow at step allow-rule (rule:12), "
+        "Claude Code chose to ask: 1 call.",
+    ]
+    assert result.summary == "Read how Seti's permission shadow compares"
+    assert gets(fake_seti, "/api/permissions/shadow") == [{}]
+    assert not fake_seti.posts()
+
+
+async def test_overview_permissions_with_nothing_counted(tools: EaTools, fake_seti: FakeSeti) -> None:
+    result = await tools.call("seti_overview", {"permissions": True})
+    assert result.text.splitlines()[1:] == ["No tool calls compared since 2026-09-21."]
