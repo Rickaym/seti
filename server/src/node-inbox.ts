@@ -92,16 +92,28 @@ export class JournalInbox {
   private readonly apply: (agent: string, entry: JournalEntry) => Promise<void>
   private readonly reply: (frame: JournalReply) => void
   private readonly saved: (cursor: SavedCursor) => Promise<void>
+  private readonly stop: (error: Error) => void
+  private stopped: Error | null = null
 
-  /** `saved` keeps each cursor before its entry is applied, so a restart takes up after it. */
+  /**
+   * `saved` keeps each cursor before its entry is applied, so a restart takes up after it. A
+   * cursor it could not keep stops the inbox, and `stop` hears why.
+   */
   constructor(
     apply: (agent: string, entry: JournalEntry) => Promise<void>,
     reply: (frame: JournalReply) => void,
     saved: (cursor: SavedCursor) => Promise<void> = async () => Promise.resolve(),
+    stop: (error: Error) => void = () => undefined,
   ) {
     this.apply = apply
     this.reply = reply
     this.saved = saved
+    this.stop = stop
+  }
+
+  /** Why the inbox stopped applying entries, or null while it applies them. */
+  get halted(): Error | null {
+    return this.stopped
   }
 
   /** Takes up from the cursors kept before a restart; a node's hello is checked against them. */
@@ -179,13 +191,20 @@ export class JournalInbox {
 
   /**
    * Keeps the cursor before applying, so a crash during the apply never applies the entry twice:
-   * a restart takes up after it, as a crash of the single process loses what it was storing.
+   * a restart takes up after it, as a crash of the single process loses what it was storing. A
+   * cursor not kept stops the inbox unapplied and unacknowledged, so a restart applies it once.
    */
   private async applyOne(agent: string, epoch: string, seq: number, entry: JournalEntry): Promise<void> {
+    if (this.stopped !== null) {
+      return
+    }
     try {
       await this.saved({ agent, epoch, seq })
     } catch (e) {
-      process.stderr.write(`node link: agent ${agent}: cursor ${String(seq)} not kept: ${String(e)}\n`)
+      this.stopped = new Error(`agent ${agent}'s cursor ${String(seq)} was not kept: ${String(e)}`)
+      process.stderr.write(`node link: stopped applying the node's entries: ${this.stopped.message}\n`)
+      this.stop(this.stopped)
+      return
     }
     try {
       await this.applying.run(agent, async () => this.apply(agent, entry))
