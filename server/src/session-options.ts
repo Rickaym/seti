@@ -6,21 +6,17 @@ import { taskSsh } from './agent-access.js'
 import { taskAws } from './aws-access.js'
 import { CLAUDE_HOME, CREDENTIALS, DATABASE_URL, REDIS_URL, SETI_HOME } from './config.js'
 import { projectSettingsRules, userSettingsRules } from './inherited-rules.js'
-import { planScope } from './memory-cap.js'
 import { memoryEnv } from './node-heap.js'
 import type { GuardScope } from './permission-guard.js'
 import { builtInRules, composeRules, type PermissionSettings } from './permission-policy.js'
-import { taskPluginConfigs } from './plugins.js'
 import type { RuleSources } from './policy/sources.js'
 import { mcpTargets } from './sandbox-mcp.js'
 import { secretDenyRules, setiHomePaths, unsandboxedHookRules, type SandboxContext } from './sandbox.js'
-import { sharedToolFolders, TOOL_SERVER } from './shared-tools.js'
 import { keyStamp, sshStamp } from './ssh-files.js'
 import { profiles } from './store/credentials.js'
 import { permissionRules } from './store/permissions.js'
 import { sandboxPolicy } from './store/sandbox.js'
 import { profileStamp } from './task-credentials.js'
-import { taskSandbox, type TaskSandbox } from './task-sandbox.js'
 import { hostToolShell, toolShellEnv } from './tool-shell.js'
 import { workspaceDir } from './workspace/dir.js'
 
@@ -90,19 +86,6 @@ export function sandboxContext(): SandboxContext {
 
 /** Names the task in its process's environment, so the resource sampler can tell processes apart. */
 export const TASK_ID_ENV = 'SETI_TASK_ID'
-
-/** The task's sandbox, with its plugins and shared tools read-only, or null when it runs without. */
-export async function sandboxFor(task: Task): Promise<TaskSandbox | null> {
-  const policy = await sandboxPolicy.get()
-  if (!(policy.enabled && task.sandbox)) {
-    return null
-  }
-  const plugins = (await taskPluginConfigs(task.id)).map((plugin) => plugin.path)
-  const tools = await sharedToolFolders(task)
-  const readOnly = tools.length === 0 ? plugins : [...plugins, TOOL_SERVER, ...tools]
-  const memory = (await planScope(task.id, 'agent'))?.cap ?? null
-  return taskSandbox(task, { ctx: sandboxContext(), policy, readOnly, memory })
-}
 
 /** The ssh hosts a task can use, with the hosts, keys and host keys its files render. */
 async function sshSetup(taskId: string) {

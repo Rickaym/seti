@@ -809,6 +809,10 @@ store, the audit chain and every record.
 - NODE-12: The node owns each agent's ssh agent and the sandbox CA files as it owns the proxy: a
   sandbox the control plane builds has the node start the ssh agent, and only the node loads and
   writes the CA.
+- NODE-13: The node starts an agent's process from the spec and a launch plan the control plane
+  hands it with no value in it: the caps, and for a sandboxed agent its policy, read-only folders,
+  proxy grant, MCP choices, ssh files and switches. A sandbox the control plane builds uses the
+  same plan.
 
 ### 15.2 Dreams
 

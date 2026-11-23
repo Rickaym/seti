@@ -11,7 +11,7 @@ import { createApp } from './app.js'
 import { archiveTask } from './archive.js'
 import { tasks } from './db.js'
 import { fakeTimers } from './fake-timers.js'
-import type * as SessionOptions from './session-options.js'
+import type * as LaunchPlan from './launch-plan.js'
 import { auditEvents } from './store/audit.js'
 import type { TaskSandbox } from './task-sandbox.js'
 import type * as TerminalIo from './terminal-io.js'
@@ -73,8 +73,8 @@ vi.mock('./terminal-io.js', async (importOriginal) => {
   }
 })
 
-vi.mock('./session-options.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof SessionOptions>()
+vi.mock('./launch-plan.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof LaunchPlan>()
   return {
     ...actual,
     sandboxFor: async (task: Task) => Promise.resolve(task.id === SANDBOXED ? fakeSandbox() : null),

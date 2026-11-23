@@ -2,26 +2,16 @@ import { spawn, type ChildProcess } from 'node:child_process'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import {
-  AWS_CREDENTIALS_PATH,
-  extraDirs,
-  hostMatches,
-  type MemoryCap,
-  type SandboxPolicy,
-  type Task,
-} from '@seti/shared'
-import { taskSsh } from './agent-access.js'
-import { profileAws, taskAws } from './aws-access.js'
+import { AWS_CREDENTIALS_PATH, extraDirs, hostMatches, type MemoryCap, type Task } from '@seti/shared'
 import { findBinary } from './binaries.js'
-import { CONNECTOR_SCOPE, connectorCredential } from './claude-credential.js'
+import { CONNECTOR_SCOPE } from './claude-credential.js'
 import { CLAUDE_HOME, SCRATCH_ROOT, SETI_HOME, WORKTREE_ROOT } from './config.js'
 import { connectionEnv } from './egress-connections.js'
-import { agentTokenStamp } from './github-token.js'
-import { taskBorrowedServers } from './mcp-borrowed.js'
+import type { SandboxPlan, SshPlan } from './launch-plan.js'
+import { borrowedServers, ownProjects, readHostConfig } from './mcp-borrowed.js'
 import { launch, type ScopePlan } from './memory-scope.js'
 import { memoryEnv } from './node-heap.js'
 import { sandboxDirOf } from './owned-dirs.js'
-import { proxyGrant } from './proxy-grant.js'
 import { proxyAwsToken, proxyGone, proxyHere, sshAgentHere } from './proxy-owner.js'
 import { awsToken } from './sandbox-aws-token.js'
 import { sandboxClaudeJson } from './sandbox-claude-json.js'
@@ -212,21 +202,19 @@ export interface TaskSandbox {
 
 export interface SandboxRequest {
   ctx: SandboxContext
-  policy: SandboxPolicy
-  /** Read-only extras, such as local plugin folders. */
-  readOnly?: readonly string[]
+  /** What the control plane read for the sandbox; the sandbox reads nothing else. */
+  plan: SandboxPlan
   /** The memory cap that holds the task's process trees, when the host enforces one. */
   memory?: MemoryCap | null
 }
 
 /** The task's ssh files and agent for its usable hosts; none, and no agent, without any. */
-async function sandboxSsh(taskId: string, dir: string, home: string, socat: string) {
-  const reach = await taskSsh(taskId)
-  if (reach.usable.length === 0) {
+async function sandboxSsh(taskId: string, plan: SshPlan | null, at: { dir: string; home: string; socat: string }) {
+  if (plan === null) {
     await stopSshAgent(taskId)
     return null
   }
-  const ssh = await prepareSandboxSsh({ taskDir: dir, home, proxy: { socat, port: PROXY_PORT }, reach })
+  const ssh = prepareSandboxSsh({ taskDir: at.dir, home: at.home, proxy: { socat: at.socat, port: PROXY_PORT }, plan })
   await sshAgentHere(taskId, async () => openTaskSsh(taskId))
   return ssh
 }
@@ -248,7 +236,8 @@ export async function taskSandbox(task: Task, request: SandboxRequest): Promise<
   const socat = findBinary('socat')
   const setpriv = findBinary('setpriv')
   const envBinary = findBinary('env')
-  const { ctx, policy } = request
+  const { ctx, plan } = request
+  const { policy, grant } = plan
   const dir = taskDir(task.id)
   const layout: SandboxLayout = {
     home: ctx.home,
@@ -261,7 +250,7 @@ export async function taskSandbox(task: Task, request: SandboxRequest): Promise<
     homeAccess: task.home_access,
     ownRoot: SCRATCH_ROOT,
     workspace: workspaceDir(task.id),
-    readOnly: request.readOnly ?? [],
+    readOnly: plan.readOnly,
     caDir: '',
     systemBundle: null,
     hidden: sandboxHiddenPaths(policy, ctx),
@@ -278,7 +267,7 @@ export async function taskSandbox(task: Task, request: SandboxRequest): Promise<
   prepareDirs(dir)
   fs.mkdirSync(workspaceDir(task.id), { recursive: true, mode: 0o700 })
   const projects = [task.cwd, checkoutOf(task.cwd, layout) ?? task.cwd]
-  const { grant, denied } = await proxyGrant(task)
+  const denied = new Set(plan.denied)
   sandboxClaudeJson(hostClaudeJson(), path.join(dir, 'home', '.claude.json'), {
     signedIn: signedInServers(),
     projects: [...new Set(projects)],
@@ -287,22 +276,20 @@ export async function taskSandbox(task: Task, request: SandboxRequest): Promise<
       grant.connections.some(
         (each) => each.header !== null && each.hosts.some((pattern) => hostMatches(pattern, host)),
       ),
-    borrowed: await taskBorrowedServers(task),
+    borrowed: borrowedServers(readHostConfig(), ownProjects(task.cwd), (name) => plan.borrowed.includes(name)),
   })
   forgetSandboxSignIns(path.join(dir, 'home', '.claude'), proxiedServers(mcpTokens, denied))
   await proxyHere(task.id, grant, async () => startProxy(task.id, grant))
   const authority = await sandboxCaPublic()
-  const ssh = await sandboxSsh(task.id, dir, ctx.home, socat)
+  const ssh = await sandboxSsh(task.id, plan.ssh, { dir, home: ctx.home, socat })
   const ready = { ...layout, caDir: authority.publicDir, systemBundle: authority.systemBundle, ssh }
   const env = sandboxEnv(process.env, ctx.home, {
-    github: (await agentTokenStamp(task.profile_id)) !== null,
-    connectors: connectorCredential() !== null,
-    aws: (await taskAws(task.id))
-      ? {
-          token: await proxyAwsToken(task.id, () => awsToken(task.id)),
-          region: (await profileAws(task.profile_id)).region,
-        }
-      : null,
+    github: plan.github,
+    connectors: plan.connectors,
+    aws:
+      plan.aws === null
+        ? null
+        : { token: await proxyAwsToken(task.id, () => awsToken(task.id)), region: plan.aws.region },
     ssh: ssh !== null,
     memory: request.memory ?? null,
     connections: connectionEnv(grant.connections),
@@ -312,16 +299,16 @@ export async function taskSandbox(task: Task, request: SandboxRequest): Promise<
     const mounts = sandboxMounts({ ...ready, readOnly: [...ready.readOnly, ...extra] })
     const init = ['--', '/bin/sh', '-c', initScript(setpriv, socat), 'seti', program]
     const argv = [...bwrapArgs(mounts, task.cwd, options.interactive === true), ...init, ...args]
-    const plan = options.scope ?? null
+    const scope = options.scope ?? null
     const base = options.env ?? env
-    if (plan === null) {
+    if (scope === null) {
       return { program: bwrap, args: argv, env: { ...base } }
     }
     // systemd-run needs the user bus; the sandbox never sees where it is.
     return {
       program: envBinary,
       args: ['-u', 'XDG_RUNTIME_DIR', bwrap, ...argv],
-      env: { ...base, XDG_RUNTIME_DIR: plan.host.runtimeDir },
+      env: { ...base, XDG_RUNTIME_DIR: scope.host.runtimeDir },
     }
   }
   return {
