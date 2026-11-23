@@ -786,8 +786,26 @@ store, the audit chain and every record.
 - NODE-7: The node reports the scopes it started and their memory events, and moves them to a
   changed cap; the processes view and the resources page show the agents' processes under
   either process.
-- NODE-8: The control plane starts no egress proxy for an agent whose proxy the node runs; its
-  sandboxes for that agent use the node's.
+- NODE-8: Only the node runs agents' egress proxies. A sandbox the control plane builds, for a
+  terminal or a `!` command, has the node open the agent's proxy and uses it, and removing an
+  agent stops its proxy on the node.
+- NODE-9: A command the node's guard refused, and a request its egress proxy blocked for
+  carrying a connection's placeholder toward a host the connection does not allow, reach the
+  control plane as journal entries, which it audits once.
+- NODE-10: The node's egress proxy asks the control plane for each Claude, GitHub, claude.ai
+  connector, MCP sign-in, connection and AWS value it puts on a request, and the node's ssh agents
+  ask for their keys on each load; the node keeps none between requests. A changed or removed
+  connection therefore applies to the next request, with no delay, and a changed ssh key or host
+  reloads the node's ssh agents. A sandbox the control plane builds gets the AWS token of the
+  node's proxy. While the control plane restarts, a request that needs a value waits for it up to
+  30 seconds; after that the proxy answers 503, which clients retry.
+- NODE-11: Values cross only to a node on the same machine, over the owner-only socket of NODE-1;
+  the control plane refuses every ask and command that carries values on any other link, so a
+  node on another machine needs a sealed path. No error, log or frame dump names a value, and the
+  control plane keeps no answer that carries one once it is sent.
+- NODE-12: The node owns each agent's ssh agent and the sandbox CA files as it owns the proxy: a
+  sandbox the control plane builds has the node start the ssh agent, and only the node loads and
+  writes the CA.
 
 ## 16. Audit
 

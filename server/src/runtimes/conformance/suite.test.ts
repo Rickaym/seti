@@ -1,17 +1,47 @@
 import type { RuntimeEvent } from '@seti/shared'
 import { describe, expect, it } from 'vitest'
+import type { SessionReport } from '../adapter.js'
 import { scriptedTarget } from '../scripted/target.js'
 import { CASES } from './describe.js'
 import { subjectOf } from './subject.js'
 
 type Target = typeof scriptedTarget
 
-const reprojected = (change: (events: RuntimeEvent[]) => RuntimeEvent[]): Target => ({
+type Change = (events: RuntimeEvent[]) => RuntimeEvent[]
+
+async function* changed(reports: AsyncIterable<SessionReport>, change: Change): AsyncGenerator<SessionReport> {
+  for await (const report of reports) {
+    yield report.type === 'message' ? { ...report, events: change([...report.events]) } : report
+  }
+}
+
+/** The scripted target with every projection, live and stored, changed the same way. */
+const reprojected = (change: Change): Target => ({
   ...scriptedTarget,
   project: (message) => change(scriptedTarget.project(message)),
+  adapter: {
+    ...scriptedTarget.adapter,
+    open: async (realised, input, rewind) => {
+      const session = await scriptedTarget.adapter.open(realised, input, rewind)
+      return { ...session, events: changed(session.events, change) }
+    },
+  },
 })
 
 let calls = 0
+
+/** The stream's reports, ending cleanly where it failed. */
+async function* swallowed(events: AsyncIterable<SessionReport>): AsyncGenerator<SessionReport> {
+  try {
+    yield* events
+  } catch {
+    return
+  }
+}
+
+/** Seti's own environment, as an adapter that forgets the launcher would pass it on. */
+const ownEnv = (): Record<string, string> =>
+  Object.fromEntries(Object.entries(process.env).filter((entry): entry is [string, string] => entry[1] !== undefined))
 
 /** Adapters that are each wrong in one way, by the case that must catch it. */
 const BROKEN: [string, Target][] = [
@@ -37,7 +67,39 @@ const BROKEN: [string, Target][] = [
       ...scriptedTarget,
       adapter: {
         ...scriptedTarget.adapter,
-        open: async (start) => ({ ...(await scriptedTarget.adapter.open(start)), close: () => undefined }),
+        open: async (realised, input) => ({
+          ...(await scriptedTarget.adapter.open(realised, input, null)),
+          close: () => undefined,
+        }),
+      },
+    },
+  ],
+  [
+    'FL-1',
+    {
+      ...scriptedTarget,
+      adapter: {
+        ...scriptedTarget.adapter,
+        open: async (realised, input, rewind) => {
+          const session = await scriptedTarget.adapter.open(realised, input, rewind)
+          return { ...session, events: swallowed(session.events) }
+        },
+      },
+    },
+  ],
+  [
+    'LN-2',
+    {
+      ...scriptedTarget,
+      adapter: {
+        ...scriptedTarget.adapter,
+        realise: async (spec, launcher, host, abortController) =>
+          scriptedTarget.adapter.realise(
+            spec,
+            { ...launcher, env: { ...ownEnv(), ...launcher.env } },
+            host,
+            abortController,
+          ),
       },
     },
   ],

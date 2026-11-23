@@ -1,6 +1,8 @@
-import { query } from '@anthropic-ai/claude-agent-sdk'
-import type { RuntimeAdapter } from '../adapter.js'
+import { query, type Options, type Query } from '@anthropic-ai/claude-agent-sdk'
+import type { RuntimeAdapter, SessionInput } from '../adapter.js'
+import { claudePrompt } from './input.js'
 import { realise } from './realise.js'
+import { rewoundOptions } from './resume.js'
 import { claudeSession, type ClaudeShapes } from './session.js'
 
 /** Starts Claude Code through the SDK; a development server may load a fake instead. */
@@ -15,8 +17,15 @@ export const claudeAdapter: RuntimeAdapter<ClaudeShapes> = {
     rewind: { conversation: true, code: true },
   },
   realise,
-  open: async (start) => Promise.resolve(claudeSession(transport(start))),
+  open: async (options, input, rewind) => {
+    const started = rewind === null ? options : rewoundOptions(options, rewind)
+    return Promise.resolve(claudeSession(transport({ prompt: claudePrompt(input), options: started }), rewind !== null))
+  },
 }
+
+/** Runs one Claude Code query outside a session, as a side chat does, and streams its messages. */
+export const queryClaude = (options: Options, input: AsyncIterable<SessionInput>): Query =>
+  transport({ prompt: claudePrompt(input), options })
 
 /** Replaces the SDK's query with the one a module exports, such as the e2e suite's fake. */
 export async function loadSdkModule(file: string): Promise<void> {

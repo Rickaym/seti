@@ -1,28 +1,20 @@
-import type { CanUseTool, SDKUserMessage } from '@anthropic-ai/claude-agent-sdk'
+import type { CanUseTool, SDKMessage } from '@anthropic-ai/claude-agent-sdk'
 import { claudeToolCall, projectClaude } from '@seti/shared'
-import type { ConformanceTarget, NeutralHost, SuiteInput } from '../conformance/target.js'
+import type { ConformanceTarget, NeutralHost } from '../conformance/target.js'
 import { claudeAdapter } from './adapter.js'
 import { claudeRig, type QuerySlot } from './conformance-rig.js'
 import type { ClaudeShapes } from './session.js'
-
-/** Seti's inputs as the user messages Claude Code reads. */
-async function* userMessages(inputs: AsyncIterable<SuiteInput>): AsyncGenerator<SDKUserMessage> {
-  for await (const input of inputs) {
-    yield {
-      type: 'user',
-      message: { role: 'user', content: input.text },
-      parent_tool_use_id: null,
-      session_id: '',
-      uuid: input.id as SDKUserMessage['uuid'] & string,
-    }
-  }
-}
 
 /** Claude Code's permission callback, answered by the neutral host. */
 const decideWith =
   (neutral: NeutralHost): CanUseTool =>
   async (toolName, input, options) => {
-    const decision = await neutral.decide(claudeToolCall(options.toolUseID, toolName, input), options.signal)
+    const call = claudeToolCall(options.toolUseID, toolName, input)
+    if (call.kind === 'question') {
+      const answers = await neutral.ask(call.question?.questions ?? [], options.signal)
+      return { behavior: 'allow', updatedInput: { ...input, answers } }
+    }
+    const decision = await neutral.decide(call, options.signal)
     return decision.allow
       ? { behavior: 'allow', updatedInput: decision.input ?? input }
       : { behavior: 'deny', message: decision.message }
@@ -31,14 +23,29 @@ const decideWith =
 /** The Claude adapter as the suite drives it, over `FakeSdk` behind the slot the mock routes to. */
 export const claudeTarget = (slot: QuerySlot): ConformanceTarget<ClaudeShapes, 'claude'> => ({
   adapter: claudeAdapter,
-  profile: { events: { turnStart: false, reasoning: true }, usage: { tokens: true, costUsd: 'reported' } },
+  profile: {
+    events: { turnStart: false, reasoning: true },
+    usage: { tokens: true, costUsd: 'reported' },
+    input: { steer: 'next_step', retract: true },
+    background: { jobs: true, stop: true },
+    gated: { shell: true, edit: true, mcp: true },
+    parsesOutput: false,
+  },
   gaps: {
+    'LN-3':
+      'realise hands the SDK no spawn when the launcher has none, so the SDK starts Claude Code on ' +
+      'the host even for a launcher that says it is sandboxed',
+    'PM-3':
+      'a call Seti denied through canUseTool comes back as a tool_result with is_error and the ' +
+      'message, the same as a failed call, so tool.ended says error',
+    'INT-1':
+      "Claude Code's result after an interrupt is error_during_execution with no mark of the " +
+      'interrupt, which arrives as a separate notice row, so turn.ended says error',
     'EV-4':
       "Claude Code reports the session's running total; the turn's share is worked out after the " +
       'adapter (store/cost.ts), so turn.ended carries no cost',
   },
-  project: projectClaude,
-  start: (realised, inputs) => ({ prompt: userMessages(inputs), options: realised }),
+  project: (message) => projectClaude(message as SDKMessage),
   host: (neutral) => ({ decide: decideWith(neutral), hooks: {}, toolServers: {} }),
   rig: (script) => claudeRig(slot, script),
 })

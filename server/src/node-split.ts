@@ -8,7 +8,7 @@ import { NodeClient } from './node-client.js'
 import { controlLink, nodeLink, reachNode } from './node-link.js'
 import { setNodePid } from './node-pid.js'
 import { notifyInterrupted } from './notifications.js'
-import { proxiesServedBy } from './proxy-owner.js'
+import { proxiesRunBy } from './proxy-owner.js'
 import { recordAndCut } from './restart-cut.js'
 import { markRestartCut, resumeInterrupted } from './restart-resume.js'
 import { keepLeftoverRequests } from './restart-waits.js'
@@ -75,6 +75,7 @@ export async function connectNode(): Promise<void> {
     check: (socket) => {
       checkNodeSocket(socket, uid)
     },
+    local: true,
     journal: nodeLink.journal,
     answer: nodeLink.answer,
     cursors: nodeCursors,
@@ -85,12 +86,24 @@ export async function connectNode(): Promise<void> {
       await recordAndCut("Seti's node")
     },
   })
-  proxiesServedBy(async (agent) =>
-    controlLink.command('proxy.serving', { agent }).then(
-      ({ serving }) => serving,
-      () => false,
-    ),
-  )
+  proxiesRunBy({
+    open: async (task) => {
+      await controlLink.command('proxy.open', { agent: task.id, task })
+    },
+    close: async (agent) => {
+      await controlLink.command('proxy.close', { agent }).catch((e: unknown) => {
+        const why = e instanceof Error ? e.message : String(e)
+        process.stderr.write(`node link: the node keeps the proxy of ${agent} until it restarts: ${why}\n`)
+      })
+    },
+    awsToken: async (agent) => (await controlLink.command('aws.token', { agent })).token,
+    sshOpen: async (agent) => {
+      await controlLink.command('ssh.open', { agent })
+    },
+    sshReload: async () => {
+      await controlLink.command('ssh.reload', {})
+    },
+  })
   reachNode({
     command: async (type, body) => client.command(type, body),
     settled: async (agent) => client.settled(agent),

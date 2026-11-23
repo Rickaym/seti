@@ -30,7 +30,6 @@ const STILL_REACHING: Readonly<Record<string, readonly string[]>> = {
   'claude-logins.ts': ['audit.ts', 'db.ts', 'store/claude-logins.ts'],
   'compact.ts': ['audit.ts', 'store/compact.ts'],
   'connection-egress.ts': ['audit.ts', 'db.ts', 'store/connections.ts', 'store/sandbox.ts'],
-  'connection-values.ts': ['store/connections.ts'],
   'context-changes.ts': ['audit.ts', 'store/context.ts'],
   'context-files.ts': ['db.ts'],
   'cpu-cap.ts': ['audit.ts', 'store/cpu.ts'],
@@ -59,7 +58,7 @@ const STILL_REACHING: Readonly<Record<string, readonly string[]>> = {
     'store/restart.ts',
   ],
   'task-credentials.ts': ['store/credentials.ts'],
-  'task-sandbox.ts': ['store/change-requests.ts', 'store/credentials.ts'],
+  'task-proxy.ts': ['store/change-requests.ts', 'store/credentials.ts'],
   'worktree-restore.ts': ['audit.ts', 'store/task-location.ts'],
 }
 

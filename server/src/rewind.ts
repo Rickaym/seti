@@ -1,13 +1,14 @@
-import type { Options, SDKMessage, SessionMessage } from '@anthropic-ai/claude-agent-sdk'
+import type { SessionMessage as ChainEntry } from '@anthropic-ai/claude-agent-sdk'
 import type { RewindTarget, TaskRewind } from '@seti/shared'
+import type { InputReport, RewindRequest, SessionMessage, SessionReport } from './runtimes/adapter.js'
 import type { DefaultSession } from './runtimes/registry.js'
 import type { PendingRewind, RewindRow } from './store/rewinds.js'
 
-/** Records how Claude Code took a rewind point: applied, or refused with its reason. */
+/** Records how the runtime took a rewind point: applied, or refused with its reason. */
 type SettleRewind = (id: number, state: 'applied' | 'refused', reason: string | null) => Promise<void>
 
-/** Error texts of a truncated resume that Claude Code will refuse again, so it is never retried. */
-const REFUSALS = ['Resume rejected by --resume-drops-turn:', 'No message found with message.uuid of:']
+/** A session's reports past how it took a rewind point, which the session follows. */
+type Followed = SessionMessage | InputReport
 
 /** A prompt the task can go back to, and the last chain entry of the conversation to keep. */
 export interface RewindPoint extends RewindTarget {
@@ -68,7 +69,7 @@ function isToolResult(block: unknown): boolean {
 }
 
 /** The typed text of a user chain entry, or null for tool results and other entries. */
-function promptEntryText(entry: SessionMessage): string | null {
+function promptEntryText(entry: ChainEntry): string | null {
   const { message } = entry
   if (entry.type !== 'user' || typeof message !== 'object' || message === null || !('content' in message)) {
     return null
@@ -94,7 +95,7 @@ export interface ChainMatch {
 }
 
 /** Finds the chosen prompt in the session chain, right after the kept entry. */
-export function matchChain(chain: readonly SessionMessage[], point: Pick<RewindPoint, 'keep' | 'text'>): ChainMatch {
+export function matchChain(chain: readonly ChainEntry[], point: Pick<RewindPoint, 'keep' | 'text'>): ChainMatch {
   const start = point.keep === null ? 0 : chain.findIndex((entry) => entry.uuid === point.keep) + 1
   if (chain.length > 0 && point.keep !== null && start === 0) {
     return { keep_found: false, prompt_uuid: null, drops_turn: null }
@@ -109,81 +110,45 @@ export function matchChain(chain: readonly SessionMessage[], point: Pick<RewindP
   return { keep_found: true, prompt_uuid: own?.uuid ?? null, drops_turn: only ? own.uuid : null }
 }
 
-/** The resume options for a pending rewind; a rewind to the first prompt starts a new session. */
-function rewoundOptions(options: Options, pending: PendingRewind): Options {
-  const { resume, ...rest } = options
-  if (pending.resume_at === null || resume === undefined) {
-    return rest
-  }
-  const drops = pending.drops_turn === null ? {} : { resumeDropsTurn: pending.drops_turn }
-  return { ...rest, resume, resumeSessionAt: pending.resume_at, ...drops }
-}
-
-const resultErrors = (m: SDKMessage) => (m.type === 'result' && m.subtype !== 'success' ? m.errors : [])
-
-/** The refusal text when a message says Claude Code declined the truncated resume, else null. */
-export function refusalOf(m: SDKMessage | Error): string | null {
-  const texts = m instanceof Error ? [m.message] : resultErrors(m)
-  for (const text of texts) {
-    const at = Math.max(...REFUSALS.map((prefix) => text.indexOf(prefix)))
-    if (at >= 0) {
-      return text.slice(at)
+/** A session's reports, with `applied` called once it applied its rewind; a refusal ends them. */
+async function* settled(
+  session: AsyncIterable<SessionReport>,
+  applied: () => Promise<void>,
+): AsyncGenerator<Followed, string | null> {
+  for await (const report of session) {
+    if (report.type !== 'rewind') {
+      yield report
+    } else if (report.state === 'refused') {
+      return report.reason
+    } else {
+      await applied()
     }
-  }
-  return null
-}
-
-/** Follows a session opened at a rewind point until Claude Code accepts or refuses it. */
-async function* rewoundSession(
-  session: AsyncIterable<SDKMessage>,
-  rewindId: number,
-  settle: SettleRewind,
-): AsyncGenerator<SDKMessage, string | null> {
-  let applied = false
-  try {
-    for await (const m of session) {
-      const refused = applied ? null : refusalOf(m)
-      if (refused !== null) {
-        return refused
-      }
-      if (!applied && m.type === 'system' && m.subtype === 'init') {
-        await settle(rewindId, 'applied', null)
-        applied = true
-      }
-      yield m
-    }
-  } catch (e) {
-    const refused = !applied && e instanceof Error ? refusalOf(e) : null
-    if (refused === null) {
-      throw e
-    }
-    return refused
   }
   return null
 }
 
 /**
- * Runs a task's session like `query`, from the pending rewind point; a refused rewind resumes
- * plainly. `open` starts one session with the given options each time it is called.
+ * Runs a task's session from the pending rewind point; a refused rewind resumes plainly unless
+ * the session was stopped. `open` starts one session each time it is called.
  */
 export async function* resumeSession(
-  options: Options,
   pending: PendingRewind | null,
   settle: SettleRewind,
-  open: (options: Options) => Promise<DefaultSession>,
-): AsyncGenerator<SDKMessage, void> {
+  open: (rewind: RewindRequest | null) => Promise<DefaultSession>,
+  stopped: () => boolean,
+): AsyncGenerator<Followed, void> {
   if (pending === null) {
-    yield* (await open(options)).events
+    yield* settled((await open(null)).events, async () => Promise.resolve())
     return
   }
-  const rewound = await open(rewoundOptions(options, pending))
-  const refused = yield* rewoundSession(rewound.events, pending.id, settle)
+  const rewound = await open({ keep: pending.resume_at, dropsTurn: pending.drops_turn })
+  const refused = yield* settled(rewound.events, async () => settle(pending.id, 'applied', null))
   if (refused === null) {
     return
   }
   rewound.close()
   await settle(pending.id, 'refused', refused)
-  if (options.abortController?.signal.aborted !== true) {
-    yield* (await open(options)).events
+  if (!stopped()) {
+    yield* settled((await open(null)).events, async () => Promise.resolve())
   }
 }

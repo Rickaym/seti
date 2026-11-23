@@ -1,17 +1,15 @@
 import { randomUUID, type UUID } from 'node:crypto'
-import type { SDKMessage, SDKResultMessage, SDKUserMessage } from '@anthropic-ai/claude-agent-sdk'
+import { eventsOf, type EventOf } from '@seti/shared'
 import { InputQueue } from './input-queue.js'
-import type { NextMessage, QueuePriority } from './next-message.js'
+import type { NextMessage } from './next-message.js'
+import type { InputContent, InputPriority, SessionInput, SessionMessage } from './runtimes/adapter.js'
 import type { DefaultSession, DefaultShapes } from './runtimes/registry.js'
 import type { CutKind } from './store/restart.js'
-import type { UserContent } from './user-content.js'
 
 /** How long an interrupted turn may take to end before its session is closed. */
 const INTERRUPT_GRACE_MS = 5000
 /** How long taking a message back waits for Claude Code to report that it has the message. */
 const ARRIVAL_WAIT_MS = 2000
-
-type BackgroundTasks = Extract<SDKMessage, { subtype: 'background_tasks_changed' }>['tasks']
 
 /** Why the running turn is being cut short: Stop, or a message sent with the interrupt flag. */
 type TurnEnding = 'stop' | 'replace'
@@ -142,8 +140,8 @@ export class LiveSession {
     this.backlog = [next]
   }
 
-  /** The prompt for a new query; a query started over gets the messages sent so far again. */
-  openInput(): AsyncIterable<SDKUserMessage> {
+  /** The inputs of a new process; a process started over gets the messages sent so far again. */
+  openInput(): AsyncIterable<SessionInput> {
     if (this.runtime !== null) {
       this.input = this.input.replay()
     }
@@ -161,12 +159,6 @@ export class LiveSession {
   async mcpServerStatus(): Promise<DefaultShapes['toolServer'][] | null> {
     const servers = this.closed ? undefined : this.runtime?.toolServers
     return servers === undefined ? null : servers()
-  }
-
-  /** The context window the runtime measures usage against; null when it cannot say in time. */
-  async contextWindow(): Promise<number | null> {
-    const read = this.closed ? undefined : this.runtime?.contextWindow
-    return read === undefined ? null : read()
   }
 
   /** Hands the running process new permission rules; the runtime applies them to its next call. */
@@ -191,7 +183,7 @@ export class LiveSession {
   }
 
   /** Sends a message into the session, which starts a turn. */
-  send(content: UserContent, promptId: number, kind: CutKind = 'user'): void {
+  send(content: InputContent, promptId: number, kind: CutKind = 'user'): void {
     this.turnKind = kind
     this.since ??= promptId
     this.heardAt = Date.now()
@@ -205,15 +197,14 @@ export class LiveSession {
   }
 
   /**
-   * A result of a turn Claude Code ran for a background notification before it read the message
-   * that started the running turn, as a resumed session does for work the last process left.
+   * The end of a turn the runtime ran for background work before it read the message that
+   * started the running turn, as a resumed session does for work the last process left.
    */
-  precedesOpener(result: SDKResultMessage): boolean {
-    if (this.opener === null || result.origin?.kind !== 'task-notification') {
+  precedesOpener(end: EventOf<'turn.ended'>): boolean {
+    if (this.opener === null || end.cause !== 'background') {
       return false
     }
-    const answered = result.user_message_uuids ?? [result.user_message_uuid]
-    return !answered.includes(this.opener)
+    return !end.answered.includes(this.opener)
   }
 
   /** The session wrote a message of a turn at work, so one waiting for its opener still goes. */
@@ -229,12 +220,15 @@ export class LiveSession {
     this.heardAt = at
   }
 
-  /** Notes a message of the session: work it reports, or Claude Code retrying the API. */
-  note(m: SDKMessage): void {
-    if (m.type !== 'system') {
+  /** Notes a message of the session: work it reports, or the runtime retrying the API. */
+  note(m: SessionMessage): void {
+    if (m.work) {
       this.heard()
-    } else if (m.subtype === 'api_retry') {
-      this.retrying = m.error_status === null ? m.error : `${m.error} (${String(m.error_status)})`
+      return
+    }
+    const retry = eventsOf(m.events, 'notice').find((event) => event.code === 'api_retry')
+    if (retry !== undefined) {
+      this.retrying = retry.status === undefined ? retry.text : `${retry.text} (${String(retry.status)})`
     }
   }
 
@@ -263,7 +257,7 @@ export class LiveSession {
    * Sends a message during a turn, which Claude Code queues. The user's messages join the running
    * turn at its next step; updates wait for the turn to end unless they ask for sooner.
    */
-  enqueue(content: UserContent, promptId: number, priority?: QueuePriority): void {
+  enqueue(content: InputContent, promptId: number, priority?: InputPriority): void {
     const uuid = randomUUID()
     let arrive = (): void => undefined
     const arrived = new Promise<void>((resolve) => {
@@ -422,9 +416,9 @@ export class LiveSession {
   }
 
   /** Replaces the set of live background work; true when its count changed. */
-  setBackground(tasks: BackgroundTasks): boolean {
+  setBackground(jobs: readonly string[]): boolean {
     const before = this.background.size
-    this.background = new Set(tasks.filter((task) => task.ambient !== true).map((task) => task.task_id))
+    this.background = new Set(jobs)
     this.changed()
     return this.background.size !== before
   }

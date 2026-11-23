@@ -62,6 +62,8 @@ export const journalEntry = z.discriminatedUnion('type', [
   z.object({ type: z.literal('session.opened') }),
   z.object({ type: z.literal('session.started'), warm: z.boolean() }),
   z.object({ type: z.literal('guard.refused'), command: z.string(), reason: z.string() }),
+  /** A request carried connection placeholders toward a host their connections do not allow. */
+  z.object({ type: z.literal('egress.blocked'), host: z.string(), names: z.array(z.string()) }),
   z.object({ type: z.literal('memory.event'), report: memoryReport }),
   /** Seti's shadow compared a call with the runtime's outcome; null when its decision failed. */
   z.object({ type: z.literal('policy.compared'), count: policyShadowCount.nullable() }),
@@ -131,6 +133,40 @@ const askSchemas = {
   },
   /** The instructions the agent's compaction keeps, or null for the runtime's own. */
   'hook.compact': { ask: z.object({}), answer: z.object({ instructions: z.string().nullable() }) },
+  /**
+   * A credential the agent's egress proxy puts on a request: the Claude token of the login its
+   * session started on, the GitHub token for an owner, the claude.ai connectors token, or the
+   * host's sign-in to the MCP server at a URL.
+   */
+  'secret.mint': {
+    ask: z.discriminatedUnion('kind', [
+      z.object({ kind: z.literal('claude'), login: z.string().nullable() }),
+      z.object({ kind: z.literal('github'), owner: z.string().nullable() }),
+      z.object({ kind: z.literal('connector') }),
+      z.object({ kind: z.literal('mcp'), url: z.url() }),
+    ]),
+    answer: z.object({ token: z.string().nullable() }),
+  },
+  /**
+   * The value of one of the agent's connections for a request, read when asked; with `refused`,
+   * the token the upstream refused, so a minted one is renewed. Null once the agent's credential
+   * no longer carries the connection or it has no value.
+   */
+  'connection.value': {
+    ask: z.object({ connection: z.string().min(1), refused: z.string().nullable() }),
+    answer: z.object({ value: z.string().nullable() }),
+  },
+  /** The private keys of the agent's usable ssh hosts, for its ssh agent. */
+  'ssh.keys': { ask: z.object({}), answer: z.object({ keys: z.array(z.string()) }) },
+  /** Credentials of the AWS role of the agent's credential, or null without a role. */
+  'aws.credentials': {
+    ask: z.object({}),
+    answer: z.object({
+      credentials: z
+        .object({ AccessKeyId: z.string(), SecretAccessKey: z.string(), Token: z.string(), Expiration: z.string() })
+        .nullable(),
+    }),
+  },
   /** The hosts a sandboxed agent may fetch from. */
   'sandbox.hosts': { ask: z.object({}), answer: z.object({ hosts: z.array(z.string()) }) },
   /** The tools Seti serves the agent's process itself, by MCP server, as each server lists them. */
@@ -149,6 +185,17 @@ const askSchemas = {
 export type NodeAskType = keyof typeof askSchemas
 export type NodeAsk<K extends NodeAskType> = z.infer<(typeof askSchemas)[K]['ask']>
 export type NodeAnswer<K extends NodeAskType> = z.infer<(typeof askSchemas)[K]['answer']>
+
+/**
+ * The asks whose answers carry secret values. They cross only to a node on this machine over the
+ * owner-only socket, and no error or log names what they carry.
+ */
+export const VALUE_ASKS: ReadonlySet<NodeAskType> = new Set<NodeAskType>([
+  'secret.mint',
+  'aws.credentials',
+  'connection.value',
+  'ssh.keys',
+])
 
 /** What a node asks the control plane and waits for, with the answer each ask gets. */
 export const NODE_ASKS: {
@@ -253,8 +300,19 @@ const commandSchemas = {
     body: z.object({ agent }),
     answer: z.object({ memory: z.array(memoryScopeSchema), cpu: z.array(cpuScopeSchema) }),
   },
-  /** Whether the node runs the agent's egress proxy, which the control plane's sandboxes then use. */
-  'proxy.serving': { body: z.object({ agent }), answer: z.object({ serving: z.boolean() }) },
+  /**
+   * Opens the agent's egress proxy on the node unless it runs, for a sandbox the control plane
+   * builds. The task is the control plane's row.
+   */
+  'proxy.open': { body: z.object({ agent, task: z.unknown() }), answer: done },
+  /** The token the agent's processes show the node's egress proxy to fetch AWS credentials. */
+  'aws.token': { body: z.object({ agent }), answer: z.object({ token: z.string() }) },
+  /** Stops a removed agent's egress proxy and ssh agent on the node. */
+  'proxy.close': { body: z.object({ agent }), answer: done },
+  /** Starts the agent's ssh agent on the node unless it runs, for a sandbox the control plane makes. */
+  'ssh.open': { body: z.object({ agent }), answer: done },
+  /** Reloads every running ssh agent's keys, after a key or an agent's ssh hosts changed. */
+  'ssh.reload': { body: done, answer: done },
   /** The agents with a live scope, whose caps a change of a default may move. */
   'scopes.agents': { body: done, answer: z.object({ agents: z.array(agent) }) },
   /** Moves the agents' live scopes to these caps now. */
@@ -274,3 +332,6 @@ export type NodeReply<K extends NodeCommandType> = z.infer<(typeof commandSchema
 export const NODE_COMMANDS: {
   [K in NodeCommandType]: { body: z.ZodType<NodeCommand<K>>; answer: z.ZodType<NodeReply<K>> }
 } = commandSchemas
+
+/** The commands whose answers carry a secret value; like value asks, only a local node gets them. */
+export const VALUE_COMMANDS: ReadonlySet<NodeCommandType> = new Set<NodeCommandType>(['aws.token'])

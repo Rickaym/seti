@@ -3,7 +3,6 @@ import os from 'node:os'
 import path from 'node:path'
 import type { SshKeySecretName } from '@seti/shared'
 import { secret } from './secrets.js'
-import { sshAgentSocket, type KeyLoader } from './ssh-agent.js'
 import { reachKeys, sandboxSshConfig, type RenderHost, type SshReach } from './ssh-config.js'
 import { sshKeys, sshKnownHosts, type SshHostRow, type SshKeyRow } from './store/ssh.js'
 
@@ -83,20 +82,17 @@ export interface SandboxSsh {
   agentDir: string
 }
 
-/** What a task's sandbox ssh is made of: where it lives, its proxy, its reach and its keys. */
+/** What a task's sandbox ssh is made of: where it lives, its proxy and its reach. */
 export interface SandboxSshRequest {
-  taskId: string
   taskDir: string
   home: string
   proxy: { socat: string; port: number }
   reach: Pick<SshReach, 'hosts' | 'knownHosts'>
-  /** The private keys of the task's hosts, read fresh whenever its agent reloads. */
-  keys: KeyLoader
 }
 
-/** Writes a task's ssh files for its usable hosts and starts its agent with only their keys. */
+/** Writes a task's ssh files for its usable hosts; its agent, holding only their keys, is apart. */
 export async function prepareSandboxSsh(request: SandboxSshRequest): Promise<SandboxSsh> {
-  const { taskId, taskDir, home, proxy, reach, keys } = request
+  const { taskDir, home, proxy, reach } = request
   const dir = path.join(taskDir, 'ssh')
   fs.mkdirSync(dir, { recursive: true, mode: 0o700 })
   await writeKeyFiles(dir, reach.hosts)
@@ -107,7 +103,5 @@ export async function prepareSandboxSsh(request: SandboxSshRequest): Promise<San
   })
   fs.writeFileSync(path.join(dir, 'config'), config, { mode: 0o600 })
   fs.writeFileSync(path.join(dir, 'known_hosts'), await knownHostsText(reach.knownHosts), { mode: 0o644 })
-  const agentDir = path.join(taskDir, 'ssh-agent')
-  await sshAgentSocket(taskId, agentDir, keys)
-  return { dir, agentDir }
+  return { dir, agentDir: path.join(taskDir, 'ssh-agent') }
 }

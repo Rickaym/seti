@@ -1,4 +1,5 @@
-import type { RuntimeEvent } from '@seti/shared'
+import { eventsOf, isAgentOutput, type RuntimeEvent } from '@seti/shared'
+import type { SessionMessage } from '../adapter.js'
 import { conversationLines, type ScriptedLine } from './dialect.js'
 import { scriptedToolCall } from './tools.js'
 
@@ -33,6 +34,27 @@ const HANDLERS: { [T in ScriptedLine['t']]: (line: Of<T>) => RuntimeEvent } = {
     status: line.status,
     result: { text: line.output, images: 0, ...(line.exit === undefined ? {} : { exitCode: line.exit }) },
   }),
+  job: (line) =>
+    line.phase === 'start'
+      ? {
+          v: 1,
+          thread: '',
+          type: 'job.started',
+          jobId: line.job,
+          callId: line.call,
+          kind: 'shell',
+          label: line.label,
+          background: true,
+        }
+      : {
+          v: 1,
+          thread: '',
+          type: 'job.ended',
+          jobId: line.job,
+          callId: line.call,
+          status: line.status ?? 'completed',
+          summary: line.label,
+        },
   end: (line) => ({
     v: 1,
     thread: '',
@@ -73,4 +95,17 @@ export function projectScripted(raw: unknown): RuntimeEvent[] {
   }
   const handler = HANDLERS[parsed.data.t] as (line: ScriptedLine) => RuntimeEvent
   return [handler(parsed.data)]
+}
+
+/** A line as a session report: the runtime speaks only of the agent at work and its turns. */
+export function scriptedReport(raw: unknown): SessionMessage {
+  const events = projectScripted(raw)
+  return {
+    type: 'message',
+    raw,
+    events,
+    work: true,
+    byAgent: events.some((event) => event.thread === '' && isAgentOutput(event)),
+    delivered: eventsOf(events, 'turn.ended').flatMap((end) => end.answered),
+  }
 }

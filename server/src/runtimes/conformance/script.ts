@@ -6,6 +6,8 @@ export interface ScriptCall {
   output?: string
   /** The tool runs and fails. */
   fails?: boolean
+  /** The tool runs until the turn is interrupted. */
+  hold?: boolean
 }
 
 /**
@@ -22,13 +24,43 @@ export type Step =
   | { malformed: true }
   /** A message of a type the adapter has no mapping for. */
   | { unknown: string }
+  /** A line of output that is no message at all, such as a stray log line. */
+  | { garbage: string }
   /** The process dies with this exit code. */
   | { exit: number }
+  /** Waits until the turn is interrupted. */
+  | { hold: true }
+  /** Waits for an input sent during the turn; a runtime that steers takes it into this turn. */
+  | { awaitInput: true }
+  /** Starts a background command with this label; it ends when the next turn starts. */
+  | { job: string }
 
 /** What the runtime does for each turn, in order; a turn past the last says its inputs back. */
 export interface Script {
   turns: Step[][]
+  /** The runtime answers every interrupt with an error. */
+  refuseInterrupt?: boolean
+  /** The launcher's environment, and whether it lacks a spawn or throws when asked to start. */
+  launcher?: { env?: Record<string, string>; spawn?: 'missing' | 'throws' }
+  /** Every process exits with this code before it writes anything. */
+  exitAtStart?: number
+  /** Processes ignore the signal to stop and never exit by themselves. */
+  deaf?: boolean
 }
 
 /** The reply of a turn the script has no steps for: its inputs' text, joined by `|`. */
 export const echoOf = (inputs: readonly string[]): string => `heard: ${inputs.join('|')}`
+
+/** A turn that uses most of what a runtime reports: reasoning, text, and calls of several kinds. */
+export const VARIED: Step[] = [
+  { think: 'plan the work' },
+  { say: 'looking around' },
+  { call: { tool: 'sh', args: { cmd: 'ls' }, output: 'README.md' } },
+  { call: { tool: 'cat', args: { path: 'README.md' }, output: '# Readme' } },
+  { call: { tool: 'grep', args: { pattern: 'TODO' }, output: 'none' } },
+  { call: { tool: 'fetch', args: { url: 'https://example.com/' }, output: 'page' } },
+  { call: { tool: 'patch', args: { path: 'README.md', diff: '-a\n+b\n' }, output: 'patched' } },
+  { call: { tool: 'seti.list_agents', args: {}, output: '[]' } },
+  { call: { tool: 'frobnicate', args: { level: 3 }, output: 'frobbed' } },
+  { say: 'all done' },
+]

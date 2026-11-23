@@ -1,7 +1,7 @@
 import type { Options, PermissionResult, SDKUserMessage } from '@anthropic-ai/claude-agent-sdk'
-import { fakeMessage, FakeSdk, type FakeSession } from '../../fake-sdk.js'
+import { aborted, fakeMessage, FakeSdk, type FakeSession } from '../../fake-sdk.js'
 import type { Launcher } from '../../launcher.js'
-import { FakeProcess } from '../conformance/process.js'
+import { FakeProcess, launcherOf } from '../conformance/process.js'
 import { echoOf, type Script, type ScriptCall, type Step } from '../conformance/script.js'
 import type { Rig, SpawnRecord } from '../conformance/target.js'
 
@@ -32,13 +32,35 @@ type FakeTurn = Parameters<TurnScript>[0]
 type Message = ReturnType<typeof fakeMessage>
 type Args = Record<string, unknown>
 
+/** The script's questions as AskUserQuestion takes them. */
+const claudeQuestions = (questions: unknown) =>
+  (Array.isArray(questions) ? (questions as { text: string; options: string[] }[]) : []).map((q) => ({
+    question: q.text,
+    header: 'Question',
+    options: q.options.map((label) => ({ label, description: '' })),
+    multiSelect: false,
+  }))
+
+/** What Claude Code tells the model once the user answered its questions. */
+const answered = (input: Args | undefined): string =>
+  `User has answered your questions: ${Object.entries((input?.answers ?? {}) as Record<string, string>)
+    .map(([question, answer]) => `"${question}"="${answer}"`)
+    .join(', ')}`
+
 /** The script's tools as Claude Code names them, with Claude Code's input for the same call. */
 const TOOLS = new Map<string, (args: Args) => [string, Args]>([
-  ['sh', (args) => ['Bash', { command: args.cmd, description: 'Run it' }]],
+  [
+    'sh',
+    (args) => [
+      'Bash',
+      { command: args.cmd, description: 'Run it', ...(args.background === true ? { run_in_background: true } : {}) },
+    ],
+  ],
   ['cat', (args) => ['Read', { file_path: args.path }]],
   ['patch', (args) => ['Edit', { file_path: args.path, old_string: 'a', new_string: 'b' }]],
   ['grep', (args) => ['Grep', { pattern: args.pattern }]],
   ['fetch', (args) => ['WebFetch', { url: args.url, prompt: 'Read it' }]],
+  ['ask', (args) => ['AskUserQuestion', { questions: claudeQuestions(args.questions) }]],
 ])
 
 const claudeTool = (call: ScriptCall): [string, Args] => {
@@ -50,7 +72,8 @@ const claudeTool = (call: ScriptCall): [string, Args] => {
 }
 
 /** Tools Claude Code asks about in its default mode when no rule allows them. */
-const isGated = (name: string) => ['Bash', 'Edit', 'Write', 'WebFetch'].includes(name) || name.startsWith('mcp__')
+const isGated = (name: string) =>
+  ['Bash', 'Edit', 'Write', 'WebFetch', 'AskUserQuestion'].includes(name) || name.startsWith('mcp__')
 
 /** A conversation Claude Code saved: its id and every input it read. */
 interface Saved {
@@ -58,12 +81,31 @@ interface Saved {
   history: string[]
 }
 
+/** A background command a process started: its task id, the call that started it, its label. */
+interface Job {
+  task: string
+  call: string
+  label: string
+}
+
+/** Claude Code's report that a background command ended. */
+const jobEnded = (job: Job, status: 'completed' | 'stopped') =>
+  fakeMessage('system', {
+    subtype: 'task_notification',
+    task_id: job.task,
+    tool_use_id: job.call,
+    status,
+    summary: job.label,
+    output_file: '',
+  })
+
 /** What outlives one Claude Code process on the rig: saved conversations and what tools did. */
 class Machine {
   readonly effects: string[] = []
+  private readonly jobs = new WeakMap<FakeSession, Job[]>()
   private readonly saved = new Map<string, string[]>()
   private readonly sessions = new WeakMap<FakeSession, Saved>()
-  private readonly script: Script
+  readonly script: Script
   private turns = 0
   private ids = 0
 
@@ -81,6 +123,21 @@ class Machine {
     const steps = this.script.turns[this.turns] ?? [{ say: echoOf([text]) }]
     this.turns += 1
     return steps
+  }
+
+  addJob(session: FakeSession, job: Job): void {
+    this.jobs.set(session, [...(this.jobs.get(session) ?? []), job])
+  }
+
+  /** Removes and returns the process's background commands, or only the one with the task id. */
+  takeJobs(session: FakeSession, task?: string): Job[] {
+    const all = this.jobs.get(session) ?? []
+    const taken = all.filter((job) => task === undefined || job.task === task)
+    this.jobs.set(
+      session,
+      all.filter((job) => !taken.includes(job)),
+    )
+    return taken
   }
 
   /** The conversation a process holds; resuming one the machine lacks fails as Claude Code does. */
@@ -130,41 +187,86 @@ class TurnPlayer {
       yield this.assistant([{ type: 'thinking', thinking: step.think, signature: '' }])
     } else if ('call' in step) {
       yield* this.call(step.call)
+    } else if ('job' in step) {
+      yield* this.job(step.job)
+    } else if ('hold' in step) {
+      await aborted(this.turn.signal)
+    } else if ('awaitInput' in step) {
+      await Promise.race([this.turn.queued(), aborted(this.turn.signal)])
+      this.session.history.push(...(this.turn.signal.aborted ? [] : this.turn.fold()))
     } else if ('malformed' in step) {
       yield this.message('assistant', { message: null })
     } else if ('unknown' in step) {
       yield this.message(step.unknown, {})
+    } else if ('garbage' in step) {
+      throw new Error("The SDK parses Claude Code's output, so a stray line never reaches the adapter")
     } else {
       throw new Error(`Claude Code process exited with code ${String(step.exit)}`)
     }
   }
 
-  private async *call(call: ScriptCall): AsyncGenerator<Message> {
+  private async *job(label: string): AsyncGenerator<Message> {
+    const task = this.machine.nextId('bash_')
+    const output = `Command running in background with ID: ${task}`
+    const call = yield* this.call({ tool: 'sh', args: { cmd: label, background: true }, output })
+    if (call !== null) {
+      yield this.message('system', {
+        subtype: 'task_started',
+        task_id: task,
+        tool_use_id: call,
+        description: label,
+        task_type: 'local_bash',
+        is_backgrounded: true,
+      })
+      this.machine.addJob(this.turn.session, { task, call, label })
+    }
+  }
+
+  /** Plays a call; returns its id when it ran to its end. */
+  private async *call(call: ScriptCall): AsyncGenerator<Message, string | null> {
     const id = this.machine.nextId('toolu_')
     const [name, input] = claudeTool(call)
     yield this.assistant([{ type: 'tool_use', id, name, input }])
     const ask = this.turn.session.options.canUseTool
-    const asked =
-      isGated(name) && ask !== undefined
-        ? await ask(name, input, { signal: this.turn.signal, toolUseID: id, requestId: `request-${id}` })
-        : null
-    const decision: PermissionResult = asked ?? { behavior: 'allow' }
     const result = (content: string, isError: boolean) =>
       this.message('user', {
         message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: id, content, is_error: isError }] },
       })
+    const { signal } = this.turn
+    const asked =
+      isGated(name) && ask !== undefined
+        ? await Promise.race([
+            ask(name, input, { signal, toolUseID: id, requestId: `request-${id}` }),
+            aborted(signal).then(() => null),
+          ])
+        : null
+    if (signal.aborted) {
+      yield result('[Request interrupted by user for tool use]', true)
+      return null
+    }
+    const decision: PermissionResult = asked ?? { behavior: 'allow' }
     if (decision.behavior === 'deny') {
       yield result(decision.message, true)
-      return
+      return null
     }
     this.machine.effects.push(`${call.tool} ${JSON.stringify(decision.updatedInput ?? input)}`)
-    yield result(call.output ?? '', call.fails === true)
+    if (call.hold === true) {
+      await aborted(this.turn.signal)
+      yield result('[Request interrupted by user for tool use]', true)
+      return null
+    }
+    const output = name === 'AskUserQuestion' ? answered(decision.updatedInput) : (call.output ?? '')
+    yield result(output, call.fails === true)
+    return id
   }
 }
 
 /** Claude Code's side of a turn: its start report, the script's steps, and the result. */
 const turnScript = (machine: Machine): TurnScript =>
   async function* (turn) {
+    if (machine.script.exitAtStart !== undefined) {
+      throw new Error(`Claude Code process exited with code ${String(machine.script.exitAtStart)}`)
+    }
     const session = machine.sessionOf(turn.session)
     session.history.push(turn.text)
     const steps = machine.stepsFor(turn.text)
@@ -178,8 +280,17 @@ const turnScript = (machine: Machine): TurnScript =>
       mcp_servers: [],
       plugins: [],
     })
+    for (const job of machine.takeJobs(turn.session)) {
+      yield jobEnded(job, 'completed')
+    }
     for (const step of steps) {
+      if (turn.signal.aborted) {
+        return
+      }
       yield* player.play(step)
+    }
+    if (turn.signal.aborted) {
+      return
     }
     yield player.message('result', {
       subtype: 'success',
@@ -194,26 +305,44 @@ const turnScript = (machine: Machine): TurnScript =>
 
 /**
  * A host where Claude Code plays the script through `FakeSdk`. Like the real SDK, the query
- * starts the process through `spawnClaudeCodeProcess` when Seti hands one.
+ * starts the process through `spawnClaudeCodeProcess` when Seti hands one, and else by itself.
  */
 export function claudeRig(slot: QuerySlot, script: Script): Rig {
   const machine = new Machine(script)
   const sdk = new FakeSdk(turnScript(machine))
+  sdk.interruptMode = script.refuseInterrupt === true ? 'reject' : 'honour'
+  sdk.onStopTask = (session, task) => {
+    for (const job of machine.takeJobs(session, task)) {
+      session.emit(jobEnded(job, 'stopped'))
+    }
+  }
   const spawns: SpawnRecord[] = []
-  const spawn: NonNullable<Launcher['spawn']> = (request) => {
+  const selfStarts: SpawnRecord[] = []
+  const start: NonNullable<Launcher['spawn']> = (request) => {
     spawns.push({ command: request.command, args: request.args, cwd: request.cwd, env: request.env })
-    return new FakeProcess(request.signal)
+    return new FakeProcess(request.signal, script.deaf === true)
   }
   slot.route((args) => {
     const options = args.options ?? {}
-    options.spawnClaudeCodeProcess?.({
-      command: 'claude',
-      args: ['--output-format', 'stream-json'],
-      ...(options.cwd === undefined ? {} : { cwd: options.cwd }),
-      env: options.env ?? {},
-      signal: options.abortController?.signal ?? new AbortController().signal,
-    })
+    const request = { command: 'claude', args: ['--output-format', 'stream-json'], env: options.env ?? {} }
+    if (options.spawnClaudeCodeProcess === undefined) {
+      selfStarts.push({ ...request, cwd: options.cwd })
+    } else {
+      options.spawnClaudeCodeProcess({
+        ...request,
+        ...(options.cwd === undefined ? {} : { cwd: options.cwd }),
+        signal: options.abortController?.signal ?? new AbortController().signal,
+      })
+    }
     return sdk.query(args)
   })
-  return { launcher: { sandboxed: true, env: {}, spawn }, spawns, effects: machine.effects }
+  return {
+    launcher: launcherOf(script, start),
+    spawns,
+    selfStarts,
+    effects: machine.effects,
+    crash: (code) => {
+      sdk.last?.fail(new Error(`Claude Code process exited with code ${String(code)}`))
+    },
+  }
 }

@@ -1,9 +1,8 @@
-import type { SDKMessage } from '@anthropic-ai/claude-agent-sdk'
 import type { QueueState } from '@seti/shared'
-import { z } from 'zod'
 import type { LiveSession } from './agent-session.js'
 import { messages } from './db.js'
 import { nodeLink } from './node-link.js'
+import type { InputReport } from './runtimes/adapter.js'
 import { publish } from './task-events.js'
 
 /** Marks a queued prompt delivered or removed, once, and tells open transcripts. */
@@ -31,28 +30,13 @@ export async function settleQueued(
   }
 }
 
-const commandLifecycle = z.object({
-  type: z.literal('command_lifecycle'),
-  command_uuid: z.string(),
-  state: z.string(),
-})
-
-/**
- * Follows Claude Code's reports on the messages it queued, which the SDK types leave out; true
- * for such a report, which is bookkeeping rather than transcript.
- */
-export async function followQueue(taskId: string, session: LiveSession, m: SDKMessage): Promise<boolean> {
-  const report = commandLifecycle.safeParse(m)
-  if (!report.success) {
-    return false
-  }
-  const { command_uuid: uuid, state } = report.data
+/** Follows the runtime's report on an input it queued: queued, handed to the agent, or dropped. */
+export async function followInput(taskId: string, session: LiveSession, { id, state }: InputReport): Promise<void> {
   if (state === 'queued') {
-    session.arrived(uuid)
+    session.arrived(id)
   } else if (state === 'started') {
-    await settleQueued(taskId, session, uuid, 'delivered')
+    await settleQueued(taskId, session, id, 'delivered')
   } else if (state === 'cancelled') {
-    await settleQueued(taskId, session, uuid, 'removed')
+    await settleQueued(taskId, session, id, 'removed')
   }
-  return true
 }

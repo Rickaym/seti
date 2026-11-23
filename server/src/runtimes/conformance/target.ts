@@ -14,14 +14,27 @@ export interface Profile {
     reasoning: boolean
   }
   usage: { tokens: boolean; costUsd: 'reported' | 'priced' | 'none' }
+  /** Input sent during a turn joins it at its next step, or waits for the turn's end. */
+  input: { steer: 'next_step' | 'after_turn'; retract: boolean }
+  /** Commands keep running in the background after their call ends, and can be stopped. */
+  background: { jobs: boolean; stop: boolean }
+  /** The kinds whose calls Seti decides before they run (gate `before` or `request`). */
+  gated: { shell: boolean; edit: boolean; mcp: boolean }
+  /** The adapter reads the runtime's output itself, rather than through the vendor's library. */
+  parsesOutput: boolean
 }
 
 /** A neutral decision: run the call, maybe with changed input, or refuse it with a reason. */
 type NeutralDecision = { allow: true; input?: Record<string, unknown> } | { allow: false; message: string }
 
+/** Structured questions to the user, as a question call carries them. */
+export type Questions = NonNullable<ToolCall['question']>['questions']
+
 /** How a case answers what the runtime asks while a turn waits. */
 export interface NeutralHost {
   decide: (call: ToolCall, signal: AbortSignal) => Promise<NeutralDecision>
+  /** The user's answers to structured questions, by question text. */
+  ask: (questions: Questions, signal: AbortSignal) => Promise<Record<string, string>>
 }
 
 /** A process start a rig saw: what the adapter asked the launcher for. */
@@ -36,14 +49,12 @@ export interface SpawnRecord {
 export interface Rig {
   readonly launcher: Launcher
   readonly spawns: readonly SpawnRecord[]
+  /** Processes the runtime started by itself, outside the launcher. */
+  readonly selfStarts: readonly SpawnRecord[]
   /** Every tool call that ran, as `<tool> <args as JSON>`, in order. */
   readonly effects: readonly string[]
-}
-
-/** An input as the suite sends it; the id is the prompt row's id in Seti. */
-export interface SuiteInput {
-  id: string
-  text: string
+  /** Kills the newest process from outside, as the kernel would, with this exit code. */
+  crash: (code: number) => void
 }
 
 /**
@@ -57,9 +68,7 @@ export interface ConformanceTarget<S extends RuntimeShapes, Id extends string = 
   /** Cases this adapter is known to fail, with the reason; they run expecting the failure. */
   gaps?: Partial<Record<string, string>>
   /** The adapter's projector, which `RuntimeAdapter` does not carry yet. */
-  project: (message: S['message']) => RuntimeEvent[]
-  /** What a session starts from, given the realised spec and the inputs Seti will send. */
-  start: (realised: S['realised'], inputs: AsyncIterable<SuiteInput>) => S['start']
+  project: (message: unknown) => RuntimeEvent[]
   /** The host the adapter gets, answering through the neutral one. */
   host: (neutral: NeutralHost) => SessionHost<S>
   /** A fake runtime that plays the script. */
