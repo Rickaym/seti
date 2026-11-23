@@ -186,9 +186,13 @@ export class ScriptedRuntime {
     return null
   }
 
-  private misbehave(step: Extract<Step, { malformed: true } | { unknown: string } | { exit: number }>): void {
+  private misbehave(
+    step: Extract<Step, { malformed: true } | { unknown: string } | { garbage: string } | { exit: number }>,
+  ): void {
     if ('malformed' in step) {
       this.io.write({ t: 'say', id: 7 })
+    } else if ('garbage' in step) {
+      this.io.write(step.garbage)
     } else if ('unknown' in step) {
       this.io.write({ t: step.unknown })
     } else {

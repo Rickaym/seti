@@ -1,4 +1,4 @@
-import type { NodeCommand, NodeReply, Task } from '@seti/shared'
+import type { NodeCommand, NodeReply } from '@seti/shared'
 import type { LiveSession } from './agent-session.js'
 import { liveScopes } from './memory-scope.js'
 import { serveControl } from './node-link.js'
@@ -97,9 +97,8 @@ serveControl({
     return {}
   },
   'scopes.read': async ({ agent }) => ({ memory: scopeMemory(agent), cpu: await scopeCpu(agent) }),
-  // The control plane read the task row.
-  'proxy.open': async ({ task }) => {
-    await openTaskProxy(task as Task)
+  'proxy.open': async ({ agent, grant }) => {
+    await openTaskProxy(agent, grant)
     return {}
   },
   'aws.token': ({ agent }) => ({ token: awsToken(agent) }),

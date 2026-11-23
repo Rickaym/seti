@@ -54,6 +54,15 @@ type RewindReport = { type: 'rewind'; state: 'applied' } | { type: 'rewind'; sta
 /** One report of an open session, in the order the runtime made them. */
 export type SessionReport = SessionMessage | InputReport | RewindReport
 
+/** How one of a session's tool servers stands, without its configuration. */
+export interface ToolServerState {
+  name: string
+  status: string
+  error?: string
+  /** How the runtime reaches it, such as stdio or http; null when it does not say. */
+  transport: string | null
+}
+
 /**
  * Where a session resumes in its conversation: after the entry `keep` names, or as a new session
  * when it is null; `dropsTurn` names the one turn the rewind drops, for the runtime to check.
@@ -82,7 +91,7 @@ interface Capabilities {
 /**
  * The values a runtime's sessions take and give that are still the runtime's own: what a spec
  * carries for it alone, what it realises a spec into, how Seti decides and checks its tool calls
- * and serves its own tools, its tool server reports, rules and permission modes.
+ * and serves its own tools, rules and permission modes.
  */
 export interface RuntimeShapes {
   vendor: unknown
@@ -90,7 +99,6 @@ export interface RuntimeShapes {
   decide: unknown
   hooks: unknown
   hostServers: unknown
-  toolServer: unknown
   policy: unknown
   mode: unknown
 }
@@ -117,7 +125,7 @@ export interface RuntimeSession<S extends RuntimeShapes> {
   /** Stops one subagent or background command the session started. */
   readonly stopBackground?: (jobId: string) => Promise<void>
   /** How the session's tool servers connected. */
-  readonly toolServers?: () => Promise<S['toolServer'][]>
+  readonly toolServers?: () => Promise<ToolServerState[]>
   /** Hands the running process new rules, which apply from its next tool call. */
   readonly setPolicy?: (policy: S['policy']) => Promise<void>
   /** Switches the running process's permission mode. */

@@ -10,6 +10,7 @@ describe("the credentials a node's egress proxy asks the control plane for", () 
     expect(await nodeLink.ask(id, 'secret.mint', { kind: 'github', owner: null })).toEqual({ token: null })
     expect(await nodeLink.ask(id, 'aws.credentials', {})).toEqual({ credentials: null })
     expect(await nodeLink.ask(id, 'ssh.keys', {})).toEqual({ keys: [] })
+    expect(await nodeLink.ask(id, 'access.reach', {})).toEqual({ sshHops: [], aws: false })
     expect(await nodeLink.ask(id, 'connection.value', { connection: 'none', refused: null })).toEqual({ value: null })
     expect(await nodeLink.ask(id, 'secret.mint', { kind: 'mcp', url: 'https://mcp.none.test/mcp' })).toEqual({
       token: null,

@@ -80,6 +80,32 @@ export const journalEntry = z.discriminatedUnion('type', [
 ])
 export type JournalEntry = z.infer<typeof journalEntry>
 
+/** A connection as an agent's egress proxy applies it: where and how, never its value. */
+const grantConnection = z.object({
+  id: z.string().min(1),
+  name: z.string(),
+  env: z.string(),
+  placeholder: z.string(),
+  hosts: z.array(z.string()),
+  header: z.object({ name: z.string(), template: z.string() }).nullable(),
+  /** The value is a token Seti mints, which a refusal renews. */
+  minted: z.boolean(),
+})
+export type GrantConnection = z.infer<typeof grantConnection>
+
+/** What an agent's egress proxy applies, as the control plane hands it, with no value in it. */
+export const proxyGrant = z.object({
+  /** The Claude login the agent's session signs in with. */
+  login: z.string().nullable(),
+  connections: z.array(grantConnection),
+  /** host:port of the MCP servers the host signed in to that the agent may use. */
+  mcp: z.array(z.string()),
+  deniedConnectors: z.array(z.string()),
+  /** Every host the sandbox CA must sign for the agent's proxy. */
+  caHosts: z.array(z.string()),
+})
+export type ProxyGrant = z.infer<typeof proxyGrant>
+
 /** A tool call of the agent, as the runtime hands it to a hook. */
 const toolCall = z.object({ tool: z.string(), input: z.record(z.string(), z.unknown()) })
 
@@ -167,6 +193,8 @@ const askSchemas = {
         .nullable(),
     }),
   },
+  /** Where the agent's proxy may open ssh to, as first hops, and whether it hands AWS credentials. */
+  'access.reach': { ask: z.object({}), answer: z.object({ sshHops: z.array(z.string()), aws: z.boolean() }) },
   /** The hosts a sandboxed agent may fetch from. */
   'sandbox.hosts': { ask: z.object({}), answer: z.object({ hosts: z.array(z.string()) }) },
   /** The tools Seti serves the agent's process itself, by MCP server, as each server lists them. */
@@ -300,11 +328,8 @@ const commandSchemas = {
     body: z.object({ agent }),
     answer: z.object({ memory: z.array(memoryScopeSchema), cpu: z.array(cpuScopeSchema) }),
   },
-  /**
-   * Opens the agent's egress proxy on the node unless it runs, for a sandbox the control plane
-   * builds. The task is the control plane's row.
-   */
-  'proxy.open': { body: z.object({ agent, task: z.unknown() }), answer: done },
+  /** Opens the agent's egress proxy on the node unless it runs, for a control plane sandbox. */
+  'proxy.open': { body: z.object({ agent, grant: proxyGrant }), answer: done },
   /** The token the agent's processes show the node's egress proxy to fetch AWS credentials. */
   'aws.token': { body: z.object({ agent }), answer: z.object({ token: z.string() }) },
   /** Stops a removed agent's egress proxy and ssh agent on the node. */

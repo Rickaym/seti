@@ -1,7 +1,8 @@
 import type { SDKMessage } from '@anthropic-ai/claude-agent-sdk'
 import type { MessageRow } from '@seti/shared'
 import { describe, expect, it } from 'vitest'
-import { WIRE_TEXT_LIMIT, wireRow } from './transcript.js'
+import { wireRow } from './transcript.js'
+import { WIRE_TEXT_LIMIT } from './wire-text.js'
 
 const LONG = 'x'.repeat(1024 * 1024)
 
