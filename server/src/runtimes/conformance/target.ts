@@ -76,6 +76,8 @@ export interface Rig {
 export interface ConformanceTarget<S extends RuntimeShapes, Id extends string = string> {
   adapter: RuntimeAdapter<S, Id>
   profile: Profile
+  /** How long anything a case waits on may take, when longer than the suite's bound. */
+  boundMs?: number
   /** Cases this adapter is known to fail, with the reason; they run expecting the failure. */
   gaps?: Partial<Record<string, string>>
   /** The host the adapter gets, answering through the neutral one. */

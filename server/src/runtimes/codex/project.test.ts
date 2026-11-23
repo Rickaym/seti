@@ -140,6 +140,15 @@ describe('Codex calls', () => {
     })
   })
 
+  it("starts the session from a resumed thread's reply, which Codex sends in place of thread/started", () => {
+    const thread = { id: ROOT, model: 'gpt-5.5', environments: [{ cwd: '/work/project' }] }
+    expect(one('thread/resume', { thread, model: 'gpt-5.5' })).toMatchObject({
+      type: 'session.started',
+      sessionId: ROOT,
+      cwd: '/work/project',
+    })
+  })
+
   it('opens a thread for a spawned subagent, and its own messages carry that thread', () => {
     const spawn = {
       type: 'collabAgentToolCall',

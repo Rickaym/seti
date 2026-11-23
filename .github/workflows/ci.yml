@@ -95,6 +95,13 @@ jobs:
         if: needs.changes.outputs.node == 'true'
       - run: pnpm audit --audit-level high
         if: needs.changes.outputs.node == 'true'
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        if: needs.changes.outputs.node == 'true'
+        with:
+          path: ~/.cache/seti-codex
+          key: codex-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('server/src/runtimes/codex/pin.json') }}
+      - run: echo "SETI_CODEX_BIN=$(node scripts/codex-binary.mjs "$HOME/.cache/seti-codex")" >> "$GITHUB_ENV"
+        if: needs.changes.outputs.node == 'true'
       - run: pnpm test
         if: needs.changes.outputs.node == 'true'
       - run: pnpm build

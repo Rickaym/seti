@@ -1,6 +1,6 @@
 import { expect } from 'vitest'
 import { closed, ofType, turnEnd, type Case } from './case.js'
-import { within, type RunView } from './run.js'
+import type { RunView } from './run.js'
 import { echoOf } from './script.js'
 
 /** The session id the session reported first. */
@@ -17,7 +17,7 @@ export const LIFECYCLE: Case[] = [
     proves: 'RuntimeAdapter.realise and open; RT-2 start through the launcher',
     run: async (subject) => {
       const rig = subject.rig({ turns: [[{ say: 'hello' }]] })
-      const run = await within(subject.open(rig), 'open')
+      const run = await subject.within(subject.open(rig), 'open')
       expect(rig.spawns.length).toBeLessThanOrEqual(1)
       run.send('one')
       await turnEnd(run, 1)
