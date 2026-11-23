@@ -1,8 +1,8 @@
 import type { Options } from '@anthropic-ai/claude-agent-sdk'
 import type { Task } from '@seti/shared'
-import { taskLauncher } from '../launcher.js'
-import { claudeLaunch } from '../runtimes/claude/realise.js'
-import { permissionSettings, systemAppend, workingDirs } from '../session-options.js'
+import { taskLauncher } from '../../launcher.js'
+import { permissionSettings, systemAppend, workingDirs } from '../../session-options.js'
+import { claudeLaunch } from './realise.js'
 
 /** Tools that only read, which a side chat the user or the EA starts may use. */
 export const READ_TOOLS = ['Read', 'Glob', 'Grep']
