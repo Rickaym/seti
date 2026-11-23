@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { MEMORY_EVENTS } from './memory.js'
+import { policyShadowCount } from './policy-shadow.js'
 import { cpuScopeSchema, memoryScopeSchema } from './processes.js'
 import { TASK_STATUSES } from './tasks.js'
 
@@ -62,6 +63,8 @@ export const journalEntry = z.discriminatedUnion('type', [
   z.object({ type: z.literal('session.started'), warm: z.boolean() }),
   z.object({ type: z.literal('guard.refused'), command: z.string(), reason: z.string() }),
   z.object({ type: z.literal('memory.event'), report: memoryReport }),
+  /** Seti's shadow compared a call with the runtime's outcome; null when its decision failed. */
+  z.object({ type: z.literal('policy.compared'), count: policyShadowCount.nullable() }),
   z.object({
     type: z.literal('rewind.settled'),
     id: z.int(),
