@@ -19,7 +19,7 @@ import type {
 } from '@seti/shared'
 import type { OpenPr } from './github.js'
 import { HttpError } from './http.js'
-import { sessionHistory, sessionPrs, sessionSpan } from './session-history.js'
+import { sessionHistory, sessionPrs, sessionSpan } from './runtimes/claude/session-history.js'
 import type { ImportedTaskInput } from './tasks.js'
 
 interface SessionSdk {

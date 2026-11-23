@@ -1,8 +1,8 @@
 import type { SDKAssistantMessage, SDKUserMessage, SessionMessage } from '@anthropic-ai/claude-agent-sdk'
 import { findPrUrls, projectClaude } from '@seti/shared'
 import { z } from 'zod'
-import type { BackfillMessage } from './db.js'
-import { createPrWatcher } from './pr-link.js'
+import type { BackfillMessage } from '../../db.js'
+import { createPrWatcher } from '../../pr-link.js'
 
 const block = z.looseObject({ type: z.string() })
 type Block = z.infer<typeof block>

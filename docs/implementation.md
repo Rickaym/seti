@@ -69,7 +69,7 @@ with another top-level folder.
 | 7.2, 7.3       | `sandbox.ts`, `sandbox-mounts.ts`, `egress-proxy.ts`, `egress-rules.ts`, `egress-placeholders.ts`, `sandbox-ca.ts`, `sandbox-aws-token.ts`, `proxy-owner.ts`, `ssh-agent.ts`, `agent-access.ts`  |
 | 7.4, 7.5       | `permission-policy.ts`, `policy/`, `permission-requests.ts`, `permission-timeout.ts`, `permission-guard.ts`, `repeat-hooks.ts`, `review-hooks.ts`, `shadow-hooks.ts`, `outward.ts`               |
 | 7.6 Changes    | `change-requests.ts`, `change-request-notes.ts`, `mcp-off-context.ts`, `shared/src/change-requests.ts`                                                                                           |
-| 7.7 Hostile    | `git.ts`, `probe-launch.ts`, `task-files.ts`, `html-preview.ts`, `uploads.ts`                                                                                                                    |
+| 7.7 Hostile    | `git.ts`, `runtimes/claude/probe-launch.ts`, `task-files.ts`, `html-preview.ts`, `uploads.ts`                                                                                                    |
 | 7.8 Caps       | `launcher.ts`, `memory-scope.ts`, `scope-cpu.ts`, `scope-limits.ts`, `scope-control.ts`, `oom-guard.ts`                                                                                          |
 | 8 Secrets      | `secret-box.ts`, `connections.ts`, `scrub.ts`, `secret-questions.ts`, `secret-delivery.ts`                                                                                                       |
 | 9 Shared tools | `shared/src/shared-tools.ts`, `shared-tool-proposals.ts`, `shared-tool-files.ts`, `shared-tool-server.ts`                                                                                        |
@@ -210,8 +210,8 @@ the AppArmor profile for `bwrap` that the installer adds ([Setup](setup.md#sandb
   timeout on the process group, capped output, and at most two at once at low priority.
   LibreOffice starts from a fresh profile with macros disabled and Java off.
 - **Agent-writable folders.** Seti runs git there only through `agentGit` in `server/src/git.ts`
-  (HST-2), probes capabilities through `server/src/probe-launch.ts` (HST-4), and serves HTML
-  previews under the policy in `server/src/html-preview.ts` (HST-5).
+  (HST-2), probes capabilities through `server/src/runtimes/claude/probe-launch.ts` (HST-4), and
+  serves HTML previews under the policy in `server/src/html-preview.ts` (HST-5).
 
 ## The EA
 
