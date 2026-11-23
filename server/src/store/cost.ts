@@ -1,6 +1,6 @@
 import type { SDKMessage, SDKResultMessage } from '@anthropic-ai/claude-agent-sdk'
 import { TURN_COST_KEY, type WithTurnCost } from '@seti/shared'
-import { now, sql, transaction } from '../db.js'
+import { now, rowFilter, sql, transaction } from '../db.js'
 import { countResult, type SessionTotal } from '../turn-cost.js'
 
 /** Adds what a result's turn cost to its task and returns that amount; null when not known. */
@@ -54,9 +54,9 @@ export async function addSideChatCost(taskId: string, usd: number): Promise<void
  */
 export async function costSince(since: string): Promise<number> {
   const [row] = await sql<{ usd: number | null }[]>`SELECT
-      sum((payload::json ->> ${TURN_COST_KEY})::float8) AS usd
+      sum(${rowFilter.turnUsd}) AS usd
     FROM task_message
-    WHERE kind = 'sdk' AND (payload::json ->> 'type') = 'result' AND created_at >= ${since}`
+    WHERE kind = 'sdk' AND ${rowFilter.turnEnd} AND created_at >= ${since}`
   const [side] = await sql<{ usd: number | null }[]>`SELECT sum(cost_usd) AS usd
     FROM task_side_chat_cost WHERE created_at >= ${since}`
   return (row?.usd ?? 0) + (side?.usd ?? 0)

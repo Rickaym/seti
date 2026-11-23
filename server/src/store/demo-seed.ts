@@ -10,6 +10,7 @@ import {
   type DemoRepo,
 } from '../demo/content/cast.js'
 import { FLEET, FLEET_WORKSPACE, fleetTranscript, type FleetSeed } from '../demo/content/history.js'
+import { EVENT_COLUMNS, storedColumns } from '../events/columns.js'
 
 type SeedValue = string | number | null
 
@@ -23,6 +24,9 @@ export interface SeedPlan {
   /** Where each repo's checkout lives; agents of the repo work there. */
   repoDir: (repo: DemoRepo) => string
 }
+
+const seedValue = (value: string | number | boolean | null): SeedValue =>
+  typeof value === 'boolean' ? String(value) : value
 
 const ago = (plan: SeedPlan, minutes: number) => new Date(plan.now - minutes * 60_000).toISOString()
 
@@ -43,12 +47,16 @@ async function seedAgent(plan: SeedPlan, agent: AgentSeed): Promise<void> {
     new Date(last).toISOString(),
   )
   for (const [n, [kind, payload]] of agent.transcript.rows.entries()) {
+    const json = JSON.stringify(payload)
+    const columns = storedColumns(kind, json)
     await plan.run(
-      `INSERT INTO task_message (task_id, kind, payload, outward, created_at) VALUES (?, ?, ?, '[]', ?)`,
+      `INSERT INTO task_message (task_id, kind, payload, outward, created_at, ${EVENT_COLUMNS.join(', ')})
+       VALUES (?, ?, ?, '[]', ?, ${EVENT_COLUMNS.map(() => '?').join(', ')})`,
       agent.id,
       kind,
-      JSON.stringify(payload),
+      json,
       new Date(Math.round(first + n * step)).toISOString(),
+      ...EVENT_COLUMNS.map((column) => seedValue(columns[column])),
     )
   }
   for (const [column, value] of Object.entries(agent.extra)) {

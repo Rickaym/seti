@@ -7,6 +7,7 @@ import {
 } from '@seti/shared'
 import { ArchiveWriter, decodeArchive, type ChunkRef, type StoredMessage } from '../archive-codec.js'
 import { now, sql, transaction, type Db } from '../db.js'
+import { EVENT_COLUMNS, storedColumns } from '../events/columns.js'
 
 /** An archive's index and sizes; the blob stays in the database until a chunk is read. */
 export interface ArchiveRecord extends TaskArchiveInfo {
@@ -50,6 +51,7 @@ const INFO = sql`task_id, codec, chunks, row_count, raw_bytes, stored_bytes, tab
 
 const READ_BATCH = 2000
 const INSERT_BATCH = 1000
+const STORED_COLUMNS = ['id', 'task_id', 'kind', 'payload', 'outward', 'created_at'] as const
 
 /** Heap bytes of the rows by PostgreSQL's measure: columns, tuple header and line pointer. */
 async function tableBytes(tx: Db, taskId: string): Promise<number> {
@@ -78,12 +80,8 @@ async function encodeTranscript(tx: Db, taskId: string) {
 async function insertRows(tx: Db, taskId: string, rows: readonly StoredMessage[]): Promise<void> {
   for (let start = 0; start < rows.length; start += INSERT_BATCH) {
     const batch = rows.slice(start, start + INSERT_BATCH)
-    await tx`INSERT INTO task_message (id, task_id, kind, payload, outward, created_at)
-      SELECT id, ${taskId}, kind, payload, outward, created_at FROM unnest(
-        ${batch.map((row) => row.id)}::bigint[], ${batch.map((row) => row.kind)}::text[],
-        ${batch.map((row) => row.payload)}::text[], ${batch.map((row) => row.outward)}::text[],
-        ${batch.map((row) => row.created_at)}::text[]
-      ) AS r(id, kind, payload, outward, created_at)`
+    const filled = batch.map((row) => ({ ...row, task_id: taskId, ...storedColumns(row.kind, row.payload) }))
+    await tx`INSERT INTO task_message ${tx(filled, [...STORED_COLUMNS, ...EVENT_COLUMNS])}`
   }
 }
 
