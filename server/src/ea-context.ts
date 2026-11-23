@@ -3,6 +3,7 @@ import { tasks } from './db.js'
 import { hideDirect } from './direct-privacy.js'
 import { renderContext } from './ea-context-render.js'
 import { LISTED_MAX, LISTED_MIN_PRIORITY, taskViews, type ContextInput, type OpenPrView } from './ea-context-tasks.js'
+import { eventsOf, rowEvents } from './events/read.js'
 import { viewerLogin } from './github.js'
 import { cachedOpenPrs, onOpenPrsFetched } from './prs.js'
 import { cache } from './redis.js'
@@ -154,7 +155,7 @@ export function isHardChange(event: TaskEvent): boolean {
     return event.type !== 'updated' && event.type !== 'shell'
   }
   const { row } = event
-  return row.kind !== 'sdk' || row.payload.type === 'result'
+  return row.kind !== 'sdk' || eventsOf(rowEvents(row), 'turn.ended').length > 0
 }
 
 const isFresh = (built: Memo, now: number) =>

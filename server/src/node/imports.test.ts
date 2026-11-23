@@ -49,6 +49,7 @@ const STILL_REACHING: Readonly<Record<string, readonly string[]>> = {
   'session-options.ts': ['store/credentials.ts', 'store/permissions.ts', 'store/sandbox.ts'],
   'seti-auth.ts': ['store/auth.ts'],
   'seti-guide.ts': ['db.ts', 'store/context.ts', 'store/ea.ts', 'store/sandbox.ts'],
+  'shadow-hooks.ts': ['store/change-requests.ts', 'store/policy-shadow.ts'],
   'shared-tools.ts': ['audit.ts', 'store/connections.ts', 'store/shared-tools.ts'],
   'ssh-files.ts': ['store/ssh.ts'],
   'task-blocked.ts': [
