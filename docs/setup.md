@@ -88,7 +88,8 @@ instead. Without these tools a share link still works and shows the file's sourc
 Seti runs as your user. `seti.service` starts `scripts/start.sh`, which runs the server from the
 clone with the settings in `~/.seti/seti.env`; systemd passes the secrets from
 `~/.seti/credentials` with `LoadCredential=`, so none reaches an environment variable. Seti listens
-on `127.0.0.1` only. Logs are in `journalctl --user -u seti.service`.
+on `127.0.0.1` only. Logs are in `journalctl --user -u seti.service`; a request that ends in a
+server error is logged with its method, route, status and error, never its body, query or headers.
 
 The installer writes its units from `deploy/seti.service` and `deploy/seti-ea.service`, with the
 clone's path, your Node and a marker line. It never replaces a unit file that lacks the marker, so

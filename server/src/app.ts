@@ -125,6 +125,7 @@ import { workspaceRoutes } from './routes/workspaces.js'
 import { onTurnEnd, registerContextProvider, registerSessionMcpServers, registerTurnPreface } from './runner.js'
 import { sandboxPrompt } from './sandbox-prompt.js'
 import { securityHeaders } from './security-headers.js'
+import { logServerErrors } from './server-errors.js'
 import { onSessionOpen } from './session-hooks.js'
 import { restartPreface } from './session-restart.js'
 import { importedContext } from './sessions.js'
@@ -250,6 +251,7 @@ export function createApp(access: AccessGuardOptions = defaultAccess(), eaUrl: s
   app.onError((e, c) =>
     e instanceof HttpError ? fail(c, e.status, e.message) : fail(c, 500, 'Server error', e.message),
   )
+  app.use('*', logServerErrors)
   app.use('*', securityHeaders(access.access))
   onProofRefused(auditRefusedProof)
   app.use('*', accessGuard({ ...access, local }))
