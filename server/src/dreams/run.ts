@@ -18,8 +18,27 @@ import { dreamAppend, dreamMessage } from './prompt.js'
 import { reportMarkdown } from './report.js'
 import { dreamTools } from './tools.js'
 
-/** What one dream may use: `dream_steps`, `dream_time` and `dream_budget`, and its model. */
-export const DREAM_LIMITS = { model: 'claude-sonnet-5-5', steps: 60, timeMs: 20 * 60_000, budgetUsd: 1 }
+/** What one dream may use: its model, `dream_steps`, `dream_time` and `dream_budget`. */
+export interface DreamLimits {
+  model: string
+  steps: number
+  timeMs: number
+  budgetUsd: number
+  /** When a nightly dream's window ends, as epoch milliseconds; it stops there. */
+  until?: number
+}
+
+export const DREAM_LIMITS: DreamLimits = { model: 'claude-sonnet-5-5', steps: 60, timeMs: 20 * 60_000, budgetUsd: 1 }
+
+/** How to stop each dream that runs now, by run id. */
+const stoppers = new Map<number, (reason: string) => void>()
+
+/** Stops a running dream, keeping what it recorded; false when it is not running here. */
+export function stopDream(runId: number, reason: string): boolean {
+  const stop = stoppers.get(runId)
+  stop?.(reason)
+  return stop !== undefined
+}
 
 /** How often a dream checks that its agent has not started a turn, which cuts the dream. */
 const WATCH_MS = 5000
@@ -31,6 +50,7 @@ export interface DreamJob {
   memory: string
   before: MemorySnapshot
   dream: DreamSupport
+  limits: DreamLimits
 }
 
 /** What a dream did while it ran, counted from its reports and its gate. */
@@ -102,9 +122,17 @@ async function follow(session: DreamSession, job: DreamJob, tally: Tally): Promi
       session.close()
     })
   }
-  const timer = setTimeout(() => {
-    stop('stopped', 'It reached its time limit.')
-  }, DREAM_LIMITS.timeMs)
+  const { timeMs, until } = job.limits
+  const atEnd = until !== undefined && until - Date.now() < timeMs
+  const timer = setTimeout(
+    () => {
+      stop('stopped', atEnd ? 'The window ended.' : 'It reached its time limit.')
+    },
+    atEnd ? Math.max(0, until - Date.now()) : timeMs,
+  )
+  stoppers.set(job.run.id, (reason) => {
+    stop('stopped', reason)
+  })
   const watch = setInterval(() => {
     if (isRunning(job.task.id)) {
       stop('cut', 'The agent started a turn.')
@@ -119,6 +147,7 @@ async function follow(session: DreamSession, job: DreamJob, tally: Tally): Promi
       }
     }
   } finally {
+    stoppers.delete(job.run.id)
     clearTimeout(timer)
     clearInterval(watch)
     session.close()
@@ -154,7 +183,7 @@ async function dreamSession(job: DreamJob, tally: Tally, night: string): Promise
     taskId: job.task.id,
     cwd: job.task.cwd,
     dirs: workingDirs(job.task),
-    model: DREAM_LIMITS.model,
+    model: job.limits.model,
     append: await dreamAppend(job.task.id, job.task.title, places.memory),
     prompt: dreamMessage({
       night: job.run.night,
@@ -162,11 +191,11 @@ async function dreamSession(job: DreamJob, tally: Tally, night: string): Promise
       digest,
       memory: places.memory,
       shared: [],
-      maxSteps: DREAM_LIMITS.steps,
-      budgetUsd: DREAM_LIMITS.budgetUsd,
+      maxSteps: job.limits.steps,
+      budgetUsd: job.limits.budgetUsd,
     }),
-    maxTurns: DREAM_LIMITS.steps,
-    budgetUsd: DREAM_LIMITS.budgetUsd,
+    maxTurns: job.limits.steps,
+    budgetUsd: job.limits.budgetUsd,
   }
   const session = await job.dream.open(spec, launcher, { gate, tools }, new AbortController())
   await follow(session, job, tally)

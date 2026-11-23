@@ -118,6 +118,16 @@ class SettingsFake(FakeSeti):
         self.clean_plan: dict[str, Any] = dict(CLEAN_PLAN)
         self.revisions: dict[tuple[str, str], list[dict[str, Any]]] = {}
         self.dreams: list[dict[str, Any]] = []
+        self.dream_settings: dict[str, Any] = {
+            "enabled": False,
+            "window_start": "01:00",
+            "window_end": "05:00",
+            "zone": None,
+            "model": "claude-sonnet-5-5",
+            "dream_budget_usd": 1,
+            "night_budget_usd": 5,
+            "at_once": 1,
+        }
         self.warm: dict[str, dict[str, Any]] = {}
         self.memory: dict[str, Any] = {
             "cap": MEMORY_DEFAULTS,
@@ -364,6 +374,17 @@ class SettingsFake(FakeSeti):
                 return ok(self.dreams)
             case "POST", ["tasks", _, "dream"]:
                 return ok({"id": 1, "state": "running"})
+            case "GET", ["dreams", "settings"]:
+                return ok(self.dream_settings)
+            case "PUT", ["dreams", "settings"]:
+                self.dream_settings = {**self.dream_settings, **body}
+                return ok(self.dream_settings)
+            case "GET", ["dreams"]:
+                return ok(None)
+            case "PUT", ["tasks", _, "dreaming"] | ["workspaces", _, "dreaming"]:
+                return ok(body)
+            case "GET", ["workspaces"]:
+                return ok([{"id": "w-client", "name": "Client", "position": 0}])
             case "GET", ["revisions", "unseen"]:
                 return ok(self.unseen)
             case "GET", ["revisions"] if "task_id" in params:
@@ -1069,6 +1090,25 @@ async def test_dreams_are_read_and_one_started_after_a_yes(tools: EaTools, fake:
     assert "sandboxed session" in asked.text
     assert started.ok
     assert writes(fake)[-1][0:2] == ("POST", f"/api/tasks/{TASK_LOGOUT}/dream")
+
+
+async def test_dreaming_is_read_changed_and_switched_per_agent_and_workspace_after_a_yes(
+    tools: EaTools, fake: SettingsFake
+) -> None:
+    read = await tools.call("dreams", {})
+    assert read.text.startswith("Nightly Dreaming is off: window 01:00 to 05:00 (no zone chosen yet)")
+    assert read.text.endswith("No night has been planned yet.")
+    change = {"enabled": True, "zone": "Europe/Istanbul", "window_start": "00:30"}
+    asked, changed = await confirm(tools, "dreams", change)
+    assert "turns it on, sets window start to 00:30, sets zone to Europe/Istanbul." in asked.text
+    assert changed.text.startswith("Nightly Dreaming is on: window 00:30 to 05:00 (Europe/Istanbul)")
+    assert writes(fake)[-1] == ("PUT", "/api/dreams/settings", change)
+    _, agent = await confirm(tools, "dreams", {"task": "logout", "dreaming": False})
+    assert agent.text == "Switched nightly Dreaming off for Fix the logout button."
+    assert writes(fake)[-1] == ("PUT", f"/api/tasks/{TASK_LOGOUT}/dreaming", {"on": False})
+    _, group = await confirm(tools, "dreams", {"workspace": "client", "dreaming": True})
+    assert group.text == "Switched nightly Dreaming on for the Client workspace."
+    assert writes(fake)[-1] == ("PUT", "/api/workspaces/w-client/dreaming", {"on": True})
 
 
 async def test_plugins_are_added_switched_and_removed(tools: EaTools, fake: SettingsFake) -> None:

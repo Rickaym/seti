@@ -2,13 +2,16 @@ import type { DreamRun, Revision } from '@seti/shared'
 import { ChevronDown, Moon, Sparkles, Undo2 } from 'lucide-react'
 import { useId, useState } from 'react'
 import { Hint } from '@/components/Hint'
+import { ToggleButton } from '@/components/ToggleButton'
 import { Button } from '@/components/ui/button'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
-import { useDreams } from './useDreams'
+import { useDreams, useNightly } from './useDreams'
 
 const CONSEQUENCE = 'text-2xs text-muted-foreground'
 
 const STATE_WORDS: Record<DreamRun['state'], string> = {
+  planned: 'planned tonight',
+  skipped: 'skipped',
   running: 'dreaming now',
   done: 'done',
   stopped: 'stopped',
@@ -95,24 +98,44 @@ function LastDream({
   )
 }
 
-/** Dream now, which tidies the agent's memory at once, and the last dream's report with undo. */
+function nightlyHint(nightly: { enabled: boolean; on: boolean } | null): string {
+  if (nightly?.on === false) {
+    return 'Left out of nightly dreams; switch on to include it'
+  }
+  return nightly?.enabled === true
+    ? 'Dreams each night it has something new; switch off to leave it out'
+    : 'Dreams each night once Dreaming is on in Settings, Lifecycle'
+}
+
+/** Dream now, the agent's nightly switch, and the last dream's report with undo. */
 export function DreamActions({ taskId, open }: { taskId: string; open: boolean }) {
   const id = useId()
   const { latest, changes, dreamNow, undo } = useDreams(taskId, open)
+  const { nightly, switchTo } = useNightly(taskId, open)
   const dreaming = latest?.state === 'running'
   return (
     <div role="group" aria-label="Dreams" className="grid gap-1 border-b border-border pb-2">
-      <Button
-        variant="outline"
-        size="sm"
-        className="justify-start"
-        disabled={dreaming}
-        aria-describedby={id}
-        onClick={dreamNow}
-      >
-        <Sparkles />
-        {dreaming ? 'Dreaming' : 'Dream now'}
-      </Button>
+      <div className="flex gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          className="flex-1 justify-start"
+          disabled={dreaming}
+          aria-describedby={id}
+          onClick={dreamNow}
+        >
+          <Sparkles />
+          {dreaming ? 'Dreaming' : 'Dream now'}
+        </Button>
+        <ToggleButton
+          pressed={nightly?.on === true}
+          disabled={nightly === null}
+          onPressedChange={switchTo}
+          icon={Moon}
+          label="Nightly"
+          hint={nightlyHint(nightly)}
+        />
+      </div>
       <p id={id} className={CONSEQUENCE}>
         Tidies its memory in a sandbox; changes nothing else
       </p>
