@@ -23,6 +23,7 @@ import { inBackground } from './background.js'
 import { capabilityCache } from './capabilities.js'
 import { tasks, toMessage } from './db.js'
 import { refuseAgent, refuseOnSelf } from './ea-guard.js'
+import { storedColumns } from './events/columns.js'
 import { HttpError } from './http.js'
 import { endSession, isRunning, publish, sessionState } from './runner.js'
 import { shellTurnGuard } from './shell-context.js'
@@ -31,7 +32,6 @@ import { archiveSettings, taskArchives, type ArchiveRecord } from './store/archi
 import { taskInputs } from './store/inputs.js'
 import { prWatch } from './store/pr-watch.js'
 import { teamMessages } from './store/team.js'
-import { storedFields } from './stored-rows.js'
 import { forgetSubtasks } from './subtask-cache.js'
 import { inLane } from './task-lane.js'
 import { requireTask } from './tasks.js'
@@ -103,8 +103,8 @@ const toRow = (taskId: string, row: StoredMessage): MessageRow => toMessage({ ..
 
 /** Matches the live page: no subagent messages and no per-step progress reports. */
 function isOwnRow(row: StoredMessage): boolean {
-  const fields = row.kind === 'sdk' ? storedFields(row.payload) : {}
-  return (fields.parent_tool_use_id ?? null) === null && fields.subtype !== 'task_progress'
+  const { thread, event } = storedColumns(row.kind, row.payload)
+  return thread === '' && event !== 'job.progress'
 }
 
 /** A page of an archived transcript, decompressing only the chunks it needs. */

@@ -23,6 +23,7 @@ import {
   type Section,
   type TaskView,
 } from './ea-context-tasks.js'
+import { eventsOf, rowEvents } from './events/read.js'
 import { redactCredentials } from './scrub.js'
 
 /** About 1,500 tokens at four characters per token. */
@@ -223,10 +224,11 @@ function eventText(
   if (row.kind === 'seti') {
     return setiText(row.payload, task)
   }
-  if (row.kind !== 'sdk' || row.payload.type !== 'result') {
+  const [end] = eventsOf(rowEvents(row), 'turn.ended')
+  if (end === undefined) {
     return null
   }
-  const failed = row.payload.subtype !== 'success' || row.payload.is_error
+  const failed = end.status === 'error' || end.ending !== undefined
   return failed
     ? { text: `${task} ended its turn with an error`, priority: SERIOUS }
     : { text: `${task} finished its turn`, priority: ROUTINE }
