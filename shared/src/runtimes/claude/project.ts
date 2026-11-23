@@ -142,6 +142,18 @@ const vendor = (name: string, m?: unknown): Event => ({
   name,
 })
 
+/** Types whose messages the transcript draws as the conversation, so a broken one must show. */
+const CONVERSATION: ReadonlySet<string> = new Set(['assistant', 'user'])
+
+/** A message of a known type whose shape the projector could not read. */
+const unreadable = (name: string, m: unknown): Event => ({
+  v: 1,
+  thread: str(m, 'parent_tool_use_id') ?? '',
+  type: 'vendor',
+  name,
+  unreadable: true,
+})
+
 function progress(m: SDKToolProgressMessage): Event {
   const thread = m.parent_tool_use_id ?? ''
   return { v: 1, thread, type: 'tool.progress', callId: m.tool_use_id, elapsedMs: m.elapsed_time_seconds * 1000 }
@@ -181,6 +193,7 @@ export function projectClaude(m: SDKMessage): RuntimeEvent[] {
   try {
     return events(m)
   } catch {
-    return [vendor(vendorName(m), m)]
+    const name = vendorName(m)
+    return [CONVERSATION.has(str(m, 'type') ?? '') ? unreadable(name, m) : vendor(name, m)]
   }
 }

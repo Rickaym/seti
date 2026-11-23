@@ -111,7 +111,11 @@ describe('Claude tool results', () => {
       { type: 'text', text: 'two' },
     ]
     expect(project(toolResult('toolu_3', content, { parent: 'toolu_agent' }))).toMatchObject([
-      { thread: 'toolu_agent', type: 'tool.ended', result: { text: 'one\ntwo', images: 1 } },
+      {
+        thread: 'toolu_agent',
+        type: 'tool.ended',
+        result: { text: 'one\ntwo', images: 1, shown: 'one\n[image]\ntwo' },
+      },
     ])
     expect(project(toolResult('toolu_4', undefined))).toMatchObject([{ result: { text: '', images: 0 } }])
   })
@@ -336,7 +340,9 @@ describe('other Claude messages', () => {
   })
 
   it('turns a message it cannot read into one vendor event instead of throwing', () => {
-    expect(raw({ type: 'assistant', message: null })).toEqual([{ v: 1, thread: '', type: 'vendor', name: 'assistant' }])
+    expect(raw({ type: 'assistant', message: null })).toEqual([
+      { v: 1, thread: '', type: 'vendor', name: 'assistant', unreadable: true },
+    ])
     expect(raw({ type: 'system', subtype: 'task_progress' })).toEqual([
       { v: 1, thread: '', type: 'vendor', name: 'system/task_progress' },
     ])

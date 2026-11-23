@@ -1,6 +1,5 @@
-import type { MessageBody } from '@seti/shared'
+import { type MessageBody, eventsOf, payloadEvents } from '@seti/shared'
 import { now, rowFilter, sql } from '../db.js'
-import { eventsOf, payloadEvents } from '../events/read.js'
 
 /** A transcript row as stored, its payload still JSON text. */
 export interface StoredRow {

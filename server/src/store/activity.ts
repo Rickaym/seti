@@ -1,6 +1,5 @@
-import type { MessageRow } from '@seti/shared'
+import { type MessageRow, eventsOf, payloadEvents } from '@seti/shared'
 import { rowFilter, sql, toMessage, type MessageRecord } from '../db.js'
-import { eventsOf, payloadEvents } from '../events/read.js'
 
 /** A window as stored times, each end null when it is open. */
 export interface StoredWindow {
