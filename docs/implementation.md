@@ -219,6 +219,91 @@ the AppArmor profile for `bwrap` that the installer adds ([Setup](setup.md#sandb
   (HST-2), probes capabilities through `server/src/runtimes/claude/probe-launch.ts` (HST-4), and
   serves HTML previews under the policy in `server/src/html-preview.ts` (HST-5).
 
+## Writing a runtime adapter
+
+A runtime adapter is the only code that starts and talks to one agent runtime, such as Claude
+Code. The conformance suite is its contract: an adapter is done when it passes every case that
+applies to it, or the case is a recorded gap with its reason.
+
+### The interface
+
+`server/src/runtimes/adapter.ts` defines a `RuntimeAdapter`: an `id`, its `capabilities`, and two
+steps.
+
+- `realise(spec, launcher, host, abortController)` turns Seti's `SessionSpec` into what the
+  runtime starts from. The launcher decides where the process runs and with which environment.
+  The host answers the runtime's permission asks and serves Seti's own tool servers. Aborting the
+  controller ends the session.
+- `open(realised, input, rewind)` starts or resumes the session, at a rewind point when one is
+  given. Inputs arrive in order as `SessionInput`s, and the session begins work when its `events`
+  are first read.
+
+The `RuntimeSession` that `open` returns yields `SessionReport`s until the session ends: each
+runtime message with its neutral events and what the session half reads from it, what became of
+each input, and how a rewind went. It offers `interrupt` and `close`, and the optional controls
+(`retract`, `stopBackground`, `toolServers`, `setPolicy`, `setMode`) only where the runtime can do
+what they do. An absent control is a normal state.
+
+Two rules hold for every adapter. It never starts a process itself: it calls `launcher.spawn`, and
+it refuses a sandboxed launcher that has no spawn. It adds no credential to the process's
+environment: inside the sandbox, the only keys are the placeholders the launcher sets for the
+egress proxy.
+
+### The conformance suite
+
+`server/src/runtimes/conformance/` holds the suite. `describeAdapter(target)` registers a test per
+case. The cases live in `cases-<area>.ts` by area: lifecycle, interrupts, queued input, reports,
+events, tool calls, permission asks, questions, subagents and plans, launch, and failures. Each
+case names the protocol requirement or interface member it proves. A case waits at most two
+seconds for anything and finishes in milliseconds when it passes, so "never hangs" means "settles
+within the bound".
+
+A case that does not apply to the runtime is skipped with the reason, read from the adapter's
+`capabilities` or the target's profile. A case the adapter is known to fail is listed in the
+target's `gaps` with the reason; it runs expecting the failure, so a fix makes the test fail until
+the entry goes. A case is never weakened to make an adapter pass.
+
+`suite.test.ts` runs chosen cases against deliberately broken adapters and expects each to fail,
+so the suite cannot pass vacuously. `isolation.test.ts` checks that no production module imports
+the suite or the scripted adapter, and that no adapter module imports `node:child_process`.
+
+### The target
+
+A target is the adapter as the suite drives it, in `runtimes/<id>/conformance-target.ts`:
+
+| Member    | What it holds                                                                                                                                                |
+| --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `adapter` | The adapter itself.                                                                                                                                          |
+| `profile` | What the runtime does that `capabilities` does not state yet: turn starts, threads, plans, steering, input reports, background work, the kinds Seti decides. |
+| `gaps`    | Known failures by case id, each with its reason.                                                                                                             |
+| `project` | The adapter's projector, which checks that stored messages give the reported events.                                                                         |
+| `host`    | The host the adapter gets, built from the suite's neutral answers.                                                                                           |
+| `rig`     | A fake runtime that plays a neutral script and records what it saw.                                                                                          |
+
+The rig is the part an adapter's author writes. It turns each step of a neutral script (say,
+think, call, hold, subagent, compact, exit, and the rest in `script.ts`) into what the runtime
+would send, through the adapter's own transport. It records the processes started through the
+launcher and any started outside it, and the tool calls that ran, and it can kill the newest
+process from outside.
+
+### The scripted adapter
+
+`server/src/runtimes/scripted/` is a second, test-only adapter that passes every case. It drives
+a stand-in runtime over standard input and output, one JSON object per line, with permission
+requests and input reports on the same pipes and saved sessions kept on a fake machine. It is
+shaped like a runtime that speaks a wire protocol of its own, so it is the model for an adapter
+that does not go through a vendor library. No registry names it, so no install can select it.
+
+### Adding an adapter
+
+1. Create `server/src/runtimes/<id>/` with the adapter, its projector and its transport, and keep
+   the vendor's package inside that folder.
+2. Write `conformance-rig.ts`, `conformance-target.ts` and a `conformance.test.ts` that calls
+   `describeAdapter`. Declare in `capabilities` and the profile only what the runtime does.
+3. Run `pnpm --filter @seti/server exec vitest run src/runtimes/<id>/` until every case that
+   applies passes or is a recorded gap.
+4. Add the adapter to `server/src/runtimes/registry.ts`.
+
 ## The EA
 
 The EA is a pipecat process: OpenAI models for chat and voice, Deepgram for speech to text and

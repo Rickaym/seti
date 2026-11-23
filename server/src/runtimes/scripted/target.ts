@@ -11,7 +11,7 @@ export const scriptedTarget: ConformanceTarget<ScriptedShapes, 'scripted'> = {
   profile: {
     events: { turnStart: true, reasoning: true, threads: true, plan: true, compaction: true, modelFallback: true },
     usage: { tokens: true, costUsd: 'reported' },
-    input: { steer: 'next_step', retract: true },
+    input: { steer: 'next_step', retract: true, reports: true },
     background: { jobs: true, stop: true, subagents: true },
     gated: { shell: true, edit: true, mcp: true },
     parsesOutput: true,

@@ -1,5 +1,5 @@
 import type { EventOf, RuntimeEvent } from '@seti/shared'
-import type { RuntimeSession, RuntimeShapes, SessionInput } from '../adapter.js'
+import type { RuntimeSession, RuntimeShapes, SessionInput, SessionReport } from '../adapter.js'
 
 /** How long anything a case waits on may take; every case settles in milliseconds when it passes. */
 const CASE_BOUND_MS = 2000
@@ -57,7 +57,7 @@ export class Channel<T> implements AsyncIterable<T> {
   }
 }
 
-/** One message the runtime sent and its events: live, again, and after a JSON round trip. */
+/** One message the runtime sent and its events: as reported, projected again, and as stored. */
 export interface Projection {
   live: RuntimeEvent[]
   again: RuntimeEvent[]
@@ -67,11 +67,15 @@ export interface Projection {
 /** An open session as a case drives it: inputs in, neutral events out. */
 export interface RunView {
   readonly events: readonly RuntimeEvent[]
+  /** Every report of the session, in order. */
+  readonly reports: readonly SessionReport[]
   /** Set once the session's events ended: null when they ended cleanly, else what they threw. */
   readonly outcome: Error | null | undefined
   send: (text: string) => string
   /** The first event from now on, or already seen, that passes the test. */
   until: (test: (event: RuntimeEvent) => boolean, label: string) => Promise<RuntimeEvent>
+  /** The first report from now on, or already seen, that passes the test. */
+  untilReport: (test: (report: SessionReport) => boolean, label: string) => Promise<SessionReport>
   /** Waits until the session's events end, within the bound. */
   settled: () => Promise<Error | null>
   interrupt: () => Promise<void>
@@ -104,7 +108,7 @@ let inputs = 0
 export class Run<S extends RuntimeShapes> implements RunView {
   readonly events: RuntimeEvent[] = []
   outcome: Error | null | undefined = undefined
-  private readonly raw: unknown[] = []
+  readonly reports: SessionReport[] = []
   private readonly waiters = new Set<() => void>()
   private readonly session: RuntimeSession<S>
   private readonly project: (message: unknown) => RuntimeEvent[]
@@ -143,6 +147,13 @@ export class Run<S extends RuntimeShapes> implements RunView {
     )
   }
 
+  async untilReport(test: (report: SessionReport) => boolean, label: string): Promise<SessionReport> {
+    return within(
+      this.wait(() => this.reports.find(test)),
+      label,
+    )
+  }
+
   async settled(): Promise<Error | null> {
     return within(
       this.wait(() => this.outcome),
@@ -174,11 +185,17 @@ export class Run<S extends RuntimeShapes> implements RunView {
   }
 
   projections(): Projection[] {
-    return this.raw.map((message) => ({
-      live: this.project(message),
-      again: this.project(message),
-      stored: this.project(JSON.parse(JSON.stringify(message))),
-    }))
+    return this.reports.flatMap((report) =>
+      report.type === 'message'
+        ? [
+            {
+              live: [...report.events],
+              again: this.project(report.raw),
+              stored: this.project(JSON.parse(JSON.stringify(report.raw))),
+            },
+          ]
+        : [],
+    )
   }
 
   /** Resolves with the first value the probe finds, checked now and after every change. */
@@ -202,11 +219,9 @@ export class Run<S extends RuntimeShapes> implements RunView {
   private async pump(): Promise<void> {
     try {
       for await (const report of this.session.events) {
-        if (report.type === 'message') {
-          this.raw.push(report.raw)
-          this.events.push(...report.events)
-          this.notify()
-        }
+        this.reports.push(report)
+        this.events.push(...(report.type === 'message' ? report.events : []))
+        this.notify()
       }
       this.outcome = null
     } catch (e) {
