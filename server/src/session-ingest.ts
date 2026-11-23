@@ -16,6 +16,7 @@ import { mirrorSession } from './session-mirror.js'
 import { processStarted, recordStart, settleRewind, setupAnswers } from './session-setup.js'
 import { storedForm, unstored } from './session-start.js'
 import { forgetSessionTools } from './session-tools.js'
+import { countShadow } from './shadow-counts.js'
 import { withTurnCost } from './store/cost.js'
 import { hadRunningSubtask } from './subtask-cache.js'
 import { publishFolded, publishSubtasks } from './subtask-prs.js'
@@ -124,6 +125,9 @@ const ingest: Ingest = {
   'egress.blocked': async (taskId, { host, names }) => auditBlockedKey(taskId, host, names),
   'memory.event': (taskId, { report }) => {
     reportMemoryEvent(taskId, report)
+  },
+  'policy.compared': (_taskId, { count }) => {
+    countShadow(count)
   },
   'rewind.settled': async (_taskId, { id, state, reason }) => settleRewind(id, state, reason),
   'session.since': (taskId, { promptId }) => sessionSince.set(taskId, promptId),

@@ -8,7 +8,7 @@ import {
   requestsSection,
   sectionCount,
   sentLine,
-  sentToast,
+  expectNoSentToast,
 } from './support/questions.js'
 import { expectKeptOut, fixtureValue, SECRET_NAME, SECRET_PURPOSE, secretAgent } from './support/secret-questions.js'
 
@@ -42,8 +42,8 @@ test('an agent asks for a secret and gets only the path of the file the user fil
   await expect(sentLine(page)).toHaveText('2 of 2 answered')
   await page.getByRole('button', { name: 'Submit all' }).click()
 
-  await expect(sentToast(page, 'Sent 2 answers. Going on:')).toBeVisible()
   await expect(page).toHaveURL(/#agents$/)
+  await expectNoSentToast(page)
   await expect
     .poll(async () => lastReply(request, merger.id))
     .toBe(`Got your answers. ${MERGE_QUESTION} ${MERGE_RECOMMENDED}`)

@@ -1,7 +1,7 @@
 import { agentWithTwoFailing, BOTH, mockFailing, promptsOf } from './support/fix-ci.js'
 import { expect, test } from './support/fixtures.js'
 import { startAgent } from './support/many-prs.js'
-import { agentCount, linkPrs, ownMessages, prUrl, QUIET, watchStarts } from './support/pr-ci.js'
+import { agentCount, expectNoFixCiToast, linkPrs, ownMessages, prUrl, QUIET, watchStarts } from './support/pr-ci.js'
 import { FAKE_CLAUDE_ENV } from './support/processes.js'
 
 test.use({ serverEnv: FAKE_CLAUDE_ENV })
@@ -20,8 +20,8 @@ test('Fix CI in the agent header sends one short message naming both failing PRs
   await fix.hover()
   await expect(page.getByRole('tooltip')).toContainText('Ask the agent to fix failing CI on all 2 PRs')
   await fix.click()
-  await expect(page.getByText(`Asked ${agent.title} to fix CI on 2 PRs`)).toBeVisible()
   await expect(ownMessages(page, BOTH)).toHaveCount(1)
+  await expectNoFixCiToast(page)
   await expect.poll(async () => promptsOf(request, agent.id)).toEqual([BOTH])
   expect(await agentCount(request)).toBe(before)
   expect(starts).toEqual([])

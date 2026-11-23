@@ -1,9 +1,9 @@
 import type { Question } from '@seti/shared'
-import { CHECKS_PROMPT, CHECKS_QUESTION, PUSH_PROMPT, REPORT_QUESTION } from './support/fake-question.js'
+import { CHECKS_PROMPT, CHECKS_QUESTION, PUSH_PROMPT, PUSH_QUESTION, REPORT_QUESTION } from './support/fake-question.js'
 import { apiData, expect, test } from './support/fixtures.js'
 import { boxOf, grid, panelOf } from './support/grid.js'
 import { FAKE_CLAUDE_ENV } from './support/processes.js'
-import { agentQuestions, askingAgent, lastReply, requestsDrawer, sentToast } from './support/questions.js'
+import { agentQuestions, askingAgent, lastReply, requestsDrawer, expectNoSentToast } from './support/questions.js'
 
 test.use({ serverEnv: FAKE_CLAUDE_ENV })
 
@@ -42,8 +42,8 @@ test("an agent's header opens a drawer with only its questions, which takes turn
   await drawer.getByRole('button', { name: 'Submit', exact: true }).click()
 
   await expect(drawer).toHaveCount(0)
-  await expect(sentToast(page, 'Sent 2 answers. Going on:')).toBeVisible()
   await expect(answer).toHaveCount(0)
+  await expectNoSentToast(page)
   await expect
     .poll(async () => lastReply(request, checker.id))
     .toBe(`Got your answers. ${CHECKS_QUESTION} Unit | ${REPORT_QUESTION} Email me`)
@@ -54,7 +54,7 @@ test("an agent's header opens a drawer with only its questions, which takes turn
   await expect(drawer).toBeVisible()
   await agentQuestions(page, pusher).getByRole('button', { name: 'Dismiss Push' }).click()
   await expect(drawer).toHaveCount(0)
-  await expect(sentToast(page, 'dismissed 1 question')).toBeVisible()
+  await expectNoSentToast(page)
   for (const agent of [checker, pusher]) {
     expect(await apiData<Question[]>(request, `/questions?task_id=${agent.id}`)).toEqual([])
   }
@@ -95,5 +95,6 @@ test("the grid's compact header opens the drawer in the dock beside the grid", a
   await drawer.getByRole('radio', { name: 'Yes' }).click()
   await drawer.getByRole('button', { name: 'Submit', exact: true }).click()
   await expect(drawer).toHaveCount(0)
-  await expect(sentToast(page, 'Sent 1 answer')).toBeVisible()
+  await expect.poll(async () => lastReply(request, asker.id)).toBe(`Got your answers. ${PUSH_QUESTION} Yes`)
+  await expectNoSentToast(page)
 })

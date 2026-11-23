@@ -1,7 +1,7 @@
 import type { APIRequestContext, Page } from '@playwright/test'
 import type { PrCheck, PullRequest, TaskListEntry } from '@seti/shared'
 import { openSeedDb } from './db.js'
-import { apiData, expect } from './fixtures.js'
+import { apiData, expect, toasts } from './fixtures.js'
 
 export const QUIET = 'e2e/quiet'
 export const RED = 'e2e/red'
@@ -104,12 +104,17 @@ export function watchStarts(page: Page): string[] {
 export const ownMessages = (page: Page, text: string) =>
   page.getByRole('region', { name: 'Transcript' }).locator('[data-own-message]').filter({ hasText: text })
 
+/** Fix CI raises no toast once its message is in the transcript. */
+export async function expectNoFixCiToast(page: Page): Promise<void> {
+  await expect(toasts(page).filter({ hasText: 'to fix CI' })).toHaveCount(0)
+}
+
 /** The short Fix CI message for red#5 sits in the agent's own transcript, and the agent is open. */
-export async function expectFixCiSent(page: Page, agent: { id: string; title: string }): Promise<void> {
-  await expect(page.getByText(`Asked ${agent.title} to fix CI on #5`)).toBeVisible()
+export async function expectFixCiSent(page: Page, agent: { id: string }): Promise<void> {
   await expect(page).toHaveURL(new RegExp(`#agents/${agent.id}$`))
   const sent = ownMessages(page, 'CI is failing on #5. Please fix it.')
   await expect(sent).toHaveCount(1)
   await expect(sent).not.toContainText('build')
   await expect(sent).not.toContainText('github.com')
+  await expectNoFixCiToast(page)
 }
