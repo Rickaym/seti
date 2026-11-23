@@ -1,5 +1,6 @@
 import type { MessageRow } from '@seti/shared'
-import { OWN_ROW, sql, toMessage, type MessageRecord } from '../db.js'
+import { rowFilter, sql, toMessage, type MessageRecord } from '../db.js'
+import { eventsOf, payloadEvents } from '../events/read.js'
 
 /** A window as stored times, each end null when it is open. */
 export interface StoredWindow {
@@ -11,7 +12,7 @@ const LAST_REPLY_CHARS = 2000
 const OPEN_END = '9999'
 
 /** Rows the default window reads: the user's prompts and the agent's own messages. */
-const TALK_ROW = sql`(kind = 'prompt' OR (kind = 'sdk' AND (payload::json ->> 'type') = 'assistant'))`
+const TALK_ROW = sql`(kind = 'prompt' OR (kind = 'sdk' AND ${rowFilter.agentRow}))`
 const NOT_AUTO = sql`COALESCE(payload::json ->> 'auto', 'false') = 'false'`
 
 /** One agent's turns in a window, its first and last row there, and its latest reply. */
@@ -28,6 +29,22 @@ interface ActiveRecord {
   last_reply: string | null
 }
 
+type ActiveRow = Omit<ActiveRecord, 'last_reply'> & { last_reply_id: number | null }
+
+/** The reply text each of these turn ends carries, cut to a summary's length, by row id. */
+async function lastReplies(ids: readonly number[]): Promise<Map<number, string>> {
+  if (ids.length === 0) {
+    return new Map()
+  }
+  const rows = await sql<{ id: number; payload: string }[]>`SELECT id, payload FROM task_message
+    WHERE id = ANY(${ids})`
+  return new Map(
+    rows.flatMap(({ id, payload }) =>
+      eventsOf(payloadEvents(payload), 'turn.ended').map((end) => [id, end.result.slice(0, LAST_REPLY_CHARS)] as const),
+    ),
+  )
+}
+
 export const activity = {
   /** Up to `limit` of the task's own rows in the window before id `before`, newest first. */
   rows: async (
@@ -38,16 +55,16 @@ export const activity = {
     const talk = page.talkOnly ? sql`AND ${TALK_ROW}` : sql``
     const records = await sql<MessageRecord[]>`SELECT * FROM task_message WHERE task_id = ${taskId}
       AND created_at >= ${window.from ?? ''} AND created_at < ${window.to ?? OPEN_END} AND id < ${page.before}
-      AND ${OWN_ROW} ${talk} ORDER BY id DESC LIMIT ${page.limit}`
+      AND ${rowFilter.ownRow} ${talk} ORDER BY id DESC LIMIT ${page.limit}`
     return records.map(toMessage)
   },
   /**
    * Every agent with rows in the window. One agent's rows get ids in time order, so its first and
    * last id in the window bound its prompts and turn results there.
    */
-  active: async (window: StoredWindow): Promise<ActiveRecord[]> =>
-    sql<ActiveRecord[]>`SELECT t.id AS task_id, t.title, t.workspace_id, t.status, s.first_at, s.last_at,
-        p.prompts, p.update_turns, r.replies, r.last_reply
+  active: async (window: StoredWindow): Promise<ActiveRecord[]> => {
+    const rows = await sql<ActiveRow[]>`SELECT t.id AS task_id, t.title, t.workspace_id, t.status, s.first_at,
+        s.last_at, p.prompts, p.update_turns, r.replies, r.last_reply_id
       FROM task t
       CROSS JOIN LATERAL (SELECT min(id) AS low, max(id) AS high, min(created_at) AS first_at,
           max(created_at) AS last_at FROM task_message
@@ -57,12 +74,13 @@ export const activity = {
           count(*) FILTER (WHERE NOT ${NOT_AUTO}) AS update_turns
         FROM task_message WHERE task_id = t.id AND kind = 'prompt' AND id BETWEEN s.low AND s.high) AS p
       CROSS JOIN LATERAL (SELECT count(*) AS replies,
-          (array_agg(left(payload::json ->> 'result', ${LAST_REPLY_CHARS}) ORDER BY id DESC)
-            FILTER (WHERE (payload::json ->> 'subtype') = 'success' AND (payload::json ->> 'result') <> ''))[1]
-            AS last_reply
-        FROM task_message WHERE kind = 'sdk' AND (payload::json ->> 'type') = 'result'
+          (array_agg(id ORDER BY id DESC) FILTER (WHERE ${rowFilter.turnReply}))[1] AS last_reply_id
+        FROM task_message WHERE kind = 'sdk' AND ${rowFilter.turnEnd}
           AND id BETWEEN s.low AND s.high AND task_id = t.id) AS r
-      WHERE s.low IS NOT NULL`,
+      WHERE s.low IS NOT NULL`
+    const replies = await lastReplies(rows.flatMap((row) => (row.last_reply_id === null ? [] : [row.last_reply_id])))
+    return rows.map(({ last_reply_id: id, ...row }) => ({ ...row, last_reply: replies.get(id ?? 0) ?? null }))
+  },
   /** PRs linked to agents in the window, oldest link first. */
   linkedPrs: async (window: StoredWindow): Promise<{ task_id: string; pr_url: string }[]> =>
     sql<{ task_id: string; pr_url: string }[]>`SELECT task_id, pr_url FROM task_pr
