@@ -61,15 +61,16 @@ export const connectionRules = (rows: readonly ConnectionRow[]): EgressRule[] =>
   rows.flatMap((row) => (row.header === null || row.hosts.length === 0 ? [] : [connectionRule(row, row.header)]))
 
 /** A request that carried connection placeholders toward a host their connections do not allow. */
-export async function auditBlockedKey(task: Task, host: string, names: readonly string[]): Promise<void> {
+export async function auditBlockedKey(taskId: string, host: string, names: readonly string[]): Promise<void> {
+  const title = (await tasks.get(taskId))?.title ?? taskId
   await audit
     .record({
       actor: 'agent',
       kind: 'task.api_key_blocked',
       subject_type: 'task',
-      subject_id: task.id,
-      summary: `Blocked a request of task "${task.title}" to ${host} carrying the connection ${names.join(', ')}`,
-      detail: { title: task.title, host, keys: [...names] },
+      subject_id: taskId,
+      summary: `Blocked a request of task "${title}" to ${host} carrying the connection ${names.join(', ')}`,
+      detail: { title, host, keys: [...names] },
     })
     .catch(() => undefined)
 }
