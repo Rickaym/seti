@@ -753,7 +753,8 @@ store, the audit chain and every record.
   reach. Nothing listens on TCP.
 - NODE-2: The node numbers each agent's journal entries and keeps them until acknowledged. The
   control plane applies each entry at most once and in order, keeping its cursor before it
-  applies, so a dropped link or a restart of either side neither repeats nor reorders one.
+  applies, so a dropped link or a restart of either side neither repeats nor reorders one. A
+  cursor it cannot keep stops it applying, with an error, until a restart takes up from there.
 - NODE-3: An ask carries an id the node made; a repeat gets the first answer, and an ask the
   node stops waiting for aborts the answer in progress.
 - NODE-4: A restart of the control plane MUST NOT cut running turns. A node that started anew

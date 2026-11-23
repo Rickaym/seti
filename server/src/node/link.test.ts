@@ -214,6 +214,22 @@ describe('the node over its socket', () => {
     expect(order).toEqual(['recorded', 'cut'])
   })
 
+  it('stops taking the node once a cursor cannot be kept, and says Seti needs a restart', async () => {
+    const node = await startNode()
+    const applied: string[] = []
+    const save = async () => Promise.reject(new Error('the database is gone'))
+    const control = controlPlane(node.socket, new Map(), applied, {
+      cursors: { list: async () => Promise.resolve([]), save },
+    })
+    await control.client.start()
+    await welcomed(control.client)
+    await node.service.control.journal(AGENT, note('n1'))
+    await vi.waitFor(async () =>
+      expect(control.client.command('quiet.restart', { agent: AGENT, at: null })).rejects.toThrow(/needs a restart/),
+    )
+    expect(applied).toEqual([])
+  })
+
   it('refuses commands while the node is not connected', async () => {
     const control = controlPlane(path.join(os.tmpdir(), 'seti-no-node', 'node.sock'), new Map(), [])
     await control.client.start(0)
