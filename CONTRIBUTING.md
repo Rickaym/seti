@@ -141,10 +141,10 @@ they are.
 
 - `server/src/`: the Node server (Hono). `app.ts` builds the app and mounts every router;
   `runner.ts` is the session API: `session-control.ts` checks each send and commands the node,
-  `session-host.ts` owns the open sessions, which it starts from the spec `session-spec.ts`
-  builds through the runtime adapter in `runtimes/`, and `session-ingest.ts` stores what they
-  report over the typed link in `node-link.ts`, with their state in `session-mirror.ts`; `tasks.ts`
-  starts tasks. Only `runtimes/claude/`
+  `session-host.ts` owns the open sessions, which it starts through the runtime adapter in
+  `runtimes/` from the spec `session-spec.ts` builds and `session-setup.ts` hands over, and
+  `session-ingest.ts` stores what they report over the typed link in `node-link.ts`, with their
+  state in `session-mirror.ts`; `tasks.ts` starts tasks. Only `runtimes/claude/`
   imports values from the Claude Agent SDK (ESLint enforces it); other files import its types.
 - `server/src/routes/<area>.ts`: one router per area.
 - `server/src/store/`: SQL. `<area>.ts` holds typed queries, `schema-<area>.ts` the migration SQL,

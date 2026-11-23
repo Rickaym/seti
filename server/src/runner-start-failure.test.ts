@@ -30,13 +30,13 @@ vi.mock('./session-spec.js', async (importOriginal) => {
   const original = await importOriginal<typeof SessionSpec>()
   return {
     ...original,
-    sessionStart: async (...args: Parameters<typeof original.sessionStart>) => {
-      const [task] = args
+    realise: async (...args: Parameters<typeof original.realise>) => {
+      const [, task] = args
       starts.attempts.set(task.id, (starts.attempts.get(task.id) ?? 0) + 1)
       if (starts.refused.has(task.id)) {
         throw new Error('bwrap: setting up uid map: Permission denied')
       }
-      return original.sessionStart(...args)
+      return original.realise(...args)
     },
   }
 })

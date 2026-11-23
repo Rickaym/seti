@@ -6,17 +6,13 @@ import { inBackground, onShutdown } from './background.js'
 import { withContextWindow } from './compact.js'
 import { CLAUDE_HOME, OPENER_WAIT_MS, SESSION_IDLE_MS } from './config.js'
 import { tasks } from './db.js'
-import { watchSessionMcp } from './mcp-session-status.js'
 import type { NextMessage } from './next-message.js'
 import { nodeLink } from './node-link.js'
 import { followQueue, settleQueued } from './queued-prompts.js'
 import { resumeSession } from './rewind.js'
 import { adapterFor, DEFAULT_RUNTIME } from './runtimes/registry.js'
 import { moveSessionTo } from './session-files.js'
-import { sessionOpening } from './session-hooks.js'
-import { sessionStart, setupKey } from './session-spec.js'
-import { recordSessionStart, unstored } from './session-start.js'
-import { rewinds } from './store/rewinds.js'
+import { realise, type SessionSpec } from './session-spec.js'
 import { inLane, outsideLane } from './task-lane.js'
 import { keepUnstarted, sessionError, takeUnstarted } from './unstarted.js'
 import { userContent, type UserContent } from './user-content.js'
@@ -77,20 +73,29 @@ export async function sendTurn(
   return inLane(taskId, async () => startTurn(taskId, message, interrupt))
 }
 
-/** Starts the session's process; a pending rewind makes it resume from the rewind point. */
+/**
+ * Starts the session's process from the spec the control plane hands it; a pending rewind makes
+ * it resume from the rewind point. A setting that changed while it started leaves no setup key,
+ * so the next turn restarts.
+ */
 async function sessionMessages(session: LiveSession, task: Task): Promise<AsyncIterable<SDKMessage>> {
-  await restoreMissingWorktrees(task, async (error) => nodeLink.journal(task.id, { type: 'note', error }))
-  const { key, options } = await sessionStart(task, session.controller)
-  session.startWith(key)
-  if (task.session_id !== null) {
-    moveSessionTo(CLAUDE_HOME, task.session_id, task.cwd)
+  const taskId = task.id
+  await restoreMissingWorktrees(task, async (error) => nodeLink.journal(taskId, { type: 'note', error }))
+  const { spec, key, rewind } = await nodeLink.ask(taskId, 'session.spec', {})
+  // The control plane built the spec with startingSpec.
+  const handed = spec as SessionSpec
+  const options = await realise(handed, task, session.controller)
+  const now = await nodeLink.ask(taskId, 'setup.key', { spec })
+  session.startWith(!now.rewind && now.key === key ? key : null)
+  if (handed.resume !== null) {
+    moveSessionTo(CLAUDE_HOME, handed.resume, handed.cwd)
   }
-  return resumeSession(task.id, options, async (sent) => {
+  const settle = async (id: number, state: 'applied' | 'refused', reason: string | null) =>
+    nodeLink.journal(taskId, { type: 'rewind.settled', id, state, reason })
+  return resumeSession(options, rewind, settle, async (sent) => {
     const started = await adapterFor(DEFAULT_RUNTIME).open({ prompt: session.openInput(), options: sent })
     session.attach(started)
-    if (session.warm) {
-      void watchSessionMcp(task.id, async () => session.mcpServerStatus())
-    }
+    await nodeLink.journal(taskId, { type: 'session.started', warm: session.warm })
     return started
   })
 }
@@ -100,11 +105,8 @@ async function needsNewProcess(session: LiveSession, taskId: string): Promise<bo
   if (session.backgroundCount > 0) {
     return false
   }
-  const task = await tasks.get(taskId)
-  if (!task) {
-    return false
-  }
-  return (await rewinds.pending(taskId)) !== undefined || !session.startedWith(await setupKey(task))
+  const now = await nodeLink.ask(taskId, 'setup.key', { spec: null })
+  return now.rewind || !session.startedWith(now.key)
 }
 
 /** Records the prompt and returns it with the text the agent gets, prefaces included. */
@@ -213,7 +215,8 @@ function openSession(taskId: string, previous: LiveSession | undefined, backlog:
   reportState(taskId)
   void nodeLink.journal(taskId, { type: 'session.opened' })
   previous?.close()
-  const opened = async () => outsideLane(async () => sessionOpening(taskId).then(async () => consume(taskId, session)))
+  const opening = async () => nodeLink.ask(taskId, 'session.opening', {})
+  const opened = async () => outsideLane(async () => opening().then(async () => consume(taskId, session)))
   session.done = (previous?.done ?? Promise.resolve()).then(async () => outsideRequest(opened))
 }
 
@@ -283,12 +286,11 @@ async function follow(taskId: string, session: LiveSession, m: SDKMessage, error
 /** Records a message of the session and follows it; returns the error a result reports. */
 async function take(taskId: string, session: LiveSession, m: SDKMessage): Promise<string | null> {
   session.note(m)
-  if ((await unstored(taskId, m)) || (await followQueue(taskId, session, m))) {
+  if (await followQueue(taskId, session, m)) {
     return null
   }
   const payload = await withContextWindow(m, async () => session.contextWindow())
   await nodeLink.journal(taskId, { type: 'message', runtime: DEFAULT_RUNTIME, payload })
-  await recordSessionStart(taskId, m, async () => session.mcpServerStatus())
   const error = resultError(m)
   await follow(taskId, session, m, error)
   return error

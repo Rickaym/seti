@@ -57,6 +57,7 @@ serveControl({
     return { closed: true }
   },
   'background.stop': async ({ agent, task }) => ({ stopped: await stopSessionTask(agent, task) }),
+  'mcp.status': async ({ agent }) => ({ servers: (await sessionOf(agent)?.mcpServerStatus()) ?? null }),
   // The control plane read the mode and rules for this runtime.
   'mode.set': async ({ agent, mode }) => ({ applied: await setMode(sessionOf(agent), mode as DefaultShapes['mode']) }),
   'policy.set': async ({ agent, policy }) => {
