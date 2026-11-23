@@ -206,15 +206,28 @@ const commandSchemas = {
   },
   /** Starts the agent's quiet clock again, from `at` or from now. */
   'quiet.restart': { body: z.object({ agent, at: z.number().nullable() }), answer: done },
-  /** The open sessions, with how long each has been quiet and why. */
+  /** The open sessions, with how long each has been quiet and why, and what their turn is. */
   'sessions.view': {
     body: done,
     answer: z.object({
       sessions: z.array(
-        z.object({ agent, running: z.boolean(), heardAt: z.number(), retrying: z.string().nullable() }),
+        z.object({
+          agent,
+          open: z.boolean(),
+          running: z.boolean(),
+          heardAt: z.number(),
+          retrying: z.string().nullable(),
+          kind: z.enum(['user', 'updates', 'wake']),
+          background: z.int().nonnegative(),
+        }),
       ),
     }),
   },
+  /**
+   * Ends the agents' running turns as Seti stops: interrupted where the runtime can, else closed,
+   * so the next start resumes them. Answers once they ended or `graceMs` passed.
+   */
+  'sessions.cut': { body: z.object({ agents: z.array(agent), graceMs: z.int().nonnegative() }), answer: done },
 }
 export type NodeCommandType = keyof typeof commandSchemas
 export type NodeCommand<K extends NodeCommandType> = z.infer<(typeof commandSchemas)[K]['body']>

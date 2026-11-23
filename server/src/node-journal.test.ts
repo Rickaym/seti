@@ -172,4 +172,141 @@ describe('node journal', () => {
     await settled()
     expect(applied).toEqual(['task-1:n1', 'task-1:n2'])
   })
+
+  it('keeps each cursor before acknowledging, so a restart never applies an entry twice', async () => {
+    const { sent, applied, outbox } = link()
+    const kept: { agent: string; epoch: string; seq: number }[] = []
+    const apply = async (agent: string, entry: JournalEntry) => {
+      applied.push(`${agent}:${entry.type === 'note' ? entry.error : entry.type}`)
+      await flushed()
+    }
+    const first = new JournalInbox(
+      apply,
+      () => undefined,
+      async (cursor) => {
+        kept.push(cursor)
+        await flushed()
+      },
+    )
+    outbox.append(AGENT, note(1))
+    first.receive(only(sent))
+    await settled()
+    expect(kept).toEqual([{ agent: AGENT, epoch: outbox.positions()[0]?.epoch, seq: 1 }])
+    outbox.disconnected()
+    outbox.append(AGENT, note(2))
+    const restarted = new JournalInbox(apply, () => undefined)
+    restarted.restore(kept)
+    expect(outbox.positions().every((position) => restarted.hello(position))).toBe(true)
+    outbox.resume(restarted.positions())
+    restarted.receive(only(sent))
+    await settled()
+    expect(applied).toEqual(['task-1:n1', 'task-1:n2'])
+  })
+
+  it.each([
+    ['as it keeps the cursor', 'keep', ['n1', 'n2', 'n3']],
+    ['once the cursor is kept', 'kept', ['n1', 'n3']],
+    ['during the apply', 'apply', ['n1', 'n2', 'n3']],
+  ])('never applies an entry twice when the control plane crashes %s', async (_when, at, expected) => {
+    const { sent, applied, outbox } = link()
+    const hang = async () => new Promise<void>(() => undefined)
+    let crashing = true
+    const isTwo = (seq: number) => crashing && seq === 2
+    const kept = new Map<string, { agent: string; epoch: string; seq: number }>()
+    const keep = async (cursor: { agent: string; epoch: string; seq: number }) => {
+      if (at === 'keep' && isTwo(cursor.seq)) {
+        await hang()
+      }
+      kept.set(cursor.agent, cursor)
+      await (at === 'kept' && isTwo(cursor.seq) ? hang() : flushed())
+    }
+    const apply = async (agent: string, entry: JournalEntry) => {
+      applied.push(`${agent}:${entry.type === 'note' ? entry.error : entry.type}`)
+      await (at === 'apply' && crashing && entry.type === 'note' && entry.error === 'n2' ? hang() : flushed())
+    }
+    const crashed = new JournalInbox(apply, () => undefined, keep)
+    outbox.append(AGENT, note(1))
+    outbox.append(AGENT, note(2))
+    sent.splice(0).forEach((frame) => {
+      crashed.receive(frame)
+    })
+    await settled()
+    outbox.disconnected()
+    crashing = false
+    const restarted = new JournalInbox(apply, () => undefined, keep)
+    restarted.restore([...kept.values()])
+    expect(outbox.positions().every((position) => restarted.hello(position))).toBe(true)
+    outbox.resume(restarted.positions())
+    outbox.append(AGENT, note(3))
+    sent.splice(0).forEach((frame) => {
+      restarted.receive(frame)
+    })
+    await settled()
+    expect(applied).toEqual(expected.map((name) => `${AGENT}:${name}`))
+  })
+
+  it('stops applying once a cursor cannot be kept, so a restart applies that entry once', async () => {
+    const { sent, replies, applied, outbox } = link()
+    const kept = new Map<string, { agent: string; epoch: string; seq: number }>()
+    let failing = true
+    const keep = async (cursor: { agent: string; epoch: string; seq: number }) => {
+      if (failing && cursor.seq === 2) {
+        throw new Error('the database is gone')
+      }
+      kept.set(cursor.agent, cursor)
+      return Promise.resolve()
+    }
+    const apply = async (agent: string, entry: JournalEntry) => {
+      applied.push(`${agent}:${entry.type === 'note' ? entry.error : entry.type}`)
+      await flushed()
+    }
+    const stops: string[] = []
+    const inbox = new JournalInbox(
+      apply,
+      (reply) => replies.push(reply),
+      keep,
+      (error) => stops.push(error.message),
+    )
+    for (const n of [1, 2, 3]) {
+      outbox.append(AGENT, note(n))
+    }
+    sent.splice(0).forEach((frame) => {
+      inbox.receive(frame)
+    })
+    await settled()
+    expect(applied).toEqual(['task-1:n1'])
+    expect(replies.map((reply) => (reply.type === 'journal.ack' ? reply.seq : -1))).toEqual([1])
+    expect(stops).toEqual([expect.stringContaining('cursor 2 was not kept: Error: the database is gone')])
+    expect(inbox.halted?.message).toBe(stops[0])
+
+    failing = false
+    outbox.disconnected()
+    const restarted = new JournalInbox(apply, () => undefined, keep)
+    restarted.restore([...kept.values()])
+    expect(outbox.positions().every((position) => restarted.hello(position))).toBe(true)
+    outbox.resume(restarted.positions())
+    sent.splice(0).forEach((frame) => {
+      restarted.receive(frame)
+    })
+    await settled()
+    expect(applied).toEqual(['task-1:n1', 'task-1:n2', 'task-1:n3'])
+  })
+
+  it('lets the node wait until the control plane stored every entry before it stops', async () => {
+    const { sent, outbox, inbox, deliverReplies } = link()
+    let drained = false
+    outbox.append(AGENT, note(1))
+    outbox.append(AGENT, note(2))
+    void outbox.drained().then(() => {
+      drained = true
+    })
+    for (const frame of sent.splice(0)) {
+      inbox.receive(frame)
+    }
+    await settled()
+    expect(drained).toBe(false)
+    deliverReplies()
+    await settled()
+    expect(drained).toBe(true)
+  })
 })

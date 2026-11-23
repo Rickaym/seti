@@ -1,13 +1,10 @@
 import { audit } from './audit.js'
+import { controlLink } from './node-link.js'
 import { stopForRestart } from './restart-state.js'
-import { liveSessions } from './runner.js'
 import { restartCuts, type CutTurn } from './store/restart.js'
 
 /** How long cut turns get to end and be recorded: Claude Code's interrupt, then its close. */
 const CUT_GRACE_MS = 7000
-
-const within = async (work: Promise<unknown>, ms: number) =>
-  Promise.race([work, new Promise((resolve) => setTimeout(resolve, ms).unref())])
 
 /**
  * Records the turns running as Seti stops and ends them: each is interrupted, so Claude Code
@@ -16,15 +13,12 @@ const within = async (work: Promise<unknown>, ms: number) =>
  */
 export async function cutRunningTurns(graceMs = CUT_GRACE_MS): Promise<CutTurn[]> {
   stopForRestart()
-  const cut = liveSessions().filter(([, session]) => session.running && !session.closed)
+  const { sessions } = await controlLink.command('sessions.view', {})
+  const cut = sessions.filter((session) => session.running && session.open)
   if (cut.length === 0) {
     return []
   }
-  const turns = cut.map(([taskId, session]) => ({
-    task_id: taskId,
-    kind: session.turnKind,
-    background: session.backgroundCount,
-  }))
+  const turns = cut.map((session) => ({ task_id: session.agent, kind: session.kind, background: session.background }))
   await restartCuts.record(turns)
   await audit.record({
     actor: 'system',
@@ -38,9 +32,6 @@ export async function cutRunningTurns(graceMs = CUT_GRACE_MS): Promise<CutTurn[]
       background: turns.reduce((sum, turn) => sum + turn.background, 0),
     },
   })
-  for (const [, session] of cut) {
-    session.cutForRestart()
-  }
-  await within(Promise.allSettled(cut.map(async ([, session]) => session.done)), graceMs)
+  await controlLink.command('sessions.cut', { agents: turns.map((turn) => turn.task_id), graceMs })
   return turns
 }

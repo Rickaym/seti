@@ -84,7 +84,10 @@ describe('control link', () => {
       'policy.set': () => ({}),
       'queued.retract': ({ promptId }) => ({ outcome: 'removed', promptId }),
       'quiet.restart': () => ({}),
-      'sessions.view': () => ({ sessions: [{ agent: TASK, running: true, heardAt: 5, retrying: null }] }),
+      'sessions.view': () => ({
+        sessions: [{ agent: TASK, open: true, running: true, heardAt: 5, retrying: null, kind: 'user', background: 0 }],
+      }),
+      'sessions.cut': () => ({}),
       'turn.send': ({ interrupt }) => ({ outcome: interrupt ? 'interrupted' : 'queued' }),
       'turn.stop': () => ({ stopped: true }),
       'session.open': () => ({}),

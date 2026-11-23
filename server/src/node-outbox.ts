@@ -17,6 +17,11 @@ class AgentJournal {
   private sent = 0
   private unacked: { seq: number; entry: JournalEntry }[] = []
 
+  /** Every entry is stored, or the control plane refused the journal. */
+  get settled(): boolean {
+    return this.refused !== null || this.acked === this.next - 1
+  }
+
   add(entry: JournalEntry): number {
     const seq = this.next
     this.next += 1
@@ -63,6 +68,7 @@ export interface JournalPosition {
 export class JournalOutbox {
   private readonly journals = new Map<string, AgentJournal>()
   private online = true
+  private readonly waiters: (() => void)[] = []
 
   private readonly send: (frame: JournalAppend) => void
   private readonly window: number
@@ -88,10 +94,28 @@ export class JournalOutbox {
     }
     if (frame.type === 'journal.reject') {
       journal.refused = frame.reason
+      this.wakeIfSettled()
       return
     }
     journal.acknowledge(frame.seq)
     this.flush(frame.agent, journal)
+    this.wakeIfSettled()
+  }
+
+  /** Resolves once the control plane stored every entry, as the node waits to stop. */
+  async drained(): Promise<void> {
+    return new Promise((resolve) => {
+      this.waiters.push(resolve)
+      this.wakeIfSettled()
+    })
+  }
+
+  private wakeIfSettled(): void {
+    if ([...this.journals.values()].every((journal) => journal.settled)) {
+      for (const wake of this.waiters.splice(0)) {
+        wake()
+      }
+    }
   }
 
   /** The link dropped: nothing goes out until it is back. */
