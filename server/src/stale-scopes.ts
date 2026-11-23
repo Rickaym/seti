@@ -60,7 +60,7 @@ const SCOPE_KINDS = memoryScopeSchema.shape.kind.options
 
 /** The kind and task of a scope `instance` named, or null for any other unit. */
 export function parseUnit(unit: string, instance: string): { kind: ScopeKind; taskId: string } | null {
-  const match = /^seti-([0-9a-f]{8})-(agent|side_chat|shell|terminal)-([\w-]+)-[0-9a-f]{8}\.scope$/.exec(unit)
+  const match = /^seti-([0-9a-f]{8})-(agent|side_chat|dream|shell|terminal)-([\w-]+)-[0-9a-f]{8}\.scope$/.exec(unit)
   const [, owner, kind, taskId] = match ?? []
   const known = SCOPE_KINDS.find((k) => k === kind)
   if (owner !== instance || taskId === undefined || known === undefined) {

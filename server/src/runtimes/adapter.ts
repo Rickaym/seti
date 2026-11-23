@@ -105,14 +105,14 @@ export interface DreamHost {
 }
 
 /** A dream session: its reports until it ends, and the controls to stop it. */
-interface DreamSession {
+export interface DreamSession {
   readonly events: AsyncIterable<SessionReport>
   interrupt(): Promise<void>
   close(): void
 }
 
 /** How a runtime runs dreams: where its agents keep memory, and a dream session. */
-interface DreamSupport {
+export interface DreamSupport {
   /** The folder the agent's own sessions keep their memory in, for its working folder. */
   memory: (cwd: string) => string
   /**

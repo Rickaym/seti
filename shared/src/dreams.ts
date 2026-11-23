@@ -16,3 +16,30 @@ export const dreamReport = z.strictObject({
   nothing_to_do: z.boolean().default(false).describe('Nothing needed doing, and nothing was changed.'),
 })
 export type DreamReport = z.infer<typeof dreamReport>
+
+export const DREAM_STATES = ['running', 'done', 'stopped', 'cut', 'failed'] as const
+export type DreamState = (typeof DREAM_STATES)[number]
+
+/** One dream of one agent: how it went, what it cost and changed, and its report. */
+export interface DreamRun {
+  id: number
+  task_id: string
+  /** The local date the dream belongs to, as YYYY-MM-DD. */
+  night: string
+  /** `manual` for Dream now. */
+  kind: 'manual' | 'nightly'
+  state: DreamState
+  /** Why it stopped, was cut or failed; null when it ended on its own. */
+  reason: string | null
+  model: string
+  started_at: string
+  ended_at: string | null
+  cost_usd: number
+  steps: number
+  /** Tool calls the dream gate refused. */
+  denials: number
+  memory_changes: number
+  report: DreamReport | null
+}
+
+export const dreamNowInput = z.strictObject({})

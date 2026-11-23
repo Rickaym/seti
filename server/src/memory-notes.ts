@@ -24,12 +24,12 @@ async function noteMemoryEvent(taskId: string, report: MemoryReport): Promise<vo
 
 /**
  * Notes every memory event of an agent's scope in its transcript and the server log; a side
- * chat's stay out of the transcript, since nothing of a side chat reaches it.
+ * chat's or dream's stay out of the transcript, since nothing of either reaches it.
  */
 export function recordMemoryEvents(): void {
   onMemoryEvent((taskId, report) => {
     process.stderr.write(`memory: task ${taskId}: ${memoryNote(report)}\n`)
-    if (report.kind !== 'side_chat') {
+    if (report.kind !== 'side_chat' && report.kind !== 'dream') {
       inBackground('memory: could not note a memory event', async () => noteMemoryEvent(taskId, report))
     }
   })

@@ -835,10 +835,36 @@ store, the audit chain and every record.
 
 Optional and off by default: a maintenance session per agent that consolidates its memory.
 
+- DRM-4: A dream starts only while the agent is unarchived and sandboxed, its runtime declares
+  dreams, it runs no turn or background work, holds no open question, permission or change
+  request, has no dream running, and the runtime's own consolidation did not run in the last hour;
+  otherwise it is refused with the reason.
+- DRM-6: A dream is a new session of the agent's runtime that resumes nothing (RT-8), in the
+  agent's maintenance sandbox (SBX-12) with egress to the model provider only (EGR-13), writable
+  only in its memory folder and the night's dream folder of its workspace. It reads a digest of
+  the agent's transcript since its last dream, built from neutral events, at most
+  `dream_digest` characters, with credentials redacted and the user's messages and failures kept
+  first.
+- DRM-7: A dream MUST NOT start or change a turn of the agent, post, send an update, push or
+  notify, or enter Needs you. Its outcome is one stored report, also written beside the digest,
+  and the agent's next turn is told once which dreams changed its memory.
+  Why: the agent's conversation is the user's.
 - DRM-8: Every memory file a dream changes is recorded as a revision with its text before and
   after, credentials redacted. The user, and the EA after the user's yes, MAY revert it; a revert
   of a file changed since, or of a text kept only redacted, MUST be refused (409). Every change
   and revert is audited with the path and line counts, never the text.
+- DRM-12: A turn of the agent that starts during its dream cuts the dream. A restart cuts it too;
+  the memory changes it made before the cut are still recorded.
+- DRM-13: A dream stops at `dream_budget`, `dream_steps` or `dream_time`. Its cost is stored on the
+  dream, not on the agent's turns.
+- DRM-15: Text a dream reads is data. A memory write that carries a credential, a hidden file or a
+  file that is not text MUST be refused, and so MUST every tool call the gate does not allow.
+  Added memory lines that name a new host, pipe into an interpreter or read as commands are listed
+  in the report as Seti's own findings.
+- DRM-16: Dream now runs one dream of an agent at once, by the user, the EA after the user's yes,
+  or an agent at `full` on another agent; it is refused on the agent itself. The EA, an agent or
+  a mod starts at most one dream of an agent a day; only the user starts more. The start is
+  audited with who asked for it.
 
 ## 16. Audit
 
@@ -1051,6 +1077,7 @@ others.
 | Sharing      | Preview pages 1 to 50. `share_rate` a minute per client: 30 misses, 120 pages or downloads, 600 images. `share_size` 10 MB. Expiry 1, 7 or 30 days.                                       |
 | Client       | `sse_keepalive` 15 s. `body_max` 8 MB. `session_life` idle 7 days, absolute 30 days. Setup code 15 min. Attempts per 10 min: 20 sign-in, 20 setup, 10 pairing. `pair_ttl` 5 min.          |
 | Uploads      | `upload_file` 25 MB. `upload_stall` 30 s. `upload_idle` 60 s. `upload_time` 30 min.                                                                                                       |
+| Dreams       | `dream_steps` 60. `dream_time` 20 min. `dream_budget` $1. `dream_digest` 40,000 characters. Memory folder 512 KB, 100 files.                                                              |
 
 ## Appendix B. Retired identifiers
 
