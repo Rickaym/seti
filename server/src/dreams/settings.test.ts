@@ -6,6 +6,7 @@ import { createApp } from '../app.js'
 import { tasks } from '../db.js'
 import { sessionOptions } from '../session-spec.js'
 import { dreamSettings } from '../store/dream-nights.js'
+import { dreamRuns } from '../store/dreams.js'
 import { workspaceRows } from '../store/workspaces.js'
 import { EA_AUTH, USER_AUTH } from '../test-auth.js'
 import { dreamsOn, setTaskDreaming, updateDreamSettings } from './settings.js'
@@ -90,5 +91,11 @@ describe('Dreaming settings', () => {
     await send('PUT', `/workspaces/${workspace?.id ?? ''}/dreaming`, { on: true })
     const covered = await sessionOptions(lead, new AbortController())
     expect(covered.settings).toMatchObject({ autoDreamEnabled: false })
+  })
+
+  it('counts dreams as having run once one starts', async () => {
+    const task = await agent()
+    await dreamRuns.start({ task_id: task.id, night: '2026-11-23', kind: 'manual', model: 'claude-sonnet-5-5' })
+    expect(await dreamRuns.any()).toBe(true)
   })
 })

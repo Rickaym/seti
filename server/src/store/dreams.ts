@@ -50,6 +50,12 @@ export const dreamRuns = {
       await sql<DreamRecord[]>`SELECT * FROM dream_run WHERE task_id = ${taskId}
         AND state NOT IN ('planned', 'skipped') ORDER BY started_at DESC, id DESC LIMIT ${limit}`
     ).map(toRun),
+  /** Whether any dream of any agent has started. */
+  any: async () => {
+    const [row] = await sql<{ started: boolean }[]>`SELECT EXISTS (SELECT 1 FROM dream_run
+        WHERE state NOT IN ('planned', 'skipped')) AS started`
+    return row?.started === true
+  },
   /** The dream of the agent that runs now, if any. */
   running: async (taskId: string) => {
     const [row] = await sql<DreamRecord[]>`SELECT * FROM dream_run WHERE task_id = ${taskId} AND state = 'running'`

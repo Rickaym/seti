@@ -1,7 +1,16 @@
-import { defineMod, type DreamNight, type DreamProposal, type DreamRun, type UiModApi } from '@seti/mod-api'
+import {
+  defineMod,
+  type Disposer,
+  type DreamNight,
+  type DreamProposal,
+  type DreamRun,
+  type UiModApi,
+} from '@seti/mod-api'
 import { ChevronLeft, ChevronRight, Moon } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import manifest from './seti-mod.json' with { type: 'json' }
+
+const SHOWN_POLL_MS = 30_000
 
 const SKIP_WORDS: Record<string, string> = {
   nothing_new: 'nothing new',
@@ -163,10 +172,25 @@ const dreamsView = (api: UiModApi) =>
     )
   }
 
-/** The Dreams view: what wants the user first, then each agent's dream, then who was left out. */
+/**
+ * The Dreams view: what wants the user first, then each agent's dream, then who was left out. Its
+ * sidebar entry shows only while Dreaming is on or once a dream has run.
+ */
 export const dreamingUi = defineMod({
   manifest,
   ui: (api) => {
-    api.registerSection({ id: 'dreams', icon: Moon, view: dreamsView(api) })
+    const shown = api.poll<{ shown: boolean }>('/shown', SHOWN_POLL_MS)
+    const view = dreamsView(api)
+    let section: Disposer | null = null
+    const follow = () => {
+      const on = shown.getSnapshot().data?.shown === true
+      if (on && section === null) {
+        section = api.registerSection({ id: 'dreams', icon: Moon, view })
+      } else if (!on && section !== null) {
+        section()
+        section = null
+      }
+    }
+    api.onDispose(shown.subscribe(follow))
   },
 })

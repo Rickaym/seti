@@ -202,6 +202,8 @@ export interface ModAsideAnswer {
 export interface ModDreamsApi {
   /** A night of dreams, `YYYY-MM-DD`, or the newest when none is named; null before the first. */
   night: (night?: string) => Promise<DreamNight | null>
+  /** True while nightly Dreaming is on or once any dream has started: when dreams have news. */
+  shown: () => Promise<boolean>
   /** Clean-ups dreams proposed that wait for the user, oldest first; only the user allows one. */
   proposals: () => Promise<DreamProposal[]>
   /** Starts a dream of an agent now under Seti's caps; a mod starts one an agent a day. */

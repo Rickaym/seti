@@ -1,7 +1,9 @@
 import type { ModDreamsApi } from '@seti/mod-api'
 import { dreamNight } from '../dreams/nights.js'
 import { startDream } from '../dreams/start.js'
+import { dreamSettings } from '../store/dream-nights.js'
 import { dreamProposals } from '../store/dream-proposals.js'
+import { dreamRuns } from '../store/dreams.js'
 import { requireTask } from '../tasks.js'
 import { requireOp } from './capabilities.js'
 
@@ -19,6 +21,7 @@ export function dreamApi(run: Run): ModDreamsApi {
     })
   return {
     night: async (name) => granted(async () => dreamNight(name)),
+    shown: async () => granted(async () => (await dreamSettings.get()).enabled || (await dreamRuns.any())),
     proposals: async () => granted(async () => dreamProposals.pending()),
     start: async (task) => granted(async () => startDream(await requireTask(task))),
   }

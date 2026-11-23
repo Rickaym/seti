@@ -11,6 +11,7 @@ export const dreamingServer = defineMod({
       const night: DreamNight | null = await api.dreams.night(NIGHT.test(query.night ?? '') ? query.night : undefined)
       return { body: night }
     })
+    api.route('GET', '/shown', async () => ({ body: { shown: await api.dreams.shown() } }))
     api.route('GET', '/waiting', async () => {
       const waiting: DreamProposal[] = await api.dreams.proposals()
       return { body: waiting }

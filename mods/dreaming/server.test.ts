@@ -15,7 +15,11 @@ const NIGHT: DreamNight = {
 
 function start() {
   const routes = new Map<string, ModRouteHandler>()
-  const dreams = { night: vi.fn(async () => Promise.resolve(NIGHT)), proposals: vi.fn(async () => Promise.resolve([])) }
+  const dreams = {
+    night: vi.fn(async () => Promise.resolve(NIGHT)),
+    shown: vi.fn(async () => Promise.resolve(false)),
+    proposals: vi.fn(async () => Promise.resolve([])),
+  }
   const api = {
     dreams,
     route: (method: string, path: string, handler: ModRouteHandler) => {
@@ -42,5 +46,12 @@ describe('the Dreaming server half', () => {
     await routes.get('GET /night')?.(request({ night: '../etc' }))
     expect(dreams.night).toHaveBeenLastCalledWith(undefined)
     expect((await routes.get('GET /waiting')?.(request({})))?.body).toEqual([])
+  })
+
+  it('says whether the Dreams entry shows, which it does not while Dreaming is off and unused', async () => {
+    const { routes, dreams } = start()
+    expect((await routes.get('GET /shown')?.(request({})))?.body).toEqual({ shown: false })
+    dreams.shown.mockResolvedValueOnce(true)
+    expect((await routes.get('GET /shown')?.(request({})))?.body).toEqual({ shown: true })
   })
 })
