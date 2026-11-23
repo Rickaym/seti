@@ -1,8 +1,8 @@
 import { randomUUID, type UUID } from 'node:crypto'
-import type { SDKMessage, SDKResultMessage } from '@anthropic-ai/claude-agent-sdk'
+import { eventsOf, type EventOf } from '@seti/shared'
 import { InputQueue } from './input-queue.js'
 import type { NextMessage } from './next-message.js'
-import type { InputContent, InputPriority, SessionInput } from './runtimes/adapter.js'
+import type { InputContent, InputPriority, SessionInput, SessionMessage } from './runtimes/adapter.js'
 import type { DefaultSession, DefaultShapes } from './runtimes/registry.js'
 import type { CutKind } from './store/restart.js'
 
@@ -10,8 +10,6 @@ import type { CutKind } from './store/restart.js'
 const INTERRUPT_GRACE_MS = 5000
 /** How long taking a message back waits for Claude Code to report that it has the message. */
 const ARRIVAL_WAIT_MS = 2000
-
-type BackgroundTasks = Extract<SDKMessage, { subtype: 'background_tasks_changed' }>['tasks']
 
 /** Why the running turn is being cut short: Stop, or a message sent with the interrupt flag. */
 type TurnEnding = 'stop' | 'replace'
@@ -163,12 +161,6 @@ export class LiveSession {
     return servers === undefined ? null : servers()
   }
 
-  /** The context window the runtime measures usage against; null when it cannot say in time. */
-  async contextWindow(): Promise<number | null> {
-    const read = this.closed ? undefined : this.runtime?.contextWindow
-    return read === undefined ? null : read()
-  }
-
   /** Hands the running process new permission rules; the runtime applies them to its next call. */
   async applyPermissions(permissions: DefaultShapes['policy']): Promise<void> {
     const apply = this.closed ? undefined : this.runtime?.setPolicy
@@ -205,15 +197,14 @@ export class LiveSession {
   }
 
   /**
-   * A result of a turn Claude Code ran for a background notification before it read the message
-   * that started the running turn, as a resumed session does for work the last process left.
+   * The end of a turn the runtime ran for background work before it read the message that
+   * started the running turn, as a resumed session does for work the last process left.
    */
-  precedesOpener(result: SDKResultMessage): boolean {
-    if (this.opener === null || result.origin?.kind !== 'task-notification') {
+  precedesOpener(end: EventOf<'turn.ended'>): boolean {
+    if (this.opener === null || end.cause !== 'background') {
       return false
     }
-    const answered = result.user_message_uuids ?? [result.user_message_uuid]
-    return !answered.includes(this.opener)
+    return !end.answered.includes(this.opener)
   }
 
   /** The session wrote a message of a turn at work, so one waiting for its opener still goes. */
@@ -229,12 +220,15 @@ export class LiveSession {
     this.heardAt = at
   }
 
-  /** Notes a message of the session: work it reports, or Claude Code retrying the API. */
-  note(m: SDKMessage): void {
-    if (m.type !== 'system') {
+  /** Notes a message of the session: work it reports, or the runtime retrying the API. */
+  note(m: SessionMessage): void {
+    if (m.work) {
       this.heard()
-    } else if (m.subtype === 'api_retry') {
-      this.retrying = m.error_status === null ? m.error : `${m.error} (${String(m.error_status)})`
+      return
+    }
+    const retry = eventsOf(m.events, 'notice').find((event) => event.code === 'api_retry')
+    if (retry !== undefined) {
+      this.retrying = retry.status === undefined ? retry.text : `${retry.text} (${String(retry.status)})`
     }
   }
 
@@ -422,9 +416,9 @@ export class LiveSession {
   }
 
   /** Replaces the set of live background work; true when its count changed. */
-  setBackground(tasks: BackgroundTasks): boolean {
+  setBackground(jobs: readonly string[]): boolean {
     const before = this.background.size
-    this.background = new Set(tasks.filter((task) => task.ambient !== true).map((task) => task.task_id))
+    this.background = new Set(jobs)
     this.changed()
     return this.background.size !== before
   }

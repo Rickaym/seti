@@ -51,7 +51,7 @@ export interface ConformanceTarget<S extends RuntimeShapes, Id extends string = 
   /** Cases this adapter is known to fail, with the reason; they run expecting the failure. */
   gaps?: Partial<Record<string, string>>
   /** The adapter's projector, which `RuntimeAdapter` does not carry yet. */
-  project: (message: S['message']) => RuntimeEvent[]
+  project: (message: unknown) => RuntimeEvent[]
   /** The host the adapter gets, answering through the neutral one. */
   host: (neutral: NeutralHost) => SessionHost<S>
   /** A fake runtime that plays the script. */

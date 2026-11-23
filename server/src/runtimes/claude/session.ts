@@ -7,10 +7,10 @@ import type {
   Options,
   PermissionMode,
   Query,
-  SDKMessage,
 } from '@anthropic-ai/claude-agent-sdk'
 import type { RuntimeSession } from '../adapter.js'
 import type { ClaudeVendor } from './realise.js'
+import { claudeReports } from './reports.js'
 
 /** How long reading the context window may take before a compaction is stored without it. */
 const CONTEXT_WAIT_MS = 3000
@@ -22,14 +22,13 @@ interface ClaudePolicy {
   deny: string[]
 }
 
-/** Claude Code's own shapes: plugins, SDK options, messages, MCP reports. */
+/** Claude Code's own shapes: plugins, SDK options, MCP reports. */
 export interface ClaudeShapes {
   vendor: ClaudeVendor
   realised: Options
   decide: CanUseTool
   hooks: Partial<Record<HookEvent, HookCallbackMatcher[]>>
   hostServers: Record<string, McpServerConfig>
-  message: SDKMessage
   toolServer: McpServerStatus
   policy: ClaudePolicy
   mode: PermissionMode
@@ -59,24 +58,29 @@ async function contextWindowOf(query: Query): Promise<number | null> {
 function optionalControls(query: Query): Partial<RuntimeSession<ClaudeShapes>> {
   return {
     ...(cancelsQueued(query) ? { retract: async (uuid) => (await query.cancelAsyncMessage(uuid)) === true } : {}),
-    ...(typeof query.getContextUsage === 'function' ? { contextWindow: async () => contextWindowOf(query) } : {}),
     ...(typeof query.applyFlagSettings === 'function'
       ? { setPolicy: async (permissions: ClaudePolicy) => query.applyFlagSettings({ permissions: { ...permissions } }) }
       : {}),
   }
 }
 
-/** A Claude Code process the SDK started, as a runtime session. */
-export const claudeSession = (query: Query): RuntimeSession<ClaudeShapes> => ({
-  events: query,
-  interrupt: async () => {
-    await query.interrupt()
-  },
-  close: () => {
-    query.close()
-  },
-  stopBackground: async (jobId) => query.stopTask(jobId),
-  toolServers: async () => query.mcpServerStatus(),
-  setMode: async (mode) => query.setPermissionMode(mode),
-  ...optionalControls(query),
-})
+/** A Claude Code process the SDK started, as a runtime session; `rewound` when at a rewind point. */
+export function claudeSession(query: Query, rewound: boolean): RuntimeSession<ClaudeShapes> {
+  let closed = false
+  const window = async () =>
+    closed || typeof query.getContextUsage !== 'function' ? Promise.resolve(null) : contextWindowOf(query)
+  return {
+    events: claudeReports(query, rewound, window),
+    interrupt: async () => {
+      await query.interrupt()
+    },
+    close: () => {
+      closed = true
+      query.close()
+    },
+    stopBackground: async (jobId) => query.stopTask(jobId),
+    toolServers: async () => query.mcpServerStatus(),
+    setMode: async (mode) => query.setPermissionMode(mode),
+    ...optionalControls(query),
+  }
+}

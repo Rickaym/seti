@@ -3,8 +3,9 @@ import { once } from 'node:events'
 import { createInterface } from 'node:readline'
 import type { ToolCall } from '@seti/shared'
 import type { Launcher } from '../../launcher.js'
-import type { RuntimeSession, SessionInput } from '../adapter.js'
+import type { RuntimeSession, SessionInput, SessionReport } from '../adapter.js'
 import { controlLine, type ControlLine, type ScriptedCommand, type Verdict } from './dialect.js'
+import { scriptedReport } from './project.js'
 import { scriptedToolCall } from './tools.js'
 
 /** How Seti decides a call the scripted runtime asks about, until the signal aborts. */
@@ -17,7 +18,6 @@ export interface ScriptedShapes {
   decide: ScriptedDecide
   hooks: null
   hostServers: Record<string, never>
-  message: unknown
   toolServer: never
   policy: never
   mode: never
@@ -75,7 +75,7 @@ class Driver {
     }
   }
 
-  async *messages(): AsyncGenerator {
+  async *messages(): AsyncGenerator<SessionReport> {
     if (this.child.stdout !== null) {
       for await (const line of createInterface({ input: this.child.stdout })) {
         const message = parsed(line)
@@ -83,7 +83,7 @@ class Driver {
         if (control.success) {
           this.control(control.data)
         } else {
-          yield message
+          yield scriptedReport(message)
         }
       }
     }
