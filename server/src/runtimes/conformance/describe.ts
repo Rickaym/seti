@@ -10,6 +10,7 @@ import { LAUNCH } from './cases-launch.js'
 import { LIFECYCLE } from './cases-lifecycle.js'
 import { PERMISSIONS } from './cases-permissions.js'
 import { QUESTIONS } from './cases-questions.js'
+import { REPORTS } from './cases-reports.js'
 import { TOOLS } from './cases-tools.js'
 import { subjectOf } from './subject.js'
 import type { ConformanceTarget } from './target.js'
@@ -19,6 +20,7 @@ export const CASES: readonly Case[] = [
   ...LIFECYCLE,
   ...INTERRUPT,
   ...INPUT,
+  ...REPORTS,
   ...EVENTS,
   ...TOOLS,
   ...PERMISSIONS,
