@@ -37,9 +37,13 @@ function Tooltip({ onOpenChange, ...props }: Omit<React.ComponentProps<typeof To
   )
 }
 
-/** Focus handed back by a closing popover or dialog comes from no element still on the page. */
-const handedBack = (event: React.FocusEvent) =>
-  !(event.relatedTarget instanceof Node && event.relatedTarget.isConnected)
+/** A closing popover hands focus back from no element on the page, or through its dialog. */
+function handedBack({ relatedTarget, currentTarget }: React.FocusEvent): boolean {
+  if (!(relatedTarget instanceof Node && relatedTarget.isConnected)) {
+    return true
+  }
+  return relatedTarget.contains(currentTarget) && !currentTarget.matches(':focus-visible')
+}
 
 function TooltipTrigger({ onFocus, ...props }: React.ComponentProps<typeof TooltipPrimitive.Trigger>) {
   return (
