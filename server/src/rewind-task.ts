@@ -1,12 +1,17 @@
-import type { RewindFilesResult } from '@anthropic-ai/claude-agent-sdk'
 import type { RewindFilesPreview, RewindRestore, RewindResult, RewindTarget, Task } from '@seti/shared'
 import { audit } from './audit.js'
 import { refuseOnSelf } from './ea-guard.js'
 import { HttpError } from './http.js'
 import { taskLauncher } from './launch-plan.js'
-import { matchChain, rewindPoints, type ChainMatch, type RewindPoint } from './rewind.js'
+import { rewindPoints, type RewindPoint } from './rewind.js'
 import { closeIdleSession, isRunning } from './runner.js'
-import { rewindFiles, sessionChain } from './runtimes/claude/rewind-files.js'
+import {
+  matchChain,
+  rewindFiles,
+  sessionChain,
+  type ChainMatch,
+  type FilesRewind,
+} from './runtimes/claude/rewind-files.js'
 import { adapterFor, DEFAULT_RUNTIME } from './runtimes/registry.js'
 import { shellTurnGuard } from './shell-context.js'
 import { rewinds } from './store/rewinds.js'
@@ -51,7 +56,7 @@ async function locate(task: Task, point: RewindPoint): Promise<ChainMatch> {
 }
 
 /** Lists, and unless dryRun puts back, the task's files as they were at a prompt. */
-async function filesAt(task: Task, promptUuid: string, dryRun: boolean): Promise<RewindFilesResult> {
+async function filesAt(task: Task, promptUuid: string, dryRun: boolean): Promise<FilesRewind> {
   if (task.session_id === null) {
     return { canRewind: false, error: 'This agent has no session yet' }
   }
@@ -75,7 +80,7 @@ function refuseUnsupported(restore: RewindRestore): void {
   }
 }
 
-async function plannedFiles(task: Task, match: ChainMatch): Promise<RewindFilesResult> {
+async function plannedFiles(task: Task, match: ChainMatch): Promise<FilesRewind> {
   if (!canRewind().code) {
     return { canRewind: false, error: NO_FILE_REWIND }
   }

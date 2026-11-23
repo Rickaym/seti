@@ -5,12 +5,13 @@ import { bypassOn, SANDBOX_POLICY_DEFAULT, type Task } from '@seti/shared'
 import { afterAll, describe, expect, it } from 'vitest'
 import { createApp } from './app.js'
 import { hostLoginKey } from './claude-logins.js'
-import { compactSetup, effectiveCompact, setTaskCompact } from './compact.js'
+import { effectiveCompact, setTaskCompact } from './compact.js'
 import { tasks } from './db.js'
 import { borrowedStamp, taskBorrowedServers } from './mcp-borrowed.js'
 import { taskDeniedServers } from './mcp-selection.js'
 import { tokenServers } from './mcp-sign-in.js'
 import { taskPluginConfigs } from './plugins.js'
+import { compactSetup } from './runtimes/claude/realise.js'
 import { signedInServers } from './sandbox-mcp.js'
 import { registerContextProvider, sandboxStamp, systemAppend, workingDirs } from './session-options.js'
 import { setupKey } from './session-spec.js'
@@ -82,5 +83,22 @@ describe('setupKey', () => {
     }
     await sandboxPolicy.save({ ...SANDBOX_POLICY_DEFAULT, enabled: true, allowed_domains: ['example.org'] })
     expect(await setupKey(sandboxed)).toBe(await keyBeforeSpec(sandboxed))
+  })
+})
+
+describe('the setup key of a spec', () => {
+  it('holds the compaction rule in the layout keys always had', async () => {
+    const task = await newTask(false)
+    await setTaskCompact(task, { auto: false, window_k: 200, threshold_pct: 70, instructions: null })
+    expect(await setupKey(task)).toContain(
+      '"compact":{"settings":{"autoCompactEnabled":false,"autoCompactWindow":200000},"env":{"CLAUDE_AUTOCOMPACT_PCT_OVERRIDE":"70"}}',
+    )
+  })
+
+  it('changes when bypass turns on, which only a new process can take', async () => {
+    const task = await newTask(false)
+    const bypass = { ...task, bypass_until: new Date(Date.now() + 3_600_000).toISOString() }
+    expect(await setupKey(bypass)).not.toBe(await setupKey(task))
+    expect(await setupKey(bypass)).toBe(await keyBeforeSpec(bypass))
   })
 })

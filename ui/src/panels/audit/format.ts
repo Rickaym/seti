@@ -17,6 +17,7 @@ export const AREA_LABELS: Record<AuditArea, string> = {
   team: 'Group chat',
   workspace: 'Workspaces',
   mod: 'Mods',
+  dream: 'Dreams',
   system: 'System',
 }
 
