@@ -23,7 +23,7 @@ their own. Seti uses the reference values in the protocol's Appendix A.
 | Process               | What it is                                                                 | Protocol      |
 | --------------------- | -------------------------------------------------------------------------- | ------------- |
 | `seti.service`        | The Hono server in `server/`; holds the open sessions in `session-host.ts` | ENT-13        |
-| Node (split mode)     | `server/src/node/main.ts` with `SETI_NODE=split`; holds the open sessions  | NODE-1        |
+| `seti-node.service`   | `server/src/node/main.ts` with `SETI_NODE=split`; holds the open sessions  | NODE-1        |
 | Agent sessions        | Claude Code via `runtimes/claude/` and the Agent SDK, about 300 MB each    | 3.2, 7.2, 7.8 |
 | `seti-ea.service`     | The EA in `ea/`, a pipecat process with its own token                      | 14            |
 | Poller workers        | Worker threads in the server (`SETI_POLLER_WORKERS`, 2 by default)         | CHN-12        |

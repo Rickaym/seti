@@ -20,6 +20,7 @@ Options:
   --no-service          do not install units; start Seti with scripts/start.sh instead
   --with-ea             also set up the Executive Assistant (voice and chat)
   --with-redis          also set up Seti's own Redis cache (Linux, needs sudo)
+  --split-node          run agents in a separate node unit, so a restart of Seti keeps their turns
   --no-system           never use sudo; report what is missing instead
   -y, --yes             accept every default without asking
   -h, --help            show this help
@@ -36,6 +37,7 @@ PORT_ARG=''
 SERVICE=ask
 WITH_EA=ask
 WITH_REDIS=ask
+SPLIT_NODE=0
 NO_SYSTEM=0
 ASSUME_YES=0
 ORIGINAL_ARGS=("$@")
@@ -50,6 +52,7 @@ while [[ $# -gt 0 ]]; do
     --no-service) SERVICE=no ;;
     --with-ea) WITH_EA=yes ;;
     --with-redis) WITH_REDIS=yes ;;
+    --split-node) SPLIT_NODE=1 ;;
     --no-system) NO_SYSTEM=1 ;;
     -y | --yes) ASSUME_YES=1 ;;
     -h | --help) usage; exit 0 ;;
@@ -454,6 +457,7 @@ settings_file() {
   chmod 600 "$file"
   [[ -z $DATABASE_SETTING ]] || add_setting SETI_DATABASE_URL "$DATABASE_SETTING"
   [[ -z $PORT_ARG ]] || add_setting SETI_PORT "$PORT_ARG"
+  [[ $SPLIT_NODE -eq 0 ]] || add_setting SETI_NODE split
   if [[ $REDIS_ON -eq 1 ]]; then
     if [[ $(env_value "$file" SETI_REDIS_URL) == off ]]; then
       warn "${file} turns Redis off; delete its SETI_REDIS_URL line to use Seti's Redis"
@@ -502,6 +506,12 @@ service() {
     return 0
   fi
   render_unit seti.service || return 0
+  if [[ $SPLIT_NODE -eq 1 ]] && render_unit seti-node.service; then
+    systemctl --user daemon-reload
+    systemctl --user enable seti-node.service >/dev/null 2>&1
+    systemctl --user restart seti-node.service
+    ok 'seti-node.service runs the agents'
+  fi
   systemctl --user daemon-reload
   systemctl --user enable seti.service >/dev/null 2>&1
   systemctl --user restart seti.service
