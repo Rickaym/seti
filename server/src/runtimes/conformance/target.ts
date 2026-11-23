@@ -20,6 +20,8 @@ export interface Profile {
   background: { jobs: boolean; stop: boolean }
   /** The kinds whose calls Seti decides before they run (gate `before` or `request`). */
   gated: { shell: boolean; edit: boolean; mcp: boolean }
+  /** The adapter reads the runtime's output itself, rather than through the vendor's library. */
+  parsesOutput: boolean
 }
 
 /** A neutral decision: run the call, maybe with changed input, or refuse it with a reason. */
@@ -47,8 +49,12 @@ export interface SpawnRecord {
 export interface Rig {
   readonly launcher: Launcher
   readonly spawns: readonly SpawnRecord[]
+  /** Processes the runtime started by itself, outside the launcher. */
+  readonly selfStarts: readonly SpawnRecord[]
   /** Every tool call that ran, as `<tool> <args as JSON>`, in order. */
   readonly effects: readonly string[]
+  /** Kills the newest process from outside, as the kernel would, with this exit code. */
+  crash: (code: number) => void
 }
 
 /**
