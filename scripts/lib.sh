@@ -30,12 +30,10 @@ die() {
 
 have() { command -v "$1" >/dev/null 2>&1; }
 
-# What a split Seti's node runs, as one id: the tracked server and shared sources and the lockfile.
+# What a split Seti's node runs, as one id: its bundled code and the package files that pin it.
 node_build_id() {
-  local root=$1 hash=(sha256sum)
-  have sha256sum || hash=(shasum -a 256)
-  git -C "$root" ls-files -s -- server shared package.json pnpm-lock.yaml ':(exclude)*.test.ts' |
-    "${hash[@]}" | cut -c1-16
+  local root=$1
+  pnpm --silent --dir "${root}/server" run build-id "$root"
 }
 
 # The last value a variable has in an env file, unquoted; empty when absent.

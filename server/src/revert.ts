@@ -2,6 +2,7 @@ import { changedKeys, contextPackInput, writeContextFileInput, type Revision, ty
 import { z } from 'zod'
 import { packState, requirePack, saveContextFile, updatePack } from './context-changes.js'
 import { readContextFile } from './context-files.js'
+import { revertMemoryFile } from './dreams/memory-revisions.js'
 import { describeIssues, HttpError } from './http.js'
 import { restoreKnowledge } from './knowledge-review.js'
 import { byUser, type ChangeSource } from './revisions.js'
@@ -47,6 +48,8 @@ async function restore(
     }
     case 'knowledge_note':
       return restoreKnowledge(id, before, fields, source)
+    case 'memory_file':
+      return revertMemoryFile(target, source)
   }
 }
 

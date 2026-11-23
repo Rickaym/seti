@@ -170,6 +170,11 @@ OBJECT_ARGS = {
         "description": "A CLAUDE.md file for its changes: user, or a repo name, adding local for "
         "CLAUDE.local.md.",
     },
+    "memory": {
+        "type": "string",
+        "description": "An agent, for the changes Seti's dreams made to the notes in its Claude Code "
+        "memory folder.",
+    },
 }
 
 SETTINGS_SPECS: list[ToolSpec] = [
@@ -400,14 +405,15 @@ SETTINGS_SPECS: list[ToolSpec] = [
     ),
     ToolSpec(
         "list_changes",
-        "Changes agents made to context packs and CLAUDE.md files that the user has not looked at "
-        "yet; or, naming one of them, its change history.",
+        "Changes agents and Seti's dreams made to context packs, CLAUDE.md files and agents' memory "
+        "files that the user has not looked at yet; or, naming a pack, file or agent's memory, its "
+        "change history.",
         dict(OBJECT_ARGS),
     ),
     ToolSpec(
         "revert_change",
-        "Set a context pack or CLAUDE.md file back to how it was before one change, saved as a new "
-        "change. Needs the user's yes.",
+        "Set a context pack, CLAUDE.md file or memory file back to how it was before one change, "
+        "saved as a new change; a memory file changed since is refused. Needs the user's yes.",
         {
             **OBJECT_ARGS,
             "change": {"type": "integer", "description": "The change number; leave out for the latest."},
@@ -416,7 +422,7 @@ SETTINGS_SPECS: list[ToolSpec] = [
     ),
     ToolSpec(
         "mark_changes_seen",
-        "Mark agents' changes as seen, so Seti stops flagging them: one pack or file, or all. "
+        "Mark changes as seen, so Seti stops flagging them: one pack, file or agent's memory, or all. "
         "Needs the user's yes.",
         {**OBJECT_ARGS, "confirmed": CONFIRMED},
     ),
@@ -745,7 +751,20 @@ def _event_kinds(args: Mapping[str, Any]) -> list[str] | None:
     return sorted(set(kinds)) or None
 
 
+def _memory_file(rev: Mapping[str, Any]) -> str:
+    return str(rev.get("object_id", "")).partition(":")[2]
+
+
+def _memory_what(rev: Mapping[str, Any]) -> str:
+    before = field_dict(rev, "before")
+    after = field_dict(rev, "after")
+    verb = "created" if before.get("deleted") else "deleted" if after.get("deleted") else "rewrote"
+    return f"{verb} memory file {_memory_file(rev)}"
+
+
 def _revision_what(rev: Mapping[str, Any]) -> str:
+    if rev.get("object_type") == "memory_file":
+        return _memory_what(rev)
     kind = rev.get("kind")
     if kind == "created":
         return "created it"
@@ -757,7 +776,16 @@ def _revision_what(rev: Mapping[str, Any]) -> str:
     return f"changed its {and_list([k.replace('_', ' ') for k in keys]) or 'nothing'}"
 
 
+def _unnamed(object_type: str, object_id: str) -> str:
+    """An object Seti lists no name for: a memory file by its path, else a deleted one."""
+    if object_type == "memory_file":
+        return f"memory file {object_id.partition(':')[2]}"
+    return f"{OBJECT_WORDS.get(object_type, '')} since deleted".strip()
+
+
 def _revision_who(rev: Mapping[str, Any]) -> str:
+    if rev.get("actor") == "system":
+        return "Seti's dream"
     if rev.get("actor") == "agent":
         return f"the agent in {rev.get('task_title')}" if rev.get("task_title") else "an agent"
     return "the user"
@@ -1494,6 +1522,9 @@ class SettingsTools:
             raise ToolError("Name one pack or file.", "Several named")
         kind = named[0]
         ref = arg_str(args, kind)
+        if kind == "memory":
+            task = await self._resolve_task(ref)
+            return "memory_file", str(task.get("id")), f"memory of {title_of(task)}"
         if kind == "pack":
             pack = only(
                 pick(
@@ -1513,9 +1544,9 @@ class SettingsTools:
         return "context_file", str(chosen.get("key")), context_file_name(chosen)
 
     async def _history(self, object_type: str, object_id: str) -> list[dict[str, Any]]:
-        revisions = dicts(
-            await self._seti.get("/revisions", {"object_type": object_type, "object_id": object_id})
-        )
+        """One object's changes; a memory_file id without a file names every file of its agent."""
+        key = "task_id" if object_type == "memory_file" and ":" not in object_id else "object_id"
+        revisions = dicts(await self._seti.get("/revisions", {"object_type": object_type, key: object_id}))
         return sorted(revisions, key=lambda r: int(r.get("id") or 0), reverse=True)
 
     def _revision_line(self, rev: Mapping[str, Any]) -> str:
@@ -1558,9 +1589,7 @@ class SettingsTools:
         ]
         for u in unseen[:SHOWN]:
             object_type, object_id = str(u.get("object_type")), str(u.get("object_id"))
-            label = names.get(
-                (object_type, object_id), f"{OBJECT_WORDS.get(object_type, '')} since deleted".strip()
-            )
+            label = names.get((object_type, object_id), _unnamed(object_type, object_id))
             rev = next(
                 (
                     r
@@ -1610,7 +1639,12 @@ class SettingsTools:
 
     async def mark_changes_seen(self, args: Mapping[str, Any]) -> ToolResult:
         target = await self._object(args)
-        if target is not None:
+        if target is not None and target[0] == "memory_file":
+            files = {str(r.get("object_id")) for r in await self._history(target[0], target[1])}
+            refs = [(target[0], f, f"{target[2]} {f.partition(':')[2]}") for f in sorted(files)]
+            if not refs:
+                raise ToolError(f"The {target[2]} has no recorded changes.", "No changes")
+        elif target is not None:
             refs = [(target[0], target[1], target[2])]
         else:
             unseen = dicts(await self._seti.get("/revisions/unseen"))
@@ -1621,7 +1655,10 @@ class SettingsTools:
                 (
                     str(u.get("object_type")),
                     str(u.get("object_id")),
-                    names.get((str(u.get("object_type")), str(u.get("object_id"))), "a deleted object"),
+                    names.get(
+                        (str(u.get("object_type")), str(u.get("object_id"))),
+                        _unnamed(str(u.get("object_type")), str(u.get("object_id"))),
+                    ),
                 )
                 for u in unseen
             ]

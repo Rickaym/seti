@@ -366,8 +366,9 @@ device list settles, and the Audio button in the call does the same on demand.
 `deploy/seti-node.service`), which runs `scripts/start.sh node`: the agents' sessions run in that
 process, and `seti.service` reaches them over `~/.seti/run/node.sock`, a socket in a folder only
 your user may enter. A restart of `seti.service` then keeps running turns going.
-`scripts/upgrade.sh` restarts the node only when the server code, the shared code or the lockfile
-changed, and Seti records the node's running turns before the node cuts them. `pnpm run doctor`
+`scripts/upgrade.sh` restarts the node only when the code the node runs or the package files
+changed (`pnpm --dir server run build-id` prints the id it compares), and Seti records the node's
+running turns before the node cuts them. `pnpm run doctor`
 checks the socket. Logs are in `journalctl --user -u seti-node.service`.
 
 Split mode still has gaps that a single process does not:
