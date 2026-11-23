@@ -37,7 +37,10 @@ const BROKEN: [string, Target][] = [
       ...scriptedTarget,
       adapter: {
         ...scriptedTarget.adapter,
-        open: async (start) => ({ ...(await scriptedTarget.adapter.open(start)), close: () => undefined }),
+        open: async (realised, input) => ({
+          ...(await scriptedTarget.adapter.open(realised, input)),
+          close: () => undefined,
+        }),
       },
     },
   ],

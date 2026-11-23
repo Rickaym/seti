@@ -2,12 +2,14 @@ import { describe, expect, it } from 'vitest'
 import type { RuntimeShapes } from '../adapter.js'
 import type { Case } from './case.js'
 import { EVENTS } from './cases-events.js'
+import { INPUT } from './cases-input.js'
+import { INTERRUPT } from './cases-interrupt.js'
 import { LIFECYCLE } from './cases-lifecycle.js'
 import { subjectOf } from './subject.js'
 import type { ConformanceTarget } from './target.js'
 
 /** Every case, in the order of the R4 plan. */
-export const CASES: readonly Case[] = [...LIFECYCLE, ...EVENTS]
+export const CASES: readonly Case[] = [...LIFECYCLE, ...INTERRUPT, ...INPUT, ...EVENTS]
 
 /**
  * Registers the conformance suite for one adapter: a test per case that applies, a skipped test

@@ -1,8 +1,5 @@
-import type { SDKUserMessage } from '@anthropic-ai/claude-agent-sdk'
 import type { PromptAttachment } from '@seti/shared'
-
-/** When Claude Code hands a message sent during a turn over: now, at the next step, or after it. */
-export type QueuePriority = NonNullable<SDKUserMessage['priority']>
+import type { InputPriority } from './runtimes/adapter.js'
 
 /** A message waiting for its session to start, or for the turn being cut short to end. */
 export interface NextMessage {
@@ -21,7 +18,7 @@ export interface NextMessage {
    * For updates with no user text: reach a running turn at its next step, or now for a person's
    * message, which moves the turn's running commands to the background; not after the turn.
    */
-  priority?: Exclude<QueuePriority, 'later'>
+  priority?: Exclude<InputPriority, 'later'>
   /** For updates with no user text: also take the ones held for the user's next message. */
   held?: boolean
 }
