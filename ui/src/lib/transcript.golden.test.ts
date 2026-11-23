@@ -1,6 +1,6 @@
 import fs from 'node:fs'
 import path from 'node:path'
-import type { MessageRow } from '@seti/shared'
+import { eventsOf, rowEvents, type MessageRow } from '@seti/shared'
 import { describe, expect, it } from 'vitest'
 import { askedInRows } from '@/lib/closing-question'
 import { compactFailure, compactingSince } from '@/lib/compacting'
@@ -65,7 +65,7 @@ const results = (rows: readonly MessageRow[]) =>
 /** What the browser's transcript readers make of one transcript: what shows, how, and grouped how. */
 function render({ rows }: GoldenTranscript) {
   const index = indexTranscript(rows)
-  const sdk = rows.flatMap((row) => (row.kind === 'sdk' ? [{ id: row.id, payload: row.payload }] : []))
+  const sdk = rows.flatMap((row) => (row.kind === 'sdk' ? [{ id: row.id, row, payload: row.payload }] : []))
   return {
     shows: ids(rows.filter(rendersContent)),
     subagent: rows.flatMap((row) => (subagentOf(row) === null ? [] : [[row.id, subagentOf(row)]])),
@@ -81,8 +81,10 @@ function render({ rows }: GoldenTranscript) {
     compactFailures: rows.flatMap((row) => (compactFailure(row) === null ? [] : [[row.id, compactFailure(row)]])),
     interrupted: [...interruptedResultIds(rows, false)],
     asked: askedInRows(rows),
-    local: sdk.flatMap(({ id, payload }) => (payload.type === 'user' ? [[id, localCommandOutput(payload)]] : [])),
-    outcomes: sdk.flatMap(({ id, payload }) => (payload.type === 'result' ? [[id, turnOutcome(payload, false)]] : [])),
+    local: sdk.flatMap(({ id, row, payload }) => (payload.type === 'user' ? [[id, localCommandOutput(row)]] : [])),
+    outcomes: sdk.flatMap(({ id, row }) =>
+      eventsOf(rowEvents(row), 'turn.ended').map((end) => [id, turnOutcome(end, false)]),
+    ),
   }
 }
 

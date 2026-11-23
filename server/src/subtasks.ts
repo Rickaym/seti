@@ -1,18 +1,19 @@
-import type {
-  JobUsage,
-  MessageRow,
-  RuntimeEvent,
-  Subtask,
-  SubtaskBrief,
-  SubtaskProgress,
-  SubtaskStatus,
-  SubtaskUsage,
-  ToolCall,
+import {
+  type JobUsage,
+  type MessageRow,
+  type RuntimeEvent,
+  type Subtask,
+  type SubtaskBrief,
+  type SubtaskProgress,
+  type SubtaskStatus,
+  type SubtaskUsage,
+  type ToolCall,
+  rowEvents,
+  type EventOf,
 } from '@seti/shared'
-import { rowEvents, type Of } from './events/read.js'
 import { trimText } from './transcript.js'
 
-type JobEvent = Of<'job.started'> | Of<'job.progress'> | Of<'job.updated'> | Of<'job.ended'>
+type JobEvent = EventOf<'job.started'> | EventOf<'job.progress'> | EventOf<'job.updated'> | EventOf<'job.ended'>
 
 const SUMMARY_CHARS = 200
 
@@ -78,7 +79,7 @@ function newDraft(
 }
 
 /** What the subagent call's own result says: launched in the background, failed, or finished. */
-function agentResultPatch(draft: Draft, row: MessageRow, event: Of<'tool.ended'>): Patch {
+function agentResultPatch(draft: Draft, row: MessageRow, event: EventOf<'tool.ended'>): Patch {
   const { result } = event
   const body = result.agent?.text ?? result.text
   if (result.job !== undefined) {
@@ -94,20 +95,20 @@ function agentResultPatch(draft: Draft, row: MessageRow, event: Of<'tool.ended'>
   return { result: result.agent?.report ?? body, usage, ended: 'completed', ended_at: row.created_at }
 }
 
-const startedPatch = (draft: Draft, row: MessageRow, event: Of<'job.started'>): Patch => ({
+const startedPatch = (draft: Draft, row: MessageRow, event: EventOf<'job.started'>): Patch => ({
   ...resumed(row),
   background: event.background ?? draft.background,
   subagent_type: draft.subagent_type ?? event.agentType ?? null,
 })
 
-const progressPatch = (event: Of<'job.progress'>): Patch => ({
+const progressPatch = (event: EventOf<'job.progress'>): Patch => ({
   progress: { description: event.label, last_tool: event.lastTool ?? null, summary: event.summary ?? null },
   usage: usageOf(event.usage),
 })
 
 const ENDED_BY_PATCH: Partial<Record<string, Ended>> = { completed: 'completed', failed: 'failed', killed: 'stopped' }
 
-function updatedPatch(draft: Draft, row: MessageRow, event: Of<'job.updated'>): Patch {
+function updatedPatch(draft: Draft, row: MessageRow, event: EventOf<'job.updated'>): Patch {
   const background = event.background ?? draft.background
   const ended = ENDED_BY_PATCH[event.status ?? '']
   if (ended === undefined || draft.ended !== null) {
@@ -116,7 +117,7 @@ function updatedPatch(draft: Draft, row: MessageRow, event: Of<'job.updated'>): 
   return { background, ended, ended_at: event.endedAt ?? row.created_at, result: draft.result ?? event.error ?? null }
 }
 
-const endedPatch = (draft: Draft, row: MessageRow, event: Of<'job.ended'>): Patch => ({
+const endedPatch = (draft: Draft, row: MessageRow, event: EventOf<'job.ended'>): Patch => ({
   ended: event.status,
   ended_at: row.created_at,
   result: event.summary.trim() === '' ? draft.result : event.summary,
@@ -260,7 +261,7 @@ export class SubtaskIndex {
     return true
   }
 
-  private applyCall(row: MessageRow, { call, thread }: Of<'tool.started'>): boolean {
+  private applyCall(row: MessageRow, { call, thread }: EventOf<'tool.started'>): boolean {
     if (call.subagent !== undefined) {
       return this.start(row, call, call.subagent, thread)
     }
@@ -272,7 +273,7 @@ export class SubtaskIndex {
     return true
   }
 
-  private applyEnd(row: MessageRow, event: Of<'tool.ended'>): boolean {
+  private applyEnd(row: MessageRow, event: EventOf<'tool.ended'>): boolean {
     const draft = this.byCall.get(event.callId)
     if (draft === undefined) {
       return false

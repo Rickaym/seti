@@ -1,5 +1,5 @@
 import type { SDKCompactBoundaryMessage, SDKResultMessage, SDKSystemMessage } from '@anthropic-ai/claude-agent-sdk'
-import { compactedAt, modelLabel, turnCostOf } from '@seti/shared'
+import { compactedAt, eventsOf, modelLabel, projectClaude, turnCostOf } from '@seti/shared'
 import { FoldVertical, Play, Terminal } from 'lucide-react'
 import type { ComponentType, ReactNode } from 'react'
 import { CopyIconButton } from '@/components/CopyButton'
@@ -7,6 +7,10 @@ import { usd } from '@/lib/money'
 import { DOT, lastSegment, permissionLabel, plural, turnOutcome } from '@/lib/session-labels'
 import { elapsedLabel } from '@/lib/time'
 import { cn } from '@/lib/utils'
+
+/** How the turn a result message ends reads as an event. */
+const turnEndOf = (message: SDKResultMessage) =>
+  eventsOf(projectClaude(message), 'turn.ended')[0] ?? { status: 'ok' as const }
 
 export function Line({
   icon: Icon,
@@ -128,7 +132,7 @@ export function ResultLine({
 }) {
   const cost = turnCostOf(message)
   const text = [
-    turnOutcome(message, interrupted),
+    turnOutcome(turnEndOf(message), interrupted),
     plural(message.num_turns, 'step'),
     elapsedLabel(message.duration_ms),
     ...(cost === null ? [] : [usd(cost)]),
