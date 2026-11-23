@@ -17,7 +17,7 @@ import { setPlannerModel } from './planner.js'
 import { auditEvents } from './store/audit.js'
 import { USER_AUTH } from './test-auth.js'
 import { imageSize, sniff } from './upload-sniff.js'
-import { checkStaged, safeName } from './uploads.js'
+import { checkStaged, safeName, stageUpload } from './uploads.js'
 import { waitIdle } from './wait-idle.js'
 import { workspaceDir } from './workspace/dir.js'
 
@@ -128,6 +128,20 @@ describe('POST /api/uploads', () => {
     expect(over.detail).toBe('huge.bin is over the 25 MB limit for one file')
     const staged = fs.readdirSync(path.join(SETI_HOME, 'uploads'))
     expect(staged.filter((name) => !name.endsWith('.json')).length * 2).toBe(staged.length)
+  })
+
+  it('gives up an upload whose bytes stop arriving, and keeps nothing of it', async () => {
+    const before = fs.readdirSync(path.join(SETI_HOME, 'uploads')).length
+    const stuck = new ReadableStream<Uint8Array>({
+      start: (controller) => {
+        controller.enqueue(new Uint8Array(PDF))
+      },
+    })
+    await expect(stageUpload(stuck, { name: 'slow.pdf' }, 30)).rejects.toMatchObject({
+      status: 408,
+      message: 'slow.pdf stopped arriving; send it again',
+    })
+    expect(fs.readdirSync(path.join(SETI_HOME, 'uploads'))).toHaveLength(before)
   })
 
   it('takes raw bodies only on the upload route', async () => {

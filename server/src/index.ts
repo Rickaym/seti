@@ -1,6 +1,7 @@
 import fs from 'node:fs'
 import os from 'node:os'
 import { serve, type WebSocketServerLike } from '@hono/node-server'
+import { UPLOAD_REQUEST_MS } from '@seti/shared'
 import { WebSocketServer } from 'ws'
 import { accountStatus, warmAccount } from './account.js'
 import { createApp } from './app.js'
@@ -149,10 +150,15 @@ function indexOlderMessages(): void {
 
 /** Fills the event columns of transcript rows stored before them, without holding up startup. */
 function fillOlderRows(): void {
-  fillEventColumns(sql)
+  const started = performance.now()
+  const minutes = () => ((performance.now() - started) / 60_000).toFixed(1)
+  const onProgress = (rows: number) => {
+    process.stdout.write(`events: filling older messages, ${String(rows)} so far after ${minutes()} min\n`)
+  }
+  fillEventColumns(sql, { onProgress })
     .then((rows) => {
       if (rows > 0) {
-        process.stdout.write(`events: filled the event columns of ${String(rows)} older messages\n`)
+        process.stdout.write(`events: filled the event columns of ${String(rows)} older messages in ${minutes()} min\n`)
       }
     })
     .catch((e: unknown) => {
@@ -246,7 +252,15 @@ const sockets = new WebSocketServer({
   maxPayload: TERMINAL_FRAME_MAX,
 }) as unknown as WebSocketServerLike
 
-serve({ fetch: createApp().fetch, hostname: HOST, port: PORT, websocket: { server: sockets } }, (info) => {
+const listen = {
+  fetch: createApp().fetch,
+  hostname: HOST,
+  port: PORT,
+  websocket: { server: sockets },
+  serverOptions: { requestTimeout: UPLOAD_REQUEST_MS },
+}
+
+serve(listen, (info) => {
   process.stdout.write(`seti listening on http://${info.address}:${String(info.port)}\n`)
   void signInHint(PUBLIC_ACCESS)
   void wakeWaiting(interrupted.resume.map((each) => each.taskId))

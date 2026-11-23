@@ -1,4 +1,4 @@
-import { pathMatches, resolvePath, type PathScope } from './paths.js'
+import { anyPlace, everyPlace, pathMatches, resolvePath, type PathScope } from './paths.js'
 import { domainMatches, nameMatches, valueMatches } from './patterns.js'
 import { parseRule, type RuleTarget } from './rule-parse.js'
 import type { PolicyCall, PolicyContext, RuleBehavior, SourcedRule } from './types.js'
@@ -48,11 +48,24 @@ function namesTool(name: string, call: PolicyCall, behavior: RuleBehavior): bool
   return name === own
 }
 
-/** Whether a path rule covers the call: any path for deny and ask, every path for allow. */
-function coversPaths(paths: readonly string[], pattern: string, behavior: RuleBehavior, scope: PathScope): boolean {
+interface PathRule {
+  pattern: string
+  behavior: RuleBehavior
+  scope: PathScope
+}
+
+/**
+ * Whether a path rule covers the call: for deny and ask, any path as given or where it leads; for
+ * allow, every path both as given and where it leads.
+ */
+function coversPaths(call: PolicyCall, paths: readonly string[], rule: PathRule) {
+  const { pattern, behavior, scope } = rule
   const absolute = paths.map((given) => resolvePath(given, scope.cwd, scope.home))
   const covered = (target: string) => pathMatches(pattern, target, behavior, scope)
-  return absolute.length > 0 && (behavior === 'allow' ? absolute.every(covered) : absolute.some(covered))
+  if (behavior === 'allow') {
+    return absolute.length > 0 && absolute.every((one) => everyPlace(one, call.resolved, covered))
+  }
+  return absolute.some((one) => anyPlace(one, call.resolved, covered))
 }
 
 function pathRule(
@@ -62,13 +75,14 @@ function pathRule(
   scope: PathScope,
 ) {
   const name = nameOf(call)
+  const rule = { pattern: target.pattern, behavior, scope }
   if (target.tool === 'Edit') {
-    return EDIT_TOOLS.has(name) && coversPaths(call.writes, target.pattern, behavior, scope)
+    return EDIT_TOOLS.has(name) && coversPaths(call, call.writes, rule)
   }
   if (READ_TOOLS.has(name)) {
-    return coversPaths(call.reads, target.pattern, behavior, scope)
+    return coversPaths(call, call.reads, rule)
   }
-  return behavior === 'deny' && READ_DENY_WRITERS.has(name) && coversPaths(call.writes, target.pattern, behavior, scope)
+  return behavior === 'deny' && READ_DENY_WRITERS.has(name) && coversPaths(call, call.writes, rule)
 }
 
 function mcpRule(target: Extract<RuleTarget, { type: 'mcp' }>, call: PolicyCall): boolean {
