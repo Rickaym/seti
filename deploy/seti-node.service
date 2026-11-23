@@ -1,0 +1,16 @@
+[Unit]
+Description=Seti node: the agent sessions of a Seti split into two processes
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+WorkingDirectory=%h/seti-live
+EnvironmentFile=-%h/.seti/seti.env
+Environment=SETI_NODE=split
+LoadCredential=secret-key:%h/.seti/credentials/secret-key
+ExecStart=%h/seti-live/scripts/start.sh node
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target
