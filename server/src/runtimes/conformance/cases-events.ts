@@ -129,7 +129,7 @@ export const EVENTS: Case[] = [
         expect(end.usage?.output).toBeGreaterThan(0)
       }
       if (subject.profile.usage.costUsd === 'reported') {
-        expect(Number.isFinite(end.costUsd)).toBe(true)
+        expect(Number.isFinite(end.costUsd), 'turn.ended costUsd').toBe(true)
         expect(end.costUsd).toBeGreaterThanOrEqual(0)
       }
       await closed(run)

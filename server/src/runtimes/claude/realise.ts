@@ -3,7 +3,6 @@ import { compactSetup } from '../../compact.js'
 import { COMMAND_LIMIT_HOURS } from '../../house-rules.js'
 import type { Launcher } from '../../launcher.js'
 import { taskBorrowedServers } from '../../mcp-borrowed.js'
-import { TASK_ID_ENV } from '../../session-options.js'
 import type { SessionSpec } from '../../session-spec.js'
 import { sharedToolServer } from '../../shared-tools.js'
 import { workspaceDir, WORKSPACE_ENV } from '../../workspace/dir.js'
@@ -115,7 +114,6 @@ export async function realise(
       ...sandbox.env,
       ...BASH_SHELL,
       ...compact.env,
-      [TASK_ID_ENV]: spec.taskId,
       [WORKSPACE_ENV]: workspaceDir(spec.taskId),
     },
   }

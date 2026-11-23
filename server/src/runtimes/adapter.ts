@@ -4,6 +4,22 @@ import type { SessionSpec } from '../session-spec.js'
 /** Names an agent runtime; Claude Code is the only one so far. */
 export type RuntimeId = 'claude'
 
+/** When an input sent during a turn reaches the agent: now, at the turn's next step, or after it. */
+export type InputPriority = 'now' | 'next' | 'later'
+
+/** What an input to the agent holds: its text, and the images sent with it as base64. */
+export interface InputContent {
+  text: string
+  images: readonly { mime: 'image/png' | 'image/jpeg' | 'image/gif' | 'image/webp'; data: string }[]
+}
+
+/** One input to a session; one sent while a turn runs has a `priority` unless someone wrote it. */
+export interface SessionInput {
+  id: string
+  content: InputContent
+  priority?: InputPriority
+}
+
 /**
  * What a runtime can do where Seti would otherwise assume Claude Code. A session whose runtime
  * version lacks a control leaves that control off instead.
@@ -23,8 +39,8 @@ interface Capabilities {
 /**
  * The values a runtime's sessions take and give that are still the runtime's own: what a spec
  * carries for it alone, what it realises a spec into, how Seti decides and checks its tool calls
- * and serves its own tools, what a session starts from, the messages it streams, its tool server
- * reports, rules and permission modes.
+ * and serves its own tools, the messages it streams, its tool server reports, rules and
+ * permission modes.
  */
 export interface RuntimeShapes {
   vendor: unknown
@@ -32,7 +48,6 @@ export interface RuntimeShapes {
   decide: unknown
   hooks: unknown
   hostServers: unknown
-  start: unknown
   message: unknown
   toolServer: unknown
   policy: unknown
@@ -94,6 +109,9 @@ export interface RuntimeAdapter<S extends RuntimeShapes, Id extends string = Run
     host: SessionHost<S>,
     abortController: AbortController,
   ): Promise<S['realised']>
-  /** Starts or resumes a session; it begins work when its events are first read. */
-  open(start: S['start']): Promise<RuntimeSession<S>>
+  /**
+   * Starts or resumes a realised session, which takes its inputs in order as they come; it begins
+   * work when its events are first read.
+   */
+  open(realised: S['realised'], input: AsyncIterable<SessionInput>): Promise<RuntimeSession<S>>
 }

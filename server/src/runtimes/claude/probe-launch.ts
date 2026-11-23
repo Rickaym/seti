@@ -1,12 +1,12 @@
 import path from 'node:path'
 import type { SpawnedProcess, SpawnOptions } from '@anthropic-ai/claude-agent-sdk'
 import { extraDirs, type Task } from '@seti/shared'
-import type { ProbeLaunch } from './capabilities.js'
-import { tasks } from './db.js'
-import { sandboxFor } from './launch-plan.js'
-import { spawnInSandbox } from './launcher.js'
-import { taskPluginConfigs } from './plugins.js'
-import { sandboxPolicy } from './store/sandbox.js'
+import type { ProbeLaunch } from '../../capabilities.js'
+import { tasks } from '../../db.js'
+import { sandboxFor } from '../../launch-plan.js'
+import { spawnInSandbox } from '../../launcher.js'
+import { taskPluginConfigs } from '../../plugins.js'
+import { sandboxPolicy } from '../../store/sandbox.js'
 
 const within = (dir: string, root: string) => dir === root || dir.startsWith(root + path.sep)
 
