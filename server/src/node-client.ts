@@ -34,8 +34,8 @@ export interface NodeClientEnd {
   fresh: () => Promise<() => void>
   /** A node took this control plane: its process, whose children run the agents. */
   took: (pid: number) => void
-  /** The asks the node still waits on as it connects, before it sends them again. */
-  waiting: (asks: readonly string[]) => Promise<void>
+  /** The node's hello, before the node sends its waiting asks again. */
+  taking: (hello: HelloFrame) => Promise<void>
   /** The node is stopping: records the turns it is about to cut. */
   stopping: () => Promise<void>
 }
@@ -261,7 +261,7 @@ export class NodeClient {
       return
     }
     const after = frame.fresh ? await this.end.fresh() : null
-    await this.end.waiting(frame.asks)
+    await this.end.taking(frame)
     for (const { agent, state, since } of frame.sessions) {
       await this.end.journal(agent, state)
       if (since !== null) {

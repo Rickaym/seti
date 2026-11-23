@@ -1,3 +1,4 @@
+import type { HelloFrame } from '@seti/shared'
 import { inBackground } from './background.js'
 import { NODE_SOCKET } from './config.js'
 import { watchInterrupted } from './ea-turn-watch.js'
@@ -15,6 +16,7 @@ import { openQuerySince } from './session-ingest.js'
 import { mirroredAgents } from './session-mirror.js'
 import { stopLeftoverScopes } from './stale-scopes.js'
 import { nodeCursors } from './store/node-cursors.js'
+import { restoreToolCalls } from './tool-calls-restore.js'
 
 const CLOSED = { open: false, running: false, accepting: false, autoQueued: false, background: 0 }
 
@@ -46,16 +48,23 @@ async function takeUpLostTurns(): Promise<() => void> {
 
 const uid = process.getuid?.() ?? -1
 
-let leftoversKept = false
+let taken = false
 
 /**
  * The first node to take this control plane says which asks it still waits on: their requests
- * stay with those asks, and the rest are kept for a late answer, as a restart keeps them.
+ * stay with those asks, and the rest are kept for a late answer, as a restart keeps them. The
+ * tool calls its open sessions still run show again.
  */
-async function keepLeftovers(asks: readonly string[]): Promise<void> {
-  if (!leftoversKept) {
-    leftoversKept = true
-    await keepLeftoverRequests(new Set(asks))
+async function takeOver({ asks, fresh, sessions }: HelloFrame): Promise<void> {
+  if (taken) {
+    return
+  }
+  taken = true
+  await keepLeftoverRequests(new Set(asks))
+  for (const { agent, since } of fresh ? [] : sessions) {
+    if (since !== null) {
+      await restoreToolCalls(agent, since)
+    }
   }
 }
 
@@ -71,7 +80,7 @@ export async function connectNode(): Promise<void> {
     cursors: nodeCursors,
     fresh: takeUpLostTurns,
     took: setNodePid,
-    waiting: keepLeftovers,
+    taking: takeOver,
     stopping: async () => {
       await recordAndCut("Seti's node")
     },

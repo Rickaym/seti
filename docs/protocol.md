@@ -759,7 +759,8 @@ store, the audit chain and every record.
   node stops waiting for aborts the answer in progress. A request the user answers takes the
   ask's id, so an ask the node still waits on when a control plane starts keeps its one request,
   and the user's answer reaches the call once.
-- NODE-4: A restart of the control plane MUST NOT cut running turns. A node that started anew
+- NODE-4: A restart of the control plane MUST NOT cut running turns, and the tool calls they have
+  open show as open again. A node that started anew
   says so as it connects, and the turns of the node before count as cut by a restart (RES-3 to
   RES-8).
 - NODE-5: A stopping node first has the control plane record and audit its running turns
