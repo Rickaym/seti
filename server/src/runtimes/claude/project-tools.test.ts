@@ -77,7 +77,7 @@ describe('Claude tool calls', () => {
       search: { pattern: 'TODO', path: 'src' },
     })
     expect(call('Glob', { pattern: '**/*.ts' }).search).toEqual({ pattern: '**/*.ts' })
-    expect(call('ToolSearch', { query: 'select:Read' }).search).toEqual({ pattern: 'select:Read' })
+    expect(call('ToolSearch', { query: 'select:Read' }).search).toEqual({ pattern: 'select:Read', tools: true })
     expect(call('WebSearch', { query: 'zod 4' })).toMatchObject({ kind: 'web', web: { query: 'zod 4' } })
     expect(call('WebFetch', { url: 'https://example.com', prompt: 'p' }).web).toEqual({ url: 'https://example.com' })
   })
@@ -95,6 +95,19 @@ describe('Claude tool calls', () => {
       },
     })
     expect(call('Task', { prompt: 'p' }).subagent).toEqual({ label: 'Subagent', prompt: 'p', thread: 'toolu_1' })
+    expect(call('Agent', { description: ' ', prompt: ' ', name: 'reviewer' }).subagent).toEqual({
+      label: 'Subagent',
+      name: 'reviewer',
+      thread: 'toolu_1',
+    })
+  })
+
+  it('reads a message to a running subagent by the name or id it is addressed with', () => {
+    expect(call('SendMessage', { to: 'reviewer', message: 'm' })).toMatchObject({
+      kind: 'other',
+      send: { to: 'reviewer' },
+    })
+    expect(call('SendMessage', { to: ' ' })).not.toHaveProperty('send')
   })
 
   it('reads TodoWrite as the whole list, leaving out items it cannot read', () => {
@@ -123,12 +136,16 @@ describe('Claude tool calls', () => {
       update: { id: '4', status: 'deleted', text: 'Gone' },
     })
     expect(call('TaskUpdate', { taskId: '5', status: 'odd' }).plan).toEqual({ update: { id: '5' } })
-    expect(call('TaskList', {})).toEqual({ callId: 'toolu_1', kind: 'plan', name: 'TaskList', input: {} })
+    expect(call('TaskUpdate', { taskId: '6', activeForm: 'Shipping' }).plan).toEqual({
+      update: { id: '6', activeText: 'Shipping' },
+    })
+    expect(call('TaskList', {})).toEqual({ callId: 'toolu_1', kind: 'plan', name: 'TaskList', input: {}, plan: {} })
     expect(call('TaskGet', { taskId: '1' }).kind).toBe('plan')
   })
 
   it('reads a plan put up for approval and a question for the user', () => {
     expect(call('ExitPlanMode', { plan: '1. Do it' })).toMatchObject({ kind: 'plan', plan: { proposal: '1. Do it' } })
+    expect(call('ExitPlanMode', {}).plan).toEqual({ proposal: '' })
     const questions = [
       {
         question: 'Which database?',

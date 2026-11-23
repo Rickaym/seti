@@ -1,5 +1,5 @@
 import type { SDKMessage } from '@anthropic-ai/claude-agent-sdk'
-import type { JournalEntry, MessageBody, MessageRow, TaskStatus } from '@seti/shared'
+import { projectClaude, type JournalEntry, type MessageBody, type MessageRow, type TaskStatus } from '@seti/shared'
 import { audit } from './audit.js'
 import { closingLine } from './closing-line.js'
 import { linkCreatedPrs } from './created-prs.js'
@@ -53,7 +53,7 @@ async function setStatus(taskId: string, status: TaskStatus): Promise<void> {
 
 async function record(taskId: string, m: SDKMessage): Promise<void> {
   const outward = outwardToolUses(m)
-  trackToolCalls(taskId, m)
+  trackToolCalls(taskId, projectClaude(m))
   await appendMessage(taskId, { kind: 'sdk', payload: storedForm(await withTurnCost(taskId, m)) }, outward)
   await audit.outwardCalls(taskId, m, outward)
   await audit.classifierDenial(taskId, m)
