@@ -1,4 +1,4 @@
-import type { AttachmentRef, MessageRow } from '@seti/shared'
+import type { AttachmentRef, WireRow } from '@seti/shared'
 import type { DraftAttachment } from '@/lib/attachments'
 
 /**
@@ -65,7 +65,7 @@ function drop(sends: readonly PendingSend[], matches: (send: PendingSend) => boo
 }
 
 /** The client ids of the prompt rows among `rows`, which confirm the sends that carry them. */
-export function confirmedIds(rows: readonly MessageRow[]): ReadonlySet<string> {
+export function confirmedIds(rows: readonly WireRow[]): ReadonlySet<string> {
   const ids = new Set<string>()
   for (const row of rows) {
     if (row.kind === 'prompt' && row.payload.client_id !== undefined) {

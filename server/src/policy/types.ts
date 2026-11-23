@@ -45,6 +45,11 @@ export interface PolicyContext {
   /** Every working directory, the primary one included. */
   dirs: readonly string[]
   home: string
+  /**
+   * Whether the runtime has a classifier that `defer` hands calls to. Without one, Seti reads
+   * shell commands itself against a small read-only list and asks where it would defer.
+   */
+  classifier: boolean
   /** Seti's guards: why the call is refused whatever the rules say, or null. */
   guard?: (call: PolicyCall) => string | null
 }
@@ -53,7 +58,16 @@ export interface PolicyContext {
 export type Verdict = 'allow' | 'deny' | 'ask' | 'review' | 'defer'
 
 export type DecisionStep =
-  'guard' | 'deny-rule' | 'review-rule' | 'ask-rule' | 'question' | 'plan' | 'safety' | 'allow-rule' | 'mode'
+  | 'guard'
+  | 'deny-rule'
+  | 'review-rule'
+  | 'ask-rule'
+  | 'question'
+  | 'plan'
+  | 'safety'
+  | 'allow-rule'
+  | 'read-only'
+  | 'mode'
 
 export interface Decision {
   verdict: Verdict

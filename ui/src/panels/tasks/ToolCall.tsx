@@ -1,4 +1,4 @@
-import { type MessageRow, jsonText, type CodeLanguage } from '@seti/shared'
+import { type WireRow, jsonText, type CodeLanguage } from '@seti/shared'
 import {
   Activity,
   AlertTriangle,
@@ -49,6 +49,7 @@ import {
   type ToolUseBlock,
 } from '@/lib/transcript'
 import { cn } from '@/lib/utils'
+import { asEvents } from '@/lib/wire'
 import { ToolFileButton } from '@/panels/files/FileLink'
 
 /** The file a call that edits one changes, whose card links to it in Files. */
@@ -79,7 +80,7 @@ export interface FullSource {
   taskId: string
   rowId: number
   toolUseId: string
-  pick: (row: MessageRow, toolUseId: string) => string
+  pick: (row: WireRow, toolUseId: string) => string
 }
 
 interface TrimmedTextProps {
@@ -111,7 +112,7 @@ export function TrimmedText({ text, source, label, className, copy = 'Copy code'
   const load = async (from: FullSource) => {
     setLoading(true)
     try {
-      const row = await apiGet<MessageRow>(`/tasks/${from.taskId}/messages/${String(from.rowId)}`)
+      const row = await apiGet<WireRow>(asEvents(`/tasks/${from.taskId}/messages/${String(from.rowId)}`))
       setFull(from.pick(row, from.toolUseId))
     } catch (e) {
       toast.error(errorText(e))

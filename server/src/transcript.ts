@@ -1,5 +1,13 @@
 import type { SDKAssistantMessage, SDKMessage, SDKUserMessage } from '@anthropic-ai/claude-agent-sdk'
-import { sandboxViolations, type MessagePage, type MessageRow, type ShellResult } from '@seti/shared'
+import {
+  asEventsRow,
+  sandboxViolations,
+  type MessagePage,
+  type MessageRow,
+  type ShellResult,
+  type WirePage,
+  type WireRow,
+} from '@seti/shared'
 import { scrubValue } from './scrub.js'
 
 /** Characters of one tool text the browser gets before it asks for the full message. */
@@ -162,7 +170,27 @@ function trimRow(row: MessageRow): MessageRow {
   return cut.length === 0 ? { ...row, payload: value } : { ...row, payload: value, trimmed: cut }
 }
 
+/** How a client takes runtime rows: as neutral events, or as the runtime stored them. */
+export type WireForm = 'events' | 'stored'
+
+export const wireFormOf = (query: { wire?: 'events' | undefined }): WireForm =>
+  query.wire === 'events' ? 'events' : 'stored'
+
+/** A redacted row in the form the client asked for. */
+const inForm = (row: MessageRow, form: WireForm): WireRow => (form === 'events' ? asEventsRow(row) : row)
+
 /** The browser copy of a stored message: text cut with a marker, credentials redacted. */
 export const wireRow = (row: MessageRow): MessageRow => scrubValue(trimRow(row))
 
-export const wirePage = (page: MessagePage): MessagePage => ({ ...page, messages: page.messages.map(wireRow) })
+const wirePage = (page: MessagePage): MessagePage => ({ ...page, messages: page.messages.map(wireRow) })
+
+/** The browser copy of a stored message in the form the client asked for. */
+export const clientRow = (row: MessageRow, form: WireForm): WireRow => inForm(wireRow(row), form)
+
+export function clientPage(page: MessagePage, form: WireForm): WirePage {
+  const shown = wirePage(page)
+  return { ...shown, messages: shown.messages.map((row) => inForm(row, form)) }
+}
+
+/** A stored message whole, as "show full output" fetches it, with credentials redacted. */
+export const fullRow = (row: MessageRow, form: WireForm): WireRow => inForm(scrubValue(row), form)
