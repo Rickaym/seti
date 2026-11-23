@@ -39,13 +39,14 @@ describe('lastSegment', () => {
 
 describe('turnOutcome', () => {
   it('reads a finished, interrupted or failed turn in plain words', () => {
-    expect(turnOutcome({ subtype: 'success', is_error: false }, false)).toBe('Turn done')
-    expect(turnOutcome({ subtype: 'error_during_execution', is_error: true }, true)).toBe('Turn interrupted')
-    expect(turnOutcome({ subtype: 'error_during_execution', is_error: true }, false)).toBe(
-      'Turn failed: error during execution',
+    expect(turnOutcome({ status: 'ok' }, false)).toBe('Turn done')
+    expect(turnOutcome({ status: 'error', ending: 'error' }, true)).toBe('Turn interrupted')
+    expect(turnOutcome({ status: 'error', ending: 'error' }, false)).toBe('Turn failed: error during execution')
+    expect(turnOutcome({ status: 'error', ending: 'turn_limit' }, false)).toBe('Turn failed: hit the step limit')
+    expect(turnOutcome({ status: 'error' }, false)).toBe('Turn failed')
+    expect(turnOutcome({ status: 'error', ending: 'other', error: 'error_new_kind' }, false)).toBe(
+      'Turn failed: error new kind',
     )
-    expect(turnOutcome({ subtype: 'error_max_turns', is_error: true }, false)).toBe('Turn failed: hit the step limit')
-    expect(turnOutcome({ subtype: 'success', is_error: true }, false)).toBe('Turn failed')
   })
 })
 
