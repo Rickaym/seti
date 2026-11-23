@@ -228,6 +228,11 @@ export function onMemoryEvent(next: MemoryListener): void {
   listener = next
 }
 
+/** Hands a memory event on, from a scope of this process or of the node that reported it. */
+export function reportMemoryEvent(taskId: string, report: MemoryReport): void {
+  listener?.(taskId, report)
+}
+
 const parsePids = (text: string) =>
   text
     .split('\n')
@@ -283,7 +288,7 @@ class LiveScope implements ScopeLimits {
     if (events.oom_kill > this.seen.oom_kill) {
       this.noteKills(events.oom_kill - this.seen.oom_kill)
     } else if (events.high > 0 && this.seen.high === 0) {
-      listener?.(this.plan.taskId, { event: 'high', cap: this.cap, kind: this.plan.kind, victims: null })
+      reportMemoryEvent(this.plan.taskId, { event: 'high', cap: this.cap, kind: this.plan.kind, victims: null })
     }
     this.seen = events
     return true
@@ -343,7 +348,7 @@ class LiveScope implements ScopeLimits {
     }
     this.account(counted, kills ?? [])
     const victims = this.victims(kills)
-    listener?.(this.plan.taskId, { event: 'oom_kill', cap: this.cap, kind: this.plan.kind, victims })
+    reportMemoryEvent(this.plan.taskId, { event: 'oom_kill', cap: this.cap, kind: this.plan.kind, victims })
     if (this.pendingKills > 0) {
       this.scheduleReport(REPORT_DELAY_MS, false)
     }

@@ -349,6 +349,16 @@ describe('directAddress', () => {
 })
 
 describe('egress proxy', () => {
+  it('loses its socket when a second proxy on the same path stops, so one path has one proxy', async () => {
+    const socketPath = path.join(dir, 'shared-proxy.sock')
+    const options = { socketPath, allowed: async () => Promise.resolve([]), ca, credentials: both }
+    const first = await startEgressProxy(options)
+    const second = await startEgressProxy(options)
+    await second.close()
+    expect(fs.existsSync(socketPath)).toBe(false)
+    await first.close()
+  })
+
   it('forwards Claude API calls from ANTHROPIC_BASE_URL with the real credential', async () => {
     const running = await proxy(allowAll, both)
     const res = await viaSocket(

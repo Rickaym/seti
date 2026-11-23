@@ -13,6 +13,11 @@ const CUT_GRACE_MS = 7000
  */
 export async function cutRunningTurns(graceMs = CUT_GRACE_MS): Promise<CutTurn[]> {
   stopForRestart()
+  return recordAndCut('Seti', graceMs)
+}
+
+/** Records the running turns and has the node cut them, as `who` stops. */
+export async function recordAndCut(who: 'Seti' | "Seti's node", graceMs = CUT_GRACE_MS): Promise<CutTurn[]> {
   const { sessions } = await controlLink.command('sessions.view', {})
   const cut = sessions.filter((session) => session.running && session.open)
   if (cut.length === 0) {
@@ -24,7 +29,7 @@ export async function cutRunningTurns(graceMs = CUT_GRACE_MS): Promise<CutTurn[]
     actor: 'system',
     kind: 'system.stopping',
     subject_type: 'system',
-    summary: `Seti is stopping and cut ${String(turns.length)} running ${turns.length === 1 ? 'turn' : 'turns'}`,
+    summary: `${who} is stopping and cut ${String(turns.length)} running ${turns.length === 1 ? 'turn' : 'turns'}`,
     detail: {
       turns: turns.length,
       tasks: turns.map((turn) => turn.task_id),

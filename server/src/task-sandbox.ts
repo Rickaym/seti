@@ -1,5 +1,4 @@
 import { spawn, type ChildProcess } from 'node:child_process'
-import { randomBytes } from 'node:crypto'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
@@ -36,6 +35,8 @@ import { connectorIds, taskDeniedServers } from './mcp-selection.js'
 import { launch, type ScopePlan } from './memory-scope.js'
 import { memoryEnv } from './node-heap.js'
 import { sandboxDirOf } from './owned-dirs.js'
+import { proxyHere } from './proxy-owner.js'
+import { awsToken, forgetAwsToken } from './sandbox-aws-token.js'
 import { loadSandboxCa, type SandboxCa } from './sandbox-ca.js'
 import { sandboxClaudeJson } from './sandbox-claude-json.js'
 import { gitEnv } from './sandbox-git.js'
@@ -203,7 +204,7 @@ async function sandboxCa(): Promise<SandboxCa> {
 }
 
 const proxies = new Map<string, Promise<EgressProxy>>()
-const awsTokens = new Map<string, string>()
+export const servesProxy = (taskId: string) => proxies.has(taskId)
 
 /** What a task's session started with: its credential, connection headers, MCP choices and login. */
 interface SessionAccess {
@@ -226,16 +227,6 @@ const accessOf = (taskId: string) => access.get(taskId) ?? NO_ACCESS
 
 async function profileAws(profileId: string): Promise<AwsSettings> {
   return (await profiles.get(profileId))?.aws ?? AWS_SETTINGS_DEFAULT
-}
-
-/** The task's AWS container authorization token, the same for its proxy and its processes. */
-function awsToken(taskId: string): string {
-  let token = awsTokens.get(taskId)
-  if (token === undefined) {
-    token = randomBytes(24).toString('base64url')
-    awsTokens.set(taskId, token)
-  }
-  return token
 }
 
 const taskDir = sandboxDirOf
@@ -287,7 +278,7 @@ async function taskProxy(task: Task, authority: SandboxCa): Promise<EgressProxy>
 export async function removeTaskSandbox(taskId: string): Promise<void> {
   const proxy = proxies.get(taskId)
   proxies.delete(taskId)
-  awsTokens.delete(taskId)
+  forgetAwsToken(taskId)
   access.delete(taskId)
   await proxy?.then(async (running) => running.close()).catch(() => undefined)
   await stopSshAgent(taskId)
@@ -413,7 +404,7 @@ export async function taskSandbox(task: Task, request: SandboxRequest): Promise<
   forgetSandboxSignIns(path.join(dir, 'home', '.claude'), proxiedServers(mcpTokens, denied))
   const authority = await sandboxCa()
   await authority.cover([...mcpHosts(), ...ruleCaHosts([...rules, ...connections])])
-  await taskProxy(task, authority)
+  await proxyHere(task.id, async () => taskProxy(task, authority))
   const ssh = await sandboxSsh(task.id, dir, ctx.home, socat)
   const ready = { ...layout, caDir: authority.publicDir, systemBundle: authority.systemBundle, ssh }
   const env = sandboxEnv(process.env, ctx.home, {

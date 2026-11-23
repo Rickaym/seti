@@ -1,13 +1,42 @@
 import type { RuntimeEvent } from './events.js'
 import type { TurnBlock } from './prose-question.js'
 import { projectClaude } from './runtimes/claude/project.js'
-import type { MessageRow } from './tasks.js'
+import type { MessageBase, MessagePage, MessageRow } from './tasks.js'
+
+/** A runtime message as a client that asked for events gets it, cut as `trimmed` names. */
+type EventsRow = MessageBase & { kind: 'events'; payload: readonly RuntimeEvent[] }
+
+/** A message as a client gets it; a server older than events sends runtime rows as stored. */
+export type WireRow = MessageRow | EventsRow
+
+export interface WirePage extends Omit<MessagePage, 'messages'> {
+  messages: WireRow[]
+}
+
+/** A row a runtime wrote, as stored or as its events, as opposed to one of Seti's own. */
+export type RuntimeRow = Extract<WireRow, { kind: 'sdk' | 'events' }>
+
+export const isRuntimeRow = (row: WireRow): row is RuntimeRow => row.kind === 'sdk' || row.kind === 'events'
+
+/** A row as a client that asks for events gets it: a runtime row as its events. */
+export function asEventsRow(row: WireRow): WireRow {
+  if (row.kind !== 'sdk') {
+    return row
+  }
+  const { id, task_id, outward, created_at, trimmed } = row
+  const base =
+    trimmed === undefined ? { id, task_id, outward, created_at } : { id, task_id, outward, created_at, trimmed }
+  return { ...base, kind: 'events', payload: rowEvents(row) }
+}
 
 const NONE: readonly RuntimeEvent[] = []
 const cache = new WeakMap<object, readonly RuntimeEvent[]>()
 
-/** The neutral events of a stored runtime row, cached per payload; Seti's own rows have none. */
-export function rowEvents(row: MessageRow): readonly RuntimeEvent[] {
+/** A runtime row's neutral events, projected once per stored payload; Seti's own rows have none. */
+export function rowEvents(row: WireRow): readonly RuntimeEvent[] {
+  if (row.kind === 'events') {
+    return row.payload
+  }
   if (row.kind !== 'sdk') {
     return NONE
   }
@@ -45,7 +74,7 @@ export const agentTexts = (events: readonly RuntimeEvent[]): string[] =>
   eventsOf(events, 'message').flatMap((event) => (event.thread === '' && event.role === 'agent' ? [event.text] : []))
 
 /** Each call's end in these rows by call id; a later end of the same call wins. */
-export function toolEnds(rows: readonly MessageRow[]): Map<string, EventOf<'tool.ended'>> {
+export function toolEnds(rows: readonly WireRow[]): Map<string, EventOf<'tool.ended'>> {
   const ends = new Map<string, EventOf<'tool.ended'>>()
   for (const event of rows.flatMap((row) => eventsOf(rowEvents(row), 'tool.ended'))) {
     ends.set(event.callId, event)

@@ -1,10 +1,11 @@
-import type { MessagePage, MessageRow, SubtaskBrief, TaskStatus } from '@seti/shared'
+import type { WirePage, WireRow, SubtaskBrief, TaskStatus } from '@seti/shared'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { apiGet, errorText } from '@/api'
 import { openEventStream } from '@/lib/event-stream'
 import { mergeBriefs } from '@/lib/subtasks'
 import { mergeRows, routedSubagentOf, subagentOf } from '@/lib/transcript'
+import { asEvents } from '@/lib/wire'
 import type { TranscriptSource } from '@/panels/tasks/TranscriptPane'
 
 const PAGE = 150
@@ -21,7 +22,7 @@ export interface SubtaskStream extends TranscriptSource {
 }
 
 interface Loaded {
-  messages: readonly MessageRow[]
+  messages: readonly WireRow[]
   hasOlder: boolean
 }
 
@@ -42,7 +43,7 @@ export function useSubtaskStream(taskId: string, toolUseId: string): SubtaskStre
   const loading = useRef(false)
   const base = `/tasks/${taskId}/subtasks/${toolUseId}/messages`
 
-  const add = useCallback((rows: readonly MessageRow[], hasOlder?: boolean) => {
+  const add = useCallback((rows: readonly WireRow[], hasOlder?: boolean) => {
     setLoaded((prev) => {
       const messages = mergeRows(prev.messages, rows)
       const older = hasOlder ?? prev.hasOlder
@@ -51,15 +52,15 @@ export function useSubtaskStream(taskId: string, toolUseId: string): SubtaskStre
   }, [])
 
   useEffect(() => {
-    const keep = (rows: readonly MessageRow[]) =>
+    const keep = (rows: readonly WireRow[]) =>
       rows.filter((row) => own.current.has(subagentOf(row) ?? routedSubagentOf(row) ?? ''))
     let opened = false
     const stream = openEventStream(
-      `/tasks/${taskId}/stream?tail=1`,
+      asEvents(`/tasks/${taskId}/stream?tail=1`),
       {
         events: {
           backlog: (event) => {
-            add(keep((JSON.parse(event.data) as MessagePage).messages))
+            add(keep((JSON.parse(event.data) as WirePage).messages))
             if (opened) {
               // A later backlog means the stream could not catch up, so fetch what it skipped.
               setAttempt((n) => n + 1)
@@ -67,7 +68,7 @@ export function useSubtaskStream(taskId: string, toolUseId: string): SubtaskStre
             opened = true
           },
           message: (event) => {
-            add(keep([JSON.parse(event.data) as MessageRow]))
+            add(keep([JSON.parse(event.data) as WireRow]))
           },
           status: (event) => {
             setStatus((JSON.parse(event.data) as { status: TaskStatus }).status)
@@ -92,7 +93,7 @@ export function useSubtaskStream(taskId: string, toolUseId: string): SubtaskStre
 
   useEffect(() => {
     let current = true
-    apiGet<MessagePage>(`${base}?limit=${String(PAGE)}`).then(
+    apiGet<WirePage>(asEvents(`${base}?limit=${String(PAGE)}`)).then(
       (page) => {
         if (current) {
           add(page.messages, page.has_older)
@@ -123,7 +124,7 @@ export function useSubtaskStream(taskId: string, toolUseId: string): SubtaskStre
     loading.current = true
     setLoadingOlder(true)
     try {
-      const page = await apiGet<MessagePage>(`${base}?before=${String(oldest)}`)
+      const page = await apiGet<WirePage>(asEvents(`${base}?before=${String(oldest)}`))
       setLoaded((prev) => ({ messages: mergeRows(prev.messages, page.messages), hasOlder: page.has_older }))
       return page.messages.length > 0
     } catch (e) {

@@ -242,6 +242,7 @@ Seti would refuse.
 | `SETI_SCRATCH_ROOT`                                | `~/work`                     | Where each new agent gets its own folder                          |
 | `SETI_SOURCE_DIR`                                  | the clone Seti runs from     | The checkout whose git history What's new reads                   |
 | `SETI_SESSION_IDLE_MINUTES`                        | `15`                         | How long an idle agent's process stays open                       |
+| `SETI_NODE`                                        | unset                        | `split` runs agents in a separate node process (`start-node`)     |
 | `SETI_MEMORY_SCOPES`                               | on                           | `off` runs agents without systemd memory and CPU caps             |
 | `SETI_AUDIT_RETENTION_DAYS`                        | `365`                        | Days the audit log keeps events                                   |
 | `SETI_TASK_RETENTION_DAYS`                         | unset                        | Days idle before a task is deleted; unset keeps all               |

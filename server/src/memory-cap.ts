@@ -12,7 +12,7 @@ import { effectiveCpuCap } from './cpu-cap.js'
 import { refuseAgent } from './ea-guard.js'
 import { scopeHost, type ScopeKind, type ScopePlan } from './memory-scope.js'
 import { agentHeapMb } from './node-heap.js'
-import { applyCaps } from './scope-limits.js'
+import { capMemoryScopes } from './scope-control.js'
 import { hostDefaultCap, memorySettings, taskMemoryCaps } from './store/memory.js'
 
 /** The cap a task's processes run under: its own, else the default. */
@@ -56,7 +56,7 @@ export async function updateMemoryCap(cap: MemoryCap, actor: AuditActor = 'user'
       was_swap_max_mb: before.swap_max_mb,
     },
   })
-  await applyCaps(async (taskId) => ((await taskMemoryCaps.get(taskId)) === null ? cap : null))
+  await capMemoryScopes(async (taskId) => ((await taskMemoryCaps.get(taskId)) === null ? cap : null))
   return memoryCapSettings()
 }
 
@@ -89,6 +89,6 @@ export async function setTaskMemoryCap(
         : `Gave task "${task.title}" a memory cap of its own: ${capLabel(cap)}`,
     detail: { title: task.title, ...result.effective, own: cap !== null },
   })
-  await applyCaps(async (taskId) => Promise.resolve(taskId === task.id ? result.effective : null))
+  await capMemoryScopes(async (taskId) => Promise.resolve(taskId === task.id ? result.effective : null))
   return result
 }

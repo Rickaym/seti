@@ -20,10 +20,10 @@ test('Bypass is off by default, turns on for the chosen hours with a header badg
   await page.goto(`/#agents/${id}`)
   const panel = await openAgentSettings(page, 'Access')
   const bypass = panel.getByTestId('bypass')
-  await expect(bypass).toContainText('Runs any tool without asking.')
+  await expect(bypass).toContainText('Runs tools without asking, except ask rules.')
   await bypass.getByRole('button', { name: 'About Bypass' }).click()
   await expect(page.getByRole('dialog').filter({ hasText: "Seti's guards" })).toContainText(
-    "Runs every tool without asking for the hours you pick, then turns off by itself. Ask rules stop asking; deny rules, Seti's guards and the sandbox still apply.",
+    "Runs every tool without asking for the hours you pick, then turns off by itself. Ask rules still ask; deny rules, Seti's guards and the sandbox still apply.",
   )
   await page.keyboard.press('Escape')
   const toggle = bypass.getByRole('switch', { name: 'Bypass' })

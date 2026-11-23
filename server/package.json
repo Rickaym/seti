@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "NODE_ENV=development tsx watch src/index.ts",
     "start": "tsx src/index.ts",
+    "start-node": "tsx src/node/main.ts",
     "backup": "tsx src/backup-cli.ts",
     "doctor": "tsx src/doctor-cli.ts",
     "ea-index": "tsx src/ea-index-cli.ts",
