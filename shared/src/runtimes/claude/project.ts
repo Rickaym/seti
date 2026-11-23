@@ -107,7 +107,7 @@ function usageOf(usage: unknown) {
 
 /** The turn a result ends. Claude Code's cost is a session total; the turn's share is Seti's. */
 function result(m: SDKResultMessage): Event {
-  const text = m.subtype === 'success' ? m.result : ''
+  const text = m.subtype === 'success' ? (str(m, 'result') ?? '') : ''
   const answered = m.user_message_uuids ?? (m.user_message_uuid === undefined ? [] : [m.user_message_uuid])
   return {
     v: 1,
@@ -134,7 +134,13 @@ function vendorName(m: unknown): string {
   return name === '' ? 'unknown' : name
 }
 
-const vendor = (name: string): Event => ({ v: 1, thread: '', type: 'vendor', name })
+/** A message Seti does not map, on the thread the message names, if it names one. */
+const vendor = (name: string, m?: unknown): Event => ({
+  v: 1,
+  thread: str(m, 'parent_tool_use_id') ?? '',
+  type: 'vendor',
+  name,
+})
 
 function progress(m: SDKToolProgressMessage): Event {
   const thread = m.parent_tool_use_id ?? ''
@@ -163,7 +169,7 @@ function events(m: SDKMessage): Event[] {
   if (m.type === 'tool_progress') {
     return [progress(m)]
   }
-  return [m.type === 'rate_limit_event' ? rateLimit(m) : vendor(vendorName(m))]
+  return [m.type === 'rate_limit_event' ? rateLimit(m) : vendor(vendorName(m), m)]
 }
 
 /**
@@ -175,6 +181,6 @@ export function projectClaude(m: SDKMessage): RuntimeEvent[] {
   try {
     return events(m)
   } catch {
-    return [vendor(vendorName(m))]
+    return [vendor(vendorName(m), m)]
   }
 }

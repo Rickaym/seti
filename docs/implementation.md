@@ -91,6 +91,13 @@ with another top-level folder.
   database password exists. Migrations (`MIGRATIONS` in `server/src/store/schema.ts`) run at
   startup in one transaction under an advisory lock, and the audit chain appends under a row lock
   on its head, so several processes can share one database.
+- A transcript row keeps the message as its runtime wrote it. Ingest also fills columns from the
+  row's neutral events (`server/src/events/columns.ts`): `runtime`, `thread`, the leading `event`
+  type, `agent` (it holds the agent's own output) and, on a turn's end, `turn_usd`, `turn_ms`,
+  `turn_steps` and `turn_reply`. Queries filter on these columns, not on the runtime's JSON. A row
+  without `runtime` is not filled yet; startup fills such rows in the background, newest first
+  (`server/src/store/event-columns.ts`). Until then the filters in `server/src/store/event-filters.ts`
+  read such a row by its JSON, so every view shows it as before.
 - Redis holds only what can be rebuilt: GitHub PR lists and the GraphQL budget, capability and
   account probes, the EA's live context, and pub/sub for agent events and group chat across
   processes. It keeps nothing on disk and never holds a token. `SETI_REDIS_URL=off` costs cache

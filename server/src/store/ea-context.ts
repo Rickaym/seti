@@ -1,5 +1,5 @@
 import type { MessageRow } from '@seti/shared'
-import { sql, toMessage, type MessageRecord } from '../db.js'
+import { rowFilter, sql, toMessage, type MessageRecord } from '../db.js'
 
 /** Tool results are dropped, since they are large and the activity line only needs their ids. */
 const LIGHT_PAYLOAD = sql`CASE WHEN m.kind = 'sdk' AND (m.payload::json ->> 'type') = 'user'
@@ -19,7 +19,7 @@ export const eaContextStore = {
         SELECT m.id, m.task_id, m.kind, ${LIGHT_PAYLOAD} AS payload, m.outward, m.created_at
         FROM task_message m
         WHERE m.task_id = t.id AND m.kind IN ('sdk', 'prompt', 'seti')
-          AND (m.kind <> 'sdk' OR (m.payload::json ->> 'parent_tool_use_id') IS NULL)
+          AND (m.kind <> 'sdk' OR ${rowFilter.ownThread})
         ORDER BY m.id DESC LIMIT ${limit}
       ) AS r`
     for (const row of rows.map(toMessage)) {
@@ -44,7 +44,7 @@ export const eaContextStore = {
   notable: async (limit: number): Promise<MessageRow[]> =>
     (
       await sql<MessageRecord[]>`SELECT * FROM task_message
-        WHERE kind IN ('input', 'seti') OR (kind = 'sdk' AND (payload::json ->> 'type') = 'result')
+        WHERE kind IN ('input', 'seti') OR (kind = 'sdk' AND ${rowFilter.turnEnd})
         ORDER BY id DESC LIMIT ${limit}`
     ).map(toMessage),
 }

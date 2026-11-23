@@ -1,5 +1,4 @@
-import { TURN_COST_KEY } from '@seti/shared'
-import { sql } from '../db.js'
+import { rowFilter, sql } from '../db.js'
 
 /** One agent's turns on one day in the reader's timezone. */
 export interface TurnDay {
@@ -38,10 +37,10 @@ export const homeStore = {
   turnDays: async (since: string, zone: string, fromId: number): Promise<TurnDay[]> => [
     ...(await sql<TurnDay[]>`SELECT task_id, to_char(created_at::timestamptz AT TIME ZONE ${zone}, 'YYYY-MM-DD') AS day,
         count(*)::int AS turns,
-        COALESCE(sum((payload::json ->> ${TURN_COST_KEY})::float8), 0)::float8 AS cost_usd,
-        COALESCE(sum((payload::json ->> 'duration_ms')::float8), 0)::float8 AS run_ms
+        COALESCE(sum(${rowFilter.turnUsd}), 0)::float8 AS cost_usd,
+        COALESCE(sum(${rowFilter.turnMs}), 0)::float8 AS run_ms
       FROM task_message
-      WHERE kind = 'sdk' AND (payload::json ->> 'type') = 'result' AND id >= ${fromId} AND created_at >= ${since}
+      WHERE kind = 'sdk' AND ${rowFilter.turnEnd} AND id >= ${fromId} AND created_at >= ${since}
       GROUP BY task_id, day ORDER BY task_id, day`),
   ],
   /** Changes when a message is stored or a PR is seen merging; counts are reused until then. */
