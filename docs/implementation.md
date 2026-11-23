@@ -23,6 +23,7 @@ their own. Seti uses the reference values in the protocol's Appendix A.
 | Process               | What it is                                                                 | Protocol      |
 | --------------------- | -------------------------------------------------------------------------- | ------------- |
 | `seti.service`        | The Hono server in `server/`; holds the open sessions in `session-host.ts` | ENT-13        |
+| Node (split mode)     | `server/src/node/main.ts` with `SETI_NODE=split`; holds the open sessions  | NODE-1        |
 | Agent sessions        | Claude Code via `runtimes/claude/` and the Agent SDK, about 300 MB each    | 3.2, 7.2, 7.8 |
 | `seti-ea.service`     | The EA in `ea/`, a pipecat process with its own token                      | 14            |
 | Poller workers        | Worker threads in the server (`SETI_POLLER_WORKERS`, 2 by default)         | CHN-12        |
@@ -38,6 +39,12 @@ A stop (SIGTERM or SIGINT) runs `cutRunningTurns` in `server/src/restart-cut.ts`
 systemd's default stop timeout. Startup reads those rows in `server/src/restart-resume.ts`
 (RES-1 to RES-8). A crash leaves no rows, so every agent still `running` is treated as a `user`
 turn.
+
+With `SETI_NODE=split` the sessions run in a separate node process instead, behind
+`SETI_HOME/run/node.sock`. The server connects to it as a client (`node-client.ts`, wired in
+`node-split.ts`), applies its journal from cursors kept in `node_cursor`, answers its asks and sends
+it commands. A stop of the server cuts no turns; a stop of the node has the server record them
+first. `server/src/node/imports.test.ts` lists each module of the node that still loads the store.
 
 One process owning every session caps a host at a few dozen open agents. The path past that is
 runner workers that claim agents from PostgreSQL (`FOR UPDATE SKIP LOCKED` with a lease), with the
@@ -55,6 +62,7 @@ with another top-level folder.
 | 4 Turns        | `runner.ts`, `session-host.ts`, `session-ingest.ts`, `session-spec.ts`, `runtime-host.ts`, `runtimes/`, `agent-session.ts`, `rewind.ts`, `turn-asking.ts`, `closing-line.ts`, `task-location.ts` |
 | 4 Restarts     | `session-restart.ts`, `input-queue.ts`                                                                                                                                                           |
 | 4 Node link    | `node-link.ts`, `node-commands.ts`, `session-control.ts`, `session-mirror.ts`, `session-setup.ts`, `session-tools.ts`, `turn-asks.ts`, `shared/src/node-protocol.ts`                             |
+| 15.1 Node      | `node/`, `node-client.ts`, `node-split.ts`, `node-inbox.ts`, `node-outbox.ts`, `store/node-cursors.ts`, `shared/src/node-frames.ts`                                                              |
 | 5 Updates      | `shared/src/channel-delivery.ts`, `inputs.ts`, `input-preface.ts`                                                                                                                                |
 | 6 Attention    | `shared/src/attention.ts`, `task-blocked.ts`, `stall-watch.ts`, `ea-attention.ts`, `notifications.ts`, `notify-scope.ts`, `presence.ts`, `attention-brief.ts`                                    |
 | 7.1 Actors     | `access.ts`, `ea-guard.ts`                                                                                                                                                                       |

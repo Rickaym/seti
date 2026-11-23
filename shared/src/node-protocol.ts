@@ -26,6 +26,16 @@ const nextMessage = z.object({
   held: z.boolean().exactOptional(),
 })
 
+/** The state of an agent's session, reported each time it changes. */
+export const sessionChanged = z.object({
+  type: z.literal('session.changed'),
+  open: z.boolean(),
+  running: z.boolean(),
+  accepting: z.boolean(),
+  autoQueued: z.boolean(),
+  background: z.int().nonnegative(),
+})
+
 /**
  * What a node reports about one agent's session, in the order it happened. A runtime's message
  * travels as the runtime wrote it; the control plane decides what it means.
@@ -48,14 +58,7 @@ export const journalEntry = z.discriminatedUnion('type', [
   z.object({ type: z.literal('session.since'), promptId: z.int() }),
   z.object({ type: z.literal('session.closed'), since: z.int().nullable() }),
   z.object({ type: z.literal('session.state'), open: z.boolean(), background: z.int().nonnegative() }),
-  z.object({
-    type: z.literal('session.changed'),
-    open: z.boolean(),
-    running: z.boolean(),
-    accepting: z.boolean(),
-    autoQueued: z.boolean(),
-    background: z.int().nonnegative(),
-  }),
+  sessionChanged,
 ])
 export type JournalEntry = z.infer<typeof journalEntry>
 

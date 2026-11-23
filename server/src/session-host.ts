@@ -23,7 +23,8 @@ const live = new Map<string, LiveSession>()
 
 type SessionChanged = Extract<JournalEntry, { type: 'session.changed' }>
 
-function changedEntry(session: LiveSession | undefined): SessionChanged {
+/** The state of the session as the control plane mirrors it. */
+export function changedEntry(session: LiveSession | undefined): SessionChanged {
   return {
     type: 'session.changed',
     open: session !== undefined && !session.closed,

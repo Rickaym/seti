@@ -1,5 +1,13 @@
 import { randomUUID } from 'node:crypto'
-import type { AskFrame, AskReply, JournalAppend, JournalEntry, JournalReply, NodeAskType } from '@seti/shared'
+import type {
+  AskCancel,
+  AskFrame,
+  AskReply,
+  JournalAppend,
+  JournalEntry,
+  JournalReply,
+  NodeAskType,
+} from '@seti/shared'
 
 /** How many entries of one agent may wait for acknowledgement on the link at once. */
 const JOURNAL_WINDOW = 64
@@ -174,17 +182,38 @@ interface WaitingAsk {
 export class AskOutbox {
   private readonly waiting = new Map<string, WaitingAsk>()
 
-  private readonly send: (frame: AskFrame) => void
+  private readonly send: (frame: AskFrame | AskCancel) => void
 
-  constructor(send: (frame: AskFrame) => void) {
+  constructor(send: (frame: AskFrame | AskCancel) => void) {
     this.send = send
   }
 
-  /** Sends the ask and resolves with the control plane's answer, unchecked. */
-  async ask(agent: string, ask: NodeAskType, body: unknown): Promise<unknown> {
+  /**
+   * Sends the ask and resolves with the control plane's answer, unchecked. Once `signal` aborts,
+   * the control plane hears that the node stopped waiting.
+   */
+  async ask(agent: string, ask: NodeAskType, body: unknown, signal?: AbortSignal): Promise<unknown> {
+    signal?.throwIfAborted()
     const frame: AskFrame = { type: 'ask', id: randomUUID(), agent, ask, body }
     return new Promise((resolve, reject) => {
-      this.waiting.set(frame.id, { frame, resolve, reject })
+      const cancel = () => {
+        this.waiting.delete(frame.id)
+        this.send({ type: 'ask.cancel', id: frame.id })
+        reject(signal?.reason instanceof Error ? signal.reason : new Error('The ask was cancelled'))
+      }
+      const settle = () => signal?.removeEventListener('abort', cancel)
+      this.waiting.set(frame.id, {
+        frame,
+        resolve: (answer) => {
+          settle()
+          resolve(answer)
+        },
+        reject: (error) => {
+          settle()
+          reject(error)
+        },
+      })
+      signal?.addEventListener('abort', cancel, { once: true })
       this.send(frame)
     })
   }

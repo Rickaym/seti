@@ -1,4 +1,4 @@
-import type { AskFrame, AskReply, JournalAppend, JournalEntry, JournalReply } from '@seti/shared'
+import type { AskCancel, AskFrame, AskReply, JournalAppend, JournalEntry, JournalReply } from '@seti/shared'
 import type { JournalPosition } from './node-outbox.js'
 
 /** How long the control plane keeps an ask's answer, so a retried ask never runs twice. */
@@ -155,15 +155,16 @@ export class JournalInbox {
 interface Answered {
   reply: Promise<AskReply>
   at: number
+  abort: AbortController
 }
 
 /** The control plane's side of asks: each ask id is answered once, and a retry gets that answer. */
 export class AskLedger {
   private readonly answers = new Map<string, Answered>()
-  private readonly answer: (frame: AskFrame) => Promise<unknown>
+  private readonly answer: (frame: AskFrame, signal: AbortSignal) => Promise<unknown>
   private readonly now: () => number
 
-  constructor(answer: (frame: AskFrame) => Promise<unknown>, now: () => number = Date.now) {
+  constructor(answer: (frame: AskFrame, signal: AbortSignal) => Promise<unknown>, now: () => number = Date.now) {
     this.answer = answer
     this.now = now
   }
@@ -174,8 +175,9 @@ export class AskLedger {
     if (known !== undefined) {
       return known.reply
     }
+    const abort = new AbortController()
     const reply = Promise.resolve(frame)
-      .then(this.answer)
+      .then(async (asked) => this.answer(asked, abort.signal))
       .then(
         (answer): AskReply => ({ type: 'ask.answer', id: frame.id, answer }),
         (e: unknown): AskReply => ({
@@ -184,8 +186,13 @@ export class AskLedger {
           error: e instanceof Error ? e.message : String(e),
         }),
       )
-    this.answers.set(frame.id, { reply, at: this.now() })
+    this.answers.set(frame.id, { reply, at: this.now(), abort })
     return reply
+  }
+
+  /** The node stopped waiting: the answer in progress is aborted. */
+  cancel({ id }: AskCancel): void {
+    this.answers.get(id)?.abort.abort(new Error('The node stopped waiting for this answer'))
   }
 
   private forgetOld(): void {

@@ -1,5 +1,7 @@
 import fs from 'node:fs'
+import http from 'node:http'
 import path from 'node:path'
+import { WebSocketServer, type WebSocket } from 'ws'
 
 type StatOf = (file: string) => Pick<fs.Stats, 'uid' | 'mode'>
 
@@ -22,4 +24,24 @@ export function checkNodeSocket(socket: string, uid: number, stat: StatOf = fs.s
   if ((file.mode & OWNER_ONLY) !== 0) {
     throw new Error(`Other users can reach the node socket ${socket}`)
   }
+}
+
+/**
+ * Listens on the socket in a folder only this user may enter, clearing one a stopped node left,
+ * and hands each control plane that connects to `attach`. Nothing but the WebSocket is served.
+ */
+export async function listenNode(socket: string, attach: (control: WebSocket) => void): Promise<http.Server> {
+  const dir = path.dirname(socket)
+  fs.mkdirSync(dir, { recursive: true, mode: 0o700 })
+  fs.chmodSync(dir, 0o700)
+  fs.rmSync(socket, { force: true })
+  const server = http.createServer((_request, response) => {
+    response.writeHead(426).end()
+  })
+  new WebSocketServer({ server }).on('connection', attach)
+  await new Promise<void>((resolve) => {
+    server.listen(socket, resolve)
+  })
+  fs.chmodSync(socket, 0o600)
+  return server
 }
