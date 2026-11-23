@@ -1,18 +1,17 @@
-import { isAgentOutput, rowEvents, type MessageRow } from '@seti/shared'
+import { isAgentOutput, rowEvents, type WireRow } from '@seti/shared'
 
 /** How a turn was cut short: by the user's next message, or by a stop with nothing after it. */
 export type Interruption = 'replaced' | 'stopped'
 
-type PromptRow = Extract<MessageRow, { kind: 'prompt' }>
+type PromptRow = Extract<WireRow, { kind: 'prompt' }>
 
 /** A row of a turn the task agent runs: its own reply or a result. */
-const turnRow = (row: MessageRow) =>
+const turnRow = (row: WireRow) =>
   rowEvents(row).some((event) => event.type === 'turn.ended' || (event.thread === '' && isAgentOutput(event)))
 
-const ends = (row: MessageRow) => rowEvents(row).some((event) => event.type === 'turn.ended')
+const ends = (row: WireRow) => rowEvents(row).some((event) => event.type === 'turn.ended')
 
-const marks = (row: MessageRow) =>
-  rowEvents(row).some((event) => event.type === 'notice' && event.code === 'interrupted')
+const marks = (row: WireRow) => rowEvents(row).some((event) => event.type === 'notice' && event.code === 'interrupted')
 
 interface TurnScan {
   /** The last result, until a prompt follows it. */
@@ -65,7 +64,7 @@ function scanResult(scan: TurnScan, id: number, out: Map<number, Interruption>):
  * user's next message, an interrupting one or one queued during it, is replaced: that message
  * shows instead. `running` settles a turn whose queued message may have started the next one.
  */
-export function interruptedResultIds(rows: readonly MessageRow[], running: boolean): Map<number, Interruption> {
+export function interruptedResultIds(rows: readonly WireRow[], running: boolean): Map<number, Interruption> {
   const interrupted = new Map<number, Interruption>()
   let scan = START
   for (const row of rows) {

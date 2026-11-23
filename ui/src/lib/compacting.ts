@@ -1,11 +1,11 @@
-import { eventsOf, rowEvents, type MessageRow, type RuntimeEvent } from '@seti/shared'
+import { eventsOf, rowEvents, type WireRow, type RuntimeEvent } from '@seti/shared'
 
 const COMPACT_COMMAND = /^\/compact(\s|$)/
 
 type Step = 'command' | 'compacting' | 'end' | null
 
 /** What a row says about compaction; queued prompts and unrelated rows say nothing. */
-function compactStep(row: MessageRow): Step {
+function compactStep(row: WireRow): Step {
   if (row.kind === 'prompt') {
     if (row.payload.queued !== undefined) {
       return null
@@ -30,7 +30,7 @@ function eventStep(event: RuntimeEvent): Step {
 }
 
 /** When the running turn's compaction began (its /compact or first status), else null. */
-export function compactingSince(rows: readonly MessageRow[], running: boolean): string | null {
+export function compactingSince(rows: readonly WireRow[], running: boolean): string | null {
   if (!running) {
     return null
   }
@@ -52,7 +52,7 @@ export function compactingSince(rows: readonly MessageRow[], running: boolean): 
 }
 
 /** Why a compaction failed, on the row that reports it; null for every other row. */
-export function compactFailure(row: MessageRow): string | null {
+export function compactFailure(row: WireRow): string | null {
   const failed = eventsOf(rowEvents(row), 'compaction').find((event) => event.phase === 'failed')
   return failed === undefined ? null : (failed.error ?? 'no reason given')
 }

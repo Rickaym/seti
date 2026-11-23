@@ -1,4 +1,4 @@
-import type { MessageRow, TaskRewind } from '@seti/shared'
+import type { WireRow, TaskRewind } from '@seti/shared'
 import { ChevronDown, ChevronRight, History } from 'lucide-react'
 import { useContext, useState, type ReactNode } from 'react'
 import { FindFocusContext } from '@/hooks/useFindMarks'
@@ -27,7 +27,7 @@ export function RewoundGroup({
   children,
 }: {
   rewind: TaskRewind
-  rows: readonly MessageRow[]
+  rows: readonly WireRow[]
   count: number
   children: ReactNode
 }) {

@@ -1,4 +1,4 @@
-import type { MessageRow, ShellProgress, Task } from '@seti/shared'
+import type { WireRow, ShellProgress, Task } from '@seti/shared'
 import { useEffect, useMemo, type ComponentProps } from 'react'
 import { usePendingSends } from '@/hooks/usePendingSends'
 import { useTranscriptBlocks } from '@/hooks/useTranscriptBlocks'
@@ -35,7 +35,7 @@ interface AgentChatProps {
   status: Task['status']
   /** What the transcript shows: its rows, rewinds, subagents, loading state and find marks. */
   transcript: Pick<TranscriptProps, 'stream' | 'rewinds' | 'subtasks' | 'load' | 'find'>
-  messages: readonly MessageRow[]
+  messages: readonly WireRow[]
   shell: ShellProgress | null
   /** Changes each time the agent's permission requests may have changed. */
   permissions: number

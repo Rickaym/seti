@@ -1,4 +1,4 @@
-import type { MessageRow } from '@seti/shared'
+import type { WireRow } from '@seti/shared'
 import { ChevronRight, ShieldAlert, X } from 'lucide-react'
 import { memo, useContext, useMemo, useState, type ReactNode } from 'react'
 import { FindFocusContext } from '@/hooks/useFindMarks'
@@ -13,7 +13,7 @@ interface GroupCall {
   outward: boolean
 }
 
-function groupCalls(rows: readonly MessageRow[]): GroupCall[] {
+function groupCalls(rows: readonly WireRow[]): GroupCall[] {
   return rows.flatMap((row) => {
     const outward = new Set(row.outward)
     return rowCalls(row).map((block) => ({ block, at: row.created_at, outward: outward.has(block.callId) }))
@@ -46,14 +46,14 @@ function KindIcons({
 }
 
 interface ToolGroupProps {
-  rows: readonly MessageRow[]
+  rows: readonly WireRow[]
   /** Results of the group's calls, in call order. */
   results: readonly (ToolResultRef | undefined)[]
   /** Background processes the group's calls started, in call order. */
   background: readonly (BackgroundStatus | undefined)[]
   /** The task is running, so a call without a result is still going. */
   running: boolean
-  renderRow: (row: MessageRow) => ReactNode
+  renderRow: (row: WireRow) => ReactNode
 }
 
 /** What needs a look inside a folded group: outward calls, sandbox refusals and failures. */
@@ -84,7 +84,7 @@ function GroupMarks({ outward, refused, failed }: { outward: number; refused: re
 }
 
 /** Whether find stepped to a message inside the group: one of its rows or one of its results. */
-function holds(rows: readonly MessageRow[], results: ToolGroupProps['results'], id: number | null): boolean {
+function holds(rows: readonly WireRow[], results: ToolGroupProps['results'], id: number | null): boolean {
   return id !== null && (rows.some((row) => row.id === id) || results.some((result) => result?.rowId === id))
 }
 
