@@ -7,7 +7,8 @@ import type {
   SDKTaskUpdatedMessage,
 } from '@anthropic-ai/claude-agent-sdk'
 import { CONTEXT_WINDOW_KEY } from '../../compact.js'
-import type { RuntimeEvent } from '../../events.js'
+import type { Refusal, RuntimeEvent } from '../../events.js'
+import { modelFallbackOf } from '../../model-fallback.js'
 import { bool, list, num, some, str } from './fields.js'
 
 type SystemMessage = Extract<SDKMessage, { type: 'system' }>
@@ -109,6 +110,16 @@ const init = (m: Of<'init'>): Event => ({
     name: str(server, 'name') ?? '',
     status: str(server, 'status') ?? '',
   })),
+  cwd: str(m, 'cwd') ?? '',
+  plugins: list(m, 'plugins').map((plugin) => ({
+    name: str(plugin, 'name') ?? '',
+    path: str(plugin, 'path') ?? '',
+    ...some('version', str(plugin, 'version')),
+  })),
+  pluginErrors: list(m, 'plugin_errors').map((error) => ({
+    plugin: str(error, 'plugin') ?? '',
+    message: str(error, 'message') ?? '',
+  })),
 })
 
 /** A status says compaction began, failed, or stopped; any other status ends a running one. */
@@ -128,6 +139,8 @@ const compacted = (m: Of<'compact_boundary'>): Event => ({
   phase: 'done',
   trigger: m.compact_metadata.trigger,
   before: m.compact_metadata.pre_tokens,
+  ...some('after', m.compact_metadata.post_tokens),
+  ...some('durationMs', m.compact_metadata.duration_ms),
   ...some('window', num(m, CONTEXT_WINDOW_KEY)),
 })
 
@@ -139,6 +152,22 @@ const retry = (m: Of<'api_retry'>): Event => ({
   ...some('status', m.error_status),
 })
 
+/** What the safeguard said, from a fallback notice that has the fields the notice shows. */
+function refusalOf(m: unknown): Refusal | undefined {
+  const parsed = modelFallbackOf(m)
+  if (parsed === null) {
+    return undefined
+  }
+  const verification = parsed.api_refusal_cyber_verification
+  return {
+    requestId: parsed.request_id,
+    ...some('scope', parsed.scope),
+    ...some('category', parsed.api_refusal_category),
+    ...some('explanation', parsed.api_refusal_explanation),
+    ...(verification === null || verification === undefined ? {} : { verification: some('url', verification.url) }),
+  }
+}
+
 const fallback = (m: Of<'model_refusal_fallback'>): Event => ({
   ...base,
   type: 'model.changed',
@@ -146,6 +175,7 @@ const fallback = (m: Of<'model_refusal_fallback'>): Event => ({
   to: m.fallback_model,
   reason: 'refusal',
   text: m.content,
+  ...some('refusal', refusalOf(m)),
 })
 
 const denied = (m: Of<'permission_denied'>): Event => ({

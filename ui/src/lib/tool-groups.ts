@@ -1,4 +1,4 @@
-import type { MessageRow, TaskRewind } from '@seti/shared'
+import { eventsOf, rowEvents, type MessageRow, type TaskRewind, type ToolCall } from '@seti/shared'
 import type { TranscriptItem } from '@/lib/rewind'
 import { isAgentTool } from '@/lib/subtasks'
 import { rendersContent, rowCalls, rowResults, subagentOf } from '@/lib/transcript'
@@ -20,7 +20,7 @@ export interface RoleContext {
 }
 
 /** Subagents and monitors keep a row of their own, so a running one is never folded away. */
-const foldable = (name: string) => !isAgentTool(name) && name !== 'Monitor' && name !== 'AskUserQuestion'
+const foldable = (call: ToolCall) => !isAgentTool(call) && call.shell?.action !== 'watch' && call.kind !== 'question'
 
 export function rowRole(row: MessageRow, context: RoleContext): RowRole {
   if (context.notes.has(row.id) || row.kind !== 'sdk') {
@@ -29,16 +29,16 @@ export function rowRole(row: MessageRow, context: RoleContext): RowRole {
   if (!context.subagentRows && subagentOf(row) !== null) {
     return 'quiet'
   }
-  const { payload } = row
-  if (payload.type === 'system' && payload.subtype === 'init') {
+  const events = rowEvents(row)
+  if (events.some((event) => event.type === 'session.started')) {
     return context.hiddenInits.has(row.id) ? 'quiet' : 'break'
   }
   const calls = rowCalls(row)
-  if (calls.length > 0 && payload.type === 'assistant') {
-    const spoken = payload.message.content.some((block) => block.type === 'text' && block.text.trim() !== '')
-    return spoken || !calls.every((call) => foldable(call.name)) ? 'break' : 'tool'
+  if (calls.length > 0) {
+    const spoken = eventsOf(events, 'message').some((event) => event.role === 'agent' && event.text.trim() !== '')
+    return spoken || !calls.every(foldable) ? 'break' : 'tool'
   }
-  if (rowResults(row).some((ref) => !context.calls.has(ref.block.tool_use_id))) {
+  if (rowResults(row).some((ref) => !context.calls.has(ref.callId))) {
     return 'break'
   }
   return rendersContent(row) ? 'break' : 'quiet'
