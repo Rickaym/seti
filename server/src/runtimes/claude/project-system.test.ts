@@ -122,7 +122,7 @@ describe('Claude session and compaction messages', () => {
     ])
     expect(system('code_change_published', { action: 'created' })).toMatchObject([{ type: 'vendor' }])
     expect(system('local_command_output', { content: 'Cost: $0.10' })).toMatchObject([
-      { type: 'message', role: 'command', text: 'Cost: $0.10' },
+      { type: 'vendor', name: 'system/local_command_output' },
     ])
   })
 

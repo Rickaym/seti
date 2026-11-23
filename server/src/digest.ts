@@ -11,8 +11,9 @@ import {
   type SubtaskBrief,
   type TaskInput,
   type ToolCall,
+  rowEvents,
+  toolEnds,
 } from '@seti/shared'
-import { rowEvents, toolEnds } from './events/read.js'
 import { redactCredentials, redactSecrets } from './scrub.js'
 
 const USER_CHARS = 600

@@ -6,9 +6,10 @@ import {
   type AgentNotifyKind,
   type Task,
   type TaskStatus,
+  eventsOf,
+  rowEvents,
 } from '@seti/shared'
 import { messages } from './db.js'
-import { eventsOf, rowEvents } from './events/read.js'
 import { openQuerySince } from './runner.js'
 import { prWatch } from './store/pr-watch.js'
 import { subtaskBriefs } from './subtask-cache.js'

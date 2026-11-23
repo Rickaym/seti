@@ -1,7 +1,6 @@
-import type { MessageRow } from '@seti/shared'
+import { type MessageRow, agentTexts, eventsOf, isAgentOutput, payloadEvents, rowEvents, toolEnds } from '@seti/shared'
 import { describe, expect, it } from 'vitest'
 import { assistant, toolResult, toolUse } from '../subtask-fixtures.js'
-import { agentTexts, eventsOf, isAgentOutput, payloadEvents, rowEvents, toolEnds } from './read.js'
 
 const row = (id: number, body: Pick<MessageRow, 'kind' | 'payload'>): MessageRow =>
   ({ id, task_id: 't', outward: [], created_at: '2026-11-20T09:00:00.000Z', ...body }) as MessageRow

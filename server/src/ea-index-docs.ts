@@ -7,8 +7,9 @@ import {
   type SubtaskBrief,
   type Task,
   type TaskInput,
+  rowEvents,
+  type EventOf,
 } from '@seti/shared'
-import { rowEvents, type Of } from './events/read.js'
 import type { OpenPr } from './github.js'
 import { redactCredentials } from './scrub.js'
 import type { IndexDoc } from './store/ea-index.js'
@@ -90,7 +91,7 @@ const long = (text: string, min: number) => text.trim().length >= min
 type Subagents = ReadonlyMap<string, string>
 
 /** A subagent's report, without the id and usage lines the runtime adds; worth no search. */
-const reportOf = (end: Of<'tool.ended'>) => end.result.agent?.text ?? end.result.text
+const reportOf = (end: EventOf<'tool.ended'>) => end.result.agent?.text ?? end.result.text
 
 /** The agent's own words, the turn's reply, and the reports its subagents gave it, by part. */
 function eventDocs(task: TaskRef, row: MessageRow, subagents: Subagents): IndexDoc[] {
