@@ -1,5 +1,5 @@
 import type { McpServerConfig, Options, PermissionMode, SdkPluginConfig } from '@anthropic-ai/claude-agent-sdk'
-import { compactSetup } from '../../compact.js'
+import type { CompactRule } from '@seti/shared'
 import { COMMAND_LIMIT_HOURS } from '../../house-rules.js'
 import type { Launcher } from '../../launcher.js'
 import { taskBorrowedServers } from '../../mcp-borrowed.js'
@@ -39,11 +39,20 @@ const BASH_SHELL = { CLAUDE_CODE_SHELL: '/bin/bash', SHELL: '/bin/bash' }
 const bypassLaunch = (mode: PermissionMode) =>
   mode === 'bypassPermissions' ? { allowDangerouslySkipPermissions: true } : {}
 
+/** What a compaction rule starts a Claude Code process with; a change takes a new process. */
+export const compactSetup = (rule: CompactRule) => ({
+  settings: {
+    autoCompactEnabled: rule.auto,
+    ...(rule.window_k === null ? {} : { autoCompactWindow: rule.window_k * 1000 }),
+  },
+  env: rule.threshold_pct === null ? {} : { CLAUDE_AUTOCOMPACT_PCT_OVERRIDE: String(rule.threshold_pct) },
+})
+
 /**
  * Everything a Claude Code process starts with that needs a new process when it changes. The mode
  * is left out: Seti switches a running process's mode without a restart.
  */
-export const claudeSetup = (spec: SessionSpec) =>
+const claudeSetup = (spec: SessionSpec) =>
   ({
     cwd: spec.cwd,
     ...(spec.dirs.length === 0 ? {} : { additionalDirectories: spec.dirs }),

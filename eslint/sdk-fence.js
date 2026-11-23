@@ -36,11 +36,6 @@ const SDK_ALLOWED = {
     'server/src/side-chat/answer.ts': "R5: the side chat's own Claude query, until the adapter owns it",
     'server/src/side-chat/ask.ts': "R5: the side chat's own Claude query, until the adapter owns it",
   },
-  /** The rewind path, which the next R2 pull request moves into the adapter. */
-  r2Rewind: {
-    'server/src/rewind.ts': "R2 PR 11: Claude's session chain entries",
-    'server/src/rewind-task.ts': "R2 PR 11: Claude's rewind files result",
-  },
 }
 
 /**

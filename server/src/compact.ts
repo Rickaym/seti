@@ -59,12 +59,3 @@ export async function setTaskCompact(
   })
   return result
 }
-
-/** What a rule starts a session's process with; a change takes a new process. */
-export const compactSetup = (rule: CompactRule) => ({
-  settings: {
-    autoCompactEnabled: rule.auto,
-    ...(rule.window_k === null ? {} : { autoCompactWindow: rule.window_k * 1000 }),
-  },
-  env: rule.threshold_pct === null ? {} : { CLAUDE_AUTOCOMPACT_PCT_OVERRIDE: String(rule.threshold_pct) },
-})
