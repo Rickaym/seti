@@ -21,7 +21,7 @@ import { sessionOptions, setupKey } from './session-spec.js'
 import { sandboxPolicy } from './store/sandbox.js'
 import { CLAUDE_PLACEHOLDER, GITHUB_PLACEHOLDER } from './task-sandbox.js'
 import { clearConnections, keyConnection } from './test-connections.js'
-import { trimText, WIRE_TEXT_LIMIT } from './transcript.js'
+import { trimText, WIRE_TEXT_LIMIT } from './wire-text.js'
 
 const CTX: SandboxContext = {
   home: '/home/me',

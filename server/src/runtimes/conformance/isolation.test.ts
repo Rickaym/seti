@@ -35,3 +35,17 @@ describe("ISO-1: the scripted adapter, the suite and adapters' suite glue are te
     expect(registry).toMatch(/const ADAPTERS = \{ claude: claudeAdapter \}/)
   })
 })
+
+const CHILD_PROCESS =
+  /(?:^import (?!type\b)[^']*from '(?:node:)?child_process')|(?:(?:require|import)\(['"](?:node:)?child_process)/m
+
+describe('ISO-3: no adapter starts a process by itself', () => {
+  it('no adapter module imports node:child_process, so every start goes through the launcher', () => {
+    const adapters = sources(path.join(SRC, 'runtimes')).filter((file) => {
+      const relative = path.relative(path.join(SRC, 'runtimes'), file).split(path.sep).join('/')
+      return relative.includes('/') && !relative.startsWith('conformance/')
+    })
+    expect(adapters.length).toBeGreaterThan(10)
+    expect(adapters.filter((file) => CHILD_PROCESS.test(readFileSync(file, 'utf8')))).toEqual([])
+  })
+})

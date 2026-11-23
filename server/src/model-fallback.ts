@@ -1,12 +1,12 @@
-import type { SDKMessage } from '@anthropic-ai/claude-agent-sdk'
 import {
   endsFallback,
   fallbackReason,
   modelFallbackOf,
   modelLabel,
   movesSession,
+  type EventOf,
   type ModelFallback,
-  type ModelFallbackMessage,
+  type Refusal,
   type Task,
 } from '@seti/shared'
 import { audit } from './audit.js'
@@ -16,16 +16,18 @@ import { modelFallbacks } from './store/model-fallback.js'
 import { publish } from './task-events.js'
 
 /** A fallback notice Seti stored already, which a replayed stream repeats; it is not taken twice. */
-export async function replayedFallback(taskId: string, m: SDKMessage): Promise<boolean> {
+export async function replayedFallback(taskId: string, m: unknown): Promise<boolean> {
   const uuid = modelFallbackOf(m)?.uuid
   return uuid !== undefined && (await modelFallbacks.stored(taskId, uuid))
 }
 
-const fallbackOf = (event: ModelFallbackMessage): ModelFallback => ({
-  original_model: event.original_model,
-  fallback_model: event.fallback_model,
-  category: event.api_refusal_category ?? null,
-  request_id: event.request_id,
+type ModelChanged = EventOf<'model.changed'>
+
+const fallbackOf = (event: ModelChanged, refusal: Refusal): ModelFallback => ({
+  original_model: event.from,
+  fallback_model: event.to,
+  category: refusal.category ?? null,
+  request_id: refusal.requestId,
   at: now(),
 })
 
@@ -54,14 +56,14 @@ async function notify(task: Task, f: ModelFallback): Promise<void> {
  * Records Claude Code's switch to a fallback model after a refusal: audited once per notice, and
  * when it moves the whole session, marked on the task and sent to the EA's inbox.
  */
-export async function noteModelFallback(taskId: string, m: SDKMessage): Promise<void> {
-  const event = modelFallbackOf(m)
-  const task = event === null ? undefined : await tasks.get(taskId)
-  if (event === null || task === undefined) {
+export async function noteModelFallback(taskId: string, event: ModelChanged): Promise<void> {
+  const { refusal } = event
+  const task = refusal === undefined ? undefined : await tasks.get(taskId)
+  if (refusal === undefined || task === undefined) {
     return
   }
-  const fallback = fallbackOf(event)
-  const session = movesSession(event)
+  const fallback = fallbackOf(event, refusal)
+  const session = movesSession(refusal)
   await audit.record({
     actor: 'system',
     kind: 'task.model_fallback',
