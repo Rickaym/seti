@@ -1,17 +1,18 @@
-import type { SDKAssistantMessage, SDKMessage, SDKResultMessage, SDKUserMessage } from '@anthropic-ai/claude-agent-sdk'
 import {
-  compactedAt,
+  compactedWithin,
   QUIET_LABELS,
   quietReason,
   type DigestKind,
   type DigestLine,
   type MessageRow,
   type PromptPayload,
+  type RuntimeEvent,
   type ShellResult,
   type SubtaskBrief,
   type TaskInput,
+  type ToolCall,
 } from '@seti/shared'
-import { bashCommand } from './outward.js'
+import { rowEvents, toolEnds } from './events/read.js'
 import { redactCredentials, redactSecrets } from './scrub.js'
 
 const USER_CHARS = 600
@@ -19,15 +20,13 @@ const AGENT_CHARS = 1200
 const TOOL_CHARS = 160
 const RESULT_CHARS = 160
 
-type AssistantBlock = SDKAssistantMessage['message']['content'][number]
-type ToolUseBlock = Extract<AssistantBlock, { type: 'tool_use' }>
-type UserBlock = Exclude<SDKUserMessage['message']['content'], string>[number]
-type ToolResultBlock = Extract<UserBlock, { type: 'tool_result' }>
+type ToolEnd = Extract<RuntimeEvent, { type: 'tool.ended' }>
+type TurnEnded = Extract<RuntimeEvent, { type: 'turn.ended' }>
 
-/** Tools whose successful output is file content or matches, which reads as noise. */
-const QUIET_RESULTS = new Set(['Read', 'Glob', 'Grep', 'NotebookRead'])
+/** Whether a call's successful output is file content or matches, which reads as noise. */
+const quietResult = (call: ToolCall) => call.kind === 'read' || (call.kind === 'search' && call.search?.tools !== true)
 
-/** Input fields that name what a non-Bash tool worked on, in order of preference. */
+/** Input fields that name what a tool other than a command worked on, in order of preference. */
 const TARGET_FIELDS = ['file_path', 'notebook_path', 'path', 'pattern', 'url', 'query', 'description', 'skill']
 
 const oneLine = (text: string) => text.replace(/\s+/g, ' ').trim()
@@ -53,24 +52,13 @@ export function toolName(name: string): string {
 }
 
 /** A tool call in a few words: its command, or its tool and what it works on. */
-export function toolLabel(block: ToolUseBlock): string {
-  if (block.name === 'Bash') {
-    const command = bashCommand(block.input)
-    return clip(command === '' ? 'Bash' : redactSecrets(command), TOOL_CHARS)
+export function toolLabel(call: ToolCall): string {
+  if (call.shell?.action === 'run') {
+    const command = call.shell.command ?? ''
+    return clip(command === '' ? call.name : redactSecrets(command), TOOL_CHARS)
   }
-  const target = TARGET_FIELDS.map((key) => field(block.input, key)).find((value) => value !== null)
-  return clip(target === undefined ? toolName(block.name) : `${toolName(block.name)} ${target}`, TOOL_CHARS)
-}
-
-function resultText(block: ToolResultBlock): string {
-  const { content } = block
-  if (content === undefined) {
-    return ''
-  }
-  if (typeof content === 'string') {
-    return content
-  }
-  return content.map((part) => (part.type === 'text' ? part.text : '')).join('\n')
+  const target = TARGET_FIELDS.map((key) => field(call.input, key)).find((value) => value !== null)
+  return clip(target === undefined ? toolName(call.name) : `${toolName(call.name)} ${target}`, TOOL_CHARS)
 }
 
 /** The first line of some output, and how many non-empty lines followed it. */
@@ -84,15 +72,15 @@ function firstLine(text: string, max: number): string {
   return more > 0 ? `${clip(first, max)} (+${String(more)} lines)` : clip(first, max)
 }
 
-function outcome(call: ToolUseBlock, result: ToolResultBlock | undefined): string {
-  if (result === undefined) {
+function outcome(call: ToolCall, end: ToolEnd | undefined): string {
+  if (end === undefined) {
     return ''
   }
-  const text = firstLine(resultText(result), RESULT_CHARS)
-  if (result.is_error === true) {
+  const text = firstLine(end.result.text, RESULT_CHARS)
+  if (end.status !== 'ok') {
     return text === '' ? ' Failed.' : ` Failed: ${text}`
   }
-  return text === '' || QUIET_RESULTS.has(call.name) ? '' : ` Result: ${text}`
+  return text === '' || quietResult(call) ? '' : ` Result: ${text}`
 }
 
 function duration(ms: number): string {
@@ -100,18 +88,21 @@ function duration(ms: number): string {
   return seconds < 60 ? `${String(seconds)}s` : `${String(Math.floor(seconds / 60))}m ${String(seconds % 60)}s`
 }
 
-const RESULT_ENDINGS: Partial<Record<string, string>> = {
-  error_during_execution: 'Turn ended with an error',
-  error_max_turns: 'Turn stopped at the turn limit',
-  error_max_budget_usd: 'Turn stopped at the budget limit',
-  error_max_structured_output_retries: 'Turn stopped after too many output retries',
+const TURN_ENDINGS: Record<NonNullable<TurnEnded['ending']>, string> = {
+  error: 'Turn ended with an error',
+  turn_limit: 'Turn stopped at the turn limit',
+  budget_limit: 'Turn stopped at the budget limit',
+  retry_limit: 'Turn stopped after too many output retries',
+  other: 'Turn ended',
 }
 
-function turnEnd(m: SDKResultMessage): string {
-  if (m.subtype !== 'success') {
-    return RESULT_ENDINGS[m.subtype] ?? 'Turn ended'
+function turnEnd(event: TurnEnded): string {
+  if (event.ending !== undefined) {
+    return TURN_ENDINGS[event.ending]
   }
-  return m.is_error ? `Turn failed: ${clip(m.result, RESULT_CHARS)}` : `Turn finished in ${duration(m.duration_ms)}`
+  return event.status === 'error'
+    ? `Turn failed: ${clip(event.result, RESULT_CHARS)}`
+    : `Turn finished in ${duration(event.durationMs ?? 0)}`
 }
 
 function promptLines(payload: PromptPayload): [DigestKind, string][] {
@@ -155,7 +146,7 @@ function updateMark(input: TaskInput): string {
 }
 
 interface Lookup {
-  results: ReadonlyMap<string, ToolResultBlock>
+  results: ReadonlyMap<string, ToolEnd>
   subtasks: ReadonlyMap<string, SubtaskBrief>
 }
 
@@ -185,33 +176,29 @@ function subtaskLine(subtask: SubtaskBrief): string {
   return /[.!?]$/.test(line) ? line : `${line}.`
 }
 
-function assistantLines(m: SDKAssistantMessage, lookup: Lookup): [DigestKind, string][] {
-  return m.message.content.flatMap((block): [DigestKind, string][] => {
-    if (block.type === 'text' && block.text.trim() !== '') {
-      return [['agent', clip(block.text, AGENT_CHARS)]]
-    }
-    if (block.type !== 'tool_use') {
-      return []
-    }
-    const subtask = lookup.subtasks.get(block.id)
-    if (subtask !== undefined) {
-      return [['subtask', subtaskLine(subtask)]]
-    }
-    return [['tool', `Ran: ${toolLabel(block)}.${outcome(block, lookup.results.get(block.id))}`]]
-  })
-}
-
-function sdkLines(m: SDKMessage, lookup: Lookup): [DigestKind, string][] {
-  if (m.type === 'assistant') {
-    return m.parent_tool_use_id === null ? assistantLines(m, lookup) : []
+/** One runtime event's lines: what the agent said and ran, and how turns and compactions ended. */
+function eventLines(event: RuntimeEvent, lookup: Lookup): [DigestKind, string][] {
+  if (event.type === 'turn.ended') {
+    return [['status', turnEnd(event)]]
   }
-  if (m.type === 'result') {
-    return [['status', turnEnd(m)]]
+  if (event.type === 'compaction' && event.phase === 'done') {
+    return [['status', `Compacted the conversation${compactedWithin(event.window, event.before ?? 0)}`]]
   }
-  if (m.type === 'system' && m.subtype === 'compact_boundary') {
-    return [['status', `Compacted the conversation${compactedAt(m, m.compact_metadata.pre_tokens)}`]]
+  if (event.thread !== '') {
+    return []
   }
-  return []
+  if (event.type === 'message' && event.role === 'agent' && event.text.trim() !== '') {
+    return [['agent', clip(event.text, AGENT_CHARS)]]
+  }
+  if (event.type !== 'tool.started') {
+    return []
+  }
+  const { call } = event
+  const subtask = lookup.subtasks.get(call.callId)
+  if (subtask !== undefined) {
+    return [['subtask', subtaskLine(subtask)]]
+  }
+  return [['tool', `Ran: ${toolLabel(call)}.${outcome(call, lookup.results.get(call.callId))}`]]
 }
 
 type SetiPayload = Extract<MessageRow, { kind: 'seti' }>['payload']
@@ -228,7 +215,7 @@ function rowLines(row: MessageRow, lookup: Lookup): [DigestKind, string][] {
     case 'prompt':
       return promptLines(row.payload)
     case 'sdk':
-      return sdkLines(row.payload, lookup)
+      return rowEvents(row).flatMap((event) => eventLines(event, lookup))
     case 'seti':
       return [['status', `${setiNoteIsError(row.payload) ? 'Error: ' : ''}${clip(row.payload.error, RESULT_CHARS)}`]]
     case 'shell':
@@ -242,27 +229,12 @@ function rowLines(row: MessageRow, lookup: Lookup): [DigestKind, string][] {
   }
 }
 
-function toolResults(rows: readonly MessageRow[]): Map<string, ToolResultBlock> {
-  const results = new Map<string, ToolResultBlock>()
-  for (const row of rows) {
-    if (row.kind !== 'sdk' || row.payload.type !== 'user' || typeof row.payload.message.content === 'string') {
-      continue
-    }
-    for (const block of row.payload.message.content) {
-      if (block.type === 'tool_result') {
-        results.set(block.tool_use_id, block)
-      }
-    }
-  }
-  return results
-}
-
 /** The digest lines of each row, oldest row first, so a reader can page by row id. */
 export function digestByRow(
   rows: readonly MessageRow[],
   subtasks: readonly SubtaskBrief[] = [],
 ): { id: number; lines: DigestLine[] }[] {
-  const lookup = { results: toolResults(rows), subtasks: new Map(subtasks.map((s) => [s.tool_use_id, s])) }
+  const lookup = { results: toolEnds(rows), subtasks: new Map(subtasks.map((s) => [s.tool_use_id, s])) }
   return rows.map((row) => ({
     id: row.id,
     lines: rowLines(row, lookup).map(([kind, text]) => ({ at: row.created_at, kind, text })),

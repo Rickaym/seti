@@ -1,5 +1,6 @@
 import type { MessageRow } from '@seti/shared'
 import { messages } from './db.js'
+import { agentTexts, eventsOf, rowEvents } from './events/read.js'
 import { redactSecrets } from './scrub.js'
 
 const LINE_CHARS = 120
@@ -22,22 +23,14 @@ export function firstLine(text: string): string {
   return clean.length <= LINE_CHARS ? clean : `${clean.slice(0, LINE_CHARS - 3)}...`
 }
 
-/** The text the turn's successful result reports, or '' without one. */
+/** The text the turn's last result reports, or '' without one. */
 function resultText(turn: readonly MessageRow[]): string {
-  const result = turn.findLast((row) => row.kind === 'sdk' && row.payload.type === 'result')
-  return result?.kind === 'sdk' && result.payload.type === 'result' && result.payload.subtype === 'success'
-    ? result.payload.result
-    : ''
+  const ends = turn.flatMap((row) => eventsOf(rowEvents(row), 'turn.ended'))
+  return ends.at(-1)?.result ?? ''
 }
 
-/** The text blocks the agent itself wrote during the turn, oldest first. */
-function spokenTexts(turn: readonly MessageRow[]): string[] {
-  return turn.flatMap((row) =>
-    row.kind === 'sdk' && row.payload.type === 'assistant' && row.payload.parent_tool_use_id === null
-      ? row.payload.message.content.flatMap((block) => (block.type === 'text' ? [block.text] : []))
-      : [],
-  )
-}
+/** The text the agent itself wrote during the turn, oldest first. */
+const spokenTexts = (turn: readonly MessageRow[]): string[] => turn.flatMap((row) => agentTexts(rowEvents(row)))
 
 /**
  * The first line of what the turn since the last prompt ended with: its result, else the last

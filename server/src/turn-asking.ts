@@ -1,31 +1,19 @@
 import { closingQuestion, type ProseQuestion, type Task, type TaskStatus, type TurnBlock } from '@seti/shared'
 import { messages } from './db.js'
+import { payloadEvents } from './events/read.js'
 import { redactSecrets } from './scrub.js'
 
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null && !Array.isArray(value)
-
-const stringOf = (value: unknown) => (typeof value === 'string' ? value : undefined)
-
+/** The blocks a turn's closing question is read from: what the agent wrote, and its tool calls. */
 function blocksOf(payload: string): TurnBlock[] {
-  let parsed: unknown
-  try {
-    parsed = JSON.parse(payload)
-  } catch {
-    return []
-  }
-  const message = isRecord(parsed) ? parsed.message : undefined
-  const content = isRecord(message) ? message.content : undefined
-  if (!Array.isArray(content)) {
-    return []
-  }
-  return content.filter(isRecord).flatMap((block) => {
-    const type = stringOf(block.type)
-    return type === undefined ? [] : [{ type, text: stringOf(block.text), name: stringOf(block.name) }]
+  return payloadEvents(payload).flatMap((event): TurnBlock[] => {
+    if (event.type === 'message' && event.role === 'agent') {
+      return [{ type: 'text', text: event.text }]
+    }
+    return event.type === 'tool.started' ? [{ type: 'tool_use', name: event.call.name }] : []
   })
 }
 
-/** The content blocks of stored assistant messages, in order; unreadable ones are left out. */
+/** The text and tool calls of stored agent messages, in order; unreadable ones are left out. */
 export const turnBlocks = (payloads: readonly string[]): TurnBlock[] => payloads.flatMap(blocksOf)
 
 /** What the task's last turn ended by asking the user in prose. */

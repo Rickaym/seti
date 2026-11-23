@@ -1,65 +1,23 @@
-import type { SDKAssistantMessage, SDKUserMessage } from '@anthropic-ai/claude-agent-sdk'
-import { TODO_STATUSES, type AgentTodo, type MessageRow, type TodoStatus } from '@seti/shared'
+import { TODO_STATUSES, type AgentTodo, type MessageRow, type TodoStatus, type ToolCall } from '@seti/shared'
+import { nonBlank, rowEvents, type Of } from './events/read.js'
 
-type UserBlock = Exclude<SDKUserMessage['message']['content'], string>[number]
-type ToolResultBlock = Extract<UserBlock, { type: 'tool_result' }>
-
-/** Claude Code's todo tools: TodoWrite, or the task tools that replace it in newer versions. */
-const TODO_TOOLS = new Set(['TodoWrite', 'TaskCreate', 'TaskUpdate', 'TaskList', 'TaskGet'])
-const CREATED = /^Task #(\S+) created successfully/
-
-interface Call {
-  name: string
-  input: unknown
-}
-
-function field(value: unknown, key: string): unknown {
-  return typeof value === 'object' && value !== null ? (value as Record<string, unknown>)[key] : undefined
-}
-
-function text(value: unknown, key: string): string | null {
-  const found = field(value, key)
-  return typeof found === 'string' && found.trim() !== '' ? found : null
-}
+type Change = NonNullable<ToolCall['plan']>
+type Report = NonNullable<Of<'tool.ended'>['result']['plan']>
 
 const isStatus = (value: unknown): value is TodoStatus =>
   typeof value === 'string' && (TODO_STATUSES as readonly string[]).includes(value)
 
-function resultText(block: ToolResultBlock): string {
-  const { content } = block
-  if (typeof content === 'string') {
-    return content
-  }
-  return (content ?? []).flatMap((part) => (part.type === 'text' ? [part.text] : [])).join('\n')
-}
-
-/** TodoWrite's whole list; items it cannot read are left out. */
-function writtenList(input: unknown): AgentTodo[] {
-  const todos = field(input, 'todos')
-  if (!Array.isArray(todos)) {
-    return []
-  }
-  return todos.flatMap((todo: unknown, index) => {
-    const content = text(todo, 'content')
-    const status = field(todo, 'status')
-    if (content === null || !isStatus(status)) {
-      return []
-    }
-    return [{ id: String(index + 1), content, active_form: text(todo, 'activeForm'), status }]
-  })
-}
-
 /**
- * The todo list an agent keeps with Claude Code's own tools, folded from its messages in id
- * order. A call counts once its result arrives without an error. TodoWrite of a subagent keeps
- * that subagent's own list, so only the agent's own count; the task tools share one list per
- * session, so every call counts. A new session starts an empty list, as Claude Code does.
+ * The todo list an agent keeps with its runtime's plan tools, folded from its messages in id
+ * order. A call counts once its result arrives without an error. A whole list a subagent writes
+ * is that subagent's own, so only the agent's own counts; single items share one list per
+ * session, so every call counts. A new session starts an empty list, as the runtime does.
  */
 export class TodoIndex {
   lastId = 0
   private items: AgentTodo[] = []
   private session: string | null = null
-  private readonly calls = new Map<string, Call>()
+  private readonly calls = new Map<string, Change>()
 
   /** Folds one message in; true when it changed the list. Older messages are ignored. */
   apply(row: MessageRow): boolean {
@@ -67,18 +25,18 @@ export class TodoIndex {
       return false
     }
     this.lastId = row.id
-    if (row.kind !== 'sdk') {
-      return false
+    const before = JSON.stringify(this.items)
+    let restarted = false
+    for (const event of rowEvents(row)) {
+      if (event.type === 'session.started') {
+        restarted = this.started(event.sessionId) || restarted
+      } else if (event.type === 'tool.started') {
+        this.noteCall(event)
+      } else if (event.type === 'tool.ended') {
+        this.ended(event)
+      }
     }
-    const m = row.payload
-    if (m.type === 'system' && m.subtype === 'init') {
-      return this.started(m.session_id)
-    }
-    if (m.type === 'assistant') {
-      this.noteCalls(m)
-      return false
-    }
-    return m.type === 'user' ? this.applyResults(m) : false
+    return restarted || JSON.stringify(this.items) !== before
   }
 
   todos(): AgentTodo[] {
@@ -95,74 +53,62 @@ export class TodoIndex {
     return true
   }
 
-  private noteCalls(m: SDKAssistantMessage): void {
-    for (const block of m.message.content) {
-      if (block.type !== 'tool_use' || !TODO_TOOLS.has(block.name)) {
-        continue
-      }
-      if (block.name === 'TodoWrite' && m.parent_tool_use_id !== null) {
-        continue
-      }
-      this.calls.set(block.id, { name: block.name, input: block.input })
-    }
-  }
-
-  private applyResults(m: SDKUserMessage): boolean {
-    if (typeof m.message.content === 'string') {
-      return false
-    }
-    const results = m.message.content.filter((block) => block.type === 'tool_result')
-    const before = JSON.stringify(this.items)
-    for (const block of results) {
-      const call = this.calls.get(block.tool_use_id)
-      if (call === undefined) {
-        continue
-      }
-      this.calls.delete(block.tool_use_id)
-      if (block.is_error !== true) {
-        this.applyCall(call, block, results.length === 1 ? m.tool_use_result : undefined)
-      }
-    }
-    return JSON.stringify(this.items) !== before
-  }
-
-  private applyCall(call: Call, block: ToolResultBlock, output: unknown): void {
-    switch (call.name) {
-      case 'TodoWrite':
-        this.items = writtenList(call.input)
-        return
-      case 'TaskCreate':
-        this.created(call.input, block, output)
-        return
-      case 'TaskUpdate':
-        this.updated(call.input, output)
-        return
-      case 'TaskList':
-        this.listed(output)
-        return
-      case 'TaskGet':
-        this.got(output)
-        return
-      default:
-    }
-  }
-
-  private created(input: unknown, block: ToolResultBlock, output: unknown): void {
-    const id = text(field(output, 'task'), 'id') ?? CREATED.exec(resultText(block))?.[1] ?? null
-    const content = text(input, 'subject')
-    if (id === null || content === null) {
+  private noteCall({ call, thread }: Of<'tool.started'>): void {
+    const change = call.plan
+    if (change === undefined || change.proposal !== undefined) {
       return
     }
-    const todo: AgentTodo = { id, content, active_form: text(input, 'activeForm'), status: 'pending' }
+    if (change.replace !== undefined && thread !== '') {
+      return
+    }
+    this.calls.set(call.callId, change)
+  }
+
+  private ended(event: Of<'tool.ended'>): void {
+    const change = this.calls.get(event.callId)
+    if (change === undefined) {
+      return
+    }
+    this.calls.delete(event.callId)
+    if (event.status !== 'error') {
+      this.applyCall(change, event.result)
+    }
+  }
+
+  private applyCall(change: Change, result: Of<'tool.ended'>['result']): void {
+    const report = result.plan
+    if (change.replace !== undefined) {
+      this.items = change.replace.map((item) => ({
+        id: item.id,
+        content: item.text,
+        active_form: item.activeText ?? null,
+        status: item.status,
+      }))
+    } else if (change.add !== undefined) {
+      this.created(change.add, result.planId)
+    } else if (change.update !== undefined) {
+      this.updated(change.update, report)
+    } else if (report?.items !== undefined) {
+      this.listed(report.items)
+    } else if (report?.item !== undefined) {
+      this.got(report.item)
+    }
+  }
+
+  private created(add: NonNullable<Change['add']>, id: string | undefined): void {
+    const content = nonBlank(add.text)
+    if (id === undefined || content === null) {
+      return
+    }
+    const todo: AgentTodo = { id, content, active_form: add.activeText ?? null, status: 'pending' }
     this.items = [...this.items.filter((item) => item.id !== id), todo]
   }
 
-  private updated(input: unknown, output: unknown): void {
-    const id = text(input, 'taskId')
-    if (id === null || field(output, 'success') === false) {
+  private updated(update: NonNullable<Change['update']>, report: Report | undefined): void {
+    const { id, status } = update
+    if (id === '' || report?.unchanged === true) {
       return
     }
-    const status = field(input, 'status')
     if (status === 'deleted') {
       this.items = this.items.filter((item) => item.id !== id)
       return
@@ -171,41 +117,28 @@ export class TodoIndex {
       item.id === id
         ? {
             ...item,
-            content: text(input, 'subject') ?? item.content,
-            active_form: text(input, 'activeForm') ?? item.active_form,
+            content: update.text ?? item.content,
+            active_form: update.activeText ?? item.active_form,
             status: isStatus(status) ? status : item.status,
           }
         : item,
     )
   }
 
-  /** TaskList reports the whole list, which settles any call this index missed. */
-  private listed(output: unknown): void {
-    const tasks = field(output, 'tasks')
-    if (!Array.isArray(tasks)) {
-      return
-    }
+  /** The whole list as the runtime reports it, which settles any call this index missed. */
+  private listed(items: NonNullable<Report['items']>): void {
     const known = new Map(this.items.map((item) => [item.id, item]))
-    this.items = tasks.flatMap((task: unknown) => {
-      const id = text(task, 'id')
-      const content = text(task, 'subject')
-      const status = field(task, 'status')
-      if (id === null || content === null || !isStatus(status)) {
-        return []
-      }
-      return [{ id, content, active_form: known.get(id)?.active_form ?? null, status }]
-    })
+    this.items = items.map((item) => ({
+      id: item.id,
+      content: item.text,
+      active_form: known.get(item.id)?.active_form ?? null,
+      status: item.status,
+    }))
   }
 
-  private got(output: unknown): void {
-    const task = field(output, 'task')
-    const id = text(task, 'id')
-    const status = field(task, 'status')
-    if (id === null || !isStatus(status)) {
-      return
-    }
+  private got(task: NonNullable<Report['item']>): void {
     this.items = this.items.map((item) =>
-      item.id === id ? { ...item, content: text(task, 'subject') ?? item.content, status } : item,
+      item.id === task.id ? { ...item, content: task.text ?? item.content, status: task.status } : item,
     )
   }
 }
