@@ -27,6 +27,8 @@ export interface Setup {
   inherited?: readonly (readonly ['allow' | 'ask' | 'deny', string])[]
   /** Whether Seti's shell guard runs, as it does for every agent. */
   guard?: boolean
+  /** Whether the runtime has a classifier, as Claude Code does; true unless set. */
+  classifier?: boolean
 }
 
 /** An agent's context as Seti builds it: built-in, workspace, stored, fixed and inherited rules. */
@@ -53,6 +55,7 @@ export function contextOf(setup: Setup = {}): PolicyContext {
     cwd: CWD,
     dirs: [CWD, WORKSPACE],
     home: HOME,
+    classifier: setup.classifier ?? true,
     ...(setup.guard === true
       ? { guard: (call) => (call.command === undefined ? null : guardCommand(call.command, scope)) }
       : {}),
