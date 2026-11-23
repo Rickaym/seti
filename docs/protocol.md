@@ -796,10 +796,12 @@ store, the audit chain and every record.
   ask for their keys on each load; the node keeps none between requests. A changed or removed
   connection therefore applies to the next request, with no delay, and a changed ssh key or host
   reloads the node's ssh agents. A sandbox the control plane builds gets the AWS token of the
-  node's proxy.
+  node's proxy. While the control plane restarts, a request that needs a value waits for it up to
+  30 seconds; after that the proxy answers 503, which clients retry.
 - NODE-11: Values cross only to a node on the same machine, over the owner-only socket of NODE-1;
-  the control plane refuses every ask that carries values on any other link, so a node on another
-  machine needs a sealed path. No error, log or frame dump names a value.
+  the control plane refuses every ask and command that carries values on any other link, so a
+  node on another machine needs a sealed path. No error, log or frame dump names a value, and the
+  control plane keeps no answer that carries one once it is sent.
 - NODE-12: The node owns each agent's ssh agent and the sandbox CA files as it owns the proxy: a
   sandbox the control plane builds has the node start the ssh agent, and only the node loads and
   writes the CA.
