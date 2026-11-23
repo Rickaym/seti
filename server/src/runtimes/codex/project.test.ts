@@ -189,6 +189,31 @@ describe('Codex calls', () => {
   })
 })
 
+describe('Codex background commands', () => {
+  it('starts a job for each command Codex lists as still running, and ends it with its item', () => {
+    const terminal = { itemId: 'call_1', processId: '4242', command: "/usr/bin/zsh -lc 'npm run dev'" }
+    const listed = { ...stored('thread/backgroundTerminals/list', { threadId: ROOT }), reply: { data: [terminal] } }
+    expect(projectCodex(listed)).toEqual([
+      {
+        v: 1,
+        thread: '',
+        type: 'job.started',
+        jobId: '4242',
+        callId: 'call_1',
+        kind: 'shell',
+        label: 'npm run dev',
+        background: true,
+      },
+    ])
+    const done = item(shell('completed', { aggregatedOutput: 'ready', exitCode: 0, processId: '4242' }))
+    const ended = projectCodex({ ...stored('item/completed', done), job: { id: '4242' } })
+    expect(ended.map((event) => event.type)).toEqual(['tool.ended', 'job.ended'])
+    expect(ended[1]).toMatchObject({ jobId: '4242', callId: 'call_1', status: 'completed', output: 'ready' })
+    const stopped = projectCodex({ ...stored('item/completed', done), job: { id: '4242', stopped: true } })
+    expect(stopped[1]).toMatchObject({ status: 'stopped' })
+  })
+})
+
 describe('Codex turns, usage, plans and notices', () => {
   it('ends an interrupted turn as interrupted and a failed one with its error', () => {
     const turn = { id: 't2', status: 'interrupted', items: [], durationMs: 2050 }

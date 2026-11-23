@@ -28,9 +28,9 @@ export const CODEX_GAPS: Partial<Record<string, string>> = {
   'TL-3': 'the adapter gives Codex no tool servers yet, so a tool server call has no item',
   'PM-2': 'the adapter gives Codex no tool servers yet, so no tool server call reaches the host',
   'PM-3': "Codex's approval reply carries no message: the model reads Codex's own refusal",
-  'INT-3': 'a command still running when its turn ends is not reported as a background job yet',
-  'INT-6': 'the adapter cannot stop a background terminal yet',
-  'TL-4': 'a command still running when its turn ends is not reported as a background job yet',
+  'INT-3':
+    'Codex sends nothing when a command moves to the background, so the adapter learns of a job ' +
+    "only at its turn's end, after the interrupt this case sends",
   'RP-2': "the rig does not play Codex's collaboration agents yet",
   'SA-1': "the rig does not play Codex's collaboration agents yet",
   'PL-1': 'the tools this Codex version offers the model include no plan tool',

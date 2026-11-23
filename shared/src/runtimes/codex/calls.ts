@@ -9,7 +9,7 @@ type Status = Ended['status']
 const WRAPPED = /^\S*\/(?:ba|z|)sh -l?c (?:'((?:[^']|'\\'')*)'|(\S+))$/
 
 /** The command inside Codex's shell wrapper, or the whole text when it has none. */
-function unwrapShell(command: string): string {
+export function unwrapShell(command: string): string {
   const match = WRAPPED.exec(command)
   if (match === null) {
     return command

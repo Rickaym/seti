@@ -1,4 +1,4 @@
-import { projectCodex, type CodexMessage } from '@seti/shared'
+import { projectCodex, type CodexJob, type CodexMessage } from '@seti/shared'
 import type { SessionMessage, SessionReport } from '../adapter.js'
 import type { CodexCall } from './rpc.js'
 
@@ -55,17 +55,22 @@ export class ReportQueue implements AsyncIterable<SessionReport> {
 /** Methods that report the agent or a subagent at work, rather than news about the session. */
 const WORK = /^(?:turn\/|item\/)/
 
-/**
- * A message Codex sent, as the session reports it: stored with the agent's thread, and projected.
- * With `reply`, the row records Seti's answer to that request.
- */
-export function codexReport(
-  root: string,
-  message: CodexCall,
-  delivered: readonly string[] = [],
-  reply?: unknown,
-): SessionMessage {
-  const raw: CodexMessage = reply === undefined ? { root, message } : { root, message, reply }
+/** What a stored row carries beside Codex's message: inputs a turn took, an answer, a job. */
+export interface RowExtras {
+  delivered?: readonly string[]
+  reply?: unknown
+  job?: CodexJob
+}
+
+/** A message Codex sent, as the session reports it: stored with the agent's thread, and projected. */
+export function codexReport(root: string, message: CodexCall, extras: RowExtras = {}): SessionMessage {
+  const { delivered = [], reply, job } = extras
+  const raw: CodexMessage = {
+    root,
+    message,
+    ...(reply === undefined ? {} : { reply }),
+    ...(job === undefined ? {} : { job }),
+  }
   const events = projectCodex(raw)
   return {
     type: 'message',

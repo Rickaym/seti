@@ -71,7 +71,8 @@ function questionsOf(args: Record<string, unknown>): unknown[] {
 export function codexCall(call: ScriptCall): ModelCall {
   const command = commandOf(call)
   if (command !== null) {
-    return { name: 'exec_command', args: { cmd: command } }
+    const background = call.args.background === true ? { yield_time_ms: 250 } : {}
+    return { name: 'exec_command', args: { cmd: command, ...background } }
   }
   if (call.tool === 'patch') {
     return { name: 'apply_patch', input: patchOf(call.args) }
@@ -94,8 +95,11 @@ const quoted = (text: string): string => `'${text.replaceAll("'", ESCAPED_QUOTE)
  * A login shell profile that stands in for every command the script runs: it notes the call and
  * prints the script's output instead of running it. Codex runs `<shell> -lc '<command>'`.
  */
-function profileOf(script: Script, effects: string): string {
-  const calls = script.turns.flat().flatMap((step) => ('call' in step ? [step.call] : []))
+function profileOf(script: Script, effects: string, nextTurn: string): string {
+  const calls = script.turns
+    .flat()
+    .map(asCall)
+    .flatMap((step) => ('call' in step ? [step.call] : []))
   const arms = calls.flatMap((call) => {
     const command = commandOf(call)
     if (command === null) {
@@ -103,7 +107,8 @@ function profileOf(script: Script, effects: string): string {
     }
     const effect = `${call.tool} ${JSON.stringify(call.args)}`
     const code = call.fails === true ? 'exit 1' : 'exit 0'
-    const ending = call.hold === true ? 'exec sleep 30' : code
+    const waits = call.args.background === true ? `while [ ! -e ${quoted(nextTurn)} ]; do sleep 0.05; done; ` : ''
+    const ending = call.hold === true ? 'exec sleep 30' : `${waits}${code}`
     const output = `printf '%s' ${quoted(call.output ?? '')}`
     return [`  ${quoted(command)}) printf '%s\\n' ${quoted(effect)} >> ${quoted(effects)}; ${output}; ${ending} ;;`]
   })
@@ -114,6 +119,11 @@ function profileOf(script: Script, effects: string): string {
     'esac',
     '',
   ].join('\n')
+}
+
+/** A background job as the model starts it: a command that outlives its call's wait. */
+function asCall(step: Step): Step {
+  return 'job' in step ? { call: { tool: 'sh', args: { cmd: step.job, background: true }, output: step.job } } : step
 }
 
 /** Where each wire step of the script goes in Codex's output. */
@@ -165,11 +175,14 @@ class Tap implements LineTap {
   private readonly refuseInterrupt: boolean
 
   private readonly model: ScriptedResponses
+  private readonly nextTurn: string
+  private starts = 0
 
-  constructor(script: Script, work: string, model: ScriptedResponses) {
+  constructor(script: Script, at: { work: string; nextTurn: string }, model: ScriptedResponses) {
     this.model = model
+    this.nextTurn = at.nextTurn
     this.pending = injectionsOf(script)
-    this.work = work
+    this.work = at.work
     this.refuseInterrupt = script.refuseInterrupt === true
   }
 
@@ -177,6 +190,12 @@ class Tap implements LineTap {
     const sent = JSON.parse(line) as { id?: unknown; method?: unknown }
     if (sent.method === 'turn/steer') {
       this.model.steered()
+    }
+    if (sent.method === 'turn/start') {
+      this.starts += 1
+      if (this.starts > 1) {
+        writeFileSync(this.nextTurn, '')
+      }
     }
     if (this.refuseInterrupt && sent.method === 'turn/interrupt') {
       answer(JSON.stringify({ id: sent.id, error: { code: -32603, message: 'the turn cannot be interrupted' } }))
@@ -214,7 +233,8 @@ class Tap implements LineTap {
 }
 
 /** The script with the steps only Codex's output carries left out, as the scripted model plays it. */
-const modelTurns = (script: Script): Step[][] => script.turns.map((steps) => steps.filter((step) => !isWire(step)))
+const modelTurns = (script: Script): Step[][] =>
+  script.turns.map((steps) => steps.filter((step) => !isWire(step)).map(asCall))
 
 /** A file a script edits, as it starts, and the effect its edit notes once the file changed. */
 interface Edit {
@@ -284,7 +304,8 @@ export function codexRig(model: ScriptedResponses, base: string, script: Script)
   mkdirSync(work)
   const effects = path.join(root, 'effects.log')
   writeFileSync(effects, '')
-  const profile = profileOf(script, effects)
+  const nextTurn = path.join(root, 'next-turn')
+  const profile = profileOf(script, effects, nextTurn)
   for (const name of ['.zshenv', '.bash_profile', '.bash_env']) {
     writeFileSync(path.join(home, name), profile)
   }
@@ -305,7 +326,7 @@ export function codexRig(model: ScriptedResponses, base: string, script: Script)
         args: request.args,
         cwd: work,
         env,
-        tap: new Tap(script, work, model),
+        tap: new Tap(script, { work, nextTurn }, model),
         deaf: script.deaf === true,
       },
       request.signal,

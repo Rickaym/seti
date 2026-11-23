@@ -51,7 +51,7 @@ export class Asks {
     const question = message.method === 'item/tool/requestUserInput'
     const record = (reply?: unknown) => {
       if (question) {
-        reports.push(codexReport(this.context.root(), message, [], reply))
+        reports.push(codexReport(this.context.root(), message, { reply }))
       }
     }
     record()

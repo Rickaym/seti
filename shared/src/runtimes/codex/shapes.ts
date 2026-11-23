@@ -120,6 +120,12 @@ export const stored = z.looseObject({
   root: text,
   message: z.looseObject({ method: text, params: z.unknown().optional() }),
   reply: z.unknown().optional(),
+  job: z.looseObject({ id: text, stopped: z.boolean().optional() }).optional(),
+})
+
+/** Codex's list of a thread's background terminals. */
+export const backgroundList = z.looseObject({
+  data: z.array(z.looseObject({ itemId: text, processId: text, command: text })),
 })
 
 /** Seti's answer to `item/tool/requestUserInput`: each question's answers by its id. */

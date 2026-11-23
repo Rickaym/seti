@@ -6,6 +6,7 @@ import type { Launcher } from '../../launcher.js'
 import type { InputContent, RuntimeSession, SessionInput, SessionReport } from '../adapter.js'
 import type { CodexDecide } from './approvals.js'
 import { Asks } from './asks.js'
+import { Background } from './background.js'
 import { codexReport, ReportQueue } from './reports.js'
 import { CodexRpc, RpcError, type CodexCall } from './rpc.js'
 
@@ -64,6 +65,8 @@ class Driver {
   private readonly steered = new Map<string, SessionInput>()
   private readonly calls = new Map<string, ToolCall>()
   private readonly asks: Asks
+  private readonly background: Background
+  private inbox: Promise<void> = Promise.resolve()
   private readonly rpc: CodexRpc
   private readonly realised: CodexRealised
   private readonly child: ChildProcess
@@ -72,6 +75,7 @@ class Driver {
     this.child = child
     this.realised = realised
     this.rpc = new CodexRpc(child)
+    this.background = new Background(this.rpc, () => this.root)
     this.asks = new Asks({
       rpc: this.rpc,
       reports: this.reports,
@@ -87,24 +91,31 @@ class Driver {
     void this.rpc
       .read({
         notified: (message) => {
-          this.notified(message)
+          this.inOrder(async () => this.notified(message))
         },
         asked: (message) => {
-          this.asks.take(message)
+          this.inOrder(() => {
+            this.asks.take(message)
+          })
         },
         garbled: () => {
-          this.reports.push({
-            type: 'message',
-            raw: null,
-            events: [unreadable()],
-            work: false,
-            byAgent: true,
-            delivered: [],
+          this.inOrder(() => {
+            this.reports.push({
+              type: 'message',
+              raw: null,
+              events: [unreadable()],
+              work: false,
+              byAgent: true,
+              delivered: [],
+            })
           })
         },
       })
       .then(async () => {
-        this.ended(await exited)
+        const exit = await exited
+        this.inOrder(() => {
+          this.ended(exit)
+        })
       })
     await this.open()
     void this.pump(inputs)
@@ -219,9 +230,27 @@ class Driver {
     }
   }
 
-  private notified(message: CodexCall): void {
+  /** Handles what Codex wrote one line at a time, in order, even where a handler waits. */
+  private inOrder(handle: () => Promise<void> | void): void {
+    this.inbox = this.inbox.then(handle).catch((e: unknown) => {
+      this.reports.fail(e instanceof Error ? e : new Error(String(e)))
+    })
+  }
+
+  private async notified(message: CodexCall): Promise<void> {
+    const job = this.background.note(message)
+    if (message.method === 'turn/completed') {
+      const listed = await this.background.listed().catch(() => null)
+      if (listed !== null) {
+        this.reports.push(codexReport(this.root, listed.message, { reply: listed.reply }))
+      }
+    }
     const delivered = this.track(message)
-    this.reports.push(codexReport(this.root, message, delivered))
+    this.reports.push(codexReport(this.root, message, { delivered, ...(job === undefined ? {} : { job }) }))
+  }
+
+  async stopBackground(jobId: string): Promise<void> {
+    await this.background.stop(jobId)
   }
 
   /** Follows turns, calls and inputs; returns the inputs a turn's end reports taken. */
@@ -305,6 +334,7 @@ export function codexSession(
   return {
     events: driver.events(inputs),
     interrupt: async () => driver.interrupt(),
+    stopBackground: async (jobId) => driver.stopBackground(jobId),
     close: () => {
       driver.close()
     },
