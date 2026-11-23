@@ -34,6 +34,14 @@ export type Step =
   | { awaitInput: true }
   /** Starts a background command with this label; it ends when the next turn starts. */
   | { job: string }
+  /** Runs a subagent whose steps play in its own thread; in the background its call ends first. */
+  | { subagent: { label: string; steps: Step[]; background?: boolean } }
+  /** The agent's plan now holds these items, in order. */
+  | { plan: { text: string; status: 'pending' | 'in_progress' | 'completed' }[] }
+  /** The runtime moves to this model on its own, as a safeguard's refusal can make it. */
+  | { fallback: string }
+  /** The runtime compacts the conversation, which held this many tokens before. */
+  | { compact: { trigger: 'auto' | 'manual'; before: number } }
 
 /** What the runtime does for each turn, in order; a turn past the last says its inputs back. */
 export interface Script {
