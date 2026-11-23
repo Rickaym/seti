@@ -13,6 +13,7 @@ import {
   stopSessionTask,
   stopTurn,
 } from './session-host.js'
+import { servesProxy } from './task-sandbox.js'
 
 const sessionOf = (agent: string): LiveSession | undefined => liveSessions().find(([id]) => id === agent)?.[1]
 
@@ -94,6 +95,7 @@ serveControl({
     return {}
   },
   'scopes.read': async ({ agent }) => ({ memory: scopeMemory(agent), cpu: await scopeCpu(agent) }),
+  'proxy.serving': ({ agent }) => ({ serving: servesProxy(agent) }),
   'scopes.agents': () => ({ agents: [...new Set(liveScopes().map((scope) => scope.plan.taskId))] }),
   'scopes.cap': async (body) => {
     await capScopes(body)

@@ -66,7 +66,7 @@ with another top-level folder.
 | 5 Updates      | `shared/src/channel-delivery.ts`, `inputs.ts`, `input-preface.ts`                                                                                                                                |
 | 6 Attention    | `shared/src/attention.ts`, `task-blocked.ts`, `stall-watch.ts`, `ea-attention.ts`, `notifications.ts`, `notify-scope.ts`, `presence.ts`, `attention-brief.ts`                                    |
 | 7.1 Actors     | `access.ts`, `ea-guard.ts`                                                                                                                                                                       |
-| 7.2, 7.3       | `sandbox.ts`, `sandbox-mounts.ts`, `egress-proxy.ts`, `egress-rules.ts`, `egress-placeholders.ts`, `sandbox-ca.ts`, `ssh-agent.ts`, `agent-access.ts`                                            |
+| 7.2, 7.3       | `sandbox.ts`, `sandbox-mounts.ts`, `egress-proxy.ts`, `egress-rules.ts`, `egress-placeholders.ts`, `sandbox-ca.ts`, `sandbox-aws-token.ts`, `proxy-owner.ts`, `ssh-agent.ts`, `agent-access.ts`  |
 | 7.4, 7.5       | `permission-policy.ts`, `policy/`, `permission-requests.ts`, `permission-timeout.ts`, `permission-guard.ts`, `repeat-hooks.ts`, `review-hooks.ts`, `outward.ts`                                  |
 | 7.6 Changes    | `change-requests.ts`, `change-request-notes.ts`, `mcp-off-context.ts`, `shared/src/change-requests.ts`                                                                                           |
 | 7.7 Hostile    | `git.ts`, `probe-launch.ts`, `task-files.ts`, `html-preview.ts`, `uploads.ts`                                                                                                                    |

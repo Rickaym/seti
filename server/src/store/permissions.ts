@@ -137,10 +137,10 @@ export const permissionRequests = {
    * The pending requests a restart left with no call waiting, which can no longer be edited since
    * their input went with the process; returns each with its task.
    */
-  orphan: async (): Promise<{ id: string; task_id: string }[]> =>
+  orphan: async (waited: readonly string[]): Promise<{ id: string; task_id: string }[]> =>
     (
       await sql<{ id: string; task_id: string }[]>`UPDATE permission_request SET editable = false
-        WHERE state = 'pending' RETURNING id, task_id`
+        WHERE state = 'pending' AND id <> ALL(${waited}::text[]) RETURNING id, task_id`
     ).map((row) => ({ ...row })),
   /** The hash of the request's exact call; null for one recorded before hashes. */
   hashOf: async (id: string): Promise<string | null> =>

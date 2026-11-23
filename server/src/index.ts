@@ -178,7 +178,9 @@ relayTaskEvents()
 relayTeamEvents()
 await auditEvents.sealPending()
 await stopLeftoverScopes()
-await keepLeftoverRequests()
+if (!NODE_SPLIT) {
+  await keepLeftoverRequests()
+}
 await resumeBypass()
 startRequestExpiry()
 startKnowledgeSweep()
