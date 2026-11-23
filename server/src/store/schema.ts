@@ -29,7 +29,7 @@ import { KNOWLEDGE } from './schema-knowledge.js'
 import { MEMORY_CAPS } from './schema-memory.js'
 import { MODS_RUNTIME } from './schema-mods-runtime.js'
 import { BLOBS_ONE_STYLE, MODS, PREVIEWS_MOD, REQUIRED_MODS, USER_THEME } from './schema-mods.js'
-import { NODE_CURSORS } from './schema-node.js'
+import { NODE_CURSORS, NODE_PROMPTS } from './schema-node.js'
 import { NOTIFY_SCOPE, NOTIFICATIONS } from './schema-notifications.js'
 import { CHANNEL_EVENT_ROUTING, CHANNEL_RUN_DUE, POLLER_CHANNELS } from './schema-pollers.js'
 import { PR_LIST_CACHE } from './schema-prs.js'
@@ -218,4 +218,5 @@ export const MIGRATIONS: readonly Migration[] = [
   { version: 116, name: 'webhook_filters', sql: WEBHOOK_FILTERS },
   { version: 117, name: 'storage_settings', sql: STORAGE_SETTINGS },
   { version: 118, name: 'node_cursors', sql: NODE_CURSORS },
+  { version: 119, name: 'node_prompts', sql: NODE_PROMPTS },
 ]

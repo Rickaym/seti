@@ -19,7 +19,7 @@ import {
 } from '@seti/shared'
 import { DATABASE_URL } from './config.js'
 import { pickAgentColor } from './new-agent-color.js'
-import { connect, ensureDatabase, migrate, type Db } from './pg.js'
+import { connect, ensureDatabase, migrate, written, type Alongside, type Db } from './pg.js'
 import { scrubValue } from './scrub.js'
 import { readBody, readOutward, readPayload, readStoredBody, storedJson } from './stored-rows.js'
 
@@ -346,11 +346,11 @@ export const OWN_ROW = sql`(kind <> 'sdk' OR ((payload::json ->> 'parent_tool_us
   AND (payload::json ->> 'subtype') IS DISTINCT FROM 'task_progress'))`
 
 export const messages = {
-  insert: async (taskId: string, body: MessageBody, outward: string[]): Promise<MessageRow> => {
-    const created_at = now()
-    const id = await insertMessage(sql, { taskId, body, outward, createdAt: created_at })
+  insert: async (taskId: string, body: MessageBody, outward: string[], alongside?: Alongside): Promise<MessageRow> => {
+    const createdAt = now()
+    const id = await written(sql, async (db) => insertMessage(db, { taskId, body, outward, createdAt }), alongside)
     const read = readBody({ task_id: taskId, id }, body.kind, scrubValue(body.payload))
-    return { ...read, id, task_id: taskId, outward, created_at }
+    return { ...read, id, task_id: taskId, outward, created_at: createdAt }
   },
   /** The first `limit` of the task's rows after `afterId`, own or not. */
   firstAfter: async (taskId: string, afterId: number, limit: number) =>

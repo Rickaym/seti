@@ -8,6 +8,21 @@ export type Db = postgres.ISql<Types>
 
 export type Pool = postgres.Sql<Types>
 
+/** A write that commits with a new row or not at all, given the row's id. */
+export type Alongside = (db: Db, id: number) => Promise<void>
+
+/** Runs `write`, in one transaction with `alongside` when there is one. */
+export async function written(pool: Pool, write: (db: Db) => Promise<number>, alongside?: Alongside): Promise<number> {
+  if (alongside === undefined) {
+    return write(pool)
+  }
+  return pool.begin(async (tx) => {
+    const id = await write(tx)
+    await alongside(tx, id)
+    return id
+  })
+}
+
 /** Where the local PostgreSQL server listens; peer auth maps the OS user to its role. */
 const PG_SOCKET_DIR = '/var/run/postgresql'
 
