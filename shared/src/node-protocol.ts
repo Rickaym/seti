@@ -40,6 +40,14 @@ export const journalEntry = z.discriminatedUnion('type', [
   z.object({ type: z.literal('session.since'), promptId: z.int() }),
   z.object({ type: z.literal('session.closed'), since: z.int().nullable() }),
   z.object({ type: z.literal('session.state'), open: z.boolean(), background: z.int().nonnegative() }),
+  z.object({
+    type: z.literal('session.changed'),
+    open: z.boolean(),
+    running: z.boolean(),
+    accepting: z.boolean(),
+    autoQueued: z.boolean(),
+    background: z.int().nonnegative(),
+  }),
 ])
 export type JournalEntry = z.infer<typeof journalEntry>
 
@@ -97,8 +105,22 @@ export const askReply = z.discriminatedUnion('type', [
 export type AskReply = z.infer<typeof askReply>
 
 const done = z.object({})
+const stopped = z.object({ stopped: z.boolean() })
 
 const commandSchemas = {
+  /** Hands the agent a message: it starts a turn, queues for the running one or cuts it short. */
+  'turn.send': {
+    body: z.object({ agent, message: nextMessage.omit({ interrupted: true }), interrupt: z.boolean() }),
+    answer: z.object({ outcome: z.enum(['started', 'queued', 'interrupted']) }),
+  },
+  /** Cuts the running turn short and waits for its end; false when no turn ran. */
+  'turn.stop': { body: z.object({ agent, deliverQueued: z.boolean() }), answer: stopped },
+  /** Opens a process for an agent without one, so it is ready for the next turn. */
+  'session.open': { body: z.object({ agent }), answer: done },
+  /** Ends the agent's process and waits; with `onlyIdle`, only when nothing runs in it. */
+  'session.close': { body: z.object({ agent, onlyIdle: z.boolean() }), answer: z.object({ closed: z.boolean() }) },
+  /** Stops one subagent or background command in the agent's open process. */
+  'background.stop': { body: z.object({ agent, task: z.string().min(1) }), answer: stopped },
   /** Switches the agent's open process to a permission mode; `next_turn` when it cannot now. */
   'mode.set': {
     body: z.object({ agent, mode: z.string() }),

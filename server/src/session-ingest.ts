@@ -7,6 +7,7 @@ import { messages, tasks } from './db.js'
 import { serveNode } from './node-link.js'
 import { outwardToolUses } from './outward.js'
 import { markQueued } from './queued-prompts.js'
+import { mirrorSession } from './session-mirror.js'
 import { storedForm } from './session-start.js'
 import { withTurnCost } from './store/cost.js'
 import { hadRunningSubtask } from './subtask-cache.js'
@@ -97,6 +98,9 @@ const ingest: Ingest = {
   'session.closed': async (taskId, { since }) => sessionClosed(taskId, since),
   'session.state': (taskId, { open, background }) => {
     publish(taskId, { type: 'session', session: { open, background } })
+  },
+  'session.changed': (taskId, state) => {
+    mirrorSession(taskId, state)
   },
 }
 
