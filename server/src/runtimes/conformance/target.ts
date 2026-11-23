@@ -18,14 +18,21 @@ export interface Profile {
   input: { steer: 'next_step' | 'after_turn'; retract: boolean }
   /** Commands keep running in the background after their call ends, and can be stopped. */
   background: { jobs: boolean; stop: boolean }
+  /** The kinds whose calls Seti decides before they run (gate `before` or `request`). */
+  gated: { shell: boolean; edit: boolean; mcp: boolean }
 }
 
 /** A neutral decision: run the call, maybe with changed input, or refuse it with a reason. */
 type NeutralDecision = { allow: true; input?: Record<string, unknown> } | { allow: false; message: string }
 
+/** Structured questions to the user, as a question call carries them. */
+export type Questions = NonNullable<ToolCall['question']>['questions']
+
 /** How a case answers what the runtime asks while a turn waits. */
 export interface NeutralHost {
   decide: (call: ToolCall, signal: AbortSignal) => Promise<NeutralDecision>
+  /** The user's answers to structured questions, by question text. */
+  ask: (questions: Questions, signal: AbortSignal) => Promise<Record<string, string>>
 }
 
 /** A process start a rig saw: what the adapter asked the launcher for. */
