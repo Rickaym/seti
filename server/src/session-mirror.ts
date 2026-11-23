@@ -14,6 +14,9 @@ export function mirrorSession(taskId: string, state: SessionChanged): void {
   }
 }
 
+/** The agents whose session the node last reported open or working. */
+export const mirroredAgents = (): string[] => [...mirror.keys()]
+
 /** Whether the task has a Claude Code process open, and how much background work runs in it. */
 export function sessionState(taskId: string): TaskSession {
   const state = mirror.get(taskId)

@@ -3,6 +3,7 @@ import type { CanUseTool, PermissionMode, PermissionResult, PermissionUpdate } f
 import type { PermissionRequest, PermissionRequestKind } from '@seti/shared'
 import { permissionModeOf } from './bypass-mode.js'
 import { tasks } from './db.js'
+import { askBeingAnswered } from './node-link.js'
 import { INPUT_CHARS, isEditable } from './permission-edits.js'
 import { callHash, takeGrant } from './permission-grants.js'
 import { alwaysRules } from './permission-policy.js'
@@ -159,14 +160,35 @@ async function allowedAlready(taskId: string, ask: Ask, hash: string): Promise<P
   return task === undefined ? null : allowed({ tool_name: ask.tool }, ask.input, permissionModeOf(task))
 }
 
-/** Records the call, shows it to the user, and waits for their answer. */
+/** Waits again on a request a node's ask recorded before this control plane restarted. */
+async function waitAgain(request: PermissionRequest, ask: Ask, signals: readonly AbortSignal[]) {
+  inputs.set(request.id, ask.input)
+  const answer = answerOf(request.id, signals)
+  try {
+    await announce(request)
+    return await answer
+  } finally {
+    inputs.delete(request.id)
+    waiting.delete(request.id)
+  }
+}
+
+/**
+ * Records the call, shows it to the user, and waits for their answer. A node's ask names the
+ * request, so the same ask sent again after a restart waits on the request it recorded.
+ */
 async function askUser(taskId: string, ask: Ask, signals: readonly AbortSignal[]): Promise<PermissionResult> {
   const hash = callHash(ask.tool, ask.input)
   const granted = await allowedAlready(taskId, ask, hash)
   if (granted !== null) {
     return granted
   }
-  const id = randomUUID()
+  const asked = askBeingAnswered()
+  const known = asked === null ? undefined : await permissionRequests.get(asked)
+  if (known?.state === 'pending') {
+    return waitAgain(known, ask, signals)
+  }
+  const id = asked !== null && known === undefined ? asked : randomUUID()
   inputs.set(id, ask.input)
   const answer = answerOf(id, signals)
   try {

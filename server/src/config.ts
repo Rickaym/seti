@@ -36,6 +36,10 @@ export const MOD_FETCH_ROOT = path.join(SETI_HOME, 'mod-fetch')
 export const SANDBOX_ROOT = path.join(SETI_HOME, 'sandbox')
 /** Plugin folders of the shared tools the user allowed, one per published version. */
 export const SHARED_TOOLS_ROOT = path.join(SETI_HOME, 'shared-tools')
+/** `split` runs sessions in a separate node process; anything else runs them in this one. */
+export const NODE_SPLIT = process.env.SETI_NODE === 'split'
+/** The unix socket the node listens on, in a folder only this user may enter. */
+export const NODE_SOCKET = path.join(SETI_HOME, 'run', 'node.sock')
 
 /** Development and test runs make their own credentials; production only reads them. */
 const DEV_MODE =
