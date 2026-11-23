@@ -7,6 +7,7 @@ import type { InputContent, RuntimeSession, SessionInput, SessionReport } from '
 import type { CodexDecide } from './approvals.js'
 import { Asks } from './asks.js'
 import { Background } from './background.js'
+import { OPTED_OUT } from './private.js'
 import { codexReport, ReportQueue } from './reports.js'
 import { CodexRpc, RpcError, type CodexCall } from './rpc.js'
 
@@ -146,7 +147,7 @@ class Driver {
   private async open(): Promise<void> {
     await this.rpc.request('initialize', {
       clientInfo: { name: 'seti', title: 'Seti', version: '1' },
-      capabilities: { experimentalApi: true },
+      capabilities: { experimentalApi: true, optOutNotificationMethods: OPTED_OUT },
     })
     this.rpc.notify('initialized')
     const { resume, cwd, model } = this.realised
@@ -157,8 +158,8 @@ class Driver {
     }
     const reply = await this.rpc.request('thread/resume', { ...common, threadId: resume, excludeTurns: true })
     this.root = threadReply.parse(reply).thread.id
-    // A resumed thread is announced only in this reply, so the reply is kept as Codex sent it.
-    this.reports.push(codexReport(this.root, { method: 'thread/resume', params: reply }))
+    // A resumed thread is announced only in this reply, so the reply is the row that starts it.
+    this.reports.push(codexReport(this.root, { method: 'thread/resume', params: { threadId: resume } }, { reply }))
   }
 
   private async pump(inputs: AsyncIterable<SessionInput>): Promise<void> {
@@ -240,6 +241,9 @@ class Driver {
   }
 
   private async notified(message: CodexCall): Promise<void> {
+    if (OPTED_OUT.includes(message.method)) {
+      return
+    }
     const job = this.background.note(message)
     if (message.method === 'turn/completed') {
       const listed = await this.background.listed().catch(() => null)

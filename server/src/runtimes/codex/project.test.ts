@@ -142,11 +142,19 @@ describe('Codex calls', () => {
 
   it("starts the session from a resumed thread's reply, which Codex sends in place of thread/started", () => {
     const thread = { id: ROOT, model: 'gpt-5.5', environments: [{ cwd: '/work/project' }] }
-    expect(one('thread/resume', { thread, model: 'gpt-5.5' })).toMatchObject({
-      type: 'session.started',
-      sessionId: ROOT,
-      cwd: '/work/project',
-    })
+    const row: CodexMessage = {
+      root: ROOT,
+      message: { method: 'thread/resume', params: { threadId: ROOT } },
+      reply: { thread, model: 'gpt-5.5' },
+    }
+    expect(projectCodex(row)).toMatchObject([{ type: 'session.started', sessionId: ROOT, cwd: '/work/project' }])
+  })
+
+  it("keeps remote control's status, which names the host, as a vendor event with no detail", () => {
+    const params = { status: 'disabled', serverName: 'a-host', installationId: 'i-1', environmentId: null }
+    expect(projectCodex(stored('remoteControl/status/changed', params))).toEqual([
+      { v: 1, thread: '', type: 'vendor', name: 'remoteControl/status/changed' },
+    ])
   })
 
   it('opens a thread for a spawned subagent, and its own messages carry that thread', () => {

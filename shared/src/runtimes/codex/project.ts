@@ -155,14 +155,14 @@ function answered(params: unknown, reply: unknown, at: Thread): Event {
 type Mapper = (params: unknown, at: Thread, root: string) => Event
 
 /** Rows that record Seti's answer to a request, by the request's method. */
-const REPLIED: Partial<Record<string, (params: unknown, reply: unknown, at: Thread) => Event[]>> = {
+const REPLIED: Partial<Record<string, (params: unknown, reply: unknown, at: Thread, root: string) => Event[]>> = {
   'item/tool/requestUserInput': (params, reply, at) => [answered(params, reply, at)],
   'thread/backgroundTerminals/list': (_params, reply, at) => jobsStarted(reply, at.thread),
+  'thread/resume': (_params, reply, _at, root) => [sessionStarted(reply, root)],
 }
 
 const MAPPED: Partial<Record<string, Mapper>> = {
   'thread/started': (params, _at, root) => sessionStarted(params, root),
-  'thread/resume': (params, _at, root) => sessionStarted(params, root),
   'turn/started': (params, at) => ({
     v: 1,
     ...at,
@@ -179,13 +179,18 @@ const MAPPED: Partial<Record<string, Mapper>> = {
   'item/tool/requestUserInput': question,
 }
 
-function projectReply(message: { method: string; params?: unknown }, reply: unknown, at: Thread): Event[] {
+function projectReply(
+  message: { method: string; params?: unknown },
+  reply: unknown,
+  at: Thread,
+  root: string,
+): Event[] {
   const map = REPLIED[message.method]
   if (map === undefined) {
     return [vendor(at.thread, message.method)]
   }
   try {
-    return map(message.params, reply, at)
+    return map(message.params, reply, at, root)
   } catch {
     return [{ ...vendor(at.thread, message.method), unreadable: true }]
   }
@@ -218,7 +223,7 @@ export function projectCodex(raw: unknown): RuntimeEvent[] {
   const { root, message, reply, job } = envelope.data
   const at = { thread: threadOf(message.params, root) }
   if (reply !== undefined) {
-    return projectReply(message, reply, at)
+    return projectReply(message, reply, at, root)
   }
   if (job !== undefined && message.method === 'item/completed') {
     return projectJobEnd(message.params, job, at)

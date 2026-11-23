@@ -1,5 +1,6 @@
 import { projectCodex, type CodexJob, type CodexMessage } from '@seti/shared'
 import type { SessionMessage, SessionReport } from '../adapter.js'
+import { kept, keptMessage } from './private.js'
 import type { CodexCall } from './rpc.js'
 
 /** Reports in the order they were made, read once; it ends, or fails with the session's error. */
@@ -67,8 +68,8 @@ export function codexReport(root: string, message: CodexCall, extras: RowExtras 
   const { delivered = [], reply, job } = extras
   const raw: CodexMessage = {
     root,
-    message,
-    ...(reply === undefined ? {} : { reply }),
+    message: keptMessage(message),
+    ...(reply === undefined ? {} : { reply: kept(reply) }),
     ...(job === undefined ? {} : { job }),
   }
   const events = projectCodex(raw)
