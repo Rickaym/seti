@@ -37,6 +37,13 @@ export const journalEntry = z.discriminatedUnion('type', [
   z.object({ type: z.literal('note'), error: z.string() }),
   z.object({ type: z.literal('queued.settled'), promptId: z.int(), state: z.enum(['delivered', 'removed']) }),
   z.object({ type: z.literal('session.opened') }),
+  z.object({ type: z.literal('session.started'), warm: z.boolean() }),
+  z.object({
+    type: z.literal('rewind.settled'),
+    id: z.int(),
+    state: z.enum(['applied', 'refused']),
+    reason: z.string().nullable(),
+  }),
   z.object({ type: z.literal('session.since'), promptId: z.int() }),
   z.object({ type: z.literal('session.closed'), since: z.int().nullable() }),
   z.object({ type: z.literal('session.state'), open: z.boolean(), background: z.int().nonnegative() }),
@@ -56,6 +63,32 @@ const askSchemas = {
   'prompt.open': {
     ask: z.object({ next: nextMessage, queued: z.boolean() }),
     answer: z.object({ promptId: z.int(), text: z.string() }),
+  },
+  /** Runs what waits for the agent's process to start; the process starts after the answer. */
+  'session.opening': { ask: z.object({}), answer: z.object({}) },
+  /**
+   * What the agent's process starts from: the spec, the key of its setup and the rewind point to
+   * resume at. The spec is the control plane's and holds no secret values.
+   */
+  'session.spec': {
+    ask: z.object({}),
+    answer: z.object({
+      spec: z.unknown(),
+      key: z.string(),
+      rewind: z.object({ id: z.int(), resume_at: z.string().nullable(), drops_turn: z.string().nullable() }).nullable(),
+    }),
+  },
+  /**
+   * The key of the setup the agent's process needs now, or that a rewind waits, which needs a new
+   * process anyway. With the spec a process started from, the key is of that spec with its live
+   * settings read again.
+   */
+  'setup.key': {
+    ask: z.object({ spec: z.unknown() }),
+    answer: z.discriminatedUnion('rewind', [
+      z.object({ rewind: z.literal(true) }),
+      z.object({ rewind: z.literal(false), key: z.string() }),
+    ]),
   },
 }
 export type NodeAskType = keyof typeof askSchemas
@@ -119,6 +152,8 @@ const commandSchemas = {
   'session.open': { body: z.object({ agent }), answer: done },
   /** Ends the agent's process and waits; with `onlyIdle`, only when nothing runs in it. */
   'session.close': { body: z.object({ agent, onlyIdle: z.boolean() }), answer: z.object({ closed: z.boolean() }) },
+  /** How the MCP servers of the agent's open process connected; null when none is open. */
+  'mcp.status': { body: z.object({ agent }), answer: z.object({ servers: z.array(z.unknown()).nullable() }) },
   /** Stops one subagent or background command in the agent's open process. */
   'background.stop': { body: z.object({ agent, task: z.string().min(1) }), answer: stopped },
   /** Switches the agent's open process to a permission mode; `next_turn` when it cannot now. */

@@ -7,7 +7,11 @@ const TASK = 'task-1'
 function controlEnd(answer: ControlEnd['answer']['prompt.open']) {
   const journal = vi.fn<ControlEnd['journal']>(async () => Promise.resolve())
   const open = vi.fn(answer)
-  serveNode({ journal, answer: { 'prompt.open': open } })
+  const none = async () => Promise.reject(new Error('not asked'))
+  serveNode({
+    journal,
+    answer: { 'prompt.open': open, 'session.opening': none, 'session.spec': none, 'setup.key': none },
+  })
   return { journal, open }
 }
 
@@ -76,6 +80,7 @@ describe('control link', () => {
       'session.open': () => ({}),
       'session.close': ({ onlyIdle }) => ({ closed: !onlyIdle }),
       'background.stop': () => ({ stopped: false }),
+      'mcp.status': () => ({ servers: null }),
     }
     serveControl(end)
     await expect(controlLink.command('mode.set', { agent: TASK, mode: 'default' })).resolves.toEqual({

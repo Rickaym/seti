@@ -8,7 +8,8 @@ import { serveNode } from './node-link.js'
 import { outwardCalls } from './outward.js'
 import { markQueued } from './queued-prompts.js'
 import { mirrorSession } from './session-mirror.js'
-import { storedForm } from './session-start.js'
+import { processStarted, recordStart, settleRewind, setupAnswers } from './session-setup.js'
+import { storedForm, unstored } from './session-start.js'
 import { withTurnCost } from './store/cost.js'
 import { hadRunningSubtask } from './subtask-cache.js'
 import { publishFolded, publishSubtasks } from './subtask-prs.js'
@@ -61,6 +62,15 @@ async function record(taskId: string, m: SDKMessage): Promise<void> {
   await linkCreatedPrs(taskId, events, openQuerySince(taskId))
 }
 
+/** Stores a message of the session, unless Seti does not keep it, and notes a session's start. */
+async function storeMessage(taskId: string, m: SDKMessage): Promise<void> {
+  if (await unstored(taskId, m)) {
+    return
+  }
+  await record(taskId, m)
+  await recordStart(taskId, m)
+}
+
 async function reportEnd(taskId: string, status: TaskStatus, lastError: string | null): Promise<void> {
   await tasks.endTurn(taskId, {
     status,
@@ -89,12 +99,16 @@ type Ingest = { [T in JournalEntry['type']]: (taskId: string, entry: EntryOf<T>)
 /** What the control plane does with each entry a node reports. */
 const ingest: Ingest = {
   // The runtime adapter of the session wrote the payload.
-  message: async (taskId, { payload }) => record(taskId, payload as SDKMessage),
+  message: async (taskId, { payload }) => storeMessage(taskId, payload as SDKMessage),
   'turn.started': async (taskId) => setStatus(taskId, 'running'),
   'turn.ended': async (taskId, { status, error }) => reportEnd(taskId, status, error),
   note: async (taskId, { error }) => appendMessage(taskId, { kind: 'seti', payload: { error } }),
   'queued.settled': async (taskId, { promptId, state }) => markQueued(taskId, promptId, state),
   'session.opened': (taskId) => sessionSince.delete(taskId),
+  'session.started': (taskId, { warm }) => {
+    processStarted(taskId, warm)
+  },
+  'rewind.settled': async (_taskId, { id, state, reason }) => settleRewind(id, state, reason),
   'session.since': (taskId, { promptId }) => sessionSince.set(taskId, promptId),
   'session.closed': async (taskId, { since }) => sessionClosed(taskId, since),
   'session.state': (taskId, { open, background }) => {
@@ -117,5 +131,6 @@ serveNode({
       const { payload, text } = await promptFor(taskId, next, queued)
       return { promptId: (await appendMessage(taskId, { kind: 'prompt', payload })).id, text }
     },
+    ...setupAnswers,
   },
 })
