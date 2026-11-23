@@ -134,12 +134,14 @@ export async function openTaskProxy(taskId: string, grant: ProxyGrant): Promise<
 export const maintenanceDirOf = (taskId: string) => path.join(sandboxDirOf(taskId), 'maintenance')
 
 const modelProxies = new Map<string, Promise<EgressProxy>>()
+const modelLogins = new Map<string, string | null>()
 
 /**
  * Opens the proxy of the agent's maintenance sandbox, which reaches the model provider with the
  * agent's login and nothing else: no allowlist, connection, connector, cloud or ssh.
  */
 export async function openModelProxy(taskId: string, login: string | null): Promise<void> {
+  modelLogins.set(taskId, login)
   if (modelProxies.has(taskId)) {
     return
   }
@@ -149,7 +151,7 @@ export async function openModelProxy(taskId: string, login: string | null): Prom
     startEgressProxy({
       socketPath: path.join(run, 'proxy.sock'),
       ca: authority,
-      ...modelOnly(async () => mint(taskId, { kind: 'claude', login })),
+      ...modelOnly(async () => mint(taskId, { kind: 'claude', login: modelLogins.get(taskId) ?? null })),
     }),
   )
   modelProxies.set(taskId, started)
@@ -162,6 +164,7 @@ export async function closeTaskProxy(taskId: string): Promise<void> {
   const running = [proxies.get(taskId), modelProxies.get(taskId)]
   proxies.delete(taskId)
   modelProxies.delete(taskId)
+  modelLogins.delete(taskId)
   forgetAwsToken(taskId)
   access.delete(taskId)
   for (const proxy of running) {
