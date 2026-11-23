@@ -1,4 +1,6 @@
 import { z } from 'zod'
+import { MEMORY_EVENTS } from './memory.js'
+import { cpuScopeSchema, memoryScopeSchema } from './processes.js'
 import { TASK_STATUSES } from './tasks.js'
 
 /** An attachment of a message the node hands its session, as the agent's workspace holds it. */
@@ -26,6 +28,26 @@ const nextMessage = z.object({
   held: z.boolean().exactOptional(),
 })
 
+/** The state of an agent's session, reported each time it changes. */
+export const sessionChanged = z.object({
+  type: z.literal('session.changed'),
+  open: z.boolean(),
+  running: z.boolean(),
+  accepting: z.boolean(),
+  autoQueued: z.boolean(),
+  background: z.int().nonnegative(),
+})
+
+const memoryCap = z.object({ high_mb: z.number(), max_mb: z.number(), swap_max_mb: z.number() })
+
+/** A memory event of a scope the node started for the agent. */
+const memoryReport = z.object({
+  event: z.enum(MEMORY_EVENTS),
+  cap: memoryCap,
+  kind: memoryScopeSchema.shape.kind,
+  victims: z.object({ root: z.boolean(), names: z.array(z.string()) }).nullable(),
+})
+
 /**
  * What a node reports about one agent's session, in the order it happened. A runtime's message
  * travels as the runtime wrote it; the control plane decides what it means.
@@ -39,6 +61,7 @@ export const journalEntry = z.discriminatedUnion('type', [
   z.object({ type: z.literal('session.opened') }),
   z.object({ type: z.literal('session.started'), warm: z.boolean() }),
   z.object({ type: z.literal('guard.refused'), command: z.string(), reason: z.string() }),
+  z.object({ type: z.literal('memory.event'), report: memoryReport }),
   z.object({
     type: z.literal('rewind.settled'),
     id: z.int(),
@@ -48,14 +71,7 @@ export const journalEntry = z.discriminatedUnion('type', [
   z.object({ type: z.literal('session.since'), promptId: z.int() }),
   z.object({ type: z.literal('session.closed'), since: z.int().nullable() }),
   z.object({ type: z.literal('session.state'), open: z.boolean(), background: z.int().nonnegative() }),
-  z.object({
-    type: z.literal('session.changed'),
-    open: z.boolean(),
-    running: z.boolean(),
-    accepting: z.boolean(),
-    autoQueued: z.boolean(),
-    background: z.int().nonnegative(),
-  }),
+  sessionChanged,
 ])
 export type JournalEntry = z.infer<typeof journalEntry>
 
@@ -175,6 +191,7 @@ export type AskReply = z.infer<typeof askReply>
 
 const done = z.object({})
 const stopped = z.object({ stopped: z.boolean() })
+const cpuCap = z.object({ quota_percent: z.number().nullable() })
 
 const commandSchemas = {
   /** Hands the agent a message: it starts a turn, queues for the running one or cuts it short. */
@@ -228,6 +245,23 @@ const commandSchemas = {
    * so the next start resumes them. Answers once they ended or `graceMs` passed.
    */
   'sessions.cut': { body: z.object({ agents: z.array(agent), graceMs: z.int().nonnegative() }), answer: done },
+  /** The scopes holding the agent's processes, with what they use against their caps. */
+  'scopes.read': {
+    body: z.object({ agent }),
+    answer: z.object({ memory: z.array(memoryScopeSchema), cpu: z.array(cpuScopeSchema) }),
+  },
+  /** Whether the node runs the agent's egress proxy, which the control plane's sandboxes then use. */
+  'proxy.serving': { body: z.object({ agent }), answer: z.object({ serving: z.boolean() }) },
+  /** The agents with a live scope, whose caps a change of a default may move. */
+  'scopes.agents': { body: done, answer: z.object({ agents: z.array(agent) }) },
+  /** Moves the agents' live scopes to these caps now. */
+  'scopes.cap': {
+    body: z.object({
+      memory: z.array(z.object({ agent, cap: memoryCap })),
+      cpu: z.array(z.object({ agent, cap: cpuCap })),
+    }),
+    answer: done,
+  },
 }
 export type NodeCommandType = keyof typeof commandSchemas
 export type NodeCommand<K extends NodeCommandType> = z.infer<(typeof commandSchemas)[K]['body']>

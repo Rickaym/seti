@@ -4,8 +4,11 @@ import { audit } from './audit.js'
 import { closingLine } from './closing-line.js'
 import { linkCreatedPrs } from './created-prs.js'
 import { messages, tasks } from './db.js'
+import { reportMemoryEvent } from './memory-scope.js'
 import { serveNode } from './node-link.js'
 import { outwardCalls } from './outward.js'
+import type { Alongside } from './pg.js'
+import { openPrompt } from './prompt-open.js'
 import { markQueued } from './queued-prompts.js'
 import { mirrorSession } from './session-mirror.js'
 import { processStarted, recordStart, settleRewind, setupAnswers } from './session-setup.js'
@@ -18,7 +21,6 @@ import { publish } from './task-events.js'
 import { forgetToolCalls, trackToolCalls } from './tool-calls.js'
 import { turnAsks } from './turn-asking.js'
 import { auditRefusal, turnAnswers } from './turn-asks.js'
-import { promptFor } from './turn-prompt.js'
 
 /**
  * Called once the task stops working, with the status it ended in. A turn that a new message cut
@@ -39,8 +41,13 @@ const sessionSince = new Map<string, number>()
 /** First message of the task's open session, which may still run subagents it started. */
 export const openQuerySince = (taskId: string): number | null => sessionSince.get(taskId) ?? null
 
-export async function appendMessage(taskId: string, body: MessageBody, outward: string[] = []): Promise<MessageRow> {
-  const row = await messages.insert(taskId, body, outward)
+export async function appendMessage(
+  taskId: string,
+  body: MessageBody,
+  outward: string[] = [],
+  alongside?: Alongside,
+): Promise<MessageRow> {
+  const row = await messages.insert(taskId, body, outward, alongside)
   publish(taskId, { type: 'message', row })
   await publishFolded(taskId, openQuerySince(taskId))
   return row
@@ -112,6 +119,9 @@ const ingest: Ingest = {
     processStarted(taskId, warm)
   },
   'guard.refused': async (taskId, { command, reason }) => auditRefusal(taskId, command, reason),
+  'memory.event': (taskId, { report }) => {
+    reportMemoryEvent(taskId, report)
+  },
   'rewind.settled': async (_taskId, { id, state, reason }) => settleRewind(id, state, reason),
   'session.since': (taskId, { promptId }) => sessionSince.set(taskId, promptId),
   'session.closed': async (taskId, { since }) => sessionClosed(taskId, since),
@@ -131,10 +141,7 @@ async function journal<T extends JournalEntry['type']>(taskId: string, entry: En
 serveNode({
   journal,
   answer: {
-    'prompt.open': async (taskId, { next, queued }) => {
-      const { payload, text } = await promptFor(taskId, next, queued)
-      return { promptId: (await appendMessage(taskId, { kind: 'prompt', payload })).id, text }
-    },
+    'prompt.open': async (taskId, ask) => openPrompt(taskId, ask, appendMessage),
     ...setupAnswers,
     ...turnAnswers,
   },

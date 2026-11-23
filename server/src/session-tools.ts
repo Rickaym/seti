@@ -1,6 +1,7 @@
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js'
 import type { NodeAnswer, Task } from '@seti/shared'
+import { tasks } from './db.js'
 import { inProcessServer, type HostTool } from './runtimes/claude/tool-server.js'
 
 /**
@@ -55,13 +56,22 @@ export async function listSessionTools(task: Task): Promise<NodeAnswer<'tools.li
   return { servers }
 }
 
+/** Serves a session's tools again when this control plane restarted and its node did not. */
+async function servedAgain(taskId: string): Promise<Map<string, Client> | undefined> {
+  const task = await tasks.get(taskId)
+  if (task !== undefined) {
+    await listSessionTools(task)
+  }
+  return served.get(taskId)
+}
+
 /** Runs a tool of the task's process as the agent; a server it was never handed is refused. */
 export async function callSessionTool(
   taskId: string,
   call: { server: string; tool: string; args: Record<string, unknown> },
   signal: AbortSignal,
 ): Promise<NodeAnswer<'tool.call'>> {
-  const client = served.get(taskId)?.get(call.server)
+  const client = (served.get(taskId) ?? (await servedAgain(taskId)))?.get(call.server)
   if (client === undefined) {
     throw new Error(`The ${call.server} MCP server is not open for this agent; it opens with its next session.`)
   }

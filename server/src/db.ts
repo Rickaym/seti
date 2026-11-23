@@ -20,7 +20,7 @@ import {
 import { DATABASE_URL } from './config.js'
 import { messageColumns } from './events/columns.js'
 import { pickAgentColor } from './new-agent-color.js'
-import { connect, ensureDatabase, migrate, type Db } from './pg.js'
+import { connect, ensureDatabase, migrate, written, type Alongside, type Db } from './pg.js'
 import { scrubValue } from './scrub.js'
 import { eventFilters } from './store/event-filters.js'
 import { readBody, readOutward, readPayload, readStoredBody, storedJson } from './stored-rows.js'
@@ -344,11 +344,11 @@ const TURN_ENDING_ROWS = 40
 export const rowFilter = eventFilters(sql)
 
 export const messages = {
-  insert: async (taskId: string, body: MessageBody, outward: string[]): Promise<MessageRow> => {
-    const created_at = now()
-    const id = await insertMessage(sql, { taskId, body, outward, createdAt: created_at })
+  insert: async (taskId: string, body: MessageBody, outward: string[], alongside?: Alongside): Promise<MessageRow> => {
+    const createdAt = now()
+    const id = await written(sql, async (db) => insertMessage(db, { taskId, body, outward, createdAt }), alongside)
     const read = readBody({ task_id: taskId, id }, body.kind, scrubValue(body.payload))
-    return { ...read, id, task_id: taskId, outward, created_at }
+    return { ...read, id, task_id: taskId, outward, created_at: createdAt }
   },
   /** The first `limit` of the task's rows after `afterId`, own or not. */
   firstAfter: async (taskId: string, afterId: number, limit: number) =>

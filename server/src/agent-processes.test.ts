@@ -12,7 +12,11 @@ import { backgroundResult, shellCall, shellStarted } from './shell-fixtures.js'
 
 const TASK = 'processes-task'
 const OTHER = 'processes-other'
-const host = { proc: new Proc(), serverPid: process.pid }
+const host = {
+  proc: new Proc(),
+  parents: () => [process.pid],
+  scopes: async () => Promise.resolve({ memory: [], cpu: [] }),
+}
 const spawned: ChildProcess[] = []
 
 /** A stand-in for Claude Code: a child of this process that names the task in its environment. */
@@ -214,7 +218,11 @@ describe('a /proc without children files', () => {
     fixture({ pid: 13, comm: 'npm exec mcp', ppid: 10, argv: ['npm', 'exec', 'mcp-server'] })
     fixture({ pid: 14, comm: 'zsh', ppid: 10, state: 'Z', argv: [] })
     fixture({ pid: 20, comm: 'claude', ppid: 1, argv: ['claude'], env: 'SETI_TASK_ID=other\0' })
-    const { view } = await readProcesses('fixture', null, { proc: new Proc(root), serverPid: 1 })
+    const { view } = await readProcesses('fixture', null, {
+      proc: new Proc(root),
+      parents: () => [1],
+      scopes: async () => Promise.resolve({ memory: [], cpu: [] }),
+    })
     expect(view.processes.map((p) => [p.pid, p.kind, p.depth])).toEqual([
       [10, 'agent', 0],
       [11, 'command', 1],
