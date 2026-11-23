@@ -78,6 +78,9 @@ export class NodeClient {
         this.send(frame)
       },
       end.cursors.save,
+      () => {
+        this.close()
+      },
     )
     this.ledger = new AskLedger(end.answer)
   }
@@ -101,6 +104,10 @@ export class NodeClient {
    * applies an entry cannot wait for entries that may need it, and calls `settled` after.
    */
   async command(type: NodeCommandType, body: unknown): Promise<unknown> {
+    const halted = this.inbox.halted
+    if (halted !== null) {
+      throw new Error(`Seti stopped taking its node's reports and needs a restart: ${halted.message}`)
+    }
     if (!this.welcomed) {
       throw new Error('The node is not connected; Seti retries the link.')
     }
