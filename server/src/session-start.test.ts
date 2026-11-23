@@ -1,6 +1,6 @@
 import type { SDKMessage } from '@anthropic-ai/claude-agent-sdk'
 import { describe, expect, it } from 'vitest'
-import { storedForm } from './session-start.js'
+import { storedForm } from './runtimes/claude/reports.js'
 import { migrateWith } from './test-migration.js'
 
 const init = {
