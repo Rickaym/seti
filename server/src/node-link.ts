@@ -1,5 +1,7 @@
+import { AsyncLocalStorage } from 'node:async_hooks'
 import {
   journalEntry,
+  type AskFrame,
   NODE_ASKS,
   NODE_COMMANDS,
   type JournalEntry,
@@ -17,6 +19,11 @@ export interface ControlEnd {
   /** Answers an ask; `signal` aborts once the node stops waiting for the answer. */
   answer: { [K in NodeAskType]: (taskId: string, ask: NodeAsk<K>, signal: AbortSignal) => Promise<NodeAnswer<K>> }
 }
+
+const answering = new AsyncLocalStorage<string>()
+
+/** The id of the node's ask being answered, or null for an ask made in this process. */
+export const askBeingAnswered = (): string | null => answering.getStore() ?? null
 
 /** The signal of an ask the node waits on until it is answered. */
 const UNTIL_ANSWERED = new AbortController().signal
@@ -75,9 +82,12 @@ export const nodeLink = {
     }
     return schemas.answer.parse(await remoteControl.ask(taskId, type, schemas.ask.parse(ask), signal))
   },
-  /** Answers an ask a node sent over the socket, checking it as an ask made here. */
-  answer: async (taskId: string, type: NodeAskType, ask: unknown, signal: AbortSignal): Promise<unknown> =>
-    answerHere(taskId, type, ask, signal),
+  /**
+   * Answers an ask a node sent over the socket, checking it as an ask made here. A request the
+   * answer records for the user takes the ask's id, so the same ask sent again finds it.
+   */
+  answer: async ({ id, agent, ask, body }: AskFrame, signal: AbortSignal): Promise<unknown> =>
+    answering.run(id, async () => answerHere(agent, ask, body, signal)),
 }
 
 /** What a node does for each command of the control plane. */

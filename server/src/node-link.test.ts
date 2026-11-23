@@ -96,6 +96,7 @@ describe('control link', () => {
       'mcp.status': () => ({ servers: null }),
       'scopes.read': () => ({ memory: [], cpu: [] }),
       'scopes.agents': () => ({ agents: [TASK] }),
+      'proxy.serving': () => ({ serving: false }),
       'scopes.cap': () => ({}),
     }
     serveControl(end)
