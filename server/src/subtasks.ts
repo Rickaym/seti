@@ -1,22 +1,20 @@
-import type { SDKAssistantMessage, SDKMessage, SDKUserMessage } from '@anthropic-ai/claude-agent-sdk'
-import type { MessageRow, Subtask, SubtaskBrief, SubtaskProgress, SubtaskStatus, SubtaskUsage } from '@seti/shared'
+import type {
+  JobUsage,
+  MessageRow,
+  RuntimeEvent,
+  Subtask,
+  SubtaskBrief,
+  SubtaskProgress,
+  SubtaskStatus,
+  SubtaskUsage,
+  ToolCall,
+} from '@seti/shared'
+import { rowEvents, type Of } from './events/read.js'
 import { trimText } from './transcript.js'
 
-type AssistantBlock = SDKAssistantMessage['message']['content'][number]
-type ToolUseBlock = Extract<AssistantBlock, { type: 'tool_use' }>
-type UserBlock = Exclude<SDKUserMessage['message']['content'], string>[number]
-type ToolResultBlock = Extract<UserBlock, { type: 'tool_result' }>
-type SystemMessage = Extract<SDKMessage, { type: 'system' }>
-type TaskMessage = Extract<
-  SystemMessage,
-  { subtype: 'task_started' | 'task_progress' | 'task_updated' | 'task_notification' }
->
-type Of<S extends TaskMessage['subtype']> = Extract<TaskMessage, { subtype: S }>
+type JobEvent = Of<'job.started'> | Of<'job.progress'> | Of<'job.updated'> | Of<'job.ended'>
 
-/** Tool names that start a subagent; older Claude Code versions call it Task. */
-const AGENT_TOOLS = new Set(['Agent', 'Task'])
 const SUMMARY_CHARS = 200
-const LAUNCHED = /^(Async|Remote) agent launched/
 
 type Ended = Exclude<SubtaskStatus, 'running' | 'unknown'>
 
@@ -31,7 +29,7 @@ interface Draft {
   prompt: string
   background: boolean
   ended: Ended | null
-  /** The SDK reported on it while Seti ran it, so a query that closed without an outcome ended it. */
+  /** The runtime reported on it while Seti ran it, so a query closed without an outcome ended it. */
   live: boolean
   /** Id of the message that last started or resumed it. */
   since: number
@@ -44,71 +42,30 @@ interface Draft {
 
 type Patch = Partial<Draft>
 
-function field(value: unknown, key: string): unknown {
-  return typeof value === 'object' && value !== null ? (value as Record<string, unknown>)[key] : undefined
-}
-
-function text(value: unknown, key: string): string | null {
-  const found = field(value, key)
-  return typeof found === 'string' && found.trim() !== '' ? found : null
-}
-
-function count(value: unknown, key: string): number | null {
-  const found = field(value, key)
-  return typeof found === 'number' && Number.isFinite(found) ? found : null
-}
-
-function resultText(block: ToolResultBlock): string {
-  const { content } = block
-  if (content === undefined) {
-    return ''
-  }
-  if (typeof content === 'string') {
-    return content
-  }
-  return content
-    .flatMap((part) => (part.type === 'text' && !part.text.startsWith('agentId:') ? [part.text] : []))
-    .join('\n')
-}
-
-/** The final report the structured Agent output carries, without the model-directed trailer. */
-function reportText(output: unknown): string | null {
-  const content = field(output, 'content')
-  if (!Array.isArray(content)) {
-    return null
-  }
-  const parts = content.flatMap((part: unknown) => {
-    const value = text(part, 'text')
-    return value === null ? [] : [value]
-  })
-  return parts.length === 0 ? null : parts.join('\n')
-}
-
-function outputUsage(output: unknown): SubtaskUsage | null {
-  const tokens = count(output, 'totalTokens')
-  if (tokens === null) {
-    return null
-  }
-  return {
-    total_tokens: tokens,
-    tool_uses: count(output, 'totalToolUseCount') ?? 0,
-    duration_ms: count(output, 'totalDurationMs') ?? 0,
-  }
-}
+const usageOf = (usage: JobUsage): SubtaskUsage => ({
+  total_tokens: usage.tokens,
+  tool_uses: usage.toolUses,
+  duration_ms: usage.durationMs,
+})
 
 const resumed = (row: MessageRow): Patch => ({ ended: null, ended_at: null, since: row.id })
 
-function newDraft(row: MessageRow, block: ToolUseBlock, parent: string | null): Draft {
+function newDraft(
+  row: MessageRow,
+  call: ToolCall,
+  subagent: NonNullable<ToolCall['subagent']>,
+  parent: string | null,
+): Draft {
   return {
-    tool_use_id: block.id,
+    tool_use_id: call.callId,
     tool_use_ids: [],
     parent_tool_use_id: parent,
     message_id: row.id,
     sdk_task_id: null,
-    description: text(block.input, 'description') ?? 'Subagent',
-    subagent_type: text(block.input, 'subagent_type'),
-    prompt: text(block.input, 'prompt') ?? '',
-    background: field(block.input, 'run_in_background') === true,
+    description: subagent.label,
+    subagent_type: subagent.agentType ?? null,
+    prompt: subagent.prompt ?? '',
+    background: subagent.background === true,
     ended: null,
     live: false,
     since: row.id,
@@ -120,76 +77,72 @@ function newDraft(row: MessageRow, block: ToolUseBlock, parent: string | null): 
   }
 }
 
-/** What the Agent call's own tool result says: launched in the background, failed, or finished. */
-function agentResultPatch(draft: Draft, row: MessageRow, block: ToolResultBlock, output: unknown): Patch {
-  const body = resultText(block)
-  const status = field(output, 'status')
-  if (status === 'async_launched' || status === 'remote_launched' || LAUNCHED.test(body)) {
+/** What the subagent call's own result says: launched in the background, failed, or finished. */
+function agentResultPatch(draft: Draft, row: MessageRow, event: Of<'tool.ended'>): Patch {
+  const { result } = event
+  const body = result.agent?.text ?? result.text
+  if (result.job !== undefined) {
     return { background: true }
   }
-  if (block.is_error === true) {
+  if (event.status === 'error') {
     return { result: body, ended: 'failed', ended_at: row.created_at }
   }
-  if (status !== 'completed' && draft.background) {
+  if (result.agent?.done !== true && draft.background) {
     return {}
   }
-  const usage = outputUsage(output) ?? draft.usage
-  return { result: reportText(output) ?? body, usage, ended: 'completed', ended_at: row.created_at }
+  const usage = result.agent?.usage === undefined ? draft.usage : usageOf(result.agent.usage)
+  return { result: result.agent?.report ?? body, usage, ended: 'completed', ended_at: row.created_at }
 }
 
-const agentIdOf = (block: ToolResultBlock, output: unknown) =>
-  text(output, 'agentId') ?? /agentId: (\w+)/.exec(resultText(block))?.[1] ?? null
-
-const startedPatch = (draft: Draft, row: MessageRow, m: Of<'task_started'>): Patch => ({
+const startedPatch = (draft: Draft, row: MessageRow, event: Of<'job.started'>): Patch => ({
   ...resumed(row),
-  background: m.is_backgrounded ?? draft.background,
-  subagent_type: draft.subagent_type ?? m.subagent_type ?? null,
+  background: event.background ?? draft.background,
+  subagent_type: draft.subagent_type ?? event.agentType ?? null,
 })
 
-const progressPatch = (m: Of<'task_progress'>): Patch => ({
-  progress: { description: m.description, last_tool: m.last_tool_name ?? null, summary: m.summary ?? null },
-  usage: m.usage,
+const progressPatch = (event: Of<'job.progress'>): Patch => ({
+  progress: { description: event.label, last_tool: event.lastTool ?? null, summary: event.summary ?? null },
+  usage: usageOf(event.usage),
 })
 
 const ENDED_BY_PATCH: Partial<Record<string, Ended>> = { completed: 'completed', failed: 'failed', killed: 'stopped' }
 
-function updatedPatch(draft: Draft, row: MessageRow, m: Of<'task_updated'>): Patch {
-  const background = m.patch.is_backgrounded ?? draft.background
-  const ended = ENDED_BY_PATCH[m.patch.status ?? '']
+function updatedPatch(draft: Draft, row: MessageRow, event: Of<'job.updated'>): Patch {
+  const background = event.background ?? draft.background
+  const ended = ENDED_BY_PATCH[event.status ?? '']
   if (ended === undefined || draft.ended !== null) {
     return { background }
   }
-  const at = m.patch.end_time === undefined ? row.created_at : new Date(m.patch.end_time).toISOString()
-  return { background, ended, ended_at: at, result: draft.result ?? m.patch.error ?? null }
+  return { background, ended, ended_at: event.endedAt ?? row.created_at, result: draft.result ?? event.error ?? null }
 }
 
-const notificationPatch = (draft: Draft, row: MessageRow, m: Of<'task_notification'>): Patch => ({
-  ended: m.status,
+const endedPatch = (draft: Draft, row: MessageRow, event: Of<'job.ended'>): Patch => ({
+  ended: event.status,
   ended_at: row.created_at,
-  result: m.summary.trim() === '' ? draft.result : m.summary,
-  usage: m.usage ?? draft.usage,
+  result: event.summary.trim() === '' ? draft.result : event.summary,
+  usage: event.usage === undefined ? draft.usage : usageOf(event.usage),
 })
 
-function taskPatch(draft: Draft, row: MessageRow, m: TaskMessage): Patch {
-  switch (m.subtype) {
-    case 'task_started':
-      return startedPatch(draft, row, m)
-    case 'task_progress':
-      return progressPatch(m)
-    case 'task_updated':
-      return updatedPatch(draft, row, m)
-    case 'task_notification':
-      return notificationPatch(draft, row, m)
+function jobPatch(draft: Draft, row: MessageRow, event: JobEvent): Patch {
+  switch (event.type) {
+    case 'job.started':
+      return startedPatch(draft, row, event)
+    case 'job.progress':
+      return progressPatch(event)
+    case 'job.updated':
+      return updatedPatch(draft, row, event)
+    case 'job.ended':
+      return endedPatch(draft, row, event)
   }
 }
 
-const isTaskMessage = (m: SystemMessage): m is TaskMessage =>
-  m.subtype === 'task_started' ||
-  m.subtype === 'task_progress' ||
-  m.subtype === 'task_updated' ||
-  m.subtype === 'task_notification'
+const isJob = (event: RuntimeEvent): event is JobEvent =>
+  event.type === 'job.started' ||
+  event.type === 'job.progress' ||
+  event.type === 'job.updated' ||
+  event.type === 'job.ended'
 
-const toolUseOf = (m: TaskMessage) => (m.subtype === 'task_updated' ? undefined : m.tool_use_id)
+const callOf = (event: JobEvent): string | null => (event.type === 'job.updated' ? null : event.callId)
 
 function firstLine(value: string | null): string | null {
   const line = value
@@ -234,8 +187,8 @@ function briefOf(draft: Draft, openSince: number | null): SubtaskBrief {
 }
 
 /**
- * The subtasks of one task, folded from its messages in id order. Each Agent tool call is one;
- * task events and tool results about other tools, such as background Bash commands, are ignored.
+ * The subtasks of one task, folded from its messages in id order. Each subagent call is one; job
+ * events and tool results about other calls, such as background shell commands, are ignored.
  */
 export class SubtaskIndex {
   lastId = 0
@@ -251,17 +204,11 @@ export class SubtaskIndex {
       return false
     }
     this.lastId = row.id
-    if (row.kind !== 'sdk') {
-      return false
+    let changed = false
+    for (const event of rowEvents(row)) {
+      changed = this.applyEvent(row, event) || changed
     }
-    const m = row.payload
-    if (m.type === 'assistant') {
-      return this.applyAssistant(row, m)
-    }
-    if (m.type === 'user') {
-      return this.applyUser(row, m)
-    }
-    return m.type === 'system' && isTaskMessage(m) ? this.applyTask(row, m) : false
+    return changed
   }
 
   /**
@@ -289,74 +236,70 @@ export class SubtaskIndex {
     }
   }
 
-  private start(row: MessageRow, block: ToolUseBlock, parent: string | null): boolean {
-    if (this.byCall.has(block.id)) {
+  private applyEvent(row: MessageRow, event: RuntimeEvent): boolean {
+    if (event.type === 'tool.started') {
+      return this.applyCall(row, event)
+    }
+    if (event.type === 'tool.ended') {
+      return this.applyEnd(row, event)
+    }
+    return isJob(event) && this.applyJob(row, event)
+  }
+
+  private start(row: MessageRow, call: ToolCall, subagent: NonNullable<ToolCall['subagent']>, thread: string): boolean {
+    if (this.byCall.has(call.callId)) {
       return false
     }
-    const draft = newDraft(row, block, parent === null ? null : (this.byCall.get(parent)?.tool_use_id ?? parent))
-    this.alias(draft, block.id)
-    const name = text(block.input, 'name')
-    if (name !== null) {
-      this.byAgent.set(name, draft)
+    const parent = thread === '' ? null : (this.byCall.get(thread)?.tool_use_id ?? thread)
+    const draft = newDraft(row, call, subagent, parent)
+    this.alias(draft, call.callId)
+    if (subagent.name !== undefined) {
+      this.byAgent.set(subagent.name, draft)
     }
     this.drafts.push(draft)
     return true
   }
 
-  private applyAssistant(row: MessageRow, m: SDKAssistantMessage): boolean {
-    let changed = false
-    for (const block of m.message.content) {
-      if (block.type !== 'tool_use') {
-        continue
-      }
-      if (AGENT_TOOLS.has(block.name)) {
-        changed = this.start(row, block, m.parent_tool_use_id) || changed
-        continue
-      }
-      const target = block.name === 'SendMessage' ? this.byAgent.get(text(block.input, 'to') ?? '') : undefined
-      if (target) {
-        this.alias(target, block.id)
-        changed = true
-      }
+  private applyCall(row: MessageRow, { call, thread }: Of<'tool.started'>): boolean {
+    if (call.subagent !== undefined) {
+      return this.start(row, call, call.subagent, thread)
     }
-    return changed
-  }
-
-  private applyUser(row: MessageRow, m: SDKUserMessage): boolean {
-    if (typeof m.message.content === 'string') {
+    const target = call.send === undefined ? undefined : this.byAgent.get(call.send.to)
+    if (target === undefined) {
       return false
     }
-    let changed = false
-    for (const block of m.message.content) {
-      const draft = block.type === 'tool_result' ? this.byCall.get(block.tool_use_id) : undefined
-      if (block.type !== 'tool_result' || draft === undefined) {
-        continue
-      }
-      changed = true
-      if (draft.tool_use_id === block.tool_use_id) {
-        const agentId = agentIdOf(block, m.tool_use_result)
-        if (agentId !== null) {
-          this.byAgent.set(agentId, draft)
-        }
-        Object.assign(draft, agentResultPatch(draft, row, block, m.tool_use_result))
-      } else if (block.is_error !== true) {
-        Object.assign(draft, resumed(row))
-      }
-    }
-    return changed
+    this.alias(target, call.callId)
+    return true
   }
 
-  private applyTask(row: MessageRow, m: TaskMessage): boolean {
-    const toolUseId = toolUseOf(m)
-    const draft = (toolUseId === undefined ? undefined : this.byCall.get(toolUseId)) ?? this.byAgent.get(m.task_id)
+  private applyEnd(row: MessageRow, event: Of<'tool.ended'>): boolean {
+    const draft = this.byCall.get(event.callId)
+    if (draft === undefined) {
+      return false
+    }
+    if (draft.tool_use_id === event.callId) {
+      const agentId = event.result.agent?.id
+      if (agentId !== undefined) {
+        this.byAgent.set(agentId, draft)
+      }
+      Object.assign(draft, agentResultPatch(draft, row, event))
+    } else if (event.status !== 'error') {
+      Object.assign(draft, resumed(row))
+    }
+    return true
+  }
+
+  private applyJob(row: MessageRow, event: JobEvent): boolean {
+    const callId = callOf(event)
+    const draft = (callId === null ? undefined : this.byCall.get(callId)) ?? this.byAgent.get(event.jobId)
     if (!draft) {
       return false
     }
-    this.byAgent.set(m.task_id, draft)
-    if (m.subtype === 'task_started' && toolUseId !== undefined) {
-      this.alias(draft, toolUseId)
+    this.byAgent.set(event.jobId, draft)
+    if (event.type === 'job.started' && callId !== null) {
+      this.alias(draft, callId)
     }
-    Object.assign(draft, { live: true, sdk_task_id: m.task_id }, taskPatch(draft, row, m))
+    Object.assign(draft, { live: true, sdk_task_id: event.jobId }, jobPatch(draft, row, event))
     return true
   }
 }

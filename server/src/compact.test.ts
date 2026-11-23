@@ -6,6 +6,7 @@ import {
   COMPACT_DEFAULTS,
   COMPACT_TEMPLATE,
   compactedAtPct,
+  compactedWithin,
   type CompactRule,
   type CompactSettings,
   type Task,
@@ -146,6 +147,8 @@ describe('a compact boundary', () => {
   it('keeps the context window it was measured against, for how full it was', async () => {
     const stored = await withContextWindow(boundary, async () => Promise.resolve(200_000))
     expect(compactedAtPct(stored, boundary.compact_metadata.pre_tokens)).toBe(82)
+    expect(compactedWithin(200_000, boundary.compact_metadata.pre_tokens)).toBe(' at 82%')
+    expect(compactedWithin(undefined, boundary.compact_metadata.pre_tokens)).toBe('')
   })
 
   it('is stored as it came when the window is unknown, and other messages never ask', async () => {

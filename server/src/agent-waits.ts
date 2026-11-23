@@ -1,10 +1,11 @@
-import type { AgentInput, AgentInputKind, Task, TaskStatus } from '@seti/shared'
+import type { AgentInput, AgentInputKind, MessageRow, Task, TaskStatus } from '@seti/shared'
 import { currentRequestSource } from './access.js'
 import { refuseArchived } from './archive-guard.js'
 import { audit } from './audit.js'
 import { inBackground } from './background.js'
 import { messages, now, tasks } from './db.js'
 import { noticeAwaitedTurn } from './ea-turn-watch.js'
+import { agentTexts, rowEvents } from './events/read.js'
 import { HttpError } from './http.js'
 import { deliverInputs } from './inputs.js'
 import { agentWaits, type AgentWait } from './store/agent-waits.js'
@@ -68,10 +69,7 @@ export async function awaitTurnEnd(target: Task, ready?: WaiterId): Promise<Agen
 /** Drops a wait set up for a message that could not be sent. */
 export const dropWait = async (wait: AgentWait) => agentWaits.remove(wait.id)
 
-const textOf = (row: Awaited<ReturnType<typeof messages.page>>['messages'][number]) =>
-  row.kind === 'sdk' && row.payload.type === 'assistant' && row.payload.parent_tool_use_id === null
-    ? row.payload.message.content.flatMap((block) => (block.type === 'text' ? [block.text] : [])).join('\n')
-    : ''
+const textOf = (row: MessageRow) => agentTexts(rowEvents(row)).join('\n')
 
 /** The agent's last words of its own, cut to a size an update can carry. */
 async function finalMessage(taskId: string): Promise<string> {
