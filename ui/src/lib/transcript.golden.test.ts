@@ -48,8 +48,8 @@ function groups(rows: readonly MessageRow[], subagentRows: boolean) {
 
 const calls = (rows: readonly MessageRow[]) =>
   rows.flatMap(rowCalls).map((call) => ({
-    id: call.id,
-    kind: toolKind(call.name),
+    id: call.callId,
+    kind: toolKind(call),
     name: toolName(call.name),
     summary: toolSummary(call),
     command: commandLine(call) ?? null,
@@ -58,8 +58,8 @@ const calls = (rows: readonly MessageRow[]) =>
 
 const results = (rows: readonly MessageRow[]) =>
   rows.flatMap(rowResults).map((ref) => {
-    const text = resultText(ref.block.content)
-    return { id: ref.block.tool_use_id, row: ref.rowId, exit: exitCode(text), refusals: refusals(text) }
+    const text = resultText(ref)
+    return { id: ref.callId, row: ref.rowId, exit: exitCode(text), refusals: refusals(text) }
   })
 
 /** What the browser's transcript readers make of one transcript: what shows, how, and grouped how. */
@@ -75,7 +75,7 @@ function render({ rows }: GoldenTranscript) {
     groups: groups(rows, false),
     subagentGroups: groups(rows, true),
     calls: calls(rows),
-    label: groupLabel(rows.flatMap(rowCalls).map((call) => call.name)),
+    label: groupLabel(rows.flatMap(rowCalls)),
     results: results(rows),
     compactingSince: rows.map((_, end) => compactingSince(rows.slice(0, end + 1), true)),
     compactFailures: rows.flatMap((row) => (compactFailure(row) === null ? [] : [[row.id, compactFailure(row)]])),

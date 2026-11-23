@@ -1,4 +1,3 @@
-import type { SDKAssistantMessage, SDKUserMessage } from '@anthropic-ai/claude-agent-sdk'
 import {
   SHELL_CONTEXT_RUNS,
   eventsOf,
@@ -8,16 +7,18 @@ import {
   type EventOf,
   type MessageRow,
   type RuntimeEvent,
+  type ToolCall,
+  type ToolResult,
 } from '@seti/shared'
 
-type AssistantBlock = SDKAssistantMessage['message']['content'][number]
-export type ToolUseBlock = Extract<AssistantBlock, { type: 'tool_use' }>
-type UserBlock = Exclude<SDKUserMessage['message']['content'], string>[number]
-type ToolResultBlock = Extract<UserBlock, { type: 'tool_result' }>
+/** A tool call as the transcript shows it. */
+export type ToolUseBlock = ToolCall
 
 /** A tool result and the stored message it came from, which holds it in full. */
 export interface ToolResultRef {
-  block: ToolResultBlock
+  callId: string
+  failed: boolean
+  result: ToolResult
   rowId: number
   /** When the result arrived, which ends the call's duration. */
   at: string
@@ -49,51 +50,37 @@ const NO_CALLS: readonly ToolUseBlock[] = []
 const resultCache = new WeakMap<MessageRow, readonly ToolResultRef[]>()
 const callCache = new WeakMap<MessageRow, readonly ToolUseBlock[]>()
 
-const isToolUse = (block: AssistantBlock): block is ToolUseBlock => block.type === 'tool_use'
-
-/** Reads a row's blocks; a malformed row reads as none, so it cannot break the rows around it. */
-function tolerant<T>(read: () => readonly T[], none: readonly T[]): readonly T[] {
-  try {
-    return read()
-  } catch {
-    return none
-  }
-}
-
 /** Tool results in a row, cached per row object so memoized rows get stable references. */
 export function rowResults(row: MessageRow): readonly ToolResultRef[] {
-  if (row.kind !== 'sdk' || row.payload.type !== 'user' || typeof row.payload.message.content === 'string') {
-    return NO_RESULTS
-  }
   const cached = resultCache.get(row)
   if (cached) {
     return cached
   }
   const trimmed = new Set(row.trimmed)
-  const { content } = row.payload.message
-  const refs = tolerant(
-    () =>
-      content.flatMap((block) =>
-        block.type === 'tool_result'
-          ? [{ block, rowId: row.id, at: row.created_at, trimmed: trimmed.has(block.tool_use_id) }]
-          : [],
-      ),
-    NO_RESULTS,
-  )
+  const ends = eventsOf(rowEvents(row), 'tool.ended')
+  const refs =
+    ends.length === 0
+      ? NO_RESULTS
+      : ends.map((end) => ({
+          callId: end.callId,
+          failed: end.status !== 'ok',
+          result: end.result,
+          rowId: row.id,
+          at: row.created_at,
+          trimmed: trimmed.has(end.callId),
+        }))
   resultCache.set(row, refs)
   return refs
 }
 
+/** Tool calls in a row, cached per row object so memoized rows get stable references. */
 export function rowCalls(row: MessageRow): readonly ToolUseBlock[] {
-  if (row.kind !== 'sdk' || row.payload.type !== 'assistant') {
-    return NO_CALLS
-  }
   const cached = callCache.get(row)
   if (cached) {
     return cached
   }
-  const { message } = row.payload
-  const calls = tolerant(() => message.content.filter(isToolUse), NO_CALLS)
+  const starts = eventsOf(rowEvents(row), 'tool.started')
+  const calls = starts.length === 0 ? NO_CALLS : starts.map((start) => start.call)
   callCache.set(row, calls)
   return calls
 }
@@ -141,10 +128,10 @@ export function indexTranscript(rows: readonly MessageRow[]): TranscriptIndex {
       }
     }
     for (const ref of rowResults(row)) {
-      results.set(ref.block.tool_use_id, ref)
+      results.set(ref.callId, ref)
     }
     for (const call of rowCalls(row)) {
-      calls.add(call.id)
+      calls.add(call.callId)
     }
   }
   return { results, calls, hiddenInits, background }
@@ -262,24 +249,18 @@ export function replaceRow(rows: readonly MessageRow[], row: MessageRow): readon
   return index < 0 ? rows : rows.with(index, row)
 }
 
-export function resultText(content: ToolResultBlock['content']): string {
-  if (content === undefined) {
-    return ''
-  }
-  if (typeof content === 'string') {
-    return content
-  }
-  return content.map((block) => (block.type === 'text' ? block.text : `[${block.type}]`)).join('\n')
-}
+/** A result's text as the transcript shows it, with a marker for each part that is not text. */
+export const resultText = (ref: Pick<ToolResultRef, 'result'> | undefined): string =>
+  ref === undefined ? '' : (ref.result.shown ?? ref.result.text)
 
 export const fullResultText = (row: MessageRow, toolUseId: string) =>
-  resultText(rowResults(row).find((ref) => ref.block.tool_use_id === toolUseId)?.block.content)
+  resultText(rowResults(row).find((ref) => ref.callId === toolUseId))
 
 export const fullInputText = (row: MessageRow, toolUseId: string) =>
-  JSON.stringify(rowCalls(row).find((call) => call.id === toolUseId)?.input, null, 2)
+  JSON.stringify(rowCalls(row).find((call) => call.callId === toolUseId)?.input, null, 2)
 
 export const fullCommandText = (row: MessageRow, toolUseId: string) =>
-  inputString(rowCalls(row).find((call) => call.id === toolUseId)?.input, 'command') ?? ''
+  inputString(rowCalls(row).find((call) => call.callId === toolUseId)?.input, 'command') ?? ''
 
 /** A prompt the agent reads with what waited for it: not a slash command, not taken back. */
 const readsPending = (row: MessageRow) =>

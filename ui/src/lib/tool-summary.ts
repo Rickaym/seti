@@ -1,38 +1,36 @@
-import { sandboxViolations, WEBFETCH_BLOCKED } from '@seti/shared'
+import { sandboxViolations, WEBFETCH_BLOCKED, type ToolCall, type ToolKind as NeutralKind } from '@seti/shared'
 import { elapsedLabel } from '@/lib/time'
-import { inputString, type ToolUseBlock } from '@/lib/transcript'
+import { inputString } from '@/lib/transcript'
 
 /** What a tool does, for its icon and for the words of a group's label. */
 export type ToolKind = 'command' | 'monitor' | 'read' | 'edit' | 'search' | 'web' | 'agent' | 'todo' | 'mcp' | 'other'
 
-const KINDS: Partial<Record<string, ToolKind>> = {
-  Bash: 'command',
-  BashOutput: 'command',
-  KillBash: 'command',
-  KillShell: 'command',
-  Monitor: 'monitor',
-  Read: 'read',
-  NotebookRead: 'read',
-  Write: 'edit',
-  Edit: 'edit',
-  MultiEdit: 'edit',
-  NotebookEdit: 'edit',
-  Grep: 'search',
-  Glob: 'search',
-  ToolSearch: 'search',
-  WebSearch: 'search',
-  WebFetch: 'web',
-  Agent: 'agent',
-  Task: 'agent',
-  TodoWrite: 'todo',
-  TaskCreate: 'todo',
-  TaskUpdate: 'todo',
-  TaskList: 'todo',
-  TaskGet: 'todo',
+const KINDS: Record<NeutralKind, ToolKind> = {
+  shell: 'command',
+  read: 'read',
+  edit: 'edit',
+  search: 'search',
+  web: 'web',
+  mcp: 'mcp',
+  subagent: 'agent',
+  question: 'other',
+  plan: 'todo',
+  think: 'other',
+  other: 'other',
 }
 
-export function toolKind(name: string): ToolKind {
-  return KINDS[name] ?? (name.startsWith('mcp__') ? 'mcp' : 'other')
+/** The icon kind of a call: a watched command, a web search and a plan proposal read apart. */
+export function toolKind(call: ToolCall): ToolKind {
+  if (call.shell?.action === 'watch') {
+    return 'monitor'
+  }
+  if (call.web !== undefined && call.web.url === undefined && call.web.query !== undefined) {
+    return 'search'
+  }
+  if (call.plan?.proposal !== undefined) {
+    return 'other'
+  }
+  return KINDS[call.kind]
 }
 
 /** A tool's short name, and the MCP server it comes from when it has one. */
@@ -148,12 +146,12 @@ const SUMMARIES: Record<ToolKind, (field: Field, input: unknown) => string> = {
 }
 
 /** One short line saying what a call does: its description, file, pattern or first command line. */
-export const toolSummary = (block: ToolUseBlock): string =>
-  oneLine(SUMMARIES[toolKind(block.name)]((key) => inputString(block.input, key), block.input))
+export const toolSummary = (call: ToolCall): string =>
+  oneLine(SUMMARIES[toolKind(call)]((key) => inputString(call.input, key), call.input))
 
 /** The command line behind a summary that shows a description instead, for hover text. */
-export function commandLine(block: ToolUseBlock): string | undefined {
-  const command = inputString(block.input, 'command')
+export function commandLine(call: ToolCall): string | undefined {
+  const command = inputString(call.input, 'command')
   return command === undefined ? undefined : commandSummary(command)
 }
 
@@ -179,10 +177,10 @@ const LABELS: Record<ToolKind, [one: string, many: string]> = {
 }
 
 /** What a run of calls did, by kind in order of first use: "Ran 4 commands, read 2 files". */
-export function groupLabel(names: readonly string[]): string {
+export function groupLabel(calls: readonly ToolCall[]): string {
   const counts = new Map<ToolKind, number>()
-  for (const name of names) {
-    const kind = toolKind(name)
+  for (const call of calls) {
+    const kind = toolKind(call)
     counts.set(kind, (counts.get(kind) ?? 0) + 1)
   }
   const text = [...counts]
@@ -202,12 +200,12 @@ export interface KindTally {
 }
 
 /** Tallies a run of calls by kind in order of first use, for one icon per kind. */
-export function kindTallies(calls: readonly { name: string; failed: boolean }[]): KindTally[] {
+export function kindTallies(calls: readonly { call: ToolCall; failed: boolean }[]): KindTally[] {
   const tallies = new Map<ToolKind, KindTally>()
-  for (const { name, failed } of calls) {
-    const kind = toolKind(name)
+  for (const { call, failed } of calls) {
+    const kind = toolKind(call)
     const tally = tallies.get(kind) ?? { kind, names: [], count: 0, failed: 0 }
-    const short = toolName(name).name
+    const short = toolName(call.name).name
     if (!tally.names.includes(short)) {
       tally.names.push(short)
     }
@@ -234,9 +232,8 @@ export function durationOf(startedAt: string, endedAt: string | undefined): stri
 }
 
 /** A call that leaves a process running past its result: a Monitor or a background shell. */
-export const startsBackground = (block: ToolUseBlock): boolean =>
-  block.name === 'Monitor' ||
-  (typeof block.input === 'object' && block.input !== null && Reflect.get(block.input, 'run_in_background') === true)
+export const startsBackground = (call: ToolCall): boolean =>
+  call.shell?.background === true || call.subagent?.background === true
 
 /** What the sandbox or the WebFetch allowlist refused in a call, one line each. */
 export function refusals(text: string): string[] {

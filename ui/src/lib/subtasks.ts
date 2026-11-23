@@ -1,10 +1,8 @@
-import { runningSubtasks, type SubtaskBrief, type SubtaskStatus } from '@seti/shared'
+import { runningSubtasks, type SubtaskBrief, type SubtaskStatus, type ToolCall } from '@seti/shared'
 import { elapsedLabel } from '@/lib/time'
 
-/** Tool names that start a subagent; older Claude Code versions call it Task. */
-const AGENT_TOOLS = new Set(['Agent', 'Task'])
-
-export const isAgentTool = (name: string) => AGENT_TOOLS.has(name)
+/** A call that starts a subagent. */
+export const isAgentTool = (call: Pick<ToolCall, 'kind'>) => call.kind === 'subagent'
 
 export const subtaskRouteId = (taskId: string, toolUseId: string) => `${taskId}/sub/${toolUseId}`
 
