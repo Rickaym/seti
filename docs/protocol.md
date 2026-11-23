@@ -360,6 +360,10 @@ interrupted only for that.
   the allowlist do not apply to it.
 - SBX-11: An agent MUST start another sandboxed, at level `self`, with at most its own access; what
   was withheld is recorded.
+- SBX-12: A maintenance session of an agent, such as a dream, runs in a sandbox of its own, with its
+  own home, `/tmp` and proxy. It mounts the agent's folders, workspace, package caches and session
+  folder read-only, except the agent's own memory folder and the folders the session names; a
+  named folder under a hidden path MUST be refused.
 
 ### 7.3 Egress
 
@@ -382,6 +386,8 @@ interrupted only for that.
   never the host's own. SSH is off by default; a host is usable only with a login in the
   credential for it and every jump host, with pinned host keys and only those logins' keys.
 - EGR-12: Tool servers an agent leaves out MUST be denied to its runtime and get no proxy sign-in.
+- EGR-13: A maintenance session's proxy allows the model provider alone, with the agent's model
+  login: no connection, allowlist, claude.ai connector, cloud or SSH, and no placeholder is issued.
 
 ### 7.4 Permission rules and requests
 

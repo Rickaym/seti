@@ -28,6 +28,7 @@ import { Proc } from './proc.js'
 import './runner.js'
 import { loadSandboxCa, type SandboxCa } from './sandbox-ca.js'
 import { hostClaudeJson } from './sandbox-mcp.js'
+import { projectSlug } from './sandbox-mounts.js'
 import { sandboxContext } from './session-options.js'
 import { stopSshAgents } from './ssh-agent.js'
 import { sshKeyService } from './ssh-key-service.js'
@@ -132,12 +133,14 @@ describe.skipIf(!available)('a real task sandbox', () => {
     script: string,
     scope: ScopePlan | null = null,
     as: Partial<Task> = {},
+    maintenance?: { writable: readonly string[] },
   ): Promise<{ code: number | null; out: string }> {
     const ctx = { ...sandboxContext(), home }
     const sandboxed = { ...task, ...as }
     const sandbox = await taskSandbox(sandboxed, {
       ctx,
       plan: await sandboxPlanFor(sandboxed, await sandboxPolicy.get()),
+      ...(maintenance === undefined ? {} : { maintenance }),
     })
     const child = sandbox.spawn('/bin/bash', ['-c', script], { stdin: 'ignore', scope })
     let out = ''
@@ -669,6 +672,33 @@ describe.skipIf(!available)('a real task sandbox', () => {
     },
     30_000,
   )
+
+  it('runs a maintenance session read-only but for its memory and named folders, reaching only Claude', async () => {
+    const workspace = workspaceDir('bwrap-task')
+    const night = path.join(workspace, 'dreams', '2026-11-23')
+    fs.mkdirSync(night, { recursive: true })
+    const memory = path.join('.claude', 'projects', projectSlug(work), 'memory')
+    const script = [
+      `touch '${work}/dreamt' 2>/dev/null || echo "work read-only"`,
+      `touch '${workspace}/chat.md' 2>/dev/null || echo "workspace read-only"`,
+      `echo note > '${path.join(home, memory, 'MEMORY.md')}' && echo "memory writable"`,
+      `echo report > '${night}/report.md' && echo "night writable"`,
+      `curl -sS -m 10 --noproxy '' http://localhost:${String(port)}/; echo`,
+      'echo "gh=${GH_TOKEN:-none} ssh=${SSH_AUTH_SOCK:-none}"',
+      'echo "proxy=$(ls /run/seti)"',
+    ].join('\n')
+    const { out } = await inSandbox(script, null, {}, { writable: [night] })
+    expect(out).toContain('work read-only')
+    expect(out).toContain('workspace read-only')
+    expect(out).toContain('memory writable')
+    expect(out).toContain('night writable')
+    expect(out).toContain('localhost is not on the allowed hosts list')
+    expect(out).not.toContain('hello from the host')
+    expect(out).toContain('gh=none ssh=none')
+    expect(fs.existsSync(path.join(work, 'dreamt'))).toBe(false)
+    expect(fs.readFileSync(path.join(CLAUDE_HOME, memory.slice('.claude/'.length), 'MEMORY.md'), 'utf8')).toBe('note\n')
+    expect(fs.existsSync(path.join(SETI_HOME, 'sandbox', 'bwrap-task', 'maintenance', 'run', 'proxy.sock'))).toBe(true)
+  })
 
   it('has its own process table', async () => {
     const { out } = await inSandbox('for p in /proc/[0-9]*; do cat "$p/comm"; done')

@@ -135,6 +135,20 @@ export interface EgressCredentials {
   connector: () => Promise<string | null>
 }
 
+/**
+ * What a model-only proxy applies: the model provider with the agent's Claude credential, and no
+ * allowlist, GitHub token, claude.ai connector, cloud or ssh.
+ */
+export const modelOnly = (claude: () => Promise<string | null>) => ({
+  allowed: async (): Promise<readonly string[]> => Promise.resolve([]),
+  credentials: {
+    claude,
+    github: async () => Promise.resolve(null),
+    connector: async () => Promise.resolve(null),
+  } satisfies EgressCredentials,
+  connectorAllowed: () => false,
+})
+
 /** The Claude or GitHub credential of a request to a host Seti authenticates itself. */
 export async function builtinCredential(
   credentials: EgressCredentials,

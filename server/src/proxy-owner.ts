@@ -4,6 +4,8 @@ import { reloadSshAgents } from './ssh-agent.js'
 /** The process that runs agents' egress proxies, when it is not this one. */
 interface ProxyOwner {
   open: (taskId: string, grant: ProxyGrant) => Promise<void>
+  /** Opens the proxy of the agent's maintenance sandbox, which reaches only the model provider. */
+  openModel: (taskId: string, login: string | null) => Promise<void>
   close: (taskId: string) => Promise<void>
   /** The token the agent's processes show the proxy to fetch AWS credentials. */
   awsToken: (taskId: string) => Promise<string>
@@ -26,6 +28,11 @@ export function proxiesRunBy(other: ProxyOwner): void {
  */
 export async function proxyHere(taskId: string, grant: ProxyGrant, start: () => Promise<void>): Promise<void> {
   await (owner === null ? start() : owner.open(taskId, grant))
+}
+
+/** Starts the proxy of the agent's maintenance sandbox here, or where agents' proxies run. */
+export async function modelProxyHere(taskId: string, login: string | null, start: () => Promise<void>): Promise<void> {
+  await (owner === null ? start() : owner.openModel(taskId, login))
 }
 
 /** Stops a removed agent's egress proxy where it runs. */

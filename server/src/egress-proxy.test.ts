@@ -22,6 +22,7 @@ import {
   type EgressCredentials,
   injectCredentials,
   MCP_PROXY_HOST,
+  modelOnly,
 } from './egress-hosts.js'
 import { swapPlaceholders, type EgressPlaceholder } from './egress-placeholders.js'
 import { startEgressProxy, type EgressOptions, type EgressProxy } from './egress-proxy.js'
@@ -480,6 +481,19 @@ describe('egress proxy', () => {
     const { status, socket } = await connect(running.socketPath, 'api.github.com:443')
     expect(status).toBe(403)
     socket.destroy()
+    await running.close()
+  })
+
+  it('reaches only the model provider in model-only mode, with Claude and no other credential', async () => {
+    const only = modelOnly(token(CLAUDE))
+    const running = await proxy(only.allowed, only.credentials, [], { connectorAllowed: only.connectorAllowed })
+    const inference = await throughTunnel(running.socketPath, ANTHROPIC_HOST, { 'x-api-key': PLACEHOLDER })
+    expect(inference.authorization).toBe(`Bearer ${CLAUDE}`)
+    for (const authority of ['api.github.com:443', 'github.com:443', 'plain.test:443', 'x.tunnel.test:443']) {
+      expect(await connectStatus(running, authority)).toBe(403)
+    }
+    const connector: unknown = await throughTunnel(running.socketPath, MCP_PROXY_HOST, {}, '/v1/mcp/srv_1')
+    expect(connector).toEqual({ error: expect.stringContaining('turned off for this agent') as unknown })
     await running.close()
   })
 
