@@ -1,4 +1,5 @@
 import type { McpServerStatus, Options, SDKMessage, SDKUserMessage } from '@anthropic-ai/claude-agent-sdk'
+import { claudeToolCall, type ToolCall } from '@seti/shared'
 
 /** Messages a test hands to the runner; only the fields the runner reads need to be real. */
 type FakeMessage = Record<string, unknown> & { type: string }
@@ -15,6 +16,10 @@ export function fakeMessage(type: string, extra: Record<string, unknown> = {}): 
     ...extra,
   }
 }
+
+/** A Claude Code tool call as the projector reads it, for readers that take a neutral call. */
+export const claudeCall = (name: string, input: unknown, callId = 'toolu_1'): ToolCall =>
+  claudeToolCall(callId, name, input)
 
 export const fakeAssistant = (text: string, parent: string | null = null) =>
   fakeMessage('assistant', { parent_tool_use_id: parent, message: { content: [{ type: 'text', text }] } })

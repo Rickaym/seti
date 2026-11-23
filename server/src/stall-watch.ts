@@ -1,5 +1,5 @@
 import { inBackground } from './background.js'
-import { liveSessions } from './runner.js'
+import { controlLink } from './node-link.js'
 import { permissionRequests } from './store/permissions.js'
 import { questions } from './store/questions.js'
 import { setStall, stalledBy } from './task-blocked.js'
@@ -38,15 +38,16 @@ const waitsOnAnswer = async (taskId: string): Promise<boolean> =>
  * a session waits on the user's answer is not silence, so its quiet clock starts over meanwhile.
  */
 export async function checkSilentSessions(now = Date.now(), limit = SILENT_MS): Promise<void> {
-  const live = new Map(liveSessions())
-  for (const [taskId, session] of live) {
-    const waiting = await waitsOnAnswer(taskId)
+  const { sessions } = await controlLink.command('sessions.view', {})
+  for (const session of sessions) {
+    const waiting = await waitsOnAnswer(session.agent)
     if (waiting) {
-      session.restartQuiet(now)
+      await controlLink.command('quiet.restart', { agent: session.agent, at: now })
     }
-    await setStall(taskId, 'silent', waiting ? null : silentReason(session, now, limit))
+    await setStall(session.agent, 'silent', waiting ? null : silentReason(session, now, limit))
   }
-  for (const taskId of stalledBy('silent').filter((id) => !live.has(id))) {
+  const open = new Set(sessions.map((session) => session.agent))
+  for (const taskId of stalledBy('silent').filter((id) => !open.has(id))) {
     await setStall(taskId, 'silent', null)
   }
 }
@@ -58,9 +59,7 @@ export async function checkSilentSessions(now = Date.now(), limit = SILENT_MS): 
 export function restartQuietOnAnswer(): void {
   onAnyTaskEvent((taskId, event) => {
     if (event.type === 'permission' && event.request.state !== 'pending') {
-      liveSessions()
-        .find(([id]) => id === taskId)?.[1]
-        .restartQuiet()
+      inBackground('stall watch', async () => controlLink.command('quiet.restart', { agent: taskId, at: null }))
     }
   })
 }

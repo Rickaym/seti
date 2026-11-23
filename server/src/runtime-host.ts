@@ -1,48 +1,67 @@
-import type { McpServerConfig } from '@anthropic-ai/claude-agent-sdk'
-import type { Task } from '@seti/shared'
-import { audit } from './audit.js'
+import type {
+  CanUseTool,
+  HookCallback,
+  HookCallbackMatcher,
+  HookJSONOutput,
+  McpServerConfig,
+  PermissionResult,
+} from '@anthropic-ai/claude-agent-sdk'
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
+import {
+  CallToolRequestSchema,
+  ListToolsRequestSchema,
+  type CallToolResult,
+  type ListToolsResult,
+} from '@modelcontextprotocol/sdk/types.js'
+import type { NodeAnswer, Task } from '@seti/shared'
 import { compactHook } from './compact.js'
 import { subagentRules } from './house-rules.js'
+import { nodeLink } from './node-link.js'
 import { bashGuard, guardRefuses } from './permission-guard.js'
-import { canUseToolFor } from './permission-requests.js'
-import { repeatHooks } from './repeat-hooks.js'
-import { reviewHook } from './review-hooks.js'
+import { ASK_TIMEOUT_S, asRecord, repeatHooks } from './repeat-hooks.js'
 import type { DefaultHost, DefaultShapes } from './runtimes/registry.js'
 import { sandboxHooks } from './sandbox.js'
-import { redactSecrets } from './scrub.js'
-import { guardScope, permissionSettings } from './session-options.js'
+import { guardScope } from './session-options.js'
 import { shadowHooks } from './shadow-hooks.js'
-import { allowedFor } from './store/change-requests.js'
+
+/** Decides each tool call the runtime would ask about by asking the control plane. */
+const decideByAsking =
+  (taskId: string, session: AbortSignal): CanUseTool =>
+  async (tool, input, { signal, ...options }) => {
+    const both = AbortSignal.any([signal, session])
+    const { result } = await nodeLink.ask(taskId, 'permission.ask', { tool, input, options }, both)
+    // The control plane answered with what canUseToolFor decided.
+    return result as PermissionResult
+  }
+
+const UNCHECKED = 'Seti could not check its review rules, so it held this call back. Tell the user.'
 
 /**
- * Builds MCP servers that run inside Seti's own process for a task's session, keyed by name.
- * @public
+ * A PreToolUse hook that holds each MCP call a review rule names until the user answers; when the
+ * control plane cannot say, the call is held back.
  */
-export type SessionMcpServers = (task: Task) => Record<string, McpServerConfig>
-
-const sessionMcpFactories: SessionMcpServers[] = []
-
-/** @public */
-export function registerSessionMcpServers(factory: SessionMcpServers): void {
-  sessionMcpFactories.push(factory)
-}
-
-const inProcessServers = (task: Task): Record<string, McpServerConfig> =>
-  Object.assign({}, ...sessionMcpFactories.map((factory) => factory(task))) as Record<string, McpServerConfig>
-
-const COMMAND_CHARS = 500
-
-/** The guard's refusals go to the audit log, so the user sees what an agent tried. */
-const auditRefusal = (task: Task) => async (command: string, reason: string) => {
-  const shown = redactSecrets(command).slice(0, COMMAND_CHARS)
-  await audit.record({
-    actor: 'system',
-    kind: 'task.permission_denied',
-    subject_type: 'task',
-    subject_id: task.id,
-    summary: `Refused a command of task "${task.title}": ${reason}`,
-    detail: { title: task.title, tool: 'Bash', command: shown, guard: true },
-  })
+function reviewHook(taskId: string, session: AbortSignal): HookCallbackMatcher {
+  const hook: HookCallback = async (input, _toolUseId, { signal }) => {
+    if (input.hook_event_name !== 'PreToolUse') {
+      return {}
+    }
+    const call = { tool: input.tool_name, input: asRecord(input.tool_input) }
+    try {
+      const { output } = await nodeLink.ask(taskId, 'review.ask', call, AbortSignal.any([signal, session]))
+      // The control plane answered with what reviewCall decided.
+      return output as HookJSONOutput
+    } catch (e) {
+      process.stderr.write(`review hook: task ${taskId}: ${String(e)}\n`)
+      return {
+        hookSpecificOutput: {
+          hookEventName: 'PreToolUse',
+          permissionDecision: 'deny',
+          permissionDecisionReason: UNCHECKED,
+        },
+      }
+    }
+  }
+  return { matcher: 'mcp__.*', hooks: [hook], timeout: ASK_TIMEOUT_S }
 }
 
 /**
@@ -50,13 +69,38 @@ const auditRefusal = (task: Task) => async (command: string, reason: string) => 
  * the task's compaction instructions.
  */
 function sessionHooks(task: Task, sandboxed: boolean, session: AbortSignal): DefaultShapes['hooks'] {
+  const taskId = task.id
   const scope = guardScope(task, sandboxed)
-  const guard = bashGuard(scope, auditRefusal(task))
-  const sandbox = sandboxed ? (sandboxHooks(async () => allowedFor(task.id)).PreToolUse ?? []) : []
-  const repeat = repeatHooks({ task, session, refused: (tool, input) => guardRefuses(tool, input, scope) })
-  const review = reviewHook({ taskId: task.id, session, denyRules: async () => (await permissionSettings(task)).deny })
-  const PreToolUse = [guard, ...sandbox, review, ...(repeat.PreToolUse ?? [])]
-  return { ...repeat, PreToolUse, SubagentStart: [subagentRules()], PreCompact: [compactHook(task.id)] }
+  const refused = async (command: string, reason: string) =>
+    nodeLink.journal(taskId, { type: 'guard.refused', command, reason })
+  const guard = bashGuard(scope, refused)
+  const hosts = async () => (await nodeLink.ask(taskId, 'sandbox.hosts', {})).hosts
+  const sandbox = sandboxed ? (sandboxHooks(hosts).PreToolUse ?? []) : []
+  const repeat = repeatHooks({
+    taskId,
+    session,
+    refused: (tool, input) => guardRefuses(tool, input, scope),
+    ask: async (call, results, signal) => nodeLink.ask(taskId, 'repeat.ask', { ...call, results }, signal),
+  })
+  const PreToolUse = [guard, ...sandbox, reviewHook(taskId, session), ...(repeat.PreToolUse ?? [])]
+  const instructions = async () => (await nodeLink.ask(taskId, 'hook.compact', {})).instructions
+  return { ...repeat, PreToolUse, SubagentStart: [subagentRules()], PreCompact: [compactHook(instructions)] }
+}
+
+type ListedServer = NodeAnswer<'tools.list'>['servers'][number]
+
+/** Serves a listed server's tools in this process; each call runs on the control plane. */
+function hostedServer(taskId: string, { name, tools }: ListedServer): McpServerConfig {
+  const instance = new McpServer({ name, version: '1.0.0' }, { capabilities: { tools: {} } })
+  // The control plane listed them with an MCP client of the server itself.
+  const listed = { tools } as ListToolsResult
+  instance.server.setRequestHandler(ListToolsRequestSchema, () => listed)
+  instance.server.setRequestHandler(CallToolRequestSchema, async ({ params }, { signal }) => {
+    const call = { server: name, tool: params.name, args: params.arguments ?? {} }
+    // The control plane answered with the server's own MCP result.
+    return (await nodeLink.ask(taskId, 'tool.call', call, signal)).result as CallToolResult
+  })
+  return { type: 'sdk', name, instance }
 }
 
 type Hooks = DefaultShapes['hooks']
@@ -71,11 +115,12 @@ function withHooks(first: Hooks, second: Hooks): Hooks {
  * What Seti answers for a task's session while its turns wait, until the session ends. Seti's own
  * permission evaluator runs beside, in shadow, and changes no answer.
  */
-export const sessionHost = (task: Task, sandboxed: boolean, session: AbortSignal): DefaultHost => {
+export async function sessionHost(task: Task, sandboxed: boolean, session: AbortSignal): Promise<DefaultHost> {
+  const { servers } = await nodeLink.ask(task.id, 'tools.list', {})
   const shadow = shadowHooks(task, sandboxed, session)
   return {
-    decide: shadow.observe(canUseToolFor(task.id, session)),
+    decide: shadow.observe(decideByAsking(task.id, session)),
     hooks: withHooks(sessionHooks(task, sandboxed, session), shadow.hooks),
-    toolServers: inProcessServers(task),
+    toolServers: Object.fromEntries(servers.map((server) => [server.name, hostedServer(task.id, server)])),
   }
 }

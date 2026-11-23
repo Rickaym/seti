@@ -1,5 +1,6 @@
 import { beforeAll, describe, expect, it } from 'vitest'
 import { sql, tasks } from './db.js'
+import { claudeCall } from './fake-sdk.js'
 import type { PrPost } from './pr-events.js'
 import { agentPostings, agentPosts, callWindow, ownPosts, type AgentCall } from './pr-self.js'
 import { postTargets } from './pr-target.js'
@@ -107,7 +108,8 @@ describe('agentPostings', () => {
 })
 
 describe('postTargets', () => {
-  const bash = (command: string) => postTargets('Bash', { command })
+  const targets = (name: string, input: unknown) => postTargets(claudeCall(name, input))
+  const bash = (command: string) => targets('Bash', { command })
 
   it('reads the PR a gh comment or review names, with its repo where given', () => {
     expect(bash('gh pr comment 7 --body "see #9"')).toEqual([{ repo: null, number: 7 }])
@@ -132,13 +134,13 @@ describe('postTargets', () => {
   })
 
   it('reads the PR of a GitHub MCP call from its fields', () => {
-    expect(postTargets('mcp__github__add_issue_comment', { owner: 'acme', repo: 'web', issue_number: 7 })).toEqual([
+    expect(targets('mcp__github__add_issue_comment', { owner: 'acme', repo: 'web', issue_number: 7 })).toEqual([
       { repo: 'acme/web', number: 7 },
     ])
-    expect(postTargets('mcp__gh__create_review', { repo: 'acme/web', pullNumber: '7' })).toEqual([
+    expect(targets('mcp__gh__create_review', { repo: 'acme/web', pullNumber: '7' })).toEqual([
       { repo: 'acme/web', number: 7 },
     ])
-    expect(postTargets('mcp__github__add_issue_comment', { body: 'Done' })).toEqual([])
+    expect(targets('mcp__github__add_issue_comment', { body: 'Done' })).toEqual([])
   })
 })
 

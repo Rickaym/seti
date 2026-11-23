@@ -76,11 +76,11 @@ export const compactSetup = (rule: CompactRule) => ({
  * Claude Code adds what a PreCompact hook answers to the summary's instructions, beside any the
  * user gave /compact. The task's instructions are read when it compacts, so edits apply at once.
  */
-export const compactHook = (taskId: string): HookCallbackMatcher => ({
+export const compactHook = (instructions: () => Promise<string | null>): HookCallbackMatcher => ({
   hooks: [
     async () => {
-      const { instructions } = await effectiveCompact(taskId)
-      return instructions === null ? {} : { systemMessage: instructions }
+      const kept = await instructions()
+      return kept === null ? {} : { systemMessage: kept }
     },
   ],
 })

@@ -101,9 +101,10 @@ function specKey(spec: SessionSpec): string {
 /** Compares the setup a process started with to what the task needs now. */
 export const setupKey = async (task: Task) => specKey(await sessionSpec(task))
 
-async function realise(spec: SessionSpec, task: Task, abortController: AbortController) {
+/** The options a process of the task starts with from the spec it is handed. */
+export async function realise(spec: SessionSpec, task: Task, abortController: AbortController) {
   const launcher = await taskLauncher(task, 'agent', true)
-  const host = sessionHost(task, launcher.sandboxed, abortController.signal)
+  const host = await sessionHost(task, launcher.sandboxed, abortController.signal)
   return adapterFor(spec.runtime).realise(spec, launcher, host, abortController)
 }
 
@@ -114,13 +115,13 @@ export const sessionOptions = async (task: Task, abortController: AbortControlle
 const reread = async (spec: SessionSpec, task: Task): Promise<SessionSpec> => ({ ...spec, ...(await liveSpec(task)) })
 
 /**
- * The options a process starts with and the setupKey of what it got. The options take the live
- * parts as read after the key, and a setting that changed meanwhile leaves no key, so the next
- * turn restarts.
+ * The spec a process starts from and the setupKey of the settings first read. The spec takes the
+ * live parts as read after the key; the node compares the key again once the process started.
  */
-export async function sessionStart(task: Task, abortController: AbortController) {
+export async function startingSpec(task: Task): Promise<{ spec: SessionSpec; key: string }> {
   const spec = await sessionSpec(task)
-  const key = specKey(spec)
-  const options = await realise(await reread(spec, task), task, abortController)
-  return { key: specKey(await reread(spec, task)) === key ? key : null, options }
+  return { spec: await reread(spec, task), key: specKey(spec) }
 }
+
+/** The setupKey of a spec a process started from, with its live parts read again. */
+export const rereadKey = async (spec: SessionSpec, task: Task): Promise<string> => specKey(await reread(spec, task))

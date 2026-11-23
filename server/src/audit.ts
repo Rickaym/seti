@@ -1,4 +1,3 @@
-import type { SDKMessage } from '@anthropic-ai/claude-agent-sdk'
 import {
   modActor,
   type AuditActor,
@@ -7,6 +6,7 @@ import {
   type AuditKind,
   type AuditSubjectType,
   type ModAuditKind,
+  type RuntimeEvent,
 } from '@seti/shared'
 import { anonymousRequest, currentRequestSource } from './access.js'
 import type { SendOutcome } from './agent-session.js'
@@ -111,35 +111,45 @@ function startRetention(): void {
   setInterval(() => void daily(), DAY_MS).unref()
 }
 
-/** Records the tool calls of an assistant message that the runner flagged as outward. */
-async function outwardCalls(taskId: string, m: SDKMessage, outwardIds: readonly string[]): Promise<void> {
-  if (m.type !== 'assistant' || outwardIds.length === 0) {
+/** Records the tool calls among a message's events that the runner flagged as outward. */
+async function outwardCalls(
+  taskId: string,
+  events: readonly RuntimeEvent[],
+  outwardIds: readonly string[],
+): Promise<void> {
+  const calls = events.flatMap((event) =>
+    event.type === 'tool.started' && outwardIds.includes(event.call.callId) ? [event.call] : [],
+  )
+  if (calls.length === 0) {
     return
   }
   const title = (await tasks.get(taskId))?.title
-  for (const block of m.message.content) {
-    if (block.type === 'tool_use' && outwardIds.includes(block.id)) {
-      const sent = outwardRecord(block.name, block.input)
-      await record({
-        actor: 'agent',
-        kind: 'agent.outward',
-        subject_type: 'task',
-        subject_id: taskId,
-        summary: sent.summary,
-        detail: { tool: block.name, tool_use_id: block.id, ...(title === undefined ? {} : { title }), ...sent.detail },
-        long: ['text', 'input'],
-      })
-    }
+  for (const call of calls) {
+    const sent = outwardRecord(call)
+    await record({
+      actor: 'agent',
+      kind: 'agent.outward',
+      subject_type: 'task',
+      subject_id: taskId,
+      summary: sent.summary,
+      detail: { tool: call.name, tool_use_id: call.callId, ...(title === undefined ? {} : { title }), ...sent.detail },
+      long: ['text', 'input'],
+    })
   }
 }
 
 /** Records a call auto mode's classifier turned down, which reaches no permission request. */
-async function classifierDenial(taskId: string, m: SDKMessage): Promise<void> {
-  if (m.type !== 'system' || m.subtype !== 'permission_denied' || m.decision_reason_type !== 'classifier') {
-    return
+async function classifierDenial(taskId: string, events: readonly RuntimeEvent[]): Promise<void> {
+  for (const denial of events) {
+    if (denial.type === 'policy.denied' && denial.classifier === true) {
+      await recordDenial(taskId, denial)
+    }
   }
-  const command = openCommand(taskId, m.tool_use_id)
-  const call = command === null ? m.tool_name : `Bash: ${command}`
+}
+
+async function recordDenial(taskId: string, denial: Extract<RuntimeEvent, { type: 'policy.denied' }>): Promise<void> {
+  const command = openCommand(taskId, denial.callId)
+  const call = command === null ? denial.tool : `${denial.tool}: ${command}`
   const title = (await tasks.get(taskId))?.title ?? taskId
   await record({
     actor: 'system',
@@ -149,10 +159,10 @@ async function classifierDenial(taskId: string, m: SDKMessage): Promise<void> {
     summary: `Auto mode turned down ${call} in task "${title}"`,
     detail: {
       title,
-      tool: m.tool_name,
-      tool_use_id: m.tool_use_id,
+      tool: denial.tool,
+      tool_use_id: denial.callId,
       ...(command === null ? {} : { command }),
-      reason: m.decision_reason ?? null,
+      reason: denial.reason ?? null,
       classifier: true,
     },
   })
