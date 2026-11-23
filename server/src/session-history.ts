@@ -1,5 +1,5 @@
 import type { SDKAssistantMessage, SDKUserMessage, SessionMessage } from '@anthropic-ai/claude-agent-sdk'
-import { findPrUrls } from '@seti/shared'
+import { findPrUrls, projectClaude } from '@seti/shared'
 import { z } from 'zod'
 import type { BackfillMessage } from './db.js'
 import { createPrWatcher } from './pr-link.js'
@@ -116,7 +116,7 @@ export function sessionPrs(raw: readonly SessionMessage[], history: readonly Bac
   const watch = createPrWatcher()
   const created = new Set<string>()
   for (const { body } of history) {
-    for (const pr of body.kind === 'sdk' ? watch('session', body.payload) : []) {
+    for (const pr of body.kind === 'sdk' ? watch('session', projectClaude(body.payload)) : []) {
       created.add(pr.url)
     }
   }

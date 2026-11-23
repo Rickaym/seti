@@ -1,7 +1,7 @@
-import { findPrUrls } from '@seti/shared'
-import { z } from 'zod'
+import { findPrUrls, type ToolCall } from '@seti/shared'
+import { payloadEvents } from './events/read.js'
 import type { PrHead } from './github.js'
-import { bashCommand } from './outward.js'
+import { shellCommand } from './outward.js'
 import { createsPrCall } from './pr-link.js'
 import type { StoredRow } from './store/pr-discovery.js'
 
@@ -182,49 +182,16 @@ export const pushedHead = (pr: PrHead, pushes: readonly Push[]): boolean =>
       (push.repo === null || pr.head_repo === null || push.repo.toLowerCase() === pr.head_repo.toLowerCase()),
   )
 
-const toolUse = z.object({ type: z.literal('tool_use'), id: z.string(), name: z.string(), input: z.unknown() })
-const toolResult = z.object({
-  type: z.literal('tool_result'),
-  tool_use_id: z.string(),
-  content: z.union([z.string(), z.array(z.object({ type: z.string(), text: z.string().optional() }))]).optional(),
-})
-const sdkRow = z.object({ message: z.object({ content: z.array(z.unknown()) }) })
-/** Claude Code's own report that the session opened a PR or pushed to one. */
-const published = z.object({
-  type: z.literal('system'),
-  subtype: z.literal('code_change_published'),
-  url: z.string(),
-  action: z.string(),
-})
-
-/** Content blocks of a message row, or the row itself when it reports a published change. */
-function blocksOf(payload: string): unknown[] {
-  try {
-    const value: unknown = JSON.parse(payload)
-    const parsed = sdkRow.safeParse(value)
-    return parsed.success ? parsed.data.message.content : [value]
-  } catch {
-    return []
-  }
-}
-
-function textOf(content: z.infer<typeof toolResult>['content']): string {
-  if (typeof content === 'string') {
-    return content
-  }
-  return (content ?? []).map((part) => part.text ?? '').join('\n')
-}
-
-function record(evidence: PrEvidence, call: z.infer<typeof toolUse>, text: string): void {
-  if (createsPrCall(call.name, call.input)) {
+function record(evidence: PrEvidence, call: ToolCall, text: string): void {
+  if (createsPrCall(call)) {
     findPrUrls(text).forEach((url) => evidence.created.add(url))
   }
-  if (call.name === 'Bash') {
-    evidence.pushes.push(...pushesOf(bashCommand(call.input), text))
+  if (call.shell?.action === 'run') {
+    evidence.pushes.push(...pushesOf(shellCommand(call), text))
   }
 }
 
-function recordPublished(evidence: PrEvidence, change: z.infer<typeof published>): void {
+function recordPublished(evidence: PrEvidence, change: { url: string; action: string }): void {
   findPrUrls(change.url).forEach((url) => {
     if (change.action === 'created') {
       evidence.created.add(url)
@@ -236,22 +203,19 @@ function recordPublished(evidence: PrEvidence, change: z.infer<typeof published>
 
 /** PRs the task opened or pushed to and branches it pushed, pairing each call with its result. */
 export function transcriptEvidence(rows: readonly StoredRow[]): PrEvidence {
-  const calls = new Map<string, z.infer<typeof toolUse>>()
+  const calls = new Map<string, ToolCall>()
   const evidence: PrEvidence = { created: new Set(), pushedTo: new Set(), pushes: [] }
-  const blocks = rows.flatMap((row) => (row.kind === 'sdk' ? blocksOf(row.payload) : []))
-  for (const block of blocks) {
-    const use = toolUse.safeParse(block)
-    const result = toolResult.safeParse(block)
-    const change = published.safeParse(block)
-    if (use.success) {
-      calls.set(use.data.id, use.data)
-    } else if (result.success) {
-      const call = calls.get(result.data.tool_use_id)
+  const events = rows.flatMap((row) => (row.kind === 'sdk' ? payloadEvents(row.payload) : []))
+  for (const event of events) {
+    if (event.type === 'tool.started') {
+      calls.set(event.call.callId, event.call)
+    } else if (event.type === 'tool.ended') {
+      const call = calls.get(event.callId)
       if (call !== undefined) {
-        record(evidence, call, textOf(result.data.content))
+        record(evidence, call, event.result.text)
       }
-    } else if (change.success) {
-      recordPublished(evidence, change.data)
+    } else if (event.type === 'change.published') {
+      recordPublished(evidence, event)
     }
   }
   return evidence
