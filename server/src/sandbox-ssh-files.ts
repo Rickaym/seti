@@ -1,6 +1,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import type { SshPlan } from './launch-plan.js'
+import { replaceFile } from './mcp-oauth.js'
 import { sandboxSshConfig, type RenderHost } from './ssh-config.js'
 import type { SshHostRow } from './store/ssh.js'
 
@@ -13,7 +14,7 @@ export function writePublicKeys(dir: string, keys: Readonly<Record<string, strin
     fs.rmSync(path.join(dir, file), { force: true })
   }
   for (const [id, key] of Object.entries(keys)) {
-    fs.writeFileSync(path.join(dir, keyFileName(id)), `${key}\n`, { mode: 0o644 })
+    replaceFile(path.join(dir, keyFileName(id)), `${key}\n`, 0o644)
   }
 }
 
@@ -49,7 +50,7 @@ export function prepareSandboxSsh(request: SandboxSshRequest): SandboxSsh {
     proxy,
     knownHosts: path.join(inside, 'known_hosts'),
   })
-  fs.writeFileSync(path.join(dir, 'config'), config, { mode: 0o600 })
-  fs.writeFileSync(path.join(dir, 'known_hosts'), plan.knownHosts, { mode: 0o644 })
+  replaceFile(path.join(dir, 'config'), config, 0o600)
+  replaceFile(path.join(dir, 'known_hosts'), plan.knownHosts, 0o644)
   return { dir, agentDir: path.join(taskDir, 'ssh-agent') }
 }
