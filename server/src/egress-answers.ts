@@ -51,13 +51,18 @@ export class ControlLate extends Error {
   }
 }
 
-/** An unreadable value counts as none, unless it is late: then the request waits no more. */
-export const noValue = (e: unknown): null => {
-  if (e instanceof ControlLate) {
-    throw e
+/** An answer that failed counts as `fallback`, unless it is late: then the request waits no more. */
+export const unlessLate =
+  <T>(fallback: T) =>
+  (e: unknown): T => {
+    if (e instanceof ControlLate) {
+      throw e
+    }
+    return fallback
   }
-  return null
-}
+
+/** An unreadable value counts as none, unless it is late. */
+export const noValue = unlessLate(null)
 
 /** Runs a request or a WebSocket handshake; one whose value came too late gets a 503 to retry. */
 export async function answerLate(to: ServerResponse | Duplex, run: () => Promise<void>): Promise<void> {

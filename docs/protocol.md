@@ -788,7 +788,9 @@ store, the audit chain and every record.
   either process.
 - NODE-8: Only the node runs agents' egress proxies. A sandbox the control plane builds, for a
   terminal or a `!` command, has the node open the agent's proxy and uses it, and removing an
-  agent stops its proxy on the node.
+  agent stops its proxy on the node. The proxy applies a grant the control plane hands it with no
+  value in it (the agent's connections, MCP sign-ins, denied connectors, login and CA hosts), and
+  asks the control plane for the allowed hosts, ssh first hops and AWS switch when it checks them.
 - NODE-9: A command the node's guard refused, and a request its egress proxy blocked for
   carrying a connection's placeholder toward a host the connection does not allow, reach the
   control plane as journal entries, which it audits once.
@@ -797,8 +799,9 @@ store, the audit chain and every record.
   ask for their keys on each load; the node keeps none between requests. A changed or removed
   connection therefore applies to the next request, with no delay, and a changed ssh key or host
   reloads the node's ssh agents. A sandbox the control plane builds gets the AWS token of the
-  node's proxy. While the control plane restarts, a request that needs a value waits for it up to
-  30 seconds; after that the proxy answers 503, which clients retry.
+  node's proxy. While the control plane restarts, a request that needs a value, or the agent's
+  allowed hosts, ssh hops or AWS switch, waits for it up to 30 seconds; after that the proxy
+  answers 503, which clients retry.
 - NODE-11: Values cross only to a node on the same machine, over the owner-only socket of NODE-1;
   the control plane refuses every ask and command that carries values on any other link, so a
   node on another machine needs a sealed path. No error, log or frame dump names a value, and the
@@ -806,6 +809,15 @@ store, the audit chain and every record.
 - NODE-12: The node owns each agent's ssh agent and the sandbox CA files as it owns the proxy: a
   sandbox the control plane builds has the node start the ssh agent, and only the node loads and
   writes the CA.
+
+### 15.2 Dreams
+
+Optional and off by default: a maintenance session per agent that consolidates its memory.
+
+- DRM-8: Every memory file a dream changes is recorded as a revision with its text before and
+  after, credentials redacted. The user, and the EA after the user's yes, MAY revert it; a revert
+  of a file changed since, or of a text kept only redacted, MUST be refused (409). Every change
+  and revert is audited with the path and line counts, never the text.
 
 ## 16. Audit
 

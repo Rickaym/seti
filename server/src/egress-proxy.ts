@@ -18,14 +18,16 @@ import {
   refusalText,
   refuseSocket,
   type Target,
+  unlessLate,
 } from './egress-answers.js'
-import { isAwsCredentialsPath, isAwsHost, serveAwsCredentials, type EgressAws } from './egress-aws.js'
+import { isAwsCredentialsPath, serveAwsCredentials, type EgressAws } from './egress-aws.js'
 import {
   ANTHROPIC_HOST,
   ANTHROPIC_HOSTS,
   builtinCredential,
   connectorOf,
   directAddress,
+  openHost,
   type EgressCredentials,
   injectCredentials,
   INTERCEPTED_HOSTS,
@@ -111,7 +113,7 @@ class Egress {
       void answerLate(socket, async () => this.onUpgrade(req, socket, head))
     })
     this.server.on('connect', (req: IncomingMessage, socket: Duplex, head: Buffer) => {
-      void this.onConnect(req, socket, head)
+      void answerLate(socket, async () => this.onConnect(req, socket, head))
     })
     for (const server of [this.server, this.intercepted]) {
       server.on('clientError', (_e, socket) => {
@@ -178,14 +180,7 @@ class Egress {
     if ((target.port === 443 && ANTHROPIC_HOSTS.includes(target.host)) || this.hasRule(target)) {
       return true
     }
-    const { aws, ssh } = this.options
-    if (aws !== undefined && target.port === 443 && isAwsHost(target.host)) {
-      return aws.enabled().catch(() => false)
-    }
-    if (ssh !== undefined && (await ssh(`${target.host}:${String(target.port)}`).catch(() => false))) {
-      return true
-    }
-    return urlAllowed(`https://${target.host}:${String(target.port)}/`, await this.options.allowed().catch(() => []))
+    return openHost(target, this.options)
   }
 
   private refused(host: string): string {
@@ -304,7 +299,7 @@ class Egress {
     }
     const origin = `https://${target.host}:${String(target.port)}`
     const url = keyed.path.startsWith('/') && URL.canParse(keyed.path, origin) ? new URL(keyed.path, origin) : null
-    const own = !builtin && urlAllowed(`${origin}/`, await this.options.allowed().catch(() => []))
+    const own = !builtin && urlAllowed(`${origin}/`, await this.options.allowed().catch(unlessLate([])))
     const { headers, applied } = builtin
       ? { headers: injected, applied: [] }
       : await applyRules(this.rulesFor(target), url, injected, own)

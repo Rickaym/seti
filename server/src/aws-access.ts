@@ -4,6 +4,7 @@ import {
   awsRoleName,
   type AccessItem,
   type AwsOutcome,
+  type AwsSettings,
   type GitHubOutcome,
   type Task,
 } from '@seti/shared'
@@ -42,6 +43,11 @@ export async function awsItem(
     in_set: false,
     session: null,
   }
+}
+
+/** The AWS role and region of a credential. */
+export async function profileAws(profileId: string): Promise<AwsSettings> {
+  return (await profiles.get(profileId))?.aws ?? AWS_SETTINGS_DEFAULT
 }
 
 /** Whether the task's sandbox gets AWS credentials of its credential's role. */

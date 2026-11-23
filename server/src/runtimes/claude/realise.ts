@@ -66,11 +66,16 @@ const deniedMcpSettings = (names: readonly string[]) => ({
   deniedMcpServers: names.map((serverName) => ({ serverName })),
 })
 
-/** The launcher as the SDK takes it: the environment, and the spawn when Seti holds the process. */
-export const claudeLaunch = (launcher: Launcher) => ({
-  env: launcher.env,
-  ...(launcher.spawn === undefined ? {} : { spawnClaudeCodeProcess: launcher.spawn }),
-})
+/**
+ * The launcher as the SDK takes it: the environment, and the spawn when Seti holds the process.
+ * Without a spawn the SDK starts Claude Code on the host, which no sandboxed launcher allows.
+ */
+export function claudeLaunch(launcher: Launcher) {
+  if (launcher.spawn === undefined && launcher.sandboxed) {
+    throw new Error('A sandboxed launcher must start Claude Code itself, and this one cannot')
+  }
+  return { env: launcher.env, ...(launcher.spawn === undefined ? {} : { spawnClaudeCodeProcess: launcher.spawn }) }
+}
 
 /** Rules for every task, the launcher, and an unsandboxed task's borrowed MCP servers. */
 async function sandboxOptions(spec: SessionSpec, launcher: Launcher) {

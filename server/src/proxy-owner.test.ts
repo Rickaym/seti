@@ -1,4 +1,4 @@
-import type { Task } from '@seti/shared'
+import type { ProxyGrant, Task } from '@seti/shared'
 import { describe, expect, it, vi } from 'vitest'
 import {
   proxiesRunBy,
@@ -11,12 +11,13 @@ import {
 } from './proxy-owner.js'
 
 const task = { id: 'agent' } as Task
+const grant: ProxyGrant = { login: null, connections: [], mcp: [], deniedConnectors: [], caHosts: [] }
 
 describe('the owner of an agent egress proxy', () => {
   it('runs the proxy here until another process runs them, then has that process open and close it', async () => {
     const start = vi.fn(async () => Promise.resolve())
     const stop = vi.fn(async () => Promise.resolve())
-    await proxyHere(task, start)
+    await proxyHere(task.id, grant, start)
     await proxyGone(task.id, stop)
     expect(start).toHaveBeenCalledTimes(1)
     expect(stop).toHaveBeenCalledTimes(1)
@@ -36,11 +37,11 @@ describe('the owner of an agent egress proxy', () => {
       sshReload: vi.fn(async () => Promise.resolve()),
     }
     proxiesRunBy(owner)
-    await proxyHere(task, start)
+    await proxyHere(task.id, grant, start)
     await proxyGone(task.id, stop)
     expect(start).toHaveBeenCalledTimes(1)
     expect(stop).toHaveBeenCalledTimes(1)
-    expect(owner.open).toHaveBeenCalledWith(task)
+    expect(owner.open).toHaveBeenCalledWith('agent', grant)
     expect(owner.close).toHaveBeenCalledWith('agent')
     expect(await proxyAwsToken(task.id, () => 'here')).toBe('node')
     await sshAgentHere(task.id, start)

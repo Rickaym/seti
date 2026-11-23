@@ -21,6 +21,7 @@ function controlEnd(answer: ControlEnd['answer']['prompt.open']) {
     'secret.mint': none,
     'aws.credentials': none,
     'connection.value': none,
+    'access.reach': none,
     'ssh.keys': none,
     'tools.list': none,
     'tool.call': none,
