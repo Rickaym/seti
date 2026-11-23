@@ -1,4 +1,5 @@
 import { insideAny, resolvePath } from './paths.js'
+import { readOnly } from './read-only.js'
 import { matchesCall, prepare, type Prepared } from './rule-match.js'
 import { droppedInAuto } from './rule-parse.js'
 import { criticalRemoval, isProtected } from './safety.js'
@@ -43,8 +44,25 @@ function unsafe(call: PolicyCall, ctx: PolicyContext): 'critical' | 'protected' 
 /** Modes that hand undecided calls to the classifier, which drop the broad allow rules first. */
 const classified = (mode: PolicyMode) => mode === 'auto' || mode === 'plan'
 
+/** The sandbox's built-in `Bash` allow, kept in auto without a classifier for fully read lines. */
+const sandboxShell = ({ rule, target }: Prepared) =>
+  rule.ref.startsWith('builtin:') && target.type === 'tool' && target.name === 'Bash'
+
+/** A shell call Seti reads in full that keeps no terminal open for later input. */
+const fullyRead = (call: PolicyCall) =>
+  call.command !== undefined && call.interactive !== true && splitShell(call.command).plain
+
+/** The allow rules the mode keeps: a mode with a classifier behind it drops the broad ones. */
+function usableAllows(call: PolicyCall, rules: readonly Prepared[], ctx: PolicyContext): readonly Prepared[] {
+  if (!classified(ctx.mode)) {
+    return rules
+  }
+  const read = ctx.mode === 'auto' && !ctx.classifier && fullyRead(call)
+  return rules.filter((prepared) => !droppedInAuto(prepared.target) || (read && sandboxShell(prepared)))
+}
+
 function allowRule(call: PolicyCall, rules: readonly Prepared[], ctx: PolicyContext): Prepared | undefined {
-  const usable = classified(ctx.mode) ? rules.filter((prepared) => !droppedInAuto(prepared.target)) : rules
+  const usable = usableAllows(call, rules, ctx)
   if (call.command !== undefined) {
     return shellAllow(call.command, call.interactive === true, usable, ctx)
   }
@@ -77,7 +95,7 @@ function byMode(call: PolicyCall, ctx: PolicyContext): Decision {
   if (ctx.mode === 'auto' && call.kind === 'edit' && inside(call.writes)) {
     return decision('allow', 'mode', 'Auto mode allows edits inside the working directories')
   }
-  if (ctx.mode === 'auto' || (ctx.mode === 'plan' && call.kind !== 'edit')) {
+  if (ctx.classifier && (ctx.mode === 'auto' || (ctx.mode === 'plan' && call.kind !== 'edit'))) {
     return decision('defer', 'mode', "No rule decides it, so the runtime's classifier does")
   }
   return decision('ask', 'mode', 'No rule allows it')
@@ -86,19 +104,33 @@ function byMode(call: PolicyCall, ctx: PolicyContext): Decision {
 /** A protected write runs in bypass, goes to the classifier in auto, and asks otherwise. */
 const PROTECTED: Record<PolicyMode, Verdict> = { bypass: 'allow', auto: 'defer', ask: 'ask', plan: 'ask' }
 
+const protectedWrite = (ctx: PolicyContext): Verdict =>
+  PROTECTED[ctx.mode] === 'defer' && !ctx.classifier ? 'ask' : PROTECTED[ctx.mode]
+
+/** Without a classifier, Seti's own read-only list lets a line it fully reads run in every mode. */
+const readsOnly = (call: PolicyCall, ctx: PolicyContext) =>
+  !ctx.classifier &&
+  ctx.mode !== 'bypass' &&
+  call.command !== undefined &&
+  call.interactive !== true &&
+  readOnly(call.command, ctx)
+
 function afterRules(call: PolicyCall, rules: readonly Prepared[], ctx: PolicyContext): Decision {
   const risk = unsafe(call, ctx)
   if (risk === 'critical') {
     return decision('ask', 'safety', 'It removes the root, home, a top-level or a working directory')
   }
   if (risk === 'protected') {
-    return decision(PROTECTED[ctx.mode], 'safety', 'It writes repository state or configuration that runs code')
+    return decision(protectedWrite(ctx), 'safety', 'It writes repository state or configuration that runs code')
   }
   if (ctx.mode === 'plan' && call.kind === 'edit') {
     return decision('ask', 'plan', 'Plan mode edits nothing until the user approves the plan')
   }
   const allow = allowRule(call, ofBehavior(rules, 'allow'), ctx)
-  return allow === undefined ? byMode(call, ctx) : decision('allow', 'allow-rule', 'An allow rule matches', allow)
+  if (allow !== undefined) {
+    return decision('allow', 'allow-rule', 'An allow rule matches', allow)
+  }
+  return readsOnly(call, ctx) ? decision('allow', 'read-only', "It only reads, by Seti's list") : byMode(call, ctx)
 }
 
 /**

@@ -91,7 +91,7 @@ function trivial(shape: CommandShape, ctx: PolicyContext): boolean {
 }
 
 /** A `cd` to another directory before `git` may run that directory's hooks, so it always asks. */
-const cdThenGit = (shapes: readonly CommandShape[], ctx: PolicyContext) =>
+export const cdThenGit = (shapes: readonly CommandShape[], ctx: PolicyContext) =>
   shapes.some((s) => s.words[0] === 'cd' && resolvePath(s.words[1] ?? '~', ctx.cwd, ctx.home) !== ctx.cwd) &&
   shapes.some((s) => s.words[0] === 'git')
 
