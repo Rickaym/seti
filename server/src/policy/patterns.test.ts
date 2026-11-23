@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { commandMatches, domainMatches, nameMatches, valueMatches } from './patterns.js'
+import { commandMatches, domainMatches, nameMatches, valueMatches, wildcard } from './patterns.js'
 
 /** Claude Code's documented wildcard table: rule, commands it matches, commands it does not. */
 const COMMAND_TABLE: [string, string[], string[]][] = [
@@ -67,5 +67,35 @@ describe('names and values', () => {
     expect(valueMatches('true', true)).toBe(true)
     expect(valueMatches('*', undefined)).toBe(false)
     expect(valueMatches('*', { nested: 1 })).toBe(false)
+  })
+})
+
+describe('wildcards', () => {
+  it.each([
+    ['a*c', 'abc', true],
+    ['a*c', 'ab', false],
+    ['*', '', true],
+    ['', '', true],
+    ['a**b', 'ab', true],
+    ['*a*b*', 'xxaxxbxx', true],
+    ['*a*b', 'xxbxxa', false],
+    ['a.b', 'axb', false],
+    ['x*', 'x\ny', true],
+  ])('%s on %s is %s', (glob, text, matches) => {
+    expect(wildcard(glob, text)).toBe(matches)
+  })
+
+  it('reads ? as one character only when asked', () => {
+    expect(wildcard('B?sh', 'Bash', true)).toBe(true)
+    expect(wildcard('B?sh', 'Bash')).toBe(false)
+    expect(wildcard('B?sh', 'B?sh')).toBe(true)
+  })
+
+  it('stays linear on a long call that a many-star rule does not match', () => {
+    const text = `${'a '.repeat(200_000)}b`
+    const started = performance.now()
+    expect(commandMatches('a * a * a * a * c', text)).toBe(false)
+    expect(valueMatches('*a*a*a*a*c', text)).toBe(false)
+    expect(performance.now() - started).toBeLessThan(1000)
   })
 })

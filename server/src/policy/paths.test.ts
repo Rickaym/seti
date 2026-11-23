@@ -62,6 +62,17 @@ describe('path rule depth', () => {
     expect(pathMatches('!sample.env', '/work/app/sample.env', 'deny', scope)).toBe(false)
     expect(pathMatches('*', '/anything/at/all', 'deny', scope)).toBe(true)
   })
+
+  it('never allows a path longer than the system opens, and lets every deny cover it', () => {
+    const long = `/work/app/${'a/'.repeat(3000)}x`
+    expect(pathMatches('/**', long, 'allow', scope)).toBe(false)
+    expect(pathMatches('nothing-like-it', long, 'deny', scope)).toBe(true)
+  })
+
+  it('reads repeated ** as one', () => {
+    expect(pathMatches('/**/**/x', '/work/app/a/b/x', 'allow', scope)).toBe(true)
+    expect(pathMatches('/**/**/x', '/work/app/x', 'allow', scope)).toBe(true)
+  })
 })
 
 describe('resolving paths', () => {
