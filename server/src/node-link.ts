@@ -84,7 +84,11 @@ export const nodeLink = {
 export type NodeEnd = { [K in NodeCommandType]: (command: NodeCommand<K>) => Promise<NodeReply<K>> | NodeReply<K> }
 
 /** A node in another process, reached over the node socket; its answers are checked here. */
-export type RemoteNode = (type: NodeCommandType, command: unknown) => Promise<unknown>
+export interface RemoteNode {
+  command: (type: NodeCommandType, command: unknown) => Promise<unknown>
+  /** Resolves once what the node reported before its last answer about the agent is applied. */
+  settled: (agent: string) => Promise<void>
+}
 
 let node: NodeEnd | null = null
 let remoteNode: RemoteNode | null = null
@@ -115,8 +119,10 @@ export const controlLink = {
     if (remoteNode === null) {
       return runHere(type, command)
     }
-    return schemas.answer.parse(await remoteNode(type, schemas.body.parse(command)))
+    return schemas.answer.parse(await remoteNode.command(type, schemas.body.parse(command)))
   },
+  /** Resolves once the control plane applied what the node reported before its last answer. */
+  settled: async (agent: string): Promise<void> => remoteNode?.settled(agent),
   /** Runs a command the control plane sent over the socket, checking it as a command made here. */
   run: async (type: NodeCommandType, command: unknown): Promise<unknown> => runHere(type, command),
 }

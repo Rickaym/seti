@@ -94,6 +94,9 @@ describe('control link', () => {
       'session.close': ({ onlyIdle }) => ({ closed: !onlyIdle }),
       'background.stop': () => ({ stopped: false }),
       'mcp.status': () => ({ servers: null }),
+      'scopes.read': () => ({ memory: [], cpu: [] }),
+      'scopes.agents': () => ({ agents: [TASK] }),
+      'scopes.cap': () => ({}),
     }
     serveControl(end)
     await expect(controlLink.command('mode.set', { agent: TASK, mode: 'default' })).resolves.toEqual({

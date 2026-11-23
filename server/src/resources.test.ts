@@ -152,7 +152,7 @@ describe('the sampler on a fixture /proc', () => {
 
   it('maps processes to tasks and measures CPU over the interval, not the lifetime', async () => {
     spin(0)
-    const sampler = new ResourceSampler(new Proc(fixture.root), SERVER)
+    const sampler = new ResourceSampler(new Proc(fixture.root), SERVER, () => [SERVER])
     const first = await sampler.sample()
     expect(first.tasks.map((t) => [t.pid, t.task?.title ?? null, t.cpu_percent])).toEqual([
       [TASK_PROC, 'Spinning task', null],
@@ -180,7 +180,7 @@ describe('the sampler on a fixture /proc', () => {
   it('flags a Bash call that spins with no child process, and clears it once a child runs', async () => {
     spin(0)
     trackToolCalls(taskId, projectClaude(bashCall('git status')), T0)
-    const sampler = new ResourceSampler(new Proc(fixture.root), SERVER)
+    const sampler = new ResourceSampler(new Proc(fixture.root), SERVER, () => [SERVER])
     const hung = await sampleEvery10s(sampler, 7, 700)
     expect(hung.tasks[0]).toMatchObject({ tool: { name: 'Bash', command: 'git status', age_s: 70 } })
     expect(hung.tasks[0]?.flags).toContain('hang')
@@ -197,7 +197,7 @@ describe('the sampler on a fixture /proc', () => {
 
   it('finds the EA by its listening socket and reports the other components', async () => {
     spin(0)
-    const sampler = new ResourceSampler(new Proc(fixture.root), SERVER)
+    const sampler = new ResourceSampler(new Proc(fixture.root), SERVER, () => [SERVER])
     const { components } = await sampler.sample()
     const byId = new Map(components.map((c) => [c.id, c]))
     expect(byId.get('ea')).toMatchObject({ state: 'up', pid: 400, uptime_s: 600 })

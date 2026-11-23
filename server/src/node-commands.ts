@@ -1,7 +1,9 @@
-import type { NodeReply } from '@seti/shared'
+import type { NodeCommand, NodeReply } from '@seti/shared'
 import type { LiveSession } from './agent-session.js'
+import { liveScopes } from './memory-scope.js'
 import { serveControl } from './node-link.js'
 import type { DefaultShapes } from './runtimes/registry.js'
+import { applyCaps, applyCpuCaps, scopeCpu, scopeMemory } from './scope-limits.js'
 import {
   closeIdleSession,
   endSession,
@@ -40,6 +42,14 @@ async function retract(session: LiveSession | undefined, promptId: number): Prom
     return { outcome: 'unsupported', promptId: null }
   }
   return cancelled ? { outcome: 'removed', promptId: session.settle(uuid) } : { outcome: 'taken', promptId: null }
+}
+
+/** Moves the agents' live scopes to the caps the control plane read for them. */
+async function capScopes({ memory, cpu }: NodeCommand<'scopes.cap'>): Promise<void> {
+  const memoryOf = new Map(memory.map(({ agent, cap }) => [agent, cap]))
+  const cpuOf = new Map(cpu.map(({ agent, cap }) => [agent, cap]))
+  await applyCaps(async (agent) => Promise.resolve(memoryOf.get(agent) ?? null))
+  await applyCpuCaps(async (agent) => Promise.resolve(cpuOf.get(agent) ?? null))
 }
 
 /** Cuts the agents' running turns for a restart and waits for them to end, at most `graceMs`. */
@@ -81,6 +91,12 @@ serveControl({
   'queued.retract': async ({ agent, promptId }) => retract(sessionOf(agent), promptId),
   'quiet.restart': ({ agent, at }) => {
     sessionOf(agent)?.restartQuiet(at ?? undefined)
+    return {}
+  },
+  'scopes.read': async ({ agent }) => ({ memory: scopeMemory(agent), cpu: await scopeCpu(agent) }),
+  'scopes.agents': () => ({ agents: [...new Set(liveScopes().map((scope) => scope.plan.taskId))] }),
+  'scopes.cap': async (body) => {
+    await capScopes(body)
     return {}
   },
   'sessions.view': () => ({

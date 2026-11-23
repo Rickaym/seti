@@ -74,6 +74,7 @@ function controlPlane(
       },
     },
     fresh,
+    took: () => undefined,
     stopping: async () => Promise.resolve(),
     ...end,
   })
@@ -115,6 +116,69 @@ describe('the node over its socket', () => {
       { timeout: 5000 },
     )
     expect(second.fresh).not.toHaveBeenCalled()
+  })
+
+  it('answers a command once the control plane applied what the node reported before it', async () => {
+    const reports: { to: ((entry: JournalEntry) => Promise<void>) | null } = { to: null }
+    const node = await startNode({
+      'turn.send': async () => {
+        await reports.to?.({ type: 'turn.started' })
+        return { outcome: 'started' }
+      },
+    })
+    reports.to = async (entry) => node.service.control.journal(AGENT, entry)
+    const applying = { arrived: false, release: () => undefined as unknown }
+    const gate = new Promise<void>((resolve) => {
+      applying.release = resolve
+    })
+    const applied: string[] = []
+    const journal = async (agent: string, entry: JournalEntry) => {
+      applying.arrived = true
+      await gate
+      applied.push(`${agent}:${entry.type}`)
+    }
+    const control = controlPlane(node.socket, new Map(), applied, { journal })
+    await control.client.start()
+    await welcomed(control.client)
+    let answered = false
+    const sent = control.client.command('turn.send', { agent: AGENT }).then((answer) => {
+      answered = true
+      return answer
+    })
+    await vi.waitFor(() => {
+      expect(applying.arrived).toBe(true)
+    })
+    expect(answered).toBe(false)
+    applying.release()
+    await expect(sent).resolves.toEqual({ outcome: 'started' })
+    expect(applied).toEqual([`${AGENT}:turn.started`])
+  })
+
+  it('lets work an entry starts command the node without waiting for the entries after it', async () => {
+    const reports: { to: ((entry: JournalEntry) => Promise<void>) | null } = { to: null }
+    const node = await startNode({
+      'turn.send': async () => {
+        await reports.to?.({ type: 'turn.started' })
+        return { outcome: 'started' }
+      },
+    })
+    reports.to = async (entry) => node.service.control.journal(AGENT, entry)
+    const applied: string[] = []
+    const plane: { client: NodeClient | null } = { client: null }
+    const journal = async (agent: string, entry: JournalEntry) => {
+      applied.push(`${agent}:${entry.type}`)
+      if (entry.type === 'turn.ended') {
+        await plane.client?.command('turn.send', { agent })
+      }
+    }
+    const control = controlPlane(node.socket, new Map(), applied, { journal })
+    plane.client = control.client
+    await control.client.start()
+    await welcomed(control.client)
+    await node.service.control.journal(AGENT, { type: 'turn.ended', status: 'idle', error: null })
+    await vi.waitFor(() => {
+      expect(applied).toEqual([`${AGENT}:turn.ended`, `${AGENT}:turn.started`])
+    })
   })
 
   it('answers an ask the node sent while no control plane was connected, once one is', async () => {

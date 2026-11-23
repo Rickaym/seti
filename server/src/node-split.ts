@@ -5,6 +5,7 @@ import { wakeWaiting } from './inputs.js'
 import { checkNodeSocket } from './node/socket.js'
 import { NodeClient } from './node-client.js'
 import { nodeLink, reachNode } from './node-link.js'
+import { setNodePid } from './node-pid.js'
 import { notifyInterrupted } from './notifications.js'
 import { recordAndCut } from './restart-cut.js'
 import { markRestartCut, resumeInterrupted } from './restart-resume.js'
@@ -54,10 +55,14 @@ export async function connectNode(): Promise<void> {
     answer: async ({ agent, ask, body }, signal) => nodeLink.answer(agent, ask, body, signal),
     cursors: nodeCursors,
     fresh: takeUpLostTurns,
+    took: setNodePid,
     stopping: async () => {
       await recordAndCut("Seti's node")
     },
   })
-  reachNode(async (type, body) => client.command(type, body))
+  reachNode({
+    command: async (type, body) => client.command(type, body),
+    settled: async (agent) => client.settled(agent),
+  })
   await client.start()
 }
