@@ -1,4 +1,4 @@
-import { type MessageRow, jsonText, type CodeLanguage } from '@seti/shared'
+import { type WireRow, jsonText, type CodeLanguage } from '@seti/shared'
 import {
   Activity,
   AlertTriangle,
@@ -49,19 +49,13 @@ import {
   type ToolUseBlock,
 } from '@/lib/transcript'
 import { cn } from '@/lib/utils'
+import { asEvents } from '@/lib/wire'
 import { ToolFileButton } from '@/panels/files/FileLink'
 
-/** Tools that write a file, whose card links to it in Files. */
-const FILE_TOOLS: Partial<Record<string, string>> = {
-  Write: 'file_path',
-  Edit: 'file_path',
-  MultiEdit: 'file_path',
-  NotebookEdit: 'notebook_path',
-}
-
+/** The file a call that edits one changes, whose card links to it in Files. */
 const touchedFile = (block: ToolUseBlock) => {
-  const key = FILE_TOOLS[block.name]
-  return key === undefined ? undefined : inputString(block.input, key)
+  const path = block.edit?.changes[0]?.path
+  return path === '' ? undefined : path
 }
 
 const ICONS: Record<ToolKind, LucideIcon> = {
@@ -86,7 +80,7 @@ export interface FullSource {
   taskId: string
   rowId: number
   toolUseId: string
-  pick: (row: MessageRow, toolUseId: string) => string
+  pick: (row: WireRow, toolUseId: string) => string
 }
 
 interface TrimmedTextProps {
@@ -118,7 +112,7 @@ export function TrimmedText({ text, source, label, className, copy = 'Copy code'
   const load = async (from: FullSource) => {
     setLoading(true)
     try {
-      const row = await apiGet<MessageRow>(`/tasks/${from.taskId}/messages/${String(from.rowId)}`)
+      const row = await apiGet<WireRow>(asEvents(`/tasks/${from.taskId}/messages/${String(from.rowId)}`))
       setFull(from.pick(row, from.toolUseId))
     } catch (e) {
       toast.error(errorText(e))
@@ -149,15 +143,13 @@ export function TrimmedText({ text, source, label, className, copy = 'Copy code'
 }
 
 export function ToolOutput({ taskId, result }: { taskId: string; result: ToolResultRef }) {
-  const source = result.trimmed
-    ? { taskId, rowId: result.rowId, toolUseId: result.block.tool_use_id, pick: fullResultText }
-    : null
+  const source = result.trimmed ? { taskId, rowId: result.rowId, toolUseId: result.callId, pick: fullResultText } : null
   return (
     <TrimmedText
-      text={resultText(result.block.content)}
+      text={resultText(result)}
       source={source}
       label="Full output"
-      className={cn('max-h-96', result.block.is_error === true && 'text-destructive')}
+      className={cn('max-h-96', result.failed && 'text-destructive')}
     />
   )
 }
@@ -249,8 +241,8 @@ function CallStatus({ block, startedAt, result, running, background }: StatusPro
       </span>
     )
   }
-  if (result.block.is_error === true) {
-    const code = exitCode(resultText(result.block.content))
+  if (result.failed) {
+    const code = exitCode(resultText(result))
     return (
       <span className="flex shrink-0 items-center gap-0.5 text-destructive" data-testid="tool-failed">
         <X aria-hidden className="size-3" />
@@ -269,7 +261,7 @@ function CallStatus({ block, startedAt, result, running, background }: StatusPro
         data-testid="tool-background"
       >
         {watching && <Spinner />}
-        {watching && block.name === 'Monitor' ? 'watching' : BACKGROUND_LABEL[background]}
+        {watching && block.shell?.action === 'watch' ? 'watching' : BACKGROUND_LABEL[background]}
       </span>
     )
   }
@@ -318,7 +310,7 @@ function CallName({ block }: { block: ToolUseBlock }) {
   const summary = toolSummary(block)
   return (
     <>
-      <ToolKindIcon kind={toolKind(block.name)} className="size-3 text-muted-foreground" />
+      <ToolKindIcon kind={toolKind(block)} className="size-3 text-muted-foreground" />
       <span className="min-w-0 truncate font-semibold" title={block.name}>
         {name.server !== null && <span className="font-normal text-muted-foreground">{name.server}.</span>}
         {name.name}
@@ -369,9 +361,9 @@ export function ToolCall({
   running,
   background,
 }: ToolCallProps) {
-  const failed = result?.block.is_error === true
-  const inputSource = inputTrimmed ? { taskId, rowId, toolUseId: block.id, pick: fullInputText } : null
-  const output = result ? resultText(result.block.content) : ''
+  const failed = result?.failed === true
+  const inputSource = inputTrimmed ? { taskId, rowId, toolUseId: block.callId, pick: fullInputText } : null
+  const output = result ? resultText(result) : ''
   const refused = refusals(output)
   const touched = touchedFile(block)
   return (

@@ -1,4 +1,4 @@
-import type { MessageRow } from '@seti/shared'
+import type { WireRow } from '@seti/shared'
 import { ChevronRight, ShieldAlert, X } from 'lucide-react'
 import { memo, useContext, useMemo, useState, type ReactNode } from 'react'
 import { FindFocusContext } from '@/hooks/useFindMarks'
@@ -13,10 +13,10 @@ interface GroupCall {
   outward: boolean
 }
 
-function groupCalls(rows: readonly MessageRow[]): GroupCall[] {
+function groupCalls(rows: readonly WireRow[]): GroupCall[] {
   return rows.flatMap((row) => {
     const outward = new Set(row.outward)
-    return rowCalls(row).map((block) => ({ block, at: row.created_at, outward: outward.has(block.id) }))
+    return rowCalls(row).map((block) => ({ block, at: row.created_at, outward: outward.has(block.callId) }))
   })
 }
 
@@ -27,9 +27,7 @@ function KindIcons({
   calls: readonly GroupCall[]
   results: readonly (ToolResultRef | undefined)[]
 }) {
-  const tallies = kindTallies(
-    calls.map((call, n) => ({ name: call.block.name, failed: results[n]?.block.is_error === true })),
-  )
+  const tallies = kindTallies(calls.map((call, n) => ({ call: call.block, failed: results[n]?.failed === true })))
   return (
     <span aria-hidden className="flex shrink-0 items-center gap-1 text-muted-foreground max-sm:hidden">
       {tallies.map((tally) => (
@@ -48,14 +46,14 @@ function KindIcons({
 }
 
 interface ToolGroupProps {
-  rows: readonly MessageRow[]
+  rows: readonly WireRow[]
   /** Results of the group's calls, in call order. */
   results: readonly (ToolResultRef | undefined)[]
   /** Background processes the group's calls started, in call order. */
   background: readonly (BackgroundStatus | undefined)[]
   /** The task is running, so a call without a result is still going. */
   running: boolean
-  renderRow: (row: MessageRow) => ReactNode
+  renderRow: (row: WireRow) => ReactNode
 }
 
 /** What needs a look inside a folded group: outward calls, sandbox refusals and failures. */
@@ -86,7 +84,7 @@ function GroupMarks({ outward, refused, failed }: { outward: number; refused: re
 }
 
 /** Whether find stepped to a message inside the group: one of its rows or one of its results. */
-function holds(rows: readonly MessageRow[], results: ToolGroupProps['results'], id: number | null): boolean {
+function holds(rows: readonly WireRow[], results: ToolGroupProps['results'], id: number | null): boolean {
   return id !== null && (rows.some((row) => row.id === id) || results.some((result) => result?.rowId === id))
 }
 
@@ -96,11 +94,11 @@ function ToolGroupView({ rows, results, background, running, renderRow }: ToolGr
   const focusId = useContext(FindFocusContext)
   const open = expanded || holds(rows, results, focusId)
   const calls = useMemo(() => groupCalls(rows), [rows])
-  const label = useMemo(() => groupLabel(calls.map((call) => call.block.name)), [calls])
-  const failed = results.filter((result) => result?.block.is_error === true).length
+  const label = useMemo(() => groupLabel(calls.map((call) => call.block)), [calls])
+  const failed = results.filter((result) => result?.failed === true).length
   const outward = calls.filter((call) => call.outward).length
   const refused = useMemo(
-    () => results.flatMap((result) => (result === undefined ? [] : refusals(resultText(result.block.content)))),
+    () => results.flatMap((result) => (result === undefined ? [] : refusals(resultText(result)))),
     [results],
   )
   const pending = running ? calls.findIndex((_, n) => results[n] === undefined) : -1

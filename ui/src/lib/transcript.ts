@@ -1,23 +1,25 @@
-import type { SDKAssistantMessage, SDKUserMessage } from '@anthropic-ai/claude-agent-sdk'
 import {
   SHELL_CONTEXT_RUNS,
   eventsOf,
   heldForMessage,
+  isRuntimeRow,
   quietReason,
   rowEvents,
   type EventOf,
-  type MessageRow,
+  type WireRow,
   type RuntimeEvent,
+  type ToolCall,
+  type ToolResult,
 } from '@seti/shared'
 
-type AssistantBlock = SDKAssistantMessage['message']['content'][number]
-export type ToolUseBlock = Extract<AssistantBlock, { type: 'tool_use' }>
-type UserBlock = Exclude<SDKUserMessage['message']['content'], string>[number]
-type ToolResultBlock = Extract<UserBlock, { type: 'tool_result' }>
+/** A tool call as the transcript shows it. */
+export type ToolUseBlock = ToolCall
 
 /** A tool result and the stored message it came from, which holds it in full. */
 export interface ToolResultRef {
-  block: ToolResultBlock
+  callId: string
+  failed: boolean
+  result: ToolResult
   rowId: number
   /** When the result arrived, which ends the call's duration. */
   at: string
@@ -46,54 +48,40 @@ export function inputString(input: unknown, key: string): string | undefined {
 
 const NO_RESULTS: readonly ToolResultRef[] = []
 const NO_CALLS: readonly ToolUseBlock[] = []
-const resultCache = new WeakMap<MessageRow, readonly ToolResultRef[]>()
-const callCache = new WeakMap<MessageRow, readonly ToolUseBlock[]>()
-
-const isToolUse = (block: AssistantBlock): block is ToolUseBlock => block.type === 'tool_use'
-
-/** Reads a row's blocks; a malformed row reads as none, so it cannot break the rows around it. */
-function tolerant<T>(read: () => readonly T[], none: readonly T[]): readonly T[] {
-  try {
-    return read()
-  } catch {
-    return none
-  }
-}
+const resultCache = new WeakMap<WireRow, readonly ToolResultRef[]>()
+const callCache = new WeakMap<WireRow, readonly ToolUseBlock[]>()
 
 /** Tool results in a row, cached per row object so memoized rows get stable references. */
-export function rowResults(row: MessageRow): readonly ToolResultRef[] {
-  if (row.kind !== 'sdk' || row.payload.type !== 'user' || typeof row.payload.message.content === 'string') {
-    return NO_RESULTS
-  }
+export function rowResults(row: WireRow): readonly ToolResultRef[] {
   const cached = resultCache.get(row)
   if (cached) {
     return cached
   }
   const trimmed = new Set(row.trimmed)
-  const { content } = row.payload.message
-  const refs = tolerant(
-    () =>
-      content.flatMap((block) =>
-        block.type === 'tool_result'
-          ? [{ block, rowId: row.id, at: row.created_at, trimmed: trimmed.has(block.tool_use_id) }]
-          : [],
-      ),
-    NO_RESULTS,
-  )
+  const ends = eventsOf(rowEvents(row), 'tool.ended')
+  const refs =
+    ends.length === 0
+      ? NO_RESULTS
+      : ends.map((end) => ({
+          callId: end.callId,
+          failed: end.status !== 'ok',
+          result: end.result,
+          rowId: row.id,
+          at: row.created_at,
+          trimmed: trimmed.has(end.callId),
+        }))
   resultCache.set(row, refs)
   return refs
 }
 
-export function rowCalls(row: MessageRow): readonly ToolUseBlock[] {
-  if (row.kind !== 'sdk' || row.payload.type !== 'assistant') {
-    return NO_CALLS
-  }
+/** Tool calls in a row, cached per row object so memoized rows get stable references. */
+export function rowCalls(row: WireRow): readonly ToolUseBlock[] {
   const cached = callCache.get(row)
   if (cached) {
     return cached
   }
-  const { message } = row.payload
-  const calls = tolerant(() => message.content.filter(isToolUse), NO_CALLS)
+  const starts = eventsOf(rowEvents(row), 'tool.started')
+  const calls = starts.length === 0 ? NO_CALLS : starts.map((start) => start.call)
   callCache.set(row, calls)
   return calls
 }
@@ -123,7 +111,7 @@ function trackBackground(event: RuntimeEvent, owners: Map<string, string>, backg
   }
 }
 
-export function indexTranscript(rows: readonly MessageRow[]): TranscriptIndex {
+export function indexTranscript(rows: readonly WireRow[]): TranscriptIndex {
   const results = new Map<string, ToolResultRef>()
   const calls = new Set<string>()
   const hiddenInits = new Set<number>()
@@ -141,21 +129,21 @@ export function indexTranscript(rows: readonly MessageRow[]): TranscriptIndex {
       }
     }
     for (const ref of rowResults(row)) {
-      results.set(ref.block.tool_use_id, ref)
+      results.set(ref.callId, ref)
     }
     for (const call of rowCalls(row)) {
-      calls.add(call.id)
+      calls.add(call.callId)
     }
   }
   return { results, calls, hiddenInits, background }
 }
 
 /** What a slash command that runs without the model printed, or null for other rows. */
-export const localCommandOutput = (row: MessageRow): string | null =>
+export const localCommandOutput = (row: WireRow): string | null =>
   eventsOf(rowEvents(row), 'message').find((event) => event.role === 'command')?.text ?? null
 
 /** Whether a row shows up in the transcript, so counts of new messages skip bookkeeping rows. */
-export function rendersContent(row: MessageRow): boolean {
+export function rendersContent(row: WireRow): boolean {
   try {
     return shows(row)
   } catch {
@@ -185,15 +173,15 @@ function showsEvent(event: RuntimeEvent): boolean {
 }
 
 /** Throws for a runtime row its projector could not read, so the row shows that it failed. */
-export function assertReadable(row: MessageRow): void {
+export function assertReadable(row: WireRow): void {
   const unreadable = eventsOf(rowEvents(row), 'vendor').find((event) => event.unreadable === true)
   if (unreadable !== undefined) {
     throw new Error(`Stored ${unreadable.name} message does not fit its runtime`)
   }
 }
 
-function shows(row: MessageRow): boolean {
-  return row.kind !== 'sdk' || rowEvents(row).some(showsEvent)
+function shows(row: WireRow): boolean {
+  return !isRuntimeRow(row) || rowEvents(row).some(showsEvent)
 }
 
 /** Events of what an agent said, did and was told, which carry the thread of the agent. */
@@ -206,17 +194,17 @@ const THREADED: ReadonlySet<RuntimeEvent['type']> = new Set([
 ])
 
 /** The subagent thread a row's runtime messages belong to, or null for the task agent's own. */
-export function subagentOf(row: MessageRow): string | null {
+export function subagentOf(row: WireRow): string | null {
   const thread = rowEvents(row).find((event) => THREADED.has(event.type))?.thread
   return thread === undefined || thread === '' ? null : thread
 }
 
 /** The Agent call of the subagent a PR update was routed to on behalf of, if any. */
-export const routedSubagentOf = (row: MessageRow): string | null =>
+export const routedSubagentOf = (row: WireRow): string | null =>
   row.kind === 'input' && row.payload.source === 'pr' ? (row.payload.subtask?.tool_use_id ?? null) : null
 
 /** New rows shown since `afterId`; subagent rows count only in a subtask's own transcript. */
-export function countNewer(rows: readonly MessageRow[], afterId: number, subagentRows: boolean): number {
+export function countNewer(rows: readonly WireRow[], afterId: number, subagentRows: boolean): number {
   let count = 0
   for (let i = rows.length - 1; i >= 0; i--) {
     const row = rows[i]
@@ -231,7 +219,7 @@ export function countNewer(rows: readonly MessageRow[], afterId: number, subagen
 }
 
 /** Merges rows by ascending id, keeping existing row objects, and `rows` itself when unchanged. */
-export function mergeRows(rows: readonly MessageRow[], incoming: readonly MessageRow[]): readonly MessageRow[] {
+export function mergeRows(rows: readonly WireRow[], incoming: readonly WireRow[]): readonly WireRow[] {
   const first = rows[0]
   const last = rows.at(-1)
   const incomingFirst = incoming[0]
@@ -257,43 +245,37 @@ export function mergeRows(rows: readonly MessageRow[], incoming: readonly Messag
 }
 
 /** Swaps in a newer copy of a loaded row; rows that are not loaded stay out. */
-export function replaceRow(rows: readonly MessageRow[], row: MessageRow): readonly MessageRow[] {
+export function replaceRow(rows: readonly WireRow[], row: WireRow): readonly WireRow[] {
   const index = rows.findIndex((loaded) => loaded.id === row.id)
   return index < 0 ? rows : rows.with(index, row)
 }
 
-export function resultText(content: ToolResultBlock['content']): string {
-  if (content === undefined) {
-    return ''
-  }
-  if (typeof content === 'string') {
-    return content
-  }
-  return content.map((block) => (block.type === 'text' ? block.text : `[${block.type}]`)).join('\n')
-}
+/** A result's text as the transcript shows it, with a marker for each part that is not text. */
+export const resultText = (ref: Pick<ToolResultRef, 'result'> | undefined): string =>
+  ref === undefined ? '' : (ref.result.shown ?? ref.result.text)
 
-export const fullResultText = (row: MessageRow, toolUseId: string) =>
-  resultText(rowResults(row).find((ref) => ref.block.tool_use_id === toolUseId)?.block.content)
+export const fullResultText = (row: WireRow, toolUseId: string) =>
+  resultText(rowResults(row).find((ref) => ref.callId === toolUseId))
 
-export const fullInputText = (row: MessageRow, toolUseId: string) =>
-  JSON.stringify(rowCalls(row).find((call) => call.id === toolUseId)?.input, null, 2)
+export const fullInputText = (row: WireRow, toolUseId: string) =>
+  JSON.stringify(rowCalls(row).find((call) => call.callId === toolUseId)?.input, null, 2)
 
-export const fullCommandText = (row: MessageRow, toolUseId: string) =>
-  inputString(rowCalls(row).find((call) => call.id === toolUseId)?.input, 'command') ?? ''
+export const fullCommandText = (row: WireRow, toolUseId: string) =>
+  inputString(rowCalls(row).find((call) => call.callId === toolUseId)?.input, 'command') ?? ''
 
 /** A prompt the agent reads with what waited for it: not a slash command, not taken back. */
-const readsPending = (row: MessageRow) =>
+const readsPending = (row: WireRow) =>
   row.kind === 'prompt' && !row.payload.text.startsWith('/') && row.payload.queued !== 'removed'
 
 /** Whether the prompt also took the updates held for the user's next message. */
-const takesHeld = (row: MessageRow) => row.kind === 'prompt' && (row.payload.auto !== true || row.payload.held === true)
+const takesHeld = (row: WireRow) => row.kind === 'prompt' && (row.payload.auto !== true || row.payload.held === true)
 
 /**
  * Updates waiting for the agent: undismissed, not quiet input rows after the last prompt it read.
  * Updates held for the user's next message outlast the turns Seti starts by itself.
  */
-export function queuedInputs(rows: readonly MessageRow[]): Extract<MessageRow, { kind: 'input' }>[] {
-  let queued: Extract<MessageRow, { kind: 'input' }>[] = []
+export function queuedInputs(rows: readonly WireRow[]): Extract<WireRow, { kind: 'input' }>[] {
+  let queued: Extract<WireRow, { kind: 'input' }>[] = []
   for (const row of rows) {
     if (readsPending(row)) {
       queued = takesHeld(row) ? [] : queued.filter((input) => heldForMessage(input.payload))
@@ -308,14 +290,14 @@ export function queuedInputs(rows: readonly MessageRow[]): Extract<MessageRow, {
   return queued
 }
 
-export const queuedInputIds = (rows: readonly MessageRow[]): Set<number> =>
+export const queuedInputIds = (rows: readonly WireRow[]): Set<number> =>
   new Set(queuedInputs(rows).map((row) => row.id))
 
 /** Whether a `!` run goes with the next message, or waits past the newest few that do. */
 export type ShellDelivery = 'next' | 'dropped'
 
 /** Shell runs since the last prompt the agent read, as `shellRuns.sinceLastTurn` picks them. */
-export function shellDeliveries(rows: readonly MessageRow[]): Map<number, ShellDelivery> {
+export function shellDeliveries(rows: readonly WireRow[]): Map<number, ShellDelivery> {
   let pending: number[] = []
   for (const row of rows) {
     if (readsPending(row)) {
@@ -340,7 +322,7 @@ function replyTail(event: RuntimeEvent, tail: readonly string[]): readonly strin
 }
 
 /** Each turn's reply by its result row: the Markdown of its texts after the last tool call. */
-export function turnReplies(rows: readonly MessageRow[]): Map<number, string> {
+export function turnReplies(rows: readonly WireRow[]): Map<number, string> {
   const replies = new Map<number, string>()
   let tail: readonly string[] = []
   for (const row of rows) {

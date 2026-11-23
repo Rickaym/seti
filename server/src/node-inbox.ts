@@ -1,4 +1,5 @@
-import type { AskFrame, AskReply, JournalAppend, JournalEntry, JournalReply } from '@seti/shared'
+import { AsyncLocalStorage } from 'node:async_hooks'
+import type { AskCancel, AskFrame, AskReply, JournalAppend, JournalEntry, JournalReply } from '@seti/shared'
 import type { JournalPosition } from './node-outbox.js'
 
 /** How long the control plane keeps an ask's answer, so a retried ask never runs twice. */
@@ -20,6 +21,9 @@ class Cursor {
   applied: Promise<void>
   /** Entries that arrived ahead of a gap, by number. */
   private readonly held = new Map<number, JournalEntry>()
+
+  /** Waits for entries not received yet, each woken once its entry is applied. */
+  private waiters: { seq: number; wake: () => void }[] = []
 
   constructor(epoch: string, received: number, applied: Promise<void> = Promise.resolve()) {
     this.epoch = epoch
@@ -48,6 +52,32 @@ class Cursor {
   then(work: () => Promise<void>): void {
     this.applied = this.applied.then(work)
   }
+
+  /** Resolves once the entry `seq` is applied, or once this journal is replaced. */
+  async reached(seq: number): Promise<void> {
+    if (seq <= this.received) {
+      return this.applied
+    }
+    return new Promise((wake) => {
+      this.waiters.push({ seq, wake })
+    })
+  }
+
+  /** Wakes the waits whose entries are now received, once those are applied. */
+  wakeReceived(): void {
+    const due = this.waiters.filter(({ seq }) => seq <= this.received)
+    this.waiters = this.waiters.filter(({ seq }) => seq > this.received)
+    for (const { wake } of due) {
+      void this.applied.then(wake)
+    }
+  }
+
+  /** The journal is replaced or refused: nothing more of it arrives, so no wait goes on. */
+  release(): void {
+    for (const { wake } of this.waiters.splice(0)) {
+      wake()
+    }
+  }
 }
 
 /**
@@ -56,6 +86,9 @@ class Cursor {
  */
 export class JournalInbox {
   private readonly cursors = new Map<string, Cursor>()
+
+  /** The agent whose entry is being applied, for work that entry starts. */
+  private readonly applying = new AsyncLocalStorage<string>()
   private readonly apply: (agent: string, entry: JournalEntry) => Promise<void>
   private readonly reply: (frame: JournalReply) => void
   private readonly saved: (cursor: SavedCursor) => Promise<void>
@@ -113,6 +146,19 @@ export class JournalInbox {
     return true
   }
 
+  /** True inside the apply of an entry, which must not wait for the entries after it. */
+  inApply(): boolean {
+    return this.applying.getStore() !== undefined
+  }
+
+  /** Resolves once the agent's entries up to `mark` are applied, or its journal is replaced. */
+  async applied(mark: SavedCursor): Promise<void> {
+    const cursor = this.cursors.get(mark.agent)
+    if (cursor?.epoch === mark.epoch) {
+      await cursor.reached(mark.seq)
+    }
+  }
+
   receive(frame: JournalAppend): void {
     const cursor = this.cursorFor(frame)
     if (cursor === null) {
@@ -125,6 +171,7 @@ export class JournalInbox {
     for (const { seq, entry } of cursor.takeReady()) {
       cursor.then(async () => this.applyOne(frame.agent, cursor.epoch, seq, entry))
     }
+    cursor.wakeReceived()
   }
 
   /** The agent's cursor for the run: a new journal starts at 1; any other must be the known one. */
@@ -137,6 +184,7 @@ export class JournalInbox {
       return null
     }
     const fresh = new Cursor(frame.epoch, 0, cursor?.applied)
+    cursor?.release()
     this.cursors.set(frame.agent, fresh)
     return fresh
   }
@@ -155,11 +203,14 @@ export class JournalInbox {
     } catch (e) {
       this.stopped = new Error(`agent ${agent}'s cursor ${String(seq)} was not kept: ${String(e)}`)
       process.stderr.write(`node link: stopped applying the node's entries: ${this.stopped.message}\n`)
+      for (const cursor of this.cursors.values()) {
+        cursor.release()
+      }
       this.stop(this.stopped)
       return
     }
     try {
-      await this.apply(agent, entry)
+      await this.applying.run(agent, async () => this.apply(agent, entry))
     } catch (e) {
       process.stderr.write(`node link: agent ${agent}: entry ${String(seq)} failed: ${String(e)}\n`)
     }
@@ -167,6 +218,10 @@ export class JournalInbox {
   }
 
   private refuse(agent: string, epoch: string, reason: string): void {
+    const cursor = this.cursors.get(agent)
+    if (cursor?.epoch === epoch) {
+      cursor.release()
+    }
     this.reply({ type: 'journal.reject', agent, epoch, reason })
   }
 }
@@ -174,15 +229,16 @@ export class JournalInbox {
 interface Answered {
   reply: Promise<AskReply>
   at: number
+  abort: AbortController
 }
 
 /** The control plane's side of asks: each ask id is answered once, and a retry gets that answer. */
 export class AskLedger {
   private readonly answers = new Map<string, Answered>()
-  private readonly answer: (frame: AskFrame) => Promise<unknown>
+  private readonly answer: (frame: AskFrame, signal: AbortSignal) => Promise<unknown>
   private readonly now: () => number
 
-  constructor(answer: (frame: AskFrame) => Promise<unknown>, now: () => number = Date.now) {
+  constructor(answer: (frame: AskFrame, signal: AbortSignal) => Promise<unknown>, now: () => number = Date.now) {
     this.answer = answer
     this.now = now
   }
@@ -193,8 +249,9 @@ export class AskLedger {
     if (known !== undefined) {
       return known.reply
     }
+    const abort = new AbortController()
     const reply = Promise.resolve(frame)
-      .then(this.answer)
+      .then(async (asked) => this.answer(asked, abort.signal))
       .then(
         (answer): AskReply => ({ type: 'ask.answer', id: frame.id, answer }),
         (e: unknown): AskReply => ({
@@ -203,8 +260,13 @@ export class AskLedger {
           error: e instanceof Error ? e.message : String(e),
         }),
       )
-    this.answers.set(frame.id, { reply, at: this.now() })
+    this.answers.set(frame.id, { reply, at: this.now(), abort })
     return reply
+  }
+
+  /** The node stopped waiting: the answer in progress is aborted. */
+  cancel({ id }: AskCancel): void {
+    this.answers.get(id)?.abort.abort(new Error('The node stopped waiting for this answer'))
   }
 
   private forgetOld(): void {

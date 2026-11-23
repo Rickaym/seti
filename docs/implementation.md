@@ -23,6 +23,7 @@ their own. Seti uses the reference values in the protocol's Appendix A.
 | Process               | What it is                                                                 | Protocol      |
 | --------------------- | -------------------------------------------------------------------------- | ------------- |
 | `seti.service`        | The Hono server in `server/`; holds the open sessions in `session-host.ts` | ENT-13        |
+| Node (split mode)     | `server/src/node/main.ts` with `SETI_NODE=split`; holds the open sessions  | NODE-1        |
 | Agent sessions        | Claude Code via `runtimes/claude/` and the Agent SDK, about 300 MB each    | 3.2, 7.2, 7.8 |
 | `seti-ea.service`     | The EA in `ea/`, a pipecat process with its own token                      | 14            |
 | Poller workers        | Worker threads in the server (`SETI_POLLER_WORKERS`, 2 by default)         | CHN-12        |
@@ -38,6 +39,12 @@ A stop (SIGTERM or SIGINT) runs `cutRunningTurns` in `server/src/restart-cut.ts`
 systemd's default stop timeout. Startup reads those rows in `server/src/restart-resume.ts`
 (RES-1 to RES-8). A crash leaves no rows, so every agent still `running` is treated as a `user`
 turn.
+
+With `SETI_NODE=split` the sessions run in a separate node process instead, behind
+`SETI_HOME/run/node.sock`. The server connects to it as a client (`node-client.ts`, wired in
+`node-split.ts`), applies its journal from cursors kept in `node_cursor`, answers its asks and sends
+it commands. A stop of the server cuts no turns; a stop of the node has the server record them
+first. `server/src/node/imports.test.ts` lists each module of the node that still loads the store.
 
 One process owning every session caps a host at a few dozen open agents. The path past that is
 runner workers that claim agents from PostgreSQL (`FOR UPDATE SKIP LOCKED` with a lease), with the
@@ -55,14 +62,15 @@ with another top-level folder.
 | 4 Turns        | `runner.ts`, `session-host.ts`, `session-ingest.ts`, `session-spec.ts`, `runtime-host.ts`, `runtimes/`, `agent-session.ts`, `rewind.ts`, `turn-asking.ts`, `closing-line.ts`, `task-location.ts` |
 | 4 Restarts     | `session-restart.ts`, `input-queue.ts`                                                                                                                                                           |
 | 4 Node link    | `node-link.ts`, `node-commands.ts`, `session-control.ts`, `session-mirror.ts`, `session-setup.ts`, `session-tools.ts`, `turn-asks.ts`, `shared/src/node-protocol.ts`                             |
+| 15.1 Node      | `node/`, `node-client.ts`, `node-split.ts`, `node-inbox.ts`, `node-outbox.ts`, `node-pid.ts`, `tool-calls-restore.ts`, `prompt-open.ts`, `store/node-*.ts`, `shared/src/node-frames.ts`          |
 | 5 Updates      | `shared/src/channel-delivery.ts`, `inputs.ts`, `input-preface.ts`                                                                                                                                |
 | 6 Attention    | `shared/src/attention.ts`, `task-blocked.ts`, `stall-watch.ts`, `ea-attention.ts`, `notifications.ts`, `notify-scope.ts`, `presence.ts`, `attention-brief.ts`                                    |
 | 7.1 Actors     | `access.ts`, `ea-guard.ts`                                                                                                                                                                       |
-| 7.2, 7.3       | `sandbox.ts`, `sandbox-mounts.ts`, `egress-proxy.ts`, `egress-rules.ts`, `egress-placeholders.ts`, `sandbox-ca.ts`, `ssh-agent.ts`, `agent-access.ts`                                            |
+| 7.2, 7.3       | `sandbox.ts`, `sandbox-mounts.ts`, `egress-proxy.ts`, `egress-rules.ts`, `egress-placeholders.ts`, `sandbox-ca.ts`, `sandbox-aws-token.ts`, `proxy-owner.ts`, `ssh-agent.ts`, `agent-access.ts`  |
 | 7.4, 7.5       | `permission-policy.ts`, `policy/`, `permission-requests.ts`, `permission-timeout.ts`, `permission-guard.ts`, `repeat-hooks.ts`, `review-hooks.ts`, `shadow-hooks.ts`, `outward.ts`               |
 | 7.6 Changes    | `change-requests.ts`, `change-request-notes.ts`, `mcp-off-context.ts`, `shared/src/change-requests.ts`                                                                                           |
 | 7.7 Hostile    | `git.ts`, `probe-launch.ts`, `task-files.ts`, `html-preview.ts`, `uploads.ts`                                                                                                                    |
-| 7.8 Caps       | `launcher.ts`, `memory-scope.ts`, `scope-cpu.ts`, `oom-guard.ts`                                                                                                                                 |
+| 7.8 Caps       | `launcher.ts`, `memory-scope.ts`, `scope-cpu.ts`, `scope-limits.ts`, `scope-control.ts`, `oom-guard.ts`                                                                                          |
 | 8 Secrets      | `secret-box.ts`, `connections.ts`, `scrub.ts`, `secret-questions.ts`, `secret-delivery.ts`                                                                                                       |
 | 9 Shared tools | `shared/src/shared-tools.ts`, `shared-tool-proposals.ts`, `shared-tool-files.ts`, `shared-tool-server.ts`                                                                                        |
 | 10 Events      | `shared/src/webhook-senders.ts`, `shared/src/webhook-sender-catalog.ts`, `channels/`, `pollers/`, `reminders/`, `quickjs/`                                                                       |
@@ -89,7 +97,9 @@ with another top-level folder.
   `turn_steps` and `turn_reply`. Queries filter on these columns, not on the runtime's JSON. A row
   without `runtime` is not filled yet; startup fills such rows in the background, newest first
   (`server/src/store/event-columns.ts`). Until then the filters in `server/src/store/event-filters.ts`
-  read such a row by its JSON, so every view shows it as before.
+  read such a row by its JSON, so every view shows it as before. The browser asks for runtime rows
+  as events (`wire=events`), which `transcript.ts` projects from the cut, redacted copy; a client
+  that does not ask gets the stored form (RT-6).
 - Redis holds only what can be rebuilt: GitHub PR lists and the GraphQL budget, capability and
   account probes, the EA's live context, and pub/sub for agent events and group chat across
   processes. It keeps nothing on disk and never holds a token. `SETI_REDIS_URL=off` costs cache

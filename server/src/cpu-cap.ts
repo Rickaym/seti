@@ -15,7 +15,7 @@ import { audit } from './audit.js'
 import { refuseAgent } from './ea-guard.js'
 import { HttpError } from './http.js'
 import { scopeHost } from './memory-scope.js'
-import { applyCpuCaps } from './scope-limits.js'
+import { capCpuScopes } from './scope-control.js'
 import { cpuSettings, taskCpuCaps } from './store/cpu.js'
 
 /** Every core of this host in percent of one, nproc x 100: the highest cap there is. */
@@ -71,7 +71,7 @@ export async function updateCpuCap(cap: CpuCap, actor: AuditActor = 'user'): Pro
       cap.quota_percent === null ? 'Turned the agent CPU cap off' : `Set the agent CPU cap to ${cpuCapLabel(cap)}`,
     detail: { ...cap, was_quota_percent: before.quota_percent },
   })
-  await applyCpuCaps(async (taskId) => ((await taskCpuCaps.get(taskId)) === null ? cap : null))
+  await capCpuScopes(async (taskId) => ((await taskCpuCaps.get(taskId)) === null ? cap : null))
   return cpuCapSettings()
 }
 
@@ -111,6 +111,6 @@ export async function setTaskCpuCap(task: Task, cap: CpuCap | null, actor: Audit
     summary: taskSummary(task, cap),
     detail: { title: task.title, ...result.effective, own: cap !== null },
   })
-  await applyCpuCaps(async (taskId) => Promise.resolve(taskId === task.id ? result.effective : null))
+  await capCpuScopes(async (taskId) => Promise.resolve(taskId === task.id ? result.effective : null))
   return result
 }

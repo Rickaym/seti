@@ -1,7 +1,7 @@
-import type { MessagePage, MessageRow } from '@seti/shared'
+import type { WirePage, WireRow } from '@seti/shared'
 
 export interface LoadedRows {
-  messages: readonly MessageRow[]
+  messages: readonly WireRow[]
   hasOlder: boolean
 }
 
@@ -31,7 +31,7 @@ export function cacheTranscript(taskId: string, rows: LoadedRows, cursor: string
 }
 
 /** Takes a fresh newest page, keeping older shown rows only when the page reaches them. */
-export function withBacklog(shown: LoadedRows, page: MessagePage): LoadedRows {
+export function withBacklog(shown: LoadedRows, page: WirePage): LoadedRows {
   const first = page.messages[0]
   const shownLast = shown.messages.at(-1)
   if (first === undefined || shownLast === undefined || first.id > shownLast.id) {

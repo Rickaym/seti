@@ -21,6 +21,7 @@ import {
   taskStreamQuery,
   toMcpChoices,
   updateTaskInput,
+  wireQuery,
   type InputPause,
 } from '@seti/shared'
 import { Hono } from 'hono'
@@ -35,7 +36,6 @@ import { burstPausedUntil, deliverPending, dismissPending } from '../inputs.js'
 import { setTaskMcpChoices, taskMcpServers } from '../mcp-selection.js'
 import { previewRewindFiles, rewindTargets, rewindTask } from '../rewind-task.js'
 import { openQuerySince } from '../runner.js'
-import { scrubValue } from '../scrub.js'
 import { restartSession } from '../session-restart.js'
 import { ownMessages, type OwnCursor } from '../store/own-messages.js'
 import { rewinds } from '../store/rewinds.js'
@@ -59,7 +59,7 @@ import {
   updateTask,
 } from '../task-actions.js'
 import { linkTaskPr, requireTask, unlinkTaskPr } from '../tasks.js'
-import { wirePage } from '../transcript.js'
+import { clientPage, fullRow, wireFormOf } from '../transcript.js'
 import { streamTask } from './stream.js'
 
 /** The stream cursor an EventSource sends back on its own reconnect, when it is one. */
@@ -160,9 +160,10 @@ export const taskRoutes = new Hono()
     }
     return ok(c, await requireTask(id))
   })
-  .get('/:id/messages', valid('query', taskMessagesQuery), async (c) =>
-    ok(c, wirePage(await messagesPage(c.req.param('id'), c.req.valid('query')))),
-  )
+  .get('/:id/messages', valid('query', taskMessagesQuery), async (c) => {
+    const query = c.req.valid('query')
+    return ok(c, clientPage(await messagesPage(c.req.param('id'), query), wireFormOf(query)))
+  })
   .get('/:id/own-message', valid('query', ownMessageQuery), async (c) => {
     const task = await liveTranscript(c.req.param('id'))
     return ok(c, await ownMessages.step(task.id, ownCursor(c.req.valid('query'))))
@@ -188,9 +189,10 @@ export const taskRoutes = new Hono()
     valid('query', messagePageQuery),
     async (c) => {
       const { id, tool_use_id } = c.req.valid('param')
-      const { before, limit } = c.req.valid('query')
-      const page = await subtaskPage(id, await requireSubtask(id, tool_use_id), limit, before)
-      return ok(c, wirePage({ ...page, messages: await hideDirect(await taskIdOf(id), page.messages) }))
+      const query = c.req.valid('query')
+      const page = await subtaskPage(id, await requireSubtask(id, tool_use_id), query.limit, query.before)
+      const shown = await hideDirect(await taskIdOf(id), page.messages)
+      return ok(c, clientPage({ ...page, messages: shown }, wireFormOf(query)))
     },
   )
   .post('/:id/subtasks/:tool_use_id/stop', valid('param', subtaskParams), async (c) => {
@@ -205,7 +207,7 @@ export const taskRoutes = new Hono()
     const { id, tool_use_id } = c.req.valid('param')
     return ok(c, await unlinkSubtaskPrUrl(await taskIdOf(id), tool_use_id, c.req.valid('query').url))
   })
-  .get('/:id/messages/:message_id', valid('param', taskMessageParams), async (c) => {
+  .get('/:id/messages/:message_id', valid('param', taskMessageParams), valid('query', wireQuery), async (c) => {
     const { id, message_id } = c.req.valid('param')
     const task = await requireTask(id)
     const row =
@@ -214,7 +216,7 @@ export const taskRoutes = new Hono()
       throw new HttpError(404, 'Message not found')
     }
     const [shown] = await hideDirect(task.id, [row])
-    return ok(c, scrubValue(shown ?? row))
+    return ok(c, fullRow(shown ?? row, wireFormOf(c.req.valid('query'))))
   })
   .post('/:id/messages', validJson(sendMessageInput), async (c) =>
     ok(c, await sendTaskMessage(await taskIdOf(c.req.param('id')), c.req.valid('json'))),
@@ -272,8 +274,9 @@ export const taskRoutes = new Hono()
     valid('query', taskStreamQuery),
     async (c) => {
       const task = await requireTask(c.req.param('id'))
-      const { after, tail } = c.req.valid('query')
-      const start = { after: after ?? lastEventId(c.req.header('Last-Event-ID')), tail }
+      const query = c.req.valid('query')
+      const after = query.after ?? lastEventId(c.req.header('Last-Event-ID'))
+      const start = { after, tail: query.tail, form: wireFormOf(query) }
       return streamTask(c, task.id, { ...start, archived: task.archived_at !== null })
     },
   )

@@ -1,6 +1,4 @@
-import type { SDKAssistantMessage, SDKUserMessage } from '@anthropic-ai/claude-agent-sdk'
-import type { EaChatEvent, EaHistoryEntry, EaNotice, MessageRow } from '@seti/shared'
-import type { ToolUseBlock } from '@/lib/transcript'
+import type { EaChatEvent, EaHistoryEntry, EaNotice, RuntimeEvent, ToolCall, WireRow } from '@seti/shared'
 import type { TranscriptMarks, TranscriptNote } from '@/panels/tasks/TranscriptMarks'
 
 /** One step of the reply that is still streaming: text as written, or a tool call. */
@@ -26,7 +24,7 @@ export interface LiveExchange {
 }
 
 export interface ChatView {
-  rows: MessageRow[]
+  rows: WireRow[]
   marks: TranscriptMarks
 }
 
@@ -37,42 +35,32 @@ export const EA_TASK_ID = 'ea'
 const SUMMARY_PREFIX = /^Summary of the earlier conversation with the user:\s*/
 const LIVE_BASE = Number.MAX_SAFE_INTEGER - 10_000
 
-type AssistantBlock = SDKAssistantMessage['message']['content'][number]
-type ToolResultBlock = Extract<Exclude<SDKUserMessage['message']['content'], string>[number], { type: 'tool_result' }>
-
-const asAssistant = (value: object) => value as SDKAssistantMessage
-const asUser = (value: object) => value as SDKUserMessage
-
 const base = (id: number, at: string) => ({ id, task_id: EA_TASK_ID, outward: [], created_at: at })
 
-const promptRow = (id: number, at: string, text: string): MessageRow => ({
+const promptRow = (id: number, at: string, text: string): WireRow => ({
   ...base(id, at),
   kind: 'prompt',
   payload: { text },
 })
 
-const assistantRow = (id: number, at: string, content: AssistantBlock[]): MessageRow => ({
+const eventsRow = (id: number, at: string, payload: RuntimeEvent[]): WireRow => ({
   ...base(id, at),
-  kind: 'sdk',
-  payload: asAssistant({
-    type: 'assistant',
-    message: { role: 'assistant', content },
-    parent_tool_use_id: null,
-    session_id: EA_TASK_ID,
-    uuid: `ea-${String(id)}`,
-  }),
+  kind: 'events',
+  payload,
 })
 
-const resultRow = (id: number, at: string, results: ToolResultBlock[]): MessageRow => ({
-  ...base(id, at),
-  kind: 'sdk',
-  payload: asUser({
-    type: 'user',
-    message: { role: 'user', content: results },
-    parent_tool_use_id: null,
-    session_id: EA_TASK_ID,
-  }),
-})
+/** What the EA wrote in one step: its text, then the tools it called. */
+function assistantRow(id: number, at: string, text: string, calls: ToolCall[]): WireRow {
+  const said: RuntimeEvent[] =
+    text === '' ? [] : [{ v: 1, thread: '', type: 'message', id: `ea-${String(id)}:0`, role: 'agent', text }]
+  const started = calls.map((call): RuntimeEvent => ({ v: 1, thread: '', type: 'tool.started', call }))
+  return eventsRow(id, at, [...said, ...started])
+}
+
+const resultRow = (id: number, at: string, callId: string, { text, ok }: { text: string; ok: boolean }): WireRow =>
+  eventsRow(id, at, [
+    { v: 1, thread: '', type: 'tool.ended', callId, status: ok ? 'ok' : 'error', result: { text, images: 0 } },
+  ])
 
 const INBOX_PREFIX = /^Inbox:\s*/
 
@@ -92,15 +80,13 @@ function noticeOf(entry: EaHistoryEntry): EaNotice {
   )
 }
 
-const noticeRow = (entry: EaHistoryEntry): MessageRow => ({
+const noticeRow = (entry: EaHistoryEntry): WireRow => ({
   ...base(entry.id, entry.created_at),
   kind: 'notice',
   payload: noticeOf(entry),
 })
 
-const textBlock = (text: string): AssistantBlock => ({ type: 'text', text, citations: null })
-
-const toolUse = (id: string, name: string, input: unknown): ToolUseBlock => ({ type: 'tool_use', id, name, input })
+const toolCall = (callId: string, name: string, input: unknown): ToolCall => ({ callId, kind: 'other', name, input })
 
 /** Tool arguments as the model wrote them, or the raw text when they are not JSON. */
 function parsedArguments(text: string): unknown {
@@ -124,7 +110,7 @@ function resultText(content: string): string {
 const clock = (at: string) =>
   new Date(at).toLocaleString(undefined, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
 
-function entryRow(entry: EaHistoryEntry): MessageRow | null {
+function entryRow(entry: EaHistoryEntry): WireRow | null {
   const { id, created_at: at, message } = entry
   switch (message.role) {
     case 'user':
@@ -132,21 +118,19 @@ function entryRow(entry: EaHistoryEntry): MessageRow | null {
     case 'assistant': {
       const text = message.content ?? ''
       const calls = (message.tool_calls ?? []).map((call) =>
-        toolUse(call.id, call.function.name, parsedArguments(call.function.arguments)),
+        toolCall(call.id, call.function.name, parsedArguments(call.function.arguments)),
       )
-      const blocks = [...(text.trim() === '' ? [] : [textBlock(text)]), ...calls]
-      return blocks.length === 0 ? null : assistantRow(id, at, blocks)
+      const said = text.trim() === '' ? '' : text
+      return said === '' && calls.length === 0 ? null : assistantRow(id, at, said, calls)
     }
     case 'tool':
-      return resultRow(id, at, [
-        { type: 'tool_result', tool_use_id: message.tool_call_id, content: resultText(message.content) },
-      ])
+      return resultRow(id, at, message.tool_call_id, { text: resultText(message.content), ok: true })
     case 'developer':
       return null
   }
 }
 
-function rowOf(entry: EaHistoryEntry): MessageRow | null {
+function rowOf(entry: EaHistoryEntry): WireRow | null {
   if (entry.kind === 'summary') {
     return null
   }
@@ -170,12 +154,12 @@ function summaryNotes(entries: readonly EaHistoryEntry[]): Map<number, Transcrip
   return notes
 }
 
-function exchangeRows(live: LiveExchange): MessageRow[] {
-  const rows: MessageRow[] = [promptRow(LIVE_BASE, live.at, live.text)]
+function exchangeRows(live: LiveExchange): WireRow[] {
+  const rows: WireRow[] = [promptRow(LIVE_BASE, live.at, live.text)]
   let text = ''
   const flush = () => {
     if (text !== '') {
-      rows.push(assistantRow(LIVE_BASE + rows.length, live.at, [textBlock(text)]))
+      rows.push(assistantRow(LIVE_BASE + rows.length, live.at, text, []))
       text = ''
     }
   }
@@ -185,11 +169,9 @@ function exchangeRows(live: LiveExchange): MessageRow[] {
       continue
     }
     flush()
-    rows.push(assistantRow(LIVE_BASE + rows.length, live.at, [toolUse(part.id, part.name, part.arguments)]))
+    rows.push(assistantRow(LIVE_BASE + rows.length, live.at, '', [toolCall(part.id, part.name, part.arguments)]))
     if (part.result !== null) {
-      const { text: output, ok } = part.result
-      const block: ToolResultBlock = { type: 'tool_result', tool_use_id: part.id, content: output, is_error: !ok }
-      rows.push(resultRow(LIVE_BASE + rows.length, live.at, [block]))
+      rows.push(resultRow(LIVE_BASE + rows.length, live.at, part.id, part.result))
     }
   }
   flush()
@@ -203,13 +185,13 @@ function landed(entries: readonly EaHistoryEntry[], live: LiveExchange): boolean
 }
 
 /** The reply in flight as task transcript rows, or none once the stored history shows it. */
-export function liveRows(entries: readonly EaHistoryEntry[], live: LiveExchange | null): MessageRow[] {
+export function liveRows(entries: readonly EaHistoryEntry[], live: LiveExchange | null): WireRow[] {
   return live === null || landed(entries, live) ? [] : exchangeRows(live)
 }
 
 /** The stored conversation as task transcript rows, with spoken turns and dividers marked. */
 export function chatView(entries: readonly EaHistoryEntry[]): ChatView {
-  const rows: MessageRow[] = []
+  const rows: WireRow[] = []
   const voice = new Set<number>()
   const notes = summaryNotes(entries)
   let callAt: string | null = null

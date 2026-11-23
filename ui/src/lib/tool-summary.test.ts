@@ -1,3 +1,4 @@
+import { claudeToolCall } from '@seti/shared'
 import { describe, expect, it } from 'vitest'
 import {
   commandSummary,
@@ -10,14 +11,9 @@ import {
   toolName,
   toolSummary,
 } from '@/lib/tool-summary'
-import type { ToolUseBlock } from '@/lib/transcript'
 
-const call = (name: string, input: Record<string, unknown>): ToolUseBlock => ({
-  type: 'tool_use',
-  id: `toolu_${name}`,
-  name,
-  input,
-})
+const call = (name: string, input: Record<string, unknown>) => claudeToolCall(`toolu_${name}`, name, input)
+const named = (...names: string[]) => names.map((name) => call(name, {}))
 
 describe('commandSummary', () => {
   it('keeps a one-line command as it is', () => {
@@ -101,7 +97,7 @@ describe('toolSummary', () => {
     expect(toolSummary(call('TaskUpdate', { taskId: '3', subject: 'Run e2e' }))).toBe('#3 Run e2e')
     expect(toolSummary(call('TaskGet', { taskId: '3' }))).toBe('#3 read')
     expect(toolSummary(call('TaskList', {}))).toBe('list')
-    expect(groupLabel(['TaskUpdate', 'TaskUpdate', 'Bash'])).toBe('Updated the todo list 2 times, ran 1 command')
+    expect(groupLabel(named('TaskUpdate', 'TaskUpdate', 'Bash'))).toBe('Updated the todo list 2 times, ran 1 command')
   })
 
   it('uses the first text input of MCP and unknown tools', () => {
@@ -122,16 +118,16 @@ describe('toolName', () => {
 
 describe('groupLabel', () => {
   it('counts calls by kind in order of first use', () => {
-    expect(groupLabel(['Bash', 'Bash', 'Read', 'Bash', 'Read'])).toBe('Ran 3 commands, read 2 files')
-    expect(groupLabel(['Read', 'Bash'])).toBe('Read 1 file, ran 1 command')
-    expect(groupLabel(['Edit', 'Grep', 'mcp__x__y', 'Skill'])).toBe(
+    expect(groupLabel(named('Bash', 'Bash', 'Read', 'Bash', 'Read'))).toBe('Ran 3 commands, read 2 files')
+    expect(groupLabel(named('Read', 'Bash'))).toBe('Read 1 file, ran 1 command')
+    expect(groupLabel(named('Edit', 'Grep', 'mcp__x__y', 'Skill'))).toBe(
       'Edited 1 file, ran 1 search, made 1 MCP call, used 1 tool',
     )
   })
 })
 
 describe('kindTallies', () => {
-  const calls = (...specs: [string, boolean][]) => specs.map(([name, failed]) => ({ name, failed }))
+  const calls = (...specs: [string, boolean][]) => specs.map(([name, failed]) => ({ call: call(name, {}), failed }))
 
   it('keeps one tally per kind in order of first use', () => {
     const tallies = kindTallies(

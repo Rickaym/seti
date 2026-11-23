@@ -21,6 +21,7 @@ import {
   BACKUP_DIR,
   DATABASE_URL,
   HOST,
+  NODE_SPLIT,
   PLANNER_MODULE,
   SDK_MODULE,
   PORT,
@@ -41,6 +42,7 @@ import { startMcpLoginKeeper } from './mcp-login-keeper.js'
 import { modHost } from './mods/bundled.js'
 import { watchDevMods } from './mods/dev.js'
 import { startModUpdates } from './mods/updates.js'
+import { connectNode } from './node-split.js'
 import { notifyInterrupted, preparePush } from './notifications.js'
 import { resumePermissionTimeouts } from './permission-timeout.js'
 import { enforcePrivateHome } from './permissions.js'
@@ -174,7 +176,8 @@ async function cutTurns(): Promise<void> {
 function stopOn(signal: 'SIGTERM' | 'SIGINT'): void {
   process.once(signal, () => {
     stopTerminals()
-    void Promise.all([stopChannelRuns(), cutTurns()]).finally(() => process.kill(process.pid, signal))
+    const turns = NODE_SPLIT ? Promise.resolve() : cutTurns()
+    void Promise.all([stopChannelRuns(), turns]).finally(() => process.kill(process.pid, signal))
   })
 }
 
@@ -190,11 +193,14 @@ relayTaskEvents()
 relayTeamEvents()
 await auditEvents.sealPending()
 await stopLeftoverScopes()
-await keepLeftoverRequests()
+if (!NODE_SPLIT) {
+  await keepLeftoverRequests()
+}
 await resumeBypass()
 startRequestExpiry()
 startKnowledgeSweep()
-const interrupted = await markRestartCut()
+// A separate node keeps its turns across this restart and reports any it lost as it connects.
+const interrupted = NODE_SPLIT ? { notify: [], resume: [] } : await markRestartCut()
 await retireBundledPlugins()
 await syncSharedTools()
 audit.startRetention()
@@ -229,6 +235,9 @@ if (PLANNER_MODULE !== '') {
 }
 if (SDK_MODULE !== '') {
   await loadSdkModule(SDK_MODULE)
+}
+if (NODE_SPLIT) {
+  await connectNode()
 }
 
 // The adapter is built for ws, but types its server narrower than ws's overloaded one.
