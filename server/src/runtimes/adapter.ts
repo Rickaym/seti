@@ -1,3 +1,4 @@
+import type { RuntimeEvent } from '@seti/shared'
 import type { Launcher } from '../launcher.js'
 import type { SessionSpec } from '../session-spec.js'
 
@@ -20,6 +21,48 @@ export interface SessionInput {
   priority?: InputPriority
 }
 
+/** A message a session reported, with what Seti reads from it beside its events. */
+export interface SessionMessage {
+  type: 'message'
+  /** The message as the runtime wrote it, which Seti stores. */
+  raw: unknown
+  /** What it says, the same on every runtime. */
+  events: readonly RuntimeEvent[]
+  /** The agent or a subagent is at work, rather than the runtime reporting on the session. */
+  work: boolean
+  /** The agent itself is at work, not a subagent. */
+  byAgent: boolean
+  /** The inputs that a turn's end reports the agent took. */
+  delivered: readonly string[]
+  /** The background jobs that keep the session open, where the message lists them. */
+  background?: readonly string[]
+}
+
+/**
+ * What became of an input sent while a turn ran: queued, taken by the agent, or dropped; 'other'
+ * is a further stage the runtime reports, which counts only as the session at work.
+ */
+export interface InputReport {
+  type: 'input'
+  id: string
+  state: 'queued' | 'started' | 'cancelled' | 'other'
+}
+
+/** How a session opened at a rewind point took it: applied, or refused with the runtime's reason. */
+type RewindReport = { type: 'rewind'; state: 'applied' } | { type: 'rewind'; state: 'refused'; reason: string }
+
+/** One report of an open session, in the order the runtime made them. */
+export type SessionReport = SessionMessage | InputReport | RewindReport
+
+/**
+ * Where a session resumes in its conversation: after the entry `keep` names, or as a new session
+ * when it is null; `dropsTurn` names the one turn the rewind drops, for the runtime to check.
+ */
+export interface RewindRequest {
+  keep: string | null
+  dropsTurn: string | null
+}
+
 /**
  * What a runtime can do where Seti would otherwise assume Claude Code. A session whose runtime
  * version lacks a control leaves that control off instead.
@@ -39,8 +82,7 @@ interface Capabilities {
 /**
  * The values a runtime's sessions take and give that are still the runtime's own: what a spec
  * carries for it alone, what it realises a spec into, how Seti decides and checks its tool calls
- * and serves its own tools, the messages it streams, its tool server reports, rules and
- * permission modes.
+ * and serves its own tools, its tool server reports, rules and permission modes.
  */
 export interface RuntimeShapes {
   vendor: unknown
@@ -48,7 +90,6 @@ export interface RuntimeShapes {
   decide: unknown
   hooks: unknown
   hostServers: unknown
-  message: unknown
   toolServer: unknown
   policy: unknown
   mode: unknown
@@ -60,10 +101,10 @@ export interface RuntimeShapes {
  */
 export interface RuntimeSession<S extends RuntimeShapes> {
   /**
-   * The runtime's messages until the session ends. A tool call may end after the turn that
-   * started it, as background work does.
+   * The session's reports until it ends. A tool call may end after the turn that started it, as
+   * background work does. A session opened at a rewind point first reports how it took it.
    */
-  readonly events: AsyncIterable<S['message']>
+  readonly events: AsyncIterable<SessionReport>
   /**
    * Ends the running turn and every tool call it started; work the agent put in the background
    * keeps running and stays reported. Resolves once the runtime took the request.
@@ -77,8 +118,6 @@ export interface RuntimeSession<S extends RuntimeShapes> {
   readonly stopBackground?: (jobId: string) => Promise<void>
   /** How the session's tool servers connected. */
   readonly toolServers?: () => Promise<S['toolServer'][]>
-  /** The context window usage is measured against; null when the runtime cannot say in time. */
-  readonly contextWindow?: () => Promise<number | null>
   /** Hands the running process new rules, which apply from its next tool call. */
   readonly setPolicy?: (policy: S['policy']) => Promise<void>
   /** Switches the running process's permission mode. */
@@ -110,8 +149,12 @@ export interface RuntimeAdapter<S extends RuntimeShapes, Id extends string = Run
     abortController: AbortController,
   ): Promise<S['realised']>
   /**
-   * Starts or resumes a realised session, which takes its inputs in order as they come; it begins
-   * work when its events are first read.
+   * Starts or resumes a realised session, at a rewind point when one is given; it takes its inputs
+   * in order as they come and begins work when its events are first read.
    */
-  open(realised: S['realised'], input: AsyncIterable<SessionInput>): Promise<RuntimeSession<S>>
+  open(
+    realised: S['realised'],
+    input: AsyncIterable<SessionInput>,
+    rewind: RewindRequest | null,
+  ): Promise<RuntimeSession<S>>
 }

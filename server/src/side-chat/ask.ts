@@ -9,6 +9,7 @@ import { refuseOtherAgent } from '../ea-guard.js'
 import { HttpError } from '../http.js'
 import { sessionState } from '../runner.js'
 import type { SessionInput } from '../runtimes/adapter.js'
+import { queryClaude } from '../runtimes/claude/adapter.js'
 import { sideChatOptions, type ForkPoint } from '../runtimes/claude/side-chat-options.js'
 import { adapterFor, DEFAULT_RUNTIME } from '../runtimes/registry.js'
 import { redactSecrets } from '../scrub.js'
@@ -98,7 +99,7 @@ async function runFork(task: Task, fork: ForkPoint, prompt: string, run: Running
   const file = sessionFile(fork.session_id, task.cwd)
   const saved = savedTotal(file)
   const options = await sideChatOptions(task, fork, { reads: run.reads, abortController: run.abort })
-  const asked = await adapterFor(DEFAULT_RUNTIME).open(options, once(prompt))
+  const asked = queryClaude(options, once(prompt))
   const stream = new AnswerStream()
   const outcome = async (m: SDKResultMessage): Promise<Outcome> => {
     const cost = await countCost(task, m, Math.max(saved, savedTotal(file)))
@@ -106,7 +107,7 @@ async function runFork(task: Task, fork: ForkPoint, prompt: string, run: Running
   }
   let skipped: SDKResultMessage | null = null
   try {
-    for await (const m of asked.events) {
+    for await (const m of asked) {
       if (m.type === 'result' && isWaitingNotice(m, stream)) {
         skipped = m
       } else if (m.type === 'result') {

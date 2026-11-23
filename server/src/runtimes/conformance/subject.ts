@@ -32,7 +32,11 @@ function specFor(resume: string | null): SessionSpec {
 }
 
 /** Allows every call as asked. */
-const ALLOW_ALL: NeutralHost = { decide: async () => Promise.resolve({ allow: true }) }
+const ALLOW_ALL: NeutralHost = {
+  decide: async () => Promise.resolve({ allow: true }),
+  ask: async (questions) =>
+    Promise.resolve(Object.fromEntries(questions.map((question) => [question.text, question.options[0] ?? '']))),
+}
 
 /** How a case opens a session. */
 interface OpenOptions {
@@ -60,7 +64,7 @@ export function subjectOf<S extends RuntimeShapes, Id extends string>(target: Co
       const host = target.host(options.host ?? ALLOW_ALL)
       const realised = await target.adapter.realise(specFor(options.resume ?? null), rig.launcher, host, controller)
       const inputs = new Channel<SessionInput>()
-      const session = await target.adapter.open(realised, inputs)
+      const session = await target.adapter.open(realised, inputs, null)
       return new Run(session, target.project, inputs, controller).start()
     },
   }

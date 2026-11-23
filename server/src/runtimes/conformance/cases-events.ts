@@ -1,7 +1,7 @@
 import type { RuntimeEvent, ToolKind } from '@seti/shared'
 import { expect } from 'vitest'
 import { closed, ofType, turnEnd, type Case } from './case.js'
-import type { Step } from './script.js'
+import { VARIED } from './script.js'
 
 const EVENT_TYPES = {
   'session.started': true,
@@ -40,20 +40,6 @@ const TOOL_KINDS = {
   think: true,
   other: true,
 } satisfies Record<ToolKind, true>
-
-/** A turn that uses most of what a runtime reports: reasoning, text, and calls of several kinds. */
-const VARIED: Step[] = [
-  { think: 'plan the work' },
-  { say: 'looking around' },
-  { call: { tool: 'sh', args: { cmd: 'ls' }, output: 'README.md' } },
-  { call: { tool: 'cat', args: { path: 'README.md' }, output: '# Readme' } },
-  { call: { tool: 'grep', args: { pattern: 'TODO' }, output: 'none' } },
-  { call: { tool: 'fetch', args: { url: 'https://example.com/' }, output: 'page' } },
-  { call: { tool: 'patch', args: { path: 'README.md', diff: '-a\n+b\n' }, output: 'patched' } },
-  { call: { tool: 'seti.list_agents', args: {}, output: '[]' } },
-  { call: { tool: 'frobnicate', args: { level: 3 }, output: 'frobbed' } },
-  { say: 'all done' },
-]
 
 const known = (type: string): boolean => Object.hasOwn(EVENT_TYPES, type)
 const kindKnown = (kind: string): boolean => Object.hasOwn(TOOL_KINDS, kind)

@@ -3,8 +3,9 @@ import { once } from 'node:events'
 import { createInterface } from 'node:readline'
 import type { ToolCall } from '@seti/shared'
 import type { Launcher } from '../../launcher.js'
-import type { RuntimeSession, SessionInput } from '../adapter.js'
+import type { RuntimeSession, SessionInput, SessionReport } from '../adapter.js'
 import { controlLine, type ControlLine, type ScriptedCommand, type Verdict } from './dialect.js'
+import { scriptedReport } from './project.js'
 import { scriptedToolCall } from './tools.js'
 
 /** How Seti decides a call the scripted runtime asks about, until the signal aborts. */
@@ -17,7 +18,6 @@ export interface ScriptedShapes {
   decide: ScriptedDecide
   hooks: null
   hostServers: Record<string, never>
-  message: unknown
   toolServer: never
   policy: never
   mode: never
@@ -58,7 +58,7 @@ class Driver {
   private rid = 0
   private stderr = ''
   private readonly acks = new Map<number, { resolve: (taken: boolean) => void; reject: (e: Error) => void }>()
-  private readonly asks = new AbortController()
+  private readonly asks = new Map<number, AbortController>()
   private readonly exited: Promise<unknown[]>
   private readonly child: ChildProcess
   private readonly decide: ScriptedDecide
@@ -78,7 +78,7 @@ class Driver {
     }
   }
 
-  async *messages(): AsyncGenerator {
+  async *messages(): AsyncGenerator<SessionReport> {
     if (this.child.stdout !== null) {
       for await (const line of createInterface({ input: this.child.stdout })) {
         const message = parsed(line)
@@ -86,7 +86,7 @@ class Driver {
         if (control.success) {
           this.control(control.data)
         } else {
-          yield message
+          yield scriptedReport(message)
         }
       }
     }
@@ -134,8 +134,16 @@ class Driver {
       }
       return
     }
-    void this.decide(scriptedToolCall(line.call), this.asks.signal).then(
+    if (line.t === 'withdraw') {
+      this.asks.get(line.rid)?.abort()
+      this.asks.delete(line.rid)
+      return
+    }
+    const ask = new AbortController()
+    this.asks.set(line.rid, ask)
+    void this.decide(scriptedToolCall(line.call), ask.signal).then(
       (verdict) => {
+        this.asks.delete(line.rid)
         this.write({ t: 'verdict', rid: line.rid, verdict })
       },
       (e: unknown) => {
@@ -147,7 +155,10 @@ class Driver {
   /** Settles what waits on the process once it ended or Seti closed it. */
   private ended(): void {
     this.over = true
-    this.asks.abort()
+    for (const ask of this.asks.values()) {
+      ask.abort()
+    }
+    this.asks.clear()
     for (const waiting of this.acks.values()) {
       waiting.reject(new Error('The scripted runtime ended before it answered'))
     }

@@ -1,14 +1,31 @@
 import type { RuntimeEvent } from '@seti/shared'
 import { describe, expect, it } from 'vitest'
+import type { SessionReport } from '../adapter.js'
 import { scriptedTarget } from '../scripted/target.js'
 import { CASES } from './describe.js'
 import { subjectOf } from './subject.js'
 
 type Target = typeof scriptedTarget
 
-const reprojected = (change: (events: RuntimeEvent[]) => RuntimeEvent[]): Target => ({
+type Change = (events: RuntimeEvent[]) => RuntimeEvent[]
+
+async function* changed(reports: AsyncIterable<SessionReport>, change: Change): AsyncGenerator<SessionReport> {
+  for await (const report of reports) {
+    yield report.type === 'message' ? { ...report, events: change([...report.events]) } : report
+  }
+}
+
+/** The scripted target with every projection, live and stored, changed the same way. */
+const reprojected = (change: Change): Target => ({
   ...scriptedTarget,
   project: (message) => change(scriptedTarget.project(message)),
+  adapter: {
+    ...scriptedTarget.adapter,
+    open: async (realised, input, rewind) => {
+      const session = await scriptedTarget.adapter.open(realised, input, rewind)
+      return { ...session, events: changed(session.events, change) }
+    },
+  },
 })
 
 let calls = 0
@@ -38,7 +55,7 @@ const BROKEN: [string, Target][] = [
       adapter: {
         ...scriptedTarget.adapter,
         open: async (realised, input) => ({
-          ...(await scriptedTarget.adapter.open(realised, input)),
+          ...(await scriptedTarget.adapter.open(realised, input, null)),
           close: () => undefined,
         }),
       },

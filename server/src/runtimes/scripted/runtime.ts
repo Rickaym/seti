@@ -250,7 +250,8 @@ export class ScriptedRuntime {
     }
     const status = call.fails === true ? 'error' : 'ok'
     const exit = call.tool === 'sh' ? { exit: call.fails === true ? 1 : 0 } : {}
-    this.io.write({ t: 'done', id, status, output: call.output ?? '', ...exit })
+    const output = call.tool === 'ask' ? JSON.stringify(verdict.args?.answers ?? {}) : (call.output ?? '')
+    this.io.write({ t: 'done', id, status, output, ...exit })
     return id
   }
 
@@ -261,6 +262,11 @@ export class ScriptedRuntime {
       this.pending.set(rid, resolve)
     })
     this.io.write({ t: 'request', rid, call: { id, tool: call.tool, args: call.args } })
-    return orAbort(verdict, signal)
+    const answered = await orAbort(verdict, signal)
+    if (answered === null) {
+      this.pending.delete(rid)
+      this.io.write({ t: 'withdraw', rid })
+    }
+    return answered
   }
 }

@@ -13,10 +13,15 @@ export const scriptedTarget: ConformanceTarget<ScriptedShapes, 'scripted'> = {
     usage: { tokens: true, costUsd: 'reported' },
     input: { steer: 'next_step', retract: true },
     background: { jobs: true, stop: true },
+    gated: { shell: true, edit: true, mcp: true },
   },
   project: projectScripted,
   host: (neutral) => ({
     decide: async (call, signal): Promise<Verdict> => {
+      if (call.kind === 'question') {
+        const answers = await neutral.ask(call.question?.questions ?? [], signal)
+        return { allow: true, args: { ...(call.input as Record<string, unknown>), answers } }
+      }
       const decision = await neutral.decide(call, signal)
       if (!decision.allow) {
         return decision
