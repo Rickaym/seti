@@ -359,13 +359,11 @@ device list settles, and the Audio button in the call does the same on demand.
 process, and `seti.service` reaches them over `~/.seti/run/node.sock`, a socket in a folder only
 your user may enter. A restart of `seti.service` then keeps running turns going.
 `scripts/upgrade.sh` restarts the node only when the server code, the shared code or the lockfile
-changed, and Seti records the node's running turns before the node cuts them. `pnpm run doctor` checks the
-socket. Logs are in `journalctl --user -u seti-node.service`.
+changed, and Seti records the node's running turns before the node cuts them. `pnpm run doctor`
+checks the socket. Logs are in `journalctl --user -u seti-node.service`.
 
 Split mode still has gaps that a single process does not:
 
-- A server that crashes after it recorded a message's prompt row and before the node heard back
-  records a second prompt row for that message.
 - A sandboxed agent's terminal or `!` command uses the node's egress proxy when the node runs
   one, and then cannot fetch AWS credentials through it. Opened before the agent's session, it
   starts a proxy of its own, which the session's proxy replaces.
