@@ -711,6 +711,9 @@ class FakeSeti:
     change_requests: list[dict[str, Any]] = field(default_factory=list)
     permission_requests: list[dict[str, Any]] = field(default_factory=list)
     request_timeout_minutes: int = 60
+    policy_shadow: dict[str, Any] = field(
+        default_factory=lambda: {"since": "2026-09-21", "results": {}, "slow": 0, "differences": []}
+    )
     team: list[dict[str, Any]] = field(default_factory=list)
     chat_hits: list[dict[str, Any]] = field(default_factory=list)
     chat_more: bool = False
@@ -1300,6 +1303,8 @@ class FakeSeti:
                 return ok([n for n in self.knowledge if n["status"] == params.get("status", "proposed")])
             case ["questions"]:
                 return ok([q for q in self.questions if q["status"] == "open"])
+            case ["permissions", "shadow"]:
+                return ok(self.policy_shadow)
             case ["permissions", "timeout"]:
                 return ok({"request_timeout_minutes": self.request_timeout_minutes, "updated_at": None})
             case ["requests"]:

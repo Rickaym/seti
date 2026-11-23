@@ -53,7 +53,7 @@ from seti_ea.gate import ANSWER, GATE_CALL, GateCall, UserAnswer
 from seti_ea.history_tools import HISTORY_WINDOW, activity_result, window_transcript
 from seti_ea.knowledge_tools import list_proposals, search_knowledge
 from seti_ea.location_tools import location_lines
-from seti_ea.metrics_tools import ea_usage_lines, metrics_lines
+from seti_ea.metrics_tools import ea_usage_lines, metrics_lines, shadow_lines
 from seti_ea.mod_tools import mods_text, themes_text
 from seti_ea.my_pack_tools import LIST_MY_PACKS_SPEC
 from seti_ea.process_tools import LIST_PROCESSES_SPEC
@@ -302,6 +302,13 @@ TOOL_SPECS: list[ToolSpec] = [
                 "description": "Instead, Seti's mods: each with its version, whether it is on, what "
                 "it does and may do, the actions it offers you for run_mod_action, and whether safe "
                 "mode is on.",
+            },
+            "permissions": {
+                "type": "boolean",
+                "description": "Instead, how Seti's own permission evaluator, run in shadow beside "
+                "Claude Code, compared with it over the last 7 days: calls by result, failed and slow "
+                "decisions, and the most frequent differences with the step and rule behind each. "
+                "Counts only; rules change only in Seti.",
             },
         },
     ),
@@ -2304,6 +2311,9 @@ class EaTools:
             return await self._changelog()
         if arg_bool(args, "metrics"):
             return await self._metrics()
+        if arg_bool(args, "permissions"):
+            summary = await self._seti.get("/permissions/shadow")
+            return ToolResult("\n".join(shadow_lines(summary)), "Read how Seti's permission shadow compares")
         if arg_bool(args, "mods"):
             listing, user = await asyncio.gather(self._seti.get("/mods"), _attempt(self._seti.get("/user")))
             text = mods_text(listing)
