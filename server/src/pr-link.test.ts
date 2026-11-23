@@ -1,6 +1,13 @@
 import type { SDKMessage } from '@anthropic-ai/claude-agent-sdk'
+import { projectClaude } from '@seti/shared'
 import { describe, expect, it } from 'vitest'
 import { createPrWatcher, createsPr } from './pr-link.js'
+
+/** A watcher fed the events of each SDK message, as ingest feeds it. */
+function watcher() {
+  const watch = createPrWatcher()
+  return (taskId: string, m: SDKMessage) => watch(taskId, projectClaude(m))
+}
 
 const URL = 'https://github.com/Octocat/seti/pull/7'
 const URL_TEXT = `Creating pull request\n${URL}\n`
@@ -40,25 +47,25 @@ describe('createsPr', () => {
 
 describe('createPrWatcher', () => {
   it('returns the URL printed by gh pr create', () => {
-    const watch = createPrWatcher()
+    const watch = watcher()
     expect(watch('t1', toolUse('a', 'gh pr create --fill --base main'))).toEqual([])
     expect(watch('t1', toolResult('a', URL_TEXT))).toEqual([created(URL)])
   })
 
   it('names the subagent call a PR-creating command ran under', () => {
-    const watch = createPrWatcher()
+    const watch = watcher()
     watch('t1', toolUse('a', 'gh pr create --fill', 'toolu_agent'))
     expect(watch('t1', toolResult('a', URL_TEXT, false, 'toolu_agent'))).toEqual([created(URL, 'toolu_agent')])
   })
 
   it('ignores PR URLs from commands that do not create PRs', () => {
-    const watch = createPrWatcher()
+    const watch = watcher()
     watch('t1', toolUse('a', 'gh pr view 7 --json url'))
     expect(watch('t1', toolResult('a', URL_TEXT))).toEqual([])
   })
 
   it('keeps PRs a command created even when a later step in it failed', () => {
-    const watch = createPrWatcher()
+    const watch = watcher()
     const api = 'https://github.com/Octocat/api/pull/3'
     watch('t1', toolUse('a', 'A=$(gh pr create --fill -R x/web) && B=$(gh pr create --fill -R x/api); gh pr edit 3'))
     const output = `Exit code 1\n${URL}\n${api}\nGraphQL: Projects (classic) is being deprecated`
@@ -66,13 +73,13 @@ describe('createPrWatcher', () => {
   })
 
   it('links PRs created through gh api', () => {
-    const watch = createPrWatcher()
+    const watch = watcher()
     watch('t1', toolUse('a', 'jq -n "{}" | gh api repos/Octocat/seti/pulls --input - -q .html_url'))
     expect(watch('t1', toolResult('a', `${URL}\n`))).toEqual([created(URL)])
   })
 
   it('links PRs created through a GitHub MCP server, and nothing other MCP tools print', () => {
-    const watch = createPrWatcher()
+    const watch = watcher()
     const mcp = (id: string, name: string) =>
       ({
         type: 'assistant',
@@ -85,14 +92,14 @@ describe('createPrWatcher', () => {
   })
 
   it('keeps tasks apart', () => {
-    const watch = createPrWatcher()
+    const watch = watcher()
     watch('t1', toolUse('a', 'gh pr create --fill'))
     expect(watch('t2', toolResult('a', URL_TEXT))).toEqual([])
     expect(watch('t1', toolResult('a', URL_TEXT))).toEqual([created(URL)])
   })
 
   it('reports every PR a task creates, across repos and in one message', () => {
-    const watch = createPrWatcher()
+    const watch = watcher()
     const api = 'https://github.com/Octocat/api/pull/3'
     const web = 'https://github.com/Octocat/web/pull/4'
     watch('t1', toolUse('a', 'gh pr create --fill'))

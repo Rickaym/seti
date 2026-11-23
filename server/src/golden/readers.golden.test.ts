@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { ShellIndex } from '../background-shells.js'
 import { buildDigest, toolLabel } from '../digest.js'
 import { rowEvents } from '../events/read.js'
-import { outwardToolUses } from '../outward.js'
+import { outwardCalls } from '../outward.js'
 import { transcriptEvidence } from '../pr-evidence.js'
 import { deriveSubtasks } from '../subtasks.js'
 import { deriveTodos } from '../todos.js'
@@ -42,7 +42,7 @@ function render({ rows }: GoldenTranscript) {
   return {
     digest: buildDigest(rows, subtasks),
     turns: afterTurns(rows),
-    outward: payloads.flatMap(outwardToolUses),
+    outward: payloads.flatMap((m) => outwardCalls(projectClaude(m))),
     prs: { created: [...evidence.created], pushedTo: [...evidence.pushedTo], pushes: evidence.pushes },
     asks: closingQuestion(turnBlocks(own.map((m) => JSON.stringify(m)))),
     labels: rows.flatMap((row) =>

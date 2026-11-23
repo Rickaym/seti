@@ -2,7 +2,7 @@ import type { Task } from '@seti/shared'
 import { describe, expect, it, vi } from 'vitest'
 import { createApp } from '../app.js'
 import { tasks } from '../db.js'
-import { fakeAssistant, fakeBackground, fakeResult, type FakeSession } from '../fake-sdk.js'
+import { claudeCall, fakeAssistant, fakeBackground, fakeResult, type FakeSession } from '../fake-sdk.js'
 import { isOutward } from '../outward.js'
 import { runTurn, sessionState } from '../runner.js'
 import { TASK_ID_ENV } from '../session-options.js'
@@ -120,8 +120,8 @@ describe('set_status', () => {
   })
 
   it('is not an outward call', () => {
-    expect(isOutward('mcp__seti__set_status', { text: 'waiting on CI' })).toBe(false)
-    expect(isOutward('mcp__seti__post_team_chat', { text: 'hi' })).toBe(true)
+    expect(isOutward(claudeCall('mcp__seti__set_status', { text: 'waiting on CI' }))).toBe(false)
+    expect(isOutward(claudeCall('mcp__seti__post_team_chat', { text: 'hi' }))).toBe(true)
   })
 })
 

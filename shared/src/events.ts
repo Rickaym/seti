@@ -177,7 +177,19 @@ export type RuntimeEvent = EventBase &
         error?: string
       }
     | { type: 'model.changed'; from: string; to: string; reason: 'user' | 'fallback' | 'refusal'; text?: string }
-    | { type: 'policy.denied'; callId: string; tool: string; by: 'runtime'; reason: string }
+    | {
+        type: 'policy.denied'
+        callId: string
+        tool: string
+        by: 'runtime'
+        /** An automatic safety classifier turned it down, not a rule or the mode. */
+        classifier?: boolean
+        /** The reason the deciding check gave, where it gave one. */
+        reason?: string
+        /** What the agent was told. */
+        text: string
+      }
+    | { type: 'change.published'; url: string; action: string }
     | { type: 'notice'; code: NoticeCode; text: string; status?: number }
     | {
         type: 'turn.ended'

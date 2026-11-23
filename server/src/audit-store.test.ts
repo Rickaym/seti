@@ -1,6 +1,6 @@
 import fs from 'node:fs'
 import type { SDKMessage } from '@anthropic-ai/claude-agent-sdk'
-import { auditQuery, type AuditActor, type AuditKind, type AuditQuery } from '@seti/shared'
+import { auditQuery, projectClaude, type AuditActor, type AuditKind, type AuditQuery } from '@seti/shared'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { audit, auditPrLink } from './audit.js'
 import { sql } from './db.js'
@@ -142,7 +142,7 @@ describe('agent events', () => {
         input: { channel_id: 'C0123ABC', text: 'hi\nthere xoxb-1234-5678-abcdefgh' },
       },
     ])
-    await audit.outwardCalls('task-1', m, ['a', 'c'])
+    await audit.outwardCalls('task-1', projectClaude(m), ['a', 'c'])
     const events = (await page({ kind: 'agent' })).events
     expect(events.map((e) => [e.actor, e.subject_id, e.summary])).toEqual([
       ['agent', 'task-1', 'Slack send_message \u2192 C0123ABC: "hi there [redacted]"'],
@@ -163,7 +163,7 @@ describe('agent events', () => {
     const m = assistant([
       { type: 'tool_use', id: 'd', name: 'mcp__x__post_update', input: { body: 'a\n'.repeat(400) } },
     ])
-    await audit.outwardCalls('task-2', m, ['d'])
+    await audit.outwardCalls('task-2', projectClaude(m), ['d'])
     const [latest] = (await page({ kind: 'agent.outward' })).events
     expect(latest?.detail.text).toBe('a\n'.repeat(400))
     expect(await auditEvents.verify()).toMatchObject({ ok: true, checked: 2 })
