@@ -1,5 +1,12 @@
-import type { SDKMessage } from '@anthropic-ai/claude-agent-sdk'
-import { projectClaude, type JournalEntry, type MessageBody, type MessageRow, type TaskStatus } from '@seti/shared'
+import {
+  projectClaude,
+  type ClaudeMessage,
+  type JournalEntry,
+  type MessageBody,
+  type MessageRow,
+  type RuntimeEvent,
+  type TaskStatus,
+} from '@seti/shared'
 import { audit } from './audit.js'
 import { closingLine } from './closing-line.js'
 import { auditBlockedKey } from './connection-egress.js'
@@ -11,13 +18,14 @@ import { outwardCalls } from './outward.js'
 import type { Alongside } from './pg.js'
 import { openPrompt } from './prompt-open.js'
 import { markQueued } from './queued-prompts.js'
+import { sessionTotal, withTurnCost } from './runtimes/claude/cost.js'
 import { secretAnswers } from './secret-asks.js'
 import { mirrorSession } from './session-mirror.js'
 import { processStarted, recordStart, settleRewind, setupAnswers } from './session-setup.js'
 import { unstored } from './session-start.js'
 import { forgetSessionTools } from './session-tools.js'
 import { countShadow } from './shadow-counts.js'
-import { withTurnCost } from './store/cost.js'
+import { recordTurnCost } from './store/cost.js'
 import { hadRunningSubtask } from './subtask-cache.js'
 import { publishFolded, publishSubtasks } from './subtask-prs.js'
 import { publish } from './task-events.js'
@@ -61,11 +69,17 @@ async function setStatus(taskId: string, status: TaskStatus): Promise<void> {
   publish(taskId, { type: 'status', status })
 }
 
-async function record(taskId: string, m: SDKMessage): Promise<void> {
-  const events = projectClaude(m)
+/** The message with what its turn cost, where it ends a turn that reports the session's total. */
+async function withCost(taskId: string, m: ClaudeMessage): Promise<ClaudeMessage> {
+  const total = sessionTotal(m)
+  const cost = total === null ? null : await recordTurnCost(taskId, total.sessionId, total.usd)
+  return cost === null ? m : withTurnCost(m, cost)
+}
+
+async function record(taskId: string, m: ClaudeMessage, events: readonly RuntimeEvent[]): Promise<void> {
   const outward = outwardCalls(events)
   trackToolCalls(taskId, events)
-  await appendMessage(taskId, { kind: 'sdk', payload: await withTurnCost(taskId, m) }, outward)
+  await appendMessage(taskId, { kind: 'sdk', payload: await withCost(taskId, m) }, outward)
   await audit.outwardCalls(taskId, events, outward)
   await audit.classifierDenial(taskId, events)
   if (outward.length > 0) {
@@ -75,12 +89,13 @@ async function record(taskId: string, m: SDKMessage): Promise<void> {
 }
 
 /** Stores a message of the session, unless Seti does not keep it, and notes a session's start. */
-async function storeMessage(taskId: string, m: SDKMessage): Promise<void> {
+async function storeMessage(taskId: string, m: ClaudeMessage): Promise<void> {
   if (await unstored(taskId, m)) {
     return
   }
-  await record(taskId, m)
-  await recordStart(taskId, m)
+  const events = projectClaude(m)
+  await record(taskId, m, events)
+  await recordStart(taskId, events)
 }
 
 async function reportEnd(taskId: string, status: TaskStatus, lastError: string | null): Promise<void> {
@@ -112,7 +127,7 @@ type Ingest = { [T in JournalEntry['type']]: (taskId: string, entry: EntryOf<T>)
 /** What the control plane does with each entry a node reports. */
 const ingest: Ingest = {
   // The runtime adapter of the session wrote the payload.
-  message: async (taskId, { payload }) => storeMessage(taskId, payload as SDKMessage),
+  message: async (taskId, { payload }) => storeMessage(taskId, payload as ClaudeMessage),
   'turn.started': async (taskId) => setStatus(taskId, 'running'),
   'turn.ended': async (taskId, { status, error }) => reportEnd(taskId, status, error),
   note: async (taskId, { error }) => appendMessage(taskId, { kind: 'seti', payload: { error } }),
