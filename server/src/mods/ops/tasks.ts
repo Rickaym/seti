@@ -1,4 +1,4 @@
-import { MOD_LIMITS, TASK_STATUSES, type Task } from '@seti/shared'
+import { asEventsRow, MOD_LIMITS, TASK_STATUSES, type Task } from '@seti/shared'
 import { z } from 'zod'
 import { tasks } from '../../db.js'
 import { scrubValue } from '../../scrub.js'
@@ -76,7 +76,7 @@ export const taskReadOps = {
     run: async (args, { call }) => {
       const task = await visible(call, args.id)
       const page = await transcriptPage(task.id, args.limit ?? MOD_LIMITS.transcriptEntries, args.before)
-      return { ...page, messages: capped(scrubValue(page.messages)) }
+      return { ...page, messages: capped(scrubValue(page.messages).map(asEventsRow)) }
     },
   }),
   'tasks.prs': defineOp({
