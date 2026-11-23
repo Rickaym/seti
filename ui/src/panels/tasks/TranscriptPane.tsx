@@ -1,4 +1,4 @@
-import type { MessageRow, OwnMessageStep, SubtaskBrief, TaskRewind } from '@seti/shared'
+import type { WireRow, OwnMessageStep, SubtaskBrief, TaskRewind } from '@seti/shared'
 import { ArrowDown, ArrowDownToLine, ArrowUp } from 'lucide-react'
 import {
   useCallback,
@@ -26,7 +26,7 @@ import { useOwnMessages } from '@/panels/tasks/useOwnMessages'
 
 /** Loaded rows of a transcript and a way to load the page before them. */
 export interface TranscriptSource {
-  messages: readonly MessageRow[]
+  messages: readonly WireRow[]
   hasOlder: boolean
   loadingOlder: boolean
   /** Loads `limit` rows before the oldest loaded message; resolves false when nothing was added. */

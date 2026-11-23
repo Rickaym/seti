@@ -97,7 +97,9 @@ with another top-level folder.
   `turn_steps` and `turn_reply`. Queries filter on these columns, not on the runtime's JSON. A row
   without `runtime` is not filled yet; startup fills such rows in the background, newest first
   (`server/src/store/event-columns.ts`). Until then the filters in `server/src/store/event-filters.ts`
-  read such a row by its JSON, so every view shows it as before.
+  read such a row by its JSON, so every view shows it as before. The browser asks for runtime rows
+  as events (`wire=events`), which `transcript.ts` projects from the cut, redacted copy; a client
+  that does not ask gets the stored form (RT-6).
 - Redis holds only what can be rebuilt: GitHub PR lists and the GraphQL budget, capability and
   account probes, the EA's live context, and pub/sub for agent events and group chat across
   processes. It keeps nothing on disk and never holds a token. `SETI_REDIS_URL=off` costs cache
@@ -171,13 +173,20 @@ the AppArmor profile for `bwrap` that the installer adds ([Setup](setup.md#sandb
   auto-mode classifier is the classifier of PERM-2. In auto mode Claude Code drops broad shell
   allow rules, so the classifier also reviews a sandboxed agent's shell commands. Where auto mode
   is unavailable Claude Code starts in `default` mode and every call no rule allows becomes a
-  request. Bypass is Claude Code's `bypassPermissions` mode. The repeat guard and review rules are
-  `PreToolUse` hooks, so they hold in Bypass. Seti's own evaluator (`policy/`) decides each call
-  beside Claude Code in shadow and changes no outcome: its hook answers at once and decides on a
-  later turn of the event loop. `shadow-hooks.ts` counts how the two compare per day, kind, step
-  and rule ref in `policy_shadow`, with no input, command, path or rule text, and also counts
-  decisions that failed or took over 50 ms (PERM-12). `pnpm doctor` shows the last seven days,
-  and `GET /permissions/shadow` and `seti_overview` with `permissions` read the counts.
+  request. Bypass is Claude Code's `bypassPermissions` mode, which still applies ask rules and deny
+  rules. The repeat guard and review rules are `PreToolUse` hooks, so they hold in Bypass. Seti's
+  own evaluator (`policy/`) decides each call beside Claude Code in shadow and changes no outcome:
+  its hook answers at once and decides on a later turn of the event loop. `shadow-hooks.ts` counts
+  how the two compare per day, kind, step and rule ref in `policy_shadow`, with no input, command,
+  path or rule text, and also counts decisions that failed or took over 50 ms (PERM-12).
+  `pnpm doctor` shows the last seven days, and `GET /permissions/shadow` and `seti_overview` with
+  `permissions` read the counts.
+- **Runtimes without a classifier.** An adapter declares in `capabilities.gate.classifier` whether
+  its runtime has a classifier to defer to. Without one the evaluator asks where it would defer,
+  keeps the sandbox's built-in shell allow in auto mode only for a line it fully reads, and lets a
+  line run that its own read-only list (`policy/read-only.ts`) passes: listed commands run
+  directly, reading inside the working directories, with no redirect, substitution, variable or
+  wrapper. Claude Code has a classifier, so this changes nothing while it is the only runtime.
 - **Memory and CPU.** Each agent's process tree starts through `systemd-run --user --scope` with
   `MemoryMax`, 1 GB of `MemorySwapMax`, `OOMPolicy=continue`, `CPUWeight=50`, `CPUQuota` and
   `BindsTo=` the server's unit, so agents end with Seti (CAP-5). Every 100 ms Seti raises the
