@@ -14,7 +14,6 @@ import {
   type ListToolsResult,
 } from '@modelcontextprotocol/sdk/types.js'
 import type { NodeAnswer, Task } from '@seti/shared'
-import { compactHook } from './compact.js'
 import { subagentRules } from './house-rules.js'
 import { nodeLink } from './node-link.js'
 import { bashGuard, guardRefuses } from './permission-guard.js'
@@ -23,6 +22,19 @@ import type { DefaultHost, DefaultShapes } from './runtimes/registry.js'
 import { sandboxHooks } from './sandbox.js'
 import { guardScope } from './session-options.js'
 import { shadowHooks } from './shadow-hooks.js'
+
+/**
+ * Claude Code adds what a PreCompact hook answers to the summary's instructions, beside any the
+ * user gave /compact. The task's instructions are read when it compacts, so edits apply at once.
+ */
+const compactHook = (instructions: () => Promise<string | null>): HookCallbackMatcher => ({
+  hooks: [
+    async () => {
+      const kept = await instructions()
+      return kept === null ? {} : { systemMessage: kept }
+    },
+  ],
+})
 
 /** Decides each tool call the runtime would ask about by asking the control plane. */
 const decideByAsking =

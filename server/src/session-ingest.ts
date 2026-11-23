@@ -14,7 +14,7 @@ import { markQueued } from './queued-prompts.js'
 import { secretAnswers } from './secret-asks.js'
 import { mirrorSession } from './session-mirror.js'
 import { processStarted, recordStart, settleRewind, setupAnswers } from './session-setup.js'
-import { storedForm, unstored } from './session-start.js'
+import { unstored } from './session-start.js'
 import { forgetSessionTools } from './session-tools.js'
 import { countShadow } from './shadow-counts.js'
 import { withTurnCost } from './store/cost.js'
@@ -65,7 +65,7 @@ async function record(taskId: string, m: SDKMessage): Promise<void> {
   const events = projectClaude(m)
   const outward = outwardCalls(events)
   trackToolCalls(taskId, events)
-  await appendMessage(taskId, { kind: 'sdk', payload: storedForm(await withTurnCost(taskId, m)) }, outward)
+  await appendMessage(taskId, { kind: 'sdk', payload: await withTurnCost(taskId, m) }, outward)
   await audit.outwardCalls(taskId, events, outward)
   await audit.classifierDenial(taskId, events)
   if (outward.length > 0) {
