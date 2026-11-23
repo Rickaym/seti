@@ -6,11 +6,8 @@ import type {
   HookJSONOutput,
   PreToolUseHookInput,
 } from '@anthropic-ai/claude-agent-sdk'
-import type { Task } from '@seti/shared'
-import { audit } from './audit.js'
-import { askAboutRepeat } from './permission-requests.js'
-import { callKey, repeatReason, RepeatTracker, resultKey } from './repeat-guard.js'
-import { archiveSettings } from './store/archive.js'
+import type { NodeAnswer } from '@seti/shared'
+import { callKey, RepeatTracker, resultKey } from './repeat-guard.js'
 
 /** How long the question may wait for the user, in seconds, as a permission request may. */
 export const ASK_TIMEOUT_S = 7 * 24 * 60 * 60
@@ -19,11 +16,17 @@ export const ASK_TIMEOUT_S = 7 * 24 * 60 * 60
 const OPEN_MAX = 1000
 
 export interface RepeatScope {
-  task: Pick<Task, 'id' | 'title'>
+  taskId: string
   /** Aborts when the session closes, which drops a question still open. */
   session: AbortSignal
   /** True when another guard refuses the call anyway, so a question about it would be noise. */
   refused: (tool: string, input: unknown) => boolean
+  /** Asks the user about a call repeated with the same result `results` times so far. */
+  ask: (
+    call: { tool: string; input: Record<string, unknown> },
+    results: number,
+    signal: AbortSignal,
+  ) => Promise<NodeAnswer<'repeat.ask'>>
 }
 
 const threadOf = (input: { agent_id?: string }) => input.agent_id ?? ''
@@ -34,17 +37,6 @@ export const asRecord = (input: unknown): Record<string, unknown> =>
 const deny = (reason: string): HookJSONOutput => ({
   hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: 'deny', permissionDecisionReason: reason },
 })
-
-async function auditStop(task: RepeatScope['task'], tool: string, reason: string, results: number): Promise<void> {
-  await audit.record({
-    actor: 'system',
-    kind: 'task.repeat_stopped',
-    subject_type: 'task',
-    subject_id: task.id,
-    summary: `Stopped task "${task.title}" to ask the user: ${reason}`,
-    detail: { title: task.title, tool, results },
-  })
-}
 
 /** Builds the hooks that stop an agent repeating a call with the same result and ask the user. */
 export function repeatHooks(scope: RepeatScope): Partial<Record<HookEvent, HookCallbackMatcher[]>> {
@@ -62,21 +54,15 @@ export function repeatHooks(scope: RepeatScope): Partial<Record<HookEvent, HookC
     if (results === 0 || scope.refused(input.tool_name, input.tool_input)) {
       return {}
     }
-    if (!(await archiveSettings.get()).repeat_guard) {
+    const asked = { tool: input.tool_name, input: asRecord(input.tool_input) }
+    const answer = await scope.ask(asked, results, AbortSignal.any([signal, scope.session]))
+    if (answer.outcome === 'off') {
       return {}
     }
-    const reason = repeatReason(input.tool_name, results)
-    await auditStop(scope.task, input.tool_name, reason, results)
-    const answer = await askAboutRepeat(
-      scope.task.id,
-      { tool: input.tool_name, input: asRecord(input.tool_input) },
-      reason,
-      [signal, scope.session],
-    )
-    if (answer.behavior === 'deny') {
+    if (answer.outcome === 'denied') {
       return deny(answer.message)
     }
-    tracker.allowed(thread, call, answer.decisionClassification === 'user_permanent')
+    tracker.allowed(thread, call, answer.always)
     return {}
   }
 
@@ -87,7 +73,7 @@ export function repeatHooks(scope: RepeatScope): Partial<Record<HookEvent, HookC
     try {
       return await check(input, signal)
     } catch (e) {
-      process.stderr.write(`repeat guard: task ${scope.task.id}: ${String(e)}\n`)
+      process.stderr.write(`repeat guard: task ${scope.taskId}: ${String(e)}\n`)
       return {}
     }
   }

@@ -1,11 +1,11 @@
-import { createSdkMcpServer, tool, type McpServerConfig } from '@anthropic-ai/claude-agent-sdk'
+import { createSdkMcpServer, tool, type McpSdkServerConfigWithInstance } from '@anthropic-ai/claude-agent-sdk'
 import type { z } from 'zod'
 
 /** What a tool call answers, as an MCP tool result. */
 type ToolAnswer = Awaited<ReturnType<Parameters<typeof tool>[3]>>
 
 /** A tool Seti runs in its own process; its handler gets the call's abort signal, if any. */
-interface HostTool {
+export interface HostTool {
   name: string
   description: string
   input: z.ZodRawShape
@@ -19,7 +19,7 @@ const signalOf = (extra: unknown): AbortSignal | undefined =>
     : undefined
 
 /** Serves the tools to a Claude Code session as one MCP server inside Seti's process. */
-export const inProcessServer = (name: string, tools: readonly HostTool[]): McpServerConfig =>
+export const inProcessServer = (name: string, tools: readonly HostTool[]): McpSdkServerConfigWithInstance =>
   createSdkMcpServer({
     name,
     version: '1.0.0',

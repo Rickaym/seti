@@ -8,10 +8,20 @@ function controlEnd(answer: ControlEnd['answer']['prompt.open']) {
   const journal = vi.fn<ControlEnd['journal']>(async () => Promise.resolve())
   const open = vi.fn(answer)
   const none = async () => Promise.reject(new Error('not asked'))
-  serveNode({
-    journal,
-    answer: { 'prompt.open': open, 'session.opening': none, 'session.spec': none, 'setup.key': none },
-  })
+  const answers: ControlEnd['answer'] = {
+    'prompt.open': open,
+    'session.opening': none,
+    'session.spec': none,
+    'setup.key': none,
+    'permission.ask': none,
+    'review.ask': none,
+    'repeat.ask': none,
+    'hook.compact': none,
+    'sandbox.hosts': none,
+    'tools.list': none,
+    'tool.call': none,
+  }
+  serveNode({ journal, answer: answers })
   return { journal, open }
 }
 
@@ -52,7 +62,7 @@ describe('node link', () => {
     const next = { prompt: 'hello', interrupted: false, client_id: 'c1', priority: 'next' as const }
     const answer = await nodeLink.ask(TASK, 'prompt.open', { next, queued: true })
     expect(answer).toEqual({ promptId: 7, text: 'Updates first\n\nhello' })
-    expect(open).toHaveBeenCalledWith(TASK, { next, queued: true })
+    expect(open).toHaveBeenCalledWith(TASK, { next, queued: true }, expect.any(AbortSignal))
     expect(Object.keys(open.mock.calls[0]?.[1].next ?? {})).toEqual(['prompt', 'interrupted', 'client_id', 'priority'])
   })
 
