@@ -13,6 +13,7 @@ import {
   type AttachmentRef,
   type PromptAttachment,
   type StagedUpload,
+  UPLOAD_IDLE_MS,
   type UploadQuery,
 } from '@seti/shared'
 import { audit } from './audit.js'
@@ -41,10 +42,28 @@ function sweep(now = Date.now()): void {
   }
 }
 
-function capped(name: string): Transform {
+/** Aborts with a 408 once no bytes arrived for `idleMs`; `touch` restarts the wait. */
+function idleWatch(name: string, idleMs: number) {
+  const abort = new AbortController()
+  const expire = () => {
+    abort.abort(new HttpError(408, `${name} stopped arriving; send it again`))
+  }
+  let timer = setTimeout(expire, idleMs)
+  const stop = () => {
+    clearTimeout(timer)
+  }
+  const touch = () => {
+    stop()
+    timer = setTimeout(expire, idleMs)
+  }
+  return { signal: abort.signal, touch, stop }
+}
+
+function capped(name: string, onBytes: () => void): Transform {
   let seen = 0
   return new Transform({
     transform(chunk: Buffer, _encoding, done) {
+      onBytes()
       seen += chunk.length
       if (seen > ATTACHMENT_FILE_MAX) {
         done(new HttpError(413, `${name} is over the ${formatBytes(ATTACHMENT_FILE_MAX)} limit for one file`))
@@ -81,18 +100,24 @@ export function safeName(name: string, ext: string | null): string {
   return suffix === '' ? kept : `${kept}.${suffix}`
 }
 
-/** Streams an upload to the staging folder, capped, then sniffs what it is. */
-export async function stageUpload(body: ReadableStream<Uint8Array> | null, query: UploadQuery): Promise<StagedUpload> {
+/** Streams an upload to the staging folder, capped and given up when it stops, then sniffs it. */
+export async function stageUpload(
+  body: ReadableStream<Uint8Array> | null,
+  query: UploadQuery,
+  idleMs = UPLOAD_IDLE_MS,
+): Promise<StagedUpload> {
   fs.mkdirSync(STAGING, { recursive: true, mode: 0o700 })
   sweep()
   const id = randomUUID()
   const file = dataFile(id)
   const source = query.source ?? 'file'
+  const idle = idleWatch(query.name, idleMs)
   try {
     await pipeline(
       body === null ? Readable.from([]) : Readable.fromWeb(body),
-      capped(query.name),
+      capped(query.name, idle.touch),
       fs.createWriteStream(file, { flags: 'wx', mode: 0o600 }),
+      { signal: idle.signal },
     )
     const size = fs.statSync(file).size
     if (size === 0) {
@@ -115,7 +140,9 @@ export async function stageUpload(body: ReadableStream<Uint8Array> | null, query
     return staged
   } catch (e) {
     fs.rmSync(file, { force: true })
-    throw e
+    throw idle.signal.aborted ? idle.signal.reason : e
+  } finally {
+    idle.stop()
   }
 }
 

@@ -1,8 +1,8 @@
-import { insideAny, resolvePath } from './paths.js'
+import { everyPlace, insideAny, resolvePath } from './paths.js'
 import { commandShape, rawWords } from './shell-forms.js'
 import { cdThenGit } from './shell-rules.js'
 import { splitShell } from './shell-split.js'
-import type { PolicyContext } from './types.js'
+import type { PolicyContext, Resolved } from './types.js'
 
 /** What a command's words are: its program and arguments, quotes removed, and as written. */
 interface Words {
@@ -37,17 +37,20 @@ const DOTS = /(^|\/)\.\.(\/|$)/
  * Whether a path a command reads stays inside the working directories. A glob or a path after a
  * `cd` must be relative with no `..`, so it cannot leave the directory it starts from.
  */
-function readsInside(given: string, moved: boolean, ctx: PolicyContext): boolean {
+function readsInside(given: string, moved: boolean, ctx: ReadContext): boolean {
   if (given.startsWith('~')) {
     return false
   }
   if (GLOB.test(given) || (moved && !given.startsWith('/'))) {
     return !given.startsWith('/') && !DOTS.test(given)
   }
-  return insideAny(resolvePath(given, ctx.cwd, ctx.home), ctx.dirs)
+  return everyPlace(resolvePath(given, ctx.cwd, ctx.home), ctx.resolved, (place) => insideAny(place, ctx.dirs))
 }
 
-type Check = (command: Words, ctx: PolicyContext, moved: boolean) => boolean
+/** The call's context and where the paths it names lead. */
+type ReadContext = PolicyContext & { resolved?: Resolved | undefined }
+
+type Check = (command: Words, ctx: ReadContext, moved: boolean) => boolean
 
 /** The values options carry after `=`, such as a file a `--files0-from=` reads. */
 const optionValues = (words: readonly string[]) =>
@@ -112,7 +115,8 @@ const UNREAD = /[<>$`]/
  * list names, run directly, reading inside the working directories. A line it cannot fully read,
  * with a redirect, substitution, variable or wrapper, or a `cd` before `git`, is not read-only.
  */
-export function readOnly(command: string, ctx: PolicyContext): boolean {
+export function readOnly(command: string, policy: PolicyContext, resolved?: Resolved): boolean {
+  const ctx: ReadContext = { ...policy, resolved }
   const split = splitShell(command)
   if (!split.plain || UNREAD.test(command)) {
     return false

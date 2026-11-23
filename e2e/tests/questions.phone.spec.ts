@@ -11,7 +11,7 @@ import {
   requestsSection,
   sectionCount,
   sentLine,
-  sentToast,
+  expectNoSentToast,
 } from './support/questions.js'
 
 test.use({ serverEnv: FAKE_CLAUDE_ENV })
@@ -40,8 +40,8 @@ test('on a phone the Requests page goes back, and one Submit all answers two age
   await expect(sentLine(page)).toHaveText('3 of 3 answered')
   await page.getByRole('button', { name: 'Submit all' }).tap()
 
-  await expect(sentToast(page, 'Sent 3 answers')).toBeVisible()
   await expect(page).toHaveURL(/#agents$/)
+  await expectNoSentToast(page)
   await expect(page.getByRole('heading', { name: 'Agents', level: 1 })).toBeVisible()
   await page.getByRole('button', { name: 'Menu' }).tap()
   await expect(requestsSection(page)).toBeVisible()
