@@ -24,6 +24,8 @@ export const helloFrame = z.object({
   protocol: z.int(),
   build: z.string().max(200),
   boot: id,
+  /** The node's process, whose children are the agents' processes on this machine. */
+  pid: z.int().positive(),
   /** No control plane welcomed this node process yet: the sessions of an earlier one are gone. */
   fresh: z.boolean(),
   journals: z.array(journalPosition),
@@ -44,10 +46,13 @@ const commandType = z.enum(Object.keys(NODE_COMMANDS) as [NodeCommandType, ...No
 export const commandFrame = z.object({ type: z.literal('command'), id, command: commandType, body: z.unknown() })
 export type CommandFrame = z.infer<typeof commandFrame>
 
+/** The commanded agent's last journal entry as the node answered; null when it has none. */
+const answeredAfter = z.object({ agent, epoch: z.string().min(1).max(64), seq: z.int() }).nullable()
+
 /** The node's answer to a command, or why it could not act. */
 export const commandReply = z.discriminatedUnion('type', [
-  z.object({ type: z.literal('command.answer'), id, answer: z.unknown() }),
-  z.object({ type: z.literal('command.error'), id, error: z.string() }),
+  z.object({ type: z.literal('command.answer'), id, answer: z.unknown(), after: answeredAfter }),
+  z.object({ type: z.literal('command.error'), id, error: z.string(), after: answeredAfter }),
 ])
 export type CommandReply = z.infer<typeof commandReply>
 

@@ -14,6 +14,7 @@ import type {
 } from '@seti/shared'
 import { CLAUDE_HOME, SETI_HOME } from './config.js'
 import { tasks } from './db.js'
+import { agentParents } from './node-pid.js'
 import { environValue, hostCpuPercent, mountOf, parseMeminfo, Proc, type CpuTimes, type ProcStat } from './proc.js'
 import {
   ageS,
@@ -98,7 +99,7 @@ function diskAt(place: string): { dir: string; disk: Omit<DiskUsage, 'mount' | '
 /** Reads /proc every interval and keeps the last hour; one per server process. */
 export class ResourceSampler {
   private readonly proc: Proc
-  private readonly serverPid: number
+  private readonly parents: () => readonly number[]
   private readonly components: ComponentProbe
   private readonly taskOfProcess = new Map<string, string | null>()
   private readings: TickReadings = new Map()
@@ -109,9 +110,9 @@ export class ResourceSampler {
   private latest: Resources | null = null
   private running: Promise<Resources> | null = null
 
-  constructor(proc = new Proc(), serverPid = process.pid) {
+  constructor(proc = new Proc(), serverPid = process.pid, parents: () => readonly number[] = agentParents) {
     this.proc = proc
-    this.serverPid = serverPid
+    this.parents = parents
     this.components = new ComponentProbe(proc, serverPid)
   }
 
@@ -308,7 +309,10 @@ export class ResourceSampler {
   }
 
   private async taskRows(scan: Scan): Promise<{ rows: TaskRow[]; candidates: TaskCandidate[] }> {
-    const found = claudeProcesses(scan.children.get(this.serverPid) ?? [], (stat) => this.taskIdOf(stat))
+    const found = claudeProcesses(
+      this.parents().flatMap((parent) => scan.children.get(parent) ?? []),
+      (stat) => this.taskIdOf(stat),
+    )
     const sandboxOn = (await sandboxPolicy.get().catch(() => null))?.enabled === true
     const measured = await Promise.all(found.map(async (claude) => this.taskRow(scan, claude, sandboxOn)))
     this.cpuTrails = new Map(found.map(({ stat }, i) => [keyOf(stat), measured[i]?.candidate.cpu ?? []]))

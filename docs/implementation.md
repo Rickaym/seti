@@ -62,7 +62,7 @@ with another top-level folder.
 | 4 Turns        | `runner.ts`, `session-host.ts`, `session-ingest.ts`, `session-spec.ts`, `runtime-host.ts`, `runtimes/`, `agent-session.ts`, `rewind.ts`, `turn-asking.ts`, `closing-line.ts`, `task-location.ts` |
 | 4 Restarts     | `session-restart.ts`, `input-queue.ts`                                                                                                                                                           |
 | 4 Node link    | `node-link.ts`, `node-commands.ts`, `session-control.ts`, `session-mirror.ts`, `session-setup.ts`, `session-tools.ts`, `turn-asks.ts`, `shared/src/node-protocol.ts`                             |
-| 15.1 Node      | `node/`, `node-client.ts`, `node-split.ts`, `node-inbox.ts`, `node-outbox.ts`, `store/node-cursors.ts`, `shared/src/node-frames.ts`                                                              |
+| 15.1 Node      | `node/`, `node-client.ts`, `node-split.ts`, `node-inbox.ts`, `node-outbox.ts`, `node-pid.ts`, `store/node-cursors.ts`, `shared/src/node-frames.ts`                                               |
 | 5 Updates      | `shared/src/channel-delivery.ts`, `inputs.ts`, `input-preface.ts`                                                                                                                                |
 | 6 Attention    | `shared/src/attention.ts`, `task-blocked.ts`, `stall-watch.ts`, `ea-attention.ts`, `notifications.ts`, `notify-scope.ts`, `presence.ts`, `attention-brief.ts`                                    |
 | 7.1 Actors     | `access.ts`, `ea-guard.ts`                                                                                                                                                                       |
@@ -70,7 +70,7 @@ with another top-level folder.
 | 7.4, 7.5       | `permission-policy.ts`, `policy/`, `permission-requests.ts`, `permission-timeout.ts`, `permission-guard.ts`, `repeat-hooks.ts`, `review-hooks.ts`, `outward.ts`                                  |
 | 7.6 Changes    | `change-requests.ts`, `change-request-notes.ts`, `mcp-off-context.ts`, `shared/src/change-requests.ts`                                                                                           |
 | 7.7 Hostile    | `git.ts`, `probe-launch.ts`, `task-files.ts`, `html-preview.ts`, `uploads.ts`                                                                                                                    |
-| 7.8 Caps       | `launcher.ts`, `memory-scope.ts`, `scope-cpu.ts`, `oom-guard.ts`                                                                                                                                 |
+| 7.8 Caps       | `launcher.ts`, `memory-scope.ts`, `scope-cpu.ts`, `scope-limits.ts`, `scope-control.ts`, `oom-guard.ts`                                                                                          |
 | 8 Secrets      | `secret-box.ts`, `connections.ts`, `scrub.ts`, `secret-questions.ts`, `secret-delivery.ts`                                                                                                       |
 | 9 Shared tools | `shared/src/shared-tools.ts`, `shared-tool-proposals.ts`, `shared-tool-files.ts`, `shared-tool-server.ts`                                                                                        |
 | 10 Events      | `shared/src/webhook-senders.ts`, `shared/src/webhook-sender-catalog.ts`, `channels/`, `pollers/`, `reminders/`, `quickjs/`                                                                       |

@@ -4,6 +4,7 @@ import { audit } from './audit.js'
 import { closingLine } from './closing-line.js'
 import { linkCreatedPrs } from './created-prs.js'
 import { messages, tasks } from './db.js'
+import { reportMemoryEvent } from './memory-scope.js'
 import { serveNode } from './node-link.js'
 import { outwardToolUses } from './outward.js'
 import { markQueued } from './queued-prompts.js'
@@ -111,6 +112,9 @@ const ingest: Ingest = {
     processStarted(taskId, warm)
   },
   'guard.refused': async (taskId, { command, reason }) => auditRefusal(taskId, command, reason),
+  'memory.event': (taskId, { report }) => {
+    reportMemoryEvent(taskId, report)
+  },
   'rewind.settled': async (_taskId, { id, state, reason }) => settleRewind(id, state, reason),
   'session.since': (taskId, { promptId }) => sessionSince.set(taskId, promptId),
   'session.closed': async (taskId, { since }) => sessionClosed(taskId, since),
