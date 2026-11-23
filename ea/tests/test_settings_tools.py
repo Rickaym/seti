@@ -118,6 +118,8 @@ class SettingsFake(FakeSeti):
         self.clean_plan: dict[str, Any] = dict(CLEAN_PLAN)
         self.revisions: dict[tuple[str, str], list[dict[str, Any]]] = {}
         self.dreams: list[dict[str, Any]] = []
+        self.proposals: list[dict[str, Any]] = []
+        self.trash: list[dict[str, Any]] = []
         self.dream_settings: dict[str, Any] = {
             "enabled": False,
             "window_start": "01:00",
@@ -381,6 +383,12 @@ class SettingsFake(FakeSeti):
                 return ok(self.dream_settings)
             case "GET", ["dreams"]:
                 return ok(None)
+            case "GET", ["dreams", "proposals"]:
+                return ok(self.proposals)
+            case "GET", ["trash"]:
+                return ok(self.trash)
+            case "POST", ["trash", _, "restore"]:
+                return ok({"id": 4, "original_path": "/work/old-notes.md"})
             case "PUT", ["tasks", _, "dreaming"] | ["workspaces", _, "dreaming"]:
                 return ok(body)
             case "GET", ["workspaces"]:
@@ -1097,7 +1105,7 @@ async def test_dreaming_is_read_changed_and_switched_per_agent_and_workspace_aft
 ) -> None:
     read = await tools.call("dreams", {})
     assert read.text.startswith("Nightly Dreaming is off: window 01:00 to 05:00 (no zone chosen yet)")
-    assert read.text.endswith("No night has been planned yet.")
+    assert read.text.endswith("No night has been planned yet. The trash is empty.")
     change = {"enabled": True, "zone": "Europe/Istanbul", "window_start": "00:30"}
     asked, changed = await confirm(tools, "dreams", change)
     assert "turns it on, sets window start to 00:30, sets zone to Europe/Istanbul." in asked.text
@@ -1109,6 +1117,15 @@ async def test_dreaming_is_read_changed_and_switched_per_agent_and_workspace_aft
     _, group = await confirm(tools, "dreams", {"workspace": "client", "dreaming": True})
     assert group.text == "Switched nightly Dreaming on for the Client workspace."
     assert writes(fake)[-1] == ("PUT", "/api/workspaces/w-client/dreaming", {"on": True})
+    fake.trash = [{"id": 4, "original_path": "/work/old-notes.md"}]
+    assert (await tools.call("dreams", {})).text.endswith("The trash holds 1 item: 4: /work/old-notes.md.")
+    _, restored = await confirm(tools, "dreams", {"restore": 4})
+    assert restored.text == "Restored /work/old-notes.md."
+    assert writes(fake)[-1][0:2] == ("POST", "/api/trash/4/restore")
+    fake.proposals = [{"kind": "delete_branch", "target": "/work/app:done", "reason": "merged"}]
+    fake.dreams = [{"night": "2026-11-24", "state": "done", "memory_changes": 0, "cost_usd": 0.1}]
+    read = await tools.call("dreams", {"task": "logout"})
+    assert read.text.endswith("- Clean-up waiting for the user: delete_branch /work/app:done (merged)")
 
 
 async def test_plugins_are_added_switched_and_removed(tools: EaTools, fake: SettingsFake) -> None:

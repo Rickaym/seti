@@ -3,6 +3,7 @@ import { nightLine } from '../dreams/brief.js'
 import { setTaskDreaming } from '../dreams/settings.js'
 import { startDream } from '../dreams/start.js'
 import { dreamNights, dreamOptOuts, dreamSettings, nightRuns } from '../store/dream-nights.js'
+import { dreamProposals } from '../store/dream-proposals.js'
 import { dreamRuns } from '../store/dreams.js'
 import { liveTask, taskRef } from './refs.js'
 import { done, notSelf, setiTool } from './tool.js'
@@ -55,7 +56,7 @@ const dreams = setiTool({
         report,
       }),
     )
-    return { nightly: !off, runs }
+    return { nightly: !off, runs, cleanups_waiting: await dreamProposals.pending(task.id) }
   },
 })
 
