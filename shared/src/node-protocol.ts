@@ -62,6 +62,8 @@ export const journalEntry = z.discriminatedUnion('type', [
   z.object({ type: z.literal('session.opened') }),
   z.object({ type: z.literal('session.started'), warm: z.boolean() }),
   z.object({ type: z.literal('guard.refused'), command: z.string(), reason: z.string() }),
+  /** A request carried connection placeholders toward a host their connections do not allow. */
+  z.object({ type: z.literal('egress.blocked'), host: z.string(), names: z.array(z.string()) }),
   z.object({ type: z.literal('memory.event'), report: memoryReport }),
   /** Seti's shadow compared a call with the runtime's outcome; null when its decision failed. */
   z.object({ type: z.literal('policy.compared'), count: policyShadowCount.nullable() }),
@@ -253,8 +255,13 @@ const commandSchemas = {
     body: z.object({ agent }),
     answer: z.object({ memory: z.array(memoryScopeSchema), cpu: z.array(cpuScopeSchema) }),
   },
-  /** Whether the node runs the agent's egress proxy, which the control plane's sandboxes then use. */
-  'proxy.serving': { body: z.object({ agent }), answer: z.object({ serving: z.boolean() }) },
+  /**
+   * Opens the agent's egress proxy on the node unless it runs, for a sandbox the control plane
+   * builds. The task is the control plane's row.
+   */
+  'proxy.open': { body: z.object({ agent, task: z.unknown() }), answer: done },
+  /** Stops a removed agent's egress proxy on the node. */
+  'proxy.close': { body: z.object({ agent }), answer: done },
   /** The agents with a live scope, whose caps a change of a default may move. */
   'scopes.agents': { body: done, answer: z.object({ agents: z.array(agent) }) },
   /** Moves the agents' live scopes to these caps now. */

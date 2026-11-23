@@ -2,6 +2,7 @@ import type { SDKMessage } from '@anthropic-ai/claude-agent-sdk'
 import { projectClaude, type JournalEntry, type MessageBody, type MessageRow, type TaskStatus } from '@seti/shared'
 import { audit } from './audit.js'
 import { closingLine } from './closing-line.js'
+import { auditBlockedKey } from './connection-egress.js'
 import { linkCreatedPrs } from './created-prs.js'
 import { messages, tasks } from './db.js'
 import { reportMemoryEvent } from './memory-scope.js'
@@ -12,7 +13,7 @@ import { openPrompt } from './prompt-open.js'
 import { markQueued } from './queued-prompts.js'
 import { mirrorSession } from './session-mirror.js'
 import { processStarted, recordStart, settleRewind, setupAnswers } from './session-setup.js'
-import { storedForm, unstored } from './session-start.js'
+import { unstored } from './session-start.js'
 import { forgetSessionTools } from './session-tools.js'
 import { countShadow } from './shadow-counts.js'
 import { withTurnCost } from './store/cost.js'
@@ -63,7 +64,7 @@ async function record(taskId: string, m: SDKMessage): Promise<void> {
   const events = projectClaude(m)
   const outward = outwardCalls(events)
   trackToolCalls(taskId, events)
-  await appendMessage(taskId, { kind: 'sdk', payload: storedForm(await withTurnCost(taskId, m)) }, outward)
+  await appendMessage(taskId, { kind: 'sdk', payload: await withTurnCost(taskId, m) }, outward)
   await audit.outwardCalls(taskId, events, outward)
   await audit.classifierDenial(taskId, events)
   if (outward.length > 0) {
@@ -120,6 +121,7 @@ const ingest: Ingest = {
     processStarted(taskId, warm)
   },
   'guard.refused': async (taskId, { command, reason }) => auditRefusal(taskId, command, reason),
+  'egress.blocked': async (taskId, { host, names }) => auditBlockedKey(taskId, host, names),
   'memory.event': (taskId, { report }) => {
     reportMemoryEvent(taskId, report)
   },

@@ -64,7 +64,7 @@ export function subjectOf<S extends RuntimeShapes, Id extends string>(target: Co
       const host = target.host(options.host ?? ALLOW_ALL)
       const realised = await target.adapter.realise(specFor(options.resume ?? null), rig.launcher, host, controller)
       const inputs = new Channel<SessionInput>()
-      const session = await target.adapter.open(realised, inputs)
+      const session = await target.adapter.open(realised, inputs, null)
       return new Run(session, target.project, inputs, controller).start()
     },
   }
