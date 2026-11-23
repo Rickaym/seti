@@ -2,7 +2,7 @@ import { hostMatches, type GrantConnection, type Task } from '@seti/shared'
 import { grantConnections, taskConnections } from './connection-egress.js'
 
 /** The host a Codex agent sends its model calls to. */
-export const OPENAI_HOST = 'api.openai.com'
+const OPENAI_HOST = 'api.openai.com'
 
 /**
  * The connection whose value is a Codex agent's OpenAI key, or null when it has none: one of the
