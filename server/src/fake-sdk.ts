@@ -244,6 +244,14 @@ export class FakeSession {
     this.outbox.end(new Error('Claude Code process aborted by user'))
   }
 
+  /** The process died: the running turn stops, and the stream ends with the error. */
+  fail(error: Error): void {
+    this.closed = true
+    this.turn?.abort()
+    this.wakeup.poke()
+    this.outbox.end(error)
+  }
+
   private async read(input: AsyncIterable<SDKUserMessage>): Promise<void> {
     for await (const m of input) {
       if (this.closed) {
