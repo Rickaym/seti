@@ -48,6 +48,9 @@ function asNamed(real: string, roots: readonly Root[]): string {
  * outside them all, changes where a path leads. Holds only the paths that lead elsewhere.
  */
 export async function resolvePaths(paths: readonly string[], roots: readonly string[]): Promise<Resolved> {
+  if (paths.length === 0) {
+    return new Map()
+  }
   const known = await Promise.all(roots.map(async (given) => ({ given, real: (await leadsTo(given)) ?? given })))
   const deepest = known.toSorted((a, b) => b.real.length - a.real.length)
   const resolved = new Map<string, string | null>()

@@ -5,6 +5,7 @@ import type { CanUseTool, HookCallbackMatcher, HookInput } from '@anthropic-ai/c
 import type { Task } from '@seti/shared'
 import { describe, expect, it, vi } from 'vitest'
 import { sql, tasks } from './db.js'
+import './session-ingest.js'
 import { shadowHooks } from './shadow-hooks.js'
 import { permissionRules } from './store/permissions.js'
 
