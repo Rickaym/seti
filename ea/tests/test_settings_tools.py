@@ -995,7 +995,7 @@ async def test_dream_memory_changes_are_listed_reverted_and_marked_seen(
     tools: EaTools, fake: SettingsFake
 ) -> None:
     memory = f"{TASK_LOGOUT}:MEMORY.md"
-    change = {
+    change: dict[str, Any] = {
         "id": 12,
         "at": "2026-09-27T10:00:00.000Z",
         "actor": "system",
@@ -1008,8 +1008,12 @@ async def test_dream_memory_changes_are_listed_reverted_and_marked_seen(
         "after": {"text": "- b", "sha256": "2"},
         "reason": "dream 2026-09-27",
     }
-    created = {**change, "id": 11, "object_id": f"{TASK_LOGOUT}:topics/new.md"}
-    created["before"] = {"text": "", "sha256": "", "deleted": True}
+    created: dict[str, Any] = {
+        **change,
+        "id": 11,
+        "object_id": f"{TASK_LOGOUT}:topics/new.md",
+        "before": {"text": "", "sha256": "", "deleted": True},
+    }
     fake.revisions[("memory_file", memory)] = [change]
     fake.revisions[("memory_file", f"{TASK_LOGOUT}:topics/new.md")] = [created]
     fake.unseen = [{"object_type": "memory_file", "object_id": memory, "revision_id": 12, "at": change["at"]}]
