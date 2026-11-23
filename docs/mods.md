@@ -267,7 +267,7 @@ strict argument schema before it runs one.
 | `connection.fetch`       | `connection`   | The bound connection, read at call time; a host in both the grant and the connection; the value set by Seti and redacted from the answer         |
 | `tasks.list`             | `tasks.read`   | Agents the filter covers                                                                                                                         |
 | `tasks.get`              | `tasks.read`   | Agents the filter covers; others answer as missing                                                                                               |
-| `tasks.transcript`       | `tasks.read`   | Direct messages hidden but the mod's own; credentials redacted; 50 entries, 256 KB                                                               |
+| `tasks.transcript`       | `tasks.read`   | Direct messages hidden but the mod's own; credentials redacted; runtime rows as events; 50 entries, 256 KB                                       |
 | `tasks.prs`              | `tasks.read`   | Agents the filter covers                                                                                                                         |
 | `tasks.manage.rename`    | `tasks.manage` | The action is granted; the agent is within the `tasks.read` filter                                                                               |
 | `tasks.manage.pin`       | `tasks.manage` | The action is granted; the agent is within the `tasks.read` filter                                                                               |
@@ -441,7 +441,9 @@ stored off; safe mode and a mod bisect leave it on, and its settings still chang
 bundled mod's do. Settings, Mods shows it with a Core badge and a lock in place of its switch. Only
 a bundled mod may be required.
 
-This Seti offers mod API 1.21.0, which added transcript blocks, `api.transcript.refresh` and
+This Seti offers mod API 1.22.0, which hands `tasks.transcript` the agent's runtime rows as
+neutral events (`{ kind: 'events', payload }`, typed as `SetiTranscriptEntry`) in place of the
+runtime's own messages, which were never typed; 1.21.0 added transcript blocks, `api.transcript.refresh` and
 stored asides (`aside.list`, `remove` and `clear` in place of `close`, and `done` events that
 carry the stored aside instead of `turns_left`); 1.20.0 added `api.app.stepOwnMessages`; 1.19.0 added
 `takesTerminalKey` to input hooks; 1.18.0 added fence
