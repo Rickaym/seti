@@ -42,7 +42,21 @@ async function retract(session: LiveSession | undefined, promptId: number): Prom
   return cancelled ? { outcome: 'removed', promptId: session.settle(uuid) } : { outcome: 'taken', promptId: null }
 }
 
+/** Cuts the agents' running turns for a restart and waits for them to end, at most `graceMs`. */
+async function cutForRestart(agents: readonly string[], graceMs: number): Promise<void> {
+  const cut = agents.flatMap((agent) => sessionOf(agent) ?? [])
+  for (const session of cut) {
+    session.cutForRestart()
+  }
+  const ended = Promise.allSettled(cut.map(async (session) => session.done))
+  await Promise.race([ended, new Promise((resolve) => setTimeout(resolve, graceMs).unref())])
+}
+
 serveControl({
+  'sessions.cut': async ({ agents, graceMs }) => {
+    await cutForRestart(agents, graceMs)
+    return {}
+  },
   'turn.send': async ({ agent, message, interrupt }) => ({ outcome: await sendTurn(agent, message, interrupt) }),
   'turn.stop': async ({ agent, deliverQueued }) => ({ stopped: await stopTurn(agent, deliverQueued) }),
   'session.open': async ({ agent }) => {
@@ -70,6 +84,14 @@ serveControl({
     return {}
   },
   'sessions.view': () => ({
-    sessions: liveSessions().map(([agent, { running, heardAt, retrying }]) => ({ agent, running, heardAt, retrying })),
+    sessions: liveSessions().map(([agent, session]) => ({
+      agent,
+      open: !session.closed,
+      running: session.running,
+      heardAt: session.heardAt,
+      retrying: session.retrying,
+      kind: session.turnKind,
+      background: session.backgroundCount,
+    })),
   }),
 })
