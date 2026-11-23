@@ -61,6 +61,8 @@ export const journalEntry = z.discriminatedUnion('type', [
   z.object({ type: z.literal('session.opened') }),
   z.object({ type: z.literal('session.started'), warm: z.boolean() }),
   z.object({ type: z.literal('guard.refused'), command: z.string(), reason: z.string() }),
+  /** A request carried connection placeholders toward a host their connections do not allow. */
+  z.object({ type: z.literal('egress.blocked'), host: z.string(), names: z.array(z.string()) }),
   z.object({ type: z.literal('memory.event'), report: memoryReport }),
   z.object({
     type: z.literal('rewind.settled'),

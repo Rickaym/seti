@@ -2,6 +2,7 @@ import type { SDKMessage } from '@anthropic-ai/claude-agent-sdk'
 import { projectClaude, type JournalEntry, type MessageBody, type MessageRow, type TaskStatus } from '@seti/shared'
 import { audit } from './audit.js'
 import { closingLine } from './closing-line.js'
+import { auditBlockedKey } from './connection-egress.js'
 import { linkCreatedPrs } from './created-prs.js'
 import { messages, tasks } from './db.js'
 import { reportMemoryEvent } from './memory-scope.js'
@@ -119,6 +120,7 @@ const ingest: Ingest = {
     processStarted(taskId, warm)
   },
   'guard.refused': async (taskId, { command, reason }) => auditRefusal(taskId, command, reason),
+  'egress.blocked': async (taskId, { host, names }) => auditBlockedKey(taskId, host, names),
   'memory.event': (taskId, { report }) => {
     reportMemoryEvent(taskId, report)
   },

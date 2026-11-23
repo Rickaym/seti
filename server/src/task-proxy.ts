@@ -6,12 +6,13 @@ import { awsBroker } from './aws-credentials.js'
 import { claudeCredential, connectorCredential } from './claude-credential.js'
 import { hostLoginKey } from './claude-logins.js'
 import { SETI_HOME } from './config.js'
-import { auditBlockedKey, connectionPlaceholders, connectionRules, taskConnections } from './connection-egress.js'
+import { connectionPlaceholders, connectionRules, taskConnections } from './connection-egress.js'
 import type { EgressPlaceholder } from './egress-placeholders.js'
 import { startEgressProxy, type EgressProxy } from './egress-proxy.js'
 import { ruleCaHosts, type EgressRule } from './egress-rules.js'
 import { agentToken, tokenOwner } from './github-token.js'
 import { connectorIds, taskDeniedServers } from './mcp-selection.js'
+import { nodeLink } from './node-link.js'
 import { sandboxDirOf } from './owned-dirs.js'
 import { awsToken, forgetAwsToken } from './sandbox-aws-token.js'
 import { loadSandboxCa, type SandboxCa } from './sandbox-ca.js'
@@ -77,7 +78,7 @@ async function taskProxy(task: Task, authority: SandboxCa): Promise<EgressProxy>
     rules: () => accessOf(taskId).rules,
     placeholders: () => accessOf(taskId).placeholders,
     onBlocked: (host, names) => {
-      void auditBlockedKey(task, host, names)
+      void nodeLink.journal(taskId, { type: 'egress.blocked', host, names: [...names] }).catch(() => undefined)
     },
     connectorAllowed: (id) => !accessOf(taskId).deniedConnectors.has(id),
     ssh: async (target) => (await taskSsh(taskId)).firstHops.includes(target),

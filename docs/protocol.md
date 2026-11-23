@@ -774,6 +774,9 @@ store, the audit chain and every record.
 - NODE-8: Only the node runs agents' egress proxies. A sandbox the control plane builds, for a
   terminal or a `!` command, has the node open the agent's proxy and uses it, and removing an
   agent stops its proxy on the node.
+- NODE-9: A command the node's guard refused, and a request its egress proxy blocked for
+  carrying a connection's placeholder toward a host the connection does not allow, reach the
+  control plane as journal entries, which it audits once.
 
 ## 16. Audit
 

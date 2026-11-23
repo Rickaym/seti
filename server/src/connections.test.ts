@@ -2,15 +2,10 @@ import { generateKeyPairSync } from 'node:crypto'
 import type { Connection, CredentialProfile, MintTest, Task } from '@seti/shared'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createApp } from './app.js'
-import {
-  auditBlockedKey,
-  connectionContext,
-  connectionPlaceholders,
-  connectionRules,
-  taskConnections,
-} from './connection-egress.js'
+import { connectionContext, connectionPlaceholders, connectionRules, taskConnections } from './connection-egress.js'
 import { createConnectionPlaceholder } from './connections.js'
 import { sql, tasks } from './db.js'
+import { nodeLink } from './node-link.js'
 import { createPoller } from './pollers/actions.js'
 import { sandboxPrompt } from './sandbox-prompt.js'
 import { setupKey } from './session-spec.js'
@@ -125,8 +120,10 @@ describe('connections', () => {
     expect(placeholder?.placeholder).toMatch(/^seti-secret-vendor-[0-9a-f]{32}$/)
     expect(await placeholder?.value()).toBe(KEY)
     expect(await connectionContext(task.id)).toContain('VENDOR_KEY (api.vendor.test, *.vendor-cdn.test)')
-    await auditBlockedKey(task, 'evil.test', ['vendor'])
-    expect(JSON.stringify(await auditEvents.latest('task.api_key_blocked'))).not.toContain(KEY)
+    await nodeLink.journal(task.id, { type: 'egress.blocked', host: 'evil.test', names: ['vendor'] })
+    const blocked = await auditEvents.latest('task.api_key_blocked')
+    expect(blocked).toMatchObject({ subject_id: task.id, detail: { host: 'evil.test', keys: ['vendor'] } })
+    expect(JSON.stringify(blocked)).not.toContain(KEY)
     await send('GET', '/audit?limit=50')
     expectNoValues()
   })
