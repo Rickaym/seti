@@ -2,7 +2,7 @@ import fs from 'node:fs'
 import type http from 'node:http'
 import os from 'node:os'
 import path from 'node:path'
-import type { JournalEntry, NodeCommandType } from '@seti/shared'
+import type { HelloFrame, JournalEntry, NodeCommandType } from '@seti/shared'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { NodeClient, type NodeClientEnd } from '../node-client.js'
 import type { NodeCursor } from '../store/node-cursors.js'
@@ -75,7 +75,7 @@ function controlPlane(
     },
     fresh,
     took: () => undefined,
-    waiting: async () => Promise.resolve(),
+    taking: async () => Promise.resolve(),
     stopping: async () => Promise.resolve(),
     ...end,
   })
@@ -191,13 +191,13 @@ describe('the node over its socket', () => {
       { next: {}, queued: false },
       new AbortController().signal,
     )
-    const waiting = vi.fn(async () => Promise.resolve())
-    const control = controlPlane(node.socket, new Map(), [], { answer, waiting })
+    const taking = vi.fn(async (_hello: HelloFrame) => Promise.resolve())
+    const control = controlPlane(node.socket, new Map(), [], { answer, taking })
     await control.client.start()
     await expect(asked).resolves.toEqual({ promptId: 4, text: 'hello' })
     expect(answer).toHaveBeenCalledTimes(1)
     const [[askId]] = answer.mock.calls as unknown as [[{ id: string }]]
-    expect(waiting).toHaveBeenCalledWith([askId.id])
+    expect(taking.mock.calls[0]?.[0].asks).toEqual([askId.id])
   })
 
   it('has the control plane record the turns of a stopping node before it cuts them', async () => {
