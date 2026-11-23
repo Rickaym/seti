@@ -97,7 +97,9 @@ with another top-level folder.
   `turn_steps` and `turn_reply`. Queries filter on these columns, not on the runtime's JSON. A row
   without `runtime` is not filled yet; startup fills such rows in the background, newest first
   (`server/src/store/event-columns.ts`). Until then the filters in `server/src/store/event-filters.ts`
-  read such a row by its JSON, so every view shows it as before.
+  read such a row by its JSON, so every view shows it as before. The browser asks for runtime rows
+  as events (`wire=events`), which `transcript.ts` projects from the cut, redacted copy; a client
+  that does not ask gets the stored form (RT-6).
 - Redis holds only what can be rebuilt: GitHub PR lists and the GraphQL budget, capability and
   account probes, the EA's live context, and pub/sub for agent events and group chat across
   processes. It keeps nothing on disk and never holds a token. `SETI_REDIS_URL=off` costs cache

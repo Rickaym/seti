@@ -6,7 +6,7 @@ import { messages, tasks } from '../db.js'
 import { openQuerySince, sessionState, subscribe } from '../runner.js'
 import { agentTodos, subtaskBriefs } from '../subtask-cache.js'
 import { currentSeq, editedSince, STREAM_EPOCH } from '../task-events.js'
-import { wirePage, wireRow } from '../transcript.js'
+import { clientPage, clientRow, type WireForm } from '../transcript.js'
 
 const KEEPALIVE_MS = 15_000
 /** New rows a resuming stream sends one by one; a longer gap gets a fresh backlog instead. */
@@ -18,6 +18,7 @@ interface StreamStart {
   tail: number
   /** An archived task streams its archived backlog and then only a restore. */
   archived: boolean
+  form: WireForm
 }
 
 /** What the client holds: messages up to `message`, and every event of this run up to `seq`. */
@@ -41,7 +42,7 @@ type MessageEvent = Extract<TaskEvent, { type: 'message' }>
 type OtherEvent = Exclude<TaskEvent, MessageEvent>
 
 /** The data of an event other than a new message, as the stream sends it. */
-function dataOf(event: OtherEvent): string {
+function dataOf(event: OtherEvent, form: WireForm): string {
   switch (event.type) {
     case 'status':
       return JSON.stringify({ status: event.status })
@@ -56,7 +57,7 @@ function dataOf(event: OtherEvent): string {
     case 'todos':
       return JSON.stringify(event.todos)
     case 'updated':
-      return JSON.stringify(wireRow(event.row))
+      return JSON.stringify(clientRow(event.row, form))
     case 'archived':
       return JSON.stringify({ archived: event.archived })
     case 'session':
@@ -71,16 +72,16 @@ function dataOf(event: OtherEvent): string {
 }
 
 /** Writes an event with the cursor as its id, skipping a message the client already holds. */
-async function writeEvent(stream: SSEStreamingApi, event: TaskEvent, cursor: Cursor): Promise<Cursor> {
+async function writeEvent(stream: SSEStreamingApi, event: TaskEvent, cursor: Cursor, form: WireForm): Promise<Cursor> {
   if (event.type !== 'message') {
-    await stream.writeSSE({ event: event.type, id: cursorId(cursor), data: dataOf(event) })
+    await stream.writeSSE({ event: event.type, id: cursorId(cursor), data: dataOf(event, form) })
     return cursor
   }
   if (event.row.id <= cursor.message) {
     return cursor
   }
   const next = { ...cursor, message: event.row.id }
-  await stream.writeSSE({ event: 'message', id: cursorId(next), data: JSON.stringify(wireRow(event.row)) })
+  await stream.writeSSE({ event: 'message', id: cursorId(next), data: JSON.stringify(clientRow(event.row, form)) })
   return next
 }
 
@@ -88,7 +89,7 @@ async function writeEvent(stream: SSEStreamingApi, event: TaskEvent, cursor: Cur
 async function writeBacklog(stream: SSEStreamingApi, taskId: string, start: StreamStart, seq: number): Promise<Cursor> {
   const page = start.archived ? await archivedPage(taskId, start.tail) : await messages.page(taskId, start.tail)
   const cursor = { message: page.messages.at(-1)?.id ?? 0, seq }
-  await stream.writeSSE({ event: 'backlog', id: cursorId(cursor), data: JSON.stringify(wirePage(page)) })
+  await stream.writeSSE({ event: 'backlog', id: cursorId(cursor), data: JSON.stringify(clientPage(page, start.form)) })
   return cursor
 }
 
@@ -134,11 +135,11 @@ export const streamTask = (c: Context, taskId: string, start: StreamStart) =>
     let cursor = resume === null ? await writeBacklog(stream, taskId, start, opened) : resume.from
     if (resume !== null) {
       for (const row of resume.edited) {
-        cursor = await writeEvent(stream, { type: 'updated', row }, cursor)
+        cursor = await writeEvent(stream, { type: 'updated', row }, cursor, start.form)
       }
       cursor = { ...cursor, seq: opened }
       for (const row of resume.added) {
-        cursor = await writeEvent(stream, { type: 'message', row }, cursor)
+        cursor = await writeEvent(stream, { type: 'message', row }, cursor, start.form)
       }
     }
     const status = start.after === undefined ? undefined : await tasks.status(taskId)
@@ -147,13 +148,13 @@ export const streamTask = (c: Context, taskId: string, start: StreamStart) =>
       await stream.writeSSE({ event: 'resumed', id: cursorId(cursor), data: JSON.stringify({ status }) })
     }
     const subtasks = await subtaskBriefs(taskId, openQuerySince(taskId))
-    cursor = await writeEvent(stream, { type: 'subtasks', subtasks }, cursor)
-    cursor = await writeEvent(stream, { type: 'todos', todos: await agentTodos(taskId) }, cursor)
-    cursor = await writeEvent(stream, { type: 'session', session: sessionState(taskId) }, cursor)
+    cursor = await writeEvent(stream, { type: 'subtasks', subtasks }, cursor, start.form)
+    cursor = await writeEvent(stream, { type: 'todos', todos: await agentTodos(taskId) }, cursor, start.form)
+    cursor = await writeEvent(stream, { type: 'session', session: sessionState(taskId) }, cursor, start.form)
     while (!stream.aborted) {
       const next = queue.shift()
       if (next) {
-        cursor = await writeEvent(stream, next.event, { ...cursor, seq: next.seq })
+        cursor = await writeEvent(stream, next.event, { ...cursor, seq: next.seq }, start.form)
         continue
       }
       await new Promise<void>((resolve) => {

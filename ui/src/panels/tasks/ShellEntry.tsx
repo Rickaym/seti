@@ -1,4 +1,4 @@
-import { SHELL_CONTEXT_RUNS, type MessageRow, type ShellProgress, type ShellResult } from '@seti/shared'
+import { SHELL_CONTEXT_RUNS, type WireRow, type ShellProgress, type ShellResult } from '@seti/shared'
 import { MessageSquareOff, MessageSquareShare, SquareTerminal } from 'lucide-react'
 import { useEffect, useState, type ReactNode } from 'react'
 import type { ShellDelivery } from '@/lib/transcript'
@@ -7,7 +7,7 @@ import { TrimmedText, type FullSource } from '@/panels/tasks/ToolCall'
 
 type Stream = 'stdout' | 'stderr'
 
-const pickStream = (row: MessageRow, stream: string) =>
+const pickStream = (row: WireRow, stream: string) =>
   row.kind === 'shell' && (stream === 'stdout' || stream === 'stderr') ? row.payload[stream] : ''
 
 function seconds(ms: number): string {
@@ -75,7 +75,7 @@ function DeliveryNote({ delivery }: { delivery: ShellDelivery }) {
 
 interface ShellEntryProps {
   taskId: string
-  row: MessageRow
+  row: WireRow
   result: ShellResult
   /** Set while the run waits for the agent's next message. */
   delivery: ShellDelivery | undefined
