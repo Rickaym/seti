@@ -56,6 +56,29 @@ describe('node journal', () => {
     expect(replies.map((reply) => (reply.type === 'journal.ack' ? reply.seq : -1))).toEqual([1, 2])
   })
 
+  it('waits for an entry not received yet, and stops waiting once a new journal replaces it', async () => {
+    const { sent, applied, outbox, inbox } = link()
+    outbox.append(AGENT, note(1))
+    const first = only(sent)
+    inbox.receive(first)
+    outbox.append(AGENT, note(2))
+    const mark = outbox.last(AGENT)
+    expect(mark).toEqual({ agent: AGENT, epoch: first.epoch, seq: 2 })
+    let reached = false
+    const waited = inbox.applied(mark ?? { agent: AGENT, epoch: '', seq: 0 }).then(() => {
+      reached = true
+    })
+    await settled()
+    expect(reached).toBe(false)
+    inbox.receive(only(sent))
+    await waited
+    expect(applied).toEqual(['task-1:n1', 'task-1:n2'])
+
+    const lost = inbox.applied({ agent: AGENT, epoch: first.epoch, seq: 3 })
+    inbox.receive({ type: 'journal.append', agent: AGENT, epoch: 'another-epoch', first: 1, entries: [note(9)] })
+    await expect(lost).resolves.toBeUndefined()
+  })
+
   it('applies a repeated run once', async () => {
     const { sent, applied, outbox, inbox } = link()
     outbox.append(AGENT, note(1))

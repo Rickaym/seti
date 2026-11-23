@@ -4,8 +4,9 @@ import path from 'node:path'
 import type { AgentProcess, AgentProcesses, AgentProcessKind, BackgroundShell, ShellOutput } from '@seti/shared'
 import { displayCommand, shellIndex } from './background-shells.js'
 import { HttpError } from './http.js'
+import { agentParents } from './node-pid.js'
 import { childLookup, CLOCK_TICKS, environValue, parseBootTime, Proc, type ProcStat } from './proc.js'
-import { scopeCpu, scopeMemory } from './scope-limits.js'
+import { agentScopes } from './scope-control.js'
 import { redactCredentials } from './scrub.js'
 import { TASK_ID_ENV } from './session-options.js'
 import { openChecked } from './task-files.js'
@@ -24,13 +25,16 @@ const SHELL_NAMES = new Set(['bash', 'zsh', 'sh', 'dash', 'fish', 'ksh'])
 const OUTPUT_FILE = /\/tasks\/([\w-]+)\.output$/
 const ESCAPES = new RegExp(`${String.fromCharCode(27)}\\[[0-9;?]*[ -/]*[@-~]`, 'g')
 
-/** Where the server and the task's processes live; tests point it at fixtures and their own pid. */
+/** Where the task's processes live and what started them; tests point it at fixtures. */
 export interface ProcessHost {
   proc: Proc
-  serverPid: number
+  /** The processes whose children are the agents' processes. */
+  parents: () => readonly number[]
+  /** The scopes holding the agent's processes. */
+  scopes: typeof agentScopes
 }
 
-const defaultHost: ProcessHost = { proc: new Proc(), serverPid: process.pid }
+const defaultHost: ProcessHost = { proc: new Proc(), parents: agentParents, scopes: agentScopes }
 
 interface Node {
   stat: ProcStat
@@ -102,7 +106,7 @@ function taskTree(host: ProcessHost, taskId: string): Node[] {
       visit(child, node)
     }
   }
-  for (const pid of children(host.serverPid).sort((a, b) => a - b)) {
+  for (const pid of host.parents().flatMap((parent) => children(parent).sort((a, b) => a - b))) {
     const stat = proc.stat(pid)
     if (stat !== null && taskIdOf(proc, stat) === taskId) {
       visit(pid, null)
@@ -209,14 +213,15 @@ export async function readProcesses(
   const agentPids = new Set(processes.filter((p) => p.kind === 'agent').map((p) => p.pid))
   const loose = processes.filter((p) => p.kind === 'command' && p.shell_id === null && agentPids.has(p.ppid))
   const terminals = agentTerminals(taskId)
+  const scopes = await host.scopes(taskId)
   const view: AgentProcesses = {
     sampled_at: new Date(now).toISOString(),
     open: openSince !== null,
     sandboxed: processes.some((p) => p.name === 'bwrap'),
     shells: shells.map(({ output_file: _file, ...shell }) => shell),
     processes,
-    memory: scopeMemory(taskId),
-    cpu: await scopeCpu(taskId),
+    memory: scopes.memory,
+    cpu: scopes.cpu,
     terminals,
     running: shells.filter((shell) => shell.status === 'running').length + loose.length + terminals.length,
   }

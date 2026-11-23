@@ -757,6 +757,37 @@ Why: an agent woken by its own actions or by news nobody waited for burns turns 
 - RES-19: Sizes are measured in the background within `size_walk`; a read MUST NOT wait for a walk,
   and a walk cut short reports its size as a floor.
 
+### 15.1 A separate node
+
+Optional and off by default: sessions run in a node process and the control plane keeps the
+store, the audit chain and every record.
+
+- NODE-1: The two talk only over a WebSocket on a unix socket in a folder only the control room's
+  user may enter. The control plane MUST refuse a socket or folder another user owns or could
+  reach. Nothing listens on TCP.
+- NODE-2: The node numbers each agent's journal entries and keeps them until acknowledged. The
+  control plane applies each entry at most once and in order, keeping its cursor before it
+  applies, so a dropped link or a restart of either side neither repeats nor reorders one. A
+  cursor it cannot keep stops it applying, with an error, until a restart takes up from there.
+- NODE-3: An ask carries an id the node made; a repeat gets the first answer, and an ask the
+  node stops waiting for aborts the answer in progress. A request the user answers takes the
+  ask's id, so an ask the node still waits on when a control plane starts keeps its one request,
+  and the user's answer reaches the call once. The prompt row of a message going out is stored
+  with its ask's id in one transaction, so the same ask after a restart gets that row back.
+- NODE-4: A restart of the control plane MUST NOT cut running turns, and the tool calls they have
+  open show as open again. A node that started anew says so as it connects, and the turns of the
+  node before count as cut by a restart (RES-3 to RES-8).
+- NODE-5: A stopping node first has the control plane record and audit its running turns
+  (RES-1), then cuts them and waits until its entries are stored.
+- NODE-6: The answer to a command about an agent is read only once the control plane applied
+  every entry the node reported for that agent before answering, so what the command changed
+  shows at once, as it does in one process.
+- NODE-7: The node reports the scopes it started and their memory events, and moves them to a
+  changed cap; the processes view and the resources page show the agents' processes under
+  either process.
+- NODE-8: The control plane starts no egress proxy for an agent whose proxy the node runs; its
+  sandboxes for that agent use the node's.
+
 ## 16. Audit
 
 - AUD-1: Every change by the user, a delegate or the control room MUST be audited. A failed audit
@@ -882,6 +913,7 @@ An implementation is SETI-compatible when it meets all of:
 | Pull requests | all PR                                                               |
 | Team          | all CHAT                                                             |
 | Assistant     | all EA; LVL-6                                                        |
+| Separate node | all NODE                                                             |
 | Mods          | all MOD                                                              |
 | Sharing       | PUB-4, PUB-7                                                         |
 | Devices       | API-11                                                               |

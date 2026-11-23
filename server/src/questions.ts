@@ -12,6 +12,7 @@ import {
 } from '@seti/shared'
 import { audit } from './audit.js'
 import { tasks } from './db.js'
+import { askBeingAnswered } from './node-link.js'
 import { stoppingForRestart } from './restart-state.js'
 import { redactSecrets } from './scrub.js'
 import { questions, type NewQuestion } from './store/questions.js'
@@ -205,7 +206,20 @@ async function auditAsked(taskId: string, stored: readonly Question[]): Promise<
   })
 }
 
-/** Records an AskUserQuestion call as a group of questions and holds it until they are settled. */
+/** The group a node's ask recorded before a restart, if still open, and the id a new one takes. */
+async function groupFor(): Promise<{ again: boolean; groupId: string }> {
+  const ask = askBeingAnswered()
+  const known = ask === null ? [] : await questions.group(ask)
+  if (ask !== null && known.some((question) => question.status === 'open')) {
+    return { again: true, groupId: ask }
+  }
+  return { again: false, groupId: ask !== null && known.length === 0 ? ask : randomUUID() }
+}
+
+/**
+ * Records an AskUserQuestion call as a group of questions and holds it until they are settled. A
+ * node's ask names the group, so the same ask sent again after a restart waits on that group.
+ */
 export async function askQuestions(
   taskId: string,
   input: Record<string, unknown>,
@@ -216,9 +230,13 @@ export async function askQuestions(
   if (asked === null) {
     return BAD_INPUT
   }
-  const groupId = randomUUID()
+  const { again, groupId } = await groupFor()
   const answer = answersOf(groupId, { taskId, input }, [options.signal, session])
   try {
+    if (again) {
+      await refreshBlocked(taskId)
+      return await answer
+    }
     const stored = await questions.open(newRows(taskId, groupId, asked, options))
     await auditAsked(taskId, stored)
     if (waiting.has(groupId)) {
@@ -236,8 +254,8 @@ export async function askQuestions(
  * A secret question cannot outlive its call, which takes the value straight from the user's
  * field; startup expires those a restart left open. Other questions stay open for a late answer.
  */
-export async function expireLeftoverSecrets(): Promise<void> {
-  const expired = await questions.expireSecrets()
+export async function expireLeftoverSecrets(asked: ReadonlySet<string> = new Set()): Promise<void> {
+  const expired = await questions.expireSecrets([...asked])
   if (expired.length > 0) {
     await audit.record({
       actor: 'system',

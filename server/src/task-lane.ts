@@ -57,6 +57,9 @@ export async function inLane<T>(taskId: string, fn: () => T | Promise<T>): Promi
   return result
 }
 
+/** True while the caller's work holds a task's lane. */
+export const holdsLane = (): boolean => held.getStore()?.active === true
+
 /** Resolves once the task's lane is empty, including work queued while waiting. */
 export async function laneSettled(taskId: string): Promise<void> {
   for (let tail = tails.get(taskId); tail !== undefined; tail = tails.get(taskId)) {

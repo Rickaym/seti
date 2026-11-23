@@ -28,7 +28,9 @@ describe('node asks', () => {
     const ledger = new AskLedger(run)
     const replies: AskReply[] = []
     const outbox = new AskOutbox((frame) => {
-      void ledger.receive(frame).then((reply) => replies.push(reply))
+      if (frame.type === 'ask') {
+        void ledger.receive(frame).then((reply) => replies.push(reply))
+      }
     })
     const answer = outbox.ask('task-1', 'prompt.open', BODY)
     await vi.waitFor(() => {
@@ -38,6 +40,29 @@ describe('node asks', () => {
       outbox.reply(reply)
     })
     await expect(answer).rejects.toThrow('Task not found')
+  })
+
+  it('aborts the answer in progress once the node stops waiting', async () => {
+    const seen: { signal: AbortSignal | null } = { signal: null }
+    const ledger = new AskLedger(async (_frame, signal) => {
+      seen.signal = signal
+      return new Promise(() => undefined)
+    })
+    const outbox = new AskOutbox((frame) => {
+      if (frame.type === 'ask') {
+        void ledger.receive(frame)
+      } else {
+        ledger.cancel(frame)
+      }
+    })
+    const waiting = new AbortController()
+    const answer = outbox.ask('task-1', 'prompt.open', BODY, waiting.signal)
+    await vi.waitFor(() => {
+      expect(seen.signal).not.toBeNull()
+    })
+    waiting.abort(new Error('The call was cancelled'))
+    await expect(answer).rejects.toThrow('The call was cancelled')
+    expect(seen.signal?.aborted).toBe(true)
   })
 
   it('forgets answers after a day', async () => {
