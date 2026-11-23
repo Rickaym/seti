@@ -1,5 +1,6 @@
 import fs from 'node:fs'
 import path from 'node:path'
+import { codexLocks } from './sandbox-codex.js'
 import { readOnlyWork } from './sandbox-read-only.js'
 
 export type Mount =
@@ -46,6 +47,8 @@ export interface SandboxLayout {
    * these, mounted at their host path.
    */
   maintenance?: { writable: readonly string[] }
+  /** A Codex agent: no Claude Code configuration, and Codex's own settings files read-only. */
+  codex?: boolean
 }
 
 const SYSTEM_DIRS = ['/usr', '/etc']
@@ -448,7 +451,7 @@ export function sandboxMounts(layout: SandboxLayout): Mount[] {
     ...binds.writable.map((dir): Mount => ({ kind: 'bind', src: dir, dest: dir })),
     ...(workspace === null ? [] : [{ kind: 'bind', src: workspace, dest: workspace } satisfies Mount]),
     ...binds.readOnly.map((dir): Mount => ({ kind: 'ro-bind', src: dir, dest: dir })),
-    ...claudeMounts(layout),
+    ...(layout.codex === true ? codexLocks(layout) : claudeMounts(layout)),
   ]
   const unique = [...new Map(maintained(user, layout).map((mount) => [mount.dest, mount])).values()].sort(byDest)
   const ca: Mount[] = [
@@ -472,46 +475,5 @@ export function sandboxMounts(layout: SandboxLayout): Mount[] {
     ...binds.guards.map((file): Mount => ({ kind: 'ro-bind', src: file, dest: file })),
     ...masks(layout, [...binds.writable, ...binds.readOnly]),
     ...ca,
-  ]
-}
-
-function mountArgs(mount: Mount): string[] {
-  switch (mount.kind) {
-    case 'bind':
-      return ['--bind', mount.src, mount.dest]
-    case 'ro-bind':
-      return ['--ro-bind', mount.src, mount.dest]
-    case 'tmpfs':
-      return ['--tmpfs', mount.dest]
-    case 'mask':
-      return ['--ro-bind', '/dev/null', mount.dest]
-    case 'symlink':
-      return ['--symlink', mount.target, mount.dest]
-  }
-}
-
-/**
- * bwrap arguments: fresh pid, network, ipc and uts namespaces, then the mounts. An interactive
- * command keeps its terminal as the controlling one: it holds a pseudo-terminal of its own that
- * no process outside the sandbox reads, so the new session that guards a shared one is left out.
- */
-export function bwrapArgs(mounts: readonly Mount[], cwd: string, interactive = false): string[] {
-  return [
-    '--unshare-user',
-    '--unshare-pid',
-    '--unshare-net',
-    '--unshare-ipc',
-    '--unshare-uts',
-    '--hostname',
-    'seti-sandbox',
-    '--die-with-parent',
-    ...(interactive ? [] : ['--new-session']),
-    '--proc',
-    '/proc',
-    '--dev',
-    '/dev',
-    ...mounts.flatMap(mountArgs),
-    '--chdir',
-    cwd,
   ]
 }

@@ -38,7 +38,7 @@ const STDERR_TAIL = 4000
 /** Drains stderr, which a runtime never reads from a process it did not start, and logs its end. */
 function piped(child: ChildProcess, label: 'sandbox' | 'scope', taskId: string): LaunchedProcess {
   if (!hasPipes(child)) {
-    throw new Error(`The ${label === 'sandbox' ? 'sandboxed' : 'scoped'} Claude Code process has no stdio pipes`)
+    throw new Error(`The ${label === 'sandbox' ? 'sandboxed' : 'scoped'} runtime process has no stdio pipes`)
   }
   let tail = ''
   child.stderr?.on('data', (chunk: Buffer) => {
@@ -46,7 +46,7 @@ function piped(child: ChildProcess, label: 'sandbox' | 'scope', taskId: string):
   })
   child.on('exit', (code) => {
     if (code !== null && code !== 0 && tail.trim() !== '') {
-      process.stderr.write(`${label}: Claude Code of task ${taskId} exited with ${String(code)}: ${tail.trim()}\n`)
+      process.stderr.write(`${label}: the runtime of task ${taskId} exited with ${String(code)}: ${tail.trim()}\n`)
     }
   })
   return child
