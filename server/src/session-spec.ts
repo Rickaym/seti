@@ -16,8 +16,8 @@ import { realise } from './session-realise.js'
 import { sharedToolFolders } from './shared-tools.js'
 
 /** What a task's session starts from, read from the database; it holds no secret values. */
-export interface SessionSpec {
-  runtime: RuntimeId
+export interface SessionSpec<Id extends string = RuntimeId> {
+  runtime: Id
   taskId: string
   title: string
   /** The runtime's session to resume, or null for a new one. */

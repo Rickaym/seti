@@ -9,9 +9,9 @@ import type { ConformanceTarget, NeutralHost, Profile, Rig } from './target.js'
 export const SUITE_CWD = '/work/conformance'
 
 /** A spec with nothing in it but what a case varies; no adapter reads the sandbox stamp. */
-function specFor(resume: string | null): SessionSpec {
+function specFor<Id extends string>(runtime: Id, resume: string | null): SessionSpec<Id> {
   return {
-    runtime: 'claude',
+    runtime,
     taskId: 'conformance-task',
     title: 'Conformance',
     resume,
@@ -62,10 +62,15 @@ export function subjectOf<S extends RuntimeShapes, Id extends string>(target: Co
     open: async (rig, options = {}) => {
       const controller = new AbortController()
       const host = target.host(options.host ?? ALLOW_ALL)
-      const realised = await target.adapter.realise(specFor(options.resume ?? null), rig.launcher, host, controller)
+      const realised = await target.adapter.realise(
+        specFor(target.adapter.id, options.resume ?? null),
+        rig.launcher,
+        host,
+        controller,
+      )
       const inputs = new Channel<SessionInput>()
       const session = await target.adapter.open(realised, inputs, null)
-      return new Run(session, target.project, inputs, controller).start()
+      return new Run(session, target.adapter.project, inputs, controller).start()
     },
   }
 }

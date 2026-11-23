@@ -149,9 +149,14 @@ export interface SessionHost<S extends RuntimeShapes> {
 export interface RuntimeAdapter<S extends RuntimeShapes, Id extends string = RuntimeId> {
   readonly id: Id
   readonly capabilities: Capabilities
+  /**
+   * The neutral events of one message the runtime wrote, live or as stored; pure, so the same
+   * message always gives the same events.
+   */
+  readonly project: (raw: unknown) => RuntimeEvent[]
   /** What a session of the spec starts from, run by the launcher and answered by the host. */
   realise(
-    spec: SessionSpec,
+    spec: SessionSpec<Id>,
     launcher: Launcher,
     host: SessionHost<S>,
     abortController: AbortController,

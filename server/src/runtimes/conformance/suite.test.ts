@@ -12,9 +12,9 @@ type Change = (events: RuntimeEvent[]) => RuntimeEvent[]
 /** The scripted target with every projection, live and stored, changed the same way. */
 const reprojected = (change: Change): Target => ({
   ...scriptedTarget,
-  project: (message) => change(scriptedTarget.project(message)),
   adapter: {
     ...scriptedTarget.adapter,
+    project: (message) => change(scriptedTarget.adapter.project(message)),
     open: async (realised, input, rewind) => {
       const session = await scriptedTarget.adapter.open(realised, input, rewind)
       return {

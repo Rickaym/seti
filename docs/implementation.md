@@ -276,7 +276,6 @@ A target is the adapter as the suite drives it, in `runtimes/<id>/conformance-ta
 | `adapter` | The adapter itself.                                                                                                                                          |
 | `profile` | What the runtime does that `capabilities` does not state yet: turn starts, threads, plans, steering, input reports, background work, the kinds Seti decides. |
 | `gaps`    | Known failures by case id, each with its reason.                                                                                                             |
-| `project` | The adapter's projector, which checks that stored messages give the reported events.                                                                         |
 | `host`    | The host the adapter gets, built from the suite's neutral answers.                                                                                           |
 | `rig`     | A fake runtime that plays a neutral script and records what it saw.                                                                                          |
 
@@ -296,8 +295,9 @@ that does not go through a vendor library. No registry names it, so no install c
 
 ### Adding an adapter
 
-1. Create `server/src/runtimes/<id>/` with the adapter, its projector and its transport, and keep
-   the vendor's package inside that folder.
+1. Create `server/src/runtimes/<id>/` with the adapter, its projector (the adapter's `project`,
+   which the suite also runs on each stored message) and its transport, and keep the vendor's
+   package inside that folder.
 2. Write `conformance-rig.ts`, `conformance-target.ts` and a `conformance.test.ts` that calls
    `describeAdapter`. Declare in `capabilities` and the profile only what the runtime does.
 3. Run `pnpm --filter @seti/server exec vitest run src/runtimes/<id>/` until every case that
