@@ -1,4 +1,5 @@
-import type { RuntimeEvent } from '@seti/shared'
+import type { RuntimeEvent, ToolCall } from '@seti/shared'
+import type { z } from 'zod'
 import type { Launcher } from '../launcher.js'
 import type { SessionSpec } from '../session-spec.js'
 
@@ -72,6 +73,61 @@ export interface RewindRequest {
   dropsTurn: string | null
 }
 
+/** What a dream starts from: a new session of the agent's runtime that resumes nothing. */
+export interface DreamSpec {
+  taskId: string
+  cwd: string
+  dirs: readonly string[]
+  model: string
+  /** Text added to the runtime's own system prompt. */
+  append: string
+  /** The first and only message. */
+  prompt: string
+  /** The most model turns the dream may take. */
+  maxTurns: number
+  /** The most it may spend, in US dollars at list price; the runtime stops it there. */
+  budgetUsd: number
+}
+
+/** A tool a dream calls besides the runtime's own, answered by the control room. */
+export interface DreamTool {
+  server: string
+  name: string
+  description: string
+  input: z.ZodRawShape
+  call: (args: unknown) => Promise<string>
+}
+
+/** What Seti answers for a dream: a refusal or null for each tool call, and its own tools. */
+export interface DreamHost {
+  gate: (call: ToolCall) => string | null
+  tools: readonly DreamTool[]
+}
+
+/** A dream session: its reports until it ends, and the controls to stop it. */
+interface DreamSession {
+  readonly events: AsyncIterable<SessionReport>
+  interrupt(): Promise<void>
+  close(): void
+}
+
+/** How a runtime runs dreams: where its agents keep memory, and a dream session. */
+interface DreamSupport {
+  /** The folder the agent's own sessions keep their memory in, for its working folder. */
+  memory: (cwd: string) => string
+  /**
+   * Starts a dream: the runtime's read, search, edit and shell tools and the host's, no question
+   * tool, subagents, web, plugins or other tool servers, and a call the gate refuses is denied,
+   * never asked. The session ends after its one message.
+   */
+  open: (
+    spec: DreamSpec,
+    launcher: Launcher,
+    host: DreamHost,
+    abortController: AbortController,
+  ) => Promise<DreamSession>
+}
+
 /**
  * What a runtime can do where Seti would otherwise assume Claude Code. A session whose runtime
  * version lacks a control leaves that control off instead.
@@ -86,6 +142,8 @@ interface Capabilities {
   session: { fork: 'none' | 'persistent' | 'ephemeral' }
   /** A later turn can resume from an earlier prompt, and files can go back to a prompt. */
   rewind: { conversation: boolean; code: boolean }
+  /** Dreams, or null where the runtime keeps no memory Seti can find. */
+  dream: DreamSupport | null
 }
 
 /**

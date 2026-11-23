@@ -3,15 +3,8 @@ import { audit } from '../audit.js'
 import { tasks } from '../db.js'
 import { HttpError } from '../http.js'
 import { bySystem, recordRevision, type ChangeSource } from '../revisions.js'
-import {
-  memoryFileState,
-  memoryPath,
-  memoryState,
-  ownMemoryDir,
-  readMemoryFile,
-  sha256,
-  writeMemoryFile,
-} from './memory-files.js'
+import { adapterFor, DEFAULT_RUNTIME } from '../runtimes/registry.js'
+import { memoryFileState, memoryPath, memoryState, readMemoryFile, sha256, writeMemoryFile } from './memory-files.js'
 import { lineCounts, memoryChanges, type MemorySnapshot } from './memory-snapshot.js'
 
 export interface RecordedChange {
@@ -85,7 +78,11 @@ export async function revertMemoryFile(target: Revision, source: ChangeSource): 
   if (before.redacted === true) {
     throw new HttpError(409, `The earlier ${ref.file} held a credential, which Seti does not keep; edit it by hand.`)
   }
-  const file = await memoryPath(ownMemoryDir(task.cwd), ref.file)
+  const memory = adapterFor(DEFAULT_RUNTIME).capabilities.dream?.memory(task.cwd) ?? null
+  if (memory === null) {
+    throw new HttpError(409, "The agent's runtime keeps no memory Seti can find.")
+  }
+  const file = await memoryPath(memory, ref.file)
   if (file === null) {
     throw new HttpError(409, `${ref.file} is not a plain file inside the agent's memory folder.`)
   }

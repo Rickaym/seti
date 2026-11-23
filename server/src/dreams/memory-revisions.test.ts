@@ -5,9 +5,9 @@ import type { AuditPage, Revision, UnseenChange } from '@seti/shared'
 import { afterAll, describe, expect, it, vi } from 'vitest'
 import { createApp } from '../app.js'
 import { tasks } from '../db.js'
+import { claudeMemory } from '../runtimes/claude/dream.js'
 import { taskArchives } from '../store/archive.js'
 import { USER_AUTH } from '../test-auth.js'
-import { ownMemoryDir } from './memory-files.js'
 import { recordMemoryChanges } from './memory-revisions.js'
 import { snapshotMemory, type MemorySnapshot } from './memory-snapshot.js'
 
@@ -57,7 +57,7 @@ async function agent(files: Record<string, string>): Promise<{ id: string; dir: 
   const cwd = path.join(scratch, 'work', id)
   fs.mkdirSync(cwd, { recursive: true })
   await tasks.insert({ id, title: `Agent ${id.slice(0, 4)}`, repo_id: null, cwd, worktree: false, pr_urls: [] })
-  const dir = ownMemoryDir(cwd)
+  const dir = claudeMemory(cwd)
   write(dir, files)
   return { id, dir }
 }
