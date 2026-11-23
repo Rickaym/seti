@@ -1,67 +1,56 @@
-import type { SDKAssistantMessage, SDKMessage, SDKUserMessage } from '@anthropic-ai/claude-agent-sdk'
+import type { RuntimeEvent, ToolCall } from '@seti/shared'
 
 export interface OpenToolCall {
   name: string
-  /** The Bash command, cut to a line's length; null for every other tool. */
+  /** The shell command it runs, cut to a line's length; null for every other call. */
   command: string | null
-  /** The subagent tool call this call belongs to; null for the task's own agent. */
+  /** The subagent call this call belongs to; null for the task's own agent. */
   parent: string | null
+  /** It waits on a subagent rather than running anything itself. */
+  waits: boolean
   since: number
 }
 
 const COMMAND_MAX = 200
 
-/** Tools that wait on subagents rather than run anything themselves. */
-const CONTAINER_TOOLS = new Set(['Agent', 'Task'])
-
 /** Tool calls each task's agent started and has no result for yet, by tool use id. */
 const open = new Map<string, Map<string, OpenToolCall>>()
 
-function commandOf(name: string, input: unknown): string | null {
-  if (name !== 'Bash' || typeof input !== 'object' || input === null || !('command' in input)) {
-    return null
-  }
-  const { command } = input
-  if (typeof command !== 'string') {
+function commandOf(call: ToolCall): string | null {
+  const command = call.shell?.action === 'run' ? call.shell.command : undefined
+  if (command === undefined) {
     return null
   }
   const line = command.replace(/\s+/g, ' ').trim()
   return line.length > COMMAND_MAX ? `${line.slice(0, COMMAND_MAX - 3)}...` : line
 }
 
-function opened(calls: Map<string, OpenToolCall>, m: SDKAssistantMessage, now: number): void {
-  for (const block of m.message.content) {
-    if (block.type === 'tool_use') {
-      const command = commandOf(block.name, block.input)
-      calls.set(block.id, { name: block.name, command, parent: m.parent_tool_use_id, since: now })
-    }
-  }
-}
-
-function closed(calls: Map<string, OpenToolCall>, m: SDKUserMessage): void {
-  if (typeof m.message.content === 'string') {
-    return
-  }
-  for (const block of m.message.content) {
-    if (block.type === 'tool_result') {
-      calls.delete(block.tool_use_id)
-    }
-  }
-}
-
-/** Follows tool calls through a task's SDK messages; a result ends the turn's own calls. */
-export function trackToolCalls(taskId: string, m: SDKMessage, now = Date.now()): void {
-  const calls = open.get(taskId) ?? new Map<string, OpenToolCall>()
-  if (m.type === 'assistant') {
-    opened(calls, m, now)
-  } else if (m.type === 'user') {
-    closed(calls, m)
-  } else if (m.type === 'result') {
+function follow(calls: Map<string, OpenToolCall>, event: RuntimeEvent, now: number): void {
+  if (event.type === 'tool.started') {
+    const { call, thread } = event
+    calls.set(call.callId, {
+      name: call.name,
+      command: commandOf(call),
+      parent: thread === '' ? null : thread,
+      waits: call.kind === 'subagent',
+      since: now,
+    })
+  } else if (event.type === 'tool.ended') {
+    calls.delete(event.callId)
+  } else if (event.type === 'turn.ended') {
     for (const [id, call] of calls) {
       if (call.parent === null) {
         calls.delete(id)
       }
     }
+  }
+}
+
+/** Follows tool calls through a task's runtime events; a turn's end ends its own calls. */
+export function trackToolCalls(taskId: string, events: readonly RuntimeEvent[], now = Date.now()): void {
+  const calls = open.get(taskId) ?? new Map<string, OpenToolCall>()
+  for (const event of events) {
+    follow(calls, event, now)
   }
   if (calls.size === 0) {
     open.delete(taskId)
@@ -74,7 +63,7 @@ export function trackToolCalls(taskId: string, m: SDKMessage, now = Date.now()):
 export function currentToolCall(taskId: string, own = false): OpenToolCall | null {
   let newest: OpenToolCall | null = null
   for (const call of open.get(taskId)?.values() ?? []) {
-    const counted = !CONTAINER_TOOLS.has(call.name) && (!own || call.parent === null)
+    const counted = !call.waits && (!own || call.parent === null)
     if (counted && (newest === null || call.since >= newest.since)) {
       newest = call
     }
@@ -85,11 +74,11 @@ export function currentToolCall(taskId: string, own = false): OpenToolCall | nul
 /** Every open call that runs something itself, by task id; subagent waits are left out. */
 export function openToolCalls(): { taskId: string; call: OpenToolCall }[] {
   return [...open].flatMap(([taskId, calls]) =>
-    [...calls.values()].filter((call) => !CONTAINER_TOOLS.has(call.name)).map((call) => ({ taskId, call })),
+    [...calls.values()].filter((call) => !call.waits).map((call) => ({ taskId, call })),
   )
 }
 
-/** The Bash command of a call the agent started and has no result for yet, else null. */
+/** The shell command of a call the agent started and has no result for yet, else null. */
 export const openCommand = (taskId: string, toolUseId: string): string | null =>
   open.get(taskId)?.get(toolUseId)?.command ?? null
 

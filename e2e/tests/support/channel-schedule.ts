@@ -11,6 +11,8 @@ const CRON = '30 14 * * *'
 const TIMEZONE = 'America/New_York'
 const POLL = 'export default async function poll() {\n  return []\n}\n'
 const REMIND = "export default () => 'Stand up'\n"
+/** Noon in the browser's timezone, far from a midnight or clock change that alters the day lines. */
+const VIEWED_AT = new Date('2040-01-16T11:00:00Z')
 
 async function create<T>(request: APIRequestContext, path: string, data: object): Promise<T> {
   const response = await request.post(`/api${path}`, { data })
@@ -65,6 +67,7 @@ export async function scheduleShowsWhatRunsNext(
 ): Promise<void> {
   const { feed, standup, resting, followup } = await seed(request, randomUUID().slice(0, 8))
   try {
+    await page.clock.setFixedTime(VIEWED_AT)
     await page.goto('/#settings/channels')
     const main = page.getByRole('main')
     await press(main.getByRole('tab', { name: 'Schedule' }))
@@ -77,7 +80,7 @@ export async function scheduleShowsWhatRunsNext(
     await expect(tomorrow.getByRole('button', { name: feed.name })).toContainText('Poller')
     await expect(main.getByRole('button', { name: feed.name })).toHaveCount(8)
 
-    const [nextStandup = ''] = nextRunTimes(CRON, TIMEZONE, 1)
+    const [nextStandup = ''] = nextRunTimes(CRON, TIMEZONE, 1, VIEWED_AT)
     const rows = main.getByRole('button', { name: standup.name })
     await expect(rows).toHaveCount(7)
     await expect(rows.first()).toContainText(await localClock(page, nextStandup))

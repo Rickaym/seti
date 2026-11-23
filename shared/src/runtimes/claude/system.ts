@@ -6,14 +6,20 @@ import type {
   SDKTaskStartedMessage,
   SDKTaskUpdatedMessage,
 } from '@anthropic-ai/claude-agent-sdk'
+import { CONTEXT_WINDOW_KEY } from '../../compact.js'
 import type { RuntimeEvent } from '../../events.js'
-import { list, some, str } from './fields.js'
+import { bool, list, num, some, str } from './fields.js'
 
 type SystemMessage = Extract<SDKMessage, { type: 'system' }>
 type Of<S extends SystemMessage['subtype']> = Extract<SystemMessage, { subtype: S }>
 type Event = RuntimeEvent
 
 const EXIT_CODE = /\(exit code (-?\d+)\)/
+/** How a task notification's summary names a stop Claude Code made on its own. */
+const STOP_CAUSES: readonly (readonly [RegExp, 'time_limit' | 'low_memory'])[] = [
+  [/background time limit/i, 'time_limit'],
+  [/running low on memory/i, 'low_memory'],
+]
 
 const base = { v: 1, thread: '' } as const
 
@@ -39,6 +45,8 @@ const started = (m: SDKTaskStartedMessage): Event => ({
   kind: jobKind(m.task_type),
   label: m.description,
   ...some('background', m.is_backgrounded),
+  ...some('agentType', m.subagent_type),
+  ...(bool(m, 'owned_by_subagent') === true ? { bySubagent: true } : {}),
 })
 
 const progressed = (m: SDKTaskProgressMessage): Event => ({
@@ -48,6 +56,7 @@ const progressed = (m: SDKTaskProgressMessage): Event => ({
   callId: m.tool_use_id ?? null,
   label: m.description,
   ...some('lastTool', m.last_tool_name),
+  ...some('summary', m.summary),
   usage: jobUsage(m.usage),
 })
 
@@ -61,12 +70,14 @@ const updated = (m: SDKTaskUpdatedMessage): Event => ({
   type: 'job.updated',
   jobId: m.task_id,
   ...some('status', m.patch.status),
+  ...some('background', m.patch.is_backgrounded),
   ...some('endedAt', endTime(m.patch.end_time)),
   ...some('error', m.patch.error),
 })
 
 function ended(m: SDKTaskNotificationMessage): Event {
   const code = EXIT_CODE.exec(m.summary)?.[1]
+  const cause = m.status === 'stopped' ? STOP_CAUSES.find(([pattern]) => pattern.test(m.summary)) : undefined
   return {
     ...base,
     type: 'job.ended',
@@ -74,8 +85,9 @@ function ended(m: SDKTaskNotificationMessage): Event {
     callId: m.tool_use_id ?? null,
     status: m.status,
     summary: m.summary,
-    ...some('output', m.output_file),
+    ...some('output', m.output_file === '' ? undefined : m.output_file),
     ...some('exitCode', code === undefined ? undefined : Number(code)),
+    ...some('stopCause', cause?.[1]),
     ...some('usage', m.usage === undefined ? undefined : jobUsage(m.usage)),
   }
 }
@@ -116,6 +128,7 @@ const compacted = (m: Of<'compact_boundary'>): Event => ({
   phase: 'done',
   trigger: m.compact_metadata.trigger,
   before: m.compact_metadata.pre_tokens,
+  ...some('window', num(m, CONTEXT_WINDOW_KEY)),
 })
 
 const retry = (m: Of<'api_retry'>): Event => ({
