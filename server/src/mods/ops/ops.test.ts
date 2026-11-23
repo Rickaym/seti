@@ -7,6 +7,7 @@ import { asAgent, asMod } from '../../access.js'
 import { messages, sql, tasks } from '../../db.js'
 import { DIRECT_HIDDEN } from '../../direct-privacy.js'
 import { contextPacks, taskContextPacks } from '../../store/context.js'
+import { bash } from '../../subtask-fixtures.js'
 import { ensureMember, postTeamMessage } from '../../team.js'
 import { waitIdle } from '../../wait-idle.js'
 import { dispatchModOp, EventCounters } from '../logic/dispatch.js'
@@ -246,6 +247,20 @@ describe('tasks.read', () => {
     expect(text).toContain('a note from the probe')
     expect(text).not.toContain(GH_TOKEN)
     expect((await messages.page(builder.task.id, 50)).messages.length).toBeGreaterThan(0)
+  })
+
+  it("hands runtime rows over as their neutral events, never the runtime's own message", async () => {
+    const { id } = await messages.insert(builder.task.id, bash('toolu_mod_read', 'git status'), [])
+    const page = valueOf(await callAs(reader, 'tasks.transcript', { id: builder.task.id })) as {
+      messages: { id: number; kind: string; payload: unknown }[]
+    }
+    expect(page.messages.some((row) => row.kind === 'sdk')).toBe(false)
+    expect(page.messages.find((row) => row.id === id)).toMatchObject({
+      kind: 'events',
+      payload: [
+        { type: 'tool.started', call: { callId: 'toolu_mod_read', kind: 'shell', shell: { command: 'git status' } } },
+      ],
+    })
   })
 })
 

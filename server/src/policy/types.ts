@@ -7,6 +7,12 @@ export type RuleBehavior = 'allow' | 'ask' | 'deny' | 'review'
 export type PolicyKind =
   'shell' | 'read' | 'search' | 'edit' | 'web' | 'mcp' | 'subagent' | 'question' | 'plan' | 'other'
 
+/**
+ * Where the paths a call names lead on disk, by absolute path as given; null where Seti cannot
+ * name it, as for a symlink loop. A path missing from it is taken as given.
+ */
+export type Resolved = ReadonlyMap<string, string | null>
+
 /** One tool call as the evaluator reads it: the parts rules match, never the whole input. */
 export interface PolicyCall {
   /** The runtime's tool name, which bare rules such as `Skill` match. */
@@ -26,6 +32,8 @@ export interface PolicyCall {
   agentType?: string
   /** The call's top-level scalar fields, for `Tool(param:value)` deny and ask rules. */
   params: Record<string, unknown>
+  /** Where the paths it names lead on disk, when the caller looked; see `Resolved`. */
+  resolved?: Resolved
 }
 
 /** A rule with where it came from; `ref` names it in records without its text. */

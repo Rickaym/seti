@@ -138,6 +138,7 @@ between two steps; an interrupt; a hook at subagent start.
   is served as `vendor` and MUST NOT break the rows around it. A client asks for events with
   `wire=events` on transcript pages, messages and streams; without it, runtime rows come as
   stored.
+- RT-7: Delegates and mods receive neutral events only.
 
 ## 4. Turn lifecycle
 

@@ -15,10 +15,9 @@ const isReady = (
 
 /**
  * The user's drafts for open questions and how they go out: one question or agent at a time, or
- * every answered one with Submit all. `onSettled` gets the summary of a send that left none of
- * `questions` open.
+ * every answered one with Submit all.
  */
-export function useAnswers(questions: readonly Question[], onSettled: (summary: string) => void) {
+export function useAnswers(questions: readonly Question[]) {
   const [drafts, setDrafts] = useState<Record<string, Draft>>({})
   const [secrets, setSecrets] = useState<Record<string, string>>({})
   const { send, sending, summary } = useSend((ids) => {
@@ -26,12 +25,7 @@ export function useAnswers(questions: readonly Question[], onSettled: (summary: 
     setSecrets((prev) => without(prev, ids))
   })
   const dispatch = (items: QuestionAnswerItem[], entries: readonly SecretEntry[] = []) => {
-    const asked = questions.map((question) => question.id)
-    void send(items, entries).then((result) => {
-      if (result.summary !== null && asked.every((id) => result.sent.includes(id))) {
-        onSettled(result.summary)
-      }
-    })
+    void send(items, entries)
   }
   const ready = questions.filter((question) => isReady(question, drafts, secrets))
   const submit = () => {

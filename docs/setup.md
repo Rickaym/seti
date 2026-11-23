@@ -43,6 +43,7 @@ curl -fsSL https://raw.githubusercontent.com/rickaym/seti/main/scripts/install.s
 | `--no-service`         | Installs no units; run Seti with `scripts/start.sh`                    |
 | `--with-ea`            | Also sets up the Executive Assistant; asks for its keys unless `--yes` |
 | `--with-redis`         | Also sets up Seti's own Redis (Linux, sudo)                            |
+| `--split-node`         | Runs agents in a separate node unit (see Separate node below)          |
 | `--no-system`          | Never runs sudo; stops with the command to run when a package is due   |
 
 The installer is idempotent. Run it again to repair an install: it keeps every secret and setting
@@ -357,6 +358,23 @@ audited as `ea.call_ended` with its reason and length, never audio or words.
 On Android, Chrome sends call audio to a Bluetooth headset only when Chrome may use Nearby devices
 (Android settings, Apps, Chrome, Permissions). A headset that connects mid-call takes over once the
 device list settles, and the Audio button in the call does the same on demand.
+
+### Separate node
+
+`--split-node` sets `SETI_NODE=split` and installs `seti-node.service` (from
+`deploy/seti-node.service`), which runs `scripts/start.sh node`: the agents' sessions run in that
+process, and `seti.service` reaches them over `~/.seti/run/node.sock`, a socket in a folder only
+your user may enter. A restart of `seti.service` then keeps running turns going.
+`scripts/upgrade.sh` restarts the node only when the server code, the shared code or the lockfile
+changed, and Seti records the node's running turns before the node cuts them. `pnpm run doctor`
+checks the socket. Logs are in `journalctl --user -u seti-node.service`.
+
+Split mode still has gaps that a single process does not:
+
+- A sandboxed agent's terminal or `!` command uses the node's egress proxy when the node runs
+  one, and then cannot fetch AWS credentials through it. Opened before the agent's session, it
+  starts a proxy of its own, which the session's proxy replaces.
+- The node still reads settings and connection values from the database itself.
 
 ### Redis
 
