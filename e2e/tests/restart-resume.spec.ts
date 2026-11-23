@@ -1,5 +1,5 @@
 import type { Envelope, MessagePage, Task } from '@seti/shared'
-import { paths } from './support/env.js'
+import { paths, SPLIT_NODE } from './support/env.js'
 import { PUSH_PROMPT, PUSH_QUESTION } from './support/fake-question.js'
 import { apiData, expect, test, unique } from './support/fixtures.js'
 import { FAKE_CLAUDE_ENV } from './support/processes.js'
@@ -9,6 +9,7 @@ import { RESUME_PROMPT, RESUMED_NOTE, startWorkingAgent, transcript } from './su
 test.use({ serverEnv: FAKE_CLAUDE_ENV })
 
 test('a turn a restart cuts off resumes by itself, marked in the transcript', async ({ page, request, setiServer }) => {
+  test.skip(SPLIT_NODE, 'a separate node keeps the turn going across a restart')
   const id = await startWorkingAgent(request)
   await setiServer.restart()
 
@@ -24,6 +25,7 @@ test('a turn a restart cuts off resumes by itself, marked in the transcript', as
 })
 
 test('a question survives a restart, and its answer resumes the agent', async ({ page, request, setiServer }) => {
+  test.skip(SPLIT_NODE, 'a separate node keeps the asking turn and asks the restarted server again')
   const asker = await askingAgent(request, 'Asker', PUSH_PROMPT)
   await setiServer.restart()
 
@@ -52,4 +54,18 @@ test('an agent that was not working is left as it was', async ({ request, setiSe
   expect((await apiData<Task>(request, `/tasks/${id}`)).status).toBe('idle')
   const { messages } = await apiData<MessagePage>(request, `/tasks/${id}/messages?limit=50`)
   expect(messages.filter((row) => row.kind === 'prompt')).toHaveLength(1)
+})
+
+test('a restart keeps a running turn going when agents run in a separate node', async ({ request, setiServer }) => {
+  test.skip(!SPLIT_NODE, 'only a separate node keeps a turn across a restart')
+  const id = await startWorkingAgent(request)
+  await setiServer.restart()
+
+  expect((await apiData<Task>(request, `/tasks/${id}`)).status).toBe('running')
+  expect((await request.post(`/api/tasks/${id}/stop`)).ok()).toBe(true)
+  await expect.poll(async () => (await apiData<Task>(request, `/tasks/${id}`)).status).toBe('stopped')
+  const { messages } = await apiData<MessagePage>(request, `/tasks/${id}/messages?limit=50`)
+  expect(messages.filter((row) => row.kind === 'prompt')).toHaveLength(1)
+  expect(messages.filter((row) => row.kind === 'sdk' && row.payload.type === 'assistant')).toHaveLength(1)
+  expect(JSON.stringify(messages)).not.toContain(RESUMED_NOTE)
 })

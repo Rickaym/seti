@@ -6,7 +6,7 @@ import type { Readable } from 'node:stream'
 import { setTimeout as delay } from 'node:timers/promises'
 import { SOURCE_HISTORY, UPSTREAM_HISTORY } from './changelog.js'
 import { dropDatabases } from './db.js'
-import { DEMO_DATABASE_URL, LOCAL_TOKENS, paths, PLUGIN, serverEnv } from './env.js'
+import { DEMO_DATABASE_URL, LOCAL_TOKENS, paths, PLUGIN, serverEnv, SPLIT_NODE } from './env.js'
 import { seedSessions } from './sessions.js'
 
 const SERVER_DIR = path.join(import.meta.dirname, '../../../server')
@@ -17,6 +17,7 @@ const GROUP_POLL_MS = 20
 const REMOVE_RETRIES = 5
 const REMOVE_RETRY_MS = 100
 const LISTENING = /seti (?:demo )?listening on (http:\/\/\S+)/
+const NODE_LISTENING = /seti node listening on (\S+)/
 
 const GIT_ENV = {
   ...process.env,
@@ -88,8 +89,8 @@ function seedCredentials(): void {
 
 type ServerProcess = ChildProcessByStdio<null, Readable, null>
 
-/** Resolves with the origin the server prints once it listens; rejects if it stops first. */
-async function listeningOrigin(child: ServerProcess): Promise<string> {
+/** Resolves with where the process says it listens; rejects if it stops first. */
+async function listeningOrigin(child: ServerProcess, listening: RegExp): Promise<string> {
   let output = ''
   return new Promise((resolve, reject) => {
     const fail = (why: string) => {
@@ -101,7 +102,7 @@ async function listeningOrigin(child: ServerProcess): Promise<string> {
     }, START_TIMEOUT_MS)
     child.stdout.on('data', (chunk: Buffer) => {
       output += chunk.toString('utf8')
-      const origin = LISTENING.exec(output)?.[1]
+      const origin = listening.exec(output)?.[1]
       if (origin !== undefined) {
         clearTimeout(timer)
         child.stdout.removeAllListeners('data').resume()
@@ -164,14 +165,14 @@ interface Started {
   origin: string
 }
 
-async function start(args: string[], env: NodeJS.ProcessEnv): Promise<Started> {
+async function start(args: string[], env: NodeJS.ProcessEnv, listening = LISTENING): Promise<Started> {
   const child = spawn(process.execPath, args, {
     cwd: SERVER_DIR,
     env,
     detached: true,
     stdio: ['ignore', 'pipe', 'inherit'],
   })
-  const started = listeningOrigin(child)
+  const started = listeningOrigin(child, listening)
   const { pid } = child
   if (pid === undefined) {
     await started
@@ -185,20 +186,31 @@ async function start(args: string[], env: NodeJS.ProcessEnv): Promise<Started> {
   }
 }
 
+/** The worker's node process in split mode, started before its server and stopped after it. */
+async function startNode(env: NodeJS.ProcessEnv): Promise<Started | null> {
+  return SPLIT_NODE ? start(['--import', 'tsx', 'src/node/main.ts'], env, NODE_LISTENING) : null
+}
+
 /** Starts Node in the server folder and resolves once it listens; `drop` names its database. */
-async function launch(args: string[], env: NodeJS.ProcessEnv, drop: 'worker' | 'demo'): Promise<WorkerServer> {
+async function launch(args: string[], given: NodeJS.ProcessEnv, drop: 'worker' | 'demo'): Promise<WorkerServer> {
+  const env = drop === 'worker' && SPLIT_NODE ? { ...given, SETI_NODE: 'split' } : given
   const cleanUp = async () => {
     await dropDatabases(drop)
     fs.rmSync(paths.root, { recursive: true, force: true, maxRetries: REMOVE_RETRIES, retryDelay: REMOVE_RETRY_MS })
   }
+  const node = drop === 'worker' ? await startNode(env) : null
+  const stopNode = async () => (node === null ? undefined : stop(node.child, node.pid))
   let current = await start(args, env).catch(async (e: unknown) => {
+    await stopNode()
     await cleanUp()
     throw e
   })
-  /** A worker that exits without its teardown still takes its server along. */
+  /** A worker that exits without its teardown still takes its server and node along. */
   const orphaned = () => {
-    if (running(current.child)) {
-      process.kill(-current.pid, 'SIGKILL')
+    for (const each of [current, node]) {
+      if (each !== null && running(each.child)) {
+        process.kill(-each.pid, 'SIGKILL')
+      }
     }
   }
   process.once('exit', orphaned)
@@ -208,6 +220,7 @@ async function launch(args: string[], env: NodeJS.ProcessEnv, drop: 'worker' | '
     close: async () => {
       process.off('exit', orphaned)
       await stop(current.child, current.pid)
+      await stopNode()
       await cleanUp()
     },
     restart: async () => {
