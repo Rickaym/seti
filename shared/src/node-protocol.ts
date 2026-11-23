@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { MEMORY_EVENTS } from './memory.js'
+import { policyShadowCount } from './policy-shadow.js'
 import { cpuScopeSchema, memoryScopeSchema } from './processes.js'
 import { TASK_STATUSES } from './tasks.js'
 
@@ -64,6 +65,8 @@ export const journalEntry = z.discriminatedUnion('type', [
   /** A request carried connection placeholders toward a host their connections do not allow. */
   z.object({ type: z.literal('egress.blocked'), host: z.string(), names: z.array(z.string()) }),
   z.object({ type: z.literal('memory.event'), report: memoryReport }),
+  /** Seti's shadow compared a call with the runtime's outcome; null when its decision failed. */
+  z.object({ type: z.literal('policy.compared'), count: policyShadowCount.nullable() }),
   z.object({
     type: z.literal('rewind.settled'),
     id: z.int(),

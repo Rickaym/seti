@@ -1,29 +1,36 @@
-import type { AttachmentRef } from '@seti/shared'
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { apiDelete, errorText } from '@/api'
+import type { AttachmentRef, StagedUpload, UploadSource } from '@seti/shared'
+import { useEffect, useState } from 'react'
+import { toast } from 'sonner'
+import { apiDelete } from '@/api'
 import {
   attachmentStore,
   fileAttachment,
   outgoing,
   pasteAttachment,
   stagedUrl,
-  uploadFile,
   withInline,
   withoutToken,
   type DraftAttachment,
 } from '@/lib/attachments'
+import { sendUpload } from '@/lib/upload-request'
+import type { UploadFailure, UploadState, UploadTotals } from '@/lib/upload-state'
+import { NO_UPLOADS, Uploader, type UploadView } from '@/lib/uploader'
 
 export interface Attachments {
   items: DraftAttachment[]
-  /** Why each failed upload failed, by item key. */
-  failed: ReadonlyMap<string, string>
-  /** Why the draft cannot go out yet: a file still uploading or one that failed. */
+  /** Each file still on its way or failed, by item key; a file on the server has no entry. */
+  uploads: ReadonlyMap<string, UploadState>
+  /** Bytes sent of bytes to send over the files still uploading; null when none is. */
+  overall: UploadTotals | null
+  /** Why the draft cannot go out yet: a file still uploading, stalled or failed. */
   pending: string | null
   /** Adds pasted text as a file and returns the token to put in the draft. */
   addText: (text: string) => string
   addFiles: (files: readonly File[]) => string[]
-  /** Drops the file and its token from the draft. */
+  /** Drops the file and its token from the draft, and stops its upload. */
   drop: (key: string) => void
+  /** Sends a stalled or failed file again. */
+  retry: (key: string) => void
   /** Puts pasted text back into the draft in place of its token. */
   inline: (key: string) => Promise<void>
   /** What to send for the draft text, then forgets the files once the message went out. */
@@ -48,21 +55,49 @@ async function stagedText(item: DraftAttachment): Promise<string> {
   return res.text()
 }
 
-function pendingOf(items: readonly DraftAttachment[], failed: ReadonlyMap<string, string>): string | null {
-  const broken = items.find((item) => failed.has(item.key))
-  if (broken !== undefined) {
-    return `${broken.name} did not upload: ${failed.get(broken.key) ?? ''}. Drop it to send.`
+export const uploadingText = (count: number) => `Uploading ${String(count)} ${count === 1 ? 'file' : 'files'}...`
+
+export function pendingOf(items: readonly DraftAttachment[], uploads: ReadonlyMap<string, UploadState>): string | null {
+  for (const item of items) {
+    const state = uploads.get(item.key)
+    if (state?.phase === 'failed') {
+      const way = state.failure.retry ? 'Retry or drop' : 'Drop'
+      return `${item.name} did not upload: ${state.failure.reason}. ${way} it to send.`
+    }
+    if (state?.phase === 'stalled') {
+      return `${item.name} stalled. Retry or drop it to send.`
+    }
   }
   const uploading = items.filter((item) => item.staged === null).length
-  const noun = uploading === 1 ? 'file' : 'files'
-  return uploading === 0 ? null : `Uploading ${String(uploading)} ${noun}...`
+  return uploading === 0 ? null : uploadingText(uploading)
+}
+
+const failureToast = (key: string) => `upload-${key}`
+
+const reportFailure = (key: string, name: string, failure: UploadFailure) => {
+  toast.error(`${name} did not upload`, { id: failureToast(key), description: failure.reason, duration: Infinity })
+}
+
+const placed = (items: readonly DraftAttachment[], key: string, staged: StagedUpload): DraftAttachment[] => {
+  const { kind, type, size, lines } = staged
+  return items.map((item) => (item.key === key ? { ...item, staged, kind, type, size, lines } : item))
 }
 
 /** The files of the draft under `storeKey`, kept across reloads; null keeps them in view only. */
 export function useAttachments(storeKey: string | null, draft: string, setDraft: (text: string) => void): Attachments {
   const [items, setItems] = useState(() => (storeKey === null ? [] : attachmentStore.read(storeKey)))
-  const [failed, setFailed] = useState<ReadonlyMap<string, string>>(new Map())
-  const dropped = useRef(new Set<string>())
+  const [view, setView] = useState<UploadView>(NO_UPLOADS)
+  const [uploader] = useState(
+    () =>
+      new Uploader({
+        send: sendUpload,
+        onChange: setView,
+        onDone: (key, staged) => {
+          setItems((prev) => placed(prev, key, staged))
+        },
+        onFail: reportFailure,
+      }),
+  )
 
   useEffect(() => {
     if (storeKey !== null) {
@@ -70,22 +105,16 @@ export function useAttachments(storeKey: string | null, draft: string, setDraft:
     }
   }, [storeKey, items])
 
-  const upload = useCallback((item: DraftAttachment, body: Blob, source: 'paste' | 'file') => {
-    uploadFile(body, item.name, source)
-      .then((staged) => {
-        if (dropped.current.has(item.key)) {
-          forget(staged.id)
-          return
-        }
-        const { kind, type, size, lines } = staged
-        setItems((prev) =>
-          prev.map((other) => (other.key === item.key ? { ...other, staged, kind, type, size, lines } : other)),
-        )
-      })
-      .catch((e: unknown) => {
-        setFailed((prev) => new Map(prev).set(item.key, errorText(e)))
-      })
-  }, [])
+  useEffect(() => {
+    uploader.resume()
+    return () => {
+      uploader.pause()
+    }
+  }, [uploader])
+
+  const upload = (item: DraftAttachment, body: Blob, source: UploadSource) => {
+    uploader.start(item.key, { name: item.name, body, source })
+  }
 
   const addText = (text: string) => {
     const item = pasteAttachment(
@@ -110,16 +139,15 @@ export function useAttachments(storeKey: string | null, draft: string, setDraft:
   }
 
   const release = (item: DraftAttachment) => {
-    dropped.current.add(item.key)
+    uploader.cancel(item.key)
+    toast.dismiss(failureToast(item.key))
     if (item.preview !== undefined) {
       URL.revokeObjectURL(item.preview)
     }
     setItems((prev) => prev.filter((other) => other.key !== item.key))
-    setFailed((prev) => {
-      const next = new Map(prev)
-      next.delete(item.key)
-      return next
-    })
+    if (item.staged !== null) {
+      forget(item.staged.id)
+    }
   }
 
   const drop = (key: string) => {
@@ -128,10 +156,12 @@ export function useAttachments(storeKey: string | null, draft: string, setDraft:
       return
     }
     release(item)
-    if (item.staged !== null) {
-      forget(item.staged.id)
-    }
     setDraft(withoutToken(draft, item.token))
+  }
+
+  const retry = (key: string) => {
+    toast.dismiss(failureToast(key))
+    uploader.retry(key)
   }
 
   const inline = async (key: string) => {
@@ -141,37 +171,31 @@ export function useAttachments(storeKey: string | null, draft: string, setDraft:
     }
     const text = item.text ?? (await stagedText(item))
     release(item)
-    if (item.staged !== null) {
-      forget(item.staged.id)
-    }
     setDraft(withInline(draft, item.token, text))
   }
 
   const sent = () => {
     for (const item of items) {
-      dropped.current.add(item.key)
       if (item.preview !== undefined) {
         URL.revokeObjectURL(item.preview)
       }
     }
     setItems([])
-    setFailed(new Map())
   }
 
   const restore = (files: readonly DraftAttachment[]) => {
-    for (const file of files) {
-      dropped.current.delete(file.key)
-    }
     setItems((prev) => [...prev, ...files.filter((file) => !prev.some((other) => other.key === file.key))])
   }
 
   return {
     items,
-    failed,
-    pending: pendingOf(items, failed),
+    uploads: view.states,
+    overall: view.overall,
+    pending: pendingOf(items, view.states),
     addText,
     addFiles,
     drop,
+    retry,
     inline,
     message: (text) => outgoing(text, items),
     sent,

@@ -80,31 +80,44 @@ const unfill = async (where: ReturnType<typeof sql>) =>
 describe('readers over rows the fill has not reached', () => {
   it('read a table of unfilled, partly filled and filled rows the same', async () => {
     const unfilled = await readAll()
-    expect(await fillEventColumns(sql, 100, 0)).toBeGreaterThan(250)
+    expect(await fillEventColumns(sql, { batch: 100, restMs: 0 })).toBeGreaterThan(250)
     const filled = await readAll()
     expect(unfilled).toEqual(filled)
 
     await unfill(sql`id % 2 = 0 OR task_id = ${taskIds[0] ?? ''}`)
     expect(await readAll()).toEqual(filled)
 
-    await fillEventColumns(sql, 100, 0)
+    await fillEventColumns(sql, { batch: 100, restMs: 0 })
     const [newest] = await sql<{ id: number }[]>`SELECT id FROM task_message ORDER BY id OFFSET 150 LIMIT 1`
     await unfill(sql`id < ${newest?.id ?? 0}`)
     expect(await readAll()).toEqual(filled)
   })
 
   it('resumes a fill cut short where it stopped and fills each row as ingest would', async () => {
-    await fillEventColumns(sql, 100, 0)
+    await fillEventColumns(sql, { batch: 100, restMs: 0 })
     const [cut] = await sql<{ id: number }[]>`SELECT id FROM task_message ORDER BY id DESC OFFSET 99 LIMIT 1`
     await unfill(sql`id < ${cut?.id ?? 0}`)
     const [left] = await sql<{ count: number }[]>`SELECT count(*)::int AS count FROM task_message
       WHERE runtime IS NULL`
     expect(left?.count).toBeGreaterThan(150)
-    expect(await fillEventColumns(sql, 64, 0)).toBe(left?.count)
+    expect(await fillEventColumns(sql, { batch: 64, restMs: 0 })).toBe(left?.count)
     const rows = await sql<({ kind: string; payload: string } & Record<string, unknown>)[]>`SELECT kind, payload,
         runtime, thread, event, agent, turn_usd, turn_ms, turn_steps, turn_reply FROM task_message`
     for (const { kind, payload, ...stored } of rows) {
       expect(stored).toEqual(storedColumns(kind, payload))
     }
+  })
+
+  it('reports the running count after the first batch and then no more often than asked', async () => {
+    await unfill(sql`true`)
+    const [all] = await sql<{ count: number }[]>`SELECT count(*)::int AS count FROM task_message`
+    const every: number[] = []
+    await fillEventColumns(sql, { batch: 100, restMs: 0, progressEveryMs: 0, onProgress: (n) => every.push(n) })
+    expect(every[0]).toBe(100)
+    expect(every.at(-1)).toBe(all?.count)
+    await unfill(sql`true`)
+    const seldom: number[] = []
+    await fillEventColumns(sql, { batch: 100, restMs: 0, onProgress: (n) => seldom.push(n) })
+    expect(seldom).toEqual([100])
   })
 })

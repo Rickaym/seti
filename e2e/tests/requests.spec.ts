@@ -5,7 +5,7 @@ import { PUSH_PROMPT, PUSH_QUESTION } from './support/fake-question.js'
 import { apiData, expect, test, toasts, unique } from './support/fixtures.js'
 import { proposeAsAgent } from './support/knowledge.js'
 import { FAKE_CLAUDE_ENV } from './support/processes.js'
-import { askingAgent, lastReply, requestsSection, sectionCount, sentToast } from './support/questions.js'
+import { askingAgent, lastReply, requestsSection, sectionCount, expectNoSentToast } from './support/questions.js'
 import {
   archiveOtherWaiting,
   deployingAgent,
@@ -102,8 +102,8 @@ test('one panel answers a question, an access request, a plan, a tool call and a
 
   await asking.getByRole('radio', { name: 'Yes' }).click()
   await page.getByRole('button', { name: 'Submit all' }).click()
-  await expect(sentToast(page, 'Sent 1 answer')).toBeVisible()
   await expect(page).toHaveURL(/#agents$/)
+  await expectNoSentToast(page)
   await expect(sectionCount(row)).toHaveCount(0)
   await expect.poll(async () => lastReply(request, asker.id)).toBe(`Got your answers. ${PUSH_QUESTION} Yes`)
 })

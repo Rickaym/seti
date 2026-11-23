@@ -1,13 +1,12 @@
-import type { PolicyShadowDifference, PolicyShadowSummary } from '@seti/shared'
+import type { PolicyShadowCount, PolicyShadowDifference, PolicyShadowSummary } from '@seti/shared'
 import { sql } from '../db.js'
-import type { ShadowRecord } from '../policy/shadow.js'
 
 /** The most differences a summary lists. */
 const DIFFERENCES_MAX = 20
 
 /** Counts each compared call under its day and outcome. */
 export const policyShadow = {
-  count: async (record: ShadowRecord, day: string): Promise<void> => {
+  count: async (record: PolicyShadowCount, day: string): Promise<void> => {
     await sql`INSERT INTO policy_shadow (day, kind, tool, mode, sandboxed, slow, verdict, step, rule, runtime, result, calls)
       VALUES (${day}, ${record.kind}, ${record.tool}, ${record.mode}, ${record.sandboxed}, ${record.slow},
         ${record.verdict}, ${record.step}, ${record.rule}, ${record.runtime}, ${record.result}, 1)
