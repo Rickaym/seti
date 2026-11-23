@@ -15,6 +15,7 @@ import { configs as tsConfigs } from 'typescript-eslint'
 import { commentStyle } from './eslint/comment-style.js'
 import { modFences } from './eslint/mod-fence.js'
 import { noRawColour } from './eslint/no-raw-colour.js'
+import { sdkFence } from './eslint/sdk-fence.js'
 
 export default defineConfig(
   includeIgnoreFile(fileURLToPath(new URL('.gitignore', import.meta.url))),
@@ -149,24 +150,7 @@ export default defineConfig(
       ],
     },
   },
-  {
-    files: ['server/src/**/*.ts'],
-    ignores: ['server/src/runtimes/claude/**', 'server/src/**/*.test.ts'],
-    rules: {
-      '@typescript-eslint/no-restricted-imports': [
-        'error',
-        {
-          paths: [
-            {
-              name: '@anthropic-ai/claude-agent-sdk',
-              allowTypeImports: true,
-              message: 'Reach Claude Code through its runtime adapter in server/src/runtimes/claude/.',
-            },
-          ],
-        },
-      ],
-    },
-  },
+  sdkFence(),
   {
     files: ['mods/*/ui.tsx'],
     rules: { 'react-refresh/only-export-components': 'off' },

@@ -2,7 +2,7 @@ import { randomUUID, type UUID } from 'node:crypto'
 import { eventsOf, type EventOf } from '@seti/shared'
 import { InputQueue } from './input-queue.js'
 import type { NextMessage } from './next-message.js'
-import type { InputContent, InputPriority, SessionInput, SessionMessage } from './runtimes/adapter.js'
+import type { InputContent, InputPriority, SessionInput, SessionMessage, ToolServerState } from './runtimes/adapter.js'
 import type { DefaultSession, DefaultShapes } from './runtimes/registry.js'
 import type { CutKind } from './store/restart.js'
 
@@ -156,7 +156,7 @@ export class LiveSession {
   }
 
   /** How the process's MCP servers connected; null before it started or once it ended. */
-  async mcpServerStatus(): Promise<DefaultShapes['toolServer'][] | null> {
+  async mcpServerStatus(): Promise<ToolServerState[] | null> {
     const servers = this.closed ? undefined : this.runtime?.toolServers
     return servers === undefined ? null : servers()
   }

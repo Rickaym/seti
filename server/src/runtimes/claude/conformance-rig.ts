@@ -1,7 +1,7 @@
 import type { Options, PermissionResult, SDKUserMessage } from '@anthropic-ai/claude-agent-sdk'
 import { aborted, fakeMessage, FakeSdk, type FakeSession } from '../../fake-sdk.js'
 import type { Launcher } from '../../launcher.js'
-import { FakeProcess } from '../conformance/process.js'
+import { FakeProcess, launcherOf } from '../conformance/process.js'
 import { echoOf, type Script, type ScriptCall, type Step } from '../conformance/script.js'
 import type { Rig, SpawnRecord } from '../conformance/target.js'
 
@@ -105,7 +105,7 @@ class Machine {
   private readonly jobs = new WeakMap<FakeSession, Job[]>()
   private readonly saved = new Map<string, string[]>()
   private readonly sessions = new WeakMap<FakeSession, Saved>()
-  private readonly script: Script
+  readonly script: Script
   private turns = 0
   private ids = 0
 
@@ -198,6 +198,8 @@ class TurnPlayer {
       yield this.message('assistant', { message: null })
     } else if ('unknown' in step) {
       yield this.message(step.unknown, {})
+    } else if ('garbage' in step) {
+      throw new Error("The SDK parses Claude Code's output, so a stray line never reaches the adapter")
     } else {
       throw new Error(`Claude Code process exited with code ${String(step.exit)}`)
     }
@@ -262,6 +264,9 @@ class TurnPlayer {
 /** Claude Code's side of a turn: its start report, the script's steps, and the result. */
 const turnScript = (machine: Machine): TurnScript =>
   async function* (turn) {
+    if (machine.script.exitAtStart !== undefined) {
+      throw new Error(`Claude Code process exited with code ${String(machine.script.exitAtStart)}`)
+    }
     const session = machine.sessionOf(turn.session)
     session.history.push(turn.text)
     const steps = machine.stepsFor(turn.text)
@@ -300,7 +305,7 @@ const turnScript = (machine: Machine): TurnScript =>
 
 /**
  * A host where Claude Code plays the script through `FakeSdk`. Like the real SDK, the query
- * starts the process through `spawnClaudeCodeProcess` when Seti hands one.
+ * starts the process through `spawnClaudeCodeProcess` when Seti hands one, and else by itself.
  */
 export function claudeRig(slot: QuerySlot, script: Script): Rig {
   const machine = new Machine(script)
@@ -312,20 +317,32 @@ export function claudeRig(slot: QuerySlot, script: Script): Rig {
     }
   }
   const spawns: SpawnRecord[] = []
-  const spawn: NonNullable<Launcher['spawn']> = (request) => {
+  const selfStarts: SpawnRecord[] = []
+  const start: NonNullable<Launcher['spawn']> = (request) => {
     spawns.push({ command: request.command, args: request.args, cwd: request.cwd, env: request.env })
-    return new FakeProcess(request.signal)
+    return new FakeProcess(request.signal, script.deaf === true)
   }
   slot.route((args) => {
     const options = args.options ?? {}
-    options.spawnClaudeCodeProcess?.({
-      command: 'claude',
-      args: ['--output-format', 'stream-json'],
-      ...(options.cwd === undefined ? {} : { cwd: options.cwd }),
-      env: options.env ?? {},
-      signal: options.abortController?.signal ?? new AbortController().signal,
-    })
+    const request = { command: 'claude', args: ['--output-format', 'stream-json'], env: options.env ?? {} }
+    if (options.spawnClaudeCodeProcess === undefined) {
+      selfStarts.push({ ...request, cwd: options.cwd })
+    } else {
+      options.spawnClaudeCodeProcess({
+        ...request,
+        ...(options.cwd === undefined ? {} : { cwd: options.cwd }),
+        signal: options.abortController?.signal ?? new AbortController().signal,
+      })
+    }
     return sdk.query(args)
   })
-  return { launcher: { sandboxed: true, env: {}, spawn }, spawns, effects: machine.effects }
+  return {
+    launcher: launcherOf(script, start),
+    spawns,
+    selfStarts,
+    effects: machine.effects,
+    crash: (code) => {
+      sdk.last?.fail(new Error(`Claude Code process exited with code ${String(code)}`))
+    },
+  }
 }

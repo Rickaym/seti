@@ -14,6 +14,7 @@ export const scriptedTarget: ConformanceTarget<ScriptedShapes, 'scripted'> = {
     input: { steer: 'next_step', retract: true },
     background: { jobs: true, stop: true },
     gated: { shell: true, edit: true, mcp: true },
+    parsesOutput: true,
   },
   project: projectScripted,
   host: (neutral) => ({

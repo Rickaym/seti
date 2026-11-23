@@ -35,6 +35,9 @@ const SCRIPT = `export default ({ state }) => {
   return { message: 'Check the deploy, round ' + count, state: count }
 }`
 
+/** A daily run twelve hours away, so the schedule never adds an event to the ones the flow fires. */
+const farFromNow = (): string => `0 ${String((new Date().getUTCHours() + 12) % 24)} * * *`
+
 async function post<T>(request: APIRequestContext, url: string, data: object = {}): Promise<T> {
   const response = await request.post(`/api${url}`, { data })
   expect(response.ok(), `POST /api${url}`).toBe(true)
@@ -94,8 +97,11 @@ async function subscribeOnCard(scene: Scene): Promise<void> {
   const { page, press, phone, agent, reminder } = scene
   await page.goto(`/#settings/channels/${reminder.id}`)
   const card = page.getByRole('main').getByRole('region', { name: reminder.name })
-  await press(card.getByRole('button', { name: 'Agent', exact: true }))
+  const add = card.getByRole('button', { name: 'Agent', exact: true })
+  await press(add)
   await press(page.getByRole('list', { name: 'Agents to subscribe' }).getByRole('button', { name: agent.title }))
+  // The closing agent list hands focus back to its button, which shuts a picker opened before that.
+  await expect(add).toBeFocused()
   const picker = card.getByRole('button', { name: new RegExp(`^${agent.title} delivery: `) })
   await expect(picker).toHaveAttribute('data-delivery', 'agent')
   await expect(picker).toHaveText('Agent default')
@@ -213,7 +219,7 @@ export async function deliveryFollowsTheChoice(flow: Flow): Promise<void> {
   const reminder = await post<ReminderChannelInfo>(request, '/channels/reminders', {
     name: `Delivery nudge ${tag}`,
     script: SCRIPT,
-    schedule: { cron: '30 14 * * *', timezone: 'Europe/Berlin' },
+    schedule: { cron: farFromNow(), timezone: 'UTC' },
   })
   const scene: Scene = { ...flow, agent, reminder }
   try {

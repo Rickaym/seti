@@ -30,6 +30,19 @@ const reprojected = (change: Change): Target => ({
 
 let calls = 0
 
+/** The stream's reports, ending cleanly where it failed. */
+async function* swallowed(events: AsyncIterable<SessionReport>): AsyncGenerator<SessionReport> {
+  try {
+    yield* events
+  } catch {
+    return
+  }
+}
+
+/** Seti's own environment, as an adapter that forgets the launcher would pass it on. */
+const ownEnv = (): Record<string, string> =>
+  Object.fromEntries(Object.entries(process.env).filter((entry): entry is [string, string] => entry[1] !== undefined))
+
 /** Adapters that are each wrong in one way, by the case that must catch it. */
 const BROKEN: [string, Target][] = [
   ['LC-2', reprojected((events) => events.map((e) => (e.type === 'turn.ended' ? { ...e, status: 'error' } : e)))],
@@ -58,6 +71,35 @@ const BROKEN: [string, Target][] = [
           ...(await scriptedTarget.adapter.open(realised, input, null)),
           close: () => undefined,
         }),
+      },
+    },
+  ],
+  [
+    'FL-1',
+    {
+      ...scriptedTarget,
+      adapter: {
+        ...scriptedTarget.adapter,
+        open: async (realised, input, rewind) => {
+          const session = await scriptedTarget.adapter.open(realised, input, rewind)
+          return { ...session, events: swallowed(session.events) }
+        },
+      },
+    },
+  ],
+  [
+    'LN-2',
+    {
+      ...scriptedTarget,
+      adapter: {
+        ...scriptedTarget.adapter,
+        realise: async (spec, launcher, host, abortController) =>
+          scriptedTarget.adapter.realise(
+            spec,
+            { ...launcher, env: { ...ownEnv(), ...launcher.env } },
+            host,
+            abortController,
+          ),
       },
     },
   ],
