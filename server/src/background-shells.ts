@@ -1,5 +1,12 @@
-import type { BackgroundShell, BackgroundShellStatus, MessageRow, ShellStopCause } from '@seti/shared'
-import { nonBlank, rowEvents, type Of } from './events/read.js'
+import {
+  type BackgroundShell,
+  type BackgroundShellStatus,
+  type MessageRow,
+  type ShellStopCause,
+  nonBlank,
+  rowEvents,
+  type EventOf,
+} from '@seti/shared'
 import { eachMessageAfter } from './message-pages.js'
 import { redactSecrets } from './scrub.js'
 
@@ -39,7 +46,7 @@ export function displayCommand(command: string, max = COMMAND_CHARS): string {
 }
 
 const ENDED_BY_PATCH: Partial<Record<string, Ended>> = { completed: 'completed', failed: 'failed', killed: 'killed' }
-const ENDED_BY_NOTICE: Record<Of<'job.ended'>['status'], Ended> = {
+const ENDED_BY_NOTICE: Record<EventOf<'job.ended'>['status'], Ended> = {
   completed: 'completed',
   failed: 'failed',
   stopped: 'killed',
@@ -114,7 +121,7 @@ export class ShellIndex {
     )
   }
 
-  private applyCall({ call }: Of<'tool.started'>): void {
+  private applyCall({ call }: EventOf<'tool.started'>): void {
     const shell = call.shell
     if (shell?.action === 'run' || shell?.action === 'watch') {
       this.calls.set(call.callId, {
@@ -156,7 +163,7 @@ export class ShellIndex {
   }
 
   /** Older runtimes report a background command only in its tool result. */
-  private applyEnd(row: MessageRow, event: Of<'tool.ended'>): void {
+  private applyEnd(row: MessageRow, event: EventOf<'tool.ended'>): void {
     const { job } = event.result
     const id = job?.id ?? null
     const draft = id === null ? null : this.draftOf(id, event.callId, row, true)
@@ -167,7 +174,7 @@ export class ShellIndex {
     }
   }
 
-  private applyJob(row: MessageRow, event: Of<'job.updated'> | Of<'job.ended'>): void {
+  private applyJob(row: MessageRow, event: EventOf<'job.updated'> | EventOf<'job.ended'>): void {
     const draft = this.drafts.get(event.jobId)
     if (draft === undefined) {
       return
@@ -178,7 +185,7 @@ export class ShellIndex {
     }
   }
 
-  private started(row: MessageRow, event: Of<'job.started'>): void {
+  private started(row: MessageRow, event: EventOf<'job.started'>): void {
     if (event.kind !== 'shell' || event.callId === null) {
       return
     }
@@ -191,7 +198,7 @@ export class ShellIndex {
   }
 }
 
-function updatedPatch(draft: Draft, row: MessageRow, event: Of<'job.updated'>): Partial<Draft> {
+function updatedPatch(draft: Draft, row: MessageRow, event: EventOf<'job.updated'>): Partial<Draft> {
   const background = draft.background || event.background === true
   const ended = ENDED_BY_PATCH[event.status ?? '']
   if (ended === undefined || draft.ended !== null) {
@@ -200,7 +207,7 @@ function updatedPatch(draft: Draft, row: MessageRow, event: Of<'job.updated'>): 
   return { background, ended, ended_at: event.endedAt ?? row.created_at }
 }
 
-function endedPatch(draft: Draft, row: MessageRow, event: Of<'job.ended'>): Partial<Draft> {
+function endedPatch(draft: Draft, row: MessageRow, event: EventOf<'job.ended'>): Partial<Draft> {
   return {
     ended: draft.ended ?? ENDED_BY_NOTICE[event.status],
     ended_at: draft.ended_at ?? row.created_at,

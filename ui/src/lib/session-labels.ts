@@ -1,4 +1,7 @@
-import type { PermissionMode, SDKResultMessage } from '@anthropic-ai/claude-agent-sdk'
+import type { PermissionMode } from '@anthropic-ai/claude-agent-sdk'
+import type { EventOf } from '@seti/shared'
+
+type TurnEnd = EventOf<'turn.ended'>
 
 /** Separates the facts on one transcript line. */
 export const DOT = ' \u00b7 '
@@ -21,25 +24,26 @@ export function lastSegment(path: string): string {
   return parts.at(-1) ?? path
 }
 
-const FAILURE = new Map<string, string>([
-  ['error_during_execution', 'error during execution'],
-  ['error_max_turns', 'hit the step limit'],
-  ['error_max_budget_usd', 'hit the budget limit'],
-  ['error_max_structured_output_retries', 'no valid structured output'],
-] satisfies [SDKResultMessage['subtype'], string][])
+const FAILURE: Record<NonNullable<TurnEnd['ending']>, string | null> = {
+  error: 'error during execution',
+  turn_limit: 'hit the step limit',
+  budget_limit: 'hit the budget limit',
+  retry_limit: 'no valid structured output',
+  other: null,
+}
 
 /** How a turn ended, in plain words: "Turn done", "Turn failed: hit the step limit". */
-export function turnOutcome(message: Pick<SDKResultMessage, 'subtype' | 'is_error'>, interrupted: boolean): string {
+export function turnOutcome(end: Pick<TurnEnd, 'status' | 'ending' | 'error'>, interrupted: boolean): string {
   if (interrupted) {
     return 'Turn interrupted'
   }
-  if (!message.is_error) {
+  if (end.status !== 'error') {
     return 'Turn done'
   }
-  if (message.subtype === 'success') {
+  if (end.ending === undefined) {
     return 'Turn failed'
   }
-  return `Turn failed: ${FAILURE.get(message.subtype) ?? message.subtype.replaceAll('_', ' ')}`
+  return `Turn failed: ${FAILURE[end.ending] ?? (end.error ?? '').replaceAll('_', ' ')}`
 }
 
 export const plural = (count: number, noun: string): string => `${String(count)} ${noun}${count === 1 ? '' : 's'}`

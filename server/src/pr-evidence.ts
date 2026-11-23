@@ -1,5 +1,4 @@
-import { findPrUrls, type ToolCall } from '@seti/shared'
-import { payloadEvents } from './events/read.js'
+import { findPrUrls, type ToolCall, payloadEvents } from '@seti/shared'
 import type { PrHead } from './github.js'
 import { shellCommand } from './outward.js'
 import { createsPrCall } from './pr-link.js'

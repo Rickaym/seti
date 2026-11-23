@@ -18,15 +18,15 @@ function provisionalStatus(result: ToolResultRef | undefined): SubtaskStatus {
   if (result === undefined) {
     return 'running'
   }
-  return result.block.is_error === true ? 'failed' : 'completed'
+  return result.failed ? 'failed' : 'completed'
 }
 
 /** What the card shows before the task's stream has reported on this subagent. */
 function provisional(block: ToolUseBlock, result: ToolResultRef | undefined, rowId: number, at: string): SubtaskBrief {
   const status = provisionalStatus(result)
   return {
-    tool_use_id: block.id,
-    tool_use_ids: [block.id],
+    tool_use_id: block.callId,
+    tool_use_ids: [block.callId],
     parent_tool_use_id: null,
     message_id: rowId,
     sdk_task_id: null,
@@ -155,7 +155,7 @@ export function SubtaskCard({ taskId, rowId, startedAt, block, result, subtask, 
   const now = useNow(brief.status === 'running')
   const elapsed = subtaskElapsed(brief, now)
   const line = progressLine(brief)
-  const promptSource = inputTrimmed ? { taskId, rowId, toolUseId: block.id, pick: fullInputText } : null
+  const promptSource = inputTrimmed ? { taskId, rowId, toolUseId: block.callId, pick: fullInputText } : null
   const kind = [brief.subagent_type, brief.background ? 'background' : null].filter((part) => part !== null)
   return (
     <div
@@ -178,7 +178,7 @@ export function SubtaskCard({ taskId, rowId, startedAt, block, result, subtask, 
           size="xs"
           aria-label={`Open subagent ${brief.description}`}
           onClick={() => {
-            navigate('agents', subtaskRouteId(taskId, block.id))
+            navigate('agents', subtaskRouteId(taskId, block.callId))
           }}
         >
           <ArrowUpRight />

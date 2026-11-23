@@ -16,7 +16,7 @@ interface GroupCall {
 function groupCalls(rows: readonly MessageRow[]): GroupCall[] {
   return rows.flatMap((row) => {
     const outward = new Set(row.outward)
-    return rowCalls(row).map((block) => ({ block, at: row.created_at, outward: outward.has(block.id) }))
+    return rowCalls(row).map((block) => ({ block, at: row.created_at, outward: outward.has(block.callId) }))
   })
 }
 
@@ -27,9 +27,7 @@ function KindIcons({
   calls: readonly GroupCall[]
   results: readonly (ToolResultRef | undefined)[]
 }) {
-  const tallies = kindTallies(
-    calls.map((call, n) => ({ name: call.block.name, failed: results[n]?.block.is_error === true })),
-  )
+  const tallies = kindTallies(calls.map((call, n) => ({ call: call.block, failed: results[n]?.failed === true })))
   return (
     <span aria-hidden className="flex shrink-0 items-center gap-1 text-muted-foreground max-sm:hidden">
       {tallies.map((tally) => (
@@ -96,11 +94,11 @@ function ToolGroupView({ rows, results, background, running, renderRow }: ToolGr
   const focusId = useContext(FindFocusContext)
   const open = expanded || holds(rows, results, focusId)
   const calls = useMemo(() => groupCalls(rows), [rows])
-  const label = useMemo(() => groupLabel(calls.map((call) => call.block.name)), [calls])
-  const failed = results.filter((result) => result?.block.is_error === true).length
+  const label = useMemo(() => groupLabel(calls.map((call) => call.block)), [calls])
+  const failed = results.filter((result) => result?.failed === true).length
   const outward = calls.filter((call) => call.outward).length
   const refused = useMemo(
-    () => results.flatMap((result) => (result === undefined ? [] : refusals(resultText(result.block.content)))),
+    () => results.flatMap((result) => (result === undefined ? [] : refusals(resultText(result)))),
     [results],
   )
   const pending = running ? calls.findIndex((_, n) => results[n] === undefined) : -1
