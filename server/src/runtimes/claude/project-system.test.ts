@@ -1,5 +1,5 @@
 import type { SDKMessage } from '@anthropic-ai/claude-agent-sdk'
-import { projectClaude, type MessageBody } from '@seti/shared'
+import { CONTEXT_WINDOW_KEY, projectClaude, type MessageBody } from '@seti/shared'
 import { describe, expect, it } from 'vitest'
 import { fakeBackground, fakeMessage } from '../../fake-sdk.js'
 import { backgroundChanged, shellNotification, shellStarted, shellUpdated } from '../../shell-fixtures.js'
@@ -14,6 +14,14 @@ const project = (body: MessageBody) => {
 
 const system = (subtype: string, extra: Record<string, unknown> = {}) =>
   projectClaude(fakeMessage('system', { subtype, ...extra }) as unknown as SDKMessage)
+
+const startFields = { task_id: 'b1', tool_use_id: 'toolu_b', description: 'Serve', task_type: 'local_bash' }
+const progressFields = {
+  task_id: 'a1',
+  description: 'progress',
+  usage: { total_tokens: 1, tool_uses: 1, duration_ms: 1 },
+}
+const endFields = { task_id: 'b1', output_file: '/work/t/b1.output', summary: 'Done' }
 
 describe('Claude session and compaction messages', () => {
   it('reads a session start with its mode and how its servers connected', () => {
@@ -56,6 +64,8 @@ describe('Claude session and compaction messages', () => {
     expect(system('compact_boundary', { compact_metadata: { trigger: 'auto', pre_tokens: 190_000 } })).toEqual([
       { v: 1, thread: '', type: 'compaction', phase: 'done', trigger: 'auto', before: 190_000 },
     ])
+    const measured = { compact_metadata: { trigger: 'manual', pre_tokens: 82_000 }, [CONTEXT_WINDOW_KEY]: 100_000 }
+    expect(system('compact_boundary', measured)).toMatchObject([{ phase: 'done', before: 82_000, window: 100_000 }])
   })
 
   it('reads retries, model fallbacks, runtime denials and slash command output', () => {
@@ -132,6 +142,7 @@ describe('Claude background work', () => {
         kind: 'subagent',
         label: 'Review',
         background: true,
+        agentType: 'general-purpose',
       },
     ])
     expect(project(taskProgress('a1', 'toolu_a', 'Grep', 3))).toEqual([
@@ -160,6 +171,29 @@ describe('Claude background work', () => {
       },
     ])
     expect(project(taskNotification('a2', undefined, 'stopped', 'Stopped.'))).toMatchObject([{ callId: null }])
+    expect(system('task_progress', { ...progressFields, summary: 'Reading the diff' })).toMatchObject([
+      { type: 'job.progress', summary: 'Reading the diff' },
+    ])
+    expect(project(taskUpdated('a1', { is_backgrounded: true }))).toEqual([
+      { v: 1, thread: '', type: 'job.updated', jobId: 'a1', background: true },
+    ])
+  })
+
+  it('reads who started a shell and why the runtime stopped one on its own', () => {
+    expect(system('task_started', { ...startFields, owned_by_subagent: true })).toMatchObject([
+      { type: 'job.started', bySubagent: true },
+    ])
+    expect(system('task_started', startFields)[0]).not.toHaveProperty('bySubagent')
+    const stopped = (summary: string) => system('task_notification', { ...endFields, status: 'stopped', summary })[0]
+    expect(stopped('Stopped: background time limit reached')).toMatchObject({ stopCause: 'time_limit' })
+    expect(stopped('Stopped: the machine is running low on memory')).toMatchObject({ stopCause: 'low_memory' })
+    expect(stopped('Stopped by the user')).not.toHaveProperty('stopCause')
+    expect(
+      system('task_notification', { ...endFields, status: 'failed', summary: 'background time limit' })[0],
+    ).not.toHaveProperty('stopCause')
+    expect(system('task_notification', { ...endFields, status: 'completed', output_file: '' })[0]).not.toHaveProperty(
+      'output',
+    )
   })
 
   it('reads a background shell, its updates and the exit code its end reports', () => {

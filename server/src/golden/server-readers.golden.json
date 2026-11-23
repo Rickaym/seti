@@ -1,0 +1,1700 @@
+{
+  "checkout": {
+    "digest": [
+      {
+        "at": "2026-11-20T09:00:00.000Z",
+        "kind": "user",
+        "text": "Card captures fail when the gateway times out. Retry them, keep 3-D Secure working, and open a PR."
+      },
+      {
+        "at": "2026-11-20T09:00:07.000Z",
+        "kind": "agent",
+        "text": "I will start with the capture path and the gateway client."
+      },
+      {
+        "at": "2026-11-20T09:00:14.000Z",
+        "kind": "tool",
+        "text": "Ran: Read src/checkout/payment.ts."
+      },
+      {
+        "at": "2026-11-20T09:00:28.000Z",
+        "kind": "tool",
+        "text": "Ran: Grep src."
+      },
+      {
+        "at": "2026-11-20T09:00:42.000Z",
+        "kind": "tool",
+        "text": "Ran: Edit src/checkout/payment.ts. Result: The file src/checkout/payment.ts has been updated."
+      },
+      {
+        "at": "2026-11-20T09:00:56.000Z",
+        "kind": "tool",
+        "text": "Ran: git diff src/checkout/payment.ts. Result: diff --git a/src/checkout/payment.ts b/src/checkout/payment.ts (+16 lines)"
+      },
+      {
+        "at": "2026-11-20T09:01:10.000Z",
+        "kind": "tool",
+        "text": "Ran: pnpm vitest run src/checkout. Result: \u2713 src/checkout/payment.test.ts (14 tests) 212ms (+3 lines)"
+      },
+      {
+        "at": "2026-11-20T09:01:24.000Z",
+        "kind": "tool",
+        "text": "Ran: gh pr create --title \"fix(checkout): retry card captures on gateway timeouts\". Result: https://github.com/acme/storefront/pull/482"
+      },
+      {
+        "at": "2026-11-20T09:01:38.000Z",
+        "kind": "agent",
+        "text": "Captures now retry up to three times on a gateway timeout, and a `requires_action` charge returns a pending receipt, so 3-D Secure still works. ```diff - const charge = await gateway.charge(order.total, order.card) + const charge = await withRetry(() => gateway.charge(order.total, order.card), { + attempts: 3, + retryOn: (error) => error instanceof GatewayTimeout, + }) + if (charge.status === 'requires_action') { + return { state: 'pending', next: charge.nextAction } + } ``` All 20 checkout tests pass. I opened **#482** and will follow its CI and reviews."
+      },
+      {
+        "at": "2026-11-20T09:01:45.000Z",
+        "kind": "status",
+        "text": "Turn finished in 3m 9s"
+      },
+      {
+        "at": "2026-11-20T09:01:52.000Z",
+        "kind": "user",
+        "text": "The review asks for a test of the third attempt failing. Add it."
+      },
+      {
+        "at": "2026-11-20T09:01:59.000Z",
+        "kind": "agent",
+        "text": "Adding a test where all three attempts time out."
+      },
+      {
+        "at": "2026-11-20T09:02:06.000Z",
+        "kind": "tool",
+        "text": "Ran: Edit src/checkout/payment.test.ts. Result: The file src/checkout/payment.test.ts has been updated."
+      },
+      {
+        "at": "2026-11-20T09:02:20.000Z",
+        "kind": "tool",
+        "text": "Ran: pnpm vitest run src/checkout/payment.test.ts."
+      }
+    ],
+    "turns": [
+      {
+        "row": 16,
+        "todos": [],
+        "subtasks": [],
+        "shells": []
+      }
+    ],
+    "outward": [
+      "toolu_checkout-0023"
+    ],
+    "prs": {
+      "created": [
+        "https://github.com/acme/storefront/pull/482"
+      ],
+      "pushedTo": [],
+      "pushes": []
+    },
+    "asks": {
+      "asks": false,
+      "question": "",
+      "options": [],
+      "closed": false
+    },
+    "labels": [
+      "Read src/checkout/payment.ts",
+      "Grep src",
+      "Edit src/checkout/payment.ts",
+      "git diff src/checkout/payment.ts",
+      "pnpm vitest run src/checkout",
+      "gh pr create --title \"fix(checkout): retry card captures on gateway timeouts\"",
+      "Edit src/checkout/payment.test.ts",
+      "pnpm vitest run src/checkout/payment.test.ts"
+    ]
+  },
+  "orders": {
+    "digest": [
+      {
+        "at": "2026-11-20T09:00:00.000Z",
+        "kind": "user",
+        "text": "GET /v2/orders returns every order at once. Add cursor pagination without breaking v1 clients."
+      },
+      {
+        "at": "2026-11-20T09:00:07.000Z",
+        "kind": "tool",
+        "text": "Ran: TodoWrite. Result: Todos have been modified successfully."
+      },
+      {
+        "at": "2026-11-20T09:00:21.000Z",
+        "kind": "tool",
+        "text": "Ran: Read src/routes/orders.ts."
+      },
+      {
+        "at": "2026-11-20T09:00:35.000Z",
+        "kind": "tool",
+        "text": "Ran: Edit src/routes/orders.ts. Result: The file src/routes/orders.ts has been updated."
+      },
+      {
+        "at": "2026-11-20T09:00:49.000Z",
+        "kind": "tool",
+        "text": "Ran: pnpm test -- orders. Result: PASS test/orders.test.ts (+5 lines)"
+      },
+      {
+        "at": "2026-11-20T09:01:03.000Z",
+        "kind": "agent",
+        "text": "The cursor works. A subagent checks the v1 clients while I write the spec."
+      },
+      {
+        "at": "2026-11-20T09:01:10.000Z",
+        "kind": "subtask",
+        "text": "Subtask \"Check v1 clients parse paged orders\" (general-purpose, background): completed in 28s: All four v1 clients ignore unknown fields, so next_cursor breaks none of them."
+      },
+      {
+        "at": "2026-11-20T09:01:45.000Z",
+        "kind": "agent",
+        "text": "The v1 clients are safe. Writing the OpenAPI parameters now."
+      },
+      {
+        "at": "2026-11-20T09:01:52.000Z",
+        "kind": "tool",
+        "text": "Ran: Edit openapi/orders.yaml."
+      }
+    ],
+    "turns": [],
+    "outward": [],
+    "prs": {
+      "created": [],
+      "pushedTo": [],
+      "pushes": []
+    },
+    "asks": {
+      "asks": false,
+      "question": "",
+      "options": [],
+      "closed": false
+    },
+    "labels": [
+      "TodoWrite",
+      "Read src/routes/orders.ts",
+      "Edit src/routes/orders.ts",
+      "pnpm test -- orders",
+      "Agent Check v1 clients parse paged orders",
+      "Edit openapi/orders.yaml"
+    ]
+  },
+  "infra": {
+    "digest": [
+      {
+        "at": "2026-11-20T09:00:00.000Z",
+        "kind": "user",
+        "text": "Upgrade the staging database to Postgres 17. Plan first and show me the plan."
+      },
+      {
+        "at": "2026-11-20T09:00:07.000Z",
+        "kind": "tool",
+        "text": "Ran: terraform -chdir=envs/staging init -upgrade. Result: Terraform has been successfully initialized!"
+      },
+      {
+        "at": "2026-11-20T09:00:21.000Z",
+        "kind": "tool",
+        "text": "Ran: Edit modules/postgres/main.tf. Result: The file modules/postgres/main.tf has been updated."
+      },
+      {
+        "at": "2026-11-20T09:00:35.000Z",
+        "kind": "tool",
+        "text": "Ran: terraform plan -target=module.postgres -var-file=staging.tfvars. Result: # module.postgres.aws_db_instance.main will be updated in-place (+5 lines)"
+      },
+      {
+        "at": "2026-11-20T09:00:49.000Z",
+        "kind": "agent",
+        "text": "The plan changes one resource in place: `engine_version` goes from 16.4 to 17.2, with no replacement. A snapshot from 06:00 today covers a rollback. Applying now."
+      },
+      {
+        "at": "2026-11-20T09:00:56.000Z",
+        "kind": "tool",
+        "text": "Ran: terraform apply -target=module.postgres -var-file=staging.tfvars."
+      }
+    ],
+    "turns": [],
+    "outward": [],
+    "prs": {
+      "created": [],
+      "pushedTo": [],
+      "pushes": []
+    },
+    "asks": {
+      "asks": false,
+      "question": "",
+      "options": [],
+      "closed": false
+    },
+    "labels": [
+      "terraform -chdir=envs/staging init -upgrade",
+      "Edit modules/postgres/main.tf",
+      "terraform plan -target=module.postgres -var-file=staging.tfvars",
+      "terraform apply -target=module.postgres -var-file=staging.tfvars"
+    ]
+  },
+  "cart": {
+    "digest": [
+      {
+        "at": "2026-11-20T09:00:00.000Z",
+        "kind": "user",
+        "text": "cart.spec.ts fails about one run in ten on CI. Find out why."
+      },
+      {
+        "at": "2026-11-20T09:00:07.000Z",
+        "kind": "tool",
+        "text": "Ran: pnpm playwright test cart.spec.ts --repeat-each=20. Result: 18 passed (+4 lines)"
+      },
+      {
+        "at": "2026-11-20T09:00:21.000Z",
+        "kind": "tool",
+        "text": "Ran: Grep src/cart."
+      },
+      {
+        "at": "2026-11-20T09:00:35.000Z",
+        "kind": "tool",
+        "text": "Ran: Read src/cart/PriceBadge.tsx."
+      },
+      {
+        "at": "2026-11-20T09:00:49.000Z",
+        "kind": "agent",
+        "text": "I found why the cart test flakes: the price badge renders before the currency loads, so the assertion races it. Two fixes work: 1. Wait for the currency in the test. Small, but hides the flash users see. 2. Render the badge only once the currency is known. Fixes the flash too, and touches 3 components. Which do you want?"
+      },
+      {
+        "at": "2026-11-20T09:00:56.000Z",
+        "kind": "status",
+        "text": "Turn finished in 2m 6s"
+      }
+    ],
+    "turns": [
+      {
+        "row": 9,
+        "todos": [],
+        "subtasks": [],
+        "shells": []
+      }
+    ],
+    "outward": [],
+    "prs": {
+      "created": [],
+      "pushedTo": [],
+      "pushes": []
+    },
+    "asks": {
+      "asks": true,
+      "question": "Which do you want?",
+      "closed": false,
+      "options": [
+        "Wait for the currency in the test. Small, but hides the flash users see.",
+        "Render the badge only once the currency is known. Fixes the flash too, and touches 3 components."
+      ]
+    },
+    "labels": [
+      "pnpm playwright test cart.spec.ts --repeat-each=20",
+      "Grep src/cart",
+      "Read src/cart/PriceBadge.tsx"
+    ]
+  },
+  "guide": {
+    "digest": [
+      {
+        "at": "2026-11-20T09:00:00.000Z",
+        "kind": "user",
+        "text": "Write a migration guide from API v1 to v2 for our partners, and a one-page PDF summary."
+      },
+      {
+        "at": "2026-11-20T09:00:07.000Z",
+        "kind": "tool",
+        "text": "Ran: Read openapi/v2.yaml."
+      },
+      {
+        "at": "2026-11-20T09:00:21.000Z",
+        "kind": "tool",
+        "text": "Ran: Write docs/migration-v2.md. Result: File created."
+      },
+      {
+        "at": "2026-11-20T09:00:35.000Z",
+        "kind": "tool",
+        "text": "Ran: pandoc docs/migration-v2.md -o docs/migration-v2.pdf."
+      },
+      {
+        "at": "2026-11-20T09:00:49.000Z",
+        "kind": "agent",
+        "text": "The guide is in `docs/migration-v2.md`, with the PDF summary beside it."
+      },
+      {
+        "at": "2026-11-20T09:00:56.000Z",
+        "kind": "status",
+        "text": "Turn finished in 1m 45s"
+      }
+    ],
+    "turns": [
+      {
+        "row": 9,
+        "todos": [],
+        "subtasks": [],
+        "shells": []
+      }
+    ],
+    "outward": [],
+    "prs": {
+      "created": [],
+      "pushedTo": [],
+      "pushes": []
+    },
+    "asks": {
+      "asks": false,
+      "question": "",
+      "options": [],
+      "closed": false
+    },
+    "labels": [
+      "Read openapi/v2.yaml",
+      "Write docs/migration-v2.md",
+      "pandoc docs/migration-v2.md -o docs/migration-v2.pdf"
+    ]
+  },
+  "fleet-5a1c7f20": {
+    "digest": [
+      {
+        "at": "2026-11-20T09:00:00.000Z",
+        "kind": "user",
+        "text": "Sign webhook payloads with HMAC"
+      },
+      {
+        "at": "2026-11-20T09:00:07.000Z",
+        "kind": "tool",
+        "text": "Ran: linear: get_issue Sign webhook payloads with HMAC. Result: ok"
+      },
+      {
+        "at": "2026-11-20T09:00:21.000Z",
+        "kind": "agent",
+        "text": "Done: sign webhook payloads with hmac."
+      },
+      {
+        "at": "2026-11-20T09:00:28.000Z",
+        "kind": "status",
+        "text": "Turn finished in 1m 35s"
+      },
+      {
+        "at": "2026-11-20T09:00:35.000Z",
+        "kind": "user",
+        "text": "Retry failed deliveries with backoff"
+      },
+      {
+        "at": "2026-11-20T09:00:42.000Z",
+        "kind": "tool",
+        "text": "Ran: github: create_pull_request Retry failed deliveries with backoff. Result: ok"
+      },
+      {
+        "at": "2026-11-20T09:00:56.000Z",
+        "kind": "agent",
+        "text": "Done: retry failed deliveries with backoff."
+      },
+      {
+        "at": "2026-11-20T09:01:03.000Z",
+        "kind": "status",
+        "text": "Turn finished in 3m 10s"
+      },
+      {
+        "at": "2026-11-20T09:01:10.000Z",
+        "kind": "user",
+        "text": "Document the v2 events"
+      },
+      {
+        "at": "2026-11-20T09:01:17.000Z",
+        "kind": "tool",
+        "text": "Ran: linear: get_issue Document the v2 events. Result: ok"
+      },
+      {
+        "at": "2026-11-20T09:01:31.000Z",
+        "kind": "agent",
+        "text": "Done: document the v2 events."
+      },
+      {
+        "at": "2026-11-20T09:01:38.000Z",
+        "kind": "status",
+        "text": "Turn finished in 4m 45s"
+      },
+      {
+        "at": "2026-11-20T09:01:45.000Z",
+        "kind": "user",
+        "text": "Sign webhook payloads with HMAC"
+      },
+      {
+        "at": "2026-11-20T09:01:52.000Z",
+        "kind": "tool",
+        "text": "Ran: github: create_pull_request Sign webhook payloads with HMAC. Result: ok"
+      },
+      {
+        "at": "2026-11-20T09:02:06.000Z",
+        "kind": "agent",
+        "text": "Done: sign webhook payloads with hmac."
+      },
+      {
+        "at": "2026-11-20T09:02:13.000Z",
+        "kind": "status",
+        "text": "Turn finished in 6m 20s"
+      },
+      {
+        "at": "2026-11-20T09:02:20.000Z",
+        "kind": "user",
+        "text": "Retry failed deliveries with backoff"
+      },
+      {
+        "at": "2026-11-20T09:02:27.000Z",
+        "kind": "tool",
+        "text": "Ran: linear: get_issue Retry failed deliveries with backoff. Result: ok"
+      },
+      {
+        "at": "2026-11-20T09:02:41.000Z",
+        "kind": "agent",
+        "text": "Done: retry failed deliveries with backoff."
+      },
+      {
+        "at": "2026-11-20T09:02:48.000Z",
+        "kind": "status",
+        "text": "Turn finished in 1m 35s"
+      },
+      {
+        "at": "2026-11-20T09:02:55.000Z",
+        "kind": "user",
+        "text": "Document the v2 events"
+      },
+      {
+        "at": "2026-11-20T09:03:02.000Z",
+        "kind": "tool",
+        "text": "Ran: github: create_pull_request Document the v2 events. Result: ok"
+      },
+      {
+        "at": "2026-11-20T09:03:16.000Z",
+        "kind": "agent",
+        "text": "Done: document the v2 events."
+      },
+      {
+        "at": "2026-11-20T09:03:23.000Z",
+        "kind": "status",
+        "text": "Turn finished in 3m 10s"
+      },
+      {
+        "at": "2026-11-20T09:03:30.000Z",
+        "kind": "user",
+        "text": "Sign webhook payloads with HMAC"
+      },
+      {
+        "at": "2026-11-20T09:03:37.000Z",
+        "kind": "tool",
+        "text": "Ran: linear: get_issue Sign webhook payloads with HMAC. Result: ok"
+      },
+      {
+        "at": "2026-11-20T09:03:51.000Z",
+        "kind": "agent",
+        "text": "Done: sign webhook payloads with hmac."
+      },
+      {
+        "at": "2026-11-20T09:03:58.000Z",
+        "kind": "status",
+        "text": "Turn finished in 4m 45s"
+      },
+      {
+        "at": "2026-11-20T09:04:05.000Z",
+        "kind": "user",
+        "text": "Retry failed deliveries with backoff"
+      },
+      {
+        "at": "2026-11-20T09:04:12.000Z",
+        "kind": "tool",
+        "text": "Ran: github: create_pull_request Retry failed deliveries with backoff. Result: ok"
+      },
+      {
+        "at": "2026-11-20T09:04:26.000Z",
+        "kind": "agent",
+        "text": "Done: retry failed deliveries with backoff."
+      },
+      {
+        "at": "2026-11-20T09:04:33.000Z",
+        "kind": "status",
+        "text": "Turn finished in 6m 20s"
+      },
+      {
+        "at": "2026-11-20T09:04:40.000Z",
+        "kind": "user",
+        "text": "Document the v2 events"
+      },
+      {
+        "at": "2026-11-20T09:04:47.000Z",
+        "kind": "tool",
+        "text": "Ran: linear: get_issue Document the v2 events. Result: ok"
+      },
+      {
+        "at": "2026-11-20T09:05:01.000Z",
+        "kind": "agent",
+        "text": "Done: document the v2 events."
+      },
+      {
+        "at": "2026-11-20T09:05:08.000Z",
+        "kind": "status",
+        "text": "Turn finished in 1m 35s"
+      },
+      {
+        "at": "2026-11-20T09:05:15.000Z",
+        "kind": "user",
+        "text": "Sign webhook payloads with HMAC"
+      },
+      {
+        "at": "2026-11-20T09:05:22.000Z",
+        "kind": "tool",
+        "text": "Ran: github: create_pull_request Sign webhook payloads with HMAC. Result: ok"
+      },
+      {
+        "at": "2026-11-20T09:05:36.000Z",
+        "kind": "agent",
+        "text": "Done: sign webhook payloads with hmac."
+      },
+      {
+        "at": "2026-11-20T09:05:43.000Z",
+        "kind": "status",
+        "text": "Turn finished in 3m 10s"
+      },
+      {
+        "at": "2026-11-20T09:05:50.000Z",
+        "kind": "user",
+        "text": "Retry failed deliveries with backoff"
+      },
+      {
+        "at": "2026-11-20T09:05:57.000Z",
+        "kind": "tool",
+        "text": "Ran: linear: get_issue Retry failed deliveries with backoff. Result: ok"
+      },
+      {
+        "at": "2026-11-20T09:06:11.000Z",
+        "kind": "agent",
+        "text": "Done: retry failed deliveries with backoff."
+      },
+      {
+        "at": "2026-11-20T09:06:18.000Z",
+        "kind": "status",
+        "text": "Turn finished in 4m 45s"
+      },
+      {
+        "at": "2026-11-20T09:06:25.000Z",
+        "kind": "user",
+        "text": "Document the v2 events"
+      },
+      {
+        "at": "2026-11-20T09:06:32.000Z",
+        "kind": "tool",
+        "text": "Ran: github: create_pull_request Document the v2 events. Result: ok"
+      },
+      {
+        "at": "2026-11-20T09:06:46.000Z",
+        "kind": "agent",
+        "text": "Done: document the v2 events."
+      },
+      {
+        "at": "2026-11-20T09:06:53.000Z",
+        "kind": "status",
+        "text": "Turn finished in 6m 20s"
+      },
+      {
+        "at": "2026-11-20T09:07:00.000Z",
+        "kind": "user",
+        "text": "Sign webhook payloads with HMAC"
+      },
+      {
+        "at": "2026-11-20T09:07:07.000Z",
+        "kind": "tool",
+        "text": "Ran: linear: get_issue Sign webhook payloads with HMAC. Result: ok"
+      },
+      {
+        "at": "2026-11-20T09:07:21.000Z",
+        "kind": "agent",
+        "text": "Done: sign webhook payloads with hmac."
+      },
+      {
+        "at": "2026-11-20T09:07:28.000Z",
+        "kind": "status",
+        "text": "Turn finished in 1m 35s"
+      },
+      {
+        "at": "2026-11-20T09:07:35.000Z",
+        "kind": "user",
+        "text": "Retry failed deliveries with backoff"
+      },
+      {
+        "at": "2026-11-20T09:07:42.000Z",
+        "kind": "tool",
+        "text": "Ran: github: create_pull_request Retry failed deliveries with backoff. Result: ok"
+      },
+      {
+        "at": "2026-11-20T09:07:56.000Z",
+        "kind": "agent",
+        "text": "Done: retry failed deliveries with backoff."
+      },
+      {
+        "at": "2026-11-20T09:08:03.000Z",
+        "kind": "status",
+        "text": "Turn finished in 3m 10s"
+      }
+    ],
+    "turns": [
+      {
+        "row": 5,
+        "todos": [],
+        "subtasks": [],
+        "shells": []
+      },
+      {
+        "row": 10,
+        "todos": [],
+        "subtasks": [],
+        "shells": []
+      },
+      {
+        "row": 15,
+        "todos": [],
+        "subtasks": [],
+        "shells": []
+      },
+      {
+        "row": 20,
+        "todos": [],
+        "subtasks": [],
+        "shells": []
+      },
+      {
+        "row": 25,
+        "todos": [],
+        "subtasks": [],
+        "shells": []
+      },
+      {
+        "row": 30,
+        "todos": [],
+        "subtasks": [],
+        "shells": []
+      },
+      {
+        "row": 35,
+        "todos": [],
+        "subtasks": [],
+        "shells": []
+      },
+      {
+        "row": 40,
+        "todos": [],
+        "subtasks": [],
+        "shells": []
+      },
+      {
+        "row": 45,
+        "todos": [],
+        "subtasks": [],
+        "shells": []
+      },
+      {
+        "row": 50,
+        "todos": [],
+        "subtasks": [],
+        "shells": []
+      },
+      {
+        "row": 55,
+        "todos": [],
+        "subtasks": [],
+        "shells": []
+      },
+      {
+        "row": 60,
+        "todos": [],
+        "subtasks": [],
+        "shells": []
+      },
+      {
+        "row": 65,
+        "todos": [],
+        "subtasks": [],
+        "shells": []
+      },
+      {
+        "row": 70,
+        "todos": [],
+        "subtasks": [],
+        "shells": []
+      }
+    ],
+    "outward": [
+      "toolu_5a1c7f20-0008",
+      "toolu_5a1c7f20-0022",
+      "toolu_5a1c7f20-0036",
+      "toolu_5a1c7f20-0050",
+      "toolu_5a1c7f20-0064",
+      "toolu_5a1c7f20-0078",
+      "toolu_5a1c7f20-0092"
+    ],
+    "prs": {
+      "created": [],
+      "pushedTo": [],
+      "pushes": []
+    },
+    "asks": {
+      "asks": false,
+      "question": "",
+      "options": [],
+      "closed": false
+    },
+    "labels": [
+      "linear: get_issue Sign webhook payloads with HMAC",
+      "github: create_pull_request Retry failed deliveries with backoff",
+      "linear: get_issue Document the v2 events",
+      "github: create_pull_request Sign webhook payloads with HMAC",
+      "linear: get_issue Retry failed deliveries with backoff",
+      "github: create_pull_request Document the v2 events",
+      "linear: get_issue Sign webhook payloads with HMAC",
+      "github: create_pull_request Retry failed deliveries with backoff",
+      "linear: get_issue Document the v2 events",
+      "github: create_pull_request Sign webhook payloads with HMAC",
+      "linear: get_issue Retry failed deliveries with backoff",
+      "github: create_pull_request Document the v2 events",
+      "linear: get_issue Sign webhook payloads with HMAC",
+      "github: create_pull_request Retry failed deliveries with backoff"
+    ]
+  },
+  "fleet-6b2d8a31": {
+    "digest": [
+      {
+        "at": "2026-11-20T09:00:00.000Z",
+        "kind": "user",
+        "text": "Split the checkout route"
+      },
+      {
+        "at": "2026-11-20T09:00:07.000Z",
+        "kind": "tool",
+        "text": "Ran: github: create_pull_request Split the checkout route. Result: ok"
+      },
+      {
+        "at": "2026-11-20T09:00:21.000Z",
+        "kind": "agent",
+        "text": "Done: split the checkout route."
+      },
+      {
+        "at": "2026-11-20T09:00:28.000Z",
+        "kind": "status",
+        "text": "Turn finished in 1m 35s"
+      },
+      {
+        "at": "2026-11-20T09:00:35.000Z",
+        "kind": "user",
+        "text": "Drop moment for date-fns"
+      },
+      {
+        "at": "2026-11-20T09:00:42.000Z",
+        "kind": "tool",
+        "text": "Ran: sentry: search_issues Drop moment for date-fns. Result: ok"
+      },
+      {
+        "at": "2026-11-20T09:00:56.000Z",
+        "kind": "agent",
+        "text": "Done: drop moment for date-fns."
+      },
+      {
+        "at": "2026-11-20T09:01:03.000Z",
+        "kind": "status",
+        "text": "Turn finished in 3m 10s"
+      },
+      {
+        "at": "2026-11-20T09:01:10.000Z",
+        "kind": "user",
+        "text": "Lazy-load the image zoom"
+      },
+      {
+        "at": "2026-11-20T09:01:17.000Z",
+        "kind": "tool",
+        "text": "Ran: github: create_pull_request Lazy-load the image zoom. Result: ok"
+      },
+      {
+        "at": "2026-11-20T09:01:31.000Z",
+        "kind": "agent",
+        "text": "Done: lazy-load the image zoom."
+      },
+      {
+        "at": "2026-11-20T09:01:38.000Z",
+        "kind": "status",
+        "text": "Turn finished in 4m 45s"
+      },
+      {
+        "at": "2026-11-20T09:01:45.000Z",
+        "kind": "user",
+        "text": "Split the checkout route"
+      },
+      {
+        "at": "2026-11-20T09:01:52.000Z",
+        "kind": "tool",
+        "text": "Ran: sentry: search_issues Split the checkout route. Result: ok"
+      },
+      {
+        "at": "2026-11-20T09:02:06.000Z",
+        "kind": "agent",
+        "text": "Done: split the checkout route."
+      },
+      {
+        "at": "2026-11-20T09:02:13.000Z",
+        "kind": "status",
+        "text": "Turn finished in 6m 20s"
+      },
+      {
+        "at": "2026-11-20T09:02:20.000Z",
+        "kind": "user",
+        "text": "Drop moment for date-fns"
+      },
+      {
+        "at": "2026-11-20T09:02:27.000Z",
+        "kind": "tool",
+        "text": "Ran: github: create_pull_request Drop moment for date-fns. Result: ok"
+      },
+      {
+        "at": "2026-11-20T09:02:41.000Z",
+        "kind": "agent",
+        "text": "Done: drop moment for date-fns."
+      },
+      {
+        "at": "2026-11-20T09:02:48.000Z",
+        "kind": "status",
+        "text": "Turn finished in 1m 35s"
+      },
+      {
+        "at": "2026-11-20T09:02:55.000Z",
+        "kind": "user",
+        "text": "Lazy-load the image zoom"
+      },
+      {
+        "at": "2026-11-20T09:03:02.000Z",
+        "kind": "tool",
+        "text": "Ran: sentry: search_issues Lazy-load the image zoom. Result: ok"
+      },
+      {
+        "at": "2026-11-20T09:03:16.000Z",
+        "kind": "agent",
+        "text": "Done: lazy-load the image zoom."
+      },
+      {
+        "at": "2026-11-20T09:03:23.000Z",
+        "kind": "status",
+        "text": "Turn finished in 3m 10s"
+      },
+      {
+        "at": "2026-11-20T09:03:30.000Z",
+        "kind": "user",
+        "text": "Split the checkout route"
+      },
+      {
+        "at": "2026-11-20T09:03:37.000Z",
+        "kind": "tool",
+        "text": "Ran: github: create_pull_request Split the checkout route. Result: ok"
+      },
+      {
+        "at": "2026-11-20T09:03:51.000Z",
+        "kind": "agent",
+        "text": "Done: split the checkout route."
+      },
+      {
+        "at": "2026-11-20T09:03:58.000Z",
+        "kind": "status",
+        "text": "Turn finished in 4m 45s"
+      },
+      {
+        "at": "2026-11-20T09:04:05.000Z",
+        "kind": "user",
+        "text": "Drop moment for date-fns"
+      },
+      {
+        "at": "2026-11-20T09:04:12.000Z",
+        "kind": "tool",
+        "text": "Ran: sentry: search_issues Drop moment for date-fns. Result: ok"
+      },
+      {
+        "at": "2026-11-20T09:04:26.000Z",
+        "kind": "agent",
+        "text": "Done: drop moment for date-fns."
+      },
+      {
+        "at": "2026-11-20T09:04:33.000Z",
+        "kind": "status",
+        "text": "Turn finished in 6m 20s"
+      },
+      {
+        "at": "2026-11-20T09:04:40.000Z",
+        "kind": "user",
+        "text": "Lazy-load the image zoom"
+      },
+      {
+        "at": "2026-11-20T09:04:47.000Z",
+        "kind": "tool",
+        "text": "Ran: github: create_pull_request Lazy-load the image zoom. Result: ok"
+      },
+      {
+        "at": "2026-11-20T09:05:01.000Z",
+        "kind": "agent",
+        "text": "Done: lazy-load the image zoom."
+      },
+      {
+        "at": "2026-11-20T09:05:08.000Z",
+        "kind": "status",
+        "text": "Turn finished in 1m 35s"
+      },
+      {
+        "at": "2026-11-20T09:05:15.000Z",
+        "kind": "user",
+        "text": "Split the checkout route"
+      },
+      {
+        "at": "2026-11-20T09:05:22.000Z",
+        "kind": "tool",
+        "text": "Ran: sentry: search_issues Split the checkout route. Result: ok"
+      },
+      {
+        "at": "2026-11-20T09:05:36.000Z",
+        "kind": "agent",
+        "text": "Done: split the checkout route."
+      },
+      {
+        "at": "2026-11-20T09:05:43.000Z",
+        "kind": "status",
+        "text": "Turn finished in 3m 10s"
+      },
+      {
+        "at": "2026-11-20T09:05:50.000Z",
+        "kind": "user",
+        "text": "Drop moment for date-fns"
+      },
+      {
+        "at": "2026-11-20T09:05:57.000Z",
+        "kind": "tool",
+        "text": "Ran: github: create_pull_request Drop moment for date-fns. Result: ok"
+      },
+      {
+        "at": "2026-11-20T09:06:11.000Z",
+        "kind": "agent",
+        "text": "Done: drop moment for date-fns."
+      },
+      {
+        "at": "2026-11-20T09:06:18.000Z",
+        "kind": "status",
+        "text": "Turn finished in 4m 45s"
+      }
+    ],
+    "turns": [
+      {
+        "row": 5,
+        "todos": [],
+        "subtasks": [],
+        "shells": []
+      },
+      {
+        "row": 10,
+        "todos": [],
+        "subtasks": [],
+        "shells": []
+      },
+      {
+        "row": 15,
+        "todos": [],
+        "subtasks": [],
+        "shells": []
+      },
+      {
+        "row": 20,
+        "todos": [],
+        "subtasks": [],
+        "shells": []
+      },
+      {
+        "row": 25,
+        "todos": [],
+        "subtasks": [],
+        "shells": []
+      },
+      {
+        "row": 30,
+        "todos": [],
+        "subtasks": [],
+        "shells": []
+      },
+      {
+        "row": 35,
+        "todos": [],
+        "subtasks": [],
+        "shells": []
+      },
+      {
+        "row": 40,
+        "todos": [],
+        "subtasks": [],
+        "shells": []
+      },
+      {
+        "row": 45,
+        "todos": [],
+        "subtasks": [],
+        "shells": []
+      },
+      {
+        "row": 50,
+        "todos": [],
+        "subtasks": [],
+        "shells": []
+      },
+      {
+        "row": 55,
+        "todos": [],
+        "subtasks": [],
+        "shells": []
+      }
+    ],
+    "outward": [
+      "toolu_6b2d8a31-0001",
+      "toolu_6b2d8a31-0015",
+      "toolu_6b2d8a31-0029",
+      "toolu_6b2d8a31-0043",
+      "toolu_6b2d8a31-0057",
+      "toolu_6b2d8a31-0071"
+    ],
+    "prs": {
+      "created": [],
+      "pushedTo": [],
+      "pushes": []
+    },
+    "asks": {
+      "asks": false,
+      "question": "",
+      "options": [],
+      "closed": false
+    },
+    "labels": [
+      "github: create_pull_request Split the checkout route",
+      "sentry: search_issues Drop moment for date-fns",
+      "github: create_pull_request Lazy-load the image zoom",
+      "sentry: search_issues Split the checkout route",
+      "github: create_pull_request Drop moment for date-fns",
+      "sentry: search_issues Lazy-load the image zoom",
+      "github: create_pull_request Split the checkout route",
+      "sentry: search_issues Drop moment for date-fns",
+      "github: create_pull_request Lazy-load the image zoom",
+      "sentry: search_issues Split the checkout route",
+      "github: create_pull_request Drop moment for date-fns"
+    ]
+  },
+  "shells": {
+    "digest": [
+      {
+        "at": "2026-11-20T09:00:00.000Z",
+        "kind": "user",
+        "text": "Start the dev server and watch the build."
+      },
+      {
+        "at": "2026-11-20T09:00:14.000Z",
+        "kind": "tool",
+        "text": "Ran: pnpm dev. Result: Command running in background with ID: b1. Output is being written to: /tmp/claude-1000/-home-user-work-demo/6a58e9d6-6259-4ddf-9dd5-8807e5dde609/tasks/b1.ou... (+1 lines)"
+      },
+      {
+        "at": "2026-11-20T09:00:35.000Z",
+        "kind": "tool",
+        "text": "Ran: Monitor Watch. Result: Monitor started (task b2)."
+      },
+      {
+        "at": "2026-11-20T09:00:56.000Z",
+        "kind": "tool",
+        "text": "Ran: pnpm build. Result: Command did not complete within its 600s timeout and was moved to the background (ID: b3). Output is being written to: /tmp/claude-1000/-home-user-work-demo/..."
+      },
+      {
+        "at": "2026-11-20T09:01:24.000Z",
+        "kind": "tool",
+        "text": "Ran: BashOutput. Result: ready on :5173"
+      },
+      {
+        "at": "2026-11-20T09:01:38.000Z",
+        "kind": "agent",
+        "text": "The server is up; the build runs in the background."
+      },
+      {
+        "at": "2026-11-20T09:01:45.000Z",
+        "kind": "status",
+        "text": "Turn finished in 42s"
+      },
+      {
+        "at": "2026-11-20T09:02:06.000Z",
+        "kind": "tool",
+        "text": "Ran: KillShell. Result: Shell b1 killed"
+      },
+      {
+        "at": "2026-11-20T09:02:27.000Z",
+        "kind": "status",
+        "text": "Turn finished in 42s"
+      }
+    ],
+    "turns": [
+      {
+        "row": 16,
+        "todos": [],
+        "subtasks": [],
+        "shells": [
+          {
+            "id": "b1",
+            "tool_use_id": "toolu_serve",
+            "tool": "Bash",
+            "command": "pnpm dev",
+            "description": "Serve",
+            "status": "killed",
+            "stop_cause": null,
+            "exit_code": null,
+            "started_at": "2026-11-20T09:00:21.000Z",
+            "ended_at": null,
+            "subagent": false,
+            "pid": null,
+            "has_output": true,
+            "output_file": "/tmp/claude-1000/-home-user-work-demo/6a58e9d6-6259-4ddf-9dd5-8807e5dde609/tasks/b1.output"
+          },
+          {
+            "id": "b2",
+            "tool_use_id": "toolu_watch",
+            "tool": "Monitor",
+            "command": "kubectl rollout status deploy/api -w",
+            "description": "Watch",
+            "status": "killed",
+            "stop_cause": null,
+            "exit_code": null,
+            "started_at": "2026-11-20T09:00:42.000Z",
+            "ended_at": null,
+            "subagent": false,
+            "pid": null,
+            "has_output": false,
+            "output_file": null
+          }
+        ]
+      },
+      {
+        "row": 22,
+        "todos": [],
+        "subtasks": [],
+        "shells": [
+          {
+            "id": "b1",
+            "tool_use_id": "toolu_serve",
+            "tool": "Bash",
+            "command": "pnpm dev",
+            "description": "Serve",
+            "status": "killed",
+            "stop_cause": null,
+            "exit_code": null,
+            "started_at": "2026-11-20T09:00:21.000Z",
+            "ended_at": "2026-11-20T09:02:20.000Z",
+            "subagent": false,
+            "pid": null,
+            "has_output": true,
+            "output_file": "/tmp/claude-1000/-home-user-work-demo/6a58e9d6-6259-4ddf-9dd5-8807e5dde609/tasks/b1.output"
+          },
+          {
+            "id": "b2",
+            "tool_use_id": "toolu_watch",
+            "tool": "Monitor",
+            "command": "kubectl rollout status deploy/api -w",
+            "description": "Watch",
+            "status": "completed",
+            "stop_cause": null,
+            "exit_code": null,
+            "started_at": "2026-11-20T09:00:42.000Z",
+            "ended_at": "2026-11-20T09:01:30.000Z",
+            "subagent": false,
+            "pid": null,
+            "has_output": false,
+            "output_file": null
+          }
+        ]
+      }
+    ],
+    "outward": [],
+    "prs": {
+      "created": [],
+      "pushedTo": [],
+      "pushes": []
+    },
+    "asks": {
+      "asks": false,
+      "question": "",
+      "options": [],
+      "closed": false
+    },
+    "labels": [
+      "pnpm dev",
+      "Monitor Watch",
+      "pnpm build",
+      "BashOutput",
+      "KillShell"
+    ]
+  },
+  "subagents": {
+    "digest": [
+      {
+        "at": "2026-11-20T09:00:00.000Z",
+        "kind": "user",
+        "text": "Review the PR with two agents and fix what they find."
+      },
+      {
+        "at": "2026-11-20T09:00:14.000Z",
+        "kind": "subtask",
+        "text": "Subtask \"Review the API\" (general-purpose, background): completed in 1m 45s: Found two unchecked inputs."
+      },
+      {
+        "at": "2026-11-20T09:00:35.000Z",
+        "kind": "subtask",
+        "text": "Subtask \"Check the docs\" (general-purpose): completed in 42s: The docs match the code."
+      },
+      {
+        "at": "2026-11-20T09:01:24.000Z",
+        "kind": "subtask",
+        "text": "Subtask \"Broken agent\" (general-purpose): failed in 7s: Agent type not found."
+      },
+      {
+        "at": "2026-11-20T09:01:38.000Z",
+        "kind": "agent",
+        "text": "One reviewer still runs."
+      },
+      {
+        "at": "2026-11-20T09:01:45.000Z",
+        "kind": "status",
+        "text": "Turn finished in 42s"
+      },
+      {
+        "at": "2026-11-20T09:02:06.000Z",
+        "kind": "agent",
+        "text": "Fixing the two inputs the reviewer found."
+      },
+      {
+        "at": "2026-11-20T09:02:13.000Z",
+        "kind": "status",
+        "text": "Turn finished in 42s"
+      }
+    ],
+    "turns": [
+      {
+        "row": 16,
+        "todos": [],
+        "subtasks": [
+          {
+            "tool_use_id": "toolu_rev",
+            "tool_use_ids": [
+              "toolu_rev"
+            ],
+            "parent_tool_use_id": null,
+            "message_id": 3,
+            "sdk_task_id": "ag1",
+            "description": "Review the API",
+            "subagent_type": "general-purpose",
+            "background": true,
+            "status": "stopped",
+            "progress": {
+              "description": "progress",
+              "last_tool": "Grep",
+              "summary": null
+            },
+            "usage": {
+              "total_tokens": 4000,
+              "tool_uses": 4,
+              "duration_ms": 8000
+            },
+            "started_at": "2026-11-20T09:00:14.000Z",
+            "ended_at": null,
+            "summary": null,
+            "pr_urls": []
+          },
+          {
+            "tool_use_id": "toolu_sync",
+            "tool_use_ids": [
+              "toolu_sync"
+            ],
+            "parent_tool_use_id": null,
+            "message_id": 6,
+            "sdk_task_id": "ag2",
+            "description": "Check the docs",
+            "subagent_type": "general-purpose",
+            "background": false,
+            "status": "completed",
+            "progress": null,
+            "usage": {
+              "total_tokens": 5100,
+              "tool_uses": 4,
+              "duration_ms": 61000
+            },
+            "started_at": "2026-11-20T09:00:35.000Z",
+            "ended_at": "2026-11-20T09:01:17.000Z",
+            "summary": "The docs match the code.",
+            "pr_urls": []
+          },
+          {
+            "tool_use_id": "toolu_bad",
+            "tool_use_ids": [
+              "toolu_bad"
+            ],
+            "parent_tool_use_id": null,
+            "message_id": 13,
+            "sdk_task_id": null,
+            "description": "Broken agent",
+            "subagent_type": "general-purpose",
+            "background": false,
+            "status": "failed",
+            "progress": null,
+            "usage": null,
+            "started_at": "2026-11-20T09:01:24.000Z",
+            "ended_at": "2026-11-20T09:01:31.000Z",
+            "summary": "Agent type not found",
+            "pr_urls": []
+          }
+        ],
+        "shells": []
+      },
+      {
+        "row": 20,
+        "todos": [],
+        "subtasks": [
+          {
+            "tool_use_id": "toolu_rev",
+            "tool_use_ids": [
+              "toolu_rev"
+            ],
+            "parent_tool_use_id": null,
+            "message_id": 3,
+            "sdk_task_id": "ag1",
+            "description": "Review the API",
+            "subagent_type": "general-purpose",
+            "background": true,
+            "status": "completed",
+            "progress": {
+              "description": "progress",
+              "last_tool": "Grep",
+              "summary": null
+            },
+            "usage": {
+              "total_tokens": 20000,
+              "tool_uses": 9,
+              "duration_ms": 90000
+            },
+            "started_at": "2026-11-20T09:00:14.000Z",
+            "ended_at": "2026-11-20T09:01:59.000Z",
+            "summary": "Found two unchecked inputs.",
+            "pr_urls": []
+          },
+          {
+            "tool_use_id": "toolu_sync",
+            "tool_use_ids": [
+              "toolu_sync"
+            ],
+            "parent_tool_use_id": null,
+            "message_id": 6,
+            "sdk_task_id": "ag2",
+            "description": "Check the docs",
+            "subagent_type": "general-purpose",
+            "background": false,
+            "status": "completed",
+            "progress": null,
+            "usage": {
+              "total_tokens": 5100,
+              "tool_uses": 4,
+              "duration_ms": 61000
+            },
+            "started_at": "2026-11-20T09:00:35.000Z",
+            "ended_at": "2026-11-20T09:01:17.000Z",
+            "summary": "The docs match the code.",
+            "pr_urls": []
+          },
+          {
+            "tool_use_id": "toolu_bad",
+            "tool_use_ids": [
+              "toolu_bad"
+            ],
+            "parent_tool_use_id": null,
+            "message_id": 13,
+            "sdk_task_id": null,
+            "description": "Broken agent",
+            "subagent_type": "general-purpose",
+            "background": false,
+            "status": "failed",
+            "progress": null,
+            "usage": null,
+            "started_at": "2026-11-20T09:01:24.000Z",
+            "ended_at": "2026-11-20T09:01:31.000Z",
+            "summary": "Agent type not found",
+            "pr_urls": []
+          }
+        ],
+        "shells": []
+      }
+    ],
+    "outward": [],
+    "prs": {
+      "created": [],
+      "pushedTo": [],
+      "pushes": []
+    },
+    "asks": {
+      "asks": false,
+      "question": "",
+      "options": [],
+      "closed": false
+    },
+    "labels": [
+      "Agent Review the API",
+      "Agent Check the docs",
+      "ls docs",
+      "Agent Broken agent"
+    ]
+  },
+  "todos": {
+    "digest": [
+      {
+        "at": "2026-11-20T09:00:00.000Z",
+        "kind": "user",
+        "text": "Plan the migration, then do it."
+      },
+      {
+        "at": "2026-11-20T09:00:14.000Z",
+        "kind": "tool",
+        "text": "Ran: TodoWrite. Result: Todos have been modified successfully."
+      },
+      {
+        "at": "2026-11-20T09:00:42.000Z",
+        "kind": "tool",
+        "text": "Ran: TaskCreate d. Result: Task #3 created successfully: Verify"
+      },
+      {
+        "at": "2026-11-20T09:00:56.000Z",
+        "kind": "tool",
+        "text": "Ran: TaskUpdate. Result: Updated task #3 status"
+      },
+      {
+        "at": "2026-11-20T09:01:10.000Z",
+        "kind": "tool",
+        "text": "Ran: TaskUpdate. Result: Updated task #2"
+      },
+      {
+        "at": "2026-11-20T09:01:24.000Z",
+        "kind": "tool",
+        "text": "Ran: TaskList. Result: #3 [in_progress] Verify"
+      },
+      {
+        "at": "2026-11-20T09:01:38.000Z",
+        "kind": "agent",
+        "text": "The plan is in place."
+      },
+      {
+        "at": "2026-11-20T09:01:45.000Z",
+        "kind": "status",
+        "text": "Turn finished in 42s"
+      },
+      {
+        "at": "2026-11-20T09:01:59.000Z",
+        "kind": "agent",
+        "text": "A new session starts with an empty list."
+      },
+      {
+        "at": "2026-11-20T09:02:06.000Z",
+        "kind": "status",
+        "text": "Turn finished in 42s"
+      }
+    ],
+    "turns": [
+      {
+        "row": 16,
+        "todos": [
+          {
+            "id": "3",
+            "content": "Verify",
+            "active_form": "Verifying",
+            "status": "in_progress"
+          }
+        ],
+        "subtasks": [],
+        "shells": []
+      },
+      {
+        "row": 19,
+        "todos": [],
+        "subtasks": [],
+        "shells": []
+      }
+    ],
+    "outward": [],
+    "prs": {
+      "created": [],
+      "pushedTo": [],
+      "pushes": []
+    },
+    "asks": {
+      "asks": false,
+      "question": "",
+      "options": [],
+      "closed": false
+    },
+    "labels": [
+      "TodoWrite",
+      "TodoWrite",
+      "TaskCreate d",
+      "TaskUpdate",
+      "TaskUpdate",
+      "TaskList"
+    ]
+  },
+  "turns": {
+    "digest": [
+      {
+        "at": "2026-11-20T09:00:00.000Z",
+        "kind": "user",
+        "text": "/compact"
+      },
+      {
+        "at": "2026-11-20T09:00:21.000Z",
+        "kind": "status",
+        "text": "Compacted the conversation"
+      },
+      {
+        "at": "2026-11-20T09:00:35.000Z",
+        "kind": "status",
+        "text": "Turn finished in 42s"
+      },
+      {
+        "at": "2026-11-20T09:00:42.000Z",
+        "kind": "user",
+        "text": "/cost"
+      },
+      {
+        "at": "2026-11-20T09:00:56.000Z",
+        "kind": "user",
+        "text": "Open a PR for the fix, then ask me about the release."
+      },
+      {
+        "at": "2026-11-20T09:01:10.000Z",
+        "kind": "tool",
+        "text": "Ran: git push -u origin fix/retry. Result: To github.com:acme/api.git (+1 lines)"
+      },
+      {
+        "at": "2026-11-20T09:01:24.000Z",
+        "kind": "tool",
+        "text": "Ran: gh pr create --fill. Result: https://github.com/acme/api/pull/42"
+      },
+      {
+        "at": "2026-11-20T09:01:38.000Z",
+        "kind": "tool",
+        "text": "Ran: github: add_issue_comment. Result: Comment added"
+      },
+      {
+        "at": "2026-11-20T09:01:52.000Z",
+        "kind": "tool",
+        "text": "Ran: WebFetch https://example.com/notes. Failed: Blocked by the allowlist"
+      },
+      {
+        "at": "2026-11-20T09:02:13.000Z",
+        "kind": "agent",
+        "text": "Opened https://github.com/acme/api/pull/42. Should I tag the release now?"
+      },
+      {
+        "at": "2026-11-20T09:02:20.000Z",
+        "kind": "status",
+        "text": "Turn finished in 42s"
+      },
+      {
+        "at": "2026-11-20T09:02:27.000Z",
+        "kind": "status",
+        "text": "Interrupted the running turn"
+      },
+      {
+        "at": "2026-11-20T09:02:27.000Z",
+        "kind": "user",
+        "text": "Not yet. Stop for now."
+      },
+      {
+        "at": "2026-11-20T09:02:34.000Z",
+        "kind": "tool",
+        "text": "Ran: sleep 600. Failed: [Request interrupted by user for tool use]"
+      },
+      {
+        "at": "2026-11-20T09:02:55.000Z",
+        "kind": "status",
+        "text": "Turn ended with an error"
+      },
+      {
+        "at": "2026-11-20T09:03:02.000Z",
+        "kind": "user",
+        "text": "Try again with the other model."
+      },
+      {
+        "at": "2026-11-20T09:03:30.000Z",
+        "kind": "tool",
+        "text": "Ran: AskUserQuestion. Result: User answered: later"
+      },
+      {
+        "at": "2026-11-20T09:03:44.000Z",
+        "kind": "tool",
+        "text": "Ran: ExitPlanMode. Result: User approved the plan"
+      },
+      {
+        "at": "2026-11-20T09:03:58.000Z",
+        "kind": "status",
+        "text": "Turn failed: API Error: 401 authentication_failed"
+      }
+    ],
+    "turns": [
+      {
+        "row": 6,
+        "todos": [],
+        "subtasks": [],
+        "shells": []
+      },
+      {
+        "row": 21,
+        "todos": [],
+        "subtasks": [],
+        "shells": []
+      },
+      {
+        "row": 26,
+        "todos": [],
+        "subtasks": [],
+        "shells": []
+      },
+      {
+        "row": 35,
+        "todos": [],
+        "subtasks": [],
+        "shells": []
+      }
+    ],
+    "outward": [
+      "toolu_push",
+      "toolu_pr",
+      "toolu_mcp"
+    ],
+    "prs": {
+      "created": [
+        "https://github.com/acme/api/pull/42"
+      ],
+      "pushedTo": [],
+      "pushes": [
+        {
+          "branch": "fix/retry",
+          "repo": "acme/api"
+        }
+      ]
+    },
+    "asks": {
+      "asks": false,
+      "question": "",
+      "options": [],
+      "closed": false
+    },
+    "labels": [
+      "git push -u origin fix/retry",
+      "gh pr create --fill",
+      "github: add_issue_comment",
+      "WebFetch https://example.com/notes",
+      "sleep 600",
+      "AskUserQuestion",
+      "ExitPlanMode"
+    ]
+  }
+}

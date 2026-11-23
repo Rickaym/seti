@@ -11,6 +11,7 @@ import type {
 import { archivedPage } from './archive.js'
 import { digestByRow } from './digest.js'
 import { hideDirect } from './direct-privacy.js'
+import { isAgentOutput, rowEvents } from './events/read.js'
 import { resolveWindow } from './history-window.js'
 import { openQuerySince } from './runner.js'
 import { scrubSummary } from './scrub.js'
@@ -34,7 +35,7 @@ interface WindowPage {
   next: number | null
 }
 
-const isTalk = (row: MessageRow) => row.kind === 'prompt' || (row.kind === 'sdk' && row.payload.type === 'assistant')
+const isTalk = (row: MessageRow) => row.kind === 'prompt' || rowEvents(row).some(isAgentOutput)
 
 const inWindow = (row: MessageRow, window: StoredWindow) =>
   (window.from === null || row.created_at >= window.from) && (window.to === null || row.created_at < window.to)

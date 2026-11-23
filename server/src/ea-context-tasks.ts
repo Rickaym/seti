@@ -1,4 +1,3 @@
-import type { SDKAssistantMessage } from '@anthropic-ai/claude-agent-sdk'
 import {
   displayStatus,
   fallbackReason,
@@ -10,12 +9,14 @@ import {
   type LinkedPrState,
   type MessageRow,
   type PullRequest,
+  type RuntimeEvent,
   type SubtaskBrief,
   type Task,
   type TaskDisplayStatus,
   type TeamMessage,
 } from '@seti/shared'
 import { toolLabel } from './digest.js'
+import { isAgentOutput, rowEvents } from './events/read.js'
 
 const LINE_CHARS = 600
 const QUOTE_CHARS = 150
@@ -190,50 +191,63 @@ export function taskViews(
     .toSorted((a, b) => b.priority - a.priority)
 }
 
-type AssistantContent = SDKAssistantMessage['message']['content']
-
-function lastBlockLine(content: AssistantContent, toolDone: boolean): string | null {
-  const block = content.at(-1)
-  if (block?.type === 'tool_use') {
-    return `${toolDone ? 'just ran' : 'running'} ${clip(toolLabel(block), TOOL_CHARS)}`
+/** What a runtime row says of the agent at its end: the tool it last called, or its last words. */
+function lastOutputLine(events: readonly RuntimeEvent[], toolDone: boolean): string | null {
+  const output = events.filter((event) => event.type !== 'notice')
+  const last = output.at(-1)
+  if (last?.type === 'tool.started') {
+    return `${toolDone ? 'just ran' : 'running'} ${clip(toolLabel(last.call), TOOL_CHARS)}`
   }
-  const text = content.findLast((part) => part.type === 'text' && part.text.trim() !== '')
-  return text?.type === 'text' ? `said ${quote(text.text)}` : null
+  const said = output.findLast(
+    (event) => event.type === 'message' && event.role === 'agent' && event.text.trim() !== '',
+  )
+  return said?.type === 'message' ? `said ${quote(said.text)}` : null
 }
+
+const isInput = (event: RuntimeEvent) =>
+  event.type === 'tool.ended' ||
+  (event.type === 'message' && event.role !== 'agent') ||
+  (event.type === 'notice' && event.code === 'interrupted')
 
 /** What a running agent does now: the tool it waits on, or what it last said. */
 function nowLine(rows: readonly MessageRow[]): string | null {
   for (const [index, row] of rows.entries()) {
-    if (row.kind === 'sdk' && row.payload.type === 'assistant') {
-      const later = rows.slice(0, index).some((r) => r.kind === 'sdk' && r.payload.type === 'user')
-      return lastBlockLine(row.payload.message.content, later)
+    const events = rowEvents(row)
+    if (events.some(isAgentOutput)) {
+      const later = rows.slice(0, index).some((newer) => rowEvents(newer).some(isInput))
+      return lastOutputLine(events, later)
     }
   }
   return null
 }
 
-const RESULT_ENDINGS: Partial<Record<string, string>> = {
-  error_during_execution: 'its last turn ended with an error',
-  error_max_turns: 'its last turn stopped at the turn limit',
-  error_max_budget_usd: 'its last turn stopped at the budget limit',
-  error_max_structured_output_retries: 'its last turn stopped after too many output retries',
+type TurnEnded = Extract<RuntimeEvent, { type: 'turn.ended' }>
+
+const TURN_ENDINGS: Record<NonNullable<TurnEnded['ending']>, string> = {
+  error: 'its last turn ended with an error',
+  turn_limit: 'its last turn stopped at the turn limit',
+  budget_limit: 'its last turn stopped at the budget limit',
+  retry_limit: 'its last turn stopped after too many output retries',
+  other: 'its last turn ended',
+}
+
+function turnLine(event: TurnEnded): string {
+  if (event.ending !== undefined) {
+    return TURN_ENDINGS[event.ending]
+  }
+  return event.status === 'error' ? `last turn failed: ${quote(event.result)}` : `last reply ${quote(event.result)}`
 }
 
 /** How a task's last turn ended: its final words, or why it stopped. */
 function lastLine(rows: readonly MessageRow[]): string | null {
   for (const row of rows) {
-    if (row.kind !== 'sdk') {
-      continue
+    const events = rowEvents(row)
+    const ended = events.find((event) => event.type === 'turn.ended')
+    if (ended?.type === 'turn.ended') {
+      return turnLine(ended)
     }
-    const m = row.payload
-    if (m.type === 'result') {
-      if (m.subtype !== 'success') {
-        return RESULT_ENDINGS[m.subtype] ?? 'its last turn ended'
-      }
-      return m.is_error ? `last turn failed: ${quote(m.result)}` : `last reply ${quote(m.result)}`
-    }
-    if (m.type === 'assistant') {
-      return lastBlockLine(m.message.content, true)
+    if (events.some(isAgentOutput)) {
+      return lastOutputLine(events, true)
     }
   }
   return null
