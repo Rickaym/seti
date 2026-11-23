@@ -40,12 +40,6 @@ export interface Rig {
   readonly effects: readonly string[]
 }
 
-/** An input as the suite sends it; the id is the prompt row's id in Seti. */
-export interface SuiteInput {
-  id: string
-  text: string
-}
-
 /**
  * One adapter as the suite drives it. Besides the adapter and its profile, a target supplies the
  * members the interface does not offer yet; each is listed with the stage that removes it in the
@@ -58,8 +52,6 @@ export interface ConformanceTarget<S extends RuntimeShapes, Id extends string = 
   gaps?: Partial<Record<string, string>>
   /** The adapter's projector, which `RuntimeAdapter` does not carry yet. */
   project: (message: S['message']) => RuntimeEvent[]
-  /** What a session starts from, given the realised spec and the inputs Seti will send. */
-  start: (realised: S['realised'], inputs: AsyncIterable<SuiteInput>) => S['start']
   /** The host the adapter gets, answering through the neutral one. */
   host: (neutral: NeutralHost) => SessionHost<S>
   /** A fake runtime that plays the script. */

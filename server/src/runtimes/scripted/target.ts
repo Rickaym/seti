@@ -10,7 +10,6 @@ export const scriptedTarget: ConformanceTarget<ScriptedShapes, 'scripted'> = {
   adapter: scriptedAdapter,
   profile: { events: { turnStart: true, reasoning: true }, usage: { tokens: true, costUsd: 'reported' } },
   project: projectScripted,
-  start: (realised, inputs) => ({ realised, inputs }),
   host: (neutral) => ({
     decide: async (call, signal): Promise<Verdict> => {
       const decision = await neutral.decide(call, signal)
