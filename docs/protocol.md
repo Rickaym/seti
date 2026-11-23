@@ -862,7 +862,9 @@ Optional and off by default: a maintenance session per agent that consolidates i
   Added memory lines that name a new host, pipe into an interpreter or read as commands are listed
   in the report as Seti's own findings.
 - DRM-16: Dream now runs one dream of an agent at once, by the user, the EA after the user's yes,
-  or an agent at `full` on another agent; it is refused on the agent itself.
+  or an agent at `full` on another agent; it is refused on the agent itself. The EA, an agent or
+  a mod starts at most one dream of an agent a day; only the user starts more. The start is
+  audited with who asked for it.
 
 ## 16. Audit
 
