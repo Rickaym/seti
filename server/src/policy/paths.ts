@@ -1,5 +1,5 @@
 import path from 'node:path'
-import type { RuleBehavior } from './types.js'
+import type { Resolved, RuleBehavior } from './types.js'
 
 /** Where a rule's relative patterns start: its settings source, the cwd and the home directory. */
 export interface PathScope {
@@ -12,6 +12,22 @@ export interface PathScope {
 export function resolvePath(given: string, cwd: string, home: string): string {
   const expanded = given === '~' || given.startsWith('~/') ? path.join(home, given.slice(1)) : given
   return path.resolve(cwd, expanded)
+}
+
+/** Whether any place a path names passes: as given, or where it leads. Deny and ask rules use it. */
+export function anyPlace(absolute: string, resolved: Resolved | undefined, test: (place: string) => boolean): boolean {
+  const real = resolved?.get(absolute)
+  return test(absolute) || (typeof real === 'string' && test(real))
+}
+
+/** Whether every place a path names passes; a path that leads nowhere known never does. */
+export function everyPlace(
+  absolute: string,
+  resolved: Resolved | undefined,
+  test: (place: string) => boolean,
+): boolean {
+  const real = resolved?.get(absolute)
+  return real !== null && test(absolute) && (real === undefined || test(real))
 }
 
 /** Whether the path is one of the directories or inside one. */

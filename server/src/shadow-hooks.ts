@@ -9,10 +9,12 @@ import { claudeToolCall, urlAllowed, WEBFETCH_BLOCKED, type Task } from '@seti/s
 import { guardCommand, type GuardScope } from './permission-guard.js'
 import { policyMode } from './policy/claude-call.js'
 import { decide } from './policy/evaluate.js'
+import { namedPaths } from './policy/named-paths.js'
 import { ShadowTracker, type ShadowRecord } from './policy/shadow.js'
 import { sourcedRules } from './policy/sources.js'
 import { policyCall } from './policy/tool-call.js'
 import type { PolicyCall, PolicyContext } from './policy/types.js'
+import { resolvePaths } from './resolve-paths.js'
 import { adapterFor, DEFAULT_RUNTIME } from './runtimes/registry.js'
 import { guardScope, ruleSources, workingDirs } from './session-options.js'
 import { allowedFor } from './store/change-requests.js'
@@ -102,9 +104,11 @@ export function shadowHooks(task: Task, sandboxed: boolean, session: AbortSignal
   }
 
   const judge = async (input: PreToolUseHookInput) => {
-    const call = policyCall(claudeToolCall(input.tool_use_id, input.tool_name, input.tool_input))
+    const given = policyCall(claudeToolCall(input.tool_use_id, input.tool_name, input.tool_input))
     const mode = policyMode(input.permission_mode)
     const ctx = { ...(await rules()), mode }
+    const resolved = await resolvePaths(namedPaths(given, ctx), [ctx.cwd, ...ctx.dirs, ctx.home])
+    const call = resolved.size === 0 ? given : { ...given, resolved }
     const started = performance.now()
     const decision = decide(call, ctx)
     const slow = performance.now() - started > SLOW_MS

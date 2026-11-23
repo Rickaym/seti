@@ -187,6 +187,11 @@ the AppArmor profile for `bwrap` that the installer adds ([Setup](setup.md#sandb
   line run that its own read-only list (`policy/read-only.ts`) passes: listed commands run
   directly, reading inside the working directories, with no redirect, substitution, variable or
   wrapper. Claude Code has a classifier, so this changes nothing while it is the only runtime.
+- **Symlinks.** `decide` reads no disk. Before it runs, the shadow lists the paths a call names
+  (`policy/named-paths.ts`) and resolves them where the session runs (`resolve-paths.ts`); links
+  above a working directory or home do not count. A deny or ask rule matches a path as given or
+  where it leads; an allow rule and the working directories need both, and a path that leads
+  nowhere known, such as a link loop, is never allowed by a rule.
 - **Memory and CPU.** Each agent's process tree starts through `systemd-run --user --scope` with
   `MemoryMax`, 1 GB of `MemorySwapMax`, `OOMPolicy=continue`, `CPUWeight=50`, `CPUQuota` and
   `BindsTo=` the server's unit, so agents end with Seti (CAP-5). Every 100 ms Seti raises the

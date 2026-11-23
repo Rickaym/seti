@@ -98,6 +98,31 @@ describe('the permission shadow', () => {
     expect(stored).not.toContain('make shadow-check')
   })
 
+  it('decides on where a path leads on disk, and stores neither path', async () => {
+    const task = await newTask()
+    const secrets = fs.mkdtempSync(path.join(os.tmpdir(), 'seti-shadow-secrets-'))
+    fs.writeFileSync(path.join(secrets, 'token'), 't')
+    const link = path.join(work, `linked-${task.id}`)
+    fs.symlinkSync(path.join(secrets, 'token'), link)
+    const deny = (await permissionRules.add(task.id, 'deny', `Read(/${secrets}/**)`)).rule
+    const shadow = shadowHooks(task, false, new AbortController().signal)
+    const input = { ...base, hook_event_name: 'PreToolUse', tool_name: 'Read', tool_use_id: 'l1' } as const
+    expect(await fire(shadow.hooks.PreToolUse, { ...input, tool_input: { file_path: link } })).toEqual([{}])
+    await shadow.observe(async () => Promise.resolve({ behavior: 'deny', message: 'no' }))(
+      'Read',
+      { file_path: link },
+      { signal: new AbortController().signal, toolUseID: 'l1', requestId: 'r1' },
+    )
+    await vi.waitFor(async () => {
+      expect(await rowsOf(`rule:${String(deny.id)}`)).toEqual([
+        expect.objectContaining({ verdict: 'deny', step: 'deny-rule', runtime: 'ask', calls: 1 }),
+      ])
+    })
+    const stored = JSON.stringify(await sql`SELECT * FROM policy_shadow`)
+    expect(stored).not.toContain(secrets)
+    expect(stored).not.toContain('linked-')
+  })
+
   it('answers at once and counts a decision that fails, without throwing it', async () => {
     const shadow = shadowHooks(await newTask(), false, new AbortController().signal)
     const failed = async () =>
