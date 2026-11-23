@@ -80,7 +80,7 @@ beforeAll(async () => {
     await sql`INSERT INTO task_message (task_id, kind, payload, created_at)
       VALUES (${TASK}, ${kind}, ${JSON.stringify(payload)}, ${AT})`
   }
-  await fillEventColumns(sql, 50, 0)
+  await fillEventColumns(sql, { batch: 50, restMs: 0 })
 })
 
 const filledRows = async () =>
@@ -129,7 +129,7 @@ describe('the message_events columns', () => {
       tx<Filled[]>`SELECT kind, runtime, thread, event, agent FROM task_message ORDER BY id`
     const rows = await migrateWith('message_events', seed, async (tx) => [
       await read(tx),
-      await fillEventColumns(tx, 1, 0),
+      await fillEventColumns(tx, { batch: 1, restMs: 0 }),
       await read(tx),
     ])
     expect(rows).toEqual([

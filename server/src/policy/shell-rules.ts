@@ -1,10 +1,10 @@
-import { insideAny, pathMatches, resolvePath } from './paths.js'
+import { anyPlace, everyPlace, insideAny, pathMatches, resolvePath } from './paths.js'
 import { commandMatches } from './patterns.js'
 import type { Prepared } from './rule-match.js'
 import { isProtected } from './safety.js'
 import { commandShape, denyForms, type CommandShape } from './shell-forms.js'
 import { splitShell } from './shell-split.js'
-import type { PolicyContext } from './types.js'
+import type { PolicyContext, Resolved } from './types.js'
 
 const READERS = new Set(['cat', 'head', 'tail', 'less', 'more', 'sed'])
 
@@ -26,18 +26,20 @@ function fileAccess(shape: CommandShape): { reads: string[]; writes: string[] } 
 }
 
 /** The first deny or ask rule a command matches anywhere in it, by its text or the files it names. */
-export function shellMatch(command: string, rules: readonly Prepared[], ctx: PolicyContext): Prepared | undefined {
+export function shellMatch(
+  command: string,
+  rules: readonly Prepared[],
+  ctx: PolicyContext,
+  resolved?: Resolved,
+): Prepared | undefined {
   const parts = splitShell(command).all
   const forms = parts.flatMap(denyForms)
   const access = parts.map(commandShape).map(fileAccess)
-  const touches = (pattern: string, paths: string[], rule: Prepared) =>
-    paths.some((given) =>
-      pathMatches(pattern, resolvePath(given, ctx.cwd, ctx.home), rule.rule.behavior, {
-        anchor: rule.rule.anchor,
-        cwd: ctx.cwd,
-        home: ctx.home,
-      }),
-    )
+  const touches = (pattern: string, paths: string[], { rule }: Prepared) => {
+    const scope = { anchor: rule.anchor, cwd: ctx.cwd, home: ctx.home }
+    const matches = (place: string) => pathMatches(pattern, place, rule.behavior, scope)
+    return paths.some((given) => anyPlace(resolvePath(given, ctx.cwd, ctx.home), resolved, matches))
+  }
   return rules.find(({ target, rule }) => {
     if (target.type === 'command') {
       return forms.some((form) => commandMatches(target.pattern, form))
@@ -53,8 +55,16 @@ export function shellMatch(command: string, rules: readonly Prepared[], ctx: Pol
 const TRIVIAL = new Set(['pwd', 'true', 'echo'])
 const UNSURE_PATH = /[~*?[$`]/
 
-/** Whether Claude Code lets an allow rule approve the files a command writes and reads. */
-function filesAllowed(shapes: readonly CommandShape[], rules: readonly Prepared[], ctx: PolicyContext): boolean {
+/**
+ * Whether Claude Code lets an allow rule approve the files a command writes and reads, each as
+ * given and where it leads.
+ */
+function filesAllowed(
+  shapes: readonly CommandShape[],
+  rules: readonly Prepared[],
+  ctx: PolicyContext,
+  resolved?: Resolved,
+): boolean {
   const moves = shapes.some((shape) => shape.words[0] === 'cd')
   const allowedBy = (tool: 'Read' | 'Edit', target: string) =>
     rules.some(
@@ -69,7 +79,8 @@ function filesAllowed(shapes: readonly CommandShape[], rules: readonly Prepared[
       return false
     }
     const target = resolvePath(given, ctx.cwd, ctx.home)
-    return (tool === 'Read' || !isProtected(target)) && (insideAny(target, ctx.dirs) || allowedBy(tool, target))
+    const reached = (place: string) => insideAny(place, ctx.dirs) || allowedBy(tool, place)
+    return (tool === 'Read' || !anyPlace(target, resolved, isProtected)) && everyPlace(target, resolved, reached)
   }
   return shapes.every((shape) => {
     const tee = shape.words[0] === 'tee' ? operands(shape.words) : []
@@ -106,21 +117,28 @@ function allowRuleFor(shape: CommandShape, rules: readonly Prepared[], interacti
   )
 }
 
+/** A shell call as allow rules read it. */
+interface ShellCall {
+  command: string
+  /** It keeps a terminal open for later input, so no wildcard rule approves it. */
+  interactive: boolean
+  resolved?: Resolved | undefined
+}
+
 /**
  * The allow rule that approves every command of the line, or undefined. A line Seti cannot fully
  * read, a write outside the working directories or to a protected path, or a command no rule
  * names leaves the call to the mode.
  */
 export function shellAllow(
-  command: string,
-  interactive: boolean,
+  { command, interactive, resolved }: ShellCall,
   rules: readonly Prepared[],
   ctx: PolicyContext,
 ): Prepared | undefined {
   const split = splitShell(command)
   const whole = rules.find(({ target }) => target.type === 'tool' && target.name === 'Bash')
   const shapes = (split.plain ? split.top : split.all).map(commandShape)
-  if ((whole === undefined && !split.plain) || !filesAllowed(shapes, rules, ctx) || cdThenGit(shapes, ctx)) {
+  if ((whole === undefined && !split.plain) || !filesAllowed(shapes, rules, ctx, resolved) || cdThenGit(shapes, ctx)) {
     return undefined
   }
   if (whole !== undefined) {

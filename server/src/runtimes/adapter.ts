@@ -26,7 +26,7 @@ interface Capabilities {
  * and serves its own tools, what a session starts from, the messages it streams, its tool server
  * reports, rules and permission modes.
  */
-interface RuntimeShapes {
+export interface RuntimeShapes {
   vendor: unknown
   realised: unknown
   decide: unknown
@@ -84,8 +84,8 @@ export interface SessionHost<S extends RuntimeShapes> {
 }
 
 /** Seti's driver for one agent runtime, the only code that starts the runtime's sessions. */
-export interface RuntimeAdapter<S extends RuntimeShapes> {
-  readonly id: RuntimeId
+export interface RuntimeAdapter<S extends RuntimeShapes, Id extends string = RuntimeId> {
+  readonly id: Id
   readonly capabilities: Capabilities
   /** What a session of the spec starts from, run by the launcher and answered by the host. */
   realise(

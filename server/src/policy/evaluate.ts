@@ -1,4 +1,4 @@
-import { insideAny, resolvePath } from './paths.js'
+import { anyPlace, everyPlace, insideAny, resolvePath } from './paths.js'
 import { readOnly } from './read-only.js'
 import { matchesCall, prepare, type Prepared } from './rule-match.js'
 import { droppedInAuto } from './rule-parse.js'
@@ -6,7 +6,16 @@ import { criticalRemoval, isProtected } from './safety.js'
 import { commandShape } from './shell-forms.js'
 import { shellAllow, shellMatch } from './shell-rules.js'
 import { splitShell } from './shell-split.js'
-import type { Decision, DecisionStep, PolicyCall, PolicyContext, PolicyMode, RuleBehavior, Verdict } from './types.js'
+import type {
+  Decision,
+  DecisionStep,
+  PolicyCall,
+  PolicyContext,
+  PolicyMode,
+  Resolved,
+  RuleBehavior,
+  Verdict,
+} from './types.js'
 
 const decision = (verdict: Verdict, step: DecisionStep, reason: string, rule: Prepared | null = null): Decision => ({
   verdict,
@@ -21,7 +30,7 @@ const ofBehavior = (rules: readonly Prepared[], behavior: RuleBehavior) =>
 /** The first deny or ask rule that matches the call, its command included. */
 function firstMatch(rules: readonly Prepared[], call: PolicyCall, ctx: PolicyContext): Prepared | undefined {
   const direct = rules.find((prepared) => matchesCall(prepared, call, ctx))
-  return direct ?? (call.command === undefined ? undefined : shellMatch(call.command, rules, ctx))
+  return direct ?? (call.command === undefined ? undefined : shellMatch(call.command, rules, ctx, call.resolved))
 }
 
 /** Seti's review rules name a tool-server tool or a whole server, bare or as `server__*`. */
@@ -30,15 +39,21 @@ const reviews = (text: string, tool: string) => {
   return text === tool || tool.startsWith(`${server}__`)
 }
 
-/** Why no allow rule may approve the call, whatever it says, or null. */
-function unsafe(call: PolicyCall, ctx: PolicyContext): 'critical' | 'protected' | null {
+/**
+ * Why no allow rule may approve the call, whatever it says, or null: `linked` is a write that
+ * reaches a protected path only through a symlink.
+ */
+function unsafe(call: PolicyCall, ctx: PolicyContext): 'critical' | 'protected' | 'linked' | null {
   if (call.command !== undefined) {
     const where = { cwd: ctx.cwd, home: ctx.home, dirs: ctx.dirs }
     const shapes = splitShell(call.command).all.map(commandShape)
     return shapes.some((shape) => criticalRemoval(shape.words, where)) ? 'critical' : null
   }
-  const writes = call.writes.map((given) => resolvePath(given, ctx.cwd, ctx.home))
-  return call.kind === 'edit' && writes.some(isProtected) ? 'protected' : null
+  const writes = call.kind === 'edit' ? call.writes.map((given) => resolvePath(given, ctx.cwd, ctx.home)) : []
+  if (writes.some(isProtected)) {
+    return 'protected'
+  }
+  return writes.some((one) => anyPlace(one, call.resolved, isProtected)) ? 'linked' : null
 }
 
 /** Modes that hand undecided calls to the classifier, which drop the broad allow rules first. */
@@ -64,7 +79,11 @@ function usableAllows(call: PolicyCall, rules: readonly Prepared[], ctx: PolicyC
 function allowRule(call: PolicyCall, rules: readonly Prepared[], ctx: PolicyContext): Prepared | undefined {
   const usable = usableAllows(call, rules, ctx)
   if (call.command !== undefined) {
-    return shellAllow(call.command, call.interactive === true, usable, ctx)
+    return shellAllow(
+      { command: call.command, interactive: call.interactive === true, resolved: call.resolved },
+      usable,
+      ctx,
+    )
   }
   return usable.find((prepared) => matchesCall(prepared, call, ctx))
 }
@@ -81,19 +100,35 @@ const UNASKED = new Set([
   'EnterPlanMode',
 ])
 
+/** Whether every path is inside the working directories, as given and where it leads. */
+const inside = (paths: readonly string[], resolved: Resolved | undefined, ctx: PolicyContext) =>
+  paths.length > 0 &&
+  paths.every((given) => everyPlace(resolvePath(given, ctx.cwd, ctx.home), resolved, (p) => insideAny(p, ctx.dirs)))
+
+/** Auto mode allows edits inside the working directories and asks for one a symlink leads out. */
+function autoEdit(call: PolicyCall, ctx: PolicyContext): Decision {
+  if (inside(call.writes, call.resolved, ctx)) {
+    return decision('allow', 'mode', 'Auto mode allows edits inside the working directories')
+  }
+  if (inside(call.writes, undefined, ctx)) {
+    return decision('ask', 'mode', 'A symlink leads the edit out of the working directories')
+  }
+  return ctx.classifier
+    ? decision('defer', 'mode', "No rule decides it, so the runtime's classifier does")
+    : decision('ask', 'mode', 'No rule allows it')
+}
+
 /** What the mode does with a call no rule decided. */
 function byMode(call: PolicyCall, ctx: PolicyContext): Decision {
   if (ctx.mode === 'bypass' || UNASKED.has(call.name)) {
     return decision('allow', 'mode', ctx.mode === 'bypass' ? 'Bypass allows it' : "It only tracks the agent's own work")
   }
-  const inside = (paths: readonly string[]) =>
-    paths.length > 0 && paths.every((given) => insideAny(resolvePath(given, ctx.cwd, ctx.home), ctx.dirs))
   const reads = call.kind === 'read' || call.kind === 'search'
-  if (reads && (ctx.mode === 'auto' || inside(call.reads))) {
+  if (reads && (ctx.mode === 'auto' || inside(call.reads, call.resolved, ctx))) {
     return decision('allow', 'mode', 'It reads, inside the working directories or in auto mode')
   }
-  if (ctx.mode === 'auto' && call.kind === 'edit' && inside(call.writes)) {
-    return decision('allow', 'mode', 'Auto mode allows edits inside the working directories')
+  if (ctx.mode === 'auto' && call.kind === 'edit') {
+    return autoEdit(call, ctx)
   }
   if (ctx.classifier && (ctx.mode === 'auto' || (ctx.mode === 'plan' && call.kind !== 'edit'))) {
     return decision('defer', 'mode', "No rule decides it, so the runtime's classifier does")
@@ -113,7 +148,7 @@ const readsOnly = (call: PolicyCall, ctx: PolicyContext) =>
   ctx.mode !== 'bypass' &&
   call.command !== undefined &&
   call.interactive !== true &&
-  readOnly(call.command, ctx)
+  readOnly(call.command, ctx, call.resolved)
 
 function afterRules(call: PolicyCall, rules: readonly Prepared[], ctx: PolicyContext): Decision {
   const risk = unsafe(call, ctx)
@@ -122,6 +157,10 @@ function afterRules(call: PolicyCall, rules: readonly Prepared[], ctx: PolicyCon
   }
   if (risk === 'protected') {
     return decision(protectedWrite(ctx), 'safety', 'It writes repository state or configuration that runs code')
+  }
+  if (risk === 'linked') {
+    const verdict = protectedWrite(ctx) === 'defer' ? 'ask' : protectedWrite(ctx)
+    return decision(verdict, 'safety', 'A symlink leads the write to repository state or configuration')
   }
   if (ctx.mode === 'plan' && call.kind === 'edit') {
     return decision('ask', 'plan', 'Plan mode edits nothing until the user approves the plan')

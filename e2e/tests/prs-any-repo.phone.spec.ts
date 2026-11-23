@@ -1,6 +1,7 @@
 import { expect, test } from './support/fixtures.js'
 import { openAgentPrs } from './support/phone-agent.js'
 import { expectFitsPhone } from './support/phone-layout.js'
+import { expectNoFixCiToast, ownMessages } from './support/pr-ci.js'
 import { ANY_REPO_ENV, expectListedWithoutRepos, seedAnyRepoPrs } from './support/prs-any-repo.js'
 
 test.use({ serverEnv: ANY_REPO_ENV })
@@ -19,6 +20,7 @@ test('the phone sheet shows a PR of a repo Seti has no checkout of in full, with
   await expectListedWithoutRepos(request, seeded)
   await row.getByRole('button', { name: 'Fix CI' }).tap()
   await expect(sheet).toBeHidden()
-  await expect(page.getByText(`Asked ${agent.title} to fix CI on #3`)).toBeVisible()
+  await expect(ownMessages(page, 'CI is failing on #3. Please fix it.')).toHaveCount(1)
+  await expectNoFixCiToast(page)
   await expectFitsPhone(page, 'agent after Fix CI')
 })

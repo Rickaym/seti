@@ -88,7 +88,8 @@ instead. Without these tools a share link still works and shows the file's sourc
 Seti runs as your user. `seti.service` starts `scripts/start.sh`, which runs the server from the
 clone with the settings in `~/.seti/seti.env`; systemd passes the secrets from
 `~/.seti/credentials` with `LoadCredential=`, so none reaches an environment variable. Seti listens
-on `127.0.0.1` only. Logs are in `journalctl --user -u seti.service`.
+on `127.0.0.1` only. Logs are in `journalctl --user -u seti.service`; a request that ends in a
+server error is logged with its method, route, status and error, never its body, query or headers.
 
 The installer writes its units from `deploy/seti.service` and `deploy/seti-ea.service`, with the
 clone's path, your Node and a marker line. It never replaces a unit file that lacks the marker, so
@@ -179,6 +180,13 @@ location / {
 Your passkeys are then the only thing between the internet and your shell. Use a proxy you trust,
 and add the proxy's own authentication (mTLS, or an identity-aware proxy) on top when you can.
 Paired phones and webhooks need nothing extra behind a proxy.
+
+An attached file uploads as one request of at most 25 MB. Seti gives an upload 30 minutes while
+bytes keep arriving and gives it up after 60 seconds without any. The proxy must accept a body of
+that size and must not end a request that is still sending: Caddy sets neither limit, nginx needs
+the `client_max_body_size` line above, and a proxy with a timeout for the whole request needs it
+long enough for a slow phone link. The reply box refuses a larger file before sending it, and
+when a proxy refuses or cuts an upload it says so on the file.
 
 ### Cloudflare Tunnel and Access
 

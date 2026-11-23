@@ -1,7 +1,6 @@
 import { requestCount, type PendingRequests } from '@seti/shared'
 import { Inbox } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { toast } from 'sonner'
 import { refreshKnowledgeWaiting } from '@/hooks/useKnowledgeWaiting'
 import { refreshRequests } from '@/hooks/useRequests'
 import { useTasks } from '@/hooks/useTasks'
@@ -53,10 +52,7 @@ export function RequestsView({ requests, submitLabel, bare = false, onEmpty }: R
   const counts = kindCounts(shown)
   const kind = filter !== 'all' && counts[filter] === 0 ? 'all' : filter
   const groups = requestGroups(shown, kind)
-  const answers = useAnswers(
-    groups.flatMap((group) => group.questions),
-    (summary) => toast.success(summary),
-  )
+  const answers = useAnswers(groups.flatMap((group) => group.questions))
   useRetract(requestCount(shown), onEmpty)
   const answered = (id: string) => {
     setGone((prev) => new Set([...prev, id]))
