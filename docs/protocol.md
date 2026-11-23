@@ -885,6 +885,13 @@ store, the audit chain and every record.
   answers. After a deploy, a view that fails to load reloads once per build if the server answers
   and no form is unsaved, else offers a reload. A failure toast stays until dismissed.
 - API-17: Every flow, full configuration included, MUST work on a phone-sized client.
+- API-18: A file for a message uploads as one request before the message goes out, at most
+  `upload_file`; the client MUST refuse a larger file without sending it and name the limit. While
+  a file uploads the client shows its bytes sent of the total, and the same for the draft's files
+  together, and lets the user cancel it. After `upload_stall` without a byte the upload is
+  `stalled`, with retry and removal. A failed upload shows its reason (too large, connection lost,
+  or the server's refusal) with the file and in a failure toast. The server gives an upload up
+  after `upload_idle` without a byte or `upload_time` in all, and keeps nothing of it.
 
 ## 20. Conformance
 
@@ -991,6 +998,7 @@ others.
 | Mod engine   | `mod_limits`: 32 MB; compute 5 s; wall 10 s (schedule 30 s); 50 calls; 10 fetches; queue 20; 60 events a minute; 20 failures an hour turn the mod off.                                    |
 | Sharing      | Preview pages 1 to 50. `share_rate` a minute per client: 30 misses, 120 pages or downloads, 600 images. `share_size` 10 MB. Expiry 1, 7 or 30 days.                                       |
 | Client       | `sse_keepalive` 15 s. `body_max` 8 MB. `session_life` idle 7 days, absolute 30 days. Setup code 15 min. Attempts per 10 min: 20 sign-in, 20 setup, 10 pairing. `pair_ttl` 5 min.          |
+| Uploads      | `upload_file` 25 MB. `upload_stall` 30 s. `upload_idle` 60 s. `upload_time` 30 min.                                                                                                       |
 
 ## Appendix B. Retired identifiers
 

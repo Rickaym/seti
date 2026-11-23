@@ -179,6 +179,13 @@ Your passkeys are then the only thing between the internet and your shell. Use a
 and add the proxy's own authentication (mTLS, or an identity-aware proxy) on top when you can.
 Paired phones and webhooks need nothing extra behind a proxy.
 
+An attached file uploads as one request of at most 25 MB. Seti gives an upload 30 minutes while
+bytes keep arriving and gives it up after 60 seconds without any. The proxy must accept a body of
+that size and must not end a request that is still sending: Caddy sets neither limit, nginx needs
+the `client_max_body_size` line above, and a proxy with a timeout for the whole request needs it
+long enough for a slow phone link. The reply box refuses a larger file before sending it, and
+when a proxy refuses or cuts an upload it says so on the file.
+
 ### Cloudflare Tunnel and Access
 
 1. Create a Cloudflare Tunnel with a public hostname pointing at `http://127.0.0.1:3006`. Leave the

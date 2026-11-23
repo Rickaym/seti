@@ -1,6 +1,7 @@
 import fs from 'node:fs'
 import os from 'node:os'
 import { serve, type WebSocketServerLike } from '@hono/node-server'
+import { UPLOAD_REQUEST_MS } from '@seti/shared'
 import { WebSocketServer } from 'ws'
 import { accountStatus, warmAccount } from './account.js'
 import { createApp } from './app.js'
@@ -246,7 +247,15 @@ const sockets = new WebSocketServer({
   maxPayload: TERMINAL_FRAME_MAX,
 }) as unknown as WebSocketServerLike
 
-serve({ fetch: createApp().fetch, hostname: HOST, port: PORT, websocket: { server: sockets } }, (info) => {
+const listen = {
+  fetch: createApp().fetch,
+  hostname: HOST,
+  port: PORT,
+  websocket: { server: sockets },
+  serverOptions: { requestTimeout: UPLOAD_REQUEST_MS },
+}
+
+serve(listen, (info) => {
   process.stdout.write(`seti listening on http://${info.address}:${String(info.port)}\n`)
   void signInHint(PUBLIC_ACCESS)
   void wakeWaiting(interrupted.resume.map((each) => each.taskId))

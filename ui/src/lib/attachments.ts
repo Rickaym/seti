@@ -1,12 +1,5 @@
-import {
-  detectTextType,
-  lineCount,
-  type AttachmentKind,
-  type AttachmentRef,
-  type StagedUpload,
-  type UploadSource,
-} from '@seti/shared'
-import { RequestError, SIGN_IN_REQUIRED, streamUrl } from '@/api'
+import { detectTextType, lineCount, type AttachmentKind, type AttachmentRef, type StagedUpload } from '@seti/shared'
+import { streamUrl } from '@/api'
 
 /** A file in a draft: shown as a chip, uploaded as soon as it is added, sent by its token. */
 export interface DraftAttachment {
@@ -55,27 +48,6 @@ export const attachmentStore = {
 }
 
 export const stagedUrl = (id: string) => streamUrl(`/uploads/${id}`)
-
-/** Streams one file to the server as the request body, which sniffs and stages it. */
-export async function uploadFile(body: Blob, name: string, source: UploadSource): Promise<StagedUpload> {
-  const query = new URLSearchParams({ name, source })
-  const res = await fetch(streamUrl(`/uploads?${query.toString()}`), {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/octet-stream' },
-    body,
-  })
-  if (res.status === 401) {
-    window.dispatchEvent(new Event(SIGN_IN_REQUIRED))
-  }
-  const envelope = (await res.json().catch(() => null)) as {
-    data?: StagedUpload
-    error?: { detail: string }
-  } | null
-  if (!res.ok || envelope?.data === undefined) {
-    throw new RequestError(res.status, envelope?.error?.detail ?? `Upload failed (${String(res.status)})`)
-  }
-  return envelope.data
-}
 
 const splitName = (name: string) => {
   const dot = name.lastIndexOf('.')
