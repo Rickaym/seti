@@ -1,8 +1,16 @@
-import { TODO_STATUSES, type AgentTodo, type MessageRow, type TodoStatus, type ToolCall } from '@seti/shared'
-import { nonBlank, rowEvents, type Of } from './events/read.js'
+import {
+  TODO_STATUSES,
+  type AgentTodo,
+  type MessageRow,
+  type TodoStatus,
+  type ToolCall,
+  nonBlank,
+  rowEvents,
+  type EventOf,
+} from '@seti/shared'
 
 type Change = NonNullable<ToolCall['plan']>
-type Report = NonNullable<Of<'tool.ended'>['result']['plan']>
+type Report = NonNullable<EventOf<'tool.ended'>['result']['plan']>
 
 const isStatus = (value: unknown): value is TodoStatus =>
   typeof value === 'string' && (TODO_STATUSES as readonly string[]).includes(value)
@@ -53,7 +61,7 @@ export class TodoIndex {
     return true
   }
 
-  private noteCall({ call, thread }: Of<'tool.started'>): void {
+  private noteCall({ call, thread }: EventOf<'tool.started'>): void {
     const change = call.plan
     if (change === undefined || change.proposal !== undefined) {
       return
@@ -64,7 +72,7 @@ export class TodoIndex {
     this.calls.set(call.callId, change)
   }
 
-  private ended(event: Of<'tool.ended'>): void {
+  private ended(event: EventOf<'tool.ended'>): void {
     const change = this.calls.get(event.callId)
     if (change === undefined) {
       return
@@ -75,7 +83,7 @@ export class TodoIndex {
     }
   }
 
-  private applyCall(change: Change, result: Of<'tool.ended'>['result']): void {
+  private applyCall(change: Change, result: EventOf<'tool.ended'>['result']): void {
     const report = result.plan
     if (change.replace !== undefined) {
       this.items = change.replace.map((item) => ({

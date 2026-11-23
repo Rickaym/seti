@@ -336,7 +336,9 @@ describe('other Claude messages', () => {
   })
 
   it('turns a message it cannot read into one vendor event instead of throwing', () => {
-    expect(raw({ type: 'assistant', message: null })).toEqual([{ v: 1, thread: '', type: 'vendor', name: 'assistant' }])
+    expect(raw({ type: 'assistant', message: null })).toEqual([
+      { v: 1, thread: '', type: 'vendor', name: 'assistant', unreadable: true },
+    ])
     expect(raw({ type: 'system', subtype: 'task_progress' })).toEqual([
       { v: 1, thread: '', type: 'vendor', name: 'system/task_progress' },
     ])

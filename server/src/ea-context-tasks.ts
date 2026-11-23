@@ -14,9 +14,10 @@ import {
   type Task,
   type TaskDisplayStatus,
   type TeamMessage,
+  isAgentOutput,
+  rowEvents,
 } from '@seti/shared'
 import { toolLabel } from './digest.js'
-import { isAgentOutput, rowEvents } from './events/read.js'
 
 const LINE_CHARS = 600
 const QUOTE_CHARS = 150

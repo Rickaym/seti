@@ -1,5 +1,4 @@
-import { projectClaude, type MessageBody, type RuntimeEvent } from '@seti/shared'
-import { isAgentOutput, payloadEvents } from './read.js'
+import { isAgentOutput, payloadEvents, projectClaude, type MessageBody, type RuntimeEvent } from '@seti/shared'
 
 /** The `task_message` columns a row's events fill. */
 export const EVENT_COLUMNS = [

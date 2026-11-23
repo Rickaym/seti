@@ -1,4 +1,4 @@
-import type { MessageRow } from '@seti/shared'
+import { eventsOf, rowEvents, type MessageRow, type RuntimeEvent } from '@seti/shared'
 
 const COMPACT_COMMAND = /^\/compact(\s|$)/
 
@@ -15,20 +15,18 @@ function compactStep(row: MessageRow): Step {
   if (row.kind === 'seti') {
     return 'end'
   }
-  if (row.kind !== 'sdk') {
-    return null
-  }
-  const { payload } = row
-  if (payload.type === 'result') {
+  return rowEvents(row).reduce<Step>((step, event) => eventStep(event) ?? step, null)
+}
+
+/** What one runtime event says about compaction: a start, an end, or nothing. */
+function eventStep(event: RuntimeEvent): Step {
+  if (event.type === 'turn.ended') {
     return 'end'
   }
-  if (payload.type !== 'system') {
+  if (event.type !== 'compaction') {
     return null
   }
-  if (payload.subtype === 'status') {
-    return payload.status === 'compacting' ? 'compacting' : 'end'
-  }
-  return payload.subtype === 'compact_boundary' ? 'end' : null
+  return event.phase === 'started' ? 'compacting' : 'end'
 }
 
 /** When the running turn's compaction began (its /compact or first status), else null. */
@@ -53,11 +51,8 @@ export function compactingSince(rows: readonly MessageRow[], running: boolean): 
   return since
 }
 
-/** Why a compaction failed, on the status row that reports it; null for every other row. */
+/** Why a compaction failed, on the row that reports it; null for every other row. */
 export function compactFailure(row: MessageRow): string | null {
-  if (row.kind !== 'sdk' || row.payload.type !== 'system' || row.payload.subtype !== 'status') {
-    return null
-  }
-  const { compact_result: result, compact_error: error } = row.payload
-  return result === 'failed' ? (error ?? 'no reason given') : null
+  const failed = eventsOf(rowEvents(row), 'compaction').find((event) => event.phase === 'failed')
+  return failed === undefined ? null : (failed.error ?? 'no reason given')
 }

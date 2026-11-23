@@ -1,5 +1,4 @@
-import type { ToolCall } from '@seti/shared'
-import { payloadEvents } from './events/read.js'
+import { type ToolCall, payloadEvents } from '@seti/shared'
 import type { WatchedPr } from './github.js'
 import { shellCommand } from './outward.js'
 import type { PrPost } from './pr-events.js'

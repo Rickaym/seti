@@ -1,11 +1,18 @@
-import type { AgentInput, AgentInputKind, MessageRow, Task, TaskStatus } from '@seti/shared'
+import {
+  type AgentInput,
+  type AgentInputKind,
+  type MessageRow,
+  type Task,
+  type TaskStatus,
+  agentTexts,
+  rowEvents,
+} from '@seti/shared'
 import { currentRequestSource } from './access.js'
 import { refuseArchived } from './archive-guard.js'
 import { audit } from './audit.js'
 import { inBackground } from './background.js'
 import { messages, now, tasks } from './db.js'
 import { noticeAwaitedTurn } from './ea-turn-watch.js'
-import { agentTexts, rowEvents } from './events/read.js'
 import { HttpError } from './http.js'
 import { deliverInputs } from './inputs.js'
 import { agentWaits, type AgentWait } from './store/agent-waits.js'

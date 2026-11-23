@@ -1,26 +1,18 @@
-import type { MessageRow } from '@seti/shared'
+import { isAgentOutput, rowEvents, type MessageRow } from '@seti/shared'
 
 /** How a turn was cut short: by the user's next message, or by a stop with nothing after it. */
 export type Interruption = 'replaced' | 'stopped'
 
-const INTERRUPT_MARKER = '[Request interrupted by user'
-
 type PromptRow = Extract<MessageRow, { kind: 'prompt' }>
-
-const userText = (row: MessageRow): string => {
-  if (row.kind !== 'sdk' || row.payload.type !== 'user') {
-    return ''
-  }
-  const { content } = row.payload.message
-  return typeof content === 'string'
-    ? content
-    : content.map((block) => (block.type === 'text' ? block.text : '')).join('')
-}
 
 /** A row of a turn the task agent runs: its own reply or a result. */
 const turnRow = (row: MessageRow) =>
-  row.kind === 'sdk' &&
-  (row.payload.type === 'result' || (row.payload.type === 'assistant' && row.payload.parent_tool_use_id === null))
+  rowEvents(row).some((event) => event.type === 'turn.ended' || (event.thread === '' && isAgentOutput(event)))
+
+const ends = (row: MessageRow) => rowEvents(row).some((event) => event.type === 'turn.ended')
+
+const marks = (row: MessageRow) =>
+  rowEvents(row).some((event) => event.type === 'notice' && event.code === 'interrupted')
 
 interface TurnScan {
   /** The last result, until a prompt follows it. */
@@ -83,9 +75,9 @@ export function interruptedResultIds(rows: readonly MessageRow[], running: boole
     }
     if (row.kind === 'prompt') {
       scan = scanPrompt(scan, row, interrupted)
-    } else if (row.kind === 'sdk' && row.payload.type === 'result') {
+    } else if (ends(row)) {
       scan = scanResult(scan, row.id, interrupted)
-    } else if (userText(row).startsWith(INTERRUPT_MARKER)) {
+    } else if (marks(row)) {
       scan = { ...scan, marked: true }
     }
   }
