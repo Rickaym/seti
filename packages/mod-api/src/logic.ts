@@ -1,4 +1,12 @@
-import type { ModCaller } from '@seti/shared'
+import type { ModCaller, WireRow } from '@seti/shared'
+
+export type { RuntimeEvent, ToolCall, ToolResult } from '@seti/shared'
+
+/**
+ * One transcript entry: Seti's own rows (prompts, updates, notes, shell runs) keep their payload,
+ * and a row the agent's runtime wrote is `{ kind: 'events', payload }` with its neutral events.
+ */
+export type SetiTranscriptEntry = Exclude<WireRow, { kind: 'sdk' }>
 
 /** What Seti tells a handler about the event; informational only, since grants never depend on it. */
 export interface ModContext {
@@ -68,7 +76,7 @@ export interface Seti {
     list: (filter?: { status?: string; limit?: number }) => Promise<SetiTask[]>
     get: (id: string) => Promise<SetiTask>
     /** The newest entries first fetched, at most 50 a call; direct messages stay hidden. */
-    transcript: (id: string, page?: { limit?: number; before?: number }) => Promise<{ messages: unknown[] }>
+    transcript: (id: string, page?: { limit?: number; before?: number }) => Promise<{ messages: SetiTranscriptEntry[] }>
     prs: (id: string) => Promise<unknown[]>
     rename: (id: string, title: string) => Promise<void>
     pin: (id: string, on: boolean) => Promise<void>

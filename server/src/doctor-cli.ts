@@ -65,6 +65,27 @@ async function eaChecks(): Promise<Check[]> {
   return checks
 }
 
+/** With a separate node, whether it listens on a socket only this user can reach. */
+async function nodeChecks(): Promise<Check[]> {
+  const { NODE_SOCKET, NODE_SPLIT } = await import('./config.js')
+  if (!NODE_SPLIT) {
+    return []
+  }
+  const section = 'Node (SETI_NODE=split)'
+  if (!fs.existsSync(NODE_SOCKET)) {
+    const fix = 'systemctl --user start seti-node.service, or scripts/start.sh node'
+    return [{ section, state: 'fail', label: `no node listens on ${NODE_SOCKET}`, fix }]
+  }
+  const { checkNodeSocket } = await import('./node/socket.js')
+  try {
+    checkNodeSocket(NODE_SOCKET, process.getuid?.() ?? -1)
+  } catch (e) {
+    const label = e instanceof Error ? e.message : String(e)
+    return [{ section, state: 'fail', label, fix: `chmod 700 ${path.dirname(NODE_SOCKET)}, then restart the node` }]
+  }
+  return [{ section, state: 'ok', label: `the node listens on ${NODE_SOCKET}, which only this user can reach` }]
+}
+
 async function main(): Promise<void> {
   const { values } = parseArgs({ options: { 'env-file': { type: 'string' }, help: { type: 'boolean' } } })
   if (values.help === true) {
@@ -94,6 +115,7 @@ async function main(): Promise<void> {
     ...(await checks.githubChecks()),
     ...(await exposureChecks()),
     ...(await checks.serviceChecks()),
+    ...(await nodeChecks()),
     ...(await eaChecks()),
   ]
   process.stdout.write(report(found))
