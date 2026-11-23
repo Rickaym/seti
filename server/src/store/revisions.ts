@@ -65,6 +65,12 @@ export const revisions = {
       await sql<RevisionRecord[]>`${SELECT} WHERE r.object_type = ${ref.object_type} AND r.object_id = ${ref.object_id}
         ORDER BY r.id DESC LIMIT ${limit}`
     ).map(toRevision),
+  /** Changes to the objects of one type that belong to an agent, newest first. */
+  forTask: async (objectType: RevisionObjectType, taskId: string, limit: number) =>
+    (
+      await sql<RevisionRecord[]>`${SELECT} WHERE r.object_type = ${objectType} AND r.task_id = ${taskId}
+        ORDER BY r.id DESC LIMIT ${limit}`
+    ).map(toRevision),
   /** The newest notes on objects of one type, newest first. */
   notes: async (objectType: RevisionObjectType, limit: number) =>
     (
@@ -75,7 +81,7 @@ export const revisions = {
     ...(await sql<
       UnseenChange[]
     >`SELECT r.object_type, r.object_id, r.id AS revision_id, r.at, r.task_id FROM revision r
-      WHERE r.actor = 'agent'
+      WHERE r.actor IN ('agent', 'system')
         AND r.id = (SELECT MAX(x.id) FROM revision x
                     WHERE x.object_type = r.object_type AND x.object_id = r.object_id AND x.after IS NOT NULL)
         AND r.id > COALESCE((SELECT s.revision_id FROM revision_seen s
