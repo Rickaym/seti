@@ -817,6 +817,8 @@ store, the audit chain and every record.
   hands it with no value in it: the caps, and for a sandboxed agent its policy, read-only folders,
   proxy grant, MCP choices, ssh files and switches. A sandbox the control plane builds uses the
   same plan.
+- NODE-14: The node never loads the secret store, so it runs without the store key; every value it
+  uses reaches it as NODE-10 says.
 
 ### 15.2 Dreams
 

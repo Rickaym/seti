@@ -41,7 +41,7 @@ const tokens = createMcpTokens(credentials)
 
 describe('sandboxMcpServers', () => {
   it('lists sign-ins, plain remote servers and connectors with their state, and no token', () => {
-    const rows = sandboxMcpServers(SANDBOX_POLICY_DEFAULT, tokens, config, () => 'login-token')
+    const rows = sandboxMcpServers(SANDBOX_POLICY_DEFAULT, () => 'login-token', tokens, config)
     expect(rows.map((row) => [row.name, row.auth, row.state])).toEqual([
       ['docs', 'none', 'refused'],
       ['keyed', 'none', 'refused'],
@@ -57,7 +57,7 @@ describe('sandboxMcpServers', () => {
   })
 
   it('says connectors need the host login when there is no token with their scope', () => {
-    const rows = sandboxMcpServers(SANDBOX_POLICY_DEFAULT, tokens, config, () => null)
+    const rows = sandboxMcpServers(SANDBOX_POLICY_DEFAULT, () => null, tokens, config)
     expect(rows.at(-1)).toMatchObject({ auth: 'connector', state: 'needs_login' })
   })
 
