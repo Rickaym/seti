@@ -5,9 +5,11 @@ import {
   formatBytes,
   importSessionInput,
   isDirect,
+  POLICY_SHADOW_DAYS,
   recipientLabel,
   type SearchMode,
   sessionListQuery,
+  shadowSince,
   TEAM_FILE_BYTES_MAX,
   TEAM_FILES_MAX,
   teamFileInput,
@@ -28,6 +30,7 @@ import { resourceSampler } from '../resources.js'
 import { sessionService } from '../sessions.js'
 import { auditEvents } from '../store/audit.js'
 import { eaUsage } from '../store/ea-usage.js'
+import { policyShadow } from '../store/policy-shadow.js'
 import { teamSearch } from '../store/search.js'
 import { teamMessages } from '../store/team.js'
 import { authorLabel, postTeamMessage, updateMember } from '../team.js'
@@ -155,8 +158,17 @@ const setiOverview = setiTool({
       .describe(
         "Instead, Seti's mods: each with its version, whether it is on, what it does and what it may do, whether safe mode is on, and the theme with the themes on offer.",
       ),
+    permissions: z
+      .boolean()
+      .default(false)
+      .describe(
+        "Instead, how Seti's own permission evaluator, run in shadow beside Claude Code, compared with it over the last 7 days: calls by result, slow and failed decisions, and the most frequent differences with the step and rule that caused each. Counts only.",
+      ),
   },
-  run: async ({ metrics, mods }) => {
+  run: async ({ metrics, mods, permissions }) => {
+    if (permissions) {
+      return policyShadow.summary(shadowSince(POLICY_SHADOW_DAYS))
+    }
     if (metrics) {
       const [summary, ea] = await Promise.all([homeSummary(), eaUsage.stats(await readerZone({}), now())])
       return { ...summary, ea }

@@ -3,6 +3,7 @@ import fs from 'node:fs'
 import net from 'node:net'
 import os from 'node:os'
 import path from 'node:path'
+import { POLICY_SHADOW_DAYS, shadowSince } from '@seti/shared'
 import { binaryPath } from './binaries.js'
 
 type CheckState = 'ok' | 'info' | 'warn' | 'fail'
@@ -196,17 +197,14 @@ export async function within<T>(ms: number, work: Promise<T>): Promise<T> {
   }
 }
 
-const SHADOW_DAYS = 7
-
 /** The first day the permission shadow line counts, as `YYYY-MM-DD`. */
-export const shadowSince = (now = new Date()): string =>
-  new Date(now.getTime() - (SHADOW_DAYS - 1) * 86_400_000).toISOString().slice(0, 10)
+export const shadowStart = (): string => shadowSince(POLICY_SHADOW_DAYS)
 
 /** How Seti's own permission decisions compared with Claude Code's over the last week. */
 export function shadowCheck(counts: Readonly<Record<string, number>>): Check {
   const of = (result: string) => counts[result] ?? 0
   const compared = ['agree', 'deferred', 'tighter', 'looser'].reduce((sum, result) => sum + of(result), 0)
-  const days = `last ${String(SHADOW_DAYS)} days`
+  const days = `last ${String(POLICY_SHADOW_DAYS)} days`
   const trouble = ['failed', 'slow'].filter((what) => of(what) > 0).map((what) => `${String(of(what))} ${what}`)
   const state = trouble.length > 0 ? 'warn' : 'info'
   const tail = trouble.length > 0 ? `; ${trouble.join(', ')}` : ''
