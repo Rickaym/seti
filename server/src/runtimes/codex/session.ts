@@ -59,6 +59,8 @@ class Driver {
   private starting: Promise<string> | null = null
   private closing = false
   private taken: string[] = []
+  private sending: Promise<void> = Promise.resolve()
+  private readonly steered = new Map<string, SessionInput>()
   private readonly calls = new Map<string, ToolCall>()
   private readonly asks = new Map<number | string, AbortController>()
   private readonly rpc: CodexRpc
@@ -143,16 +145,23 @@ class Driver {
       if (this.closing) {
         return
       }
-      await this.send(input).catch((e: unknown) => {
-        this.reports.fail(e instanceof Error ? e : new Error(String(e)))
-      })
+      await this.queue(input, false)
     }
   }
 
-  private async send(input: SessionInput): Promise<void> {
+  /** Sends inputs one at a time, in the order they came; `again` for one Codex dropped. */
+  private async queue(input: SessionInput, again: boolean): Promise<void> {
+    const sent = this.sending.then(async () => this.send(input, again))
+    this.sending = sent.catch((e: unknown) => {
+      this.reports.fail(e instanceof Error ? e : new Error(String(e)))
+    })
+    await this.sending
+  }
+
+  private async send(input: SessionInput, again: boolean): Promise<void> {
     const turnId = this.turn ?? (this.starting === null ? null : await this.starting.catch(() => null))
     if (turnId !== null && this.turn !== null) {
-      const steered = await this.steer(turnId, input)
+      const steered = await this.steer(turnId, input, again)
       if (steered) {
         return
       }
@@ -185,11 +194,14 @@ class Driver {
   }
 
   /** Joins a running turn; false when that turn ended before Codex took the input. */
-  private async steer(turnId: string, input: SessionInput): Promise<boolean> {
+  private async steer(turnId: string, input: SessionInput, again: boolean): Promise<boolean> {
     try {
       const params = { threadId: this.root, expectedTurnId: turnId, clientUserMessageId: input.id }
       await this.rpc.request('turn/steer', { ...params, input: codexInput(input.content) })
-      this.reports.push({ type: 'input', id: input.id, state: 'queued' })
+      this.steered.set(input.id, input)
+      if (!again) {
+        this.reports.push({ type: 'input', id: input.id, state: 'queued' })
+      }
       return true
     } catch (e) {
       if (e instanceof RpcError) {
@@ -218,6 +230,7 @@ class Driver {
       this.turn = null
       const taken = this.taken
       this.taken = []
+      this.resendDropped()
       return taken
     }
     if (message.method === 'serverRequest/resolved') {
@@ -242,9 +255,19 @@ class Driver {
     } else if (message.method === 'item/completed' && item.type === 'userMessage') {
       const id = item.clientId ?? null
       if (id !== null) {
+        this.steered.delete(id)
         this.taken.push(id)
         this.reports.push({ type: 'input', id, state: 'started' })
       }
+    }
+  }
+
+  /** Codex drops input steered into a turn that ended before taking it, as an interrupt does. */
+  private resendDropped(): void {
+    const dropped = [...this.steered.values()]
+    this.steered.clear()
+    for (const input of dropped) {
+      void this.queue(input, true)
     }
   }
 

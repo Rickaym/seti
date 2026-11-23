@@ -150,7 +150,10 @@ class Tap implements LineTap {
   private readonly work: string
   private readonly refuseInterrupt: boolean
 
-  constructor(script: Script, work: string) {
+  private readonly model: ScriptedResponses
+
+  constructor(script: Script, work: string, model: ScriptedResponses) {
+    this.model = model
     this.pending = injectionsOf(script)
     this.work = work
     this.refuseInterrupt = script.refuseInterrupt === true
@@ -158,6 +161,9 @@ class Tap implements LineTap {
 
   inbound(line: string, answer: (line: string) => void): string[] {
     const sent = JSON.parse(line) as { id?: unknown; method?: unknown }
+    if (sent.method === 'turn/steer') {
+      this.model.steered()
+    }
     if (this.refuseInterrupt && sent.method === 'turn/interrupt') {
       answer(JSON.stringify({ id: sent.id, error: { code: -32603, message: 'the turn cannot be interrupted' } }))
       return []
@@ -285,7 +291,7 @@ export function codexRig(model: ScriptedResponses, base: string, script: Script)
         args: request.args,
         cwd: work,
         env,
-        tap: new Tap(script, work),
+        tap: new Tap(script, work, model),
         deaf: script.deaf === true,
       },
       request.signal,
