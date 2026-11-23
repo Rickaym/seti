@@ -72,6 +72,16 @@ const BROKEN: [string, Target][] = [
       ),
     ),
   ],
+  [
+    'FL-2',
+    reprojected((events) =>
+      events.flatMap((e): RuntimeEvent[] =>
+        e.type === 'vendor' && e.unreadable === true
+          ? [e, { v: 1, thread: e.thread, type: 'message', id: 'misread', role: 'user', text: 'not a message' }]
+          : [e],
+      ),
+    ),
+  ],
   ['RP-1', rereported((r) => (r.type === 'message' ? { ...r, delivered: [] } : r))],
   ['RP-3', rereported((r) => (r.type === 'input' ? { ...r, state: 'other' } : r))],
   ['SA-1', reprojected((events) => events.map((e) => ({ ...e, thread: '' })))],

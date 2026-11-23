@@ -95,7 +95,10 @@ export const FAILURES: Case[] = [
       )
       if (ended === null) {
         expect(ofType(run, 'vendor').filter((event) => event.unreadable === true)).toHaveLength(1)
-        const said = ofType(run, 'message').filter((message) => message.role === 'agent')
+        const messages = ofType(run, 'message')
+        const echoes = messages.filter((message) => message.role === 'user' && message.text === 'go')
+        expect(echoes.length).toBeLessThanOrEqual(1)
+        const said = messages.filter((message) => !echoes.includes(message))
         expect(said.map((message) => message.text)).toEqual(['before', 'after'])
         await closed(run)
       } else {

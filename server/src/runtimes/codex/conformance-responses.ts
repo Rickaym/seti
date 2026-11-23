@@ -35,7 +35,10 @@ const think = (text: string): OutputItem => ({
 })
 
 /** The step ends a model response: Codex answers a call, and a held response never ends. */
-const endsRound = (step: Step): boolean => 'call' in step || 'hold' in step
+const endsRound = (step: Step): boolean => 'call' in step || 'hold' in step || 'awaitInput' in step
+
+/** Steps that hold the response open rather than add an item to it. */
+const waits = (step: Step): boolean => 'hold' in step || 'awaitInput' in step
 
 /** The steps of one model response: up to and including the first that ends it, or all left. */
 function round(steps: readonly Step[]): Step[] {
@@ -94,6 +97,8 @@ export class ScriptedResponses {
   private readonly order = new Map<string, number>()
   private readonly server: Server
   private readonly mapCall: CallMapper
+  private wake: (() => void) | null = null
+  private early = false
 
   constructor(mapCall: CallMapper) {
     this.mapCall = mapCall
@@ -111,6 +116,8 @@ export class ScriptedResponses {
   /** Plays this script from its first turn; earlier state is forgotten. */
   play(turns: Step[][]): void {
     this.turns = turns
+    this.wake = null
+    this.early = false
     this.states.clear()
     this.order.clear()
   }
@@ -132,12 +139,34 @@ export class ScriptedResponses {
       }
       const said = conversation(JSON.parse(raw) as unknown)
       const steps = this.answer(turnOf(req), said)
-      const items = steps.filter((step) => !('hold' in step)).map((step) => this.item(step, said.texts))
-      stream(
-        res,
-        items,
-        steps.some((step) => 'hold' in step),
-      )
+      const items = steps.filter((step) => !waits(step)).map((step) => this.item(step, said.texts))
+      stream(res, items, this.endOf(steps))
+    })
+  }
+
+  /** Lets a response that waits for steered input end; an input that came first counts. */
+  steered(): void {
+    const wake = this.wake
+    this.wake = null
+    this.early = wake === null
+    wake?.()
+  }
+
+  /** When a response ends: never while it holds, after the next input while it waits for one. */
+  private endOf(steps: readonly Step[]): Promise<void> | null {
+    if (steps.some((step) => 'hold' in step)) {
+      return null
+    }
+    return steps.some((step) => 'awaitInput' in step) ? this.nextInput() : Promise.resolve()
+  }
+
+  private async nextInput(): Promise<void> {
+    if (this.early) {
+      this.early = false
+      return
+    }
+    await new Promise<void>((resolve) => {
+      this.wake = resolve
     })
   }
 
@@ -189,8 +218,8 @@ function sse(res: ServerResponse, event: Record<string, unknown>): void {
   res.write(`event: ${String(event.type)}\ndata: ${JSON.stringify(event)}\n\n`)
 }
 
-/** Streams one response the way the Responses API does, with usage at its end unless it holds. */
-function stream(res: ServerResponse, items: readonly OutputItem[], hold: boolean): void {
+/** Streams one response the way the Responses API does; it ends with usage once `ended` settles. */
+function stream(res: ServerResponse, items: readonly OutputItem[], ended: Promise<void> | null): void {
   const id = nextId('resp')
   res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' })
   sse(res, { type: 'response.created', response: { id, status: 'in_progress' } })
@@ -198,9 +227,12 @@ function stream(res: ServerResponse, items: readonly OutputItem[], hold: boolean
     sse(res, { type: 'response.output_item.added', output_index: index, item: { ...item, status: 'in_progress' } })
     sse(res, { type: 'response.output_item.done', output_index: index, item })
   })
-  if (hold) {
-    return
-  }
+  void ended?.then(() => {
+    complete(res, id)
+  })
+}
+
+function complete(res: ServerResponse, id: string): void {
   const usage = {
     input_tokens: 1200,
     input_tokens_details: { cached_tokens: 1000 },

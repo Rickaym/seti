@@ -1,5 +1,6 @@
 import type { RuntimeEvent } from '../../events.js'
 import { callOf, endOf, isCall } from './calls.js'
+import { jobEnded, jobsStarted, type CodexJob } from './jobs.js'
 import {
   agentMessage,
   errorNotice,
@@ -10,6 +11,7 @@ import {
   threadStarted,
   tokenUsage,
   turnParams,
+  userInputAnswer,
   userInputRequest,
   userMessage,
   type Item,
@@ -27,6 +29,10 @@ export interface CodexMessage {
   root: string
   /** The notification, or the request Codex sent, unchanged. */
   message: unknown
+  /** Seti's answer to that request, or Codex's reply to Seti's, on the row that records it. */
+  reply?: unknown
+  /** The background command whose end this message reports. */
+  job?: CodexJob
 }
 
 type Vendor = Extract<Event, { type: 'vendor' }>
@@ -137,11 +143,26 @@ function question(params: unknown, at: Thread): Event {
   return { v: 1, ...at, type: 'tool.started', call: { ...call, question: { questions: asked } } }
 }
 
+function answered(params: unknown, reply: unknown, at: Thread): Event {
+  const { itemId, questions } = userInputRequest.parse(params)
+  const { answers } = userInputAnswer.parse(reply)
+  const lines = questions.map((one) => `${one.question} ${(answers[one.id]?.answers ?? []).join(', ')}`)
+  const result = { text: lines.join('\n'), images: 0 }
+  const status = Object.keys(answers).length === 0 ? 'cancelled' : 'ok'
+  return { v: 1, ...at, type: 'tool.ended', callId: itemId, status, result }
+}
+
 type Mapper = (params: unknown, at: Thread, root: string) => Event
+
+/** Rows that record Seti's answer to a request, by the request's method. */
+const REPLIED: Partial<Record<string, (params: unknown, reply: unknown, at: Thread, root: string) => Event[]>> = {
+  'item/tool/requestUserInput': (params, reply, at) => [answered(params, reply, at)],
+  'thread/backgroundTerminals/list': (_params, reply, at) => jobsStarted(reply, at.thread),
+  'thread/resume': (_params, reply, _at, root) => [sessionStarted(reply, root)],
+}
 
 const MAPPED: Partial<Record<string, Mapper>> = {
   'thread/started': (params, _at, root) => sessionStarted(params, root),
-  'thread/resume': (params, _at, root) => sessionStarted(params, root),
   'turn/started': (params, at) => ({
     v: 1,
     ...at,
@@ -156,6 +177,31 @@ const MAPPED: Partial<Record<string, Mapper>> = {
   'turn/plan/updated': plan,
   error: notice,
   'item/tool/requestUserInput': question,
+}
+
+function projectReply(
+  message: { method: string; params?: unknown },
+  reply: unknown,
+  at: Thread,
+  root: string,
+): Event[] {
+  const map = REPLIED[message.method]
+  if (map === undefined) {
+    return [vendor(at.thread, message.method)]
+  }
+  try {
+    return map(message.params, reply, at, root)
+  } catch {
+    return [{ ...vendor(at.thread, message.method), unreadable: true }]
+  }
+}
+
+function projectJobEnd(params: unknown, job: CodexJob, at: Thread): Event[] {
+  try {
+    return [completed(itemParams.parse(params).item, at), jobEnded(params, job, at.thread)]
+  } catch {
+    return [{ ...vendor(at.thread, 'item/completed'), unreadable: true }]
+  }
 }
 
 /** The thread a message belongs to: empty for the agent's own, else the subagent's thread id. */
@@ -174,8 +220,14 @@ export function projectCodex(raw: unknown): RuntimeEvent[] {
   if (!envelope.success) {
     return [{ ...vendor('', 'codex'), unreadable: true }]
   }
-  const { root, message } = envelope.data
+  const { root, message, reply, job } = envelope.data
   const at = { thread: threadOf(message.params, root) }
+  if (reply !== undefined) {
+    return projectReply(message, reply, at, root)
+  }
+  if (job !== undefined && message.method === 'item/completed') {
+    return projectJobEnd(message.params, job, at)
+  }
   const map = MAPPED[message.method]
   if (map === undefined) {
     return [vendor(at.thread, message.method)]

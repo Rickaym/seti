@@ -4,7 +4,10 @@ import type { ToolCall } from '@seti/shared'
 import { z } from 'zod'
 import type { Launcher } from '../../launcher.js'
 import type { InputContent, RuntimeSession, SessionInput, SessionReport } from '../adapter.js'
-import { askedOf, type CodexDecide } from './approvals.js'
+import type { CodexDecide } from './approvals.js'
+import { Asks } from './asks.js'
+import { Background } from './background.js'
+import { OPTED_OUT } from './private.js'
 import { codexReport, ReportQueue } from './reports.js'
 import { CodexRpc, RpcError, type CodexCall } from './rpc.js'
 
@@ -59,8 +62,12 @@ class Driver {
   private starting: Promise<string> | null = null
   private closing = false
   private taken: string[] = []
+  private sending: Promise<void> = Promise.resolve()
+  private readonly steered = new Map<string, SessionInput>()
   private readonly calls = new Map<string, ToolCall>()
-  private readonly asks = new Map<number | string, AbortController>()
+  private readonly asks: Asks
+  private readonly background: Background
+  private inbox: Promise<void> = Promise.resolve()
   private readonly rpc: CodexRpc
   private readonly realised: CodexRealised
   private readonly child: ChildProcess
@@ -69,6 +76,14 @@ class Driver {
     this.child = child
     this.realised = realised
     this.rpc = new CodexRpc(child)
+    this.background = new Background(this.rpc, () => this.root)
+    this.asks = new Asks({
+      rpc: this.rpc,
+      reports: this.reports,
+      decide: realised.decide,
+      root: () => this.root,
+      started: (itemId) => this.calls.get(itemId),
+    })
   }
 
   /** Reads Codex's output, opens the thread, then takes inputs; reports go to `reports`. */
@@ -77,24 +92,31 @@ class Driver {
     void this.rpc
       .read({
         notified: (message) => {
-          this.notified(message)
+          this.inOrder(async () => this.notified(message))
         },
         asked: (message) => {
-          this.asked(message)
+          this.inOrder(() => {
+            this.asks.take(message)
+          })
         },
         garbled: () => {
-          this.reports.push({
-            type: 'message',
-            raw: null,
-            events: [unreadable()],
-            work: false,
-            byAgent: true,
-            delivered: [],
+          this.inOrder(() => {
+            this.reports.push({
+              type: 'message',
+              raw: null,
+              events: [unreadable()],
+              work: false,
+              byAgent: true,
+              delivered: [],
+            })
           })
         },
       })
       .then(async () => {
-        this.ended(await exited)
+        const exit = await exited
+        this.inOrder(() => {
+          this.ended(exit)
+        })
       })
     await this.open()
     void this.pump(inputs)
@@ -106,7 +128,9 @@ class Driver {
     if (turnId === null) {
       return
     }
+    this.background.abandon()
     await this.rpc.request('turn/interrupt', { threadId: this.root, turnId })
+    await this.background.stopAbandoned()
   }
 
   close(): void {
@@ -114,7 +138,7 @@ class Driver {
       return
     }
     this.closing = true
-    this.abortAsks()
+    this.asks.dropAll()
     this.rpc.end(new Error('The Codex session was closed'))
     this.reports.end()
     this.child.kill()
@@ -123,7 +147,7 @@ class Driver {
   private async open(): Promise<void> {
     await this.rpc.request('initialize', {
       clientInfo: { name: 'seti', title: 'Seti', version: '1' },
-      capabilities: { experimentalApi: true },
+      capabilities: { experimentalApi: true, optOutNotificationMethods: OPTED_OUT },
     })
     this.rpc.notify('initialized')
     const { resume, cwd, model } = this.realised
@@ -134,8 +158,8 @@ class Driver {
     }
     const reply = await this.rpc.request('thread/resume', { ...common, threadId: resume, excludeTurns: true })
     this.root = threadReply.parse(reply).thread.id
-    // A resumed thread is announced only in this reply, so the reply is kept as Codex sent it.
-    this.reports.push(codexReport(this.root, { method: 'thread/resume', params: reply }))
+    // A resumed thread is announced only in this reply, so the reply is the row that starts it.
+    this.reports.push(codexReport(this.root, { method: 'thread/resume', params: { threadId: resume } }, { reply }))
   }
 
   private async pump(inputs: AsyncIterable<SessionInput>): Promise<void> {
@@ -143,16 +167,23 @@ class Driver {
       if (this.closing) {
         return
       }
-      await this.send(input).catch((e: unknown) => {
-        this.reports.fail(e instanceof Error ? e : new Error(String(e)))
-      })
+      await this.queue(input, false)
     }
   }
 
-  private async send(input: SessionInput): Promise<void> {
+  /** Sends inputs one at a time, in the order they came; `again` for one Codex dropped. */
+  private async queue(input: SessionInput, again: boolean): Promise<void> {
+    const sent = this.sending.then(async () => this.send(input, again))
+    this.sending = sent.catch((e: unknown) => {
+      this.reports.fail(e instanceof Error ? e : new Error(String(e)))
+    })
+    await this.sending
+  }
+
+  private async send(input: SessionInput, again: boolean): Promise<void> {
     const turnId = this.turn ?? (this.starting === null ? null : await this.starting.catch(() => null))
     if (turnId !== null && this.turn !== null) {
-      const steered = await this.steer(turnId, input)
+      const steered = await this.steer(turnId, input, again)
       if (steered) {
         return
       }
@@ -185,11 +216,14 @@ class Driver {
   }
 
   /** Joins a running turn; false when that turn ended before Codex took the input. */
-  private async steer(turnId: string, input: SessionInput): Promise<boolean> {
+  private async steer(turnId: string, input: SessionInput, again: boolean): Promise<boolean> {
     try {
       const params = { threadId: this.root, expectedTurnId: turnId, clientUserMessageId: input.id }
       await this.rpc.request('turn/steer', { ...params, input: codexInput(input.content) })
-      this.reports.push({ type: 'input', id: input.id, state: 'queued' })
+      this.steered.set(input.id, input)
+      if (!again) {
+        this.reports.push({ type: 'input', id: input.id, state: 'queued' })
+      }
       return true
     } catch (e) {
       if (e instanceof RpcError) {
@@ -199,9 +233,30 @@ class Driver {
     }
   }
 
-  private notified(message: CodexCall): void {
+  /** Handles what Codex wrote one line at a time, in order, even where a handler waits. */
+  private inOrder(handle: () => Promise<void> | void): void {
+    this.inbox = this.inbox.then(handle).catch((e: unknown) => {
+      this.reports.fail(e instanceof Error ? e : new Error(String(e)))
+    })
+  }
+
+  private async notified(message: CodexCall): Promise<void> {
+    if (OPTED_OUT.includes(message.method)) {
+      return
+    }
+    const job = this.background.note(message)
+    if (message.method === 'turn/completed') {
+      const listed = await this.background.listed().catch(() => null)
+      if (listed !== null) {
+        this.reports.push(codexReport(this.root, listed.message, { reply: listed.reply }))
+      }
+    }
     const delivered = this.track(message)
-    this.reports.push(codexReport(this.root, message, delivered))
+    this.reports.push(codexReport(this.root, message, { delivered, ...(job === undefined ? {} : { job }) }))
+  }
+
+  async stopBackground(jobId: string): Promise<void> {
+    await this.background.stop(jobId)
   }
 
   /** Follows turns, calls and inputs; returns the inputs a turn's end reports taken. */
@@ -218,11 +273,12 @@ class Driver {
       this.turn = null
       const taken = this.taken
       this.taken = []
+      this.resendDropped()
       return taken
     }
     if (message.method === 'serverRequest/resolved') {
       const done = resolvedNote.safeParse(message.params).data?.requestId
-      this.abortAsk(done)
+      this.asks.drop(done)
       return []
     }
     this.trackItem(message)
@@ -242,62 +298,24 @@ class Driver {
     } else if (message.method === 'item/completed' && item.type === 'userMessage') {
       const id = item.clientId ?? null
       if (id !== null) {
+        this.steered.delete(id)
         this.taken.push(id)
         this.reports.push({ type: 'input', id, state: 'started' })
       }
     }
   }
 
-  private asked(message: CodexCall & { id: number | string }): void {
-    let asked
-    try {
-      asked = askedOf(message.method, message.params, (itemId) => this.calls.get(itemId))
-    } catch (e) {
-      this.rpc.refuse(message.id, e instanceof Error ? e.message : String(e))
-      return
+  /** Codex drops input steered into a turn that ended before taking it, as an interrupt does. */
+  private resendDropped(): void {
+    const dropped = [...this.steered.values()]
+    this.steered.clear()
+    for (const input of dropped) {
+      void this.queue(input, true)
     }
-    if (asked === null) {
-      this.rpc.refuse(message.id, `Seti does not answer ${message.method}`)
-      return
-    }
-    if (message.method === 'item/tool/requestUserInput') {
-      this.reports.push(codexReport(this.root, message))
-    }
-    const control = new AbortController()
-    this.asks.set(message.id, control)
-    const answer = (reply: unknown) => {
-      if (this.asks.get(message.id) === control) {
-        this.asks.delete(message.id)
-        this.rpc.answer(message.id, reply)
-      }
-    }
-    this.realised.decide(asked.call, control.signal).then(
-      (verdict) => {
-        answer(control.signal.aborted ? asked.cancelled : asked.reply(verdict))
-      },
-      (e: unknown) => {
-        answer(asked.reply({ allow: false, message: e instanceof Error ? e.message : String(e) }))
-      },
-    )
-  }
-
-  private abortAsk(id: number | string | undefined): void {
-    if (id === undefined) {
-      return
-    }
-    this.asks.get(id)?.abort()
-    this.asks.delete(id)
-  }
-
-  private abortAsks(): void {
-    for (const control of this.asks.values()) {
-      control.abort()
-    }
-    this.asks.clear()
   }
 
   private ended([code, signal]: [number | null, NodeJS.Signals | null]): void {
-    this.abortAsks()
+    this.asks.dropAll()
     if (this.closing) {
       return
     }
@@ -322,6 +340,7 @@ export function codexSession(
   return {
     events: driver.events(inputs),
     interrupt: async () => driver.interrupt(),
+    stopBackground: async (jobId) => driver.stopBackground(jobId),
     close: () => {
       driver.close()
     },

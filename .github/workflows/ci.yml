@@ -100,7 +100,9 @@ jobs:
         with:
           path: ~/.cache/seti-codex
           key: codex-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('server/src/runtimes/codex/pin.json') }}
-      - run: echo "SETI_CODEX_BIN=$(node scripts/codex-binary.mjs "$HOME/.cache/seti-codex")" >> "$GITHUB_ENV"
+      - run: |
+          bin="$(node scripts/codex-binary.mjs "$HOME/.cache/seti-codex")"
+          echo "SETI_CODEX_BIN=$bin" >> "$GITHUB_ENV"
         if: needs.changes.outputs.node == 'true'
       - run: pnpm test
         if: needs.changes.outputs.node == 'true'

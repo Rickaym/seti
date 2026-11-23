@@ -142,11 +142,19 @@ describe('Codex calls', () => {
 
   it("starts the session from a resumed thread's reply, which Codex sends in place of thread/started", () => {
     const thread = { id: ROOT, model: 'gpt-5.5', environments: [{ cwd: '/work/project' }] }
-    expect(one('thread/resume', { thread, model: 'gpt-5.5' })).toMatchObject({
-      type: 'session.started',
-      sessionId: ROOT,
-      cwd: '/work/project',
-    })
+    const row: CodexMessage = {
+      root: ROOT,
+      message: { method: 'thread/resume', params: { threadId: ROOT } },
+      reply: { thread, model: 'gpt-5.5' },
+    }
+    expect(projectCodex(row)).toMatchObject([{ type: 'session.started', sessionId: ROOT, cwd: '/work/project' }])
+  })
+
+  it("keeps remote control's status, which names the host, as a vendor event with no detail", () => {
+    const params = { status: 'disabled', serverName: 'a-host', installationId: 'i-1', environmentId: null }
+    expect(projectCodex(stored('remoteControl/status/changed', params))).toEqual([
+      { v: 1, thread: '', type: 'vendor', name: 'remoteControl/status/changed' },
+    ])
   })
 
   it('opens a thread for a spawned subagent, and its own messages carry that thread', () => {
@@ -181,6 +189,36 @@ describe('Codex calls', () => {
       type: 'tool.started',
       call: { callId: 'q1', kind: 'question', question: { questions: [{ text: 'Which one?', options: ['A', 'B'] }] } },
     })
+    const answered = (reply: unknown) => projectCodex({ ...stored('item/tool/requestUserInput', params), reply })
+    expect(answered({ answers: { a: { answers: ['B'] } } })).toEqual([
+      { v: 1, thread: '', type: 'tool.ended', callId: 'q1', status: 'ok', result: { text: 'Which one? B', images: 0 } },
+    ])
+    expect(answered({ answers: {} })).toMatchObject([{ type: 'tool.ended', status: 'cancelled' }])
+  })
+})
+
+describe('Codex background commands', () => {
+  it('starts a job for each command Codex lists as still running, and ends it with its item', () => {
+    const terminal = { itemId: 'call_1', processId: '4242', command: "/usr/bin/zsh -lc 'npm run dev'" }
+    const listed = { ...stored('thread/backgroundTerminals/list', { threadId: ROOT }), reply: { data: [terminal] } }
+    expect(projectCodex(listed)).toEqual([
+      {
+        v: 1,
+        thread: '',
+        type: 'job.started',
+        jobId: '4242',
+        callId: 'call_1',
+        kind: 'shell',
+        label: 'npm run dev',
+        background: true,
+      },
+    ])
+    const done = item(shell('completed', { aggregatedOutput: 'ready', exitCode: 0, processId: '4242' }))
+    const ended = projectCodex({ ...stored('item/completed', done), job: { id: '4242' } })
+    expect(ended.map((event) => event.type)).toEqual(['tool.ended', 'job.ended'])
+    expect(ended[1]).toMatchObject({ jobId: '4242', callId: 'call_1', status: 'completed', output: 'ready' })
+    const stopped = projectCodex({ ...stored('item/completed', done), job: { id: '4242', stopped: true } })
+    expect(stopped[1]).toMatchObject({ status: 'stopped' })
   })
 })
 
