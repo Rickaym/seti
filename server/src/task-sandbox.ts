@@ -2,19 +2,26 @@ import { spawn, type ChildProcess } from 'node:child_process'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { AWS_CREDENTIALS_PATH, extraDirs, type MemoryCap, type SandboxPolicy, type Task } from '@seti/shared'
+import {
+  AWS_CREDENTIALS_PATH,
+  extraDirs,
+  hostMatches,
+  type MemoryCap,
+  type SandboxPolicy,
+  type Task,
+} from '@seti/shared'
 import { taskSsh } from './agent-access.js'
-import { taskAws } from './aws-access.js'
+import { profileAws, taskAws } from './aws-access.js'
 import { findBinary } from './binaries.js'
 import { CONNECTOR_SCOPE, connectorCredential } from './claude-credential.js'
 import { CLAUDE_HOME, SCRATCH_ROOT, SETI_HOME, WORKTREE_ROOT } from './config.js'
-import { connectionEnv } from './connection-egress.js'
-import { ruleCaHosts, ruleCovers } from './egress-rules.js'
+import { connectionEnv } from './egress-connections.js'
 import { agentTokenStamp } from './github-token.js'
 import { taskBorrowedServers } from './mcp-borrowed.js'
 import { launch, type ScopePlan } from './memory-scope.js'
 import { memoryEnv } from './node-heap.js'
 import { sandboxDirOf } from './owned-dirs.js'
+import { proxyGrant } from './proxy-grant.js'
 import { proxyAwsToken, proxyGone, proxyHere, sshAgentHere } from './proxy-owner.js'
 import { awsToken } from './sandbox-aws-token.js'
 import { sandboxClaudeJson } from './sandbox-claude-json.js'
@@ -33,7 +40,7 @@ import {
 import { homeExcluded, type SandboxContext, sandboxHiddenPaths } from './sandbox.js'
 import { SSH_AGENT_SOCKET, stopSshAgent } from './ssh-agent.js'
 import { prepareSandboxSsh } from './ssh-files.js'
-import { closeTaskProxy, grantAccess, openTaskSsh, profileAws, sandboxCaPublic, startProxy } from './task-proxy.js'
+import { closeTaskProxy, openTaskSsh, sandboxCaPublic, startProxy } from './task-proxy.js'
 import { toolShellEnv, writeToolShell } from './tool-shell.js'
 import { workspaceDir } from './workspace/dir.js'
 
@@ -271,16 +278,19 @@ export async function taskSandbox(task: Task, request: SandboxRequest): Promise<
   prepareDirs(dir)
   fs.mkdirSync(workspaceDir(task.id), { recursive: true, mode: 0o700 })
   const projects = [task.cwd, checkoutOf(task.cwd, layout) ?? task.cwd]
-  const { denied, connections, headerRules, rules } = await grantAccess(task)
+  const { grant, denied } = await proxyGrant(task)
   sandboxClaudeJson(hostClaudeJson(), path.join(dir, 'home', '.claude.json'), {
     signedIn: signedInServers(),
     projects: [...new Set(projects)],
     denied,
-    covered: (host) => headerRules.some((rule) => ruleCovers(rule, host, 443)),
+    covered: (host) =>
+      grant.connections.some(
+        (each) => each.header !== null && each.hosts.some((pattern) => hostMatches(pattern, host)),
+      ),
     borrowed: await taskBorrowedServers(task),
   })
   forgetSandboxSignIns(path.join(dir, 'home', '.claude'), proxiedServers(mcpTokens, denied))
-  await proxyHere(task, async () => startProxy(task, ruleCaHosts([...rules, ...connections])))
+  await proxyHere(task.id, grant, async () => startProxy(task.id, grant))
   const authority = await sandboxCaPublic()
   const ssh = await sandboxSsh(task.id, dir, ctx.home, socat)
   const ready = { ...layout, caDir: authority.publicDir, systemBundle: authority.systemBundle, ssh }
@@ -295,7 +305,7 @@ export async function taskSandbox(task: Task, request: SandboxRequest): Promise<
       : null,
     ssh: ssh !== null,
     memory: request.memory ?? null,
-    connections: connectionEnv(connections),
+    connections: connectionEnv(grant.connections),
   })
   const command = (program: string, args: readonly string[], options: SandboxCommandOptions = {}) => {
     const extra = path.isAbsolute(program) ? [program] : []

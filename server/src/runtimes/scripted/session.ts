@@ -18,7 +18,6 @@ export interface ScriptedShapes {
   decide: ScriptedDecide
   hooks: null
   hostServers: Record<string, never>
-  toolServer: never
   policy: never
   mode: never
 }

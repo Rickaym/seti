@@ -1,8 +1,9 @@
 import { hostAllowed, hostsWithin, VALUE_PLACEHOLDER } from '@seti/shared'
 import { z } from 'zod'
 import { audit } from '../../audit.js'
-import { connectionRule } from '../../connection-egress.js'
+import { grantConnection } from '../../connection-egress.js'
 import { connectionToken } from '../../connection-values.js'
+import { connectionRule } from '../../egress-connections.js'
 import { HttpError } from '../../http.js'
 import { redactValues, type PollResponse } from '../../pollers/fetch.js'
 import { connectionRows, type ConnectionRow } from '../../store/connections.js'
@@ -71,9 +72,9 @@ async function connectionFetch(
   }
   const header = row.header?.name.toLowerCase() ?? ''
   const rule = connectionRule(
-    row,
+    grantConnection(row),
     { name: header, template: row.header?.template ?? VALUE_PLACEHOLDER },
-    async (target, refused) => connectionToken(target, refused),
+    async (_connection, refused) => connectionToken(row, refused),
   )
   const headers = Object.fromEntries(
     Object.entries(args.headers ?? {}).filter(([name]) => name.toLowerCase() !== header),

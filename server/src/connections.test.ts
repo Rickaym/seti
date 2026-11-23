@@ -2,9 +2,10 @@ import { generateKeyPairSync } from 'node:crypto'
 import type { Connection, CredentialProfile, MintTest, Task } from '@seti/shared'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createApp } from './app.js'
-import { connectionContext, connectionPlaceholders, connectionRules, taskConnections } from './connection-egress.js'
+import { connectionContext, grantConnections, taskConnections } from './connection-egress.js'
 import { createConnectionPlaceholder } from './connections.js'
 import { sql, tasks } from './db.js'
+import { connectionPlaceholders, connectionRules } from './egress-connections.js'
 import { nodeLink } from './node-link.js'
 import { createPoller } from './pollers/actions.js'
 import { sandboxPrompt } from './sandbox-prompt.js'
@@ -117,7 +118,10 @@ describe('connections', () => {
       detail: { connection: 'vendor', env: 'VENDOR_KEY', credentials: ['Default', 'Work'], values: ['value'] },
     })
     const task = await newTask(work.id)
-    const [placeholder] = connectionPlaceholders(await taskConnections(task), connectionValueAsk(task.id))
+    const [placeholder] = connectionPlaceholders(
+      grantConnections(await taskConnections(task)),
+      connectionValueAsk(task.id),
+    )
     expect(placeholder?.placeholder).toMatch(/^seti-secret-vendor-[0-9a-f]{32}$/)
     expect(await placeholder?.value()).toBe(KEY)
     expect(await connectionContext(task.id)).toContain('VENDOR_KEY (api.vendor.test, *.vendor-cdn.test)')
@@ -141,10 +145,11 @@ describe('connections', () => {
     const plain = await newTask()
     const url = new URL('https://api.vendor.test/v1/things')
     const valueOf = async (target: Task) =>
-      connectionRules(await taskConnections(target), connectionValueAsk(target.id))[0]?.value(url) ?? null
+      connectionRules(grantConnections(await taskConnections(target)), connectionValueAsk(target.id))[0]?.value(url) ??
+      null
     expect(await valueOf(task)).toBe(KEY)
     expect(await valueOf(plain)).toBeNull()
-    const [started] = connectionRules(await taskConnections(task), connectionValueAsk(task.id))
+    const [started] = connectionRules(grantConnections(await taskConnections(task)), connectionValueAsk(task.id))
     const replaced = `${KEY}-next`
     await data('PUT', `/connections/${made.id}/values/value`, { value: replaced })
     expect(await started?.value(url)).toBe(replaced)

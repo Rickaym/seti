@@ -87,8 +87,8 @@ export async function connectNode(): Promise<void> {
     },
   })
   proxiesRunBy({
-    open: async (task) => {
-      await controlLink.command('proxy.open', { agent: task.id, task })
+    open: async (agent, grant) => {
+      await controlLink.command('proxy.open', { agent, grant })
     },
     close: async (agent) => {
       await controlLink.command('proxy.close', { agent }).catch((e: unknown) => {

@@ -1,5 +1,6 @@
 import type { NodeAnswer, NodeAsk } from '@seti/shared'
 import { taskSsh } from './agent-access.js'
+import { profileAws, taskAws } from './aws-access.js'
 import { awsBroker } from './aws-credentials.js'
 import { claudeCredential, connectorCredential } from './claude-credential.js'
 import { taskConnections } from './connection-egress.js'
@@ -9,7 +10,6 @@ import { agentToken, tokenOwner } from './github-token.js'
 import { taskDeniedServers } from './mcp-selection.js'
 import { mcpTokens } from './sandbox-mcp.js'
 import { hostKeys } from './ssh-files.js'
-import { profileAws } from './task-proxy.js'
 
 async function taskOf(taskId: string) {
   const task = await tasks.get(taskId)
@@ -57,6 +57,10 @@ export const secretAnswers = {
     taskId: string,
     ask: NodeAsk<'connection.value'>,
   ): Promise<NodeAnswer<'connection.value'>> => ({ value: await connectionValueOf(taskId, ask) }),
+  'access.reach': async (taskId: string): Promise<NodeAnswer<'access.reach'>> => ({
+    sshHops: (await taskSsh(taskId)).firstHops,
+    aws: await taskAws(taskId),
+  }),
   'ssh.keys': async (taskId: string): Promise<NodeAnswer<'ssh.keys'>> => ({
     keys: await hostKeys((await taskSsh(taskId)).hosts),
   }),

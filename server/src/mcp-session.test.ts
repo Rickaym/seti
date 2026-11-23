@@ -9,6 +9,7 @@ import { CLAUDE_HOME } from './config.js'
 import { messages, sql, tasks } from './db.js'
 import { sessionMcp, sessionState, watchSessionMcp } from './mcp-session-status.js'
 import { runTurn } from './runner.js'
+import type { ToolServerState } from './runtimes/adapter.js'
 import { hostClaudeJson } from './sandbox-mcp.js'
 import { setupKey } from './session-spec.js'
 import { USER_AUTH } from './test-auth.js'
@@ -277,9 +278,9 @@ describe('sessionState and watchSessionMcp', () => {
   })
 
   it('polls until no server is pending, keeping each answer', async () => {
-    const answers: Sdk.McpServerStatus[][] = [
-      [{ name: 'a', status: 'pending' }],
-      [{ name: 'a', status: 'connected', config: { type: 'stdio', command: 'a' } }],
+    const answers: ToolServerState[][] = [
+      [{ name: 'a', status: 'pending', transport: null }],
+      [{ name: 'a', status: 'connected', transport: 'stdio' }],
     ]
     let reads = 0
     await watchSessionMcp('watched', async () => Promise.resolve(answers[reads++] ?? null), {

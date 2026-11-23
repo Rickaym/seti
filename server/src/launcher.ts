@@ -1,7 +1,8 @@
 import { spawn, type ChildProcess } from 'node:child_process'
 import type { Readable, Writable } from 'node:stream'
 import type { Task } from '@seti/shared'
-import { connectionEnv, taskConnections } from './connection-egress.js'
+import { grantConnections, taskConnections } from './connection-egress.js'
+import { connectionEnv } from './egress-connections.js'
 import { planScope } from './memory-cap.js'
 import { launch, type ScopeKind, type ScopePlan } from './memory-scope.js'
 import { agentEnv, sandboxFor } from './session-options.js'
@@ -92,7 +93,7 @@ export async function taskLauncher(task: Task, kind: ScopeKind, connections: boo
   const env = agentEnv(scope?.cap ?? null)
   return {
     sandboxed: false,
-    env: connections ? { ...env, ...connectionEnv(await taskConnections(task)) } : env,
+    env: connections ? { ...env, ...connectionEnv(grantConnections(await taskConnections(task))) } : env,
     ...(scope === null ? {} : { spawn: spawnInScope(scope) }),
   }
 }

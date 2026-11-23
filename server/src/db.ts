@@ -313,7 +313,7 @@ export const tasks = {
   markSeen: async (id: string) => {
     await sql`UPDATE task SET unseen = false WHERE id = ${id} AND status <> 'running'`
   },
-  setSession: async (id: string, session: { sessionId: string; permissionMode: string; model: string }) => {
+  setSession: async (id: string, session: { sessionId: string; permissionMode: string | null; model: string }) => {
     await sql`UPDATE task SET session_id = ${session.sessionId}, permission_mode = ${session.permissionMode},
       model = ${session.model} WHERE id = ${id}`
   },

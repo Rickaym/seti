@@ -146,8 +146,9 @@ they are.
   `session-ingest.ts` stores what they report over the typed link in `node-link.ts`, with their
   state in `session-mirror.ts`. Decisions inside a turn are asks the node sends: `runtime-host.ts`
   asks, `turn-asks.ts` answers, and `session-tools.ts` serves the tools Seti hands a session;
-  `tasks.ts` starts tasks. Only `runtimes/claude/`
-  imports values from the Claude Agent SDK (ESLint enforces it); other files import its types.
+  `tasks.ts` starts tasks. Only the Claude adapter (`runtimes/claude/` here and in `shared/src/`)
+  imports the Claude Agent SDK, types included: `eslint/sdk-fence.js` enforces it and lists the
+  files still allowed, each with the stage that removes it.
 - `server/src/routes/<area>.ts`: one router per area.
 - `server/src/store/`: SQL. `<area>.ts` holds typed queries, `schema-<area>.ts` the migration SQL,
   and `schema.ts` the ordered `MIGRATIONS` list.

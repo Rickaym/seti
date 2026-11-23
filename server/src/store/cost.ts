@@ -1,10 +1,11 @@
-import type { SDKMessage, SDKResultMessage } from '@anthropic-ai/claude-agent-sdk'
-import { TURN_COST_KEY, type WithTurnCost } from '@seti/shared'
 import { now, rowFilter, sql, transaction } from '../db.js'
 import { countResult, type SessionTotal } from '../turn-cost.js'
 
-/** Adds what a result's turn cost to its task and returns that amount; null when not known. */
-async function recordResult(taskId: string, sessionId: string, total: number): Promise<number | null> {
+/**
+ * Adds what a turn cost to its task, from the session's running total its end reports, and
+ * returns that amount; null when not known.
+ */
+export async function recordTurnCost(taskId: string, sessionId: string, total: number): Promise<number | null> {
   return transaction(async (tx) => {
     const [task] = await tx`SELECT 1 FROM task WHERE id = ${taskId} FOR UPDATE`
     if (task === undefined) {
@@ -23,19 +24,6 @@ async function recordResult(taskId: string, sessionId: string, total: number): P
     }
     return counted.cost
   })
-}
-
-/** A result carries the session's running total; its turn's share is counted and stored with it. */
-export async function withTurnCost(taskId: string, m: SDKMessage): Promise<SDKMessage> {
-  if (m.type !== 'result') {
-    return m
-  }
-  const cost = await recordResult(taskId, m.session_id, m.total_cost_usd)
-  if (cost === null) {
-    return m
-  }
-  const counted: WithTurnCost<SDKResultMessage> = { ...m, [TURN_COST_KEY]: cost }
-  return counted
 }
 
 /** Adds what a side chat answer cost to its task, and to the ledger today's cost reads. */
