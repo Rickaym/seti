@@ -8,6 +8,7 @@ import {
   type WirePage,
   type WireRow,
 } from '@seti/shared'
+import { fromDelegate } from './ea-guard.js'
 import { scrubValue } from './scrub.js'
 
 /** Characters of one tool text the browser gets before it asks for the full message. */
@@ -173,8 +174,9 @@ function trimRow(row: MessageRow): MessageRow {
 /** How a client takes runtime rows: as neutral events, or as the runtime stored them. */
 export type WireForm = 'events' | 'stored'
 
+/** The form a request asked for; the EA, agents and mods get events only (RT-7). */
 export const wireFormOf = (query: { wire?: 'events' | undefined }): WireForm =>
-  query.wire === 'events' ? 'events' : 'stored'
+  query.wire === 'events' || fromDelegate() ? 'events' : 'stored'
 
 /** A redacted row in the form the client asked for. */
 const inForm = (row: MessageRow, form: WireForm): WireRow => (form === 'events' ? asEventsRow(row) : row)

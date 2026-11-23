@@ -9,7 +9,7 @@ import {
   requestsSection,
   sectionCount,
   sentLine,
-  sentToast,
+  expectNoSentToast,
 } from './support/questions.js'
 
 test.use({ serverEnv: FAKE_CLAUDE_ENV })
@@ -44,8 +44,8 @@ test('two agents ask through AskUserQuestion and one Submit all answers both', a
   await page.getByRole('button', { name: 'Submit all' }).click()
 
   await expect(page).toHaveURL(new RegExp(`#agents/${checker.id}$`))
-  await expect(sentToast(page, /Sent 3 answers\. Going on:/)).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Requests' })).toHaveCount(0)
+  await expectNoSentToast(page)
   await expect(requestsSection(page)).toBeVisible()
   await expect(sectionCount(requestsSection(page))).toHaveCount(0)
   await expect.poll(async () => lastReply(request, pusher.id)).toBe(`Got your answers. ${PUSH_QUESTION} Yes`)
@@ -70,7 +70,7 @@ test("Skip dismisses an agent's questions, it goes on, and the page opened direc
   await group.getByRole('button', { name: `Skip ${skipped.title}` }).click()
   await expect(group).toHaveCount(0)
   await expect(page).toHaveURL(/#agents$/)
-  await expect(sentToast(page, /dismissed 1 question/)).toBeVisible()
+  await expectNoSentToast(page)
   await expect
     .poll(async () => lastReply(request, skipped.id))
     .toMatch(/^No answers: The user dismissed your questions/)
