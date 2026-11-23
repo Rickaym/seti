@@ -5,6 +5,7 @@ import {
   proxyAwsToken,
   proxyCa,
   proxyGone,
+  modelProxyHere,
   proxyHere,
   sshAgentHere,
   sshKeysChanged,
@@ -31,6 +32,7 @@ describe('the owner of an agent egress proxy', () => {
 
     const owner = {
       open: vi.fn(async () => Promise.resolve()),
+      openModel: vi.fn(async () => Promise.resolve()),
       close: vi.fn(async () => Promise.resolve()),
       awsToken: vi.fn(async () => Promise.resolve('node')),
       sshOpen: vi.fn(async () => Promise.resolve()),
@@ -42,6 +44,8 @@ describe('the owner of an agent egress proxy', () => {
     expect(start).toHaveBeenCalledTimes(1)
     expect(stop).toHaveBeenCalledTimes(1)
     expect(owner.open).toHaveBeenCalledWith('agent', grant)
+    await modelProxyHere(task.id, 'login', start)
+    expect(owner.openModel).toHaveBeenCalledWith('agent', 'login')
     expect(owner.close).toHaveBeenCalledWith('agent')
     expect(await proxyAwsToken(task.id, () => 'here')).toBe('node')
     await sshAgentHere(task.id, start)

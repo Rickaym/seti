@@ -1,5 +1,6 @@
 import fs from 'node:fs'
 import path from 'node:path'
+import { readOnlyWork } from './sandbox-read-only.js'
 
 export type Mount =
   | { kind: 'bind' | 'ro-bind'; src: string; dest: string }
@@ -40,6 +41,11 @@ export interface SandboxLayout {
   sessionId: string | null
   /** The task's generated ~/.ssh and the agent socket's directory, when it has ssh hosts. */
   ssh?: { dir: string; agentDir: string } | null
+  /**
+   * A maintenance session: every folder above read-only except the agent's own memory folder and
+   * these, mounted at their host path.
+   */
+  maintenance?: { writable: readonly string[] }
 }
 
 const SYSTEM_DIRS = ['/usr', '/etc']
@@ -419,6 +425,17 @@ function masks(layout: SandboxLayout, mounted: readonly string[]): Mount[] {
     })
 }
 
+/** The user's mounts as a maintenance session gets them, or as they are for any other. */
+function maintained(user: Mount[], layout: SandboxLayout): Mount[] {
+  if (layout.maintenance === undefined) {
+    return user
+  }
+  const memory = path.join('projects', projectSlug(layout.cwd), 'memory')
+  fs.mkdirSync(path.join(layout.claudeHome, memory), { recursive: true, mode: 0o700 })
+  const own = { src: path.join(layout.claudeHome, memory), dest: path.join(layout.home, '.claude', memory) }
+  return readOnlyWork(user, { memory: own, writable: layout.maintenance.writable }, layout.hidden)
+}
+
 /**
  * Every mount of a task's sandbox, in the order bwrap applies them: the system read-only, a
  * private home and /tmp, the task's directories and caches, then covers for what must not
@@ -433,7 +450,7 @@ export function sandboxMounts(layout: SandboxLayout): Mount[] {
     ...binds.readOnly.map((dir): Mount => ({ kind: 'ro-bind', src: dir, dest: dir })),
     ...claudeMounts(layout),
   ]
-  const unique = [...new Map(user.map((mount) => [mount.dest, mount])).values()].sort(byDest)
+  const unique = [...new Map(maintained(user, layout).map((mount) => [mount.dest, mount])).values()].sort(byDest)
   const ca: Mount[] = [
     { kind: 'ro-bind', src: layout.caDir, dest: SANDBOX_CA },
     { kind: 'ro-bind', src: path.join(layout.taskDir, 'run'), dest: SANDBOX_RUN },
