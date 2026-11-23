@@ -1,11 +1,11 @@
 import type { DreamRun, Revision } from '@seti/shared'
-import { ChevronDown, Moon, Sparkles, Undo2 } from 'lucide-react'
+import { ChevronDown, Moon, Sparkles } from 'lucide-react'
 import { useId, useState } from 'react'
-import { Hint } from '@/components/Hint'
 import { ToggleButton } from '@/components/ToggleButton'
 import { Button } from '@/components/ui/button'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { DreamProposals } from './DreamProposals'
+import { MemoryChanges } from './MemoryDiff'
 import { useDreams, useNightly } from './useDreams'
 
 const CONSEQUENCE = 'text-2xs text-muted-foreground'
@@ -33,34 +33,6 @@ function ReportList({ title, items }: { title: string; items: readonly string[] 
         ))}
       </ul>
     </div>
-  )
-}
-
-function Changes({ changes, onUndo }: { changes: readonly Revision[]; onUndo: (revision: Revision) => void }) {
-  return (
-    <ul aria-label="Memory changes" className="grid gap-1">
-      {changes.map((revision) => {
-        const file = revision.object_id.slice(revision.object_id.indexOf(':') + 1)
-        return (
-          <li key={revision.id} className="flex items-center justify-between gap-2 text-2xs">
-            <span className="min-w-0 truncate font-mono">{file}</span>
-            <Hint text={`Put ${file} back as it was before this dream`}>
-              <Button
-                variant="ghost"
-                size="sm"
-                aria-label={`Undo ${file}`}
-                onClick={() => {
-                  onUndo(revision)
-                }}
-              >
-                <Undo2 />
-                Undo
-              </Button>
-            </Hint>
-          </li>
-        )
-      })}
-    </ul>
   )
 }
 
@@ -93,7 +65,7 @@ function LastDream({
         <ReportList title="Remembered" items={report?.remembered ?? []} />
         <ReportList title="Asks" items={report?.asks ?? []} />
         <ReportList title="Found" items={report?.found ?? []} />
-        {changes.length > 0 && <Changes changes={changes} onUndo={onUndo} />}
+        {changes.length > 0 && <MemoryChanges changes={changes} onUndo={onUndo} />}
       </CollapsibleContent>
     </Collapsible>
   )

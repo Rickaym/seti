@@ -43,10 +43,15 @@ function DiffRowView({ row }: { row: DiffRow }) {
 }
 
 /** The lines that changed between two texts, with long unchanged runs folded. */
-export function LineDiff({ before, after }: { before: string; after: string }) {
+export function LineDiff({ before, after, className }: { before: string; after: string; className?: string }) {
   const rows = foldUnchanged(lineDiff(before, after))
   return (
-    <div className="max-h-72 overflow-auto border border-border bg-muted/30 py-1 font-mono text-2xs leading-relaxed break-all">
+    <div
+      className={cn(
+        'max-h-72 overflow-auto border border-border bg-muted/30 py-1 font-mono text-2xs leading-relaxed break-all',
+        className,
+      )}
+    >
       {rows.map((row, index) => (
         <DiffRowView key={String(index)} row={row} />
       ))}
