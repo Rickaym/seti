@@ -29,7 +29,13 @@ interface Open {
   facts?: CallFacts
   decision?: Decision
   runtime?: Observed
+  /** The runtime asked while its auto mode was paused after repeated classifier blocks. */
+  paused?: boolean
 }
+
+/** Claude Code's auto mode prompts after this many classifier blocks in a row, or in all. */
+const BLOCKS_IN_A_ROW = 3
+const BLOCKS_IN_ALL = 20
 
 /** Calls of one session waiting for both sides, at most this many; the oldest go first. */
 const OPEN_MAX = 1000
@@ -37,28 +43,40 @@ const OPEN_MAX = 1000
 /** A call Seti's own hooks refuse or hold never reaches the runtime's rules, so is not compared. */
 const setiHook = (decision: Decision) => decision.step === 'guard' || decision.verdict === 'review'
 
-function resultOf(decision: Decision, runtime: Observed | 'unobserved'): ShadowRecord['result'] {
+function resultOf(decision: Decision, runtime: Observed | 'unobserved', paused: boolean): ShadowRecord['result'] {
+  if (paused && runtime === 'ask' && decision.verdict === 'defer') {
+    return 'deferred'
+  }
   if (runtime !== 'interrupted' && runtime !== 'unobserved') {
     return compareOutcomes(decision, runtime)
   }
   return setiHook(decision) ? 'seti-hook' : runtime
 }
 
-function recordOf(facts: CallFacts, decision: Decision, runtime: Observed | 'unobserved'): ShadowRecord {
-  const result = resultOf(decision, runtime)
+function recordOf(
+  facts: CallFacts,
+  decision: Decision,
+  runtime: Observed | 'unobserved',
+  paused = false,
+): ShadowRecord {
+  const result = resultOf(decision, runtime, paused)
   return { ...facts, verdict: decision.verdict, step: decision.step, rule: decision.rule ?? '', runtime, result }
 }
 
 /**
  * Pairs Seti's decision on each call of a session with what the runtime did, whichever comes
  * first, and hands each pair on once. What the runtime did first counts: an ask stays an ask
- * after the user allows the call.
+ * after the user allows the call. A deferred call the runtime asked about while its auto mode was
+ * paused after repeated classifier blocks counts as deferred: the classifier's fallback asked.
  */
 export class ShadowTracker {
   private readonly open = new Map<string, Open>()
   /** Calls already handed on, so a later sign of the same call opens nothing. */
   private readonly done = new Set<string>()
   private readonly emit: (record: ShadowRecord) => void
+  /** Classifier blocks since a call last ran, and since the total last paused auto mode. */
+  private readonly blocks = { inARow: 0, inAll: 0 }
+  private paused = false
 
   constructor(emit: (record: ShadowRecord) => void) {
     this.emit = emit
@@ -69,8 +87,26 @@ export class ShadowTracker {
   }
 
   observed(callId: string, runtime: Observed): void {
+    const paused = runtime === 'ask' && this.paused
+    this.count(runtime)
     if (!this.done.has(callId) && this.open.get(callId)?.runtime === undefined) {
-      this.update(callId, { runtime })
+      this.update(callId, paused ? { runtime, paused } : { runtime })
+    }
+  }
+
+  /** Follows auto mode's pause: a block counts, a call that ran resumes it and ends the row. */
+  private count(runtime: Observed): void {
+    if (runtime === 'allow') {
+      this.blocks.inARow = 0
+      this.paused = false
+    } else if (runtime === 'deny') {
+      this.blocks.inARow += 1
+      this.blocks.inAll += 1
+      if (this.blocks.inAll >= BLOCKS_IN_ALL) {
+        this.blocks.inAll = 0
+        this.paused = true
+      }
+      this.paused ||= this.blocks.inARow >= BLOCKS_IN_A_ROW
     }
   }
 
@@ -90,7 +126,7 @@ export class ShadowTracker {
     if (entry.facts !== undefined && entry.decision !== undefined && entry.runtime !== undefined) {
       this.open.delete(callId)
       this.finish(callId)
-      this.emit(recordOf(entry.facts, entry.decision, entry.runtime))
+      this.emit(recordOf(entry.facts, entry.decision, entry.runtime, entry.paused))
       return
     }
     this.open.set(callId, entry)

@@ -1,7 +1,7 @@
 import type {
   AgentTodo,
-  MessagePage,
-  MessageRow,
+  WirePage,
+  WireRow,
   OwnMessageStep,
   ShellProgress,
   SubtaskBrief,
@@ -20,6 +20,7 @@ import { mergeBriefs } from '@/lib/subtasks'
 import { mergeRows, replaceRow } from '@/lib/transcript'
 import { refreshTranscriptBlocks } from '@/lib/transcript-blocks'
 import { cachedTranscript, cacheTranscript, withBacklog, type LoadedRows as Loaded } from '@/lib/transcript-cache'
+import { asEvents } from '@/lib/wire'
 import type { TranscriptWindow } from '@/panels/tasks/TranscriptPane'
 
 export interface TaskStream extends Loaded {
@@ -70,10 +71,10 @@ const NO_SUBTASKS: readonly SubtaskBrief[] = []
 const NO_SESSION: TaskSession = { open: false, background: 0 }
 
 /** Drops the live shell entry once its finished row has arrived. */
-const settled = (shell: ShellProgress | null, rows: readonly MessageRow[]) =>
+const settled = (shell: ShellProgress | null, rows: readonly WireRow[]) =>
   shell !== null && rows.some((row) => row.kind === 'shell' && row.payload.run_id === shell.run_id) ? null : shell
 
-function merged(prev: Loaded, rows: readonly MessageRow[], hasOlder = prev.hasOlder): Loaded {
+function merged(prev: Loaded, rows: readonly WireRow[], hasOlder = prev.hasOlder): Loaded {
   const messages = mergeRows(prev.messages, rows)
   return messages === prev.messages && hasOlder === prev.hasOlder ? prev : { messages, hasOlder }
 }
@@ -108,7 +109,7 @@ export function useTaskStream(taskId: string): TaskStream {
       setCursor(event.lastEventId === '' ? null : event.lastEventId)
     }
     const stream = openEventStream(
-      `/tasks/${taskId}/stream`,
+      asEvents(`/tasks/${taskId}/stream`),
       {
         onConnected: (connected) => {
           if (open) {
@@ -117,7 +118,7 @@ export function useTaskStream(taskId: string): TaskStream {
         },
         events: {
           backlog: (event) => {
-            const page = JSON.parse(event.data) as MessagePage
+            const page = JSON.parse(event.data) as WirePage
             setLoaded({ messages: page.messages, hasOlder: page.has_older })
             rowsUpTo(event)
             setReady(true)
@@ -125,13 +126,13 @@ export function useTaskStream(taskId: string): TaskStream {
             setShell((prev) => settled(prev, page.messages))
           },
           message: (event) => {
-            const row = JSON.parse(event.data) as MessageRow
+            const row = JSON.parse(event.data) as WireRow
             setLoaded((prev) => merged(prev, [row]))
             rowsUpTo(event)
             setShell((prev) => settled(prev, [row]))
           },
           updated: (event) => {
-            const row = JSON.parse(event.data) as MessageRow
+            const row = JSON.parse(event.data) as WireRow
             const replace = <T extends Loaded>(prev: T): T => {
               const messages = replaceRow(prev.messages, row)
               return messages === prev.messages ? prev : { ...prev, messages }
@@ -209,7 +210,7 @@ export function useTaskStream(taskId: string): TaskStream {
   }, [])
 
   const resync = useCallback(() => {
-    Promise.all([apiGet<MessagePage>(`/tasks/${taskId}/messages`), apiGet<Task>(`/tasks/${taskId}`)])
+    Promise.all([apiGet<WirePage>(asEvents(`/tasks/${taskId}/messages`)), apiGet<Task>(`/tasks/${taskId}`)])
       .then(([page, task]) => {
         setLoaded((prev) => withBacklog(prev, page))
         setStatus(task.status)
@@ -230,7 +231,7 @@ export function useTaskStream(taskId: string): TaskStream {
       setLoadingOlder(true)
       try {
         const size = limit === undefined ? '' : `&limit=${String(limit)}`
-        const page = await apiGet<MessagePage>(`/tasks/${taskId}/messages?before=${String(oldest)}${size}`)
+        const page = await apiGet<WirePage>(asEvents(`/tasks/${taskId}/messages?before=${String(oldest)}${size}`))
         if (isDetached) {
           setDetached((prev) => prev && { ...merged(prev, page.messages, page.has_older), hasNewer: prev.hasNewer })
         } else {
@@ -249,7 +250,7 @@ export function useTaskStream(taskId: string): TaskStream {
   )
 
   /** Joins a stretch that reached the newest messages back onto them. */
-  const rejoin = useCallback((rows: readonly MessageRow[], hasOlder: boolean) => {
+  const rejoin = useCallback((rows: readonly WireRow[], hasOlder: boolean) => {
     setLoaded((prev) => ({ messages: mergeRows(prev.messages, rows), hasOlder }))
     setDetached(null)
   }, [])
@@ -263,8 +264,8 @@ export function useTaskStream(taskId: string): TaskStream {
       loading.current = true
       setLoadingNewer(true)
       try {
-        const page = await apiGet<MessagePage>(
-          `/tasks/${taskId}/messages?after=${String(newest)}&limit=${String(limit)}`,
+        const page = await apiGet<WirePage>(
+          asEvents(`/tasks/${taskId}/messages?after=${String(newest)}&limit=${String(limit)}`),
         )
         if (page.has_newer === true) {
           setDetached((prev) => prev && { ...merged(prev, page.messages), hasNewer: true })
@@ -296,7 +297,9 @@ export function useTaskStream(taskId: string): TaskStream {
         return
       }
       try {
-        const page = await apiGet<MessagePage>(`/tasks/${taskId}/messages?around=${String(id)}&limit=${String(WINDOW)}`)
+        const page = await apiGet<WirePage>(
+          asEvents(`/tasks/${taskId}/messages?around=${String(id)}&limit=${String(WINDOW)}`),
+        )
         if (page.has_newer === true) {
           setDetached({ messages: page.messages, hasOlder: page.has_older, hasNewer: true })
         } else {

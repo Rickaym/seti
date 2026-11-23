@@ -1,4 +1,4 @@
-import type { MessageRow } from '@seti/shared'
+import type { WireRow } from '@seti/shared'
 import { X } from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'sonner'
@@ -6,7 +6,7 @@ import { apiDelete, errorText } from '@/api'
 import { Hint } from '@/components/Hint'
 import { InfoTip } from '@/components/InfoTip'
 
-export type PromptRow = Extract<MessageRow, { kind: 'prompt' }>
+export type PromptRow = Extract<WireRow, { kind: 'prompt' }>
 
 /** Takes a queued message back before the agent reads it. */
 function RemoveQueued({ taskId, rowId }: { taskId: string; rowId: number }) {

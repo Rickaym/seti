@@ -10,7 +10,7 @@ let transport: typeof query = query
 export const claudeAdapter: RuntimeAdapter<ClaudeShapes> = {
   id: 'claude',
   capabilities: {
-    gate: { rewriteInput: true },
+    gate: { rewriteInput: true, classifier: true },
     session: { fork: 'ephemeral' },
     rewind: { conversation: true, code: true },
   },

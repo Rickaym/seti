@@ -54,6 +54,59 @@ describe('pairing decisions with what the runtime did', () => {
   })
 })
 
+describe("auto mode's pause after repeated classifier blocks", () => {
+  const block = (tracker: ShadowTracker, ids: readonly string[]) => {
+    for (const id of ids) {
+      tracker.decided(id, facts, defer)
+      tracker.observed(id, 'deny')
+    }
+  }
+  const askedAbout = (tracker: ShadowTracker, id: string, decision: Decision = defer) => {
+    tracker.decided(id, facts, decision)
+    tracker.observed(id, 'ask')
+  }
+  const results = (records: readonly ShadowRecord[]) => records.slice(-1).map((record) => record.result)
+
+  it('counts a deferred call asked about after 3 blocks in a row as deferred, not looser', () => {
+    const { tracker, records } = tracked()
+    block(tracker, ['b1', 'b2'])
+    askedAbout(tracker, 'early')
+    expect(results(records)).toEqual(['looser'])
+    block(tracker, ['b3'])
+    askedAbout(tracker, 'paused')
+    expect(results(records)).toEqual(['deferred'])
+    askedAbout(tracker, 'by-rule', allow)
+    expect(results(records)).toEqual(['looser'])
+  })
+
+  it('resumes once a call runs, the asked one approved included', () => {
+    const { tracker, records } = tracked()
+    block(tracker, ['b1', 'b2', 'b3'])
+    askedAbout(tracker, 'paused')
+    tracker.observed('paused', 'allow')
+    askedAbout(tracker, 'resumed')
+    expect(records.map((record) => record.result).slice(-2)).toEqual(['deferred', 'looser'])
+  })
+
+  it('pauses after 20 blocks in all, and counts the total again from there', () => {
+    const { tracker, records } = tracked()
+    for (let i = 0; i < 9; i += 1) {
+      block(tracker, [`x${String(i)}`, `y${String(i)}`])
+      tracker.observed(`ran${String(i)}`, 'allow')
+    }
+    block(tracker, ['b19'])
+    askedAbout(tracker, 'nineteen')
+    expect(results(records)).toEqual(['looser'])
+    block(tracker, ['b20'])
+    askedAbout(tracker, 'twenty')
+    expect(results(records)).toEqual(['deferred'])
+    tracker.observed('ran', 'allow')
+    block(tracker, ['c1', 'c2'])
+    askedAbout(tracker, 'counted-again')
+    expect(results(records)).toEqual(['looser'])
+  })
+})
+
 describe('the doctor line', () => {
   it('counts the last seven days, today included', () => {
     expect(shadowSince(7, new Date('2026-11-22T10:00:00Z'))).toBe('2026-11-16')
