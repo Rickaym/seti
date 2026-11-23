@@ -106,7 +106,7 @@ describe('credentials and protected files', () => {
     const inherited = [['deny', 'Read(/secrets/**)']] as const
     expect(decideClaude('Read', { file_path: `${HOME}/.claude/secrets/k` }, { inherited })).toMatchObject({
       verdict: 'deny',
-      rule: 'inherited:~/.claude/settings.json:0',
+      rule: 'inherited:user:0',
     })
     expect(decideClaude('Read', { file_path: `${CWD}/secrets/k` }, { inherited }).verdict).toBe('allow')
   })

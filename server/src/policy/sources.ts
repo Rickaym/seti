@@ -20,7 +20,7 @@ export interface RuleSources {
 
 /**
  * The rules as the evaluator reads them, each with a ref that names it without its text where
- * the text is the user's: a stored rule by id, a settings file's rule by file and position.
+ * the text is the user's: a stored rule by id, a settings file's rule by scope and position.
  */
 export function sourcedRules(sources: RuleSources): SourcedRule[] {
   const own = (behavior: SourcedRule['behavior'], text: string, ref: string): SourcedRule => ({
@@ -39,7 +39,7 @@ export function sourcedRules(sources: RuleSources): SourcedRule[] {
     ...sources.inherited.map((rule, i) => ({
       behavior: rule.behavior,
       text: rule.rule,
-      ref: `inherited:${rule.source}:${String(i)}`,
+      ref: `inherited:${rule.anchor === sources.cwd ? 'project' : 'user'}:${String(i)}`,
       anchor: rule.anchor,
     })),
   ]

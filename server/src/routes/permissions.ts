@@ -5,8 +5,10 @@ import {
   permissionRequestParams,
   permissionRuleParams,
   permissionTimeoutInput,
+  policyShadowQuery,
   reviewCoverageQuery,
   setBypassInput,
+  shadowSince,
   taskPermissionRuleParams,
 } from '@seti/shared'
 import { Hono } from 'hono'
@@ -26,6 +28,7 @@ import {
   taskRequests,
 } from '../permission-rules.js'
 import { permissionTimeout, setPermissionTimeout } from '../permission-timeout.js'
+import { policyShadow } from '../store/policy-shadow.js'
 
 /** The EA may list rules and requests to remind the user, never change or answer them. */
 const userOnly = eaReadOnly('change permission rules or the request timeout, or answer permission requests')
@@ -50,6 +53,9 @@ export const permissionRoutes = new Hono()
   })
   .get('/requests', async (c) => ok(c, await pendingRequests()))
   .get('/timeout', async (c) => ok(c, await permissionTimeout()))
+  .get('/shadow', valid('query', policyShadowQuery), async (c) =>
+    ok(c, await policyShadow.summary(shadowSince(c.req.valid('query').days))),
+  )
   .put('/timeout', validJson(permissionTimeoutInput), async (c) =>
     ok(c, await setPermissionTimeout(c.req.valid('json'))),
   )

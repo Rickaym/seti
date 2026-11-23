@@ -1,5 +1,6 @@
+import { shadowSince } from '@seti/shared'
 import { describe, expect, it } from 'vitest'
-import { shadowCheck, shadowSince } from '../doctor.js'
+import { shadowCheck } from '../doctor.js'
 import { ShadowTracker, type CallFacts, type ShadowRecord } from './shadow.js'
 import type { Decision } from './types.js'
 
@@ -55,7 +56,7 @@ describe('pairing decisions with what the runtime did', () => {
 
 describe('the doctor line', () => {
   it('counts the last seven days, today included', () => {
-    expect(shadowSince(new Date('2026-11-22T10:00:00Z'))).toBe('2026-11-16')
+    expect(shadowSince(7, new Date('2026-11-22T10:00:00Z'))).toBe('2026-11-16')
   })
 
   it('says how many calls matched and how the rest differed', () => {
