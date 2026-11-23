@@ -11,7 +11,7 @@ import { CONNECTIONS, secretsToConnections } from './schema-connections.js'
 import { recountTaskCosts, TASK_COST_SESSION, TASK_SIDE_CHAT_COST } from './schema-cost.js'
 import { CPU_CAPS } from './schema-cpu.js'
 import { ANDROID_OVERRIDE, DEVICE_SHOW_NAMES, DEVICES, dropOfficialAndroidRow } from './schema-devices.js'
-import { DREAM_NIGHTS, DREAM_RUNS } from './schema-dreams.js'
+import { DREAM_NIGHTS, DREAM_PROPOSALS, DREAM_RUNS } from './schema-dreams.js'
 import {
   ATTENTION_TIERS,
   EA_CONTEXT_PACKS,
@@ -226,4 +226,5 @@ export const MIGRATIONS: readonly Migration[] = [
   { version: 121, name: 'node_prompts', sql: NODE_PROMPTS },
   { version: 122, name: 'dream_runs', sql: DREAM_RUNS },
   { version: 123, name: 'dream_nights', sql: DREAM_NIGHTS },
+  { version: 124, name: 'dream_proposals', sql: DREAM_PROPOSALS },
 ]

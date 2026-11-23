@@ -2,7 +2,15 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { REBUILDABLE_DIRS, REBUILDABLE_IF_IGNORED, type Task } from '@seti/shared'
-import { ARCHIVE_ROOT, MOD_FETCH_ROOT, SANDBOX_ROOT, SCRATCH_ROOT, SHARED_TOOLS_ROOT, WORKTREE_ROOT } from './config.js'
+import {
+  ARCHIVE_ROOT,
+  MOD_FETCH_ROOT,
+  SANDBOX_ROOT,
+  SCRATCH_ROOT,
+  SHARED_TOOLS_ROOT,
+  TRASH_ROOT,
+  WORKTREE_ROOT,
+} from './config.js'
 import { removeLinkedWorktree } from './git.js'
 import { WORKSPACE_ROOT } from './workspace/dir.js'
 
@@ -15,6 +23,7 @@ export const OWNED_ROOTS = {
   archive: ARCHIVE_ROOT,
   modFetch: MOD_FETCH_ROOT,
   sharedTools: SHARED_TOOLS_ROOT,
+  trash: TRASH_ROOT,
 } as const
 
 export type OwnedRoot = keyof typeof OWNED_ROOTS

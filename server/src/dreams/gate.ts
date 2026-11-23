@@ -8,6 +8,8 @@ import { asText, MEMORY_CAP } from './memory-files.js'
 /** The tool server a dream reports through, and its one tool. */
 export const DREAM_SERVER = 'dream'
 export const DREAM_REPORT = 'dream_report'
+/** The tool a dream proposes clean-ups with, served only when the user turned clean-ups on. */
+export const DREAM_PROPOSE = 'dream_propose'
 
 /** Where a dream works, as its sandbox shows the paths. */
 export interface DreamPlaces {
@@ -159,7 +161,7 @@ const BY_KIND: Partial<Record<ToolKind, Decide>> = {
   edit: editAnswer,
   shell: (call, places) => shellAnswer(call, places),
   mcp: (call) =>
-    call.mcp?.server === DREAM_SERVER && call.mcp.tool === DREAM_REPORT
+    call.mcp?.server === DREAM_SERVER && (call.mcp.tool === DREAM_REPORT || call.mcp.tool === DREAM_PROPOSE)
       ? null
       : 'A dream has no tool servers but its report.',
 }

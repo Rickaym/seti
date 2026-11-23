@@ -295,6 +295,11 @@ export const AUDIT_KINDS = [
   'dream.night_planned',
   'dream.night_ended',
   'dream.night_missed',
+  'dream.proposed',
+  'dream.proposal_decided',
+  'dream.trashed',
+  'dream.restored',
+  'dream.trash_purged',
 ] as const satisfies readonly `${AuditArea}.${string}`[]
 export type AuditKind = (typeof AUDIT_KINDS)[number]
 

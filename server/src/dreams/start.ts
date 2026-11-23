@@ -81,7 +81,7 @@ async function dreamRefusal(task: Task): Promise<DreamRefusal | null> {
 /** What one dream of the agent may use under Dreaming's settings. */
 export function dreamLimits(task: Pick<Task, 'model'>, settings: DreamSettings): DreamLimits {
   const model = settings.model === 'agent' ? (task.model ?? DREAM_LIMITS.model) : settings.model
-  return { ...DREAM_LIMITS, model, budgetUsd: settings.dream_budget_usd }
+  return { ...DREAM_LIMITS, model, budgetUsd: settings.dream_budget_usd, cleanups: settings.cleanups }
 }
 
 /** The local date in Dreaming's zone, else Seti's, which names the night a dream belongs to. */

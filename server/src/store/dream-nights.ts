@@ -11,7 +11,7 @@ interface SettingsRow extends Omit<DreamSettings, 'dream_budget_usd' | 'night_bu
 export const dreamSettings = {
   get: async (): Promise<DreamSettings> => {
     const [row] = await sql<SettingsRow[]>`SELECT enabled, window_start, window_end, zone, model,
-        dream_budget_usd, night_budget_usd, at_once FROM dream_settings WHERE id = 1`
+        dream_budget_usd, night_budget_usd, at_once, cleanups FROM dream_settings WHERE id = 1`
     return row === undefined
       ? DREAM_SETTINGS_DEFAULTS
       : {
@@ -22,13 +22,13 @@ export const dreamSettings = {
   },
   set: async (next: DreamSettings): Promise<void> => {
     await sql`INSERT INTO dream_settings (id, enabled, window_start, window_end, zone, model,
-        dream_budget_usd, night_budget_usd, at_once, updated_at)
+        dream_budget_usd, night_budget_usd, at_once, cleanups, updated_at)
       VALUES (1, ${next.enabled}, ${next.window_start}, ${next.window_end}, ${next.zone}, ${next.model},
-        ${next.dream_budget_usd}, ${next.night_budget_usd}, ${next.at_once}, ${now()})
+        ${next.dream_budget_usd}, ${next.night_budget_usd}, ${next.at_once}, ${next.cleanups}, ${now()})
       ON CONFLICT (id) DO UPDATE SET enabled = excluded.enabled, window_start = excluded.window_start,
         window_end = excluded.window_end, zone = excluded.zone, model = excluded.model,
         dream_budget_usd = excluded.dream_budget_usd, night_budget_usd = excluded.night_budget_usd,
-        at_once = excluded.at_once, updated_at = excluded.updated_at`
+        at_once = excluded.at_once, cleanups = excluded.cleanups, updated_at = excluded.updated_at`
   },
   /** When the settings were last saved, or null when they never were. */
   savedAt: async (): Promise<string | null> => {

@@ -33,6 +33,7 @@ import {
 import { openDatabase, sql, tasks } from './db.js'
 import { cutDreamsAtStart } from './dreams/start.js'
 import { startDreamTicker } from './dreams/ticker.js'
+import { startTrashSweep } from './dreams/trash.js'
 import { followLiveContext } from './ea-context.js'
 import { startInboxSweeper } from './ea-deliver.js'
 import { startEaIndex } from './ea-index.js'
@@ -224,6 +225,7 @@ startAutoArchive()
 startArchiveLifecycle()
 startStorageSchedule()
 startDreamTicker()
+startTrashSweep()
 startMcpLoginKeeper()
 startLoginKeeper()
 resourceSampler.start()

@@ -30,6 +30,8 @@ export const SCRATCH_ROOT = env('SETI_SCRATCH_ROOT', path.join(os.homedir(), 'wo
 export const BACKUP_DIR = path.join(SETI_HOME, 'backups')
 /** Archived agents' folders, packed into one bundle per agent. */
 export const ARCHIVE_ROOT = path.join(SETI_HOME, 'archive')
+/** Where allowed clean-ups lie until `trash_keep` passes, one folder per item. */
+export const TRASH_ROOT = path.join(SETI_HOME, 'trash')
 /** Bare git repositories a mod install fetches into, each removed once read. */
 export const MOD_FETCH_ROOT = path.join(SETI_HOME, 'mod-fetch')
 /** Each sandboxed agent's private home, /tmp and run folder, one folder per agent. */
