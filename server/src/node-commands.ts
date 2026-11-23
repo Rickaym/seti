@@ -3,6 +3,7 @@ import type { LiveSession } from './agent-session.js'
 import { liveScopes } from './memory-scope.js'
 import { serveControl } from './node-link.js'
 import type { DefaultShapes } from './runtimes/registry.js'
+import { awsToken } from './sandbox-aws-token.js'
 import { applyCaps, applyCpuCaps, scopeCpu, scopeMemory } from './scope-limits.js'
 import {
   closeIdleSession,
@@ -100,6 +101,7 @@ serveControl({
     await openTaskProxy(task as Task)
     return {}
   },
+  'aws.token': ({ agent }) => ({ token: awsToken(agent) }),
   'proxy.close': async ({ agent }) => {
     await closeTaskProxy(agent)
     return {}

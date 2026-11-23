@@ -95,6 +95,7 @@ export async function connectNode(): Promise<void> {
         process.stderr.write(`node link: the node keeps the proxy of ${agent} until it restarts: ${why}\n`)
       })
     },
+    awsToken: async (agent) => (await controlLink.command('aws.token', { agent })).token,
   })
   reachNode({
     command: async (type, body) => client.command(type, body),

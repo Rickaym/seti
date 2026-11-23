@@ -1,16 +1,13 @@
 import path from 'node:path'
-import { AWS_SETTINGS_DEFAULT, DEFAULT_PROFILE_ID, type AwsSettings, type Task } from '@seti/shared'
+import { AWS_SETTINGS_DEFAULT, DEFAULT_PROFILE_ID, type AwsSettings, type NodeAsk, type Task } from '@seti/shared'
 import { taskSsh } from './agent-access.js'
 import { taskAws } from './aws-access.js'
-import { awsBroker } from './aws-credentials.js'
-import { claudeCredential, connectorCredential } from './claude-credential.js'
 import { hostLoginKey } from './claude-logins.js'
 import { SETI_HOME } from './config.js'
 import { connectionPlaceholders, connectionRules, taskConnections } from './connection-egress.js'
 import type { EgressPlaceholder } from './egress-placeholders.js'
 import { startEgressProxy, type EgressProxy } from './egress-proxy.js'
 import { ruleCaHosts, type EgressRule } from './egress-rules.js'
-import { agentToken, tokenOwner } from './github-token.js'
 import { connectorIds, taskDeniedServers } from './mcp-selection.js'
 import { nodeLink } from './node-link.js'
 import { sandboxDirOf } from './owned-dirs.js'
@@ -59,6 +56,10 @@ export async function profileAws(profileId: string): Promise<AwsSettings> {
   return (await profiles.get(profileId))?.aws ?? AWS_SETTINGS_DEFAULT
 }
 
+/** A credential the control plane hands the proxy for one request; the node keeps none. */
+const mint = async (taskId: string, ask: NodeAsk<'secret.mint'>) =>
+  (await nodeLink.ask(taskId, 'secret.mint', ask)).token
+
 async function taskProxy(task: Task, authority: SandboxCa): Promise<EgressProxy> {
   const taskId = task.id
   const existing = proxies.get(taskId)
@@ -71,9 +72,9 @@ async function taskProxy(task: Task, authority: SandboxCa): Promise<EgressProxy>
     allowed: async () => allowedFor(taskId),
     ca: authority,
     credentials: {
-      claude: async () => (await claudeCredential(accessOf(taskId).login))?.token ?? null,
-      github: async (owner) => agentToken(accessOf(taskId).profileId, owner ?? tokenOwner(task)),
-      connector: async () => Promise.resolve(connectorCredential()),
+      claude: async () => mint(taskId, { kind: 'claude', login: accessOf(taskId).login }),
+      github: async (owner) => mint(taskId, { kind: 'github', owner }),
+      connector: async () => mint(taskId, { kind: 'connector' }),
     },
     rules: () => accessOf(taskId).rules,
     placeholders: () => accessOf(taskId).placeholders,
@@ -85,7 +86,7 @@ async function taskProxy(task: Task, authority: SandboxCa): Promise<EgressProxy>
     aws: {
       enabled: async () => taskAws(taskId),
       token: awsToken(taskId),
-      credentials: async () => awsBroker.credentials(await profileAws(accessOf(taskId).profileId)),
+      credentials: async () => (await nodeLink.ask(taskId, 'aws.credentials', {})).credentials,
     },
     onRefused: (host) => {
       if (!refused.has(host)) {

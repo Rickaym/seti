@@ -130,6 +130,27 @@ const askSchemas = {
   },
   /** The instructions the agent's compaction keeps, or null for the runtime's own. */
   'hook.compact': { ask: z.object({}), answer: z.object({ instructions: z.string().nullable() }) },
+  /**
+   * A credential the agent's egress proxy puts on a request: the Claude token of the login its
+   * session started on, the GitHub token for an owner, or the claude.ai connectors token.
+   */
+  'secret.mint': {
+    ask: z.discriminatedUnion('kind', [
+      z.object({ kind: z.literal('claude'), login: z.string().nullable() }),
+      z.object({ kind: z.literal('github'), owner: z.string().nullable() }),
+      z.object({ kind: z.literal('connector') }),
+    ]),
+    answer: z.object({ token: z.string().nullable() }),
+  },
+  /** Credentials of the AWS role of the agent's credential, or null without a role. */
+  'aws.credentials': {
+    ask: z.object({}),
+    answer: z.object({
+      credentials: z
+        .object({ AccessKeyId: z.string(), SecretAccessKey: z.string(), Token: z.string(), Expiration: z.string() })
+        .nullable(),
+    }),
+  },
   /** The hosts a sandboxed agent may fetch from. */
   'sandbox.hosts': { ask: z.object({}), answer: z.object({ hosts: z.array(z.string()) }) },
   /** The tools Seti serves the agent's process itself, by MCP server, as each server lists them. */
@@ -257,6 +278,8 @@ const commandSchemas = {
    * builds. The task is the control plane's row.
    */
   'proxy.open': { body: z.object({ agent, task: z.unknown() }), answer: done },
+  /** The token the agent's processes show the node's egress proxy to fetch AWS credentials. */
+  'aws.token': { body: z.object({ agent }), answer: z.object({ token: z.string() }) },
   /** Stops a removed agent's egress proxy on the node. */
   'proxy.close': { body: z.object({ agent }), answer: done },
   /** The agents with a live scope, whose caps a change of a default may move. */

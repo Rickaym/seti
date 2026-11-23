@@ -782,6 +782,9 @@ store, the audit chain and every record.
 - NODE-9: A command the node's guard refused, and a request its egress proxy blocked for
   carrying a connection's placeholder toward a host the connection does not allow, reach the
   control plane as journal entries, which it audits once.
+- NODE-10: The node's egress proxy asks the control plane for each Claude, GitHub, claude.ai
+  connector and AWS credential it puts on a request, and keeps none. A sandbox the control plane
+  builds gets the AWS token of the node's proxy.
 
 ## 16. Audit
 

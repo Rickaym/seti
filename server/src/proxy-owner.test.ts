@@ -1,6 +1,6 @@
 import type { Task } from '@seti/shared'
 import { describe, expect, it, vi } from 'vitest'
-import { proxiesRunBy, proxyGone, proxyHere } from './proxy-owner.js'
+import { proxiesRunBy, proxyAwsToken, proxyGone, proxyHere } from './proxy-owner.js'
 
 const task = { id: 'agent' } as Task
 
@@ -12,8 +12,13 @@ describe('the owner of an agent egress proxy', () => {
     await proxyGone(task.id, stop)
     expect(start).toHaveBeenCalledTimes(1)
     expect(stop).toHaveBeenCalledTimes(1)
+    expect(await proxyAwsToken(task.id, () => 'here')).toBe('here')
 
-    const owner = { open: vi.fn(async () => Promise.resolve()), close: vi.fn(async () => Promise.resolve()) }
+    const owner = {
+      open: vi.fn(async () => Promise.resolve()),
+      close: vi.fn(async () => Promise.resolve()),
+      awsToken: vi.fn(async () => Promise.resolve('node')),
+    }
     proxiesRunBy(owner)
     await proxyHere(task, start)
     await proxyGone(task.id, stop)
@@ -21,5 +26,6 @@ describe('the owner of an agent egress proxy', () => {
     expect(stop).toHaveBeenCalledTimes(1)
     expect(owner.open).toHaveBeenCalledWith(task)
     expect(owner.close).toHaveBeenCalledWith('agent')
+    expect(await proxyAwsToken(task.id, () => 'here')).toBe('node')
   })
 })

@@ -15,7 +15,7 @@ import { taskBorrowedServers } from './mcp-borrowed.js'
 import { launch, type ScopePlan } from './memory-scope.js'
 import { memoryEnv } from './node-heap.js'
 import { sandboxDirOf } from './owned-dirs.js'
-import { proxyGone, proxyHere } from './proxy-owner.js'
+import { proxyAwsToken, proxyGone, proxyHere } from './proxy-owner.js'
 import { awsToken } from './sandbox-aws-token.js'
 import { sandboxClaudeJson } from './sandbox-claude-json.js'
 import { gitEnv } from './sandbox-git.js'
@@ -288,7 +288,10 @@ export async function taskSandbox(task: Task, request: SandboxRequest): Promise<
     github: (await agentTokenStamp(task.profile_id)) !== null,
     connectors: connectorCredential() !== null,
     aws: (await taskAws(task.id))
-      ? { token: awsToken(task.id), region: (await profileAws(task.profile_id)).region }
+      ? {
+          token: await proxyAwsToken(task.id, () => awsToken(task.id)),
+          region: (await profileAws(task.profile_id)).region,
+        }
       : null,
     ssh: ssh !== null,
     memory: request.memory ?? null,
