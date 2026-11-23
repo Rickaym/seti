@@ -2,7 +2,7 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { asText, MEMORY_CAP, sha256 } from './memory-files.js'
 
-export interface MemoryFile {
+interface MemoryFile {
   text: string
   sha256: string
 }
