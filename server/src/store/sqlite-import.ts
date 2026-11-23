@@ -271,7 +271,7 @@ export async function resetSequences(source: DatabaseSync, tx: Db): Promise<void
  */
 export async function deriveRows(tx: Db): Promise<void> {
   await tx.unsafe(TASK_WORKTREE_BACKFILL)
-  await fillEventColumns(tx, 1000, 0)
+  await fillEventColumns(tx, { batch: 1000, restMs: 0 })
   await tx`UPDATE task SET home_access = TRUE`
   await tx`UPDATE task SET turn_ended_at = updated_at WHERE status <> 'running'`
 }
