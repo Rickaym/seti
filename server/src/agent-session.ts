@@ -90,11 +90,17 @@ export class LiveSession {
   turnKind: CutKind = 'user'
   /** Seti is stopping, so the next start resumes the turn instead of this one reporting its end. */
   restartCut = false
+  private changed: () => void = () => undefined
 
   constructor(backlog: NextMessage[]) {
     this.backlog = backlog
     this.running = backlog.length > 0
     this.warm = backlog.length === 0
+  }
+
+  /** Calls `listener` after each change of whether it runs, accepts, queues updates or is open. */
+  watch(listener: () => void): void {
+    this.changed = listener
   }
 
   /** Background subagents and commands still running. */
@@ -195,6 +201,7 @@ export class LiveSession {
     this.ending = null
     this.opener = randomUUID()
     this.input.push(content, this.opener)
+    this.changed()
   }
 
   /**
@@ -264,6 +271,7 @@ export class LiveSession {
     })
     this.queued.set(uuid, { promptId, later: priority === 'later', written: priority === undefined, arrived, arrive })
     this.input.push(content, uuid, priority)
+    this.changed()
   }
 
   /** Claude Code reported the message in its queue, where it can be taken back. */
@@ -276,6 +284,7 @@ export class LiveSession {
     const entry = this.queued.get(uuid)
     entry?.arrive()
     this.queued.delete(uuid)
+    this.changed()
     return entry?.promptId ?? null
   }
 
@@ -286,6 +295,7 @@ export class LiveSession {
     for (const entry of entries) {
       entry.arrive()
     }
+    this.changed()
     return entries.map((entry) => entry.promptId)
   }
 
@@ -320,6 +330,7 @@ export class LiveSession {
    */
   async cutShort(ending: TurnEnding, takenBack: (uuid: string) => void, keepWritten = false): Promise<void> {
     this.ending = ending
+    this.changed()
     const uuids = [...this.queued].filter(([, entry]) => !(keepWritten && entry.written)).map(([uuid]) => uuid)
     await Promise.all(
       uuids.map(async (uuid) => {
@@ -336,6 +347,7 @@ export class LiveSession {
   /** Cuts the running turn short; a session that cannot be interrupted in time is closed. */
   interrupt(ending: TurnEnding): void {
     this.ending = ending
+    this.changed()
     if (this.interrupting) {
       return
     }
@@ -381,6 +393,7 @@ export class LiveSession {
   carryOn(): void {
     this.running = true
     this.cancelIdle()
+    this.changed()
   }
 
   /** Marks the running turn over and returns how it was being ended, if it was. */
@@ -391,6 +404,7 @@ export class LiveSession {
     this.opener = null
     this.stopOpenerWait()
     this.interrupting = false
+    this.changed()
     return ending
   }
 
@@ -411,6 +425,7 @@ export class LiveSession {
   setBackground(tasks: BackgroundTasks): boolean {
     const before = this.background.size
     this.background = new Set(tasks.filter((task) => task.ambient !== true).map((task) => task.task_id))
+    this.changed()
     return this.background.size !== before
   }
 
@@ -444,6 +459,7 @@ export class LiveSession {
       return
     }
     this.closed = true
+    this.changed()
     this.cancelIdle()
     this.stopOpenerWait()
     this.input.close()
