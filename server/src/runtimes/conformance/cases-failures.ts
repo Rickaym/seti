@@ -1,6 +1,6 @@
 import { expect } from 'vitest'
 import { closed, ofType, type Case } from './case.js'
-import { isTurnEnd, within, type RunView } from './run.js'
+import { isTurnEnd, type RunView } from './run.js'
 import type { Subject } from './subject.js'
 import type { NeutralHost, Rig } from './target.js'
 
@@ -40,7 +40,7 @@ function killing(rig: Rig): { host: NeutralHost; aborted: Promise<void> } {
 export async function refusal(subject: Subject, rig: Rig, resume: string | null = null): Promise<Error> {
   let run: RunView
   try {
-    run = await within(subject.open(rig, { resume }), 'open')
+    run = await subject.within(subject.open(rig, { resume }), 'open')
   } catch (e) {
     expect(e).toBeInstanceOf(Error)
     return e instanceof Error ? e : new Error(String(e))
@@ -74,7 +74,7 @@ export const FAILURES: Case[] = [
         const { host, aborted } = killing(rig)
         const killed = await subject.open(rig, { host })
         killed.send('go')
-        await within(aborted, "the held decision's signal")
+        await subject.within(aborted, "the held decision's signal")
         expect(await killed.settled()).toBeInstanceOf(Error)
         expect(rig.effects).toEqual([])
       }
@@ -95,7 +95,8 @@ export const FAILURES: Case[] = [
       )
       if (ended === null) {
         expect(ofType(run, 'vendor').filter((event) => event.unreadable === true)).toHaveLength(1)
-        expect(ofType(run, 'message').map((message) => message.text)).toEqual(['before', 'after'])
+        const said = ofType(run, 'message').filter((message) => message.role === 'agent')
+        expect(said.map((message) => message.text)).toEqual(['before', 'after'])
         await closed(run)
       } else {
         expect(run.outcome).toBeInstanceOf(Error)

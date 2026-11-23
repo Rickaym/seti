@@ -256,7 +256,7 @@ case. The cases live in `cases-<area>.ts` by area: lifecycle, interrupts, queued
 events, tool calls, permission asks, questions, subagents and plans, launch, and failures. Each
 case names the protocol requirement or interface member it proves. A case waits at most two
 seconds for anything and finishes in milliseconds when it passes, so "never hangs" means "settles
-within the bound".
+within the bound". A target whose rig runs a real program may set a longer bound with `boundMs`.
 
 A case that does not apply to the runtime is skipped with the reason, read from the adapter's
 `capabilities` or the target's profile. A case the adapter is known to fail is listed in the
@@ -284,6 +284,13 @@ think, call, hold, subagent, compact, exit, and the rest in `script.ts`) into wh
 would send, through the adapter's own transport. It records the processes started through the
 launcher and any started outside it, and the tool calls that ran, and it can kill the newest
 process from outside.
+
+A rig may also run the vendor's real program. The Codex rig starts the pinned `codex` binary named
+by `SETI_CODEX_BIN` through `conformance/real-process.ts`, answers its model calls from a scripted
+Responses API (`codex/conformance-responses.ts`), and puts a login shell profile in the program's
+home that prints each scripted command's output instead of running it. Without the variable its
+cases are skipped. `node scripts/codex-binary.mjs <folder>` fetches the pinned binary from the npm
+registry, checks it against `codex/pin.json` and prints its path; CI runs the cases with it.
 
 ### The scripted adapter
 

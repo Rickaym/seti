@@ -141,6 +141,7 @@ type Mapper = (params: unknown, at: Thread, root: string) => Event
 
 const MAPPED: Partial<Record<string, Mapper>> = {
   'thread/started': (params, _at, root) => sessionStarted(params, root),
+  'thread/resume': (params, _at, root) => sessionStarted(params, root),
   'turn/started': (params, at) => ({
     v: 1,
     ...at,

@@ -2,7 +2,7 @@ import type { EventOf, RuntimeEvent } from '@seti/shared'
 import type { RuntimeSession, RuntimeShapes, SessionInput, SessionReport } from '../adapter.js'
 
 /** How long anything a case waits on may take; every case settles in milliseconds when it passes. */
-const CASE_BOUND_MS = 2000
+export const CASE_BOUND_MS = 2000
 
 /** The promise's value, or a rejection naming what did not settle within the bound. */
 export async function within<T>(promise: Promise<T>, label: string, bound = CASE_BOUND_MS): Promise<T> {
@@ -114,17 +114,19 @@ export class Run<S extends RuntimeShapes> implements RunView {
   private readonly project: (message: unknown) => RuntimeEvent[]
   private readonly input: Channel<SessionInput>
   private readonly controller: AbortController
+  private readonly bound: number
 
   constructor(
     session: RuntimeSession<S>,
     project: (message: unknown) => RuntimeEvent[],
     input: Channel<SessionInput>,
-    controller: AbortController,
+    limits: { controller: AbortController; bound: number },
   ) {
     this.session = session
     this.project = project
     this.input = input
-    this.controller = controller
+    this.controller = limits.controller
+    this.bound = limits.bound
   }
 
   /** Starts reading the session's messages. */
@@ -144,6 +146,7 @@ export class Run<S extends RuntimeShapes> implements RunView {
     return within(
       this.wait(() => this.events.find(test)),
       label,
+      this.bound,
     )
   }
 
@@ -151,6 +154,7 @@ export class Run<S extends RuntimeShapes> implements RunView {
     return within(
       this.wait(() => this.reports.find(test)),
       label,
+      this.bound,
     )
   }
 
@@ -158,21 +162,22 @@ export class Run<S extends RuntimeShapes> implements RunView {
     return within(
       this.wait(() => this.outcome),
       'the event stream',
+      this.bound,
     )
   }
 
   async interrupt(): Promise<void> {
-    return within(this.session.interrupt(), 'interrupt')
+    return within(this.session.interrupt(), 'interrupt', this.bound)
   }
 
   retract(inputId: string): Promise<boolean> | null {
     const { retract } = this.session
-    return retract === undefined ? null : within(retract(inputId), 'retract')
+    return retract === undefined ? null : within(retract(inputId), 'retract', this.bound)
   }
 
   stopBackground(jobId: string): Promise<void> | null {
     const { stopBackground } = this.session
-    return stopBackground === undefined ? null : within(stopBackground(jobId), 'stopBackground')
+    return stopBackground === undefined ? null : within(stopBackground(jobId), 'stopBackground', this.bound)
   }
 
   close(): void {
