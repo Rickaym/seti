@@ -1,4 +1,5 @@
 import type { Task } from '@seti/shared'
+import { SPLIT_NODE } from './support/env.js'
 import { apiData, expect, test } from './support/fixtures.js'
 import { expectFitsPhone } from './support/phone-layout.js'
 import { FAKE_CLAUDE_ENV } from './support/processes.js'
@@ -7,6 +8,7 @@ import { RESUME_PROMPT, RESUMED_NOTE, startWorkingAgent, transcript } from './su
 test.use({ serverEnv: FAKE_CLAUDE_ENV })
 
 test('a turn a restart cut off shows as resumed on a phone', async ({ page, request, setiServer }) => {
+  test.skip(SPLIT_NODE, 'a separate node keeps the turn going across a restart')
   const id = await startWorkingAgent(request)
   await setiServer.restart()
 

@@ -106,3 +106,6 @@ export function serverEnv(): NodeJS.ProcessEnv {
     AWS_EC2_METADATA_DISABLED: 'true',
   }
 }
+
+/** Agents run in a separate node process, which a restart of the server leaves running. */
+export const SPLIT_NODE = process.env.SETI_E2E_NODE === 'split'
