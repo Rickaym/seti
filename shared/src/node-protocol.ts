@@ -250,6 +250,8 @@ const commandSchemas = {
     body: z.object({ agent }),
     answer: z.object({ memory: z.array(memoryScopeSchema), cpu: z.array(cpuScopeSchema) }),
   },
+  /** Whether the node runs the agent's egress proxy, which the control plane's sandboxes then use. */
+  'proxy.serving': { body: z.object({ agent }), answer: z.object({ serving: z.boolean() }) },
   /** The agents with a live scope, whose caps a change of a default may move. */
   'scopes.agents': { body: done, answer: z.object({ agents: z.array(agent) }) },
   /** Moves the agents' live scopes to these caps now. */
