@@ -1,4 +1,4 @@
-import { eventsOf, rowEvents, type MessageRow, type TaskRewind, type ToolCall } from '@seti/shared'
+import { eventsOf, isRuntimeRow, rowEvents, type WireRow, type TaskRewind, type ToolCall } from '@seti/shared'
 import type { TranscriptItem } from '@/lib/rewind'
 import { isAgentTool } from '@/lib/subtasks'
 import { rendersContent, rowCalls, rowResults, subagentOf } from '@/lib/transcript'
@@ -7,7 +7,7 @@ import { rendersContent, rowCalls, rowResults, subagentOf } from '@/lib/transcri
 export type RowRole = 'tool' | 'quiet' | 'break'
 
 /** A row shown on its own, or a run of tool calls folded into one group row. */
-export type Segment = { type: 'row'; row: MessageRow } | { type: 'tools'; rows: readonly MessageRow[]; calls: number }
+export type Segment = { type: 'row'; row: WireRow } | { type: 'tools'; rows: readonly WireRow[]; calls: number }
 
 /** What decides whether a row shows in a transcript, as the transcript itself decides it. */
 export interface RoleContext {
@@ -22,8 +22,8 @@ export interface RoleContext {
 /** Subagents and monitors keep a row of their own, so a running one is never folded away. */
 const foldable = (call: ToolCall) => !isAgentTool(call) && call.shell?.action !== 'watch' && call.kind !== 'question'
 
-export function rowRole(row: MessageRow, context: RoleContext): RowRole {
-  if (context.notes.has(row.id) || row.kind !== 'sdk') {
+export function rowRole(row: WireRow, context: RoleContext): RowRole {
+  if (context.notes.has(row.id) || !isRuntimeRow(row)) {
     return 'break'
   }
   if (!context.subagentRows && subagentOf(row) !== null) {
@@ -48,9 +48,9 @@ export function rowRole(row: MessageRow, context: RoleContext): RowRole {
 const MIN_CALLS = 2
 
 /** Folds runs of calls with nothing shown between them; a group runs up to the next shown row. */
-export function groupRows(rows: readonly MessageRow[], role: (row: MessageRow) => RowRole): Segment[] {
+export function groupRows(rows: readonly WireRow[], role: (row: WireRow) => RowRole): Segment[] {
   const segments: Segment[] = []
-  let run: MessageRow[] = []
+  let run: WireRow[] = []
   let calls = 0
   const flush = () => {
     if (calls >= MIN_CALLS) {
@@ -81,17 +81,17 @@ export function groupRows(rows: readonly MessageRow[], role: (row: MessageRow) =
 export type TranscriptView =
   | Segment
   | { type: 'note'; rewind: TaskRewind }
-  | { type: 'rewound'; rewind: TaskRewind; rows: readonly MessageRow[]; count: number; segments: Segment[] }
+  | { type: 'rewound'; rewind: TaskRewind; rows: readonly WireRow[]; count: number; segments: Segment[] }
 
 /** Folds runs of tool calls among the transcript's rows and inside rewound folds; null folds none. */
 export function transcriptViews(
   items: readonly TranscriptItem[],
-  role: ((row: MessageRow) => RowRole) | null,
+  role: ((row: WireRow) => RowRole) | null,
 ): TranscriptView[] {
-  const segment = (rows: readonly MessageRow[]): Segment[] =>
+  const segment = (rows: readonly WireRow[]): Segment[] =>
     role === null ? rows.map((row) => ({ type: 'row', row })) : groupRows(rows, role)
   const views: TranscriptView[] = []
-  let run: MessageRow[] = []
+  let run: WireRow[] = []
   const flush = () => {
     views.push(...segment(run))
     run = []

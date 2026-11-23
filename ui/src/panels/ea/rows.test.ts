@@ -1,4 +1,11 @@
-import type { EaChatEvent, EaHistoryEntry, EaLlmMessage, MessageRow } from '@seti/shared'
+import {
+  rowEvents,
+  type EaChatEvent,
+  type EaHistoryEntry,
+  type EaLlmMessage,
+  type RuntimeEvent,
+  type WireRow,
+} from '@seti/shared'
 import { describe, expect, it } from 'vitest'
 import { applyEvent, chatView, lastReply, liveRows, SUMMARISED, type LiveExchange } from './rows'
 import { parseEvent, readEvents } from './stream'
@@ -31,32 +38,21 @@ const CONVERSATION: EaHistoryEntry[] = [
   entry(8, { role: 'assistant', content: '- **login**: running' }, 'chat'),
 ]
 
-function describeRow(row: MessageRow): string {
+function describeEvent(event: RuntimeEvent): string {
+  if (event.type === 'message') {
+    return `text ${event.text}`
+  }
+  if (event.type === 'tool.started') {
+    return `tool ${event.call.name}`
+  }
+  return event.type === 'tool.ended' ? `result ${event.result.text}` : ''
+}
+
+function describeRow(row: WireRow): string {
   if (row.kind === 'prompt') {
     return `prompt ${row.payload.text}`
   }
-  if (row.kind !== 'sdk') {
-    return row.kind
-  }
-  const { payload } = row
-  if (payload.type === 'assistant') {
-    return payload.message.content
-      .map((block) => {
-        if (block.type === 'text') {
-          return `text ${block.text}`
-        }
-        return block.type === 'tool_use' ? `tool ${block.name}` : ''
-      })
-      .join(', ')
-  }
-  if (payload.type === 'user' && typeof payload.message.content !== 'string') {
-    return payload.message.content
-      .map((block) =>
-        block.type === 'tool_result' && typeof block.content === 'string' ? `result ${block.content}` : '',
-      )
-      .join(', ')
-  }
-  return payload.type
+  return row.kind === 'events' ? rowEvents(row).map(describeEvent).join(', ') : row.kind
 }
 
 describe('chatView', () => {
@@ -74,11 +70,9 @@ describe('chatView', () => {
     expect([...view.marks.voice]).toEqual([2, 3])
     expect(view.marks.notes.get(2)?.text).toMatch(/^Call started /)
     const call = view.rows[3]
-    expect(call?.kind === 'sdk' && call.payload.type === 'assistant' && call.payload.message.content[0]).toMatchObject({
-      type: 'tool_use',
-      id: 'c1',
-      input: { status: 'running' },
-    })
+    expect(call === undefined ? [] : rowEvents(call)).toMatchObject([
+      { type: 'tool.started', call: { callId: 'c1', kind: 'other', input: { status: 'running' } } },
+    ])
   })
 
   it('puts a summary before the first turn it did not cover', () => {
@@ -128,8 +122,8 @@ describe('chatView', () => {
       'text Seti is down.',
     ])
     const result = rows[3]
-    expect(result?.kind === 'sdk' && result.payload.type === 'user' && result.payload.message.content).toEqual([
-      { type: 'tool_result', tool_use_id: 'c2', content: 'Seti is down.', is_error: true },
+    expect(result === undefined ? [] : rowEvents(result)).toMatchObject([
+      { type: 'tool.ended', callId: 'c2', status: 'error', result: { text: 'Seti is down.' } },
     ])
     const stored = new Set(chatView(CONVERSATION).rows.map((row) => row.id))
     expect(rows.some((row) => stored.has(row.id))).toBe(false)

@@ -14,7 +14,7 @@ const HOUR_MS = 60 * 60_000
 
 const NOTES = {
   on: (hours: number) =>
-    `Bypass on for ${String(hours)} hours: tools run without asking. Seti's guards still refuse dangerous commands.`,
+    `Bypass on for ${String(hours)} hours: tools run without asking, except calls an ask rule matches. Seti's guards still refuse dangerous commands.`,
   off: 'Bypass turned off: tool calls go through the usual permission checks again.',
   expired: 'Bypass ended: tool calls go through the usual permission checks again.',
 }

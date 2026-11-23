@@ -186,7 +186,10 @@ const TRANSCRIPT_PAGE = 100
 /** A task stream position: newest message id held, then the server run and its last event seen. */
 export const TASK_STREAM_CURSOR = /^(\d+)(?:\.([0-9a-f]+)\.(\d+))?$/
 
-export const taskStreamQuery = z.object({
+/** Asks for runtime rows as neutral events; without it the server sends them as stored. */
+export const wireQuery = z.object({ wire: z.literal('events').optional() })
+
+export const taskStreamQuery = wireQuery.extend({
   after: z.string().regex(TASK_STREAM_CURSOR).optional(),
   tail: z.coerce.number().int().min(1).max(1000).default(TRANSCRIPT_TAIL),
 })
@@ -194,7 +197,7 @@ export const taskStreamQuery = z.object({
 /** The most rows one transcript page request loads. */
 export const TRANSCRIPT_PAGE_MAX = 500
 
-export const messagePageQuery = z.object({
+export const messagePageQuery = wireQuery.extend({
   before: z.coerce.number().int().positive().optional(),
   limit: z.coerce.number().int().min(1).max(TRANSCRIPT_PAGE_MAX).default(TRANSCRIPT_PAGE),
 })
@@ -334,7 +337,7 @@ export interface PromptPayload {
   from?: string
 }
 
-interface MessageBase {
+export interface MessageBase {
   id: number
   task_id: string
   outward: string[]

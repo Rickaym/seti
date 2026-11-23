@@ -90,7 +90,7 @@ between two steps; an interrupt; a hook at subagent start.
 - ENT-10: A prompt record MUST carry what applies of: `auto`, `held`, `inputs` (count), `retry`,
   `interrupted`, `queued` (`waiting`, `delivered`, `removed`), `attachments`, `client_id`, `from`.
 - ENT-11: Subagent status (`running`, `completed`, `failed`, `stopped`, `unknown`) MUST be
-  derivable from the transcript alone.
+  derivable from the transcript's events alone.
 - ENT-13: One process owns every open session. A second process MUST NOT steer them.
 - ENT-14: A session stays open between turns; idle with no background work, it MUST close after
   `idle_close`.
@@ -129,6 +129,15 @@ between two steps; an interrupt; a hook at subagent start.
 
 - ENT-22: Update state is derived, not stored: waiting (newer than the last prompt the agent
   read), held (`with_message`), dismissed, quiet (PR-4), read.
+
+### 3.5 Runtime
+
+- RT-6: The transcript stores each runtime message unchanged and serves neutral events computed
+  from it. Event types and tool kinds (`shell`, `read`, `edit`, `search`, `web`, `mcp`,
+  `subagent`, `question`, `plan`, `think`, `other`) are closed lists. A message with no mapping
+  is served as `vendor` and MUST NOT break the rows around it. A client asks for events with
+  `wire=events` on transcript pages, messages and streams; without it, runtime rows come as
+  stored.
 
 ## 4. Turn lifecycle
 
@@ -388,8 +397,8 @@ interrupted only for that.
   rule and touches no other request. A request whose session is gone closes as `cancelled`.
   Why: an agent must never wait on the user for ever, and must not read silence as refusal.
 - PERM-10: Bypass is per agent, off by default, set only by the user for 2, 8 or 24 h. In bypass
-  `ask` rules and the classifier do not apply; deny rules, guards, review rules, the repeat guard
-  and the sandbox still hold. Turning it off or its expiry MUST take effect at once. Each change
+  the classifier does not apply and a call no rule decides runs without a request; `ask` rules,
+  deny rules, guards, review rules, the repeat guard and the sandbox still hold. Turning it off or its expiry MUST take effect at once. Each change
   is audited and noted in the transcript.
 - PERM-12: An implementation MAY compute its own decision on each call beside the runtime's, in
   shadow. The shadow MUST NOT change, delay or fail any call, and keeps only counts per day: the
@@ -883,7 +892,7 @@ store, the audit chain and every record.
 
 An implementation is SETI-compatible when it meets all of:
 
-1. Agent state and derived status: ENT-1 to ENT-4, ENT-13 to ENT-15, ENT-20 to ENT-22.
+1. Agent state and derived status: ENT-1 to ENT-4, ENT-13 to ENT-15, ENT-20 to ENT-22; RT-6.
 2. Turn lifecycle: TURN-1 to TURN-8, TURN-11 to TURN-14, TURN-18.
 3. Update delivery: UPD-1 to UPD-8, UPD-11, UPD-13.
 4. Attention: ATT-1 to ATT-11, ATT-14 to ATT-18, ATT-21, ATT-23, ATT-25.

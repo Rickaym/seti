@@ -1,4 +1,4 @@
-import { compactedWithin, eventsOf, modelLabel, rowEvents, type EventOf, type MessageRow } from '@seti/shared'
+import { compactedWithin, eventsOf, modelLabel, rowEvents, type EventOf, type WireRow } from '@seti/shared'
 import { FoldVertical, Play, Terminal } from 'lucide-react'
 import type { ComponentType, ReactNode } from 'react'
 import { CopyIconButton } from '@/components/CopyButton'
@@ -169,7 +169,7 @@ export function RuntimeLine({
   reply,
   children,
 }: {
-  row: MessageRow
+  row: WireRow
   taskId: string
   interrupted: boolean
   reply: string | undefined

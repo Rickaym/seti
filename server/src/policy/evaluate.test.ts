@@ -58,11 +58,21 @@ describe('the order of decisions', () => {
     })
   })
 
-  it('keeps ask rules in bypass, as Claude Code does', () => {
-    expect(bash('git push', { mode: 'bypass', rules: [['ask', 'Bash(git push:*)']] })).toMatchObject({
+  it('keeps ask rules of every source in bypass, as Claude Code does (PERM-10)', () => {
+    const bypass = { mode: 'bypass', sandboxed: false } as const
+    expect(bash('git push', { ...bypass, rules: [['ask', 'Bash(git push:*)']] })).toMatchObject({
       verdict: 'ask',
       step: 'ask-rule',
+      rule: 'rule:1',
     })
+    expect(bash('git push', { ...bypass, inherited: [['ask', 'Bash(git push *)']] })).toMatchObject({
+      verdict: 'ask',
+      rule: 'inherited:user:0',
+    })
+    const settings = decideClaude('Edit', { file_path: `${CWD}/.claude/settings.json` }, bypass)
+    expect(settings).toMatchObject({ verdict: 'ask', step: 'ask-rule' })
+    expect(settings.rule).toMatch(/^builtin:ask:/)
+    expect(bash('git push', bypass)).toMatchObject({ verdict: 'allow', step: 'mode' })
   })
 })
 
