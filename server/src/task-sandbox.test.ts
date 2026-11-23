@@ -20,6 +20,7 @@ import { readProcesses, stoppable, subtreeOf, terminate } from './agent-processe
 import { findBinary } from './binaries.js'
 import { CLAUDE_HOME, SCRATCH_ROOT, SETI_HOME } from './config.js'
 import { tasks } from './db.js'
+import { sandboxPlanFor } from './launch-plan.js'
 import { detectScopeHost, type ScopePlan } from './memory-scope.js'
 import { oomRun, oomRunBlocked, oomScriptArgs } from './oom-fixtures.js'
 import { TOOL_OOM_ADJ } from './oom-guard.js'
@@ -133,7 +134,11 @@ describe.skipIf(!available)('a real task sandbox', () => {
     as: Partial<Task> = {},
   ): Promise<{ code: number | null; out: string }> {
     const ctx = { ...sandboxContext(), home }
-    const sandbox = await taskSandbox({ ...task, ...as }, { ctx, policy: await sandboxPolicy.get() })
+    const sandboxed = { ...task, ...as }
+    const sandbox = await taskSandbox(sandboxed, {
+      ctx,
+      plan: await sandboxPlanFor(sandboxed, await sandboxPolicy.get()),
+    })
     const child = sandbox.spawn('/bin/bash', ['-c', script], { stdin: 'ignore', scope })
     let out = ''
     child.stdout?.on('data', (chunk: Buffer) => (out += chunk.toString()))
@@ -194,7 +199,11 @@ describe.skipIf(!available)('a real task sandbox', () => {
         const cap = { high_mb: 300, max_mb: 300, swap_max_mb: 0 }
         const plan: ScopePlan = { host: scopes, taskId: task.id, kind: 'agent', cap, cpu: { quota_percent: null } }
         const policy = await sandboxPolicy.get()
-        const sandbox = await taskSandbox(task, { ctx: { ...sandboxContext(), home }, policy, memory: cap })
+        const sandbox = await taskSandbox(task, {
+          ctx: { ...sandboxContext(), home },
+          plan: await sandboxPlanFor(task, policy),
+          memory: cap,
+        })
         const child = sandbox.spawn(process.execPath, oomScriptArgs(work, tool), { stdin: 'ignore', scope: plan })
         let out = ''
         child.stdout?.on('data', (chunk: Buffer) => (out += chunk.toString()))
@@ -695,7 +704,10 @@ describe.skipIf(!available)('a real task sandbox', () => {
   })
 
   it('gives an interactive shell its own terminal: job control, Ctrl+C and resizes', async () => {
-    const sandbox = await taskSandbox(task, { ctx: { ...sandboxContext(), home }, policy: await sandboxPolicy.get() })
+    const sandbox = await taskSandbox(task, {
+      ctx: { ...sandboxContext(), home },
+      plan: await sandboxPlanFor(task, await sandboxPolicy.get()),
+    })
     const env = { ...sandbox.env, TERM: 'xterm-256color', PS1: '$ ' }
     const run = sandbox.command('/bin/bash', ['--norc', '-i'], { env, interactive: true })
     const pty = spawnPty(run.program, run.args, { cwd: work, env: run.env, cols: 80, rows: 24 })
@@ -744,7 +756,7 @@ describe.skipIf(!available)('a real task sandbox', () => {
 
   it("shows the sandbox's processes from the host, with Seti's helpers apart and stoppable commands", async () => {
     const ctx = { ...sandboxContext(), home }
-    const sandbox = await taskSandbox(task, { ctx, policy: await sandboxPolicy.get() })
+    const sandbox = await taskSandbox(task, { ctx, plan: await sandboxPlanFor(task, await sandboxPolicy.get()) })
     const env = { ...sandbox.env, SETI_TASK_ID: task.id }
     const child = sandbox.spawn('/bin/bash', ['-c', 'bash -c "sleep 310; true" & wait'], { env, stdin: 'ignore' })
     const processHost = {

@@ -1,12 +1,11 @@
 import { spawn, type ChildProcess } from 'node:child_process'
 import type { Readable, Writable } from 'node:stream'
 import type { Task } from '@seti/shared'
-import { grantConnections, taskConnections } from './connection-egress.js'
 import { connectionEnv } from './egress-connections.js'
-import { planScope } from './memory-cap.js'
-import { launch, type ScopeKind, type ScopePlan } from './memory-scope.js'
-import { agentEnv, sandboxFor } from './session-options.js'
-import type { TaskSandbox } from './task-sandbox.js'
+import type { LaunchPlan } from './launch-plan.js'
+import { launch, scopeHost, type ScopeKind, type ScopePlan } from './memory-scope.js'
+import { agentEnv, sandboxContext } from './session-options.js'
+import { taskSandbox, type TaskSandbox } from './task-sandbox.js'
 
 /** A process a launcher started, with the pipes its runtime talks over. */
 type LaunchedProcess = ChildProcess & { stdin: Writable; stdout: Readable }
@@ -80,20 +79,40 @@ const spawnInScope =
       scope.taskId,
     )
 
+/** The scope a process of the task starts in, held to the plan's caps, where the host has scopes. */
+async function scopeFrom(taskId: string, kind: ScopeKind, plan: LaunchPlan): Promise<ScopePlan | null> {
+  const host = await scopeHost()
+  return host === null ? null : { host, taskId, kind, cap: plan.memory, cpu: plan.cpu }
+}
+
+/** The task's sandbox as its plan describes it, or null when it runs unsandboxed. */
+export async function sandboxFrom(task: Task, plan: LaunchPlan): Promise<TaskSandbox | null> {
+  if (plan.sandbox === null) {
+    return null
+  }
+  const memory = (await scopeFrom(task.id, 'agent', plan))?.cap ?? null
+  return taskSandbox(task, { ctx: sandboxContext(), plan: plan.sandbox, memory })
+}
+
 /**
- * Where a task's process starts: in its sandbox, else on the host in the scope of its kind, with
- * the task's connections in its environment when asked.
+ * Where a task's process starts, as its plan says: in its sandbox, else on the host in the scope
+ * of its kind, with the task's connections in its environment when asked.
  */
-export async function taskLauncher(task: Task, kind: ScopeKind, connections: boolean): Promise<Launcher> {
-  const sandbox = await sandboxFor(task)
-  const scope = await planScope(task.id, kind)
+export async function launcherFrom(
+  task: Task,
+  kind: ScopeKind,
+  connections: boolean,
+  plan: LaunchPlan,
+): Promise<Launcher> {
+  const sandbox = await sandboxFrom(task, plan)
+  const scope = await scopeFrom(task.id, kind, plan)
   if (sandbox !== null) {
     return { sandboxed: true, env: sandbox.env, spawn: spawnInSandbox(sandbox, task.id, scope) }
   }
   const env = agentEnv(scope?.cap ?? null)
   return {
     sandboxed: false,
-    env: connections ? { ...env, ...connectionEnv(grantConnections(await taskConnections(task))) } : env,
+    env: connections ? { ...env, ...connectionEnv(plan.grant.connections) } : env,
     ...(scope === null ? {} : { spawn: spawnInScope(scope) }),
   }
 }

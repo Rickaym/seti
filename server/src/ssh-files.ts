@@ -2,8 +2,9 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import type { SshKeySecretName } from '@seti/shared'
+import type { SshPlan } from './launch-plan.js'
 import { secret } from './secrets.js'
-import { reachKeys, sandboxSshConfig, type RenderHost, type SshReach } from './ssh-config.js'
+import { reachKeys, sandboxSshConfig, type RenderHost } from './ssh-config.js'
 import { sshKeys, sshKnownHosts, type SshHostRow, type SshKeyRow } from './store/ssh.js'
 
 export const keySecret = (id: string): SshKeySecretName => `ssh_key:${id}`
@@ -54,19 +55,26 @@ export async function knownHostsText(names: ReadonlySet<string>): Promise<string
 
 const keyFileName = (keyId: string) => `seti-${keyId}.pub`
 
-/** Writes the public halves of the hosts' keys, which ssh needs to pick a key from the agent. */
-export async function writeKeyFiles(dir: string, hosts: readonly SshHostRow[]): Promise<void> {
-  const ids = reachKeys(hosts)
-  const wanted = new Set(ids.map(keyFileName))
+/** Writes these public keys by key id, which ssh needs to pick a key from the agent. */
+function writePublicKeys(dir: string, keys: Readonly<Record<string, string>>): void {
+  const wanted = new Set(Object.keys(keys).map(keyFileName))
   for (const file of fs.readdirSync(dir).filter((name) => /^seti-.*\.pub$/.test(name) && !wanted.has(name))) {
     fs.rmSync(path.join(dir, file), { force: true })
   }
-  for (const id of ids) {
-    const key = await sshKeys.get(id)
-    if (key !== undefined) {
-      fs.writeFileSync(path.join(dir, keyFileName(id)), `${key.public_key}\n`, { mode: 0o644 })
-    }
+  for (const [id, key] of Object.entries(keys)) {
+    fs.writeFileSync(path.join(dir, keyFileName(id)), `${key}\n`, { mode: 0o644 })
   }
+}
+
+/** The public halves of the hosts' keys, by key id. */
+export async function publicKeys(hosts: readonly SshHostRow[]): Promise<Record<string, string>> {
+  const keys = await Promise.all(reachKeys(hosts).map(async (id) => sshKeys.get(id)))
+  return Object.fromEntries(keys.flatMap((key) => (key === undefined ? [] : [[key.id, key.public_key]])))
+}
+
+/** Writes the public halves of the hosts' keys. */
+export async function writeKeyFiles(dir: string, hosts: readonly SshHostRow[]): Promise<void> {
+  writePublicKeys(dir, await publicKeys(hosts))
 }
 
 export const renderHosts = (hosts: readonly SshHostRow[], keyDir: string): RenderHost[] =>
@@ -82,26 +90,26 @@ export interface SandboxSsh {
   agentDir: string
 }
 
-/** What a task's sandbox ssh is made of: where it lives, its proxy and its reach. */
+/** What a task's sandbox ssh is made of: where it lives, its proxy and its plan. */
 export interface SandboxSshRequest {
   taskDir: string
   home: string
   proxy: { socat: string; port: number }
-  reach: Pick<SshReach, 'hosts' | 'knownHosts'>
+  plan: SshPlan
 }
 
 /** Writes a task's ssh files for its usable hosts; its agent, holding only their keys, is apart. */
-export async function prepareSandboxSsh(request: SandboxSshRequest): Promise<SandboxSsh> {
-  const { taskDir, home, proxy, reach } = request
+export function prepareSandboxSsh(request: SandboxSshRequest): SandboxSsh {
+  const { taskDir, home, proxy, plan } = request
   const dir = path.join(taskDir, 'ssh')
   fs.mkdirSync(dir, { recursive: true, mode: 0o700 })
-  await writeKeyFiles(dir, reach.hosts)
+  writePublicKeys(dir, plan.publicKeys)
   const inside = path.join(home, '.ssh')
-  const config = sandboxSshConfig(renderHosts(reach.hosts, inside), {
+  const config = sandboxSshConfig(renderHosts(plan.hosts, inside), {
     proxy,
     knownHosts: path.join(inside, 'known_hosts'),
   })
   fs.writeFileSync(path.join(dir, 'config'), config, { mode: 0o600 })
-  fs.writeFileSync(path.join(dir, 'known_hosts'), await knownHostsText(reach.knownHosts), { mode: 0o644 })
+  fs.writeFileSync(path.join(dir, 'known_hosts'), plan.knownHosts, { mode: 0o644 })
   return { dir, agentDir: path.join(taskDir, 'ssh-agent') }
 }

@@ -1,6 +1,6 @@
 import type { Options } from '@anthropic-ai/claude-agent-sdk'
 import type { Task } from '@seti/shared'
-import { taskLauncher } from '../../launcher.js'
+import { taskLauncher } from '../../launch-plan.js'
 import { permissionSettings, systemAppend, workingDirs } from '../../session-options.js'
 import { claudeLaunch } from './realise.js'
 

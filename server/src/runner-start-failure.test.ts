@@ -5,8 +5,8 @@ import { messages, tasks } from './db.js'
 import { retryLastPrompt } from './dropped-prompt.js'
 import { deliverInputs, wakeTask } from './inputs.js'
 import { onTurnEnd, runTurn, sessionState } from './runner.js'
+import type * as SessionRealise from './session-realise.js'
 import { restartSession } from './session-restart.js'
-import type * as SessionSpec from './session-spec.js'
 import { waitIdle } from './wait-idle.js'
 
 const sdk = await vi.hoisted(async () => {
@@ -26,8 +26,8 @@ vi.mock('@anthropic-ai/claude-agent-sdk', async (importOriginal) => ({
 /** Tasks whose sessions cannot start, as when the sandbox cannot be set up, and their attempts. */
 const starts = vi.hoisted(() => ({ refused: new Set<string>(), attempts: new Map<string, number>() }))
 
-vi.mock('./session-spec.js', async (importOriginal) => {
-  const original = await importOriginal<typeof SessionSpec>()
+vi.mock('./session-realise.js', async (importOriginal) => {
+  const original = await importOriginal<typeof SessionRealise>()
   return {
     ...original,
     realise: async (...args: Parameters<typeof original.realise>) => {
