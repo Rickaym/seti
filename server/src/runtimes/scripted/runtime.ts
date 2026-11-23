@@ -79,6 +79,7 @@ export class ScriptedRuntime {
       this.open(command.resume)
     } else if (command.t === 'input') {
       this.queue.push({ id: command.id, text: command.text })
+      this.io.write({ t: 'inputState', id: command.id, state: 'queued' })
       this.inputArrived?.()
       if (this.turn === null) {
         void this.runTurns()
@@ -88,6 +89,9 @@ export class ScriptedRuntime {
     } else if (command.t === 'retract') {
       const at = this.queue.findIndex((input) => input.id === command.id)
       this.queue.splice(at < 0 ? this.queue.length : at, 1)
+      if (at >= 0) {
+        this.io.write({ t: 'inputState', id: command.id, state: 'cancelled' })
+      }
       this.io.write({ t: 'ack', rid: command.rid, ok: true, taken: at >= 0 })
     } else if (command.t === 'stop') {
       this.endJob(command.job, 'stopped')
@@ -134,6 +138,9 @@ export class ScriptedRuntime {
   /** Moves the waiting inputs into the turn and the session's history; returns their texts. */
   private take(turn: Turn, history: string[]): string[] {
     const batch = this.queue.splice(0)
+    for (const input of batch) {
+      this.io.write({ t: 'inputState', id: input.id, state: 'started' })
+    }
     turn.inputs.push(...batch.map((input) => input.id))
     history.push(...batch.map((input) => input.text))
     return batch.map((input) => input.text)

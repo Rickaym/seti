@@ -22,8 +22,11 @@ export interface Profile {
     modelFallback: boolean
   }
   usage: { tokens: boolean; costUsd: 'reported' | 'priced' | 'none' }
-  /** Input sent during a turn joins it at its next step, or waits for the turn's end. */
-  input: { steer: 'next_step' | 'after_turn'; retract: boolean }
+  /**
+   * Input sent during a turn joins it at its next step, or waits for the turn's end; a queued
+   * input can be taken back; the session reports when an input is queued, taken or dropped.
+   */
+  input: { steer: 'next_step' | 'after_turn'; retract: boolean; reports: boolean }
   /** Commands and subagents keep running in the background after their call ends; jobs can stop. */
   background: { jobs: boolean; stop: boolean; subagents: boolean }
   /** The kinds whose calls Seti decides before they run (gate `before` or `request`). */

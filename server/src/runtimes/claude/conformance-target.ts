@@ -26,7 +26,7 @@ export const claudeTarget = (slot: QuerySlot): ConformanceTarget<ClaudeShapes, '
   profile: {
     events: { turnStart: false, reasoning: true, threads: true, plan: true, compaction: true, modelFallback: true },
     usage: { tokens: true, costUsd: 'reported' },
-    input: { steer: 'next_step', retract: true },
+    input: { steer: 'next_step', retract: true, reports: true },
     background: { jobs: true, stop: true, subagents: true },
     gated: { shell: true, edit: true, mcp: true },
     parsesOutput: false,

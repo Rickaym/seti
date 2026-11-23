@@ -38,7 +38,11 @@ export const INPUT: Case[] = [
       const read = run.send('one')
       await run.until((event) => event.type === 'message' && event.text === 'busy', 'busy')
       const waiting = run.send('two')
-      await settle()
+      if (subject.profile.input.reports) {
+        await run.untilReport((r) => r.type === 'input' && r.id === waiting && r.state === 'queued', 'queued')
+      } else {
+        await settle()
+      }
       expect(await run.retract(waiting)).toBe(true)
       expect(await run.retract(read)).toBe(false)
       await run.interrupt()
