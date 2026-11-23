@@ -32,6 +32,21 @@ type FakeTurn = Parameters<TurnScript>[0]
 type Message = ReturnType<typeof fakeMessage>
 type Args = Record<string, unknown>
 
+/** The script's questions as AskUserQuestion takes them. */
+const claudeQuestions = (questions: unknown) =>
+  (Array.isArray(questions) ? (questions as { text: string; options: string[] }[]) : []).map((q) => ({
+    question: q.text,
+    header: 'Question',
+    options: q.options.map((label) => ({ label, description: '' })),
+    multiSelect: false,
+  }))
+
+/** What Claude Code tells the model once the user answered its questions. */
+const answered = (input: Args | undefined): string =>
+  `User has answered your questions: ${Object.entries((input?.answers ?? {}) as Record<string, string>)
+    .map(([question, answer]) => `"${question}"="${answer}"`)
+    .join(', ')}`
+
 /** The script's tools as Claude Code names them, with Claude Code's input for the same call. */
 const TOOLS = new Map<string, (args: Args) => [string, Args]>([
   [
@@ -45,6 +60,7 @@ const TOOLS = new Map<string, (args: Args) => [string, Args]>([
   ['patch', (args) => ['Edit', { file_path: args.path, old_string: 'a', new_string: 'b' }]],
   ['grep', (args) => ['Grep', { pattern: args.pattern }]],
   ['fetch', (args) => ['WebFetch', { url: args.url, prompt: 'Read it' }]],
+  ['ask', (args) => ['AskUserQuestion', { questions: claudeQuestions(args.questions) }]],
 ])
 
 const claudeTool = (call: ScriptCall): [string, Args] => {
@@ -56,7 +72,8 @@ const claudeTool = (call: ScriptCall): [string, Args] => {
 }
 
 /** Tools Claude Code asks about in its default mode when no rule allows them. */
-const isGated = (name: string) => ['Bash', 'Edit', 'Write', 'WebFetch'].includes(name) || name.startsWith('mcp__')
+const isGated = (name: string) =>
+  ['Bash', 'Edit', 'Write', 'WebFetch', 'AskUserQuestion'].includes(name) || name.startsWith('mcp__')
 
 /** A conversation Claude Code saved: its id and every input it read. */
 interface Saved {
@@ -209,15 +226,23 @@ class TurnPlayer {
     const [name, input] = claudeTool(call)
     yield this.assistant([{ type: 'tool_use', id, name, input }])
     const ask = this.turn.session.options.canUseTool
-    const asked =
-      isGated(name) && ask !== undefined
-        ? await ask(name, input, { signal: this.turn.signal, toolUseID: id, requestId: `request-${id}` })
-        : null
-    const decision: PermissionResult = asked ?? { behavior: 'allow' }
     const result = (content: string, isError: boolean) =>
       this.message('user', {
         message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: id, content, is_error: isError }] },
       })
+    const { signal } = this.turn
+    const asked =
+      isGated(name) && ask !== undefined
+        ? await Promise.race([
+            ask(name, input, { signal, toolUseID: id, requestId: `request-${id}` }),
+            aborted(signal).then(() => null),
+          ])
+        : null
+    if (signal.aborted) {
+      yield result('[Request interrupted by user for tool use]', true)
+      return null
+    }
+    const decision: PermissionResult = asked ?? { behavior: 'allow' }
     if (decision.behavior === 'deny') {
       yield result(decision.message, true)
       return null
@@ -228,7 +253,8 @@ class TurnPlayer {
       yield result('[Request interrupted by user for tool use]', true)
       return null
     }
-    yield result(call.output ?? '', call.fails === true)
+    const output = name === 'AskUserQuestion' ? answered(decision.updatedInput) : (call.output ?? '')
+    yield result(output, call.fails === true)
     return id
   }
 }
