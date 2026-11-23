@@ -18,6 +18,7 @@ const listed = z.looseObject({
 export class Background {
   private readonly running = new Set<string>()
   private readonly jobs = new Map<string, CodexJob>()
+  private readonly abandoned = new Set<string>()
   private readonly rpc: CodexRpc
   private readonly root: () => string
 
@@ -44,9 +45,34 @@ export class Background {
     return undefined
   }
 
+  /** The commands of a turn being interrupted: they are never jobs; `stopAbandoned` ends them. */
+  abandon(): void {
+    for (const id of this.running) {
+      if (!this.jobs.has(id)) {
+        this.abandoned.add(id)
+      }
+    }
+  }
+
+  /** Stops what an interrupted turn left running, since Codex's interrupt leaves it running. */
+  async stopAbandoned(): Promise<void> {
+    if (this.abandoned.size === 0) {
+      return
+    }
+    const threadId = this.root()
+    const reply = listed.parse(await this.rpc.request('thread/backgroundTerminals/list', { threadId }))
+    const stale = reply.data.filter((terminal) => this.abandoned.has(terminal.itemId))
+    this.abandoned.clear()
+    await Promise.all(
+      stale.map(async (terminal) =>
+        this.rpc.request('thread/backgroundTerminals/terminate', { threadId, processId: terminal.processId }),
+      ),
+    )
+  }
+
   /** At a turn's end: the list request and Codex's reply naming the commands still running. */
   async listed(): Promise<{ message: CodexCall; reply: unknown } | null> {
-    const fresh = [...this.running].filter((id) => !this.jobs.has(id))
+    const fresh = [...this.running].filter((id) => !this.jobs.has(id) && !this.abandoned.has(id))
     if (fresh.length === 0) {
       return null
     }

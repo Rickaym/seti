@@ -127,7 +127,9 @@ class Driver {
     if (turnId === null) {
       return
     }
+    this.background.abandon()
     await this.rpc.request('turn/interrupt', { threadId: this.root, turnId })
+    await this.background.stopAbandoned()
   }
 
   close(): void {
