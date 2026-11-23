@@ -1,5 +1,5 @@
 import type { ModTranscriptSource } from '@seti/mod-api'
-import { Registry, type MessageRow } from '@seti/shared'
+import { Registry, type WireRow } from '@seti/shared'
 import type { TranscriptView } from '@/lib/tool-groups'
 
 /** A source of blocks an enabled mod draws inline in agents' transcripts. */
@@ -48,7 +48,7 @@ export interface PlacedBlocks {
 export const NO_BLOCKS: PlacedBlocks = { before: new Map(), after: [] }
 
 /** The row a view of the transcript starts with; a rewind note has none. */
-export function viewStart(view: TranscriptView): MessageRow | undefined {
+export function viewStart(view: TranscriptView): WireRow | undefined {
   switch (view.type) {
     case 'row':
       return view.row
