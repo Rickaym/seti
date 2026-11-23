@@ -104,16 +104,16 @@ let inputs = 0
 export class Run<S extends RuntimeShapes> implements RunView {
   readonly events: RuntimeEvent[] = []
   outcome: Error | null | undefined = undefined
-  private readonly raw: S['message'][] = []
+  private readonly raw: unknown[] = []
   private readonly waiters = new Set<() => void>()
   private readonly session: RuntimeSession<S>
-  private readonly project: (message: S['message']) => RuntimeEvent[]
+  private readonly project: (message: unknown) => RuntimeEvent[]
   private readonly input: Channel<SessionInput>
   private readonly controller: AbortController
 
   constructor(
     session: RuntimeSession<S>,
-    project: (message: S['message']) => RuntimeEvent[],
+    project: (message: unknown) => RuntimeEvent[],
     input: Channel<SessionInput>,
     controller: AbortController,
   ) {
@@ -177,7 +177,7 @@ export class Run<S extends RuntimeShapes> implements RunView {
     return this.raw.map((message) => ({
       live: this.project(message),
       again: this.project(message),
-      stored: this.project(JSON.parse(JSON.stringify(message)) as S['message']),
+      stored: this.project(JSON.parse(JSON.stringify(message))),
     }))
   }
 
@@ -201,10 +201,12 @@ export class Run<S extends RuntimeShapes> implements RunView {
 
   private async pump(): Promise<void> {
     try {
-      for await (const message of this.session.events) {
-        this.raw.push(message)
-        this.events.push(...this.project(message))
-        this.notify()
+      for await (const report of this.session.events) {
+        if (report.type === 'message') {
+          this.raw.push(report.raw)
+          this.events.push(...report.events)
+          this.notify()
+        }
       }
       this.outcome = null
     } catch (e) {

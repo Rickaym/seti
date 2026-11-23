@@ -1,17 +1,15 @@
-import type { SDKMessage, SDKResultMessage } from '@anthropic-ai/claude-agent-sdk'
-import type { JournalEntry, Task, TaskStatus } from '@seti/shared'
+import { eventsOf, type EventOf, type JournalEntry, type Task, type TaskStatus } from '@seti/shared'
 import { outsideRequest } from './access.js'
 import { LiveSession, outcomeOf, type SendOutcome } from './agent-session.js'
 import { inBackground, onShutdown } from './background.js'
-import { withContextWindow } from './compact.js'
 import { CLAUDE_HOME, OPENER_WAIT_MS, SESSION_IDLE_MS } from './config.js'
 import { tasks } from './db.js'
 import type { LaunchPlan } from './launch-plan.js'
 import type { NextMessage } from './next-message.js'
 import { nodeLink } from './node-link.js'
-import { followQueue, settleQueued } from './queued-prompts.js'
+import { followInput, settleQueued } from './queued-prompts.js'
 import { resumeSession } from './rewind.js'
-import type { InputContent } from './runtimes/adapter.js'
+import type { InputContent, InputReport, RewindRequest, SessionMessage } from './runtimes/adapter.js'
 import { adapterFor, DEFAULT_RUNTIME } from './runtimes/registry.js'
 import { moveSessionTo } from './session-files.js'
 import { realise } from './session-realise.js'
@@ -82,7 +80,7 @@ export async function sendTurn(
  * it resume from the rewind point. A setting that changed while it started leaves no setup key,
  * so the next turn restarts.
  */
-async function sessionMessages(session: LiveSession, task: Task): Promise<AsyncIterable<SDKMessage>> {
+async function sessionReports(session: LiveSession, task: Task): Promise<AsyncIterable<Report>> {
   const taskId = task.id
   await restoreMissingWorktrees(task, async (error) => nodeLink.journal(taskId, { type: 'note', error }))
   const { spec, launch, key, rewind } = await nodeLink.ask(taskId, 'session.spec', {})
@@ -96,12 +94,13 @@ async function sessionMessages(session: LiveSession, task: Task): Promise<AsyncI
   }
   const settle = async (id: number, state: 'applied' | 'refused', reason: string | null) =>
     nodeLink.journal(taskId, { type: 'rewind.settled', id, state, reason })
-  return resumeSession(options, rewind, settle, async (sent) => {
-    const started = await adapterFor(DEFAULT_RUNTIME).open(sent, session.openInput())
+  const open = async (at: RewindRequest | null) => {
+    const started = await adapterFor(DEFAULT_RUNTIME).open(options, session.openInput(), at)
     session.attach(started)
     await nodeLink.journal(taskId, { type: 'session.started', warm: session.warm })
     return started
-  })
+  }
+  return resumeSession(rewind, settle, open, () => session.controller.signal.aborted)
 }
 
 /** A pending rewind or changed settings need a new process, which waits for background work. */
@@ -226,16 +225,24 @@ function openSession(taskId: string, previous: LiveSession | undefined, backlog:
 
 const endStatus = (error: string | null): TaskStatus => (error === null ? 'idle' : 'error')
 
+type TurnEnded = EventOf<'turn.ended'>
+/** A session's report as the session follows it. */
+type Report = SessionMessage | InputReport
+
+/** The error a turn's end reports, or null for a turn that ended well. */
+const turnError = (end: TurnEnded): string | null => (end.status === 'error' ? (end.error ?? '') : null)
+
 /**
- * A result ends the turn. Messages that waited for it to be cut short go out next; queued ones
- * Claude Code has not handed over yet start a turn of its own; otherwise the task stops working.
- * A notification turn ahead of the turn's message ends it only if the session then goes quiet.
+ * A turn's end. Messages that waited for it to be cut short go out next; queued ones the runtime
+ * has not handed over yet start a turn of its own; otherwise the task stops working. A turn for
+ * background work ahead of the turn's message ends it only if the session then goes quiet.
  */
-async function endTurn(taskId: string, session: LiveSession, m: SDKResultMessage, error: string | null): Promise<void> {
-  for (const uuid of m.user_message_uuids ?? []) {
+async function endTurn(taskId: string, session: LiveSession, m: SessionMessage, end: TurnEnded): Promise<void> {
+  const error = turnError(end)
+  for (const uuid of m.delivered) {
     await settleQueued(taskId, session, uuid, 'delivered')
   }
-  if (!session.precedesOpener(m)) {
+  if (!session.precedesOpener(end)) {
     await closeTurn(taskId, session, error)
     return
   }
@@ -262,23 +269,14 @@ async function closeTurn(taskId: string, session: LiveSession, error: string | n
 }
 
 /** The task's own agent working again; messages of background subagents do not count. */
-const startsWork = (m: SDKMessage) =>
-  (m.type === 'assistant' && m.parent_tool_use_id === null) || (m.type === 'system' && m.subtype === 'init')
+const startsWork = (m: SessionMessage) => m.byAgent || m.events.some((event) => event.type === 'session.started')
 
-/** The error a turn's result reports, or null for any other message. */
-function resultError(m: SDKMessage): string | null {
-  if (m.type !== 'result' || !m.is_error) {
-    return null
-  }
-  return m.subtype === 'success' ? m.result : m.subtype
-}
-
-/** Follows the session: results end turns, and background work reporting back starts new ones. */
-async function follow(taskId: string, session: LiveSession, m: SDKMessage, error: string | null): Promise<void> {
-  if (m.type === 'result') {
-    await endTurn(taskId, session, m, error)
-  } else if (m.type === 'system' && m.subtype === 'background_tasks_changed') {
-    if (session.setBackground(m.tasks)) {
+/** Follows the session: turn ends end turns, and background work reporting back starts new ones. */
+async function follow(taskId: string, session: LiveSession, m: SessionMessage, end: TurnEnded | undefined) {
+  if (end !== undefined) {
+    await endTurn(taskId, session, m, end)
+  } else if (m.background !== undefined) {
+    if (session.setBackground(m.background)) {
       await publishSession(taskId)
     }
     session.closeWhenIdle(SESSION_IDLE_MS)
@@ -287,17 +285,21 @@ async function follow(taskId: string, session: LiveSession, m: SDKMessage, error
   }
 }
 
-/** Records a message of the session and follows it; returns the error a result reports. */
-async function take(taskId: string, session: LiveSession, m: SDKMessage): Promise<string | null> {
-  session.note(m)
-  if (await followQueue(taskId, session, m)) {
-    return null
+/** What a session's report ends: a turn with its error, or nothing. */
+type Taken = { ended: false } | { ended: true; error: string | null }
+
+/** Records a report of the session and follows it; says whether it ended a turn, and its error. */
+async function take(taskId: string, session: LiveSession, report: Report): Promise<Taken> {
+  if (report.type === 'input') {
+    session.heard()
+    await followInput(taskId, session, report)
+    return { ended: false }
   }
-  const payload = await withContextWindow(m, async () => session.contextWindow())
-  await nodeLink.journal(taskId, { type: 'message', runtime: DEFAULT_RUNTIME, payload })
-  const error = resultError(m)
-  await follow(taskId, session, m, error)
-  return error
+  session.note(report)
+  await nodeLink.journal(taskId, { type: 'message', runtime: DEFAULT_RUNTIME, payload: report.raw })
+  const [end] = eventsOf(report.events, 'turn.ended')
+  await follow(taskId, session, report, end)
+  return end === undefined ? { ended: false } : { ended: true, error: turnError(end) }
 }
 
 /**
@@ -334,16 +336,16 @@ async function finish(taskId: string, session: LiveSession, lastError: string | 
 }
 
 /** Opens the process and sends the messages that waited for it; the SDK starts it on first read. */
-async function startSession(taskId: string, session: LiveSession): Promise<AsyncIterable<SDKMessage>> {
+async function startSession(taskId: string, session: LiveSession): Promise<AsyncIterable<Report>> {
   const task = await tasks.get(taskId)
   if (!task) {
     throw new Error('Task was deleted before its session started')
   }
-  const messagesOfSession = await sessionMessages(session, task)
+  const reports = await sessionReports(session, task)
   await sendBacklog(taskId, session)
   await publishSession(taskId)
   session.closeWhenIdle(SESSION_IDLE_MS)
-  return messagesOfSession
+  return reports
 }
 
 /** Follows one session to its end; each message is recorded and followed in the task's lane. */
@@ -352,11 +354,11 @@ async function consume(taskId: string, session: LiveSession): Promise<void> {
   let opened = false
   try {
     if (!session.closed && (session.warm || session.backlog.length > 0)) {
-      const messagesOfSession = await inLane(taskId, async () => startSession(taskId, session))
+      const reports = await inLane(taskId, async () => startSession(taskId, session))
       opened = true
-      for await (const m of messagesOfSession) {
-        const error = await inLane(taskId, async () => take(taskId, session, m))
-        lastError = m.type === 'result' ? error : lastError
+      for await (const report of reports) {
+        const taken = await inLane(taskId, async () => take(taskId, session, report))
+        lastError = taken.ended ? taken.error : lastError
       }
     }
   } catch (e) {

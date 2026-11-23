@@ -1,13 +1,10 @@
-import type { HookCallbackMatcher, SDKCompactBoundaryMessage, SDKMessage } from '@anthropic-ai/claude-agent-sdk'
 import {
   compactLabel,
-  CONTEXT_WINDOW_KEY,
   type AuditActor,
   type CompactRule,
   type CompactSettings,
   type Task,
   type TaskCompactRule,
-  type WithContextWindow,
 } from '@seti/shared'
 import { audit } from './audit.js'
 import { refuseAgent } from './ea-guard.js'
@@ -71,29 +68,3 @@ export const compactSetup = (rule: CompactRule) => ({
   },
   env: rule.threshold_pct === null ? {} : { CLAUDE_AUTOCOMPACT_PCT_OVERRIDE: String(rule.threshold_pct) },
 })
-
-/**
- * Claude Code adds what a PreCompact hook answers to the summary's instructions, beside any the
- * user gave /compact. The task's instructions are read when it compacts, so edits apply at once.
- */
-export const compactHook = (instructions: () => Promise<string | null>): HookCallbackMatcher => ({
-  hooks: [
-    async () => {
-      const kept = await instructions()
-      return kept === null ? {} : { systemMessage: kept }
-    },
-  ],
-})
-
-/** A compact boundary keeps the context window it was measured against, for its percentage. */
-export async function withContextWindow(m: SDKMessage, window: () => Promise<number | null>): Promise<SDKMessage> {
-  if (m.type !== 'system' || m.subtype !== 'compact_boundary') {
-    return m
-  }
-  const tokens = await window()
-  if (tokens === null) {
-    return m
-  }
-  const stored: WithContextWindow<SDKCompactBoundaryMessage> = { ...m, [CONTEXT_WINDOW_KEY]: tokens }
-  return stored
-}
