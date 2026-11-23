@@ -1,4 +1,4 @@
-import type { NodeCommand, NodeReply } from '@seti/shared'
+import type { NodeCommand, NodeReply, Task } from '@seti/shared'
 import type { LiveSession } from './agent-session.js'
 import { liveScopes } from './memory-scope.js'
 import { serveControl } from './node-link.js'
@@ -13,7 +13,7 @@ import {
   stopSessionTask,
   stopTurn,
 } from './session-host.js'
-import { servesProxy } from './task-sandbox.js'
+import { closeTaskProxy, openTaskProxy } from './task-proxy.js'
 
 const sessionOf = (agent: string): LiveSession | undefined => liveSessions().find(([id]) => id === agent)?.[1]
 
@@ -95,7 +95,15 @@ serveControl({
     return {}
   },
   'scopes.read': async ({ agent }) => ({ memory: scopeMemory(agent), cpu: await scopeCpu(agent) }),
-  'proxy.serving': ({ agent }) => ({ serving: servesProxy(agent) }),
+  // The control plane read the task row.
+  'proxy.open': async ({ task }) => {
+    await openTaskProxy(task as Task)
+    return {}
+  },
+  'proxy.close': async ({ agent }) => {
+    await closeTaskProxy(agent)
+    return {}
+  },
   'scopes.agents': () => ({ agents: [...new Set(liveScopes().map((scope) => scope.plan.taskId))] }),
   'scopes.cap': async (body) => {
     await capScopes(body)

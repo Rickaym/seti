@@ -39,6 +39,9 @@ interface ScriptedRealised {
 
 const STDERR_TAIL = 2000
 
+/** A command the runtime answers with an ack, before the driver numbers it. */
+type Acked = { t: 'interrupt' } | { t: 'retract'; id: string } | { t: 'stop'; job: string }
+
 /** A line as the runtime wrote it: its JSON value, or the text when it is not JSON. */
 const parsed = (line: string): unknown => {
   try {
@@ -54,7 +57,7 @@ class Driver {
   private over = false
   private rid = 0
   private stderr = ''
-  private readonly acks = new Map<number, { resolve: () => void; reject: (e: Error) => void }>()
+  private readonly acks = new Map<number, { resolve: (taken: boolean) => void; reject: (e: Error) => void }>()
   private readonly asks = new AbortController()
   private readonly exited: Promise<unknown[]>
   private readonly child: ChildProcess
@@ -94,16 +97,17 @@ class Driver {
     }
   }
 
-  async interrupt(): Promise<void> {
+  /** Sends a command the runtime answers; resolves with whether it took what was named. */
+  async command(command: Acked): Promise<boolean> {
     if (this.over) {
       throw new Error('The scripted runtime has ended')
     }
     this.rid += 1
     const rid = this.rid
-    const acked = new Promise<void>((resolve, reject) => {
+    const acked = new Promise<boolean>((resolve, reject) => {
       this.acks.set(rid, { resolve, reject })
     })
-    this.write({ t: 'interrupt', rid })
+    this.write({ ...command, rid })
     return acked
   }
 
@@ -124,7 +128,7 @@ class Driver {
       const waiting = this.acks.get(line.rid)
       this.acks.delete(line.rid)
       if (line.ok) {
-        waiting?.resolve()
+        waiting?.resolve(line.taken ?? true)
       } else {
         waiting?.reject(new Error(line.error ?? 'The scripted runtime refused the command'))
       }
@@ -171,9 +175,15 @@ export function scriptedSession(
   })
   return {
     events: driver.messages(),
-    interrupt: async () => driver.interrupt(),
+    interrupt: async () => {
+      await driver.command({ t: 'interrupt' })
+    },
     close: () => {
       driver.close()
+    },
+    retract: async (id) => driver.command({ t: 'retract', id }),
+    stopBackground: async (job) => {
+      await driver.command({ t: 'stop', job })
     },
   }
 }

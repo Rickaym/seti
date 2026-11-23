@@ -14,6 +14,10 @@ export interface Profile {
     reasoning: boolean
   }
   usage: { tokens: boolean; costUsd: 'reported' | 'priced' | 'none' }
+  /** Input sent during a turn joins it at its next step, or waits for the turn's end. */
+  input: { steer: 'next_step' | 'after_turn'; retract: boolean }
+  /** Commands keep running in the background after their call ends, and can be stopped. */
+  background: { jobs: boolean; stop: boolean }
 }
 
 /** A neutral decision: run the call, maybe with changed input, or refuse it with a reason. */
