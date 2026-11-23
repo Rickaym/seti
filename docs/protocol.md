@@ -397,8 +397,8 @@ interrupted only for that.
   rule and touches no other request. A request whose session is gone closes as `cancelled`.
   Why: an agent must never wait on the user for ever, and must not read silence as refusal.
 - PERM-10: Bypass is per agent, off by default, set only by the user for 2, 8 or 24 h. In bypass
-  `ask` rules and the classifier do not apply; deny rules, guards, review rules, the repeat guard
-  and the sandbox still hold. Turning it off or its expiry MUST take effect at once. Each change
+  the classifier does not apply and a call no rule decides runs without a request; `ask` rules,
+  deny rules, guards, review rules, the repeat guard and the sandbox still hold. Turning it off or its expiry MUST take effect at once. Each change
   is audited and noted in the transcript.
 - PERM-12: An implementation MAY compute its own decision on each call beside the runtime's, in
   shadow. The shadow MUST NOT change, delay or fail any call, and keeps only counts per day: the
