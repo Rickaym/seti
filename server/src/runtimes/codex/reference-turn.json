@@ -1,0 +1,664 @@
+[
+  {
+    "method": "thread/started",
+    "params": {
+      "thread": {
+        "id": "01a20244-c954-7390-bda1-b0194900d368",
+        "environments": [
+          {
+            "environmentId": "local",
+            "cwd": "/work/project",
+            "runtimeWorkspaceRoots": ["/work/project"]
+          }
+        ],
+        "extra": null,
+        "sessionId": "01a20244-c954-7390-bda1-b0194900d368",
+        "forkedFromId": null,
+        "attachedToThreadId": null,
+        "parentThreadId": null,
+        "preview": "",
+        "ephemeral": false,
+        "section": null,
+        "sectionEnteredAt": null,
+        "projectId": null,
+        "historyMode": "paginated",
+        "modelProvider": "seti",
+        "model": "gpt-5.5",
+        "reasoningEffort": null,
+        "createdAt": 1795334392,
+        "updatedAt": 1795334392,
+        "recencyAt": 1795334392,
+        "status": {
+          "type": "idle"
+        },
+        "path": "/work/home/.codex/sessions/2026/11/22/rollout-2026-11-22T07-59-52-01a20244-c954-7390-bda1-b0194900d368.jsonl",
+        "cwd": "/work/project",
+        "cliVersion": "0.171.0",
+        "originator": "seti_spike",
+        "source": "vscode",
+        "canAcceptDirectInput": true,
+        "threadSource": null,
+        "agentNickname": null,
+        "agentRole": null,
+        "gitInfo": null,
+        "name": null,
+        "daybreakEnabled": null,
+        "turns": []
+      }
+    },
+    "emittedAtMs": 1795334392162
+  },
+  {
+    "method": "thread/settings/updated",
+    "params": {
+      "threadId": "01a20244-c954-7390-bda1-b0194900d368",
+      "threadSettings": {
+        "disabledPluginIds": [],
+        "cwd": "/work/project",
+        "environments": [
+          {
+            "environmentId": "local",
+            "cwd": "/work/project",
+            "runtimeWorkspaceRoots": ["/work/project"]
+          }
+        ],
+        "approvalPolicy": "untrusted",
+        "approvalsReviewer": "user",
+        "sandboxPolicy": {
+          "type": "externalSandbox",
+          "networkAccess": "restricted"
+        },
+        "activePermissionProfile": null,
+        "model": "gpt-5.5-mini",
+        "modelProvider": "seti",
+        "serviceTier": null,
+        "effort": "high",
+        "summary": null,
+        "collaborationMode": {
+          "mode": "default",
+          "settings": {
+            "model": "gpt-5.5-mini",
+            "reasoning_effort": "high",
+            "developer_instructions": null
+          }
+        },
+        "multiAgentMode": "explicitRequestOnly",
+        "personality": null
+      }
+    },
+    "emittedAtMs": 1795334392168
+  },
+  {
+    "method": "thread/status/changed",
+    "params": {
+      "threadId": "01a20244-c954-7390-bda1-b0194900d368",
+      "status": {
+        "type": "active",
+        "activeFlags": []
+      }
+    },
+    "emittedAtMs": 1795334392230
+  },
+  {
+    "method": "turn/started",
+    "params": {
+      "threadId": "01a20244-c954-7390-bda1-b0194900d368",
+      "turn": {
+        "id": "01a20244-c964-7f12-867b-8f7618af6ed6",
+        "rootTurnId": "01a20244-c964-7f12-867b-8f7618af6ed6",
+        "items": [],
+        "itemsView": "notLoaded",
+        "status": "inProgress",
+        "error": null,
+        "startedAt": 1795334392,
+        "completedAt": null,
+        "durationMs": null
+      }
+    },
+    "emittedAtMs": 1795334392230
+  },
+  {
+    "method": "item/started",
+    "params": {
+      "item": {
+        "type": "userMessage",
+        "id": "01a20244-c9af-74e0-a68c-8bd56bcd425a",
+        "clientId": null,
+        "content": [
+          {
+            "type": "text",
+            "text": "Reference turn. SCENARIO:shell-and-edit",
+            "text_elements": []
+          }
+        ],
+        "startedAtMs": 1795334392240,
+        "completedAtMs": null
+      },
+      "threadId": "01a20244-c954-7390-bda1-b0194900d368",
+      "turnId": "01a20244-c964-7f12-867b-8f7618af6ed6",
+      "startedAtMs": 1795334392240
+    },
+    "emittedAtMs": 1795334392240
+  },
+  {
+    "method": "item/completed",
+    "params": {
+      "item": {
+        "type": "userMessage",
+        "id": "01a20244-c9af-74e0-a68c-8bd56bcd425a",
+        "clientId": null,
+        "content": [
+          {
+            "type": "text",
+            "text": "Reference turn. SCENARIO:shell-and-edit",
+            "text_elements": []
+          }
+        ],
+        "startedAtMs": 1795334392240,
+        "completedAtMs": 1795334392240
+      },
+      "threadId": "01a20244-c954-7390-bda1-b0194900d368",
+      "turnId": "01a20244-c964-7f12-867b-8f7618af6ed6",
+      "contentTokenCount": null,
+      "completedAtMs": 1795334392240
+    },
+    "emittedAtMs": 1795334392243
+  },
+  {
+    "method": "item/started",
+    "params": {
+      "item": {
+        "type": "reasoning",
+        "id": "rs_0002",
+        "summary": ["I will look around first."],
+        "content": [],
+        "startedAtMs": 1795334392260,
+        "completedAtMs": null
+      },
+      "threadId": "01a20244-c954-7390-bda1-b0194900d368",
+      "turnId": "01a20244-c964-7f12-867b-8f7618af6ed6",
+      "startedAtMs": 1795334392260
+    },
+    "emittedAtMs": 1795334392260
+  },
+  {
+    "method": "item/completed",
+    "params": {
+      "item": {
+        "type": "reasoning",
+        "id": "rs_0002",
+        "summary": ["I will look around first."],
+        "content": [],
+        "startedAtMs": 1795334392260,
+        "completedAtMs": 1795334392260
+      },
+      "threadId": "01a20244-c954-7390-bda1-b0194900d368",
+      "turnId": "01a20244-c964-7f12-867b-8f7618af6ed6",
+      "contentTokenCount": null,
+      "completedAtMs": 1795334392260
+    },
+    "emittedAtMs": 1795334392261
+  },
+  {
+    "method": "thread/status/changed",
+    "params": {
+      "threadId": "01a20244-c954-7390-bda1-b0194900d368",
+      "status": {
+        "type": "active",
+        "activeFlags": ["waitingOnApproval"]
+      }
+    },
+    "emittedAtMs": 1795334392279
+  },
+  {
+    "method": "item/started",
+    "params": {
+      "item": {
+        "type": "commandExecution",
+        "id": "call_0004",
+        "pluginId": null,
+        "scriptPath": null,
+        "command": "/usr/bin/zsh -lc 'echo spike-shell-ran > shell-proof.txt; ls'",
+        "cwd": "/work/project",
+        "processId": null,
+        "source": "agent",
+        "status": "inProgress",
+        "commandActions": [
+          {
+            "type": "unknown",
+            "command": "echo spike-shell-ran > shell-proof.txt; ls"
+          }
+        ],
+        "aggregatedOutput": null,
+        "exitCode": null,
+        "durationMs": null,
+        "startedAtMs": 1795334392279,
+        "completedAtMs": null
+      },
+      "threadId": "01a20244-c954-7390-bda1-b0194900d368",
+      "turnId": "01a20244-c964-7f12-867b-8f7618af6ed6",
+      "startedAtMs": 1795334392279
+    },
+    "emittedAtMs": 1795334392280
+  },
+  {
+    "method": "serverRequest/resolved",
+    "params": {
+      "threadId": "01a20244-c954-7390-bda1-b0194900d368",
+      "requestId": 0
+    },
+    "emittedAtMs": 1795334392281
+  },
+  {
+    "method": "thread/status/changed",
+    "params": {
+      "threadId": "01a20244-c954-7390-bda1-b0194900d368",
+      "status": {
+        "type": "active",
+        "activeFlags": []
+      }
+    },
+    "emittedAtMs": 1795334392281
+  },
+  {
+    "method": "item/completed",
+    "params": {
+      "item": {
+        "type": "commandExecution",
+        "id": "call_0004",
+        "pluginId": null,
+        "scriptPath": null,
+        "command": "/usr/bin/zsh -lc 'echo spike-shell-ran > shell-proof.txt; ls'",
+        "cwd": "/work/project",
+        "processId": "88818",
+        "source": "unifiedExecStartup",
+        "status": "completed",
+        "commandActions": [
+          {
+            "type": "unknown",
+            "command": "echo spike-shell-ran > shell-proof.txt; ls"
+          }
+        ],
+        "aggregatedOutput": "README.md\nshell-proof.txt\n",
+        "exitCode": 0,
+        "durationMs": 0,
+        "startedAtMs": 1795334392279,
+        "completedAtMs": 1795334392312
+      },
+      "threadId": "01a20244-c954-7390-bda1-b0194900d368",
+      "turnId": "01a20244-c964-7f12-867b-8f7618af6ed6",
+      "contentTokenCount": null,
+      "completedAtMs": 1795334392312
+    },
+    "emittedAtMs": 1795334392314
+  },
+  {
+    "method": "thread/tokenUsage/updated",
+    "params": {
+      "threadId": "01a20244-c954-7390-bda1-b0194900d368",
+      "turnId": "01a20244-c964-7f12-867b-8f7618af6ed6",
+      "tokenUsage": {
+        "total": {
+          "totalTokens": 1240,
+          "inputTokens": 1200,
+          "cachedInputTokens": 1000,
+          "cacheWriteInputTokens": 0,
+          "outputTokens": 40,
+          "reasoningOutputTokens": 12
+        },
+        "last": {
+          "totalTokens": 1240,
+          "inputTokens": 1200,
+          "cachedInputTokens": 1000,
+          "cacheWriteInputTokens": 0,
+          "outputTokens": 40,
+          "reasoningOutputTokens": 12
+        },
+        "modelContextWindow": 258400
+      }
+    },
+    "emittedAtMs": 1795334392319
+  },
+  {
+    "method": "account/rateLimits/updated",
+    "params": {
+      "rateLimits": {
+        "limitId": "codex",
+        "limitName": null,
+        "normalModelSlug": null,
+        "primary": null,
+        "secondary": null,
+        "credits": null,
+        "individualLimit": null,
+        "spendControlReached": null,
+        "planType": null,
+        "rateLimitReachedType": null
+      }
+    },
+    "emittedAtMs": 1795334392319
+  },
+  {
+    "method": "item/started",
+    "params": {
+      "item": {
+        "type": "reasoning",
+        "id": "rs_0006",
+        "summary": ["Now I edit the README."],
+        "content": [],
+        "startedAtMs": 1795334392331,
+        "completedAtMs": null
+      },
+      "threadId": "01a20244-c954-7390-bda1-b0194900d368",
+      "turnId": "01a20244-c964-7f12-867b-8f7618af6ed6",
+      "startedAtMs": 1795334392331
+    },
+    "emittedAtMs": 1795334392331
+  },
+  {
+    "method": "item/completed",
+    "params": {
+      "item": {
+        "type": "reasoning",
+        "id": "rs_0006",
+        "summary": ["Now I edit the README."],
+        "content": [],
+        "startedAtMs": 1795334392331,
+        "completedAtMs": 1795334392331
+      },
+      "threadId": "01a20244-c954-7390-bda1-b0194900d368",
+      "turnId": "01a20244-c964-7f12-867b-8f7618af6ed6",
+      "contentTokenCount": null,
+      "completedAtMs": 1795334392331
+    },
+    "emittedAtMs": 1795334392332
+  },
+  {
+    "method": "item/started",
+    "params": {
+      "item": {
+        "type": "fileChange",
+        "id": "call_0008",
+        "changes": [
+          {
+            "path": "/work/project/README.md",
+            "kind": {
+              "type": "update",
+              "move_path": null
+            },
+            "diff": "@@ -2,2 +2,2 @@\n \n-Old line.\n+New line written by the scripted model.\n"
+          }
+        ],
+        "status": "inProgress",
+        "startedAtMs": 1795334392338,
+        "completedAtMs": null
+      },
+      "threadId": "01a20244-c954-7390-bda1-b0194900d368",
+      "turnId": "01a20244-c964-7f12-867b-8f7618af6ed6",
+      "startedAtMs": 1795334392338
+    },
+    "emittedAtMs": 1795334392338
+  },
+  {
+    "method": "thread/status/changed",
+    "params": {
+      "threadId": "01a20244-c954-7390-bda1-b0194900d368",
+      "status": {
+        "type": "active",
+        "activeFlags": ["waitingOnApproval"]
+      }
+    },
+    "emittedAtMs": 1795334392339
+  },
+  {
+    "method": "serverRequest/resolved",
+    "params": {
+      "threadId": "01a20244-c954-7390-bda1-b0194900d368",
+      "requestId": 1
+    },
+    "emittedAtMs": 1795334392339
+  },
+  {
+    "method": "thread/status/changed",
+    "params": {
+      "threadId": "01a20244-c954-7390-bda1-b0194900d368",
+      "status": {
+        "type": "active",
+        "activeFlags": []
+      }
+    },
+    "emittedAtMs": 1795334392339
+  },
+  {
+    "method": "item/completed",
+    "params": {
+      "item": {
+        "type": "fileChange",
+        "id": "call_0008",
+        "changes": [
+          {
+            "path": "/work/project/README.md",
+            "kind": {
+              "type": "update",
+              "move_path": null
+            },
+            "diff": "@@ -2,2 +2,2 @@\n \n-Old line.\n+New line written by the scripted model.\n"
+          }
+        ],
+        "status": "completed",
+        "startedAtMs": 1795334392338,
+        "completedAtMs": 1795334392340
+      },
+      "threadId": "01a20244-c954-7390-bda1-b0194900d368",
+      "turnId": "01a20244-c964-7f12-867b-8f7618af6ed6",
+      "contentTokenCount": null,
+      "completedAtMs": 1795334392340
+    },
+    "emittedAtMs": 1795334392341
+  },
+  {
+    "method": "turn/diff/updated",
+    "params": {
+      "threadId": "01a20244-c954-7390-bda1-b0194900d368",
+      "turnId": "01a20244-c964-7f12-867b-8f7618af6ed6",
+      "diff": "diff --git a/README.md b/README.md\nindex aa2521fbd53c1c21546c9fc2b73200e769021227..e8c1c4ac3190fdb117836d5b7c8a85c2f021be4f\n--- a/README.md\n+++ b/README.md\n@@ -1,3 +1,3 @@\n # demo project\n \n-Old line.\n+New line written by the scripted model.\n"
+    },
+    "emittedAtMs": 1795334392341
+  },
+  {
+    "method": "thread/tokenUsage/updated",
+    "params": {
+      "threadId": "01a20244-c954-7390-bda1-b0194900d368",
+      "turnId": "01a20244-c964-7f12-867b-8f7618af6ed6",
+      "tokenUsage": {
+        "total": {
+          "totalTokens": 2580,
+          "inputTokens": 2500,
+          "cachedInputTokens": 2000,
+          "cacheWriteInputTokens": 0,
+          "outputTokens": 80,
+          "reasoningOutputTokens": 24
+        },
+        "last": {
+          "totalTokens": 1340,
+          "inputTokens": 1300,
+          "cachedInputTokens": 1000,
+          "cacheWriteInputTokens": 0,
+          "outputTokens": 40,
+          "reasoningOutputTokens": 12
+        },
+        "modelContextWindow": 258400
+      }
+    },
+    "emittedAtMs": 1795334392346
+  },
+  {
+    "method": "account/rateLimits/updated",
+    "params": {
+      "rateLimits": {
+        "limitId": "codex",
+        "limitName": null,
+        "normalModelSlug": null,
+        "primary": null,
+        "secondary": null,
+        "credits": null,
+        "individualLimit": null,
+        "spendControlReached": null,
+        "planType": null,
+        "rateLimitReachedType": null
+      }
+    },
+    "emittedAtMs": 1795334392346
+  },
+  {
+    "method": "item/started",
+    "params": {
+      "item": {
+        "type": "agentMessage",
+        "moderation": null,
+        "id": "msg_0010",
+        "text": "Done: ran one command and edited README.md.",
+        "phase": null,
+        "memoryCitation": null,
+        "delivery": null,
+        "questions": null,
+        "startedAtMs": 1795334392357,
+        "completedAtMs": null
+      },
+      "threadId": "01a20244-c954-7390-bda1-b0194900d368",
+      "turnId": "01a20244-c964-7f12-867b-8f7618af6ed6",
+      "startedAtMs": 1795334392357
+    },
+    "emittedAtMs": 1795334392357
+  },
+  {
+    "method": "item/completed",
+    "params": {
+      "item": {
+        "type": "agentMessage",
+        "moderation": null,
+        "id": "msg_0010",
+        "text": "Done: ran one command and edited README.md.",
+        "phase": null,
+        "memoryCitation": null,
+        "delivery": null,
+        "questions": null,
+        "startedAtMs": 1795334392357,
+        "completedAtMs": 1795334392357
+      },
+      "threadId": "01a20244-c954-7390-bda1-b0194900d368",
+      "turnId": "01a20244-c964-7f12-867b-8f7618af6ed6",
+      "contentTokenCount": null,
+      "completedAtMs": 1795334392357
+    },
+    "emittedAtMs": 1795334392359
+  },
+  {
+    "method": "thread/tokenUsage/updated",
+    "params": {
+      "threadId": "01a20244-c954-7390-bda1-b0194900d368",
+      "turnId": "01a20244-c964-7f12-867b-8f7618af6ed6",
+      "tokenUsage": {
+        "total": {
+          "totalTokens": 4020,
+          "inputTokens": 3900,
+          "cachedInputTokens": 3000,
+          "cacheWriteInputTokens": 0,
+          "outputTokens": 120,
+          "reasoningOutputTokens": 36
+        },
+        "last": {
+          "totalTokens": 1440,
+          "inputTokens": 1400,
+          "cachedInputTokens": 1000,
+          "cacheWriteInputTokens": 0,
+          "outputTokens": 40,
+          "reasoningOutputTokens": 12
+        },
+        "modelContextWindow": 258400
+      }
+    },
+    "emittedAtMs": 1795334392363
+  },
+  {
+    "method": "account/rateLimits/updated",
+    "params": {
+      "rateLimits": {
+        "limitId": "codex",
+        "limitName": null,
+        "normalModelSlug": null,
+        "primary": null,
+        "secondary": null,
+        "credits": null,
+        "individualLimit": null,
+        "spendControlReached": null,
+        "planType": null,
+        "rateLimitReachedType": null
+      }
+    },
+    "emittedAtMs": 1795334392363
+  },
+  {
+    "method": "turn/diff/updated",
+    "params": {
+      "threadId": "01a20244-c954-7390-bda1-b0194900d368",
+      "turnId": "01a20244-c964-7f12-867b-8f7618af6ed6",
+      "diff": "diff --git a/README.md b/README.md\nindex aa2521fbd53c1c21546c9fc2b73200e769021227..e8c1c4ac3190fdb117836d5b7c8a85c2f021be4f\n--- a/README.md\n+++ b/README.md\n@@ -1,3 +1,3 @@\n # demo project\n \n-Old line.\n+New line written by the scripted model.\n"
+    },
+    "emittedAtMs": 1795334392365
+  },
+  {
+    "method": "thread/readState/changed",
+    "params": {
+      "threadId": "01a20244-c954-7390-bda1-b0194900d368",
+      "readState": {
+        "firstUnread": {
+          "type": "turn",
+          "turnId": "01a20244-c964-7f12-867b-8f7618af6ed6"
+        },
+        "revision": "0531e02e-8d54-49d1-b573-b8b97e4d4488"
+      }
+    },
+    "emittedAtMs": 1795334392371
+  },
+  {
+    "method": "thread/status/changed",
+    "params": {
+      "threadId": "01a20244-c954-7390-bda1-b0194900d368",
+      "status": {
+        "type": "idle"
+      }
+    },
+    "emittedAtMs": 1795334392371
+  },
+  {
+    "method": "turn/completed",
+    "params": {
+      "threadId": "01a20244-c954-7390-bda1-b0194900d368",
+      "turn": {
+        "id": "01a20244-c964-7f12-867b-8f7618af6ed6",
+        "rootTurnId": "01a20244-c964-7f12-867b-8f7618af6ed6",
+        "items": [
+          {
+            "type": "agentMessage",
+            "moderation": null,
+            "id": "msg_0010",
+            "text": "Done: ran one command and edited README.md.",
+            "phase": null,
+            "memoryCitation": null,
+            "delivery": null,
+            "questions": null,
+            "startedAtMs": 1795334392357,
+            "completedAtMs": 1795334392357
+          }
+        ],
+        "itemsView": "summary",
+        "status": "completed",
+        "error": null,
+        "startedAt": 1795334392,
+        "completedAt": 1795334392,
+        "durationMs": 197
+      }
+    },
+    "emittedAtMs": 1795334392371
+  }
+]

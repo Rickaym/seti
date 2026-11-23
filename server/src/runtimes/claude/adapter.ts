@@ -1,4 +1,5 @@
-import { query, type Options, type Query } from '@anthropic-ai/claude-agent-sdk'
+import { query, type Options, type Query, type SDKMessage } from '@anthropic-ai/claude-agent-sdk'
+import { projectClaude } from '@seti/shared'
 import type { RuntimeAdapter, SessionInput } from '../adapter.js'
 import { claudePrompt } from './input.js'
 import { realise } from './realise.js'
@@ -16,6 +17,8 @@ export const claudeAdapter: RuntimeAdapter<ClaudeShapes> = {
     session: { fork: 'ephemeral' },
     rewind: { conversation: true, code: true },
   },
+  // Claude Code wrote it, live or as Seti stored it.
+  project: (raw) => projectClaude(raw as SDKMessage),
   realise,
   open: async (options, input, rewind) => {
     const started = rewind === null ? options : rewoundOptions(options, rewind)
