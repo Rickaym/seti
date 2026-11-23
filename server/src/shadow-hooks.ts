@@ -13,6 +13,7 @@ import { ShadowTracker, type ShadowRecord } from './policy/shadow.js'
 import { sourcedRules } from './policy/sources.js'
 import { policyCall } from './policy/tool-call.js'
 import type { PolicyCall, PolicyContext } from './policy/types.js'
+import { adapterFor, DEFAULT_RUNTIME } from './runtimes/registry.js'
 import { guardScope, ruleSources, workingDirs } from './session-options.js'
 import { allowedFor } from './store/change-requests.js'
 import { policyShadow } from './store/policy-shadow.js'
@@ -40,6 +41,7 @@ async function rulesOf(task: Task, sandboxed: boolean): Promise<Rules> {
     cwd: task.cwd,
     dirs: [task.cwd, ...workingDirs(task)],
     home: scope.home,
+    classifier: adapterFor(DEFAULT_RUNTIME).capabilities.gate.classifier,
     guard: (call) => refusal(call, scope, allowed),
   }
 }
