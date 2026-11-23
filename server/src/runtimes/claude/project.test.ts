@@ -145,6 +145,47 @@ describe('Claude tool results', () => {
     ])
   })
 
+  it('reads a subagent result without its id line, with the report and usage once it is done', () => {
+    expect(project(completedResult('toolu_c', 'a5', 'All good.'))).toMatchObject([
+      { result: { agent: { id: 'a5', text: 'All good.', done: true, report: 'All good.', usage: { tokens: 5100 } } } },
+    ])
+    expect(project(launched('toolu_a', 'a3b4', true))).toMatchObject([
+      { result: { agent: { id: 'a3b4', done: false } } },
+    ])
+    expect(project(plainResult('toolu_p', 'ok'))[0]).not.toHaveProperty('result.agent')
+  })
+
+  it('reads the plan a task tool reports, from a message that holds only its result', () => {
+    const tasks = [
+      { id: '1', subject: 'Fix CI', status: 'completed' },
+      { id: '2', subject: ' ', status: 'pending' },
+      { id: '3', subject: 'Odd', status: 'blocked' },
+    ]
+    expect(project(toolResult('toolu_l', 'listed', { output: { tasks } }))).toMatchObject([
+      { result: { plan: { items: [{ id: '1', text: 'Fix CI', status: 'completed' }] } } },
+    ])
+    expect(
+      project(toolResult('toolu_g', 'got', { output: { task: { id: '4', status: 'in_progress' } } })),
+    ).toMatchObject([{ result: { plan: { item: { id: '4', status: 'in_progress' } } } }])
+    expect(project(toolResult('toolu_u', 'no', { output: { success: false } }))).toMatchObject([
+      { result: { plan: { unchanged: true } } },
+    ])
+    const two = raw({
+      type: 'user',
+      parent_tool_use_id: null,
+      message: {
+        role: 'user',
+        content: [
+          { type: 'tool_result', tool_use_id: 't1', content: 'Task #9 created successfully: a' },
+          { type: 'tool_result', tool_use_id: 't2', content: 'b' },
+        ],
+      },
+      tool_use_result: { task: { id: '8', status: 'pending' }, success: false },
+    })
+    expect(two).toMatchObject([{ result: { planId: '9' } }, {}])
+    expect(two[0]).not.toHaveProperty('result.plan')
+  })
+
   it('gives every result of a message the message structured output', () => {
     const body = raw({
       type: 'user',
@@ -232,6 +273,17 @@ describe('Claude results', () => {
     ])
     const apiError = { ...fakeResult(), is_error: true, result: 'API Error: 401', api_error_status: 401, uuid: 'r3' }
     expect(raw(apiError)).toMatchObject([{ status: 'error', error: 'API Error: 401', apiStatus: 401 }])
+    expect(raw(apiError)[0]).not.toHaveProperty('ending')
+  })
+
+  it('says why a turn stopped short of its answer', () => {
+    const ended = (subtype: string) => raw({ ...fakeResult(true), subtype, uuid: 'r6' })[0]
+    expect(ended('error_during_execution')).toMatchObject({ ending: 'error' })
+    expect(ended('error_max_turns')).toMatchObject({ ending: 'turn_limit' })
+    expect(ended('error_max_budget_usd')).toMatchObject({ ending: 'budget_limit' })
+    expect(ended('error_max_structured_output_retries')).toMatchObject({ ending: 'retry_limit' })
+    expect(ended('error_new_kind')).toMatchObject({ ending: 'other', error: 'error_new_kind' })
+    expect(raw({ ...fakeResult(), uuid: 'r7' })[0]).not.toHaveProperty('ending')
   })
 
   it('reads a background turn, its steps, usage and the messages it answered', () => {
