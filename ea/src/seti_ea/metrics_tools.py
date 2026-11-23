@@ -130,3 +130,54 @@ def ea_usage_lines(stats: Any) -> list[str]:
     if models:
         lines.append(f"Models: {and_list(models)}.")
     return lines
+
+
+COMPARED = ("agree", "deferred", "tighter", "looser")
+NOT_COMPARED = ("seti-hook", "unobserved", "interrupted")
+TOP_DIFFERENCES = 5
+
+
+def _difference(entry: Mapping[str, Any]) -> str:
+    rule = str(entry.get("rule") or "") or "no rule"
+    seti = f"Seti would {entry.get('verdict')} at step {entry.get('step')} ({rule})"
+    claude = f"Claude Code chose to {entry.get('runtime')}"
+    calls = plural(int(_num(entry, "calls")), "call")
+    where = f"{entry.get('tool')} in {entry.get('mode')} mode"
+    return f"- {entry.get('result')}: {where}, {seti}, {claude}: {calls}."
+
+
+def _counts(fields: Mapping[str, Any], keys: Sequence[str]) -> list[str]:
+    return [f"{int(_num(fields, key))} {key}" for key in keys if _num(fields, key)]
+
+
+def shadow_lines(summary: Any) -> list[str]:
+    """How Seti's own permission evaluator, run in shadow, compared with Claude Code since the day."""
+    fields: dict[str, Any] = summary if isinstance(summary, dict) else {}
+    raw = fields.get("results")
+    results: dict[str, Any] = raw if isinstance(raw, dict) else {}
+    since = fields.get("since", "the start")
+    compared = sum(int(_num(results, key)) for key in COMPARED)
+    lines = [
+        "Seti's own permission evaluator runs in shadow: it decides every tool call beside Claude Code "
+        "and changes no outcome."
+    ]
+    if compared == 0:
+        lines.append(f"No tool calls compared since {since}.")
+    else:
+        lines.append(
+            f"Since {since}: matched Claude Code on {int(_num(results, 'agree'))} "
+            f"of {plural(compared, 'call')}; "
+            f"{int(_num(results, 'deferred'))} left to its classifier, "
+            f"{int(_num(results, 'tighter'))} stricter, {int(_num(results, 'looser'))} looser."
+        )
+    others = _counts(results, NOT_COMPARED)
+    if others:
+        lines.append(f"Not compared: {and_list(others)}.")
+    trouble = _counts(results, ("failed",)) + _counts(fields, ("slow",))
+    if trouble:
+        lines.append(f"Decisions that went wrong: {and_list(trouble)}.")
+    differences = dicts(fields.get("differences"))
+    if differences:
+        lines.append("Most frequent differences:")
+        lines.extend(_difference(entry) for entry in differences[:TOP_DIFFERENCES])
+    return lines
