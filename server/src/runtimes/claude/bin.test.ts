@@ -2,7 +2,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
-import { claudeOnPath, findClaudeBin } from './claude-bin.js'
+import { claudeOnPath, findClaudeBin } from './bin.js'
 
 const root = fs.mkdtempSync(path.join(os.tmpdir(), 'seti-claude-bin-'))
 const broken = path.join(root, 'broken')

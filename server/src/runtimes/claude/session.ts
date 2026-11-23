@@ -7,7 +7,6 @@ import type {
   Options,
   PermissionMode,
   Query,
-  query,
   SDKMessage,
 } from '@anthropic-ai/claude-agent-sdk'
 import type { RuntimeSession } from '../adapter.js'
@@ -23,14 +22,13 @@ interface ClaudePolicy {
   deny: string[]
 }
 
-/** Claude Code's own shapes: plugins, SDK options and start arguments, messages, MCP reports. */
+/** Claude Code's own shapes: plugins, SDK options, messages, MCP reports. */
 export interface ClaudeShapes {
   vendor: ClaudeVendor
   realised: Options
   decide: CanUseTool
   hooks: Partial<Record<HookEvent, HookCallbackMatcher[]>>
   hostServers: Record<string, McpServerConfig>
-  start: Parameters<typeof query>[0]
   message: SDKMessage
   toolServer: McpServerStatus
   policy: ClaudePolicy

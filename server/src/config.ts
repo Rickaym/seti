@@ -3,8 +3,8 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { androidAppSchema, AWAY_MS, MOD_LIMITS, POLLER_LIMITS, SETI_HOSTNAMES, type AndroidApp } from '@seti/shared'
-import { findClaudeBin } from './claude-bin.js'
 import { socketUrl } from './pg.js'
+import { findClaudeBin } from './runtimes/claude/bin.js'
 
 function env(name: string, fallback: string): string {
   const value = process.env[name]

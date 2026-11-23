@@ -1,9 +1,9 @@
 import { COMPACT_DEFAULTS } from '@seti/shared'
 import type { SessionSpec } from '../../session-spec.js'
-import type { RuntimeShapes } from '../adapter.js'
+import type { RuntimeShapes, SessionInput } from '../adapter.js'
 import { Channel, Run, type RunView } from './run.js'
 import type { Script } from './script.js'
-import type { ConformanceTarget, NeutralHost, Profile, Rig, SuiteInput } from './target.js'
+import type { ConformanceTarget, NeutralHost, Profile, Rig } from './target.js'
 
 /** The folder every suite session works in; no adapter may touch it, since the runtime is fake. */
 const SUITE_CWD = '/work/conformance'
@@ -59,8 +59,8 @@ export function subjectOf<S extends RuntimeShapes, Id extends string>(target: Co
       const controller = new AbortController()
       const host = target.host(options.host ?? ALLOW_ALL)
       const realised = await target.adapter.realise(specFor(options.resume ?? null), rig.launcher, host, controller)
-      const inputs = new Channel<SuiteInput>()
-      const session = await target.adapter.open(target.start(realised, inputs))
+      const inputs = new Channel<SessionInput>()
+      const session = await target.adapter.open(realised, inputs)
       return new Run(session, target.project, inputs, controller).start()
     },
   }

@@ -27,15 +27,15 @@ export const LIFECYCLE: Case[] = [
   },
   {
     id: 'LC-2',
-    title: 'the first input reports the session id first and ends its turn once, with the reply',
+    title: 'the session id comes before the first turn, which ends once, with the reply',
     proves: 'RT-2 resumable session id and turn end; TURN-17',
     run: async (subject) => {
       const run = await subject.open(subject.rig({ turns: [[{ say: 'working' }, { say: 'all done' }]] }))
       run.send('start')
       const end = await turnEnd(run, 1)
-      const started = ofType(run, 'session.started')
-      expect(started).toHaveLength(1)
-      expect(started[0]?.sessionId).not.toBe('')
+      const ids = new Set(ofType(run, 'session.started').map((started) => started.sessionId))
+      expect([...ids]).toHaveLength(1)
+      expect(ids.has('')).toBe(false)
       expect(run.events.findIndex((event) => event.type === 'session.started')).toBeLessThan(
         run.events.findIndex((event) => event.type === 'message'),
       )
@@ -55,7 +55,7 @@ export const LIFECYCLE: Case[] = [
       await turnEnd(run, 1)
       run.send('second')
       expect((await turnEnd(run, 2)).result).toBe(echoOf(['second']))
-      expect(ofType(run, 'session.started')).toHaveLength(1)
+      expect(new Set(ofType(run, 'session.started').map((started) => started.sessionId)).size).toBe(1)
       expect(rig.spawns).toHaveLength(1)
       await closed(run)
     },

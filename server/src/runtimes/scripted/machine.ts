@@ -1,46 +1,13 @@
-import { ChildProcess } from 'node:child_process'
 import { createInterface } from 'node:readline'
-import { PassThrough } from 'node:stream'
 import type { Launcher } from '../../launcher.js'
+import { FakeProcess } from '../conformance/process.js'
 import type { Script } from '../conformance/script.js'
 import type { Rig, SpawnRecord } from '../conformance/target.js'
 import type { ScriptedCommand } from './dialect.js'
 import { ScriptedRuntime, type MachineState } from './runtime.js'
 
-type LaunchRequest = Parameters<NonNullable<Launcher['spawn']>>[0]
-
-/** A process of the scripted runtime: real pipes, no operating system process behind them. */
-class ScriptedProcess extends ChildProcess {
-  override stdin = new PassThrough()
-  override stdout = new PassThrough()
-  override stderr = new PassThrough()
-  private finished = false
-
-  constructor(signal: AbortSignal) {
-    super()
-    signal.addEventListener('abort', () => {
-      this.finish(null, 'SIGTERM')
-    })
-  }
-
-  override kill(signal?: NodeJS.Signals | number): boolean {
-    this.finish(null, typeof signal === 'string' ? signal : 'SIGTERM')
-    return true
-  }
-
-  finish(code: number | null, signal: NodeJS.Signals | null): void {
-    if (this.finished) {
-      return
-    }
-    this.finished = true
-    this.stdout.push(null)
-    this.stderr.push(null)
-    setImmediate(() => this.emit('exit', code, signal))
-  }
-}
-
 /** Connects a new scripted runtime to the process's pipes. */
-function boot(child: ScriptedProcess, state: MachineState): void {
+function boot(child: FakeProcess, state: MachineState): void {
   const { stdout } = child
   const runtime = new ScriptedRuntime(state, {
     write: (line) => {
@@ -64,9 +31,9 @@ function boot(child: ScriptedProcess, state: MachineState): void {
 export function scriptedMachine(script: Script, env: Record<string, string> = {}): Rig {
   const state: MachineState = { script, sessions: new Map(), effects: [], turns: 0 }
   const spawns: SpawnRecord[] = []
-  const spawn = (request: LaunchRequest) => {
+  const spawn: NonNullable<Launcher['spawn']> = (request) => {
     spawns.push({ command: request.command, args: request.args, cwd: request.cwd, env: request.env })
-    const child = new ScriptedProcess(request.signal)
+    const child = new FakeProcess(request.signal)
     boot(child, state)
     return child
   }

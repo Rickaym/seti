@@ -1,6 +1,5 @@
 import type { EventOf, RuntimeEvent } from '@seti/shared'
-import type { RuntimeSession, RuntimeShapes } from '../adapter.js'
-import type { SuiteInput } from './target.js'
+import type { RuntimeSession, RuntimeShapes, SessionInput } from '../adapter.js'
 
 /** How long anything a case waits on may take; every case settles in milliseconds when it passes. */
 const CASE_BOUND_MS = 2000
@@ -76,10 +75,23 @@ export interface RunView {
   /** Waits until the session's events end, within the bound. */
   settled: () => Promise<Error | null>
   interrupt: () => Promise<void>
+  /** Takes back a queued input; null when the session cannot take one back. */
+  retract: (inputId: string) => Promise<boolean> | null
+  /** Stops a background job; null when the session cannot stop one. */
+  stopBackground: (jobId: string) => Promise<void> | null
   close: () => void
   /** Aborts the controller the session was realised with. */
   abort: () => void
   projections: () => Projection[]
+}
+
+/** Lets messages already sent between Seti and an in-process runtime arrive before going on. */
+export async function settle(): Promise<void> {
+  for (let i = 0; i < 3; i += 1) {
+    await new Promise((resolve) => {
+      setImmediate(resolve)
+    })
+  }
 }
 
 /** The event is the end of a turn of the agent itself. */
@@ -96,13 +108,13 @@ export class Run<S extends RuntimeShapes> implements RunView {
   private readonly waiters = new Set<() => void>()
   private readonly session: RuntimeSession<S>
   private readonly project: (message: S['message']) => RuntimeEvent[]
-  private readonly input: Channel<SuiteInput>
+  private readonly input: Channel<SessionInput>
   private readonly controller: AbortController
 
   constructor(
     session: RuntimeSession<S>,
     project: (message: S['message']) => RuntimeEvent[],
-    input: Channel<SuiteInput>,
+    input: Channel<SessionInput>,
     controller: AbortController,
   ) {
     this.session = session
@@ -120,7 +132,7 @@ export class Run<S extends RuntimeShapes> implements RunView {
   send(text: string): string {
     inputs += 1
     const id = `input-${String(inputs)}`
-    this.input.push({ id, text })
+    this.input.push({ id, content: { text, images: [] } })
     return id
   }
 
@@ -140,6 +152,16 @@ export class Run<S extends RuntimeShapes> implements RunView {
 
   async interrupt(): Promise<void> {
     return within(this.session.interrupt(), 'interrupt')
+  }
+
+  retract(inputId: string): Promise<boolean> | null {
+    const { retract } = this.session
+    return retract === undefined ? null : within(retract(inputId), 'retract')
+  }
+
+  stopBackground(jobId: string): Promise<void> | null {
+    const { stopBackground } = this.session
+    return stopBackground === undefined ? null : within(stopBackground(jobId), 'stopBackground')
   }
 
   close(): void {
