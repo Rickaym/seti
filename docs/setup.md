@@ -365,7 +365,8 @@ checks the socket. Logs are in `journalctl --user -u seti-node.service`.
 
 Split mode still has gaps that a single process does not:
 
-- The node still reads settings and connection values from the database itself.
+- The node still reads some settings from the database itself. It reads no secret value and runs
+  without the secret store key.
 
 ### Redis
 
