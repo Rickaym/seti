@@ -2,6 +2,7 @@ import { timingSafeEqual } from 'node:crypto'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { AWS_CREDENTIALS_PATH } from '@seti/shared'
 import type { ContainerCredentials } from './aws-credentials.js'
+import { ControlLate, unlessLate } from './egress-answers.js'
 
 /** A task's AWS, as its egress proxy serves it. */
 export interface EgressAws {
@@ -41,7 +42,7 @@ export async function serveAwsCredentials(
   aws: EgressAws | undefined,
 ): Promise<void> {
   req.resume()
-  if (aws === undefined || !(await aws.enabled().catch(() => false))) {
+  if (aws === undefined || !(await aws.enabled().catch(unlessLate(false)))) {
     json(res, 404, { message: 'Seti: AWS is off for this agent. Ask the user to turn it on for the task.' })
     return
   }
@@ -54,7 +55,7 @@ export async function serveAwsCredentials(
     credentials = await aws.credentials()
   } catch (e) {
     const reason = e instanceof Error ? e.message : String(e)
-    json(res, 502, { message: `Seti could not assume the AWS role: ${reason}` })
+    json(res, e instanceof ControlLate ? 503 : 502, { message: `Seti could not assume the AWS role: ${reason}` })
     return
   }
   if (credentials === null) {

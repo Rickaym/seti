@@ -1,5 +1,13 @@
 import { AsyncLocalStorage } from 'node:async_hooks'
-import type { AskCancel, AskFrame, AskReply, JournalAppend, JournalEntry, JournalReply } from '@seti/shared'
+import {
+  type AskCancel,
+  type AskFrame,
+  type AskReply,
+  type JournalAppend,
+  type JournalEntry,
+  type JournalReply,
+  VALUE_ASKS,
+} from '@seti/shared'
 import type { JournalPosition } from './node-outbox.js'
 
 /** How long the control plane keeps an ask's answer, so a retried ask never runs twice. */
@@ -232,7 +240,10 @@ interface Answered {
   abort: AbortController
 }
 
-/** The control plane's side of asks: each ask id is answered once, and a retry gets that answer. */
+/**
+ * The control plane's side of asks: each ask id is answered once, and a retry gets that answer.
+ * An answer that carries values is never kept: once sent, a retry asks again.
+ */
 export class AskLedger {
   private readonly answers = new Map<string, Answered>()
   private readonly answer: (frame: AskFrame, signal: AbortSignal) => Promise<unknown>
@@ -261,6 +272,9 @@ export class AskLedger {
         }),
       )
     this.answers.set(frame.id, { reply, at: this.now(), abort })
+    if (VALUE_ASKS.has(frame.ask)) {
+      void reply.finally(() => this.answers.delete(frame.id))
+    }
     return reply
   }
 
