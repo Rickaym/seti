@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import type { SDKResultMessage, SDKUserMessage } from '@anthropic-ai/claude-agent-sdk'
+import type { SDKResultMessage } from '@anthropic-ai/claude-agent-sdk'
 import type { SideAnswer, SideChatEvent, SideChatInput, Task } from '@seti/shared'
 import { refuseArchived } from '../archive-guard.js'
 import { CLAUDE_HOME } from '../config.js'
@@ -8,6 +8,7 @@ import { refuseHiddenDirect } from '../direct-privacy.js'
 import { refuseOtherAgent } from '../ea-guard.js'
 import { HttpError } from '../http.js'
 import { sessionState } from '../runner.js'
+import type { SessionInput } from '../runtimes/adapter.js'
 import { sideChatOptions, type ForkPoint } from '../runtimes/claude/side-chat-options.js'
 import { adapterFor, DEFAULT_RUNTIME } from '../runtimes/registry.js'
 import { redactSecrets } from '../scrub.js'
@@ -47,14 +48,8 @@ async function forkPoint(task: Task): Promise<ForkPoint> {
   return { session_id: task.session_id, at: pending?.resume_at ?? null }
 }
 
-async function* once(text: string): AsyncGenerator<SDKUserMessage> {
-  const message: SDKUserMessage = {
-    type: 'user',
-    message: { role: 'user', content: text },
-    parent_tool_use_id: null,
-    uuid: randomUUID(),
-  }
-  yield await Promise.resolve(message)
+async function* once(text: string): AsyncGenerator<SessionInput> {
+  yield await Promise.resolve({ id: randomUUID(), content: { text, images: [] } })
 }
 
 const clipped = (text: string) => {
@@ -103,7 +98,7 @@ async function runFork(task: Task, fork: ForkPoint, prompt: string, run: Running
   const file = sessionFile(fork.session_id, task.cwd)
   const saved = savedTotal(file)
   const options = await sideChatOptions(task, fork, { reads: run.reads, abortController: run.abort })
-  const asked = await adapterFor(DEFAULT_RUNTIME).open({ prompt: once(prompt), options })
+  const asked = await adapterFor(DEFAULT_RUNTIME).open(options, once(prompt))
   const stream = new AnswerStream()
   const outcome = async (m: SDKResultMessage): Promise<Outcome> => {
     const cost = await countCost(task, m, Math.max(saved, savedTotal(file)))

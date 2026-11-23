@@ -15,7 +15,6 @@ export const scriptedTarget: ConformanceTarget<ScriptedShapes, 'scripted'> = {
     background: { jobs: true, stop: true },
   },
   project: projectScripted,
-  start: (realised, inputs) => ({ realised, inputs }),
   host: (neutral) => ({
     decide: async (call, signal): Promise<Verdict> => {
       const decision = await neutral.decide(call, signal)

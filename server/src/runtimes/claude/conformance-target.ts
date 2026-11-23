@@ -1,22 +1,9 @@
-import type { CanUseTool, SDKUserMessage } from '@anthropic-ai/claude-agent-sdk'
+import type { CanUseTool } from '@anthropic-ai/claude-agent-sdk'
 import { claudeToolCall, projectClaude } from '@seti/shared'
-import type { ConformanceTarget, NeutralHost, SuiteInput } from '../conformance/target.js'
+import type { ConformanceTarget, NeutralHost } from '../conformance/target.js'
 import { claudeAdapter } from './adapter.js'
 import { claudeRig, type QuerySlot } from './conformance-rig.js'
 import type { ClaudeShapes } from './session.js'
-
-/** Seti's inputs as the user messages Claude Code reads. */
-async function* userMessages(inputs: AsyncIterable<SuiteInput>): AsyncGenerator<SDKUserMessage> {
-  for await (const input of inputs) {
-    yield {
-      type: 'user',
-      message: { role: 'user', content: input.text },
-      parent_tool_use_id: null,
-      session_id: '',
-      uuid: input.id as SDKUserMessage['uuid'] & string,
-    }
-  }
-}
 
 /** Claude Code's permission callback, answered by the neutral host. */
 const decideWith =
@@ -46,7 +33,6 @@ export const claudeTarget = (slot: QuerySlot): ConformanceTarget<ClaudeShapes, '
       'adapter (store/cost.ts), so turn.ended carries no cost',
   },
   project: projectClaude,
-  start: (realised, inputs) => ({ prompt: userMessages(inputs), options: realised }),
   host: (neutral) => ({ decide: decideWith(neutral), hooks: {}, toolServers: {} }),
   rig: (script) => claudeRig(slot, script),
 })
