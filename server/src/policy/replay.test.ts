@@ -176,8 +176,13 @@ describe('comparing outcomes', () => {
 
   it('calls Seti looser where it would let through what Claude Code stopped', () => {
     expect(compareOutcomes(at('allow'), 'ask')).toBe('looser')
-    expect(compareOutcomes(at('defer'), 'deny')).toBe('looser')
+    expect(compareOutcomes(at('defer'), 'ask')).toBe('looser')
     expect(compareOutcomes(at('ask'), 'deny')).toBe('looser')
+  })
+
+  it('cannot tell a classifier answer from a rule when Seti defers a call Claude Code ran or denied', () => {
+    expect(compareOutcomes(at('defer'), 'allow')).toBe('deferred')
+    expect(compareOutcomes(at('defer'), 'deny')).toBe('deferred')
   })
 
   it('calls Seti tighter where it would stop what Claude Code let through', () => {

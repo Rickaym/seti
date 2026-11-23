@@ -59,7 +59,7 @@ with another top-level folder.
 | 6 Attention    | `shared/src/attention.ts`, `task-blocked.ts`, `stall-watch.ts`, `ea-attention.ts`, `notifications.ts`, `notify-scope.ts`, `presence.ts`, `attention-brief.ts`                                    |
 | 7.1 Actors     | `access.ts`, `ea-guard.ts`                                                                                                                                                                       |
 | 7.2, 7.3       | `sandbox.ts`, `sandbox-mounts.ts`, `egress-proxy.ts`, `egress-rules.ts`, `egress-placeholders.ts`, `sandbox-ca.ts`, `ssh-agent.ts`, `agent-access.ts`                                            |
-| 7.4, 7.5       | `permission-policy.ts`, `policy/`, `permission-requests.ts`, `permission-timeout.ts`, `permission-guard.ts`, `repeat-hooks.ts`, `review-hooks.ts`, `outward.ts`                                  |
+| 7.4, 7.5       | `permission-policy.ts`, `policy/`, `permission-requests.ts`, `permission-timeout.ts`, `permission-guard.ts`, `repeat-hooks.ts`, `review-hooks.ts`, `shadow-hooks.ts`, `outward.ts`               |
 | 7.6 Changes    | `change-requests.ts`, `change-request-notes.ts`, `mcp-off-context.ts`, `shared/src/change-requests.ts`                                                                                           |
 | 7.7 Hostile    | `git.ts`, `probe-launch.ts`, `task-files.ts`, `html-preview.ts`, `uploads.ts`                                                                                                                    |
 | 7.8 Caps       | `launcher.ts`, `memory-scope.ts`, `scope-cpu.ts`, `oom-guard.ts`                                                                                                                                 |
@@ -164,7 +164,11 @@ the AppArmor profile for `bwrap` that the installer adds ([Setup](setup.md#sandb
   allow rules, so the classifier also reviews a sandboxed agent's shell commands. Where auto mode
   is unavailable Claude Code starts in `default` mode and every call no rule allows becomes a
   request. Bypass is Claude Code's `bypassPermissions` mode. The repeat guard and review rules are
-  `PreToolUse` hooks, so they hold in Bypass.
+  `PreToolUse` hooks, so they hold in Bypass. Seti's own evaluator (`policy/`) decides each call
+  beside Claude Code in shadow and changes no outcome: its hook answers at once and decides on a
+  later turn of the event loop. `shadow-hooks.ts` counts how the two compare per day, kind, step
+  and rule ref in `policy_shadow`, with no input, command, path or rule text, and also counts
+  decisions that failed or took over 50 ms; `pnpm doctor` shows the last seven days.
 - **Memory and CPU.** Each agent's process tree starts through `systemd-run --user --scope` with
   `MemoryMax`, 1 GB of `MemorySwapMax`, `OOMPolicy=continue`, `CPUWeight=50`, `CPUQuota` and
   `BindsTo=` the server's unit, so agents end with Seti (CAP-5). Every 100 ms Seti raises the

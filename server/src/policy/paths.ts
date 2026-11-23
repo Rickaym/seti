@@ -20,6 +20,9 @@ export const insideAny = (target: string, dirs: readonly string[]): boolean =>
 
 const escape = (char: string) => char.replace(/[.+^${}()|\\]/g, '\\$&')
 
+/** Linux's limit on a path; matching stays cheap below it. */
+const PATH_MAX = 4096
+
 const GLOB_CHARS: Record<string, string> = { '*': '[^/]*', '?': '[^/]' }
 
 function segment(glob: string): string {
@@ -40,7 +43,7 @@ function segment(glob: string): string {
 }
 
 function globRegex(glob: string, anyDepth: boolean): RegExp {
-  const parts = glob.split('/').filter((part) => part !== '')
+  const parts = glob.split('/').filter((part, i, all) => part !== '' && !(part === '**' && all[i - 1] === '**'))
   const body = parts
     .map((part, i) => {
       const last = i === parts.length - 1
@@ -93,8 +96,12 @@ const ancestors = (relative: string) => {
  * Whether a `Read` or `Edit` pattern covers an absolute path, in gitignore syntax: `//` from the
  * root, `~/` from home, `/` from the rule's settings source, else from the cwd. A deny or ask
  * pattern also covers what lies inside a directory it names; an allow pattern only what it names.
+ * A path longer than any the system opens is covered by every deny and ask pattern and no allow.
  */
 export function pathMatches(pattern: string, target: string, behavior: RuleBehavior, scope: PathScope): boolean {
+  if (target.length > PATH_MAX) {
+    return behavior !== 'allow'
+  }
   const base = baseOf(pattern.trim(), behavior, scope)
   if (base === null || !insideAny(target, [base.root])) {
     return false

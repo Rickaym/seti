@@ -3,6 +3,38 @@ const escape = (text: string) => text.replace(/[.+?^${}()|[\]\\]/g, '\\$&')
 const squash = (text: string) => text.trim().replace(/\s+/g, ' ')
 
 /**
+ * Whether a glob matches the whole text: `*` stands for any text and, when `single` is set, `?`
+ * for one character. Greedy with one backtrack point, so it never takes more than pattern times
+ * text steps, whatever the pattern or the call holds.
+ */
+export function wildcard(glob: string, text: string, single = false): boolean {
+  let g = 0
+  let t = 0
+  let star = -1
+  let resume = 0
+  while (t < text.length) {
+    if (g < glob.length && (glob[g] === text[t] || (single && glob[g] === '?'))) {
+      g += 1
+      t += 1
+    } else if (g < glob.length && glob[g] === '*') {
+      star = g
+      resume = t
+      g += 1
+    } else if (star === -1) {
+      return false
+    } else {
+      g = star + 1
+      resume += 1
+      t = resume
+    }
+  }
+  while (glob[g] === '*') {
+    g += 1
+  }
+  return g === glob.length
+}
+
+/**
  * Whether a shell rule's pattern matches a command: `*` stands for any text, a trailing ` *` or
  * `:*` that is the only wildcard also matches the bare command, and no `*` means exactly.
  */
@@ -17,17 +49,11 @@ export function commandMatches(pattern: string, command: string): boolean {
     const prefix = rule.slice(0, -2)
     return text === prefix || text.startsWith(`${prefix} `)
   }
-  return new RegExp(`^${rule.split('*').map(escape).join('.*')}$`, 's').test(text)
+  return wildcard(rule, text)
 }
 
 /** Whether a name glob, such as `mcp__*` or `get_*`, matches a whole name. */
-export const nameMatches = (glob: string, name: string): boolean =>
-  new RegExp(
-    `^${glob
-      .split('*')
-      .map((part) => part.split('?').map(escape).join('.'))
-      .join('.*')}$`,
-  ).test(name)
+export const nameMatches = (glob: string, name: string): boolean => wildcard(glob, name, true)
 
 const hostOf = (url: string): string | null => {
   try {
@@ -62,5 +88,5 @@ export function valueMatches(pattern: string, value: unknown): boolean {
   if (typeof value !== 'string' && typeof value !== 'number' && typeof value !== 'boolean') {
     return false
   }
-  return new RegExp(`^${pattern.split('*').map(escape).join('.*')}$`, 's').test(String(value))
+  return wildcard(pattern, String(value))
 }
