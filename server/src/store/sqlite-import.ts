@@ -1,8 +1,10 @@
 import { createHash } from 'node:crypto'
 import type { DatabaseSync, SQLOutputValue } from 'node:sqlite'
 import type { AuditChainStatus } from '@seti/shared'
+import { EVENT_COLUMNS } from '../events/columns.js'
 import type { Db, Pool } from '../pg.js'
 import { checkChain, verifyAuditChain, type Chain, type ChainRecord } from './audit.js'
+import { fillEventColumns } from './event-columns.js'
 import { TASK_WORKTREE_BACKFILL } from './schema-tasks.js'
 
 /** Every table, parents before children, with the key both sides order rows by. */
@@ -64,6 +66,7 @@ const POSTGRES_ONLY: Readonly<Record<string, readonly string[]>> = {
     'home_access',
     'turn_ended_at',
   ],
+  task_message: EVENT_COLUMNS,
   task_context_pack: ['linked'],
   ea_settings: ['join_on_open', 'form_of_address', 'language'],
   ea_history: ['unseen'],
@@ -262,11 +265,13 @@ export async function resetSequences(source: DatabaseSync, tx: Db): Promise<void
 }
 
 /**
- * Fills what follows from imported rows: the task worktrees, home access, which every agent from
- * before private sandboxes keeps, and when each agent's last turn ended.
+ * Fills what follows from imported rows: the task worktrees, the transcript rows' event columns,
+ * home access, which every agent from before private sandboxes keeps, and when each agent's last
+ * turn ended.
  */
 export async function deriveRows(tx: Db): Promise<void> {
   await tx.unsafe(TASK_WORKTREE_BACKFILL)
+  await fillEventColumns(tx, 1000, 0)
   await tx`UPDATE task SET home_access = TRUE`
   await tx`UPDATE task SET turn_ended_at = updated_at WHERE status <> 'running'`
 }
