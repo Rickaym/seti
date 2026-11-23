@@ -94,14 +94,20 @@ export const CONTEXT_WINDOW_KEY = 'seti_context_window'
 /** A compact boundary with the context window Seti read for it. */
 export type WithContextWindow<T> = T & Record<typeof CONTEXT_WINDOW_KEY, number>
 
+const percentOf = (window: unknown, preTokens: number): number | null =>
+  typeof window === 'number' && window > 0 ? Math.round((preTokens / window) * 100) : null
+
 /** How full the context was when it compacted, in percent; null without a stored window. */
 export function compactedAtPct(boundary: object, preTokens: number): number | null {
-  const window = CONTEXT_WINDOW_KEY in boundary ? boundary[CONTEXT_WINDOW_KEY] : null
-  return typeof window === 'number' && window > 0 ? Math.round((preTokens / window) * 100) : null
+  return percentOf(CONTEXT_WINDOW_KEY in boundary ? boundary[CONTEXT_WINDOW_KEY] : null, preTokens)
 }
 
+const atPercent = (pct: number | null) => (pct === null ? '' : ` at ${String(pct)}%`)
+
 /** " at 82%" for a boundary with a stored window, else nothing. */
-export function compactedAt(boundary: object, preTokens: number): string {
-  const pct = compactedAtPct(boundary, preTokens)
-  return pct === null ? '' : ` at ${String(pct)}%`
-}
+export const compactedAt = (boundary: object, preTokens: number): string =>
+  atPercent(compactedAtPct(boundary, preTokens))
+
+/** " at 82%" for a compaction whose window is known, else nothing. */
+export const compactedWithin = (window: number | undefined, preTokens: number): string =>
+  atPercent(percentOf(window, preTokens))
