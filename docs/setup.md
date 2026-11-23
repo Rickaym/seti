@@ -362,6 +362,15 @@ your user may enter. A restart of `seti.service` then keeps running turns going.
 changed, and Seti records the node's running turns before the node cuts them. `pnpm run doctor` checks the
 socket. Logs are in `journalctl --user -u seti-node.service`.
 
+Split mode still has gaps that a single process does not:
+
+- A server that crashes after it recorded a message's prompt row and before the node heard back
+  records a second prompt row for that message.
+- Tool calls a running turn had open before a server restart do not show as open after it.
+- A sandboxed agent's terminal or `!` command starts a second egress proxy for that agent on the
+  server, beside the node's; both apply the same rules.
+- The node still reads settings and connection values from the database itself.
+
 ### Redis
 
 Without Redis every cache read misses and Seti still works; the installer writes
