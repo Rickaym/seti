@@ -3,7 +3,7 @@ import type { RewindFilesPreview, RewindRestore, RewindResult, RewindTarget, Tas
 import { audit } from './audit.js'
 import { refuseOnSelf } from './ea-guard.js'
 import { HttpError } from './http.js'
-import { taskLauncher } from './launcher.js'
+import { taskLauncher } from './launch-plan.js'
 import { matchChain, rewindPoints, type ChainMatch, type RewindPoint } from './rewind.js'
 import { closeIdleSession, isRunning } from './runner.js'
 import { rewindFiles, sessionChain } from './runtimes/claude/rewind-files.js'

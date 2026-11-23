@@ -1,6 +1,7 @@
 import type { McpServerStatus, SDKMessage } from '@anthropic-ai/claude-agent-sdk'
 import type { NodeAnswer, NodeAsk } from '@seti/shared'
 import { tasks } from './db.js'
+import { launchPlan } from './launch-plan.js'
 import { watchSessionMcp } from './mcp-session-status.js'
 import { controlLink } from './node-link.js'
 import { sessionOpening } from './session-hooks.js'
@@ -30,8 +31,9 @@ export const setupAnswers = {
     return {}
   },
   'session.spec': async (taskId: string): Promise<NodeAnswer<'session.spec'>> => {
-    const { spec, key } = await startingSpec(await taskOf(taskId))
-    return { spec, key, rewind: (await rewinds.pending(taskId)) ?? null }
+    const task = await taskOf(taskId)
+    const { spec, key } = await startingSpec(task)
+    return { spec, launch: await launchPlan(task), key, rewind: (await rewinds.pending(taskId)) ?? null }
   },
   'setup.key': async (taskId: string, { spec }: NodeAsk<'setup.key'>): Promise<NodeAnswer<'setup.key'>> => {
     if (spec !== null && spec !== undefined) {

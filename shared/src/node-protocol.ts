@@ -115,13 +115,15 @@ const askSchemas = {
   /** Runs what waits for the agent's process to start; the process starts after the answer. */
   'session.opening': { ask: z.object({}), answer: z.object({}) },
   /**
-   * What the agent's process starts from: the spec, the key of its setup and the rewind point to
-   * resume at. The spec is the control plane's and holds no secret values.
+   * What the agent's process starts from: the spec, the plan it launches from, the key of its
+   * setup and the rewind point to resume at. Spec and plan are the control plane's and hold no
+   * secret values.
    */
   'session.spec': {
     ask: z.object({}),
     answer: z.object({
       spec: z.unknown(),
+      launch: z.unknown(),
       key: z.string(),
       rewind: z.object({ id: z.int(), resume_at: z.string().nullable(), drops_turn: z.string().nullable() }).nullable(),
     }),

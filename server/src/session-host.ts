@@ -6,13 +6,15 @@ import { inBackground, onShutdown } from './background.js'
 import { withContextWindow } from './compact.js'
 import { CLAUDE_HOME, OPENER_WAIT_MS, SESSION_IDLE_MS } from './config.js'
 import { tasks } from './db.js'
+import type { LaunchPlan } from './launch-plan.js'
 import type { NextMessage } from './next-message.js'
 import { nodeLink } from './node-link.js'
 import { followQueue, settleQueued } from './queued-prompts.js'
 import { resumeSession } from './rewind.js'
 import { adapterFor, DEFAULT_RUNTIME } from './runtimes/registry.js'
 import { moveSessionTo } from './session-files.js'
-import { realise, type SessionSpec } from './session-spec.js'
+import { realise } from './session-realise.js'
+import type { SessionSpec } from './session-spec.js'
 import { inLane, outsideLane } from './task-lane.js'
 import { keepUnstarted, sessionError, takeUnstarted } from './unstarted.js'
 import { userContent, type UserContent } from './user-content.js'
@@ -82,10 +84,10 @@ export async function sendTurn(
 async function sessionMessages(session: LiveSession, task: Task): Promise<AsyncIterable<SDKMessage>> {
   const taskId = task.id
   await restoreMissingWorktrees(task, async (error) => nodeLink.journal(taskId, { type: 'note', error }))
-  const { spec, key, rewind } = await nodeLink.ask(taskId, 'session.spec', {})
-  // The control plane built the spec with startingSpec.
+  const { spec, launch, key, rewind } = await nodeLink.ask(taskId, 'session.spec', {})
+  // The control plane built the spec with startingSpec and the plan with launchPlan.
   const handed = spec as SessionSpec
-  const options = await realise(handed, task, session.controller)
+  const options = await realise(handed, task, launch as LaunchPlan, session.controller)
   const now = await nodeLink.ask(taskId, 'setup.key', { spec })
   session.startWith(!now.rewind && now.key === key ? key : null)
   if (handed.resume !== null) {

@@ -2,18 +2,18 @@ import type { CompactRule, Task } from '@seti/shared'
 import { permissionModeOf } from './bypass-mode.js'
 import { hostLoginKey } from './claude-logins.js'
 import { compactSetup, effectiveCompact } from './compact.js'
-import { taskLauncher } from './launcher.js'
+import { launchPlan } from './launch-plan.js'
 import { borrowedStamp, taskBorrowedServers } from './mcp-borrowed.js'
 import { taskDeniedServers } from './mcp-selection.js'
 import { tokenServers } from './mcp-sign-in.js'
 import type { PermissionSettings } from './permission-policy.js'
 import { taskPluginConfigs } from './plugins.js'
-import { sessionHost } from './runtime-host.js'
 import type { RuntimeId } from './runtimes/adapter.js'
 import { claudeSetup } from './runtimes/claude/realise.js'
-import { adapterFor, DEFAULT_RUNTIME, type DefaultShapes } from './runtimes/registry.js'
+import { DEFAULT_RUNTIME, type DefaultShapes } from './runtimes/registry.js'
 import { signedInServers } from './sandbox-mcp.js'
 import { permissionSettings, sandboxStamp, systemAppend, workingDirs } from './session-options.js'
+import { realise } from './session-realise.js'
 import { sharedToolFolders } from './shared-tools.js'
 
 /** What a task's session starts from, read from the database; it holds no secret values. */
@@ -101,16 +101,9 @@ function specKey(spec: SessionSpec): string {
 /** Compares the setup a process started with to what the task needs now. */
 export const setupKey = async (task: Task) => specKey(await sessionSpec(task))
 
-/** The options a process of the task starts with from the spec it is handed. */
-export async function realise(spec: SessionSpec, task: Task, abortController: AbortController) {
-  const launcher = await taskLauncher(task, 'agent', true)
-  const host = await sessionHost(task, launcher.sandboxed, abortController.signal)
-  return adapterFor(spec.runtime).realise(spec, launcher, host, abortController)
-}
-
 /** The options a task's process starts with, resuming the task's session if any. */
 export const sessionOptions = async (task: Task, abortController: AbortController) =>
-  realise(await sessionSpec(task), task, abortController)
+  realise(await sessionSpec(task), task, await launchPlan(task), abortController)
 
 const reread = async (spec: SessionSpec, task: Task): Promise<SessionSpec> => ({ ...spec, ...(await liveSpec(task)) })
 
