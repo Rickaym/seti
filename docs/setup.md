@@ -366,7 +366,6 @@ Split mode still has gaps that a single process does not:
 
 - A server that crashes after it recorded a message's prompt row and before the node heard back
   records a second prompt row for that message.
-- Tool calls a running turn had open before a server restart do not show as open after it.
 - A sandboxed agent's terminal or `!` command uses the node's egress proxy when the node runs
   one, and then cannot fetch AWS credentials through it. Opened before the agent's session, it
   starts a proxy of its own, which the session's proxy replaces.
