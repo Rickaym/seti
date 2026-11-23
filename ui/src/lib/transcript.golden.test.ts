@@ -1,6 +1,6 @@
 import fs from 'node:fs'
 import path from 'node:path'
-import type { MessageRow } from '@seti/shared'
+import { eventsOf, rowEvents, type MessageRow } from '@seti/shared'
 import { describe, expect, it } from 'vitest'
 import { askedInRows } from '@/lib/closing-question'
 import { compactFailure, compactingSince } from '@/lib/compacting'
@@ -48,8 +48,8 @@ function groups(rows: readonly MessageRow[], subagentRows: boolean) {
 
 const calls = (rows: readonly MessageRow[]) =>
   rows.flatMap(rowCalls).map((call) => ({
-    id: call.id,
-    kind: toolKind(call.name),
+    id: call.callId,
+    kind: toolKind(call),
     name: toolName(call.name),
     summary: toolSummary(call),
     command: commandLine(call) ?? null,
@@ -58,14 +58,14 @@ const calls = (rows: readonly MessageRow[]) =>
 
 const results = (rows: readonly MessageRow[]) =>
   rows.flatMap(rowResults).map((ref) => {
-    const text = resultText(ref.block.content)
-    return { id: ref.block.tool_use_id, row: ref.rowId, exit: exitCode(text), refusals: refusals(text) }
+    const text = resultText(ref)
+    return { id: ref.callId, row: ref.rowId, exit: exitCode(text), refusals: refusals(text) }
   })
 
 /** What the browser's transcript readers make of one transcript: what shows, how, and grouped how. */
 function render({ rows }: GoldenTranscript) {
   const index = indexTranscript(rows)
-  const sdk = rows.flatMap((row) => (row.kind === 'sdk' ? [{ id: row.id, payload: row.payload }] : []))
+  const sdk = rows.flatMap((row) => (row.kind === 'sdk' ? [{ id: row.id, row, payload: row.payload }] : []))
   return {
     shows: ids(rows.filter(rendersContent)),
     subagent: rows.flatMap((row) => (subagentOf(row) === null ? [] : [[row.id, subagentOf(row)]])),
@@ -75,14 +75,16 @@ function render({ rows }: GoldenTranscript) {
     groups: groups(rows, false),
     subagentGroups: groups(rows, true),
     calls: calls(rows),
-    label: groupLabel(rows.flatMap(rowCalls).map((call) => call.name)),
+    label: groupLabel(rows.flatMap(rowCalls)),
     results: results(rows),
     compactingSince: rows.map((_, end) => compactingSince(rows.slice(0, end + 1), true)),
     compactFailures: rows.flatMap((row) => (compactFailure(row) === null ? [] : [[row.id, compactFailure(row)]])),
     interrupted: [...interruptedResultIds(rows, false)],
     asked: askedInRows(rows),
-    local: sdk.flatMap(({ id, payload }) => (payload.type === 'user' ? [[id, localCommandOutput(payload)]] : [])),
-    outcomes: sdk.flatMap(({ id, payload }) => (payload.type === 'result' ? [[id, turnOutcome(payload, false)]] : [])),
+    local: sdk.flatMap(({ id, row, payload }) => (payload.type === 'user' ? [[id, localCommandOutput(row)]] : [])),
+    outcomes: sdk.flatMap(({ id, row }) =>
+      eventsOf(rowEvents(row), 'turn.ended').map((end) => [id, turnOutcome(end, false)]),
+    ),
   }
 }
 

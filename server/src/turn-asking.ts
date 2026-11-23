@@ -1,20 +1,18 @@
-import { closingQuestion, type ProseQuestion, type Task, type TaskStatus, type TurnBlock } from '@seti/shared'
+import {
+  closingQuestion,
+  type ProseQuestion,
+  type Task,
+  type TaskStatus,
+  type TurnBlock,
+  payloadEvents,
+  turnBlocksOf,
+} from '@seti/shared'
 import { messages } from './db.js'
-import { payloadEvents } from './events/read.js'
 import { redactSecrets } from './scrub.js'
 
-/** The blocks a turn's closing question is read from: what the agent wrote, and its tool calls. */
-function blocksOf(payload: string): TurnBlock[] {
-  return payloadEvents(payload).flatMap((event): TurnBlock[] => {
-    if (event.type === 'message' && event.role === 'agent') {
-      return [{ type: 'text', text: event.text }]
-    }
-    return event.type === 'tool.started' ? [{ type: 'tool_use', name: event.call.name }] : []
-  })
-}
-
 /** The text and tool calls of stored agent messages, in order; unreadable ones are left out. */
-export const turnBlocks = (payloads: readonly string[]): TurnBlock[] => payloads.flatMap(blocksOf)
+export const turnBlocks = (payloads: readonly string[]): TurnBlock[] =>
+  payloads.flatMap((payload) => turnBlocksOf(payloadEvents(payload)))
 
 /** What the task's last turn ended by asking the user in prose. */
 const turnQuestion = async (taskId: string): Promise<ProseQuestion> =>

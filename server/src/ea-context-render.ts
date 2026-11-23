@@ -6,6 +6,8 @@ import {
   type MessageRow,
   type PrQuietReason,
   type TeamMessage,
+  eventsOf,
+  rowEvents,
 } from '@seti/shared'
 import {
   CI_WORDS,
@@ -23,7 +25,6 @@ import {
   type Section,
   type TaskView,
 } from './ea-context-tasks.js'
-import { eventsOf, rowEvents } from './events/read.js'
 import { redactCredentials } from './scrub.js'
 
 /** About 1,500 tokens at four characters per token. */

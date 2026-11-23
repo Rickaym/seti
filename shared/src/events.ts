@@ -92,7 +92,19 @@ export interface ToolResult {
   agent?: AgentResult
   planId?: string
   plan?: PlanReport
+  /** The text with `[image]` and the like for parts that are not text, where there are any. */
+  shown?: string
   structured?: unknown
+}
+
+/** A safeguard's refusal that moved the agent to another model; scope `local` moved one response. */
+export interface Refusal {
+  requestId: string | null
+  scope?: string
+  category?: string
+  explanation?: string
+  /** The account's verification for the safeguard, and where to apply for it. */
+  verification?: { url?: string }
 }
 
 type JobKind = 'subagent' | 'shell' | 'other'
@@ -124,7 +136,16 @@ interface EventBase {
 /** One thing a runtime reported, the same on every runtime; `vendor` stands for anything unmapped. */
 export type RuntimeEvent = EventBase &
   (
-    | { type: 'session.started'; sessionId: string; model: string; mode: string | null; servers: ServerStatus[] }
+    | {
+        type: 'session.started'
+        sessionId: string
+        model: string
+        mode: string | null
+        servers: ServerStatus[]
+        cwd?: string
+        plugins?: { name: string; path: string; version?: string }[]
+        pluginErrors?: { plugin: string; message: string }[]
+      }
     | { type: 'turn.started'; turnId: string; cause: TurnCause }
     | { type: 'message'; id: string; role: 'agent' | 'user' | 'command'; text: string; synthetic?: boolean }
     | { type: 'reasoning'; id: string; text: string; summary: boolean }
@@ -172,11 +193,20 @@ export type RuntimeEvent = EventBase &
         phase: 'started' | 'stopped' | 'done' | 'failed'
         trigger?: 'auto' | 'manual'
         before?: number
+        after?: number
+        durationMs?: number
         /** The context window `before` was measured against, in tokens, where known. */
         window?: number
         error?: string
       }
-    | { type: 'model.changed'; from: string; to: string; reason: 'user' | 'fallback' | 'refusal'; text?: string }
+    | {
+        type: 'model.changed'
+        from: string
+        to: string
+        reason: 'user' | 'fallback' | 'refusal'
+        text?: string
+        refusal?: Refusal
+      }
     | {
         type: 'policy.denied'
         callId: string
@@ -207,7 +237,8 @@ export type RuntimeEvent = EventBase &
         answered: string[]
         apiStatus?: number
       }
-    | { type: 'vendor'; name: string }
+    /** `unreadable` marks a message of a known type whose shape the projector could not read. */
+    | { type: 'vendor'; name: string; unreadable?: true }
   )
 
 interface ServerStatus {

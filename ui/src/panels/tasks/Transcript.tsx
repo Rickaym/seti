@@ -1,11 +1,16 @@
-import type { SDKAssistantMessage } from '@anthropic-ai/claude-agent-sdk'
-import { modelFallbackOf, type MessageRow, type SubtaskBrief, type TaskRewind } from '@seti/shared'
-import { FoldVertical, Terminal } from 'lucide-react'
+import {
+  eventsOf,
+  isAgentOutput,
+  rowEvents,
+  type MessageRow,
+  type RuntimeEvent,
+  type SubtaskBrief,
+  type TaskRewind,
+} from '@seti/shared'
 import { Fragment, lazy, memo, Suspense, useMemo } from 'react'
 import { CopyReply } from '@/components/CopyReply'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { useToolGrouping } from '@/hooks/useToolGrouping'
-import { compactFailure } from '@/lib/compacting'
 import { interruptedResultIds } from '@/lib/interruptions'
 import { transcriptItems } from '@/lib/rewind'
 import { openFailure } from '@/lib/seti-notes'
@@ -13,8 +18,8 @@ import { isAgentTool } from '@/lib/subtasks'
 import { rowRole, transcriptViews, type RoleContext, type Segment, type TranscriptView } from '@/lib/tool-groups'
 import { startsBackground } from '@/lib/tool-summary'
 import {
+  assertReadable,
   indexTranscript,
-  localCommandOutput,
   queuedInputIds,
   rendersContent,
   rowCalls,
@@ -37,9 +42,8 @@ import {
 } from '@/lib/transcript-blocks'
 import { FileLink } from '@/panels/files/FileLink'
 import { useFileLinks } from '@/panels/files/file-links'
-import { ASK_TOOL, QuestionCall } from '@/panels/questions/QuestionCall'
+import { QuestionCall } from '@/panels/questions/QuestionCall'
 import { InputEntry } from '@/panels/tasks/InputEntry'
-import { ModelFallbackNotice } from '@/panels/tasks/ModelFallbackNotice'
 import { NoticeEntry } from '@/panels/tasks/NoticeEntry'
 import { PromptEntry } from '@/panels/tasks/PromptEntry'
 import { RewindNote, RewoundGroup } from '@/panels/tasks/Rewound'
@@ -49,7 +53,7 @@ import { SubtaskCard } from '@/panels/tasks/SubtaskCard'
 import { OrphanResult, ToolCall } from '@/panels/tasks/ToolCall'
 import { ToolGroup } from '@/panels/tasks/ToolGroup'
 import { TranscriptBlocks } from '@/panels/tasks/TranscriptBlocks'
-import { CompactLine, InitLine, Line, ResultLine } from '@/panels/tasks/TranscriptLines'
+import { RuntimeLine } from '@/panels/tasks/TranscriptLines'
 import { NoteLine, Spoken, type TranscriptMarks } from '@/panels/tasks/TranscriptMarks'
 
 const Markdown = lazy(async () => import('@/components/Markdown').then((m) => ({ default: m.Markdown })))
@@ -106,33 +110,34 @@ interface RowProps {
   reply: string | undefined
 }
 
-function AssistantMessage({ props, message }: { props: RowProps; message: SDKAssistantMessage }) {
+function AssistantMessage({ props, events }: { props: RowProps; events: readonly RuntimeEvent[] }) {
   const { taskId, row, results, subtasks, background, running } = props
   const outward = new Set(row.outward)
   const trimmed = new Set(row.trimmed)
   let call = 0
   return (
     <div className="space-y-2">
-      {message.message.content.map((block, index) => {
-        const key = `${message.uuid}-${String(index)}`
-        if (block.type === 'text' && block.text.trim() !== '') {
+      {events.map((event, index) => {
+        const key = `${String(row.id)}-${String(index)}`
+        if (event.type === 'message' && event.role === 'agent' && event.text.trim() !== '') {
           return (
             <Spoken key={key} voice={props.voice}>
-              <AgentText text={block.text} />
+              <AgentText text={event.text} />
             </Spoken>
           )
         }
-        if (block.type !== 'tool_use') {
+        if (event.type !== 'tool.started') {
           return null
         }
+        const block = event.call
         const result = results[call]
         const subtask = subtasks[call]
         const process = background[call]
         call++
-        if (block.name === ASK_TOOL) {
+        if (block.kind === 'question') {
           return <QuestionCall key={key} taskId={taskId} block={block} done={result !== undefined} />
         }
-        if (isAgentTool(block.name)) {
+        if (isAgentTool(block)) {
           return (
             <SubtaskCard
               key={key}
@@ -142,7 +147,7 @@ function AssistantMessage({ props, message }: { props: RowProps; message: SDKAss
               block={block}
               result={result}
               subtask={subtask}
-              inputTrimmed={trimmed.has(block.id)}
+              inputTrimmed={trimmed.has(block.callId)}
             />
           )
         }
@@ -154,8 +159,8 @@ function AssistantMessage({ props, message }: { props: RowProps; message: SDKAss
             startedAt={row.created_at}
             block={block}
             result={result}
-            outward={outward.has(block.id)}
-            inputTrimmed={trimmed.has(block.id)}
+            outward={outward.has(block.callId)}
+            inputTrimmed={trimmed.has(block.callId)}
             running={running}
             background={process}
           />
@@ -175,11 +180,7 @@ function rowVisible({ row, hidden, orphans, subagentRows }: RowProps): boolean {
   if (!subagentRows && subagentOf(row) !== null) {
     return false
   }
-  const { payload } = row
-  if (payload.type === 'system' && payload.subtype === 'init') {
-    return true
-  }
-  return rendersContent(row) || orphans.length > 0
+  return startOf(row) !== undefined || rendersContent(row) || orphans.length > 0
 }
 
 /** A row too malformed to judge shows, so its boundary can say it could not be shown. */
@@ -214,47 +215,24 @@ function RowBody(props: RowProps) {
   if (row.kind !== 'sdk') {
     return <PlainRow props={props} row={row} />
   }
-  const { payload } = row
-  if (payload.type === 'system' && payload.subtype === 'init') {
-    return <InitLine message={payload} />
-  }
-  if (payload.type === 'assistant') {
-    return <AssistantMessage props={props} message={payload} />
-  }
-  if (payload.type === 'result') {
-    return <ResultLine message={payload} interrupted={props.interrupted} reply={props.reply} />
-  }
-  if (payload.type === 'system' && payload.subtype === 'compact_boundary') {
-    return <CompactLine message={payload} />
-  }
-  const fallback = payload.type === 'system' ? modelFallbackOf(payload) : null
-  if (fallback !== null) {
-    return <ModelFallbackNotice taskId={taskId} message={fallback} />
-  }
-  const failure = compactFailure(row)
-  if (failure !== null) {
-    return (
-      <Line icon={FoldVertical} error>
-        compaction failed: {failure}
-      </Line>
-    )
-  }
-  const local = payload.type === 'user' ? localCommandOutput(payload) : null
-  if (local !== null) {
-    return (
-      <Line icon={Terminal}>
-        <span className="font-mono whitespace-pre-wrap">{local === '' ? 'command done' : local}</span>
-      </Line>
-    )
+  assertReadable(row)
+  const events = rowEvents(row)
+  if (events.some(isAgentOutput)) {
+    return <AssistantMessage props={props} events={events} />
   }
   return (
-    <div className="space-y-2">
-      {orphans.map((result) => (
-        <OrphanResult key={result.block.tool_use_id} taskId={taskId} result={result} />
-      ))}
-    </div>
+    <RuntimeLine row={row} taskId={taskId} interrupted={props.interrupted} reply={props.reply}>
+      <div className="space-y-2">
+        {orphans.map((result) => (
+          <OrphanResult key={result.callId} taskId={taskId} result={result} />
+        ))}
+      </div>
+    </RuntimeLine>
   )
 }
+
+/** The session start a row reports, if it reports one. */
+const startOf = (row: MessageRow) => eventsOf(rowEvents(row), 'session.started')[0]
 
 const sameItems = <T,>(a: readonly T[], b: readonly T[]) =>
   a.length === b.length && a.every((item, index) => item === b[index])
@@ -334,16 +312,14 @@ export const Transcript = memo(function TranscriptList({
 
   const backgroundOf = (calls: readonly ToolUseBlock[]) =>
     calls.some(startsBackground)
-      ? calls.map((call) => (startsBackground(call) ? index.background.get(call.id) : undefined))
+      ? calls.map((call) => (startsBackground(call) ? index.background.get(call.callId) : undefined))
       : NO_BACKGROUND
 
   const renderRow = (row: MessageRow) => {
     const calls = rowCalls(row)
-    const results = calls.length === 0 ? NONE : calls.map((call) => index.results.get(call.id))
-    const started = calls.some((call) => isAgentTool(call.name))
-      ? calls.map((call) => byCall.get(call.id))
-      : NO_SUBTASKS
-    const orphans = rowResults(row).filter((ref) => !index.calls.has(ref.block.tool_use_id))
+    const results = calls.length === 0 ? NONE : calls.map((call) => index.results.get(call.callId))
+    const started = calls.some((call) => isAgentTool(call)) ? calls.map((call) => byCall.get(call.callId)) : NO_SUBTASKS
+    const orphans = rowResults(row).filter((ref) => !index.calls.has(ref.callId))
     const note = marks.notes.get(row.id)
     const view = (
       <TranscriptRow
@@ -379,7 +355,7 @@ export const Transcript = memo(function TranscriptList({
       return renderRow(segment.row)
     }
     const calls = segment.rows.flatMap(rowCalls)
-    const results = calls.map((call) => index.results.get(call.id))
+    const results = calls.map((call) => index.results.get(call.callId))
     return (
       <ToolGroup
         key={`tools-${String(segment.rows[0]?.id ?? 0)}`}
