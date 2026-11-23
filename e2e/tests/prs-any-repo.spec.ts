@@ -1,4 +1,5 @@
 import { expect, test } from './support/fixtures.js'
+import { expectNoFixCiToast, ownMessages } from './support/pr-ci.js'
 import { ANY_REPO_ENV, expectListedWithoutRepos, seedAnyRepoPrs } from './support/prs-any-repo.js'
 
 test.use({ serverEnv: ANY_REPO_ENV })
@@ -35,7 +36,6 @@ test('a PR in a repo Seti has no checkout of shows its status, takes Fix CI and 
   await expect(checks.getByTestId('failing-check')).toContainText('build')
   await checks.getByRole('button', { name: 'Fix CI' }).click()
   await expect(checks).toBeHidden()
-  await expect(page.getByText(`Asked ${agent.title} to fix CI on #3`)).toBeVisible()
-  const sent = page.getByRole('region', { name: 'Transcript' }).locator('[data-own-message]')
-  await expect(sent.filter({ hasText: 'CI is failing on #3. Please fix it.' })).toHaveCount(1)
+  await expect(ownMessages(page, 'CI is failing on #3. Please fix it.')).toHaveCount(1)
+  await expectNoFixCiToast(page)
 })
