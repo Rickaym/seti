@@ -746,7 +746,11 @@ describe.skipIf(!available)('a real task sandbox', () => {
     const sandbox = await taskSandbox(task, { ctx, policy: await sandboxPolicy.get() })
     const env = { ...sandbox.env, SETI_TASK_ID: task.id }
     const child = sandbox.spawn('/bin/bash', ['-c', 'bash -c "sleep 310; true" & wait'], { env, stdin: 'ignore' })
-    const processHost = { proc: new Proc(), serverPid: process.pid }
+    const processHost = {
+      proc: new Proc(),
+      parents: () => [process.pid],
+      scopes: async () => Promise.resolve({ memory: [], cpu: [] }),
+    }
     try {
       let view = (await readProcesses(task.id, null, processHost)).view
       await vi.waitFor(async () => {

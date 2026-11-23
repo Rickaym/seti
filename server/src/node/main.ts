@@ -1,6 +1,7 @@
 import { NODE_SOCKET, SDK_MODULE } from '../config.js'
 import '../node-commands.js'
-import { controlLink, reachControl } from '../node-link.js'
+import { onMemoryEvent } from '../memory-scope.js'
+import { controlLink, nodeLink, reachControl } from '../node-link.js'
 import { loadSdkModule } from '../runtimes/registry.js'
 import { changedEntry, liveSessions } from '../session-host.js'
 import { NodeService } from './service.js'
@@ -23,6 +24,11 @@ const service = new NodeService(
   process.env.SETI_BUILD_ID ?? 'dev',
 )
 reachControl(service.control)
+onMemoryEvent((agent, report) => {
+  nodeLink.journal(agent, { type: 'memory.event', report }).catch((e: unknown) => {
+    process.stderr.write(`node: a memory event of ${agent} was not reported: ${String(e)}\n`)
+  })
+})
 if (SDK_MODULE !== '') {
   await loadSdkModule(SDK_MODULE)
 }

@@ -49,7 +49,9 @@ export async function runTurn(taskId: string, prompt: string, options: TurnOptio
     ...(options.clientId === undefined ? {} : { client_id: options.clientId }),
     ...(options.from === undefined ? {} : { from: options.from }),
   }
-  return (await inLane(taskId, async () => sendTurn(taskId, message, options.interrupt === true))).outcome
+  const { outcome } = await inLane(taskId, async () => sendTurn(taskId, message, options.interrupt === true))
+  await controlLink.settled(taskId)
+  return outcome
 }
 
 /**
@@ -58,7 +60,9 @@ export async function runTurn(taskId: string, prompt: string, options: TurnOptio
  * the updates that wait for the user's next message go too.
  */
 export async function runAutoTurn(taskId: string, how: Pick<NextMessage, 'priority' | 'held'> = {}): Promise<number> {
-  return (await inLane(taskId, async () => sendTurn(taskId, { prompt: null, ...how }, false))).count
+  const { count } = await inLane(taskId, async () => sendTurn(taskId, { prompt: null, ...how }, false))
+  await controlLink.settled(taskId)
+  return count
 }
 
 /** Interrupts the running turn and waits; queued messages go back, or on with `deliverQueued`. */

@@ -3,6 +3,7 @@ import {
   NODE_PROTOCOL,
   nodeFrame,
   type AskFrame,
+  type CommandReply,
   type ControlFrame,
   type HelloFrame,
   type JournalEntry,
@@ -13,6 +14,7 @@ import { WebSocket, type RawData } from 'ws'
 import { readFrame } from './node/wire.js'
 import { AskLedger, JournalInbox } from './node-inbox.js'
 import type { NodeCursor } from './store/node-cursors.js'
+import { holdsLane } from './task-lane.js'
 
 const FIRST_RETRY_MS = 1000
 const LAST_RETRY_MS = 30_000
@@ -30,6 +32,8 @@ export interface NodeClientEnd {
   cursors: { list: () => Promise<NodeCursor[]>; save: (cursor: NodeCursor) => Promise<void> }
   /** A node process started anew; the work it returns runs once the node is taken. */
   fresh: () => Promise<() => void>
+  /** A node took this control plane: its process, whose children run the agents. */
+  took: (pid: number) => void
   /** The node is stopping: records the turns it is about to cut. */
   stopping: () => Promise<void>
 }
@@ -37,7 +41,11 @@ export interface NodeClientEnd {
 interface Pending {
   resolve: (answer: unknown) => void
   reject: (error: Error) => void
+  /** The caller waits for the entries the node reported before it answered. */
+  waits: boolean
 }
+
+type JournalMark = NonNullable<CommandReply['after']>
 
 const errorText = (e: unknown) => (e instanceof Error ? e.message : String(e))
 
@@ -52,6 +60,8 @@ export class NodeClient {
   private closed = false
   private retryMs = FIRST_RETRY_MS
   private readonly pending = new Map<string, Pending>()
+  /** Each agent's last entry a command answer followed, for `settled`. */
+  private readonly marks = new Map<string, JournalMark>()
   private readonly inbox: JournalInbox
   private readonly ledger: AskLedger
   private readonly end: NodeClientEnd
@@ -85,16 +95,29 @@ export class NodeClient {
     this.socket?.terminate()
   }
 
-  /** Sends a command to the node and waits for its answer, unchecked. */
+  /**
+   * Sends a command to the node and waits for its answer, unchecked, and for the entries the node
+   * reported before it, as a session in this process would have. Work that holds a lane or
+   * applies an entry cannot wait for entries that may need it, and calls `settled` after.
+   */
   async command(type: NodeCommandType, body: unknown): Promise<unknown> {
     if (!this.welcomed) {
       throw new Error('The node is not connected; Seti retries the link.')
     }
     const id = randomUUID()
+    const waits = !holdsLane() && !this.inbox.inApply()
     return new Promise((resolve, reject) => {
-      this.pending.set(id, { resolve, reject })
+      this.pending.set(id, { resolve, reject, waits })
       this.send({ type: 'command', id, command: type, body })
     })
+  }
+
+  /** Resolves once the entries the agent's last answered command followed are applied. */
+  async settled(agent: string): Promise<void> {
+    const mark = this.marks.get(agent)
+    if (mark !== undefined && !holdsLane() && !this.inbox.inApply()) {
+      await this.inbox.applied(mark)
+    }
   }
 
   private connect(): void {
@@ -196,7 +219,7 @@ export class NodeClient {
         return
       case 'command.answer':
       case 'command.error':
-        this.answered(frame)
+        await this.answered(frame)
         return
       case 'node.stopping':
         await this.end.stopping().finally(() => {
@@ -205,9 +228,15 @@ export class NodeClient {
     }
   }
 
-  private answered(frame: Extract<NodeFrame, { type: 'command.answer' | 'command.error' }>): void {
+  private async answered(frame: CommandReply): Promise<void> {
     const pending = this.pending.get(frame.id)
     this.pending.delete(frame.id)
+    if (frame.after !== null) {
+      this.marks.set(frame.after.agent, frame.after)
+      if (pending?.waits === true) {
+        await this.inbox.applied(frame.after)
+      }
+    }
     if (frame.type === 'command.answer') {
       pending?.resolve(frame.answer)
     } else {
@@ -235,6 +264,7 @@ export class NodeClient {
     const cursors = [...this.inbox.positions()].map(([agent, { epoch, seq }]) => ({ agent, epoch, seq }))
     this.send({ type: 'welcome', protocol: NODE_PROTOCOL, cursors })
     this.welcomed = true
+    this.end.took(frame.pid)
     this.retryMs = FIRST_RETRY_MS
     this.tookUs()
     after?.()

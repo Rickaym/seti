@@ -149,6 +149,12 @@ export class JournalOutbox {
     }
   }
 
+  /** The agent's last entry so far, or null before its first. */
+  last(agent: string): { agent: string; epoch: string; seq: number } | null {
+    const journal = this.journals.get(agent)
+    return journal === undefined ? null : { agent, epoch: journal.epoch, seq: journal.next - 1 }
+  }
+
   /** Why the control plane refused the agent's journal, or null. */
   refusal(agent: string): string | null {
     return this.journals.get(agent)?.refused ?? null

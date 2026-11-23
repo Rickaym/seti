@@ -761,6 +761,12 @@ store, the audit chain and every record.
   RES-8).
 - NODE-5: A stopping node first has the control plane record and audit its running turns
   (RES-1), then cuts them and waits until its entries are stored.
+- NODE-6: The answer to a command about an agent is read only once the control plane applied
+  every entry the node reported for that agent before answering, so what the command changed
+  shows at once, as it does in one process.
+- NODE-7: The node reports the scopes it started and their memory events, and moves them to a
+  changed cap; the processes view and the resources page show the agents' processes under
+  either process.
 
 ## 16. Audit
 

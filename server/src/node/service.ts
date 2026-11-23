@@ -8,6 +8,7 @@ import {
   type NodeFrame,
 } from '@seti/shared'
 import type { RawData, WebSocket } from 'ws'
+import { z } from 'zod'
 import type { RemoteControl } from '../node-link.js'
 import { AskOutbox, JournalOutbox } from '../node-outbox.js'
 import { readFrame } from './wire.js'
@@ -21,6 +22,9 @@ export interface NodeSessions {
   /** Cuts the agents' running turns and waits for them to end, at most `graceMs`. */
   cut: (graceMs: number) => Promise<void>
 }
+
+/** The agent a command acts on, when it names one. */
+const commanded = z.object({ agent: z.string() })
 
 const errorText = (e: unknown) => (e instanceof Error ? e.message : String(e))
 
@@ -81,6 +85,7 @@ export class NodeService {
       protocol: NODE_PROTOCOL,
       build: this.build,
       boot: this.boot,
+      pid: process.pid,
       fresh: this.fresh,
       journals: this.journal.positions(),
       sessions: this.sessions.snapshot(),
@@ -161,11 +166,18 @@ export class NodeService {
     this.asks.resume()
   }
 
+  /**
+   * Runs a command; its answer names the agent's last entry, so the control plane reads the
+   * answer only once it applied what the command reported.
+   */
   private async run(id: string, type: NodeCommandType, body: unknown): Promise<void> {
+    const parsed = commanded.safeParse(body)
+    const after = () => (parsed.success ? this.journal.last(parsed.data.agent) : null)
     try {
-      this.send({ type: 'command.answer', id, answer: await this.sessions.command(type, body) })
+      const answer = await this.sessions.command(type, body)
+      this.send({ type: 'command.answer', id, answer, after: after() })
     } catch (e) {
-      this.send({ type: 'command.error', id, error: errorText(e) })
+      this.send({ type: 'command.error', id, error: errorText(e), after: after() })
     }
   }
 }
