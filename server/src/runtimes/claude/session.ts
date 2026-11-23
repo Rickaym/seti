@@ -8,7 +8,7 @@ import type {
   PermissionMode,
   Query,
 } from '@anthropic-ai/claude-agent-sdk'
-import type { RuntimeSession } from '../adapter.js'
+import type { RuntimeSession, ToolServerState } from '../adapter.js'
 import type { ClaudeVendor } from './realise.js'
 import { claudeReports } from './reports.js'
 
@@ -22,17 +22,24 @@ interface ClaudePolicy {
   deny: string[]
 }
 
-/** Claude Code's own shapes: plugins, SDK options, MCP reports. */
+/** Claude Code's own shapes: plugins, SDK options, hooks, rules and permission modes. */
 export interface ClaudeShapes {
   vendor: ClaudeVendor
   realised: Options
   decide: CanUseTool
   hooks: Partial<Record<HookEvent, HookCallbackMatcher[]>>
   hostServers: Record<string, McpServerConfig>
-  toolServer: McpServerStatus
   policy: ClaudePolicy
   mode: PermissionMode
 }
+
+/** An MCP server's status without its configuration; a server configured without a type is stdio. */
+const serverState = (s: McpServerStatus): ToolServerState => ({
+  name: s.name,
+  status: s.status,
+  ...(s.error === undefined ? {} : { error: s.error }),
+  transport: s.config?.type ?? (s.config === undefined ? null : 'stdio'),
+})
 
 /** The SDK sends cancel_async_message from this method, which its Query type does not declare. */
 interface CancelsQueued {
@@ -79,7 +86,7 @@ export function claudeSession(query: Query, rewound: boolean): RuntimeSession<Cl
       query.close()
     },
     stopBackground: async (jobId) => query.stopTask(jobId),
-    toolServers: async () => query.mcpServerStatus(),
+    toolServers: async () => (await query.mcpServerStatus()).map(serverState),
     setMode: async (mode) => query.setPermissionMode(mode),
     ...optionalControls(query),
   }

@@ -1,4 +1,3 @@
-import type { SDKMessage } from '@anthropic-ai/claude-agent-sdk'
 import { z } from 'zod'
 import { accessChoices } from './access.js'
 import { agentColorInput, storedAgentColor, type AgentColor } from './agent-color.js'
@@ -16,6 +15,7 @@ import type { PermissionRequest } from './permissions.js'
 import { disabledPluginIds } from './plugins.js'
 import { prUrl } from './pr-url.js'
 import type { RepoRef } from './repos.js'
+import type { ClaudeMessage } from './runtimes/claude/message.js'
 import { DEFAULT_SETI_CONTROL, setiControlLevel, type SetiControlLevel } from './seti-control.js'
 import type { ShellProgress, ShellResult } from './shell.js'
 import type { SubtaskBrief } from './subtasks.js'
@@ -348,7 +348,7 @@ export interface MessageBase {
 
 export type MessageBody =
   | { kind: 'prompt'; payload: PromptPayload }
-  | { kind: 'sdk'; payload: SDKMessage }
+  | { kind: 'sdk'; payload: ClaudeMessage }
   /**
    * A note from Seti; `stopped` marks one about a process the user stopped, `session` one about a
    * session restart and `seti_control` one about the agent's Seti control level, which the agent

@@ -1,9 +1,9 @@
-import type { McpServerStatus } from '@anthropic-ai/claude-agent-sdk'
 import { MCP_STATUSES, mcpSignIn, type McpSessionState, type McpStatus } from '@seti/shared'
 import { inBackground } from './background.js'
 import { scrubUrls } from './capabilities.js'
 import { hasClientId, tokenServers } from './mcp-sign-in.js'
 import { cache } from './redis.js'
+import type { ToolServerState } from './runtimes/adapter.js'
 import { remoteServer, secretFree } from './sandbox-claude-json.js'
 import { latestSessionInit, type SessionInit } from './store/sessions.js'
 import { readPayload } from './stored-rows.js'
@@ -64,11 +64,11 @@ export function noteSignedIn(): void {
   inBackground('stalls', async () => clearStalls('mcp'))
 }
 
-const fromStatus = (s: McpServerStatus): SessionServer => ({
+const fromStatus = (s: ToolServerState): SessionServer => ({
   name: s.name,
-  status: s.status,
+  status: statusOf(s.status),
   error: s.error === undefined ? null : scrubUrls(s.error),
-  transport: s.config?.type ?? (s.config === undefined ? null : 'stdio'),
+  transport: s.transport,
 })
 
 const sleep = async (ms: number) =>
@@ -79,7 +79,7 @@ const sleep = async (ms: number) =>
 /** Keeps a session's MCP status until none is pending or `settleMs` passed; null ends it. */
 export async function watchSessionMcp(
   taskId: string,
-  read: () => Promise<McpServerStatus[] | null>,
+  read: () => Promise<ToolServerState[] | null>,
   timing = { pollMs: POLL_MS, settleMs: SETTLE_MS },
 ): Promise<void> {
   const deadline = Date.now() + timing.settleMs
