@@ -4,7 +4,7 @@ import path from 'node:path'
 import { InProcessClient, type SdkServer } from './fake-mcp.js'
 
 /** The line every fake dream adds to the agent's MEMORY.md. */
-export const DREAM_LINE = '- The user wants short replies [user 2026-11-23]'
+const DREAM_LINE = '- The user wants short replies [user 2026-11-23]'
 /** The summary every fake dream reports. */
 export const DREAM_SUMMARY = 'Kept one rule about replies'
 

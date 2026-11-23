@@ -4,6 +4,7 @@ import type { DreamRun, Task } from '@seti/shared'
 import { audit } from '../audit.js'
 import { inBackground } from '../background.js'
 import { tasks } from '../db.js'
+import { fromDelegate } from '../ea-guard.js'
 import { HttpError } from '../http.js'
 import { pendingRequests } from '../pending-requests.js'
 import { adapterFor, DEFAULT_RUNTIME } from '../runtimes/registry.js'
@@ -38,7 +39,7 @@ function lockIsFresh(memory: string): boolean {
 }
 
 /** Why the agent cannot dream now, or null when it can. */
-export async function dreamRefusal(task: Task): Promise<string | null> {
+async function dreamRefusal(task: Task): Promise<string | null> {
   const dream = adapterFor(DEFAULT_RUNTIME).capabilities.dream
   const checks: [boolean | (() => Promise<boolean>), string][] = [
     [task.archived_at !== null, 'The agent is archived.'],
@@ -47,7 +48,6 @@ export async function dreamRefusal(task: Task): Promise<string | null> {
       async () => !(await sandboxPolicy.get()).enabled || !task.sandbox,
       'The agent runs without the sandbox, so a dream could not be contained.',
     ],
-    [dreaming.has(task.id), 'The agent is dreaming already.'],
     [
       isRunning(task.id) || sessionState(task.id).background > 0,
       'The agent is at work; dream when its turn and background work end.',
@@ -73,7 +73,8 @@ async function nightOf(at: Date): Promise<string> {
 
 /**
  * Starts one dream of the agent now, outside any window, under the dream limits; the dream runs
- * in the background and the run is answered at once. Refused with 409 and the reason.
+ * in the background and the run is answered at once. Refused with 409 and the reason. The EA, an
+ * agent or a mod starts at most one dream of an agent a day; only the user starts more.
  */
 export async function startDream(task: Task): Promise<DreamRun> {
   const refusal = await dreamRefusal(task)
@@ -81,16 +82,23 @@ export async function startDream(task: Task): Promise<DreamRun> {
   if (refusal !== null || dream === null) {
     throw new HttpError(409, refusal ?? "The agent's runtime keeps no memory Seti can find.")
   }
+  const night = await nightOf(new Date())
+  if (fromDelegate() && (await dreamRuns.forTask(task.id, 1))[0]?.night === night) {
+    throw new HttpError(409, 'The agent dreamt today already; only the user starts another, in Seti.')
+  }
   const memory = dream.memory(task.cwd)
   const before = await snapshotMemory(memory)
   if (!before.ok) {
     throw new HttpError(409, `${before.reason} Tidy it by hand before a dream.`)
   }
+  if (dreaming.has(task.id)) {
+    throw new HttpError(409, 'The agent is dreaming already.')
+  }
   dreaming.add(task.id)
   try {
     const run = await dreamRuns.start({
       task_id: task.id,
-      night: await nightOf(new Date()),
+      night,
       kind: 'manual',
       model: DREAM_LIMITS.model,
     })

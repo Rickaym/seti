@@ -4,7 +4,7 @@ import { packsOfTask } from '../store/context.js'
 const ROLE_CHARS = 2000
 
 /** The note a dream's system prompt ends with: what dreaming is, what it may change, and trust. */
-export function dreamNote(title: string, memory: string): string {
+function dreamNote(title: string, memory: string): string {
   return `You are dreaming: a quiet maintenance session Seti runs for the agent "${title}".
 The agent's conversation is closed. You work from its memory, its files and a digest of its day.
 Nobody will read or answer anything until later. Do not ask questions; decide, or put it in the

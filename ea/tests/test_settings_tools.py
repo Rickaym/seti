@@ -1047,7 +1047,7 @@ async def test_dream_memory_changes_are_listed_reverted_and_marked_seen(
 
 
 async def test_dreams_are_read_and_one_started_after_a_yes(tools: EaTools, fake: SettingsFake) -> None:
-    none = await tools.call("dream_agent", {"task": "logout"})
+    none = await tools.call("dreams", {"task": "logout"})
     assert none.text == "Fix the logout button has not dreamt yet."
     fake.dreams = [
         {
@@ -1059,13 +1059,13 @@ async def test_dreams_are_read_and_one_started_after_a_yes(tools: EaTools, fake:
             "report": {"summary": "Merged the deploy notes", "tidied": ["MEMORY.md: one rule"], "asks": []},
         }
     ]
-    read = await tools.call("dream_agent", {"task": "logout"})
+    read = await tools.call("dreams", {"task": "logout"})
     assert read.text.splitlines()[1:] == [
         "- Night of 2026-11-23: done, 2 memory files changed, $0.24",
         "  Merged the deploy notes",
         "  Tidied: MEMORY.md: one rule",
     ]
-    asked, started = await confirm(tools, "dream_agent", {"task": "logout", "start": True})
+    asked, started = await confirm(tools, "dreams", {"task": "logout", "start": True})
     assert "sandboxed session" in asked.text
     assert started.ok
     assert writes(fake)[-1][0:2] == ("POST", f"/api/tasks/{TASK_LOGOUT}/dream")

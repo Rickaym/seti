@@ -4,7 +4,7 @@ import { digestByRow, toolName } from '../digest.js'
 import { redactCredentials, redactSecrets } from '../scrub.js'
 
 /** The most characters a dream's digest holds (`dream_digest`). */
-export const DIGEST_CHARS = 40_000
+const DIGEST_CHARS = 40_000
 const SHOWN_PATHS = 20
 const PATH_CHARS = 160
 

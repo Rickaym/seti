@@ -7,7 +7,7 @@ import { done, notSelf, setiTool } from './tool.js'
 const SHOWN = 5
 
 const dreamAgent = setiTool({
-  name: 'dream_agent',
+  name: 'dreams',
   description:
     "Another agent's recent dreams: how each ended, what it changed and its report. With start, run one dream of it now: a sandboxed session that tidies its memory folder and changes nothing else.",
   input: {

@@ -10,9 +10,11 @@ import { messages, tasks } from '../db.js'
 import type { DreamHost, DreamSession, DreamSpec, DreamSupport, SessionReport } from '../runtimes/adapter.js'
 import { claudeMemory } from '../runtimes/claude/dream.js'
 import { adapterFor } from '../runtimes/registry.js'
+import { DREAM_TOOLS } from '../seti-tools/dreams.js'
+import { callSetiTool } from '../seti-tools/server.js'
 import { taskArchives } from '../store/archive.js'
 import { sandboxPolicy } from '../store/sandbox.js'
-import { USER_AUTH } from '../test-auth.js'
+import { EA_AUTH, USER_AUTH } from '../test-auth.js'
 import { dreamPreface } from './preface.js'
 
 const scratch = await vi.hoisted(async () => {
@@ -45,10 +47,15 @@ afterAll(() => {
 })
 
 // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-parameters -- names the response data type
-async function send<T>(method: string, url: string, body?: unknown): Promise<{ status: number; data: T }> {
+async function send<T>(
+  method: string,
+  url: string,
+  body?: unknown,
+  auth: Record<string, string> = USER_AUTH,
+): Promise<{ status: number; data: T }> {
   const res = await app.request(`/api${url}`, {
     method,
-    headers: { host: 'localhost', ...USER_AUTH, 'content-type': 'application/json' },
+    headers: { host: 'localhost', ...auth, 'content-type': 'application/json' },
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
   })
   const parsed = (await res.json()) as { data?: T; error?: { detail: string } }
@@ -105,7 +112,7 @@ function fakeDream(): { dream: DreamSupport; seen: { spec?: DreamSpec; refused?:
   return { dream, seen }
 }
 
-async function agent(patch: { sandbox?: boolean } = {}) {
+async function agent(patch: { sandbox?: boolean; seti_control?: 'full' } = {}) {
   const id = randomUUID()
   const cwd = path.join(scratch, 'work', id)
   fs.mkdirSync(cwd, { recursive: true })
@@ -173,6 +180,28 @@ describe.skipIf(!bwrap)('Dream now', () => {
     const res = await send<string>('POST', `/tasks/${archived.id}/dream`, {})
     expect(res.status).toBe(409)
     expect(res.data).toMatch(/archived/)
+  })
+
+  it('audits who started a dream and lets the EA and agents start one a day, never on themselves', async () => {
+    claude.capabilities.dream = fakeDream().dream
+    const { id } = await agent()
+    expect((await send<DreamRun>('POST', `/tasks/${id}/dream`, {}, EA_AUTH)).status).toBe(200)
+    await ended(id)
+    const audit = await send<AuditPage>('GET', `/audit?area=dream&limit=50`)
+    const started = audit.data.events.find((e) => e.kind === 'dream.started' && e.subject_id === id)
+    expect(started?.detail).toMatchObject({ via: 'ea' })
+    const again = await send<string>('POST', `/tasks/${id}/dream`, {}, EA_AUTH)
+    expect([again.status, again.data]).toEqual([409, expect.stringMatching(/dreamt today already/)])
+    const lead = await agent({ seti_control: 'full' })
+    const tool = DREAM_TOOLS[0]
+    if (tool === undefined) {
+      throw new Error('No dreams tool')
+    }
+    const own = await callSetiTool(tool, lead.id, { task: lead.id, start: true })
+    expect([own.isError, own.content[0]?.text]).toEqual([true, expect.stringMatching(/cannot start a dream of/)])
+    expect((await callSetiTool(tool, lead.id, { task: id, start: true })).content[0]?.text).toMatch(/today already/)
+    expect((await send<DreamRun>('POST', `/tasks/${id}/dream`, {})).status).toBe(200)
+    await ended(id)
   })
 
   it('refuses a runtime that declares no dreams', async () => {
