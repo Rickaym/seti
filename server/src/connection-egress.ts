@@ -1,6 +1,5 @@
 import { VALUE_PLACEHOLDER, type Task } from '@seti/shared'
 import { audit } from './audit.js'
-import { connectionValue, minterOf, tokenMinter } from './connection-values.js'
 import { tasks } from './db.js'
 import type { EgressPlaceholder } from './egress-placeholders.js'
 import type { EgressRule } from './egress-rules.js'
@@ -17,13 +16,16 @@ export const taskConnections = async (task: Task): Promise<ConnectionRow[]> => c
 export const connectionEnv = (rows: readonly ConnectionRow[]): Record<string, string> =>
   Object.fromEntries(rows.map((row) => [row.env, row.placeholder]))
 
+/** A connection's value for one request; with `refused`, a minted token renewed in its place. */
+export type ConnectionValue = (row: ConnectionRow, refused: string | null) => Promise<string | null>
+
 /** The connections as the egress proxy swaps them, reading each value when a request needs it. */
-export const connectionPlaceholders = (rows: readonly ConnectionRow[]): EgressPlaceholder[] =>
+export const connectionPlaceholders = (rows: readonly ConnectionRow[], value: ConnectionValue): EgressPlaceholder[] =>
   rows.map((row) => ({
     name: row.name,
     placeholder: row.placeholder,
     hosts: row.hosts,
-    value: async () => connectionValue(row),
+    value: async () => value(row, null),
   }))
 
 const safe = (value: string | null) => (value === null || value === '' || HEADER_UNSAFE.test(value) ? null : value)
@@ -38,27 +40,26 @@ function tokenOf(template: string, value: string): string {
 export function connectionRule(
   row: ConnectionRow,
   header: NonNullable<ConnectionRow['header']>,
-  minter = tokenMinter,
+  value: ConnectionValue,
 ): EgressRule {
-  const fill = (value: string | null) => {
-    const checked = safe(value)
+  const fill = (found: string | null) => {
+    const checked = safe(found)
     return checked === null ? null : header.template.replaceAll(VALUE_PLACEHOLDER, checked)
   }
-  const plan = minterOf(row)
   const base = { hosts: row.hosts, port: HTTPS_PORT, header: header.name.toLowerCase() }
-  if (plan === null) {
-    return { ...base, value: async () => fill(await connectionValue(row)) }
+  if (row.kind === 'key' || row.mint === null) {
+    return { ...base, value: async () => fill(await value(row, null)) }
   }
   return {
     ...base,
-    value: async () => fill((await minter.token(row.id, plan)).token),
-    renew: async (_url, refused) => fill((await minter.renew(row.id, plan, tokenOf(header.template, refused))).token),
+    value: async () => fill(await value(row, null)),
+    renew: async (_url, refused) => fill(await value(row, tokenOf(header.template, refused))),
   }
 }
 
 /** The headers of the task's connections, which its session's proxy applies first. */
-export const connectionRules = (rows: readonly ConnectionRow[]): EgressRule[] =>
-  rows.flatMap((row) => (row.header === null || row.hosts.length === 0 ? [] : [connectionRule(row, row.header)]))
+export const connectionRules = (rows: readonly ConnectionRow[], value: ConnectionValue): EgressRule[] =>
+  rows.flatMap((row) => (row.header === null || row.hosts.length === 0 ? [] : [connectionRule(row, row.header, value)]))
 
 /** A request that carried connection placeholders toward a host their connections do not allow. */
 export async function auditBlockedKey(taskId: string, host: string, names: readonly string[]): Promise<void> {

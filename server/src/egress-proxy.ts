@@ -11,9 +11,11 @@ import tls from 'node:tls'
 import { urlAllowed } from '@seti/shared'
 import {
   answer,
+  answerLate,
   connectorOff,
   NO_CLAUDE_CREDENTIAL,
   parseAuthority,
+  refusalText,
   refuseSocket,
   type Target,
 } from './egress-answers.js'
@@ -86,10 +88,6 @@ interface Outgoing {
   url: URL | null
 }
 
-/** Why a host was refused, in the words a command's error output shows the agent. */
-export const refusalText = (host: string) =>
-  `Seti sandbox: ${host} is not on the allowed hosts list. Ask the user to add it in Settings, Sandbox.`
-
 /** One HTTP proxy per sandboxed task, on a unix socket only that task's sandbox mounts. */
 class Egress {
   private readonly options: EgressOptions
@@ -104,13 +102,13 @@ class Egress {
     this.options = options
     this.upstream = options.upstream ?? DIRECT
     this.server = http.createServer({ requestTimeout: 0 }, (req, res) => {
-      void this.onRequest(req, res)
+      void answerLate(res, async () => this.onRequest(req, res))
     })
     this.intercepted = http.createServer({ requestTimeout: 0 }, (req, res) => {
       this.onIntercepted(req, res)
     })
     this.intercepted.on('upgrade', (req: IncomingMessage, socket: Duplex, head: Buffer) => {
-      void this.onUpgrade(req, socket, head)
+      void answerLate(socket, async () => this.onUpgrade(req, socket, head))
     })
     this.server.on('connect', (req: IncomingMessage, socket: Duplex, head: Buffer) => {
       void this.onConnect(req, socket, head)
@@ -243,7 +241,7 @@ class Egress {
       answer(res, 400, 'Seti sandbox proxy: unknown connection')
       return
     }
-    void this.forward(target, req, res)
+    void answerLate(res, async () => this.forward(target, req, res))
   }
 
   /** WebSocket handshakes on intercepted hosts get the same keys, credentials and checks. */

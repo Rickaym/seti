@@ -372,8 +372,6 @@ checks the socket. Logs are in `journalctl --user -u seti-node.service`.
 
 Split mode still has gaps that a single process does not:
 
-- A sandboxed agent's terminal or `!` command uses the node's egress proxy, and cannot fetch
-  AWS credentials through it.
 - The node still reads settings and connection values from the database itself.
 
 ### Redis

@@ -18,6 +18,10 @@ function controlEnd(answer: ControlEnd['answer']['prompt.open']) {
     'repeat.ask': none,
     'hook.compact': none,
     'sandbox.hosts': none,
+    'secret.mint': none,
+    'aws.credentials': none,
+    'connection.value': none,
+    'ssh.keys': none,
     'tools.list': none,
     'tool.call': none,
   }
@@ -98,6 +102,9 @@ describe('control link', () => {
       'scopes.agents': () => ({ agents: [TASK] }),
       'proxy.open': () => ({}),
       'proxy.close': () => ({}),
+      'aws.token': () => ({ token: 'token' }),
+      'ssh.open': () => ({}),
+      'ssh.reload': () => ({}),
       'scopes.cap': () => ({}),
     }
     serveControl(end)

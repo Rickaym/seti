@@ -11,8 +11,8 @@ import {
 import { audit } from './audit.js'
 import { awsHostRole } from './aws-credentials.js'
 import { HttpError } from './http.js'
+import { sshKeysChanged } from './proxy-owner.js'
 import { githubTokens } from './secrets.js'
-import { reloadSshAgents } from './ssh-agent.js'
 import { profileSshHosts, setSetHost } from './ssh.js'
 import { connectionRows } from './store/connections.js'
 import { profiles, type ProfileRow } from './store/credentials.js'
@@ -114,7 +114,7 @@ export async function deleteProfile(id: string): Promise<void> {
   const hosts = await profileSshHosts(id)
   await profiles.remove(id)
   await githubTokens(id).clearAll()
-  await reloadSshAgents()
+  await sshKeysChanged()
   await auditProfile('system.profile_deleted', profile, `Deleted the credential ${profile.name}`, {
     agents_moved_to_default: agents.map((agent) => agent.title),
     ssh_hosts_removed: hosts,

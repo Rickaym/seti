@@ -11,6 +11,7 @@ import { outwardCalls } from './outward.js'
 import type { Alongside } from './pg.js'
 import { openPrompt } from './prompt-open.js'
 import { markQueued } from './queued-prompts.js'
+import { secretAnswers } from './secret-asks.js'
 import { mirrorSession } from './session-mirror.js'
 import { processStarted, recordStart, settleRewind, setupAnswers } from './session-setup.js'
 import { unstored } from './session-start.js'
@@ -150,5 +151,6 @@ serveNode({
     'prompt.open': async (taskId, ask) => openPrompt(taskId, ask, appendMessage),
     ...setupAnswers,
     ...turnAnswers,
+    ...secretAnswers,
   },
 })

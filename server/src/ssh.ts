@@ -1,7 +1,7 @@
 import type { SshHost, SshHostValues, SshKey, SshKnownHost, SshOption, SshStatus } from '@seti/shared'
 import { audit } from './audit.js'
 import { HttpError } from './http.js'
-import { reloadSshAgents } from './ssh-agent.js'
+import { sshKeysChanged } from './proxy-owner.js'
 import { checkJump, firstHop, hostMap, knownName, sshRoute, SshHostError } from './ssh-config.js'
 import { accessDefaults } from './store/access.js'
 import { profiles } from './store/credentials.js'
@@ -23,7 +23,7 @@ const publicRow = ({ public_key: _key, ...row }: KnownHostRow): SshKnownHost => 
 /** Something changed what agents reach: task.md files and the running agents' keys follow. */
 export async function sshChanged(): Promise<void> {
   signalWorkspaces('task')
-  await reloadSshAgents()
+  await sshKeysChanged()
 }
 
 interface ViewContext {

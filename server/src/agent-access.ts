@@ -27,8 +27,8 @@ import { mcpCatalog, mcpDefaultFor, setMcpDefault, taskMcpServers } from './mcp-
 import { sessionMcp, sessionState } from './mcp-session-status.js'
 import { tokenServers } from './mcp-sign-in.js'
 import { pluginLoaded, setDefaultPluginEnabled } from './plugins.js'
+import { sshKeysChanged } from './proxy-owner.js'
 import { signedInServers } from './sandbox-mcp.js'
-import { reloadSshAgents } from './ssh-agent.js'
 import { hostMap, sshReach, sshRoute, type SshReach } from './ssh-config.js'
 import { accessDefaults, taskAccess } from './store/access.js'
 import { taskHosts } from './store/change-requests.js'
@@ -351,7 +351,7 @@ export async function setTaskAccess(
   })
   signalWorkspaces('task', task.id)
   if (kind === 'ssh') {
-    await reloadSshAgents()
+    await sshKeysChanged()
   }
   return effectiveAccess(task)
 }
@@ -419,7 +419,7 @@ async function setStoredDefault(kind: 'ssh' | 'aws', item: AccessDefault, enable
   })
   signalWorkspaces('task')
   if (kind === 'ssh') {
-    await reloadSshAgents()
+    await sshKeysChanged()
   }
 }
 

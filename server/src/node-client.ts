@@ -3,12 +3,15 @@ import {
   NODE_PROTOCOL,
   nodeFrame,
   type AskFrame,
+  type AskReply,
   type CommandReply,
   type ControlFrame,
   type HelloFrame,
   type JournalEntry,
   type NodeCommandType,
   type NodeFrame,
+  VALUE_ASKS,
+  VALUE_COMMANDS,
 } from '@seti/shared'
 import { WebSocket, type RawData } from 'ws'
 import { readFrame } from './node/wire.js'
@@ -27,6 +30,8 @@ export interface NodeClientEnd {
   /** The socket to connect to; refuses one another user could have made or reach. */
   socket: string
   check: (socket: string) => void
+  /** The socket is this machine's owner-only unix socket, the only link values may cross. */
+  local: boolean
   journal: (agent: string, entry: JournalEntry) => Promise<void>
   answer: (frame: AskFrame, signal: AbortSignal) => Promise<unknown>
   cursors: { list: () => Promise<NodeCursor[]>; save: (cursor: NodeCursor) => Promise<void> }
@@ -50,6 +55,13 @@ interface Pending {
 type JournalMark = NonNullable<CommandReply['after']>
 
 const errorText = (e: unknown) => (e instanceof Error ? e.message : String(e))
+
+/** A node that is not on this machine needs the sealed path for an ask that carries values. */
+const refusedValues = (frame: AskFrame): AskReply => ({
+  type: 'ask.error',
+  id: frame.id,
+  error: `${frame.ask} carries values, which cross only to a node on this machine`,
+})
 
 /**
  * The control plane's side of the node socket. It connects, takes the node's hello, applies each
@@ -112,6 +124,9 @@ export class NodeClient {
     }
     if (!this.welcomed) {
       throw new Error('The node is not connected; Seti retries the link.')
+    }
+    if (!this.end.local && VALUE_COMMANDS.has(type)) {
+      throw new Error(`${type} carries values, which cross only from a node on this machine`)
     }
     const id = randomUUID()
     const waits = !holdsLane() && !this.inbox.inApply()
@@ -221,7 +236,9 @@ export class NodeClient {
         this.inbox.receive(frame)
         return
       case 'ask':
-        this.send(await this.ledger.receive(frame))
+        this.send(
+          this.end.local || !VALUE_ASKS.has(frame.ask) ? await this.ledger.receive(frame) : refusedValues(frame),
+        )
         return
       case 'ask.cancel':
         this.ledger.cancel(frame)
