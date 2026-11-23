@@ -75,10 +75,23 @@ export interface RunView {
   /** Waits until the session's events end, within the bound. */
   settled: () => Promise<Error | null>
   interrupt: () => Promise<void>
+  /** Takes back a queued input; null when the session cannot take one back. */
+  retract: (inputId: string) => Promise<boolean> | null
+  /** Stops a background job; null when the session cannot stop one. */
+  stopBackground: (jobId: string) => Promise<void> | null
   close: () => void
   /** Aborts the controller the session was realised with. */
   abort: () => void
   projections: () => Projection[]
+}
+
+/** Lets messages already sent between Seti and an in-process runtime arrive before going on. */
+export async function settle(): Promise<void> {
+  for (let i = 0; i < 3; i += 1) {
+    await new Promise((resolve) => {
+      setImmediate(resolve)
+    })
+  }
 }
 
 /** The event is the end of a turn of the agent itself. */
@@ -139,6 +152,16 @@ export class Run<S extends RuntimeShapes> implements RunView {
 
   async interrupt(): Promise<void> {
     return within(this.session.interrupt(), 'interrupt')
+  }
+
+  retract(inputId: string): Promise<boolean> | null {
+    const { retract } = this.session
+    return retract === undefined ? null : within(retract(inputId), 'retract')
+  }
+
+  stopBackground(jobId: string): Promise<void> | null {
+    const { stopBackground } = this.session
+    return stopBackground === undefined ? null : within(stopBackground(jobId), 'stopBackground')
   }
 
   close(): void {

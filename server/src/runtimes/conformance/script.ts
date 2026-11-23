@@ -6,6 +6,8 @@ export interface ScriptCall {
   output?: string
   /** The tool runs and fails. */
   fails?: boolean
+  /** The tool runs until the turn is interrupted. */
+  hold?: boolean
 }
 
 /**
@@ -24,10 +26,18 @@ export type Step =
   | { unknown: string }
   /** The process dies with this exit code. */
   | { exit: number }
+  /** Waits until the turn is interrupted. */
+  | { hold: true }
+  /** Waits for an input sent during the turn; a runtime that steers takes it into this turn. */
+  | { awaitInput: true }
+  /** Starts a background command with this label; it ends when the next turn starts. */
+  | { job: string }
 
 /** What the runtime does for each turn, in order; a turn past the last says its inputs back. */
 export interface Script {
   turns: Step[][]
+  /** The runtime answers every interrupt with an error. */
+  refuseInterrupt?: boolean
 }
 
 /** The reply of a turn the script has no steps for: its inputs' text, joined by `|`. */

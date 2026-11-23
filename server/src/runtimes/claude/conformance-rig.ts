@@ -1,5 +1,5 @@
 import type { Options, PermissionResult, SDKUserMessage } from '@anthropic-ai/claude-agent-sdk'
-import { fakeMessage, FakeSdk, type FakeSession } from '../../fake-sdk.js'
+import { aborted, fakeMessage, FakeSdk, type FakeSession } from '../../fake-sdk.js'
 import type { Launcher } from '../../launcher.js'
 import { FakeProcess } from '../conformance/process.js'
 import { echoOf, type Script, type ScriptCall, type Step } from '../conformance/script.js'
@@ -34,7 +34,13 @@ type Args = Record<string, unknown>
 
 /** The script's tools as Claude Code names them, with Claude Code's input for the same call. */
 const TOOLS = new Map<string, (args: Args) => [string, Args]>([
-  ['sh', (args) => ['Bash', { command: args.cmd, description: 'Run it' }]],
+  [
+    'sh',
+    (args) => [
+      'Bash',
+      { command: args.cmd, description: 'Run it', ...(args.background === true ? { run_in_background: true } : {}) },
+    ],
+  ],
   ['cat', (args) => ['Read', { file_path: args.path }]],
   ['patch', (args) => ['Edit', { file_path: args.path, old_string: 'a', new_string: 'b' }]],
   ['grep', (args) => ['Grep', { pattern: args.pattern }]],
@@ -58,9 +64,28 @@ interface Saved {
   history: string[]
 }
 
+/** A background command a process started: its task id, the call that started it, its label. */
+interface Job {
+  task: string
+  call: string
+  label: string
+}
+
+/** Claude Code's report that a background command ended. */
+const jobEnded = (job: Job, status: 'completed' | 'stopped') =>
+  fakeMessage('system', {
+    subtype: 'task_notification',
+    task_id: job.task,
+    tool_use_id: job.call,
+    status,
+    summary: job.label,
+    output_file: '',
+  })
+
 /** What outlives one Claude Code process on the rig: saved conversations and what tools did. */
 class Machine {
   readonly effects: string[] = []
+  private readonly jobs = new WeakMap<FakeSession, Job[]>()
   private readonly saved = new Map<string, string[]>()
   private readonly sessions = new WeakMap<FakeSession, Saved>()
   private readonly script: Script
@@ -81,6 +106,21 @@ class Machine {
     const steps = this.script.turns[this.turns] ?? [{ say: echoOf([text]) }]
     this.turns += 1
     return steps
+  }
+
+  addJob(session: FakeSession, job: Job): void {
+    this.jobs.set(session, [...(this.jobs.get(session) ?? []), job])
+  }
+
+  /** Removes and returns the process's background commands, or only the one with the task id. */
+  takeJobs(session: FakeSession, task?: string): Job[] {
+    const all = this.jobs.get(session) ?? []
+    const taken = all.filter((job) => task === undefined || job.task === task)
+    this.jobs.set(
+      session,
+      all.filter((job) => !taken.includes(job)),
+    )
+    return taken
   }
 
   /** The conversation a process holds; resuming one the machine lacks fails as Claude Code does. */
@@ -130,6 +170,13 @@ class TurnPlayer {
       yield this.assistant([{ type: 'thinking', thinking: step.think, signature: '' }])
     } else if ('call' in step) {
       yield* this.call(step.call)
+    } else if ('job' in step) {
+      yield* this.job(step.job)
+    } else if ('hold' in step) {
+      await aborted(this.turn.signal)
+    } else if ('awaitInput' in step) {
+      await Promise.race([this.turn.queued(), aborted(this.turn.signal)])
+      this.session.history.push(...(this.turn.signal.aborted ? [] : this.turn.fold()))
     } else if ('malformed' in step) {
       yield this.message('assistant', { message: null })
     } else if ('unknown' in step) {
@@ -139,7 +186,25 @@ class TurnPlayer {
     }
   }
 
-  private async *call(call: ScriptCall): AsyncGenerator<Message> {
+  private async *job(label: string): AsyncGenerator<Message> {
+    const task = this.machine.nextId('bash_')
+    const output = `Command running in background with ID: ${task}`
+    const call = yield* this.call({ tool: 'sh', args: { cmd: label, background: true }, output })
+    if (call !== null) {
+      yield this.message('system', {
+        subtype: 'task_started',
+        task_id: task,
+        tool_use_id: call,
+        description: label,
+        task_type: 'local_bash',
+        is_backgrounded: true,
+      })
+      this.machine.addJob(this.turn.session, { task, call, label })
+    }
+  }
+
+  /** Plays a call; returns its id when it ran to its end. */
+  private async *call(call: ScriptCall): AsyncGenerator<Message, string | null> {
     const id = this.machine.nextId('toolu_')
     const [name, input] = claudeTool(call)
     yield this.assistant([{ type: 'tool_use', id, name, input }])
@@ -155,10 +220,16 @@ class TurnPlayer {
       })
     if (decision.behavior === 'deny') {
       yield result(decision.message, true)
-      return
+      return null
     }
     this.machine.effects.push(`${call.tool} ${JSON.stringify(decision.updatedInput ?? input)}`)
+    if (call.hold === true) {
+      await aborted(this.turn.signal)
+      yield result('[Request interrupted by user for tool use]', true)
+      return null
+    }
     yield result(call.output ?? '', call.fails === true)
+    return id
   }
 }
 
@@ -178,8 +249,17 @@ const turnScript = (machine: Machine): TurnScript =>
       mcp_servers: [],
       plugins: [],
     })
+    for (const job of machine.takeJobs(turn.session)) {
+      yield jobEnded(job, 'completed')
+    }
     for (const step of steps) {
+      if (turn.signal.aborted) {
+        return
+      }
       yield* player.play(step)
+    }
+    if (turn.signal.aborted) {
+      return
     }
     yield player.message('result', {
       subtype: 'success',
@@ -199,6 +279,12 @@ const turnScript = (machine: Machine): TurnScript =>
 export function claudeRig(slot: QuerySlot, script: Script): Rig {
   const machine = new Machine(script)
   const sdk = new FakeSdk(turnScript(machine))
+  sdk.interruptMode = script.refuseInterrupt === true ? 'reject' : 'honour'
+  sdk.onStopTask = (session, task) => {
+    for (const job of machine.takeJobs(session, task)) {
+      session.emit(jobEnded(job, 'stopped'))
+    }
+  }
   const spawns: SpawnRecord[] = []
   const spawn: NonNullable<Launcher['spawn']> = (request) => {
     spawns.push({ command: request.command, args: request.args, cwd: request.cwd, env: request.env })
