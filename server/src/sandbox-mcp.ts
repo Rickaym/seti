@@ -1,7 +1,6 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { urlAllowed, type SandboxMcpServer, type SandboxPolicy } from '@seti/shared'
-import { connectorCredential } from './claude-credential.js'
 import { CLAUDE_HOME } from './config.js'
 import { MCP_PROXY_HOST } from './egress-hosts.js'
 import {
@@ -158,9 +157,9 @@ function configRow(name: string, server: unknown, policy: SandboxPolicy): Sandbo
  */
 export function sandboxMcpServers(
   policy: SandboxPolicy,
+  connector: () => string | null,
   tokens: McpTokens = mcpTokens,
   configFile: string = hostClaudeJson(),
-  connector: () => string | null = () => connectorCredential(),
 ): SandboxMcpServer[] {
   const logins = tokens.logins()
   const signedIn = new Set(logins.map((login) => login.name))

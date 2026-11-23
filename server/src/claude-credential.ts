@@ -1,5 +1,6 @@
 import fs from 'node:fs'
 import type { ClaudeCredentialMode, SecretName } from '@seti/shared'
+import { CONNECTOR_SCOPE } from './claude-login-file.js'
 import { hostLoginKey, loginPaths, savedAccessToken } from './claude-logins.js'
 import { secret, secretStamp } from './secrets.js'
 
@@ -9,9 +10,6 @@ export interface ClaudeCredential {
   source: Exclude<ClaudeCredentialMode, 'none'>
   token: string
 }
-
-/** The scope an OAuth token needs to list and reach claude.ai connectors. */
-export const CONNECTOR_SCOPE = 'user:mcp_servers'
 
 interface HostLogin {
   accessToken: string

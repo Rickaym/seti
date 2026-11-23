@@ -1,5 +1,6 @@
 import { checkSshOption, sshHostFields } from '@seti/shared'
 import { describe, expect, it } from 'vitest'
+import { renderHosts } from './sandbox-ssh-files.js'
 import {
   checkJump,
   firstHop,
@@ -10,7 +11,6 @@ import {
   sshReach,
   sshRoute,
 } from './ssh-config.js'
-import { renderHosts } from './ssh-files.js'
 import type { SshHostRow } from './store/ssh.js'
 
 const host = (alias: string, hostname: string, port = 22, jump: string | null = null): SshHostRow => ({
