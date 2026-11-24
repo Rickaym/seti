@@ -1,22 +1,18 @@
-import { isSecurityAccess, type AuditActor, type Task, type TaskAccessView } from '@seti/shared'
+import type { Task, TaskAccessView } from '@seti/shared'
 import { effectiveAccess, storeOverride } from './agent-access.js'
 import { audit } from './audit.js'
-import { fromEa, refuseAgent } from './ea-guard.js'
-import { HttpError } from './http.js'
+import { refuseDelegates } from './ea-guard.js'
 import { sshKeysChanged } from './proxy-owner.js'
 import { signalWorkspaces } from './workspace/dir.js'
 
 /**
  * Drops every own choice of an agent, so each item follows its credential, else the default, from
- * its next turn. The EA may not drop a choice on SSH or AWS, which stay the user's.
+ * its next turn. Only the user does it: it can lift what an agent-started agent was held to.
  */
-export async function resetTaskAccess(task: Task, actor: AuditActor = 'user'): Promise<TaskAccessView> {
-  refuseAgent("change an agent's access")
+export async function resetTaskAccess(task: Task): Promise<TaskAccessView> {
+  refuseDelegates("reset an agent's access")
   const view = await effectiveAccess(task)
   const own = view.items.filter((item) => item.override !== null)
-  if (fromEa() && own.some((item) => isSecurityAccess(item.kind))) {
-    throw new HttpError(403, "The EA cannot reset an agent's SSH or AWS choices; the user does that in Seti")
-  }
   if (own.length === 0) {
     return view
   }
@@ -24,7 +20,7 @@ export async function resetTaskAccess(task: Task, actor: AuditActor = 'user'): P
     await storeOverride(task, item.kind, item.id, null)
   }
   await audit.record({
-    actor,
+    actor: 'user',
     kind: 'task.access_changed',
     subject_type: 'task',
     subject_id: task.id,

@@ -1,12 +1,15 @@
 import { randomUUID } from 'node:crypto'
 import type { TaskAccessView } from '@seti/shared'
 import { describe, expect, it } from 'vitest'
+import { resetTaskAccess } from './access-reset.js'
+import { asAgent, asMod } from './access.js'
 import { createApp } from './app.js'
 import { sql, tasks } from './db.js'
 import { taskAccess } from './store/access.js'
 import { contextPacks, taskContextPacks } from './store/context.js'
 import { credentialAccess } from './store/credential-access.js'
 import { profiles } from './store/credentials.js'
+import { taskMcpChoices } from './store/mcp.js'
 import { EA_AUTH, USER_AUTH } from './test-auth.js'
 
 const app = createApp()
@@ -46,10 +49,20 @@ describe('resetting an agent to its credential', () => {
     ])
   })
 
-  it('refuses the EA when an own choice is on SSH or AWS', async () => {
+  it('refuses the EA, agents and mods, so a held-back off choice stays', async () => {
     const id = await agentOn('default')
     await taskAccess.set(id, 'aws', 'aws', true)
+    await taskMcpChoices.set(id, { github: false })
     expect((await reset(id, EA_AUTH)).status).toBe(403)
-    expect(await taskAccess.all(id, 'aws')).toEqual({ aws: true })
+    const task = await tasks.get(id)
+    if (task === undefined) {
+      throw new Error('no task')
+    }
+    const agent = { id: randomUUID(), title: 'Starter', seti_control: 'full' as const }
+    await expect(asAgent(agent, async () => resetTaskAccess(task))).rejects.toMatchObject({ status: 403 })
+    await expect(asMod({ id: 'sample', grants: [] }, async () => resetTaskAccess(task))).rejects.toMatchObject({
+      status: 403,
+    })
+    expect([await taskAccess.all(id, 'aws'), await taskMcpChoices.get(id)]).toEqual([{ aws: true }, { github: false }])
   })
 })
