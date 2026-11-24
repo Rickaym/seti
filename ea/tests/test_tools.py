@@ -111,6 +111,16 @@ async def test_get_task_reads_the_agents_todo_list(tools: EaTools, fake_seti: Fa
     assert "todo list" not in (await tools.call("get_task", {"task": "logout"})).text
 
 
+async def test_get_task_names_the_agent_that_started_it_and_its_helpers(
+    tools: EaTools, fake_seti: FakeSeti
+) -> None:
+    fake_seti.tasks[1]["delegated_by"] = TASK_LOGIN
+    helper = await tools.call("get_task", {"task": "logout"})
+    assert "Another agent, Fix the login redirect bug, started it." in helper.text
+    lead = await tools.call("get_task", {"task": "login"})
+    assert "It started 1 agent: Fix the logout button." in lead.text
+
+
 async def test_list_tasks_says_which_agents_ask_the_user(tools: EaTools, fake_seti: FakeSeti) -> None:
     fake_seti.tasks[1]["asking"] = True
     result = await tools.call("list_tasks", {"status": "asking"})
