@@ -3,7 +3,7 @@ import { MessageSquareOff, MessageSquareShare, SquareTerminal } from 'lucide-rea
 import { useEffect, useState, type ReactNode } from 'react'
 import type { ShellDelivery } from '@/lib/transcript'
 import { cn } from '@/lib/utils'
-import { TrimmedText, type FullSource } from '@/panels/tasks/ToolCall'
+import { TrimmedText, type FullSource } from '@/panels/tasks/TrimmedText'
 
 type Stream = 'stdout' | 'stderr'
 
