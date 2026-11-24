@@ -118,11 +118,26 @@ const matches = (item: AccessItem, query: string) => `${item.name} ${item.detail
 
 const onOff = (on: boolean) => (on ? 'on' : 'off')
 
-function sourceHint(item: AccessItem, owner: string): string {
-  if (item.override === null) {
-    return `Inherited: ${onOff(item.default_enabled)} for every agent without its own choice.`
+/** Where an item's state comes from: the mark's word, its hint and what Reset goes back to. */
+function sourceOf(item: AccessItem, owner: string, profile: AccessProfile | null) {
+  const set = profile?.name ?? 'its credential'
+  const base =
+    item.credential === null ? `the default: ${onOff(item.default_enabled)}` : `${set}: ${onOff(item.credential)}`
+  if (item.override !== null) {
+    return { label: 'Custom', hint: `${owner}'s own choice; without it, ${base}.`, reset: `Back to ${base}` }
   }
-  return `${owner}'s own choice; agents inherit ${onOff(item.default_enabled)}.`
+  if (item.credential !== null) {
+    return {
+      label: 'Credential',
+      hint: `From ${set}: ${onOff(item.credential)} for its agents without their own choice.`,
+      reset: '',
+    }
+  }
+  return {
+    label: 'Inherited',
+    hint: `Inherited: ${onOff(item.default_enabled)} for every agent without its own choice.`,
+    reset: '',
+  }
 }
 
 /** An enabled host that cannot connect: it, or a jump host on its way, has no key yet. */
@@ -149,16 +164,13 @@ function MissingKey({ item }: { item: AccessItem }) {
 }
 
 /** The lines under an item's name: where it goes, how it is passed or granted, what is missing. */
-function RowNotes({ item, profile }: { item: AccessItem; profile: AccessProfile | null }) {
+function RowNotes({ item }: { item: AccessItem }) {
   const jumpNote =
     !item.enabled && item.jump_for.length > 0 ? `Passed through as the jump host of ${item.jump_for.join(', ')}` : null
   return (
     <>
       {item.detail !== null && <div className="truncate text-2xs text-muted-foreground">{item.detail}</div>}
       {jumpNote !== null && <div className="truncate text-2xs text-muted-foreground">{jumpNote}</div>}
-      {item.override === null && item.credential !== null && (
-        <div className="truncate text-2xs text-muted-foreground">From {profile?.name ?? 'its credential'}</div>
-      )}
       <MissingKey item={item} />
     </>
   )
@@ -197,12 +209,13 @@ function Row({
       <li className={cn(ROW, columns === 2 && TWO_COLUMN_ROW)}>
         <div className="min-w-0 flex-1">
           <div className="truncate font-medium">{item.name}</div>
-          <RowNotes item={item} profile={profile} />
+          <RowNotes item={item} />
         </div>
         <NotOnRuntime label={runtime ?? 'this runtime'} reason={item.unusable} />
       </li>
     )
   }
+  const source = sourceOf(item, owner, profile)
   const control = (
     <Switch
       aria-label={item.name}
@@ -217,16 +230,16 @@ function Row({
     <li className={cn(ROW, columns === 2 && TWO_COLUMN_ROW)}>
       <div className="min-w-0 flex-1">
         <div className="truncate font-medium">{item.name}</div>
-        <RowNotes item={item} profile={profile} />
+        <RowNotes item={item} />
         <McpSessionNote item={item} {...(onSignIn === undefined ? {} : { onSignIn })} />
       </div>
-      {!plain && <SourceMark custom={item.override !== null} hint={sourceHint(item, owner)} />}
+      {!plain && <SourceMark custom={item.override !== null} hint={source.hint} label={source.label} />}
       {!plain && item.override !== null && locked === null && (
-        <Hint text={`Back to the default: ${onOff(item.default_enabled)}`}>
+        <Hint text={source.reset}>
           <Button
             size="icon-xs"
             variant="ghost"
-            aria-label={`Reset ${item.name} to default`}
+            aria-label={`Reset ${item.name}`}
             disabled={busy}
             onClick={() => {
               onChange(item, null)

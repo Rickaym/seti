@@ -310,7 +310,7 @@ test.describe('sandboxed ssh', () => {
     const row = (alias: string) =>
       ssh.getByRole('listitem').filter({ has: page.getByRole('switch', { name: alias, exact: true }) })
     await expect(row('jump')).toContainText('Inherited')
-    await expect(row('db')).toContainText('From Default')
+    await expect(row('db')).toContainText('Credential')
     await expect(ssh.getByRole('switch', { name: 'db', exact: true })).toBeChecked()
     await expect(ssh.getByRole('switch', { name: 'db', exact: true })).toBeEnabled()
     await ssh.getByRole('switch', { name: 'k8s', exact: true }).click()

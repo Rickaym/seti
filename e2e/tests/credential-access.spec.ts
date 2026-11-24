@@ -18,7 +18,7 @@ test("a credential's access: an item its agents follow, back to the default, and
   await expect(page.getByText(`Agents using ${profile.name} follow it from their next turn`)).toBeVisible()
   await expect(aws).toContainText('Custom')
   await expect(access.getByRole('switch', { name: 'AWS', exact: true })).toBeChecked()
-  await access.getByRole('button', { name: 'Reset AWS to default' }).click()
+  await access.getByRole('button', { name: 'Reset AWS' }).click()
   await expect(aws).toContainText('Inherited')
   await expect(access.getByRole('switch', { name: 'AWS', exact: true })).not.toBeChecked()
 

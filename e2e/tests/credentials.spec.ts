@@ -369,7 +369,7 @@ test.describe('credentials', () => {
     await expect(aws).toBeChecked()
     await expect(region).toContainText('Custom')
     expect(await awsOf()).toMatchObject({ enabled: true, override: true, default_enabled: false })
-    await region.getByRole('button', { name: 'Reset AWS to default' }).click()
+    await region.getByRole('button', { name: 'Reset AWS' }).click()
     await expect(aws).not.toBeChecked()
     expect(await awsOf()).toMatchObject({ enabled: false, override: null })
     await page.keyboard.press('Escape')
