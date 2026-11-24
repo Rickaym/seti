@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import type { ClaudeCredentialMode } from '../sandbox.js'
 import type { RuntimeOffer } from './picks.js'
 
 /**
@@ -91,11 +92,25 @@ export interface CodexStatus {
   pricesAsOf: string
 }
 
+/** Claude Code as Settings shows it: its program and version, the defaults it names, no value. */
+export interface ClaudeStatus {
+  /** The program agents run: SETI_CLAUDE_BIN, a claude on the PATH, or the Agent SDK's own. */
+  program: string
+  /** The version the program reports, when it ran. */
+  version: string | null
+  /** The model and effort Claude Code's user settings name; null for its own defaults. */
+  default_model: string | null
+  default_effort: string | null
+  /** What sandboxed agents sign in with: the token in Credentials, this machine's login, or none. */
+  sign_in: ClaudeCredentialMode
+}
+
 /**
- * Every runtime besides Claude Code, as `GET /api/runtimes` answers, and the runtimes a new agent
- * may start on now: Claude Code always, Codex only while it is ready.
+ * Each runtime as `GET /api/runtimes` answers, and the runtimes a new agent may start on now:
+ * Claude Code always, Codex only while it is ready.
  */
 export interface RuntimesStatus {
+  claude: ClaudeStatus
   codex: CodexStatus
   offers: RuntimeOffer[]
 }
