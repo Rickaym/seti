@@ -4,6 +4,7 @@ import path from 'node:path'
 import { REBUILDABLE_DIRS, REBUILDABLE_IF_IGNORED, type Task } from '@seti/shared'
 import {
   ARCHIVE_ROOT,
+  CODEX_ROOT,
   MOD_FETCH_ROOT,
   SANDBOX_ROOT,
   SCRATCH_ROOT,
@@ -24,6 +25,7 @@ export const OWNED_ROOTS = {
   modFetch: MOD_FETCH_ROOT,
   sharedTools: SHARED_TOOLS_ROOT,
   trash: TRASH_ROOT,
+  codex: CODEX_ROOT,
 } as const
 
 export type OwnedRoot = keyof typeof OWNED_ROOTS
@@ -141,12 +143,42 @@ function gitDirOf(dir: string): string | null {
   return line === undefined ? null : path.resolve(dir, line)
 }
 
-/** Why a folder is in use now: a process works in it or git holds a lock in it; else null. */
+/** The device and inode of each file right in `dir`, as `dev:ino`. */
+async function filesIn(dir: string): Promise<Set<string>> {
+  const names = await fs.promises.readdir(dir).catch(() => [])
+  const stats = await Promise.all(names.map(async (name) => fs.promises.lstat(path.join(dir, name)).catch(() => null)))
+  return new Set(stats.flatMap((stat) => (stat?.isFile() === true ? [`${String(stat.dev)}:${String(stat.ino)}`] : [])))
+}
+
+/** A process whose program is one of the files right in `dir`, matched by inode across mounts. */
+async function programUser(dir: string): Promise<string | null> {
+  const files = await filesIn(dir)
+  if (files.size === 0) {
+    return null
+  }
+  const pids = (await fs.promises.readdir(PROC).catch(() => [])).filter((name) => /^\d+$/.test(name))
+  for (const pid of pids) {
+    const stat = await fs.promises.stat(path.join(PROC, pid, 'exe')).catch(() => null)
+    if (stat !== null && files.has(`${String(stat.dev)}:${String(stat.ino)}`)) {
+      return pid
+    }
+  }
+  return null
+}
+
+/**
+ * Why a folder is in use now: a process works in it or runs a program from it, or git holds a
+ * lock in it; else null.
+ */
 export async function busyReason(dir: string): Promise<string | null> {
   const real = realOrNull(dir) ?? dir
   const user = (await processCwds()).find(({ cwd }) => within(cwd, real))
   if (user !== undefined) {
     return `process ${user.pid} works in ${user.cwd}`
+  }
+  const runner = await programUser(dir)
+  if (runner !== null) {
+    return `process ${runner} runs a program in ${dir}`
   }
   const gitDir = gitDirOf(dir)
   if (gitDir !== null && fs.existsSync(path.join(gitDir, 'index.lock'))) {
@@ -155,7 +187,10 @@ export async function busyReason(dir: string): Promise<string | null> {
   return null
 }
 
-/** Removes a folder after checking it again; returns why it refused instead when it must not. */
+/**
+ * Removes a folder after checking it again, a read-only one made writable first, as Codex's are;
+ * returns why it refused instead when it must not.
+ */
 export async function removeOwnedDir(dir: string, root: OwnedRoot, others: readonly DirUser[]): Promise<string | null> {
   const refusal = removalRefusal(dir, root, others) ?? (await busyReason(dir))
   if (refusal !== null) {
@@ -169,6 +204,10 @@ export async function removeOwnedDir(dir: string, root: OwnedRoot, others: reado
     } catch {
       // git could not remove it; the folder goes below and git prunes its record later
     }
+  }
+  const { mode } = await fs.promises.stat(dir)
+  if ((mode & 0o200) === 0) {
+    await fs.promises.chmod(dir, mode | 0o700)
   }
   await fs.promises.rm(dir, { recursive: true, maxRetries: 2 })
   return null

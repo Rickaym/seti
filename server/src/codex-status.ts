@@ -9,17 +9,18 @@ import {
   type StoredRuntime,
 } from '@seti/shared'
 import { audit } from './audit.js'
-import { codexKeyedCredentials, credentialHasKey } from './codex-key.js'
+import { copyState, followSettings, installCodex, type CodexInstallFailure } from './codex-install.js'
+import { codexKeyedCredentials, credentialHasKey, keyOutsideDefault } from './codex-key.js'
+import { CODEX_PIN } from './codex-pin.js'
 import { refuseAgent } from './ea-guard.js'
 import { HttpError } from './http.js'
-import pin from './runtimes/codex/pin.json' with { type: 'json' }
 import { PRICES_AS_OF } from './runtimes/codex/prices.js'
 import { codexSettings } from './store/codex-settings.js'
 
 const run = promisify(execFile)
 
 /** The Codex version this Seti is built and tested against. */
-const PINNED = pin.version
+const PINNED = CODEX_PIN.version
 
 /** The last version read, by program and the file's change time, so a check runs once per file. */
 let known: { key: string; version: string | null } | null = null
@@ -41,49 +42,89 @@ async function versionOf(program: string): Promise<string | null> {
   return known.version
 }
 
-/** The states the settings and program decide, before any key counts. */
-type ProgramState = Exclude<CodexStatus['state'], 'ready' | 'no_key'>
+/** Where the program agents start leaves Codex, before any key counts. */
+type ProgramNow =
+  | { state: 'off' | 'installing'; version: null; program: null }
+  | { state: 'failed'; version: string | null; program: null; failure: CodexInstallFailure }
+  | { state: 'runs'; version: string; program: string }
 
-/** Where the program leaves Codex, or null when it can run. */
-function programState(settings: CodexSettings, version: string | null): ProgramState | null {
-  if (!settings.enabled) {
-    return 'off'
+/** The program the user named in place of Seti's copy, checked to report the pinned version. */
+async function ownProgram(program: string): Promise<ProgramNow> {
+  const version = await versionOf(program)
+  if (version === PINNED) {
+    return { state: 'runs', version, program }
   }
-  if (settings.program === null) {
-    return 'not_set_up'
-  }
-  if (version === null) {
-    return 'missing'
-  }
-  return version === PINNED ? null : 'update_needed'
+  const message =
+    version === null
+      ? `The program you named, ${program}, is not there or does not run`
+      : `The program you named reports ${version}; this Seti needs ${PINNED}`
+  return { state: 'failed', version, program: null, failure: { reason: 'program', message } }
 }
 
-/** The settings, the version the program reports and the state they leave Codex in. */
-async function programNow() {
-  const settings = await codexSettings.get()
-  const version = settings.program === null ? null : await versionOf(settings.program)
-  return { settings, version, state: programState(settings, version) }
+/** The program new Codex agents start and where it stands, from the settings. */
+async function programNow(settings: CodexSettings): Promise<ProgramNow> {
+  if (!settings.enabled) {
+    return { state: 'off', version: null, program: null }
+  }
+  if (settings.program !== null) {
+    return ownProgram(settings.program)
+  }
+  const copy = await copyState()
+  if (copy.state === 'ready') {
+    return { state: 'runs', version: PINNED, program: copy.program }
+  }
+  return copy.state === 'installing'
+    ? { state: 'installing', version: null, program: null }
+    : { state: 'failed', version: null, program: null, failure: copy.failure }
+}
+
+/** The program a new Codex process starts, or null while Codex is off, installing or failed. */
+export async function codexProgram(): Promise<string | null> {
+  return (await programNow(await codexSettings.get())).program
 }
 
 /**
- * Where Codex stands: off, not set up, missing, an older or newer version, or whether the default
- * credential, which new agents from the start page get, holds an OpenAI key.
+ * Where Codex stands: off, installing, failed with its reason, or whether the default credential,
+ * which new agents from the start page get, holds an OpenAI key.
  */
 export async function codexStatus(): Promise<CodexStatus> {
-  const { settings, version, state } = await programNow()
+  const settings = await codexSettings.get()
+  const now = await programNow(settings)
   const keyed = await codexKeyedCredentials()
   const ready = keyed.includes(DEFAULT_PROFILE_ID) ? 'ready' : 'no_key'
-  return { state: state ?? ready, version, pinned: PINNED, settings, keyed, pricesAsOf: PRICES_AS_OF }
+  return {
+    state: now.state === 'runs' ? ready : now.state,
+    failure: now.state === 'failed' ? now.failure : null,
+    version: now.version,
+    pinned: PINNED,
+    binary: now.program,
+    settings,
+    keyed,
+    keyElsewhere: keyed.includes(DEFAULT_PROFILE_ID) ? null : await keyOutsideDefault(),
+    pricesAsOf: PRICES_AS_OF,
+  }
 }
 
 const NO_KEY =
   "The agent's credential has no OpenAI key: the user adds a connection with a header on api.openai.com to it in Connections"
 
-const WHY: Record<ProgramState, string> = {
-  off: 'Codex is off on this Seti; the user turns it on in Settings, Runtimes',
-  not_set_up: 'Codex has no program named; the user names it in Settings, Runtimes',
-  missing: 'The codex program named in Settings, Runtimes is not there or does not run',
-  update_needed: 'The codex program named in Settings, Runtimes is not the version this Seti needs',
+/** Why a new Codex agent cannot start now, as the agent and the user read it. */
+function whyNot(now: Exclude<ProgramNow, { state: 'runs' }>): string {
+  if (now.state === 'off') {
+    return 'Codex is off on this Seti; the user turns it on in Settings, Runtimes'
+  }
+  return now.state === 'failed'
+    ? `Codex cannot start: ${now.failure.message}. The user retries in Settings, Runtimes`
+    : 'Codex is still installing on this Seti; try again in a minute'
+}
+
+/** The program a Codex agent's process starts, or a refusal saying why there is none. */
+export async function requireCodexProgram(settings: CodexSettings): Promise<string> {
+  const now = await programNow(settings)
+  if (now.state !== 'runs') {
+    throw new Error(whyNot(now))
+  }
+  return now.program
 }
 
 /** Refuses a new agent on a runtime that cannot start one now, or on a credential without its key. */
@@ -91,9 +132,9 @@ export async function requireRuntime(runtime: StoredRuntime, profileId: string):
   if (runtime !== 'codex') {
     return
   }
-  const { state } = await programNow()
-  if (state !== null) {
-    throw new HttpError(409, WHY[state])
+  const now = await programNow(await codexSettings.get())
+  if (now.state !== 'runs') {
+    throw new HttpError(409, whyNot(now))
   }
   if (!(await credentialHasKey(profileId))) {
     throw new HttpError(409, NO_KEY)
@@ -105,9 +146,9 @@ const changedKeys = (before: CodexSettings, after: CodexSettings) =>
   (Object.keys(after) as (keyof CodexSettings)[]).filter((key) => before[key] !== after[key])
 
 /**
- * Changes the Codex settings as the user, audited with what changed. The EA and agents are
- * refused: the settings decide whether agents run on another vendor's model and who answers
- * their calls.
+ * Changes the Codex settings as the user, audited with what changed; turning Codex on installs
+ * the pinned version in the background. The EA and agents are refused: the settings decide
+ * whether agents run on another vendor's model and who answers their calls.
  */
 export async function updateCodexSettings(input: CodexSettingsInput): Promise<CodexStatus> {
   refuseAgent('change the Codex runtime settings')
@@ -125,6 +166,21 @@ export async function updateCodexSettings(input: CodexSettingsInput): Promise<Co
       summary: `Changed the Codex runtime settings: ${changed.join(', ')}`,
       detail: { runtime: 'codex', changed, enabled: after.enabled, evaluator_decides: after.evaluator_decides },
     })
+    await followSettings(before, after)
+  }
+  return codexStatus()
+}
+
+/**
+ * Tries again after a failure, as the user: installs the pinned version again, or reads the
+ * version of the program the user named afresh. The EA and agents are refused, as for a change.
+ */
+export async function retryCodex(): Promise<CodexStatus> {
+  refuseAgent('install the Codex runtime')
+  const settings = await codexSettings.get()
+  known = null
+  if (settings.enabled && settings.program === null) {
+    void installCodex('user')
   }
   return codexStatus()
 }

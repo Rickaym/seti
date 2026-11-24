@@ -26,6 +26,7 @@ import { SignInPage } from '@/panels/settings/SignInPage'
 import { StoragePage } from '@/panels/settings/StoragePage'
 import { ConnectionsPage } from '@/panels/settings/connections/ConnectionsPage'
 import { CredentialSetsPage } from '@/panels/settings/credentials/CredentialSetsPage'
+import { SettingsJsonPage } from '@/panels/settings/json/SettingsJsonPage'
 import { ModsPage } from '@/panels/settings/mods/ModsPage'
 import {
   isProbedPage,
@@ -51,6 +52,7 @@ const PAGES: Record<Exclude<SettingsPageKey, ProbedPageKey>, (detail: string | n
   storage: () => <StoragePage />,
   channels: (detail) => <ChannelsPage detail={detail} />,
   about: () => <AboutPage />,
+  json: () => <SettingsJsonPage />,
   account: () => <AccountPage />,
   signin: () => <SignInPage />,
   sandbox: () => <SandboxPage />,

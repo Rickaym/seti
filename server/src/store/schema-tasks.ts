@@ -198,3 +198,6 @@ CREATE TABLE codex_settings (
   updated_at TEXT NOT NULL
 );
 `
+
+/** The approvals an agent-started agent may not go beyond: those of a Codex agent, or none. */
+export const TASK_APPROVAL_CEILING = 'ALTER TABLE task ADD COLUMN approval_ceiling TEXT;'
