@@ -149,15 +149,16 @@ between two steps; an interrupt; a hook at subagent start.
   the control room's own, and no question tool, subagents, web tools, plugins, hooks or tool
   servers of the user's. Every tool call passes the control room's gate first, which allows or
   denies it and never asks; the runtime's own memory consolidation is off in it.
-- RT-9: A runtime besides the default is off until the user turns it on and names its program.
-  While it is off, its program is missing or it is not the version the control room is built for,
-  a new agent or session on it MUST be refused with that reason; its agents stay readable. A
-  runtime that needs a model key MUST also refuse a new agent whose credential holds no connection
-  for that key, and its status MUST read "no key", not ready, while the default credential holds
-  none. Only the user changes a runtime's settings, and each change is audited. The control room
-  MUST offer a new agent the models of the default runtime always and those of another runtime
-  only while that runtime can start one; the runtimes it offers MUST be readable with their models
-  and efforts.
+- RT-9: A runtime besides the default is off until the user turns it on. Its status reads off,
+  installing, failed with a reason the user can retry, no key, or ready. While it is not ready, a
+  new agent or session on it MUST be refused with that reason; its agents stay readable. A runtime
+  that needs a model key MUST also refuse a new agent whose credential holds no connection for
+  that key, and its status MUST read "no key", not ready, while the default credential holds none.
+  The status MAY name the one connection for that key the default credential lacks, but nothing
+  but the user changes a credential or connection for it. Only the user changes a runtime's
+  settings, and each change is audited. The control room MUST offer a new agent the models of the
+  default runtime always and those of another runtime only while that runtime can start one; the
+  runtimes it offers MUST be readable with their models and efforts.
 - RT-10: A new agent's start MAY name a runtime, a model and an effort. A model alone MUST pick the
   one runtime that offers it, and a start naming neither runs on the default runtime with the
   user's default model. A model no runtime offers, a runtime and model that disagree, and an
@@ -165,6 +166,22 @@ between two steps; an interrupt; a hook at subagent start.
   runtime's models are the ones it reports for the account, else its stable aliases. An agent
   started on a model and effort MUST run every session start, restart and resume on them; a
   fallback switch (RES-14) lasts until the next session start.
+- RT-11: Turning a runtime on installs the version the control room pins, in the background;
+  pressing Retry and the control room's start while the runtime is on are the only other
+  triggers, and the EA and agents can trigger none of them. The install contacts only the host
+  the pin names, MUST check the downloaded package's sha512 integrity and then the program's
+  sha256, both from the pin, and MUST discard what it fetched and never run it when either
+  differs. The program lands alone in a folder of the control room's own data, one folder per
+  version, read and run only, which a sandbox mounts read-only. The install resumes a cut
+  download, fetches once however often it is asked, and records each install and failure in the
+  audit log with the version and checksum. A user MAY name a program of their own instead, for a
+  machine without network access; it MUST report the pinned version, and nothing is fetched for
+  it.
+- RT-12: When an upgrade moves the pin, the control room installs the new version at its start if
+  the runtime is on. A running session keeps the program it started with until it ends or
+  restarts; a version folder no running program uses, and that the settings no longer need, is
+  removed, as is every copy once the runtime is off or runs a program of the user's. Nothing
+  outside the control room's own folders is removed.
 
 ## 4. Turn lifecycle
 
@@ -385,8 +402,8 @@ interrupted only for that.
 - SBX-9: Every command the user runs for an agent (shell, terminal, side question, rewind helper)
   MUST run in its sandbox. An unsandboxed agent has the user's access to the host; credentials and
   the allowlist do not apply to it.
-- SBX-11: An agent MUST start another sandboxed, at level `self`, with at most its own access; what
-  was withheld is recorded.
+- SBX-11: An agent MUST start another sandboxed, at level `self`, with at most its own access and
+  approvals no looser than its own (PERM-13); what was withheld is recorded.
 - SBX-12: A maintenance session of an agent, such as a dream, runs in a sandbox of its own, with its
   own home, `/tmp` and proxy. It mounts the agent's folders, workspace, package caches and session
   folder read-only, except the agent's own memory folder and the folders the session names; a
@@ -457,6 +474,17 @@ interrupted only for that.
   call's kind and tool, the mode, both outcomes, the deciding step and rule id, never the call's
   input or a rule's text. The user and the EA read them with `GET /permissions/shadow?days=` (1
   to 30, default 7).
+- PERM-13: Approval regimes, strictest first: `user` (the user answers every call no guard or rule
+  refuses), `rules` (allow rules and the built-in allows run a call, the user answers the rest),
+  `classifier` (as `rules`, then a classifier runs or turns down the rest) and `bypass`
+  (PERM-10). A Codex agent is `user`, or `rules` while the user lets the rules decide for Codex; a
+  Claude agent is `classifier`, or `bypass` while its Bypass lasts. An agent that an agent starts
+  MUST settle no call more loosely than its starter: a Claude agent started by a Codex agent, or
+  by an agent held so, is held to a Codex agent's regime, which follows that setting, and Bypass
+  never passes on. The hold is recorded with what was withheld and in the start's audit, lasts
+  for the agent's life and leaves Bypass to the user. A Codex agent or a held one MUST NOT import
+  sessions, which would run under the classifier. The user's and the EA's starts are not held:
+  the EA has no regime of its own and starts agents only in a turn the user began (EA-8).
 
 ### 7.5 Guards
 
@@ -966,6 +994,16 @@ Optional and off by default: a maintenance session per agent that consolidates i
 - AUD-12: Also audited: outward calls; classifier refusals; guard refusals; refused sign-ins (rate
   limited); placeholder misuse; each restart cut, resume and hold.
 
+### 16.1 Settings document
+
+- CFG-1: The control room MUST offer its stored settings as one JSON document with a `version`, a
+  `revision` and a JSON Schema derived from the schemas that validate its settings writes. Its
+  sections follow the settings groups and pages the user sees; lists are keyed by a stable name.
+- CFG-2: The document, its schema and any error about it MUST NOT contain a secret value; a secret
+  reads `set` or `not set`.
+- CFG-3: Agents, mods and devices MUST be refused the document and its schema. The EA reads plain
+  configuration only; security settings are absent from its document and schema.
+
 ## 17. Mods
 
 - MOD-1: Tiers are `theme` (tokens only), `bundled` and `third-party`. A mod's manifest (id,
@@ -1072,19 +1110,19 @@ An implementation is SETI-compatible when it meets all of:
 
 ### 20.2 Profiles
 
-| Profile       | Adds                                                                 |
-| ------------- | -------------------------------------------------------------------- |
-| Sandbox       | all SBX, EGR, HST, CAP, SEC and CHG; PERM-10; GRD-2, GRD-7 to GRD-12 |
-| Shared tools  | all TOOL (requires Sandbox)                                          |
-| Events        | all CHN; PUB-2 (hooks)                                               |
-| Pull requests | all PR                                                               |
-| Team          | all CHAT                                                             |
-| Assistant     | all EA; LVL-6                                                        |
-| Separate node | all NODE                                                             |
-| Mods          | all MOD                                                              |
-| Sharing       | PUB-4, PUB-7                                                         |
-| Devices       | API-11                                                               |
-| Storage       | RES-16 to RES-19                                                     |
+| Profile       | Adds                                                                          |
+| ------------- | ----------------------------------------------------------------------------- |
+| Sandbox       | all SBX, EGR, HST, CAP, SEC and CHG; PERM-10, PERM-13; GRD-2, GRD-7 to GRD-12 |
+| Shared tools  | all TOOL (requires Sandbox)                                                   |
+| Events        | all CHN; PUB-2 (hooks)                                                        |
+| Pull requests | all PR                                                                        |
+| Team          | all CHAT                                                                      |
+| Assistant     | all EA; LVL-6                                                                 |
+| Separate node | all NODE                                                                      |
+| Mods          | all MOD                                                                       |
+| Sharing       | PUB-4, PUB-7                                                                  |
+| Devices       | API-11                                                                        |
+| Storage       | RES-16 to RES-19                                                              |
 
 An implementation without the Sandbox profile MUST NOT claim that agents are untrusted, and MUST
 treat every agent as holding the user's access.

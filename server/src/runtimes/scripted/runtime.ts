@@ -50,6 +50,16 @@ const orAbort = async <T>(pending: Promise<T>, signal: AbortSignal): Promise<T |
 /** Never settles: what a held step waits on until its turn is interrupted. */
 const forever = new Promise<never>(() => undefined)
 
+/** When a call's tool answers: at once, after its delay, or never for a held one. */
+const answerOf = async (call: ScriptCall): Promise<true> =>
+  call.hold === true
+    ? forever
+    : new Promise((resolve) =>
+        setTimeout(() => {
+          resolve(true)
+        }, call.delayMs ?? 0),
+      )
+
 /**
  * The scripted runtime: plays a script one turn per batch of inputs, asks before every gated
  * call, takes input sent during a turn at its next `awaitInput` step or else in the next turn,
@@ -324,8 +334,9 @@ export class ScriptedRuntime {
       return null
     }
     this.machine.effects.push(`${call.tool} ${JSON.stringify(verdict.args ?? call.args)}`)
-    if (call.hold === true) {
-      await orAbort(forever, signal)
+    const answered = await orAbort(answerOf(call), signal)
+    if (answered === null) {
+      this.machine.effects.push(`cancelled ${call.tool}`)
       this.io.write({ t: 'done', id, status: 'cancelled', output: '', ...thread })
       return null
     }

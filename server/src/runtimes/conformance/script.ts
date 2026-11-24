@@ -6,8 +6,10 @@ export interface ScriptCall {
   output?: string
   /** The tool runs and fails. */
   fails?: boolean
-  /** The tool runs until the turn is interrupted. */
+  /** The tool runs until the turn is interrupted; the rig notes `cancelled <tool>` then. */
   hold?: boolean
+  /** The tool answers only after this many milliseconds, as a Seti tool that waits does. */
+  delayMs?: number
 }
 
 /**

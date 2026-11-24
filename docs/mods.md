@@ -470,7 +470,9 @@ key files; and no host may be a wildcard over a public suffix such as `*.co.uk` 
 
 Settings, Mods lists each mod with its icon, name, one-line description, publisher and version,
 and gives it a page with tabs for its README, permissions, settings, contributions and changelog.
-These manifest fields fill them in, and every one is optional:
+The settings document (Settings, JSON) holds each mod under `mods.<id>`: whether it is on and its
+declared settings, which the manifest's `settings` fields describe and validate. These manifest
+fields fill the page in, and every one is optional:
 
 - `displayName`: the name the list and the page show, up to 60 characters; `name` stays the short
   name that consent copy and posts use.

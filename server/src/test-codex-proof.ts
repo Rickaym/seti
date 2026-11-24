@@ -4,6 +4,8 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { answerQuestionsInput, CODEX_SETTINGS_DEFAULTS, DEFAULT_PROFILE_ID, type Task } from '@seti/shared'
 import { findBinary } from './binaries.js'
+import { copyState, installCodex } from './codex-install.js'
+import { CODEX_PIN } from './codex-pin.js'
 import { sql, tasks } from './db.js'
 import { connectNode } from './node-split.js'
 import { answerPermission } from './permission-rules.js'
@@ -17,6 +19,7 @@ import { permissionRequests } from './store/permissions.js'
 import { questions } from './store/questions.js'
 import { routeEgressForTests } from './task-proxy.js'
 import { TestModelHost } from './test-codex-model.js'
+import { fakeBuild, FakeRegistry } from './test-codex-registry.js'
 import { MODEL_HOST } from './test-codex-upstream.js'
 import { keyConnection } from './test-connections.js'
 
@@ -120,6 +123,21 @@ async function startNode(model: TestModelHost, notes: string): Promise<ChildProc
   return child
 }
 
+/** Installs the pinned Codex into Seti's own folder from a registry here, as turning it on does. */
+async function installFrom(scratch: string, binary: string): Promise<string> {
+  const registry = await new FakeRegistry().start()
+  try {
+    await installCodex('user', registry.pin(fakeBuild(scratch, CODEX_PIN.version, binary)))
+  } finally {
+    await registry.close()
+  }
+  const copy = await copyState()
+  if (copy.state !== 'ready') {
+    throw new Error(`The pinned Codex did not install from ${binary}: ${JSON.stringify(copy)}`)
+  }
+  return copy.program
+}
+
 /**
  * One proof run: the model host, Codex on with the pinned program, and a key the proxy adds.
  * With `split`, sessions and proxies run in a node process of their own, as `SETI_NODE=split`
@@ -133,7 +151,8 @@ export async function proofRun(scratch: string, binary: string, split: boolean) 
   if (node === null) {
     routeEgressForTests(local)
   }
-  await codexSettings.set({ ...CODEX_SETTINGS_DEFAULTS, enabled: true, program: binary })
+  await codexSettings.set({ ...CODEX_SETTINGS_DEFAULTS, enabled: true })
+  const program = await installFrom(scratch, binary)
   const key = `proof-${randomUUID()}`
   await keyConnection('proof_openai', key, {
     hosts: [MODEL_HOST],
@@ -143,6 +162,8 @@ export async function proofRun(scratch: string, binary: string, split: boolean) 
   return {
     model,
     key,
+    /** Seti's own copy of the pinned Codex, which the agent runs. */
+    program,
     /** A Codex agent at Full Seti control in a folder of its own, with a file it is told to remove. */
     agent: async (): Promise<Task> => {
       const id = randomUUID()
@@ -157,7 +178,7 @@ export async function proofRun(scratch: string, binary: string, split: boolean) 
       return task
     },
     firstTurn: async (task: Task) => {
-      model.play([firstTurn(task, binary), [{ hold: true }], [{ recall: true }]])
+      model.play([firstTurn(task, program), [{ hold: true }], [{ recall: true }]])
       await runTurn(task.id, 'go')
       await untilIdle(task, model)
     },

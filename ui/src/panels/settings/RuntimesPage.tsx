@@ -9,7 +9,7 @@ export function RuntimesPage() {
       header={
         <SettingsHeader
           title="Runtimes"
-          description="The programs agents run on. Claude Code is always there; Codex stays off until you set it up."
+          description="The programs agents run on. Claude Code is always there; Codex stays off until you turn it on."
         />
       }
     >

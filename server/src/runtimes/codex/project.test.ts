@@ -64,7 +64,7 @@ describe('a recorded Codex turn in neutral events', () => {
       call: {
         callId: 'call_0004',
         kind: 'shell',
-        name: 'exec_command',
+        name: 'Bash',
         input: { command: 'echo spike-shell-ran > shell-proof.txt; ls', cwd: '/work/project' },
         shell: { action: 'run', command: 'echo spike-shell-ran > shell-proof.txt; ls' },
       },
@@ -105,6 +105,41 @@ describe('Codex calls', () => {
       status: 'error',
       result: { exitCode: 2 },
     })
+  })
+
+  it('unwraps a command Codex quoted in double quotes or in joined quoted parts', () => {
+    const command = (wrapped: string) => {
+      const event = one('item/started', item({ ...shell('inProgress'), command: wrapped }))
+      return event.type === 'tool.started' ? event.call.shell?.command : undefined
+    }
+    expect(command(`/usr/bin/zsh -lc "sed -n '1,20p' notes.md"`)).toBe("sed -n '1,20p' notes.md")
+    expect(command(String.raw`/bin/bash -lc "rg -n \"a\\(b\" src \$HOME"`)).toBe(String.raw`rg -n "a\(b" src $HOME`)
+    expect(command(`/usr/bin/zsh -lc 'echo '"'"'quoted'"'"' "$x"'`)).toBe(`echo 'quoted' "$x"`)
+    expect(command("/usr/bin/zsh -lc 'printf a\nb'")).toBe('printf a\nb')
+    for (const kept of [
+      '/usr/bin/zsh -lc "unclosed',
+      '/usr/bin/zsh -lc ls -la',
+      '/usr/bin/zsh -lc a;b',
+      'git status',
+    ]) {
+      expect(command(kept)).toBe(kept)
+    }
+  })
+
+  it('names calls as other runtimes do: a command Bash, an edit Edit, one that only adds files Write', () => {
+    const named = (value: Record<string, unknown>) => {
+      const event = one('item/started', item(value))
+      return event.type === 'tool.started' ? event.call.name : undefined
+    }
+    expect(named(shell('inProgress'))).toBe('Bash')
+    const patch = (type: string) => ({
+      type: 'fileChange',
+      id: 'p',
+      status: 'inProgress',
+      changes: [{ path: '/w/a', kind: { type }, diff: '+a' }],
+    })
+    expect(named(patch('update'))).toBe('Edit')
+    expect(named(patch('add'))).toBe('Write')
   })
 
   it('names an MCP call by server and tool, with its text or its error', () => {
@@ -192,11 +227,18 @@ describe('Codex calls', () => {
       threadId: ROOT,
       turnId: 't1',
       itemId: 'q1',
-      questions: [{ id: 'a', header: 'Pick', question: 'Which one?', options: [{ label: 'A' }, { label: 'B' }] }],
+      questions: [
+        { id: 'a', header: 'Pick', question: 'Which one?', options: [{ label: 'A (Recommended)' }, { label: 'B' }] },
+      ],
     }
     expect(one('item/tool/requestUserInput', params)).toMatchObject({
       type: 'tool.started',
-      call: { callId: 'q1', kind: 'question', question: { questions: [{ text: 'Which one?', options: ['A', 'B'] }] } },
+      call: {
+        callId: 'q1',
+        kind: 'question',
+        name: 'AskUserQuestion',
+        question: { questions: [{ text: 'Which one?', options: ['A', 'B'] }] },
+      },
     })
     const answered = (reply: unknown) => projectCodex({ ...stored('item/tool/requestUserInput', params), reply })
     expect(answered({ answers: { a: { answers: ['B'] } } })).toEqual([
