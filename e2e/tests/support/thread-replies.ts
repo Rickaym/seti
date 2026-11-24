@@ -91,10 +91,10 @@ export async function danaReplies(baseURL: string, path: string, channel: string
 export async function expectThreadReply(page: Page, channel: string): Promise<void> {
   const entry = page.getByRole('main').locator('[data-kind="input"][data-input="thread"]')
   await expect(entry).toBeVisible({ timeout: ROUTED_WITHIN_MS })
-  await expect(entry).toContainText(`Dana replied in Slack ${channel}`)
+  await expect(entry).toContainText(`Dana replied in Slack channel ${channel}, name not known`)
   await expect(entry).toContainText('Could you also check the staging deploy')
   await expect(entry).toContainText('queued')
-  const link = entry.getByRole('link', { name: `Open the thread of Dana replied in Slack ${channel}` })
+  const link = entry.getByRole('link', { name: /^Open the thread of Dana replied in Slack/ })
   await expect(link).toHaveAttribute(
     'href',
     `https://acme.slack.com/archives/${channel}/p${REPLY_TS.replace('.', '')}?thread_ts=${ROOT}&cid=${channel}`,
