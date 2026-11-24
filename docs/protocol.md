@@ -184,6 +184,12 @@ between two steps; an interrupt; a hook at subagent start.
   restarts; a version folder no running program uses, and that the settings no longer need, is
   removed, as is every copy once the runtime is off or runs a program of the user's. Nothing
   outside the control room's own folders is removed.
+- RT-13: A runtime declares whether it loads the user's MCP servers and connectors, Seti's
+  plugins and a compaction rule, whether it can run outside the sandbox, fork a side chat, dream
+  and rewind; `GET /api/runtimes/capabilities` serves each runtime's declaration. For an agent
+  whose runtime lacks one, its settings show the control as not on that runtime instead of a
+  working control, counts leave those items out, its `task.md` and system prompt do not offer
+  them, and the server refuses the change with the reason.
 - RT-14: A runtime whose model can summarise its reasoning MUST ask for the summary, so its agents
   show their thinking as the default runtime's do. Reasoning the model seals for its own next call
   MUST NOT be stored, served or shown by the control room.
@@ -1041,6 +1047,7 @@ Optional and off by default: a maintenance session per agent that consolidates i
 - CFG-1: The control room MUST offer its stored settings as one JSON document with a `version`, a
   `revision` and a JSON Schema derived from the schemas that validate its settings writes. Its
   sections follow the settings groups and pages the user sees; lists are keyed by a stable name.
+  An agent's and a workspace's own settings are documents of their own.
 - CFG-2: The document, its schema and any error about it MUST NOT contain a secret value; a secret
   reads `set` or `not set`.
 - CFG-3: Agents, mods and devices MUST be refused the document and its schema. The EA reads plain

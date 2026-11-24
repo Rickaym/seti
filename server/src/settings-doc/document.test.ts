@@ -10,6 +10,7 @@ import { secrets } from '../secrets.js'
 import { userSettings } from '../store/user.js'
 import { USER_AUTH } from '../test-auth.js'
 import { withBundledMods } from '../test-mods.js'
+import { undocumented, type JsonSchema } from './test-schema.js'
 
 withBundledMods()
 
@@ -37,26 +38,6 @@ async function read<T>(path: string, as: Record<string, unknown> | null = null):
   const res = await get(path)
   expect(res.status).toBe(200)
   return ((await res.json()) as { data: T }).data
-}
-
-interface JsonSchema {
-  description?: string
-  properties?: Record<string, JsonSchema>
-  anyOf?: JsonSchema[]
-  additionalProperties?: JsonSchema | boolean
-  items?: JsonSchema
-}
-
-/** Every property path of a JSON Schema that has no description. */
-function undocumented(schema: JsonSchema, path = ''): string[] {
-  const values = typeof schema.additionalProperties === 'object' ? [schema.additionalProperties] : []
-  const inner = [...(schema.anyOf ?? []), ...values, ...(schema.items === undefined ? [] : [schema.items])]
-  const nested = inner.flatMap((option) => undocumented(option, `${path}.*`))
-  const own = Object.entries(schema.properties ?? {}).flatMap(([key, child]) => {
-    const at = path === '' ? key : `${path}.${key}`
-    return [...(child.description === undefined ? [at] : []), ...undocumented(child, at)]
-  })
-  return [...own, ...nested]
 }
 
 describe('the settings document', () => {

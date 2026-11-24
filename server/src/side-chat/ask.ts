@@ -10,9 +10,9 @@ import { HttpError } from '../http.js'
 import { sessionState } from '../runner.js'
 import { refuseOnCodex } from '../runtime-features.js'
 import type { SessionInput } from '../runtimes/adapter.js'
+import { forksSideChat } from '../runtimes/capabilities.js'
 import { queryClaude } from '../runtimes/claude/adapter.js'
 import { sideChatOptions, type ForkPoint } from '../runtimes/claude/side-chat-options.js'
-import { adapterFor, DEFAULT_RUNTIME } from '../runtimes/registry.js'
 import { redactSecrets } from '../scrub.js'
 import { moveSessionTo } from '../session-files.js'
 import { addSideChatCost } from '../store/cost.js'
@@ -40,7 +40,7 @@ const NO_FORK = "This agent's runtime cannot fork its conversation for a side ch
 
 /** The agent's conversation as its next turn sees it: the session, or a pending rewind point. */
 async function forkPoint(task: Task): Promise<ForkPoint> {
-  if (adapterFor(DEFAULT_RUNTIME).capabilities.session.fork === 'none') {
+  if (!forksSideChat(task.runtime)) {
     throw new HttpError(409, NO_FORK)
   }
   const pending = await rewinds.pending(task.id)
