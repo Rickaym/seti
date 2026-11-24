@@ -19,6 +19,7 @@ import { NotificationsPage } from '@/panels/settings/NotificationsPage'
 import { PermissionsPage } from '@/panels/settings/PermissionsPage'
 import { ReposPage } from '@/panels/settings/ReposPage'
 import { ResourcesPage } from '@/panels/settings/ResourcesPage'
+import { RuntimesPage } from '@/panels/settings/RuntimesPage'
 import { SandboxPage } from '@/panels/settings/SandboxPage'
 import { SharingPage } from '@/panels/settings/SharingPage'
 import { SignInPage } from '@/panels/settings/SignInPage'
@@ -46,6 +47,7 @@ const PAGES: Record<Exclude<SettingsPageKey, ProbedPageKey>, (detail: string | n
   repos: () => <ReposPage />,
   ea: () => <EaPage />,
   resources: () => <ResourcesPage />,
+  runtimes: () => <RuntimesPage />,
   storage: () => <StoragePage />,
   channels: (detail) => <ChannelsPage detail={detail} />,
   about: () => <AboutPage />,

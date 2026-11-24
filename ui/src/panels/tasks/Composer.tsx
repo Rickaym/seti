@@ -29,6 +29,8 @@ const HINTS = {
     'Enter sends, Ctrl+Enter adds a line. / commands, ! shell',
   ],
   touchIdle: ['Start with / for a command or ! to run a shell command here.', '/ command, ! shell'],
+  codexIdle: ['Enter sends, Ctrl+Enter adds a line. Start with ! to run a shell command here.', 'Enter sends. ! shell'],
+  touchCodexIdle: ['Start with ! to run a shell command here.', '! shell'],
   busy: [
     'Enter queues it for the agent, Alt+Enter interrupts and sends. Esc stops it.',
     'Enter queues, Alt+Enter interrupts, Esc stops.',
@@ -105,10 +107,12 @@ interface ComposerState {
   agentRunning: boolean
   compacting: boolean
   shellRunning: boolean
+  /** A Codex agent takes no slash commands and cannot rewind. */
+  codex: boolean
 }
 
 /** Touch screens get the same hints without keyboard shortcuts. */
-function hintKey({ agentRunning, compacting, shellRunning }: ComposerState, touch: boolean): keyof typeof HINTS {
+function hintKey({ agentRunning, compacting, shellRunning, codex }: ComposerState, touch: boolean): keyof typeof HINTS {
   if (compacting) {
     return touch ? 'touchCompacting' : 'compacting'
   }
@@ -117,6 +121,9 @@ function hintKey({ agentRunning, compacting, shellRunning }: ComposerState, touc
   }
   if (shellRunning) {
     return touch ? 'touchShell' : 'shell'
+  }
+  if (codex) {
+    return touch ? 'touchCodexIdle' : 'codexIdle'
   }
   return touch ? 'touchIdle' : 'idle'
 }
@@ -193,6 +200,7 @@ export const Composer = memo(function ComposerView({
   agentRunning,
   compacting,
   shellRunning,
+  codex = false,
   draft,
   onDraftChange: setDraft,
   sends,
@@ -202,6 +210,7 @@ export const Composer = memo(function ComposerView({
   agentRunning: boolean
   compacting: boolean
   shellRunning: boolean
+  codex?: boolean
   /** Kept by the task view, which fills it with the prompt of a rewind. */
   draft: string
   onDraftChange: (draft: string) => void
@@ -305,7 +314,7 @@ export const Composer = memo(function ComposerView({
           onChange={setDraft}
           commands={commands}
           label="Reply"
-          placeholder={HINTS[hintKey({ agentRunning, compacting, shellRunning }, touch)][roomy ? 0 : 1]}
+          placeholder={HINTS[hintKey({ agentRunning, compacting, shellRunning, codex }, touch)][roomy ? 0 : 1]}
           rows={2}
           className="max-md:min-h-11 pointer-coarse:placeholder:text-sm"
           disabled={shellRunning}

@@ -100,7 +100,7 @@ export async function startTask(
   await contextPacks.assertLinkable(packIds)
   await setiPlugins.assertExist(input.disabled_plugin_ids)
   await requireProfile(input.profile_id)
-  await requireRuntime(input.runtime)
+  await requireRuntime(input.runtime, input.profile_id)
   const access = await planStartAccess(input.access)
   const workspace = await startWorkspace(input.workspace_id)
   const id = randomUUID()

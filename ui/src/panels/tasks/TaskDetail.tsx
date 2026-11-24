@@ -12,6 +12,7 @@ import { toast } from 'sonner'
 import { apiPost, errorText } from '@/api'
 import { ChatFindBar } from '@/components/ChatFindBar'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
+import { RuntimeBadge } from '@/components/RuntimeBadge'
 import { useCommands } from '@/components/palette/useCommands'
 import { useConfirm } from '@/components/ui/confirm-context'
 import { useChatFindIn } from '@/hooks/useChatFind'
@@ -101,6 +102,7 @@ export function TaskDetail({ task, onChanged, onSubtasks }: TaskDetailProps) {
   const liveStatus = stream.status
   const status = liveStatus ?? task.status
   const busy = status === 'running' || stream.shell !== null
+  const codex = task.runtime === 'codex'
   const root = useRef<HTMLDivElement>(null)
   const [draft, setDraft] = useDraft(taskDraftKey(task.id))
   const [rewinding, setRewinding] = useState(false)
@@ -175,8 +177,8 @@ export function TaskDetail({ task, onChanged, onSubtasks }: TaskDetailProps) {
     busy,
     onStop: stop,
     onRewind: useCallback(() => {
-      setRewinding(true)
-    }, []),
+      setRewinding(!codex)
+    }, [codex]),
   })
 
   useStopCommand(task, { busy, shell: shellRunning }, stop)
@@ -215,6 +217,7 @@ export function TaskDetail({ task, onChanged, onSubtasks }: TaskDetailProps) {
       <HeaderUnseenDot unseen={task.unseen} status={status} />
       <StatusPill status={shownStatus} subagents={runningSubagents} />
       <BypassBadge until={task.bypass_until} />
+      <RuntimeBadge task={task} />
       <FallbackMark fallback={task.model_fallback} />
     </>
   )

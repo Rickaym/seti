@@ -150,8 +150,10 @@ between two steps; an interrupt; a hook at subagent start.
   denies it and never asks; the runtime's own memory consolidation is off in it.
 - RT-9: A runtime besides the default is off until the user turns it on and names its program.
   While it is off, its program is missing or it is not the version the control room is built for,
-  a new agent or session on it MUST be refused with that reason; its agents stay readable. Only
-  the user changes a runtime's settings, and each change is audited.
+  a new agent or session on it MUST be refused with that reason; its agents stay readable. A
+  runtime that needs a model key MUST also refuse a new agent whose credential holds no connection
+  for that key, and its status MUST read "no key", not ready, while the default credential holds
+  none. Only the user changes a runtime's settings, and each change is audited.
 
 ## 4. Turn lifecycle
 
@@ -416,7 +418,8 @@ interrupted only for that.
   A call an `ask` rule matches, or that nothing decides, becomes a request and the agent blocks.
   On a runtime with no classifier that asks before every call (Codex), guards and deny rules
   refuse at once, review and ask rules hold as for any agent, and every other call becomes a
-  request offering `allow` and `deny` only, unless the user lets the rules decide for that runtime;
+  request offering `allow` and `deny` only, and a `deny` with a message is refused there since that
+  runtime cannot pass it on, unless the user lets the rules decide for that runtime;
   then a rule's or the read-only list's allow runs the call. Beside each answer the user gives, the
   implementation counts its own verdict (PERM-12).
 - PERM-4: Built-in: reads, search and platform tools are allowed; shell and edits inside the
