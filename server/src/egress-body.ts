@@ -1,0 +1,159 @@
+import type { IncomingHttpHeaders, OutgoingHttpHeaders } from 'node:http'
+import { Transform, type Readable, type TransformCallback } from 'node:stream'
+import { hostMatches } from '@seti/shared'
+import type { Target } from './egress-answers.js'
+import { blockedText, placeholderAllowed, type EgressPlaceholder, type Refusal } from './egress-placeholders.js'
+
+/** The most of a request body the proxy holds to look for a placeholder in it. */
+export const BODY_LIMIT = 1024 * 1024
+const LIMIT_TEXT = '1 MiB'
+
+/** The body types the proxy reads for placeholders; it never reads any other. */
+export type BodyType = 'json' | 'form' | 'multipart' | 'text'
+
+export function bodyTypeOf(contentType: string | undefined): BodyType | null {
+  const essence = (contentType ?? '').split(';', 1)[0]?.trim().toLowerCase() ?? ''
+  if (essence === 'application/json' || (essence.startsWith('application/') && essence.endsWith('+json'))) {
+    return 'json'
+  }
+  if (essence === 'application/x-www-form-urlencoded') {
+    return 'form'
+  }
+  if (essence === 'multipart/form-data') {
+    return 'multipart'
+  }
+  return essence === 'text/plain' ? 'text' : null
+}
+
+/** How the proxy sends a body on: streamed unread, whole once read, or read in part then watched. */
+export type BodyPlan =
+  { kind: 'stream' } | { kind: 'whole'; body: Buffer } | { kind: 'rest'; head: Buffer; watch: readonly Buffer[] }
+
+/** A body the proxy refused, with the connections to report as blocked. */
+export type BodyRefusal = Refusal & { names: readonly string[] }
+
+const onHost = (entry: EgressPlaceholder, host: string) => entry.hosts.some((pattern) => hostMatches(pattern, host))
+
+const identity = (headers: IncomingHttpHeaders) => {
+  const encoding = (headers['content-encoding'] ?? '').trim().toLowerCase()
+  return encoding === '' || encoding === 'identity'
+}
+
+/** Up to `limit` bytes and whether that was all, or null when the client went away first. */
+async function readUpTo(body: Readable, limit: number): Promise<{ head: Buffer; complete: boolean } | null> {
+  return new Promise((resolve) => {
+    const chunks: Buffer[] = []
+    let size = 0
+    const finish = (result: { head: Buffer; complete: boolean } | null) => {
+      body.off('data', onData).off('end', onEnd)
+      resolve(result)
+    }
+    const onData = (chunk: Buffer | string) => {
+      const bytes = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)
+      chunks.push(bytes)
+      size += bytes.length
+      if (size > limit) {
+        body.pause()
+        finish({ head: Buffer.concat(chunks), complete: false })
+      }
+    }
+    const onEnd = () => {
+      finish({ head: Buffer.concat(chunks), complete: true })
+    }
+    const onClose = () => {
+      finish(null)
+    }
+    body.on('data', onData).once('end', onEnd).once('close', onClose).once('error', onClose)
+  })
+}
+
+const offText = (host: string, names: readonly string[]) =>
+  `Seti sandbox proxy: refused a request to ${host} carrying the placeholder of ${names.join(', ')} in its ` +
+  'body, and sent nothing. Seti swaps a connection value into the URL and headers only, never into a ' +
+  'request body, so a login that posts it would fail.'
+
+const tooLargeText = (names: readonly string[]) =>
+  `Seti sandbox proxy: refused a request body over ${LIMIT_TEXT} carrying the placeholder of ${names.join(', ')}.`
+
+export const TOO_LARGE: Omit<Refusal, 'body'> = { status: 413, reason: 'Payload Too Large' }
+
+/** Whether the proxy reads the body: a text type, unencoded, to one of the connections' hosts. */
+const inspected = (target: Target, headers: IncomingHttpHeaders, entries: readonly EgressPlaceholder[]) =>
+  bodyTypeOf(headers['content-type']) !== null &&
+  identity(headers) &&
+  entries.some((entry) => onHost(entry, target.host))
+
+/** A whole body to send, or refused for a placeholder toward another host or one not swapped. */
+function checkWhole(target: Target, body: Buffer, entries: readonly EgressPlaceholder[]): BodyPlan | BodyRefusal {
+  const found = entries.filter((entry) => body.includes(entry.placeholder))
+  if (found.length === 0) {
+    return { kind: 'whole', body }
+  }
+  const blocked = found.filter((entry) => !placeholderAllowed(entry, target.host, target.port))
+  const names = (blocked.length > 0 ? blocked : found).map((entry) => entry.name)
+  const text = blocked.length > 0 ? blockedText(target.host, names) : offText(target.host, names)
+  return { status: 403, reason: 'Forbidden', body: text, names }
+}
+
+/**
+ * How to send a request's body. The proxy reads only JSON, form, multipart and plain text bodies
+ * without a content encoding, on its connections' hosts, holding at most BODY_LIMIT; any other
+ * body streams on unread. Null when the client went away while it read.
+ */
+export async function planBody(
+  target: Target,
+  headers: IncomingHttpHeaders,
+  body: Readable,
+  entries: readonly EgressPlaceholder[],
+): Promise<BodyPlan | BodyRefusal | null> {
+  if (!inspected(target, headers, entries)) {
+    return { kind: 'stream' }
+  }
+  const read = await readUpTo(body, BODY_LIMIT)
+  if (read === null) {
+    return null
+  }
+  if (read.complete) {
+    return checkWhole(target, read.head, entries)
+  }
+  const found = entries.filter((entry) => read.head.includes(entry.placeholder)).map((entry) => entry.name)
+  if (found.length > 0) {
+    return { ...TOO_LARGE, body: tooLargeText(found), names: found }
+  }
+  return { kind: 'rest', head: read.head, watch: entries.map((entry) => Buffer.from(entry.placeholder)) }
+}
+
+/** Raised by watchRest when a placeholder shows past the part the proxy held. */
+export class PlaceholderInBody extends Error {
+  constructor() {
+    super(`Seti sandbox proxy: refused a request body over ${LIMIT_TEXT} carrying a connection placeholder.`)
+  }
+}
+
+/** Passes the rest of a body on, failing as soon as a placeholder shows, across chunk edges too. */
+export function watchRest(watch: readonly Buffer[], head: Buffer): Transform {
+  const keep = Math.max(1, ...watch.map((needle) => needle.length)) - 1
+  let tail = head.subarray(Math.max(0, head.length - keep))
+  return new Transform({
+    transform(chunk: Buffer, _encoding: BufferEncoding, done: TransformCallback) {
+      const window = Buffer.concat([tail, chunk])
+      if (watch.some((needle) => window.includes(needle))) {
+        done(new PlaceholderInBody())
+        return
+      }
+      tail = window.subarray(Math.max(0, window.length - keep))
+      done(null, chunk)
+    },
+  })
+}
+
+/** The headers a body goes out with: a held body gets its exact length and no chunking. */
+export function headersForBody(headers: OutgoingHttpHeaders, plan: BodyPlan): OutgoingHttpHeaders {
+  if (plan.kind !== 'whole') {
+    return headers
+  }
+  const out: OutgoingHttpHeaders = { ...headers, 'content-length': String(plan.body.length) }
+  delete out['transfer-encoding']
+  delete out.expect
+  return out
+}

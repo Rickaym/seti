@@ -64,6 +64,6 @@ describe('the model selector', () => {
 
   it('says a Codex start asks only when the rules do not decide', () => {
     expect(codexHint(false)).toBe('Codex: sandboxed; asks before each call.')
-    expect(codexHint(true)).toBe('Codex: sandboxed; asks unless rules allow.')
+    expect(codexHint(true)).toBe('Codex: sandboxed; asks unless your rules allow.')
   })
 })

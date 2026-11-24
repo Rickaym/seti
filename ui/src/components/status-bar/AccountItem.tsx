@@ -25,7 +25,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { activeLogin, switchLogin, useAccount } from '@/hooks/useAccount'
-import { navigate } from '@/lib/route'
+import { openSettingsCard } from '@/lib/route'
 import { cn } from '@/lib/utils'
 
 const ICON: Record<AccountHealthState, LucideIcon> = {
@@ -117,7 +117,7 @@ const STATE_WORDS: Record<AccountHealthState, string> = {
 }
 
 const openSettings = () => {
-  navigate('settings', 'account')
+  openSettingsCard('runtimes', 'claude')
 }
 
 /** The saved logins, the one in use ticked; picking another switches Claude Code to it. */
