@@ -102,6 +102,15 @@ export function proofSuite(split: boolean): void {
       expect(last).toContain('The user restarted your Codex session from Seti')
     }, 120_000)
 
+    it("runs the user's MCP server in the sandbox, asks about its call, and lets the user's rule allow it", async () => {
+      const { asked, ruled, started } = await run.mcpTurns(task)
+      expect(asked, 'a read-only tool of a user server is still asked about').toEqual(['mcp__proof__peek'])
+      expect(ruled, "the user's allow rule decides the second call").toEqual([])
+      const last = run.model.fake.bodies.at(-1) ?? ''
+      expect(last.split('PROOF PEEKED').length - 1, 'both calls ran').toBe(2)
+      expect(started.trim().split('\n'), 'one server process, without the model key').toEqual(['PROOF nokey'])
+    }, 180_000)
+
     it("asks Claude for a second opinion through Seti's tool relay and hears its answer as data", async () => {
       await run.asksOpinion(task)
       const told = run.model.told()

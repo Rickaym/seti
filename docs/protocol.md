@@ -207,6 +207,12 @@ between two steps; an interrupt; a hook at subagent start.
   runtime that would offer skills from a folder the agent can write (its home, its runtime's
   folder or its working folder) MUST NOT offer them; the control room lists the user's skills in
   its own instructions instead, and the runtime's own skills folder starts empty in each process.
+- KIT-3: The user's tool servers reach an agent on every runtime that takes their transport, with
+  the filter a sandboxed agent's servers pass: no value of their own, or a remote server the egress
+  proxy signs on its host. A local server runs inside the agent's sandbox, never in the control
+  room. Every call to a user's tool server MUST pass the control room's gate whatever the tool or
+  the runtime says of it; where rules decide, a call runs unasked only when a rule of the user's
+  names its server or tool. A server definition the agent writes MUST NOT load.
 
 ## 4. Turn lifecycle
 
