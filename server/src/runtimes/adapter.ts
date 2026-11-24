@@ -115,6 +115,8 @@ export interface DreamSession {
 export interface DreamSupport {
   /** The folder the agent's own sessions keep their memory in, for its working folder. */
   memory: (cwd: string) => string
+  /** The memory folder the agent's sessions load at their start, where it is not `memory`'s. */
+  loaded?: (cwd: string) => string
   /**
    * Starts a dream: the runtime's read, search, edit and shell tools and the host's, no question
    * tool, subagents, web, plugins or other tool servers, and a call the gate refuses is denied,

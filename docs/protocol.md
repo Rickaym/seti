@@ -979,7 +979,8 @@ Optional and off by default: a maintenance session per agent that consolidates i
   the agent's transcript since its last dream, built from neutral events, at most
   `dream_digest` characters, with credentials redacted and the user's messages and failures kept
   first. Its prompt names the other memory folders the agent's sessions see (its checkouts'),
-  which it reads before it writes and may not change.
+  which it reads before it writes and may not change. When it changed memory that the agent's
+  sessions do not load, because they load their repository's, its report says so in one line.
 - DRM-7: A dream MUST NOT start or change a turn of the agent, post, send an update, push or
   notify, or enter Needs you. Its outcome is one stored report, also written beside the digest,
   and the agent's next turn is told once which dreams changed its memory.

@@ -224,6 +224,14 @@ async function dreamSession(job: DreamJob, tally: Tally, night: string): Promise
   await follow(session, job, tally)
 }
 
+/** Seti's line for a dream that changed memory the agent's sessions do not load. */
+function unloaded(job: DreamJob, changes: number): string[] {
+  const loaded = job.dream.loaded?.(job.task.cwd) ?? job.memory
+  return changes > 0 && loaded !== job.memory
+    ? ["Seti: the agent's sessions load its repository's memory, not this folder, so they do not see these notes yet."]
+    : []
+}
+
 /**
  * Runs one dream to its end: writes the day's digest, runs the session in the agent's maintenance
  * sandbox, records each memory file it changed as a revision, and stores the outcome with its
@@ -241,7 +249,7 @@ export async function runDream(job: DreamJob): Promise<DreamRun | undefined> {
   }
   const after = await recordAfter(job.task.id, job.run, job.memory, job.before)
   forgetBefore(job.task.id, job.run.id)
-  const found = [...(tally.report?.found ?? []), ...after.found].slice(0, 10)
+  const found = [...(tally.report?.found ?? []), ...unloaded(job, after.changes), ...after.found].slice(0, 10)
   const report = tally.report === null ? null : { ...tally.report, found }
   const end: DreamEnd = {
     state: tally.end?.state ?? 'done',

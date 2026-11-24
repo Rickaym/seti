@@ -1,7 +1,7 @@
 import { query, type Options, type Query, type SDKMessage } from '@anthropic-ai/claude-agent-sdk'
 import { projectClaude } from '@seti/shared'
 import type { RuntimeAdapter, SessionInput } from '../adapter.js'
-import { claudeMemory, dreamOptions } from './dream.js'
+import { claudeLoadedMemory, claudeMemory, dreamOptions } from './dream.js'
 import { claudePrompt } from './input.js'
 import { realise } from './realise.js'
 import { rewoundOptions } from './resume.js'
@@ -22,6 +22,7 @@ export const claudeAdapter: RuntimeAdapter<ClaudeShapes, 'claude'> = {
     compaction: true,
     dream: {
       memory: claudeMemory,
+      loaded: claudeLoadedMemory,
       open: async (spec, launcher, host, abortController) => {
         const options = dreamOptions(spec, launcher, host, abortController)
         return Promise.resolve(claudeSession(transport({ prompt: claudePrompt(once(spec.prompt)), options }), false))
