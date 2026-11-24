@@ -12,6 +12,12 @@ export const refusedHostLines = {
     const row = rows.at(0)
     return row === undefined ? undefined : { id: row.id, count: Number(row.count ?? 1) }
   },
+  /** How many refused hosts the task's transcript names. */
+  hosts: async (taskId: string): Promise<number> => {
+    const rows = await sql<{ n: string }[]>`SELECT count(*) AS n FROM task_message
+      WHERE task_id = ${taskId} AND kind = 'seti' AND (payload::json ->> 'refused_host') IS NOT NULL`
+    return Number(rows.at(0)?.n ?? 0)
+  },
   /** Sets the refusals a line counts. */
   count: async (taskId: string, id: number, count: number): Promise<void> => {
     await sql`UPDATE task_message

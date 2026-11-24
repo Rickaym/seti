@@ -1,4 +1,5 @@
-import { Check, Globe, ShieldBan } from 'lucide-react'
+import { hostFlags } from '@seti/shared'
+import { Check, Globe, ShieldBan, TriangleAlert } from 'lucide-react'
 import { useId, useState } from 'react'
 import { toast } from 'sonner'
 import { apiPost, errorText } from '@/api'
@@ -48,6 +49,12 @@ export function RefusedHostLine({ taskId, host, count }: { taskId: string; host:
       </PopoverTrigger>
       <PopoverContent side="top" className="w-auto max-w-72 gap-2 text-xs">
         <p>Lets the agent reach {host} from its next request.</p>
+        {hostFlags(host).map((flag) => (
+          <p key={flag} className="flex items-center gap-1 text-warning-text">
+            <TriangleAlert className="size-3 shrink-0" aria-hidden />
+            {flag}
+          </p>
+        ))}
         <span className="flex items-center gap-1.5 text-muted-foreground">
           <Switch id={scopeId} size="sm" checked={everyAgent} onCheckedChange={setEveryAgent} />
           <label htmlFor={scopeId}>All agents</label>

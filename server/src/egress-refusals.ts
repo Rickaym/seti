@@ -1,5 +1,8 @@
 const FLUSH_MS = 5000
 
+/** The most refused hosts one agent's transcript names; refusals of further hosts go unreported. */
+export const MAX_REFUSED_HOSTS = 20
+
 /**
  * Counts a task's refused hosts on the node and reports each: the first refusal at once, then
  * the running count at most every few seconds while refusals go on, so retries never flood it.
@@ -9,8 +12,10 @@ export function refusalReporter(report: (host: string, count: number) => void): 
   return (host) => {
     const seen = counts.get(host)
     if (seen === undefined) {
-      counts.set(host, { count: 1, timer: null })
-      report(host, 1)
+      if (counts.size < MAX_REFUSED_HOSTS) {
+        counts.set(host, { count: 1, timer: null })
+        report(host, 1)
+      }
       return
     }
     seen.count += 1
