@@ -62,8 +62,9 @@ function serverSettings(servers: Record<string, StdioServer>, shared: StdioServe
  * Terminals for `tty` commands are off, so nothing typed into a running command escapes a
  * decision; hooks, plugins, apps, goals, memories, skills, analytics and hosted web search are
  * off. Commands get no shell snapshot, which every later command would source, and the sandbox's
- * search path, which leaves out the helper folder Codex makes in its writable home. Approvals go
- * to Seti, never to a reviewer model.
+ * search path, which leaves out the helper folder Codex makes in its writable home. The model
+ * sends a summary of its reasoning, which Seti's models leave out unless asked. Approvals go to
+ * Seti, never to a reviewer model.
  */
 function overrides(provider: CodexProvider, model: string, searchPath: string | undefined): Setting[] {
   return [
@@ -87,6 +88,7 @@ function overrides(provider: CodexProvider, model: string, searchPath: string | 
     ['features.memories', false],
     ['features.shell_snapshot', false],
     ['skills.include_instructions', false],
+    ['model_reasoning_summary', 'auto'],
     ['approvals_reviewer', 'user'],
     ['analytics.enabled', false],
     ['web_search', 'disabled'],

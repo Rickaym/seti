@@ -1,6 +1,6 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http'
 import type { AddressInfo } from 'node:net'
-import { echoOf, type ScriptCall, type Step } from '../conformance/script.js'
+import { echoOf, SEALED_REASONING, type ScriptCall, type Step } from '../conformance/script.js'
 
 /** One output item of the OpenAI Responses API, as the scripted model sends it. */
 type OutputItem = Record<string, unknown> & { type: string; id: string }
@@ -26,12 +26,23 @@ const say = (text: string): OutputItem => ({
   content: [{ type: 'output_text', text, annotations: [] }],
 })
 
-const think = (text: string): OutputItem => ({
+/** What a request asks of reasoning: a summary unless it names none, and the sealed content. */
+function reasoningAsked(body: unknown): { summary: boolean; sealed: boolean } {
+  const { reasoning, include } = body as { reasoning?: { summary?: unknown }; include?: unknown }
+  const summary = reasoning?.summary
+  return {
+    summary: typeof summary === 'string' && summary !== 'none',
+    sealed: Array.isArray(include) && include.includes('reasoning.encrypted_content'),
+  }
+}
+
+/** Reasoning as the API sends it: like the models Seti offers, no summary unless asked for one. */
+const think = (text: string, asked: { summary: boolean; sealed: boolean }): OutputItem => ({
   type: 'reasoning',
   id: nextId('rs'),
-  summary: [{ type: 'summary_text', text }],
+  summary: asked.summary ? [{ type: 'summary_text', text }] : [],
   content: [],
-  encrypted_content: null,
+  encrypted_content: asked.sealed ? SEALED_REASONING : null,
 })
 
 /** The step ends a model response: Codex answers a call, and a held response never ends. */
@@ -163,10 +174,11 @@ export class ScriptedResponses {
         // A tool server's tools are deferred: the model searches first and calls in its next response.
         state.done -= 1
         const before = steps.slice(0, -1).filter((step) => !waits(step))
-        stream(res, [...before.map((step) => this.item(step, said.texts)), search(unsearched)], Promise.resolve())
+        const searched = [...before.map((step) => this.item(step, said.texts, body)), search(unsearched)]
+        stream(res, searched, Promise.resolve())
         return
       }
-      const items = steps.filter((step) => !waits(step)).map((step) => this.item(step, said.texts))
+      const items = steps.filter((step) => !waits(step)).map((step) => this.item(step, said.texts, body))
       stream(res, items, this.endOf(steps))
     })
   }
@@ -231,12 +243,12 @@ export class ScriptedResponses {
     return { steps, state }
   }
 
-  private item(step: Step, texts: readonly string[]): OutputItem {
+  private item(step: Step, texts: readonly string[], body: unknown): OutputItem {
     if ('say' in step) {
       return say(step.say)
     }
     if ('think' in step) {
-      return think(step.think)
+      return think(step.think, reasoningAsked(body))
     }
     if ('recall' in step) {
       return say(texts.join('|'))
