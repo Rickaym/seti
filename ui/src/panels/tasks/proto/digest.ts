@@ -52,7 +52,7 @@ export type ChatItem =
   | { type: 'work'; span: WorkSpan }
 
 /** A team chat message, or a channel event a person wrote, such as a Slack thread reply. */
-export const personOf = (input: TaskInput): PersonInput | null => {
+const personOf = (input: TaskInput): PersonInput | null => {
   if (input.source === 'team') {
     return input
   }
