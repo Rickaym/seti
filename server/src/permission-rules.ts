@@ -267,7 +267,8 @@ export async function answerPermission(
   }
   await auditAnswer(task, settled, input, edited)
   const always = input.decision === 'always'
-  const result = input.decision === 'deny' ? denied(message) : allowed(settled, call, permissionModeOf(task), always)
+  const result =
+    input.decision === 'deny' ? denied(message) : allowed(settled, call, await permissionModeOf(task), always)
   await resolveRequest(settled, result)
   if (late) {
     await deliverLateDecision(settled)

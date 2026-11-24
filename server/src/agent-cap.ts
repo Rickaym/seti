@@ -1,5 +1,6 @@
 import { AWS_ACCESS_ID, DEFAULT_PROFILE_ID, type AccessChoice, type Task } from '@seti/shared'
 import { effectiveAccess } from './agent-access.js'
+import { ceilingNote, ceilingOf, type ApprovalCeiling } from './approval-ceiling.js'
 import { mcpCatalog } from './mcp-selection.js'
 import { accessDefaults } from './store/access.js'
 import { setiPlugins } from './store/plugins.js'
@@ -7,7 +8,7 @@ import { sshHostStore } from './store/ssh.js'
 
 /**
  * What an agent at Seti control Full may hand on to the agents it starts or imports: at most
- * what it reaches itself, always sandboxed and at Seti control Self.
+ * what it reaches itself, always sandboxed and at Seti control Self, and approvals no looser.
  */
 export interface AccessCap {
   /** The agent the cap comes from, named in what it holds back. */
@@ -17,6 +18,8 @@ export interface AccessCap {
   aws: boolean
   mcp: ReadonlySet<string>
   plugins: ReadonlySet<string>
+  /** The approval ceiling its agents get, so none settles calls more loosely than it does. */
+  approvals: ApprovalCeiling | null
 }
 
 export async function capOf(caller: Task): Promise<AccessCap> {
@@ -29,6 +32,7 @@ export async function capOf(caller: Task): Promise<AccessCap> {
     aws: on('aws').size > 0,
     mcp: on('mcp'),
     plugins: on('plugin'),
+    approvals: await ceilingOf(caller),
   }
 }
 
@@ -37,7 +41,7 @@ export interface CappedStart {
   access: AccessChoice[]
   mcp_disabled: string[]
   disabled_plugin_ids: string[]
-  /** What the defaults would have given beyond the cap, for the agent's setup note. */
+  /** What the cap held back, for the agent's setup note. */
   held: string[]
 }
 
@@ -61,11 +65,14 @@ export async function capStart(cap: AccessCap): Promise<CappedStart> {
     mcp_disabled: mcp,
     disabled_plugin_ids: pluginsOff.map((plugin) => plugin.id),
     held: [
-      ...ssh.map((host) => `SSH ${host.alias}`),
-      ...(aws ? ['AWS'] : []),
-      ...servers.filter((s) => s.default_enabled && !cap.mcp.has(s.name)).map((s) => `MCP ${s.name}`),
-      ...pluginsOff.map((plugin) => `plugin ${plugin.name}`),
-    ].map((item) => `${item}: beyond what ${cap.title} has`),
+      ...[
+        ...ssh.map((host) => `SSH ${host.alias}`),
+        ...(aws ? ['AWS'] : []),
+        ...servers.filter((s) => s.default_enabled && !cap.mcp.has(s.name)).map((s) => `MCP ${s.name}`),
+        ...pluginsOff.map((plugin) => `plugin ${plugin.name}`),
+      ].map((item) => `${item}: beyond what ${cap.title} has`),
+      ...(cap.approvals === null ? [] : [ceilingNote(cap.title)]),
+    ],
   }
 }
 
@@ -83,5 +90,6 @@ export async function defaultsBeyond(cap: AccessCap): Promise<string[]> {
     ...(awsDefaults[AWS_ACCESS_ID] === true && !cap.aws ? ['AWS'] : []),
     ...servers.flatMap((s) => (s.default_enabled && !cap.mcp.has(s.name) ? [`MCP ${s.name}`] : [])),
     ...plugins.flatMap((p) => (p.enabled && !cap.plugins.has(p.id) ? [`plugin ${p.name}`] : [])),
+    ...(cap.approvals === null ? [] : ["Claude Code's classifier, which decides calls a Codex agent asks about"]),
   ]
 }

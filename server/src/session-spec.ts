@@ -99,7 +99,7 @@ async function sessionSpec(task: Task): Promise<SessionSpec> {
     resume: task.session_id,
     cwd: task.cwd,
     dirs: workingDirs(task),
-    mode: task.runtime === 'codex' ? 'default' : permissionModeOf(task),
+    mode: task.runtime === 'codex' ? 'default' : await permissionModeOf(task),
     instructions: { append: await systemAppend(task.id) },
     setiControl: task.seti_control,
     setiDreams: await dreamsOn(task),

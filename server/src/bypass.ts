@@ -2,7 +2,7 @@ import type { PermissionMode } from '@anthropic-ai/claude-agent-sdk'
 import { bypassOn, type BypassHours, type BypassState, type Task } from '@seti/shared'
 import { audit } from './audit.js'
 import { inBackground } from './background.js'
-import { PERMISSION_MODE } from './config.js'
+import { permissionModeOf } from './bypass-mode.js'
 import { tasks } from './db.js'
 import { refuseAgent } from './ea-guard.js'
 import { controlLink } from './node-link.js'
@@ -49,7 +49,7 @@ async function expire(taskId: string, until: string): Promise<void> {
     summary: `Bypass of task "${task.title}" ended`,
     detail: { title: task.title, until },
   })
-  await applyLive(taskId, PERMISSION_MODE)
+  await applyLive(taskId, await permissionModeOf({ ...task, bypass_until: null }))
   await note(task, NOTES.expired, false)
 }
 
@@ -89,7 +89,7 @@ export async function setBypass(task: Task, hours: BypassHours | null): Promise<
         : `Turned Bypass on for task "${task.title}" for ${String(hours)} hours`,
     detail: { title: task.title, until, ...(hours === null ? {} : { hours }) },
   })
-  const applied = await applyLive(task.id, until === null ? PERMISSION_MODE : 'bypassPermissions')
+  const applied = await applyLive(task.id, await permissionModeOf({ ...task, bypass_until: until }))
   await note(task, hours === null ? NOTES.off : NOTES.on(hours), hours !== null)
   return { bypass_until: until, applied }
 }

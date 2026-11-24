@@ -159,7 +159,7 @@ interface Ask {
 /** The call the user allowed after a restart cut it off runs once without a second request. */
 async function allowedAlready(taskId: string, ask: Ask, hash: string): Promise<PermissionResult | null> {
   const task = takeGrant(taskId, hash) ? await tasks.get(taskId) : undefined
-  return task === undefined ? null : allowed({ tool_name: ask.tool }, ask.input, permissionModeOf(task))
+  return task === undefined ? null : allowed({ tool_name: ask.tool }, ask.input, await permissionModeOf(task))
 }
 
 /** Waits again on a request a node's ask recorded before this control plane restarted. */
