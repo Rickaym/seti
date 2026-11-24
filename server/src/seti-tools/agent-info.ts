@@ -231,7 +231,7 @@ function digestText(lines: readonly DigestLine[]): string[] {
 const getTask = setiTool({
   name: 'get_task',
   description:
-    'One agent in detail: status, a condensed recent transcript, its todo list, updates waiting for it, running subagents and counts of the rest, where it works, its setup, cost at API prices, linked PRs and the Slack threads it posted in and follows for replies. For an earlier day use read_transcript.',
+    'One agent in detail: status, a condensed recent transcript, its todo list, updates waiting for it, running subagents and counts of the rest, where it works, its setup, cost at API prices, the Slack threads it posted in and follows for replies, and linked PRs. For an earlier day use read_transcript.',
   input: { task: taskRef },
   run: async ({ task: ref }) => {
     const task = await anyTask(ref)
