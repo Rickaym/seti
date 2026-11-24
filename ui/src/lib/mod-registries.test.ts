@@ -58,7 +58,7 @@ describe('the registries mods add to', () => {
 
   it('list About only while a mod adds a part to it, and put news on the page it is on', () => {
     const appPages = () => settingsGroups()[0]?.pages.map((page) => page.key)
-    expect(appPages()).toEqual(['general', 'notifications', 'ea'])
+    expect(appPages()).toEqual(['general', 'notifications', 'ea', 'json'])
     expect(isSettingsPage('about')).toBe(false)
     let unseen = false
     const disposers = [
@@ -70,7 +70,7 @@ describe('the registries mods add to', () => {
         news: { subscribe: () => () => undefined, get: () => unseen },
       }),
     ]
-    expect(appPages()).toEqual(['general', 'notifications', 'ea', 'about'])
+    expect(appPages()).toEqual(['general', 'notifications', 'ea', 'json', 'about'])
     expect(headerViews.list().map((view) => view.key)).toEqual(['sample.band'])
     expect(newsEntries.list().filter((entry) => entry.news.get())).toEqual([])
     unseen = true

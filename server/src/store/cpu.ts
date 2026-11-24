@@ -1,5 +1,5 @@
 import type { CpuCap } from '@seti/shared'
-import { now, sql } from '../db.js'
+import { now, sql, type Db } from '../db.js'
 
 interface CapRow {
   quota_percent: number | null
@@ -12,8 +12,8 @@ export const cpuSettings = {
     const [row] = await sql<CapRow[]>`SELECT quota_percent, updated_at FROM cpu_settings WHERE id = 1`
     return row === undefined ? null : { cap: { quota_percent: row.quota_percent }, updated_at: row.updated_at }
   },
-  set: async (cap: CpuCap): Promise<void> => {
-    await sql`INSERT INTO cpu_settings (id, quota_percent, updated_at) VALUES (1, ${cap.quota_percent}, ${now()})
+  set: async (cap: CpuCap, db: Db = sql): Promise<void> => {
+    await db`INSERT INTO cpu_settings (id, quota_percent, updated_at) VALUES (1, ${cap.quota_percent}, ${now()})
       ON CONFLICT (id) DO UPDATE SET quota_percent = excluded.quota_percent, updated_at = excluded.updated_at`
   },
 }

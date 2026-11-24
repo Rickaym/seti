@@ -1,4 +1,3 @@
-import { type WireRow, jsonText, type CodeLanguage } from '@seti/shared'
 import {
   Activity,
   AlertTriangle,
@@ -10,7 +9,6 @@ import {
   Globe,
   ListTodo,
   Loader2,
-  Maximize2,
   Plug,
   Search,
   ShieldAlert,
@@ -19,13 +17,8 @@ import {
   X,
   type LucideIcon,
 } from 'lucide-react'
-import { useMemo, useState, type ReactNode } from 'react'
-import { toast } from 'sonner'
-import { apiGet, errorText } from '@/api'
-import { CODE_COPY, CODE_COPY_ROOM, CopyIconButton } from '@/components/CopyButton'
+import { type ReactNode } from 'react'
 import { Hint } from '@/components/Hint'
-import { HighlightedCode } from '@/components/highlight/HighlightedCode'
-import { Button } from '@/components/ui/button'
 import { useNow } from '@/hooks/useNow'
 import { elapsedLabel } from '@/lib/time'
 import {
@@ -39,18 +32,17 @@ import {
   type ToolKind,
 } from '@/lib/tool-summary'
 import {
-  fullCommandText,
   fullInputText,
   fullResultText,
-  inputString,
   resultText,
   type BackgroundStatus,
   type ToolResultRef,
   type ToolUseBlock,
 } from '@/lib/transcript'
 import { cn } from '@/lib/utils'
-import { asEvents } from '@/lib/wire'
 import { ToolFileButton } from '@/panels/files/FileLink'
+import { CallInput } from '@/panels/tasks/ToolInput'
+import { TrimmedText } from '@/panels/tasks/TrimmedText'
 
 /** The file a call that edits one changes, whose card links to it in Files. */
 const touchedFile = (block: ToolUseBlock) => {
@@ -74,72 +66,6 @@ const ICONS: Record<ToolKind, LucideIcon> = {
 export function ToolKindIcon({ kind, className }: { kind: ToolKind; className?: string }) {
   const Icon = ICONS[kind]
   return <Icon aria-hidden className={cn('size-3.5 shrink-0', className)} />
-}
-
-export interface FullSource {
-  taskId: string
-  rowId: number
-  toolUseId: string
-  pick: (row: WireRow, toolUseId: string) => string
-}
-
-interface TrimmedTextProps {
-  text: string
-  /** Where to fetch the full text from, or null when `text` is complete. */
-  source: FullSource | null
-  label: string
-  className: string
-  /** The copy button's name, such as Copy command. */
-  copy?: string
-  /** Colours the text as this language; left out, JSON is found, indented and coloured. */
-  language?: CodeLanguage
-}
-
-/** The text to show and its language: JSON comes back indented when no language is given. */
-function shownCode(text: string, language: CodeLanguage | undefined): { code: string; language: CodeLanguage | null } {
-  if (language !== undefined) {
-    return { code: text, language }
-  }
-  const json = jsonText(text)
-  return json === null ? { code: text, language: null } : { code: json, language: 'json' }
-}
-
-export function TrimmedText({ text, source, label, className, copy = 'Copy code', language }: TrimmedTextProps) {
-  const [full, setFull] = useState<string | null>(null)
-  const [loading, setLoading] = useState(false)
-  const shown = useMemo(() => shownCode(full ?? text, language), [full, text, language])
-
-  const load = async (from: FullSource) => {
-    setLoading(true)
-    try {
-      const row = await apiGet<WireRow>(asEvents(`/tasks/${from.taskId}/messages/${String(from.rowId)}`))
-      setFull(from.pick(row, from.toolUseId))
-    } catch (e) {
-      toast.error(errorText(e))
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  return (
-    <>
-      <div className="group/code relative">
-        <pre className={cn('overflow-auto break-all whitespace-pre-wrap', CODE_COPY_ROOM, className)}>
-          <HighlightedCode code={shown.code} language={shown.language} />
-        </pre>
-        <CopyIconButton text={shown.code} label={copy} className={CODE_COPY} />
-      </div>
-      {source !== null && full === null && (
-        <div className="flex items-center gap-2 text-muted-foreground">
-          <span>Trimmed for display.</span>
-          <Button variant="outline" size="xs" disabled={loading} onClick={() => void load(source)}>
-            <Maximize2 />
-            {loading ? 'Loading...' : label}
-          </Button>
-        </div>
-      )}
-    </>
-  )
 }
 
 export function ToolOutput({ taskId, result }: { taskId: string; result: ToolResultRef }) {
@@ -281,36 +207,6 @@ export function CallStatus({ block, startedAt, result, running, background }: St
   )
 }
 
-const COMMAND_KEYS = new Set(['command', 'description'])
-
-/** The input of a shell call: its description, the full command to copy, and any other options. */
-function CommandInput({ block, source }: { block: ToolUseBlock; source: FullSource | null }) {
-  const command = inputString(block.input, 'command') ?? ''
-  const description = inputString(block.input, 'description')
-  const options =
-    typeof block.input === 'object' && block.input !== null
-      ? Object.entries(block.input).filter(([key]) => !COMMAND_KEYS.has(key))
-      : []
-  return (
-    <>
-      {description !== undefined && <p className="text-muted-foreground">{description}</p>}
-      <TrimmedText
-        text={command}
-        source={source === null ? null : { ...source, pick: fullCommandText }}
-        label="Full command"
-        className="max-h-64 border border-border bg-background/60 py-1.5 pr-8 pl-2"
-        copy="Copy command"
-        language="bash"
-      />
-      {options.length > 0 && (
-        <p className="text-muted-foreground">
-          {options.map(([key, value]) => `${key}: ${JSON.stringify(value)}`).join(' | ')}
-        </p>
-      )}
-    </>
-  )
-}
-
 /** The tool's icon and name, and one line saying what the call does. */
 function CallName({ block }: { block: ToolUseBlock }) {
   const name = toolName(block.name)
@@ -330,15 +226,6 @@ function CallName({ block }: { block: ToolUseBlock }) {
         {summary}
       </span>
     </>
-  )
-}
-
-function CallInput({ block, source }: { block: ToolUseBlock; source: FullSource | null }) {
-  if (inputString(block.input, 'command') !== undefined) {
-    return <CommandInput block={block} source={source} />
-  }
-  return (
-    <TrimmedText text={JSON.stringify(block.input, null, 2)} source={source} label="Full input" className="max-h-64" />
   )
 }
 
@@ -395,7 +282,7 @@ export function ToolCall({
         </>
       }
     >
-      <CallInput block={block} source={inputSource} />
+      <CallInput block={block} source={inputSource} taskId={taskId} />
       {result ? (
         <div className="space-y-2 border-t border-border pt-2">
           <ToolOutput taskId={taskId} result={result} />

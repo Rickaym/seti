@@ -73,6 +73,13 @@ static `/pair` page and `/.well-known/assetlinks.json`; `POST /hooks/<id>`; and 
 `/share/<token>`, its `/raw`, `/p/1` to `/p/50` and `/card.png`. The app's own page and static
 files need no API credential; on a public hostname they sit behind Access when Access is set up.
 
+## The settings document
+
+`GET /api/settings-doc` gives every stored setting as one JSON document. A secret appears only as
+`set` or `not set` beside a name; the builder reads the views the settings pages read, which never
+carry a value. The EA gets plain configuration only, with security settings left out; agents,
+mods and paired devices are refused (CFG-1 to CFG-3). The document only reads: no route writes it.
+
 ## Where each secret lives
 
 | Secret                             | Stored as                              | Read by                     |
@@ -101,6 +108,17 @@ create what is missing; production never creates a key file and stops naming the
 bound to their name, never leave the server, and are set and cleared in Settings, Credentials and
 Settings, Connections. The host's `gh` login, which the PR views use, is neither stored nor read
 by Seti. Seti keeps `~/.seti` owner-only and tightens anything more open at startup.
+
+## What Seti downloads
+
+Seti downloads one program by itself: OpenAI's Codex, and only after you turn Codex on in
+Settings, Runtimes. It fetches the version pinned in `server/src/runtimes/codex/pin.json` from the
+npm registry (`registry.npmjs.org`), when you turn Codex on, when you press Retry, and at a start
+of Seti after an upgrade moved the pin while Codex is on. It contacts no other host, follows no
+redirect, and checks the package's sha512 integrity and the program's sha256 against the pin
+before anything runs; a mismatch deletes the download. The program lives alone in
+`~/.seti/codex/<version>/`, read and run only, mounted read-only into each Codex agent's sandbox,
+and each install, failure and removal is in the audit log with the version and checksum.
 
 ## What is not protected
 

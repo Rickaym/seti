@@ -3,6 +3,7 @@ import { Registry, type Disposer } from '@seti/shared'
 import {
   Bell,
   Blocks,
+  Braces,
   BotMessageSquare,
   Cpu,
   FolderGit2,
@@ -35,6 +36,7 @@ export type SettingsPageKey =
   | 'notifications'
   | 'ea'
   | 'about'
+  | 'json'
   | 'agents'
   | 'repos'
   | 'resources'
@@ -88,6 +90,7 @@ const CORE_GROUPS: { group: SettingsGroup; pages: (Omit<SettingsPage, 'group'> &
       },
       { key: 'notifications', label: 'Notifications', icon: Bell, keywords: 'push sound' },
       { key: 'ea', label: 'EA', icon: Headset, keywords: 'assistant voice microphone wake word' },
+      { key: 'json', label: 'JSON', icon: Braces, keywords: 'settings json export copy every setting document' },
     ],
   },
   {

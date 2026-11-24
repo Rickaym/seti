@@ -44,8 +44,18 @@ function serverOf(name: string, calls: ScriptCall[], effects: string): RelayedSe
     call: async (tool, args, signal) => {
       const call = calls.find((each) => each.tool === `${name}.${tool}`)
       appendFileSync(effects, `${name}.${tool} ${JSON.stringify(args)}\n`)
-      if (call?.hold === true) {
-        await cancelled(signal)
+      const answered = await Promise.race([
+        cancelled(signal).then(() => false),
+        new Promise<boolean>((resolve) => {
+          if (call?.hold !== true) {
+            setTimeout(() => {
+              resolve(true)
+            }, call?.delayMs ?? 0)
+          }
+        }),
+      ])
+      if (!answered) {
+        appendFileSync(effects, `cancelled ${name}.${tool}\n`)
       }
       return { content: [{ type: 'text', text: call?.output ?? '' }], isError: call?.fails === true }
     },
