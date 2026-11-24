@@ -18,9 +18,9 @@ const escape = (key: string) => key.replaceAll('~', '~0').replaceAll('/', '~1')
 const unescape = (key: string) => key.replaceAll('~1', '/').replaceAll('~0', '~')
 
 /** A path as a JSON Pointer (RFC 6901), the key of a settings revision's state. */
-export const pointerOf = (path: DocPath) => path.map((key) => `/${escape(key)}`).join('')
+const pointerOf = (path: DocPath) => path.map((key) => `/${escape(key)}`).join('')
 
-export const pathOf = (pointer: string): string[] => pointer.split('/').slice(1).map(unescape)
+const pathOf = (pointer: string): string[] => pointer.split('/').slice(1).map(unescape)
 
 /** The smallest parts that changed: objects on both sides recurse, anything else is one part. */
 export function changedParts(from: unknown, to: unknown, at: DocPath = []): DocPath[] {
