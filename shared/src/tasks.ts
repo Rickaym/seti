@@ -164,6 +164,8 @@ export const updateTaskInput = z.object({
   notifications_muted: z.boolean().optional(),
   /** Only false: takes the user's home folders out of an older agent's sandbox for good. */
   home_access: z.literal(false).optional(),
+  /** Only true: drops the agent's own access choices, after a credential change when both come. */
+  reset_access: z.literal(true).optional(),
 })
 
 export const taskPrInput = z.object({ url: prUrl })

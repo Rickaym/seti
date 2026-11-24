@@ -74,6 +74,8 @@ export interface ProfileSummary {
   name: string
   builtin: boolean
   agents: number
+  /** How many items its access set names; 0 when its agents follow the defaults alone. */
+  access_items: number
 }
 
 export const profileAwsInput = awsSettingsInput
