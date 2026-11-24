@@ -1006,7 +1006,10 @@ Optional and off by default: a maintenance session per agent that consolidates i
   and removal is audited with path and bytes, never content.
 - DRM-12: A turn of the agent that starts during its dream cuts the dream. A restart cuts it too;
   the memory changes it made before the cut are still recorded. A cut nightly dream is planned
-  once more within its window; cut again, it has failed.
+  once more within its window; cut again, it has failed. A dream ends once: its end is stored
+  with its `dream.ended` event in one transaction, after the events of its memory changes, so no
+  reader finds an ended dream without that event. A restart leaves a dream running until both
+  are stored.
 - DRM-13: A dream stops at its budget per dream (`dream_budget` by default), `dream_steps` or
   `dream_time`, and runs on the model the settings name. Its cost is stored on the dream, not on
   the agent's turns.
