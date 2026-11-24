@@ -1039,6 +1039,11 @@ Optional and off by default: a maintenance session per agent that consolidates i
 - CFG-4: The control room MUST serve every setting's default in the shape of the document, and
   MUST show which settings differ from their default; the document filtered to those differences
   is a merge patch that turns the defaults into the document.
+- CFG-5: A write of the document MUST be a JSON merge patch that applies whole or not at all: it
+  names each invalid path, is refused whole when it names a security setting or a secret, refuses
+  a path whose value changed since the client read it, needs each change with a consequence
+  confirmed, records the audit events the settings pages record and one revision that undoes it,
+  and MUST be refused for the EA, agents, mods and devices.
 
 ## 17. Mods
 
