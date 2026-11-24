@@ -17,7 +17,7 @@ import { prUrl } from './pr-url.js'
 import type { RepoRef } from './repos.js'
 import type { ClaudeMessage } from './runtimes/claude/message.js'
 import type { CodexMessage } from './runtimes/codex/project.js'
-import { ONLY_CODEX_PICKS, onlyCodexPicks, runtimeFields } from './runtimes/settings.js'
+import { runtimeFields } from './runtimes/picks.js'
 import { STORED_RUNTIMES, type StoredRuntime } from './runtimes/stored.js'
 import { DEFAULT_SETI_CONTROL, setiControlLevel, type SetiControlLevel } from './seti-control.js'
 import type { ShellProgress, ShellResult } from './shell.js'
@@ -115,31 +115,29 @@ export const STATUS_LINE_MAX = 60
 export const statusLineText = z.string().trim().max(STATUS_LINE_MAX)
 
 /** A new agent always works in a fresh folder of its own, so a request names no place. */
-export const createTaskInput = z
-  .object({
-    /** Left out, Seti's planner titles the agent from the prompt. */
-    title: z.string().trim().min(1).max(200).optional(),
-    prompt: z.string().trim().min(1, 'prompt is required'),
-    pr_urls: z.array(prUrl).max(MAX_TASK_PRS).optional(),
-    /** Leave out for the packs linked by default. */
-    context_pack_ids: z.array(z.uuid()).optional(),
-    disabled_plugin_ids: disabledPluginIds,
-    /** MCP servers this agent turns on or off against the defaults. */
-    ...mcpChoiceFields,
-    /** Run in Claude Code's sandbox when the sandbox setting is on; off for ssh or cloud CLIs. */
-    sandbox: z.boolean().default(true),
-    /** Overrides against the access defaults, such as ssh hosts or AWS; see effective access. */
-    access: accessChoices,
-    /** The credential profile whose tokens the sandbox proxy adds. */
-    profile_id: z.string().trim().min(1).max(64).default(DEFAULT_PROFILE_ID),
-    /** How far the agent's seti MCP tools reach; a security setting. */
-    seti_control: setiControlLevel.default(DEFAULT_SETI_CONTROL),
-    /** Left out, the agent joins the first workspace. */
-    workspace_id: workspaceId.optional(),
-    /** The runtime the agent runs on, Codex only while the user turned it on, and its model. */
-    ...runtimeFields,
-  })
-  .refine(onlyCodexPicks, ONLY_CODEX_PICKS)
+export const createTaskInput = z.object({
+  /** Left out, Seti's planner titles the agent from the prompt. */
+  title: z.string().trim().min(1).max(200).optional(),
+  prompt: z.string().trim().min(1, 'prompt is required'),
+  pr_urls: z.array(prUrl).max(MAX_TASK_PRS).optional(),
+  /** Leave out for the packs linked by default. */
+  context_pack_ids: z.array(z.uuid()).optional(),
+  disabled_plugin_ids: disabledPluginIds,
+  /** MCP servers this agent turns on or off against the defaults. */
+  ...mcpChoiceFields,
+  /** Run in Claude Code's sandbox when the sandbox setting is on; off for ssh or cloud CLIs. */
+  sandbox: z.boolean().default(true),
+  /** Overrides against the access defaults, such as ssh hosts or AWS; see effective access. */
+  access: accessChoices,
+  /** The credential profile whose tokens the sandbox proxy adds. */
+  profile_id: z.string().trim().min(1).max(64).default(DEFAULT_PROFILE_ID),
+  /** How far the agent's seti MCP tools reach; a security setting. */
+  seti_control: setiControlLevel.default(DEFAULT_SETI_CONTROL),
+  /** Left out, the agent joins the first workspace. */
+  workspace_id: workspaceId.optional(),
+  /** The runtime the agent runs on, Codex only while the user turned it on, and its model. */
+  ...runtimeFields,
+})
 export type CreateTaskInput = z.input<typeof createTaskInput>
 export type CreateTaskRequest = z.output<typeof createTaskInput>
 /** A create request with its title settled, and how the planner set it up when it did. */

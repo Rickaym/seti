@@ -241,6 +241,13 @@ function CallStatus({ block, startedAt, result, running, background }: StatusPro
       </span>
     )
   }
+  if (result.stopped === true) {
+    return (
+      <span className="shrink-0 text-muted-foreground" data-testid="tool-stopped">
+        stopped
+      </span>
+    )
+  }
   if (result.failed) {
     const code = exitCode(resultText(result))
     return (

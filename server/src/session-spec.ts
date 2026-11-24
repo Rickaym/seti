@@ -1,4 +1,4 @@
-import type { CompactRule, Task } from '@seti/shared'
+import { effortLevel, type CompactRule, type Task } from '@seti/shared'
 import { claudeRules } from './approval-ceiling.js'
 import { permissionModeOf } from './bypass-mode.js'
 import { hostLoginKey } from './claude-logins.js'
@@ -88,8 +88,18 @@ async function codexVendor(task: Task): Promise<CodexShapes['vendor']> {
   }
 }
 
+/** A Claude Code agent's plugins, and the model and effort it was started with, if any. */
+async function claudeVendor(task: Task): Promise<DefaultShapes['vendor']> {
+  const effort = effortLevel(task.requested_effort)
+  return {
+    plugins: await taskPluginConfigs(task.id),
+    ...(task.requested_model === null ? {} : { model: task.requested_model }),
+    ...(effort === null ? {} : { effort }),
+  }
+}
+
 const vendorOf = async (task: Task): Promise<SessionSpec['vendor']> =>
-  task.runtime === 'codex' ? codexVendor(task) : { plugins: await taskPluginConfigs(task.id) }
+  task.runtime === 'codex' ? codexVendor(task) : claudeVendor(task)
 
 /** The task's session spec, resuming its session if it has one. */
 async function sessionSpec(task: Task): Promise<SessionSpec> {
@@ -154,7 +164,7 @@ function codexKey(spec: SessionSpec<'codex'>): string {
 /**
  * A digest of the spec's setup. A Claude Code agent's has the layout keys had before runtimes
  * existed, so a process started by an earlier release keeps its key, and its session, across a
- * deploy.
+ * deploy; only an agent started on a picked model or effort has them in its key.
  */
 function specKey(spec: SessionSpec): string {
   if (isCodexSpec(spec)) {
@@ -169,6 +179,8 @@ function specKey(spec: SessionSpec): string {
     ...(setup.dirs.length === 0 ? {} : { additionalDirectories: setup.dirs }),
     ...(setup.bypass ? { allowDangerouslySkipPermissions: true } : {}),
     plugins: setup.vendor.plugins,
+    ...(setup.vendor.model === undefined ? {} : { model: setup.vendor.model }),
+    ...(setup.vendor.effort === undefined ? {} : { effort: setup.vendor.effort }),
     systemPrompt: { type: 'preset', preset: 'claude_code', append: setup.instructions },
     mcp_denied: setup.deniedToolServers,
     shared_tools: setup.toolServers.shared,

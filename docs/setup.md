@@ -500,7 +500,9 @@ Settings, Runtimes; it is off by default, and only you change it.
    agents get. The status then reads Ready. The agent holds a placeholder; the egress proxy puts
    the key on requests to OpenAI's API only. A Codex agent on a credential without such a
    connection is refused at start.
-4. On the start page, turn on Codex beside the message box and start the agent.
+4. On the start page, pick a Codex model in the Model selector beside the message box, and an
+   effort if you want one, then start the agent. The selector lists Codex models only while the
+   status reads Ready.
 
 A Codex agent runs only in the sandbox and asks you before every command, edit and tool call; a
 guard or deny rule still refuses at once. Settings, Runtimes can let Seti's rules answer the

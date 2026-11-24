@@ -9,6 +9,7 @@ import { accessDefaults } from './store/access.js'
 import { contextPacks } from './store/context.js'
 import { profiles } from './store/credentials.js'
 import { sshHostStore } from './store/ssh.js'
+import { containTags } from './update-frames.js'
 
 const PLANNER_MODEL = 'claude-haiku-4-5'
 const PLANNER_TIMEOUT_MS = 8000
@@ -100,7 +101,7 @@ function plannerPrompt(message: string, catalog: PlannerCatalog, titleOnly: bool
         ),
         `AWS: ${awsLine(catalog.aws)}`,
       ]
-  return [...lists, '', '<message>', message, '</message>'].join('\n')
+  return [...lists, '', '<message>', containTags(message, ['message']), '</message>'].join('\n')
 }
 
 export const plannerRequest = (message: string, catalog: PlannerCatalog, titleOnly = false): PlannerRequest => ({

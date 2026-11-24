@@ -1,7 +1,7 @@
 import type { SDKMessage } from '@anthropic-ai/claude-agent-sdk'
 import type { MessageRow } from '@seti/shared'
 import { describe, expect, it } from 'vitest'
-import { indexTranscript, rendersContent, turnReplies } from '@/lib/transcript'
+import { indexTranscript, rendersContent, rowResults, turnReplies } from '@/lib/transcript'
 
 let nextId = 0
 
@@ -97,5 +97,26 @@ describe('rendersContent results', () => {
     expect(rendersContent(result({ num_turns: 2, origin: notice }))).toBe(true)
     expect(rendersContent(result({ num_turns: 0, origin: notice, is_error: true, result: 'boom' }))).toBe(true)
     expect(rendersContent(result({ num_turns: 0 }))).toBe(true)
+  })
+})
+
+describe('the results of calls a stop ended', () => {
+  it('reads a cancelled end as stopped rather than failed', () => {
+    nextId += 1
+    const row = {
+      id: nextId,
+      task_id: 't',
+      outward: [],
+      created_at: '2026-10-02T10:00:00.000Z',
+      kind: 'events' as const,
+      payload: [
+        { v: 1, thread: '', type: 'tool.ended', callId: 'a', status: 'cancelled', result: { text: '', images: 0 } },
+        { v: 1, thread: '', type: 'tool.ended', callId: 'b', status: 'error', result: { text: 'no', images: 0 } },
+      ] as const,
+    }
+    expect(rowResults(row).map((ref) => ({ callId: ref.callId, failed: ref.failed, stopped: ref.stopped }))).toEqual([
+      { callId: 'a', failed: false, stopped: true },
+      { callId: 'b', failed: true, stopped: undefined },
+    ])
   })
 })
