@@ -301,6 +301,7 @@ export function AccessList({
   frozen = false,
   onSetAll,
   onSignIn,
+  unavailable = {},
 }: {
   items: readonly AccessItem[]
   onChange: (item: AccessItem, enabled: boolean | null) => void
@@ -325,6 +326,8 @@ export function AccessList({
   onSetAll?: (items: readonly AccessItem[], enabled: boolean) => void
   /** Opens the OAuth sign-in of an MCP server its latest session could not reach. */
   onSignIn?: (item: AccessItem) => void
+  /** Kinds the agent's runtime cannot use, shown as this in place of their items. */
+  unavailable?: Partial<Record<AccessKind, ReactNode>>
 }) {
   const needle = query.trim().toLowerCase()
   const groups = GROUPS.filter((group) => kinds.includes(group.kind)).flatMap((group) => {
@@ -342,6 +345,18 @@ export function AccessList({
     <div className="flex min-w-0 flex-col gap-3 text-xs">
       {groups.map(({ group, all, rows }) => {
         const Icon = group.icon
+        const away = unavailable[group.kind]
+        if (away !== undefined) {
+          return (
+            <section key={group.kind} aria-label={group.title} className="flex min-w-0 flex-col gap-1">
+              <h4 className="flex items-center gap-1.5 text-2xs font-medium text-muted-foreground">
+                <Icon className="size-3.5" aria-hidden />
+                {group.title}
+                <span className="font-normal">{away}</span>
+              </h4>
+            </section>
+          )
+        }
         const on = all.filter((item) => item.enabled).length
         const free = rows.filter((item) => locked(item) === null)
         return (

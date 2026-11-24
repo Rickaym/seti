@@ -232,7 +232,9 @@ Settings, JSON shows every setting Seti keeps in its database as one JSON docume
 values the other settings pages show: search it, copy a section or export the whole document.
 Secrets appear only as `set` or `not set`, and the page only reads; each setting changes on its
 own page. `GET /api/settings-doc` serves the document and `GET /api/settings-doc/schema` its
-JSON Schema.
+JSON Schema; `GET /api/settings-doc/agents/<id>` and `GET /api/settings-doc/workspaces/<id>` give
+one agent's or one workspace's own settings, with schemas under `/schema/agent` and
+`/schema/workspace`.
 
 Settings Seti reads at start live in `~/.seti/seti.env` (one `NAME=value` per line) and secrets in
 `~/.seti/credentials`, one owner-only file each. Restart Seti after a change:
@@ -425,10 +427,11 @@ Custom opens the form with every field for a service the list does not have. The
 A connection is one service's access, made in Settings, Connections: its name, the hosts it may
 reach (exact or `*.suffix`), how Seti signs in, and the values that takes. Agents see its variable,
 such as `STRIPE`, holding a placeholder that the proxy swaps for the value on those hosts only, in
-the URL and headers (EGR-5 in [the protocol](protocol.md#73-egress)). It never swaps a value into a
-request body, and refuses a request that carries a placeholder in its body unsent (EGR-14). With
-"Seti adds it" on, the proxy also sets a header from a template (`Bearer {{value}}`) on every
-request to those hosts (EGR-7). A connection signs in one of four ways:
+the URL and headers (EGR-5 in [the protocol](protocol.md#73-egress)). With "Seti adds it" on, the
+proxy also sets a header from a template (`Bearer {{value}}`) on every request to those hosts
+(EGR-7). The value goes into a request body only when Body is on for the connection, which it is
+not until you turn it on; without it, the proxy refuses a request that carries a placeholder in
+its body and sends nothing (EGR-14, EGR-15). A connection signs in one of four ways:
 
 - A key the user pastes.
 - OAuth client credentials, with a client secret, Basic auth or a private key JWT (Entra
@@ -441,6 +444,25 @@ request to those hosts (EGR-7). A connection signs in one of four ways:
 For the OAuth kinds Seti mints a short-lived token and mints again after a 401; Test mints one
 without showing it. A connection can be added without its values, which you fill in later. Values
 are write-only. Pollers send a connection by its name.
+
+### Logging in to a web app
+
+An agent that tests a web app often logs in by posting an email and a password, as JSON or a
+form, to the app's login endpoint. The password is a connection like any key, with Body on so the
+proxy swaps it into the request body:
+
+1. In Settings, Connections, add a Custom connection and pick the kind Web login, which starts
+   with Body on.
+2. Name it, such as `staging_login`, and give the app's host, such as `app.staging.example.com`,
+   and the API host too if the login posts there.
+3. Paste the password as its key and switch the connection on in the agent's credential.
+
+The agent sees `STAGING_LOGIN` and posts `{"email": "qa@example.com", "password":
+"$STAGING_LOGIN"}`; the app receives the real password, and nothing else does. Give the agent the
+email in its task, since it is not a secret. Body also swaps into form and plain text bodies and
+multipart text fields, never into a file. A host that echoes a request body back, as some
+validation errors quote the input, can show the value to the agent, so turn Body on only for a
+host you trust; [Security](security.md#connection-values-in-request-bodies) has the trade-off.
 
 A credential is the bundle an agent picks, managed in Settings, Credentials. The built-in Default
 holds what Seti had before credentials; more of them let different agents use different access. A
