@@ -9,7 +9,7 @@ test('a phone picks a Codex model for a new agent with touch-sized selects', asy
     const main = page.getByRole('main')
     await main.getByRole('button', { name: 'New agent' }).tap()
     await expect(main.getByLabel('Message')).toBeVisible()
-    await expect(main.getByRole('combobox', { name: 'Model' })).toHaveCount(0)
+    await expect(main.getByRole('combobox', { name: 'Model' }).locator('optgroup')).toHaveCount(1)
 
     await codexReady(request)
     await page.reload()

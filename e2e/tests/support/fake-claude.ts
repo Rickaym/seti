@@ -74,6 +74,8 @@ interface Options {
   abortController?: AbortController
   env?: Record<string, string | undefined>
   systemPrompt?: { append?: string }
+  /** The model the agent was started on, which the session's start reports as Claude Code does. */
+  model?: string
   /** Seti's launcher, which runs the stand-in in the agent's memory scope like the real one. */
   spawnClaudeCodeProcess?: (options: SpawnOptions) => ChildProcess
 }
@@ -213,7 +215,7 @@ class FakeClaude {
     this.sdk({
       type: 'system',
       subtype: 'init',
-      model: 'claude-fake',
+      model: this.options.model ?? 'claude-fake',
       permissionMode: 'auto',
       cwd: this.options.cwd ?? '',
       tools: [],

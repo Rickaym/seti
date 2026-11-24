@@ -161,7 +161,10 @@ between two steps; an interrupt; a hook at subagent start.
 - RT-10: A new agent's start MAY name a runtime, a model and an effort. A model alone MUST pick the
   one runtime that offers it, and a start naming neither runs on the default runtime with the
   user's default model. A model no runtime offers, a runtime and model that disagree, and an
-  effort the runtime does not offer MUST be refused with the reason.
+  effort the model does not take MUST be refused with the reason, naming the offered models. A
+  runtime's models are the ones it reports for the account, else its stable aliases. An agent
+  started on a model and effort MUST run every session start, restart and resume on them; a
+  fallback switch (RES-14) lasts until the next session start.
 - RT-11: Turning a runtime on installs the version the control room pins, in the background;
   pressing Retry and the control room's start while the runtime is on are the only other
   triggers, and the EA and agents can trigger none of them. The install contacts only the host
@@ -246,7 +249,8 @@ between two steps; an interrupt; a hook at subagent start.
   `The message from the user follows.` and the prompt, or says none came and to act as the task
   requires.
 - UPD-13: Each update is wrapped in a tag by source. Attribute values are escaped, and a body MUST
-  NOT be able to close its tag:
+  NOT be able to open or close any of these tags, in any case or spacing. The planner's message
+  is held the same way:
 
 ```
 <update source="pr" kind="K" subject="S" url="U">TITLE BODY</update>

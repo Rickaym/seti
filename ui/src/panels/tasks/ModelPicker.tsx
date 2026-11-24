@@ -59,7 +59,7 @@ function EffortSelect({ pick, offers, onChange, disabled }: PickerProps) {
     <IconSelect
       icon={Gauge}
       label="Effort"
-      hint="Reasoning effort; Default takes the one set in Settings"
+      hint="Reasoning effort; Default leaves it to the runtime"
       value={pick.effort ?? DEFAULT_EFFORT}
       disabled={disabled}
       onChange={(value) => {
@@ -77,8 +77,8 @@ function EffortSelect({ pick, offers, onChange, disabled }: PickerProps) {
 }
 
 /**
- * The model a new agent runs on, grouped by runtime, and its effort where the runtime has one.
- * Shown only while there is more than one model to pick, so most users never see it.
+ * The model a new agent runs on, grouped by runtime, and its effort where the model takes one.
+ * Hidden while the default model is the only one to pick.
  */
 export function ModelPicker({ pick, onChange, disabled }: Omit<PickerProps, 'offers'>) {
   const offers = useRuntimes().data?.offers ?? []

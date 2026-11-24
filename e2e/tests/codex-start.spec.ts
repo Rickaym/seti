@@ -5,7 +5,14 @@ import { expect, test } from './support/fixtures.js'
 
 test.use({ allowedHttpStatuses: [409], failureToasts: true })
 
-const CODEX_HINT = 'Codex: sandboxed, asks before every command and edit.'
+const CODEX_HINT = 'Codex: sandboxed; asks before each call.'
+
+const groupsOf = async (page: Page) =>
+  page
+    .getByRole('main')
+    .getByRole('combobox', { name: 'Model' })
+    .locator('optgroup')
+    .evaluateAll((all) => all.map((group) => group.getAttribute('label')))
 
 /** Holds the start request and answers it with a refusal, so no agent or Codex session starts. */
 async function catchStart(page: Page): Promise<() => StartAgentInput | null> {
@@ -30,23 +37,22 @@ test('the start page lists Codex models only while Codex is ready with a key', a
   await codexOff(request)
   try {
     let main = await startPage(page)
-    await expect(main.getByRole('combobox', { name: 'Model' }), 'Claude Code has only its default').toHaveCount(0)
+    await expect(main.getByRole('combobox', { name: 'Model' })).toHaveValue('claude:')
+    expect(await groupsOf(page), 'Codex is off').toEqual(['Claude Code'])
     await expect(main.getByText(CODEX_HINT)).toHaveCount(0)
 
     await request.put('/api/runtimes/codex', { data: { enabled: true, program: codexStandIn(PINNED_CODEX) } })
     main = await startPage(page)
-    await expect(main.getByRole('combobox', { name: 'Model' }), 'no key in the default credential').toHaveCount(0)
+    await expect(main.getByRole('combobox', { name: 'Model' })).toHaveValue('claude:')
+    expect(await groupsOf(page), 'no key in the default credential').toEqual(['Claude Code'])
 
     await codexReady(request)
     main = await startPage(page)
     const model = main.getByRole('combobox', { name: 'Model' })
     await expect(model).toHaveValue('claude:')
-    const groups = model.locator('optgroup')
-    expect(await groups.evaluateAll((all) => all.map((group) => group.getAttribute('label')))).toEqual([
-      'Claude Code',
-      'Codex',
-    ])
-    await expect(model.locator('option')).toHaveText(['Default', 'gpt-5.5'])
+    expect(await groupsOf(page)).toEqual(['Claude Code', 'Codex'])
+    await expect(model.locator('optgroup').first().locator('option').first()).toHaveText('Default')
+    await expect(model.locator('optgroup').last().locator('option')).toHaveText(['gpt-5.5'])
     await expect(main.getByRole('combobox', { name: 'Effort' })).toHaveCount(0)
   } finally {
     await codexOff(request)
@@ -77,6 +83,11 @@ test('picking a Codex model hides the sandbox toggle and starts the agent on Cod
     await expect(sandbox).toBeVisible()
     await expect(effort).toHaveCount(0)
     await expect(main.getByText(CODEX_HINT)).toHaveCount(0)
+
+    await request.put('/api/runtimes/codex', { data: { evaluator_decides: true } })
+    await startPage(page)
+    await model.selectOption({ label: 'gpt-5.5' })
+    await expect(main.getByText('Codex: sandboxed; asks unless rules allow.')).toBeVisible()
   } finally {
     await codexOff(request)
   }

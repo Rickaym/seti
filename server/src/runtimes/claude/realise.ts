@@ -1,5 +1,5 @@
 import type { McpServerConfig, Options, PermissionMode, SdkPluginConfig } from '@anthropic-ai/claude-agent-sdk'
-import type { CompactRule } from '@seti/shared'
+import type { CompactRule, EffortLevel } from '@seti/shared'
 import { COMMAND_LIMIT_HOURS } from '../../house-rules.js'
 import type { Launcher } from '../../launcher.js'
 import { taskBorrowedServers } from '../../mcp-borrowed.js'
@@ -12,9 +12,11 @@ import type { ClaudeShapes } from './session.js'
 /** What Seti answers for a Claude Code session. */
 type ClaudeHost = SessionHost<ClaudeShapes>
 
-/** What a spec carries for Claude Code alone. */
+/** What a spec carries for Claude Code alone: plugins, and the model and effort the user picked. */
 export interface ClaudeVendor {
   plugins: SdkPluginConfig[]
+  model?: string
+  effort?: EffortLevel
 }
 
 /**
@@ -58,6 +60,8 @@ const claudeSetup = (spec: SessionSpec<'claude'>) =>
     ...(spec.dirs.length === 0 ? {} : { additionalDirectories: spec.dirs }),
     ...bypassLaunch(spec.mode),
     plugins: spec.vendor.plugins,
+    ...(spec.vendor.model === undefined ? {} : { model: spec.vendor.model }),
+    ...(spec.vendor.effort === undefined ? {} : { effort: spec.vendor.effort }),
     systemPrompt: { type: 'preset', preset: 'claude_code', append: spec.instructions.append },
   }) satisfies Options
 
