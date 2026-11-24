@@ -467,7 +467,7 @@ interrupted only for that.
 - EGR-12: Tool servers an agent leaves out MUST be denied to its runtime and get no proxy sign-in.
 - EGR-13: A maintenance session's proxy allows the model provider alone, with the agent's model
   login: no connection, allowlist, claude.ai connector, cloud or SSH, and no placeholder is issued.
-- EGR-15: A host the proxy refuses as off the allowlist answers 403 with a body that tells the
+- EGR-16: A host the proxy refuses as off the allowlist answers 403 with a body that tells the
   agent retrying will not help and to ask with `request_change` (`allow_host`) or tell the user.
   The first refusal of each host for an agent MUST add one quiet transcript line naming it,
   audited once; later refusals raise the count that line shows and add nothing else, in a separate
