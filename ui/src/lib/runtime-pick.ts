@@ -12,9 +12,9 @@ export interface RuntimePick {
 /** Today's default: Claude Code on the user's default model. */
 export const DEFAULT_PICK: RuntimePick = { runtime: DEFAULT_RUNTIME, model: null, effort: null }
 
-/** What a Codex start says under the box: it always runs sandboxed, and asks unless rules decide. */
+/** What a Codex start says under the box: always sandboxed, and asks unless the rules decide. */
 export const codexHint = (rulesDecide: boolean): string =>
-  rulesDecide ? 'Codex: sandboxed; asks unless rules allow.' : 'Codex: sandboxed; asks before each call.'
+  rulesDecide ? 'Codex: sandboxed; asks unless your rules allow.' : 'Codex: sandboxed; asks before each call.'
 
 /** One option of the model selector, grouped under its runtime. */
 export interface ModelOption {

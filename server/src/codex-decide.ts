@@ -107,9 +107,9 @@ async function askedUser(task: Task, call: ToolCall, signal: AbortSignal): Promi
 
 /**
  * Seti's answer to a Codex agent's call. Seti's guards and the user's deny rules refuse it at
- * once; a review or ask rule asks as it does for any agent; any other call goes to the user, with
- * Allow and Deny only, unless the user let Seti's rules decide for Codex agents and they allow
- * it. Beside each answer the user gives, the evaluator's own verdict is counted.
+ * once; a review or ask rule asks as it does for any agent; an allow runs the call while Seti's
+ * rules decide for Codex agents (the default); any other call goes to the user, with Allow and
+ * Deny only. Beside each answer the user gives, the evaluator's own verdict is counted.
  */
 export async function decideCodexCall(taskId: string, call: ToolCall, signal: AbortSignal): Promise<Verdict> {
   const task = await tasks.get(taskId)

@@ -156,7 +156,8 @@ between two steps; an interrupt; a hook at subagent start.
   that key, and its status MUST read "no key", not ready, while the default credential holds none.
   The status MAY name the one connection for that key the default credential lacks, but nothing
   but the user changes a credential or connection for it. Only the user changes a runtime's
-  settings, and each change is audited. The control room MUST offer a new agent the models of the
+  settings, including whether the rules decide its calls (on by default, PERM-2), and each change
+  is audited. The control room MUST offer a new agent the models of the
   default runtime always and those of another runtime only while that runtime can start one; the
   runtimes it offers MUST be readable with their models and efforts.
 - RT-10: A new agent's start MAY name a runtime, a model and an effort. A model alone MUST pick the
@@ -447,11 +448,13 @@ interrupted only for that.
   A call it turns down never reaches the user: the agent gets the reason and the audit records it.
   A call an `ask` rule matches, or that nothing decides, becomes a request and the agent blocks.
   On a runtime with no classifier that asks before every call (Codex), guards and deny rules
-  refuse at once, review and ask rules hold as for any agent, and every other call becomes a
-  request offering `allow` and `deny` only, and a `deny` with a message is refused there since that
-  runtime cannot pass it on, unless the user lets the rules decide for that runtime;
-  then a rule's or the read-only list's allow runs the call. Beside each answer the user gives, the
-  implementation counts its own verdict (PERM-12).
+  refuse at once and review and ask rules hold as for any agent. The rules decide there by
+  default: an allow from a rule or the read-only list runs the call, and a call to a tool server
+  other than the control room's own runs without the user only by a rule of the user's that names
+  that server or tool. The user MAY turn this off for the runtime, and an upgrade MUST keep the
+  choice the user stored. Every call that nothing allows becomes a request offering `allow` and
+  `deny` only, and a `deny` with a message is refused there since that runtime cannot pass it on.
+  Beside each answer the user gives, the implementation counts its own verdict (PERM-12).
 - PERM-4: Built-in: reads, search and platform tools are allowed; shell and edits inside the
   agent's folders are allowed in the sandbox only; killing by name is denied.
 - PERM-5: Request fields: `id`, `task_id`, `tool_name`, `kind`, `summary`, `input`, `reason`,

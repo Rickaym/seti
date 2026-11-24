@@ -236,8 +236,9 @@ the AppArmor profile for `bwrap` that the installer adds ([Setup](setup.md#sandb
   and Deny only and no editable fields, and the answer route refuses Always allow for it. Beside
   each answer the user gives, the evaluator's own verdict is counted in `policy_shadow` with mode
   `codex` and the answer as `user-allow` or `user-deny`; the Claude Code summary leaves those rows
-  out. With `evaluator_decides` on in the Codex settings (`codex_settings`, off by default), an
-  allow from a rule or the read-only list answers without the user. A question goes to the user
+  out. With `evaluator_decides` on in the Codex settings (`codex_settings`, on by default; the
+  migration that made it so changed only the column default, never a stored choice), an allow from a rule or the read-only
+  list answers without the user. A question goes to the user
   as an AskUserQuestion call does. The node's Codex host (`codex-host.ts`) serves the agent's tool
   servers through the relay. Codex is asked not to stream item parts or the turn's running diff,
   so a Codex agent's rows are its whole items; a line Codex wrote that Seti cannot read is shown

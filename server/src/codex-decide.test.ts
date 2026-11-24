@@ -1,11 +1,11 @@
 import type { PermissionRequest, ToolCall } from '@seti/shared'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { decideCodexCall } from './codex-decide.js'
 import { sql, tasks } from './db.js'
 import { answerPermission } from './permission-rules.js'
 import { auditEvents } from './store/audit.js'
 import { codexSettings } from './store/codex-settings.js'
-import { permissionRequests } from './store/permissions.js'
+import { permissionRequests, permissionRules } from './store/permissions.js'
 
 await vi.hoisted(async () => {
   const { mkdtempSync } = await import('node:fs')
@@ -32,6 +32,14 @@ const shell = (command: string): ToolCall => ({
   shell: { action: 'run', command },
 })
 
+const mcp = (server: string, tool: string): ToolCall => ({
+  callId: `call-${server}-${tool}`,
+  kind: 'mcp',
+  name: `mcp__${server}__${tool}`,
+  input: { id: 7 },
+  mcp: { server, tool },
+})
+
 /** The request the call raised, once it is pending. */
 async function pending(): Promise<PermissionRequest> {
   let found: PermissionRequest | undefined
@@ -49,7 +57,7 @@ const codexCounts = async () =>
   sql<{ verdict: string; step: string; runtime: string; result: string; calls: number }[]>`SELECT verdict, step,
       runtime, result, calls FROM policy_shadow WHERE mode = 'codex' ORDER BY runtime`
 
-afterEach(async () => {
+beforeEach(async () => {
   await codexSettings.set({ ...(await codexSettings.get()), evaluator_decides: false })
 })
 
@@ -91,6 +99,27 @@ describe("Seti's answer to a Codex agent's call", () => {
     await codexSettings.set({ ...(await codexSettings.get()), evaluator_decides: true })
     expect(await decideCodexCall(TASK, shell('ls'), new AbortController().signal)).toEqual({ allow: true })
     expect(await permissionRequests.pending(TASK)).toEqual([])
+  })
+
+  it("allows a tool-server call without the user only by the user's rule that names it", async () => {
+    await codexSettings.set({ ...(await codexSettings.get()), evaluator_decides: true })
+    const bash = (await permissionRules.add(TASK, 'allow', 'Bash')).rule
+    const asked = decideCodexCall(TASK, mcp('tracker', 'get_issue'), new AbortController().signal)
+    const request = await pending()
+    expect(request.tool_name).toBe('mcp__tracker__get_issue')
+    await answerPermission(task, request.id, { decision: 'deny' })
+    expect((await asked).allow).toBe(false)
+    const tool = (await permissionRules.add(TASK, 'allow', 'mcp__tracker__get_issue')).rule
+    const server = (await permissionRules.add(TASK, 'allow', 'mcp__docs')).rule
+    const signal = new AbortController().signal
+    expect(await decideCodexCall(TASK, mcp('tracker', 'get_issue'), signal)).toEqual({ allow: true })
+    expect(await decideCodexCall(TASK, mcp('docs', 'write_page'), signal)).toEqual({ allow: true })
+    const other = decideCodexCall(TASK, mcp('tracker', 'close_issue'), signal)
+    await answerPermission(task, (await pending()).id, { decision: 'deny' })
+    expect((await other).allow).toBe(false)
+    for (const rule of [bash, tool, server]) {
+      await permissionRules.remove(TASK, rule.id)
+    }
   })
 
   it('drops the request when Codex stops waiting, and counts nothing for it', async () => {
