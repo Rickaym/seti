@@ -742,8 +742,9 @@ interrupted only for that.
 - SEC-16: An item's state for an agent MUST be its own choice, else its credential's set, else the
   default for every agent; a set change applies from each agent's next turn. Its allowlist MUST be
   the shared list, its credential's hosts and its own.
-- SEC-18: Only the user changes a set. A delegate MUST NOT move an agent to a credential whose set
-  turns on an SSH host, cloud access or a host the agent lacks.
+- SEC-18: Only the user changes a set or drops all of an agent's own choices at once. A delegate
+  MUST NOT move an agent to a credential whose set turns on an SSH host, cloud access or a host the
+  agent lacks.
 
 ## 9. Shared tools
 
