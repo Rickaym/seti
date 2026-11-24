@@ -1,10 +1,10 @@
-import type { Task } from '@seti/shared'
+import type { McpTransport, Task } from '@seti/shared'
 import { describe, expect, it, vi } from 'vitest'
 import { createApp } from './app.js'
 import { sql, tasks } from './db.js'
 import { startDream } from './dreams/start.js'
 import { mcpOffContext } from './mcp-off-context.js'
-import { runtimeCapabilities } from './runtimes/capabilities.js'
+import { pluginRuntimes, runtimeCapabilities, serverRuntimes } from './runtimes/capabilities.js'
 import { setTaskSandbox } from './tasks.js'
 import { USER_AUTH } from './test-auth.js'
 import { renderTask } from './workspace/task-file.js'
@@ -40,9 +40,11 @@ describe("what an agent's runtime declares", () => {
     }
     expect(served.data).toEqual(runtimeCapabilities())
     expect(runtimeCapabilities().claude).toMatchObject({ mcp_servers: true, plugins: true, dreams: true })
+    expect(runtimeCapabilities().claude.mcp_transports).toEqual(['stdio', 'sse', 'http', 'sdk', 'claudeai-proxy'])
     expect(runtimeCapabilities().codex).toEqual({
       label: 'Codex',
       mcp_servers: false,
+      mcp_transports: [],
       plugins: false,
       unsandboxed: false,
       compaction: false,
@@ -78,5 +80,16 @@ describe("what an agent's runtime declares", () => {
     })
     expect(compact.status).toBe(409)
     await expect(startDream(task)).rejects.toThrow("The agent's runtime keeps no memory Seti can find.")
+  })
+
+  it("says which runtimes can use each MCP server: those that take its transport, and a plugin's only where plugins load", () => {
+    const server = (type: McpTransport['type'], source: string | null = null) => ({
+      transport: { type, target: null },
+      source,
+    })
+    expect(serverRuntimes(server('stdio'))).toEqual(['claude'])
+    expect(serverRuntimes(server('http', 'plugin:acme'))).toEqual(['claude'])
+    expect(serverRuntimes({ transport: null, source: null })).toEqual([])
+    expect(pluginRuntimes()).toEqual(['claude'])
   })
 })

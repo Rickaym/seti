@@ -943,6 +943,24 @@ async def _attempt[T](job: Awaitable[T]) -> T | SetiError:
         return e
 
 
+def runtime_note(usable: object, on: list[str], caps: Mapping[str, Any]) -> str:
+    """ ", Claude only" or ", not on Codex" for a row some runtime that is on cannot use, else ""."""
+    if not isinstance(usable, list):
+        return ""
+    missing = [runtime for runtime in on if runtime not in usable]
+    if not missing:
+        return ""
+
+    def label(runtime: str) -> str:
+        found = caps.get(runtime)
+        return str(found.get("label", runtime)) if isinstance(found, dict) else runtime
+
+    left = [runtime for runtime in on if runtime in usable]
+    if len(left) == 1:
+        return f", {label(left[0]).split()[0]} only"
+    return f", not on {' and '.join(label(runtime) for runtime in missing)}"
+
+
 class EaTools:
     """The EA's tools over the Seti API."""
 
@@ -1864,13 +1882,15 @@ class EaTools:
         checked = ago(snapshot.get("probed_at"), self._now()) if isinstance(snapshot, dict) else "earlier"
         lines = [f"{plural(len(servers), 'MCP server')}: {tally}. Checked {checked}."]
         servers.sort(key=lambda s: (s.get("status") == "connected", name_of(s).lower()))
+        on, caps = await self._runtimes_on()
         for s in servers[:20]:
             status = str(s.get("status"))
             scope = f", {s.get('scope')} scope" if s.get("scope") else ""
             tools = len(dicts(s.get("tools")))
             tool_text = f", {plural(tools, 'tool')}" if status == "connected" else ""
             error = f": {clip(str(s.get('error')), 100)}" if s.get("error") and status != "connected" else ""
-            lines.append(f"- {name_of(s)}: {MCP_WORDS.get(status, status)}{scope}{tool_text}{error}")
+            only = runtime_note(s.get("runtimes"), on, caps)
+            lines.append(f"- {name_of(s)}: {MCP_WORDS.get(status, status)}{scope}{tool_text}{only}{error}")
         if len(servers) > 20:
             lines.append(f"And {len(servers) - 20} more not listed.")
         return ToolResult("\n".join(lines), f"Listed {plural(len(servers), 'MCP server')}")
@@ -1934,6 +1954,14 @@ class EaTools:
                 lines.append(f"And {len(installed) - LIST_LIMIT} more not listed.")
         else:
             lines.append("No Claude Code plugins installed.")
+        on, caps = await self._runtimes_on()
+        missing = [
+            caps[r].get("label", r)
+            for r in on
+            if isinstance(caps.get(r), dict) and caps[r].get("plugins") is False
+        ]
+        if missing:
+            lines.append(f"Plugins do not load on {' or '.join(str(name) for name in missing)} agents.")
         shared = dicts(await self._seti.get("/shared-tools"))
         lines.extend(self._shared_tool_lines(shared))
         total = len(defaults) + len(installed)
@@ -1984,6 +2012,16 @@ class EaTools:
             who = unsaved.get("email") or "an account"
             return f"Claude Code is signed in to {who}, which is not a saved login{saved}."
         return f"No Claude login in use{saved}." if others else None
+
+    async def _runtimes_on(self) -> tuple[list[str], dict[str, Any]]:
+        """The runtimes new agents may start on now, and what each runtime can do."""
+        runtimes = await self._seti.get("/runtimes")
+        offers = dicts(runtimes.get("offers")) if isinstance(runtimes, dict) else []
+        on = [str(offer.get("runtime")) for offer in offers]
+        if len(on) < 2:
+            return on, {}
+        caps = await self._seti.get("/runtimes/capabilities")
+        return on, caps if isinstance(caps, dict) else {}
 
     async def _claude_line(self) -> str | None:
         """Claude Code's version and default model from the runtimes route, or None if unknown."""

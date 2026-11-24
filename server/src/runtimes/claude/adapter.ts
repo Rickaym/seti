@@ -1,5 +1,5 @@
 import { query, type Options, type Query, type SDKMessage } from '@anthropic-ai/claude-agent-sdk'
-import { projectClaude } from '@seti/shared'
+import { MCP_TRANSPORTS, projectClaude } from '@seti/shared'
 import type { RuntimeAdapter, SessionInput } from '../adapter.js'
 import { reportedCost } from './cost.js'
 import { claudeLoadedMemory, claudeMemory, dreamOptions } from './dream.js'
@@ -18,7 +18,7 @@ export const claudeAdapter: RuntimeAdapter<ClaudeShapes, 'claude'> = {
     gate: { rewriteInput: true, classifier: true },
     session: { fork: 'ephemeral' },
     rewind: { conversation: true, code: true },
-    tools: { userServers: true, plugins: true },
+    tools: { userServers: MCP_TRANSPORTS, plugins: true },
     sandbox: { optional: true },
     compaction: true,
     dream: {

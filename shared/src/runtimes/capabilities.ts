@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import type { McpTransport } from '../capabilities.js'
 import type { StoredRuntime } from './stored.js'
 
 /**
@@ -10,6 +11,8 @@ export interface AgentCapabilities {
   label: string
   /** It loads the user's MCP servers and claude.ai connectors; Seti's own tools reach any runtime. */
   mcp_servers: boolean
+  /** How it reaches the user's MCP servers; a server of another transport is not for it. */
+  mcp_transports: McpTransport['type'][]
   /** It loads Seti's plugins. */
   plugins: boolean
   /** It can run outside Seti's sandbox. */
