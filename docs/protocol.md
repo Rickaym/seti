@@ -495,6 +495,11 @@ interrupted only for that.
   for the agent's life and leaves Bypass to the user. A Codex agent or a held one MUST NOT import
   sessions, which would run under the classifier. The user's and the EA's starts are not held:
   the EA has no regime of its own and starts agents only in a turn the user began (EA-8).
+- PERM-14: When the user lets the rules decide for a runtime with no classifier, each request of
+  that runtime's agents still waiting MUST be decided again as a new call would be: one the rules
+  allow runs, one a guard or deny rule refuses is refused with the reason, and the rest keep
+  waiting. Only one answer reaches the runtime, the user's or the rules', and it is audited once.
+  A request whose turn has stopped is left as it is.
 
 ### 7.5 Guards
 
@@ -1112,7 +1117,7 @@ An implementation is SETI-compatible when it meets all of:
 3. Update delivery: UPD-1 to UPD-8, UPD-11, UPD-13.
 4. Attention: ATT-1 to ATT-11, ATT-14 to ATT-18, ATT-21, ATT-23, ATT-25.
 5. Actors and reserved powers: ACT-1 to ACT-6.
-6. Permission requests with timeout: PERM-1 to PERM-8; guards GRD-1, GRD-4.
+6. Permission requests with timeout: PERM-1 to PERM-8, PERM-14; guards GRD-1, GRD-4.
 7. Questions and levels: LVL-1 to LVL-5, LVL-8 to LVL-13.
 8. Resilience: RES-1 to RES-9, RES-11, RES-12.
 9. Audit chain: AUD-1 to AUD-12.
