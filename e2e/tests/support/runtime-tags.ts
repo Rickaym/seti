@@ -1,8 +1,8 @@
 import type { Page } from '@playwright/test'
-import type { CapabilitiesSnapshot, McpServer } from '@seti/shared'
+import type { CapabilitiesSnapshot, McpServer, StoredRuntime } from '@seti/shared'
 import { paths } from './env.js'
 
-const server = (name: string, type: 'http' | 'sse', runtimes: McpServer['runtimes']): McpServer => ({
+const server = (name: string, type: 'http' | 'sse', runtimes: StoredRuntime[]): McpServer => ({
   name,
   status: 'connected',
   scope: 'user',
