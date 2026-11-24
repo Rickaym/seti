@@ -1,6 +1,7 @@
 import {
   AWS_ACCESS_ID,
   AWS_SETTINGS_DEFAULT,
+  DEFAULT_PROFILE_ID,
   awsRoleName,
   type AccessItem,
   type AwsOutcome,
@@ -9,8 +10,11 @@ import {
   type Task,
 } from '@seti/shared'
 import { knownHostRole } from './aws-credentials.js'
+import { followedChoices } from './credential-access.js'
+import { tasks } from './db.js'
 import { githubTokens } from './secrets.js'
 import { accessDefaults, taskAccess } from './store/access.js'
+import { credentialAccess } from './store/credential-access.js'
 import { profiles } from './store/credentials.js'
 import { sandboxPolicy } from './store/sandbox.js'
 
@@ -30,17 +34,18 @@ export async function awsItem(
   const byDefault = (await accessDefaults.all('aws'))[AWS_ACCESS_ID] ?? false
   const override = overrides[AWS_ACCESS_ID] ?? null
   const profile = profileId === null ? undefined : await profiles.get(profileId)
+  const credential = profileId === null ? null : ((await credentialAccess.of(profileId, 'aws'))[AWS_ACCESS_ID] ?? null)
   return {
     kind: 'aws',
     id: AWS_ACCESS_ID,
     name: AWS_NAME,
     detail: profile === undefined ? null : awsDetail(profile),
     default_enabled: byDefault,
+    credential,
     override,
-    enabled: override ?? byDefault,
+    enabled: override ?? credential ?? byDefault,
     jump_for: [],
     missing_key: [],
-    in_set: false,
     session: null,
   }
 }
@@ -52,8 +57,9 @@ export async function profileAws(profileId: string): Promise<AwsSettings> {
 
 /** Whether the task's sandbox gets AWS credentials of its credential's role. */
 export async function taskAws(taskId: string): Promise<boolean> {
-  const override = (await taskAccess.all(taskId, 'aws'))[AWS_ACCESS_ID]
-  return override ?? (await accessDefaults.all('aws'))[AWS_ACCESS_ID] ?? false
+  const profileId = (await tasks.get(taskId))?.profile_id ?? DEFAULT_PROFILE_ID
+  const choices = await followedChoices(profileId, 'aws', await taskAccess.all(taskId, 'aws'))
+  return choices[AWS_ACCESS_ID] ?? (await accessDefaults.all('aws'))[AWS_ACCESS_ID] ?? false
 }
 
 /** What the agent's AWS calls run as; unsandboxed, the host's own identity, whatever its switch. */

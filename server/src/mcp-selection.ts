@@ -1,5 +1,6 @@
 import os from 'node:os'
 import {
+  DEFAULT_PROFILE_ID,
   fromMcpChoices,
   mcpEnabled,
   type AuditActor,
@@ -16,6 +17,7 @@ import { tasks } from './db.js'
 import { refuseAgent } from './ea-guard.js'
 import { isBorrowed, localServers, ownProjects, readHostConfig, tilde } from './mcp-borrowed.js'
 import { mcpGone } from './mcp-presence.js'
+import { credentialAccess } from './store/credential-access.js'
 import { mcpDefaults, taskMcpChoices } from './store/mcp.js'
 import { signalWorkspaces } from './workspace/dir.js'
 
@@ -103,17 +105,25 @@ async function taskScope(taskId: string): Promise<LocalScope> {
   return localScope(task === undefined ? null : ownProjects(task.cwd))
 }
 
+/** A task's own choices and its credential's set for MCP servers. */
+async function taskChoices(taskId: string) {
+  const profileId = (await tasks.get(taskId))?.profile_id ?? DEFAULT_PROFILE_ID
+  const [choices, set] = await Promise.all([taskMcpChoices.get(taskId), credentialAccess.of(profileId, 'mcp')])
+  return { choices, set }
+}
+
 export async function taskMcpServers(taskId: string, probe = true): Promise<TaskMcpServer[]> {
-  const [defaults, choices, scope] = await Promise.all([
+  const [defaults, { choices, set }, scope] = await Promise.all([
     mcpDefaults.all(),
-    taskMcpChoices.get(taskId),
+    taskChoices(taskId),
     taskScope(taskId),
   ])
   const servers = probe ? await probedServers() : knownServers()
-  return (await presentCatalog(servers, defaults, scope, choices)).map((entry) => ({
+  return (await presentCatalog(servers, defaults, scope, { ...set, ...choices })).map((entry) => ({
     ...entry,
     choice: choices[entry.name] ?? null,
-    enabled: choices[entry.name] ?? entry.default_enabled,
+    credential: set[entry.name] ?? null,
+    enabled: choices[entry.name] ?? set[entry.name] ?? entry.default_enabled,
     borrowed: scope.borrowed(entry.name),
   }))
 }
@@ -133,8 +143,8 @@ export async function taskMcpNames(taskId: string): Promise<{ enabled: string[];
 
 /** What a task's session leaves out, read at every session start and in its setup key. */
 export async function taskDeniedServers(taskId: string): Promise<string[]> {
-  const [defaults, choices] = await Promise.all([mcpDefaults.all(), taskMcpChoices.get(taskId)])
-  return deniedServers(defaults, choices)
+  const [defaults, { choices, set }] = await Promise.all([mcpDefaults.all(), taskChoices(taskId)])
+  return deniedServers(defaults, { ...set, ...choices })
 }
 
 /** Connector ids of claude.ai connectors among the named servers, for the sandbox proxy. */

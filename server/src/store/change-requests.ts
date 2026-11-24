@@ -7,6 +7,7 @@ import {
   type RequestedChange,
 } from '@seti/shared'
 import { now, sql } from '../db.js'
+import { credentialHosts } from './credential-access.js'
 import { sandboxPolicy } from './sandbox.js'
 
 type RequestRecord = Omit<ChangeRequest, 'change' | 'flags'> & { change: string; change_key: string }
@@ -117,7 +118,12 @@ export const taskHosts = {
     (await sql`DELETE FROM task_allowed_host WHERE task_id = ${taskId} AND entry = ${entry}`).count > 0,
 }
 
-/** Every allowlist entry a task's proxy lets through: the shared list, then its own. */
+/** Every allowlist entry a task's proxy lets through: shared, its credential's, then its own. */
 export async function allowedFor(taskId: string): Promise<string[]> {
-  return [...(await sandboxPolicy.get()).allowed_domains, ...(await taskHosts.list(taskId))]
+  const [shared, set, own] = await Promise.all([
+    sandboxPolicy.get(),
+    credentialHosts.forTask(taskId),
+    taskHosts.list(taskId),
+  ])
+  return [...new Set([...shared.allowed_domains, ...set, ...own])]
 }

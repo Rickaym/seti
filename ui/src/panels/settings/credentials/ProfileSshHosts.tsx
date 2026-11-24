@@ -76,7 +76,7 @@ export function ProfileSshHosts({ profile, onChanged }: { profile: CredentialPro
   return (
     <SettingsCard title="SSH hosts">
       <p className="border-b border-border p-3 text-muted-foreground">
-        Hosts switched on here reach every agent using {profile.name}, beside the hosts each agent turns on itself.
+        Hosts switched on here reach every agent using {profile.name}, unless an agent turns one off itself.
       </p>
       {status === null && <p className="p-3 text-muted-foreground">Loading...</p>}
       {status?.hosts.length === 0 && (

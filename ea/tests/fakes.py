@@ -1134,7 +1134,7 @@ class FakeSeti:
                     "enabled": default if override is None else override,
                     "jump_for": [],
                     "missing_key": [] if kind != "ssh" or self.ssh_keys.get(item_id) else [item_id],
-                    "in_set": False,
+                    "credential": None,
                 }
             )
         return items

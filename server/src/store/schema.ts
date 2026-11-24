@@ -1,5 +1,5 @@
 import type { Db } from '../pg.js'
-import { ACCESS_DEFAULTS, CREDENTIAL_PROFILES, MCP_SELECTION } from './schema-access.js'
+import { ACCESS_DEFAULTS, CREDENTIAL_ACCESS, CREDENTIAL_PROFILES, MCP_SELECTION } from './schema-access.js'
 import { AGENT_GUIDE, SETI_GUIDE_PACK } from './schema-agent-guide.js'
 import { ARCHIVE_FILES, REPEAT_GUARD, RESTART_RESUME, TASK_ARCHIVE } from './schema-archive.js'
 import { TASK_ASIDE } from './schema-asides.js'
@@ -236,4 +236,5 @@ export const MIGRATIONS: readonly Migration[] = [
   { version: 127, name: 'task_approval_ceiling', sql: TASK_APPROVAL_CEILING },
   { version: 128, name: 'codex_rules_decide_default', sql: CODEX_RULES_DECIDE_DEFAULT },
   { version: 129, name: 'task_second_opinion', sql: TASK_SECOND_OPINION },
+  { version: 130, name: 'credential_access', sql: CREDENTIAL_ACCESS },
 ]

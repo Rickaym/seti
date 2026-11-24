@@ -1,4 +1,5 @@
 import {
+  accessBase,
   AWS_ACCESS_ID,
   DEFAULT_PROFILE_ID,
   localServerNote,
@@ -33,10 +34,11 @@ import { hostMap, sshReach, sshRoute, type SshReach } from './ssh-config.js'
 import { accessDefaults, taskAccess } from './store/access.js'
 import { taskHosts } from './store/change-requests.js'
 import { contextPacks, taskContextPacks } from './store/context.js'
+import { credentialAccess } from './store/credential-access.js'
 import { profiles } from './store/credentials.js'
 import { taskMcpChoices } from './store/mcp.js'
 import { setiPlugins, taskPluginChoices } from './store/plugins.js'
-import { setHosts, sshHostStore } from './store/ssh.js'
+import { sshHostStore } from './store/ssh.js'
 import { signalWorkspaces } from './workspace/dir.js'
 
 const MCP_KIND: Record<McpSelectionKind, string> = { config: 'configured', plugin: 'plugin', connector: 'claude.ai' }
@@ -59,24 +61,24 @@ const AUDIT_KIND: Record<AccessKind, AuditKind> = {
 
 type Choices = Readonly<Record<string, boolean>>
 
-/** Hosts granted on their own, by choice or default, and those the agent's set bundles. */
+/** Hosts on by the agent's own choice, else its credential's set, else their default. */
 async function sshGrants(profileId: string, overrides: Choices) {
-  const [list, defaults, bundled] = await Promise.all([
+  const [list, defaults, set] = await Promise.all([
     sshHostStore.list(),
     accessDefaults.all('ssh'),
-    setHosts.forProfile(profileId),
+    credentialAccess.of(profileId, 'ssh'),
   ])
   const enabled = list
     .map((host) => host.alias)
-    .filter((alias) => bundled.includes(alias) || (overrides[alias] ?? defaults[alias] ?? false))
-  return { list, defaults, bundled, reach: sshReach(list, enabled) }
+    .filter((alias) => overrides[alias] ?? set[alias] ?? defaults[alias] ?? false)
+  return { list, defaults, set, reach: sshReach(list, enabled) }
 }
 
 const reachFor = async (profileId: string, overrides: Choices): Promise<SshReach> =>
   (await sshGrants(profileId, overrides)).reach
 
 async function sshItems(overrides: Choices, profileId: string | null): Promise<AccessItem[]> {
-  const { list, defaults, bundled, reach } = await sshGrants(profileId ?? '', overrides)
+  const { list, defaults, set, reach } = await sshGrants(profileId ?? '', overrides)
   const rows = hostMap(list)
   return list.map((host) => ({
     kind: 'ssh',
@@ -84,11 +86,11 @@ async function sshItems(overrides: Choices, profileId: string | null): Promise<A
     name: host.alias,
     detail: sshRoute(rows, host.alias),
     default_enabled: defaults[host.alias] ?? false,
+    credential: set[host.alias] ?? null,
     override: overrides[host.alias] ?? null,
     enabled: reach.enabled.includes(host.alias),
     jump_for: reach.jumpFor.get(host.alias) ?? [],
     missing_key: reach.missing.get(host.alias) ?? [],
-    in_set: bundled.includes(host.alias),
     session: null,
   }))
 }
@@ -143,6 +145,7 @@ async function mcpItems(task: Task | null): Promise<AccessItem[]> {
       ? (await mcpCatalog()).map((entry) => ({
           ...entry,
           choice: null,
+          credential: null,
           enabled: entry.default_enabled,
           borrowed: entry.local_to.length > 0,
         }))
@@ -154,17 +157,17 @@ async function mcpItems(task: Task | null): Promise<AccessItem[]> {
     name: server.name,
     detail: mcpDetail(server),
     default_enabled: server.default_enabled,
+    credential: server.credential,
     override: server.choice,
     enabled: server.enabled,
     jump_for: [],
     missing_key: [],
-    in_set: false,
     session: server.enabled ? stateOf(server.name) : null,
   }))
 }
 
 /** Reference packs only: an agent's role pack is picked in its settings, one at a time. */
-async function packItems(choices: Choices): Promise<AccessItem[]> {
+async function packItems(choices: Choices, set: Choices = {}): Promise<AccessItem[]> {
   return (await contextPacks.list()).flatMap((pack) =>
     pack.kind === 'role'
       ? []
@@ -175,29 +178,29 @@ async function packItems(choices: Choices): Promise<AccessItem[]> {
             name: pack.name,
             detail: pack.description === '' ? null : pack.description,
             default_enabled: pack.linked_by_default,
+            credential: set[pack.id] ?? null,
             override: choices[pack.id] ?? null,
-            enabled: choices[pack.id] ?? pack.linked_by_default,
+            enabled: choices[pack.id] ?? set[pack.id] ?? pack.linked_by_default,
             jump_for: [],
             missing_key: [],
-            in_set: false,
             session: null,
           },
         ],
   )
 }
 
-async function pluginItems(choices: Choices): Promise<AccessItem[]> {
+async function pluginItems(choices: Choices, set: Choices = {}): Promise<AccessItem[]> {
   return (await setiPlugins.list()).map((plugin) => ({
     kind: 'plugin',
     id: plugin.id,
     name: plugin.name,
     detail: plugin.version === null ? plugin.path : `${plugin.version}, ${plugin.path}`,
     default_enabled: plugin.enabled,
+    credential: set[plugin.id] ?? null,
     override: choices[plugin.id] ?? null,
-    enabled: pluginLoaded(plugin, choices),
+    enabled: pluginLoaded(plugin, { ...set, ...choices }),
     jump_for: [],
     missing_key: [],
-    in_set: false,
     session: null,
   }))
 }
@@ -226,8 +229,8 @@ export async function effectiveAccess(task: Task): Promise<TaskAccessView> {
     ...(await sshItems(await taskAccess.all(task.id, 'ssh'), task.profile_id)),
     await awsItem(await taskAccess.all(task.id, 'aws'), task.profile_id),
     ...(await mcpItems(task)),
-    ...(await packItems(await taskContextPacks.choices(task.id))),
-    ...(await pluginItems(await taskPluginChoices.get(task.id))),
+    ...(await packItems(await taskContextPacks.choices(task.id), await credentialAccess.of(task.profile_id, 'pack'))),
+    ...(await pluginItems(await taskPluginChoices.get(task.id), await credentialAccess.of(task.profile_id, 'plugin'))),
   ]
   const isSandboxed = await sandboxed(task)
   return {
@@ -272,6 +275,12 @@ async function defaultOf(kind: AccessKind, id: string, taskId: string | null = n
   }
 }
 
+/** One item's default and the task's credential's choice for it. */
+async function baseOf(kind: AccessKind, id: string, task: Pick<Task, 'id' | 'profile_id'>) {
+  const credential = (await credentialAccess.of(task.profile_id, kind))[id] ?? null
+  return { ...(await defaultOf(kind, id, task.id)), credential }
+}
+
 async function overridesOf(taskId: string, kind: AccessKind): Promise<Choices> {
   switch (kind) {
     case 'ssh':
@@ -308,8 +317,10 @@ async function storeOverride(task: Task, kind: AccessKind, id: string, override:
 
 const itemLabel = (kind: AccessKind, name: string) => (kind === 'aws' ? AWS_NAME : `${KIND_LABEL[kind]} ${name}`)
 
-const verbOf = (enabled: boolean, override: boolean | null) =>
-  `${enabled ? 'Turned on' : 'Turned off'}${override === null ? ' (the default)' : ''}`
+const verbOf = (enabled: boolean, override: boolean | null, credential: boolean | null) => {
+  const base = credential === null ? ' (the default)' : " (its credential's choice)"
+  return `${enabled ? 'Turned on' : 'Turned off'}${override === null ? base : ''}`
+}
 
 /**
  * Turns one item on or off for a task, or with null drops its override so the default applies.
@@ -321,24 +332,20 @@ export async function setTaskAccess(
   actor: AuditActor = 'user',
 ): Promise<TaskAccessView> {
   refuseAgent("change an agent's access")
-  const item = await defaultOf(kind, id, task.id)
-  if (kind === 'ssh' && enabled === false && (await setHosts.forProfile(task.profile_id)).includes(id)) {
-    const set = (await profiles.get(task.profile_id))?.name ?? task.profile_id
-    throw new HttpError(409, `${id} comes with the credential ${set}; take it out of the credential or pick another`)
-  }
+  const item = await baseOf(kind, id, task)
   const current = (await overridesOf(task.id, kind))[id] ?? null
   const override = enabled === null ? null : overrideFor(item, enabled)
   if (override === current) {
     return effectiveAccess(task)
   }
   await storeOverride(task, kind, id, override)
-  const now = override ?? item.default_enabled
+  const now = override ?? accessBase(item)
   await audit.record({
     actor,
     kind: AUDIT_KIND[kind],
     subject_type: 'task',
     subject_id: task.id,
-    summary: `${verbOf(now, override)} ${itemLabel(kind, item.name)} for task "${task.title}"`,
+    summary: `${verbOf(now, override, item.credential)} ${itemLabel(kind, item.name)} for task "${task.title}"`,
     detail: {
       title: task.title,
       access: kind,
@@ -347,6 +354,7 @@ export async function setTaskAccess(
       enabled: now,
       override,
       default_enabled: item.default_enabled,
+      credential: item.credential,
     },
   })
   signalWorkspaces('task', task.id)
@@ -357,11 +365,11 @@ export async function setTaskAccess(
 }
 
 /**
- * Turns AWS on for a task the user gives a credential with a role. AWS stays the user's
- * choice: when the EA changes the credential, AWS stays as it was.
+ * Turns AWS on for a task the user gives a credential with a role, unless the credential's set
+ * decides AWS. AWS stays the user's choice: when the EA changes the credential, AWS stays.
  */
 export async function awsWithProfile(task: Task, actor: AuditActor): Promise<void> {
-  if (actor !== 'user' || fromEa()) {
+  if (actor !== 'user' || fromEa() || AWS_ACCESS_ID in (await credentialAccess.of(task.profile_id, 'aws'))) {
     return
   }
   const role = (await profiles.get(task.profile_id))?.aws.role_arn ?? null
@@ -377,14 +385,18 @@ interface StartOverride {
   enabled: boolean
 }
 
-/** Checks a new task's choices and keeps those that differ from the default; 400 when unknown. */
-export async function planStartAccess(choices: readonly AccessChoice[]): Promise<StartOverride[]> {
+/**
+ * Checks a new task's choices and keeps every off and each on that differs from its base, so no
+ * later default or credential set lifts an off it started with; 400 when unknown.
+ */
+export async function planStartAccess(choices: readonly AccessChoice[], profileId: string): Promise<StartOverride[]> {
   const plan: StartOverride[] = []
   for (const choice of choices) {
     const item = await defaultOf(choice.kind, choice.id).catch((e: unknown) => {
       throw e instanceof HttpError ? new HttpError(400, e.message) : e
     })
-    if (overrideFor(item, choice.enabled) !== null) {
+    const credential = (await credentialAccess.of(profileId, choice.kind))[choice.id] ?? null
+    if (!choice.enabled || overrideFor({ ...item, credential }, choice.enabled) !== null) {
       plan.push(choice)
     }
   }

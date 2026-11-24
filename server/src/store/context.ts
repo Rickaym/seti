@@ -8,13 +8,15 @@ type PackFields = Pick<ContextPack, 'name' | 'description' | 'body'>
 const getPack = async (id: string) => (await sql<ContextPack[]>`SELECT * FROM context_pack WHERE id = ${id}`).at(0)
 
 /**
- * The packs linked to a task: its own link or unlink, else the pack's default. Built-in packs'
- * bodies are left for Seti to render.
+ * The packs linked to a task: its own link or unlink, else its credential's, else the pack's
+ * default. Built-in packs' bodies are left for Seti to render.
  */
 export const packsOfTask = async (taskId: string) =>
   sql<ContextPack[]>`SELECT p.* FROM context_pack p
     LEFT JOIN task_context_pack tp ON tp.pack_id = p.id AND tp.task_id = ${taskId}
-    WHERE COALESCE(tp.linked, p.linked_by_default) ORDER BY lower(p.name)`
+    LEFT JOIN credential_access ca ON ca.kind = 'pack' AND ca.item = p.id
+      AND ca.profile_id = (SELECT profile_id FROM task WHERE id = ${taskId})
+    WHERE COALESCE(tp.linked, ca.enabled, p.linked_by_default) ORDER BY lower(p.name)`
 
 async function assertNameFree(name: string, id: string | null): Promise<void> {
   const [existing] = await sql<Pick<ContextPack, 'id'>[]>`SELECT id FROM context_pack WHERE name = ${name}`
@@ -95,13 +97,15 @@ export const taskContextPacks = {
           WHERE task_id = ${taskId} ORDER BY pack_id`
       ).map((row) => [row.pack_id, row.linked]),
     ),
-  /** Links exactly these packs, storing only where that differs from each pack's default. */
+  /** Links exactly these packs, storing only where that differs from what the task gets without. */
   set: async (taskId: string, packIds: readonly string[]): Promise<void> => {
     await transaction(async (tx) => {
       await tx`DELETE FROM task_context_pack WHERE task_id = ${taskId}`
       await tx`INSERT INTO task_context_pack (task_id, pack_id, linked)
         SELECT ${taskId}, p.id, p.id = ANY(${[...packIds]}) FROM context_pack p
-        WHERE (p.id = ANY(${[...packIds]})) <> p.linked_by_default`
+        LEFT JOIN credential_access ca ON ca.kind = 'pack' AND ca.item = p.id
+          AND ca.profile_id = (SELECT profile_id FROM task WHERE id = ${taskId})
+        WHERE (p.id = ANY(${[...packIds]})) <> COALESCE(ca.enabled, p.linked_by_default)`
     })
   },
   setOne: async (taskId: string, packId: string, linked: boolean | null): Promise<void> => {
@@ -152,11 +156,12 @@ export const eaContextPacks = {
   },
 }
 
-/** The unarchived agents that read a pack, by their own link or its default, and the EA. */
+/** The unarchived agents that read a pack, by own link, credential or default, and the EA. */
 export async function packLinks(pack: Pick<ContextPack, 'id' | 'linked_by_default'>): Promise<ContextPackLinks> {
   const agents = await sql<ContextPackLinks['agents']>`SELECT t.id, t.title FROM task t
     LEFT JOIN task_context_pack tp ON tp.task_id = t.id AND tp.pack_id = ${pack.id}
-    WHERE t.archived_at IS NULL AND COALESCE(tp.linked, ${pack.linked_by_default})
+    LEFT JOIN credential_access ca ON ca.profile_id = t.profile_id AND ca.kind = 'pack' AND ca.item = ${pack.id}
+    WHERE t.archived_at IS NULL AND COALESCE(tp.linked, ca.enabled, ${pack.linked_by_default})
     ORDER BY lower(t.title), t.id`
   const [ea] = await sql<{ linked: boolean }[]>`SELECT EXISTS (SELECT 1 FROM ea_context_pack
     WHERE pack_id = ${pack.id}) AS linked`

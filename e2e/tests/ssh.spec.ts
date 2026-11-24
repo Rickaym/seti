@@ -312,20 +312,20 @@ test.describe('sandboxed ssh', () => {
     await expect(row('jump')).toContainText('Inherited')
     await expect(row('db')).toContainText('From Default')
     await expect(ssh.getByRole('switch', { name: 'db', exact: true })).toBeChecked()
-    await expect(ssh.getByRole('switch', { name: 'db', exact: true })).toBeDisabled()
+    await expect(ssh.getByRole('switch', { name: 'db', exact: true })).toBeEnabled()
     await ssh.getByRole('switch', { name: 'k8s', exact: true }).click()
     await expect(row('k8s')).toContainText('Custom')
     await expect(row('k8s')).toContainText('198.51.100.9:22 via jump')
     const view = await apiData<TaskAccessView>(request, `/tasks/${id}/access`)
     expect(view.items.filter((item) => item.kind === 'ssh')).toMatchObject([
-      { id: 'db', enabled: true, in_set: true, override: null, missing_key: [] },
-      { id: 'jump', enabled: true, in_set: false, missing_key: [] },
-      { id: 'k8s', enabled: true, in_set: false, override: true, missing_key: [] },
+      { id: 'db', enabled: true, credential: true, override: null, missing_key: [] },
+      { id: 'jump', enabled: true, credential: null, missing_key: [] },
+      { id: 'k8s', enabled: true, credential: null, override: true, missing_key: [] },
     ])
     await page.keyboard.press('Escape')
 
     await request.delete('/api/credentials/profiles/default/ssh-hosts/db')
     const after = await apiData<TaskAccessView>(request, `/tasks/${id}/access`)
-    expect(after.items.find((item) => item.id === 'db')).toMatchObject({ enabled: false, in_set: false })
+    expect(after.items.find((item) => item.id === 'db')).toMatchObject({ enabled: false, credential: null })
   })
 })

@@ -68,7 +68,7 @@ const GROUPS: readonly Group[] = [
     kind: 'ssh',
     title: 'SSH hosts',
     icon: KIND_ICONS.ssh,
-    hint: "Hosts from Settings, SSH, off for every agent unless a host's Default is on or the agent's credential bundles it. Turning a host on also lets ssh pass through its jump hosts.",
+    hint: "Hosts from Settings, SSH, off for every agent unless a host's Default is on or the agent's credential turns it on. Turning a host on also lets ssh pass through its jump hosts.",
     empty: (
       <>
         No hosts yet; add them in <SettingsLink page="ssh">Settings, SSH</SettingsLink>.
@@ -147,10 +147,6 @@ function MissingKey({ item }: { item: AccessItem }) {
   )
 }
 
-/** Why a host the agent's credential bundles stays on, or null. */
-const setLock = (item: AccessItem, profile: AccessProfile | null) =>
-  item.in_set ? `Comes with ${profile?.name ?? 'its credential'}; change it in Settings, Credentials` : null
-
 /** The lines under an item's name: where it goes, how it is passed or granted, what is missing. */
 function RowNotes({ item, profile }: { item: AccessItem; profile: AccessProfile | null }) {
   const jumpNote =
@@ -159,7 +155,7 @@ function RowNotes({ item, profile }: { item: AccessItem; profile: AccessProfile 
     <>
       {item.detail !== null && <div className="truncate text-2xs text-muted-foreground">{item.detail}</div>}
       {jumpNote !== null && <div className="truncate text-2xs text-muted-foreground">{jumpNote}</div>}
-      {item.in_set && (
+      {item.override === null && item.credential !== null && (
         <div className="truncate text-2xs text-muted-foreground">From {profile?.name ?? 'its credential'}</div>
       )}
       <MissingKey item={item} />
@@ -189,12 +185,11 @@ function Row({
   onChange: (item: AccessItem, enabled: boolean | null) => void
   onSignIn?: (item: AccessItem) => void
 }) {
-  const lock = locked ?? setLock(item, profile)
   const control = (
     <Switch
       aria-label={item.name}
       checked={item.enabled}
-      disabled={busy || lock !== null}
+      disabled={busy || locked !== null}
       onCheckedChange={(enabled) => {
         onChange(item, enabled)
       }}
@@ -213,7 +208,7 @@ function Row({
         <McpSessionNote item={item} {...(onSignIn === undefined ? {} : { onSignIn })} />
       </div>
       {!plain && <SourceMark custom={item.override !== null} hint={sourceHint(item)} />}
-      {!plain && item.override !== null && lock === null && (
+      {!plain && item.override !== null && locked === null && (
         <Hint text={`Back to the default: ${onOff(item.default_enabled)}`}>
           <Button
             size="icon-xs"
@@ -228,10 +223,10 @@ function Row({
           </Button>
         </Hint>
       )}
-      {lock === null ? (
+      {locked === null ? (
         control
       ) : (
-        <Hint text={lock}>
+        <Hint text={locked}>
           <span>{control}</span>
         </Hint>
       )}

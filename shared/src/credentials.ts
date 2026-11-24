@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import type { AccessKind } from './access.js'
 import { awsSettingsInput, type AwsSettings } from './aws.js'
 import type { ProfileConnection } from './connections.js'
 import type { GitHubOwnerToken, SecretSource } from './secrets.js'
@@ -30,6 +31,20 @@ export interface ProfileAgent {
   sandbox: boolean
 }
 
+/** One entry of a credential's access set: what its agents get unless they chose their own. */
+export interface CredentialAccessEntry {
+  kind: AccessKind
+  id: string
+  enabled: boolean
+}
+
+/** What a credential's agents follow; an item it does not name has no opinion. */
+export interface CredentialAccessSet {
+  items: CredentialAccessEntry[]
+  /** Hosts its agents reach beside the shared allowlist and their own. */
+  hosts: string[]
+}
+
 /** A credential: the bundle of access an agent picks, with the connections it carries. */
 export interface CredentialProfile {
   id: string
@@ -39,8 +54,9 @@ export interface CredentialProfile {
   github: ProfileGitHub
   connections: ProfileConnection[]
   agents: ProfileAgent[]
-  /** Aliases of the ssh hosts it bundles: every agent using it gets them. */
+  /** Aliases of the ssh hosts its access set turns on. */
   ssh_hosts: string[]
+  access: CredentialAccessSet
   created_at: string
   updated_at: string
 }
