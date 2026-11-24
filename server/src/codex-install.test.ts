@@ -95,14 +95,22 @@ describe("Seti's own copy of Codex", () => {
     expect(fs.existsSync(marker)).toBe(false)
   })
 
-  it('resumes a cut download from the bytes it kept', async () => {
+  it('fails a cut download as a network failure, and the next try finishes it', async () => {
     const pin = registry.pin(fakeBuild(scratch, '1.0.4', '/bin/sleep'))
     registry.mode = 'cut'
     await installCodex('user', pin)
     expect(await copyState(pin)).toMatchObject({ state: 'failed', failure: { reason: 'network' } })
-    const kept = fs.statSync(path.join(stagingOf('1.0.4'), 'codex.tgz')).size
-    expect(kept).toBeGreaterThan(0)
     registry.mode = 'serve'
+    await installCodex('user', pin)
+    expect((await copyState(pin)).state).toBe('ready')
+  })
+
+  it('resumes a download from the bytes an earlier cut left', async () => {
+    const build = fakeBuild(scratch, '1.0.9', '/bin/sleep')
+    const pin = registry.pin(build)
+    const kept = Math.floor(build.tarball.length / 2)
+    fs.mkdirSync(stagingOf('1.0.9'), { recursive: true })
+    fs.writeFileSync(path.join(stagingOf('1.0.9'), 'codex.tgz'), build.tarball.subarray(0, kept))
     await installCodex('user', pin)
     expect(registry.ranges.at(-1)).toBe(`bytes=${String(kept)}-`)
     expect((await copyState(pin)).state).toBe('ready')
