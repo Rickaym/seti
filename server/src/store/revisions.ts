@@ -7,7 +7,7 @@ import type {
   RevisionState,
   UnseenChange,
 } from '@seti/shared'
-import { now, sql } from '../db.js'
+import { now, sql, type Db } from '../db.js'
 
 export interface NewRevision {
   actor: RevisionActor
@@ -38,18 +38,18 @@ function toRevision(record: RevisionRecord): Revision {
 
 const SELECT = sql`SELECT r.*, t.title AS task_title FROM revision r LEFT JOIN task t ON t.id = r.task_id`
 
-const getRecord = async (id: number) => (await sql<RevisionRecord[]>`${SELECT} WHERE r.id = ${id}`).at(0)
+const getRecord = async (id: number, db: Db = sql) => (await db<RevisionRecord[]>`${SELECT} WHERE r.id = ${id}`).at(0)
 
 const stateJson = (state: RevisionState | null) => (state === null ? null : JSON.stringify(state))
 
 export const revisions = {
-  insert: async (revision: NewRevision): Promise<Revision> => {
-    const [row] = await sql<{ id: number }[]>`INSERT INTO revision
+  insert: async (revision: NewRevision, db: Db = sql): Promise<Revision> => {
+    const [row] = await db<{ id: number }[]>`INSERT INTO revision
         (at, actor, task_id, object_type, object_id, before, after, reason)
       VALUES (${now()}, ${revision.actor}, ${revision.task_id}, ${revision.object_type}, ${revision.object_id},
         ${stateJson(revision.before)}, ${stateJson(revision.after)}, ${revision.reason})
       RETURNING id`
-    const record = row && (await getRecord(row.id))
+    const record = row && (await getRecord(row.id, db))
     if (!record) {
       throw new Error('Revision was not recorded')
     }

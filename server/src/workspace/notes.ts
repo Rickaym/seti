@@ -6,7 +6,7 @@ import { revisions } from '../store/revisions.js'
 /** Records an agent's note in the history of a pack, audited as the agent. */
 export async function addNote(
   taskId: string,
-  ref: RevisionObjectRef & { object_type: Exclude<RevisionObjectType, 'memory_file'> },
+  ref: RevisionObjectRef & { object_type: Exclude<RevisionObjectType, 'memory_file' | 'settings'> },
   label: string,
   text: string,
 ): Promise<number> {
