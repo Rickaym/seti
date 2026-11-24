@@ -11,6 +11,9 @@ import { at } from './seed.js'
 const OUT = process.env.SETI_CHAT_SHOTS ?? path.join(import.meta.dirname, '../test-results/chat-view')
 const DESIGNS = (process.env.SETI_CHAT_DESIGNS ?? 'now,a,b,c').split(',')
 
+/** The floating own-message steps cover panel edges in a still; the README hides them too. */
+const HIDDEN = '[data-testid="own-message-nav"] { visibility: hidden; }'
+
 const envelope = <T>(data: T) => ({ data, meta: {} })
 
 const GATEWAY: PullRequest = {
@@ -91,7 +94,13 @@ async function settle(page: Page): Promise<void> {
 async function save(page: Page, name: string): Promise<void> {
   await settle(page)
   fs.mkdirSync(OUT, { recursive: true })
-  await page.screenshot({ path: path.join(OUT, `${name}.png`), animations: 'disabled', caret: 'hide', scale: 'device' })
+  await page.screenshot({
+    path: path.join(OUT, `${name}.png`),
+    animations: 'disabled',
+    caret: 'hide',
+    scale: 'device',
+    style: HIDDEN,
+  })
 }
 
 async function open(browser: Browser, base: string, device: Device, theme: Theme): Promise<Page> {
@@ -138,7 +147,7 @@ test('chat view prototypes', async ({ browser, baseURL }) => {
     await desk
       .locator('[data-grid-item]')
       .first()
-      .screenshot({ path: path.join(OUT, `panel-1-${design}.png`), scale: 'device' })
+      .screenshot({ path: path.join(OUT, `panel-1-${design}.png`), scale: 'device', style: HIDDEN })
     await openDetail(desk.locator('[data-grid-item]').first(), design)
     await save(desk, `${design}-detail`)
     await desk.context().close()

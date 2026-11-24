@@ -13,13 +13,6 @@ import { Transcript } from '@/panels/tasks/Transcript'
 import type { PersonInput, WorkSpan } from '@/panels/tasks/proto/digest'
 import { chipLook, urgency, workFacts } from '@/panels/tasks/proto/facts'
 
-const updatesLabel = (count: number) => {
-  if (count === 0) {
-    return ''
-  }
-  return `${String(count)} ${count === 1 ? 'update' : 'updates'}`
-}
-
 const spanTook = (span: WorkSpan) => elapsedLabel(Date.parse(span.end) - Date.parse(span.start))
 
 /** The classic transcript of one stretch, as the current view shows it. */
@@ -80,7 +73,6 @@ export function WorkLine({
   const [open, setOpen] = useState(false)
   const live = running ? span.live : null
   const facts = workFacts(span)
-  const updates = span.updates.length
   return (
     <div data-testid="work-line" className="space-y-1">
       <button
@@ -95,9 +87,9 @@ export function WorkLine({
           aria-hidden
           className={cn('size-3.5 shrink-0 transition-transform motion-reduce:transition-none', open && 'rotate-90')}
         />
-        <span className="shrink-0 text-foreground/80">{live === null ? `Worked ${spanTook(span)}` : 'Working'}</span>
+        <span className="shrink-0 text-foreground/80">{live === null ? `Worked ${spanTook(span)}:` : 'Working:'}</span>
         <span className="min-w-0 truncate">
-          {[facts, updatesLabel(updates)].filter((part) => part !== '').join(', ')}
+          {facts}
           {span.files.length > 0 && (
             <span className="text-muted-foreground/80">
               {' '}

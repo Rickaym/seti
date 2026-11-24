@@ -157,11 +157,7 @@ function LanePair({ pair, props }: { pair: Pair; props: BodyProps }) {
   const label = work === null ? '' : `Show work: ${workFacts(work)}`
   return (
     <>
-      <div className="min-w-0 space-y-2 pr-3 pb-3" data-message-id={pair.said?.row.id}>
-        {pair.said !== null && <Said item={pair.said} props={props} />}
-        {work !== null && <StandingFailure span={work} />}
-      </div>
-      <div className="border-l border-border pb-3">
+      <div className="border-r border-border pb-3">
         {work !== null && (
           <button
             type="button"
@@ -181,6 +177,10 @@ function LanePair({ pair, props }: { pair: Pair; props: BodyProps }) {
           </button>
         )}
       </div>
+      <div className="min-w-0 space-y-2 pb-3 pl-3" data-message-id={pair.said?.row.id}>
+        {pair.said !== null && <Said item={pair.said} props={props} />}
+        {work !== null && <StandingFailure span={work} />}
+      </div>
       {open && work !== null && (
         <div className="col-span-2 pb-3">
           <SpanDetail taskId={props.taskId} rows={work.rows} running={props.running} subtasks={props.subtasks} />
@@ -190,11 +190,11 @@ function LanePair({ pair, props }: { pair: Pair; props: BodyProps }) {
   )
 }
 
-/** C: the conversation in the main column, with the work beside it in a narrow lane of marks. */
+/** C: the conversation in the main column, with the work in a narrow lane of marks to its left. */
 export function LanesBody(props: BodyProps) {
   const pairs = useMemo(() => pairUp(digest(props.messages, props.running)), [props.messages, props.running])
   return (
-    <div className="grid grid-cols-[minmax(0,1fr)_2.75rem]" data-testid="lanes">
+    <div className="grid grid-cols-[2.75rem_minmax(0,1fr)]" data-testid="lanes">
       {pairs.map((pair, n) => (
         <Fragment key={pair.said === null ? `p-${String(n)}` : `p-${String(pair.said.row.id)}`}>
           <LanePair pair={pair} props={props} />

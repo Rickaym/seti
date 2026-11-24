@@ -281,6 +281,7 @@ export const Transcript = memo(function TranscriptList({
   marks = NO_MARKS,
   blocks,
   edges = ALL_LOADED,
+  ungrouped = false,
 }: {
   taskId: string
   messages: readonly WireRow[]
@@ -293,8 +294,11 @@ export const Transcript = memo(function TranscriptList({
   blocks?: readonly TimedBlock[] | undefined
   /** What the loaded rows leave out, so a block outside them waits for its page. */
   edges?: LoadedEdges
+  /** Lists every call on its own row, as an opened stretch of work does. */
+  ungrouped?: boolean
 }) {
-  const [grouping] = useToolGrouping()
+  const [grouped] = useToolGrouping()
+  const grouping = grouped && !ungrouped
   const index = useMemo(() => indexTranscript(messages), [messages])
   const byCall = useMemo(() => new Map(subtasks.map((subtask) => [subtask.tool_use_id, subtask])), [subtasks])
   const items = useMemo(() => transcriptItems(messages, rewinds), [messages, rewinds])

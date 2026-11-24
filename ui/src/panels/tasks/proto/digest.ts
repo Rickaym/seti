@@ -170,6 +170,12 @@ export function digest(rows: readonly WireRow[], running: boolean): ChatItem[] {
     items.push(item)
   }
   close()
+  const last = items.findLast((item) => item.type === 'work' && item.span.calls.length > 0)
+  for (const item of items) {
+    if (item.type === 'work' && item !== last) {
+      item.span.standing = null
+    }
+  }
   return items
 }
 
