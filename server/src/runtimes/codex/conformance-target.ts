@@ -77,7 +77,10 @@ export const codexTarget = (bench: CodexBench): ConformanceTarget<CodexShapes, '
   host: (neutral) => ({ decide: decideWith(neutral), hooks: null, toolServers: {} }),
   rig: (script) => codexRig(bench.model, bench.folder, script),
   oneShot: {
-    runner: codexOneShotFor(bench.binary, { baseUrl: bench.baseUrl, envKey: 'OPENAI_API_KEY' }),
+    runner: codexOneShotFor(async () => Promise.resolve(bench.binary), {
+      baseUrl: bench.baseUrl,
+      envKey: 'OPENAI_API_KEY',
+    }),
     model: 'gpt-5.5',
   },
 })

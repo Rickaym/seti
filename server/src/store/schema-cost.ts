@@ -24,6 +24,22 @@ CREATE TABLE task_side_chat_cost (
 CREATE INDEX task_side_chat_cost_created ON task_side_chat_cost (created_at);
 `
 
+/** Each second opinion an agent asked: which runtime and model answered, how it went, its cost. */
+export const TASK_SECOND_OPINION = `
+CREATE TABLE task_second_opinion (
+  id BIGSERIAL PRIMARY KEY,
+  task_id TEXT NOT NULL REFERENCES task(id) ON DELETE CASCADE,
+  runtime TEXT NOT NULL,
+  model TEXT NOT NULL,
+  outcome TEXT NOT NULL,
+  cost_usd DOUBLE PRECISION,
+  estimated BOOLEAN NOT NULL,
+  created_at TEXT NOT NULL
+);
+CREATE INDEX task_second_opinion_task ON task_second_opinion (task_id, created_at);
+CREATE INDEX task_second_opinion_created ON task_second_opinion (created_at);
+`
+
 const BATCH = 500
 
 type Payload = Record<string, unknown>

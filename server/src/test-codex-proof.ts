@@ -182,6 +182,25 @@ export async function proofRun(scratch: string, binary: string, split: boolean) 
       await runTurn(task.id, 'go')
       await untilIdle(task, model)
     },
+    /** A Claude agent at Seti control Self on the same credential, which holds the OpenAI key. */
+    claudeAgent: async (): Promise<Task> => {
+      const id = randomUUID()
+      const cwd = fs.mkdtempSync(path.join(scratch, 'claude-'))
+      await tasks.insert({ id, title: `Asker ${id.slice(0, 8)}`, repo_id: null, cwd, worktree: false, pr_urls: [] })
+      await sql`UPDATE task SET seti_level = 'self' WHERE id = ${id}`
+      const task = await tasks.get(id)
+      if (task === undefined) {
+        throw new Error('The Claude agent was not stored')
+      }
+      return task
+    },
+    /** A turn in which the Codex agent asks for a second opinion through Seti's tool relay. */
+    asksOpinion: async (task: Task) => {
+      const question = 'Is taking the cache lock before the queue lock safe?'
+      model.play([[{ call: { tool: 'seti.second_opinion', args: { question } } }, { say: 'thanks' }]])
+      await runTurn(task.id, 'ask')
+      await untilIdle(task, model)
+    },
     interruptedTurn: async (task: Task) => {
       await runTurn(task.id, 'wait')
       await pause(1000)
