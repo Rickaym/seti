@@ -49,6 +49,7 @@ async function view(row: ConnectionRow): Promise<Connection> {
     hosts: row.hosts,
     header: row.header,
     mint: row.mint,
+    body: row.body,
     mint_error: row.mint_error,
     mint_checked_at: row.mint_checked_at,
     created_at: row.created_at,
@@ -103,6 +104,7 @@ const settingsLine = (settings: ConnectionSettings): AuditDetail => ({
   header: settings.header?.name ?? null,
   token_url: settings.mint?.token_url ?? null,
   scope: settings.mint?.scope ?? null,
+  body: settings.body,
 })
 
 const unique = (e: unknown) => typeof e === 'object' && e !== null && 'code' in e && e.code === '23505'
@@ -220,6 +222,7 @@ export async function createConnectionPlaceholder(
     hosts: request.hosts,
     header: request.adds_header ? { name: 'Authorization', template: 'Bearer {{value}}' } : null,
     mint: null,
+    body: request.body,
   }
   await assertFree(settings, null)
   const [row] = await insert({ settings, values: {}, profileIds: [] })
@@ -237,7 +240,8 @@ export async function createConnectionPlaceholder(
 }
 
 const sameSettings = (a: ConnectionSettings, b: ConnectionSettings) =>
-  JSON.stringify([a.env, a.hosts, a.header, a.mint]) === JSON.stringify([b.env, b.hosts, b.header, b.mint])
+  JSON.stringify([a.env, a.hosts, a.header, a.mint, a.body]) ===
+  JSON.stringify([b.env, b.hosts, b.header, b.mint, b.body])
 
 /** Changes a connection's settings; its values, placeholder and credentials stay. */
 export async function updateConnection(id: string, input: ConnectionRequest): Promise<Connection> {

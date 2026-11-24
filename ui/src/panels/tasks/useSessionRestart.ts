@@ -1,15 +1,23 @@
-import type { RestartSessionInput, Task } from '@seti/shared'
+import type { AgentCapabilities, RestartSessionInput, Task } from '@seti/shared'
 import { RotateCw } from 'lucide-react'
 import { toast } from 'sonner'
 import { apiPost, errorText } from '@/api'
 import { useCommands } from '@/components/palette/useCommands'
 import { useConfirm, type ConfirmOptions } from '@/components/ui/confirm-context'
+import { useCapabilities } from '@/hooks/useCapabilities'
 
 const ENDS = 'Background shells, processes and subagents it started end with the old process.'
 const STOPS = 'It is working now, so its turn stops first.'
 
-function question(task: Task, running: boolean): ConfirmOptions {
-  const effect = `Claude Code for "${task.title}" starts again with its MCP servers, plugins, tools and settings loaded anew.`
+/** What restarting loads anew, as far as the agent's runtime loads it. */
+function reloaded(caps: AgentCapabilities | null): string {
+  const parts = [caps?.mcp_servers === false ? '' : 'MCP servers', caps?.plugins === false ? '' : 'plugins', 'tools']
+  const named = parts.filter((part) => part !== '')
+  return `${named.join(', ')} and settings`
+}
+
+function question(task: Task, running: boolean, caps: AgentCapabilities | null): ConfirmOptions {
+  const effect = `${caps?.label ?? 'The runtime'} for "${task.title}" starts again with its ${reloaded(caps)} loaded anew.`
   return {
     title: 'Restart session',
     message: 'The conversation is kept.',
@@ -22,8 +30,9 @@ function question(task: Task, running: boolean): ConfirmOptions {
 /** Restarts the agent's session after a confirmation; `running` offers to stop the turn first. */
 export function useRestartAction(task: Task, running: boolean, onChanged: () => void) {
   const confirm = useConfirm()
+  const caps = useCapabilities(task)
   return async () => {
-    if (!(await confirm(question(task, running)))) {
+    if (!(await confirm(question(task, running, caps)))) {
       return
     }
     try {
@@ -47,7 +56,7 @@ export function useSessionRestart(task: Task, running: boolean, onChanged: () =>
       detail: task.title,
       icon: RotateCw,
       group: 'Current agent',
-      keywords: 'reload reconnect mcp servers plugins tools claude code process',
+      keywords: 'reload reconnect mcp servers plugins tools runtime process',
       when: (context) => context.agent?.id === task.id,
       run: () => void restart(),
     },
