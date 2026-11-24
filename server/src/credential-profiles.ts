@@ -64,7 +64,7 @@ export async function profileSummaries(): Promise<ProfileSummary[]> {
       name: profile.name,
       builtin: isDefault(profile.id),
       agents: counts.get(profile.id) ?? 0,
-      access_items: (await credentialAccess.all(profile.id)).length,
+      access_items: (await credentialAccess.all(profile.id)).length + (await credentialHosts.list(profile.id)).length,
     })),
   )
 }
