@@ -13,7 +13,7 @@
     "views": [{ "id": "dreams", "title": "Dreams", "icon": "moon", "where": "section", "phone": true }],
     "routes": [
       { "method": "GET", "path": "/night" },
-      { "method": "GET", "path": "/shown" },
+      { "method": "GET", "path": "/shown", "demo": true },
       { "method": "GET", "path": "/waiting" }
     ]
   }
