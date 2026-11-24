@@ -252,6 +252,13 @@ their own pages; every setting stays editable on its own page, on a phone too.
 merge patch of the document: `null` removes an item from a list keyed by name and sets any other
 setting to `null`.
 
+Export saves every setting as a file, or with Modified on only the settings that differ from
+their default. Import reads such a file and shows what it would do before anything applies: the
+plain settings it changes, the MCP server defaults and mod settings it would set (each applies
+only when you tick it), and what it leaves alone, such as security settings and secrets, with
+the page where each changes. The import is one entry in History. What the file leaves out stays
+as it is.
+
 Settings Seti reads at start live in `~/.seti/seti.env` (one `NAME=value` per line) and secrets in
 `~/.seti/credentials`, one owner-only file each. Restart Seti after a change:
 `systemctl --user restart seti.service`. `pnpm seti:doctor` reads the same file and reports a value

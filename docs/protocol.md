@@ -1044,6 +1044,11 @@ Optional and off by default: a maintenance session per agent that consolidates i
   a path whose value changed since the client read it, needs each change with a consequence
   confirmed, records the audit events the settings pages record and one revision that undoes it,
   and MUST be refused for the EA, agents, mods and devices.
+- CFG-6: An import of a settings file MUST show what it changes before anything applies and apply
+  as one revision. It MUST NOT set a secret, install, grant or switch a mod, or change a security
+  setting, sign-in, devices or share links; those are listed as not imported. Settings that
+  decide what agents may run or reach are offered item by item for the user's confirmation, and
+  lists merge: what the file names is set, what it leaves out is kept.
 
 ## 17. Mods
 

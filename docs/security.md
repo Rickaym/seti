@@ -87,6 +87,13 @@ refused whole, so no part of it applies. The write runs the same service functio
 settings pages, in one transaction, records the same audit events and one revision, and refuses a
 value that changed since it was read (CFG-5).
 
+An imported settings file is treated as hostile input (CFG-6). The server checks it whole, never
+runs anything in it, and applies only plain settings after the preview; MCP server defaults and
+mod settings apply only as items the user ticks. A secret value, a security setting, a mod's
+switch, sign-in, devices, share links and anything Seti does not know are listed as not imported
+and never applied; the preview names their paths and never repeats their values. Files are
+capped at 512 KB and twelve levels deep.
+
 ## Where each secret lives
 
 | Secret                             | Stored as                              | Read by                     |
