@@ -228,7 +228,13 @@ Settings, Sign-in (or `SETI_ANDROID_PACKAGE` and `SETI_ANDROID_CERT_SHA256`).
 
 ## Configuration
 
-Settings live in `~/.seti/seti.env` (one `NAME=value` per line) and secrets in
+Settings, JSON shows every setting Seti keeps in its database as one JSON document, the same
+values the other settings pages show: search it, copy a section or export the whole document.
+Secrets appear only as `set` or `not set`, and the page only reads; each setting changes on its
+own page. `GET /api/settings-doc` serves the document and `GET /api/settings-doc/schema` its
+JSON Schema.
+
+Settings Seti reads at start live in `~/.seti/seti.env` (one `NAME=value` per line) and secrets in
 `~/.seti/credentials`, one owner-only file each. Restart Seti after a change:
 `systemctl --user restart seti.service`. `pnpm seti:doctor` reads the same file and reports a value
 Seti would refuse.

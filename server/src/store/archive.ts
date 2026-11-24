@@ -191,9 +191,9 @@ export const archiveSettings = {
           updated_at: row.updated_at,
         }
   },
-  set: async (input: Omit<AutoArchiveSettings, 'updated_at'>): Promise<AutoArchiveSettings> => {
+  set: async (input: Omit<AutoArchiveSettings, 'updated_at'>, db: Db = sql): Promise<AutoArchiveSettings> => {
     const at = now()
-    await sql`INSERT INTO archive_settings (id, auto_enabled, auto_days, delete_after_days, resume_after_restart,
+    await db`INSERT INTO archive_settings (id, auto_enabled, auto_days, delete_after_days, resume_after_restart,
         repeat_guard, updated_at)
       VALUES (1, ${input.enabled ? 1 : 0}, ${input.days}, ${input.delete_after_days}, ${input.resume_after_restart},
         ${input.repeat_guard}, ${at})

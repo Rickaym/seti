@@ -402,8 +402,8 @@ interrupted only for that.
 - SBX-9: Every command the user runs for an agent (shell, terminal, side question, rewind helper)
   MUST run in its sandbox. An unsandboxed agent has the user's access to the host; credentials and
   the allowlist do not apply to it.
-- SBX-11: An agent MUST start another sandboxed, at level `self`, with at most its own access; what
-  was withheld is recorded.
+- SBX-11: An agent MUST start another sandboxed, at level `self`, with at most its own access and
+  approvals no looser than its own (PERM-13); what was withheld is recorded.
 - SBX-12: A maintenance session of an agent, such as a dream, runs in a sandbox of its own, with its
   own home, `/tmp` and proxy. It mounts the agent's folders, workspace, package caches and session
   folder read-only, except the agent's own memory folder and the folders the session names; a
@@ -490,6 +490,17 @@ interrupted only for that.
   call's kind and tool, the mode, both outcomes, the deciding step and rule id, never the call's
   input or a rule's text. The user and the EA read them with `GET /permissions/shadow?days=` (1
   to 30, default 7).
+- PERM-13: Approval regimes, strictest first: `user` (the user answers every call no guard or rule
+  refuses), `rules` (allow rules and the built-in allows run a call, the user answers the rest),
+  `classifier` (as `rules`, then a classifier runs or turns down the rest) and `bypass`
+  (PERM-10). A Codex agent is `user`, or `rules` while the user lets the rules decide for Codex; a
+  Claude agent is `classifier`, or `bypass` while its Bypass lasts. An agent that an agent starts
+  MUST settle no call more loosely than its starter: a Claude agent started by a Codex agent, or
+  by an agent held so, is held to a Codex agent's regime, which follows that setting, and Bypass
+  never passes on. The hold is recorded with what was withheld and in the start's audit, lasts
+  for the agent's life and leaves Bypass to the user. A Codex agent or a held one MUST NOT import
+  sessions, which would run under the classifier. The user's and the EA's starts are not held:
+  the EA has no regime of its own and starts agents only in a turn the user began (EA-8).
 
 ### 7.5 Guards
 
@@ -1000,6 +1011,16 @@ Optional and off by default: a maintenance session per agent that consolidates i
 - AUD-12: Also audited: outward calls; classifier refusals; guard refusals; refused sign-ins (rate
   limited); placeholder misuse; each restart cut, resume and hold.
 
+### 16.1 Settings document
+
+- CFG-1: The control room MUST offer its stored settings as one JSON document with a `version`, a
+  `revision` and a JSON Schema derived from the schemas that validate its settings writes. Its
+  sections follow the settings groups and pages the user sees; lists are keyed by a stable name.
+- CFG-2: The document, its schema and any error about it MUST NOT contain a secret value; a secret
+  reads `set` or `not set`.
+- CFG-3: Agents, mods and devices MUST be refused the document and its schema. The EA reads plain
+  configuration only; security settings are absent from its document and schema.
+
 ## 17. Mods
 
 - MOD-1: Tiers are `theme` (tokens only), `bundled` and `third-party`. A mod's manifest (id,
@@ -1106,19 +1127,19 @@ An implementation is SETI-compatible when it meets all of:
 
 ### 20.2 Profiles
 
-| Profile       | Adds                                                                 |
-| ------------- | -------------------------------------------------------------------- |
-| Sandbox       | all SBX, EGR, HST, CAP, SEC and CHG; PERM-10; GRD-2, GRD-7 to GRD-12 |
-| Shared tools  | all TOOL (requires Sandbox)                                          |
-| Events        | all CHN; PUB-2 (hooks)                                               |
-| Pull requests | all PR                                                               |
-| Team          | all CHAT                                                             |
-| Assistant     | all EA; LVL-6                                                        |
-| Separate node | all NODE                                                             |
-| Mods          | all MOD                                                              |
-| Sharing       | PUB-4, PUB-7                                                         |
-| Devices       | API-11                                                               |
-| Storage       | RES-16 to RES-19                                                     |
+| Profile       | Adds                                                                          |
+| ------------- | ----------------------------------------------------------------------------- |
+| Sandbox       | all SBX, EGR, HST, CAP, SEC and CHG; PERM-10, PERM-13; GRD-2, GRD-7 to GRD-12 |
+| Shared tools  | all TOOL (requires Sandbox)                                                   |
+| Events        | all CHN; PUB-2 (hooks)                                                        |
+| Pull requests | all PR                                                                        |
+| Team          | all CHAT                                                                      |
+| Assistant     | all EA; LVL-6                                                                 |
+| Separate node | all NODE                                                                      |
+| Mods          | all MOD                                                                       |
+| Sharing       | PUB-4, PUB-7                                                                  |
+| Devices       | API-11                                                                        |
+| Storage       | RES-16 to RES-19                                                              |
 
 An implementation without the Sandbox profile MUST NOT claim that agents are untrusted, and MUST
 treat every agent as holding the user's access.

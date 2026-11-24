@@ -78,6 +78,7 @@ import {
   TRIM_SESSION_INIT,
   TASK_RUNTIME,
   CODEX_SETTINGS,
+  TASK_APPROVAL_CEILING,
 } from './schema-tasks.js'
 import {
   EA_DOC_NO_DIRECT,
@@ -231,5 +232,6 @@ export const MIGRATIONS: readonly Migration[] = [
   { version: 124, name: 'dream_proposals', sql: DREAM_PROPOSALS },
   { version: 125, name: 'task_runtime', sql: TASK_RUNTIME },
   { version: 126, name: 'codex_settings', sql: CODEX_SETTINGS },
-  { version: 127, name: 'connection_body', sql: CONNECTION_BODY },
+  { version: 127, name: 'task_approval_ceiling', sql: TASK_APPROVAL_CEILING },
+  { version: 128, name: 'connection_body', sql: CONNECTION_BODY },
 ]

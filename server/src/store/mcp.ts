@@ -13,12 +13,12 @@ const toChoices = (rows: readonly ChoiceRow[]): McpChoices =>
 export const mcpDefaults = {
   all: async (): Promise<McpChoices> =>
     toChoices(await sql<ChoiceRow[]>`SELECT name, enabled FROM mcp_server_default ORDER BY name`),
-  set: async (name: string, enabled: boolean, fallback = true): Promise<void> => {
+  set: async (name: string, enabled: boolean, fallback = true, db: Db = sql): Promise<void> => {
     if (enabled === fallback) {
-      await sql`DELETE FROM mcp_server_default WHERE name = ${name}`
+      await db`DELETE FROM mcp_server_default WHERE name = ${name}`
       return
     }
-    await sql`INSERT INTO mcp_server_default (name, enabled, updated_at) VALUES (${name}, ${enabled}, ${now()})
+    await db`INSERT INTO mcp_server_default (name, enabled, updated_at) VALUES (${name}, ${enabled}, ${now()})
       ON CONFLICT (name) DO UPDATE SET enabled = excluded.enabled, updated_at = excluded.updated_at`
   },
 }

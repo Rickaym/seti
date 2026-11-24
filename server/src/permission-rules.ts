@@ -10,6 +10,7 @@ import type {
   ReviewCoverage,
   Task,
 } from '@seti/shared'
+import { claudeRules } from './approval-ceiling.js'
 import { audit } from './audit.js'
 import { permissionModeOf } from './bypass-mode.js'
 import { tasks } from './db.js'
@@ -22,7 +23,6 @@ import { builtInRules, GUARDS } from './permission-policy.js'
 import { allowed, denied, inputText, resolveRequest, waitingInput, waitsFor } from './permission-requests.js'
 import { deliverLateDecision, isLateRequest } from './restart-waits.js'
 import { reviewCoverage, reviewGaps } from './review-coverage.js'
-import { permissionSettings } from './session-options.js'
 import { permissionRequests, permissionRules } from './store/permissions.js'
 
 /** Hands every open session the permission rules its task has now, or only the one task's. */
@@ -31,7 +31,7 @@ async function refreshPermissions(taskId?: string): Promise<void> {
   for (const { agent: id } of sessions) {
     const task = taskId === undefined || id === taskId ? await tasks.get(id) : undefined
     if (task !== undefined) {
-      const policy = await permissionSettings(task)
+      const policy = await claudeRules(task)
       await controlLink.command('policy.set', { agent: id, policy }).catch((e: unknown) => {
         process.stderr.write(`permissions: task ${id}: could not update its session: ${String(e)}\n`)
       })
@@ -267,7 +267,8 @@ export async function answerPermission(
   }
   await auditAnswer(task, settled, input, edited)
   const always = input.decision === 'always'
-  const result = input.decision === 'deny' ? denied(message) : allowed(settled, call, permissionModeOf(task), always)
+  const result =
+    input.decision === 'deny' ? denied(message) : allowed(settled, call, await permissionModeOf(task), always)
   await resolveRequest(settled, result)
   if (late) {
     await deliverLateDecision(settled)
