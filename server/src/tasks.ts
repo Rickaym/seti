@@ -8,6 +8,7 @@ import {
   setupSummary,
   SETI_CONTROL_LABELS,
   type SetiControlLevel,
+  startRuntime,
   type Task,
   type TaskRequest,
   type TaskSetup,
@@ -100,7 +101,8 @@ export async function startTask(
   await contextPacks.assertLinkable(packIds)
   await setiPlugins.assertExist(input.disabled_plugin_ids)
   await requireProfile(input.profile_id)
-  await requireRuntime(input.runtime, input.profile_id)
+  const runtime = startRuntime(input)
+  await requireRuntime(runtime, input.profile_id)
   const access = await planStartAccess(input.access)
   const workspace = await startWorkspace(input.workspace_id)
   const id = randomUUID()
@@ -117,7 +119,7 @@ export async function startTask(
     pr_urls: [...new Set(input.pr_urls ?? [])],
     setup: input.setup ?? null,
     workspace_id: workspace.id,
-    runtime: input.runtime,
+    runtime,
     requested_model: input.model ?? null,
     requested_effort: input.effort ?? null,
   })

@@ -15,7 +15,7 @@ import { RETRYING_LABEL, useClientSend } from '@/hooks/useClientSend'
 import { useCommandCatalog } from '@/hooks/useCommandCatalog'
 import { useDraft } from '@/hooks/useDraft'
 import { useCoarsePointer } from '@/hooks/useMedia'
-import { useCodexReady } from '@/hooks/useRuntimes'
+import { useRuntimes } from '@/hooks/useRuntimes'
 import { useSystem } from '@/hooks/useSystem'
 import { useTasks } from '@/hooks/useTasks'
 import { useUserName } from '@/hooks/useUserName'
@@ -23,10 +23,10 @@ import { useCurrentWorkspace } from '@/hooks/useWorkspaces'
 import { withTokens } from '@/lib/attachments'
 import { NEW_TASK_PROMPT } from '@/lib/drafts'
 import { navigate } from '@/lib/route'
-import { CLAUDE_PICK, CODEX_HINT, pickFields, type RuntimePick } from '@/lib/runtime-pick'
+import { CODEX_HINT, DEFAULT_PICK, offeredPick, pickFields, type RuntimePick } from '@/lib/runtime-pick'
 import { AttachButton, DraftAttachments } from '@/panels/tasks/AttachmentChips'
 import { CommandField, ComposerStatus } from '@/panels/tasks/CommandField'
-import { RuntimeChoice } from '@/panels/tasks/RuntimeChoice'
+import { ModelPicker } from '@/panels/tasks/ModelPicker'
 
 const HINT = 'Enter starts it, Ctrl+Enter adds a line. It works in its own folder and clones what it needs.'
 const TOUCH_HINT = 'It works in its own folder and clones what it needs.'
@@ -38,7 +38,7 @@ const SHELL_IN_PROMPT =
 const inWorkspace = (input: StartAgentInput, workspaceId: string | null): StartAgentInput =>
   workspaceId === null ? input : { ...input, workspace_id: workspaceId }
 
-/** What the composer says while idle: an unsandboxed or Codex start says so first. */
+/** What the composer says while idle: a start on Codex or unsandboxed says so first. */
 function idleHint(sandboxed: boolean, touch: boolean, codex: boolean): string {
   if (codex) {
     return CODEX_HINT
@@ -103,8 +103,9 @@ export function StartPage() {
   const find = useFind()
   const [starting, setStarting] = useState(false)
   const [sandboxed, setSandboxed] = useState(true)
-  const [picked, setRuntime] = useState<RuntimePick>(CLAUDE_PICK)
-  const runtime = useCodexReady() ? picked : CLAUDE_PICK
+  const [picked, setPick] = useState<RuntimePick>(DEFAULT_PICK)
+  const pick = offeredPick(picked, useRuntimes().data?.offers ?? [])
+  const codex = pick.runtime === 'codex'
   const clientSend = useClientSend()
   const commands = useCommandCatalog('/commands', prompt.trimStart().startsWith('/'))
   const check = checkComposer(prompt, commands.commands)
@@ -126,8 +127,8 @@ export function StartPage() {
     try {
       const body = {
         ...inWorkspace(attachments.message(prompt), currentId),
-        ...(sandboxed || runtime.codex ? {} : { sandbox: false }),
-        ...pickFields(runtime),
+        ...(sandboxed || codex ? {} : { sandbox: false }),
+        ...pickFields(pick),
       }
       const task = await clientSend.run(JSON.stringify(body), async (clientId, options) =>
         apiSend<Task>('/tasks/start', { ...body, client_id: clientId }, options),
@@ -177,9 +178,9 @@ export function StartPage() {
               className="min-h-20 border-0 px-3 py-3 text-sm focus-visible:ring-0 md:text-sm dark:bg-transparent"
             />
             <div className="flex items-end gap-1 px-2 pb-2">
-              <RuntimeChoice pick={runtime} onChange={setRuntime} disabled={starting} />
+              <ModelPicker pick={pick} onChange={setPick} disabled={starting} />
               <div className="ml-auto flex shrink-0 items-center gap-1">
-                {!runtime.codex && <SandboxToggle on={sandboxed} onChange={setSandboxed} disabled={starting} />}
+                {!codex && <SandboxToggle on={sandboxed} onChange={setSandboxed} disabled={starting} />}
                 {touch && <FindButton find={find} />}
                 <AttachButton
                   disabled={starting}
@@ -210,7 +211,7 @@ export function StartPage() {
               check={check}
               commands={commands}
               shellCwd={null}
-              idle={attachments.pending ?? idleHint(sandboxed, touch, runtime.codex)}
+              idle={attachments.pending ?? idleHint(sandboxed, touch, codex)}
             />
           )}
         </div>

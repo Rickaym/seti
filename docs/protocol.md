@@ -153,7 +153,14 @@ between two steps; an interrupt; a hook at subagent start.
   a new agent or session on it MUST be refused with that reason; its agents stay readable. A
   runtime that needs a model key MUST also refuse a new agent whose credential holds no connection
   for that key, and its status MUST read "no key", not ready, while the default credential holds
-  none. Only the user changes a runtime's settings, and each change is audited.
+  none. Only the user changes a runtime's settings, and each change is audited. The control room
+  MUST offer a new agent the models of the default runtime always and those of another runtime
+  only while that runtime can start one; the runtimes it offers MUST be readable with their models
+  and efforts.
+- RT-10: A new agent's start MAY name a runtime, a model and an effort. A model alone MUST pick the
+  one runtime that offers it, and a start naming neither runs on the default runtime with the
+  user's default model. A model no runtime offers, a runtime and model that disagree, and an
+  effort the runtime does not offer MUST be refused with the reason.
 
 ## 4. Turn lifecycle
 
