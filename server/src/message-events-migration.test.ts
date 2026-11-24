@@ -94,7 +94,7 @@ describe('the message_events columns', () => {
     const rows = await filledRows()
     expect(rows.length).toBeGreaterThan(ODD.length + 100)
     for (const { kind, payload, ...filled } of rows) {
-      expect({ payload, ...filled }).toEqual({ payload, ...storedColumns(kind, payload) })
+      expect({ payload, ...filled }).toEqual({ payload, ...storedColumns(kind, payload, null) })
     }
   })
 

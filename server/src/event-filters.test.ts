@@ -104,7 +104,7 @@ describe('readers over rows the fill has not reached', () => {
     const rows = await sql<({ kind: string; payload: string } & Record<string, unknown>)[]>`SELECT kind, payload,
         runtime, thread, event, agent, turn_usd, turn_ms, turn_steps, turn_reply FROM task_message`
     for (const { kind, payload, ...stored } of rows) {
-      expect(stored).toEqual(storedColumns(kind, payload))
+      expect(stored).toEqual(storedColumns(kind, payload, null))
     }
   })
 

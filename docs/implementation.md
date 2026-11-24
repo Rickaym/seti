@@ -59,7 +59,7 @@ with another top-level folder.
 | Section        | Main files                                                                                                                                                                                                                                                                                                                                       |
 | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | 3 Entities     | `shared/src/tasks.ts`, `shared/src/inputs.ts`, `shared/src/requests.ts`, `shared/src/events.ts`, `shared/src/runtimes/`, `events/`, `db.ts`, `pending-requests.ts`                                                                                                                                                                               |
-| 4 Turns        | `runner.ts`, `session-host.ts`, `session-ingest.ts`, `session-spec.ts`, `session-realise.ts`, `runtime-host.ts`, `runtimes/`, `agent-session.ts`, `rewind.ts`, `turn-asking.ts`, `closing-line.ts`, `task-location.ts`                                                                                                                           |
+| 4 Turns        | `runner.ts`, `session-host.ts`, `session-ingest.ts`, `codex-spend.ts`, `session-spec.ts`, `session-realise.ts`, `runtime-host.ts`, `runtimes/`, `agent-session.ts`, `rewind.ts`, `turn-asking.ts`, `closing-line.ts`, `task-location.ts`                                                                                                         |
 | 4 Restarts     | `session-restart.ts`, `input-queue.ts`                                                                                                                                                                                                                                                                                                           |
 | 4 Node link    | `node-link.ts`, `node-commands.ts`, `session-control.ts`, `session-mirror.ts`, `session-setup.ts`, `session-tools.ts`, `turn-asks.ts`, `shared/src/node-protocol.ts`                                                                                                                                                                             |
 | 15.1 Node      | `node/`, `node-client.ts`, `node-split.ts`, `node-inbox.ts`, `node-outbox.ts`, `node-pid.ts`, `tool-calls-restore.ts`, `prompt-open.ts`, `store/node-*.ts`, `shared/src/node-frames.ts`                                                                                                                                                          |
@@ -101,6 +101,13 @@ with another top-level folder.
   read such a row by its JSON, so every view shows it as before. The browser asks for runtime rows
   as events (`wire=events`), which `transcript.ts` projects from the cut, redacted copy; a client
   that does not ask gets the stored form (RT-6).
+- A runtime's message is stored with kind `sdk` and read by the runtime its `runtime` column names
+  (`shared/src/runtimes/stored.ts`); a row the fill has not reached is Claude Code's, since rows
+  of any other runtime are filled when stored. A Codex message keeps the notification as Codex
+  sent it beside the agent's own thread id. Codex reports tokens per model call, so at a turn's
+  end ingest adds up the turn's calls and estimates their cost from OpenAI's public prices
+  (`server/src/codex-spend.ts`, `runtimes/codex/prices.ts`, dated); the turn end marks the cost
+  as estimated. Archives keep each row's runtime.
 - Redis holds only what can be rebuilt: GitHub PR lists and the GraphQL budget, capability and
   account probes, the EA's live context, and pub/sub for agent events and group chat across
   processes. It keeps nothing on disk and never holds a token. `SETI_REDIS_URL=off` costs cache

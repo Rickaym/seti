@@ -1,10 +1,18 @@
-import { checkMessageBody, type MessageBody, type StoredBody } from '@seti/shared'
+import { checkMessageBody, storedRuntime, type MessageBody, type StoredBody } from '@seti/shared'
 
 type Payloads = { [B in MessageBody as B['kind']]: B['payload'] }
 
 export interface RowRef {
   task_id: string
   id: number
+  /** The runtime that wrote a runtime's message; a row without one is Claude Code's. */
+  runtime?: string | null | undefined
+}
+
+/** A runtime message's stored JSON and the runtime that wrote it, null where not yet filled. */
+export interface StoredPayload {
+  payload: string
+  runtime: string | null
 }
 
 const KIND_CHARS = 40
@@ -37,7 +45,7 @@ function parseJson(text: string): Parsed {
 
 /** A message body as Seti reads it, or an unreadable stand-in the UI shows as such. */
 export function readBody(row: RowRef, kind: string, payload: unknown): StoredBody {
-  const checked = checkMessageBody(kind, payload)
+  const checked = checkMessageBody(kind, payload, storedRuntime(row.runtime))
   if (checked.ok) {
     return checked.body
   }

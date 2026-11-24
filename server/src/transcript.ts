@@ -8,6 +8,7 @@ import {
 } from '@seti/shared'
 import { fromDelegate } from './ea-guard.js'
 import { wireClaude } from './runtimes/claude/wire.js'
+import { wireCodex } from './runtimes/codex/wire.js'
 import { scrubValue } from './scrub.js'
 import { trimText, WIRE_TEXT_LIMIT, type Wire } from './wire-text.js'
 
@@ -29,6 +30,10 @@ function trimRow(row: MessageRow): MessageRow {
   }
   if (row.kind !== 'sdk') {
     return row
+  }
+  if (row.runtime === 'codex') {
+    const { value, cut } = wireCodex(row.payload)
+    return cut.length === 0 ? { ...row, payload: value } : { ...row, payload: value, trimmed: cut }
   }
   const { value, cut } = wireClaude(row.payload)
   return cut.length === 0 ? { ...row, payload: value } : { ...row, payload: value, trimmed: cut }

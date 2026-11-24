@@ -115,12 +115,27 @@ export type Item = z.infer<typeof threadItem>
 
 export const turnParams = z.looseObject({ turn })
 
+const count = z.number().nonnegative()
+
+/** What a turn spent, summed by Seti from its model calls; `usd` is an estimate. */
+const turnSpend = z.looseObject({
+  input: count,
+  output: count,
+  cacheRead: count,
+  cacheWrite: count.optional(),
+  reasoning: count,
+  usd: count.optional(),
+})
+
+export type TurnSpend = z.infer<typeof turnSpend>
+
 /** A message as Seti stores it: the notification or request unchanged, and the agent's thread. */
 export const stored = z.looseObject({
   root: text,
   message: z.looseObject({ method: text, params: z.unknown().optional() }),
   reply: z.unknown().optional(),
   job: z.looseObject({ id: text, stopped: z.boolean().optional() }).optional(),
+  spent: turnSpend.optional(),
 })
 
 /** Codex's list of a thread's background terminals. */

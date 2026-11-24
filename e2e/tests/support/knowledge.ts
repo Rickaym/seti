@@ -1,5 +1,5 @@
 import type { APIRequestContext } from '@playwright/test'
-import type { Envelope, KnowledgeNote, MessagePage, Task } from '@seti/shared'
+import { type Envelope, isClaudeRow, type KnowledgeNote, type MessagePage, type Task } from '@seti/shared'
 import { setiPrompt, SYSTEM_PROMPT_PROMPT } from './fake-claude.js'
 import { apiData, expect, unique } from './fixtures.js'
 
@@ -46,7 +46,7 @@ export async function newAgentIndex(request: APIRequestContext): Promise<string>
   const agent = await startAgent(request, SYSTEM_PROMPT_PROMPT)
   const { messages } = await apiData<MessagePage>(request, `/tasks/${agent.id}/messages?limit=50`)
   const texts = messages.flatMap((row) =>
-    row.kind === 'sdk' && row.payload.type === 'assistant'
+    isClaudeRow(row) && row.payload.type === 'assistant'
       ? row.payload.message.content.flatMap((block) => (block.type === 'text' ? [block.text] : []))
       : [],
   )

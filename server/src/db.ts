@@ -23,7 +23,7 @@ import { pickAgentColor } from './new-agent-color.js'
 import { connect, ensureDatabase, migrate, written, type Alongside, type Db } from './pg.js'
 import { scrubValue } from './scrub.js'
 import { eventFilters } from './store/event-filters.js'
-import { readBody, readOutward, readPayload, readStoredBody, storedJson } from './stored-rows.js'
+import { readBody, readOutward, readPayload, readStoredBody, storedJson, type StoredPayload } from './stored-rows.js'
 
 export type { Db, Pool } from './pg.js'
 
@@ -85,6 +85,8 @@ export interface MessageRecord {
   payload: string
   outward: string
   created_at: string
+  /** The runtime that wrote it, filled with its events; null on a row the fill has not reached. */
+  runtime?: string | null
 }
 
 const TASK_SELECT = sql`SELECT t.*, r.slug AS repo_slug,
@@ -347,7 +349,8 @@ export const messages = {
   insert: async (taskId: string, body: MessageBody, outward: string[], alongside?: Alongside): Promise<MessageRow> => {
     const createdAt = now()
     const id = await written(sql, async (db) => insertMessage(db, { taskId, body, outward, createdAt }), alongside)
-    const read = readBody({ task_id: taskId, id }, body.kind, scrubValue(body.payload))
+    const runtime = body.kind === 'sdk' ? body.runtime : undefined
+    const read = readBody({ task_id: taskId, id, runtime }, body.kind, scrubValue(body.payload))
     return { ...read, id, task_id: taskId, outward, created_at: createdAt }
   },
   /** The first `limit` of the task's rows after `afterId`, own or not. */
@@ -428,13 +431,13 @@ export const messages = {
   /** The payloads of the agent's own last replies since the latest prompt, oldest first. */
   turnEnding: async (taskId: string) =>
     (
-      await sql<{ payload: string }[]>`SELECT payload FROM (
-        SELECT id, payload FROM task_message
+      await sql<StoredPayload[]>`SELECT payload, runtime FROM (
+        SELECT id, payload, COALESCE(runtime, 'claude') AS runtime FROM task_message
         WHERE task_id = ${taskId} AND kind = 'sdk' AND ${rowFilter.agentRow} AND ${rowFilter.ownThread}
           AND id > COALESCE((SELECT MAX(p.id) FROM task_message p WHERE p.task_id = ${taskId} AND p.kind = 'prompt'), 0)
         ORDER BY id DESC LIMIT ${TURN_ENDING_ROWS}
       ) AS ending ORDER BY id`
-    ).map((row) => row.payload),
+    ).map(({ payload, runtime }) => ({ payload, runtime })),
   get: async (taskId: string, id: number) => {
     const [record] = await sql<MessageRecord[]>`SELECT * FROM task_message WHERE task_id = ${taskId} AND id = ${id}`
     return record && toMessage(record)

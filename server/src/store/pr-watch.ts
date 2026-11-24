@@ -22,6 +22,8 @@ export interface StoredCall {
   task_id: string
   payload: string
   created_at: string
+  /** The runtime that wrote it; null on a row the event fill has not reached. */
+  runtime?: string | null | undefined
 }
 
 /** Enough of a task's newest candidate calls to find one that pushed. */
@@ -56,7 +58,8 @@ export const prWatch = {
   ],
   /** Tool calls and results of the tasks linked to the PR, stored between `from` and `to`. */
   calls: async (url: string, from: string, to: string): Promise<StoredCall[]> => [
-    ...(await sql<StoredCall[]>`SELECT m.task_id, m.payload, m.created_at FROM task_message m
+    ...(await sql<StoredCall[]>`SELECT m.task_id, m.payload, m.created_at, COALESCE(m.runtime, 'claude') AS runtime
+      FROM task_message m
       WHERE m.task_id IN (SELECT task_id FROM task_pr WHERE pr_url = ${url}) AND m.kind = 'sdk'
         AND m.created_at >= ${from} AND m.created_at <= ${to}
         AND (strpos(m.payload, '"tool_use"') > 0 OR strpos(m.payload, '"tool_result"') > 0)
@@ -64,7 +67,8 @@ export const prWatch = {
   ],
   /** The task's newest calls that may push or open a PR since its last CI update on `subject`. */
   pushCalls: async (taskId: string, subject: string): Promise<StoredCall[]> => [
-    ...(await sql<StoredCall[]>`SELECT m.task_id, m.payload, m.created_at FROM task_message m
+    ...(await sql<StoredCall[]>`SELECT m.task_id, m.payload, m.created_at, COALESCE(m.runtime, 'claude') AS runtime
+      FROM task_message m
       WHERE m.task_id = ${taskId} AND m.kind = 'sdk' AND strpos(m.payload, '"tool_use"') > 0
         AND (strpos(m.payload, 'push') > 0 OR strpos(m.payload, 'gh pr create') > 0
           OR strpos(m.payload, '/pulls') > 0 OR strpos(m.payload, 'create_pull_request') > 0)

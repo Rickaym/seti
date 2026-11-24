@@ -1,6 +1,8 @@
 import {
   projectClaude,
+  projectCodex,
   type ClaudeMessage,
+  type CodexMessage,
   type JournalEntry,
   type MessageBody,
   type MessageRow,
@@ -9,6 +11,7 @@ import {
 } from '@seti/shared'
 import { audit } from './audit.js'
 import { closingLine } from './closing-line.js'
+import { withSpend } from './codex-spend.js'
 import { auditBlockedKey } from './connection-egress.js'
 import { linkCreatedPrs } from './created-prs.js'
 import { messages, tasks } from './db.js'
@@ -25,7 +28,7 @@ import { processStarted, recordStart, settleRewind, setupAnswers } from './sessi
 import { unstored } from './session-start.js'
 import { forgetSessionTools } from './session-tools.js'
 import { countShadow } from './shadow-counts.js'
-import { recordTurnCost } from './store/cost.js'
+import { addTurnCost, recordTurnCost } from './store/cost.js'
 import { hadRunningSubtask } from './subtask-cache.js'
 import { publishFolded, publishSubtasks } from './subtask-prs.js'
 import { publish } from './task-events.js'
@@ -76,10 +79,10 @@ async function withCost(taskId: string, m: ClaudeMessage): Promise<ClaudeMessage
   return cost === null ? m : withTurnCost(m, cost)
 }
 
-async function record(taskId: string, m: ClaudeMessage, events: readonly RuntimeEvent[]): Promise<void> {
+async function record(taskId: string, body: MessageBody, events: readonly RuntimeEvent[]): Promise<void> {
   const outward = outwardCalls(events)
   trackToolCalls(taskId, events)
-  await appendMessage(taskId, { kind: 'sdk', payload: await withCost(taskId, m) }, outward)
+  await appendMessage(taskId, body, outward)
   await audit.outwardCalls(taskId, events, outward)
   await audit.classifierDenial(taskId, events)
   if (outward.length > 0) {
@@ -94,7 +97,16 @@ async function storeMessage(taskId: string, m: ClaudeMessage): Promise<void> {
     return
   }
   const events = projectClaude(m)
-  await record(taskId, m, events)
+  await record(taskId, { kind: 'sdk', payload: await withCost(taskId, m) }, events)
+  await recordStart(taskId, events)
+}
+
+/** Stores a message of a Codex session, with what its turn spent where it ends one. */
+async function storeCodexMessage(taskId: string, raw: CodexMessage): Promise<void> {
+  const m = await withSpend(taskId, raw, projectCodex(raw))
+  const events = projectCodex(m)
+  await addTurnCost(taskId, m.spent?.usd ?? 0)
+  await record(taskId, { kind: 'sdk', runtime: 'codex', payload: m }, events)
   await recordStart(taskId, events)
 }
 
@@ -127,7 +139,10 @@ type Ingest = { [T in JournalEntry['type']]: (taskId: string, entry: EntryOf<T>)
 /** What the control plane does with each entry a node reports. */
 const ingest: Ingest = {
   // The runtime adapter of the session wrote the payload.
-  message: async (taskId, { payload }) => storeMessage(taskId, payload as ClaudeMessage),
+  message: async (taskId, { runtime, payload }) =>
+    runtime === 'codex'
+      ? storeCodexMessage(taskId, payload as CodexMessage)
+      : storeMessage(taskId, payload as ClaudeMessage),
   'turn.started': async (taskId) => setStatus(taskId, 'running'),
   'turn.ended': async (taskId, { status, error }) => reportEnd(taskId, status, error),
   note: async (taskId, { error }) => appendMessage(taskId, { kind: 'seti', payload: { error } }),

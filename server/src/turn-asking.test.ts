@@ -34,12 +34,14 @@ describe('turnBlocks', () => {
   const reply = (content: unknown) => JSON.stringify({ type: 'assistant', message: { content } })
 
   it('reads text and tool use blocks of stored replies in order, skipping unreadable ones', () => {
-    const blocks = turnBlocks([
-      reply([{ type: 'text', text: 'Checking.' }]),
-      '{not json',
-      reply('plain'),
-      reply([{ type: 'tool_use', name: 'AskUserQuestion', input: {} }, 'stray', { text: 'no type' }]),
-    ])
+    const blocks = turnBlocks(
+      [
+        reply([{ type: 'text', text: 'Checking.' }]),
+        '{not json',
+        reply('plain'),
+        reply([{ type: 'tool_use', name: 'AskUserQuestion', input: {} }, 'stray', { text: 'no type' }]),
+      ].map((payload) => ({ payload, runtime: null })),
+    )
     expect(blocks).toEqual([
       { type: 'text', text: 'Checking.', name: undefined },
       { type: 'tool_use', text: undefined, name: 'AskUserQuestion' },

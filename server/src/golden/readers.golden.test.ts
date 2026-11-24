@@ -1,4 +1,4 @@
-import { closingQuestion, projectClaude, type MessageRow, rowEvents } from '@seti/shared'
+import { closingQuestion, isClaudeRow, type MessageRow, projectClaude, rowEvents } from '@seti/shared'
 import { describe, expect, it } from 'vitest'
 import { ShellIndex } from '../background-shells.js'
 import { buildDigest, toolLabel } from '../digest.js'
@@ -12,14 +12,14 @@ import { asciiJson } from './json.js'
 
 const corpus = goldenCorpus()
 
-const sdkPayloads = (rows: readonly MessageRow[]) => rows.flatMap((row) => (row.kind === 'sdk' ? [row.payload] : []))
+const sdkPayloads = (rows: readonly MessageRow[]) => rows.flatMap((row) => (isClaudeRow(row) ? [row.payload] : []))
 
 /** Todos, subtasks and background shells as they stood after each turn of the transcript. */
 function afterTurns(rows: readonly MessageRow[]) {
   const shells = new ShellIndex()
   return rows.flatMap((row, index) => {
     shells.apply(row)
-    if (row.kind !== 'sdk' || row.payload.type !== 'result') {
+    if (!isClaudeRow(row) || row.payload.type !== 'result') {
       return []
     }
     const before = rows.slice(0, index + 1)
@@ -43,7 +43,7 @@ function render({ rows }: GoldenTranscript) {
     turns: afterTurns(rows),
     outward: payloads.flatMap((m) => outwardCalls(projectClaude(m))),
     prs: { created: [...evidence.created], pushedTo: [...evidence.pushedTo], pushes: evidence.pushes },
-    asks: closingQuestion(turnBlocks(own.map((m) => JSON.stringify(m)))),
+    asks: closingQuestion(turnBlocks(own.map((m) => ({ payload: JSON.stringify(m), runtime: null })))),
     labels: rows.flatMap((row) =>
       rowEvents(row).flatMap((e) => (e.type === 'tool.started' ? [toolLabel(e.call)] : [])),
     ),

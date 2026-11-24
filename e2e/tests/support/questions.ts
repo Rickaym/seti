@@ -1,5 +1,5 @@
 import type { APIRequestContext, Locator, Page } from '@playwright/test'
-import type { Envelope, MessagePage, Task } from '@seti/shared'
+import { type Envelope, isClaudeRow, type MessagePage, type Task } from '@seti/shared'
 import { apiData, expect, toasts, unique } from './fixtures.js'
 
 /** Starts an agent on a question prompt and waits until its questions hold it in Needs you. */
@@ -17,7 +17,7 @@ export async function askingAgent(request: APIRequestContext, name: string, prom
 export async function lastReply(request: APIRequestContext, taskId: string): Promise<string> {
   const { messages } = await apiData<MessagePage>(request, `/tasks/${taskId}/messages?limit=50`)
   const texts = messages.flatMap((row) =>
-    row.kind === 'sdk' && row.payload.type === 'assistant'
+    isClaudeRow(row) && row.payload.type === 'assistant'
       ? row.payload.message.content.flatMap((block) => (block.type === 'text' ? [block.text] : []))
       : [],
   )
@@ -28,7 +28,7 @@ export async function lastReply(request: APIRequestContext, taskId: string): Pro
 export async function lastToolResult(request: APIRequestContext, taskId: string): Promise<string> {
   const { messages } = await apiData<MessagePage>(request, `/tasks/${taskId}/messages?limit=50`)
   const results = messages.flatMap((row) => {
-    if (row.kind !== 'sdk' || row.payload.type !== 'user') {
+    if (!isClaudeRow(row) || row.payload.type !== 'user') {
       return []
     }
     const { content } = row.payload.message

@@ -1,4 +1,4 @@
-import type { MessageRow, PrInput, TaskStatus } from '@seti/shared'
+import { isClaudeRow, type MessageRow, type PrInput, type TaskStatus } from '@seti/shared'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { createApp } from './app.js'
 import { messages, tasks } from './db.js'
@@ -93,7 +93,7 @@ function label(row: MessageRow): string {
     const notes = [queued, interrupted === true ? 'interrupted' : undefined].filter((note) => note !== undefined)
     return ['prompt:', text, ...notes.map((note) => `(${note})`)].join(' ')
   }
-  if (row.kind !== 'sdk') {
+  if (!isClaudeRow(row)) {
     return row.kind
   }
   const { payload } = row

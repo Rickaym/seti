@@ -1,6 +1,8 @@
 import { z } from 'zod'
 import { firstIssue } from './lenient.js'
 import { modelFallbackMessage } from './model-fallback.js'
+import { stored as codexPayload } from './runtimes/codex/shapes.js'
+import type { StoredRuntime } from './runtimes/stored.js'
 import { setiControlLevel } from './seti-control.js'
 import type { MessageBody } from './tasks.js'
 
@@ -142,14 +144,20 @@ const PAYLOADS = new Map<string, z.ZodType>([
 
 export type BodyCheck = { ok: true; body: MessageBody } | { ok: false; reason: string }
 
-/** Checks the fields Seti reads against their types; any other field passes through untouched. */
-export function checkMessageBody(kind: string, payload: unknown): BodyCheck {
-  const schema = PAYLOADS.get(kind)
+/**
+ * Checks the fields Seti reads against their types; any other field passes through untouched. A
+ * runtime's message is checked as the stored row's `runtime` wrote it.
+ */
+export function checkMessageBody(kind: string, payload: unknown, runtime: StoredRuntime = 'claude'): BodyCheck {
+  const codex = kind === 'sdk' && runtime === 'codex'
+  const schema = codex ? codexPayload : PAYLOADS.get(kind)
   if (schema === undefined) {
     return { ok: false, reason: 'unknown kind' }
   }
   const parsed = schema.safeParse(payload)
-  return parsed.success
-    ? ({ ok: true, body: { kind, payload } } as { ok: true; body: MessageBody })
-    : { ok: false, reason: firstIssue(parsed.error) }
+  if (!parsed.success) {
+    return { ok: false, reason: firstIssue(parsed.error) }
+  }
+  const body = codex ? { kind, payload, runtime } : { kind, payload }
+  return { ok: true, body } as { ok: true; body: MessageBody }
 }

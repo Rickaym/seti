@@ -1,4 +1,4 @@
-import { turnCostOf } from '@seti/shared'
+import { isClaudeRow, turnCostOf } from '@seti/shared'
 import { describe, expect, it, vi } from 'vitest'
 import { messages, tasks } from './db.js'
 import type { FakeSession } from './fake-sdk.js'
@@ -104,7 +104,7 @@ const costOf = async (taskId: string) => (await tasks.get(taskId))?.cost_usd ?? 
 
 async function turnCosts(taskId: string): Promise<(number | null)[]> {
   const rows = (await messages.page(taskId, 200)).messages
-  return rows.flatMap((row) => (row.kind === 'sdk' && row.payload.type === 'result' ? [turnCostOf(row.payload)] : []))
+  return rows.flatMap((row) => (isClaudeRow(row) && row.payload.type === 'result' ? [turnCostOf(row.payload)] : []))
 }
 
 describe('the cost of an agent', () => {

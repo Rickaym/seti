@@ -1,5 +1,12 @@
 import fs from 'node:fs'
-import { projectClaude, type MessageBody, type MessageRow, type WirePage, type WireRow } from '@seti/shared'
+import {
+  isClaudeRow,
+  type MessageBody,
+  type MessageRow,
+  projectClaude,
+  type WirePage,
+  type WireRow,
+} from '@seti/shared'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { createApp } from '../app.js'
 import { messages, tasks } from '../db.js'
@@ -72,7 +79,7 @@ afterAll(() => {
 /** What a client that asks for events must get for a stored row: its wire copy's events. */
 function asEvents(row: MessageRow): WireRow {
   const wire = wireRow(row)
-  return wire.kind === 'sdk'
+  return isClaudeRow(wire)
     ? {
         id: wire.id,
         task_id: wire.task_id,

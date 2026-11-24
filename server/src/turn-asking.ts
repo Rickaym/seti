@@ -9,10 +9,11 @@ import {
 } from '@seti/shared'
 import { messages } from './db.js'
 import { redactSecrets } from './scrub.js'
+import type { StoredPayload } from './stored-rows.js'
 
 /** The text and tool calls of stored agent messages, in order; unreadable ones are left out. */
-export const turnBlocks = (payloads: readonly string[]): TurnBlock[] =>
-  payloads.flatMap((payload) => turnBlocksOf(payloadEvents(payload)))
+export const turnBlocks = (rows: readonly StoredPayload[]): TurnBlock[] =>
+  rows.flatMap((row) => turnBlocksOf(payloadEvents(row.payload, row.runtime)))
 
 /** What the task's last turn ended by asking the user in prose. */
 const turnQuestion = async (taskId: string): Promise<ProseQuestion> =>

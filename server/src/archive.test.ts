@@ -193,6 +193,19 @@ describe('archive codec', () => {
     await expect(decodeArchive({ ...encoded, sha256: '0'.repeat(64) })).rejects.toThrow(/checksum/)
     await expect(writer.add([{ ...rows[0], id: 1 } as StoredMessage])).rejects.toThrow(/ascending/)
   })
+
+  it('keeps the runtime of a row another runtime wrote, and writes Claude rows as before', async () => {
+    const claude = { id: 1, kind: 'sdk', payload: '{}', outward: '[]', created_at: '2026-11-24T00:00:00.000Z' }
+    const codex = { ...claude, id: 2, runtime: 'codex' }
+    const writer = new ArchiveWriter()
+    await writer.add([claude, codex])
+    expect(await decodeArchive(await writer.finish())).toEqual([claude, codex])
+    const alone = new ArchiveWriter()
+    await alone.add([claude])
+    const plain = new ArchiveWriter()
+    await plain.add([{ ...claude, runtime: null }])
+    expect((await plain.finish()).sha256).toBe((await alone.finish()).sha256)
+  })
 })
 
 describe('archive and restore', () => {

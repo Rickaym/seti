@@ -48,7 +48,7 @@ async function seedAgent(plan: SeedPlan, agent: AgentSeed): Promise<void> {
   )
   for (const [n, [kind, payload]] of agent.transcript.rows.entries()) {
     const json = JSON.stringify(payload)
-    const columns = storedColumns(kind, json)
+    const columns = storedColumns(kind, json, null)
     await plan.run(
       `INSERT INTO task_message (task_id, kind, payload, outward, created_at, ${EVENT_COLUMNS.join(', ')})
        VALUES (?, ?, ?, '[]', ?, ${EVENT_COLUMNS.map(() => '?').join(', ')})`,

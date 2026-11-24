@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { MEMORY_EVENTS } from './memory.js'
 import { policyShadowCount } from './policy-shadow.js'
 import { cpuScopeSchema, memoryScopeSchema } from './processes.js'
+import { STORED_RUNTIMES } from './runtimes/stored.js'
 import { TASK_STATUSES } from './tasks.js'
 
 /** An attachment of a message the node hands its session, as the agent's workspace holds it. */
@@ -54,7 +55,7 @@ const memoryReport = z.object({
  * travels as the runtime wrote it; the control plane decides what it means.
  */
 export const journalEntry = z.discriminatedUnion('type', [
-  z.object({ type: z.literal('message'), runtime: z.enum(['claude']), payload: z.unknown() }),
+  z.object({ type: z.literal('message'), runtime: z.enum(STORED_RUNTIMES), payload: z.unknown() }),
   z.object({ type: z.literal('turn.started') }),
   z.object({ type: z.literal('turn.ended'), status: z.enum(TASK_STATUSES), error: z.string().nullable() }),
   z.object({ type: z.literal('note'), error: z.string() }),

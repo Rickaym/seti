@@ -1,5 +1,12 @@
 import type { Page } from '@playwright/test'
-import { BUILTIN_ROLES, type ContextPack, type ContextPackSummary, type MessagePage, type Task } from '@seti/shared'
+import {
+  BUILTIN_ROLES,
+  type ContextPack,
+  type ContextPackSummary,
+  isClaudeRow,
+  type MessagePage,
+  type Task,
+} from '@seti/shared'
 import { settingsDialog, showSection } from './support/agent-settings.js'
 import { SYSTEM_PROMPT_PROMPT } from './support/fake-claude.js'
 import { apiData, expect, test, toasts, unique, waitForToastsToClear } from './support/fixtures.js'
@@ -40,7 +47,7 @@ async function promptReply(page: Page, taskId: string): Promise<string> {
     .poll(async () => {
       const { messages } = await apiData<MessagePage>(page.request, `/tasks/${taskId}/messages?limit=50`)
       const texts = messages.flatMap((row) =>
-        row.kind === 'sdk' && row.payload.type === 'assistant'
+        isClaudeRow(row) && row.payload.type === 'assistant'
           ? row.payload.message.content.flatMap((block) => (block.type === 'text' ? [block.text] : []))
           : [],
       )

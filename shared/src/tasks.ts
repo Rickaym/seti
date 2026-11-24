@@ -16,6 +16,8 @@ import { disabledPluginIds } from './plugins.js'
 import { prUrl } from './pr-url.js'
 import type { RepoRef } from './repos.js'
 import type { ClaudeMessage } from './runtimes/claude/message.js'
+import type { CodexMessage } from './runtimes/codex/project.js'
+import { STORED_RUNTIMES, type StoredRuntime } from './runtimes/stored.js'
 import { DEFAULT_SETI_CONTROL, setiControlLevel, type SetiControlLevel } from './seti-control.js'
 import type { ShellProgress, ShellResult } from './shell.js'
 import type { SubtaskBrief } from './subtasks.js'
@@ -273,7 +275,13 @@ export interface Task {
   source_session_id: string | null
   status: TaskStatus
   permission_mode: string | null
+  /** The model the agent's session last reported. */
   model: string | null
+  /** The runtime the agent runs on. */
+  runtime: StoredRuntime
+  /** The model and effort chosen when the agent started; null for the runtime's default. */
+  requested_model: string | null
+  requested_effort: string | null
   /** The fallback model Claude Code moved the session to after a refusal; null while on its own. */
   model_fallback: ModelFallback | null
   cost_usd: number
@@ -348,7 +356,9 @@ export interface MessageBase {
 
 export type MessageBody =
   | { kind: 'prompt'; payload: PromptPayload }
-  | { kind: 'sdk'; payload: ClaudeMessage }
+  /** A runtime's message as it sent it; `runtime` names any runtime but Claude Code. */
+  | { kind: 'sdk'; payload: ClaudeMessage; runtime?: undefined }
+  | { kind: 'sdk'; payload: CodexMessage; runtime: 'codex' }
   /**
    * A note from Seti; `stopped` marks one about a process the user stopped, `session` one about a
    * session restart and `seti_control` one about the agent's Seti control level, which the agent
@@ -474,6 +484,9 @@ export const taskFields = {
   status: orDefault<TaskStatus>('status', z.enum(TASK_STATUSES), UNKNOWN_STATUS),
   permission_mode: maybeText('permission_mode'),
   model: maybeText('model'),
+  runtime: orDefault<StoredRuntime>('runtime', z.enum(STORED_RUNTIMES), 'claude'),
+  requested_model: maybeText('requested_model'),
+  requested_effort: maybeText('requested_effort'),
   model_fallback: opaque<ModelFallback>('model_fallback'),
   cost_usd: amount('cost_usd'),
   outward_count: amount('outward_count'),

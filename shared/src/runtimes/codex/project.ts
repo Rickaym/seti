@@ -11,6 +11,7 @@ import {
   threadStarted,
   tokenUsage,
   turnParams,
+  type TurnSpend,
   userInputAnswer,
   userInputRequest,
   userMessage,
@@ -33,6 +34,8 @@ export interface CodexMessage {
   reply?: unknown
   /** The background command whose end this message reports. */
   job?: CodexJob
+  /** What the turn this message ends spent, as Seti summed it when it stored the message. */
+  spent?: TurnSpend
 }
 
 type Vendor = Extract<Event, { type: 'vendor' }>
@@ -204,6 +207,17 @@ function projectJobEnd(params: unknown, job: CodexJob, at: Thread): Event[] {
   }
 }
 
+/** A turn end with the tokens Seti summed for it, and the cost it estimated from them. */
+function withSpend(event: Event, spent: TurnSpend | undefined): Event {
+  if (spent === undefined || event.type !== 'turn.ended') {
+    return event
+  }
+  const { input, output, cacheRead, cacheWrite, usd } = spent
+  const tokens = { input, output, cacheRead, reasoning: spent.reasoning }
+  const counted = { ...tokens, ...(cacheWrite === undefined ? {} : { cacheWrite }) }
+  return { ...event, usage: counted, ...(usd === undefined ? {} : { costUsd: usd, costEstimated: true }) }
+}
+
 /** The thread a message belongs to: empty for the agent's own, else the subagent's thread id. */
 function threadOf(params: unknown, root: string): string {
   const id = typeof params === 'object' && params !== null ? (params as { threadId?: unknown }).threadId : undefined
@@ -220,7 +234,7 @@ export function projectCodex(raw: unknown): RuntimeEvent[] {
   if (!envelope.success) {
     return [{ ...vendor('', 'codex'), unreadable: true }]
   }
-  const { root, message, reply, job } = envelope.data
+  const { root, message, reply, job, spent } = envelope.data
   const at = { thread: threadOf(message.params, root) }
   if (reply !== undefined) {
     return projectReply(message, reply, at, root)
@@ -233,7 +247,7 @@ export function projectCodex(raw: unknown): RuntimeEvent[] {
     return [vendor(at.thread, message.method)]
   }
   try {
-    return [map(message.params, at, root)]
+    return [withSpend(map(message.params, at, root), spent)]
   } catch {
     return [{ ...vendor(at.thread, message.method), unreadable: true }]
   }

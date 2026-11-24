@@ -65,7 +65,8 @@ async function tableBytes(tx: Db, taskId: string): Promise<number> {
 async function encodeTranscript(tx: Db, taskId: string) {
   const writer = new ArchiveWriter()
   for (let after = 0; ;) {
-    const rows = await tx<StoredMessage[]>`SELECT id, kind, payload, outward, created_at FROM task_message
+    const rows = await tx<StoredMessage[]>`SELECT id, kind, payload, outward, created_at,
+        CASE WHEN kind = 'sdk' AND runtime <> 'claude' THEN runtime END AS runtime FROM task_message
       WHERE task_id = ${taskId} AND id > ${after} ORDER BY id LIMIT ${READ_BATCH}`
     const last = rows.at(-1)
     if (last === undefined) {
@@ -80,7 +81,11 @@ async function encodeTranscript(tx: Db, taskId: string) {
 async function insertRows(tx: Db, taskId: string, rows: readonly StoredMessage[]): Promise<void> {
   for (let start = 0; start < rows.length; start += INSERT_BATCH) {
     const batch = rows.slice(start, start + INSERT_BATCH)
-    const filled = batch.map((row) => ({ ...row, task_id: taskId, ...storedColumns(row.kind, row.payload) }))
+    const filled = batch.map((row) => ({
+      ...row,
+      task_id: taskId,
+      ...storedColumns(row.kind, row.payload, row.runtime ?? null),
+    }))
     await tx`INSERT INTO task_message ${tx(filled, [...STORED_COLUMNS, ...EVENT_COLUMNS])}`
   }
 }

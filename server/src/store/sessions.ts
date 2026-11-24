@@ -15,11 +15,13 @@ export interface SessionInit {
   task_id: string
   at: string
   payload: string
+  runtime: string | null
 }
 
 /** The latest session start of a task, as recorded: its time and its init message. */
 export async function latestSessionInit(taskId: string): Promise<SessionInit | undefined> {
-  const rows = await sql<SessionInit[]>`SELECT id, task_id, created_at AS at, payload FROM task_message
+  const rows = await sql<SessionInit[]>`SELECT id, task_id, created_at AS at, payload,
+    COALESCE(runtime, 'claude') AS runtime FROM task_message
     WHERE task_id = ${taskId} AND kind = 'sdk' AND ${rowFilter.sessionStart}
     ORDER BY id DESC LIMIT 1`
   return rows[0]

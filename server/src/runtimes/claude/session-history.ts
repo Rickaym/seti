@@ -116,7 +116,9 @@ export function sessionPrs(raw: readonly SessionMessage[], history: readonly Bac
   const watch = createPrWatcher()
   const created = new Set<string>()
   for (const { body } of history) {
-    for (const pr of body.kind === 'sdk' ? watch('session', projectClaude(body.payload)) : []) {
+    for (const pr of body.kind === 'sdk' && body.runtime === undefined
+      ? watch('session', projectClaude(body.payload))
+      : []) {
       created.add(pr.url)
     }
   }

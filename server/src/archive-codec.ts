@@ -9,6 +9,8 @@ export interface StoredMessage {
   payload: string
   outward: string
   created_at: string
+  /** The runtime of a runtime message by any runtime but Claude Code; absent otherwise. */
+  runtime?: string | null
 }
 
 /** Where one independently compressed run of rows sits in the archive blob. */
@@ -59,16 +61,21 @@ const rowBytes = (row: StoredMessage) =>
 
 const SAFE_FIELD = /^[^\t\n]*$/
 
-/** Each row is a header line `id kind created_at payload-bytes outward-bytes`, then both texts. */
+/**
+ * Each row is a header line `id kind created_at payload-bytes outward-bytes`, then both texts;
+ * a row another runtime than Claude Code wrote ends its header with that runtime.
+ */
 function encodeRows(rows: readonly StoredMessage[]): Buffer {
   const parts: Buffer[] = []
   for (const row of rows) {
-    if (!SAFE_FIELD.test(row.kind) || !SAFE_FIELD.test(row.created_at)) {
-      throw new Error(`Message ${String(row.id)} has a kind or time that cannot be archived`)
+    const runtime = row.runtime ?? ''
+    if (!SAFE_FIELD.test(row.kind) || !SAFE_FIELD.test(row.created_at) || !SAFE_FIELD.test(runtime)) {
+      throw new Error(`Message ${String(row.id)} has a kind, time or runtime that cannot be archived`)
     }
     const payload = Buffer.from(row.payload, 'utf8')
     const outward = Buffer.from(row.outward, 'utf8')
-    const header = [row.id, row.kind, row.created_at, payload.length, outward.length].join('\t')
+    const fields = [row.id, row.kind, row.created_at, payload.length, outward.length]
+    const header = (runtime === '' ? fields : [...fields, runtime]).join('\t')
     parts.push(Buffer.from(`${header}\n`, 'utf8'), payload, outward)
   }
   return Buffer.concat(parts)
@@ -84,7 +91,7 @@ function decodeRows(data: Buffer): StoredMessage[] {
     if (end < 0) {
       throw new Error('Archive chunk is truncated')
     }
-    const [id, kind, createdAt, payloadLength, outwardLength] = data.toString('utf8', at, end).split('\t')
+    const [id, kind, createdAt, payloadLength, outwardLength, runtime] = data.toString('utf8', at, end).split('\t')
     const payloadEnd = end + 1 + Number(payloadLength)
     const outwardEnd = payloadEnd + Number(outwardLength)
     if (kind === undefined || createdAt === undefined || outwardEnd > data.length) {
@@ -96,6 +103,7 @@ function decodeRows(data: Buffer): StoredMessage[] {
       payload: data.toString('utf8', end + 1, payloadEnd),
       outward: data.toString('utf8', payloadEnd, outwardEnd),
       created_at: createdAt,
+      ...(runtime === undefined ? {} : { runtime }),
     })
     at = outwardEnd
   }

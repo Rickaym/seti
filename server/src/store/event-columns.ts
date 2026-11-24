@@ -15,7 +15,7 @@ async function fillBatch(db: Db, batch: number): Promise<number> {
   if (rows.length === 0) {
     return 0
   }
-  const filled = rows.map((row) => ({ id: row.id, ...storedColumns(row.kind, row.payload) }))
+  const filled = rows.map((row) => ({ id: row.id, ...storedColumns(row.kind, row.payload, null) }))
   const column = <K extends keyof (typeof filled)[number]>(key: K) => filled.map((row) => row[key])
   await db`UPDATE task_message m SET runtime = f.runtime, thread = f.thread, event = f.event, agent = f.agent,
       turn_usd = f.turn_usd, turn_ms = f.turn_ms, turn_steps = f.turn_steps, turn_reply = f.turn_reply

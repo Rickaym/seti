@@ -1,5 +1,5 @@
 import type { SDKMessage } from '@anthropic-ai/claude-agent-sdk'
-import type { MessageRow } from '@seti/shared'
+import { isClaudeRow, type MessageRow } from '@seti/shared'
 import { describe, expect, it } from 'vitest'
 import { wireRow } from './transcript.js'
 import { WIRE_TEXT_LIMIT } from './wire-text.js'
@@ -18,7 +18,7 @@ const toolResult = (content: unknown, extra: Record<string, unknown> = {}) =>
   })
 
 function payloadOf(row: MessageRow): SDKMessage {
-  if (row.kind !== 'sdk') {
+  if (!isClaudeRow(row)) {
     throw new Error('expected an sdk row')
   }
   return row.payload
