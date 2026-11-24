@@ -57,8 +57,11 @@ function quietDream(): { dream: DreamSupport; seen: () => { spec: DreamSpec; hos
     interrupt: async () => Promise.resolve(),
     close: () => undefined,
   }
+  if (real === null) {
+    throw new Error('The Claude adapter declares no dreams')
+  }
   const dream: DreamSupport = {
-    memory: claudeMemory,
+    ...real,
     open: async (spec, _launcher, host) => {
       opened = { spec, host }
       return Promise.resolve(session)
