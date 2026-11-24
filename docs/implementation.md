@@ -175,9 +175,18 @@ the AppArmor profile for `bwrap` that the installer adds ([Setup](setup.md#sandb
   servers or claude.ai connectors. Its grant has `anthropic: false`, so the proxy mints no
   Anthropic credential for it, and its OpenAI key is the connection `codexKeyConnection` names,
   whose placeholder the sandbox also sets as `SETI_MODEL_KEY`. `CODEX_HOME` is `~/.codex` in the
-  private home, where `config.toml` and `.env` are empty and read-only and `rules/` is an empty
-  read-only folder (`sandbox-codex.ts`): each would otherwise let the agent change how its next
-  session runs, and command rules there run commands without asking.
+  private home. Everything Codex or its shell reads that the agent could write to change how
+  commands run or are asked about is empty and read-only (`sandbox-codex.ts`): in `~/.codex` the
+  settings, `.env`, sign-in (`auth.json`), execution environments (`environments.toml`),
+  instructions (`AGENTS.md`, `AGENTS.override.md`), command rules (`rules/`, which run commands
+  without asking) and agent roles (`agents/`); in the home, `~/.agents` skills and the startup
+  files of zsh, bash and sh; and the machine's `/etc/codex` where it exists. Every other setting
+  goes on the command line, which wins over any config file (`runtimes/codex/realise.ts`): no
+  hooks, plugins, apps, goals, memories, skills, shell snapshot or reviewer model, and the
+  sandbox's `PATH` for commands, which drops the helper folder Codex makes in its writable home.
+  The session store (`sessions/`, the SQLite files) stays writable so a session can resume; the
+  approval policy Seti sends with every resume and turn overrides what it holds. `AGENTS.md` in
+  the agent's folders reaches its model as `CLAUDE.md` does for a Claude agent.
 - **Permissions.** Claude Code runs in its `auto` permission mode with Seti's rules, and its
   auto-mode classifier is the classifier of PERM-2. In auto mode Claude Code drops broad shell
   allow rules, so the classifier also reviews a sandboxed agent's shell commands. Where auto mode

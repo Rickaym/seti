@@ -21,12 +21,14 @@ const DEFAULT_MODEL = 'gpt-5.5'
 const toml = (value: string | boolean) => (typeof value === 'boolean' ? String(value) : JSON.stringify(value))
 
 /**
- * Every setting the app-server runs with, on its command line: a config file in the agent's home
- * is writable by the agent, and the command line wins over it. Terminals for `tty` commands are
- * off, so nothing typed into a running command escapes a decision; hooks, plugins, apps,
- * analytics and hosted web search are off.
+ * Every setting the app-server runs with, on its command line, which wins over any config file.
+ * Terminals for `tty` commands are off, so nothing typed into a running command escapes a
+ * decision; hooks, plugins, apps, goals, memories, skills, analytics and hosted web search are
+ * off. Commands get no shell snapshot, which every later command would source, and the sandbox's
+ * search path, which leaves out the helper folder Codex makes in its writable home. Approvals go
+ * to Seti, never to a reviewer model.
  */
-function overrides(provider: CodexProvider, model: string): string[] {
+function overrides(provider: CodexProvider, model: string, searchPath: string | undefined): string[] {
   const settings: [string, string | boolean][] = [
     ['model', model],
     ['model_provider', PROVIDER],
@@ -44,8 +46,14 @@ function overrides(provider: CodexProvider, model: string): string[] {
     ['features.skill_mcp_dependency_install', false],
     ['features.multi_agent', false],
     ['features.multi_agent_v2', false],
+    ['features.goals', false],
+    ['features.memories', false],
+    ['features.shell_snapshot', false],
+    ['skills.include_instructions', false],
+    ['approvals_reviewer', 'user'],
     ['analytics.enabled', false],
     ['web_search', 'disabled'],
+    ...(searchPath === undefined ? [] : [['shell_environment_policy.set.PATH', searchPath] satisfies [string, string]]),
   ]
   return settings.flatMap(([key, value]) => ['-c', `${key}=${toml(value)}`])
 }
@@ -73,7 +81,7 @@ export function realiseCodex(
   }
   return {
     command: binary,
-    args: ['app-server', '--listen', 'stdio://', ...overrides(provider, DEFAULT_MODEL)],
+    args: ['app-server', '--listen', 'stdio://', ...overrides(provider, DEFAULT_MODEL, launcher.env.PATH)],
     cwd: spec.cwd,
     env: { ...launcher.env },
     resume: spec.resume,
