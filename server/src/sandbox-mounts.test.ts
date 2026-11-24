@@ -669,6 +669,21 @@ describe("a Codex agent's mounts", () => {
     }
   })
 
+  it("give Codex the user's own CLAUDE.md, read-only, as its global instructions", () => {
+    const own = make(root, 'claude-home-with-instructions')
+    touch(path.join(own, 'CLAUDE.md'), 'USER_INSTRUCTIONS')
+    const dest = path.join(home, '.codex', 'AGENTS.md')
+    expect(find(codexLocks(layout({ codex: true, claudeHome: own })), dest)).toEqual([
+      { kind: 'ro-bind', src: path.join(own, 'CLAUDE.md'), dest },
+    ])
+    const override = path.join(home, '.codex', 'AGENTS.override.md')
+    expect(find(codexLocks(layout({ codex: true, claudeHome: own })), override)).toEqual([
+      { kind: 'ro-bind', src: path.join(taskDir, 'empty-file'), dest: override },
+    ])
+    const bare = layout({ codex: true, claudeHome: own, maintenance: { writable: [], bare: true } })
+    expect(find(codexLocks(bare), dest)).toEqual([{ kind: 'ro-bind', src: path.join(taskDir, 'empty-file'), dest }])
+  })
+
   it("cover the machine's own Codex settings only where the machine has them", () => {
     const hostConfig = make(root, 'etc-codex')
     const empty = path.join(taskDir, 'empty')

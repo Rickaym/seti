@@ -195,6 +195,15 @@ between two steps; an interrupt; a hook at subagent start.
   show their thinking as the default runtime's do. Reasoning the model seals for its own next call
   MUST NOT be stored, served or shown by the control room.
 
+### 3.6 What an agent is given
+
+- KIT-1: The user's own instruction file reaches an agent read-only on every runtime that reads
+  instruction files, and a folder's instruction file (`CLAUDE.md`, or for Codex `AGENTS.md`
+  first) is read from the agent's folder as its input (HST-1). Both MUST come below the control
+  room's own instructions: in the conversation as project instructions, never in the system or
+  developer instructions. A runtime folder the agent can write MUST NOT carry instructions into a
+  later session.
+
 ## 4. Turn lifecycle
 
 - TURN-1: A user message (`prompt`, `interrupt`, `attachments`, `notify_when_done`, `client_id`)
