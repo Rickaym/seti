@@ -420,9 +420,9 @@ A connection is one service's access, made in Settings, Connections: its name, t
 reach (exact or `*.suffix`), how Seti signs in, and the values that takes. Agents see its variable,
 such as `STRIPE`, holding a placeholder that the proxy swaps for the value on those hosts only, in
 the URL and headers (EGR-5 in [the protocol](protocol.md#73-egress)). It never swaps a value into a
-request body, and refuses a request that carries a placeholder in its body unsent (EGR-14). With "Seti adds it" on, the proxy also sets a
-header from a template (`Bearer {{value}}`) on every request to those hosts (EGR-7). A connection
-signs in one of four ways:
+request body, and refuses a request that carries a placeholder in its body unsent (EGR-14). With
+"Seti adds it" on, the proxy also sets a header from a template (`Bearer {{value}}`) on every
+request to those hosts (EGR-7). A connection signs in one of four ways:
 
 - A key the user pastes.
 - OAuth client credentials, with a client secret, Basic auth or a private key JWT (Entra
