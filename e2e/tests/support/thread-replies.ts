@@ -3,7 +3,7 @@ import type { APIRequestContext, Page } from '@playwright/test'
 import type { ChannelSecret } from '@seti/shared'
 import { openSeedDb } from './db.js'
 import { paths } from './env.js'
-import { expect } from './fixtures.js'
+import { expect, test } from './fixtures.js'
 
 const SECRET = ['e2e', 'slack', 'signing', 'secret'].join('-')
 const ROOT = '1700000000.000100'
@@ -101,10 +101,10 @@ export async function expectThreadReply(page: Page, channel: string): Promise<vo
   )
 }
 
-/** Saves a screenshot to the folder SETI_E2E_SHOTS names, when it is set. */
+/** Saves a screenshot, named for the project, to the folder SETI_E2E_SHOTS names, when it is set. */
 export async function shot(page: Page, name: string): Promise<void> {
   const folder = process.env.SETI_E2E_SHOTS
   if (folder !== undefined) {
-    await page.screenshot({ path: `${folder}/${name}.png` })
+    await page.screenshot({ path: `${folder}/${name}-${test.info().project.name}.png` })
   }
 }

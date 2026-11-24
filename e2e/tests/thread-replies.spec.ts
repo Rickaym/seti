@@ -22,7 +22,7 @@ test('a reply in a Slack thread the agent started reaches it as a quiet transcri
     await expect(page.getByRole('main').getByRole('heading', { name: `E2E Slack thread ${tag}` })).toBeVisible()
     await danaReplies(baseURL ?? '', webhook.path, channel, 'Could you also check the staging deploy before Friday?')
     await expectThreadReply(page, channel)
-    await shot(page, 'thread-reply-desktop')
+    await shot(page, 'thread-reply')
   } finally {
     await request.delete(`/api/channels/${webhook.id}`)
   }

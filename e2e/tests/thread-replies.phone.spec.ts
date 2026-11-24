@@ -20,7 +20,7 @@ test('a Slack thread reply fits the phone transcript', async ({ page, request, b
     await danaReplies(baseURL ?? '', webhook.path, channel, 'Could you also check the staging deploy before Friday?')
     await expectThreadReply(page, channel)
     await expectFitsPhone(page, 'a Slack thread reply in the transcript')
-    await shot(page, 'thread-reply-phone')
+    await shot(page, 'thread-reply')
   } finally {
     await request.delete(`/api/channels/${webhook.id}`)
   }
