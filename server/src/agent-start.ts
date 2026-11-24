@@ -8,6 +8,7 @@ import {
 import { capStart, type AccessCap } from './agent-cap.js'
 import { awaitTurnEnd, requestWaiter } from './agent-waits.js'
 import { sendKey, sendOnce } from './client-sends.js'
+import { withBrief } from './crew/handover.js'
 import { fromEa } from './ea-guard.js'
 import { planAgent, planTitle } from './planner.js'
 import { approvalCeilings } from './store/approval-ceilings.js'
@@ -53,6 +54,20 @@ export async function startAgent(input: StartAgentRequest, cap?: AccessCap): Pro
   )
 }
 
+/** The fields a start names only when its caller set them. */
+const optionalFields = (input: StartAgentRequest, cap: AccessCap | undefined) => ({
+  ...(input.pr_urls === undefined ? {} : { pr_urls: input.pr_urls }),
+  ...(input.workspace_id === undefined ? {} : { workspace_id: input.workspace_id }),
+  ...(input.model === undefined ? {} : { model: input.model }),
+  ...(input.effort === undefined ? {} : { effort: input.effort }),
+  ...(cap === undefined ? {} : { delegated_by: cap.task_id }),
+})
+
+/** The first message: the prompt, and after it a brief of the agent it names, if it names one. */
+async function firstPrompt(input: StartAgentRequest): Promise<string> {
+  return input.brief_of === undefined ? input.prompt : withBrief(input.prompt, await requireTask(input.brief_of))
+}
+
 async function startPlanned(input: StartAgentRequest, cap?: AccessCap): Promise<Task> {
   refuseCommandAttachments(input.prompt, input.attachments)
   checkStaged(input.attachments)
@@ -67,8 +82,7 @@ async function startPlanned(input: StartAgentRequest, cap?: AccessCap): Promise<
   return startTask(
     {
       title: plan.title,
-      prompt: input.prompt,
-      ...(input.pr_urls === undefined ? {} : { pr_urls: input.pr_urls }),
+      prompt: await firstPrompt(input),
       context_pack_ids: plan.context_pack_ids,
       disabled_plugin_ids: capped?.disabled_plugin_ids ?? [],
       mcp_enabled: plan.mcp_enabled.filter((name) => cap === undefined || cap.mcp.has(name)),
@@ -79,10 +93,8 @@ async function startPlanned(input: StartAgentRequest, cap?: AccessCap): Promise<
       seti_control: DEFAULT_SETI_CONTROL,
       setup: capped === null ? plan.setup : { ...plan.setup, withheld: [...plan.setup.withheld, ...capped.held] },
       attachments: input.attachments,
-      ...(input.workspace_id === undefined ? {} : { workspace_id: input.workspace_id }),
       runtime: input.runtime,
-      ...(input.model === undefined ? {} : { model: input.model }),
-      ...(input.effort === undefined ? {} : { effort: input.effort }),
+      ...optionalFields(input, cap),
     },
     onCreated,
   )

@@ -141,7 +141,13 @@ export const createTaskInput = z.object({
 export type CreateTaskInput = z.input<typeof createTaskInput>
 export type CreateTaskRequest = z.output<typeof createTaskInput>
 /** A create request with its title settled, and how the planner set it up when it did. */
-export type TaskRequest = CreateTaskRequest & { title: string; setup?: TaskSetup; attachments?: AttachmentRef[] }
+export type TaskRequest = CreateTaskRequest & {
+  title: string
+  setup?: TaskSetup
+  attachments?: AttachmentRef[]
+  /** The agent that starts it, when an agent does. */
+  delegated_by?: string
+}
 
 export const updateTaskInput = z.object({
   title: z.string().trim().min(1).optional(),
@@ -318,6 +324,8 @@ export interface Task {
   closing_line: string | null
   /** Why its work cannot go on without the user, such as a tool call to allow; null otherwise. */
   blocked: string | null
+  /** The agent whose start_task started it; null when the user or the EA started it. */
+  delegated_by: string | null
 }
 
 /**
@@ -511,6 +519,7 @@ export const taskFields = {
   asking: flag('asking'),
   closing_line: maybeText('closing_line'),
   blocked: maybeText('blocked'),
+  delegated_by: maybeText('delegated_by'),
 }
 
 export const taskSchema = z.object(taskFields) satisfies ResponseSchema<Task>

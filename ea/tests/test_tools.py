@@ -209,6 +209,14 @@ async def test_start_can_ask_to_hear_when_the_turn_ends(tools: EaTools, fake_set
     assert fake_seti.posts() == [("/api/tasks/start", body)]
 
 
+async def test_start_can_brief_the_new_agent_on_another_agents_work(
+    tools: EaTools, fake_seti: FakeSeti
+) -> None:
+    await tools.call("start_task", {"prompt": "Carry on the login fix", "brief_of": "login"})
+    body = {"prompt": "Carry on the login fix", "brief_of": TASK_LOGIN}
+    assert fake_seti.posts() == [("/api/tasks/start", body)]
+
+
 async def test_stop_task(tools: EaTools, fake_seti: FakeSeti) -> None:
     result = await tools.call("stop_task", {"task": "login"})
     assert result.ok

@@ -471,6 +471,12 @@ TOOL_SPECS: list[ToolSpec] = [
                 "description": "Only when the user names one: its reasoning effort, which Seti refuses "
                 "for a model that takes none.",
             },
+            "brief_of": {
+                **TASK_REF,
+                "description": "Only when the user wants the new agent to carry on or help with "
+                "another agent's work: that agent. Seti adds a brief of what it did, as data, after "
+                "the prompt.",
+            },
         },
         ["prompt"],
     ),
@@ -1697,6 +1703,9 @@ class EaTools:
             value = arg_str(args, key, required=False)
             if value:
                 body[key] = value
+        brief_ref = arg_str(args, "brief_of", required=False)
+        if brief_ref:
+            body["brief_of"] = (await self.resolve_task(brief_ref)).get("id")
         created = await self._seti.post("/tasks/start", body)
         task = created if isinstance(created, dict) else {}
         title = str(task.get("title") or title or "the new task")

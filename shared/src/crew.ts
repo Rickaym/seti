@@ -7,6 +7,9 @@ export const SECOND_OPINION_TOOL = 'second_opinion'
 /** The tag a second opinion reaches the asking agent in. */
 export const SECOND_OPINION_TAG = 'second-opinion'
 
+/** The tag a brief of another agent's work reaches an agent in. */
+export const HANDOVER_TAG = 'handover-brief'
+
 /** The limits of second opinions: sizes in characters, counts per asking agent. */
 export const SECOND_OPINION_LIMITS = {
   question: 8000,

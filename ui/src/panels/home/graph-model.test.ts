@@ -28,6 +28,7 @@ const task = (id: string, extra: Partial<TaskListEntry> = {}) =>
     status: 'idle',
     asking: false,
     blocked: null,
+    delegated_by: null,
     pr_urls: [],
     repos: [{ id: 'r1', slug: 'acme/web', dir: '/srv/web', worktree: false }],
     running_subtasks: [],
