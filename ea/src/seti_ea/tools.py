@@ -2018,7 +2018,7 @@ class EaTools:
         runtimes = await self._seti.get("/runtimes")
         offers = dicts(runtimes.get("offers")) if isinstance(runtimes, dict) else []
         on = [str(offer.get("runtime")) for offer in offers]
-        if len(on) < 2:
+        if not on:
             return on, {}
         caps = await self._seti.get("/runtimes/capabilities")
         return on, caps if isinstance(caps, dict) else {}

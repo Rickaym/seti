@@ -4,6 +4,7 @@ import {
   type AgentCapabilities,
   type CapabilitiesSnapshot,
   type McpServer,
+  type McpTransport,
   type RuntimeCapabilities,
   type StoredRuntime,
 } from '@seti/shared'
@@ -26,19 +27,21 @@ export const pluginRuntimes = (): StoredRuntime[] => STORED_RUNTIMES.filter(load
  * The runtimes whose agents can use an MCP server: those that take its transport, and for a
  * server a plugin brings, only those that load plugins.
  */
-export function serverRuntimes(server: Pick<McpServer, 'transport' | 'source'>): StoredRuntime[] {
-  const type = server.transport?.type
-  const plugin = server.source?.startsWith('plugin') === true
+export function serverRuntimes(transport: McpTransport, source: string | null): StoredRuntime[] {
+  const plugin = source?.startsWith('plugin') === true
   return STORED_RUNTIMES.filter(
-    (runtime) =>
-      type !== undefined && declared(runtime).tools.userServers.includes(type) && (!plugin || loadsPlugins(runtime)),
+    (runtime) => declared(runtime).tools.userServers.includes(transport.type) && (!plugin || loadsPlugins(runtime)),
   )
 }
+
+/** A server with the runtimes that can use it; left as it is while its transport is unknown. */
+const tagged = (server: McpServer): McpServer =>
+  server.transport === null ? server : { ...server, runtimes: serverRuntimes(server.transport, server.source) }
 
 /** The snapshot's servers, each with the runtimes that can use it. */
 export const withRuntimes = (snapshot: CapabilitiesSnapshot): CapabilitiesSnapshot => ({
   ...snapshot,
-  servers: snapshot.servers.map((server) => ({ ...server, runtimes: serverRuntimes(server) })),
+  servers: snapshot.servers.map(tagged),
 })
 
 /** The runtime can run outside Seti's sandbox. */

@@ -39,7 +39,7 @@ export interface McpServer {
   error: string | null
   tools: McpTool[]
   sign_in: McpSignIn
-  /** The runtimes whose agents can use it; absent from a probe as stored. */
+  /** The runtimes whose agents can use it; absent from a probe as stored or of unknown transport. */
   runtimes?: StoredRuntime[]
 }
 
