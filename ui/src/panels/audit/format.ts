@@ -65,7 +65,7 @@ const SUBJECT_LINKS: Record<AuditEvent['subject_type'], ((id: string) => Subject
   shared_tool: settingsLink('plugins', 'Shared tools'),
   credential_profile: (id) => ({ href: `#settings/credentials/${id}`, label: 'Credential' }),
   connection: (id) => ({ href: `#settings/connections/${id}`, label: 'Connection' }),
-  account: settingsLink('account', 'Account'),
+  account: settingsLink('runtimes', 'Runtimes'),
   ea: settingsLink('ea', 'EA'),
   team: null,
   workspace: null,

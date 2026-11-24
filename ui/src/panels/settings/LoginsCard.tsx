@@ -18,7 +18,7 @@ import {
 } from '@/hooks/useAccount'
 import { useBusy } from '@/hooks/useBusy'
 import { cn } from '@/lib/utils'
-import { SettingsCard } from './layout'
+import { SettingRow } from './layout'
 
 const ROW = 'flex items-center gap-3 border-b border-border px-3 py-2.5 max-md:flex-wrap'
 
@@ -286,10 +286,20 @@ export function LoginsCard({ logins }: { logins: ClaudeLogins }) {
   const { accounts, active_id: activeId, unsaved } = logins
   const signedOut = activeId === null && unsaved === null
   return (
-    <SettingsCard
-      title="Saved logins"
-      actions={
-        !adding && (
+    <section aria-label="Saved logins" className="border-b border-border last:border-b-0">
+      <SettingRow
+        label="Saved logins"
+        stack
+        description={
+          <>
+            Claude Code on this machine runs on one login at a time. Switch here, from the account item in the status
+            bar ({chordLabel(CHORDS.switchLogin)}) or with Ctrl+K; each agent moves to the new login when its next turn
+            starts. Agent credentials hold no Claude login, so every agent uses this one, except that sandboxed agents
+            use the Claude token in Credentials when one is set.
+          </>
+        }
+      >
+        {!adding && (
           <Button
             size="sm"
             variant="outline"
@@ -300,15 +310,8 @@ export function LoginsCard({ logins }: { logins: ClaudeLogins }) {
             <LogIn />
             Log in
           </Button>
-        )
-      }
-    >
-      <p className="border-b border-border p-3 text-muted-foreground">
-        Claude Code on this machine runs on one login at a time. Switch here, from the account item in the status bar (
-        {chordLabel(CHORDS.switchLogin)}) or with Ctrl+K; each agent moves to the new login when its next turn starts.
-        Agent credentials hold no Claude login, so every agent uses this one, except that sandboxed agents use the
-        Claude token in Credentials when one is set.
-      </p>
+        )}
+      </SettingRow>
       {unsaved !== null && <UnsavedRow email={unsaved.email} />}
       {signedOut && accounts.length > 0 && (
         <p className={cn(ROW, 'text-muted-foreground')}>
@@ -330,6 +333,6 @@ export function LoginsCard({ logins }: { logins: ClaudeLogins }) {
           }}
         />
       )}
-    </SettingsCard>
+    </section>
   )
 }

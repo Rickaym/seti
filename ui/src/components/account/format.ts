@@ -10,7 +10,7 @@ export function planName(subscription: string | null | undefined): string {
   return plan === '' ? 'Claude' : `${plan.charAt(0).toUpperCase()}${plan.slice(1)}`
 }
 
-export const planLabel = (account: AccountIdentity | null): string => planName(account?.subscription_type)
+const planLabel = (account: AccountIdentity | null): string => planName(account?.subscription_type)
 
 const ESTIMATE = 'Estimate at API prices, across all its sessions'
 
