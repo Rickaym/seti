@@ -7,6 +7,7 @@ import type { Script, ScriptCall, Step } from '../conformance/script.js'
 import { SUITE_CWD } from '../conformance/subject.js'
 import type { Rig, SpawnRecord } from '../conformance/target.js'
 import type { ModelCall, ScriptedResponses } from './conformance-responses.js'
+import { serveRigTools } from './conformance-tools.js'
 
 /** What the sandbox hands Codex when a script names no launcher: a path and the key's placeholder. */
 const SANDBOX_ENV = { PATH: '/usr/bin:/bin', HOME: '/sandbox/home', OPENAI_API_KEY: 'egress-placeholder' }
@@ -82,7 +83,9 @@ export function codexCall(call: ScriptCall): ModelCall {
   }
   const dot = call.tool.indexOf('.')
   if (dot > 0) {
-    return { name: call.tool.slice(dot + 1), args: call.args, namespace: `mcp__${call.tool.slice(0, dot)}__` }
+    // Codex names a server's deferred tools by a namespace with every other character as `_`.
+    const namespace = `mcp__${call.tool.slice(0, dot).replaceAll(/\W/g, '_')}`
+    return { name: call.tool.slice(dot + 1), args: call.args, namespace }
   }
   return { name: call.tool, args: call.args }
 }
@@ -335,8 +338,10 @@ export function codexRig(model: ScriptedResponses, base: string, script: Script)
     return real
   }
   const launcherEnv = script.launcher?.env ?? SANDBOX_ENV
+  const launcher = launcherOf({ ...script, launcher: { ...script.launcher, env: launcherEnv } }, start)
+  serveRigTools(launcher, script, { root, effects })
   return {
-    launcher: launcherOf({ ...script, launcher: { ...script.launcher, env: launcherEnv } }, start),
+    launcher,
     spawns,
     selfStarts: [],
     effects: liveEffects(effects, edits(script, work)),

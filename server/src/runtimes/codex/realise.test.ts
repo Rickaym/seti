@@ -3,11 +3,17 @@ import type { Launcher } from '../../launcher.js'
 import type { SessionSpec } from '../../session-spec.js'
 import { realiseCodex } from './realise.js'
 
-const spec = { runtime: 'codex', cwd: '/work/project', resume: null } as SessionSpec<'codex'>
+const toolServers = { shared: [], borrowed: { names: [], digest: '' }, signedIn: [], tokens: [] }
+const spec = { runtime: 'codex', cwd: '/work/project', resume: null, toolServers } as unknown as SessionSpec<'codex'>
 const spawn: NonNullable<Launcher['spawn']> = () => {
   throw new Error('not started in this test')
 }
-const answering = { decide: async () => Promise.reject(new Error('no ask')), abortController: new AbortController() }
+const answering = {
+  decide: async () => Promise.reject(new Error('no ask')),
+  toolServers: {},
+  abortController: new AbortController(),
+}
+const settingsOf = (args: string[]) => args.filter((_arg, index) => args[index - 1] === '-c')
 const launcher = (env: Record<string, string>): Launcher => ({ sandboxed: true, env, spawn })
 
 describe('realising a Codex session', () => {
@@ -44,6 +50,37 @@ describe('realising a Codex session', () => {
         'approvals_reviewer="user"',
         'shell_environment_policy.set.PATH="/usr/bin:/bin"',
       ]),
+    )
+  })
+
+  it("starts Seti's tool servers through their relay, and the shared tools with the agent's variables", () => {
+    const relay = { command: '/usr/bin/socat', args: ['STDIO', 'UNIX-CONNECT:/run/seti/tools-0.sock'] }
+    const withShared = { ...spec, toolServers: { ...toolServers, shared: ['/tools/a'] } }
+    const env = { SETI_MODEL_KEY: 'seti-placeholder', GH_TOKEN: 'seti-sandbox-placeholder' }
+    const realised = realiseCodex(withShared, launcher(env), {
+      ...answering,
+      toolServers: { seti: relay },
+      binary: '/c',
+    })
+    const settings = settingsOf(realised.args)
+    expect(settings).toEqual(
+      expect.arrayContaining([
+        'mcp_servers.seti.command="/usr/bin/socat"',
+        'mcp_servers.seti.args=["STDIO","UNIX-CONNECT:/run/seti/tools-0.sock"]',
+        'mcp_servers.seti.tool_timeout_sec=604800',
+        `mcp_servers.shared.command=${JSON.stringify(process.execPath)}`,
+        'mcp_servers.shared.env_vars=["GH_TOKEN"]',
+      ]),
+    )
+    expect(settings.filter((setting) => setting.startsWith('mcp_servers.seti.env_vars'))).toEqual([])
+  })
+
+  it('refuses a tool server whose name Codex would read as more than one key', () => {
+    const relay = { command: '/usr/bin/socat', args: [] }
+    const env = { SETI_MODEL_KEY: 'seti-placeholder' }
+    const servers = { 'a.b': relay }
+    expect(() => realiseCodex(spec, launcher(env), { ...answering, toolServers: servers, binary: '/c' })).toThrow(
+      /tool server named "a.b"/,
     )
   })
 

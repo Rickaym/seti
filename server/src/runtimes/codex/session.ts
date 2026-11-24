@@ -3,6 +3,7 @@ import { once } from 'node:events'
 import type { ToolCall } from '@seti/shared'
 import { z } from 'zod'
 import type { Launcher } from '../../launcher.js'
+import type { StdioServer } from '../../tool-relay.js'
 import type { InputContent, RuntimeSession, SessionInput, SessionReport } from '../adapter.js'
 import type { CodexDecide } from './approvals.js'
 import { Asks } from './asks.js'
@@ -11,13 +12,13 @@ import { OPTED_OUT } from './private.js'
 import { codexReport, ReportQueue } from './reports.js'
 import { CodexRpc, RpcError, type CodexCall } from './rpc.js'
 
-/** Codex's own shapes: a neutral decision, a JSON-RPC process, and no hooks or modes. */
+/** Codex's shapes: a neutral decision, a JSON-RPC process, stdio tool servers, no hooks or modes. */
 export interface CodexShapes {
   vendor: unknown
   realised: CodexRealised
   decide: CodexDecide
   hooks: null
-  hostServers: Record<string, never>
+  hostServers: Record<string, StdioServer>
   policy: never
   mode: never
 }
@@ -130,6 +131,8 @@ class Driver {
     }
     this.background.abandon()
     await this.rpc.request('turn/interrupt', { threadId: this.root, turnId })
+    // Codex cancels the turn's asks itself; Seti stops waiting on them at once.
+    this.asks.dropAll()
     await this.background.stopAbandoned()
   }
 

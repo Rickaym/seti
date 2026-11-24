@@ -74,10 +74,25 @@ const textsOf = (item: Record<string, unknown>): string[] => {
   return texts.some((text) => CONTEXT.test(text)) ? [] : texts
 }
 
+/** The input items of a request. */
+function inputItems(body: unknown): Record<string, unknown>[] {
+  const input = (body as { input?: unknown }).input
+  return Array.isArray(input) ? (input as Record<string, unknown>[]) : []
+}
+
+/** The model's search of Codex's deferred tools, for the tools of one namespace. */
+const search = (namespace: string): OutputItem => ({
+  type: 'tool_search_call',
+  id: nextId('ts'),
+  call_id: nextId('call'),
+  execution: 'client',
+  status: 'completed',
+  arguments: { query: namespace.replace(/^mcp__/, '').replaceAll('_', ' '), limit: 8 },
+})
+
 /** The user texts of a request in order, and how many came before the model last spoke. */
 function conversation(body: unknown): { texts: string[]; spoken: number } {
-  const input = (body as { input?: unknown }).input
-  const items = Array.isArray(input) ? (input as Record<string, unknown>[]) : []
+  const items = inputItems(body)
   const texts: string[] = []
   let spoken = 0
   for (const item of items) {
@@ -140,8 +155,17 @@ export class ScriptedResponses {
         return
       }
       this.bodies.push(raw)
-      const said = conversation(JSON.parse(raw) as unknown)
-      const steps = this.answer(turnOf(req), said)
+      const body = JSON.parse(raw) as unknown
+      const said = conversation(body)
+      const { steps, state } = this.answer(turnOf(req), said)
+      const unsearched = this.unsearched(steps, body)
+      if (unsearched !== null) {
+        // A tool server's tools are deferred: the model searches first and calls in its next response.
+        state.done -= 1
+        const before = steps.slice(0, -1).filter((step) => !waits(step))
+        stream(res, [...before.map((step) => this.item(step, said.texts)), search(unsearched)], Promise.resolve())
+        return
+      }
       const items = steps.filter((step) => !waits(step)).map((step) => this.item(step, said.texts))
       stream(res, items, this.endOf(steps))
     })
@@ -173,8 +197,24 @@ export class ScriptedResponses {
     })
   }
 
+  /** The namespace of the tool the round ends calling when no search found it yet, else null. */
+  private unsearched(steps: readonly Step[], body: unknown): string | null {
+    const last = steps.at(-1)
+    const call = last !== undefined && 'call' in last ? this.mapCall(last.call) : null
+    const namespace = call !== null && 'namespace' in call ? call.namespace : undefined
+    if (namespace === undefined) {
+      return null
+    }
+    const searches = inputItems(body).filter((item) => item.type === 'tool_search_output')
+    const found = searches.some((item) => JSON.stringify(item.tools ?? []).includes(`"name":"${namespace}"`))
+    return found || inputItems(body).at(-1)?.type === 'tool_search_output' ? null : namespace
+  }
+
   /** The steps of the next response in this turn; a turn past the script says its inputs back. */
-  private answer(at: { thread: string; turn: string }, said: { texts: string[]; spoken: number }): Step[] {
+  private answer(
+    at: { thread: string; turn: string },
+    said: { texts: string[]; spoken: number },
+  ): { steps: Step[]; state: TurnState } {
     const key = `${at.thread}:${at.turn}`
     let state = this.states.get(key)
     if (state === undefined) {
@@ -184,11 +224,11 @@ export class ScriptedResponses {
       this.states.set(key, state)
     }
     if (state.steps === null) {
-      return [{ say: echoOf(said.texts.slice(state.base)) }]
+      return { steps: [{ say: echoOf(said.texts.slice(state.base)) }], state }
     }
     const steps = round(state.steps.slice(state.done))
     state.done += steps.length
-    return steps
+    return { steps, state }
   }
 
   private item(step: Step, texts: readonly string[]): OutputItem {

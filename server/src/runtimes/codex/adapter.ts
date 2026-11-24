@@ -17,6 +17,7 @@ export const codexAdapterFor = (binary: string, provider?: CodexProvider): Runti
     Promise.resolve(
       realiseCodex(spec, launcher, {
         decide: host.decide,
+        toolServers: host.toolServers,
         abortController,
         binary,
         ...(provider === undefined ? {} : { provider }),

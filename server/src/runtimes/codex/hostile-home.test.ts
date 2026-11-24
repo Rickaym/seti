@@ -69,7 +69,8 @@ async function turn(where: { home: string; work: string }, steps: Step[], resume
     return Promise.resolve({ allow: true as const })
   }
   const controller = new AbortController()
-  const spec = { runtime: 'codex', cwd: where.work, resume } as SessionSpec<'codex'>
+  const toolServers = { shared: [], borrowed: { names: [], digest: '' }, signedIn: [], tokens: [] }
+  const spec = { runtime: 'codex', cwd: where.work, resume, toolServers } as unknown as SessionSpec<'codex'>
   const realised = await adapter.realise(
     spec,
     launcherIn(where.home),
