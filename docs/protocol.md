@@ -978,7 +978,8 @@ Optional and off by default: a maintenance session per agent that consolidates i
   only in its memory folder and the night's dream folder of its workspace. It reads a digest of
   the agent's transcript since its last dream, built from neutral events, at most
   `dream_digest` characters, with credentials redacted and the user's messages and failures kept
-  first.
+  first. Its prompt names the other memory folders the agent's sessions see (its checkouts'),
+  which it reads before it writes and may not change.
 - DRM-7: A dream MUST NOT start or change a turn of the agent, post, send an update, push or
   notify, or enter Needs you. Its outcome is one stored report, also written beside the digest,
   and the agent's next turn is told once which dreams changed its memory.

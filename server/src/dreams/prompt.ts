@@ -15,7 +15,9 @@ MEMORY.md and the topic files it chooses to open. Memory is a bet on what a futu
 need and cannot find in the code, the git history or the docs. Keep what changes behaviour: the
 user's corrections and preferences, in their own words; decisions and their reasons; how this
 agent's environment really behaves; traps it hit and the way out; work in flight and where it
-stands. Leave out what the code, the git log or the docs already say.
+stands. Leave out what the code, the git log or the docs already say, and what memory the agent's
+sessions see elsewhere already holds: a copy wastes a line of the index and goes stale on its own,
+where a one-line pointer to the original does not.
 
 What you can change: files in ${memory}, and nothing else. Every change is recorded and the
 user can undo it. Your report goes through the dream_report tool; it is the only thing the user
@@ -57,9 +59,10 @@ const REVIEW = {
 export function dreamMessage(m: DreamMessage): string {
   const shared = m.shared.length === 0 ? 'none' : m.shared.join(', ')
   return `Dream for the night of ${m.night}. Last dream: ${m.lastDream ?? 'never'}. Digest: ${m.digest}.
-Memory folder: ${m.memory}. Read-only memory you may learn from but not edit: ${shared}.
+Memory folder: ${m.memory}. Read-only memory the agent's sessions also see: ${shared}.
 
-1. Orient. List the memory folder, read MEMORY.md and skim the topic files.
+1. Orient. List the memory folder, read MEMORY.md and skim the topic files. Read the MEMORY.md of
+   each read-only memory folder too, so you know what is kept there.
 2. Gather. Read the digest. Check memories the day touched against the files and git state now.
    Do not read transcripts or large files end to end; open what the digest points at.
 3. Consolidate. Put each thing worth keeping in the topic file it belongs to, or a new one.
