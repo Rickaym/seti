@@ -132,7 +132,8 @@ with another top-level folder.
   with, each key described; `server/src/settings-doc/` reads them through the functions the pages
   read. A new column in a settings table fails `settings-doc/columns.test.ts` until it has a path
   or a reason it is state, and a new settings page fails `settings/json/settings-json.test.ts`
-  until it has a section. A section's `security` keys are left out of the EA's document.
+  until it has a section. A section's `security` keys are left out of the EA's document. Its
+  defaults are in `server/src/settings-doc/defaults.ts`, which the compiler holds complete.
 
 [Setup](setup.md#where-data-lives) lists every path on disk.
 

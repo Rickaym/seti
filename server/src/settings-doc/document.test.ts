@@ -84,7 +84,7 @@ describe('the settings document', () => {
       { via: 'device', deviceId: 'd1', name: 'Phone', scopes: ['widget'], showNames: false },
     ]
     for (const as of refused) {
-      for (const path of ['', '/schema']) {
+      for (const path of ['', '?only=modified', '/defaults', '/schema']) {
         source.current = as
         expect((await get(path)).status, `${as.via} ${path}`).toBe(403)
       }
@@ -121,6 +121,8 @@ describe('secrets in the settings document', () => {
       JSON.stringify(await read('/schema')),
       JSON.stringify(await read('', EA)),
       JSON.stringify(await read('/schema', EA)),
+      JSON.stringify(await read('?only=modified')),
+      JSON.stringify(await read('/defaults')),
     ]
     for (const output of outputs) {
       for (const planted of [connectionValue, claudeToken, githubToken, ownerToken, String(webhookSecret)]) {
