@@ -76,7 +76,7 @@ export const SECURITY_READERS: SectionReaders<
   }),
   'security.connections': async () => ({
     connections: Object.fromEntries(
-      (await listConnections()).map(({ name, kind, env, hosts, header, mint, slots }) => [
+      (await listConnections()).map(({ name, kind, env, hosts, header, mint, body, slots }) => [
         name,
         {
           kind,
@@ -84,6 +84,7 @@ export const SECURITY_READERS: SectionReaders<
           hosts,
           header,
           mint,
+          body,
           values: Object.fromEntries(slots.map((slot) => [slot.slot, secretStateOf(slot.set)])),
         },
       ]),

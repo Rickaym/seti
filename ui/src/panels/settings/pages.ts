@@ -24,7 +24,7 @@ import {
   ShieldCheck,
   SlidersHorizontal,
   SquareSlash,
-  Users,
+  Wrench,
 } from 'lucide-react'
 import { useSyncExternalStore, type ComponentType } from 'react'
 import { aboutParts } from '@/lib/mod-views'
@@ -45,7 +45,7 @@ export type SettingsPageKey =
   | 'mcp'
   | 'plugins'
   | 'skills'
-  | 'subagents'
+  | 'tools'
   | 'signin'
   | 'sandbox'
   | 'permissions'
@@ -56,7 +56,7 @@ export type SettingsPageKey =
   | 'audit'
   | 'mods'
 
-const SETTINGS_GROUPS = ['App', 'Agents', 'Claude Code', 'Security', 'Mods'] as const
+const SETTINGS_GROUPS = ['App', 'Agents', 'Capabilities', 'Security', 'Mods'] as const
 type SettingsGroup = (typeof SETTINGS_GROUPS)[number]
 
 /** What a page's view gets: its key and the detail of its route, such as a credential's id. */
@@ -106,7 +106,7 @@ const CORE_GROUPS: { group: SettingsGroup; pages: (Omit<SettingsPage, 'group'> &
         key: 'runtimes',
         label: 'Runtimes',
         icon: Cpu,
-        keywords: 'codex openai gpt claude code models account login usage plan',
+        keywords: 'codex openai gpt claude code models account login usage plan subagents',
       },
       {
         key: 'storage',
@@ -118,12 +118,12 @@ const CORE_GROUPS: { group: SettingsGroup; pages: (Omit<SettingsPage, 'group'> &
     ],
   },
   {
-    group: 'Claude Code',
+    group: 'Capabilities',
     pages: [
-      { key: 'mcp', label: 'MCP servers', icon: Blocks },
-      { key: 'plugins', label: 'Plugins', icon: Puzzle, keywords: 'marketplaces shared tools' },
+      { key: 'mcp', label: 'MCP servers', icon: Blocks, keywords: 'tool servers connectors' },
       { key: 'skills', label: 'Skills', icon: SquareSlash, keywords: 'slash commands' },
-      { key: 'subagents', label: 'Subagents', icon: Users, keywords: 'models' },
+      { key: 'tools', label: 'Shared tools', icon: Wrench, keywords: 'scripts proposed tools' },
+      { key: 'plugins', label: 'Plugins', icon: Puzzle, keywords: 'marketplaces claude code' },
     ],
   },
   {
@@ -208,7 +208,7 @@ export function useSettingsGroups() {
 export const isSettingsPage = (value: string | null): value is string => value !== null && settingsPages.has(value)
 
 /** Pages that read the Claude Code probe, which they share while switching between them. */
-const PROBED_PAGES = ['mcp', 'plugins', 'skills', 'subagents'] as const
+const PROBED_PAGES = ['mcp', 'plugins', 'skills'] as const
 
 export type ProbedPageKey = (typeof PROBED_PAGES)[number]
 

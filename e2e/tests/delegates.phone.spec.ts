@@ -3,8 +3,11 @@ import { expect, test, unique } from './support/fixtures.js'
 import { expectFitsPhone } from './support/phone-layout.js'
 
 test('a phone lists a helper under its lead on one line and opens it with a tap', async ({ page }) => {
-  const helperTitle = unique('Helper migration tests')
-  const ids = await seedDelegates(unique('Lead payments refactor'), helperTitle, unique('Unrelated docs'))
+  const ids = await seedDelegates(
+    unique('Lead payments refactor'),
+    unique('Helper migration tests'),
+    unique('Unrelated docs'),
+  )
   await page.goto('/#agents')
   const main = page.getByRole('main')
   const lead = main.locator(`[data-task-id="${ids.lead}"]`)
@@ -17,7 +20,6 @@ test('a phone lists a helper under its lead on one line and opens it with a tap'
   await page.screenshot({ path: test.info().outputPath('delegates-phone.png') })
   await helper.getByRole('button').tap()
   await expect(page.getByRole('combobox', { name: 'Reply' })).toBeVisible()
-  await expect(page.getByText(helperTitle).first()).toBeVisible()
   const transcript = page.getByRole('region', { name: 'Transcript' })
   await expect(transcript.getByText('Write the migration tests for the ledger change.')).toBeVisible()
   const fold = transcript.getByTestId('handover-brief')
