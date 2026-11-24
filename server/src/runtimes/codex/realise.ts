@@ -67,8 +67,13 @@ const STARTUP_TIMEOUT_S = 30
  * itself; a stdio one runs inside the sandbox with the agent's connection variables, never the
  * model key's. A server named like one of Seti's own is left out.
  */
-function userServerSettings(servers: CodexToolServer[], taken: ReadonlySet<string>, env: string[]): Setting[] {
-  const passed = env.filter((name) => name !== MODEL_KEY_ENV)
+function userServerSettings(
+  servers: CodexToolServer[],
+  taken: ReadonlySet<string>,
+  env: string[],
+  keyEnv: string,
+): Setting[] {
+  const passed = env.filter((name) => name !== MODEL_KEY_ENV && name !== keyEnv)
   return servers
     .filter((server) => !taken.has(server.name) && SERVER_NAME.test(server.name))
     .flatMap((server): Setting[] => {
@@ -165,7 +170,10 @@ export function realiseCodex(
   const env = Object.keys(launcher.env)
   const shared = sharedToolCommand(spec.toolServers.shared)
   const taken = new Set([...Object.keys(toolServers), SHARED_TOOL_SERVER])
-  const servers = [...serverSettings(toolServers, shared, env), ...userServerSettings(spec.vendor.servers, taken, env)]
+  const servers = [
+    ...serverSettings(toolServers, shared, env),
+    ...userServerSettings(spec.vendor.servers, taken, env, provider.envKey),
+  ]
   const model = spec.vendor.model ?? DEFAULT_MODEL
   const settings = [...overrides(provider, model, launcher.env.PATH), ...servers]
   return {
