@@ -88,7 +88,13 @@ export const requestedChange = z.discriminatedUnion('kind', [
     host: requestHost,
     port: z.number().int().min(1).max(65_535).default(HTTPS_PORT),
   }),
-  z.object({ kind: z.literal('api_key'), env: connectionEnv, hosts: z.array(connectionHost).min(1).max(5) }),
+  z.object({
+    kind: z.literal('api_key'),
+    env: connectionEnv,
+    hosts: z.array(connectionHost).min(1).max(5),
+    /** The value also goes into request bodies, as a login that posts it needs. */
+    body: z.boolean().optional(),
+  }),
   z.object({ kind: z.literal('mcp_server'), server: z.string().trim().min(1).max(255) }),
   sharedToolProposal,
 ])
@@ -116,7 +122,7 @@ export function describeChange(change: RequestedChange): string {
     case 'allow_host':
       return `access to ${hostEntry(change)}`
     case 'api_key':
-      return `an API key ${change.env} for ${change.hosts.join(', ')}`
+      return `an API key ${change.env} for ${change.hosts.join(', ')}${change.body === true ? ', in request bodies too' : ''}`
     case 'mcp_server':
       return `the MCP server ${change.server}`
     case 'shared_tool':

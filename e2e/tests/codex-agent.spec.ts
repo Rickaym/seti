@@ -27,7 +27,8 @@ test("a Codex agent's request offers Allow and Deny only, and its settings say w
 
   const dialog = await openAgentSettings(page, 'Access')
   await expect(dialog.getByTestId('bypass')).toHaveCount(0)
-  await expect(dialog.getByText('Not on Codex')).toBeVisible()
+  await expect(dialog.getByTestId('bypass')).toHaveCount(0)
+  await expect(dialog.getByText('Not on Codex').first()).toBeVisible()
   const session = await showSection(dialog, 'Session')
   await expect(session).toContainText('Codex, high')
   await expect(session).toContainText(/Estimated from OpenAI prices as of \d{4}-\d{2}-\d{2}/)

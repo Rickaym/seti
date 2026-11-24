@@ -184,6 +184,12 @@ between two steps; an interrupt; a hook at subagent start.
   restarts; a version folder no running program uses, and that the settings no longer need, is
   removed, as is every copy once the runtime is off or runs a program of the user's. Nothing
   outside the control room's own folders is removed.
+- RT-13: A runtime declares whether it loads the user's MCP servers and connectors, Seti's
+  plugins and a compaction rule, whether it can run outside the sandbox, fork a side chat, dream
+  and rewind; `GET /api/runtimes/capabilities` serves each runtime's declaration. For an agent
+  whose runtime lacks one, its settings show the control as not on that runtime instead of a
+  working control, counts leave those items out, its `task.md` and system prompt do not offer
+  them, and the server refuses the change with the reason.
 - RT-14: A runtime whose model can summarise its reasoning MUST ask for the summary, so its agents
   show their thinking as the default runtime's do. Reasoning the model seals for its own next call
   MUST NOT be stored, served or shown by the control room.
@@ -435,13 +441,22 @@ interrupted only for that.
   swaps it for the value in the URL path and headers (Basic auth too), on the connection's hosts
   and port 443 only. A readable request that carries a placeholder elsewhere MUST be refused (403)
   and audited. A connection with no value answers 502. The agent is told where the value is
-  swapped and that a body is not.
+  swapped, and in which connections' bodies (EGR-15).
 - EGR-14: On its connections' hosts the proxy reads the body of a JSON, form, multipart or plain
   text request without a content encoding, holding at most 1 MiB, before anything goes upstream;
-  every other body streams on unread. A held body carrying a placeholder MUST be refused (403)
-  and audited as in EGR-5, naming the connection and never its value, since Seti does not swap a
-  value into a body. A body over 1 MiB streams on while the proxy watches the rest; a placeholder
-  in it cuts the request off and answers 413. A held body goes upstream with its exact length.
+  every other body streams on unread. A held body carrying a placeholder toward a host its
+  connection does not allow, or of a connection with Body off, MUST be refused (403) and audited
+  as in EGR-5, naming the connection and never its value, and nothing is sent upstream. A body
+  over 1 MiB streams on while the proxy watches the rest; a placeholder in it cuts the request off
+  and answers 413. A held body goes upstream with its exact length.
+- EGR-15: A connection's Body setting is off by default and only the user changes it. With it on,
+  the proxy swaps the value into a held body (EGR-14) on the connection's hosts: string-escaped
+  in JSON, URL-encoded in a form, raw in plain text and in a multipart text field (no file name,
+  no type or `text/plain`), never into another body type. A value with a line break in a
+  multipart field, or a placeholder in a file part or a part header, is refused (422) rather than
+  sent with the placeholder. On such a connection's hosts a JSON, form, multipart or plain text
+  body with a content encoding is refused (415), since it cannot be searched. The setting travels
+  in the value-free grant (NODE-8). Response bodies are not scrubbed.
 - EGR-7: A header "added by the proxy" is set from its template on every request to the
   connection's hosts, first matching rule winning. The code-host token is the credential's one for
   the owner named, else its default, never another credential's; minted tokens are cached until
@@ -535,8 +550,8 @@ interrupted only for that.
 
 ### 7.6 Change requests
 
-- CHG-1: Kinds: `allow_host {host, port}`, `api_key {env, hosts[1..5]}`, `mcp_server {server}`,
-  `shared_tool` (section 9), each with a `reason` (10 to 500). The answer is
+- CHG-1: Kinds: `allow_host {host, port}`, `api_key {env, hosts[1..5], body?}`,
+  `mcp_server {server}`, `shared_tool` (section 9), each with a `reason` (10 to 500). The answer is
   `{decision: allow, scope: agent | all, value?}` (`value` for `api_key` only) or
   `{decision: deny}`.
 - CHG-2: MUST be refused: hosts on the machine or its networks; wildcards over a public suffix;
@@ -546,7 +561,8 @@ interrupted only for that.
   `chg_hourly` an hour. A request expires after `chg_expiry`.
 - CHG-5: Allow applies as the user: the host to the agent's or the shared allowlist; the server on
   for the agent; the connection into the asking agent's credential on those hosts, joining an
-  existing one with that variable only on the same hosts and only filling an empty value. The
+  existing one with that variable only on the same hosts and only filling an empty value, and
+  turning on its Body (EGR-15) when the request asked for `body`. The
   agent gets one `seti` update with the outcome and whether a value is set.
 - CHG-7: The pasted value MUST travel only in the user's Allow and MUST NOT enter the request, the
   update, the transcript, events, errors or the audit.
@@ -1042,6 +1058,7 @@ Optional and off by default: a maintenance session per agent that consolidates i
 - CFG-1: The control room MUST offer its stored settings as one JSON document with a `version`, a
   `revision` and a JSON Schema derived from the schemas that validate its settings writes. Its
   sections follow the settings groups and pages the user sees; lists are keyed by a stable name.
+  An agent's and a workspace's own settings are documents of their own.
 - CFG-2: The document, its schema and any error about it MUST NOT contain a secret value; a secret
   reads `set` or `not set`.
 - CFG-3: Agents, mods and devices MUST be refused the document and its schema. The EA reads plain

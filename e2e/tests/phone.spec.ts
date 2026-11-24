@@ -24,7 +24,7 @@ const SECTIONS = [
   'settings/mcp',
   'settings/plugins',
   'settings/skills',
-  'settings/subagents',
+  'settings/tools',
   'settings/signin',
   'settings/sandbox',
   'settings/audit',

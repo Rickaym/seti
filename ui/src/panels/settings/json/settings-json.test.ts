@@ -10,7 +10,7 @@ import { docSections, exportName, pruned, shownSections } from './settings-json'
 const NO_SETTINGS: Record<string, string> = {
   about: "what's new and the version",
   skills: "Claude Code's skill files, read by the probe",
-  subagents: "Claude Code's agent files, read by the probe",
+  tools: 'scripts agents proposed and the user published, not settings',
   audit: 'a log, not settings',
   json: 'this view of the document itself',
   mods: 'each mod is its own section under mods',

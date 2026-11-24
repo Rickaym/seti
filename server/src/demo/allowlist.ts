@@ -101,6 +101,7 @@ const READS = [
   '/api/revisions',
   '/api/revisions/unseen',
   '/api/runtimes',
+  '/api/runtimes/capabilities',
   '/api/sandbox',
   '/api/secrets',
   '/api/ssh',
