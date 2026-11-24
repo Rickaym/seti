@@ -3,6 +3,7 @@ import type { ToolCall } from '@seti/shared'
 import { z } from 'zod'
 import type { Launcher } from '../../launcher.js'
 import type { StdioServer } from '../../tool-relay.js'
+import type { UserSkill } from '../../user-skills.js'
 import type { InputContent, RuntimeSession, SessionInput, SessionReport } from '../adapter.js'
 import type { CodexDecide } from './approvals.js'
 import { Asks } from './asks.js'
@@ -12,12 +13,14 @@ import { OPTED_OUT } from './private.js'
 import { codexReport, ReportQueue } from './reports.js'
 import { CodexRpc, RpcError, type CodexCall } from './rpc.js'
 
-/** What a Codex agent's spec carries for Codex alone: the program, and the model and effort. */
+/** What a Codex agent's spec carries for Codex alone: the program, model, effort and skills. */
 interface CodexVendor {
   binary: string
   /** Null for the runtime's default model. */
   model: string | null
   effort: string | null
+  /** The user's own skills, which Seti lists for the agent itself; Codex's skill list stays off. */
+  skills: readonly UserSkill[]
 }
 
 /** Codex's shapes: a neutral decision, a JSON-RPC process, stdio tool servers, no hooks or modes. */

@@ -203,6 +203,10 @@ between two steps; an interrupt; a hook at subagent start.
   room's own instructions: in the conversation as project instructions, never in the system or
   developer instructions. A runtime folder the agent can write MUST NOT carry instructions into a
   later session.
+- KIT-2: The user's own skills reach an agent read-only on every runtime that takes them. A
+  runtime that would offer skills from a folder the agent can write (its home, its runtime's
+  folder or its working folder) MUST NOT offer them; the control room lists the user's skills in
+  its own instructions instead, and the runtime's own skills folder starts empty in each process.
 
 ## 4. Turn lifecycle
 
