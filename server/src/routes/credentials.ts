@@ -1,4 +1,5 @@
 import {
+  accessPreviewInput,
   accessSaveInput,
   credentialHostInput,
   credentialHostParams,
@@ -67,7 +68,7 @@ export const credentialRoutes = new Hono()
   .put('/profiles/:id/access', validId, validJson(taskAccessInput), async (c) =>
     ok(c, await setProfileAccess(c.req.valid('param').id, c.req.valid('json'))),
   )
-  .post('/profiles/:id/access/preview', validId, validJson(accessSaveInput), async (c) =>
+  .post('/profiles/:id/access/preview', validId, validJson(accessPreviewInput), async (c) =>
     ok(c, await previewAccessSave(c.req.valid('param').id, c.req.valid('json').task_id)),
   )
   .post('/profiles/:id/access/save', validId, validJson(accessSaveInput), async (c) => {

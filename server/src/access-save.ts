@@ -58,6 +58,7 @@ function reach(item: AccessItem, was: boolean | null, others: readonly TaskViewO
 }
 
 interface TaskViewOf {
+  id: string
   title: string
   items: ReadonlyMap<string, AccessItem>
 }
@@ -80,7 +81,7 @@ async function plan(profileId: string, taskId: string): Promise<Plan> {
     const other = await tasks.get(agent.id)
     if (other !== undefined) {
       const items = (await effectiveAccess(other)).items
-      others.push({ title: other.title, items: new Map(items.map((item) => [keyOf(item), item])) })
+      others.push({ id: other.id, title: other.title, items: new Map(items.map((item) => [keyOf(item), item])) })
     }
   }
   const was = new Map(before.map((entry) => [`${entry.kind}:${entry.id}`, entry.enabled]))
@@ -99,13 +100,22 @@ async function plan(profileId: string, taskId: string): Promise<Plan> {
     })
     .toSorted((a, b) => Number(isSecurityAccess(b.kind)) - Number(isSecurityAccess(a.kind)))
   const hostsAdded = view.hosts.filter((host) => !hostsBefore.includes(host))
-  const state = { before, hostsBefore, changes, hostsAdded, own: view.items.filter((i) => i.override !== null) }
+  const own = view.items.filter((item) => item.override !== null)
+  const state = {
+    before,
+    hostsBefore,
+    changes,
+    hostsAdded,
+    agents: others.map((other) => other.id),
+    own: own.map((item) => `${keyOf(item)}:${String(item.override)}`),
+    ownHosts: view.hosts,
+  }
   const preview: AccessSavePreview = {
     profile: { id: profile.id, name: profile.name },
     agents: others.map((other) => other.title),
     changes,
     hosts_added: hostsAdded,
-    own_cleared: state.own.length,
+    own_cleared: own.length,
     own_hosts_cleared: view.hosts.length,
     fingerprint: createHash('sha256').update(JSON.stringify(state)).digest('hex'),
   }
@@ -121,9 +131,9 @@ export async function previewAccessSave(profileId: string, taskId: string): Prom
  * Copies the agent's access into its credential, which its other agents follow from their next
  * turn, and clears the agent's own choices and hosts, which the credential now gives it.
  */
-export async function saveAccess(profileId: string, taskId: string, expect?: string): Promise<AccessSavePreview> {
+export async function saveAccess(profileId: string, taskId: string, expect: string): Promise<AccessSavePreview> {
   const { task, view, preview } = await plan(profileId, taskId)
-  if (expect !== undefined && expect !== preview.fingerprint) {
+  if (expect !== preview.fingerprint) {
     throw new HttpError(409, 'The access changed since the preview; look at it again')
   }
   for (const change of preview.changes) {

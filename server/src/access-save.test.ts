@@ -1,8 +1,8 @@
 import { randomUUID } from 'node:crypto'
 import type { AccessSavePreview } from '@seti/shared'
 import { describe, expect, it } from 'vitest'
-import { saveAccess } from './access-save.js'
-import { asAgent } from './access.js'
+import { previewAccessSave, saveAccess } from './access-save.js'
+import { asAgent, asMod } from './access.js'
 import { createApp } from './app.js'
 import { sql, tasks } from './db.js'
 import { taskAccess } from './store/access.js'
@@ -87,15 +87,45 @@ describe("saving an agent's access into its credential", () => {
     })
   })
 
-  it('refuses another credential, the EA and agents', async () => {
+  it('refuses a save without a preview, or after an agent joined or chose since', async () => {
+    const { ops, saver, follower } = await setup()
+    const save = async (fingerprint?: string) =>
+      send(`/credentials/profiles/${ops}/access/save`, {
+        task_id: saver,
+        ...(fingerprint === undefined ? {} : { expect: fingerprint }),
+      })
+    const look = async () =>
+      (
+        (await (await send(`/credentials/profiles/${ops}/access/preview`, { task_id: saver })).json()) as {
+          data: AccessSavePreview
+        }
+      ).data
+    expect((await save()).status).toBe(400)
+    const first = await look()
+    await agent(ops, 'newcomer')
+    expect((await save(first.fingerprint)).status).toBe(409)
+    const second = await look()
+    expect(second.agents).toContain('newcomer')
+    await taskAccess.set(follower, 'aws', 'aws', false)
+    expect((await save(second.fingerprint)).status).toBe(409)
+    expect(await credentialAccess.all(ops)).toEqual([])
+    expect((await save((await look()).fingerprint)).status).toBe(200)
+  })
+
+  it('refuses another credential, the EA, agents and mods', async () => {
     const { ops, saver } = await setup()
     const other = (await profiles.create(`Other ${randomUUID().slice(0, 6)}`)).id
     expect((await send(`/credentials/profiles/${other}/access/preview`, { task_id: saver })).status).toBe(409)
+    const { fingerprint } = await previewAccessSave(ops, saver)
     for (const path of ['preview', 'save']) {
-      expect((await send(`/credentials/profiles/${ops}/access/${path}`, { task_id: saver }, EA_AUTH)).status).toBe(403)
+      const body = { task_id: saver, expect: fingerprint }
+      expect((await send(`/credentials/profiles/${ops}/access/${path}`, body, EA_AUTH)).status).toBe(403)
     }
     const caller = { id: saver, title: 'saver', seti_control: 'full' as const }
-    await expect(asAgent(caller, async () => saveAccess(ops, saver))).rejects.toMatchObject({ status: 403 })
+    for (const write of [async () => saveAccess(ops, saver, fingerprint), async () => previewAccessSave(ops, saver)]) {
+      await expect(asAgent(caller, write)).rejects.toMatchObject({ status: 403 })
+      await expect(asMod({ id: 'sample', grants: [] }, write)).rejects.toMatchObject({ status: 403 })
+    }
     expect(await credentialAccess.all(ops)).toEqual([])
   })
 })

@@ -83,14 +83,11 @@ export const credentialHostInput = z.object({ host: domainEntry })
 
 export const credentialHostParams = z.object({ id: z.string().min(1).max(64), host: domainEntry })
 
-/** Saves an agent's access into its credential; `expect` is the preview's fingerprint. */
-export const accessSaveInput = z.object({
-  task_id: z.string().min(1).max(64),
-  expect: z
-    .string()
-    .regex(/^[0-9a-f]{64}$/)
-    .optional(),
-})
+/** Asks what saving an agent's access into its credential would change. */
+export const accessPreviewInput = z.object({ task_id: z.string().min(1).max(64) })
+
+/** Saves an agent's access into its credential; `expect` is the fingerprint of the preview read. */
+export const accessSaveInput = accessPreviewInput.extend({ expect: z.string().regex(/^[0-9a-f]{64}$/) })
 export type AccessSaveInput = z.input<typeof accessSaveInput>
 
 /** One item a save changes in the credential, and which other agents it changes. */

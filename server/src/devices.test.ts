@@ -54,6 +54,8 @@ const CREDENTIAL_ACCESS_WRITES: readonly (readonly [string, unknown])[] = [
   ['POST /api/credentials/profiles/default/hosts', { host: 'api.example.com' }],
   ['DELETE /api/credentials/profiles/default/hosts/api.example.com', undefined],
   ['POST /api/tasks/any/access/reset', {}],
+  ['POST /api/credentials/profiles/default/access/preview', { task_id: 'any' }],
+  ['POST /api/credentials/profiles/default/access/save', { task_id: 'any', expect: '0'.repeat(64) }],
 ]
 const LOCAL = { host: '127.0.0.1:3006', origin: 'http://127.0.0.1:3006', ...USER_AUTH }
 
