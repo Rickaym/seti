@@ -730,8 +730,11 @@ api.slack.com/apps, under Event Subscriptions, subscribe to `message.channels`, 
 `message.im` and `message.mpim` (as events on behalf of users when the app acts as you), and
 reinstall the app if Slack asks.
 
-Upgrading: Slack `message` events no longer reach a Slack webhook's subscribers, such as the EA's
-inbox, unless its filter keeps them; a filter that returns `true` brings back the old behaviour.
+While both switches are off, the Slack webhook works exactly as before. Once you turn one on,
+`app_mention` and other events still reach its subscribers, such as the EA's inbox, but a `message`
+event reaches them only when the webhook's filter keeps it, or, without a filter, when it mentions
+you. Other messages are recorded as ignored, so subscribing to message events does not flood the
+EA. A filter that returns `true` sends every message on, as before.
 
 ### Webhook filters
 

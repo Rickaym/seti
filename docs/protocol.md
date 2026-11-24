@@ -723,15 +723,20 @@ interrupted only for that.
   the agent follows it; a later send there follows it again after a stop. Seti keeps ids and the
   link, never the text. An agent follows at most `thread_cap` threads; a new one stops the least
   recently active.
-- THR-2: A webhook whose sender Seti reads threads from (the catalog `slack` sender) hands each
-  verified message event to the thread matcher before its filter. A new message (not an edit,
-  deletion or join) in a followed thread is queued for every agent following it whose first message
-  there is older, once each, when the webhook's `thread_replies` is on. With `thread_dms` on, an
-  unthreaded message in a direct message goes to the agent that wrote there last within
-  `dm_window`. A message any agent sent is never queued. Queued text is redacted.
-- THR-3: A message event of such a sender reaches subscribers only when the webhook's filter keeps
-  or changes it; otherwise the delivery is `ignored` and keeps no excerpt.
-  Why: a user who subscribes the app to message events for replies must not flood the EA's inbox.
+- THR-2: While a webhook's `thread_replies` and `thread_dms` are both off, Seti handles its
+  deliveries exactly as it would without thread replies. With either on, a webhook whose sender Seti
+  reads threads from (the catalog `slack` sender) hands each verified message event to the thread
+  matcher before its filter. A new message (not an edit, deletion or join) in a followed thread is
+  queued for every agent following it whose first message there is older, once each, when
+  `thread_replies` is on. With `thread_dms` on, an unthreaded message in a direct message goes to
+  the agent that wrote there last within `dm_window`. A message any agent sent is never queued.
+  Queued text is redacted.
+- THR-3: With either switch on, other events such as `app_mention` reach subscribers as before. A
+  message event reaches them when the webhook's filter keeps or changes it, or, when the webhook
+  has no filter or its filter fails, when it mentions a user the sender's app is authorised for;
+  otherwise the delivery is `ignored` and keeps no excerpt.
+  Why: subscribing the app to message events for replies must not flood the EA's inbox, and a
+  mention that arrives as a message event must still reach it.
 - THR-4: A queued reply is routed after `reply_settle`, so an agent's own message whose echo came
   first is recognised (`own`). It reaches the agent as a `thread` update unless the thread is
   stopped or `thread_rate` replies of it were sent within the hour (`rate`). A bot's reply is held

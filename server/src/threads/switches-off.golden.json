@@ -1,0 +1,209 @@
+{
+  "answers": {
+    "app mention": {
+      "status": "accepted",
+      "reason": "sent to the EA inbox"
+    },
+    "plain message": {
+      "status": "accepted",
+      "reason": "sent to the EA inbox"
+    },
+    "mention as a message": {
+      "status": "accepted",
+      "reason": "sent to the EA inbox"
+    },
+    "reply in a followed thread": {
+      "status": "accepted",
+      "reason": "sent to the EA inbox"
+    },
+    "edit": {
+      "status": "accepted",
+      "reason": "sent to the EA inbox"
+    },
+    "bot message": {
+      "status": "accepted",
+      "reason": "sent to the EA inbox"
+    },
+    "direct message": {
+      "status": "accepted",
+      "reason": "sent to the EA inbox"
+    }
+  },
+  "deliveries": [
+    {
+      "status": "accepted",
+      "http_status": 200,
+      "reason": "sent to the EA inbox",
+      "excerpt": "{\"type\":\"event_callback\",\"event_id\":\"Ev1\",\"authorizations\":[{\"user_id\":\"U0OWNER001\",\"is_bot\":false}],\"event\":{\"type\":\"app_mention\",\"user\":\"U0OTHER0001\",\"text\":\"<@U0OWNER001> look\",\"ts\":\"1700000001.000100\",\"channel\":\"C0PROJ1234\"}}",
+      "filter": null,
+      "routes": [
+        {
+          "target": "ea",
+          "label": "EA",
+          "outcome": "delivered",
+          "reason": "Queued in the EA inbox"
+        }
+      ],
+      "event": {
+        "source": "Slack",
+        "severity": "info",
+        "kind": "app_mention",
+        "title": "<@U0OWNER001> look",
+        "detail": "<@U0OWNER001> look",
+        "url": null,
+        "subject": null,
+        "state": null
+      }
+    },
+    {
+      "status": "accepted",
+      "http_status": 200,
+      "reason": "sent to the EA inbox",
+      "excerpt": "{\"type\":\"event_callback\",\"event_id\":\"Ev2\",\"authorizations\":[{\"user_id\":\"U0OWNER001\",\"is_bot\":false}],\"event\":{\"type\":\"message\",\"channel_type\":\"channel\",\"user\":\"U0OTHER0001\",\"text\":\"Looks good\",\"channel\":\"C0PROJ1234\",\"ts\":\"1700000002.000100\"}}",
+      "filter": null,
+      "routes": [
+        {
+          "target": "ea",
+          "label": "EA",
+          "outcome": "delivered",
+          "reason": "Queued in the EA inbox"
+        }
+      ],
+      "event": {
+        "source": "Slack",
+        "severity": "info",
+        "kind": "message",
+        "title": "Looks good",
+        "detail": "Looks good",
+        "url": null,
+        "subject": null,
+        "state": null
+      }
+    },
+    {
+      "status": "accepted",
+      "http_status": 200,
+      "reason": "sent to the EA inbox",
+      "excerpt": "{\"type\":\"event_callback\",\"event_id\":\"Ev3\",\"authorizations\":[{\"user_id\":\"U0OWNER001\",\"is_bot\":false}],\"event\":{\"type\":\"message\",\"channel_type\":\"channel\",\"user\":\"U0OTHER0001\",\"text\":\"hey <@U0OWNER001>\",\"channel\":\"C0PROJ1234\",\"ts\":\"1700000003.000100\"}}",
+      "filter": null,
+      "routes": [
+        {
+          "target": "ea",
+          "label": "EA",
+          "outcome": "delivered",
+          "reason": "Queued in the EA inbox"
+        }
+      ],
+      "event": {
+        "source": "Slack",
+        "severity": "info",
+        "kind": "message",
+        "title": "hey <@U0OWNER001>",
+        "detail": "hey <@U0OWNER001>",
+        "url": null,
+        "subject": null,
+        "state": null
+      }
+    },
+    {
+      "status": "accepted",
+      "http_status": 200,
+      "reason": "sent to the EA inbox",
+      "excerpt": "{\"type\":\"event_callback\",\"event_id\":\"Ev4\",\"authorizations\":[{\"user_id\":\"U0OWNER001\",\"is_bot\":false}],\"event\":{\"type\":\"message\",\"channel_type\":\"channel\",\"user\":\"U0OTHER0001\",\"text\":\"Looks good\",\"channel\":\"C0PROJ1234\",\"ts\":\"1700000004.000100\",\"thread_ts\":\"1700000000.000100\"}}",
+      "filter": null,
+      "routes": [
+        {
+          "target": "ea",
+          "label": "EA",
+          "outcome": "delivered",
+          "reason": "Queued in the EA inbox"
+        }
+      ],
+      "event": {
+        "source": "Slack",
+        "severity": "info",
+        "kind": "message",
+        "title": "Looks good",
+        "detail": "Looks good",
+        "url": null,
+        "subject": null,
+        "state": null
+      }
+    },
+    {
+      "status": "accepted",
+      "http_status": 200,
+      "reason": "sent to the EA inbox",
+      "excerpt": "{\"type\":\"event_callback\",\"event_id\":\"Ev5\",\"authorizations\":[{\"user_id\":\"U0OWNER001\",\"is_bot\":false}],\"event\":{\"type\":\"message\",\"channel_type\":\"channel\",\"user\":\"U0OTHER0001\",\"text\":\"Looks good\",\"channel\":\"C0PROJ1234\",\"ts\":\"1700000005.000100\",\"subtype\":\"message_changed\"}}",
+      "filter": null,
+      "routes": [
+        {
+          "target": "ea",
+          "label": "EA",
+          "outcome": "delivered",
+          "reason": "Queued in the EA inbox"
+        }
+      ],
+      "event": {
+        "source": "Slack",
+        "severity": "info",
+        "kind": "message.message_changed",
+        "title": "Looks good",
+        "detail": "Looks good",
+        "url": null,
+        "subject": null,
+        "state": null
+      }
+    },
+    {
+      "status": "accepted",
+      "http_status": 200,
+      "reason": "sent to the EA inbox",
+      "excerpt": "{\"type\":\"event_callback\",\"event_id\":\"Ev6\",\"authorizations\":[{\"user_id\":\"U0OWNER001\",\"is_bot\":false}],\"event\":{\"type\":\"message\",\"channel_type\":\"channel\",\"text\":\"Looks good\",\"channel\":\"C0PROJ1234\",\"ts\":\"1700000006.000100\",\"bot_id\":\"B0CIBOT001\",\"subtype\":\"bot_message\"}}",
+      "filter": null,
+      "routes": [
+        {
+          "target": "ea",
+          "label": "EA",
+          "outcome": "delivered",
+          "reason": "Queued in the EA inbox"
+        }
+      ],
+      "event": {
+        "source": "Slack",
+        "severity": "info",
+        "kind": "message.bot_message",
+        "title": "Looks good",
+        "detail": "Looks good",
+        "url": null,
+        "subject": null,
+        "state": null
+      }
+    },
+    {
+      "status": "accepted",
+      "http_status": 200,
+      "reason": "sent to the EA inbox",
+      "excerpt": "{\"type\":\"event_callback\",\"event_id\":\"Ev7\",\"authorizations\":[{\"user_id\":\"U0OWNER001\",\"is_bot\":false}],\"event\":{\"type\":\"message\",\"channel_type\":\"im\",\"user\":\"U0OTHER0001\",\"text\":\"Looks good\",\"channel\":\"D0DIRECT01\",\"ts\":\"1700000007.000100\"}}",
+      "filter": null,
+      "routes": [
+        {
+          "target": "ea",
+          "label": "EA",
+          "outcome": "delivered",
+          "reason": "Queued in the EA inbox"
+        }
+      ],
+      "event": {
+        "source": "Slack",
+        "severity": "info",
+        "kind": "message",
+        "title": "Looks good",
+        "detail": "Looks good",
+        "url": null,
+        "subject": null,
+        "state": null
+      }
+    }
+  ]
+}

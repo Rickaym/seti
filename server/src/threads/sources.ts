@@ -23,6 +23,8 @@ export interface ThreadSource {
   isMessage: (payload: unknown) => boolean
   /** A new message someone wrote; null for edits, deletions, joins and anything else. */
   read: (payload: unknown) => InboundMessage | null
+  /** Whether the message mentions the workspace user the sender's app is authorised for. */
+  mentionsOwner: (payload: unknown) => boolean
   /** A link to a message, in its thread when it has one; null when the workspace is unknown. */
   link: (space: string, container: string, message: string, thread: string) => string | null
 }
@@ -82,6 +84,23 @@ function readSlack(payload: unknown): InboundMessage | null {
   }
 }
 
+/** The users a Slack delivery is for: `authorizations[].user_id`, or the older `authed_users`. */
+function authorisedUsers(payload: Fields): string[] {
+  const authorizations = Array.isArray(payload.authorizations) ? payload.authorizations : []
+  const users = authorizations.map((a: unknown) => (isFields(a) ? text(a.user_id) : null))
+  const authed = Array.isArray(payload.authed_users) ? payload.authed_users.map(text) : []
+  return [...users, ...authed].filter((id): id is string => id !== null)
+}
+
+function slackMentionsOwner(payload: unknown): boolean {
+  const event = slackEvent(payload)
+  if (event === null || !isFields(payload) || typeof event.text !== 'string') {
+    return false
+  }
+  const said = event.text
+  return authorisedUsers(payload).some((id) => said.includes(`<@${id}>`) || said.includes(`<@${id}|`))
+}
+
 function slackLink(space: string, container: string, message: string, thread: string): string | null {
   if (space === '') {
     return null
@@ -95,6 +114,7 @@ const SLACK: ThreadSource = {
   label: 'Slack',
   isMessage: (payload) => slackEvent(payload) !== null,
   read: readSlack,
+  mentionsOwner: slackMentionsOwner,
   link: slackLink,
 }
 
