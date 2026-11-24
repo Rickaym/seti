@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import type { CodexToolServer } from '../../codex-tool-servers.js'
 import type { Launcher } from '../../launcher.js'
 import type { SessionSpec } from '../../session-spec.js'
 import { realiseCodex } from './realise.js'
@@ -126,12 +127,12 @@ describe('realising a Codex session', () => {
   })
 
   it("starts the user's servers in the sandbox, asking Seti about every call, never with the key", () => {
-    const servers = [
+    const servers: CodexToolServer[] = [
       { name: 'play', transport: 'stdio', command: 'npx', args: ['@playwright/mcp'] },
       { name: 'docs', transport: 'http', url: 'https://docs.example.com/mcp' },
       { name: 'shared', transport: 'stdio', command: 'not-seti', args: [] },
-    ] as const
-    const withServers = { ...spec, vendor: { ...spec.vendor, servers: [...servers] } }
+    ]
+    const withServers = { ...spec, vendor: { ...spec.vendor, servers } }
     const env = { SETI_MODEL_KEY: 'seti-placeholder', GH_TOKEN: 'seti-sandbox-placeholder' }
     const realised = realiseCodex(withServers, launcher(env), { ...answering, binary: '/c' })
     const settings = settingsOf(realised.args)

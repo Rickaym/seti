@@ -24,7 +24,7 @@ interface CodexVendor {
   /** The user's own skills, which Seti lists for the agent itself; Codex's skill list stays off. */
   skills: readonly UserSkill[]
   /** The user's MCP servers the agent starts with, without a value. */
-  servers: CodexToolServer[]
+  servers: readonly CodexToolServer[]
 }
 
 /** Codex's shapes: a neutral decision, a JSON-RPC process, stdio tool servers, no hooks or modes. */

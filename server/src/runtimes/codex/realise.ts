@@ -68,7 +68,7 @@ const STARTUP_TIMEOUT_S = 30
  * model key's. A server named like one of Seti's own is left out.
  */
 function userServerSettings(
-  servers: CodexToolServer[],
+  servers: readonly CodexToolServer[],
   taken: ReadonlySet<string>,
   env: string[],
   keyEnv: string,
