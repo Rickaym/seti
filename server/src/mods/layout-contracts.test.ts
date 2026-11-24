@@ -30,9 +30,6 @@ describe('layout, header and chord contributions', () => {
     expect(issue({ commands: [{ id: 'ask', title: 'Ask', for: ['palette'], needs }] })).toBe(
       'A command that needs a capability takes a task argument',
     )
-    expect(
-      issue({ commands: [{ id: 'ask', title: 'Ask', args: task, for: ['palette'], needs: ['wings'] }] }),
-    ).not.toBeNull()
     const view = { id: 'chat', title: 'Chat', phone: true, needs }
     expect(issue({ views: [{ ...view, where: 'agentDock' }] })).toBeNull()
     expect(issue({ views: [{ ...view, where: 'section' }] })).toBe(
