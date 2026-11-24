@@ -11,7 +11,7 @@ const TS = /^\d{10}\.\d{6}$/
 const CHANNEL = /^[A-Z0-9]{8,}$/
 
 /** A Slack MCP server's send_message, or chat.postMessage called from the shell. */
-export function sendsSlackMessage(call: ToolCall): boolean {
+function sendsSlackMessage(call: ToolCall): boolean {
   if (call.mcp !== undefined) {
     return MCP_SEND.test(call.mcp.tool) && SLACK.test(`${call.mcp.server} ${call.mcp.tool}`)
   }
@@ -62,7 +62,7 @@ function fromLink(text: string, inputThread: string | null): SentMessage | null 
  * The Slack message a successful send reported, read from its result: a Web API answer, else the
  * first Slack message link. Null when the result names no channel and timestamp.
  */
-export function slackSent(call: ToolCall, resultText: string): SentMessage | null {
+function slackSent(call: ToolCall, resultText: string): SentMessage | null {
   const input = isFields(call.input) ? call.input : {}
   const inputThread = tsOf(input.thread_ts)
   const answer = jsonOf(resultText)
