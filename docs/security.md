@@ -73,6 +73,13 @@ static `/pair` page and `/.well-known/assetlinks.json`; `POST /hooks/<id>`; and 
 `/share/<token>`, its `/raw`, `/p/1` to `/p/50` and `/card.png`. The app's own page and static
 files need no API credential; on a public hostname they sit behind Access when Access is set up.
 
+## The settings document
+
+`GET /api/settings-doc` gives every stored setting as one JSON document. A secret appears only as
+`set` or `not set` beside a name; the builder reads the views the settings pages read, which never
+carry a value. The EA gets plain configuration only, with security settings left out; agents,
+mods and paired devices are refused (CFG-1 to CFG-3). The document only reads: no route writes it.
+
 ## Where each secret lives
 
 | Secret                             | Stored as                              | Read by                     |
