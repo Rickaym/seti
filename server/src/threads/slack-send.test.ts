@@ -43,6 +43,23 @@ describe('createSlackSendWatcher', () => {
     ])
   })
 
+  it('reads the link in the JSON answer the Slack MCP server gives, slashes escaped', () => {
+    const answer = JSON.stringify({
+      message_link: LINK,
+      message_context: { message_ts: '1700000000.000100', channel_id: 'C0PROJ1234' },
+    }).replaceAll('/', '\\/')
+    expect(sent(SEND, { channel_id: 'C0PROJ1234', message: 'hi' }, answer)).toEqual([
+      {
+        service: 'slack',
+        space: 'acme',
+        container: 'C0PROJ1234',
+        thread: '1700000000.000100',
+        message: '1700000000.000100',
+        url: LINK,
+      },
+    ])
+  })
+
   it('takes the thread of a reply from the link, else from the call', () => {
     const [fromLink] = sent(SEND, { channel_id: 'C0PROJ1234', message: 'hi' }, `Sent <${REPLY_LINK}>`)
     expect(fromLink).toMatchObject({ thread: '1700000000.000100', message: '1700000050.000200' })

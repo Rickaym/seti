@@ -60,13 +60,15 @@ function fromLink(text: string, inputThread: string | null): SentMessage | null 
 
 /**
  * The Slack message a successful send reported, read from its result: a Web API answer, else the
- * first Slack message link. Null when the result names no channel and timestamp.
+ * first Slack message link, also inside JSON that escapes its slashes. Null when the result names
+ * no channel and timestamp.
  */
 function slackSent(call: ToolCall, resultText: string): SentMessage | null {
   const input = isFields(call.input) ? call.input : {}
   const inputThread = tsOf(input.thread_ts)
   const answer = jsonOf(resultText)
-  return (answer === null ? null : fromApiAnswer(answer, inputThread)) ?? fromLink(resultText, inputThread)
+  const unescaped = resultText.replaceAll('\\/', '/')
+  return (answer === null ? null : fromApiAnswer(answer, inputThread)) ?? fromLink(unescaped, inputThread)
 }
 
 /** Tracks Slack sends per task and yields each message a send that ended well reported. */
