@@ -476,6 +476,9 @@ class SettingsFake(FakeSeti):
                     "hidden_paths": ["~/work"],
                 }
                 return ok({"policy": policy, "token_mode": "none"})
+            case "GET", ["runtimes"]:
+                failure = {"reason": "network", "message": "Could not reach registry.npmjs.org"}
+                return ok({"codex": {"state": "failed", "failure": failure, "pinned": "0.171.0"}})
             case _:
                 return None
 
@@ -1236,6 +1239,7 @@ async def test_refreshes_resources_ea_settings_schedule_and_security(
     assert "You address the user with no title." in cleared.text
     security = await tools.call("get_security_settings", {})
     assert security.text.startswith("The sandbox is on")
+    assert "Codex cannot start: Could not reach registry.npmjs.org; the user retries" in security.text
     assert "You cannot change them or see any secret." in security.text
 
 

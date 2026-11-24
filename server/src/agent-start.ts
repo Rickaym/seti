@@ -10,6 +10,7 @@ import { awaitTurnEnd, requestWaiter } from './agent-waits.js'
 import { sendKey, sendOnce } from './client-sends.js'
 import { fromEa } from './ea-guard.js'
 import { planAgent, planTitle } from './planner.js'
+import { approvalCeilings } from './store/approval-ceilings.js'
 import { requireTask, startTask } from './tasks.js'
 import { checkStaged, refuseCommandAttachments } from './uploads.js'
 
@@ -24,10 +25,22 @@ async function firstTurnWait(notify: boolean) {
   }
 }
 
+/** Holds the new agent to its starter's approvals, then sets up the wait, before its first turn. */
+async function beforeFirstTurn(notify: boolean, cap: AccessCap | undefined) {
+  const waited = await firstTurnWait(notify)
+  const ceiling = cap?.approvals ?? null
+  return async (taskId: string) => {
+    if (ceiling !== null) {
+      await approvalCeilings.set(taskId, ceiling)
+    }
+    await waited?.(taskId)
+  }
+}
+
 /**
  * Plans what the caller did not pin, then starts the agent on the default profile, sandboxed
  * unless the user turned that off. An agent starting another passes its cap: the new one is
- * sandboxed, gets nothing its starter lacks and grants nothing.
+ * sandboxed, gets nothing its starter lacks, grants nothing and settles no call more loosely.
  */
 export async function startAgent(input: StartAgentRequest, cap?: AccessCap): Promise<Task> {
   return sendOnce(
@@ -43,7 +56,7 @@ export async function startAgent(input: StartAgentRequest, cap?: AccessCap): Pro
 async function startPlanned(input: StartAgentRequest, cap?: AccessCap): Promise<Task> {
   refuseCommandAttachments(input.prompt, input.attachments)
   checkStaged(input.attachments)
-  const onCreated = await firstTurnWait(input.notify_when_done)
+  const onCreated = await beforeFirstTurn(input.notify_when_done, cap)
   const plan = await planAgent(input.prompt, {
     title: input.title,
     fromEa: fromEa(),

@@ -2,8 +2,11 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { CODEX_SETTINGS_DEFAULTS, type Task } from '@seti/shared'
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { createApp } from './app.js'
+import { sweepCodex } from './codex-install.js'
+import { CODEX_ROOT } from './config.js'
+import { endSession } from './session-control.js'
 import { codexSettings } from './store/codex-settings.js'
 import { canSandbox, proofRun, type ProofRun } from './test-codex-proof.js'
 import { clearConnections } from './test-connections.js'
@@ -33,8 +36,13 @@ export function proofSuite(split: boolean): void {
     }, 60_000)
 
     afterAll(async () => {
+      await endSession(task.id)
       await run.close()
       await codexSettings.set(CODEX_SETTINGS_DEFAULTS)
+      await vi.waitFor(async () => {
+        await sweepCodex()
+        expect(fs.readdirSync(CODEX_ROOT), 'Seti removes its copy once no Codex runs it').toEqual([])
+      })
       await clearConnections()
     })
 
@@ -65,7 +73,10 @@ export function proofSuite(split: boolean): void {
     it("refuses writes to Codex's locked files and to the program's folder", () => {
       const locked = fs.readFileSync(path.join(task.cwd, 'locked.txt'), 'utf8').trim().split('\n')
       expect(locked.map(Number).every((code) => code !== 0)).toBe(true)
-      expect(fs.existsSync(path.join(path.dirname(binary), 'seti-proof'))).toBe(false)
+      expect(path.dirname(run.program), "Seti's own copy, not the program the test named").not.toBe(
+        path.dirname(binary),
+      )
+      expect(fs.existsSync(path.join(path.dirname(run.program), 'seti-proof'))).toBe(false)
     })
 
     it('stops a turn on an interrupt, and resumes the conversation after a restart', async () => {

@@ -32,23 +32,9 @@ async function contextOf(task: Task): Promise<PolicyContext> {
   }
 }
 
-/**
- * The tool name the user's rules give a call, which are written in Claude Code's names: a command
- * is `Bash`, an edit `Edit`, or `Write` when it only makes files, whatever Codex calls the tool.
- */
-function ruleName(call: ToolCall): string {
-  if (call.kind === 'shell') {
-    return 'Bash'
-  }
-  if (call.kind !== 'edit') {
-    return call.name
-  }
-  return (call.edit?.changes ?? []).every((change) => change.op === 'create') ? 'Write' : 'Edit'
-}
-
 /** The call as the evaluator reads it, with where the paths it names lead. */
 async function readCall(call: ToolCall, ctx: PolicyContext): Promise<PolicyCall> {
-  const given = { ...policyCall(call), name: ruleName(call) }
+  const given = policyCall(call)
   const resolved = await resolvePaths(namedPaths(given, ctx), [ctx.cwd, ...ctx.dirs, ctx.home])
   return resolved.size === 0 ? given : { ...given, resolved }
 }

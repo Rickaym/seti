@@ -17,6 +17,7 @@ import { stopChannelRuns } from './channels/drain.js'
 import { warmFilters } from './channels/filter-actions.js'
 import { startRouteRetries } from './channels/router.js'
 import { startLoginKeeper } from './claude-logins.js'
+import { startCodexKeeper } from './codex-install.js'
 import {
   BACKUP,
   BACKUP_DIR,
@@ -226,6 +227,7 @@ startArchiveLifecycle()
 startStorageSchedule()
 startDreamTicker()
 startTrashSweep()
+startCodexKeeper()
 startMcpLoginKeeper()
 startLoginKeeper()
 resourceSampler.start()

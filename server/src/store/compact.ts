@@ -1,5 +1,5 @@
 import { COMPACT_DEFAULTS, type CompactRule } from '@seti/shared'
-import { now, sql } from '../db.js'
+import { now, sql, type Db } from '../db.js'
 
 interface RuleRow {
   auto: boolean
@@ -31,8 +31,8 @@ export const compactSettings = {
       ? { rule: COMPACT_DEFAULTS, updated_at: null }
       : { rule: toRule(row), updated_at: row.updated_at }
   },
-  set: async (rule: CompactRule): Promise<void> => {
-    await sql`INSERT INTO compact_settings (id, auto, window_k, threshold_pct, instructions, updated_at)
+  set: async (rule: CompactRule, db: Db = sql): Promise<void> => {
+    await db`INSERT INTO compact_settings (id, auto, window_k, threshold_pct, instructions, updated_at)
       VALUES (1, ${rule.auto}, ${rule.window_k}, ${rule.threshold_pct}, ${instructionsOf(rule)}, ${now()})
       ON CONFLICT (id) DO UPDATE SET auto = excluded.auto, window_k = excluded.window_k,
         threshold_pct = excluded.threshold_pct, instructions = excluded.instructions,

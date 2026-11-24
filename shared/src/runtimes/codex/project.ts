@@ -137,14 +137,19 @@ function notice(params: unknown, at: Thread): Event {
   return { v: 1, ...at, type: 'notice', code, text: error.message }
 }
 
+/** Codex marks the option it suggests in its label; Seti asks with the plain label. */
+const RECOMMENDED = ' (Recommended)'
+
+const plainLabel = (label: string) => (label.endsWith(RECOMMENDED) ? label.slice(0, -RECOMMENDED.length) : label)
+
 function question(params: unknown, at: Thread): Event {
   const { itemId, questions } = userInputRequest.parse(params)
   const asked = questions.map((one) => ({
     text: one.question,
-    options: (one.options ?? []).map((option) => option.label),
+    options: (one.options ?? []).map((option) => plainLabel(option.label)),
     ...(one.header === null || one.header === undefined ? {} : { header: one.header }),
   }))
-  const call = { callId: itemId, kind: 'question', name: 'request_user_input', input: params } as const
+  const call = { callId: itemId, kind: 'question', name: 'AskUserQuestion', input: params } as const
   return { v: 1, ...at, type: 'tool.started', call: { ...call, question: { questions: asked } } }
 }
 

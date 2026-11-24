@@ -3,16 +3,12 @@ import fs from 'node:fs'
 import path from 'node:path'
 import type { APIRequestContext } from '@playwright/test'
 import type { CodexSettingsInput } from '@seti/shared'
+import { PINNED_CODEX } from './codex-registry.js'
 import { openSeedDb } from './db.js'
 import { paths } from './env.js'
 import { expect } from './fixtures.js'
 
-/** The Codex version this Seti needs, which the Ready stand-in reports. */
-export const PINNED_CODEX = (
-  JSON.parse(
-    fs.readFileSync(path.join(import.meta.dirname, '../../../server/src/runtimes/codex/pin.json'), 'utf8'),
-  ) as { version: string }
-).version
+export { PINNED_CODEX }
 
 /**
  * A scripted stand-in for the codex program that only answers `--version`: these specs check
