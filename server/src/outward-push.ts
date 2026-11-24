@@ -1,7 +1,9 @@
 import { pushRuleOwner, type Task } from '@seti/shared'
-import { agentGitWithin } from './git.js'
+import { agentGitReading } from './git.js'
 import { gh, viewerLogin } from './github.js'
+import { agentGitView, type AgentGitView } from './outward-folder.js'
 import { outwardCalls, type Outward, type OutwardAction } from './policy/outward.js'
+import { rewriteUrl } from './push-url.js'
 import { cache } from './redis.js'
 import { permissionRules } from './store/permissions.js'
 
@@ -57,7 +59,7 @@ export function repoOf(given: string): { host: string; owner: string; repo: stri
     .trim()
     .replace(/\.git$/, '')
     .replace(/\/$/, '')
-  if (text.startsWith('/') || text.startsWith('.') || text.startsWith('file:')) {
+  if (/^(\/|\.|~|file:)/.test(text)) {
     return null
   }
   const scp = SCP_URL.exec(text)
@@ -75,31 +77,74 @@ export function repoOf(given: string): { host: string; owner: string; repo: stri
   return owner === '' ? null : { host: host.toLowerCase(), owner, repo }
 }
 
-/** The remote git pushes to by default from the folder's branch, as git itself picks it. */
-async function defaultRemote(dir: string): Promise<string> {
-  const read = async (...args: string[]) => agentGitWithin(GIT_TIMEOUT_MS, dir, ...args).catch(() => '')
-  const branch = await read('symbolic-ref', '--short', '-q', 'HEAD')
-  const tried = [
-    branch === '' ? '' : await read('config', '--get', `branch.${branch}.pushRemote`),
-    await read('config', '--get', 'remote.pushDefault'),
-    branch === '' ? '' : await read('config', '--get', `branch.${branch}.remote`),
-  ]
-  return tried.find((name) => name !== '') ?? 'origin'
+/** Git in the agent's folder as its own git sees it: hostile config read, nothing run. */
+type Git = (...args: string[]) => Promise<string>
+
+/** A key as git reads it: from the repository first, else from the agent's global config. */
+async function setting(git: Git, repoOnly: Git, key: string): Promise<string> {
+  const own = await repoOnly('config', '--get', key).catch(() => '')
+  return own === '' ? git('config', '--get', key).catch(() => '') : own
 }
 
-/** The push URLs of a remote of the folder's repository, rewrites applied; empty when unreadable. */
-async function pushUrls(dir: string, remote: string | null): Promise<string[]> {
+/** The remote git pushes to by default from the folder's branch, as git itself picks it. */
+async function defaultRemote(git: Git, repoOnly: Git): Promise<string> {
+  const branch = await repoOnly('symbolic-ref', '--short', '-q', 'HEAD').catch(() => '')
+  const keys = [
+    ...(branch === '' ? [] : [`branch.${branch}.pushRemote`]),
+    'remote.pushDefault',
+    ...(branch === '' ? [] : [`branch.${branch}.remote`]),
+  ]
+  for (const key of keys) {
+    const name = await setting(git, repoOnly, key)
+    if (name !== '') {
+      return name
+    }
+  }
+  return 'origin'
+}
+
+/** Whether a push from the folder also pushes its submodules, to remotes Seti does not read. */
+async function pushesSubmodules(git: Git, repoOnly: Git): Promise<boolean> {
+  const push = (await setting(git, repoOnly, 'push.recurseSubmodules')).toLowerCase()
+  const recurse = (await setting(git, repoOnly, 'submodule.recurse')).toLowerCase()
+  return push === 'on-demand' || (push === '' && ['true', 'yes', 'on', '1'].includes(recurse))
+}
+
+/** The URLs a remote of the folder names, rewrites applied; '*' takes every remote's. */
+async function remoteUrls(git: Git, repoOnly: Git, remote: string | null): Promise<string[]> {
+  const names = remote === '*' ? (await git('remote')).split('\n') : [remote ?? (await defaultRemote(git, repoOnly))]
+  const urls = await Promise.all(
+    names
+      .filter((name) => name.trim() !== '')
+      .flatMap((name) => [
+        git('remote', 'get-url', '--push', '--all', '--', name),
+        ...(remote === '*' ? [git('remote', 'get-url', '--all', '--', name)] : []),
+      ]),
+  )
+  return [...new Set(urls.flatMap((out) => out.split('\n')).filter((line) => line.trim() !== ''))]
+}
+
+/** The places a push from a folder reaches, or [null] where git cannot say or it reaches more. */
+async function pushedFrom(view: AgentGitView, dir: string, where: { remote?: string | null; url?: string }) {
+  const at = view.folder(dir)
+  const git: Git = async (...args) => agentGitReading(GIT_TIMEOUT_MS, at, view.globals, ...args)
+  const repoOnly: Git = async (...args) => agentGitReading(GIT_TIMEOUT_MS, at, [], ...args)
   try {
-    const name = remote ?? (await defaultRemote(dir))
-    const out = await agentGitWithin(GIT_TIMEOUT_MS, dir, 'remote', 'get-url', '--push', '--all', '--', name)
-    return out.split('\n').filter((line) => line.trim() !== '')
+    if (await pushesSubmodules(git, repoOnly)) {
+      return [null]
+    }
+    const urls =
+      where.url === undefined
+        ? await remoteUrls(git, repoOnly, where.remote ?? null)
+        : [rewriteUrl(where.url, await git('config', '--get-regexp', '^url\\.').catch(() => ''))]
+    return urls.length === 0 ? [null] : urls
   } catch {
-    return []
+    return [null]
   }
 }
 
 /** The repositories a call reaches: each with its owner, a bare owner, or null where unknown. */
-async function reached(call: Outward): Promise<(string | null)[]> {
+async function reached(call: Outward, view: AgentGitView): Promise<(string | null)[]> {
   const { where } = call
   if ('unknown' in where) {
     return [null]
@@ -107,11 +152,7 @@ async function reached(call: Outward): Promise<(string | null)[]> {
   if ('owner' in where) {
     return [`${where.owner}/`]
   }
-  if ('repo' in where) {
-    return [where.repo]
-  }
-  const urls = await pushUrls(where.dir, where.remote)
-  return urls.length === 0 ? [null] : urls
+  return 'repo' in where ? [where.repo] : pushedFrom(view, where.dir, where)
 }
 
 /** Owners the user's own `PushTo(owner)` allow rules name, global and the agent's. */
@@ -138,22 +179,22 @@ function outside(action: OutwardAction, given: string | null, own: Set<string>):
     return null
   }
   const name = repo.repo === '' ? repo.owner : `${repo.owner}/${repo.repo}`
-  return { action, target: onGithub ? name : `${repo.host}/${name}`, owner: repo.owner }
+  return { action, target: onGithub ? name : `${repo.host}/${name}`, owner: onGithub ? repo.owner : null }
 }
 
 /**
  * The pushes, forks, pull requests and API writes of a shell line that reach a repository outside
- * the user's own organisations, or that Seti cannot place; the user's `PushTo` rules let an owner
- * through. Read in the agent's folder with git's hostile-repository guards, never in its sandbox.
+ * the user's own organisations, or that Seti cannot place; the user's `PushTo` rules let a GitHub
+ * owner through. Read on the host with git's hostile-repository guards, never in the sandbox.
  */
 export async function outsidePushes(task: Task, command: string, cwd: string | null): Promise<OutsidePush[]> {
   const calls = outwardCalls(command, cwd)
   if (calls.length === 0) {
     return []
   }
-  const [own, allowed] = await Promise.all([ownOwners(task), allowedOwners(task.id)])
+  const [own, allowed, view] = await Promise.all([ownOwners(task), allowedOwners(task.id), agentGitView(task)])
   const found = await Promise.all(
-    calls.map(async (call) => (await reached(call)).map((given) => outside(call.action, given, own))),
+    calls.map(async (call) => (await reached(call, view)).map((given) => outside(call.action, given, own))),
   )
   return found
     .flat()

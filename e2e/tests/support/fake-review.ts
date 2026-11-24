@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto'
+import { PUSH_PROMPT, pushElsewhere } from './fake-push.js'
 import { REPEAT_PROMPT, repeatBuild, type FakeHooks } from './fake-repeat.js'
 import type { StepActor } from './fake-steps.js'
 
@@ -46,10 +47,13 @@ async function sendReviewed(hooks: FakeHooks | undefined, tool: string, act: Ste
 
 type HookTurn = (hooks: FakeHooks | undefined, act: StepActor) => Promise<void>
 
-/** The turn a prompt asks for that runs through Seti's hooks: a repeated build or a reviewed send. */
+/** The turn a prompt asks for that runs through Seti's hooks: a repeated build, a push or a send. */
 export function hookTurnOf(prompt: string): HookTurn | undefined {
   if (prompt.includes(REPEAT_PROMPT)) {
     return repeatBuild
+  }
+  if (prompt.includes(PUSH_PROMPT)) {
+    return async (hooks, act) => pushElsewhere(hooks, prompt, act)
   }
   return prompt.includes(REVIEW_PROMPT) ? async (hooks, act) => sendReviewed(hooks, reviewTool(prompt), act) : undefined
 }

@@ -6,11 +6,16 @@ import { splitShell } from './shell-split.js'
 export type OutwardAction = 'push' | 'fork' | 'pr' | 'api'
 
 /**
- * Where it goes: a repository the command names (a URL or owner/repo), a remote of the repository
- * in a folder (null for the one git pushes to by default), or a place Seti cannot read.
+ * Where it goes: a repository gh names, an owner, a URL or path git pushes to from a folder (its
+ * rewrites apply), a remote of the folder's repository (null for git's default, '*' for every
+ * remote gh may pick), or a place Seti cannot read.
  */
-export type OutwardWhere =
-  { repo: string } | { owner: string } | { remote: string | null; dir: string } | { unknown: string }
+type OutwardWhere =
+  | { repo: string }
+  | { owner: string }
+  | { url: string; dir: string }
+  | { remote: string | null; dir: string }
+  | { unknown: string }
 
 export interface Outward {
   action: OutwardAction
@@ -51,8 +56,8 @@ function optionValue(words: readonly string[], names: readonly string[]): string
   return undefined
 }
 
-/** Config on git's command line that changes where a push goes. */
-const REROUTES = /(^(url|remote|branch)\.)|insteadof/i
+/** Settings on git's command line that cannot change where or what a push sends. */
+const HARMLESS_SETTING = /^(user|color|advice|commit|gpg|i18n)\.|^core\.(pager|editor|quotepath)=|^push\.default=/i
 
 /** Git's own options before its command: the folder it works in, or why Seti cannot follow it. */
 function gitGlobals(words: readonly string[], dir: string | null): { at: number; dir: string | null; why?: string } {
@@ -61,13 +66,13 @@ function gitGlobals(words: readonly string[], dir: string | null): { at: number;
   let why: string | undefined
   while ((words[at] ?? '').startsWith('-')) {
     const word = words[at] ?? ''
-    const paired = word === '-C' || word === '-c' || /^--(git-dir|work-tree|namespace)$/.test(word)
+    const paired = word === '-C' || word === '-c' || /^--(git-dir|work-tree|namespace|config-env)$/.test(word)
     if (word === '-C') {
       where = folder(where, words[at + 1])
-    } else if (word === '-c' && REROUTES.test(words[at + 1] ?? '')) {
-      why = 'git -c changes where it pushes'
-    } else if (/^--(git-dir|work-tree|namespace)/.test(word)) {
-      why = 'git names another repository'
+    } else if (word === '-c' && !HARMLESS_SETTING.test(words[at + 1] ?? '')) {
+      why = 'git -c changes its settings'
+    } else if (/^--(git-dir|work-tree|namespace|config-env)/.test(word)) {
+      why = 'git names another repository or settings'
     }
     at += paired ? 2 : 1
   }
@@ -76,22 +81,30 @@ function gitGlobals(words: readonly string[], dir: string | null): { at: number;
 
 const PUSH_PAIRED = ['-o', '--push-option', '--repo', '--receive-pack', '--exec']
 
+/** A URL or a path, which git pushes to as given, rather than the name of a remote. */
+const isUrl = (named: string) => /^[^/]*:/.test(named) || /^[/.~]/.test(named)
+
 /** Where a `git push` goes: a URL or path it names, a remote, or the default one. */
 function gitPush(words: readonly string[], dir: string | null): Outward | null {
   const globals = gitGlobals(words, dir)
   if (words[globals.at] !== 'push') {
     return null
   }
-  if (globals.why !== undefined) {
-    return { action: 'push', where: { unknown: globals.why } }
-  }
   const args = words.slice(globals.at + 1)
-  const named = optionValue(args, ['--repo']) ?? args[positional(args, 0, PUSH_PAIRED)]
-  if (named !== undefined && /[:/]/.test(named)) {
-    return { action: 'push', where: { repo: named } }
+  const why =
+    globals.why ??
+    (args.some((word) => /^--(recurse-submodules=on-demand|exec|receive-pack)/.test(word))
+      ? 'git push runs or pushes more than the folder'
+      : undefined)
+  if (why !== undefined) {
+    return { action: 'push', where: { unknown: why } }
   }
   if (globals.dir === null) {
     return { action: 'push', where: { unknown: 'Seti cannot tell which folder it pushes from' } }
+  }
+  const named = optionValue(args, ['--repo']) ?? args[positional(args, 0, PUSH_PAIRED)]
+  if (named !== undefined && isUrl(named)) {
+    return { action: 'push', where: { url: named, dir: globals.dir } }
   }
   return { action: 'push', where: { remote: named ?? null, dir: globals.dir } }
 }
@@ -101,11 +114,14 @@ const API_PAIRED = ['-X', '--method', '-f', '-F', '--field', '--raw-field', '--i
 const API_PAIRED_MORE = ['--jq', '-t', '--template', '--hostname', '--cache', '-p', '--preview']
 const WRITES = new Set(['POST', 'PUT', 'PATCH', 'DELETE'])
 
-/** A repository gh acts on by default: the one in the folder, by its `origin`. */
+/** A repository gh acts on by default: one of the folder's remotes, as gh picks among them. */
 const current = (action: OutwardAction, dir: string | null): Outward =>
   dir === null
     ? { action, where: { unknown: 'Seti cannot tell which repository it acts on' } }
-    : { action, where: { remote: 'origin', dir } }
+    : { action, where: { remote: '*', dir } }
+
+/** A repository as gh takes it (`OWNER/REPO`, `HOST/OWNER/REPO`, a URL), with its host as a URL. */
+const ghRepo = (given: string) => (/^[\w-]+(\.[\w-]+)+\/[^/]+\/[^/]+$/.test(given) ? `https://${given}` : given)
 
 /** Whether a `gh api` call writes: a write method, or fields without a method. */
 function apiWrites(args: readonly string[]): boolean {
@@ -120,21 +136,9 @@ function apiWrites(args: readonly string[]): boolean {
 function ghFork(args: readonly string[], dir: string | null): Outward[] {
   const source = args[positional(args, 0, FORK_PAIRED)]
   const org = optionValue(args, ['--org'])
-  const forked: Outward = source === undefined ? current('fork', dir) : { action: 'fork', where: { repo: source } }
+  const forked: Outward =
+    source === undefined ? current('fork', dir) : { action: 'fork', where: { repo: ghRepo(source) } }
   return org === undefined ? [forked] : [forked, { action: 'fork', where: { owner: org } }]
-}
-
-/** What a `gh` command sends: a fork, a pull request on a repository it names, an API write. */
-function ghCall(words: readonly string[], dir: string | null): Outward[] {
-  const [, group = '', verb = ''] = words
-  if (group === 'repo' && verb === 'fork') {
-    return ghFork(words.slice(3), dir)
-  }
-  if (group === 'pr' && verb === 'create') {
-    const repo = optionValue(words.slice(3), ['-R', '--repo'])
-    return repo === undefined ? [] : [{ action: 'pr', where: { repo } }]
-  }
-  return group === 'api' ? ghApi(words.slice(2), dir) : []
 }
 
 /** An API write to `repos/<owner>/<repo>/...`; `{owner}` stands for the folder's repository. */
@@ -148,6 +152,22 @@ function ghApi(api: readonly string[], dir: string | null): Outward[] {
   return slug.includes('{') ? [current('api', dir)] : [{ action: 'api', where: { repo: slug } }]
 }
 
+/** What a `gh` command sends: a fork, a pull request, an API write; `retargeted` under GH_REPO. */
+function ghCall(words: readonly string[], dir: string | null, retargeted: boolean): Outward[] {
+  const [, group = '', verb = ''] = words
+  if (group === 'repo' && verb === 'fork') {
+    return ghFork(words.slice(3), dir)
+  }
+  if (group === 'pr' && verb === 'create') {
+    const repo = optionValue(words.slice(3), ['-R', '--repo'])
+    if (repo === undefined) {
+      return retargeted ? [{ action: 'pr', where: { unknown: 'GH_REPO names the repository' } }] : []
+    }
+    return [{ action: 'pr', where: { repo: ghRepo(repo) } }]
+  }
+  return group === 'api' ? ghApi(words.slice(2), dir) : []
+}
+
 /** The folder a `cd` or `pushd` moves to, or undefined when the command is neither. */
 function moves(words: readonly string[], dir: string | null): string | null | undefined {
   if (words[0] !== 'cd' && words[0] !== 'pushd') {
@@ -159,27 +179,74 @@ function moves(words: readonly string[], dir: string | null): string | null | un
   )
 }
 
+const HARMLESS_GIT_ENV =
+  /^GIT_(TRACE\w*|TERMINAL_PROMPT|(AUTHOR|COMMITTER)_\w+|EDITOR|PAGER|OPTIONAL_LOCKS|PROGRESS_DELAY)$/
+
+/** A word naming git's files: its folder, its config or a global or module config. */
+const GIT_FILES = /(^|\/)\.git(\/|$)|gitconfig|\.config\/git|\.gitmodules/
+
+/** Whether git words change remotes or config rather than read them. */
+function rewritesGit(words: readonly string[]): boolean {
+  const globals = gitGlobals(words, null)
+  const [command, sub] = [words[globals.at], words[globals.at + 1]]
+  if (command === 'remote') {
+    return !(sub === undefined || ['-v', '--verbose', 'show', 'get-url'].includes(sub))
+  }
+  const reads = ['--get', '--get-all', '--get-regexp', '--get-urlmatch', '-l', '--list', 'get', 'list']
+  return command === 'config' && !words.slice(globals.at + 1).some((word) => reads.includes(word))
+}
+
+/** Why the line's own words could send a push or a gh call elsewhere than Seti reads, if they do. */
+function rerouting(parts: readonly string[]): { git?: string; gh?: string } {
+  const words = parts.flatMap((part) => rawWords(part).map(unquote))
+  const forms = parts.flatMap((part) => denyForms(part).map((form) => rawWords(form).map(unquote)))
+  const assigned = words.flatMap((word) => /^([A-Z_]\w*)=/.exec(word)?.[1] ?? [])
+  const changes = forms.some((form) => form[0] === 'git' && rewritesGit(form)) || words.some((w) => GIT_FILES.test(w))
+  const env = assigned.some((name) => name.startsWith('GIT_') && !HARMLESS_GIT_ENV.test(name))
+  const git = changes ? 'the command changes git remotes or config too' : undefined
+  const why = env ? "the command sets git's environment" : git
+  const gh = assigned.some((name) => name === 'GH_REPO' || name === 'GH_HOST') ? 'GH_REPO or GH_HOST is set' : undefined
+  return { ...(why === undefined ? {} : { git: why }), ...(gh === undefined ? {} : { gh }) }
+}
+
+/** A call read in a folder, as unknown when the line itself could send it elsewhere. */
+function settled(call: Outward, why: string | undefined): Outward {
+  return why === undefined || 'repo' in call.where || 'owner' in call.where || 'unknown' in call.where
+    ? call
+    : { action: call.action, where: { unknown: why } }
+}
+
+/** The calls of one command of the line, read in the folder the line has moved to. */
+function callsOf(words: readonly string[], dir: string | null, why: { git?: string; gh?: string }): Outward[] {
+  if (words[0] === 'git') {
+    const push = gitPush(words, dir)
+    return push === null ? [] : [settled(push, why.git)]
+  }
+  if (words[0] !== 'gh') {
+    return []
+  }
+  const calls = ghCall(words, dir, why.gh !== undefined).map((call) => settled(call, why.git))
+  return why.gh === undefined ? calls : calls.map(({ action }) => ({ action, where: { unknown: why.gh ?? '' } }))
+}
+
 /**
  * What a shell line sends to a code host, read past wrappers, nested scripts and `cd`: each push,
- * fork, pull request on a named repository and API write to `repos/<owner>/...`.
+ * fork, pull request on a named repository and API write to `repos/<owner>/...`. A line that
+ * changes git's remotes, config or environment, or sets GH_REPO or GH_HOST, leaves them unknown.
  */
 export function outwardCalls(command: string, cwd: string | null): Outward[] {
   const found: Outward[] = []
+  const parts = splitShell(command).all
+  const why = rerouting(parts)
   let dir = cwd
-  for (const part of splitShell(command).all) {
+  for (const part of parts) {
     const forms = denyForms(part).map((form) => rawWords(form).map(unquote))
     const moved = moves(forms[forms.length - 1] ?? [], dir)
     if (moved !== undefined) {
       dir = moved
       continue
     }
-    for (const words of forms) {
-      if (words[0] === 'git') {
-        found.push(...[gitPush(words, dir)].filter((one): one is Outward => one !== null))
-      } else if (words[0] === 'gh') {
-        found.push(...ghCall(words, dir))
-      }
-    }
+    found.push(...forms.flatMap((words) => callsOf(words, dir, why)))
   }
   const seen = new Set<string>()
   return found.filter((one) => {
