@@ -13,11 +13,9 @@ import { QuickReplies } from '@/panels/tasks/QuickReplies'
 import { ShellLive } from '@/panels/tasks/ShellEntry'
 import { QueuedInputs } from '@/panels/tasks/TaskInputs'
 import { TranscriptPane } from '@/panels/tasks/TranscriptPane'
-import { BriefView, NowBar } from '@/panels/tasks/proto/BriefView'
 import { ConversationBody, LanesBody } from '@/panels/tasks/proto/ConversationBody'
-import { chatDesign, type ChatDesign } from '@/panels/tasks/proto/chat-design'
-import { lastOwnMessage, worldState } from '@/panels/tasks/proto/digest'
-import { UpdatesStrip } from '@/panels/tasks/proto/parts'
+import { ProtoFrame } from '@/panels/tasks/proto/ProtoFrame'
+import { chatDesign, pinsNeeds, type ChatDesign } from '@/panels/tasks/proto/chat-design'
 
 type TranscriptProps = ComponentProps<typeof TranscriptPane>
 
@@ -82,11 +80,6 @@ export function AgentChat({
   const { store, unsent } = usePendingRows(task.id, transcript.stream.messages)
   const blocks = useTranscriptBlocks(task.id)
   const design = chatDesign()
-  const rows = transcript.stream.messages
-  const updates = useMemo(
-    () => (design === 'a' || design === 'a-plus' ? worldState(rows, lastOwnMessage(rows)) : []),
-    [design, rows],
-  )
   const needs = (
     <>
       <PermissionRequests taskId={task.id} blocked={task.blocked} version={permissions} />
@@ -114,24 +107,19 @@ export function AgentChat({
       empty="No messages yet. A reply below starts this agent's first turn."
       {...(body === undefined ? {} : { body })}
     >
-      {needs}
+      {pinsNeeds(design) ? null : needs}
     </TranscriptPane>
   )
   return (
     <>
-      {(design === 'a' || design === 'a-plus') && (
-        <UpdatesStrip
-          taskId={task.id}
-          updates={updates}
-          className="shrink-0 border-b border-border bg-background px-5 py-1 max-md:px-3 in-data-agent-frame:px-3"
-        />
-      )}
-      {design === 'b' ? (
-        <BriefView taskId={task.id} messages={rows} running={running} needs={needs} history={pane} />
-      ) : (
-        pane
-      )}
-      {design === 'a-plus' && <NowBar messages={rows} running={running} />}
+      <ProtoFrame
+        design={design}
+        taskId={task.id}
+        rows={transcript.stream.messages}
+        running={running}
+        needs={needs}
+        pane={pane}
+      />
       <QueuedInputs task={task} messages={messages} running={running} />
       <Composer
         taskId={task.id}
