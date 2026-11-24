@@ -13,7 +13,20 @@ test('a phone reads the Claude Code card on Runtimes, from an old Account link t
   await expect(claude.getByRole('status')).toHaveText('Ready')
   await expect(claude).toBeInViewport()
   await expectTouchTarget(claude.getByRole('button', { name: 'Recheck' }))
+  await expect(
+    claude.getByRole('region', { name: 'Plan usage' }),
+    'state, login and usage on the first screen',
+  ).toBeInViewport({
+    ratio: 1,
+  })
+  await claude.getByRole('button', { name: 'About saved logins' }).tap()
+  await expect(page.getByText('Agent credentials hold no Claude login')).toBeVisible()
+  await page.keyboard.press('Escape')
   await expectFitsPhone(page, 'Runtimes with the Claude Code card')
+  const credentials = claude.getByRole('button', { name: 'Credentials' })
+  await credentials.scrollIntoViewIfNeeded()
+  await expectTouchTarget(credentials)
+  await expectFitsPhone(page, 'Claude Code token, program and model')
 
   await claude.getByRole('button', { name: 'Log in' }).tap()
   await expect(claude.getByRole('textbox', { name: 'New login name' })).toBeVisible()

@@ -1,5 +1,6 @@
 import { codexSettingsInput, type RuntimesStatus } from '@seti/shared'
 import { Hono } from 'hono'
+import { claudeStatus } from '../claude-status.js'
 import { codexStatus, retryCodex, updateCodexSettings } from '../codex-status.js'
 import { eaReadOnly } from '../ea-guard.js'
 import { ok, validJson } from '../http.js'
@@ -12,7 +13,7 @@ export const runtimeRoutes = new Hono()
   .use('*', userOnly)
   .get('/', async (c) => {
     const codex = await codexStatus()
-    return ok(c, { codex, offers: runtimeOffers(codex) } satisfies RuntimesStatus)
+    return ok(c, { claude: await claudeStatus(), codex, offers: runtimeOffers(codex) } satisfies RuntimesStatus)
   })
   .put('/codex', validJson(codexSettingsInput), async (c) => ok(c, await updateCodexSettings(c.req.valid('json'))))
   .post('/codex/retry', async (c) => ok(c, await retryCodex()))

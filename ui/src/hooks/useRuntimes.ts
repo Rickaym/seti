@@ -4,7 +4,7 @@ import { createPolledResource } from '@/lib/polled'
 
 const runtimesResource = createPolledResource<RuntimesStatus>('/runtimes', 15_000)
 
-/** Where each runtime besides Claude Code stands, and the runtimes a new agent may start on now. */
+/** Where each runtime stands, and the runtimes a new agent may start on now. */
 export function useRuntimes() {
   return usePolled(runtimesResource)
 }

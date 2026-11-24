@@ -32,3 +32,19 @@ test('the palette finds the Claude login and usage on Runtimes', async ({ page }
   await palette.getByRole('option', { name: /^Runtimes\b/ }).click()
   await expect(page).toHaveURL(/#settings\/runtimes$/)
 })
+
+test("the Claude Code card shows the agents' token, the program and its default model, and links to Credentials", async ({
+  page,
+  request,
+}) => {
+  await savedLogins(request)
+  signInAs('work')
+  await page.goto('/#settings/runtimes')
+  const claude = page.getByRole('main').getByRole('region', { name: 'Claude Code' })
+  await expect(claude).toContainText("Sandboxed agents use this machine's login")
+  await expect(claude).toContainText("from Claude Code's settings")
+  await expect(claude.getByText(/^(\d+\.\d+\.\d|Version unknown)/)).toBeVisible()
+  await claude.getByRole('button', { name: 'Credentials' }).click()
+  await expect(page).toHaveURL(/#settings\/credentials$/)
+  await expect(page.locator('#secrets')).toBeInViewport()
+})

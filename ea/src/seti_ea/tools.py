@@ -535,7 +535,7 @@ TOOL_SPECS: list[ToolSpec] = [
     ToolSpec(
         "account_status",
         "The Claude account Seti's agents use: the saved login in use, login health, plan usage "
-        "windows and rate limits.",
+        "windows and rate limits, and the Claude Code version and default model they run.",
         {"refresh": {"type": "boolean", "description": "Fetch the usage from Claude again first."}},
     ),
     ToolSpec(
@@ -1978,6 +1978,16 @@ class EaTools:
             return f"Claude Code is signed in to {who}, which is not a saved login{saved}."
         return f"No Claude login in use{saved}." if others else None
 
+    async def _claude_line(self) -> str | None:
+        """Claude Code's version and default model from the runtimes route, or None if unknown."""
+        runtimes = await self._seti.get("/runtimes")
+        claude = runtimes.get("claude") if isinstance(runtimes, dict) else None
+        if not isinstance(claude, dict):
+            return None
+        version = claude.get("version") or "of an unknown version"
+        model = claude.get("default_model") or "its own default"
+        return f"Claude Code {version} runs agents on {model} unless one picks another model."
+
     async def account_status(self, args: Mapping[str, Any]) -> ToolResult:
         refresh = arg_bool(args, "refresh")
         data = await (self._seti.post("/account/refresh") if refresh else self._seti.get("/account"))
@@ -1990,6 +2000,9 @@ class EaTools:
         login = self._login_line(status.get("logins"))
         if login:
             lines.append(login)
+        program = await self._claude_line()
+        if program:
+            lines.append(program)
         usage = status.get("usage")
         parts = self._usage_parts(dicts(usage.get("windows"))) if isinstance(usage, dict) else []
         if parts:

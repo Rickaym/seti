@@ -63,6 +63,13 @@ describe('the Codex runtime in Settings', () => {
     expect((await status()).pricesAsOf).toMatch(/^\d{4}-\d{2}-\d{2}$/)
     expect(await offered()).toEqual(['claude'])
     expect((await runtimes()).offers[0]?.models.map((model) => model.id)).toEqual(['opus', 'sonnet', 'haiku'])
+    expect(Object.keys((await runtimes()).claude).toSorted((a, b) => a.localeCompare(b, 'en'))).toEqual([
+      'default_effort',
+      'default_model',
+      'program',
+      'sign_in',
+      'version',
+    ])
   })
 
   it('is ready only on, with a program of the pinned version and a key, and records each change', async () => {

@@ -159,7 +159,8 @@ between two steps; an interrupt; a hook at subagent start.
   settings, including whether the rules decide its calls (on by default, PERM-2), and each change
   is audited. The control room MUST offer a new agent the models of the
   default runtime always and those of another runtime only while that runtime can start one; the
-  runtimes it offers MUST be readable with their models and efforts.
+  runtimes it offers MUST be readable with their models and efforts. Each runtime's program,
+  version, default model and sign-in kind MUST be readable in one place, with no secret value.
 - RT-10: A new agent's start MAY name a runtime, a model and an effort. A model alone MUST pick the
   one runtime that offers it, and a start naming neither runs on the default runtime with the
   user's default model. A model no runtime offers, a runtime and model that disagree, and an
