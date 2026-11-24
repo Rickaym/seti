@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 const SRC = fileURLToPath(new URL('../../', import.meta.url))
-const TEST_ONLY = /^runtimes\/(?:scripted\/|conformance\/|[\w-]+\/conformance-)/
+const TEST_ONLY = /^(?:runtimes\/(?:scripted\/|conformance\/|[\w-]+\/conformance-)|test-[\w-]+\.ts$)/
 const IMPORTS_TEST_ONLY = /from '[^']*\/(?:scripted\/|conformance\/|conformance-)[^']*'/
 
 const isTest = (file: string) => /\.test\.tsx?$/.test(file)

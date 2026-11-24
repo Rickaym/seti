@@ -339,6 +339,15 @@ home that prints each scripted command's output instead of running it. Without t
 cases are skipped. `node scripts/codex-binary.mjs <folder>` fetches the pinned binary from the npm
 registry, checks it against `codex/pin.json` and prints its path; CI runs the cases with it.
 
+The rig drives Codex outside Seti. `codex-proof.test.ts` and `codex-proof-split.test.ts` run the
+same binary as an agent of Seti: started by the runner in the agent's sandbox, its model calls
+through the agent's egress proxy, its calls answered through permission requests and questions,
+and Seti's tools through the relay, in one process and with a split node. The proxies reach a
+local HTTPS stand-in for `api.openai.com` through `routeEgressForTests` in `task-proxy.ts`, which
+only test files call (`egress-seam.test.ts` holds that); the split node starts from the test-only
+entry `test-codex-node.ts`. They run where `SETI_CODEX_BIN` is set and the sandbox works, and CI
+fails without either.
+
 ### The scripted adapter
 
 `server/src/runtimes/scripted/` is a second, test-only adapter that passes every case. It drives

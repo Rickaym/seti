@@ -16,7 +16,7 @@ import { modelProxyHere, proxyAwsToken, proxyGone, proxyHere, sshAgentHere } fro
 import { awsToken } from './sandbox-aws-token.js'
 import { bwrapArgs } from './sandbox-bwrap.js'
 import { sandboxClaudeJson } from './sandbox-claude-json.js'
-import { CODEX_DIR, codexMountPoints, EMPTY_DIR, MODEL_KEY_ENV } from './sandbox-codex.js'
+import { CODEX_DIR, codexMountPoints, EMPTY_DIR, EMPTY_FILE, MODEL_KEY_ENV } from './sandbox-codex.js'
 import { gitEnv } from './sandbox-git.js'
 import { forgetSandboxSignIns, hostClaudeJson, mcpTokens, proxiedServers, signedInServers } from './sandbox-mcp.js'
 import {
@@ -313,7 +313,7 @@ function prepareCodex(dir: string): void {
   for (const folder of [path.join(dir, 'home', CODEX_DIR), path.join(dir, EMPTY_DIR), ...dirs]) {
     fs.mkdirSync(folder, { recursive: true, mode: 0o700 })
   }
-  for (const file of files) {
+  for (const file of [...files, path.join(dir, EMPTY_FILE)]) {
     fs.closeSync(fs.openSync(file, 'a', 0o600))
   }
 }
