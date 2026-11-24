@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import { houseRulesContext } from '../house-rules.js'
 import { packsOfTask } from '../store/context.js'
 
@@ -83,3 +84,25 @@ Memory folder: ${m.memory}. Read-only memory you may learn from but not edit: ${
 
 Budget: about ${String(m.maxSteps)} tool calls and $${m.budgetUsd.toFixed(2)} of model use. Stop when done.`
 }
+
+const SAMPLE: DreamMessage = {
+  night: '2000-01-01',
+  lastDream: null,
+  digest: '<digest>',
+  memory: '<memory>',
+  shared: [],
+  maxSteps: 0,
+  budgetUsd: 0,
+  cleanups: false,
+}
+
+/**
+ * A short hash of the prompt's own wording, both review variants included, which each dream run
+ * records; it changes with any edit to this file's text and with nothing else.
+ */
+export const DREAM_PROMPT_VERSION = createHash('sha256')
+  .update(
+    [dreamNote('<title>', '<memory>'), dreamMessage(SAMPLE), dreamMessage({ ...SAMPLE, cleanups: true })].join('\n'),
+  )
+  .digest('hex')
+  .slice(0, 8)

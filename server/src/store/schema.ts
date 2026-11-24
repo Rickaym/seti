@@ -11,7 +11,7 @@ import { CONNECTION_BODY, CONNECTIONS, secretsToConnections } from './schema-con
 import { recountTaskCosts, TASK_COST_SESSION, TASK_SECOND_OPINION, TASK_SIDE_CHAT_COST } from './schema-cost.js'
 import { CPU_CAPS } from './schema-cpu.js'
 import { ANDROID_OVERRIDE, DEVICE_SHOW_NAMES, DEVICES, dropOfficialAndroidRow } from './schema-devices.js'
-import { DREAM_NIGHTS, DREAM_PROPOSALS, DREAM_RUNS } from './schema-dreams.js'
+import { DREAM_NIGHTS, DREAM_PROMPT_VERSION, DREAM_PROPOSALS, DREAM_RUNS } from './schema-dreams.js'
 import {
   ATTENTION_TIERS,
   EA_CONTEXT_PACKS,
@@ -237,4 +237,5 @@ export const MIGRATIONS: readonly Migration[] = [
   { version: 128, name: 'codex_rules_decide_default', sql: CODEX_RULES_DECIDE_DEFAULT },
   { version: 129, name: 'task_second_opinion', sql: TASK_SECOND_OPINION },
   { version: 130, name: 'connection_body', sql: CONNECTION_BODY },
+  { version: 131, name: 'dream_prompt_version', sql: DREAM_PROMPT_VERSION },
 ]
