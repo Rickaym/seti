@@ -8,6 +8,7 @@ import {
 import { ArchiveWriter, decodeArchive, type ChunkRef, type StoredMessage } from '../archive-codec.js'
 import { now, sql, transaction, type Db } from '../db.js'
 import { EVENT_COLUMNS, storedColumns } from '../events/columns.js'
+import { indexRuntimeRows } from './search-runtime.js'
 
 /** An archive's index and sizes; the blob stays in the database until a chunk is read. */
 export interface ArchiveRecord extends TaskArchiveInfo {
@@ -87,6 +88,7 @@ async function insertRows(tx: Db, taskId: string, rows: readonly StoredMessage[]
       ...storedColumns(row.kind, row.payload, row.runtime ?? null),
     }))
     await tx`INSERT INTO task_message ${tx(filled, [...STORED_COLUMNS, ...EVENT_COLUMNS])}`
+    await indexRuntimeRows(tx, filled)
   }
 }
 

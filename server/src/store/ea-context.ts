@@ -2,7 +2,10 @@ import type { MessageRow } from '@seti/shared'
 import { rowFilter, sql, toMessage, type MessageRecord } from '../db.js'
 
 /** Tool results are dropped, since they are large and the activity line only needs their ids. */
-const LIGHT_PAYLOAD = sql`CASE WHEN m.kind = 'sdk' AND (m.payload::json ->> 'type') = 'user'
+const LIGHT_PAYLOAD = sql`CASE
+  WHEN m.kind = 'sdk' AND m.runtime = 'codex' AND m.event = 'tool.ended'
+  THEN (m.payload::jsonb #- '{message,params,item,aggregatedOutput}' #- '{message,params,item,result}')::text
+  WHEN m.kind = 'sdk' AND (m.runtime IS NULL OR m.runtime = 'claude') AND (m.payload::json ->> 'type') = 'user'
   THEN json_build_object('type', 'user', 'parent_tool_use_id', m.payload::json -> 'parent_tool_use_id',
     'message', json_build_object('role', 'user', 'content', '[]'::json))::text
   ELSE m.payload END`

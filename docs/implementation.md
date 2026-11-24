@@ -107,7 +107,10 @@ with another top-level folder.
   sent it beside the agent's own thread id. Codex reports tokens per model call, so at a turn's
   end ingest adds up the turn's calls and estimates their cost from OpenAI's public prices
   (`server/src/codex-spend.ts`, `runtimes/codex/prices.ts`, dated); the turn end marks the cost
-  as estimated. Archives keep each row's runtime.
+  as estimated. Archives keep each row's runtime. Readers that filter on JSON text read such a
+  row by its event columns instead (`callText`, `callOrResultText` in `event-filters.ts`), and
+  search indexes it from its neutral events (`server/src/events/search-text.ts`) where the search
+  trigger indexes Claude Code's rows from their JSON.
 - Redis holds only what can be rebuilt: GitHub PR lists and the GraphQL budget, capability and
   account probes, the EA's live context, and pub/sub for agent events and group chat across
   processes. It keeps nothing on disk and never holds a token. `SETI_REDIS_URL=off` costs cache

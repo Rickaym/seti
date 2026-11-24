@@ -17,6 +17,9 @@ export function eventFilters(sql: Pool) {
   // eslint-disable-next-line @typescript-eslint/promise-function-async -- a fragment, never awaited
   const value = (filled: Fragment, unfilled: Fragment) =>
     sql`(CASE WHEN runtime IS NULL THEN ${unfilled} ELSE ${filled} END)`
+  // eslint-disable-next-line @typescript-eslint/promise-function-async -- a fragment, never awaited
+  const byRuntime = (neutral: Fragment, claude: Fragment) =>
+    sql`((runtime IS NOT NULL AND runtime <> 'claude' AND ${neutral}) OR ((runtime IS NULL OR runtime = 'claude') AND ${claude}))`
   const parent = sql`(payload::json ->> 'parent_tool_use_id')`
   const type = sql`(payload::json ->> 'type')`
   return {
@@ -58,6 +61,13 @@ export function eventFilters(sql: Pool) {
     ),
     /** Rows that report a change the agent published. */
     published: either(sql`event = 'change.published'`, sql`strpos(payload, '"subtype":"code_change_published"') > 0`),
+    /** Rows that may hold a tool call: Claude Code's by their JSON text, others' by their events. */
+    callText: byRuntime(sql`agent`, sql`strpos(payload, '"tool_use"') > 0`),
+    /** Rows that may hold a tool call or a tool result, read the same way. */
+    callOrResultText: byRuntime(
+      sql`(agent OR event = 'tool.ended')`,
+      sql`(strpos(payload, '"tool_use"') > 0 OR strpos(payload, '"tool_result"') > 0)`,
+    ),
     /** What a turn end says the turn cost, in US dollars. */
     turnUsd: value(sql`turn_usd`, sql`(payload::json ->> ${TURN_COST_KEY})::float8`),
     /** How long a turn end says the turn ran, in milliseconds. */

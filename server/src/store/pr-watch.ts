@@ -1,5 +1,5 @@
 import type { LinkedPrState } from '@seti/shared'
-import { now, sql } from '../db.js'
+import { now, rowFilter, sql } from '../db.js'
 import type { PrSnapshot } from '../pr-events.js'
 
 /** A task a PR's updates go to, and the Agent call of the subagent the PR is linked to, if any. */
@@ -62,14 +62,14 @@ export const prWatch = {
       FROM task_message m
       WHERE m.task_id IN (SELECT task_id FROM task_pr WHERE pr_url = ${url}) AND m.kind = 'sdk'
         AND m.created_at >= ${from} AND m.created_at <= ${to}
-        AND (strpos(m.payload, '"tool_use"') > 0 OR strpos(m.payload, '"tool_result"') > 0)
+        AND ${rowFilter.callOrResultText}
       ORDER BY m.id`),
   ],
   /** The task's newest calls that may push or open a PR since its last CI update on `subject`. */
   pushCalls: async (taskId: string, subject: string): Promise<StoredCall[]> => [
     ...(await sql<StoredCall[]>`SELECT m.task_id, m.payload, m.created_at, COALESCE(m.runtime, 'claude') AS runtime
       FROM task_message m
-      WHERE m.task_id = ${taskId} AND m.kind = 'sdk' AND strpos(m.payload, '"tool_use"') > 0
+      WHERE m.task_id = ${taskId} AND m.kind = 'sdk' AND ${rowFilter.callText}
         AND (strpos(m.payload, 'push') > 0 OR strpos(m.payload, 'gh pr create') > 0
           OR strpos(m.payload, '/pulls') > 0 OR strpos(m.payload, 'create_pull_request') > 0)
         AND m.id > COALESCE((
