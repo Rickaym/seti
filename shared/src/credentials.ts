@@ -82,3 +82,41 @@ export const profileAwsInput = awsSettingsInput
 export const credentialHostInput = z.object({ host: domainEntry })
 
 export const credentialHostParams = z.object({ id: z.string().min(1).max(64), host: domainEntry })
+
+/** Saves an agent's access into its credential; `expect` is the preview's fingerprint. */
+export const accessSaveInput = z.object({
+  task_id: z.string().min(1).max(64),
+  expect: z
+    .string()
+    .regex(/^[0-9a-f]{64}$/)
+    .optional(),
+})
+export type AccessSaveInput = z.input<typeof accessSaveInput>
+
+/** One item a save changes in the credential, and which other agents it changes. */
+export interface AccessSaveChange {
+  kind: AccessKind
+  id: string
+  name: string
+  enabled: boolean
+  /** The credential's value before; null when it had no opinion. */
+  was: boolean | null
+  /** Other agents on the credential whose state turns to `enabled`. */
+  turns: string[]
+  /** Other agents that keep their own choice on it. */
+  keeps: string[]
+}
+
+/** What saving an agent's access into its credential would change, read before the user saves. */
+export interface AccessSavePreview {
+  profile: { id: string; name: string }
+  /** The other agents using the credential, which follow it from their next turn. */
+  agents: string[]
+  /** SSH and AWS first. */
+  changes: AccessSaveChange[]
+  hosts_added: string[]
+  /** The saving agent's own choices and hosts, cleared since the credential now gives them. */
+  own_cleared: number
+  own_hosts_cleared: number
+  fingerprint: string
+}

@@ -13,6 +13,12 @@ export async function agentOnCredential(request: APIRequestContext, name: string
   await request.put(`/api/credentials/profiles/${profile.id}/access`, {
     data: { kind: 'aws', id: 'aws', enabled: true },
   })
+  const id = await insertAgent(profile.id)
+  return { id, profile }
+}
+
+/** An idle sandboxed agent on the credential. */
+export async function insertAgent(profileId: string): Promise<string> {
   const db = openSeedDb()
   const id = randomUUID()
   const ts = new Date().toISOString()
@@ -24,10 +30,10 @@ export async function agentOnCredential(request: APIRequestContext, name: string
     paths.checkout,
     ts,
     ts,
-    profile.id,
+    profileId,
   )
   await db.close()
-  return { id, profile }
+  return id
 }
 
 /** Opens the agent's access dialog from its settings. */

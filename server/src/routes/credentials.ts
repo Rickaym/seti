@@ -1,4 +1,5 @@
 import {
+  accessSaveInput,
   credentialHostInput,
   credentialHostParams,
   githubOwnerName,
@@ -10,6 +11,7 @@ import {
   taskAccessInput,
 } from '@seti/shared'
 import { Hono, type Context } from 'hono'
+import { previewAccessSave, saveAccess } from '../access-save.js'
 import {
   createProfile,
   credentialsOverview,
@@ -65,6 +67,13 @@ export const credentialRoutes = new Hono()
   .put('/profiles/:id/access', validId, validJson(taskAccessInput), async (c) =>
     ok(c, await setProfileAccess(c.req.valid('param').id, c.req.valid('json'))),
   )
+  .post('/profiles/:id/access/preview', validId, validJson(accessSaveInput), async (c) =>
+    ok(c, await previewAccessSave(c.req.valid('param').id, c.req.valid('json').task_id)),
+  )
+  .post('/profiles/:id/access/save', validId, validJson(accessSaveInput), async (c) => {
+    const { task_id: taskId, expect } = c.req.valid('json')
+    return ok(c, await saveAccess(c.req.valid('param').id, taskId, expect))
+  })
   .post('/profiles/:id/hosts', validId, validJson(credentialHostInput), async (c) =>
     ok(c, await setProfileHost(c.req.valid('param').id, c.req.valid('json').host, true)),
   )
