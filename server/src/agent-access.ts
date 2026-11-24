@@ -204,7 +204,8 @@ async function baseOf(kind: AccessKind, id: string, task: Pick<Task, 'id' | 'pro
   return { ...(await defaultOf(kind, id, task.id)), credential }
 }
 
-async function overridesOf(taskId: string, kind: AccessKind): Promise<Choices> {
+/** A task's own choices for one kind, without its credential's set or the defaults. */
+export async function overridesOf(taskId: string, kind: AccessKind): Promise<Choices> {
   switch (kind) {
     case 'ssh':
     case 'aws':

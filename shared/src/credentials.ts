@@ -2,6 +2,7 @@ import { z } from 'zod'
 import type { AccessKind } from './access.js'
 import { awsSettingsInput, type AwsSettings } from './aws.js'
 import type { ProfileConnection } from './connections.js'
+import { domainEntry } from './sandbox.js'
 import type { GitHubOwnerToken, SecretSource } from './secrets.js'
 
 /** The built-in credentials every task starts with; it holds what Seti had before credentials. */
@@ -76,3 +77,8 @@ export interface ProfileSummary {
 }
 
 export const profileAwsInput = awsSettingsInput
+
+/** A host every agent using the credential reaches beside the shared allowlist. */
+export const credentialHostInput = z.object({ host: domainEntry })
+
+export const credentialHostParams = z.object({ id: z.string().min(1).max(64), host: domainEntry })
