@@ -13,7 +13,7 @@ function Summary({ threads }: { threads: WebhookThreads }) {
     <>
       Replies in Slack threads an agent posted in reach that agent; DM replies also hands it the next messages in a
       direct message it wrote in, for 24 hours.
-      {threads.message_seen_at === null && (
+      {(threads.replies || threads.dms) && threads.message_seen_at === null && (
         <span className="mt-1 block text-muted-foreground" data-testid="no-message-events">
           No message events yet: subscribe to {MESSAGE_EVENTS} in your Slack app.
         </span>

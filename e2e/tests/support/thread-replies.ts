@@ -47,11 +47,16 @@ export async function seedThreadAgent(title: string, channel: string): Promise<s
   return id
 }
 
-/** A Slack webhook with thread replies on; delete it when done. */
-export async function slackWebhookWithReplies(request: APIRequestContext, name: string): Promise<ChannelSecret> {
+/** A Slack webhook with both thread switches off, as one is made; delete it when done. */
+export async function slackWebhook(request: APIRequestContext, name: string): Promise<ChannelSecret> {
   const created = await request.post('/api/channels', { data: { name, preset: 'slack', secret: SECRET } })
   expect(created.ok()).toBe(true)
-  const secret = ((await created.json()) as { data: ChannelSecret }).data
+  return ((await created.json()) as { data: ChannelSecret }).data
+}
+
+/** A Slack webhook with thread replies on; delete it when done. */
+export async function slackWebhookWithReplies(request: APIRequestContext, name: string): Promise<ChannelSecret> {
+  const secret = await slackWebhook(request, name)
   const on = await request.put(`/api/channels/${secret.channel.id}/threads`, { data: { replies: true } })
   expect(on.ok()).toBe(true)
   return secret

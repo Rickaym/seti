@@ -2,7 +2,7 @@ import type { APIRequestContext, Page } from '@playwright/test'
 import { openAgentSettings } from './agent-settings.js'
 import { openSeedDb } from './db.js'
 import { expect } from './fixtures.js'
-import { danaReplies, seedThreadAgent, shot, slackWebhookWithReplies } from './thread-replies.js'
+import { danaReplies, seedThreadAgent, shot, slackWebhook } from './thread-replies.js'
 
 /** An agent following one Slack thread in a channel Seti knows by name. */
 export async function seedFollower(title: string, channel: string): Promise<string> {
@@ -25,29 +25,41 @@ export async function stopFollowedThread(page: Page, id: string, tap: boolean): 
   const threads = page.getByTestId('task-threads')
   await expect(threads).toContainText('#deploys')
   await expect(threads).toContainText('0 replies')
-  await shot(page, tap ? 'threads-phone' : 'threads-desktop')
+  await shot(page, 'threads')
   const stop = threads.getByRole('button', { name: 'Stop following #deploys' })
   await (tap ? stop.tap() : stop.click())
   await expect(page.getByTestId('task-threads')).toHaveCount(0)
 }
 
-/** The Slack webhook shows its switches and says when no message event came yet, until one does. */
-export async function expectMessageEventsLine(
+/**
+ * A new Slack webhook shows both switches off and no hint; turning Threads on brings DMs and says
+ * no message event came yet, until one does.
+ */
+export async function expectRepliesRow(
   page: Page,
   request: APIRequestContext,
-  baseURL: string,
-  name: string,
+  { baseURL, name, tap }: { baseURL: string; name: string; tap: boolean },
 ): Promise<string> {
-  const { channel } = await slackWebhookWithReplies(request, name)
+  const { channel } = await slackWebhook(request, name)
   await page.goto('/#settings/channels')
-  const card = page.getByRole('main').getByRole('region', { name })
-  await expect(card.getByRole('switch', { name: `${name} thread replies` })).toBeChecked()
-  await expect(card.getByRole('switch', { name: `${name} DM replies` })).toBeChecked()
-  await expect(card.getByTestId('no-message-events')).toContainText('No message events yet')
-  await card.getByRole('switch', { name: `${name} DM replies` }).click()
-  await expect(card.getByRole('switch', { name: `${name} DM replies` })).not.toBeChecked()
+  const card = () => page.getByRole('main').getByRole('region', { name })
+  const threads = card().getByRole('switch', { name: `${name} thread replies` })
+  const dms = card().getByRole('switch', { name: `${name} DM replies` })
+  await expect(threads).not.toBeChecked()
+  await expect(dms).not.toBeChecked()
+  await expect(card().getByTestId('no-message-events')).toHaveCount(0)
+  await threads.scrollIntoViewIfNeeded()
+  await shot(page, 'webhook-replies-off')
+  await (tap ? threads.tap() : threads.click())
+  await expect(threads).toBeChecked()
+  await expect(dms).toBeChecked()
+  await expect(card().getByTestId('no-message-events')).toContainText('No message events yet')
+  await shot(page, 'webhook-replies-on')
+  await (tap ? dms.tap() : dms.click())
+  await expect(dms).not.toBeChecked()
   await danaReplies(baseURL, channel.path, 'C0E2ENOBODY', 'A message nobody follows')
   await page.reload()
-  await expect(page.getByRole('main').getByRole('region', { name }).getByTestId('no-message-events')).toHaveCount(0)
+  await expect(card().getByRole('switch', { name: `${name} thread replies` })).toBeChecked()
+  await expect(card().getByTestId('no-message-events')).toHaveCount(0)
   return channel.id
 }

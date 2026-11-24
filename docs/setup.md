@@ -723,8 +723,8 @@ days. Two switches, both off until you turn them on, decide what reaches agents:
 and DM replies, which hands the next messages in a direct message to the agent that wrote there in
 the last 24 hours even when they are not threaded. Turning Thread replies on turns DM replies on
 with it; you can turn DM replies off on its own. Only you change them, on the Replies row of the
-Slack webhook's card in Settings, Channels. Until a message event arrives, the row says "No message
-events yet" and names the four events to subscribe to. An agent's settings list the threads it
+Slack webhook's card in Settings, Channels. While a switch is on and no message event has
+arrived, the row says "No message events yet" and names the four events to subscribe to. An agent's settings list the threads it
 follows on the Team tab, each with Stop; the EA and the agent can stop one with `unlink_pr` and
 `thread`.
 

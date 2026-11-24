@@ -758,8 +758,8 @@ interrupted only for that.
   `thread_replies` on turns `thread_dms` on too unless the same change says otherwise.
 - THR-7: The user, the EA after the user's yes, or the agent itself MAY stop an agent following a
   thread; each stop is audited with who stopped it. An agent's settings list the threads it follows
-  with Stop, and a Slack webhook's card shows both switches and, until the first one arrives, that
-  no message event came yet.
+  with Stop, and a Slack webhook's card shows both switches and, while one is on and none has
+  arrived, that no message event came yet.
 
 ## 11. Pull requests
 
