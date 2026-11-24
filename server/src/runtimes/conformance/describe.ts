@@ -9,6 +9,7 @@ import { INPUT } from './cases-input.js'
 import { INTERRUPT } from './cases-interrupt.js'
 import { LAUNCH } from './cases-launch.js'
 import { LIFECYCLE } from './cases-lifecycle.js'
+import { ONE_SHOT } from './cases-one-shot.js'
 import { PERMISSIONS } from './cases-permissions.js'
 import { QUESTIONS } from './cases-questions.js'
 import { REPORTS } from './cases-reports.js'
@@ -30,6 +31,7 @@ export const CASES: readonly Case[] = [
   ...DELEGATES,
   ...LAUNCH,
   ...FAILURES,
+  ...ONE_SHOT,
 ]
 
 /**
@@ -41,7 +43,10 @@ export function describeAdapter<S extends RuntimeShapes, Id extends string>(targ
   describe(`${target.adapter.id} adapter conformance`, () => {
     for (const each of CASES) {
       const title = `${each.id}: ${each.title} [${each.proves}]`
-      const skip = each.skip?.(target.profile, target.adapter.capabilities) ?? null
+      const skip =
+        each.needsOneShot === true && subject.oneShot === undefined
+          ? 'the target supplies no one-shot'
+          : (each.skip?.(target.profile, target.adapter.capabilities) ?? null)
       const gap = target.gaps?.[each.id]
       const passes = async () => {
         await expect(each.run(subject)).resolves.toBeUndefined()

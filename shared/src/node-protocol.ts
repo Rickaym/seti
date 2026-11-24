@@ -109,6 +109,14 @@ export const proxyGrant = z.object({
 })
 export type ProxyGrant = z.infer<typeof proxyGrant>
 
+/** What a maintenance sandbox's proxy reaches its model provider with: a Claude login or a key. */
+const modelReach = z.object({
+  login: z.string().nullable(),
+  /** The connection that carries the agent's OpenAI key, for a session on Codex. */
+  key: grantConnection.nullable(),
+})
+export type ModelReach = z.infer<typeof modelReach>
+
 /** A tool call of the agent, as the runtime hands it to a hook. */
 const toolCall = z.object({ tool: z.string(), input: z.record(z.string(), z.unknown()) })
 
@@ -347,7 +355,7 @@ const commandSchemas = {
   /** Opens the agent's egress proxy on the node unless it runs, for a control plane sandbox. */
   'proxy.open': { body: z.object({ agent, grant: proxyGrant }), answer: done },
   /** Opens the proxy of the agent's maintenance sandbox, which reaches only the model provider. */
-  'proxy.model': { body: z.object({ agent, login: z.string().nullable() }), answer: done },
+  'proxy.model': { body: z.object({ agent, ...modelReach.shape }), answer: done },
   /** The token the agent's processes show the node's egress proxy to fetch AWS credentials. */
   'aws.token': { body: z.object({ agent }), answer: z.object({ token: z.string() }) },
   /** Stops a removed agent's egress proxy and ssh agent on the node. */

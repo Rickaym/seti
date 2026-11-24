@@ -40,6 +40,8 @@ export interface CodexRealised {
   cwd: string
   env: Record<string, string | undefined>
   resume: string | null
+  /** The thread stays off disk, so nothing of it can be resumed. */
+  ephemeral?: true
   model: string
   effort: string | null
   /** What Seti tells the agent beside Codex's own instructions, as a Claude agent's prompt gets. */
@@ -177,11 +179,12 @@ class Driver {
       capabilities: { experimentalApi: true, optOutNotificationMethods: OPTED_OUT },
     })
     this.rpc.notify('initialized')
-    const { resume, cwd, model, instructions } = this.realised
+    const { resume, cwd, model, instructions, ephemeral } = this.realised
     const told = instructions === '' ? {} : { developerInstructions: instructions }
     const common = { cwd, approvalPolicy: APPROVAL, model, ...told }
     if (resume === null) {
-      this.root = threadReply.parse(await this.rpc.request('thread/start', common)).thread.id
+      const start = ephemeral === true ? { ...common, ephemeral } : common
+      this.root = threadReply.parse(await this.rpc.request('thread/start', start)).thread.id
       return
     }
     const reply = await this.rpc.request('thread/resume', { ...common, threadId: resume, excludeTurns: true })

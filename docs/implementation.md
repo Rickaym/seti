@@ -236,8 +236,9 @@ the AppArmor profile for `bwrap` that the installer adds ([Setup](setup.md#sandb
   and Deny only and no editable fields, and the answer route refuses Always allow for it. Beside
   each answer the user gives, the evaluator's own verdict is counted in `policy_shadow` with mode
   `codex` and the answer as `user-allow` or `user-deny`; the Claude Code summary leaves those rows
-  out. With `evaluator_decides` on in the Codex settings (`codex_settings`, off by default), an
-  allow from a rule or the read-only list answers without the user. A question goes to the user
+  out. With `evaluator_decides` on in the Codex settings (`codex_settings`, on by default; the
+  migration that made it so changed only the column default, never a stored choice), an allow from a rule or the read-only
+  list answers without the user. A question goes to the user
   as an AskUserQuestion call does. The node's Codex host (`codex-host.ts`) serves the agent's tool
   servers through the relay. Codex is asked not to stream item parts or the turn's running diff,
   so a Codex agent's rows are its whole items; a line Codex wrote that Seti cannot read is shown
@@ -303,11 +304,29 @@ it refuses a sandboxed launcher that has no spawn. It adds no credential to the 
 environment: inside the sandbox, the only keys are the placeholders the launcher sets for the
 egress proxy.
 
+### One-shot calls
+
+A runtime may also answer one question with no tools, for a second opinion. Its `OneShot`
+(`server/src/runtimes/one-shot.ts`; `claude/one-shot.ts`, `codex/one-shot.ts`) opens a new
+session that offers the model no tool, refuses any call it makes without asking anyone, and keeps
+nothing to resume: Claude Code with no tools, settings or tool servers, one turn and no saved
+session; Codex with no tool server, an ephemeral thread and every ask declined. `runOneShot`
+reads its one turn and returns the answer, its tokens and its cost, reported or priced from the
+tokens; it ends the session on a time limit, on the caller's signal, past an output token limit,
+or when the model keeps calling tools.
+
+A one-shot runs in a bare maintenance sandbox (`maintenanceLauncher` with `bare`): an empty
+folder of its own, none of the agent's folders, memory or Claude Code state, and a proxy that
+reaches only the model provider, with the agent's Claude login or the connection that carries its
+OpenAI key. Until `capabilities` declares one-shots, the suite reads them from the target's
+`oneShot`, and cases OS-1 and OS-2 cover them.
+
 ### The conformance suite
 
 `server/src/runtimes/conformance/` holds the suite. `describeAdapter(target)` registers a test per
 case. The cases live in `cases-<area>.ts` by area: lifecycle, interrupts, queued input, reports,
-events, tool calls, permission asks, questions, subagents and plans, launch, and failures. Each
+events, tool calls, permission asks, questions, subagents and plans, launch, failures and
+one-shots. Each
 case names the protocol requirement or interface member it proves. A case waits at most two
 seconds for anything and finishes in milliseconds when it passes, so "never hangs" means "settles
 within the bound". A target whose rig runs a real program may set a longer bound with `boundMs`.
@@ -332,6 +351,7 @@ A target is the adapter as the suite drives it, in `runtimes/<id>/conformance-ta
 | `gaps`    | Known failures by case id, each with its reason.                                                                                                             |
 | `host`    | The host the adapter gets, built from the suite's neutral answers.                                                                                           |
 | `rig`     | A fake runtime that plays a neutral script and records what it saw.                                                                                          |
+| `oneShot` | The runtime's one-shot and a model it offers, where it has one.                                                                                              |
 
 The rig is the part an adapter's author writes. It turns each step of a neutral script (say,
 think, call, hold, subagent, compact, exit, and the rest in `script.ts`) into what the runtime

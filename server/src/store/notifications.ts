@@ -7,7 +7,7 @@ import {
   type NotificationSettings,
   type PushDevice,
 } from '@seti/shared'
-import { now, sql, transaction } from '../db.js'
+import { now, sql, transaction, type Db } from '../db.js'
 
 /** A device's push subscription as web-push takes it. */
 export interface PushTarget {
@@ -114,11 +114,11 @@ export const notificationSettings = {
   get: async (): Promise<NotificationSettings> =>
     tiersOf((await sql<{ tiers: unknown }[]>`SELECT tiers FROM notification_settings WHERE id = 1`).at(0)?.tiers),
   /** Saves the tiers, and the old per-kind switches they imply for an earlier release. */
-  set: async (tiers: NotificationSettings): Promise<void> => {
+  set: async (tiers: NotificationSettings, db: Db = sql): Promise<void> => {
     const finished = tiers.active !== 'off'
     const needsYou = tiers.urgent === 'push'
-    await sql`INSERT INTO notification_settings (id, finished, needs_you, ea_replies, tiers, updated_at)
-      VALUES (1, ${finished}, ${needsYou}, true, ${sql.json({ ...tiers })}, ${now()})
+    await db`INSERT INTO notification_settings (id, finished, needs_you, ea_replies, tiers, updated_at)
+      VALUES (1, ${finished}, ${needsYou}, true, ${db.json({ ...tiers })}, ${now()})
       ON CONFLICT (id) DO UPDATE SET finished = excluded.finished, needs_you = excluded.needs_you,
         tiers = excluded.tiers, updated_at = excluded.updated_at`
   },

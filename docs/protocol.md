@@ -156,7 +156,8 @@ between two steps; an interrupt; a hook at subagent start.
   that key, and its status MUST read "no key", not ready, while the default credential holds none.
   The status MAY name the one connection for that key the default credential lacks, but nothing
   but the user changes a credential or connection for it. Only the user changes a runtime's
-  settings, and each change is audited. The control room MUST offer a new agent the models of the
+  settings, including whether the rules decide its calls (on by default, PERM-2), and each change
+  is audited. The control room MUST offer a new agent the models of the
   default runtime always and those of another runtime only while that runtime can start one; the
   runtimes it offers MUST be readable with their models and efforts.
 - RT-10: A new agent's start MAY name a runtime, a model and an effort. A model alone MUST pick the
@@ -426,8 +427,15 @@ interrupted only for that.
   name-constrained to them whose key stays outside the sandbox. Other hosts are tunnelled unread.
 - EGR-5: A placeholder is `seti-secret-<name>-<32 hex>`, in the connection's variable. The proxy
   swaps it for the value in the URL path and headers (Basic auth too), on the connection's hosts
-  and port 443 only; bodies are not read. A readable request that carries a placeholder elsewhere
-  MUST be refused (403) and audited. A connection with no value answers 502.
+  and port 443 only. A readable request that carries a placeholder elsewhere MUST be refused (403)
+  and audited. A connection with no value answers 502. The agent is told where the value is
+  swapped and that a body is not.
+- EGR-14: On its connections' hosts the proxy reads the body of a JSON, form, multipart or plain
+  text request without a content encoding, holding at most 1 MiB, before anything goes upstream;
+  every other body streams on unread. A held body carrying a placeholder MUST be refused (403)
+  and audited as in EGR-5, naming the connection and never its value, since Seti does not swap a
+  value into a body. A body over 1 MiB streams on while the proxy watches the rest; a placeholder
+  in it cuts the request off and answers 413. A held body goes upstream with its exact length.
 - EGR-7: A header "added by the proxy" is set from its template on every request to the
   connection's hosts, first matching rule winning. The code-host token is the credential's one for
   the owner named, else its default, never another credential's; minted tokens are cached until
@@ -447,11 +455,13 @@ interrupted only for that.
   A call it turns down never reaches the user: the agent gets the reason and the audit records it.
   A call an `ask` rule matches, or that nothing decides, becomes a request and the agent blocks.
   On a runtime with no classifier that asks before every call (Codex), guards and deny rules
-  refuse at once, review and ask rules hold as for any agent, and every other call becomes a
-  request offering `allow` and `deny` only, and a `deny` with a message is refused there since that
-  runtime cannot pass it on, unless the user lets the rules decide for that runtime;
-  then a rule's or the read-only list's allow runs the call. Beside each answer the user gives, the
-  implementation counts its own verdict (PERM-12).
+  refuse at once and review and ask rules hold as for any agent. The rules decide there by
+  default: an allow from a rule or the read-only list runs the call, and a call to a tool server
+  other than the control room's own runs without the user only by a rule of the user's that names
+  that server or tool. The user MAY turn this off for the runtime, and an upgrade MUST keep the
+  choice the user stored. Every call that nothing allows becomes a request offering `allow` and
+  `deny` only, and a `deny` with a message is refused there since that runtime cannot pass it on.
+  Beside each answer the user gives, the implementation counts its own verdict (PERM-12).
 - PERM-4: Built-in: reads, search and platform tools are allowed; shell and edits inside the
   agent's folders are allowed in the sandbox only; killing by name is denied.
 - PERM-5: Request fields: `id`, `task_id`, `tool_name`, `kind`, `summary`, `input`, `reason`,
@@ -1133,9 +1143,9 @@ treat every agent as holding the user's access.
   API-9.
 - The sandbox is the boundary for agents. Permission rules and the classifier are not; they bind
   the runtime's tools, not what a shell command can do.
-- The egress proxy cannot read tunnelled traffic or request bodies. A placeholder sent in a body,
-  or to an allowlisted host the proxy does not terminate, is not detected; it is still only a
-  placeholder.
+- The egress proxy cannot read tunnelled traffic, and it reads request bodies only as EGR-14
+  says. A placeholder sent in another body, or to an allowlisted host the proxy does not
+  terminate, is not detected; it is still only a placeholder.
 - A webhook delivery that carries its secret as a bearer or shared token proves the sender but not
   the body, and puts the secret on the wire with every delivery.
 - A custom sender definition decides how a public path authenticates, which is why only the user
