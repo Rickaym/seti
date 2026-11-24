@@ -3,8 +3,9 @@ import type { APIRequestContext, Page } from '@playwright/test'
 import type { ChannelSecret, Envelope, Task } from '@seti/shared'
 import { openSeedDb } from './db.js'
 import { EA_HEADERS } from './env.js'
-import { SLACK_CHANNEL, SLACK_POSTED, SLACK_PROMPT } from './fake-permission.js'
+import { SLACK_CHANNEL, SLACK_POSTED, SLACK_PROMPT, SLACK_UNNAMED_CHANNEL } from './fake-permission.js'
 import { apiData, expect, unique } from './fixtures.js'
+import { shot } from './thread-replies.js'
 
 const SECRET = ['e2e', 'slack', 'names', 'secret'].join('-')
 
@@ -24,11 +25,12 @@ export async function seedSlackNames(names: Record<string, string>): Promise<voi
   await db.close()
 }
 
-/** An agent that asks to post the deploy note to the Slack channel Seti knows as #deploys. */
-export async function startSlackPoster(request: APIRequestContext): Promise<string> {
+/** An agent that asks to post the deploy note to #deploys, or to a channel Seti never saw named. */
+export async function startSlackPoster(request: APIRequestContext, named: boolean): Promise<string> {
   await seedSlackNames({ [SLACK_CHANNEL]: 'deploys' })
+  const prompt = named ? `Please ${SLACK_PROMPT}` : `Please ${SLACK_PROMPT}, in ${SLACK_UNNAMED_CHANNEL}`
   const response = await request.post('/api/tasks', {
-    data: { title: unique('Slack poster'), prompt: `Please ${SLACK_PROMPT}`, sandbox: false },
+    data: { title: unique('Slack poster'), prompt, sandbox: false },
   })
   expect(response.ok(), 'POST /api/tasks').toBe(true)
   const { id } = ((await response.json()) as Envelope<Task>).data
@@ -36,19 +38,25 @@ export async function startSlackPoster(request: APIRequestContext): Promise<stri
   return id
 }
 
-/** The request names the channel; once allowed, the transcript row for the send names it too. */
-export async function expectNamedRequestAndRow(page: Page, id: string, tap: boolean): Promise<void> {
+/** How the request and the transcript row read the destination. */
+const shown = (named: boolean) =>
+  named ? 'Send to #deploys' : `Send to channel ${SLACK_UNNAMED_CHANNEL}, name not known`
+
+/** The request names the channel or says it is not known; once allowed, the row says the same. */
+export async function expectSendRequestAndRow(page: Page, id: string, tap: boolean, named: boolean): Promise<void> {
   await page.goto(`/#agents/${id}`)
   const main = page.getByRole('main')
   const card = main.getByRole('region', { name: /^Permission request for/ })
-  await expect(card).toContainText('Send to #deploys: Deploy done')
-  await expect(card).not.toContainText(`${SLACK_CHANNEL}, name not known`)
+  await expect(card).toContainText(`${shown(named)}: Deploy done`)
+  await card.scrollIntoViewIfNeeded()
+  await shot(page, `slack-request-${named ? 'named' : 'unnamed'}`)
   const allow = card.getByRole('button', { name: 'Allow', exact: true })
   await (tap ? allow.tap() : allow.click())
   await expect(main.getByText(SLACK_POSTED, { exact: true })).toBeVisible()
-  await expect(main.getByTestId('tool-summary').filter({ hasText: 'Send to #deploys' })).toHaveText(
-    'Send to #deploys: Deploy done',
+  await expect(main.getByTestId('tool-summary').filter({ hasText: shown(named) })).toHaveText(
+    `${shown(named)}: Deploy done`,
   )
+  await shot(page, `slack-send-row-${named ? 'named' : 'unnamed'}`)
 }
 
 /** A signed Slack app_mention to a new webhook that reports to the EA; the webhook's id. */

@@ -22,6 +22,8 @@ export interface ConnectionForm {
   kind: ConnectionKind
   hosts: string
   addsHeader: boolean
+  /** Whether the proxy also swaps the value into request bodies on its hosts. */
+  body: boolean
   header: string
   template: string
   tokenUrl: string
@@ -46,6 +48,7 @@ const BLANK: ConnectionForm = {
   kind: 'key',
   hosts: '',
   addsHeader: false,
+  body: false,
   header: 'Authorization',
   template: BEARER,
   tokenUrl: '',
@@ -74,6 +77,11 @@ export const PRESETS: readonly ConnectionPreset[] = [
     label: 'Header key',
     hint: 'Seti adds it as a header on its hosts; the agent never sends it.',
     form: { kind: 'key', addsHeader: true },
+  },
+  {
+    label: 'Web login',
+    hint: "A site's password the agent posts to log in; Seti swaps it into the request body too.",
+    form: { kind: 'key', body: true },
   },
   {
     label: 'OAuth client',
@@ -168,6 +176,7 @@ function settingsOf(form: ConnectionForm): ConnectionInput {
     hosts: splitHosts(form.hosts),
     header: form.addsHeader ? { name: form.header.trim(), template: form.template.trim() } : null,
     mint: mintOf(form),
+    body: form.body,
   }
 }
 
@@ -211,6 +220,7 @@ export function formOf(connection: Connection): ConnectionForm {
     envEdited: true,
     kind: connection.kind,
     hosts: connection.hosts.join(', '),
+    body: connection.body,
     ...(header === null ? {} : { addsHeader: true, header: header.name, template: header.template }),
     ...(mint === null ? {} : mintForm(mint)),
   }

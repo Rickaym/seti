@@ -2,6 +2,7 @@ import type { CapabilitiesSnapshot, SetiControlLevel } from '@seti/shared'
 import { capabilityCache } from './capabilities.js'
 import { tasks } from './db.js'
 import { taskMcpServers } from './mcp-selection.js'
+import { loadsUserServers } from './runtimes/capabilities.js'
 
 /** Servers the block names; the rest are counted, so the block stays short on every turn. */
 const LIST_MAX = 8
@@ -80,7 +81,7 @@ export function offServersText(servers: readonly OffServer[], level: SetiControl
 /** Tells an agent which MCP servers it could have, so it asks by name instead of searching. */
 export async function mcpOffContext(taskId: string): Promise<string | null> {
   const task = await tasks.get(taskId)
-  if (task === undefined) {
+  if (task === undefined || !loadsUserServers(task.runtime)) {
     return null
   }
   const off = (await taskMcpServers(taskId, false)).filter((server) => !server.enabled)

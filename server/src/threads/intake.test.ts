@@ -1,10 +1,12 @@
 import type { WebhookChannelInfo } from '@seti/shared'
 import { describe, expect, it } from 'vitest'
+import { asAgent } from '../access.js'
 import { sql } from '../db.js'
 import { auditEvents } from '../store/audit.js'
 import { channelStore } from '../store/channels.js'
 import { slackNames } from '../store/slack-names.js'
 import { EA_AUTH } from '../test-auth.js'
+import { setWebhookThreads } from './actions.js'
 import { DM_WINDOW_MS } from './intake.js'
 import { agentSends, api, data, deliver, message, quietTask, slackWebhook } from './slack-test-kit.js'
 
@@ -12,6 +14,7 @@ const ROOT = '1700000000.000100'
 const reply = (ts: string, fields: Record<string, unknown> = {}) =>
   message({ channel: 'C0PROJ1234', ts, thread_ts: ROOT, ...fields })
 const MULTI = 'C0MULTI123'
+const OWNER = { authorizations: [{ user_id: 'U0OWNER001', is_bot: false }] }
 
 const queued = async (task: string) =>
   sql<{ message: string; text: string }[]>`SELECT r.message, r.text FROM thread_reply r
@@ -21,33 +24,50 @@ const switches = async (channel: WebhookChannelInfo, change: object) =>
   data<WebhookChannelInfo>(await api('PUT', `/channels/${channel.id}/threads`, change))
 
 describe('Slack message events at the webhook', () => {
-  it('keep plain messages from subscribers unless the filter keeps them, and note that they arrive', async () => {
+  it('with replies on and no filter, pass mentions either way and hold other messages', async () => {
     const channel = await slackWebhook('Slack mentions')
     expect(channel.threads).toEqual({ replies: false, dms: false, message_seen_at: null })
-    const ignored = await deliver(channel, message({ channel: 'C0PROJ1234', ts: '1700000001.000100' }))
-    expect(ignored.status).toBe('ignored')
-    expect(ignored.reason).toContain('in no followed thread')
-    const mention = await deliver(channel, { event: { type: 'app_mention', text: 'hi', ts: '1700000002.000100' } })
-    expect(mention.status).toBe('accepted')
-    expect((await channelStore.recent(channel.id, 5)).map((event) => event.kind)).toEqual(['app_mention'])
+    await switches(channel, { replies: true })
+    const owned = (fields: Record<string, unknown>) => ({ ...OWNER, ...message({ channel: 'C0PROJ1234', ...fields }) })
+    const ignored = await deliver(channel, owned({ ts: '1700000001.000100' }))
+    expect(ignored).toMatchObject({ status: 'ignored', reason: expect.stringContaining('mentions only') as string })
+    const app = { ...OWNER, event: { type: 'app_mention', text: '<@U0OWNER001> hi', ts: '1700000002.000100' } }
+    expect((await deliver(channel, app)).status).toBe('accepted')
+    const asMessage = await deliver(channel, owned({ ts: '1700000003.000100', text: 'hey <@U0OWNER001|ricky>' }))
+    expect(asMessage.status).toBe('accepted')
+    const other = await deliver(channel, owned({ ts: '1700000004.000100', text: 'hey <@U0SOMEONE1>' }))
+    expect(other.status).toBe('ignored')
+    expect((await channelStore.recent(channel.id, 5)).map((event) => event.kind)).toEqual(['message', 'app_mention'])
     const seen = (await data<WebhookChannelInfo[]>(await api('GET', '/channels'))).find((c) => c.id === channel.id)
     expect(seen?.threads?.message_seen_at).not.toBeNull()
-
-    await data(
-      await api('PUT', `/channels/${channel.id}/filter`, { script: 'export default () => true', enabled: true }),
-    )
-    expect((await deliver(channel, message({ channel: 'C0PROJ1234', ts: '1700000003.000100' }))).status).toBe(
-      'accepted',
-    )
   })
 
-  it('show names Seti knows in place of ids in what subscribers get', async () => {
+  it('with replies on and a filter, let the filter decide message events; a failing one passes mentions', async () => {
+    const channel = await slackWebhook('Filtered')
+    await switches(channel, { replies: true })
+    const filter = async (script: string) =>
+      data(await api('PUT', `/channels/${channel.id}/filter`, { script, enabled: true }))
+    await filter('export default () => true')
+    expect((await deliver(channel, message({ channel: 'C0PROJ1234', ts: '1700000005.000100' }))).status).toBe(
+      'accepted',
+    )
+    await filter('export default () => false')
+    const mention = { ...OWNER, ...message({ channel: 'C0PROJ1234', ts: '1700000006.000100', text: '<@U0OWNER001>' }) }
+    expect((await deliver(channel, mention)).status).toBe('filtered')
+    await filter("export default () => { throw new Error('broken') }")
+    expect((await deliver(channel, { ...mention, event: { ...mention.event, ts: '1700000007.000100' } })).status).toBe(
+      'accepted',
+    )
+    expect((await deliver(channel, message({ channel: 'C0PROJ1234', ts: '1700000008.000100' }))).status).toBe('ignored')
+  })
+
+  it('show names Seti knows in place of ids, and a label only where it stands', async () => {
     const channel = await slackWebhook('Mentions with names')
     await slackNames.learn([{ id: 'U0RICKY001', kind: 'user', name: 'Ricky' }], 'test', new Date().toISOString())
     const text = '<@U0RICKY001> can you look at <#C0DEPLOY77|deploys> and C0DEPLOY77?'
     await deliver(channel, { event: { type: 'app_mention', text, ts: '1700000004.000100' } })
     const [event] = await channelStore.recent(channel.id, 1)
-    expect(event?.title).toBe('@Ricky can you look at #deploys and #deploys?')
+    expect(event?.title).toBe('@Ricky can you look at #deploys and C0DEPLOY77?')
   })
 
   it('queue nothing for agents while both switches are off', async () => {
@@ -62,6 +82,11 @@ describe('Slack message events at the webhook', () => {
     const channel = await slackWebhook('Switches')
     const refused = await api('PUT', `/channels/${channel.id}/threads`, { replies: true }, EA_AUTH)
     expect(refused.status).toBe(403)
+    const agent = { id: await quietTask(), title: 'Full agent', seti_control: 'full' as const }
+    await expect(asAgent(agent, async () => setWebhookThreads(channel.id, { replies: true }))).rejects.toThrow(
+      /Agents cannot/,
+    )
+    expect((await channelStore.get(channel.id))?.thread_replies).toBe(false)
     expect((await switches(channel, { replies: true })).threads).toMatchObject({ replies: true, dms: true })
     expect((await switches(channel, { dms: false })).threads).toMatchObject({ replies: true, dms: false })
     expect((await switches(channel, { replies: false, dms: false })).threads).toMatchObject({ replies: false })
@@ -78,8 +103,9 @@ describe('Slack message events at the webhook', () => {
   it('queue a reply for each agent that posted earlier in the thread, once, with secrets redacted', async () => {
     const channel = await slackWebhook('Replies')
     await switches(channel, { replies: true })
-    const [first, second] = [await quietTask(), await quietTask()]
+    const [first, second, bystander] = [await quietTask(), await quietTask(), await quietTask()]
     await agentSends(first, MULTI, ROOT)
+    await agentSends(bystander, MULTI, '1700000010.000100')
     await deliver(channel, reply('1700000020.000100', { channel: MULTI }))
     await agentSends(second, MULTI, '1700000030.000100', ROOT)
     const later = reply('1700000040.000100', { channel: MULTI, text: `token ghp_${'z'.repeat(36)} works` })
@@ -89,6 +115,7 @@ describe('Slack message events at the webhook', () => {
     const [mine] = await queued(second)
     expect(mine?.message).toBe('1700000040.000100')
     expect(mine?.text).not.toContain('z'.repeat(36))
+    expect(await queued(bystander)).toEqual([])
   })
 
   it('never queue a message a Seti agent sent, nor edits and other threads', async () => {

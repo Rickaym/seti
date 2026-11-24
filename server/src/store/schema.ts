@@ -7,7 +7,7 @@ import { SETI_AUTH } from './schema-auth.js'
 import { CHANGE_REQUESTS } from './schema-change-requests.js'
 import { CHANGELOG } from './schema-changelog.js'
 import { COMPACT_RULES } from './schema-compact.js'
-import { CONNECTIONS, secretsToConnections } from './schema-connections.js'
+import { CONNECTION_BODY, CONNECTIONS, secretsToConnections } from './schema-connections.js'
 import { recountTaskCosts, TASK_COST_SESSION, TASK_SECOND_OPINION, TASK_SIDE_CHAT_COST } from './schema-cost.js'
 import { CPU_CAPS } from './schema-cpu.js'
 import { ANDROID_OVERRIDE, DEVICE_SHOW_NAMES, DEVICES, dropOfficialAndroidRow } from './schema-devices.js'
@@ -238,6 +238,7 @@ export const MIGRATIONS: readonly Migration[] = [
   { version: 127, name: 'task_approval_ceiling', sql: TASK_APPROVAL_CEILING },
   { version: 128, name: 'codex_rules_decide_default', sql: CODEX_RULES_DECIDE_DEFAULT },
   { version: 129, name: 'task_second_opinion', sql: TASK_SECOND_OPINION },
-  { version: 130, name: 'thread_follows', sql: THREAD_FOLLOWS },
-  { version: 131, name: 'slack_names', sql: SLACK_NAMES },
+  { version: 130, name: 'connection_body', sql: CONNECTION_BODY },
+  { version: 131, name: 'thread_follows', sql: THREAD_FOLLOWS },
+  { version: 132, name: 'slack_names', sql: SLACK_NAMES },
 ]

@@ -81,6 +81,11 @@ const line = (connection: PlannedConnection) => {
   return `${connection.name} (${connection.kind}, ${connection.env}) on ${hosts} from ${connection.from}`
 }
 
+/** Whether the proxy also swaps a connection's value into request bodies; off until the user says. */
+export const CONNECTION_BODY = `
+ALTER TABLE connection ADD COLUMN body BOOLEAN NOT NULL DEFAULT false;
+`
+
 /** Moves API keys, header rules and named secrets onto connections, reading no secret value. */
 export async function secretsToConnections(tx: Db): Promise<void> {
   const planned = planConnections(await readOld(tx), placeholderFor)

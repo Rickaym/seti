@@ -11,7 +11,12 @@ export const SLACK_PROMPT = 'post the deploy note to Slack once I allow it'
 export const SLACK_CHANNEL = 'C0E2EDEPLOY'
 export const SLACK_POSTED = 'Posted the deploy note.'
 const SLACK_SEND = 'mcp__plugin_slack_slack__slack_send_message'
-const SLACK_INPUT = { channel_id: SLACK_CHANNEL, message: 'Deploy done' }
+/** A Slack channel Seti has never seen named; a prompt that names it posts there instead. */
+export const SLACK_UNNAMED_CHANNEL = 'C0E2EUNNAMED'
+const slackInput = (prompt: string) => ({
+  channel_id: prompt.includes(SLACK_UNNAMED_CHANNEL) ? SLACK_UNNAMED_CHANNEL : SLACK_CHANNEL,
+  message: 'Deploy done',
+})
 
 /** What Seti answers a tool call with, as far as the stand-in reads it. */
 interface PermissionAnswer {
@@ -64,14 +69,15 @@ async function askToDeploy(
 async function askToPost(
   canUseTool: CanUseTool | undefined,
   toolUseId: string,
+  input: Record<string, unknown>,
 ): Promise<{ result: string; reply: string }> {
-  const answer = await canUseTool?.(SLACK_SEND, SLACK_INPUT, {
+  const answer = await canUseTool?.(SLACK_SEND, input, {
     signal: new AbortController().signal,
     toolUseID: toolUseId,
     requestId: `req_${toolUseId}`,
   })
   if (answer?.behavior === 'allow') {
-    const link = `https://acme.slack.com/archives/${SLACK_CHANNEL}/p1700000000000100`
+    const link = `https://acme.slack.com/archives/${String(input.channel_id)}/p1700000000000100`
     return { result: JSON.stringify({ message_link: link }), reply: SLACK_POSTED }
   }
   const why = answer?.message ?? 'No permission callback'
@@ -99,10 +105,22 @@ async function askToStart(
   return { result: why, reply: `Not starting: ${why}` }
 }
 
-const DEPLOY = { prompt: PERMISSION_PROMPT, tool: 'Bash', input: PERMISSION_INPUT, run: askToDeploy }
-const asks = [
-  { prompt: PLAN_APPROVAL_PROMPT, tool: 'ExitPlanMode', input: { plan: PLAN_TEXT }, run: askToStart },
-  { prompt: SLACK_PROMPT, tool: SLACK_SEND, input: SLACK_INPUT, run: askToPost },
+/** A permission the stand-in asks for: the prompt that asks it, the call, and how it goes on. */
+interface Ask {
+  prompt: string
+  tool: string
+  input: (prompt: string) => Record<string, unknown>
+  run: (
+    canUseTool: CanUseTool | undefined,
+    toolUseId: string,
+    input: Record<string, unknown>,
+  ) => Promise<{ result: string; reply: string }>
+}
+
+const DEPLOY: Ask = { prompt: PERMISSION_PROMPT, tool: 'Bash', input: () => PERMISSION_INPUT, run: askToDeploy }
+const asks: Ask[] = [
+  { prompt: PLAN_APPROVAL_PROMPT, tool: 'ExitPlanMode', input: () => ({ plan: PLAN_TEXT }), run: askToStart },
+  { prompt: SLACK_PROMPT, tool: SLACK_SEND, input: slackInput, run: askToPost },
 ]
 
 /**
@@ -115,9 +133,10 @@ export async function actPermission(
   prompt: string,
 ): Promise<void> {
   const id = `toolu_perm_${randomUUID().slice(0, 8)}`
-  const ask = asks.find((entry) => prompt.includes(entry.prompt)) ?? DEPLOY
-  actor.assistant([{ type: 'tool_use', id, name: ask.tool, input: ask.input }])
-  const { result, reply } = await ask.run(canUseTool, id)
+  const ask: Ask = asks.find((entry) => prompt.includes(entry.prompt)) ?? DEPLOY
+  const input = ask.input(prompt)
+  actor.assistant([{ type: 'tool_use', id, name: ask.tool, input }])
+  const { result, reply } = await ask.run(canUseTool, id, input)
   if (!actor.ended()) {
     actor.toolResult(id, result)
     actor.assistant([{ type: 'text', text: reply }])

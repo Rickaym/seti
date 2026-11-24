@@ -18,6 +18,8 @@ export interface ConnectionRow {
   hosts: string[]
   header: ConnectionHeader | null
   mint: MintSettings | null
+  /** Whether the proxy also swaps the value into request bodies on its hosts. */
+  body: boolean
   /** The stored secret behind each slot that is set. */
   slots: Partial<Record<ConnectionSlot, StoredSecretName>>
   mint_error: string | null
@@ -37,6 +39,7 @@ interface ConnectionRecord {
   template: string | null
   /** Rows from before the issuer field have none. */
   mint: (Omit<MintSettings, 'issuer'> & { issuer?: string | null }) | null
+  body: boolean
   mint_error: string | null
   mint_checked_at: string | null
   created_at: string
@@ -51,7 +54,7 @@ const toRow = ({ header, template, slots, mint, ...rest }: ConnectionRecord): Co
   slots: Object.fromEntries((slots ?? []).map((entry) => [entry.slot, entry.secret])),
 })
 
-const SELECT = sql`SELECT c.id, c.name, c.kind, c.env, c.placeholder, c.hosts, c.header, c.template, c.mint,
+const SELECT = sql`SELECT c.id, c.name, c.kind, c.env, c.placeholder, c.hosts, c.header, c.template, c.mint, c.body,
     c.mint_error, c.mint_checked_at, c.created_at, c.updated_at,
     (SELECT json_agg(json_build_object('slot', s.slot, 'secret', s.secret)) FROM connection_secret s
       WHERE s.connection_id = c.id) AS slots
@@ -65,6 +68,7 @@ export interface ConnectionSettings {
   hosts: readonly string[]
   header: ConnectionHeader | null
   mint: MintSettings | null
+  body: boolean
 }
 
 /** Connections, their slots and the credentials that carry them; values live in the secret store. */
@@ -101,16 +105,17 @@ export const connectionRows = {
   },
   insert: async (db: Db, id: string, settings: ConnectionSettings, placeholder: string): Promise<void> => {
     const at = now()
-    await db`INSERT INTO connection (id, name, kind, env, placeholder, hosts, header, template, mint, created_at,
-        updated_at)
+    await db`INSERT INTO connection (id, name, kind, env, placeholder, hosts, header, template, mint, body,
+        created_at, updated_at)
       VALUES (${id}, ${settings.name}, ${settings.kind}, ${settings.env}, ${placeholder}, ${[...settings.hosts]},
         ${settings.header?.name ?? null}, ${settings.header?.template ?? null},
-        ${settings.mint === null ? null : db.json(settings.mint)}, ${at}, ${at})`
+        ${settings.mint === null ? null : db.json(settings.mint)}, ${settings.body}, ${at}, ${at})`
   },
   update: async (db: Db, id: string, settings: ConnectionSettings): Promise<void> => {
     await db`UPDATE connection SET name = ${settings.name}, env = ${settings.env}, hosts = ${[...settings.hosts]},
         header = ${settings.header?.name ?? null}, template = ${settings.header?.template ?? null},
-        mint = ${settings.mint === null ? null : db.json(settings.mint)}, updated_at = ${now()}
+        mint = ${settings.mint === null ? null : db.json(settings.mint)}, body = ${settings.body},
+        updated_at = ${now()}
       WHERE id = ${id}`
   },
   touch: async (db: Db, id: string): Promise<void> => {

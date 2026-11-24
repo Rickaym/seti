@@ -185,6 +185,12 @@ between two steps; an interrupt; a hook at subagent start.
   restarts; a version folder no running program uses, and that the settings no longer need, is
   removed, as is every copy once the runtime is off or runs a program of the user's. Nothing
   outside the control room's own folders is removed.
+- RT-13: A runtime declares whether it loads the user's MCP servers and connectors, Seti's
+  plugins and a compaction rule, whether it can run outside the sandbox, fork a side chat, dream
+  and rewind; `GET /api/runtimes/capabilities` serves each runtime's declaration. For an agent
+  whose runtime lacks one, its settings show the control as not on that runtime instead of a
+  working control, counts leave those items out, its `task.md` and system prompt do not offer
+  them, and the server refuses the change with the reason.
 - RT-14: A runtime whose model can summarise its reasoning MUST ask for the summary, so its agents
   show their thinking as the default runtime's do. Reasoning the model seals for its own next call
   MUST NOT be stored, served or shown by the control room.
@@ -436,13 +442,22 @@ interrupted only for that.
   swaps it for the value in the URL path and headers (Basic auth too), on the connection's hosts
   and port 443 only. A readable request that carries a placeholder elsewhere MUST be refused (403)
   and audited. A connection with no value answers 502. The agent is told where the value is
-  swapped and that a body is not.
+  swapped, and in which connections' bodies (EGR-15).
 - EGR-14: On its connections' hosts the proxy reads the body of a JSON, form, multipart or plain
   text request without a content encoding, holding at most 1 MiB, before anything goes upstream;
-  every other body streams on unread. A held body carrying a placeholder MUST be refused (403)
-  and audited as in EGR-5, naming the connection and never its value, since Seti does not swap a
-  value into a body. A body over 1 MiB streams on while the proxy watches the rest; a placeholder
-  in it cuts the request off and answers 413. A held body goes upstream with its exact length.
+  every other body streams on unread. A held body carrying a placeholder toward a host its
+  connection does not allow, or of a connection with Body off, MUST be refused (403) and audited
+  as in EGR-5, naming the connection and never its value, and nothing is sent upstream. A body
+  over 1 MiB streams on while the proxy watches the rest; a placeholder in it cuts the request off
+  and answers 413. A held body goes upstream with its exact length.
+- EGR-15: A connection's Body setting is off by default and only the user changes it. With it on,
+  the proxy swaps the value into a held body (EGR-14) on the connection's hosts: string-escaped
+  in JSON, URL-encoded in a form, raw in plain text and in a multipart text field (no file name,
+  no type or `text/plain`), never into another body type. A value with a line break in a
+  multipart field, or a placeholder in a file part or a part header, is refused (422) rather than
+  sent with the placeholder. On such a connection's hosts a JSON, form, multipart or plain text
+  body with a content encoding is refused (415), since it cannot be searched. The setting travels
+  in the value-free grant (NODE-8). Response bodies are not scrubbed.
 - EGR-7: A header "added by the proxy" is set from its template on every request to the
   connection's hosts, first matching rule winning. The code-host token is the credential's one for
   the owner named, else its default, never another credential's; minted tokens are cached until
@@ -536,8 +551,8 @@ interrupted only for that.
 
 ### 7.6 Change requests
 
-- CHG-1: Kinds: `allow_host {host, port}`, `api_key {env, hosts[1..5]}`, `mcp_server {server}`,
-  `shared_tool` (section 9), each with a `reason` (10 to 500). The answer is
+- CHG-1: Kinds: `allow_host {host, port}`, `api_key {env, hosts[1..5], body?}`,
+  `mcp_server {server}`, `shared_tool` (section 9), each with a `reason` (10 to 500). The answer is
   `{decision: allow, scope: agent | all, value?}` (`value` for `api_key` only) or
   `{decision: deny}`.
 - CHG-2: MUST be refused: hosts on the machine or its networks; wildcards over a public suffix;
@@ -547,7 +562,8 @@ interrupted only for that.
   `chg_hourly` an hour. A request expires after `chg_expiry`.
 - CHG-5: Allow applies as the user: the host to the agent's or the shared allowlist; the server on
   for the agent; the connection into the asking agent's credential on those hosts, joining an
-  existing one with that variable only on the same hosts and only filling an empty value. The
+  existing one with that variable only on the same hosts and only filling an empty value, and
+  turning on its Body (EGR-15) when the request asked for `body`. The
   agent gets one `seti` update with the outcome and whether a value is set.
 - CHG-7: The pasted value MUST travel only in the user's Allow and MUST NOT enter the request, the
   update, the transcript, events, errors or the audit.
@@ -701,26 +717,36 @@ interrupted only for that.
   `warning`.
 - CHN-29: Each delivery is logged with its status, HTTP status, reason, a redacted excerpt and
   each subscription's outcome. Failed routes retry with doubling backoff (`route_retry`).
-- CHN-33: Seti learns Slack channel and person names only from what passes through it: markup and
-  profiles in verified Slack deliveries, and the results of agents' Slack MCP calls. A different
-  name for an id replaces the old one. Where Seti shows a Slack id (a Slack event's title and text,
-  a thread reply, a Slack send's request summary, transcript row and audit summary) it shows the
-  name it knows, else the id and "name not known"; it never guesses. Audit details keep the ids.
+- CHN-33: Seti learns a Slack channel or person name only where Slack states it and no message
+  author can write it: the author's own profile on a message event a Slack webhook delivers while a
+  thread switch is on, and the first line of a Slack MCP answer that reads a channel or a person's
+  profile by id, when that line names the same id. It never learns from message text, markup labels
+  or search results; a label inside a message may show in place where that message is shown. A newer
+  sighting replaces the name and when it was last seen. Where Seti shows a Slack id (a Slack event's
+  title and text, a thread reply, a Slack send's request summary, transcript row and audit summary)
+  it shows the name it knows, else the id and "name not known"; it never guesses. A name shown on a
+  permission request never comes from text a message author controls, and says when it was last
+  seen if that was over `slack_name_stale` ago. Audit details keep the ids.
 - THR-1: A Slack message an agent sends, with an MCP `send_message` tool or `chat.postMessage`, is
   recorded when its successful result names the channel and ts (a Slack message link, or the Web
   API answer). Its thread is the link's or the call's `thread_ts`, else the message itself, and
   the agent follows it; a later send there follows it again after a stop. Seti keeps ids and the
   link, never the text. An agent follows at most `thread_cap` threads; a new one stops the least
   recently active.
-- THR-2: A webhook whose sender Seti reads threads from (the catalog `slack` sender) hands each
-  verified message event to the thread matcher before its filter. A new message (not an edit,
-  deletion or join) in a followed thread is queued for every agent following it whose first message
-  there is older, once each, when the webhook's `thread_replies` is on. With `thread_dms` on, an
-  unthreaded message in a direct message goes to the agent that wrote there last within
-  `dm_window`. A message any agent sent is never queued. Queued text is redacted.
-- THR-3: A message event of such a sender reaches subscribers only when the webhook's filter keeps
-  or changes it; otherwise the delivery is `ignored` and keeps no excerpt.
-  Why: a user who subscribes the app to message events for replies must not flood the EA's inbox.
+- THR-2: While a webhook's `thread_replies` and `thread_dms` are both off, Seti handles its
+  deliveries exactly as it would without thread replies. With either on, a webhook whose sender Seti
+  reads threads from (the catalog `slack` sender) hands each verified message event to the thread
+  matcher before its filter. A new message (not an edit, deletion or join) in a followed thread is
+  queued for every agent following it whose first message there is older, once each, when
+  `thread_replies` is on. With `thread_dms` on, an unthreaded message in a direct message goes to
+  the agent that wrote there last within `dm_window`. A message any agent sent is never queued.
+  Queued text is redacted.
+- THR-3: With either switch on, other events such as `app_mention` reach subscribers as before. A
+  message event reaches them when the webhook's filter keeps or changes it, or, when the webhook
+  has no filter or its filter fails, when it mentions a user the sender's app is authorised for;
+  otherwise the delivery is `ignored` and keeps no excerpt.
+  Why: subscribing the app to message events for replies must not flood the EA's inbox, and a
+  mention that arrives as a message event must still reach it.
 - THR-4: A queued reply is routed after `reply_settle`, so an agent's own message whose echo came
   first is recognised (`own`). It reaches the agent as a `thread` update unless the thread is
   stopped or `thread_rate` replies of it were sent within the hour (`rate`). A bot's reply is held
@@ -1066,6 +1092,7 @@ Optional and off by default: a maintenance session per agent that consolidates i
 - CFG-1: The control room MUST offer its stored settings as one JSON document with a `version`, a
   `revision` and a JSON Schema derived from the schemas that validate its settings writes. Its
   sections follow the settings groups and pages the user sees; lists are keyed by a stable name.
+  An agent's and a workspace's own settings are documents of their own.
 - CFG-2: The document, its schema and any error about it MUST NOT contain a secret value; a secret
   reads `set` or `not set`.
 - CFG-3: Agents, mods and devices MUST be refused the document and its schema. The EA reads plain
@@ -1253,7 +1280,7 @@ others.
 | Poller fetch | 20 requests a run, 5 redirects, 4 MB each, 12 MB a run. `poller_backoff` 6 h. `fail_streak` 5 (reminders 3).                                                                                                                                                                                                                                                                           |
 | Reminders    | `reminder_limits`: interval 1 min to 7 days; 5 s; 256 MB; message 2000; state 16 KB. `cron_catchup` 1 h.                                                                                                                                                                                                                                                                               |
 | PRs          | Create request 50 links. `pr_poll` 60 s. `pr_skew` 5 s. `subagent_wait` 30 min.                                                                                                                                                                                                                                                                                                        |
-| Threads      | `thread_cap` 50. `dm_window` 24 h. `reply_settle` 10 s. `thread_rate` 10 an hour. `thread_quiet` 7 days. `thread_age` 30 days.                                                                                                                                                                                                                                                         |
+| Threads      | `thread_cap` 50. `dm_window` 24 h. `reply_settle` 10 s. `thread_rate` 10 an hour. `thread_quiet` 7 days. `thread_age` 30 days. `slack_name_stale` 30 days.                                                                                                                                                                                                                             |
 | Chat         | Message 4000. Active agent: running, session open, or updated within 12 h. `chat_burst` 12 in 15 min. `chat_loop` 6 in 15 min.                                                                                                                                                                                                                                                         |
 | Questions    | Answer batch 100 items. `notes_waiting` 10. Index 1500 characters. `note_stale` 3 failed checks in a row, or unverified 30 days (fact, environment) or 90 days (how-to, gotcha).                                                                                                                                                                                                       |
 | Assistant    | `ask_ttl` 10 min. `settle` quiet 45 s, at most 3 min. `call_silence` 30 s. `wake_phrase` 2 to 40 characters, at most 4 words. `keep_awake_seconds` 5 to 600.                                                                                                                                                                                                                           |
