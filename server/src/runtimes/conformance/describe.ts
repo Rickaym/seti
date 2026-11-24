@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { RuntimeShapes } from '../adapter.js'
 import type { Case } from './case.js'
 import { AGENTS } from './cases-agents.js'
+import { DELEGATES } from './cases-delegates.js'
 import { EVENTS } from './cases-events.js'
 import { FAILURES } from './cases-failures.js'
 import { INPUT } from './cases-input.js'
@@ -26,6 +27,7 @@ export const CASES: readonly Case[] = [
   ...PERMISSIONS,
   ...QUESTIONS,
   ...AGENTS,
+  ...DELEGATES,
   ...LAUNCH,
   ...FAILURES,
 ]
