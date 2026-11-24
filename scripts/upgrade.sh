@@ -118,7 +118,7 @@ roll_back() {
   refresh_units
   if [[ $RESTARTED -eq 1 ]]; then
     restart_units
-    health_check 180 >/dev/null || warn 'the previous version is not healthy either: see pnpm run doctor'
+    health_check 180 >/dev/null || warn 'the previous version is not healthy either: see pnpm seti:doctor'
   fi
   local lines=("Seti runs ${PREVIOUS:0:12} again.")
   if [[ -n $DUMP ]]; then

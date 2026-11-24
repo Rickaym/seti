@@ -213,7 +213,7 @@ the AppArmor profile for `bwrap` that the installer adds ([Setup](setup.md#sandb
   its hook answers at once and decides on a later turn of the event loop. `shadow-hooks.ts` reports
   each comparison to the control plane as a `policy.compared` journal entry, which `policy_shadow`
   counts per day, kind, step and rule ref, with no input, command, path or rule text; it also
-  counts decisions that failed or took over 50 ms (PERM-12). `pnpm doctor` shows the last seven
+  counts decisions that failed or took over 50 ms (PERM-12). `pnpm seti:doctor` shows the last seven
   days, and `GET /permissions/shadow` and `seti_overview` with `permissions` read the counts.
 - **Runtimes without a classifier.** An adapter declares in `capabilities.gate.classifier` whether
   its runtime has a classifier to defer to. Without one the evaluator asks where it would defer,

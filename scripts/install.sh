@@ -247,7 +247,7 @@ PROFILE
   if bwrap "${BWRAP_PROBE[@]}" 2>/dev/null; then
     ok 'bubblewrap works with its AppArmor profile'
   else
-    warn 'bubblewrap still cannot create user namespaces; pnpm run doctor shows the next step.'
+    warn 'bubblewrap still cannot create user namespaces; pnpm seti:doctor shows the next step.'
   fi
 }
 
@@ -555,7 +555,7 @@ assistant() {
     systemctl --user daemon-reload
     systemctl --user enable seti-ea.service >/dev/null 2>&1
     systemctl --user restart seti.service seti-ea.service
-    health_check 180 >/dev/null || warn 'Seti did not answer after the restart; see pnpm run doctor.'
+    health_check 180 >/dev/null || warn 'Seti did not answer after the restart; see pnpm seti:doctor.'
     ok 'seti-ea.service is running'
   else
     note 'Start it with: uv run --project ea --frozen python -m seti_ea'
@@ -564,7 +564,7 @@ assistant() {
 
 finish() {
   step 'Checking the install'
-  (cd "$SETI_ROOT" && pnpm --silent run doctor) || true
+  (cd "$SETI_ROOT" && pnpm --silent seti:doctor) || true
   local port token
   port="$(setting SETI_PORT)"
   token="$(credentials_dir)/local-token-user"
@@ -577,7 +577,7 @@ finish() {
   else
     printf '  Start     %s/scripts/start.sh\n' "$SETI_ROOT"
   fi
-  printf '  Check     cd %s && pnpm run doctor\n' "$SETI_ROOT"
+  printf '  Check     cd %s && pnpm seti:doctor\n' "$SETI_ROOT"
   printf '  Upgrade   %s/scripts/upgrade.sh\n' "$SETI_ROOT"
   printf '  Guide     %s/docs/setup.md\n' "$SETI_ROOT"
   if [[ $OS == Darwin ]]; then

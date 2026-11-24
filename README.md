@@ -133,7 +133,7 @@ the [install script](scripts/install.sh) before you run it.
 3. Sign in with the token that `cat ~/.seti/credentials/local-token-user` prints.
 4. Start an agent: say what it should do and which repos to clone.
 
-[Setup](docs/setup.md) covers every option, remote access and upgrades. `pnpm run doctor` in
+[Setup](docs/setup.md) covers every option, remote access and upgrades. `pnpm seti:doctor` in
 `~/seti` says what is wrong and how to fix it.
 
 ## How it works
