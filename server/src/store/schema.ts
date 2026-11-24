@@ -7,7 +7,7 @@ import { SETI_AUTH } from './schema-auth.js'
 import { CHANGE_REQUESTS } from './schema-change-requests.js'
 import { CHANGELOG } from './schema-changelog.js'
 import { COMPACT_RULES } from './schema-compact.js'
-import { CONNECTIONS, secretsToConnections } from './schema-connections.js'
+import { CONNECTION_BODY, CONNECTIONS, secretsToConnections } from './schema-connections.js'
 import {
   recountTaskCosts,
   SECOND_OPINION_REVIEWS,
@@ -242,5 +242,6 @@ export const MIGRATIONS: readonly Migration[] = [
   { version: 127, name: 'task_approval_ceiling', sql: TASK_APPROVAL_CEILING },
   { version: 128, name: 'codex_rules_decide_default', sql: CODEX_RULES_DECIDE_DEFAULT },
   { version: 129, name: 'task_second_opinion', sql: TASK_SECOND_OPINION },
-  { version: 130, name: 'second_opinion_reviews', sql: SECOND_OPINION_REVIEWS },
+  { version: 130, name: 'connection_body', sql: CONNECTION_BODY },
+  { version: 131, name: 'second_opinion_reviews', sql: SECOND_OPINION_REVIEWS },
 ]

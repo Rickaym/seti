@@ -11,8 +11,7 @@ import { Switch } from '@/components/ui/switch'
 import { DeleteIconButton } from '@/components/ui/table-action-buttons'
 import { relativeTime } from '@/lib/time'
 import { ScriptCode, ToolArguments, ToolEffect, ToolNeeds } from '@/panels/tasks/SharedToolProposal'
-import { EmptyRow, Section } from './Section'
-import { matches } from './filter'
+import { EmptyRow } from './Section'
 
 const HASH_CHARS = 12
 
@@ -141,7 +140,8 @@ function ToolRow({ tool, onChanged, onView }: RowProps) {
 }
 
 /** The scripts agents proposed and the user allowed, with each one's code, switch and removal. */
-export function SharedToolSection({ query, refreshToken }: { query: string; refreshToken: number }) {
+/** Every shared tool with its switch, code and removal, read again when `refreshToken` changes. */
+export function SharedToolList({ refreshToken }: { refreshToken: number }) {
   const [tools, setTools] = useState<SharedTool[] | null>(null)
   const [error, setError] = useState('')
   const [viewing, setViewing] = useState<string | null>(null)
@@ -168,17 +168,17 @@ export function SharedToolSection({ query, refreshToken }: { query: string; refr
     setN((value) => value + 1)
   }, [])
 
-  const rows = (tools ?? []).filter((tool) => matches(query, tool.name, tool.description))
+  const rows = tools ?? []
   return (
-    <Section title="Shared tools" count={rows.length}>
+    <section aria-label="Shared tools" className="border border-border bg-card">
       <p className="border-b border-border px-3 py-1.5 text-muted-foreground">
-        Scripts agents proposed and you allowed. Each is a typed tool for every agent whose credential has the variables
-        it needs. In a sandboxed agent it runs inside the sandbox; in an agent without the sandbox it runs with that
-        agent&apos;s access to this machine. Turning one off or removing it applies from each agent&apos;s next turn.
+        Each is a typed tool for every agent whose credential has the variables it needs. In a sandboxed agent it runs
+        inside the sandbox; in an agent without the sandbox it runs with that agent&apos;s access to this machine.
+        Turning one off or removing it applies from each agent&apos;s next turn.
       </p>
       {error !== '' && <p className="border-b border-border px-3 py-2 text-destructive">{error}</p>}
       {tools !== null && rows.length === 0 && (
-        <EmptyRow>{query === '' ? 'No shared tools. Agents propose them with request_change.' : 'No match.'}</EmptyRow>
+        <EmptyRow>No shared tools. Agents propose them with request_change.</EmptyRow>
       )}
       <ul className="divide-y divide-border">
         {rows.map((tool) => (
@@ -200,6 +200,6 @@ export function SharedToolSection({ query, refreshToken }: { query: string; refr
           }}
         />
       )}
-    </Section>
+    </section>
   )
 }

@@ -628,6 +628,7 @@ describe('egress proxy', () => {
       kind: 'client_credentials',
       env: 'MINTED',
       placeholder: 'seti-secret-minted',
+      body: false,
       hosts: ['minted.rules.test'],
       header,
       mint: mintSettingsInput.parse({ token_url: 'https://login.rules.test/token', client_id: 'app' }),
@@ -669,11 +670,18 @@ describe('egress proxy', () => {
     const HOLDER = `seti-secret-voice_key-${'a1'.repeat(16)}`
     const OTHER_HOLDER = `seti-secret-other_key-${'b2'.repeat(16)}`
     const entries: EgressPlaceholder[] = [
-      { name: 'voice_key', placeholder: HOLDER, hosts: ['keys.rules.test'], value: async () => Promise.resolve(KEY) },
+      {
+        name: 'voice_key',
+        placeholder: HOLDER,
+        hosts: ['keys.rules.test'],
+        body: false,
+        value: async () => Promise.resolve(KEY),
+      },
       {
         name: 'other_key',
         placeholder: OTHER_HOLDER,
         hosts: ['other.rules.test'],
+        body: false,
         value: async () => Promise.resolve(OTHER_KEY),
       },
     ]
@@ -755,6 +763,7 @@ describe('egress proxy', () => {
         name: 'eleven',
         placeholder: HOLDER,
         hosts: ['api.elevenlabs.io', '*.elevenlabs.io'],
+        body: false,
         value: async () => Promise.resolve(KEY),
       }
       const headers = { 'xi-api-key': HOLDER }

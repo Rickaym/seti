@@ -32,6 +32,7 @@ const entry: EgressPlaceholder = {
   name: 'site_login',
   placeholder: HOLDER,
   hosts: [LOGIN_HOST, MINTED_HOST],
+  body: false,
   value: async () => Promise.resolve(VALUE),
 }
 
@@ -53,6 +54,11 @@ beforeAll(async () => {
     req.on('end', () => {
       const body = Buffer.concat(chunks).toString()
       got.bodies.push({ path: req.url ?? '', body, length: req.headers['content-length'] })
+      if (req.url === '/echo') {
+        res.writeHead(422, { 'content-type': 'text/plain' })
+        res.end(`Invalid login: ${body}`)
+        return
+      }
       const status = req.url === '/strict' && req.headers.authorization !== 'Bearer fresh' ? 401 : 200
       res.writeHead(status, { 'content-type': 'application/json' })
       res.end(JSON.stringify({ ok: status === 200, bytes: Buffer.byteLength(body) }))
@@ -75,14 +81,14 @@ beforeEach(() => {
 const blocked: { host: string; names: readonly string[] }[] = []
 const none = async () => Promise.resolve(null)
 
-async function proxy(rules: readonly EgressRule[] = []): Promise<EgressProxy> {
+async function proxy(rules: readonly EgressRule[] = [], body = false): Promise<EgressProxy> {
   return startEgressProxy({
     socketPath: path.join(dir, `proxy-${String(++proxies)}.sock`),
     allowed: async () => Promise.resolve([]),
     ca,
     credentials: { claude: none, github: none, connector: none },
     rules: () => rules,
-    placeholders: () => [entry],
+    placeholders: () => [{ ...entry, body }],
     onBlocked: (host, names) => blocked.push({ host, names }),
     upstream: { address: async () => Promise.resolve({ host: '127.0.0.1', port: standInPort }), tls: { ca: caPem } },
   })
@@ -193,5 +199,42 @@ describe('request bodies through the egress proxy', () => {
     expect(answer.status).toBe(200)
     expect(got.bodies.map((seen) => seen.body)).toEqual([body, body])
     await running.close()
+  })
+
+  describe('with Body on for the connection', () => {
+    it('sends the real value to the stand-in, and the agent side never sees it', async () => {
+      const running = await proxy([], true)
+      blocked.length = 0
+      const answer = await post(running, { headers: json }, login(HOLDER))
+      expect(answer.status).toBe(200)
+      expect(answer.body).not.toContain(VALUE)
+      const sent = login(VALUE)
+      expect(got.bodies).toEqual([{ path: '/login', body: sent, length: String(Buffer.byteLength(sent)) }])
+      expect(blocked).toEqual([])
+      await running.close()
+    })
+
+    it('replays the swapped body after a 401 renews the minted credential', async () => {
+      const rule: EgressRule = {
+        hosts: [MINTED_HOST],
+        port: 443,
+        header: 'authorization',
+        value: async () => Promise.resolve('Bearer stale'),
+        renew: async () => Promise.resolve('Bearer fresh'),
+      }
+      const running = await proxy([rule], true)
+      const answer = await post(running, { host: MINTED_HOST, path: '/strict', headers: json }, login(HOLDER))
+      expect(answer.status).toBe(200)
+      expect(got.bodies.map((seen) => seen.body)).toEqual([login(VALUE), login(VALUE)])
+      await running.close()
+    })
+
+    it('does not mask a response that echoes the value back: Body trusts its hosts', async () => {
+      const running = await proxy([], true)
+      const answer = await post(running, { path: '/echo', headers: json }, login(HOLDER))
+      expect(answer.status).toBe(422)
+      expect(answer.body).toContain(VALUE)
+      await running.close()
+    })
   })
 })
