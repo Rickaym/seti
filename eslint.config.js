@@ -94,7 +94,11 @@ export default defineConfig(
       // The MCP SDK's wildcard exports map types the resolver cannot follow; TypeScript checks them.
       'import-x/no-unresolved': [
         'error',
-        { ignore: [String.raw`^@modelcontextprotocol/sdk/(client/index|inMemory|server/mcp|types)\.js$`] },
+        {
+          ignore: [
+            String.raw`^@modelcontextprotocol/sdk/(client/index|client/stdio|inMemory|server/mcp|server/stdio|types)\.js$`,
+          ],
+        },
       ],
       'import-x/no-useless-path-segments': 'error',
       'import-x/first': 'error',

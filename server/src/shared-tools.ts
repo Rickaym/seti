@@ -20,6 +20,7 @@ import { removeOtherFolders, toolFolder, toolFolderReady, writeToolFolder } from
 import { declareToolWrites } from './shared-tool-writes.js'
 import { connectionRows } from './store/connections.js'
 import { sharedTools, withoutCode } from './store/shared-tools.js'
+import type { StdioServer } from './tool-relay.js'
 
 /** Whether an agent gets a tool, and what it lacks when it does not. */
 export interface ToolReach {
@@ -73,13 +74,18 @@ export async function sharedToolFolders(task: Task): Promise<string[]> {
 export const TOOL_SERVER = fileURLToPath(new URL('./shared-tool-server.ts', import.meta.url))
 
 /**
- * The MCP server that offers the folders' tools. Claude Code starts it as a child of the agent's
- * own process, so in a sandboxed agent it and the scripts it runs are inside that sandbox.
+ * The program that serves the folders' tools over stdio, or null without any. The agent's runtime
+ * starts it as a child of its own process, so in a sandboxed agent it and the scripts it runs are
+ * inside that sandbox.
  */
-export const sharedToolServer = (folders: readonly string[]): Record<string, McpServerConfig> =>
-  folders.length === 0
-    ? {}
-    : { [SHARED_TOOL_SERVER]: { type: 'stdio', command: process.execPath, args: [TOOL_SERVER, ...folders] } }
+export const sharedToolCommand = (folders: readonly string[]): StdioServer | null =>
+  folders.length === 0 ? null : { command: process.execPath, args: [TOOL_SERVER, ...folders] }
+
+/** The shared tools as Claude Code's MCP server settings. */
+export function sharedToolServer(folders: readonly string[]): Record<string, McpServerConfig> {
+  const command = sharedToolCommand(folders)
+  return command === null ? {} : { [SHARED_TOOL_SERVER]: { type: 'stdio', ...command } }
+}
 
 async function noteWrites(): Promise<void> {
   const tools = await sharedTools.list()

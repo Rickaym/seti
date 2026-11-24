@@ -1,11 +1,11 @@
 import { isClaudeRow, type MessageRow, type TaskInput } from '@seti/shared'
 import { currentRequestSource } from './access.js'
+import { codexBlocks, codexHidden, DIRECT_HIDDEN, type Block } from './direct-codex.js'
 import { HttpError } from './http.js'
 import { directRows } from './store/direct.js'
 import { teamMembers, teamMessages, type DirectParties } from './store/team.js'
 
-/** What a reader who is not party to a direct message sees in its place. */
-export const DIRECT_HIDDEN = '[direct message hidden]'
+export { DIRECT_HIDDEN } from './direct-codex.js'
 
 /**
  * Who reads a transcript: the user sees everything, the EA and an agent see a direct message only
@@ -43,17 +43,13 @@ type Other =
   | { kind: 'handle'; handle: string }
   | null
 
-interface Block {
-  type: string
-  name?: string
-  input?: unknown
-  content?: unknown
-}
-
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null
 
 const blocksOf = (row: MessageRow): Block[] => {
-  if (!isClaudeRow(row) || (row.payload.type !== 'assistant' && row.payload.type !== 'user')) {
+  if (!isClaudeRow(row)) {
+    return codexBlocks(row)
+  }
+  if (row.payload.type !== 'assistant' && row.payload.type !== 'user') {
     return []
   }
   const content: unknown = row.payload.message.content
@@ -113,7 +109,10 @@ function hidden(row: MessageRow): MessageRow {
   if (row.kind === 'input') {
     return { ...row, payload: { ...row.payload, title: DIRECT_HIDDEN, body: DIRECT_HIDDEN } }
   }
-  if (!isClaudeRow(row) || (row.payload.type !== 'assistant' && row.payload.type !== 'user')) {
+  if (!isClaudeRow(row)) {
+    return codexHidden(row, { marked: (block) => blockOther(block) !== null, field: hideField })
+  }
+  if (row.payload.type !== 'assistant' && row.payload.type !== 'user') {
     return row
   }
   const blocks = blocksOf(row).map((block) => {

@@ -1,8 +1,11 @@
+import { openToolRelay } from '../../tool-relay.js'
+import type { RuntimeAdapter } from '../adapter.js'
 import type { ConformanceTarget, NeutralHost } from '../conformance/target.js'
 import { codexAdapterFor } from './adapter.js'
 import type { CodexDecide } from './approvals.js'
 import type { ScriptedResponses } from './conformance-responses.js'
 import { codexRig } from './conformance-rig.js'
+import { rigTools } from './conformance-tools.js'
 import type { CodexShapes } from './session.js'
 
 /** Seti's decision for a Codex ask, from the neutral host; a question goes to the user. */
@@ -18,15 +21,14 @@ const decideWith =
 
 /** Cases the Codex adapter is known to fail, with the reason. */
 export const CODEX_GAPS: Partial<Record<string, string>> = {
-  'EV-2':
-    'Codex answers a call of a tool it does not offer, or of a tool server it was not given, ' +
-    'without an item, so the call has no start or end',
+  'EV-2': 'Codex answers a call of a tool it does not offer without an item, so the call has no start or end',
   'EV-4':
     'Codex reports tokens per model call (thread/tokenUsage/updated), not on the turn end; ' +
     'Seti adds them up when it stores the turn',
   'TL-1': 'Codex has no read, search or web tools: reads, searches and fetches are shell commands',
-  'TL-3': 'the adapter gives Codex no tool servers yet, so a tool server call has no item',
-  'PM-2': 'the adapter gives Codex no tool servers yet, so no tool server call reaches the host',
+  'PM-2':
+    "Codex reports an edit's path joined to the working folder, not as the model wrote it; " +
+    'the tool server call reaches the host before it runs',
   'PM-3': "Codex's approval reply carries no message: the model reads Codex's own refusal",
   'INT-3':
     'Codex sends nothing when a command moves to the background, so the adapter learns of a job ' +
@@ -43,9 +45,22 @@ export interface CodexBench {
   folder: string
 }
 
+/** The adapter, given the rig's tool servers through Seti's relay as a session host gives its own. */
+function withRigTools(adapter: RuntimeAdapter<CodexShapes, 'codex'>): RuntimeAdapter<CodexShapes, 'codex'> {
+  return {
+    ...adapter,
+    realise: async (spec, launcher, host, abortController) => {
+      const tools = rigTools(launcher)
+      const toolServers =
+        tools === undefined ? {} : await openToolRelay(tools.place, tools.servers, abortController.signal)
+      return adapter.realise(spec, launcher, { ...host, toolServers }, abortController)
+    },
+  }
+}
+
 /** The Codex adapter as the suite drives it, over the real binary and a scripted model. */
 export const codexTarget = (bench: CodexBench): ConformanceTarget<CodexShapes, 'codex'> => ({
-  adapter: codexAdapterFor(bench.binary, { baseUrl: bench.baseUrl, envKey: 'OPENAI_API_KEY' }),
+  adapter: withRigTools(codexAdapterFor(bench.binary, { baseUrl: bench.baseUrl, envKey: 'OPENAI_API_KEY' })),
   // A real binary on a busy machine takes seconds where an in-process fake takes milliseconds.
   boundMs: 8000,
   profile: {

@@ -1,6 +1,9 @@
+import { SHARED_TOOL_SERVER } from '@seti/shared'
 import type { Launcher } from '../../launcher.js'
 import { MODEL_KEY_ENV } from '../../sandbox-codex.js'
 import type { SessionSpec } from '../../session-spec.js'
+import { sharedToolCommand } from '../../shared-tools.js'
+import type { StdioServer } from '../../tool-relay.js'
 import type { CodexDecide } from './approvals.js'
 import type { CodexRealised } from './session.js'
 
@@ -18,7 +21,40 @@ const OPENAI: CodexProvider = { baseUrl: 'https://api.openai.com/v1', envKey: MO
 /** The model a Codex agent uses until it picks one; without a model Codex offers no tools. */
 const DEFAULT_MODEL = 'gpt-5.5'
 
-const toml = (value: string | boolean) => (typeof value === 'boolean' ? String(value) : JSON.stringify(value))
+type Setting = [string, string | boolean | number | string[]]
+
+/** A value as TOML writes it; a JSON string or list of strings is also a TOML one. */
+const toml = (value: Setting[1]) =>
+  typeof value === 'string' || Array.isArray(value) ? JSON.stringify(value) : String(value)
+
+/** How long one of Seti's tool calls may run, as long as Claude Code agents wait for one. */
+const TOOL_TIMEOUT_S = 7 * 24 * 60 * 60
+
+/** Codex reads an MCP server's name as a bare key of its settings. */
+const SERVER_NAME = /^[A-Za-z0-9_-]+$/
+
+/**
+ * The tool servers Codex starts: the host's, then the shared tools, which read the agent's
+ * connection variables as they do under Claude Code; never the variable of the model's key.
+ */
+function serverSettings(servers: Record<string, StdioServer>, shared: StdioServer | null, env: string[]): Setting[] {
+  const all = Object.entries(servers).map(([name, server]) => ({ name, server, env: [] as string[] }))
+  if (shared !== null) {
+    all.push({ name: SHARED_TOOL_SERVER, server: shared, env: env.filter((name) => name !== MODEL_KEY_ENV) })
+  }
+  return all.flatMap(({ name, server, env: passed }): Setting[] => {
+    if (!SERVER_NAME.test(name)) {
+      throw new Error(`Codex cannot start a tool server named ${JSON.stringify(name)}`)
+    }
+    const key = `mcp_servers.${name}`
+    return [
+      [`${key}.command`, server.command],
+      [`${key}.args`, server.args],
+      [`${key}.tool_timeout_sec`, TOOL_TIMEOUT_S],
+      ...(passed.length === 0 ? [] : [[`${key}.env_vars`, passed] satisfies Setting]),
+    ]
+  })
+}
 
 /**
  * Every setting the app-server runs with, on its command line, which wins over any config file.
@@ -28,8 +64,8 @@ const toml = (value: string | boolean) => (typeof value === 'boolean' ? String(v
  * search path, which leaves out the helper folder Codex makes in its writable home. Approvals go
  * to Seti, never to a reviewer model.
  */
-function overrides(provider: CodexProvider, model: string, searchPath: string | undefined): string[] {
-  const settings: [string, string | boolean][] = [
+function overrides(provider: CodexProvider, model: string, searchPath: string | undefined): Setting[] {
+  return [
     ['model', model],
     ['model_provider', PROVIDER],
     [`model_providers.${PROVIDER}.name`, 'OpenAI through Seti'],
@@ -53,14 +89,17 @@ function overrides(provider: CodexProvider, model: string, searchPath: string | 
     ['approvals_reviewer', 'user'],
     ['analytics.enabled', false],
     ['web_search', 'disabled'],
-    ...(searchPath === undefined ? [] : [['shell_environment_policy.set.PATH', searchPath] satisfies [string, string]]),
+    ...(searchPath === undefined ? [] : [['shell_environment_policy.set.PATH', searchPath] satisfies Setting]),
   ]
-  return settings.flatMap(([key, value]) => ['-c', `${key}=${toml(value)}`])
 }
+
+const commandLine = (settings: Setting[]) => settings.flatMap(([key, value]) => ['-c', `${key}=${toml(value)}`])
 
 /** What a session's asks are answered by, and the program and provider it runs with. */
 interface Answering {
   decide: CodexDecide
+  /** Seti's own tool servers, as programs Codex starts inside the sandbox. */
+  toolServers: Record<string, StdioServer>
   abortController: AbortController
   binary: string
   /** OpenAI's API through the proxy unless a test bench names its own. */
@@ -71,7 +110,7 @@ interface Answering {
 export function realiseCodex(
   spec: SessionSpec<'codex'>,
   launcher: Launcher,
-  { decide, abortController, binary, provider = OPENAI }: Answering,
+  { decide, toolServers, abortController, binary, provider = OPENAI }: Answering,
 ): CodexRealised {
   if (!launcher.sandboxed || launcher.spawn === undefined) {
     throw new Error("Codex runs only in Seti's sandbox, started through its launcher")
@@ -79,9 +118,11 @@ export function realiseCodex(
   if (launcher.env[provider.envKey] === undefined) {
     throw new Error('This Codex agent has no OpenAI key: its credential needs a connection for api.openai.com')
   }
+  const servers = serverSettings(toolServers, sharedToolCommand(spec.toolServers.shared), Object.keys(launcher.env))
+  const settings = [...overrides(provider, DEFAULT_MODEL, launcher.env.PATH), ...servers]
   return {
     command: binary,
-    args: ['app-server', '--listen', 'stdio://', ...overrides(provider, DEFAULT_MODEL, launcher.env.PATH)],
+    args: ['app-server', '--listen', 'stdio://', ...commandLine(settings)],
     cwd: spec.cwd,
     env: { ...launcher.env },
     resume: spec.resume,
