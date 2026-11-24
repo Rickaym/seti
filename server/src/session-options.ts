@@ -2,7 +2,6 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { extraDirs, type MemoryCap, type Task } from '@seti/shared'
-import { regimeOfTask } from './approval-ceiling.js'
 import { CLAUDE_HOME, CREDENTIALS, DATABASE_URL, REDIS_URL, SETI_HOME } from './config.js'
 import { projectSettingsRules, userSettingsRules } from './inherited-rules.js'
 import { memoryEnv } from './node-heap.js'
@@ -116,18 +115,16 @@ export async function ruleSources(task: Task): Promise<RuleSources> {
 /**
  * The allow, ask and deny rules the task's agent runs with: built-in, edits in its workspace,
  * global and its own, with the deny rules that keep credentials out of every task and hooks out
- * of sandboxed ones. A Claude agent held to a Codex agent's approvals while the user answers
- * every Codex call gets no allow rule.
+ * of sandboxed ones.
  */
 export async function permissionSettings(task: Task): Promise<PermissionSettings> {
   const own = await setiRules(task)
-  const rules = composeRules({
+  return composeRules({
     builtIn: own.builtIn,
     sandboxed: own.sandboxed,
     stored: [{ behavior: 'allow', rule: own.workspace }, ...own.stored],
     fixedDeny: own.fixedDeny,
   })
-  return task.runtime === 'claude' && (await regimeOfTask(task)) === 'user' ? { ...rules, allow: [] } : rules
 }
 
 const GUARDED_SETI = ['credentials', 'dev-credentials']

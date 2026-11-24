@@ -1,4 +1,6 @@
 import { bypassOn, type Task } from '@seti/shared'
+import type { PermissionSettings } from './permission-policy.js'
+import { permissionSettings } from './session-options.js'
 import { approvalCeilings } from './store/approval-ceilings.js'
 import { codexSettings } from './store/codex-settings.js'
 
@@ -61,6 +63,15 @@ export async function regimeOfTask(task: Pick<Task, 'id' | 'runtime' | 'bypass_u
     ceiling,
     rulesDecide: settings.evaluator_decides,
   })
+}
+
+/**
+ * The rules a Claude agent runs with: its own, without any allow rule while it is held to a Codex
+ * agent's approvals and the user answers every Codex call.
+ */
+export async function claudeRules(task: Task): Promise<PermissionSettings> {
+  const rules = await permissionSettings(task)
+  return task.runtime === 'claude' && (await regimeOfTask(task)) === 'user' ? { ...rules, allow: [] } : rules
 }
 
 /** The line an agent's start records, in its settings and in its creation audit event. */

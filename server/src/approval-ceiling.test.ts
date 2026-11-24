@@ -2,12 +2,18 @@ import { auditQuery, type Task } from '@seti/shared'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { capOf, defaultsBeyond } from './agent-cap.js'
 import { createApp } from './app.js'
-import { ceilingFrom, ceilingNote, regimeOf, type ApprovalRegime, type RegimeFacts } from './approval-ceiling.js'
+import {
+  ceilingFrom,
+  ceilingNote,
+  claudeRules,
+  regimeOf,
+  type ApprovalRegime,
+  type RegimeFacts,
+} from './approval-ceiling.js'
 import { permissionModeOf } from './bypass-mode.js'
 import { setBypass } from './bypass.js'
 import { tasks } from './db.js'
 import { setPlannerModel } from './planner.js'
-import { permissionSettings } from './session-options.js'
 import { SETI_TOOLS } from './seti-tools/catalog.js'
 import { callSetiTool } from './seti-tools/server.js'
 import { approvalCeilings } from './store/approval-ceilings.js'
@@ -153,9 +159,9 @@ describe('agents a Codex agent starts', () => {
 
   it('get no allow rule while the user answers every Codex call, and the rules once they decide', async () => {
     const child = await startFrom(await newTask('codex'))
-    expect((await permissionSettings(child)).allow).toEqual([])
+    expect((await claudeRules(child)).allow).toEqual([])
     await setRulesDecide(true)
-    expect((await permissionSettings(child)).allow).toContain('Read')
+    expect((await claudeRules(child)).allow).toContain('Read')
     expect(await permissionModeOf(child)).toBe('default')
   })
 
@@ -187,7 +193,7 @@ describe('agents nobody held', () => {
     const child = await startFrom(await newTask('claude'))
     expect(await approvalCeilings.get(child.id)).toBeNull()
     expect(sdk.fake.last?.options.permissionMode).toBe('auto')
-    expect((await permissionSettings(child)).allow).toContain('Read')
+    expect((await claudeRules(child)).allow).toContain('Read')
   })
 
   it('the user and the EA start agents with the defaults', async () => {

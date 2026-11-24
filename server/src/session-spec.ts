@@ -1,4 +1,5 @@
 import type { CompactRule, Task } from '@seti/shared'
+import { claudeRules } from './approval-ceiling.js'
 import { permissionModeOf } from './bypass-mode.js'
 import { hostLoginKey } from './claude-logins.js'
 import { effectiveCompact } from './compact.js'
@@ -14,7 +15,7 @@ import type { CodexShapes } from './runtimes/codex/session.js'
 import type { DefaultShapes } from './runtimes/registry.js'
 import { signedInServers } from './sandbox-mcp.js'
 import { sandboxStamp } from './sandbox-stamp.js'
-import { permissionSettings, systemAppend, workingDirs } from './session-options.js'
+import { systemAppend, workingDirs } from './session-options.js'
 import { isClaudeSpec, isCodexSpec, realiseClaude } from './session-realise.js'
 import { sharedToolFolders } from './shared-tools.js'
 import { codexSettings } from './store/codex-settings.js'
@@ -57,7 +58,7 @@ const sorted = (names: Set<string>) => [...names].toSorted((a, b) => a.localeCom
 /** The parts of a spec a process can change under while it starts, read again for its key. */
 async function liveSpec(task: Task) {
   return {
-    rules: await permissionSettings(task),
+    rules: await claudeRules(task),
     deniedToolServers: await taskDeniedServers(task.id),
     toolServers: {
       shared: await sharedToolFolders(task),
