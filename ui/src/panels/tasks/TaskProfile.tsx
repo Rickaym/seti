@@ -1,15 +1,16 @@
 import { awsRoleName, DEFAULT_PROFILE_ID, type ProfileSummary, type Task, type TaskAccessView } from '@seti/shared'
-import { ArrowRightLeft, RotateCcw } from 'lucide-react'
+import { RotateCcw } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { apiGet, apiPatch, errorText } from '@/api'
 import { Hint } from '@/components/Hint'
 import { SettingsLink } from '@/components/SettingsLink'
 import { Button } from '@/components/ui/button'
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 import { SourceMark } from '@/panels/access/SourceMark'
 import { noteAccessChange } from '@/panels/access/access'
+import { PickCredentialDialog } from './PickCredentialDialog'
+import { pickConsequence, type PickConsequence } from './pick-consequence'
 
 const APPLIES = 'Applies from the next turn'
 
@@ -55,70 +56,6 @@ function ProfileSelect({
   )
 }
 
-const items = (n: number, noun: string) => `${String(n)} ${noun}${n === 1 ? '' : 's'}`
-
-/** The consequence of picking a credential whose access set its agents follow, before the switch. */
-function PickDialog({
-  title,
-  profile,
-  own,
-  onPick,
-  onClose,
-}: {
-  title: string
-  profile: ProfileSummary
-  own: number
-  onPick: (reset: boolean) => void
-  onClose: () => void
-}) {
-  const stay = own === 1 ? 'stays' : 'stay'
-  const keeps = own === 0 ? '' : ` Its ${items(own, 'own choice')} ${stay} unless you reset.`
-  return (
-    <Dialog
-      open
-      onOpenChange={(next) => {
-        if (!next) {
-          onClose()
-        }
-      }}
-    >
-      <DialogContent className="sm:max-w-md" aria-describedby={undefined}>
-        <DialogHeader>
-          <DialogTitle className="truncate">Use {profile.name}</DialogTitle>
-        </DialogHeader>
-        <p className="text-sm">
-          {title} follows {profile.name}&apos;s access from the next turn: {items(profile.access_items, 'item')} it
-          sets.{keeps}
-        </p>
-        <DialogFooter className="gap-2">
-          <Button variant="outline" onClick={onClose}>
-            Cancel
-          </Button>
-          {own > 0 && (
-            <Button
-              variant="outline"
-              onClick={() => {
-                onPick(true)
-              }}
-            >
-              <RotateCcw />
-              Reset own
-            </Button>
-          )}
-          <Button
-            onClick={() => {
-              onPick(false)
-            }}
-          >
-            <ArrowRightLeft />
-            Switch
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  )
-}
-
 /** The toast after a change: the role when AWS is on, since a credential with a role turns it on. */
 const appliedText = (view: TaskAccessView) =>
   view.aws.state === 'on' ? `AWS on: ${awsRoleName(view.aws.role)}` : APPLIES
@@ -130,7 +67,7 @@ const appliedText = (view: TaskAccessView) =>
 export function TaskCredentials({ task, onChanged }: { task: Task; onChanged: () => void }) {
   const custom = task.profile_id !== DEFAULT_PROFILE_ID
   const profiles = useProfiles()
-  const [pick, setPick] = useState<{ profile: ProfileSummary; own: number } | null>(null)
+  const [pick, setPick] = useState<PickConsequence | null>(null)
   const change = async (profileId: string, reset = false) => {
     setPick(null)
     try {
@@ -148,20 +85,15 @@ export function TaskCredentials({ task, onChanged }: { task: Task; onChanged: ()
       void change(id)
       return
     }
-    void apiGet<TaskAccessView>(`/tasks/${task.id}/access`).then(
-      (view) => {
-        setPick({ profile, own: view.items.filter((item) => item.override !== null).length })
-      },
-      (e: unknown) => toast.error(errorText(e)),
-    )
+    pickConsequence(task.id, profile).then(setPick, (e: unknown) => toast.error(errorText(e)))
   }
   return (
     <div className="flex flex-wrap items-center gap-2">
       <ProfileSelect value={task.profile_id} profiles={profiles} onChange={choose} />
       {pick !== null && (
-        <PickDialog
+        <PickCredentialDialog
           title={task.title}
-          {...pick}
+          pick={pick}
           onPick={(reset) => void change(pick.profile.id, reset)}
           onClose={() => {
             setPick(null)

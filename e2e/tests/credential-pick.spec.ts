@@ -14,7 +14,7 @@ test('picking a credential with an access set says what the agent follows, and c
   await access.getByLabel('Credentials').selectOption(profile.id)
   const pick = page.getByRole('dialog', { name: `Use ${profile.name}` })
   await expect(pick).toContainText('follows')
-  await expect(pick).toContainText('1 item it sets')
+  await expect(pick).toContainText('Turns on: AWS')
   await page.screenshot({ path: test.info().outputPath('pick.png') })
   await pick.getByRole('button', { name: 'Switch' }).click()
   await expect(pick).toHaveCount(0)
