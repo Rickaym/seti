@@ -255,7 +255,7 @@ export async function runDream(job: DreamJob): Promise<DreamRun | undefined> {
       steps: end.steps,
       cost_usd: end.cost_usd,
       denials: end.denials,
-      denied_by: tally.deniedBy,
+      denied_by: Object.entries(tally.deniedBy).map(([kind, n]) => `${kind} ${String(n)}`),
       memory_changes: end.memory_changes,
     },
   })
