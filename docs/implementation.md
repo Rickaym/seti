@@ -127,6 +127,13 @@ with another top-level folder.
   and the script); startup rewrites missing folders from the `shared_tool` table and removes the
   rest. Each session gets one stdio MCP server, `shared`, which is `server/src/shared-tool-server.ts`.
 
+- Every stored setting appears in the settings document (`GET /api/settings-doc`). Its sections
+  are declared in `shared/src/settings-doc-*.ts` from the zod schemas the settings routes validate
+  with, each key described; `server/src/settings-doc/` reads them through the functions the pages
+  read. A new column in a settings table fails `settings-doc/columns.test.ts` until it has a path
+  or a reason it is state, and a new settings page fails `settings/json/settings-json.test.ts`
+  until it has a section. A section's `security` keys are left out of the EA's document.
+
 [Setup](setup.md#where-data-lives) lists every path on disk.
 
 ## Folder sizes, Clean and orphans

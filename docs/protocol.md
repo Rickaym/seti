@@ -961,6 +961,16 @@ Optional and off by default: a maintenance session per agent that consolidates i
 - AUD-12: Also audited: outward calls; classifier refusals; guard refusals; refused sign-ins (rate
   limited); placeholder misuse; each restart cut, resume and hold.
 
+### 16.1 Settings document
+
+- CFG-1: The control room MUST offer its stored settings as one JSON document with a `version`, a
+  `revision` and a JSON Schema derived from the schemas that validate its settings writes. Its
+  sections follow the settings groups and pages the user sees; lists are keyed by a stable name.
+- CFG-2: The document, its schema and any error about it MUST NOT contain a secret value; a secret
+  reads `set` or `not set`.
+- CFG-3: Agents, mods and devices MUST be refused the document and its schema. The EA reads plain
+  configuration only; security settings are absent from its document and schema.
+
 ## 17. Mods
 
 - MOD-1: Tiers are `theme` (tokens only), `bundled` and `third-party`. A mod's manifest (id,
