@@ -37,6 +37,9 @@ let currentHash = window.location.hash
 /** The card a redirected old link points at, kept until the hash changes again. */
 let card: string | null = null
 
+/** The card the next hash change opens at, set by `openSettingsCard`. */
+let nextCard: string | null = null
+
 const DEPTH_KEY = 'setiDepth'
 
 /** How many of Seti's own history entries lie behind the one whose state this is, if stamped. */
@@ -62,7 +65,8 @@ if (depthOf(window.history.state) === null) {
 window.addEventListener('hashchange', () => {
   previousHash = currentHash
   currentHash = window.location.hash
-  card = null
+  card = nextCard
+  nextCard = null
   const stamped = depthOf(window.history.state)
   if (stamped === null) {
     depth += 1
@@ -113,6 +117,7 @@ const MERGED_PAGES: Partial<Record<string, Moved>> = {
   'whats-new': { page: 'about', card: 'changes' },
   devices: PHONES,
   secrets: SECRETS,
+  account: { page: 'runtimes', card: 'claude' },
 }
 
 interface Target {
@@ -220,6 +225,21 @@ export function goBack(section: SectionKey) {
 }
 
 /** Changes the hash after any leave guard agrees; `force` skips guards after a save or delete. */
+/** Opens a settings page at one of its cards, such as the Claude Code card on Runtimes. */
+export function openSettingsCard(page: string, to: string): void {
+  void mayLeave().then((ok) => {
+    if (!ok) {
+      return
+    }
+    if (window.location.hash === `#settings/${page}`) {
+      document.getElementById(to)?.scrollIntoView({ block: 'start' })
+      return
+    }
+    nextCard = to
+    window.location.hash = `settings/${page}`
+  })
+}
+
 export function navigate(section: SectionKey, id?: string, { force = false }: { force?: boolean } = {}) {
   const hash = id === undefined ? section : `${section}/${id}`
   if (force) {

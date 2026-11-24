@@ -154,6 +154,8 @@ interface Ask {
   suggestions: string[]
   /** Whether the agent's runtime would run the call with input the user edited. */
   rewrites?: boolean
+  /** Told the request's id once it waits for the user. */
+  opened?: (id: string) => void
 }
 
 /** The call the user allowed after a restart cut it off runs once without a second request. */
@@ -166,6 +168,7 @@ async function allowedAlready(taskId: string, ask: Ask, hash: string): Promise<P
 async function waitAgain(request: PermissionRequest, ask: Ask, signals: readonly AbortSignal[]) {
   inputs.set(request.id, ask.input)
   const answer = answerOf(request.id, signals)
+  ask.opened?.(request.id)
   try {
     await announce(request)
     return await answer
@@ -208,6 +211,7 @@ async function askUser(taskId: string, ask: Ask, signals: readonly AbortSignal[]
       timeout_minutes: (await timeoutSettings.get()).request_timeout_minutes,
     })
     if (waiting.has(id)) {
+      ask.opened?.(id)
       await announce(request)
     } else if (!stoppingForRestart()) {
       await dropRequest(id)
@@ -284,14 +288,40 @@ export type UserAnswer = { allow: true } | { allow: false; message: string; drop
  */
 export async function askCodexUser(
   taskId: string,
-  call: { tool: string; input: Record<string, unknown>; review: boolean; reason: string },
+  call: Pick<Ask, 'tool' | 'input' | 'reason' | 'opened'> & { review: boolean },
   signals: readonly AbortSignal[],
 ): Promise<UserAnswer> {
   const kind = call.review ? 'review' : 'tool'
-  const ask: Ask = { tool: call.tool, input: call.input, kind, reason: call.reason, suggestions: [], rewrites: false }
+  const ask: Ask = { ...call, kind, suggestions: [], rewrites: false }
   const result = await askUser(taskId, ask, signals)
   if (result.behavior === 'allow') {
     return { allow: true }
   }
   return { allow: false, message: result.message, dropped: result.interrupt === true }
+}
+
+/**
+ * Settles a request Seti's rules now decide, unless the user answered it or its session stopped
+ * waiting first; the stored state is the one answer the agent gets. `won` runs before the agent
+ * gets it. Returns the request, or undefined.
+ */
+export async function answerByRules(
+  id: string,
+  answer: UserAnswer,
+  won: () => void,
+): Promise<PermissionRequest | undefined> {
+  if (!waitsFor(id)) {
+    return undefined
+  }
+  const message = answer.allow ? null : answer.message
+  const settled = await permissionRequests.settle(id, answer.allow ? 'allowed' : 'denied', message)
+  if (settled === undefined) {
+    return undefined
+  }
+  won()
+  const result: PermissionResult = answer.allow
+    ? { behavior: 'allow', updatedInput: waitingInput(id) }
+    : { behavior: 'deny', message: answer.message }
+  await resolveRequest(settled, result)
+  return settled
 }

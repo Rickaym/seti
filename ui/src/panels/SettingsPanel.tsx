@@ -8,7 +8,6 @@ import { PANES } from '@/lib/pane-size'
 import { navigate } from '@/lib/route'
 import { cn } from '@/lib/utils'
 import { AboutPage } from '@/panels/settings/AboutPage'
-import { AccountPage } from '@/panels/settings/AccountPage'
 import { AgentsPage } from '@/panels/settings/AgentsPage'
 import { AuditPage } from '@/panels/settings/AuditPage'
 import { CapabilitiesPages } from '@/panels/settings/CapabilitiesPages'
@@ -53,7 +52,6 @@ const PAGES: Record<Exclude<SettingsPageKey, ProbedPageKey>, (detail: string | n
   channels: (detail) => <ChannelsPage detail={detail} />,
   about: () => <AboutPage />,
   json: () => <SettingsJsonPage />,
-  account: () => <AccountPage />,
   signin: () => <SignInPage />,
   sandbox: () => <SandboxPage />,
   permissions: () => <PermissionsPage />,

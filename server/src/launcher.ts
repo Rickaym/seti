@@ -4,6 +4,7 @@ import type { Task } from '@seti/shared'
 import { connectionEnv } from './egress-connections.js'
 import type { LaunchPlan } from './launch-plan.js'
 import { launch, scopeHost, type ScopeKind, type ScopePlan } from './memory-scope.js'
+import type { Maintenance } from './sandbox-mounts.js'
 import { agentEnv, sandboxContext } from './session-options.js'
 import { taskSandbox, type TaskSandbox } from './task-sandbox.js'
 
@@ -87,18 +88,18 @@ async function scopeFrom(taskId: string, kind: ScopeKind, plan: LaunchPlan): Pro
 
 /**
  * Where a maintenance session of the task starts: a sandbox of its own that reads the agent's
- * folders and writes only its memory folder and `writable`, in a dream scope; null unsandboxed.
+ * folders and writes only its memory folder and the folders named writable, or for a bare
+ * session none of them, in a dream scope; null unsandboxed.
  */
 export async function maintenanceLauncher(
   task: Task,
-  writable: readonly string[],
+  maintenance: Maintenance,
   plan: LaunchPlan,
 ): Promise<Launcher | null> {
   if (plan.sandbox === null) {
     return null
   }
   const scope = await scopeFrom(task.id, 'dream', plan)
-  const maintenance = { writable }
   const sandbox = await taskSandbox(task, {
     ctx: sandboxContext(),
     plan: plan.sandbox,

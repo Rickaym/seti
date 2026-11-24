@@ -6,6 +6,7 @@ import type { CodexDecide } from './approvals.js'
 import type { ScriptedResponses } from './conformance-responses.js'
 import { codexRig } from './conformance-rig.js'
 import { rigTools } from './conformance-tools.js'
+import { codexOneShotFor } from './one-shot.js'
 import type { CodexShapes } from './session.js'
 
 /** Seti's decision for a Codex ask, from the neutral host; a question goes to the user. */
@@ -75,4 +76,8 @@ export const codexTarget = (bench: CodexBench): ConformanceTarget<CodexShapes, '
   gaps: CODEX_GAPS,
   host: (neutral) => ({ decide: decideWith(neutral), hooks: null, toolServers: {} }),
   rig: (script) => codexRig(bench.model, bench.folder, script),
+  oneShot: {
+    runner: codexOneShotFor(bench.binary, { baseUrl: bench.baseUrl, envKey: 'OPENAI_API_KEY' }),
+    model: 'gpt-5.5',
+  },
 })

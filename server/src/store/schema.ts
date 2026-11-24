@@ -77,6 +77,7 @@ import {
   TASK_WORKTREE_BACKFILL,
   TRIM_SESSION_INIT,
   TASK_RUNTIME,
+  CODEX_RULES_DECIDE_DEFAULT,
   CODEX_SETTINGS,
   TASK_APPROVAL_CEILING,
 } from './schema-tasks.js'
@@ -233,5 +234,6 @@ export const MIGRATIONS: readonly Migration[] = [
   { version: 125, name: 'task_runtime', sql: TASK_RUNTIME },
   { version: 126, name: 'codex_settings', sql: CODEX_SETTINGS },
   { version: 127, name: 'task_approval_ceiling', sql: TASK_APPROVAL_CEILING },
-  { version: 128, name: 'connection_body', sql: CONNECTION_BODY },
+  { version: 128, name: 'codex_rules_decide_default', sql: CODEX_RULES_DECIDE_DEFAULT },
+  { version: 129, name: 'connection_body', sql: CONNECTION_BODY },
 ]

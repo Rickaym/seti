@@ -77,7 +77,7 @@ function Notice({ failure, raw, children }: { failure: Failure; raw: string | nu
           {raw !== null && <RawText raw={raw} />}
           <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
             {children}
-            {ACCOUNT_KINDS.has(failure.kind) && <SettingsLink page="account">Open Account settings</SettingsLink>}
+            {ACCOUNT_KINDS.has(failure.kind) && <SettingsLink page="runtimes">Open Claude Code settings</SettingsLink>}
           </div>
         </div>
       </div>

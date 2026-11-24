@@ -101,8 +101,8 @@ serveControl({
     await openTaskProxy(agent, grant)
     return {}
   },
-  'proxy.model': async ({ agent, login }) => {
-    await openModelProxy(agent, login)
+  'proxy.model': async ({ agent, login, key }) => {
+    await openModelProxy(agent, { login, key })
     return {}
   },
   'aws.token': ({ agent }) => ({ token: awsToken(agent) }),

@@ -9,6 +9,7 @@ import {
   type StoredRuntime,
 } from '@seti/shared'
 import { audit } from './audit.js'
+import { redecideWaitingCodexCalls } from './codex-decide.js'
 import { copyState, followSettings, installCodex, type CodexInstallFailure } from './codex-install.js'
 import { codexKeyedCredentials, credentialHasKey, keyOutsideDefault } from './codex-key.js'
 import { CODEX_PIN } from './codex-pin.js'
@@ -147,8 +148,9 @@ const changedKeys = (before: CodexSettings, after: CodexSettings) =>
 
 /**
  * Changes the Codex settings as the user, audited with what changed; turning Codex on installs
- * the pinned version in the background. The EA and agents are refused: the settings decide
- * whether agents run on another vendor's model and who answers their calls.
+ * the pinned version in the background; letting the rules decide answers the calls that wait.
+ * The EA and agents are refused: the settings decide whether agents run on another vendor's
+ * model and who answers their calls.
  */
 export async function updateCodexSettings(input: CodexSettingsInput): Promise<CodexStatus> {
   refuseAgent('change the Codex runtime settings')
@@ -167,6 +169,9 @@ export async function updateCodexSettings(input: CodexSettingsInput): Promise<Co
       detail: { runtime: 'codex', changed, enabled: after.enabled, evaluator_decides: after.evaluator_decides },
     })
     await followSettings(before, after)
+    if (!before.evaluator_decides && after.evaluator_decides) {
+      await redecideWaitingCodexCalls()
+    }
   }
   return codexStatus()
 }

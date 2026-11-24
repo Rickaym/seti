@@ -29,7 +29,7 @@ import './runner.js'
 import type { RuntimeId } from './runtimes/adapter.js'
 import { loadSandboxCa, type SandboxCa } from './sandbox-ca.js'
 import { hostClaudeJson } from './sandbox-mcp.js'
-import { projectSlug } from './sandbox-mounts.js'
+import { projectSlug, type Maintenance } from './sandbox-mounts.js'
 import { sandboxContext } from './session-options.js'
 import { stopSshAgents } from './ssh-agent.js'
 import { sshKeyService } from './ssh-key-service.js'
@@ -160,7 +160,7 @@ describe.skipIf(!available)('a real task sandbox', () => {
     script: string,
     scope: ScopePlan | null = null,
     as: Partial<Task> = {},
-    session: { maintenance?: { writable: readonly string[] }; runtime?: RuntimeId } = {},
+    session: { maintenance?: Maintenance; runtime?: RuntimeId } = {},
   ): Promise<{ code: number | null; out: string }> {
     const { maintenance, runtime = 'claude' } = session
     const ctx = { ...sandboxContext(), home }
@@ -726,6 +726,31 @@ describe.skipIf(!available)('a real task sandbox', () => {
     expect(fs.existsSync(path.join(work, 'dreamt'))).toBe(false)
     expect(fs.readFileSync(path.join(CLAUDE_HOME, memory.slice('.claude/'.length), 'MEMORY.md'), 'utf8')).toBe('note\n')
     expect(fs.existsSync(path.join(SETI_HOME, 'sandbox', 'bwrap-task', 'maintenance', 'run', 'proxy.sock'))).toBe(true)
+  })
+
+  it("runs a bare session in an empty folder of its own, with none of the agent's folders", async () => {
+    const workspace = workspaceDir('bwrap-task')
+    fs.mkdirSync(workspace, { recursive: true })
+    fs.writeFileSync(path.join(workspace, 'chat.md'), 'chat')
+    const script = [
+      'echo "cwd=$(pwd) files=$(ls -A | wc -l)"',
+      `test -e '${work}/.git' && echo "work seen" || echo "no work"`,
+      `test -e '${workspace}/chat.md' && echo "workspace seen" || echo "no workspace"`,
+      'grep -q . "$HOME/.claude/settings.json" 2>/dev/null && echo "claude seen" || echo "no claude"',
+      'touch here 2>/dev/null && echo "cwd writable" || echo "cwd read-only"',
+      'echo "codex=${CODEX_HOME:-none} gh=${GH_TOKEN:-none}"',
+    ].join('\n')
+    for (const runtime of ['claude', 'codex'] as const) {
+      const { out } = await inSandbox(script, null, {}, { maintenance: { writable: [], bare: true }, runtime })
+      const bare = path.join(SETI_HOME, 'sandbox', 'bwrap-task', 'maintenance', 'work')
+      expect(out).toContain(`cwd=${bare} files=0`)
+      expect(out).toContain('no work')
+      expect(out).toContain('no workspace')
+      expect(out).toContain('no claude')
+      expect(out).toContain('cwd read-only')
+      expect(out).toContain(runtime === 'codex' ? 'codex=/' : 'codex=none')
+      expect(out).toContain('gh=none')
+    }
   })
 
   it("runs a Codex agent with Codex's home, what changes how it runs locked, and no Claude configuration", async () => {

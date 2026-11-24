@@ -11,7 +11,6 @@ const PAGES = [
   { label: 'Repos', hash: 'repos', group: 'Agents' },
   { label: 'Resources', hash: 'resources', group: 'Agents' },
   { label: 'Channels', hash: 'channels', group: 'Agents' },
-  { label: 'Account', hash: 'account', group: 'Claude Code' },
   { label: 'MCP servers', hash: 'mcp', group: 'Claude Code' },
   { label: 'Plugins', hash: 'plugins', group: 'Claude Code' },
   { label: 'Skills', hash: 'skills', group: 'Claude Code' },
@@ -49,6 +48,7 @@ const MERGED = [
   { from: 'whats-new', to: 'about', title: 'About', card: 'changes' },
   { from: 'devices', to: 'signin', title: 'Sign-in', card: 'phones' },
   { from: 'secrets', to: 'credentials', title: 'Credentials', card: 'secrets' },
+  { from: 'account', to: 'runtimes', title: 'Runtimes', card: 'claude' },
 ] as const
 
 const nav = (page: Page) => page.getByRole('navigation', { name: 'Settings pages' })
@@ -134,9 +134,10 @@ test('status bar items open their settings pages', async ({ page }) => {
   await expect(page).toHaveURL(/#settings\/sandbox$/)
   await expect(pageTitle(page, 'Sandbox')).toBeVisible()
   await bar.getByRole('button', { name: 'Claude account' }).click()
-  await expect(page).toHaveURL(/#settings\/account$/)
-  await expect(pageTitle(page, 'Account')).toBeVisible()
-  await expect(page.getByRole('main').getByRole('button', { name: 'Recheck' })).toBeVisible()
+  await expect(page).toHaveURL(/#settings\/runtimes$/)
+  await expect(pageTitle(page, 'Runtimes')).toBeVisible()
+  const claude = page.getByRole('main').getByRole('region', { name: 'Claude Code' })
+  await expect(claude.getByRole('button', { name: 'Recheck' })).toBeVisible()
 })
 
 test('general switches between light, dark and the system mode', async ({ page }) => {
