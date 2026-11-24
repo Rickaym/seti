@@ -71,7 +71,8 @@ function PickDialog({
   onPick: (reset: boolean) => void
   onClose: () => void
 }) {
-  const keeps = own === 0 ? '' : ` Its ${items(own, 'own choice')} stay unless you reset them.`
+  const stay = own === 1 ? 'stays' : 'stay'
+  const keeps = own === 0 ? '' : ` Its ${items(own, 'own choice')} ${stay} unless you reset.`
   return (
     <Dialog
       open
@@ -141,25 +142,22 @@ export function TaskCredentials({ task, onChanged }: { task: Task; onChanged: ()
       toast.error(errorText(e))
     }
   }
+  const choose = (id: string) => {
+    const profile = profiles?.find((entry) => entry.id === id)
+    if (profile === undefined || profile.access_items === 0) {
+      void change(id)
+      return
+    }
+    void apiGet<TaskAccessView>(`/tasks/${task.id}/access`).then(
+      (view) => {
+        setPick({ profile, own: view.items.filter((item) => item.override !== null).length })
+      },
+      (e: unknown) => toast.error(errorText(e)),
+    )
+  }
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <ProfileSelect
-        value={task.profile_id}
-        profiles={profiles}
-        onChange={(id) => {
-          const profile = profiles?.find((entry) => entry.id === id)
-          if (profile === undefined || profile.access_items === 0) {
-            void change(id)
-            return
-          }
-          void apiGet<TaskAccessView>(`/tasks/${task.id}/access`).then(
-            (view) => {
-              setPick({ profile, own: view.items.filter((item) => item.override !== null).length })
-            },
-            (e: unknown) => toast.error(errorText(e)),
-          )
-        }}
-      />
+      <ProfileSelect value={task.profile_id} profiles={profiles} onChange={choose} />
       {pick !== null && (
         <PickDialog
           title={task.title}
@@ -184,7 +182,9 @@ export function TaskCredentials({ task, onChanged }: { task: Task; onChanged: ()
             size="icon-xs"
             variant="ghost"
             aria-label="Reset credentials to Default"
-            onClick={() => void change(DEFAULT_PROFILE_ID)}
+            onClick={() => {
+              choose(DEFAULT_PROFILE_ID)
+            }}
           >
             <RotateCcw />
           </Button>

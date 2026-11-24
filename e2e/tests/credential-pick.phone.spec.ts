@@ -9,7 +9,7 @@ test('the credential pick consequence fits a phone', async ({ page, request }) =
   await access.getByRole('switch', { name: 'AWS', exact: true }).tap()
   await access.getByLabel('Credentials').selectOption(profile.id)
   const pick = page.getByRole('dialog', { name: `Use ${profile.name}` })
-  await expect(pick).toContainText('Its 1 own choice stay')
+  await expect(pick).toContainText('Its 1 own choice stays')
   await expectFitsPhone(page, 'credential pick')
   await page.screenshot({ path: test.info().outputPath('pick-phone.png') })
   await pick.getByRole('button', { name: 'Reset own' }).tap()
