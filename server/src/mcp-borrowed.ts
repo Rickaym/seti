@@ -2,9 +2,7 @@ import { createHash } from 'node:crypto'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { DEFAULT_PROFILE_ID, mcpEnabled, type Task } from '@seti/shared'
-import { followedChoices } from './credential-access.js'
-import { tasks } from './db.js'
+import { mcpEnabled, type Task } from '@seti/shared'
 import { hostClaudeJson } from './sandbox-mcp.js'
 import { canonicalRoot } from './sandbox-mounts.js'
 import { mcpDefaults, taskMcpChoices } from './store/mcp.js'
@@ -73,11 +71,7 @@ export function borrowedServers(host: Json, own: readonly string[], enabled: (na
 
 /** The servers of other directories a task turns on, which its session gets from Seti. */
 export async function taskBorrowedServers(task: Pick<Task, 'id' | 'cwd'>, host = readHostConfig()): Promise<Json> {
-  const profileId = (await tasks.get(task.id))?.profile_id ?? DEFAULT_PROFILE_ID
-  const [defaults, choices] = await Promise.all([
-    mcpDefaults.all(),
-    taskMcpChoices.get(task.id).then(async (own) => followedChoices(profileId, 'mcp', own)),
-  ])
+  const [defaults, choices] = await Promise.all([mcpDefaults.all(), taskMcpChoices.followed(task.id)])
   return borrowedServers(host, ownProjects(task.cwd), (name) => mcpEnabled(name, defaults, choices, false))
 }
 

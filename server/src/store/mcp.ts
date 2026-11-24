@@ -41,6 +41,14 @@ export const taskMcpChoices = {
       await replaceTaskChoices(tx, taskId, choices)
     })
   },
+  /** The task's own choices over its credential's set: what decides each server before its default. */
+  followed: async (taskId: string): Promise<McpChoices> => ({
+    ...toChoices(
+      await sql<ChoiceRow[]>`SELECT c.item AS name, c.enabled FROM credential_access c
+        JOIN task t ON t.profile_id = c.profile_id WHERE t.id = ${taskId} AND c.kind = 'mcp' ORDER BY c.item`,
+    ),
+    ...(await taskMcpChoices.get(taskId)),
+  }),
 }
 
 /** Every server name a default or task choice is stored for. */
@@ -56,6 +64,7 @@ export async function forgetMcpChoices(names: readonly string[]): Promise<void> 
   await transaction(async (tx) => {
     await tx`DELETE FROM mcp_server_default WHERE name = ANY(${list}::text[])`
     await tx`DELETE FROM task_mcp_server WHERE name = ANY(${list}::text[])`
+    await tx`DELETE FROM credential_access WHERE kind = 'mcp' AND item = ANY(${list}::text[])`
   })
 }
 
