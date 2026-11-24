@@ -119,6 +119,19 @@ export async function launchPlan(task: Task, runtime: RuntimeId = task.runtime):
   }
 }
 
+/**
+ * The agent's plan as if it ran sandboxed on `runtime`, for a one-shot call on it, even where the
+ * agent itself runs unsandboxed; null while the sandbox is off on this Seti.
+ */
+export async function oneShotPlan(task: Task, runtime: RuntimeId): Promise<LaunchPlan | null> {
+  const policy = await sandboxPolicy.get()
+  if (!policy.enabled) {
+    return null
+  }
+  const sandbox = await sandboxPlanFor(task, policy, runtime)
+  return { memory: await effectiveCap(task.id), cpu: await effectiveCpuCap(task.id), sandbox, grant: sandbox.grant }
+}
+
 /** The task's sandbox, from a plan read now; null when it runs unsandboxed. */
 export const sandboxFor = async (task: Task) => sandboxFrom(task, await launchPlan(task))
 

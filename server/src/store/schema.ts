@@ -8,7 +8,7 @@ import { CHANGE_REQUESTS } from './schema-change-requests.js'
 import { CHANGELOG } from './schema-changelog.js'
 import { COMPACT_RULES } from './schema-compact.js'
 import { CONNECTIONS, secretsToConnections } from './schema-connections.js'
-import { recountTaskCosts, TASK_COST_SESSION, TASK_SIDE_CHAT_COST } from './schema-cost.js'
+import { recountTaskCosts, TASK_COST_SESSION, TASK_SECOND_OPINION, TASK_SIDE_CHAT_COST } from './schema-cost.js'
 import { CPU_CAPS } from './schema-cpu.js'
 import { ANDROID_OVERRIDE, DEVICE_SHOW_NAMES, DEVICES, dropOfficialAndroidRow } from './schema-devices.js'
 import { DREAM_NIGHTS, DREAM_PROPOSALS, DREAM_RUNS } from './schema-dreams.js'
@@ -231,4 +231,5 @@ export const MIGRATIONS: readonly Migration[] = [
   { version: 124, name: 'dream_proposals', sql: DREAM_PROPOSALS },
   { version: 125, name: 'task_runtime', sql: TASK_RUNTIME },
   { version: 126, name: 'codex_settings', sql: CODEX_SETTINGS },
+  { version: 128, name: 'task_second_opinion', sql: TASK_SECOND_OPINION },
 ]

@@ -512,6 +512,14 @@ plugins. Their cost is an estimate from the price table in
 standard rates from OpenAI's pricing page into that table, set `asOf` to the day, and run
 `pnpm check`.
 
+With both runtimes set up, any agent with Seti control can ask the other one for a second
+opinion with its `second_opinion` tool: a Claude agent asks Codex, a Codex agent asks Claude.
+The other model answers once, with no tools and none of the agent's folders, in a sandbox that
+reaches only its provider with the agent's credential, so the credential needs that runtime's
+key. The transcript shows one row, "Asked gpt-5.5: ...", that opens to the question and answer;
+its cost counts toward the agent's and shows under Cost in its settings. An agent may ask 20
+times an hour and 60 a day.
+
 ### Access: defaults and per-agent choices
 
 Everything an agent may reach follows one model: each SSH host, AWS, MCP server, context

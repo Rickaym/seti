@@ -1,5 +1,6 @@
 import { now, rowFilter, sql, transaction } from '../db.js'
 import { countResult, type SessionTotal } from '../turn-cost.js'
+import { secondOpinions } from './second-opinions.js'
 
 /**
  * Adds what a turn cost to its task, from the session's running total its end reports, and
@@ -44,8 +45,8 @@ export async function addSideChatCost(taskId: string, usd: number): Promise<void
 }
 
 /**
- * What every turn stored since `since` cost, with side chat answers, in US dollars; archived
- * transcripts are left out.
+ * What every turn stored since `since` cost, with side chat answers and second opinions, in US
+ * dollars; archived transcripts are left out.
  */
 export async function costSince(since: string): Promise<number> {
   const [row] = await sql<{ usd: number | null }[]>`SELECT
@@ -54,5 +55,5 @@ export async function costSince(since: string): Promise<number> {
     WHERE kind = 'sdk' AND ${rowFilter.turnEnd} AND created_at >= ${since}`
   const [side] = await sql<{ usd: number | null }[]>`SELECT sum(cost_usd) AS usd
     FROM task_side_chat_cost WHERE created_at >= ${since}`
-  return (row?.usd ?? 0) + (side?.usd ?? 0)
+  return (row?.usd ?? 0) + (side?.usd ?? 0) + (await secondOpinions.costSince(since))
 }

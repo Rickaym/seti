@@ -300,13 +300,13 @@ async function modelReach(task: Task, request: SandboxRequest): Promise<Reach> {
   return { ssh: null, options: { ...own, codex, connections: connectionEnv(key === null ? [] : [key]) } }
 }
 
-/** Where a bare maintenance session works: an empty folder of its own. */
-const bareDir = (dir: string) => path.join(dir, 'work')
+/** Where a bare maintenance session of the agent works: an empty folder of its own. */
+export const bareWorkDir = (taskId: string) => path.join(maintenanceDirOf(taskId), 'work')
 
 /** The folders a sandbox works in: the agent's, or for a bare session only its empty folder. */
-function workOf(task: Task, dir: string, maintenance: Maintenance | undefined) {
+function workOf(task: Task, maintenance: Maintenance | undefined) {
   if (maintenance?.bare === true) {
-    return { cwd: bareDir(dir), dirs: [], homeAccess: false, workspace: null }
+    return { cwd: bareWorkDir(task.id), dirs: [], homeAccess: false, workspace: null }
   }
   return { cwd: task.cwd, dirs: extraDirs(task), homeAccess: task.home_access, workspace: workspaceDir(task.id) }
 }
@@ -375,7 +375,7 @@ export async function taskSandbox(task: Task, request: SandboxRequest): Promise<
     worktreeRoot: WORKTREE_ROOT,
     claudeHome: CLAUDE_HOME,
     taskDir: dir,
-    ...workOf(task, dir, maintenance),
+    ...workOf(task, maintenance),
     ownRoot: SCRATCH_ROOT,
     readOnly: plan.readOnly,
     caDir: '',

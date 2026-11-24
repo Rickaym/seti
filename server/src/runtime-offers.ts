@@ -27,6 +27,9 @@ export const runtimeOffers = (codex: CodexStatus): RuntimeOffer[] => [
   ...(codex.state === 'ready' ? [codexOffer()] : []),
 ]
 
+/** Every runtime's offer, whether or not it can start an agent now, in the order Seti offers them. */
+export const everyOffer = (): RuntimeOffer[] => [claudeOffer(reportedClaudeModels()), codexOffer()]
+
 interface Picks {
   runtime?: StoredRuntime | undefined
   model?: string | undefined
@@ -38,7 +41,7 @@ interface Picks {
  * can start now; a model, runtime or effort that does not fit is refused with the reason.
  */
 export function pickedRuntime(picks: Picks): StoredRuntime {
-  const offers = [claudeOffer(reportedClaudeModels()), codexOffer()]
+  const offers = everyOffer()
   const refusal = pickRefusal(picks, offers)
   if (refusal !== null) {
     throw new HttpError(400, refusal)

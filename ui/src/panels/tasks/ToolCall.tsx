@@ -154,7 +154,7 @@ export function ToolOutput({ taskId, result }: { taskId: string; result: ToolRes
   )
 }
 
-function ToolDetails({
+export function ToolDetails({
   className,
   resultRow,
   summary,
@@ -226,7 +226,7 @@ interface StatusProps {
 }
 
 /** Running time, a failure with its exit code, or a quiet mark and duration once done. */
-function CallStatus({ block, startedAt, result, running, background }: StatusProps) {
+export function CallStatus({ block, startedAt, result, running, background }: StatusProps) {
   if (result === undefined) {
     return (
       <span className="flex shrink-0 items-center gap-1 text-muted-foreground tabular-nums" data-testid="tool-running">
@@ -342,7 +342,7 @@ function CallInput({ block, source }: { block: ToolUseBlock; source: FullSource 
   )
 }
 
-interface ToolCallProps {
+export interface ToolCallProps {
   taskId: string
   rowId: number
   /** When the call was made, for the running time. */

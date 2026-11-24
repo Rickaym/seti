@@ -109,6 +109,7 @@ export const AUDIT_KINDS = [
   'task.host_removed',
   'task.api_key_blocked',
   'agent.outward',
+  'agent.second_opinion',
   'repo.added',
   'repo.updated',
   'repo.removed',
