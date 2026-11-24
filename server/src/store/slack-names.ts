@@ -8,15 +8,20 @@ export interface SlackName {
 }
 
 export const slackNames = {
-  /** Stores what Seti saw; a different name replaces the old one, so a rename is corrected. */
+  /** Stores what Seti saw; a newer sighting replaces the name and when it was last seen. */
   learn: async (names: readonly SlackName[], source: string, at: string): Promise<void> => {
     for (const { id, kind, name } of names) {
       await sql`INSERT INTO slack_name (id, kind, name, source, learned_at)
         VALUES (${id}, ${kind}, ${name}, ${source}, ${at})
         ON CONFLICT (id) DO UPDATE SET kind = excluded.kind, name = excluded.name, source = excluded.source,
-          learned_at = excluded.learned_at
-        WHERE slack_name.name <> excluded.name OR slack_name.kind <> excluded.kind`
+          learned_at = excluded.learned_at`
     }
+  },
+  /** The name Seti knows for an id and when it last saw it; undefined when it knows none. */
+  seen: async (id: string): Promise<{ name: string; learned_at: string } | undefined> => {
+    const [row] = await sql<{ name: string; learned_at: string }[]>`SELECT name, learned_at FROM slack_name
+      WHERE id = ${id}`
+    return row
   },
   /** The names Seti knows for these ids; an unknown id is absent. */
   of: async (ids: readonly string[]): Promise<Map<string, string>> => {

@@ -1,35 +1,6 @@
 import { slackDestination, slackPlace } from '@seti/shared'
 import { describe, expect, it } from 'vitest'
-import { idsIn, namesIn, readableSlack } from './names.js'
-
-describe('namesIn', () => {
-  it('reads names beside ids in Slack markup and in the Slack MCP server answers', () => {
-    const answer = JSON.stringify({
-      results:
-        '## Messages\nChannel: #deploys (ID: C0DEPLOY01)\nFrom: Dana Reyes <dana@example.com> (ID: U0DANA0001)\n' +
-        'Text: <@U0SAM00001|Sam Lee> see <#C0OPS00001|ops>\n---\n### Result 1 of 1\nName: #release-train\n' +
-        'Creator: x\nPermalink: [link](https://acme.slack.com/archives/C0TRAIN001)\n---\nName: Kim Ito\nUser ID: U0KIM00001',
-    }).replaceAll('/', '\\/')
-    expect(namesIn(answer).map(({ id, kind, name }) => `${kind} ${id} ${name}`)).toEqual([
-      'channel C0OPS00001 ops',
-      'channel C0DEPLOY01 deploys',
-      'channel C0TRAIN001 release-train',
-      'user U0SAM00001 Sam Lee',
-      'user U0DANA0001 Dana Reyes',
-      'user U0KIM00001 Kim Ito',
-    ])
-    expect(namesIn('Channel: #general (C0GENERAL1)\n\nbody')).toEqual([
-      { id: 'C0GENERAL1', kind: 'channel', name: 'general' },
-    ])
-  })
-
-  it('learns nothing from text without names, and the last sighting of an id wins', () => {
-    expect(namesIn('Posted to C0DEPLOY01 at 1700000000.000100')).toEqual([])
-    expect(namesIn('<#C0DEPLOY01|old> then <#C0DEPLOY01|new>')).toEqual([
-      { id: 'C0DEPLOY01', kind: 'channel', name: 'new' },
-    ])
-  })
-})
+import { idsIn, readableSlack } from './names.js'
 
 describe('readableSlack', () => {
   const names = new Map([

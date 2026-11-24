@@ -717,11 +717,16 @@ interrupted only for that.
   `warning`.
 - CHN-29: Each delivery is logged with its status, HTTP status, reason, a redacted excerpt and
   each subscription's outcome. Failed routes retry with doubling backoff (`route_retry`).
-- CHN-33: Seti learns Slack channel and person names only from what passes through it: markup and
-  profiles in verified Slack deliveries, and the results of agents' Slack MCP calls. A different
-  name for an id replaces the old one. Where Seti shows a Slack id (a Slack event's title and text,
-  a thread reply, a Slack send's request summary, transcript row and audit summary) it shows the
-  name it knows, else the id and "name not known"; it never guesses. Audit details keep the ids.
+- CHN-33: Seti learns a Slack channel or person name only where Slack states it and no message
+  author can write it: the author's own profile on a message event a Slack webhook delivers while a
+  thread switch is on, and the first line of a Slack MCP answer that reads a channel or a person's
+  profile by id, when that line names the same id. It never learns from message text, markup labels
+  or search results; a label inside a message may show in place where that message is shown. A newer
+  sighting replaces the name and when it was last seen. Where Seti shows a Slack id (a Slack event's
+  title and text, a thread reply, a Slack send's request summary, transcript row and audit summary)
+  it shows the name it knows, else the id and "name not known"; it never guesses. A name shown on a
+  permission request never comes from text a message author controls, and says when it was last
+  seen if that was over `slack_name_stale` ago. Audit details keep the ids.
 - THR-1: A Slack message an agent sends, with an MCP `send_message` tool or `chat.postMessage`, is
   recorded when its successful result names the channel and ts (a Slack message link, or the Web
   API answer). Its thread is the link's or the call's `thread_ts`, else the message itself, and
@@ -1271,7 +1276,7 @@ others.
 | Poller fetch | 20 requests a run, 5 redirects, 4 MB each, 12 MB a run. `poller_backoff` 6 h. `fail_streak` 5 (reminders 3).                                                                                                                                                                                                                                                                           |
 | Reminders    | `reminder_limits`: interval 1 min to 7 days; 5 s; 256 MB; message 2000; state 16 KB. `cron_catchup` 1 h.                                                                                                                                                                                                                                                                               |
 | PRs          | Create request 50 links. `pr_poll` 60 s. `pr_skew` 5 s. `subagent_wait` 30 min.                                                                                                                                                                                                                                                                                                        |
-| Threads      | `thread_cap` 50. `dm_window` 24 h. `reply_settle` 10 s. `thread_rate` 10 an hour. `thread_quiet` 7 days. `thread_age` 30 days.                                                                                                                                                                                                                                                         |
+| Threads      | `thread_cap` 50. `dm_window` 24 h. `reply_settle` 10 s. `thread_rate` 10 an hour. `thread_quiet` 7 days. `thread_age` 30 days. `slack_name_stale` 30 days.                                                                                                                                                                                                                             |
 | Chat         | Message 4000. Active agent: running, session open, or updated within 12 h. `chat_burst` 12 in 15 min. `chat_loop` 6 in 15 min.                                                                                                                                                                                                                                                         |
 | Questions    | Answer batch 100 items. `notes_waiting` 10. Index 1500 characters. `note_stale` 3 failed checks in a row, or unverified 30 days (fact, environment) or 90 days (how-to, gotcha).                                                                                                                                                                                                       |
 | Assistant    | `ask_ttl` 10 min. `settle` quiet 45 s, at most 3 min. `call_silence` 30 s. `wake_phrase` 2 to 40 characters, at most 4 words. `keep_awake_seconds` 5 to 600.                                                                                                                                                                                                                           |
