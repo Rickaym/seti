@@ -269,6 +269,18 @@ export const askAboutRepeat = async (
   signals: readonly AbortSignal[],
 ): Promise<PermissionResult> => askUser(taskId, { ...call, kind: 'repeat', reason, suggestions: [] }, signals)
 
+/** Asks the user about a command that pushes outside their organisations; Always adds `PushTo`. */
+export const askAboutPush = async (
+  taskId: string,
+  call: { tool: string; input: Record<string, unknown>; reason: string; owners: readonly string[] },
+  signals: readonly AbortSignal[],
+): Promise<PermissionResult> =>
+  askUser(
+    taskId,
+    { ...call, kind: 'tool', suggestions: [...new Set(call.owners)].map((owner) => `PushTo(${owner})`) },
+    signals,
+  )
+
 const REVIEW_REASON = 'A review rule holds this call for you to check, and edit, before it runs'
 
 /** Asks the user about an MCP call a review rule holds; no rules, as review asks each time. */

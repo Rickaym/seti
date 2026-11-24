@@ -128,6 +128,8 @@ export interface DreamSupport {
     host: DreamHost,
     abortController: AbortController,
   ) => Promise<DreamSession>
+  /** The dream's cost so far as a raw message of the runtime reports it, or null when it does not. */
+  reportedCost: (raw: unknown) => number | null
 }
 
 /**
