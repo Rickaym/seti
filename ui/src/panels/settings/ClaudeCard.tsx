@@ -10,6 +10,7 @@ import { recheckAccount, useAccount } from '@/hooks/useAccount'
 import { navigate } from '@/lib/route'
 import { relativeTime } from '@/lib/time'
 import { cn } from '@/lib/utils'
+import { ClaudeRuntimeRows } from './ClaudeRuntimeRows'
 import { LoginsCard } from './LoginsCard'
 import { SettingRow, SettingsCard } from './layout'
 import { useMovedCard } from './use-moved-card'
@@ -230,13 +231,14 @@ function ClaudeDetails({ status }: { status: AccountStatus }) {
   return (
     <>
       <LoginRow status={status} />
+      <Usage status={status} />
       <LoginsCard logins={status.logins} />
       {account && (
         <Section title="Current login">
           <Identity account={account} />
         </Section>
       )}
-      <Usage status={status} />
+      <ClaudeRuntimeRows />
       <TaskFailure
         status={status}
         onOpenTask={(id) => {

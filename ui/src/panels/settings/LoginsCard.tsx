@@ -2,6 +2,7 @@ import { LOGIN_NAME_MAX, type ClaudeLogin, type ClaudeLogins, type SignInStart }
 import { ArrowLeftRight, Check, ExternalLink, LogIn, Pencil, Save, Trash2, X } from 'lucide-react'
 import { useState, type ReactNode } from 'react'
 import { toast } from 'sonner'
+import { InfoTip } from '@/components/InfoTip'
 import { planName } from '@/components/account/format'
 import { chordLabel, CHORDS } from '@/components/shortcuts/chords'
 import { Button } from '@/components/ui/button'
@@ -289,14 +290,20 @@ export function LoginsCard({ logins }: { logins: ClaudeLogins }) {
     <section aria-label="Saved logins" className="border-b border-border last:border-b-0">
       <SettingRow
         label="Saved logins"
-        stack
         description={
-          <>
-            Claude Code on this machine runs on one login at a time. Switch here, from the account item in the status
-            bar ({chordLabel(CHORDS.switchLogin)}) or with Ctrl+K; each agent moves to the new login when its next turn
-            starts. Agent credentials hold no Claude login, so every agent uses this one, except that sandboxed agents
-            use the Claude token in Credentials when one is set.
-          </>
+          <span className="inline-flex items-center gap-1.5">
+            One in use at a time; agents move at their next turn.
+            <InfoTip
+              label="About saved logins"
+              text={
+                <>
+                  Switch here, from the account item in the status bar ({chordLabel(CHORDS.switchLogin)}) or with
+                  Ctrl+K. Agent credentials hold no Claude login, so every agent uses this one, except that sandboxed
+                  agents use the Claude token in Credentials when one is set.
+                </>
+              }
+            />
+          </span>
         }
       >
         {!adding && (

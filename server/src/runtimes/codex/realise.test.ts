@@ -60,6 +60,14 @@ describe('realising a Codex session', () => {
     )
   })
 
+  it("asks the model for a summary of its reasoning, so the agent's thinking shows", () => {
+    const realised = realiseCodex(spec, launcher({ SETI_MODEL_KEY: 'seti-placeholder' }), {
+      ...answering,
+      binary: '/c',
+    })
+    expect(settingsOf(realised.args)).toContain('model_reasoning_summary="auto"')
+  })
+
   it("starts Seti's tool servers through their relay, and the shared tools with the agent's variables", () => {
     const relay = { command: '/usr/bin/socat', args: ['STDIO', 'UNIX-CONNECT:/run/seti/tools-0.sock'] }
     const withShared = { ...spec, toolServers: { ...toolServers, shared: ['/tools/a'] } }

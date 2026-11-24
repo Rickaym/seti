@@ -6,6 +6,7 @@ import { ok, valid, validJson } from '../http.js'
 import { setTaskMemoryCap, taskMemoryCap } from '../memory-cap.js'
 import { readShellOutput, stopProcess, stopShell } from '../process-stop.js'
 import { openQuerySince } from '../runner.js'
+import { secondOpinions } from '../store/second-opinions.js'
 import { requireTask } from '../tasks.js'
 
 /** An agent's shells and live processes, stopping one of them, and its memory and CPU caps. */
@@ -27,6 +28,9 @@ export const taskProcessRoutes = new Hono()
     return ok(c, await stopShell(id, shell_id))
   })
   .get('/:id/memory', async (c) => ok(c, await taskMemoryCap((await requireTask(c.req.param('id'))).id)))
+  .get('/:id/second-opinions', async (c) =>
+    ok(c, { spend: await secondOpinions.spend((await requireTask(c.req.param('id'))).id) }),
+  )
   .put('/:id/memory', validJson(taskMemoryCapInput), async (c) => {
     const task = await requireTask(c.req.param('id'))
     return ok(c, await setTaskMemoryCap(task, c.req.valid('json').cap))
