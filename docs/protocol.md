@@ -1072,6 +1072,9 @@ Optional and off by default: a maintenance session per agent that consolidates i
   reads `set` or `not set`.
 - CFG-3: Agents, mods and devices MUST be refused the document and its schema. The EA reads plain
   configuration only; security settings are absent from its document and schema.
+- CFG-4: The control room MUST serve every setting's default in the shape of the document, and
+  MUST show which settings differ from their default; the document filtered to those differences
+  is a merge patch that turns the defaults into the document.
 
 ## 17. Mods
 
