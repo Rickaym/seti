@@ -66,8 +66,11 @@ class Scanner {
   readonly keys: KeySpan[] = []
   /** The last character that was not space or inside a value, such as `{`, `,` or `:`. */
   mark = ''
+  private readonly text: string
 
-  constructor(private readonly text: string) {}
+  constructor(text: string) {
+    this.text = text
+  }
 
   run(end: number): this {
     let i = 0

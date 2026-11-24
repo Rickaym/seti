@@ -16,7 +16,7 @@ export const settingsPatchInput = z.strictObject({
   patch: z.record(z.string(), z.unknown()),
   /** The value the client saw at each path it changes; a missing value means none was there. */
   expect: z
-    .array(z.strictObject({ path: docPath, value: z.unknown() }))
+    .array(z.strictObject({ path: docPath, value: z.unknown().optional() }))
     .max(PATCH_PATHS_MAX)
     .default([]),
   /** The changes with a consequence the user confirmed, by the ids a refusal named. */
