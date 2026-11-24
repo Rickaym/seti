@@ -84,6 +84,7 @@ export const AUDIT_KINDS = [
   'task.share_link_rotated',
   'task.share_revoked',
   'task.share_link_preview',
+  'task.share_live',
   'task.files_attached',
   'task.unarchived',
   'task.memory_cap_changed',

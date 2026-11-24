@@ -206,16 +206,69 @@ jobs:
             e2e/test-results
           retention-days: 1
 
+  e2e-webkit:
+    name: e2e (webkit)
+    needs: changes
+    if: needs.changes.outputs.e2e == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16@sha256:ccc6e83d6e35e931dc7c5def2022729d5a6c370318d099181995567ff1fb4d6b
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+      redis:
+        image: redis:7@sha256:c6eabf748fc7a61dbb5a705c78bcf3d6377b1127a97d0ce965c11c44ba46896f
+        ports:
+          - 6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - run: |
+          echo "SETI_TEST_DATABASE_URL=postgres://postgres:postgres@localhost:${{ job.services.postgres.ports['5432'] }}/postgres" >> "$GITHUB_ENV"
+          echo "SETI_TEST_REDIS_URL=redis://localhost:${{ job.services.redis.ports['6379'] }}" >> "$GITHUB_ENV"
+      - uses: ./.github/actions/setup
+        with:
+          playwright-deps: 'true'
+      - run: pnpm --filter @seti/e2e exec playwright install --with-deps webkit
+      - run: pnpm build
+      - run: pnpm e2e --project=webkit
+        env:
+          SETI_E2E_WEBKIT: '1'
+          SETI_E2E_WORKERS: 1
+      - if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: playwright-report-webkit
+          path: |
+            e2e/playwright-report
+            e2e/test-results
+          retention-days: 1
+
   e2e:
     name: e2e
-    needs: [changes, e2e-shard]
+    needs: [changes, e2e-shard, e2e-webkit]
     if: always() && needs.changes.outputs.e2e == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
       - env:
           RESULT: ${{ needs.e2e-shard.result }}
-        run: test "$RESULT" = success
+          WEBKIT: ${{ needs.e2e-webkit.result }}
+        run: test "$RESULT" = success && test "$WEBKIT" = success
 
   ea:
     name: ea
