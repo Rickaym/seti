@@ -116,6 +116,7 @@ async function main(): Promise<void> {
     ...(await exposureChecks()),
     ...(await checks.serviceChecks()),
     ...(await nodeChecks()),
+    ...(await (await import('./doctor-codex.js')).doctorCodex()),
     ...(await eaChecks()),
   ]
   process.stdout.write(report(found))

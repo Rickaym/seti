@@ -27,7 +27,7 @@ if (task === undefined) {
 const shell = (command: string): ToolCall => ({
   callId: `call-${command}`,
   kind: 'shell',
-  name: 'exec_command',
+  name: 'Bash',
   input: { command },
   shell: { action: 'run', command },
 })

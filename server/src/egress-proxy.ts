@@ -21,6 +21,7 @@ import {
   unlessLate,
 } from './egress-answers.js'
 import { isAwsCredentialsPath, serveAwsCredentials, type EgressAws } from './egress-aws.js'
+import { headersForBody, planBody, type BodyPlan } from './egress-body.js'
 import {
   ANTHROPIC_HOST,
   ANTHROPIC_HOSTS,
@@ -44,6 +45,7 @@ import {
 import { relayUpgrade, tunnel } from './egress-relay.js'
 import { relayRenewing } from './egress-replay.js'
 import { applyRules, ruleCovers, type Applied, type EgressRule } from './egress-rules.js'
+import { relay } from './egress-send.js'
 import type { SandboxCa } from './sandbox-ca.js'
 
 /** Where connections for a host really go; tests point them at local fakes. */
@@ -168,6 +170,18 @@ class Egress {
     return keyRequest({ target, path, headers }, this.placeholders(), this.options.onBlocked)
   }
 
+  /** How the body goes on, or null once the request is refused or its client went away. */
+  private async bodyOf(target: Target, req: IncomingMessage, res: ServerResponse): Promise<BodyPlan | null> {
+    const plan = await planBody(target, req.headers, req, this.placeholders())
+    if (plan !== null && 'status' in plan) {
+      this.options.onBlocked?.(target.host, plan.names)
+      answer(res, plan.status, plan.body)
+      req.resume()
+      return null
+    }
+    return plan
+  }
+
   private hasRule(target: Target): boolean {
     return (
       this.rulesFor(target).length > 0 ||
@@ -215,9 +229,12 @@ class Egress {
       req.resume()
       return
     }
-    const address = await this.reach(target)
+    const plan = await this.bodyOf(target, req, res)
+    const address = plan === null ? null : await this.reach(target)
     if (address instanceof Error) {
       answer(res, 502, address.message)
+    }
+    if (plan === null || address === null || address instanceof Error) {
       return
     }
     const out = http.request({
@@ -225,9 +242,9 @@ class Egress {
       port: address.port,
       method: req.method,
       path: keyed.path,
-      headers: { ...withoutHopByHop(keyed.headers), host: parsed.host },
+      headers: headersForBody({ ...withoutHopByHop(keyed.headers), host: parsed.host }, plan),
     })
-    this.relay(target.host, req, res, out)
+    relay({ host: target.host, req, res, plan }, out)
   }
 
   private onIntercepted(req: IncomingMessage, res: ServerResponse): void {
@@ -314,6 +331,10 @@ class Egress {
       req.resume()
       return
     }
+    const plan = await this.bodyOf(target, req, res)
+    if (plan === null) {
+      return
+    }
     const connector = connectorOf(target.host, keyed.path)
     if (connector !== null && this.options.connectorAllowed?.(connector) === false) {
       answer(res, 403, connectorOff(connector), 'application/json')
@@ -346,13 +367,14 @@ class Egress {
       })
     const renewable = applied.filter((entry) => entry.rule.renew !== undefined)
     if (renewable.length === 0 || url === null) {
-      this.relay(target.host, req, res, send(headers))
+      relay({ host: target.host, req, res, plan }, send(headersForBody(headers, plan)))
       return
     }
     await relayRenewing({
       host: target.host,
       url,
       req,
+      plan,
       res,
       headers,
       renewable,
@@ -361,22 +383,6 @@ class Egress {
         answer(res, status, body)
       },
     })
-  }
-
-  private relay(host: string, req: IncomingMessage, res: ServerResponse, out: http.ClientRequest): void {
-    out.on('response', (upstream) => {
-      res.writeHead(upstream.statusCode ?? 502, withoutHopByHop(upstream.headers))
-      upstream.pipe(res)
-    })
-    out.on('error', (e) => {
-      answer(res, 502, `Seti sandbox proxy could not reach ${host}: ${e.message}`)
-    })
-    res.on('close', () => {
-      if (!res.writableFinished) {
-        out.destroy()
-      }
-    })
-    req.pipe(out)
   }
 
   private async onConnect(req: IncomingMessage, socket: Duplex, head: Buffer): Promise<void> {

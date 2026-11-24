@@ -1,6 +1,8 @@
 import { effortLevel, type CompactRule, type Task } from '@seti/shared'
+import { claudeRules } from './approval-ceiling.js'
 import { permissionModeOf } from './bypass-mode.js'
 import { hostLoginKey } from './claude-logins.js'
+import { requireCodexProgram } from './codex-status.js'
 import { effectiveCompact } from './compact.js'
 import { dreamsOn } from './dreams/settings.js'
 import { launchPlan } from './launch-plan.js'
@@ -14,7 +16,7 @@ import type { CodexShapes } from './runtimes/codex/session.js'
 import type { DefaultShapes } from './runtimes/registry.js'
 import { signedInServers } from './sandbox-mcp.js'
 import { sandboxStamp } from './sandbox-stamp.js'
-import { permissionSettings, systemAppend, workingDirs } from './session-options.js'
+import { systemAppend, workingDirs } from './session-options.js'
 import { isClaudeSpec, isCodexSpec, realiseClaude } from './session-realise.js'
 import { sharedToolFolders } from './shared-tools.js'
 import { codexSettings } from './store/codex-settings.js'
@@ -57,7 +59,7 @@ const sorted = (names: Set<string>) => [...names].toSorted((a, b) => a.localeCom
 /** The parts of a spec a process can change under while it starts, read again for its key. */
 async function liveSpec(task: Task) {
   return {
-    rules: await permissionSettings(task),
+    rules: await claudeRules(task),
     deniedToolServers: await taskDeniedServers(task.id),
     toolServers: {
       shared: await sharedToolFolders(task),
@@ -72,16 +74,14 @@ async function liveSpec(task: Task) {
 }
 
 /**
- * What a Codex agent's process starts: the program the user named, and the agent's model and
- * effort, else the runtime's defaults. A runtime that is off or has no program starts nothing.
+ * What a Codex agent's process starts: Seti's copy of the pinned Codex or the program the user
+ * named, and the agent's model and effort, else the runtime's defaults. A runtime that is off,
+ * installing or failed starts nothing.
  */
 async function codexVendor(task: Task): Promise<CodexShapes['vendor']> {
   const settings = await codexSettings.get()
-  if (!settings.enabled || settings.program === null) {
-    throw new Error('Codex is off on this Seti, so this agent cannot start; the user turns it on in Settings, Runtimes')
-  }
   return {
-    binary: settings.program,
+    binary: await requireCodexProgram(settings),
     model: task.requested_model ?? settings.default_model,
     effort: task.requested_effort ?? settings.default_effort,
   }
@@ -109,7 +109,7 @@ async function sessionSpec(task: Task): Promise<SessionSpec> {
     resume: task.session_id,
     cwd: task.cwd,
     dirs: workingDirs(task),
-    mode: task.runtime === 'codex' ? 'default' : permissionModeOf(task),
+    mode: task.runtime === 'codex' ? 'default' : await permissionModeOf(task),
     instructions: { append: await systemAppend(task.id) },
     setiControl: task.seti_control,
     setiDreams: await dreamsOn(task),
