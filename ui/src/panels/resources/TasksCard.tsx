@@ -59,7 +59,11 @@ function Flags({ row }: { row: TaskProcess }) {
 function TaskTitle({ row }: { row: TaskProcess }) {
   const { task } = row
   if (task === null) {
-    return <span className="text-muted-foreground">Claude Code without an agent (pid {row.pid})</span>
+    return (
+      <span className="text-muted-foreground">
+        {row.program ?? 'Claude Code'} without an agent (pid {row.pid})
+      </span>
+    )
   }
   return (
     <span className="flex min-w-0 flex-wrap items-center gap-x-2">

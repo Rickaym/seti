@@ -16,8 +16,11 @@ export function SessionFields({ task, running }: { task: Task; running: boolean 
           <TaskModel task={task} running={running} />
         </Row>
       )}
+      {task.runtime === 'codex' && (
+        <Row label="Runtime">{['Codex', task.requested_effort].filter((part) => part !== null).join(', ')}</Row>
+      )}
       <Row label="Cost">
-        <TaskCost cost={task.cost_usd} />
+        <TaskCost cost={task.cost_usd} estimated={task.runtime === 'codex'} />
       </Row>
       <Row label="Memory">
         <TaskMemory taskId={task.id} />

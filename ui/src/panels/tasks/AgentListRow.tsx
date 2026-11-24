@@ -2,6 +2,7 @@ import { todoProgress, type AgentTodo } from '@seti/shared'
 import { Archive, Pin } from 'lucide-react'
 import { useState } from 'react'
 import { Hint } from '@/components/Hint'
+import { RuntimeBadge } from '@/components/RuntimeBadge'
 import { UnsandboxedBadge } from '@/components/UnsandboxedBadge'
 import { Button } from '@/components/ui/button'
 import { agentColorAttr } from '@/lib/agent-color-sheet'
@@ -119,6 +120,7 @@ export function AgentListRow({ row, selected, draggable, place, archiving, onOpe
           <span className={cn('min-w-0 truncate text-sm font-medium', reason === null && 'flex-1')}>{task.title}</span>
           <StatusLine text={reason} hint={false} className="min-w-[10ch] flex-1" />
           <UnsandboxedBadge task={task} />
+          <RuntimeBadge task={task} />
           <TodoCount todos={task.todos} />
           {task.unseen && <UnseenDot />}
           <span aria-hidden className={cn('w-6 shrink-0 pointer-coarse:w-11', archiving ? 'block' : GAP_ON_ROW)} />

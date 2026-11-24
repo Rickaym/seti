@@ -94,6 +94,7 @@ export function AgentChat({
         agentRunning={running}
         compacting={compacting !== null}
         shellRunning={shell !== null}
+        codex={task.runtime === 'codex'}
         draft={draft}
         onDraftChange={onDraftChange}
         sends={store}

@@ -42,7 +42,8 @@ const RUNTIME_PROGRAMS = new Map([
   ['claude', 'Claude Code'],
   ['codex', 'Codex'],
 ])
-const unmappedLabel = (comm: string) => `${RUNTIME_PROGRAMS.get(comm) ?? 'Claude Code'} without an agent`
+const programOf = (comm: string) => RUNTIME_PROGRAMS.get(comm) ?? 'Claude Code'
+const unmappedLabel = (comm: string) => `${programOf(comm)} without an agent`
 
 /** An agent runtime's process among the server's children, with the task its environment names. */
 interface RuntimeProcess {
@@ -293,6 +294,7 @@ export class ResourceSampler {
     const rssBytes = status?.rssBytes ?? 0
     const row = {
       pid: stat.pid,
+      program: programOf(stat.comm),
       task: taskRef(task, sandboxOn),
       rss_bytes: rssBytes,
       swap_bytes: status?.swapBytes ?? 0,

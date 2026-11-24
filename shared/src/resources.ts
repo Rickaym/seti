@@ -78,7 +78,9 @@ export type ChildProcess = z.infer<typeof childProcessSchema>
 
 export const taskProcessSchema = z.object({
   pid: z.number().int(),
-  /** Null for a Claude Code process that serves no task, such as a capability probe. */
+  /** The runtime the process is, such as Claude Code or Codex; older servers left it out. */
+  program: z.string().optional(),
+  /** Null for a runtime process that serves no task, such as a capability probe. */
   task: z
     .object({
       id: z.string(),

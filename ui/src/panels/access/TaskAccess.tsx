@@ -96,7 +96,8 @@ function awsChipState(aws: AwsOutcome, enabled: number): ChipState {
   return chipState(enabled, aws.state === 'no_role' ? 1 : 0)
 }
 
-function chips({ items, aws }: TaskAccessView): Chip[] {
+/** The chips of what is on; a Codex agent runs without plugins, so it shows none for them. */
+function chips({ items, aws }: TaskAccessView, codex: boolean): Chip[] {
   const on = (kind: AccessItem['kind']) => items.filter((item) => item.kind === kind && item.enabled)
   const count = (kind: AccessItem['kind'], label: string, noun: string): Chip => {
     const n = on(kind).length
@@ -120,7 +121,7 @@ function chips({ items, aws }: TaskAccessView): Chip[] {
     },
     mcpChip(items),
     count('pack', 'packs', 'context packs'),
-    count('plugin', 'plugins', 'plugins'),
+    ...(codex ? [] : [count('plugin', 'plugins', 'plugins')]),
   ]
 }
 
@@ -134,7 +135,15 @@ function CredentialsRow({ task, onChanged }: { task: Task; onChanged: () => void
 }
 
 /** The agent's access at a glance in its details: what is on, muted what is off. */
-export function AccessSummary({ taskId, onOpen }: { taskId: string; onOpen: () => void }) {
+export function AccessSummary({
+  taskId,
+  codex = false,
+  onOpen,
+}: {
+  taskId: string
+  codex?: boolean
+  onOpen: () => void
+}) {
   const { view } = useTaskAccess(taskId)
   return (
     <div className="flex min-w-0 items-start gap-1">
@@ -142,7 +151,7 @@ export function AccessSummary({ taskId, onOpen }: { taskId: string; onOpen: () =
         <span className="text-muted-foreground">Loading...</span>
       ) : (
         <ul aria-label="Access" className="flex min-w-0 flex-1 flex-wrap gap-1">
-          {[...chips(view), setiChip(view.seti_control)].map((chip) => {
+          {[...chips(view, codex), setiChip(view.seti_control)].map((chip) => {
             const Icon = chip.icon
             return (
               <li key={chip.key} className="min-w-0">

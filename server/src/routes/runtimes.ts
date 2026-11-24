@@ -1,4 +1,4 @@
-import { codexSettingsInput } from '@seti/shared'
+import { codexSettingsInput, type RuntimesStatus } from '@seti/shared'
 import { Hono } from 'hono'
 import { codexStatus, updateCodexSettings } from '../codex-status.js'
 import { eaReadOnly } from '../ea-guard.js'
@@ -9,5 +9,5 @@ const userOnly = eaReadOnly('change the Codex runtime settings')
 
 export const runtimeRoutes = new Hono()
   .use('*', userOnly)
-  .get('/', async (c) => ok(c, { codex: await codexStatus() }))
+  .get('/', async (c) => ok(c, { codex: await codexStatus() } satisfies RuntimesStatus))
   .put('/codex', validJson(codexSettingsInput), async (c) => ok(c, await updateCodexSettings(c.req.valid('json'))))
