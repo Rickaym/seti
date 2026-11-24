@@ -327,9 +327,16 @@ ACTION_SPECS: list[ToolSpec] = [
     ToolSpec(
         "unlink_pr",
         "Unlink a pull request from an agent or one of its subagents; Seti then never links it to that "
-        "agent again on its own. Needs the user's yes.",
-        {"task": TASK_REF, "pr": PR_REF, "subagent": SUBAGENT_REF, "confirmed": CONFIRMED},
-        ["task", "pr"],
+        "agent again on its own. Or, with thread instead of pr, stop the agent following a Slack thread "
+        "it posted in, so replies there no longer reach it. Needs the user's yes.",
+        {
+            "task": TASK_REF,
+            "pr": PR_REF,
+            "thread": {"type": "integer", "description": "A followed thread's id, as get_task lists it."},
+            "subagent": SUBAGENT_REF,
+            "confirmed": CONFIRMED,
+        },
+        ["task"],
     ),
     ToolSpec(
         "start_agent_from_pr",
@@ -1055,6 +1062,9 @@ class AgentActions:
 
     async def unlink_pr(self, args: Mapping[str, Any]) -> ToolResult:
         task, title = await self._task_ref(args)
+        thread = args.get("thread")
+        if isinstance(thread, int) and not isinstance(thread, bool):
+            return await self._stop_thread(args, task, title, thread)
         ref = arg_str(args, "pr")
         sub_ref = arg_str(args, "subagent", required=False)
         sub = await self._find.resolve_subtask(task, sub_ref) if sub_ref else None
@@ -1076,6 +1086,18 @@ class AgentActions:
             return ask("unlink_pr", args, effect, f"unlink {label}")
         await self._seti.delete(path, {"url": url})
         return ToolResult(f"Unlinked {label} from {owner}.", clip(f"Unlinked {label} from {title}", 70))
+
+    async def _stop_thread(
+        self, args: Mapping[str, Any], task: Mapping[str, Any], title: str, thread: int
+    ) -> ToolResult:
+        path = f"/tasks/{task.get('id')}/threads/{thread}/stop"
+        if not await self._cleared(args, gate_key("unlink_pr", path)):
+            effect = (
+                f"This stops {title} following that Slack thread: replies there no longer reach the agent."
+            )
+            return ask("unlink_pr", args, effect, "stop following the thread")
+        await self._seti.post(path, {})
+        return ToolResult(f"{title} no longer follows that thread.", clip(f"Stopped a thread of {title}", 70))
 
     async def start_agent_from_pr(self, args: Mapping[str, Any]) -> ToolResult:
         pr = await self._find.resolve_pr(arg_str(args, "pr"))

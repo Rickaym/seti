@@ -17,7 +17,8 @@ def _thread_line(thread: Mapping[str, Any], now: datetime) -> str:
     where = f"{thread.get('service')} {channel}, thread {thread.get('thread')}"
     replies = plural(int(thread.get("replies") or 0), "reply", "replies")
     link = f" {thread.get('url')}" if thread.get("url") else ""
-    return f"- {where}: {replies}, last activity {ago(thread.get('last_activity_at'), now)}.{link}"
+    when = ago(thread.get("last_activity_at"), now)
+    return f"- {where} (id {thread.get('id')}): {replies}, last activity {when}.{link}"
 
 
 async def thread_lines(seti: SetiClient, task_id: str, now: datetime) -> list[str]:

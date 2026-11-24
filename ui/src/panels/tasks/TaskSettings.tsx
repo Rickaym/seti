@@ -39,6 +39,7 @@ import { TaskLocation } from '@/panels/tasks/TaskLocation'
 import { TaskNotify } from '@/panels/tasks/TaskNotify'
 import { TaskCredentials } from '@/panels/tasks/TaskProfile'
 import { TaskTeam } from '@/panels/tasks/TaskTeam'
+import { TaskThreads } from '@/panels/tasks/TaskThreads'
 import { useArchive } from '@/panels/tasks/useArchive'
 import { useSessionRestart } from '@/panels/tasks/useSessionRestart'
 import { WorkspaceSelect } from '@/panels/tasks/workspaces/WorkspaceSelect'
@@ -236,6 +237,9 @@ export const TaskSettings = memo(function TaskSettingsView({
         </Row>
         <Row label="Channels">
           <TaskChannels taskId={task.id} onCount={setChannelCount} />
+        </Row>
+        <Row label="Threads">
+          <TaskThreads taskId={task.id} />
         </Row>
         {(task.pr_urls.length > 0 || channelCount > 0) && (
           <Row label="Updates">

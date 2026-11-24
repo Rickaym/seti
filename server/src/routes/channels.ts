@@ -43,11 +43,13 @@ import { slackNames } from '../store/slack-names.js'
 import { threadFollows } from '../store/threads.js'
 import { requireTask } from '../tasks.js'
 import { setWebhookThreads, THREAD_SWITCHES } from '../threads/actions.js'
+import { stopFollowing } from '../threads/stop.js'
 import { pollerRoutes } from './pollers.js'
 import { reminderRoutes } from './reminders.js'
 
 const idParam = z.object({ id: z.string().regex(HOOK_ID) })
 const subscriptionParam = idParam.extend({ sub: z.coerce.number().int().positive() })
+const threadParam = z.object({ id: z.string().min(1), follow: z.coerce.number().int().positive() })
 
 /** Webhooks, pollers and reminders: settings, events, deliveries; secrets once, never to the EA. */
 export const channelRoutes = new Hono()
@@ -136,6 +138,10 @@ export const channelRoutes = new Hono()
 export const taskChannelRoutes = new Hono()
   .get('/:id/channels', async (c) => ok(c, await subscriptions.forTask(c.req.param('id'))))
   .get('/:id/threads', async (c) => ok(c, await threadFollows.forTask((await requireTask(c.req.param('id'))).id)))
+  .post('/:id/threads/:follow/stop', valid('param', threadParam), async (c) => {
+    const { id, follow } = c.req.valid('param')
+    return ok(c, await stopFollowing(id, follow))
+  })
 
 /** Mounted under /api/ea: the channels whose events reach the EA's inbox. */
 export const eaChannelRoutes = new Hono().get('/channels', async (c) => ok(c, await subscriptions.forEa()))
