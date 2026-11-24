@@ -70,7 +70,8 @@ These paths answer without a token, a session or Access, each with its own check
 `/api/local-session` (the local token, on loopback); `/api/auth` sign-in and setup calls (rate
 limited); `/api/devices/pair` (a one-time code) and `/api/widget/summary` (a device proof); the
 static `/pair` page and `/.well-known/assetlinks.json`; `POST /hooks/<id>`; and `GET` or `HEAD` of
-`/share/<token>`, its `/raw`, `/p/1` to `/p/50` and `/card.png`. The app's own page and static
+`/share/<token>`, its `/raw`, `/p/1` to `/p/50`, `/card.png`, and a live share's `/live` and
+`/static`. The app's own page and static
 files need no API credential; on a public hostname they sit behind Access when Access is set up.
 
 ## The settings document
