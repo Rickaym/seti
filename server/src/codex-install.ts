@@ -121,9 +121,10 @@ export async function installCodex(actor: 'user' | 'system', pin: CodexPin = COD
   return run
 }
 
-/** The version folders and leftover downloads in the root that the current settings keep. */
+/** The folders in the root that installs in flight and the current settings keep. */
 function kept(pin: CodexPin, settings: CodexSettings): Set<string> {
-  const keep = new Set([...running.keys()].map((version) => stagingDir(CODEX_ROOT, version)))
+  const busy = [...running.keys()]
+  const keep = new Set([...busy.map((v) => stagingDir(CODEX_ROOT, v)), ...busy.map((v) => versionDir(CODEX_ROOT, v))])
   if (wantsCopy(settings)) {
     keep.add(versionDir(CODEX_ROOT, pin.version)).add(stagingDir(CODEX_ROOT, pin.version))
   }
@@ -136,6 +137,15 @@ function kept(pin: CodexPin, settings: CodexSettings): Set<string> {
  * stays until a later sweep finds it free.
  */
 export async function sweepCodex(pin: CodexPin = CODEX_PIN): Promise<string[]> {
+  const run = sweeping.then(async () => sweepOnce(pin))
+  sweeping = run.catch(() => undefined)
+  return run
+}
+
+/** The sweep running now, which the next one waits for, so two never remove at once. */
+let sweeping: Promise<unknown> = Promise.resolve()
+
+async function sweepOnce(pin: CodexPin): Promise<string[]> {
   const names = await fs.promises.readdir(CODEX_ROOT).catch(() => [])
   const keep = kept(pin, await codexSettings.get())
   const removed: string[] = []

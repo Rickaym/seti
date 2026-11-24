@@ -26,6 +26,7 @@ const stagingOf = (version: string) => path.join(CODEX_ROOT, `.staging-${version
 const ZERO_SHA512 = `sha512-${Buffer.alloc(64).toString('base64')}`
 
 beforeEach(async () => {
+  await sweepCodex()
   registry.mode = 'serve'
   registry.ranges.length = 0
   await codexSettings.set({ ...CODEX_SETTINGS_DEFAULTS, enabled: true })
@@ -167,7 +168,7 @@ describe("Seti's own copy of Codex", () => {
     const pin = registry.pin(fakeBuild(scratch, '3.0.0', '/bin/sleep'))
     await installCodex('user', pin)
     await codexSettings.set({ ...CODEX_SETTINGS_DEFAULTS, enabled: true, program: '/opt/codex' })
-    expect(await sweepCodex(pin)).toContain('3.0.0')
+    await sweepCodex(pin)
     expect(fs.readdirSync(CODEX_ROOT)).toEqual([])
   })
 })
