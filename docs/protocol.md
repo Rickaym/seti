@@ -440,13 +440,22 @@ interrupted only for that.
   swaps it for the value in the URL path and headers (Basic auth too), on the connection's hosts
   and port 443 only. A readable request that carries a placeholder elsewhere MUST be refused (403)
   and audited. A connection with no value answers 502. The agent is told where the value is
-  swapped and that a body is not.
+  swapped, and in which connections' bodies (EGR-15).
 - EGR-14: On its connections' hosts the proxy reads the body of a JSON, form, multipart or plain
   text request without a content encoding, holding at most 1 MiB, before anything goes upstream;
-  every other body streams on unread. A held body carrying a placeholder MUST be refused (403)
-  and audited as in EGR-5, naming the connection and never its value, since Seti does not swap a
-  value into a body. A body over 1 MiB streams on while the proxy watches the rest; a placeholder
-  in it cuts the request off and answers 413. A held body goes upstream with its exact length.
+  every other body streams on unread. A held body carrying a placeholder toward a host its
+  connection does not allow, or of a connection with Body off, MUST be refused (403) and audited
+  as in EGR-5, naming the connection and never its value, and nothing is sent upstream. A body
+  over 1 MiB streams on while the proxy watches the rest; a placeholder in it cuts the request off
+  and answers 413. A held body goes upstream with its exact length.
+- EGR-15: A connection's Body setting is off by default and only the user changes it. With it on,
+  the proxy swaps the value into a held body (EGR-14) on the connection's hosts: string-escaped
+  in JSON, URL-encoded in a form, raw in plain text and in a multipart text field (no file name,
+  no type or `text/plain`), never into another body type. A value with a line break in a
+  multipart field, or a placeholder in a file part or a part header, is refused (422) rather than
+  sent with the placeholder. On such a connection's hosts a JSON, form, multipart or plain text
+  body with a content encoding is refused (415), since it cannot be searched. The setting travels
+  in the value-free grant (NODE-8). Response bodies are not scrubbed.
 - EGR-7: A header "added by the proxy" is set from its template on every request to the
   connection's hosts, first matching rule winning. The code-host token is the credential's one for
   the owner named, else its default, never another credential's; minted tokens are cached until
@@ -512,6 +521,20 @@ interrupted only for that.
   waiting. Only one answer reaches the runtime, the user's or the rules', and it is audited once.
   A request whose turn has stopped is left as it is.
 
+- PERM-15: A command of any agent, on any runtime and in every mode including bypass, that
+  pushes to, forks, opens a pull request on or writes through the code host's API to a repository
+  outside the user's own MUST become a request before it runs, reading "Push to <owner>/<repo>,
+  outside your organisations" or the like; it is an ask, never a refusal. The user's own are the
+  owners of the signed-in code-host account and its organisations, read on the control plane and
+  cached for about an hour, and the owners of the repositories the agent was given. The
+  implementation reads the command past wrappers, nested scripts and `cd`, resolves a remote or
+  URL under HST-2 with the repository's and the agent's own global git config and URL rewrites,
+  in the folder as the agent sees it (a sandbox's private home and /tmp included), and asks
+  whenever it cannot place the target: the same command changes remotes, git config or git's
+  environment, sets the code host's repository or host variables, or pushes submodules. A push
+  to a local path does not ask. An allow rule `PushTo(<owner>)`, which only the user adds, lets
+  that code-host owner through; it is never handed to a runtime.
+
 ### 7.5 Guards
 
 - GRD-1: Shell guard, every agent, whatever the rules or bypass: recursive delete with a computed
@@ -540,8 +563,8 @@ interrupted only for that.
 
 ### 7.6 Change requests
 
-- CHG-1: Kinds: `allow_host {host, port}`, `api_key {env, hosts[1..5]}`, `mcp_server {server}`,
-  `shared_tool` (section 9), each with a `reason` (10 to 500). The answer is
+- CHG-1: Kinds: `allow_host {host, port}`, `api_key {env, hosts[1..5], body?}`,
+  `mcp_server {server}`, `shared_tool` (section 9), each with a `reason` (10 to 500). The answer is
   `{decision: allow, scope: agent | all, value?}` (`value` for `api_key` only) or
   `{decision: deny}`.
 - CHG-2: MUST be refused: hosts on the machine or its networks; wildcards over a public suffix;
@@ -551,7 +574,8 @@ interrupted only for that.
   `chg_hourly` an hour. A request expires after `chg_expiry`.
 - CHG-5: Allow applies as the user: the host to the agent's or the shared allowlist; the server on
   for the agent; the connection into the asking agent's credential on those hosts, joining an
-  existing one with that variable only on the same hosts and only filling an empty value. The
+  existing one with that variable only on the same hosts and only filling an empty value, and
+  turning on its Body (EGR-15) when the request asked for `body`. The
   agent gets one `seti` update with the outcome and whether a value is set.
 - CHG-7: The pasted value MUST travel only in the user's Allow and MUST NOT enter the request, the
   update, the transcript, events, errors or the audit.
@@ -996,7 +1020,10 @@ Optional and off by default: a maintenance session per agent that consolidates i
   and removal is audited with path and bytes, never content.
 - DRM-12: A turn of the agent that starts during its dream cuts the dream. A restart cuts it too;
   the memory changes it made before the cut are still recorded. A cut nightly dream is planned
-  once more within its window; cut again, it has failed.
+  once more within its window; cut again, it has failed. A dream ends once: its end is stored
+  with its `dream.ended` event in one transaction, after the events of its memory changes, so no
+  reader finds an ended dream without that event. A restart leaves a dream running until both
+  are stored.
 - DRM-13: A dream stops at its budget per dream (`dream_budget` by default), `dream_steps` or
   `dream_time`, and runs on the model the settings name. Its cost is stored on the dream, not on
   the agent's turns.
@@ -1150,19 +1177,19 @@ An implementation is SETI-compatible when it meets all of:
 
 ### 20.2 Profiles
 
-| Profile       | Adds                                                                          |
-| ------------- | ----------------------------------------------------------------------------- |
-| Sandbox       | all SBX, EGR, HST, CAP, SEC and CHG; PERM-10, PERM-13; GRD-2, GRD-7 to GRD-12 |
-| Shared tools  | all TOOL (requires Sandbox)                                                   |
-| Events        | all CHN; PUB-2 (hooks)                                                        |
-| Pull requests | all PR                                                                        |
-| Team          | all CHAT                                                                      |
-| Assistant     | all EA; LVL-6                                                                 |
-| Separate node | all NODE                                                                      |
-| Mods          | all MOD                                                                       |
-| Sharing       | PUB-4, PUB-7                                                                  |
-| Devices       | API-11                                                                        |
-| Storage       | RES-16 to RES-19                                                              |
+| Profile       | Adds                                                                                   |
+| ------------- | -------------------------------------------------------------------------------------- |
+| Sandbox       | all SBX, EGR, HST, CAP, SEC and CHG; PERM-10, PERM-13, PERM-15; GRD-2, GRD-7 to GRD-12 |
+| Shared tools  | all TOOL (requires Sandbox)                                                            |
+| Events        | all CHN; PUB-2 (hooks)                                                                 |
+| Pull requests | all PR                                                                                 |
+| Team          | all CHAT                                                                               |
+| Assistant     | all EA; LVL-6                                                                          |
+| Separate node | all NODE                                                                               |
+| Mods          | all MOD                                                                                |
+| Sharing       | PUB-4, PUB-7                                                                           |
+| Devices       | API-11                                                                                 |
+| Storage       | RES-16 to RES-19                                                                       |
 
 An implementation without the Sandbox profile MUST NOT claim that agents are untrusted, and MUST
 treat every agent as holding the user's access.
