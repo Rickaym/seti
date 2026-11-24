@@ -197,6 +197,7 @@ export async function openModelProxy(taskId: string, model: ModelReach): Promise
     ...modelOnly(async () => mint(taskId, { kind: 'claude', login: modelReaches.get(taskId)?.login ?? null })),
     rules: () => keyRules(taskId).rules,
     placeholders: () => keyRules(taskId).placeholders,
+    ...(testEgress === null ? {} : { upstream: testEgress.upstream, onRefused: testEgress.refused }),
   })
   modelProxies.set(taskId, started)
   started.catch(() => modelProxies.delete(taskId))

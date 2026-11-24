@@ -3,6 +3,7 @@ import { SETI_TOOLS } from './catalog.js'
 import { KNOWLEDGE_TOOLS } from './knowledge.js'
 import { modActionTools } from './mod-actions.js'
 import { REQUEST_TOOLS, SECRET_TOOLS } from './requests.js'
+import { OPINION_TOOLS } from './second-opinion.js'
 import { SELF_TOOLS } from './self.js'
 import { HANDOFF_TOOLS } from './team.js'
 import type { SetiTool } from './tool.js'
@@ -75,12 +76,19 @@ function onCaller(entry: SetiTool, key: string): SetiTool {
 const SELF_LEVEL: readonly SetiTool[] = [
   ...EVERY_AGENT,
   ...REQUEST_TOOLS,
+  ...OPINION_TOOLS,
   ...KNOWLEDGE_TOOLS,
   ...Object.entries(ON_ONE_AGENT).map(([name, key]) => onCaller(named(name), key)),
   ...READS_SETI.map(named),
 ]
 
-const FULL_LEVEL: readonly SetiTool[] = [...EVERY_AGENT, ...REQUEST_TOOLS, ...KNOWLEDGE_TOOLS, ...SETI_TOOLS]
+const FULL_LEVEL: readonly SetiTool[] = [
+  ...EVERY_AGENT,
+  ...REQUEST_TOOLS,
+  ...OPINION_TOOLS,
+  ...KNOWLEDGE_TOOLS,
+  ...SETI_TOOLS,
+]
 
 /** The seti tools an agent gets at each Seti control level, with those of the mods that are on. */
 export function toolsFor(level: SetiControlLevel): readonly SetiTool[] {

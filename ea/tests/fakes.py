@@ -581,6 +581,17 @@ def default_update() -> dict[str, Any]:
     }
 
 
+def default_runtimes() -> dict[str, Any]:
+    claude = {
+        "program": "/usr/bin/claude",
+        "version": "2.3.1",
+        "default_model": "opus",
+        "default_effort": None,
+        "sign_in": "login",
+    }
+    return {"claude": claude, "codex": {"state": "off"}, "offers": []}
+
+
 def default_account() -> dict[str, Any]:
     return {
         "account": {
@@ -688,6 +699,7 @@ class FakeSeti:
     plugins: dict[str, Any] = field(default_factory=default_plugins)
     shared_tools: list[dict[str, Any]] = field(default_factory=list)
     account: dict[str, Any] = field(default_factory=default_account)
+    runtimes: dict[str, Any] = field(default_factory=default_runtimes)
     changelog: dict[str, Any] = field(default_factory=default_changelog)
     update: dict[str, Any] = field(default_factory=default_update)
     home: dict[str, Any] = field(default_factory=default_home)
@@ -711,6 +723,15 @@ class FakeSeti:
     change_requests: list[dict[str, Any]] = field(default_factory=list)
     permission_requests: list[dict[str, Any]] = field(default_factory=list)
     request_timeout_minutes: int = 60
+    settings_doc: dict[str, Any] = field(
+        default_factory=lambda: {
+            "version": 1,
+            "revision": "r1",
+            "app": {"ea": {"wake_enabled": False, "wake_phrase": "Hey Seti"}},
+            "agents": {"lifecycle": {"auto_archive": {"enabled": True, "days": 7}}},
+            "mods": {},
+        }
+    )
     policy_shadow: dict[str, Any] = field(
         default_factory=lambda: {"since": "2026-09-21", "results": {}, "slow": 0, "differences": []}
     )
@@ -1270,6 +1291,8 @@ class FakeSeti:
                 return ok(self.shared_tools)
             case ["account"]:
                 return ok(self.account)
+            case ["runtimes"]:
+                return ok(self.runtimes)
             case ["mods", "whats-new", "changelog"]:
                 limit = int(params.get("limit", "200"))
                 return ok({**self.changelog, "entries": self.changelog["entries"][:limit]})
@@ -1305,6 +1328,8 @@ class FakeSeti:
                 return ok([q for q in self.questions if q["status"] == "open"])
             case ["permissions", "shadow"]:
                 return ok(self.policy_shadow)
+            case ["settings-doc"]:
+                return ok(self.settings_doc)
             case ["permissions", "timeout"]:
                 return ok({"request_timeout_minutes": self.request_timeout_minutes, "updated_at": None})
             case ["requests"]:

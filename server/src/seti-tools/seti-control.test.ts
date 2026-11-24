@@ -135,7 +135,7 @@ describe('the Seti control level', () => {
     await waitIdle(task.id)
     expect(sdk.fake.sessions).toHaveLength(sessions + 1)
     expect(sdk.fake.last?.options.mcpServers?.seti).toMatchObject({ type: 'sdk', name: 'seti' })
-    expect(on && sessionTools(on)).toHaveLength(SETI_TOOLS.length + 5 + KNOWLEDGE_TOOLS.length)
+    expect(on && sessionTools(on)).toHaveLength(SETI_TOOLS.length + 6 + KNOWLEDGE_TOOLS.length)
   })
 
   it('tells the agent at its next turn that its seti tools came or went', async () => {

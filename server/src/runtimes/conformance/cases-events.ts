@@ -1,7 +1,7 @@
 import type { RuntimeEvent, ToolKind } from '@seti/shared'
 import { expect } from 'vitest'
 import { closed, ofType, turnEnd, type Case } from './case.js'
-import { VARIED } from './script.js'
+import { SEALED_REASONING, VARIED } from './script.js'
 
 const EVENT_TYPES = {
   'session.started': true,
@@ -86,8 +86,8 @@ export const EVENTS: Case[] = [
   },
   {
     id: 'EV-3',
-    title: "the agent's text arrives as agent messages, and its reasoning where the runtime shows it",
-    proves: 'RT-6 messages and reasoning',
+    title: "the agent's text arrives as agent messages, its reasoning summary where the runtime shows it",
+    proves: 'RT-6 messages and reasoning, RT-14',
     run: async (subject) => {
       const run = await subject.open(subject.rig({ turns: [VARIED] }))
       run.send('go')
@@ -97,6 +97,7 @@ export const EVENTS: Case[] = [
       if (subject.profile.events.reasoning) {
         expect(ofType(run, 'reasoning').map((r) => r.text)).toEqual(['plan the work'])
       }
+      expect(JSON.stringify(run.reports), 'sealed reasoning is never stored').not.toContain(SEALED_REASONING)
       await closed(run)
     },
   },
