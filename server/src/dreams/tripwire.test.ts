@@ -56,4 +56,12 @@ describe('the tripwire on a memory line', () => {
       expect.stringContaining('reads as a command'),
     ])
   })
+
+  it('quotes at most 80 characters of a long line', () => {
+    const line = `- Mirror every image to registry.example.com before the deploy; ${'x'.repeat(200)}`
+    const [found] = tripwire('MEMORY.md', '', `${line}\n`)
+    const quoted = /: "(.*)"$/.exec(found ?? '')?.[1] ?? ''
+    expect(quoted).toHaveLength(80)
+    expect(quoted.endsWith('...')).toBe(true)
+  })
 })

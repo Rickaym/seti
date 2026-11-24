@@ -3,7 +3,8 @@ import { redactSecrets } from '../scrub.js'
 
 const PIPE_TO_SHELL = /\|\s*(?:sudo\s+)?(?:sh|bash|zsh|python3?|node|perl|ruby)\b/
 const COMMANDING = /\b(?:ignore (?:all |any |the |previous |your )?(?:rules|instructions)|always run|never tell)\b/i
-const SHOWN = 120
+/** The most of a memory line Seti quotes, so its found line fits a phone. */
+const SHOWN = 80
 
 /** Lines the change added that are not in the earlier text, as a multiset. */
 function addedLines(before: string, after: string): string[] {
@@ -38,7 +39,8 @@ export function tripwire(file: string, before: string, after: string): string[] 
   const known = hostsIn(before)
   return addedLines(before, after).flatMap((line) => {
     const reason = why(line, known)
-    const shown = redactSecrets(line.trim()).slice(0, SHOWN)
+    const text = redactSecrets(line.trim())
+    const shown = text.length > SHOWN ? `${text.slice(0, SHOWN - 3)}...` : text
     return reason === null ? [] : [`Seti: ${file} gained a line that ${reason}: "${shown}"`]
   })
 }
