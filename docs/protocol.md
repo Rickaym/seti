@@ -232,7 +232,8 @@ between two steps; an interrupt; a hook at subagent start.
   `The message from the user follows.` and the prompt, or says none came and to act as the task
   requires.
 - UPD-13: Each update is wrapped in a tag by source. Attribute values are escaped, and a body MUST
-  NOT be able to close its tag:
+  NOT be able to open or close any of these tags, in any case or spacing. The planner's message
+  is held the same way:
 
 ```
 <update source="pr" kind="K" subject="S" url="U">TITLE BODY</update>
