@@ -21,7 +21,6 @@ import { TaskPrs } from '@/panels/tasks/TaskPrs'
 import { TaskTitle } from '@/panels/tasks/TaskTitle'
 import type { ActionHandlers, Running } from '@/panels/tasks/agent-actions'
 import type { AgentFrame } from '@/panels/tasks/agent-frame'
-import { repoLabel, shortRepoLabel } from '@/panels/tasks/agent-list'
 import { usePin } from '@/panels/tasks/usePin'
 
 /** Most PRs the header row shows, fewer when they do not fit one line; the rest open from a list. */
@@ -30,17 +29,14 @@ const COMPACT_SHOWN_PRS = 2
 
 interface TaskMetaProps {
   task: TaskListEntry
-  /** Names the repos without owners and shows fewer PRs; a folder always shows by its name. */
+  /** Shows fewer PRs, for a narrow header. */
   compact?: boolean
 }
 
-/** Where the agent works, its PRs and its status line on one line. */
+/** The agent's PRs and its status line on one line. */
 function TaskMeta({ task, compact = false }: TaskMetaProps) {
   return (
     <div className="flex min-w-0 items-center gap-x-3 text-xs text-muted-foreground">
-      <span className="min-w-0 truncate" title={task.cwd}>
-        {compact || task.repos.length === 0 ? shortRepoLabel(task) : repoLabel(task)}
-      </span>
       <TaskPrs task={task} limit={compact ? COMPACT_SHOWN_PRS : SHOWN_PRS} />
       <StatusLine text={task.blocked ?? task.status_line} className="min-w-[10ch] flex-1" />
     </div>

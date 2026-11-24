@@ -155,8 +155,14 @@ between two steps; an interrupt; a hook at subagent start.
   that key, and its status MUST read "no key", not ready, while the default credential holds none.
   The status MAY name the one connection for that key the default credential lacks, but nothing
   but the user changes a credential or connection for it. Only the user changes a runtime's
-  settings, and each change is audited.
-- RT-10: Turning a runtime on installs the version the control room pins, in the background;
+  settings, and each change is audited. The control room MUST offer a new agent the models of the
+  default runtime always and those of another runtime only while that runtime can start one; the
+  runtimes it offers MUST be readable with their models and efforts.
+- RT-10: A new agent's start MAY name a runtime, a model and an effort. A model alone MUST pick the
+  one runtime that offers it, and a start naming neither runs on the default runtime with the
+  user's default model. A model no runtime offers, a runtime and model that disagree, and an
+  effort the runtime does not offer MUST be refused with the reason.
+- RT-11: Turning a runtime on installs the version the control room pins, in the background;
   pressing Retry and the control room's start while the runtime is on are the only other
   triggers, and the EA and agents can trigger none of them. The install contacts only the host
   the pin names, MUST check the downloaded package's sha512 integrity and then the program's
@@ -167,7 +173,7 @@ between two steps; an interrupt; a hook at subagent start.
   audit log with the version and checksum. A user MAY name a program of their own instead, for a
   machine without network access; it MUST report the pinned version, and nothing is fetched for
   it.
-- RT-11: When an upgrade moves the pin, the control room installs the new version at its start if
+- RT-12: When an upgrade moves the pin, the control room installs the new version at its start if
   the runtime is on. A running session keeps the program it started with until it ends or
   restarts; a version folder no running program uses, and that the settings no longer need, is
   removed, as is every copy once the runtime is off or runs a program of the user's. Nothing

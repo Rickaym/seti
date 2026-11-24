@@ -491,12 +491,14 @@ Agents run on Claude Code. An agent can run on OpenAI's Codex instead; Codex is 
 and only you change that.
 
 1. In Settings, Runtimes, turn Codex on. Seti installs the version it is built for into
-   `~/.seti/codex/<version>/` and checks it first (RT-10 in [the protocol](protocol.md#35-runtime));
+   `~/.seti/codex/<version>/` and checks it first (RT-11 in [the protocol](protocol.md#35-runtime));
    the status reads Installing, then No key.
 2. In Settings, Connections, add a connection with your OpenAI key for `api.openai.com`, with the
    header `Authorization: Bearer {{value}}`, in the default credential. The status reads Ready.
    The agent holds a placeholder; the egress proxy puts the key on requests to OpenAI's API only.
-3. On the start page, turn on Codex beside the message box and start the agent.
+3. On the start page, pick a Codex model in the Model selector beside the message box, and an
+   effort if you want one, then start the agent. The selector lists Codex models only while the
+   status reads Ready.
 
 When an upgrade moves the pinned version, Seti installs the new one at its start and removes the
 old one once no agent runs it. With a separate node (`SETI_NODE=split`), `seti.service` installs

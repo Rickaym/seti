@@ -455,11 +455,15 @@ TOOL_SPECS: list[ToolSpec] = [
                 "type": "string",
                 "enum": ["claude", "codex"],
                 "description": "Only when the user asks for Codex: the agent runs on OpenAI's Codex "
-                "instead of Claude Code. Seti refuses it while the user has Codex off.",
+                "instead of Claude Code. Left out, the model picks it. Seti refuses Codex while the "
+                "user has it off.",
             },
             "model": {
                 "type": "string",
-                "description": "Only for a Codex agent, when the user names one: its model.",
+                "description": "Only when the user names one: its model, which picks the runtime "
+                "that offers it, so a Codex model alone starts a Codex agent. Claude Code agents take "
+                "none and run on the user's default model. Seti refuses a model no runtime offers or "
+                "one that does not run on the named runtime.",
             },
             "effort": {
                 "type": "string",
