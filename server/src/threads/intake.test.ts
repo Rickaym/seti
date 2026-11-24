@@ -1,9 +1,11 @@
 import type { WebhookChannelInfo } from '@seti/shared'
 import { describe, expect, it } from 'vitest'
+import { asAgent } from '../access.js'
 import { sql } from '../db.js'
 import { auditEvents } from '../store/audit.js'
 import { channelStore } from '../store/channels.js'
 import { EA_AUTH } from '../test-auth.js'
+import { setWebhookThreads } from './actions.js'
 import { DM_WINDOW_MS } from './intake.js'
 import { agentSends, api, data, deliver, message, quietTask, slackWebhook } from './slack-test-kit.js'
 
@@ -52,6 +54,11 @@ describe('Slack message events at the webhook', () => {
     const channel = await slackWebhook('Switches')
     const refused = await api('PUT', `/channels/${channel.id}/threads`, { replies: true }, EA_AUTH)
     expect(refused.status).toBe(403)
+    const agent = { id: await quietTask(), title: 'Full agent', seti_control: 'full' as const }
+    await expect(asAgent(agent, async () => setWebhookThreads(channel.id, { replies: true }))).rejects.toThrow(
+      /Agents cannot/,
+    )
+    expect((await channelStore.get(channel.id))?.thread_replies).toBe(false)
     expect((await switches(channel, { replies: true })).threads).toMatchObject({ replies: true, dms: true })
     expect((await switches(channel, { dms: false })).threads).toMatchObject({ replies: true, dms: false })
     expect((await switches(channel, { replies: false, dms: false })).threads).toMatchObject({ replies: false })
@@ -68,8 +75,9 @@ describe('Slack message events at the webhook', () => {
   it('queue a reply for each agent that posted earlier in the thread, once, with secrets redacted', async () => {
     const channel = await slackWebhook('Replies')
     await switches(channel, { replies: true })
-    const [first, second] = [await quietTask(), await quietTask()]
+    const [first, second, bystander] = [await quietTask(), await quietTask(), await quietTask()]
     await agentSends(first, MULTI, ROOT)
+    await agentSends(bystander, MULTI, '1700000010.000100')
     await deliver(channel, reply('1700000020.000100', { channel: MULTI }))
     await agentSends(second, MULTI, '1700000030.000100', ROOT)
     const later = reply('1700000040.000100', { channel: MULTI, text: `token ghp_${'z'.repeat(36)} works` })
@@ -79,6 +87,7 @@ describe('Slack message events at the webhook', () => {
     const [mine] = await queued(second)
     expect(mine?.message).toBe('1700000040.000100')
     expect(mine?.text).not.toContain('z'.repeat(36))
+    expect(await queued(bystander)).toEqual([])
   })
 
   it('never queue a message a Seti agent sent, nor edits and other threads', async () => {
