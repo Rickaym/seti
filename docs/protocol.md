@@ -148,7 +148,8 @@ between two steps; an interrupt; a hook at subagent start.
   that resumes nothing and saves nothing, with the runtime's read, search, edit and shell tools and
   the control room's own, and no question tool, subagents, web tools, plugins, hooks or tool
   servers of the user's. Every tool call passes the control room's gate first, which allows or
-  denies it and never asks; the runtime's own memory consolidation is off in it.
+  denies it and never asks; the runtime's own memory consolidation is off in it. It also says how
+  to read the session's cost so far from the runtime's messages.
 - RT-9: A runtime besides the default is off until the user turns it on. Its status reads off,
   installing, failed with a reason the user can retry, no key, or ready. While it is not ready, a
   new agent or session on it MUST be refused with that reason; its agents stay readable. A runtime
@@ -1025,8 +1026,9 @@ Optional and off by default: a maintenance session per agent that consolidates i
   reader finds an ended dream without that event. A restart leaves a dream running until both
   are stored.
 - DRM-13: A dream stops at its budget per dream (`dream_budget` by default), `dream_steps` or
-  `dream_time`, and runs on the model the settings name. Its cost is stored on the dream, not on
-  the agent's turns.
+  `dream_time`, and runs on the model the settings name. Its cost is what its runtime reports for
+  the dream's session, stored on the dream, not on the agent's turns; Seti stops a dream whose
+  reported cost passes its budget while the runtime lets it go on.
 - DRM-14: The first brief after a night's window holds one line for the night: agents dreamt, how
   many want the user, the cost. It never counts toward Needs you, and nothing about dreams
   notifies at night.
