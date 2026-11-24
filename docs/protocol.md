@@ -1005,8 +1005,9 @@ Optional and off by default: a maintenance session per agent that consolidates i
   notifies at night.
 - DRM-15: Text a dream reads is data. A memory write that carries a credential, a hidden file or a
   file that is not text MUST be refused, and so MUST every tool call the gate does not allow.
-  Added memory lines that name a new host, pipe into an interpreter or read as commands are listed
-  in the report as Seti's own findings.
+  Added memory lines that name a new host (an IP address, or a name under a public or
+  private-network suffix; not a file name, path, version or dotted identifier), pipe into an
+  interpreter or read as commands are listed in the report as Seti's own findings.
 - DRM-16: Dream now runs one dream of an agent at once, by the user, the EA after the user's yes,
   or an agent at `full` on another agent; it is refused on the agent itself. The EA, an agent or
   a mod starts at most one dream of an agent a day; only the user starts more. Dream now waits for
