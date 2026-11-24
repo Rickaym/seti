@@ -37,7 +37,7 @@ export function fakeChanges(): string[][] {
   return lines
     .filter((line) => line !== '')
     .map((line) => JSON.parse(line) as string[])
-    .filter((args) => !args.includes('list') && !args.includes('details'))
+    .filter((args) => !args.includes('list') && !args.includes('details') && !args.includes('--version'))
 }
 
 /** Adds the fake marketplace through Settings, Plugins, and waits for its row. */

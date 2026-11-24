@@ -10,7 +10,7 @@ test('the capabilities pages tag a row Codex cannot use only while Codex is on',
   await mockTaggedServers(page)
   await page.goto('/#settings/mcp')
   const main = page.getByRole('main')
-  await expect(main.getByText('events')).toBeVisible()
+  await expect(main.getByText('events', { exact: true })).toBeVisible()
   await expect(main.getByText('Claude only')).toHaveCount(0)
 
   await codexReady(request)
