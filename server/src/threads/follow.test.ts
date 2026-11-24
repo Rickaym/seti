@@ -69,7 +69,10 @@ describe('followSentThreads', () => {
   it('lists the threads on the task route', async () => {
     const task = await newTask()
     await send(task, 'C0OTHER123', 3)
-    const response = await createApp().request(`/api/tasks/${task}/threads`, { headers: USER_AUTH })
+    const response = await createApp().request(`/api/tasks/${task}/threads`, {
+      headers: { host: 'localhost', ...USER_AUTH },
+    })
+    expect(response.status).toBe(200)
     const listed = (await response.json()) as { data: { channel: string }[] }
     expect(listed.data.map((t) => t.channel)).toEqual(['C0OTHER123'])
   })
