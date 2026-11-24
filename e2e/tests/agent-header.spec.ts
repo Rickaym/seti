@@ -41,15 +41,15 @@ test('the title and actions share a row and the PR line spans the header under b
     expect(middle).toBeLessThan(heading.y + heading.height)
   }
 
-  const whereText = main.getByTitle(paths.checkout, { exact: true })
-  const where = await box(whereText)
-  expect(Math.abs(where.x - heading.x)).toBeLessThanOrEqual(1)
-  expect(where.y).toBeGreaterThanOrEqual(Math.max(heading.y + heading.height, find.y + find.height) - 1)
+  await expect(main.getByTitle(paths.checkout, { exact: true })).toHaveCount(0)
+  const first = await box(chips.first())
+  expect(Math.abs(first.x - heading.x)).toBeLessThanOrEqual(1)
+  expect(first.y).toBeGreaterThanOrEqual(Math.max(heading.y + heading.height, find.y + find.height) - 1)
   const last = await box(chips.last())
-  expect(last.y).toBeLessThan(where.y + where.height)
-  const line = await box(whereText.locator('..'))
+  expect(last.y).toBeLessThan(first.y + first.height)
+  const line = await box(chips.first().locator('xpath=ancestor::div[contains(@class,"text-xs")][1]'))
   expect(line.x + line.width).toBeGreaterThan(settings.x + settings.width - 1)
-  expect(line.height).toBeLessThan(where.height * 2)
+  expect(line.height).toBeLessThan(first.height * 2)
 })
 
 test('agent settings group their rows under section labels with the session actions last', async ({ page }) => {
