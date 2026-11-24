@@ -39,7 +39,7 @@ function SecondOpinionCall({ taskId, startedAt, block, result, running, backgrou
       className={cn(result?.failed === true && 'border-destructive')}
       resultRow={result?.rowId}
       summary={
-        <>
+        <span className="flex min-w-0 flex-1 items-center gap-2 max-sm:flex-wrap max-sm:gap-y-0.5">
           <MessagesSquare aria-hidden className="size-3 shrink-0 text-muted-foreground" />
           <span className="shrink-0 font-semibold" data-testid="opinion-model">
             {asked}
@@ -47,13 +47,15 @@ function SecondOpinionCall({ taskId, startedAt, block, result, running, backgrou
           <span className="min-w-0 flex-1 truncate text-muted-foreground" title={question} data-testid="tool-summary">
             {question.replace(/\s+/g, ' ').slice(0, SUMMARY_CHARS)}
           </span>
-          {cost !== null && (
-            <span className="shrink-0 text-muted-foreground tabular-nums" data-testid="opinion-cost">
-              {cost}
-            </span>
-          )}
-          <CallStatus block={block} startedAt={startedAt} result={result} running={running} background={background} />
-        </>
+          <span className="flex shrink-0 items-center gap-2 max-sm:w-full max-sm:pl-5" data-testid="opinion-meta">
+            {cost !== null && (
+              <span className="text-muted-foreground tabular-nums" data-testid="opinion-cost">
+                {cost}
+              </span>
+            )}
+            <CallStatus block={block} startedAt={startedAt} result={result} running={running} background={background} />
+          </span>
+        </span>
       }
     >
       <section aria-label="Question" className="space-y-1">
