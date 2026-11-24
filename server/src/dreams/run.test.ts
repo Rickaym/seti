@@ -67,6 +67,7 @@ function fakeDream(): { dream: DreamSupport; seen: { spec?: DreamSpec; refused?:
   const seen: { spec?: DreamSpec; refused?: string | null } = {}
   const dream: DreamSupport = {
     memory: claudeMemory,
+    reportedCost: () => null,
     open: async (spec: DreamSpec, _launcher, host: DreamHost) => {
       seen.spec = spec
       const inside = /Memory folder: (\S+)\./.exec(spec.prompt)?.[1] ?? ''
