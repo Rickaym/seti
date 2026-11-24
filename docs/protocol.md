@@ -148,6 +148,10 @@ between two steps; an interrupt; a hook at subagent start.
   the control room's own, and no question tool, subagents, web tools, plugins, hooks or tool
   servers of the user's. Every tool call passes the control room's gate first, which allows or
   denies it and never asks; the runtime's own memory consolidation is off in it.
+- RT-9: A runtime besides the default is off until the user turns it on and names its program.
+  While it is off, its program is missing or it is not the version the control room is built for,
+  a new agent or session on it MUST be refused with that reason; its agents stay readable. Only
+  the user changes a runtime's settings, and each change is audited.
 
 ## 4. Turn lifecycle
 
@@ -174,7 +178,9 @@ between two steps; an interrupt; a hook at subagent start.
 - TURN-15: Session restart keeps the session id and opens the next process at once; it MUST be
   refused while a turn runs unless `interrupt` is set. Rewind restores `conversation`, `code` or
   `both` to an earlier prompt; it MUST be refused while a turn or background work runs.
-- TURN-17: The stored result MUST carry the turn's own cost; `cost_usd` accumulates it.
+- TURN-17: The stored result MUST carry the turn's own cost; `cost_usd` accumulates it. A runtime
+  that reports tokens but no cost gets an estimate from a dated price table, marked as estimated
+  wherever it shows.
 - TURN-18: `asking` is true only for an `idle` end whose prose after the last tool call ends in a
   question, optionally with a list of answers, judged without a model call. Questions in code,
   quotes or headings, self-addressed questions and closing courtesies MUST NOT count.
@@ -408,6 +414,11 @@ interrupted only for that.
 - PERM-2: Rules and guards decide first; a classifier then allows or turns down each other call.
   A call it turns down never reaches the user: the agent gets the reason and the audit records it.
   A call an `ask` rule matches, or that nothing decides, becomes a request and the agent blocks.
+  On a runtime with no classifier that asks before every call (Codex), guards and deny rules
+  refuse at once, review and ask rules hold as for any agent, and every other call becomes a
+  request offering `allow` and `deny` only, unless the user lets the rules decide for that runtime;
+  then a rule's or the read-only list's allow runs the call. Beside each answer the user gives, the
+  implementation counts its own verdict (PERM-12).
 - PERM-4: Built-in: reads, search and platform tools are allowed; shell and edits inside the
   agent's folders are allowed in the sandbox only; killing by name is denied.
 - PERM-5: Request fields: `id`, `task_id`, `tool_name`, `kind`, `summary`, `input`, `reason`,
@@ -420,7 +431,8 @@ interrupted only for that.
   answered, that it is no judgement on the action, and to carry on or ask again. A timeout adds no
   rule and touches no other request. A request whose session is gone closes as `cancelled`.
   Why: an agent must never wait on the user for ever, and must not read silence as refusal.
-- PERM-10: Bypass is per agent, off by default, set only by the user for 2, 8 or 24 h. In bypass
+- PERM-10: Bypass is per agent, off by default, set only by the user for 2, 8 or 24 h, and not
+  offered on a runtime without a classifier. In bypass
   the classifier does not apply and a call no rule decides runs without a request; `ask` rules,
   deny rules, guards, review rules, the repeat guard and the sandbox still hold. Turning it off or its expiry MUST take effect at once. Each change
   is audited and noted in the transcript.

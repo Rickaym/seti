@@ -434,7 +434,8 @@ TOOL_SPECS: list[ToolSpec] = [
     ),
     ToolSpec(
         "start_task",
-        "Start a new task: a Claude Code agent working on the prompt. It works in a fresh folder "
+        "Start a new task: an agent working on the prompt, on Claude Code unless the user asks for "
+        "Codex. It works in a fresh folder "
         "of its own and clones the repos it needs, so name them in the prompt. Seti's planner titles "
         "it and picks context packs and MCP servers from the prompt. Unclear permissions are not "
         "given: it runs sandboxed with SSH hosts and AWS only as their defaults say; only the user "
@@ -450,6 +451,21 @@ TOOL_SPECS: list[ToolSpec] = [
                 "description": "Only when the user names one: the workspace it joins. Left out, the first.",
             },
             "notify_when_done": NOTIFY_WHEN_DONE,
+            "runtime": {
+                "type": "string",
+                "enum": ["claude", "codex"],
+                "description": "Only when the user asks for Codex: the agent runs on OpenAI's Codex "
+                "instead of Claude Code. Seti refuses it while the user has Codex off.",
+            },
+            "model": {
+                "type": "string",
+                "description": "Only for a Codex agent, when the user names one: its model.",
+            },
+            "effort": {
+                "type": "string",
+                "enum": ["low", "medium", "high", "xhigh", "max"],
+                "description": "Only for a Codex agent, when the user names one: its reasoning effort.",
+            },
         },
         ["prompt"],
     ),
@@ -1672,6 +1688,10 @@ class EaTools:
         notify = arg_bool(args, "notify_when_done")
         if notify:
             body["notify_when_done"] = True
+        for key in ("runtime", "model", "effort"):
+            value = arg_str(args, key, required=False)
+            if value:
+                body[key] = value
         created = await self._seti.post("/tasks/start", body)
         task = created if isinstance(created, dict) else {}
         title = str(task.get("title") or title or "the new task")

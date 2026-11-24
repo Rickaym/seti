@@ -485,6 +485,29 @@ proposed each one and when; Code shows the arguments and the script, the switch 
 for every agent, and Remove deletes it. A script reads its arguments as one JSON object on stdin,
 prints its result to stdout, and is stopped after 120 seconds unless the proposal sets up to 600.
 
+### Codex agents
+
+Agents run on Claude Code. An agent can run on OpenAI's Codex instead once you turn Codex on in
+Settings, Runtimes; it is off by default, and only you change it.
+
+1. Install the `codex` program of the version Settings, Runtimes names (Seti is built and tested
+   against one version), for example with `node scripts/codex-binary.mjs <folder>` from a clone,
+   which fetches it from the npm registry and checks its checksum.
+2. In Settings, Runtimes, turn Codex on and give the program's absolute path. The status reads
+   Ready once the program runs and reports that version.
+3. Add a connection with your OpenAI key for `api.openai.com`, with the header
+   `Authorization: Bearer {value}`, and add it to the credential your Codex agents use. The agent
+   holds a placeholder; the egress proxy puts the key on requests to OpenAI's API only.
+4. Start an agent with the Runtime choice set to Codex.
+
+A Codex agent runs only in the sandbox and asks you before every command, edit and tool call; a
+guard or deny rule still refuses at once. Settings, Runtimes can let Seti's rules answer the
+calls they allow instead (off by default). Codex agents have no side chat, rewind, Bypass or
+plugins. Their cost is an estimate from the price table in
+`server/src/runtimes/codex/prices.ts`, which names the day it was read; to update it, copy the
+standard rates from OpenAI's pricing page into that table, set `asOf` to the day, and run
+`pnpm check`.
+
 ### Access: defaults and per-agent choices
 
 Everything an agent may reach follows one model: each SSH host, AWS, MCP server, context

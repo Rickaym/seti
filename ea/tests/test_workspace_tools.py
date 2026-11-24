@@ -63,6 +63,20 @@ async def test_start_task_joins_the_named_workspace_or_sends_none(
     assert unknown.text.startswith('No workspace matches "nowhere".')
 
 
+async def test_start_task_names_codex_only_when_asked(tools: EaTools, fake_seti: FakeSeti) -> None:
+    await tools.call(
+        "start_task", {"prompt": "port it", "runtime": "codex", "model": "gpt-5.5", "effort": "high"}
+    )
+    await tools.call("start_task", {"prompt": "port it again"})
+    sent = [body for path, body in fake_seti.posts() if path == "/api/tasks/start"]
+    assert {key: sent[0].get(key) for key in ("runtime", "model", "effort")} == {
+        "runtime": "codex",
+        "model": "gpt-5.5",
+        "effort": "high",
+    }
+    assert "runtime" not in sent[1]
+
+
 async def test_create_rename_and_delete_ask_first(tools: EaTools, fake_seti: FakeSeti) -> None:
     asked, created = await confirm(tools, {"action": "create", "name": "Ops"})
     assert asked.text.startswith("Not done yet")

@@ -36,6 +36,9 @@ const CODEX_PRICES = {
   } satisfies Record<string, ModelPrice>,
 }
 
+/** The day the price table was read, which the estimate names. */
+export const PRICES_AS_OF = CODEX_PRICES.asOf
+
 type Usage = Extract<RuntimeEvent, { type: 'usage' }>['usage']
 
 const PER_TOKEN = 1 / 1_000_000

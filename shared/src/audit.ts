@@ -286,6 +286,7 @@ export const AUDIT_KINDS = [
   'system.device_proof_refused',
   'system.sharing_changed',
   'system.shares_revoked',
+  'system.runtime_changed',
   'dream.started',
   'dream.ended',
   'dream.memory_changed',

@@ -67,6 +67,9 @@ async function startPlanned(input: StartAgentRequest, cap?: AccessCap): Promise<
       setup: capped === null ? plan.setup : { ...plan.setup, withheld: [...plan.setup.withheld, ...capped.held] },
       attachments: input.attachments,
       ...(input.workspace_id === undefined ? {} : { workspace_id: input.workspace_id }),
+      runtime: input.runtime,
+      ...(input.model === undefined ? {} : { model: input.model }),
+      ...(input.effort === undefined ? {} : { effort: input.effort }),
     },
     onCreated,
   )

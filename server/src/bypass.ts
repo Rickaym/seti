@@ -7,6 +7,7 @@ import { tasks } from './db.js'
 import { refuseAgent } from './ea-guard.js'
 import { controlLink } from './node-link.js'
 import { appendMessage } from './runner.js'
+import { refuseOnCodex } from './runtime-features.js'
 import { bypass } from './store/permissions.js'
 import { inLane } from './task-lane.js'
 
@@ -66,6 +67,9 @@ function schedule(taskId: string, until: string | null): void {
 /** Turns Bypass on for `hours`, or off with null; the open process takes it if it can. */
 export async function setBypass(task: Task, hours: BypassHours | null): Promise<BypassState> {
   refuseAgent('turn Bypass on or off')
+  if (hours !== null) {
+    refuseOnCodex(task, 'Bypass')
+  }
   const until = hours === null ? null : new Date(Date.now() + hours * HOUR_MS).toISOString()
   if (until === null && !bypassOn(task.bypass_until)) {
     await bypass.set(task.id, null)

@@ -62,7 +62,8 @@ type TaskRecord = Omit<Task, 'worktree' | 'sandbox' | 'repos' | 'setup' | 'seti_
 type TaskPrSource = 'user' | 'agent' | 'import' | 'discovered'
 
 type NewTask = Pick<Task, 'id' | 'title' | 'repo_id' | 'cwd' | 'worktree' | 'pr_urls'> &
-  Partial<Pick<Task, 'sandbox' | 'home_access' | 'profile_id' | 'setup' | 'seti_control' | 'workspace_id'>>
+  Partial<Pick<Task, 'sandbox' | 'home_access' | 'profile_id' | 'setup' | 'seti_control' | 'workspace_id'>> &
+  Partial<Pick<Task, 'runtime' | 'requested_model' | 'requested_effort'>>
 type ImportedTask = NewTask & Pick<Task, 'session_id' | 'source_session_id'>
 
 /** A repo the agent can edit besides the one it runs in. */
@@ -136,18 +137,28 @@ async function linkPr(db: Db, taskId: string, url: string, source: TaskPrSource)
 }
 
 /** Inserts a task in a preset colour the live agents use least, with its repos and PRs. */
+/** The runtime a new task runs on, Claude Code unless it names one, and its model and effort. */
+const runtimeOf = (task: NewTask) => ({
+  runtime: task.runtime ?? 'claude',
+  model: task.requested_model ?? null,
+  effort: task.requested_effort ?? null,
+})
+
 async function insertTask(db: Db, task: ImportedTask, extras: readonly ExtraRepo[], source: TaskPrSource) {
   const ts = now()
+  const runtime = runtimeOf(task)
   const setup = task.setup === undefined || task.setup === null ? null : JSON.stringify(task.setup)
   const live = await db<{ color: AgentColor }[]>`SELECT color FROM task
     WHERE archived_at IS NULL AND color IS NOT NULL`
   const color = pickAgentColor(live.map((row) => row.color))
   await db`INSERT INTO task (id, title, repo_id, cwd, worktree, sandbox, profile_id, session_id,
-      source_session_id, status, created_at, updated_at, setup, seti_level, workspace_id, color, home_access)
+      source_session_id, status, created_at, updated_at, setup, seti_level, workspace_id, color, home_access,
+      runtime, requested_model, requested_effort)
     VALUES (${task.id}, ${task.title}, ${task.repo_id}, ${task.cwd}, ${task.worktree ? 1 : 0},
       ${task.sandbox === false ? 0 : 1}, ${task.profile_id ?? DEFAULT_PROFILE_ID}, ${task.session_id},
       ${task.source_session_id}, 'idle', ${ts}, ${ts}, ${setup}, ${task.seti_control ?? DEFAULT_SETI_CONTROL},
-      COALESCE(${task.workspace_id ?? null}, default_workspace_id()), ${color}, ${task.home_access === true})`
+      COALESCE(${task.workspace_id ?? null}, default_workspace_id()), ${color}, ${task.home_access === true},
+      ${runtime.runtime}, ${runtime.model}, ${runtime.effort})`
   for (const [index, extra] of extras.entries()) {
     await db`INSERT INTO task_repo (task_id, repo_id, position, dir)
       VALUES (${task.id}, ${extra.repo_id}, ${index + 1}, ${extra.dir})`
