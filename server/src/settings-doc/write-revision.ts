@@ -18,7 +18,7 @@ const escape = (key: string) => key.replaceAll('~', '~0').replaceAll('/', '~1')
 const unescape = (key: string) => key.replaceAll('~1', '/').replaceAll('~0', '~')
 
 /** A path as a JSON Pointer (RFC 6901), the key of a settings revision's state. */
-const pointerOf = (path: DocPath) => path.map((key) => `/${escape(key)}`).join('')
+export const pointerOf = (path: DocPath) => path.map((key) => `/${escape(key)}`).join('')
 
 const pathOf = (pointer: string): string[] => pointer.split('/').slice(1).map(unescape)
 
