@@ -36,6 +36,8 @@ export interface CodexMessage {
   job?: CodexJob
   /** What the turn this message ends spent, as Seti summed it when it stored the message. */
   spent?: TurnSpend
+  /** The calls the turn this message ends left without an end, such as asks an interrupt cut. */
+  unfinished?: readonly string[]
 }
 
 type Vendor = Extract<Event, { type: 'vendor' }>
@@ -218,6 +220,17 @@ function withSpend(event: Event, spent: TurnSpend | undefined): Event {
   return { ...event, usage: counted, ...(usd === undefined ? {} : { costUsd: usd, costEstimated: true }) }
 }
 
+/** The calls a turn's end left open, as ended by the stop, ahead of the turn's end. */
+const stoppedCalls = (unfinished: readonly string[] | undefined, thread: string): Event[] =>
+  (unfinished ?? []).map((callId) => ({
+    v: 1,
+    thread,
+    type: 'tool.ended',
+    callId,
+    status: 'cancelled',
+    result: { text: '', images: 0 },
+  }))
+
 /** The thread a message belongs to: empty for the agent's own, else the subagent's thread id. */
 function threadOf(params: unknown, root: string): string {
   const id = typeof params === 'object' && params !== null ? (params as { threadId?: unknown }).threadId : undefined
@@ -234,7 +247,7 @@ export function projectCodex(raw: unknown): RuntimeEvent[] {
   if (!envelope.success) {
     return [{ ...vendor('', 'codex'), unreadable: true }]
   }
-  const { root, message, reply, job, spent } = envelope.data
+  const { root, message, reply, job, spent, unfinished } = envelope.data
   const at = { thread: threadOf(message.params, root) }
   if (reply !== undefined) {
     return projectReply(message, reply, at, root)
@@ -247,7 +260,7 @@ export function projectCodex(raw: unknown): RuntimeEvent[] {
     return [vendor(at.thread, message.method)]
   }
   try {
-    return [withSpend(map(message.params, at, root), spent)]
+    return [...stoppedCalls(unfinished, at.thread), withSpend(map(message.params, at, root), spent)]
   } catch {
     return [{ ...vendor(at.thread, message.method), unreadable: true }]
   }
