@@ -1,6 +1,6 @@
 import { chmodSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
-import { CODEX_SETTINGS_DEFAULTS, DEFAULT_PROFILE_ID, type CodexStatus } from '@seti/shared'
+import { CODEX_SETTINGS_DEFAULTS, DEFAULT_PROFILE_ID, type RuntimesStatus } from '@seti/shared'
 import { afterAll, describe, expect, it, vi } from 'vitest'
 import { asAgent } from './access.js'
 import { createApp } from './app.js'
@@ -32,12 +32,14 @@ function program(name: string, version: string): string {
 
 const app = createApp()
 const HEADERS = { host: '127.0.0.1:3006', origin: 'http://127.0.0.1:3006', 'content-type': 'application/json' }
-const status = async (auth: object = USER_AUTH) =>
+const runtimes = async (auth: object = USER_AUTH) =>
   (
     (await (await app.request('/api/runtimes', { headers: { ...HEADERS, ...auth } })).json()) as {
-      data: { codex: CodexStatus }
+      data: RuntimesStatus
     }
-  ).data.codex
+  ).data
+const status = async (auth: object = USER_AUTH) => (await runtimes(auth)).codex
+const offered = async () => (await runtimes()).offers.map((offer) => offer.runtime)
 const change = async (body: object, auth: object = USER_AUTH) =>
   app.request('/api/runtimes/codex', { method: 'PUT', headers: { ...HEADERS, ...auth }, body: JSON.stringify(body) })
 
@@ -59,6 +61,8 @@ describe('the Codex runtime in Settings', () => {
     await codexSettings.set(CODEX_SETTINGS_DEFAULTS)
     expect(await status(EA_AUTH)).toMatchObject({ state: 'off', version: null, pinned: '0.171.0' })
     expect((await status()).pricesAsOf).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+    expect(await offered()).toEqual(['claude'])
+    expect((await runtimes()).offers[0]?.models.map((model) => model.id)).toEqual(['opus', 'sonnet', 'haiku'])
   })
 
   it('is ready only on, with a program of the pinned version and a key, and records each change', async () => {
@@ -73,6 +77,10 @@ describe('the Codex runtime in Settings', () => {
     expect(await status()).toMatchObject({ state: 'no_key', version: '0.171.0', keyed: [] })
     await openaiKey()
     expect(await status()).toMatchObject({ state: 'ready', keyed: [DEFAULT_PROFILE_ID] })
+    expect(await offered()).toEqual(['claude', 'codex'])
+    expect((await runtimes()).offers[1]?.models).toEqual([
+      { id: 'gpt-5.5', label: 'gpt-5.5', efforts: ['low', 'medium', 'high', 'xhigh', 'max'] },
+    ])
     const recorded = await auditEvents.latest('system.runtime_changed')
     expect(recorded?.detail).toMatchObject({ runtime: 'codex', changed: ['program'] })
   })
@@ -90,12 +98,23 @@ describe('a new Codex agent', () => {
   const start = async (body: object) =>
     app.request('/api/tasks', { method: 'POST', headers: { ...HEADERS, ...USER_AUTH }, body: JSON.stringify(body) })
 
-  it('is refused while Codex is off, and a model is refused for a Claude Code agent', async () => {
+  it('is refused while Codex is off, also when only its model names it, and never runs a Codex model on Claude Code', async () => {
     await codexSettings.set(CODEX_SETTINGS_DEFAULTS)
     const off = await start({ title: 'Port', prompt: 'port it', runtime: 'codex' })
     expect(off.status).toBe(409)
     expect(await off.text()).toContain('Codex is off')
-    expect((await start({ title: 'Port', prompt: 'port it', model: 'gpt-5.5' })).status).toBe(400)
+    const byModel = await start({ title: 'Port', prompt: 'port it', model: 'gpt-5.5' })
+    expect(byModel.status).toBe(409)
+    expect(await byModel.text()).toContain('Codex is off')
+    const mixed = await start({ title: 'Port', prompt: 'port it', runtime: 'claude', model: 'gpt-5.5' })
+    expect(mixed.status).toBe(400)
+    expect(await mixed.text()).toContain('gpt-5.5 runs on Codex, not on Claude Code')
+    const unknown = await start({ title: 'Port', prompt: 'port it', model: 'claude-opus-5-5' })
+    expect(unknown.status).toBe(400)
+    expect(await unknown.text()).toContain('No runtime offers claude-opus-5-5; a new agent may name opus, sonnet')
+    const effortless = await start({ title: 'Port', prompt: 'port it', model: 'sonnet', effort: 'high' })
+    expect(effortless.status).toBe(400)
+    expect(await effortless.text()).toContain('sonnet takes no high effort here')
   })
 
   it('is refused on a credential without an OpenAI key, with where the user adds one', async () => {

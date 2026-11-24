@@ -114,10 +114,14 @@ const startTaskTool = setiTool({
     workspace: workspaceRef.optional().describe('The workspace it joins; left out, your own.'),
     notify_when_done: NOTIFY_WHEN_DONE,
     runtime: startAgentInput.shape.runtime.describe(
-      "claude unless the user asked for OpenAI's Codex; Seti refuses codex while the user has it off.",
+      "Left out, the model picks it, else claude. codex runs it on OpenAI's Codex, which Seti refuses while the user has it off.",
     ),
-    model: startAgentInput.shape.model.describe('Only for a Codex agent: its model.'),
-    effort: startAgentInput.shape.effort.describe('Only for a Codex agent: its reasoning effort.'),
+    model: startAgentInput.shape.model.describe(
+      'Only when the user names one: its model, which picks the runtime that offers it, a Claude Code model such as opus or a Codex model.',
+    ),
+    effort: startAgentInput.shape.effort.describe(
+      'Only when the user names one: its reasoning effort, if its model takes one.',
+    ),
   },
   run: async ({ prompt, title, workspace, notify_when_done, runtime, model, effort }, ctx) => {
     const input = startAgentInput.parse({

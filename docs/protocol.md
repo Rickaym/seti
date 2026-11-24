@@ -154,7 +154,17 @@ between two steps; an interrupt; a hook at subagent start.
   a new agent or session on it MUST be refused with that reason; its agents stay readable. A
   runtime that needs a model key MUST also refuse a new agent whose credential holds no connection
   for that key, and its status MUST read "no key", not ready, while the default credential holds
-  none. Only the user changes a runtime's settings, and each change is audited.
+  none. Only the user changes a runtime's settings, and each change is audited. The control room
+  MUST offer a new agent the models of the default runtime always and those of another runtime
+  only while that runtime can start one; the runtimes it offers MUST be readable with their models
+  and efforts.
+- RT-10: A new agent's start MAY name a runtime, a model and an effort. A model alone MUST pick the
+  one runtime that offers it, and a start naming neither runs on the default runtime with the
+  user's default model. A model no runtime offers, a runtime and model that disagree, and an
+  effort the model does not take MUST be refused with the reason, naming the offered models. A
+  runtime's models are the ones it reports for the account, else its stable aliases. An agent
+  started on a model and effort MUST run every session start, restart and resume on them; a
+  fallback switch (RES-14) lasts until the next session start.
 
 ## 4. Turn lifecycle
 
@@ -224,7 +234,8 @@ between two steps; an interrupt; a hook at subagent start.
   `The message from the user follows.` and the prompt, or says none came and to act as the task
   requires.
 - UPD-13: Each update is wrapped in a tag by source. Attribute values are escaped, and a body MUST
-  NOT be able to close its tag:
+  NOT be able to open or close any of these tags, in any case or spacing. The planner's message
+  is held the same way:
 
 ```
 <update source="pr" kind="K" subject="S" url="U">TITLE BODY</update>
