@@ -1086,6 +1086,11 @@ Optional and off by default: a maintenance session per agent that consolidates i
 - MOD-23: Third-party mods MAY contribute settings, commands, slash commands, webhook senders,
   views, file viewers, status items, notification kinds, context text, themes, audit kinds,
   schedules and agent events (type, agent id and time only); all else is bundled only.
+- MOD-25: A mod's command that takes an agent, and its view beside or over one agent, MAY name
+  runtime capabilities it needs (RT-13). On an agent whose runtime's adapter does not declare one,
+  the control room MUST NOT offer the command or show the view there, its slash command says it is
+  not on that runtime, and the server refuses the command for that agent (409) to the user, the EA
+  and agents alike.
 
 ## 18. Public surfaces
 

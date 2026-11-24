@@ -1,5 +1,6 @@
 import { MOD_TASK_ARG, modScoped, type Disposer, type ModCommand, type ModManifest } from '@seti/shared'
 import { parseHash } from '@/lib/route'
+import { agentLacks } from './agent-needs'
 import { commandContext, runModCommand, uiCommands } from './commands'
 import { parseModChord, registerModChord } from './mod-chords'
 
@@ -13,7 +14,10 @@ function shownAgent(): string | null {
 function runByChord(manifest: ModManifest, command: ModCommand): void {
   const agent = shownAgent()
   const context = commandContext(agent)
-  if (uiCommands.get(modScoped(manifest.id, command.id))?.when?.(context) === false) {
+  if (
+    agentLacks(agent, command.needs) !== null ||
+    uiCommands.get(modScoped(manifest.id, command.id))?.when?.(context) === false
+  ) {
     return
   }
   const task = command.args[MOD_TASK_ARG]
