@@ -185,6 +185,15 @@ describe('Codex calls', () => {
     expect(projectCodex(row)).toMatchObject([{ type: 'session.started', sessionId: ROOT, cwd: '/work/project' }])
   })
 
+  it('ends the calls a stopped turn left open as stopped, ahead of the turn end', () => {
+    const turn = { id: 't1', items: [], status: 'interrupted', error: null }
+    const row: CodexMessage = { ...stored('turn/completed', { threadId: ROOT, turn }), unfinished: ['call_1'] }
+    expect(projectCodex(row)).toMatchObject([
+      { type: 'tool.ended', callId: 'call_1', status: 'cancelled', result: { text: '' } },
+      { type: 'turn.ended', status: 'interrupted' },
+    ])
+  })
+
   it("keeps remote control's status, which names the host, as a vendor event with no detail", () => {
     const params = { status: 'disabled', serverName: 'a-host', installationId: 'i-1', environmentId: null }
     expect(projectCodex(stored('remoteControl/status/changed', params))).toEqual([

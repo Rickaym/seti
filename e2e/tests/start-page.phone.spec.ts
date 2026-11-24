@@ -5,14 +5,15 @@ import { expectFitsPhone } from './support/phone-layout.js'
 
 const TARGET_PX = 40
 
-test('a phone starts an agent from one message, with nothing else to pick', async ({ page, request }) => {
+test('a phone starts an agent from one message, with only a model to pick', async ({ page, request }) => {
   await page.goto('/#agents/new')
   const main = page.getByRole('main')
   const message = page.getByLabel('Message')
   await expect(message).toBeEditable()
   await expect(main.getByText('It works in its own folder and clones what it needs.')).toBeVisible()
   await expect(page.getByRole('group', { name: 'Recent repos' })).toHaveCount(0)
-  await expect(main.locator('select')).toHaveCount(0)
+  await expect(main.locator('select')).toHaveCount(1)
+  await expect(main.getByRole('combobox', { name: 'Model' })).toHaveValue('claude:')
   await expectFitsPhone(page, 'the start page')
 
   const start = main.getByRole('button', { name: 'Start agent' })

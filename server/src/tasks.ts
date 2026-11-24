@@ -8,7 +8,6 @@ import {
   setupSummary,
   SETI_CONTROL_LABELS,
   type SetiControlLevel,
-  startRuntime,
   type Task,
   type TaskRequest,
   type TaskSetup,
@@ -25,6 +24,7 @@ import { errorCode } from './pg.js'
 import { taskPluginNames } from './plugins.js'
 import { sshKeysChanged } from './proxy-owner.js'
 import { publish, runTurn } from './runner.js'
+import { pickedRuntime } from './runtime-offers.js'
 import { contextPacks, taskContextPacks } from './store/context.js'
 import { profiles } from './store/credentials.js'
 import { taskMcpChoices } from './store/mcp.js'
@@ -101,7 +101,7 @@ export async function startTask(
   await contextPacks.assertLinkable(packIds)
   await setiPlugins.assertExist(input.disabled_plugin_ids)
   await requireProfile(input.profile_id)
-  const runtime = startRuntime(input)
+  const runtime = pickedRuntime(input)
   await requireRuntime(runtime, input.profile_id)
   const access = await planStartAccess(input.access)
   const workspace = await startWorkspace(input.workspace_id)

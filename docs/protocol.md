@@ -141,7 +141,8 @@ between two steps; an interrupt; a hook at subagent start.
   `subagent`, `question`, `plan`, `think`, `other`) are closed lists. A message with no mapping
   is served as `vendor` and MUST NOT break the rows around it. A client asks for events with
   `wire=events` on transcript pages, messages and streams; without it, runtime rows come as
-  stored.
+  stored. Every tool call that starts ends by its turn's end or as background work: a call a
+  stop cut before it ran ends as `cancelled`, which reads as stopped, not failed.
 - RT-7: Delegates and mods receive neutral events only.
 - RT-8: A runtime declares dreams, or none: where its agents' sessions keep memory, and a session
   that resumes nothing and saves nothing, with the runtime's read, search, edit and shell tools and
@@ -160,7 +161,10 @@ between two steps; an interrupt; a hook at subagent start.
 - RT-10: A new agent's start MAY name a runtime, a model and an effort. A model alone MUST pick the
   one runtime that offers it, and a start naming neither runs on the default runtime with the
   user's default model. A model no runtime offers, a runtime and model that disagree, and an
-  effort the runtime does not offer MUST be refused with the reason.
+  effort the model does not take MUST be refused with the reason, naming the offered models. A
+  runtime's models are the ones it reports for the account, else its stable aliases. An agent
+  started on a model and effort MUST run every session start, restart and resume on them; a
+  fallback switch (RES-14) lasts until the next session start.
 
 ## 4. Turn lifecycle
 
@@ -185,7 +189,8 @@ between two steps; an interrupt; a hook at subagent start.
 - TURN-14: Retry resends the last real message, with its attachments and `from` mark, as a new
   turn. 409 while a turn runs or when no message exists.
 - TURN-15: Session restart keeps the session id and opens the next process at once; it MUST be
-  refused while a turn runs unless `interrupt` is set. Rewind restores `conversation`, `code` or
+  refused while a turn runs unless `interrupt` is set. The reopened process leaves an idle agent
+  idle: what a runtime reports on opening is no work until the next input or background work. Rewind restores `conversation`, `code` or
   `both` to an earlier prompt; it MUST be refused while a turn or background work runs.
 - TURN-17: The stored result MUST carry the turn's own cost; `cost_usd` accumulates it. A runtime
   that reports tokens but no cost gets an estimate from a dated price table, marked as estimated
@@ -229,7 +234,8 @@ between two steps; an interrupt; a hook at subagent start.
   `The message from the user follows.` and the prompt, or says none came and to act as the task
   requires.
 - UPD-13: Each update is wrapped in a tag by source. Attribute values are escaped, and a body MUST
-  NOT be able to close its tag:
+  NOT be able to open or close any of these tags, in any case or spacing. The planner's message
+  is held the same way:
 
 ```
 <update source="pr" kind="K" subject="S" url="U">TITLE BODY</update>

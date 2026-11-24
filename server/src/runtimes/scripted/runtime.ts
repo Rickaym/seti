@@ -50,6 +50,16 @@ const orAbort = async <T>(pending: Promise<T>, signal: AbortSignal): Promise<T |
 /** Never settles: what a held step waits on until its turn is interrupted. */
 const forever = new Promise<never>(() => undefined)
 
+/** When a call's tool answers: at once, after its delay, or never for a held one. */
+const answerOf = async (call: ScriptCall): Promise<true> =>
+  call.hold === true
+    ? forever
+    : new Promise((resolve) =>
+        setTimeout(() => {
+          resolve(true)
+        }, call.delayMs ?? 0),
+      )
+
 /**
  * The scripted runtime: plays a script one turn per batch of inputs, asks before every gated
  * call, takes input sent during a turn at its next `awaitInput` step or else in the next turn,
@@ -62,6 +72,8 @@ export class ScriptedRuntime {
   private readonly pending = new Map<number, (verdict: Verdict) => void>()
   private readonly jobs = new Map<string, { call: string; label: string }>()
   private inputArrived: (() => void) | null = null
+  /** A resumed session's start, said with its first input as a resumed runtime says it. */
+  private hello: unknown = null
   /** The subagent thread whose steps play now; the agent's own when null. */
   private thread: string | null = null
   private ids = 0
@@ -78,6 +90,7 @@ export class ScriptedRuntime {
     if (command.t === 'open') {
       this.open(command.resume)
     } else if (command.t === 'input') {
+      this.sayHello()
       this.queue.push({ id: command.id, text: command.text })
       this.io.write({ t: 'inputState', id: command.id, state: 'queued' })
       this.inputArrived?.()
@@ -121,7 +134,17 @@ export class ScriptedRuntime {
     const id = resume ?? `scripted-${String(this.machine.sessions.size + 1)}`
     this.machine.sessions.set(id, saved)
     this.session = { id, inputs: saved }
-    this.io.write({ t: 'hello', session: id, model: MODEL, resumed: resume !== null })
+    this.hello = { t: 'hello', session: id, model: MODEL, resumed: resume !== null }
+    if (resume === null) {
+      this.sayHello()
+    }
+  }
+
+  private sayHello(): void {
+    if (this.hello !== null) {
+      this.io.write(this.hello)
+      this.hello = null
+    }
   }
 
   private next(prefix: string): string {
@@ -311,8 +334,9 @@ export class ScriptedRuntime {
       return null
     }
     this.machine.effects.push(`${call.tool} ${JSON.stringify(verdict.args ?? call.args)}`)
-    if (call.hold === true) {
-      await orAbort(forever, signal)
+    const answered = await orAbort(answerOf(call), signal)
+    if (answered === null) {
+      this.machine.effects.push(`cancelled ${call.tool}`)
       this.io.write({ t: 'done', id, status: 'cancelled', output: '', ...thread })
       return null
     }
