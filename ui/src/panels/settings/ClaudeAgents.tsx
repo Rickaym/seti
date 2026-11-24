@@ -3,12 +3,15 @@ import { useState } from 'react'
 import { movedCard } from '@/lib/route'
 import { ModelList, SubagentList } from '@/panels/capabilities/CommandSections'
 import { useCapabilities } from '@/panels/capabilities/useCapabilities'
+import { useMovedCard } from './use-moved-card'
 
 const ID = 'claude-agents'
 
 /** The subagents and models of the probe, read only once the section is open. */
 function ProbedLists() {
   const { snapshot, loading, error } = useCapabilities()
+  // The lists arrive after the rest of the page, so an old link scrolls again once they show.
+  useMovedCard(snapshot !== null)
   if (error !== '') {
     return <p className="px-3 py-2 text-destructive">{error}</p>
   }
