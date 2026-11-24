@@ -401,7 +401,7 @@ describe('which agents load a shared tool', () => {
     })
 
     const connection = await createConnectionPlaceholder(
-      { name: env.toLowerCase(), env, hosts: ['api.load.test'], adds_header: false },
+      { name: env.toLowerCase(), env, hosts: ['api.load.test'], adds_header: false, body: false },
       'user',
     )
     await setConnectionProfiles(connection.id, [caller.profile_id])

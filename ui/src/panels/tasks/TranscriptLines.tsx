@@ -53,7 +53,7 @@ function SessionFacts({ start }: { start: EventOf<'session.started'> }) {
         <span className="font-mono">{start.sessionId}</span>
       </Fact>
       <Fact label="Model">{start.model}</Fact>
-      <Fact label="Permissions">{start.mode}</Fact>
+      {start.mode !== null && <Fact label="Permissions">{start.mode}</Fact>}
       <Fact label="Directory">
         <span className="font-mono">{start.cwd}</span>
       </Fact>
@@ -67,16 +67,18 @@ function SessionFacts({ start }: { start: EventOf<'session.started'> }) {
               </span>
             ))}
       </Fact>
-      <Fact label="Plugins">
-        {plugins.length === 0
-          ? NONE
-          : plugins.map((plugin) => (
-              <span key={`${plugin.name}:${plugin.path}`} className="block" title={plugin.path}>
-                {plugin.name}
-                {plugin.version !== undefined && <span className="text-muted-foreground"> {plugin.version}</span>}
-              </span>
-            ))}
-      </Fact>
+      {start.plugins !== undefined && (
+        <Fact label="Plugins">
+          {plugins.length === 0
+            ? NONE
+            : plugins.map((plugin) => (
+                <span key={`${plugin.name}:${plugin.path}`} className="block" title={plugin.path}>
+                  {plugin.name}
+                  {plugin.version !== undefined && <span className="text-muted-foreground"> {plugin.version}</span>}
+                </span>
+              ))}
+        </Fact>
+      )}
       {errors.length > 0 && (
         <Fact label="Failed">
           {errors.map((error) => (
@@ -94,11 +96,13 @@ function InitLine({ start }: { start: EventOf<'session.started'> }) {
   const failed = start.pluginErrors?.length ?? 0
   const facts = [
     modelLabel(start.model),
-    permissionLabel(start.mode ?? ''),
+    start.mode === null ? '' : permissionLabel(start.mode),
     lastSegment(start.cwd ?? ''),
     `${String(start.servers.length)} MCP`,
-    plural(start.plugins?.length ?? 0, 'plugin'),
-  ].join(DOT)
+    start.plugins === undefined ? '' : plural(start.plugins.length, 'plugin'),
+  ]
+    .filter((fact) => fact !== '')
+    .join(DOT)
   return (
     <details className="text-xs">
       <summary className="flex min-h-6 max-w-full cursor-pointer items-center gap-2 text-muted-foreground hover:text-foreground pointer-coarse:min-h-11">

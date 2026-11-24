@@ -1,4 +1,6 @@
 import { RUNTIME_NAMES, warmCacheNote, type Task } from '@seti/shared'
+import { useCapabilities } from '@/hooks/useCapabilities'
+import { NotOnRuntime } from '@/panels/tasks/NotOnCodex'
 import { OpinionSpend } from '@/panels/tasks/OpinionSpend'
 import { Fields, Row } from '@/panels/tasks/SettingsFields'
 import { PlannerFallback, WarmCaches } from '@/panels/tasks/StartFacts'
@@ -18,6 +20,7 @@ function runtimeLine(task: Task): string | null {
 
 /** The Session tab of the agent settings: model, cost, caps, compaction and how it started. */
 export function SessionFields({ task, running }: { task: Task; running: boolean }) {
+  const caps = useCapabilities(task)
   return (
     <Fields>
       {task.model !== null && (
@@ -37,7 +40,14 @@ export function SessionFields({ task, running }: { task: Task; running: boolean 
         <TaskCpu taskId={task.id} />
       </Row>
       <Row label="Compaction">
-        <TaskCompact taskId={task.id} />
+        {caps === null || caps.compaction ? (
+          <TaskCompact taskId={task.id} />
+        ) : (
+          <NotOnRuntime
+            label={caps.label}
+            reason={`${caps.label} compacts its context on its own; this rule does not apply.`}
+          />
+        )}
       </Row>
       {task.setup?.planner === 'fallback' && (
         <Row label="Planner">

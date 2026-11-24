@@ -1,8 +1,9 @@
-import type { Task } from '@seti/shared'
+import type { AgentCapabilities, Task } from '@seti/shared'
 import { RotateCw, Shield } from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { apiPatch, errorText } from '@/api'
+import { Hint } from '@/components/Hint'
 import { ToggleButton } from '@/components/ToggleButton'
 import { Button } from '@/components/ui/button'
 import { useSystem } from '@/hooks/useSystem'
@@ -14,7 +15,7 @@ const SANDBOX_HINT = {
 }
 
 /** A task's own sandbox switch; a change applies at the next turn, or now through a restart. */
-export function SandboxToggle({ task, running, onChanged }: { task: Task; running: boolean; onChanged: () => void }) {
+function SandboxToggle({ task, running, onChanged }: { task: Task; running: boolean; onChanged: () => void }) {
   const settingOn = useSystem().data?.sandbox.enabled ?? false
   const restart = useRestartAction(task, running, onChanged)
   const [turnSandbox, setTurnSandbox] = useState<boolean | null>(null)
@@ -58,4 +59,26 @@ export function SandboxToggle({ task, running, onChanged }: { task: Task; runnin
       )}
     </span>
   )
+}
+
+/** The sandbox toggle, or a fixed Sandboxed where the agent's runtime runs only there. */
+export function TaskIsolation({
+  task,
+  running,
+  onChanged,
+  caps,
+}: {
+  task: Task
+  running: boolean
+  onChanged: () => void
+  caps: AgentCapabilities | null
+}) {
+  if (caps?.unsandboxed === false) {
+    return (
+      <Hint text={`${caps.label} agents run only in Seti's sandbox.`}>
+        <span className="text-muted-foreground">Sandboxed</span>
+      </Hint>
+    )
+  }
+  return <SandboxToggle task={task} running={running} onChanged={onChanged} />
 }

@@ -723,6 +723,15 @@ class FakeSeti:
     change_requests: list[dict[str, Any]] = field(default_factory=list)
     permission_requests: list[dict[str, Any]] = field(default_factory=list)
     request_timeout_minutes: int = 60
+    settings_doc: dict[str, Any] = field(
+        default_factory=lambda: {
+            "version": 1,
+            "revision": "r1",
+            "app": {"ea": {"wake_enabled": False, "wake_phrase": "Hey Seti"}},
+            "agents": {"lifecycle": {"auto_archive": {"enabled": True, "days": 7}}},
+            "mods": {},
+        }
+    )
     policy_shadow: dict[str, Any] = field(
         default_factory=lambda: {"since": "2026-09-21", "results": {}, "slow": 0, "differences": []}
     )
@@ -1319,6 +1328,8 @@ class FakeSeti:
                 return ok([q for q in self.questions if q["status"] == "open"])
             case ["permissions", "shadow"]:
                 return ok(self.policy_shadow)
+            case ["settings-doc"]:
+                return ok(self.settings_doc)
             case ["permissions", "timeout"]:
                 return ok({"request_timeout_minutes": self.request_timeout_minutes, "updated_at": None})
             case ["requests"]:

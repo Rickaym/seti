@@ -768,3 +768,28 @@ async def test_overview_permissions_reads_the_shadow_counts(tools: EaTools, fake
 async def test_overview_permissions_with_nothing_counted(tools: EaTools, fake_seti: FakeSeti) -> None:
     result = await tools.call("seti_overview", {"permissions": True})
     assert result.text.splitlines()[1:] == ["No tool calls compared since 2026-09-21."]
+
+
+async def test_overview_reads_plain_settings_as_json(tools: EaTools, fake_seti: FakeSeti) -> None:
+    result = await tools.call("seti_overview", {"settings": "agents.lifecycle"})
+    assert result.ok
+    assert result.text.splitlines()[0] == "agents.lifecycle:"
+    assert '"days": 7' in result.text
+    assert result.summary == "Read the agents.lifecycle settings"
+    whole = await tools.call("seti_overview", {"settings": "all"})
+    assert '"wake_phrase": "Hey Seti"' in whole.text
+    assert "revision" not in whole.text
+    assert gets(fake_seti, "/api/settings-doc") == [{}, {}]
+    assert not fake_seti.posts()
+
+
+async def test_overview_names_the_parts_of_settings_it_lacks(tools: EaTools) -> None:
+    result = await tools.call("seti_overview", {"settings": "security.sandbox"})
+    assert not result.ok
+    assert result.text == "Seti's settings have no security.sandbox. Parts: app.ea, agents.lifecycle."
+
+
+async def test_overview_asks_for_a_part_of_long_settings(tools: EaTools, fake_seti: FakeSeti) -> None:
+    fake_seti.settings_doc["app"]["general"] = {"name": "x" * 7000}
+    result = await tools.call("seti_overview", {"settings": "all"})
+    assert result.text == "Seti's settings are long; ask for one part: app.ea, app.general, agents.lifecycle."

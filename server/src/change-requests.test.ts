@@ -185,6 +185,29 @@ describe('answering a request', () => {
     expect((await ask(caller, change)).text).toContain('Your credential already has FIXTURE_API_KEY.')
   })
 
+  it('allows a request for request bodies by turning on Body, also for a variable the agent has', async () => {
+    const caller = await newTask()
+    const change = { kind: 'api_key', env: 'LOGIN_PASSWORD', hosts: ['app.login.example.com'] }
+    const first = (await ask(caller, change)).json()
+    expect((await answer(caller, first.request.id, { decision: 'allow' })).status).toBe(200)
+    const made = (await connectionRows.list()).find((row) => row.env === 'LOGIN_PASSWORD')
+    expect(made?.body).toBe(false)
+    const bodies = { ...change, body: true }
+    const asked = await ask(caller, bodies)
+    expect(asked.text).not.toContain('already has')
+    const { request } = asked.json()
+    expect(request.change).toEqual(bodies)
+    expect((await answer(caller, request.id, { decision: 'allow' })).status).toBe(200)
+    expect((await connectionRows.list()).find((row) => row.env === 'LOGIN_PASSWORD')?.body).toBe(true)
+    expect(await lastAudit('system.connection_changed')).toMatchObject({ actor: 'user', detail: { body: true } })
+    expect((await ask(caller, bodies)).text).toContain('Your credential already has LOGIN_PASSWORD.')
+    const fresh = await newTask()
+    const other = { kind: 'api_key', env: 'OTHER_LOGIN', hosts: ['other.login.example.com'], body: true }
+    const filed = (await ask(fresh, other)).json()
+    expect((await answer(fresh, filed.request.id, { decision: 'allow' })).status).toBe(200)
+    expect((await connectionRows.list()).find((row) => row.env === 'OTHER_LOGIN')?.body).toBe(true)
+  })
+
   it('allows a key request with the pasted key, which reaches only the connection', async () => {
     const caller = await newTask()
     const change = { kind: 'api_key', env: 'PASTED_API_KEY', hosts: ['api.pasted.example.com'] }
