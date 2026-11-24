@@ -156,9 +156,11 @@ between two steps; an interrupt; a hook at subagent start.
   that key, and its status MUST read "no key", not ready, while the default credential holds none.
   The status MAY name the one connection for that key the default credential lacks, but nothing
   but the user changes a credential or connection for it. Only the user changes a runtime's
-  settings, and each change is audited. The control room MUST offer a new agent the models of the
+  settings, including whether the rules decide its calls (on by default, PERM-2), and each change
+  is audited. The control room MUST offer a new agent the models of the
   default runtime always and those of another runtime only while that runtime can start one; the
-  runtimes it offers MUST be readable with their models and efforts.
+  runtimes it offers MUST be readable with their models and efforts. Each runtime's program,
+  version, default model and sign-in kind MUST be readable in one place, with no secret value.
 - RT-10: A new agent's start MAY name a runtime, a model and an effort. A model alone MUST pick the
   one runtime that offers it, and a start naming neither runs on the default runtime with the
   user's default model. A model no runtime offers, a runtime and model that disagree, and an
@@ -182,6 +184,9 @@ between two steps; an interrupt; a hook at subagent start.
   restarts; a version folder no running program uses, and that the settings no longer need, is
   removed, as is every copy once the runtime is off or runs a program of the user's. Nothing
   outside the control room's own folders is removed.
+- RT-14: A runtime whose model can summarise its reasoning MUST ask for the summary, so its agents
+  show their thinking as the default runtime's do. Reasoning the model seals for its own next call
+  MUST NOT be stored, served or shown by the control room.
 
 ## 4. Turn lifecycle
 
@@ -261,6 +266,7 @@ between two steps; an interrupt; a hook at subagent start.
 <agent-turn agent="TITLE" task_id="ID" ended="idle|error|stopped">...</agent-turn>
 <seti-answer request_id="ID" outcome="allowed|denied|expired">...</seti-answer>
 <workspace-edit file="F">...</workspace-edit>
+<second-opinion runtime="R" model="M" seconds="S" cost_usd="C" estimated="true|false">...</second-opinion>
 ```
 
 ## 6. Attention
@@ -426,8 +432,15 @@ interrupted only for that.
   name-constrained to them whose key stays outside the sandbox. Other hosts are tunnelled unread.
 - EGR-5: A placeholder is `seti-secret-<name>-<32 hex>`, in the connection's variable. The proxy
   swaps it for the value in the URL path and headers (Basic auth too), on the connection's hosts
-  and port 443 only; bodies are not read. A readable request that carries a placeholder elsewhere
-  MUST be refused (403) and audited. A connection with no value answers 502.
+  and port 443 only. A readable request that carries a placeholder elsewhere MUST be refused (403)
+  and audited. A connection with no value answers 502. The agent is told where the value is
+  swapped and that a body is not.
+- EGR-14: On its connections' hosts the proxy reads the body of a JSON, form, multipart or plain
+  text request without a content encoding, holding at most 1 MiB, before anything goes upstream;
+  every other body streams on unread. A held body carrying a placeholder MUST be refused (403)
+  and audited as in EGR-5, naming the connection and never its value, since Seti does not swap a
+  value into a body. A body over 1 MiB streams on while the proxy watches the rest; a placeholder
+  in it cuts the request off and answers 413. A held body goes upstream with its exact length.
 - EGR-7: A header "added by the proxy" is set from its template on every request to the
   connection's hosts, first matching rule winning. The code-host token is the credential's one for
   the owner named, else its default, never another credential's; minted tokens are cached until
@@ -447,11 +460,13 @@ interrupted only for that.
   A call it turns down never reaches the user: the agent gets the reason and the audit records it.
   A call an `ask` rule matches, or that nothing decides, becomes a request and the agent blocks.
   On a runtime with no classifier that asks before every call (Codex), guards and deny rules
-  refuse at once, review and ask rules hold as for any agent, and every other call becomes a
-  request offering `allow` and `deny` only, and a `deny` with a message is refused there since that
-  runtime cannot pass it on, unless the user lets the rules decide for that runtime;
-  then a rule's or the read-only list's allow runs the call. Beside each answer the user gives, the
-  implementation counts its own verdict (PERM-12).
+  refuse at once and review and ask rules hold as for any agent. The rules decide there by
+  default: an allow from a rule or the read-only list runs the call, and a call to a tool server
+  other than the control room's own runs without the user only by a rule of the user's that names
+  that server or tool. The user MAY turn this off for the runtime, and an upgrade MUST keep the
+  choice the user stored. Every call that nothing allows becomes a request offering `allow` and
+  `deny` only, and a `deny` with a message is refused there since that runtime cannot pass it on.
+  Beside each answer the user gives, the implementation counts its own verdict (PERM-12).
 - PERM-4: Built-in: reads, search and platform tools are allowed; shell and edits inside the
   agent's folders are allowed in the sandbox only; killing by name is denied.
 - PERM-5: Request fields: `id`, `task_id`, `tool_name`, `kind`, `summary`, `input`, `reason`,
@@ -485,6 +500,11 @@ interrupted only for that.
   for the agent's life and leaves Bypass to the user. A Codex agent or a held one MUST NOT import
   sessions, which would run under the classifier. The user's and the EA's starts are not held:
   the EA has no regime of its own and starts agents only in a turn the user began (EA-8).
+- PERM-14: When the user lets the rules decide for a runtime with no classifier, each request of
+  that runtime's agents still waiting MUST be decided again as a new call would be: one the rules
+  allow runs, one a guard or deny rule refuses is refused with the reason, and the rest keep
+  waiting. Only one answer reaches the runtime, the user's or the rules', and it is audited once.
+  A request whose turn has stopped is left as it is.
 
 ### 7.5 Guards
 
@@ -771,6 +791,18 @@ Why: an agent woken by its own actions or by news nobody waited for burns turns 
 - LVL-15: Agents at `self` or `full` propose knowledge notes, at most `notes_waiting` each, refused
   with credentials or private paths. Only a bounded index of approved titles reaches prompts,
   framed as reference, not instructions. Notes go stale by `note_stale`.
+- DLG-5: An agent at `self` or `full` MAY ask a model on another runtime one question, with text
+  and up to `opinion_files` of its own files read under the file hand-off rules. The answering
+  model MUST be offered no tool and refuse any call unasked, run in a sandbox of its own that
+  mounts none of the agent's folders, reach only its provider, with the asking agent's
+  credential, and keep no session. With no runtime named, the first runtime in offer order that
+  is not the caller's and can answer for its credential answers, with its first model. What is
+  sent MUST be redacted and bounded by `opinion_sizes`, and MUST NOT quote a direct message the
+  agent can read. It is refused with the reason while no such runtime is ready, while the sandbox
+  is off, while the agent has one running, and past `opinion_rate`. The answer reaches the agent
+  as its tool result in a `<second-opinion>` tag (UPD-13) with a preface that it is data. The
+  cost is the caller's, marked estimated where the runtime reports none; the audit records the
+  runtime, model, sizes, cost and outcome, never the text.
 
 ## 14. The assistant
 
@@ -1102,7 +1134,7 @@ An implementation is SETI-compatible when it meets all of:
 3. Update delivery: UPD-1 to UPD-8, UPD-11, UPD-13.
 4. Attention: ATT-1 to ATT-11, ATT-14 to ATT-18, ATT-21, ATT-23, ATT-25.
 5. Actors and reserved powers: ACT-1 to ACT-6.
-6. Permission requests with timeout: PERM-1 to PERM-8; guards GRD-1, GRD-4.
+6. Permission requests with timeout: PERM-1 to PERM-8, PERM-14; guards GRD-1, GRD-4.
 7. Questions and levels: LVL-1 to LVL-5, LVL-8 to LVL-13.
 8. Resilience: RES-1 to RES-9, RES-11, RES-12.
 9. Audit chain: AUD-1 to AUD-12.
@@ -1133,9 +1165,9 @@ treat every agent as holding the user's access.
   API-9.
 - The sandbox is the boundary for agents. Permission rules and the classifier are not; they bind
   the runtime's tools, not what a shell command can do.
-- The egress proxy cannot read tunnelled traffic or request bodies. A placeholder sent in a body,
-  or to an allowlisted host the proxy does not terminate, is not detected; it is still only a
-  placeholder.
+- The egress proxy cannot read tunnelled traffic, and it reads request bodies only as EGR-14
+  says. A placeholder sent in another body, or to an allowlisted host the proxy does not
+  terminate, is not detected; it is still only a placeholder.
 - A webhook delivery that carries its secret as a bearer or shared token proves the sender but not
   the body, and puts the secret on the wire with every delivery.
 - A custom sender definition decides how a public path authenticates, which is why only the user
@@ -1197,6 +1229,7 @@ others.
 | Sharing      | Preview pages 1 to 50. `share_rate` a minute per client: 30 misses, 120 pages or downloads, 600 images. `share_size` 10 MB. Expiry 1, 7 or 30 days.                                                                                                                                                                                                                                    |
 | Client       | `sse_keepalive` 15 s. `body_max` 8 MB. `session_life` idle 7 days, absolute 30 days. Setup code 15 min. Attempts per 10 min: 20 sign-in, 20 setup, 10 pairing. `pair_ttl` 5 min.                                                                                                                                                                                                       |
 | Uploads      | `upload_file` 25 MB. `upload_stall` 30 s. `upload_idle` 60 s. `upload_time` 30 min.                                                                                                                                                                                                                                                                                                    |
+| Opinions     | `opinion_sizes`: question 8,000, context 60,000, files 40,000 in all, answer 8,000 characters. `opinion_files` 5. `opinion_rate` 1 at a time, 20 an hour, 60 a day an agent. Time 5 min. 4,000 output tokens. $1 a call.                                                                                                                                                               |
 | Dreams       | Window 01:00 to 05:00. `dream_gap` 2 min. `dream_retry` 10 min. `dream_steps` 60. `dream_time` 20 min. `dream_budget` $1. Night budget $5. `dream_gates`: five-hour use 60%, weekly 85%, load 0.75 x cores, 5 GB free. `dream_digest` 40,000 characters. Memory folder 512 KB, 100 files. `dream_proposals` 10. `proposal_expiry` 7 days. `trash_keep` 14 days. `trash_item_max` 5 GB. |
 
 ## Appendix B. Retired identifiers

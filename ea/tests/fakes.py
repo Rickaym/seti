@@ -581,6 +581,17 @@ def default_update() -> dict[str, Any]:
     }
 
 
+def default_runtimes() -> dict[str, Any]:
+    claude = {
+        "program": "/usr/bin/claude",
+        "version": "2.3.1",
+        "default_model": "opus",
+        "default_effort": None,
+        "sign_in": "login",
+    }
+    return {"claude": claude, "codex": {"state": "off"}, "offers": []}
+
+
 def default_account() -> dict[str, Any]:
     return {
         "account": {
@@ -688,6 +699,7 @@ class FakeSeti:
     plugins: dict[str, Any] = field(default_factory=default_plugins)
     shared_tools: list[dict[str, Any]] = field(default_factory=list)
     account: dict[str, Any] = field(default_factory=default_account)
+    runtimes: dict[str, Any] = field(default_factory=default_runtimes)
     changelog: dict[str, Any] = field(default_factory=default_changelog)
     update: dict[str, Any] = field(default_factory=default_update)
     home: dict[str, Any] = field(default_factory=default_home)
@@ -1279,6 +1291,8 @@ class FakeSeti:
                 return ok(self.shared_tools)
             case ["account"]:
                 return ok(self.account)
+            case ["runtimes"]:
+                return ok(self.runtimes)
             case ["mods", "whats-new", "changelog"]:
                 limit = int(params.get("limit", "200"))
                 return ok({**self.changelog, "entries": self.changelog["entries"][:limit]})

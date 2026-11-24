@@ -66,7 +66,7 @@ export async function codexOff(request: APIRequestContext): Promise<void> {
   await setCodex(request, {
     enabled: false,
     program: null,
-    evaluator_decides: false,
+    evaluator_decides: true,
     default_model: null,
     default_effort: null,
   })

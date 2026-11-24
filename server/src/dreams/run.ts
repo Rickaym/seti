@@ -166,7 +166,7 @@ function placesOf(job: DreamJob, night: string): DreamPlaces {
 }
 
 async function dreamSession(job: DreamJob, tally: Tally, night: string): Promise<void> {
-  const launcher = await maintenanceLauncher(job.task, [night], await launchPlan(job.task))
+  const launcher = await maintenanceLauncher(job.task, { writable: [night] }, await launchPlan(job.task))
   if (launcher === null) {
     throw new Error('The agent runs without the sandbox, so a dream could not be contained.')
   }

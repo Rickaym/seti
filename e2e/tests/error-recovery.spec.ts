@@ -130,8 +130,8 @@ test('a sign-in failure links to the account page, and Restart session restarts 
   await expect(toasts(page).filter({ hasText: 'Session restarted' })).toBeVisible()
   await expect(transcript(page)).toContainText('Session restarted; the conversation continues')
 
-  await notice(page).getByRole('link', { name: 'Open Account settings' }).click()
-  await expect(page).toHaveURL(/#settings\/account$/)
+  await notice(page).getByRole('link', { name: 'Open Claude Code settings' }).click()
+  await expect(page).toHaveURL(/#settings\/runtimes$/)
 })
 
 test('an agent a Seti restart cut off says so and retries its last message', async ({ page, request }) => {

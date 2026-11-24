@@ -61,7 +61,7 @@ test('turning Codex on installs it, shows a failure with Retry, and reads Ready 
     await page.reload()
     await expect(card(page).getByRole('status')).toHaveText('Ready')
     await expect(card(page)).toContainText('New agents get the key in the default credential.')
-    await expect(card(page).getByRole('button', { name: 'Rules' })).toHaveAttribute('aria-pressed', 'false')
+    await expect(card(page).getByRole('button', { name: 'Rules' })).toHaveAttribute('aria-pressed', 'true')
 
     await card(page)
       .getByRole('button', { name: /Advanced/ })

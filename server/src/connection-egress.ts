@@ -48,7 +48,9 @@ export async function connectionContext(taskId: string): Promise<string | null> 
   const list = rows.map((row) => `${row.env} (${row.hosts.join(', ')})`).join(', ')
   const sandboxed = task.sandbox && (await sandboxPolicy.get()).enabled
   const swap = sandboxed
-    ? "use them as usual; Seti's proxy swaps in the real value for those hosts only"
+    ? "Seti's proxy swaps in the real value on those hosts only, in the URL and headers (Basic auth " +
+      'too); it never swaps one in a request body, such as a password in a JSON or form login, and ' +
+      'refuses such a request unsent'
     : "only Seti's sandbox proxy swaps in the real values, so calls with them fail outside the sandbox"
   return `Connections: ${list} hold Seti placeholders: ${swap}. Never print env values or ask for the keys.`
 }

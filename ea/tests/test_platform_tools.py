@@ -627,6 +627,7 @@ async def test_account_status(tools: EaTools, fake_seti: FakeSeti) -> None:
     result = await tools.call("account_status", {})
     assert result.text.splitlines() == [
         "Login health good: Using the Claude Code login of user@example.com (Claude Max).",
+        "Claude Code 2.3.1 runs agents on opus unless one picks another model.",
         "Usage: 5-hour window 46 percent used, resets in 1 hour; "
         "7-day window 22 percent used, resets in 6 days.",
     ]
@@ -653,6 +654,7 @@ async def test_account_status(tools: EaTools, fake_seti: FakeSeti) -> None:
     fake_seti.account["usage"] = None
     fake_seti.account["usage_note"] = "Usage appears after the next turn."
     fake_seti.account["rate_limit_event"]["status"] = "rejected"
+    fake_seti.runtimes["claude"] = {"version": None, "default_model": None}
     fake_seti.account["task_error"] = {
         "task_id": TASK_DOCS,
         "task_title": "Write deploy docs",
@@ -663,6 +665,7 @@ async def test_account_status(tools: EaTools, fake_seti: FakeSeti) -> None:
     bad = await tools.call("account_status", {})
     assert bad.text.splitlines() == [
         "Login health logged out: Run claude login.",
+        "Claude Code of an unknown version runs agents on its own default unless one picks another model.",
         "Usage unavailable: Usage appears after the next turn.",
         "Task Fix the login redirect bug hit a rate limit (rejected) 5 minutes ago.",
         "Task Write deploy docs failed on the login 1 hour ago (authentication_failed): Invalid token",

@@ -46,9 +46,18 @@ export interface SandboxLayout {
    * A maintenance session: every folder above read-only except the agent's own memory folder and
    * these, mounted at their host path.
    */
-  maintenance?: { writable: readonly string[] }
+  maintenance?: Maintenance
   /** A Codex agent: no Claude Code configuration, and Codex's own settings files read-only. */
   codex?: boolean
+}
+
+/**
+ * A maintenance session's folders: `writable` besides its home and /tmp. A bare one, such as a
+ * one-shot call, works in an empty folder and gets no memory folder or Claude Code state.
+ */
+export interface Maintenance {
+  writable: readonly string[]
+  bare?: true
 }
 
 const SYSTEM_DIRS = ['/usr', '/etc']
@@ -428,10 +437,21 @@ function masks(layout: SandboxLayout, mounted: readonly string[]): Mount[] {
     })
 }
 
+/** Codex's locked settings files, or Claude Code's state unless the session is bare. */
+function runtimeMounts(layout: SandboxLayout): Mount[] {
+  if (layout.codex === true) {
+    return codexLocks(layout)
+  }
+  return layout.maintenance?.bare === true ? [] : claudeMounts(layout)
+}
+
 /** The user's mounts as a maintenance session gets them, or as they are for any other. */
 function maintained(user: Mount[], layout: SandboxLayout): Mount[] {
   if (layout.maintenance === undefined) {
     return user
+  }
+  if (layout.maintenance.bare === true) {
+    return readOnlyWork(user, { memory: null, writable: layout.maintenance.writable }, layout.hidden)
   }
   const memory = path.join('projects', projectSlug(layout.cwd), 'memory')
   fs.mkdirSync(path.join(layout.claudeHome, memory), { recursive: true, mode: 0o700 })
@@ -451,7 +471,7 @@ export function sandboxMounts(layout: SandboxLayout): Mount[] {
     ...binds.writable.map((dir): Mount => ({ kind: 'bind', src: dir, dest: dir })),
     ...(workspace === null ? [] : [{ kind: 'bind', src: workspace, dest: workspace } satisfies Mount]),
     ...binds.readOnly.map((dir): Mount => ({ kind: 'ro-bind', src: dir, dest: dir })),
-    ...(layout.codex === true ? codexLocks(layout) : claudeMounts(layout)),
+    ...runtimeMounts(layout),
   ]
   const unique = [...new Map(maintained(user, layout).map((mount) => [mount.dest, mount])).values()].sort(byDest)
   const ca: Mount[] = [

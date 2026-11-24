@@ -1,4 +1,5 @@
 import { RUNTIME_NAMES, warmCacheNote, type Task } from '@seti/shared'
+import { OpinionSpend } from '@/panels/tasks/OpinionSpend'
 import { Fields, Row } from '@/panels/tasks/SettingsFields'
 import { PlannerFallback, WarmCaches } from '@/panels/tasks/StartFacts'
 import { TaskCompact } from '@/panels/tasks/TaskCompact'
@@ -27,6 +28,7 @@ export function SessionFields({ task, running }: { task: Task; running: boolean 
       {runtimeLine(task) !== null && <Row label="Runtime">{runtimeLine(task)}</Row>}
       <Row label="Cost">
         <TaskCost cost={task.cost_usd} estimated={task.runtime === 'codex'} />
+        <OpinionSpend taskId={task.id} />
       </Row>
       <Row label="Memory">
         <TaskMemory taskId={task.id} />

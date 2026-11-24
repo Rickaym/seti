@@ -20,7 +20,7 @@ test('switches the Claude login from the status bar on a phone, and the logins f
   await saveLogin(request, 'work', 'Work')
   await saveLogin(request, 'home', 'Personal')
 
-  await page.goto('/#settings/account')
+  await page.goto('/#settings/runtimes')
   const logins = page.getByRole('main').getByRole('region', { name: 'Saved logins' })
   await expect(logins.getByTestId('saved-login')).toHaveCount(2)
   const overflow = await page.evaluate(
