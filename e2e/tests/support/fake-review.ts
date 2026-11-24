@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { PUSH_PROMPT, pushElsewhere } from './fake-push.js'
+import { OUTSIDE_PUSH_PROMPT, pushElsewhere } from './fake-push.js'
 import { REPEAT_PROMPT, repeatBuild, type FakeHooks } from './fake-repeat.js'
 import type { StepActor } from './fake-steps.js'
 
@@ -52,7 +52,7 @@ export function hookTurnOf(prompt: string): HookTurn | undefined {
   if (prompt.includes(REPEAT_PROMPT)) {
     return repeatBuild
   }
-  if (prompt.includes(PUSH_PROMPT)) {
+  if (prompt.includes(OUTSIDE_PUSH_PROMPT)) {
     return async (hooks, act) => pushElsewhere(hooks, prompt, act)
   }
   return prompt.includes(REVIEW_PROMPT) ? async (hooks, act) => sendReviewed(hooks, reviewTool(prompt), act) : undefined

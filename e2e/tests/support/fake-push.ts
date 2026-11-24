@@ -4,11 +4,12 @@ import { denial, fire, type FakeHooks } from './fake-repeat.js'
 import type { StepActor } from './fake-steps.js'
 
 /** What a prompt asks for to get a turn that pushes to the GitHub owner it names next. */
-export const PUSH_PROMPT = 'push the fix to'
+export const OUTSIDE_PUSH_PROMPT = 'send this branch outside, to'
 export const PUSHED = 'Pushed.'
 
 /** The `owner/repo` a push prompt names, such as "push the fix to acme/tool". */
-const targetOf = (prompt: string) => new RegExp(`${PUSH_PROMPT} ([\\w.-]+/[\\w.-]+)`).exec(prompt)?.[1] ?? 'acme/tool'
+const targetOf = (prompt: string) =>
+  new RegExp(`${OUTSIDE_PUSH_PROMPT} ([\\w.-]+/[\\w.-]+)`).exec(prompt)?.[1] ?? 'acme/tool'
 
 /** Pushes to the repository the prompt names by URL, after Seti's PreToolUse hooks. */
 export async function pushElsewhere(hooks: FakeHooks | undefined, prompt: string, act: StepActor): Promise<void> {
