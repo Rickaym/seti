@@ -31,7 +31,7 @@ import { ListFailure } from '@/panels/tasks/ListFailure'
 import { StartPage } from '@/panels/tasks/StartPage'
 import { ArchivedLight } from '@/panels/tasks/StatusPill'
 import { DetailSkeleton } from '@/panels/tasks/TranscriptSkeleton'
-import { filterAgents, groupAgents, ROW, rowHint, type AgentRow } from '@/panels/tasks/agent-list'
+import { filterAgents, groupAgents, nestDelegates, ROW, rowHint, type AgentRow } from '@/panels/tasks/agent-list'
 import { useActiveLayout, useLayoutPlace } from '@/panels/tasks/agents-layouts'
 import { ImportSessionsDialog } from '@/panels/tasks/import/ImportSessionsDialog'
 import { WorkspaceSwitcher } from '@/panels/tasks/workspaces/WorkspaceSwitcher'
@@ -174,7 +174,10 @@ function ActiveList({
       }),
     [tasks, live, selectedId],
   )
-  const { needsYou, others } = useMemo(() => groupAgents(filterAgents(rows, query)), [rows, query])
+  const { needsYou, others } = useMemo(() => {
+    const groups = groupAgents(filterAgents(rows, query))
+    return { needsYou: groups.needsYou, others: nestDelegates(groups.others) }
+  }, [rows, query])
   const fromNeedsYou = useOpenFromNeedsYou()
   const item = (place: 'list' | 'needsYou') => (row: AgentRow) => (
     <AgentListRow

@@ -1,0 +1,32 @@
+import { BRIEF_LINE, seedDelegates } from './support/delegates.js'
+import { expect, test, unique } from './support/fixtures.js'
+import { expectFitsPhone } from './support/phone-layout.js'
+
+test('a phone lists a helper under its lead on one line and opens it with a tap', async ({ page }) => {
+  const helperTitle = unique('Helper migration tests')
+  const ids = await seedDelegates(unique('Lead payments refactor'), helperTitle, unique('Unrelated docs'))
+  await page.goto('/#agents')
+  const main = page.getByRole('main')
+  const lead = main.locator(`[data-task-id="${ids.lead}"]`)
+  const helper = main.locator(`[data-task-id="${ids.helper}"]`)
+  await expect(helper.getByTestId('agent-delegate-mark')).toBeVisible()
+  const [leadBox, helperBox] = await Promise.all([lead.boundingBox(), helper.boundingBox()])
+  expect(helperBox?.height, 'one line, as tall as its lead').toBe(leadBox?.height)
+  expect(helperBox?.y, 'right under its lead').toBeCloseTo((leadBox?.y ?? 0) + (leadBox?.height ?? 0), 0)
+  await expectFitsPhone(page, 'agent list with a helper under its lead')
+  await page.screenshot({ path: test.info().outputPath('delegates-phone.png') })
+  await helper.getByRole('button').tap()
+  await expect(page.getByRole('combobox', { name: 'Reply' })).toBeVisible()
+  await expect(page.getByText(helperTitle).first()).toBeVisible()
+  const transcript = page.getByRole('region', { name: 'Transcript' })
+  await expect(transcript.getByText('Write the migration tests for the ledger change.')).toBeVisible()
+  const fold = transcript.getByTestId('handover-brief')
+  await expect(fold.locator('summary')).toHaveText(/Brief of Lead payments refactor/)
+  await expect(transcript.getByText(BRIEF_LINE)).toBeHidden()
+  await expectFitsPhone(page, 'a helper whose first message carries a closed brief')
+  await page.screenshot({ path: test.info().outputPath('delegates-phone-brief-closed.png') })
+  await fold.locator('summary').tap()
+  await expect(transcript.getByText(BRIEF_LINE)).toBeVisible()
+  await expectFitsPhone(page, 'an open brief')
+  await page.screenshot({ path: test.info().outputPath('delegates-phone-brief-open.png') })
+})

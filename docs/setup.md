@@ -536,6 +536,13 @@ key. The transcript shows one row, "Asked gpt-5.5: ...", that opens to the quest
 its cost counts toward the agent's and shows under Cost in its settings. An agent may ask 20
 times an hour and 60 a day.
 
+An agent at Seti control Full can start a helper on either runtime with `start_task`, which
+runs sandboxed with at most the caller's access and approvals. The helper sits right under its
+caller in the agent list, and the Home graph links the two. With `include_brief`, Seti adds a
+brief of the caller's work after the prompt: what it was asked, its plan, steps, files and PRs,
+redacted and without direct messages. The EA's `start_task` takes `brief_of` to brief a new
+agent on any agent's work.
+
 ### Access: defaults and per-agent choices
 
 Everything an agent may reach follows one model: each SSH host, AWS, MCP server, context

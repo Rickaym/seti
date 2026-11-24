@@ -98,4 +98,18 @@ describe('buildGraph', () => {
     expect(cost.nodes.map((node) => node.kind)).toEqual(['agent', 'agent'])
     expect(cost.edges).toEqual([])
   })
+  it('links an agent to the helpers it started, live while one runs', () => {
+    const helpers = [
+      task('lead'),
+      task('busy', { delegated_by: 'lead', status: 'running' }),
+      task('done', { delegated_by: 'lead' }),
+      task('orphan', { delegated_by: 'archived' }),
+    ]
+    const graph = buildGraph({ tasks: helpers, archived: [], summary: null, filters: DEFAULT_FILTERS })
+    const edges = graph.edges.filter((edge) => edge.kind === 'delegate')
+    expect(edges.map((edge) => `${edge.source}>${edge.target}${edge.live ? ' live' : ''}`)).toEqual([
+      'agent:lead>agent:busy live',
+      'agent:lead>agent:done',
+    ])
+  })
 })
