@@ -102,6 +102,34 @@ bound to their name, never leave the server, and are set and cleared in Settings
 Settings, Connections. The host's `gh` login, which the PR views use, is neither stored nor read
 by Seti. Seti keeps `~/.seti` owner-only and tightens anything more open at startup.
 
+## Connection values in request bodies
+
+A connection's value goes into a request body only when the user turns on Body for that
+connection in Settings, Connections; it is off for every connection until then. With Body off, the
+proxy refuses a request whose body carries the placeholder and sends nothing, so a login is never
+tried with the placeholder (EGR-14). With Body on, the proxy swaps the value into JSON, form,
+multipart text and plain text bodies of at most 1 MiB, on that connection's hosts only (EGR-15).
+
+What Body adds over a header swap is the chance that a host shows a request body back to the
+agent, as a validation error that quotes the input does. A host that echoes headers has the same
+risk today, so Body widens the surface rather than opening a new kind of leak. The hosts are the
+ones you chose for the connection, and the setting is per connection, so turn it on for a login
+endpoint you trust and leave it off elsewhere.
+
+What stays impossible with Body on:
+
+- The value going to any other host: a placeholder in a body toward a host its connection does not
+  name is refused and audited, as in a header.
+- The value in Seti's logs, audit details, error messages, transcripts or the proxy's own refusal
+  text: a refusal names the connection, never its value.
+- The value in a compressed body, a file part of a multipart body, or a body over 1 MiB: the proxy
+  refuses those instead of sending the placeholder or guessing.
+
+Response bodies are not scrubbed. The proxy does not mask an echo of the value in a response,
+because a mask catches only an exact copy: a host that escapes, encodes, compresses or splits the
+value would pass it anyway, and masking would mean holding and rewriting every response from the
+host. Treat a host with Body on as able to show the value to the agent if it echoes its input.
+
 ## What is not protected
 
 - systemd 255's user manager cannot decrypt credentials, so the key files are plain files the Seti

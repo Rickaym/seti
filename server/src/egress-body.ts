@@ -2,6 +2,7 @@ import type { IncomingHttpHeaders, OutgoingHttpHeaders } from 'node:http'
 import { Transform, type Readable, type TransformCallback } from 'node:stream'
 import { hostMatches } from '@seti/shared'
 import type { Target } from './egress-answers.js'
+import { swapBody } from './egress-body-swap.js'
 import { blockedText, placeholderAllowed, type EgressPlaceholder, type Refusal } from './egress-placeholders.js'
 
 /** The most of a request body the proxy holds to look for a placeholder in it. */
@@ -69,36 +70,82 @@ async function readUpTo(body: Readable, limit: number): Promise<{ head: Buffer; 
 
 const offText = (host: string, names: readonly string[]) =>
   `Seti sandbox proxy: refused a request to ${host} carrying the placeholder of ${names.join(', ')} in its ` +
-  'body, and sent nothing. Seti swaps a connection value into the URL and headers only, never into a ' +
-  'request body, so a login that posts it would fail.'
+  "body, and sent nothing. Seti swaps a connection's value into a request body only when the user turns " +
+  'on Body for that connection in Settings, Connections; ask them, or propose it with request_change ' +
+  '(kind api_key, body true).'
+
+const encodedText = (host: string) =>
+  `Seti sandbox proxy: ${host} takes connection values in request bodies, which Seti cannot search ` +
+  'once compressed. Send the body without a Content-Encoding.'
 
 const tooLargeText = (names: readonly string[]) =>
   `Seti sandbox proxy: refused a request body over ${LIMIT_TEXT} carrying the placeholder of ${names.join(', ')}.`
 
 export const TOO_LARGE: Omit<Refusal, 'body'> = { status: 413, reason: 'Payload Too Large' }
 
-/** Whether the proxy reads the body: a text type, unencoded, to one of the connections' hosts. */
+/** Whether the proxy reads the body: a text type, to one of the connections' hosts. */
 const inspected = (target: Target, headers: IncomingHttpHeaders, entries: readonly EgressPlaceholder[]) =>
-  bodyTypeOf(headers['content-type']) !== null &&
-  identity(headers) &&
-  entries.some((entry) => onHost(entry, target.host))
+  bodyTypeOf(headers['content-type']) !== null && entries.some((entry) => onHost(entry, target.host))
 
-/** A whole body to send, or refused for a placeholder toward another host or one not swapped. */
-function checkWhole(target: Target, body: Buffer, entries: readonly EgressPlaceholder[]): BodyPlan | BodyRefusal {
+/** An encoded body streams on unread, unless the host takes values in bodies: then it is refused. */
+function encoded(target: Target, entries: readonly EgressPlaceholder[]): BodyPlan | BodyRefusal {
+  const swaps = entries.some((entry) => entry.body && placeholderAllowed(entry, target.host, target.port))
+  return swaps
+    ? { status: 415, reason: 'Unsupported Media Type', body: encodedText(target.host), names: [] }
+    : { kind: 'stream' }
+}
+
+const refusal = (status: number, body: string, entries: readonly EgressPlaceholder[]): BodyRefusal => ({
+  status,
+  reason: 'Forbidden',
+  body,
+  names: entries.map((entry) => entry.name),
+})
+
+/** A whole body to send with its connections' values swapped in, or why it is refused. */
+async function checkWhole(
+  target: Target,
+  headers: IncomingHttpHeaders,
+  body: Buffer,
+  entries: readonly EgressPlaceholder[],
+): Promise<BodyPlan | BodyRefusal> {
   const found = entries.filter((entry) => body.includes(entry.placeholder))
   if (found.length === 0) {
     return { kind: 'whole', body }
   }
   const blocked = found.filter((entry) => !placeholderAllowed(entry, target.host, target.port))
-  const names = (blocked.length > 0 ? blocked : found).map((entry) => entry.name)
-  const text = blocked.length > 0 ? blockedText(target.host, names) : offText(target.host, names)
-  return { status: 403, reason: 'Forbidden', body: text, names }
+  if (blocked.length > 0) {
+    return refusal(
+      403,
+      blockedText(
+        target.host,
+        blocked.map((entry) => entry.name),
+      ),
+      blocked,
+    )
+  }
+  const off = found.filter((entry) => !entry.body)
+  if (off.length > 0) {
+    return refusal(
+      403,
+      offText(
+        target.host,
+        off.map((entry) => entry.name),
+      ),
+      off,
+    )
+  }
+  const contentType = headers['content-type'] ?? ''
+  const type = bodyTypeOf(contentType) ?? 'text'
+  const swapped = await swapBody(body, { type, contentType }, found)
+  return Buffer.isBuffer(swapped) ? { kind: 'whole', body: swapped } : { ...swapped, names: [] }
 }
 
 /**
  * How to send a request's body. The proxy reads only JSON, form, multipart and plain text bodies
  * without a content encoding, on its connections' hosts, holding at most BODY_LIMIT; any other
- * body streams on unread. Null when the client went away while it read.
+ * body streams on unread, except an encoded one where a connection swaps into bodies, which is
+ * refused. Null when the client went away while it read.
  */
 export async function planBody(
   target: Target,
@@ -109,12 +156,15 @@ export async function planBody(
   if (!inspected(target, headers, entries)) {
     return { kind: 'stream' }
   }
+  if (!identity(headers)) {
+    return encoded(target, entries)
+  }
   const read = await readUpTo(body, BODY_LIMIT)
   if (read === null) {
     return null
   }
   if (read.complete) {
-    return checkWhole(target, read.head, entries)
+    return checkWhole(target, headers, read.head, entries)
   }
   const found = entries.filter((entry) => read.head.includes(entry.placeholder)).map((entry) => entry.name)
   if (found.length > 0) {
