@@ -14,7 +14,7 @@ async function openFromList(page: Page, label: string): Promise<void> {
 
 test('the settings list gives every concern its own page, and each fits a phone', async ({ page }) => {
   await page.goto('/#settings')
-  for (const name of ['General', 'Lifecycle', 'Notifications', 'Repos', 'About', 'Skills', 'Subagents', 'Sign-in']) {
+  for (const name of ['General', 'Lifecycle', 'Notifications', 'Repos', 'About', 'Skills', 'Shared tools', 'Sign-in']) {
     await expect(list(page).getByRole('button', { name, exact: true })).toBeVisible()
   }
   await expectFitsPhone(page, 'settings list')
@@ -41,9 +41,9 @@ test('the settings list gives every concern its own page, and each fits a phone'
   await expect(main(page).getByRole('region', { name: 'Transcripts' })).toBeVisible()
   await expectFitsPhone(page, 'General')
 
-  await openFromList(page, 'Subagents')
+  await openFromList(page, 'Skills')
   await expect(main(page).getByRole('combobox', { name: 'Config scope' })).toBeVisible()
-  await expectFitsPhone(page, 'Subagents')
+  await expectFitsPhone(page, 'Skills')
 
   await openFromList(page, 'Sign-in')
   await expect(main(page).getByRole('region', { name: 'Phones' })).toBeVisible()
