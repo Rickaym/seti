@@ -4,7 +4,7 @@ import type { DreamProposalInput, DreamReport, DreamRun, RuntimeEvent, Task } fr
 import { audit } from '../audit.js'
 import { launchPlan } from '../launch-plan.js'
 import { maintenanceLauncher } from '../launcher.js'
-import type { DreamSession, DreamSupport } from '../runtimes/adapter.js'
+import type { DreamSession, DreamSupport, SessionMessage } from '../runtimes/adapter.js'
 import { projectSlug } from '../sandbox-mounts.js'
 import { isRunning } from '../session-mirror.js'
 import { sandboxContext, workingDirs } from '../session-options.js'
@@ -61,6 +61,7 @@ class Tally {
   steps = 0
   denials = 0
   cost = 0
+  finished = false
   report: DreamReport | null = null
   end: { state: DreamEnd['state']; reason: string | null } | null = null
 
@@ -77,10 +78,24 @@ class Tally {
     this.report = report
   }
 
-  count(event: RuntimeEvent): void {
+  /** Takes one message: its events, and the dream's cost so far where the runtime reports it. */
+  take(message: SessionMessage, reportedCost: DreamSupport['reportedCost']): void {
+    message.events.forEach((event) => {
+      this.count(event)
+    })
+    this.cost = reportedCost(message.raw) ?? this.cost
+  }
+
+  /** Whether the dream spent past its budget while its runtime let it go on. */
+  overBudget(budgetUsd: number): boolean {
+    return this.end === null && !this.finished && this.cost > budgetUsd
+  }
+
+  private count(event: RuntimeEvent): void {
     if (event.type === 'tool.started' && event.thread === '') {
       this.steps += 1
     } else if (event.type === 'turn.ended') {
+      this.finished = true
       this.cost = event.costUsd ?? this.cost
       if (event.ending === 'budget_limit') {
         this.ended('stopped', 'It reached its budget.')
@@ -144,9 +159,10 @@ async function follow(session: DreamSession, job: DreamJob, tally: Tally): Promi
   try {
     for await (const report of session.events) {
       if (report.type === 'message') {
-        report.events.forEach((event) => {
-          tally.count(event)
-        })
+        tally.take(report, job.dream.reportedCost)
+      }
+      if (tally.overBudget(job.limits.budgetUsd)) {
+        stop('stopped', 'It reached its budget.')
       }
     }
   } finally {
@@ -209,7 +225,8 @@ async function dreamSession(job: DreamJob, tally: Tally, night: string): Promise
 
 /**
  * Runs one dream to its end: writes the day's digest, runs the session in the agent's maintenance
- * sandbox, records each memory file it changed as a revision, and stores and audits the outcome.
+ * sandbox, records each memory file it changed as a revision, and stores the outcome with its
+ * audit event in one transaction, so a dream is never seen ended without it.
  */
 export async function runDream(job: DreamJob): Promise<DreamRun | undefined> {
   const tally = new Tally()
@@ -235,21 +252,25 @@ export async function runDream(job: DreamJob): Promise<DreamRun | undefined> {
     report,
   }
   fs.writeFileSync(path.join(night, 'report.md'), reportMarkdown(job.task.title, job.run.night, end), { mode: 0o600 })
-  const ended = await dreamRuns.end(job.run.id, end)
-  await audit.record({
-    actor: 'system',
-    kind: 'dream.ended',
-    subject_type: 'task',
-    subject_id: job.task.id,
-    summary: `A dream of ${job.task.title} ended: ${end.state}, ${String(end.memory_changes)} memory files changed`,
-    detail: {
-      run: job.run.id,
-      state: end.state,
-      steps: end.steps,
-      cost_usd: end.cost_usd,
-      denials: end.denials,
-      memory_changes: end.memory_changes,
-    },
-  })
-  return ended
+  return audit.recordWith(
+    async (tx) => dreamRuns.end(job.run.id, end, tx),
+    (ended) =>
+      ended === undefined
+        ? null
+        : {
+            actor: 'system',
+            kind: 'dream.ended',
+            subject_type: 'task',
+            subject_id: job.task.id,
+            summary: `A dream of ${job.task.title} ended: ${end.state}, ${String(end.memory_changes)} memory files changed`,
+            detail: {
+              run: job.run.id,
+              state: end.state,
+              steps: end.steps,
+              cost_usd: end.cost_usd,
+              denials: end.denials,
+              memory_changes: end.memory_changes,
+            },
+          },
+  )
 }

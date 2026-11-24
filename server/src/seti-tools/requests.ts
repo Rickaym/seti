@@ -14,7 +14,8 @@ const requestChange = setiTool({
     'answer as an update. Kinds: allow_host (a host and port on the network ' +
     `allowlist, ${String(HTTPS_PORT)} by default; the user picks you or every agent), api_key (a connection by ` +
     'its variable name and hosts; the user pastes the key into the request in Seti as they allow it, and you ' +
-    'only ever hold a placeholder), mcp_server (an MCP server this install has that is off for you, by the ' +
+    'only ever hold a placeholder; body true also asks for the value in request bodies, for a login that ' +
+    'posts it as JSON or a form, and works for a variable you already have), mcp_server (an MCP server this install has that is off for you, by the ' +
     'name your system prompt or list_mcp_servers gives; your session restarts with its tools for the turn ' +
     'that brings the answer), shared_tool (one script ' +
     'file of yours, at most 64 KB, that proved useful, as a typed tool for every agent: name it, describe ' +
@@ -30,7 +31,7 @@ const requestChange = setiTool({
     `at most ${String(PENDING_MAX)} wait at once.`,
   input: {
     change: fileChangeInput.shape.change.describe(
-      'The change: {kind: "allow_host", host, port?}, {kind: "api_key", env, hosts}, {kind: "mcp_server", server} ' +
+      'The change: {kind: "allow_host", host, port?}, {kind: "api_key", env, hosts, body?}, {kind: "mcp_server", server} ' +
         'or {kind: "shared_tool", name, description, path, input, writes, timeout_seconds?, needs?: [{env, hosts}]}.',
     ),
     reason: z

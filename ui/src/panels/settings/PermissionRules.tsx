@@ -44,6 +44,14 @@ const PLACEHOLDER: Record<PermissionBehavior, string> = {
 const REVIEW_TIP =
   'Review holds each call of an MCP tool or server for you to check and edit before it runs, in Bypass too.'
 
+const PUSH_TIP =
+  "Agents ask before they push, fork or open a pull request outside your organisations. PushTo(owner), such as PushTo(acme), lets them do it on that owner's repositories without asking."
+
+const TIPS: Partial<Record<PermissionBehavior, { label: string; text: string }>> = {
+  allow: { label: 'About pushes elsewhere', text: PUSH_TIP },
+  review: { label: 'About review rules', text: REVIEW_TIP },
+}
+
 /** One rule in a list: what it does, the rule, a note such as its file, and a way to remove it. */
 export interface RuleEntry {
   key: string
@@ -145,6 +153,7 @@ export function RuleEditor({
   const [unlisted, setUnlisted] = useState('')
   const ruleId = useId()
   const behaviorId = useId()
+  const tip = TIPS[behavior]
 
   const add = async () => {
     const parsed = addPermissionRuleInput.safeParse({ behavior, rule: text })
@@ -245,7 +254,7 @@ export function RuleEditor({
             setText(event.target.value)
           }}
         />
-        {behavior === 'review' && <InfoTip label="About review rules" text={REVIEW_TIP} />}
+        {tip !== undefined && <InfoTip label={tip.label} text={tip.text} />}
         <Button type="submit" size="sm" variant="outline" disabled={busy || text.trim() === ''}>
           <Plus />
           Add

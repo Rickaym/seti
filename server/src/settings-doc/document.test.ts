@@ -130,7 +130,9 @@ describe('secrets in the settings document', () => {
       }
     }
     const doc = await read<Record<string, Record<string, Record<string, unknown>>>>('')
-    expect(doc.security?.connections).toMatchObject({ connections: { planted_api: { values: { value: 'set' } } } })
+    expect(doc.security?.connections).toMatchObject({
+      connections: { planted_api: { body: false, values: { value: 'set' } } },
+    })
     expect(doc.security?.credentials).toMatchObject({ agent_tokens: { claude_oauth_token: 'set' } })
   })
 })

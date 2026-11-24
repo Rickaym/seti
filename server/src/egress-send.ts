@@ -1,8 +1,9 @@
 import type http from 'node:http'
 import type { IncomingMessage, ServerResponse } from 'node:http'
-import { answer } from './egress-answers.js'
-import { PlaceholderInBody, TOO_LARGE, watchRest, type BodyPlan } from './egress-body.js'
+import { answer, type Target } from './egress-answers.js'
+import { planBody, PlaceholderInBody, TOO_LARGE, watchRest, type BodyPlan } from './egress-body.js'
 import { withoutHopByHop } from './egress-hosts.js'
+import type { EgressPlaceholder } from './egress-placeholders.js'
 
 /** A request from the sandbox on its way to `host`, with its body planned. */
 export interface Relayed {
@@ -10,6 +11,27 @@ export interface Relayed {
   req: IncomingMessage
   res: ServerResponse
   plan: BodyPlan
+}
+
+/**
+ * How the request's body goes on, or null once it is answered: refused, reporting the connections
+ * it carried toward the wrong place, or its client gone.
+ */
+export async function bodyOf(
+  { target, req, res }: { target: Target; req: IncomingMessage; res: ServerResponse },
+  entries: readonly EgressPlaceholder[],
+  onBlocked?: (host: string, names: readonly string[]) => void,
+): Promise<BodyPlan | null> {
+  const plan = await planBody(target, req.headers, req, entries)
+  if (plan !== null && 'status' in plan) {
+    if (plan.names.length > 0) {
+      onBlocked?.(target.host, plan.names)
+    }
+    answer(res, plan.status, plan.body)
+    req.resume()
+    return null
+  }
+  return plan
 }
 
 /** Sends the request's body as planned and relays the answer back to the sandbox. */

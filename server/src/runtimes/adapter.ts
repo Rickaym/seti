@@ -126,13 +126,15 @@ export interface DreamSupport {
     host: DreamHost,
     abortController: AbortController,
   ) => Promise<DreamSession>
+  /** The dream's cost so far as a raw message of the runtime reports it, or null when it does not. */
+  reportedCost: (raw: unknown) => number | null
 }
 
 /**
  * What a runtime can do where Seti would otherwise assume Claude Code. A session whose runtime
  * version lacks a control leaves that control off instead.
  */
-interface Capabilities {
+export interface Capabilities {
   /**
    * A decision can change the call's input, as an edit before allowing a held call does; and the
    * runtime has its own classifier that decides the calls no rule decides in its auto mode.
@@ -144,6 +146,12 @@ interface Capabilities {
   rewind: { conversation: boolean; code: boolean }
   /** Dreams, or null where the runtime keeps no memory Seti can find. */
   dream: DreamSupport | null
+  /** It loads the user's own tool servers and connectors, and Seti's plugins, beside Seti's tools. */
+  tools: { userServers: boolean; plugins: boolean }
+  /** It can run outside Seti's sandbox. */
+  sandbox: { optional: boolean }
+  /** It takes a rule for when to compact its context. */
+  compaction: boolean
 }
 
 /**
