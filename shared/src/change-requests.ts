@@ -160,6 +160,10 @@ export const answerChangeInput = z.discriminatedUnion('decision', [
 ])
 export type AnswerChangeInput = z.input<typeof answerChangeInput>
 
+/** The user's Allow host on a host the agent's sandbox refused, for the agent or every agent. */
+export const allowRefusedHostInput = z.object({ host: requestHost, scope: z.enum(HOST_SCOPES).default('agent') })
+export type AllowRefusedHostInput = z.input<typeof allowRefusedHostInput>
+
 export const changeRequestParams = z.object({ id: z.string().trim().min(1).max(100), request_id: z.uuid() })
 
 export const changeRequestSchema = z.object({
