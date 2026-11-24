@@ -151,7 +151,7 @@ export async function proofRun(scratch: string, binary: string, split: boolean) 
   if (node === null) {
     routeEgressForTests(local)
   }
-  await codexSettings.set({ ...CODEX_SETTINGS_DEFAULTS, enabled: true })
+  await codexSettings.set({ ...CODEX_SETTINGS_DEFAULTS, enabled: true, evaluator_decides: false })
   const program = await installFrom(scratch, binary)
   const key = `proof-${randomUUID()}`
   await keyConnection('proof_openai', key, {

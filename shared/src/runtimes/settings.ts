@@ -10,7 +10,7 @@ export interface CodexSettings {
   enabled: boolean
   /** A `codex` program the user names instead of Seti's own copy, as on a machine offline. */
   program: string | null
-  /** On, an allow rule or Seti's read-only list answers a call; off, the user answers every one. */
+  /** On (the default), an allow rule or Seti's read-only list answers a call; off, the user does. */
   evaluator_decides: boolean
   /** The model and effort a new Codex agent starts with unless it picks its own. */
   default_model: string | null
@@ -20,7 +20,7 @@ export interface CodexSettings {
 export const CODEX_SETTINGS_DEFAULTS: CodexSettings = {
   enabled: false,
   program: null,
-  evaluator_decides: false,
+  evaluator_decides: true,
   default_model: null,
   default_effort: null,
 }

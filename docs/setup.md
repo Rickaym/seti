@@ -516,9 +516,11 @@ On a machine without network access, put a `codex` program of the pinned version
 name it under Advanced, Own program, in the Codex card; the status says when it is missing or
 another version. `pnpm seti:doctor` shows a Codex line while Codex is on.
 
-A Codex agent runs only in the sandbox and asks you before every command, edit and tool call; a
-guard or deny rule still refuses at once. Settings, Runtimes can let Seti's rules answer the
-calls they allow instead (off by default). Codex agents have no side chat, rewind, Bypass or
+A Codex agent runs only in the sandbox. Seti's rules answer its calls: a guard or deny rule
+refuses at once, an allow rule or Seti's read-only list runs the call, and every other command,
+edit and tool call asks you. A call to one of your tool servers runs without asking only when an
+allow rule of yours names that server or tool. Turn Rules decide off in the Codex card under
+Settings, Runtimes to answer every call yourself; an upgrade keeps the choice you made. Codex agents have no side chat, rewind, Bypass or
 plugins. Their cost is an estimate from the price table in
 `server/src/runtimes/codex/prices.ts`, which names the day it was read; to update it, copy the
 standard rates from OpenAI's pricing page into that table, set `asOf` to the day, and run

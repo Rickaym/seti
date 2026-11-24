@@ -201,3 +201,8 @@ CREATE TABLE codex_settings (
 
 /** The approvals an agent-started agent may not go beyond: those of a Codex agent, or none. */
 export const TASK_APPROVAL_CEILING = 'ALTER TABLE task ADD COLUMN approval_ceiling TEXT;'
+
+/** Rules decide for a new install's Codex agents; a value the user already stored stays as it is. */
+export const CODEX_RULES_DECIDE_DEFAULT = `
+ALTER TABLE codex_settings ALTER COLUMN evaluator_decides SET DEFAULT true;
+`
