@@ -16,12 +16,15 @@ describe('reading runtime rows as events', () => {
 
   it('reads stored JSON text, and none from text that does not parse', () => {
     const { payload } = assistant([{ type: 'text', text: 'Done' }])
-    expect(agentTexts(payloadEvents(JSON.stringify(payload)))).toEqual(['Done'])
-    expect(payloadEvents('{not json')).toEqual([])
+    expect(agentTexts(payloadEvents(JSON.stringify(payload), null))).toEqual(['Done'])
+    expect(payloadEvents('{not json', null)).toEqual([])
   })
 
   it("keeps the agent's own text apart from a subagent's", () => {
-    const events = [...rowEvents(row(3, assistant([{ type: 'text', text: 'Sub' }], 't9'))), ...payloadEvents('{}')]
+    const events = [
+      ...rowEvents(row(3, assistant([{ type: 'text', text: 'Sub' }], 't9'))),
+      ...payloadEvents('{}', null),
+    ]
     expect(agentTexts(events)).toEqual([])
     expect(eventsOf(events, 'vendor')).toHaveLength(1)
   })

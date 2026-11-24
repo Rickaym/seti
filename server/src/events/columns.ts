@@ -1,4 +1,11 @@
-import { isAgentOutput, payloadEvents, projectClaude, type MessageBody, type RuntimeEvent } from '@seti/shared'
+import {
+  isAgentOutput,
+  payloadEvents,
+  projectRuntime,
+  storedRuntime,
+  type MessageBody,
+  type RuntimeEvent,
+} from '@seti/shared'
 
 /** The `task_message` columns a row's events fill. */
 export const EVENT_COLUMNS = [
@@ -45,9 +52,11 @@ function eventColumns(runtime: string, events: readonly RuntimeEvent[]): EventCo
 }
 
 /** The columns of a message about to be stored. */
-export const messageColumns = (body: MessageBody): EventColumns =>
-  eventColumns('claude', body.kind === 'sdk' ? projectClaude(body.payload) : [])
+export function messageColumns(body: MessageBody): EventColumns {
+  const runtime = storedRuntime(body.kind === 'sdk' ? body.runtime : null)
+  return eventColumns(runtime, body.kind === 'sdk' ? projectRuntime(runtime, body.payload) : [])
+}
 
-/** The columns of a row stored as JSON text, as an archive or an import holds it. */
-export const storedColumns = (kind: string, payload: string): EventColumns =>
-  eventColumns('claude', kind === 'sdk' ? payloadEvents(payload) : [])
+/** The columns of a row stored as JSON text by `runtime`, as an archive or an import holds it. */
+export const storedColumns = (kind: string, payload: string, runtime: string | null): EventColumns =>
+  eventColumns(storedRuntime(runtime), kind === 'sdk' ? payloadEvents(payload, runtime) : [])

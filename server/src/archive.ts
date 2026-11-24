@@ -103,7 +103,7 @@ const toRow = (taskId: string, row: StoredMessage): MessageRow => toMessage({ ..
 
 /** Matches the live page: no subagent messages and no per-step progress reports. */
 function isOwnRow(row: StoredMessage): boolean {
-  const { thread, event } = storedColumns(row.kind, row.payload)
+  const { thread, event } = storedColumns(row.kind, row.payload, row.runtime ?? null)
   return thread === '' && event !== 'job.progress'
 }
 

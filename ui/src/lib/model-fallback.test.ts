@@ -20,7 +20,7 @@ function notice(extra: Record<string, unknown> = {}): RefusalChange {
     content: 'flagged',
     ...extra,
   }
-  const change = eventsOf(payloadEvents(JSON.stringify(message)), 'model.changed').find(
+  const change = eventsOf(payloadEvents(JSON.stringify(message), null), 'model.changed').find(
     (event): event is RefusalChange => event.refusal !== undefined,
   )
   if (change === undefined) {

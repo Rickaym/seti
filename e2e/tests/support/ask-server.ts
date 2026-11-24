@@ -1,5 +1,5 @@
 import type { APIRequestContext, Locator, Page, TestInfo } from '@playwright/test'
-import type { Envelope, MessagePage, Task, TaskMcpServer } from '@seti/shared'
+import { type Envelope, isClaudeRow, type MessagePage, type Task, type TaskMcpServer } from '@seti/shared'
 import { setiPrompt, SYSTEM_PROMPT_PROMPT } from './fake-claude.js'
 import { SERVERS_PROMPT, SERVERS_REPLY } from './fake-mcp-servers.js'
 import { apiData, expect, unique } from './fixtures.js'
@@ -22,7 +22,7 @@ export async function removeServer(request: APIRequestContext, name: string): Pr
 
 const replies = async (request: APIRequestContext, id: string) =>
   (await apiData<MessagePage>(request, `/tasks/${id}/messages?limit=100`)).messages.flatMap((row) =>
-    row.kind === 'sdk' && row.payload.type === 'assistant'
+    isClaudeRow(row) && row.payload.type === 'assistant'
       ? row.payload.message.content.flatMap((block) => (block.type === 'text' ? [block.text] : []))
       : [],
   )

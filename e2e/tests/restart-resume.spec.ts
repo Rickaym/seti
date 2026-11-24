@@ -1,4 +1,4 @@
-import type { Envelope, MessagePage, Task } from '@seti/shared'
+import { type Envelope, isClaudeRow, type MessagePage, type Task } from '@seti/shared'
 import { paths, SPLIT_NODE } from './support/env.js'
 import { PUSH_PROMPT, PUSH_QUESTION } from './support/fake-question.js'
 import { apiData, expect, test, unique } from './support/fixtures.js'
@@ -66,7 +66,7 @@ test('a restart keeps a running turn going when agents run in a separate node', 
   await expect.poll(async () => (await apiData<Task>(request, `/tasks/${id}`)).status).toBe('stopped')
   const { messages } = await apiData<MessagePage>(request, `/tasks/${id}/messages?limit=50`)
   expect(messages.filter((row) => row.kind === 'prompt')).toHaveLength(1)
-  expect(messages.filter((row) => row.kind === 'sdk' && row.payload.type === 'assistant')).toHaveLength(1)
+  expect(messages.filter((row) => isClaudeRow(row) && row.payload.type === 'assistant')).toHaveLength(1)
   expect(JSON.stringify(messages)).not.toContain(RESUMED_NOTE)
 })
 

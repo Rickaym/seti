@@ -204,7 +204,7 @@ function recordPublished(evidence: PrEvidence, change: { url: string; action: st
 export function transcriptEvidence(rows: readonly StoredRow[]): PrEvidence {
   const calls = new Map<string, ToolCall>()
   const evidence: PrEvidence = { created: new Set(), pushedTo: new Set(), pushes: [] }
-  const events = rows.flatMap((row) => (row.kind === 'sdk' ? payloadEvents(row.payload) : []))
+  const events = rows.flatMap((row) => (row.kind === 'sdk' ? payloadEvents(row.payload, row.runtime ?? null) : []))
   for (const event of events) {
     if (event.type === 'tool.started') {
       calls.set(event.call.callId, event.call)

@@ -5,6 +5,8 @@ import { now, rowFilter, sql } from '../db.js'
 export interface StoredRow {
   kind: MessageBody['kind']
   payload: string
+  /** The runtime that wrote it; null on a row the event fill has not reached. */
+  runtime?: string | null | undefined
 }
 
 type IdRow = StoredRow & { id: number }
@@ -18,9 +20,9 @@ async function firstResults(
   if (asked.length === 0) {
     return []
   }
-  return sql<IdRow[]>`SELECT r.id, r.kind, r.payload
+  return sql<IdRow[]>`SELECT r.id, r.kind, r.payload, r.runtime
     FROM unnest(${asked.map((one) => one.after)}::bigint[], ${asked.map((one) => one.call)}::text[]) AS c(after, call)
-    CROSS JOIN LATERAL (SELECT id, kind, payload FROM task_message
+    CROSS JOIN LATERAL (SELECT id, kind, payload, COALESCE(runtime, 'claude') AS runtime FROM task_message
       WHERE task_id = ${taskId} AND id > c.after AND id <= ${upTo} AND kind = 'sdk' AND ${rowFilter.resultRow}
         AND strpos(payload, c.call) > 0
       ORDER BY id LIMIT 1) AS r`
@@ -45,18 +47,25 @@ export const prDiscoveryStore = {
   ],
   /** Rows up to `upTo` that may show the task opening or pushing to a PR: calls, results, reports. */
   evidenceRows: async (taskId: string, upTo: number): Promise<StoredRow[]> => {
-    const calls = await sql<IdRow[]>`SELECT id, kind, payload FROM task_message
+    const calls = await sql<IdRow[]>`SELECT id, kind, payload, COALESCE(runtime, 'claude') AS runtime
+      FROM task_message
       WHERE task_id = ${taskId} AND id <= ${upTo} AND kind = 'sdk' AND ${rowFilter.callRow}
         AND (strpos(payload, 'git push') > 0 OR strpos(payload, 'gh pr create') > 0
           OR strpos(payload, '/pulls') > 0 OR strpos(payload, 'create_pull_request') > 0)`
-    const published = await sql<IdRow[]>`SELECT id, kind, payload FROM task_message
+    const published = await sql<IdRow[]>`SELECT id, kind, payload, COALESCE(runtime, 'claude') AS runtime
+      FROM task_message
       WHERE task_id = ${taskId} AND id <= ${upTo} AND kind = 'sdk' AND ${rowFilter.published}`
     const asked = calls.flatMap((row) =>
-      eventsOf(payloadEvents(row.payload), 'tool.started').map((event) => ({ after: row.id, call: event.call.callId })),
+      eventsOf(payloadEvents(row.payload, row.runtime ?? null), 'tool.started').map((event) => ({
+        after: row.id,
+        call: event.call.callId,
+      })),
     )
     const results = await firstResults(taskId, upTo, asked)
     const rows = new Map([...calls, ...published, ...results].map((row) => [row.id, row]))
-    return [...rows.values()].sort((a, b) => a.id - b.id).map(({ kind, payload }) => ({ kind, payload }))
+    return [...rows.values()]
+      .sort((a, b) => a.id - b.id)
+      .map(({ kind, payload, runtime }) => ({ kind, payload, runtime }))
   },
   /** Every task that is not archived, most recently updated first. */
   taskIds: async () =>

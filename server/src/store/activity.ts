@@ -35,11 +35,13 @@ async function lastReplies(ids: readonly number[]): Promise<Map<number, string>>
   if (ids.length === 0) {
     return new Map()
   }
-  const rows = await sql<{ id: number; payload: string }[]>`SELECT id, payload FROM task_message
-    WHERE id = ANY(${ids})`
+  const rows = await sql<{ id: number; payload: string; runtime: string | null }[]>`SELECT id, payload, runtime
+    FROM task_message WHERE id = ANY(${ids})`
   return new Map(
-    rows.flatMap(({ id, payload }) =>
-      eventsOf(payloadEvents(payload), 'turn.ended').map((end) => [id, end.result.slice(0, LAST_REPLY_CHARS)] as const),
+    rows.flatMap(({ id, payload, runtime }) =>
+      eventsOf(payloadEvents(payload, runtime), 'turn.ended').map(
+        (end) => [id, end.result.slice(0, LAST_REPLY_CHARS)] as const,
+      ),
     ),
   )
 }

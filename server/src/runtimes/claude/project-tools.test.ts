@@ -1,10 +1,10 @@
-import { projectClaude, type MessageBody, type RuntimeEvent, type ToolCall } from '@seti/shared'
+import { isClaudeRow, type MessageBody, projectClaude, type RuntimeEvent, type ToolCall } from '@seti/shared'
 import { describe, expect, it } from 'vitest'
 import { shellCall } from '../../shell-fixtures.js'
 import { agentCall, assistant, toolUse } from '../../subtask-fixtures.js'
 
 const sdkOf = (body: MessageBody) => {
-  if (body.kind !== 'sdk') {
+  if (!isClaudeRow(body)) {
     throw new Error('not an sdk row')
   }
   return body.payload

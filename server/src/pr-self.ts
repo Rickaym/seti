@@ -32,7 +32,7 @@ function agentCalls(rows: readonly StoredCall[], acts: Acts): AgentCall[] {
   const calls = new Map<string, AgentCall>()
   for (const row of rows) {
     const at = Date.parse(row.created_at)
-    for (const event of payloadEvents(row.payload)) {
+    for (const event of payloadEvents(row.payload, row.runtime ?? null)) {
       if (event.type === 'tool.started' && acts(event.call)) {
         const targets = postTargets(event.call)
         calls.set(event.call.callId, { task_id: row.task_id, at, until: null, anchors: [], targets })
@@ -137,7 +137,9 @@ const pushesCall = (call: ToolCall): boolean =>
 /** Whether any of the stored calls pushed commits or opened a PR. */
 export const pushed = (rows: readonly StoredCall[]): boolean =>
   rows.some((row) =>
-    payloadEvents(row.payload).some((event) => event.type === 'tool.started' && pushesCall(event.call)),
+    payloadEvents(row.payload, row.runtime ?? null).some(
+      (event) => event.type === 'tool.started' && pushesCall(event.call),
+    ),
   )
 
 /**

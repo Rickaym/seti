@@ -1,5 +1,5 @@
 import type { SDKMessage } from '@anthropic-ai/claude-agent-sdk'
-import type { MessageRow, TaskRewind } from '@seti/shared'
+import { isClaudeRow, type MessageRow, type TaskRewind } from '@seti/shared'
 import { describe, expect, it } from 'vitest'
 import { transcriptItems } from '@/lib/rewind'
 import { groupRows, rowRole, transcriptViews, type RoleContext, type Segment } from '@/lib/tool-groups'
@@ -75,7 +75,7 @@ function shape(segments: readonly Segment[]): string[] {
 }
 
 function rowRoleName(row: MessageRow): string[] {
-  const first = row.kind === 'sdk' && row.payload.type === 'assistant' ? row.payload.message.content[0] : undefined
+  const first = isClaudeRow(row) && row.payload.type === 'assistant' ? row.payload.message.content[0] : undefined
   if (first?.type === 'tool_use') {
     return [first.name]
   }

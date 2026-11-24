@@ -16,7 +16,7 @@ export const eaContextStore = {
     }
     const rows = await sql<MessageRecord[]>`SELECT r.* FROM unnest(${taskIds}::text[]) AS t(id)
       CROSS JOIN LATERAL (
-        SELECT m.id, m.task_id, m.kind, ${LIGHT_PAYLOAD} AS payload, m.outward, m.created_at
+        SELECT m.id, m.task_id, m.kind, ${LIGHT_PAYLOAD} AS payload, m.outward, m.created_at, m.runtime
         FROM task_message m
         WHERE m.task_id = t.id AND m.kind IN ('sdk', 'prompt', 'seti')
           AND (m.kind <> 'sdk' OR ${rowFilter.ownThread})

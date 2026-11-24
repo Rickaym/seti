@@ -179,3 +179,10 @@ export const TASK_TURN_ENDED_AT = `
 ALTER TABLE task ADD COLUMN turn_ended_at TEXT;
 UPDATE task SET turn_ended_at = updated_at WHERE status <> 'running';
 `
+
+/** The runtime each agent runs on, and the model and effort it started with; null is the default. */
+export const TASK_RUNTIME = `
+ALTER TABLE task ADD COLUMN runtime TEXT NOT NULL DEFAULT 'claude';
+ALTER TABLE task ADD COLUMN requested_model TEXT;
+ALTER TABLE task ADD COLUMN requested_effort TEXT;
+`

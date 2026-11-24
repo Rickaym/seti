@@ -1,4 +1,4 @@
-import type { MessageRow, TaskStatus } from '@seti/shared'
+import { isClaudeRow, type MessageRow, type TaskStatus } from '@seti/shared'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { messages, tasks } from './db.js'
 import { fakeTimers } from './fake-timers.js'
@@ -69,7 +69,7 @@ function label(row: MessageRow): string {
   if (row.kind === 'prompt') {
     return `prompt: ${row.payload.text}${row.payload.interrupted === true ? ' (interrupted)' : ''}`
   }
-  if (row.kind !== 'sdk') {
+  if (!isClaudeRow(row)) {
     return row.kind
   }
   const { payload } = row

@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import type { APIRequestContext, Page } from '@playwright/test'
-import type { Envelope, MessagePage, Task } from '@seti/shared'
+import { type Envelope, isClaudeRow, type MessagePage, type Task } from '@seti/shared'
 import { openSeedDb } from './support/db.js'
 import { paths } from './support/env.js'
 import { HOLD_PROMPT } from './support/fake-claude.js'
@@ -108,7 +108,7 @@ const listItem = (page: Page, title: string) => page.getByRole('button', { name:
 async function serverReplies(request: APIRequestContext, id: string): Promise<string[]> {
   const { data } = (await (await request.get(`/api/tasks/${id}/messages`)).json()) as Envelope<MessagePage>
   return data.messages.flatMap((row) => {
-    if (row.kind !== 'sdk' || row.payload.type !== 'assistant') {
+    if (!isClaudeRow(row) || row.payload.type !== 'assistant') {
       return []
     }
     const [block] = row.payload.message.content

@@ -1,4 +1,4 @@
-import type { PrInput, PromptPayload, TaskStatus } from '@seti/shared'
+import { isClaudeRow, type PrInput, type PromptPayload, type TaskStatus } from '@seti/shared'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { createApp } from './app.js'
 import { OPENER_WAIT_MS, SESSION_IDLE_MS } from './config.js'
@@ -150,10 +150,10 @@ describe('one streaming session per task', () => {
     const id = await newTask()
     await turn(id, 'think')
     const rows = (await messages.page(id, 100)).messages
-    expect(rows.some((row) => row.kind === 'sdk' && row.payload.type === 'assistant')).toBe(true)
-    expect(rows.filter((row) => row.kind === 'sdk' && row.payload.type === 'system').map((row) => row.payload)).toEqual(
-      [expect.objectContaining({ subtype: 'init' })],
-    )
+    expect(rows.some((row) => isClaudeRow(row) && row.payload.type === 'assistant')).toBe(true)
+    expect(rows.filter((row) => isClaudeRow(row) && row.payload.type === 'system').map((row) => row.payload)).toEqual([
+      expect.objectContaining({ subtype: 'init' }),
+    ])
   })
 
   it('sends every message into the same session and reports each turn once', async () => {
@@ -348,7 +348,7 @@ describe('one streaming session per task', () => {
     await turn(id, 'notices first')
     expect(endsOf(id)).toEqual(['idle'])
     const rows = (await messages.page(id, 100)).messages
-    const results = rows.filter((row) => row.kind === 'sdk' && row.payload.type === 'result')
+    const results = rows.filter((row) => isClaudeRow(row) && row.payload.type === 'result')
     expect(results).toHaveLength(3)
   })
 
@@ -358,7 +358,7 @@ describe('one streaming session per task', () => {
     await runTurn(id, 'dropped after a notice')
     await vi.waitFor(async () => {
       const rows = (await messages.page(id, 100)).messages
-      expect(rows.some((row) => row.kind === 'sdk' && row.payload.type === 'result')).toBe(true)
+      expect(rows.some((row) => isClaudeRow(row) && row.payload.type === 'result')).toBe(true)
     })
     await vi.advanceTimersByTimeAsync(OPENER_WAIT_MS - 1000)
     expect((await tasks.get(id))?.status).toBe('running')

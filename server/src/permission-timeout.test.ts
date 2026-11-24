@@ -1,12 +1,13 @@
 import { randomUUID } from 'node:crypto'
 import type { CanUseTool, PermissionResult } from '@anthropic-ai/claude-agent-sdk'
 import {
-  timedOutMessage,
   type AgentPermissions,
+  isClaudeRow,
   type PermissionPolicy,
   type PermissionRequest,
   type PermissionTimeoutSettings,
   type Task,
+  timedOutMessage,
 } from '@seti/shared'
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { asAgent } from './access.js'
@@ -118,7 +119,7 @@ async function reply(taskId: string): Promise<{ behavior: string; message?: stri
   await waitIdle(taskId)
   const rows = (await messages.page(taskId, 50)).messages
   const texts = rows.flatMap((row) =>
-    row.kind === 'sdk' && row.payload.type === 'assistant' ? row.payload.message.content : [],
+    isClaudeRow(row) && row.payload.type === 'assistant' ? row.payload.message.content : [],
   )
   const last = texts.at(-1)
   return JSON.parse(last?.type === 'text' ? last.text : '{}') as { behavior: string; message?: string }

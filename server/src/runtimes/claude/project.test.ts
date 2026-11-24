@@ -1,12 +1,12 @@
 import type { SDKMessage } from '@anthropic-ai/claude-agent-sdk'
-import { projectClaude, TURN_COST_KEY, type MessageBody } from '@seti/shared'
+import { isClaudeRow, type MessageBody, projectClaude, TURN_COST_KEY } from '@seti/shared'
 import { describe, expect, it } from 'vitest'
 import { fakeAssistant, fakeMessage, fakeResult } from '../../fake-sdk.js'
 import { backgroundResult, movedResult, plainResult } from '../../shell-fixtures.js'
 import { assistant, completedResult, launched, toolResult, toolUse } from '../../subtask-fixtures.js'
 
 const sdkOf = (body: MessageBody): SDKMessage => {
-  if (body.kind !== 'sdk') {
+  if (!isClaudeRow(body)) {
     throw new Error('not an sdk row')
   }
   return body.payload

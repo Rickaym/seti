@@ -1,7 +1,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import type { Options } from '@anthropic-ai/claude-agent-sdk'
-import { sideChatEvent, type SideChatEvent } from '@seti/shared'
+import { isClaudeRow, sideChatEvent, type SideChatEvent } from '@seti/shared'
 import { describe, expect, it, vi } from 'vitest'
 import { asAgent } from '../access.js'
 import { createApp } from '../app.js'
@@ -207,7 +207,7 @@ describe('side chat', () => {
     const id = await newAgent('hold')
     await vi.waitFor(async () => {
       const rows = (await messages.page(id, 10)).messages
-      expect(rows.some((row) => row.kind === 'sdk' && row.payload.type === 'assistant')).toBe(true)
+      expect(rows.some((row) => isClaudeRow(row) && row.payload.type === 'assistant')).toBe(true)
     })
     const before = await agentState(id)
     const { events } = await ask(id, 'what are you doing?')

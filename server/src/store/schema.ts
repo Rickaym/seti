@@ -76,6 +76,7 @@ import {
   TASK_SETI_LEVEL,
   TASK_WORKTREE_BACKFILL,
   TRIM_SESSION_INIT,
+  TASK_RUNTIME,
 } from './schema-tasks.js'
 import {
   EA_DOC_NO_DIRECT,
@@ -227,4 +228,5 @@ export const MIGRATIONS: readonly Migration[] = [
   { version: 122, name: 'dream_runs', sql: DREAM_RUNS },
   { version: 123, name: 'dream_nights', sql: DREAM_NIGHTS },
   { version: 124, name: 'dream_proposals', sql: DREAM_PROPOSALS },
+  { version: 125, name: 'task_runtime', sql: TASK_RUNTIME },
 ]

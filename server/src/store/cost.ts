@@ -26,6 +26,13 @@ export async function recordTurnCost(taskId: string, sessionId: string, total: n
   })
 }
 
+/** Adds what a turn cost to its task, where its runtime reports no running total. */
+export async function addTurnCost(taskId: string, usd: number): Promise<void> {
+  if (usd > 0) {
+    await sql`UPDATE task SET cost_usd = cost_usd + ${usd} WHERE id = ${taskId}`
+  }
+}
+
 /** Adds what a side chat answer cost to its task, and to the ledger today's cost reads. */
 export async function addSideChatCost(taskId: string, usd: number): Promise<void> {
   await transaction(async (tx) => {

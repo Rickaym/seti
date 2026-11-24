@@ -1,4 +1,4 @@
-import { projectClaude, type ToolCall } from '@seti/shared'
+import { isClaudeRow, projectClaude, type ToolCall } from '@seti/shared'
 import { describe, expect, it } from 'vitest'
 import { goldenCorpus } from '../golden/corpus.js'
 import { asciiJson } from '../golden/json.js'
@@ -34,7 +34,7 @@ function recordedCalls(): { transcript: string; call: ToolCall }[] {
   const seen = new Set<string>()
   return goldenCorpus().flatMap((transcript) =>
     transcript.rows
-      .flatMap((row) => (row.kind === 'sdk' ? projectClaude(row.payload) : []))
+      .flatMap((row) => (isClaudeRow(row) ? projectClaude(row.payload) : []))
       .flatMap((event) => {
         if (event.type !== 'tool.started' || seen.has(event.call.callId)) {
           return []

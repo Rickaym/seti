@@ -36,6 +36,23 @@ describe('checkMessageBody', () => {
     expect(checkMessageBody('__proto__', {})).toEqual({ ok: false, reason: 'unknown kind' })
     expect(checkMessageBody('sdk', { type: 'system', subtype: 'constructor' }).ok).toBe(true)
   })
+
+  it('checks a Codex message as Codex stores it, and only on a row its runtime names', () => {
+    const payload = { root: 'thread-1', message: { method: 'turn/started', params: {} } }
+    expect(checkMessageBody('sdk', payload, 'codex')).toEqual({
+      ok: true,
+      body: { kind: 'sdk', runtime: 'codex', payload },
+    })
+    expect(checkMessageBody('sdk', { type: 'assistant' }, 'codex').ok).toBe(false)
+    expect(checkMessageBody('sdk', payload).ok).toBe(false)
+    vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
+    expect(readStoredBody({ ...ROW, id: 3, runtime: 'codex' }, 'sdk', JSON.stringify(payload))).toEqual({
+      kind: 'sdk',
+      runtime: 'codex',
+      payload,
+    })
+    expect(readStoredBody({ ...ROW, id: 4, runtime: 'claude' }, 'sdk', JSON.stringify(payload)).kind).toBe('unreadable')
+  })
 })
 
 describe('reading stored rows', () => {

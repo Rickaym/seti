@@ -1,4 +1,4 @@
-import type { MessageRow, TaskInput } from '@seti/shared'
+import { isClaudeRow, type MessageRow, type TaskInput } from '@seti/shared'
 import { currentRequestSource } from './access.js'
 import { HttpError } from './http.js'
 import { directRows } from './store/direct.js'
@@ -53,7 +53,7 @@ interface Block {
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null
 
 const blocksOf = (row: MessageRow): Block[] => {
-  if (row.kind !== 'sdk' || (row.payload.type !== 'assistant' && row.payload.type !== 'user')) {
+  if (!isClaudeRow(row) || (row.payload.type !== 'assistant' && row.payload.type !== 'user')) {
     return []
   }
   const content: unknown = row.payload.message.content
@@ -113,7 +113,7 @@ function hidden(row: MessageRow): MessageRow {
   if (row.kind === 'input') {
     return { ...row, payload: { ...row.payload, title: DIRECT_HIDDEN, body: DIRECT_HIDDEN } }
   }
-  if (row.kind !== 'sdk' || (row.payload.type !== 'assistant' && row.payload.type !== 'user')) {
+  if (!isClaudeRow(row) || (row.payload.type !== 'assistant' && row.payload.type !== 'user')) {
     return row
   }
   const blocks = blocksOf(row).map((block) => {

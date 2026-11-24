@@ -1,6 +1,6 @@
 import fs from 'node:fs'
 import path from 'node:path'
-import { asEventsRow, eventsOf, rowEvents, type MessageRow, type WireRow } from '@seti/shared'
+import { asEventsRow, eventsOf, isClaudeRow, rowEvents, type MessageRow, type WireRow } from '@seti/shared'
 import { describe, expect, it } from 'vitest'
 import { askedInRows } from '@/lib/closing-question'
 import { compactFailure, compactingSince } from '@/lib/compacting'
@@ -66,7 +66,7 @@ const results = (rows: readonly WireRow[]) =>
 function render(stored: readonly MessageRow[], rows: readonly WireRow[]) {
   const index = indexTranscript(rows)
   const sdk = stored.flatMap((row, at) =>
-    row.kind === 'sdk' ? [{ id: row.id, row: rows[at] ?? row, payload: row.payload }] : [],
+    isClaudeRow(row) ? [{ id: row.id, row: rows[at] ?? row, payload: row.payload }] : [],
   )
   return {
     shows: ids(rows.filter(rendersContent)),

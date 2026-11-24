@@ -1,6 +1,8 @@
 import type { RuntimeEvent } from './events.js'
 import type { TurnBlock } from './prose-question.js'
 import { projectClaude } from './runtimes/claude/project.js'
+import { projectCodex } from './runtimes/codex/project.js'
+import { projectRuntime, storedRuntime } from './runtimes/stored.js'
 import type { MessageBase, MessagePage, MessageRow } from './tasks.js'
 
 /** A runtime message as a client that asked for events gets it, cut as `trimmed` names. */
@@ -17,6 +19,11 @@ export interface WirePage extends Omit<MessagePage, 'messages'> {
 export type RuntimeRow = Extract<WireRow, { kind: 'sdk' | 'events' }>
 
 export const isRuntimeRow = (row: WireRow): row is RuntimeRow => row.kind === 'sdk' || row.kind === 'events'
+
+/** A message, row or body, that Claude Code wrote, as stored. */
+export const isClaudeRow = <R extends { kind: string; runtime?: unknown }>(
+  row: R,
+): row is Extract<R, { kind: 'sdk'; runtime?: undefined }> => row.kind === 'sdk' && row.runtime === undefined
 
 /** A row as a client that asks for events gets it: a runtime row as its events. */
 export function asEventsRow(row: WireRow): WireRow {
@@ -44,15 +51,18 @@ export function rowEvents(row: WireRow): readonly RuntimeEvent[] {
   if (cached !== undefined) {
     return cached
   }
-  const events = projectClaude(row.payload)
+  const events = row.runtime === 'codex' ? projectCodex(row.payload) : projectClaude(row.payload)
   cache.set(row.payload, events)
   return events
 }
 
-/** The neutral events of a runtime message stored as JSON text; text that does not parse has none. */
-export function payloadEvents(payload: string): readonly RuntimeEvent[] {
+/**
+ * The neutral events of a runtime message stored as JSON text, read as the row's `runtime` column
+ * names its runtime; text that does not parse has none.
+ */
+export function payloadEvents(payload: string, runtime: string | null): readonly RuntimeEvent[] {
   try {
-    return projectClaude(JSON.parse(payload) as Parameters<typeof projectClaude>[0])
+    return projectRuntime(storedRuntime(runtime), JSON.parse(payload) as unknown)
   } catch {
     return NONE
   }

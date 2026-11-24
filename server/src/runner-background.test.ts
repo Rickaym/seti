@@ -1,4 +1,4 @@
-import type { TaskStatus } from '@seti/shared'
+import { isClaudeRow, type TaskStatus } from '@seti/shared'
 import { describe, expect, it, vi } from 'vitest'
 import { messages, tasks } from './db.js'
 import { fakeAssistant, fakeBackground, fakeMessage, fakeResult, type FakeSession } from './fake-sdk.js'
@@ -29,7 +29,7 @@ async function newTask(): Promise<string> {
 
 const status = async (id: string): Promise<TaskStatus | undefined> => (await tasks.get(id))?.status
 const results = async (id: string) =>
-  (await messages.page(id, 100)).messages.filter((row) => row.kind === 'sdk' && row.payload.type === 'result').length
+  (await messages.page(id, 100)).messages.filter((row) => isClaudeRow(row) && row.payload.type === 'result').length
 
 async function turn(id: string, prompt: string): Promise<FakeSession> {
   await runTurn(id, prompt)

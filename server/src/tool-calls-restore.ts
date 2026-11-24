@@ -1,4 +1,4 @@
-import { projectClaude } from '@seti/shared'
+import { rowEvents } from '@seti/shared'
 import { messages } from './db.js'
 import { trackToolCalls } from './tool-calls.js'
 
@@ -14,7 +14,7 @@ export async function restoreToolCalls(taskId: string, since: number): Promise<v
     const rows = await messages.firstAfter(taskId, after, PAGE)
     for (const row of rows) {
       if (row.kind === 'sdk') {
-        trackToolCalls(taskId, projectClaude(row.payload), Date.parse(row.created_at))
+        trackToolCalls(taskId, rowEvents(row), Date.parse(row.created_at))
       }
     }
     const last = rows.at(-1)

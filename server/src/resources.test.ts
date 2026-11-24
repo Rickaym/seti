@@ -9,7 +9,7 @@ import { createApp } from './app.js'
 import { tasks } from './db.js'
 import { Proc, type ProcStat } from './proc.js'
 import { descendants } from './process-scan.js'
-import { claudeProcesses, ResourceSampler } from './resources.js'
+import { runtimeProcesses, ResourceSampler } from './resources.js'
 import { USER_AUTH } from './test-auth.js'
 import { trackToolCalls } from './tool-calls.js'
 
@@ -45,11 +45,16 @@ describe('process tree and task mapping', () => {
 
   it('maps Claude Code children to the task their environment names and skips other children', () => {
     const env = new Map([[TASK_PROC, 'task-a']])
-    const found = claudeProcesses(tree.get(SERVER) ?? [], (s) => env.get(s.pid) ?? null)
+    const found = runtimeProcesses(tree.get(SERVER) ?? [], (s) => env.get(s.pid) ?? null)
     expect(found.map(({ stat: s, taskId }) => [s.pid, taskId])).toEqual([
       [TASK_PROC, 'task-a'],
       [201, null],
     ])
+  })
+
+  it('keeps a Codex child without a task as well', () => {
+    const children = [stat(203, 'codex', SERVER), stat(204, 'gh', SERVER)]
+    expect(runtimeProcesses(children, () => null).map(({ stat: s }) => s.pid)).toEqual([203])
   })
 })
 

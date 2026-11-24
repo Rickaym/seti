@@ -6,7 +6,7 @@ import { cache } from './redis.js'
 import type { ToolServerState } from './runtimes/adapter.js'
 import { remoteServer, secretFree } from './sandbox-claude-json.js'
 import { latestSessionInit, type SessionInit } from './store/sessions.js'
-import { readPayload } from './stored-rows.js'
+import { readStoredBody } from './stored-rows.js'
 import { clearStalls } from './task-blocked.js'
 import { publish } from './task-events.js'
 
@@ -98,7 +98,8 @@ export async function watchSessionMcp(
 }
 
 function fromInit(row: SessionInit): SessionMcp {
-  const m = readPayload(row, 'sdk', row.payload)
+  const body = readStoredBody(row, 'sdk', row.payload)
+  const m = body.kind === 'sdk' && body.runtime === undefined ? body.payload : undefined
   const servers = m?.type === 'system' && m.subtype === 'init' ? m.mcp_servers : undefined
   return { at: row.at, servers: brief(servers) }
 }

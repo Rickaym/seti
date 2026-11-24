@@ -1,5 +1,5 @@
 import type { APIRequestContext, Page } from '@playwright/test'
-import type { Envelope, MessagePage, Task } from '@seti/shared'
+import { type Envelope, isClaudeRow, type MessagePage, type Task } from '@seti/shared'
 import { paths } from './env.js'
 import { HOLD_PROMPT, SESSION_PROMPT } from './fake-claude.js'
 import { apiData, expect, unique } from './fixtures.js'
@@ -34,7 +34,7 @@ export async function startWorkingAgent(request: APIRequestContext): Promise<str
   const { id } = ((await response.json()) as Envelope<Task>).data
   const working = async () => {
     const { messages } = await apiData<MessagePage>(request, `/tasks/${id}/messages?limit=50`)
-    return messages.some((row) => row.kind === 'sdk' && row.payload.type === 'assistant')
+    return messages.some((row) => isClaudeRow(row) && row.payload.type === 'assistant')
   }
   await expect.poll(working).toBe(true)
   return id

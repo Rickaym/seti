@@ -232,6 +232,8 @@ export type RuntimeEvent = EventBase &
         cause: TurnCause
         steps?: number
         costUsd?: number
+        /** Seti estimated `costUsd` from the turn's tokens and a dated price table. */
+        costEstimated?: true
         durationMs?: number
         usage?: Usage
         answered: string[]

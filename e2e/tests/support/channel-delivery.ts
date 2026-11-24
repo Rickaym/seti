@@ -2,7 +2,15 @@ import { randomUUID } from 'node:crypto'
 import fs from 'node:fs'
 import path from 'node:path'
 import type { APIRequestContext, Locator, Page } from '@playwright/test'
-import type { ChannelSubscription, DeliveryTiming, Envelope, MessageRow, ReminderChannelInfo, Task } from '@seti/shared'
+import {
+  type ChannelSubscription,
+  type DeliveryTiming,
+  type Envelope,
+  isClaudeRow,
+  type MessageRow,
+  type ReminderChannelInfo,
+  type Task,
+} from '@seti/shared'
 import { openAgentSettings, settingsDialog } from './agent-settings.js'
 import { paths } from './env.js'
 import { BURST_COMMANDS, BURST_DONE, burstPrompt, JOINED_REPLY, releaseStep } from './fake-steps.js'
@@ -50,7 +58,7 @@ const rows = async ({ request, agent }: Scene) =>
 /** What the agent said so far, one entry per text it wrote. */
 async function said(scene: Scene): Promise<string[]> {
   return (await rows(scene)).messages.flatMap((row) => {
-    if (row.kind !== 'sdk' || row.payload.type !== 'assistant') {
+    if (!isClaudeRow(row) || row.payload.type !== 'assistant') {
       return []
     }
     return row.payload.message.content.flatMap((block) => (block.type === 'text' ? [block.text] : []))

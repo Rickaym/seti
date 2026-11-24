@@ -37,24 +37,29 @@ const HISTORY_MS = 60 * 60_000
 /** Long enough for the hang rule to look back over a few minutes of one process. */
 const CPU_TRAIL_MS = 5 * 60_000
 const CHILDREN_SHOWN = 8
-const UNMAPPED_LABEL = 'Claude Code without an agent'
+/** Agent runtimes by process name; one without an agent is labelled with its runtime. */
+const RUNTIME_PROGRAMS = new Map([
+  ['claude', 'Claude Code'],
+  ['codex', 'Codex'],
+])
+const unmappedLabel = (comm: string) => `${RUNTIME_PROGRAMS.get(comm) ?? 'Claude Code'} without an agent`
 
-/** A Claude Code process among the server's children, with the task its environment names. */
-interface ClaudeProcess {
+/** An agent runtime's process among the server's children, with the task its environment names. */
+interface RuntimeProcess {
   stat: ProcStat
   taskId: string | null
 }
 
 type TaskRow = Omit<TaskProcess, 'flags'>
 
-/** The server's children that are Claude Code: named `claude`, or started for a task. */
-export function claudeProcesses(
+/** The server's children that run an agent: named after a runtime, or started for a task. */
+export function runtimeProcesses(
   children: readonly ProcStat[],
   taskIdOf: (stat: ProcStat) => string | null,
-): ClaudeProcess[] {
+): RuntimeProcess[] {
   return children.flatMap((stat) => {
     const taskId = taskIdOf(stat)
-    return taskId !== null || stat.comm === 'claude' ? [{ stat, taskId }] : []
+    return taskId !== null || RUNTIME_PROGRAMS.has(stat.comm) ? [{ stat, taskId }] : []
   })
 }
 
@@ -278,7 +283,7 @@ export class ResourceSampler {
 
   private async taskRow(
     scan: Scan,
-    { stat, taskId }: ClaudeProcess,
+    { stat, taskId }: RuntimeProcess,
     sandboxOn: boolean,
   ): Promise<{ row: TaskRow; candidate: TaskCandidate }> {
     const task = taskId === null ? undefined : await tasks.get(taskId).catch(() => undefined)
@@ -299,7 +304,7 @@ export class ResourceSampler {
     }
     const candidate = {
       taskId: task?.id ?? null,
-      label: task?.title ?? UNMAPPED_LABEL,
+      label: task?.title ?? unmappedLabel(stat.comm),
       rssBytes,
       cpu: this.cpuTrail(scan, stat),
       tool,
@@ -309,7 +314,7 @@ export class ResourceSampler {
   }
 
   private async taskRows(scan: Scan): Promise<{ rows: TaskRow[]; candidates: TaskCandidate[] }> {
-    const found = claudeProcesses(
+    const found = runtimeProcesses(
       this.parents().flatMap((parent) => scan.children.get(parent) ?? []),
       (stat) => this.taskIdOf(stat),
     )
