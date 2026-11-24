@@ -11,7 +11,7 @@ import { InputEntry } from '@/panels/tasks/InputEntry'
 import { RunningFor, Spinner, ToolKindIcon } from '@/panels/tasks/ToolCall'
 import { Transcript } from '@/panels/tasks/Transcript'
 import type { PersonInput, WorkSpan } from '@/panels/tasks/proto/digest'
-import { chipLook, workFacts } from '@/panels/tasks/proto/facts'
+import { chipLook, urgency, workFacts } from '@/panels/tasks/proto/facts'
 
 const updatesLabel = (count: number) => {
   if (count === 0) {
@@ -68,11 +68,14 @@ export function WorkLine({
   span,
   running,
   subtasks,
+  nowBar = false,
 }: {
   taskId: string
   span: WorkSpan
   running: boolean
   subtasks: readonly SubtaskBrief[]
+  /** The now bar under the panel shows the running call, so the line leaves it out. */
+  nowBar?: boolean
 }) {
   const [open, setOpen] = useState(false)
   const live = running ? span.live : null
@@ -117,7 +120,7 @@ export function WorkLine({
           </span>
         )}
       </button>
-      {live !== null && !open && (
+      {live !== null && !open && !nowBar && (
         <div className="flex min-w-0 items-center gap-2 pl-5.5 text-xs text-muted-foreground" data-testid="work-now">
           <ToolKindIcon kind={toolKind(live.call)} className="size-3.5 shrink-0" />
           <span className="min-w-0 truncate font-mono">{toolSummary(live.call)}</span>
@@ -158,44 +161,68 @@ export function PersonMessage({ input, at }: { input: PersonInput; at: string })
   )
 }
 
-/** The current state of what changed since the user last wrote, one chip per subject. */
+const SHOWN_CHIPS = 2
+
+type InputRow = Extract<WireRow, { kind: 'input' }>
+
+function UpdateChip({ taskId, row }: { taskId: string; row: InputRow }) {
+  const look = chipLook(row.payload)
+  const Icon = look.icon
+  return (
+    <Popover>
+      <PopoverTrigger
+        className="flex min-w-0 shrink items-center gap-1.5 hover:underline pointer-coarse:min-h-11"
+        title={`${row.payload.title}, ${ageLabel(row.created_at)} ago`}
+        data-testid="update-chip"
+      >
+        <Icon className={cn('size-3.5 shrink-0', look.className)} aria-hidden />
+        <span className="min-w-0 truncate text-foreground/90">{look.text}</span>
+      </PopoverTrigger>
+      <PopoverContent className="w-96 max-w-[calc(100vw-2rem)] p-0">
+        <InputEntry taskId={taskId} input={row.payload} queued={false} />
+      </PopoverContent>
+    </Popover>
+  )
+}
+
+/** The current state of what changed since the user last wrote: the two most urgent, then +N. */
 export function UpdatesStrip({
   taskId,
   updates,
   className,
 }: {
   taskId: string
-  updates: readonly Extract<WireRow, { kind: 'input' }>[]
+  updates: readonly InputRow[]
   className?: string
 }) {
   if (updates.length === 0) {
     return null
   }
+  const ranked = [...updates].sort((a, b) => urgency(a.payload) - urgency(b.payload) + (b.id < a.id ? -0.5 : 0.5))
+  const rest = ranked.slice(SHOWN_CHIPS)
   return (
     <div
-      className={cn('flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-xs', className)}
+      className={cn('flex min-w-0 items-center gap-3 overflow-hidden text-xs whitespace-nowrap', className)}
       data-testid="updates-strip"
-      title="What changed since your last message"
     >
-      {updates.map((row) => {
-        const look = chipLook(row.payload)
-        const Icon = look.icon
-        return (
-          <Popover key={row.id}>
-            <PopoverTrigger
-              className="flex max-w-full min-w-0 items-center gap-1.5 hover:underline pointer-coarse:min-h-11"
-              data-testid="update-chip"
-            >
-              <Icon className={cn('size-3.5 shrink-0', look.className)} aria-hidden />
-              <span className="min-w-0 truncate text-foreground/90">{look.text}</span>
-              <span className="shrink-0 text-muted-foreground tabular-nums">{ageLabel(row.created_at)}</span>
-            </PopoverTrigger>
-            <PopoverContent className="w-96 max-w-[calc(100vw-2rem)] p-0">
-              <InputEntry taskId={taskId} input={row.payload} queued={false} />
-            </PopoverContent>
-          </Popover>
-        )
-      })}
+      {ranked.slice(0, SHOWN_CHIPS).map((row) => (
+        <UpdateChip key={row.id} taskId={taskId} row={row} />
+      ))}
+      {rest.length > 0 && (
+        <Popover>
+          <PopoverTrigger
+            className="shrink-0 text-muted-foreground hover:text-foreground pointer-coarse:min-h-11"
+            aria-label={`${String(rest.length)} more updates`}
+          >
+            +{rest.length}
+          </PopoverTrigger>
+          <PopoverContent className="max-h-96 w-96 max-w-[calc(100vw-2rem)] space-y-2 overflow-y-auto p-2">
+            {rest.map((row) => (
+              <InputEntry key={row.id} taskId={taskId} input={row.payload} queued={false} />
+            ))}
+          </PopoverContent>
+        </Popover>
+      )}
     </div>
   )
 }

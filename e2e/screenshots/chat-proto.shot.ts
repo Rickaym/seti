@@ -1,6 +1,6 @@
 import fs from 'node:fs'
 import path from 'node:path'
-import type { Browser, Page } from '@playwright/test'
+import type { Browser, Locator, Page } from '@playwright/test'
 import type { PermissionRequest, PullRequest, WorkspaceEntry } from '@seti/shared'
 import { apiData, expect, test } from '../tests/support/fixtures.js'
 import { newPage, openContext, type Device, type Theme } from './capture.js'
@@ -112,11 +112,10 @@ async function grid(page: Page, design: string): Promise<void> {
 }
 
 /** Opens the hidden work of the first panel the way each design offers it. */
-async function openDetail(page: Page, design: string): Promise<void> {
-  const first = page.locator('[data-grid-item]').first()
+async function openDetail(first: Locator, design: string): Promise<void> {
   if (design === 'now') {
     await first.getByTestId('tool-group').first().getByRole('button').first().click()
-  } else if (design === 'a') {
+  } else if (design === 'a' || design === 'a-plus') {
     await first.getByTestId('work-line').first().getByRole('button').first().click()
   } else if (design === 'b') {
     await first.getByRole('button', { name: 'History' }).click()
@@ -140,7 +139,7 @@ test('chat view prototypes', async ({ browser, baseURL }) => {
       .locator('[data-grid-item]')
       .first()
       .screenshot({ path: path.join(OUT, `panel-1-${design}.png`), scale: 'device' })
-    await openDetail(desk, design)
+    await openDetail(desk.locator('[data-grid-item]').first(), design)
     await save(desk, `${design}-detail`)
     await desk.context().close()
 
@@ -157,6 +156,10 @@ test('chat view prototypes', async ({ browser, baseURL }) => {
       await phone.goto(`/?chat=${design}#agents/${id}`)
       await expect(phone.getByRole('main').getByRole('heading').first()).toBeVisible()
       await save(phone, `${design}-phone-${String(n)}`)
+      if (n === 1) {
+        await openDetail(phone.getByRole('main'), design)
+        await save(phone, `${design}-phone-detail`)
+      }
       await phone.context().close()
     }
   }

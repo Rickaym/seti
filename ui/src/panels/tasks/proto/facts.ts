@@ -77,3 +77,16 @@ export function chipLook(input: TaskInput): ChipLook {
   }
   return { icon: Webhook, className: 'text-muted-foreground', text: input.title }
 }
+
+const URGENCY: Record<PrInput['kind'], number> = {
+  ci_failed: 0,
+  conflict: 0,
+  closed: 1,
+  merged: 1,
+  review: 2,
+  comment: 3,
+  ci_passed: 4,
+}
+
+/** Lower first: what blocks a merge, then a PR's end, then talk, then good news and the rest. */
+export const urgency = (input: TaskInput): number => (input.source === 'pr' ? URGENCY[input.kind] : 2)

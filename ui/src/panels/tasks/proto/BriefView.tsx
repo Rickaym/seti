@@ -78,6 +78,18 @@ function NowLine({ work, running }: { work: WorkSpan | null; running: boolean })
   )
 }
 
+/** One line under the conversation: what the agent does now, or how its last turn ended. */
+export function NowBar({ messages, running }: { messages: readonly WireRow[]; running: boolean }) {
+  const work = useMemo(() => briefOf(digest(messages, running)).work, [messages, running])
+  return (
+    <div className="flex shrink-0 items-center border-t border-border px-5 py-1.5 text-xs text-muted-foreground max-md:px-3 in-data-agent-frame:px-3">
+      <span className="min-w-0 flex-1">
+        <NowLine work={work} running={running} />
+      </span>
+    </div>
+  )
+}
+
 interface BriefViewProps {
   taskId: string
   messages: readonly WireRow[]

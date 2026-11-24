@@ -13,7 +13,7 @@ import { QuickReplies } from '@/panels/tasks/QuickReplies'
 import { ShellLive } from '@/panels/tasks/ShellEntry'
 import { QueuedInputs } from '@/panels/tasks/TaskInputs'
 import { TranscriptPane } from '@/panels/tasks/TranscriptPane'
-import { BriefView } from '@/panels/tasks/proto/BriefView'
+import { BriefView, NowBar } from '@/panels/tasks/proto/BriefView'
 import { ConversationBody, LanesBody } from '@/panels/tasks/proto/ConversationBody'
 import { chatDesign, type ChatDesign } from '@/panels/tasks/proto/chat-design'
 import { lastOwnMessage, worldState } from '@/panels/tasks/proto/digest'
@@ -39,8 +39,9 @@ type BodyProps = Omit<ComponentProps<typeof ConversationBody>, 'messages'>
 
 /** The rows as the chosen prototype draws them; undefined keeps the classic transcript. */
 function bodyFor(design: ChatDesign, props: BodyProps) {
-  if (design === 'a') {
-    return (shown: readonly WireRow[]) => <ConversationBody {...props} messages={shown} />
+  if (design === 'a' || design === 'a-plus') {
+    const nowBar = design === 'a-plus'
+    return (shown: readonly WireRow[]) => <ConversationBody {...props} nowBar={nowBar} messages={shown} />
   }
   if (design === 'c') {
     return (shown: readonly WireRow[]) => <LanesBody {...props} messages={shown} />
@@ -82,7 +83,10 @@ export function AgentChat({
   const blocks = useTranscriptBlocks(task.id)
   const design = chatDesign()
   const rows = transcript.stream.messages
-  const updates = useMemo(() => (design === 'a' ? worldState(rows, lastOwnMessage(rows)) : []), [design, rows])
+  const updates = useMemo(
+    () => (design === 'a' || design === 'a-plus' ? worldState(rows, lastOwnMessage(rows)) : []),
+    [design, rows],
+  )
   const needs = (
     <>
       <PermissionRequests taskId={task.id} blocked={task.blocked} version={permissions} />
@@ -115,7 +119,7 @@ export function AgentChat({
   )
   return (
     <>
-      {design === 'a' && (
+      {(design === 'a' || design === 'a-plus') && (
         <UpdatesStrip
           taskId={task.id}
           updates={updates}
@@ -127,6 +131,7 @@ export function AgentChat({
       ) : (
         pane
       )}
+      {design === 'a-plus' && <NowBar messages={rows} running={running} />}
       <QueuedInputs task={task} messages={messages} running={running} />
       <Composer
         taskId={task.id}

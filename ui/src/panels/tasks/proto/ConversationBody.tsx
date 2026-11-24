@@ -1,16 +1,18 @@
 import type { SubtaskBrief, WireRow } from '@seti/shared'
 import { CircleX, Loader } from 'lucide-react'
-import { Fragment, useMemo, useState } from 'react'
+import { Fragment, useMemo, useState, type ReactNode } from 'react'
 import { rowCalls, rowResults } from '@/lib/transcript'
 import { cn } from '@/lib/utils'
 import { PromptEntry } from '@/panels/tasks/PromptEntry'
 import { ToolKindIcon } from '@/panels/tasks/ToolCall'
 import { AgentText, Transcript } from '@/panels/tasks/Transcript'
 import { digest, type ChatItem, type WorkSpan } from '@/panels/tasks/proto/digest'
-import { chipLook, kindCounts, workFacts } from '@/panels/tasks/proto/facts'
+import { chipLook, kindCounts, urgency, workFacts } from '@/panels/tasks/proto/facts'
 import { PersonMessage, SpanDetail, StandingFailure, WorkLine } from '@/panels/tasks/proto/parts'
 
 interface BodyProps {
+  /** A now bar sits under the transcript, as in the a-plus design. */
+  nowBar?: boolean
   taskId: string
   messages: readonly WireRow[]
   running: boolean
@@ -57,7 +59,13 @@ export function ConversationBody(props: BodyProps) {
       {items.filter(shownInFlow).map((item) => (
         <div key={itemKey(item)} data-message-id={item.type === 'work' ? undefined : item.row.id}>
           {item.type === 'work' ? (
-            <WorkLine taskId={props.taskId} span={item.span} running={props.running} subtasks={props.subtasks} />
+            <WorkLine
+              taskId={props.taskId}
+              span={item.span}
+              running={props.running}
+              subtasks={props.subtasks}
+              nowBar={props.nowBar === true}
+            />
           ) : (
             <Said item={item} props={props} />
           )}
@@ -90,32 +98,55 @@ function pairUp(items: readonly ChatItem[]): Pair[] {
   return pairs
 }
 
-const MAX_MARKS = 4
+const MAX_MARKS = 3
 
-/** The marks of one stretch in the lane: a count per kind of call, failures and updates. */
-function LaneMarks({ span, running }: { span: WorkSpan; running: boolean }) {
-  const counts = kindCounts(span)
+interface Mark {
+  key: string
+  icon: ReactNode
+  count: number
+  className?: string
+}
+
+/** Failures first, then updates, then the busiest kinds of call, up to three marks in all. */
+function marksOf(span: WorkSpan, running: boolean): Mark[] {
+  const marks: Mark[] = []
   const failed = span.failed + span.refused
+  if (failed > 0) {
+    marks.push({
+      key: 'failed',
+      icon: <CircleX className="size-3" aria-hidden />,
+      count: failed,
+      className: 'text-destructive',
+    })
+  }
+  const [newest] = [...span.updates].sort((a, b) => urgency(a.payload) - urgency(b.payload))
+  if (newest !== undefined) {
+    const look = chipLook(newest.payload)
+    const Icon = look.icon
+    marks.push({
+      key: 'updates',
+      icon: <Icon className={cn('size-3', look.className)} aria-hidden />,
+      count: span.updates.length,
+    })
+  }
+  for (const count of kindCounts(span)) {
+    marks.push({ key: count.kind, icon: <ToolKindIcon kind={count.kind} className="size-3" />, count: count.count })
+  }
+  const live = running && span.live !== null
+  return marks.slice(0, live ? MAX_MARKS - 1 : MAX_MARKS)
+}
+
+/** The marks of one stretch in the lane: failures, updates and the busiest kinds of call. */
+function LaneMarks({ span, running }: { span: WorkSpan; running: boolean }) {
   return (
-    <span className="flex flex-col items-center gap-1 text-2xs text-muted-foreground tabular-nums">
+    <span className="flex flex-col items-center gap-0.5 text-2xs leading-4 text-muted-foreground tabular-nums">
       {running && span.live !== null && <Loader className="size-3.5 motion-safe:animate-spin" aria-hidden />}
-      {failed > 0 && (
-        <span className="flex items-center gap-0.5 text-destructive">
-          <CircleX className="size-3" aria-hidden />
-          {failed}
-        </span>
-      )}
-      {counts.slice(0, MAX_MARKS).map((count) => (
-        <span key={count.kind} className="flex items-center gap-0.5">
-          <ToolKindIcon kind={count.kind} className="size-3" />
-          {count.count}
+      {marksOf(span, running).map((mark) => (
+        <span key={mark.key} className={cn('flex items-center gap-0.5', mark.className)}>
+          {mark.icon}
+          {mark.count}
         </span>
       ))}
-      {span.updates.map((row) => {
-        const look = chipLook(row.payload)
-        const Icon = look.icon
-        return <Icon key={row.id} className={cn('size-3', look.className)} aria-hidden />
-      })}
     </span>
   )
 }
@@ -139,7 +170,7 @@ function LanePair({ pair, props }: { pair: Pair; props: BodyProps }) {
             title={label}
             data-testid="lane-marks"
             className={cn(
-              'flex min-h-11 w-full justify-center py-1 hover:bg-muted/60',
+              'flex w-full justify-center py-1 hover:bg-muted/60 pointer-coarse:min-h-11',
               open && 'bg-muted/60 text-foreground',
             )}
             onClick={() => {
