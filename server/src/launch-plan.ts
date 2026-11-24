@@ -1,3 +1,4 @@
+import path from 'node:path'
 import type { CpuCap, MemoryCap, ProxyGrant, SandboxPolicy, Task } from '@seti/shared'
 import { taskSsh } from './agent-access.js'
 import { profileAws, taskAws } from './aws-access.js'
@@ -10,9 +11,11 @@ import { taskBorrowedServers } from './mcp-borrowed.js'
 import { effectiveCap } from './memory-cap.js'
 import type { ScopeKind } from './memory-scope.js'
 import { taskPluginConfigs } from './plugins.js'
-import { proxyGrant, type PlannedRuntime } from './proxy-grant.js'
+import { proxyGrant } from './proxy-grant.js'
+import type { RuntimeId } from './runtimes/adapter.js'
 import { sharedToolFolders, TOOL_SERVER } from './shared-tools.js'
 import { knownHostsText, publicKeys } from './ssh-files.js'
+import { codexSettings } from './store/codex-settings.js'
 import { sandboxPolicy } from './store/sandbox.js'
 import type { SshHostRow } from './store/ssh.js'
 
@@ -27,7 +30,7 @@ export interface SshPlan {
 /** What a sandbox around the agent's process is made of, with no value in it. */
 export interface SandboxPlan {
   policy: SandboxPolicy
-  /** Plugin, tool server and shared tool folders the sandbox mounts read-only. */
+  /** Plugin or runtime program, tool server and shared tool folders the sandbox mounts read-only. */
   readOnly: string[]
   grant: ProxyGrant
   /** The MCP servers the agent turned off. */
@@ -69,6 +72,12 @@ async function sshPlan(taskId: string): Promise<SshPlan | null> {
   }
 }
 
+/** The folder of the program a Codex agent runs, which its sandbox mounts read-only. */
+async function codexFolders(): Promise<string[]> {
+  const { program } = await codexSettings.get()
+  return program === null ? [] : [path.dirname(program)]
+}
+
 /** A Codex agent's part of its plan, which leaves out Claude's plugins, servers and connectors. */
 async function codexPart(task: Task) {
   return { codex: { modelKey: (await codexKeyConnection(task))?.env ?? null }, connectors: false, borrowed: [] }
@@ -78,14 +87,15 @@ async function codexPart(task: Task) {
 export async function sandboxPlanFor(
   task: Task,
   policy: SandboxPolicy,
-  runtime: PlannedRuntime = 'claude',
+  runtime: RuntimeId = task.runtime,
 ): Promise<SandboxPlan> {
   const { grant, denied } = await proxyGrant(task, runtime)
-  const plugins = runtime === 'codex' ? [] : (await taskPluginConfigs(task.id)).map((plugin) => plugin.path)
+  const own =
+    runtime === 'codex' ? await codexFolders() : (await taskPluginConfigs(task.id)).map((plugin) => plugin.path)
   const tools = await sharedToolFolders(task)
   return {
     policy,
-    readOnly: tools.length === 0 ? plugins : [...plugins, TOOL_SERVER, ...tools],
+    readOnly: tools.length === 0 ? own : [...own, TOOL_SERVER, ...tools],
     grant,
     denied: [...denied],
     borrowed: Object.keys(await taskBorrowedServers(task)),
@@ -98,7 +108,7 @@ export async function sandboxPlanFor(
 }
 
 /** The agent's launch plan, read from the store and the host's settings. */
-export async function launchPlan(task: Task, runtime: PlannedRuntime = 'claude'): Promise<LaunchPlan> {
+export async function launchPlan(task: Task, runtime: RuntimeId = task.runtime): Promise<LaunchPlan> {
   const policy = await sandboxPolicy.get()
   const sandbox = policy.enabled && task.sandbox ? await sandboxPlanFor(task, policy, runtime) : null
   return {

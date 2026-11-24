@@ -10,12 +10,14 @@ import { tokenServers } from './mcp-sign-in.js'
 import type { PermissionSettings } from './permission-policy.js'
 import { taskPluginConfigs } from './plugins.js'
 import type { RuntimeId } from './runtimes/adapter.js'
-import { DEFAULT_RUNTIME, type DefaultShapes } from './runtimes/registry.js'
+import type { CodexShapes } from './runtimes/codex/session.js'
+import type { DefaultShapes } from './runtimes/registry.js'
 import { signedInServers } from './sandbox-mcp.js'
 import { sandboxStamp } from './sandbox-stamp.js'
 import { permissionSettings, systemAppend, workingDirs } from './session-options.js'
-import { realise } from './session-realise.js'
+import { isClaudeSpec, isCodexSpec, realiseClaude } from './session-realise.js'
 import { sharedToolFolders } from './shared-tools.js'
+import { codexSettings } from './store/codex-settings.js'
 
 /** What a task's session starts from, read from the database; it holds no secret values. */
 export interface SessionSpec<Id extends string = RuntimeId> {
@@ -27,6 +29,7 @@ export interface SessionSpec<Id extends string = RuntimeId> {
   cwd: string
   /** The folders besides cwd the agent works in. */
   dirs: string[]
+  /** Claude Code's permission mode; a runtime without modes runs as `default`. */
   mode: DefaultShapes['mode']
   instructions: { append: string }
   rules: PermissionSettings
@@ -46,7 +49,7 @@ export interface SessionSpec<Id extends string = RuntimeId> {
   /** The login the host's runtime process signs in with. */
   account: string | null
   /** What only the runtime's own adapter reads. */
-  vendor: DefaultShapes['vendor']
+  vendor: Id extends 'codex' ? CodexShapes['vendor'] : DefaultShapes['vendor']
 }
 
 const sorted = (names: Set<string>) => [...names].toSorted((a, b) => a.localeCompare(b, 'en'))
@@ -68,20 +71,39 @@ async function liveSpec(task: Task) {
   }
 }
 
+/**
+ * What a Codex agent's process starts: the program the user named, and the agent's model and
+ * effort, else the runtime's defaults. A runtime that is off or has no program starts nothing.
+ */
+async function codexVendor(task: Task): Promise<CodexShapes['vendor']> {
+  const settings = await codexSettings.get()
+  if (!settings.enabled || settings.program === null) {
+    throw new Error('Codex is off on this Seti, so this agent cannot start; the user turns it on in Settings, Runtimes')
+  }
+  return {
+    binary: settings.program,
+    model: task.requested_model ?? settings.default_model,
+    effort: task.requested_effort ?? settings.default_effort,
+  }
+}
+
+const vendorOf = async (task: Task): Promise<SessionSpec['vendor']> =>
+  task.runtime === 'codex' ? codexVendor(task) : { plugins: await taskPluginConfigs(task.id) }
+
 /** The task's session spec, resuming its session if it has one. */
 async function sessionSpec(task: Task): Promise<SessionSpec> {
   return {
-    runtime: DEFAULT_RUNTIME,
+    runtime: task.runtime,
     taskId: task.id,
     title: task.title,
     resume: task.session_id,
     cwd: task.cwd,
     dirs: workingDirs(task),
-    mode: permissionModeOf(task),
+    mode: task.runtime === 'codex' ? 'default' : permissionModeOf(task),
     instructions: { append: await systemAppend(task.id) },
     setiControl: task.seti_control,
     setiDreams: await dreamsOn(task),
-    vendor: { plugins: await taskPluginConfigs(task.id) },
+    vendor: await vendorOf(task),
     ...(await liveSpec(task)),
   }
 }
@@ -90,7 +112,7 @@ async function sessionSpec(task: Task): Promise<SessionSpec> {
  * What a process of the spec starts with that needs a new process when it changes. The mode is
  * left out except for bypass, which only a start can turn on; a running process switches modes.
  */
-const setupOf = (spec: SessionSpec) => ({
+const setupOf = <Id extends RuntimeId>(spec: SessionSpec<Id>) => ({
   cwd: spec.cwd,
   dirs: spec.dirs,
   bypass: spec.mode === 'bypassPermissions',
@@ -113,11 +135,33 @@ const compactionKey = (rule: CompactRule) => ({
   env: rule.threshold_pct === null ? {} : { CLAUDE_AUTOCOMPACT_PCT_OVERRIDE: String(rule.threshold_pct) },
 })
 
+/** A digest of a Codex agent's setup: what Codex starts with, by the runtime's own names. */
+function codexKey(spec: SessionSpec<'codex'>): string {
+  const setup = setupOf(spec)
+  return JSON.stringify({
+    runtime: 'codex',
+    cwd: setup.cwd,
+    dirs: setup.dirs,
+    codex: setup.vendor,
+    instructions: setup.instructions,
+    shared_tools: setup.toolServers.shared,
+    seti_control: setup.setiControl,
+    sandbox: setup.sandbox,
+  })
+}
+
 /**
- * A digest of the spec's setup. Its layout is the one keys had before runtimes existed, so a
- * process started by an earlier release keeps its key, and its session, across a deploy.
+ * A digest of the spec's setup. A Claude Code agent's has the layout keys had before runtimes
+ * existed, so a process started by an earlier release keeps its key, and its session, across a
+ * deploy.
  */
 function specKey(spec: SessionSpec): string {
+  if (isCodexSpec(spec)) {
+    return codexKey(spec)
+  }
+  if (!isClaudeSpec(spec)) {
+    throw new Error('Seti has no such runtime')
+  }
   const setup = setupOf(spec)
   return JSON.stringify({
     cwd: setup.cwd,
@@ -141,8 +185,13 @@ function specKey(spec: SessionSpec): string {
 export const setupKey = async (task: Task) => specKey(await sessionSpec(task))
 
 /** The options a task's process starts with, resuming the task's session if any. */
-export const sessionOptions = async (task: Task, abortController: AbortController) =>
-  realise(await sessionSpec(task), task, await launchPlan(task), abortController)
+export async function sessionOptions(task: Task, abortController: AbortController) {
+  const spec = await sessionSpec(task)
+  if (!isClaudeSpec(spec)) {
+    throw new Error('Only a Claude Code agent starts with these options')
+  }
+  return realiseClaude(spec, task, await launchPlan(task), abortController)
+}
 
 const reread = async (spec: SessionSpec, task: Task): Promise<SessionSpec> => ({ ...spec, ...(await liveSpec(task)) })
 

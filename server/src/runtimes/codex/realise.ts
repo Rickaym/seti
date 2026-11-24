@@ -119,15 +119,17 @@ export function realiseCodex(
     throw new Error('This Codex agent has no OpenAI key: its credential needs a connection for api.openai.com')
   }
   const servers = serverSettings(toolServers, sharedToolCommand(spec.toolServers.shared), Object.keys(launcher.env))
-  const settings = [...overrides(provider, DEFAULT_MODEL, launcher.env.PATH), ...servers]
+  const model = spec.vendor.model ?? DEFAULT_MODEL
+  const settings = [...overrides(provider, model, launcher.env.PATH), ...servers]
   return {
     command: binary,
     args: ['app-server', '--listen', 'stdio://', ...commandLine(settings)],
     cwd: spec.cwd,
     env: { ...launcher.env },
     resume: spec.resume,
-    model: DEFAULT_MODEL,
-    effort: null,
+    model,
+    effort: spec.vendor.effort,
+    instructions: spec.instructions.append,
     spawn: launcher.spawn,
     decide,
     signal: abortController.signal,

@@ -209,6 +209,17 @@ const askSchemas = {
       servers: z.array(z.object({ name: z.string(), tools: z.array(z.looseObject({ name: z.string() })) })),
     }),
   },
+  /**
+   * Decides a call a runtime without Claude Code's engine asks about, given as its neutral call:
+   * allowed, with the user's answers for a question, or refused with a message for the model.
+   */
+  'call.decide': {
+    ask: z.object({ call: z.unknown() }),
+    answer: z.discriminatedUnion('allow', [
+      z.object({ allow: z.literal(true), input: z.record(z.string(), z.unknown()).exactOptional() }),
+      z.object({ allow: z.literal(false), message: z.string() }),
+    ]),
+  },
   /** Runs one of those tools as the agent and answers its MCP result. */
   'tool.call': {
     ask: z.object({ server: z.string(), tool: z.string(), args: z.record(z.string(), z.unknown()) }),

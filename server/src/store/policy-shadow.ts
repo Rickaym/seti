@@ -20,14 +20,17 @@ export const policyShadow = {
       ON CONFLICT (day, kind, tool, mode, sandboxed, slow, verdict, step, rule, runtime, result)
       DO UPDATE SET calls = policy_shadow.calls + 1`
   },
-  /** The counts since the day: by result, the slow ones, and the most frequent differences. */
+  /**
+   * The counts since the day: by result, the slow ones, and the most frequent differences. Codex
+   * answers, which compare the evaluator with the user rather than with Claude Code, stay out.
+   */
   summary: async (since: string): Promise<PolicyShadowSummary> => {
     const results = await sql<{ result: string; calls: number; slow: number }[]>`SELECT result,
         SUM(calls)::int AS calls, COALESCE(SUM(calls) FILTER (WHERE slow), 0)::int AS slow
-      FROM policy_shadow WHERE day >= ${since} GROUP BY result`
+      FROM policy_shadow WHERE day >= ${since} AND mode <> 'codex' GROUP BY result`
     const differences = await sql<PolicyShadowDifference[]>`SELECT result, kind, tool, mode, verdict, step, rule,
         runtime, SUM(calls)::int AS calls
-      FROM policy_shadow WHERE day >= ${since} AND result IN ('looser', 'tighter')
+      FROM policy_shadow WHERE day >= ${since} AND mode <> 'codex' AND result IN ('looser', 'tighter')
       GROUP BY result, kind, tool, mode, verdict, step, rule, runtime
       ORDER BY calls DESC, result, kind, tool, rule LIMIT ${DIFFERENCES_MAX}`
     return {

@@ -24,6 +24,7 @@ afterAll(() => {
 })
 
 const SEARCH_PATH = '/usr/bin:/bin'
+const HOUSE_RULES = 'SETI_HOUSE_RULES: post in team chat when you finish.'
 const passThrough = { inbound: (line: string) => [line], outbound: (line: string) => ({ lines: [line] }) }
 
 /** A home and work folder for one test, with files planted where the agent could write them. */
@@ -70,7 +71,14 @@ async function turn(where: { home: string; work: string }, steps: Step[], resume
   }
   const controller = new AbortController()
   const toolServers = { shared: [], borrowed: { names: [], digest: '' }, signedIn: [], tokens: [] }
-  const spec = { runtime: 'codex', cwd: where.work, resume, toolServers } as unknown as SessionSpec<'codex'>
+  const spec = {
+    runtime: 'codex',
+    cwd: where.work,
+    resume,
+    toolServers,
+    instructions: { append: HOUSE_RULES },
+    vendor: { binary, model: null, effort: null },
+  } as unknown as SessionSpec<'codex'>
   const realised = await adapter.realise(
     spec,
     launcherIn(where.home),
@@ -115,6 +123,7 @@ describe.skipIf(model === null)('Codex with files the agent planted in its home'
     expect(asked.map((call) => call.kind)).toEqual(['shell'])
     const bodies = model?.bodies.join('\n') ?? ''
     expect(bodies).not.toContain('PLANTED_SKILL')
+    expect(bodies).toContain('SETI_HOUSE_RULES')
     expect(bodies).not.toContain('create_goal')
     const searched = outputs(events).join('\n')
     expect(searched).toContain(SEARCH_PATH)

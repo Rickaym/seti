@@ -152,6 +152,8 @@ interface Ask {
   kind: PermissionRequestKind
   reason: string | null
   suggestions: string[]
+  /** Whether the agent's runtime would run the call with input the user edited. */
+  rewrites?: boolean
 }
 
 /** The call the user allowed after a restart cut it off runs once without a second request. */
@@ -201,7 +203,7 @@ async function askUser(taskId: string, ask: Ask, signals: readonly AbortSignal[]
       input: inputText(ask.input),
       reason: ask.reason,
       suggestions: ask.suggestions,
-      editable: ask.kind !== 'repeat' && rewritesInput() && isEditable(ask.tool, ask.input),
+      editable: ask.kind !== 'repeat' && (ask.rewrites ?? rewritesInput()) && isEditable(ask.tool, ask.input),
       input_hash: hash,
       timeout_minutes: (await timeoutSettings.get()).request_timeout_minutes,
     })
@@ -272,3 +274,24 @@ export const askForReview = async (
   signals: readonly AbortSignal[],
 ): Promise<PermissionResult> =>
   askUser(taskId, { ...call, kind: 'review', reason: REVIEW_REASON, suggestions: [] }, signals)
+
+/** What the user answered a request, or that the session dropped it before they did. */
+export type UserAnswer = { allow: true } | { allow: false; message: string; dropped: boolean }
+
+/**
+ * Asks the user about a Codex agent's call: Allow and Deny only, since a rule Always allow would
+ * add does not answer for a Codex agent, and no edits, since Codex runs a call as it asked.
+ */
+export async function askCodexUser(
+  taskId: string,
+  call: { tool: string; input: Record<string, unknown>; review: boolean; reason: string },
+  signals: readonly AbortSignal[],
+): Promise<UserAnswer> {
+  const kind = call.review ? 'review' : 'tool'
+  const ask: Ask = { tool: call.tool, input: call.input, kind, reason: call.reason, suggestions: [], rewrites: false }
+  const result = await askUser(taskId, ask, signals)
+  if (result.behavior === 'allow') {
+    return { allow: true }
+  }
+  return { allow: false, message: result.message, dropped: result.interrupt === true }
+}

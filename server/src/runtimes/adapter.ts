@@ -4,7 +4,7 @@ import type { Launcher } from '../launcher.js'
 import type { SessionSpec } from '../session-spec.js'
 
 /** Names an agent runtime; Claude Code is the only one so far. */
-export type RuntimeId = 'claude'
+export type RuntimeId = 'claude' | 'codex'
 
 /** When an input sent during a turn reaches the agent: now, at the turn's next step, or after it. */
 export type InputPriority = 'now' | 'next' | 'later'
@@ -25,7 +25,7 @@ export interface SessionInput {
 /** A message a session reported, with what Seti reads from it beside its events. */
 export interface SessionMessage {
   type: 'message'
-  /** The message as the runtime wrote it, which Seti stores. */
+  /** The message as the runtime wrote it, which Seti stores; null for a line it could not read. */
   raw: unknown
   /** What it says, the same on every runtime. */
   events: readonly RuntimeEvent[]

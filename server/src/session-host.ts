@@ -10,9 +10,8 @@ import { nodeLink } from './node-link.js'
 import { followInput, settleQueued } from './queued-prompts.js'
 import { resumeSession } from './rewind.js'
 import type { InputContent, InputReport, RewindRequest, SessionMessage } from './runtimes/adapter.js'
-import { adapterFor, DEFAULT_RUNTIME } from './runtimes/registry.js'
 import { moveSessionTo } from './session-files.js'
-import { realise } from './session-realise.js'
+import { openRealised, realise } from './session-realise.js'
 import type { SessionSpec } from './session-spec.js'
 import { inLane, outsideLane } from './task-lane.js'
 import { keepUnstarted, sessionError, takeUnstarted } from './unstarted.js'
@@ -86,16 +85,16 @@ async function sessionReports(session: LiveSession, task: Task): Promise<AsyncIt
   const { spec, launch, key, rewind } = await nodeLink.ask(taskId, 'session.spec', {})
   // The control plane built the spec with startingSpec and the plan with launchPlan.
   const handed = spec as SessionSpec
-  const options = await realise(handed, task, launch as LaunchPlan, session.controller)
+  const realised = await realise(handed, task, launch as LaunchPlan, session.controller)
   const now = await nodeLink.ask(taskId, 'setup.key', { spec })
-  session.startWith(!now.rewind && now.key === key ? key : null)
-  if (handed.resume !== null) {
+  session.startWith(!now.rewind && now.key === key ? key : null, realised.runtime)
+  if (handed.resume !== null && realised.runtime === 'claude') {
     moveSessionTo(CLAUDE_HOME, handed.resume, handed.cwd)
   }
   const settle = async (id: number, state: 'applied' | 'refused', reason: string | null) =>
     nodeLink.journal(taskId, { type: 'rewind.settled', id, state, reason })
   const open = async (at: RewindRequest | null) => {
-    const started = await adapterFor(DEFAULT_RUNTIME).open(options, session.openInput(), at)
+    const started = await openRealised(realised, session.openInput(), at)
     session.attach(started)
     await nodeLink.journal(taskId, { type: 'session.started', warm: session.warm })
     return started
@@ -296,7 +295,9 @@ async function take(taskId: string, session: LiveSession, report: Report): Promi
     return { ended: false }
   }
   session.note(report)
-  await nodeLink.journal(taskId, { type: 'message', runtime: DEFAULT_RUNTIME, payload: report.raw })
+  if (report.raw !== null) {
+    await nodeLink.journal(taskId, { type: 'message', runtime: session.runtimeId, payload: report.raw })
+  }
   const [end] = eventsOf(report.events, 'turn.ended')
   await follow(taskId, session, report, end)
   return end === undefined ? { ended: false } : { ended: true, error: turnError(end) }

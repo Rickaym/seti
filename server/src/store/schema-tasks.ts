@@ -186,3 +186,15 @@ ALTER TABLE task ADD COLUMN runtime TEXT NOT NULL DEFAULT 'claude';
 ALTER TABLE task ADD COLUMN requested_model TEXT;
 ALTER TABLE task ADD COLUMN requested_effort TEXT;
 `
+
+export const CODEX_SETTINGS = `
+CREATE TABLE codex_settings (
+  id INTEGER PRIMARY KEY CHECK (id = 1),
+  enabled BOOLEAN NOT NULL DEFAULT false,
+  program TEXT,
+  evaluator_decides BOOLEAN NOT NULL DEFAULT false,
+  default_model TEXT,
+  default_effort TEXT,
+  updated_at TEXT NOT NULL
+);
+`

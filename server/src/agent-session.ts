@@ -2,7 +2,14 @@ import { randomUUID, type UUID } from 'node:crypto'
 import { eventsOf, type EventOf } from '@seti/shared'
 import { InputQueue } from './input-queue.js'
 import type { NextMessage } from './next-message.js'
-import type { InputContent, InputPriority, SessionInput, SessionMessage, ToolServerState } from './runtimes/adapter.js'
+import type {
+  InputContent,
+  InputPriority,
+  RuntimeId,
+  SessionInput,
+  SessionMessage,
+  ToolServerState,
+} from './runtimes/adapter.js'
 import type { DefaultSession, DefaultShapes } from './runtimes/registry.js'
 import type { CutKind } from './store/restart.js'
 
@@ -67,6 +74,8 @@ export class LiveSession {
   done: Promise<void> = Promise.resolve()
   private input = new InputQueue()
   private runtime: DefaultSession | null = null
+  /** The runtime the process runs on, from the spec it started from. */
+  private ranOn: RuntimeId = 'claude'
   private interrupting = false
   private background = new Set<string>()
   private idleTimer: ReturnType<typeof setTimeout> | null = null
@@ -174,8 +183,14 @@ export class LiveSession {
     return this.closed ? null : this.runtime
   }
 
-  startWith(setup: string | null): void {
+  /** The process starts on the runtime with the setup key, null when its setup changed meanwhile. */
+  startWith(setup: string | null, runtime: RuntimeId): void {
     this.setup = setup
+    this.ranOn = runtime
+  }
+
+  get runtimeId(): RuntimeId {
+    return this.ranOn
   }
 
   startedWith(setup: string): boolean {

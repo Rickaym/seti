@@ -35,6 +35,13 @@ afterEach(() => {
 })
 
 describe('the permission shadow summary', () => {
+  it("leaves out the evaluator's verdicts beside a Codex agent's answers", async () => {
+    await policyShadow.count({ ...record({}), mode: 'codex', runtime: 'user-allow' }, '2990-03-01')
+    const summary = await policyShadow.summary('2990-03-01')
+    expect(summary.results).toEqual({})
+    expect(summary.differences).toEqual([])
+  })
+
   it('counts results, slow decisions and the most frequent differences since the day', async () => {
     await policyShadow.count(record({}), '2990-01-01')
     await policyShadow.count(record({}), '2990-01-02')

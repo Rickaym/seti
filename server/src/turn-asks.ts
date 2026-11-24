@@ -1,6 +1,7 @@
 import type { CanUseTool } from '@anthropic-ai/claude-agent-sdk'
-import type { NodeAnswer, NodeAsk, Task } from '@seti/shared'
+import type { NodeAnswer, NodeAsk, Task, ToolCall } from '@seti/shared'
 import { audit } from './audit.js'
+import { decideCodexCall } from './codex-decide.js'
 import { effectiveCompact } from './compact.js'
 import { tasks } from './db.js'
 import { askAboutRepeat, canUseToolFor } from './permission-requests.js'
@@ -80,4 +81,7 @@ export const turnAnswers = {
   'tools.list': async (taskId: string) => listSessionTools(await taskOf(taskId)),
   'tool.call': async (taskId: string, call: NodeAsk<'tool.call'>, signal: AbortSignal) =>
     callSessionTool(taskId, call, signal),
+  // The node handed on the neutral call its runtime's adapter made.
+  'call.decide': async (taskId: string, { call }: NodeAsk<'call.decide'>, signal: AbortSignal) =>
+    decideCodexCall(taskId, call as ToolCall, signal),
 }
