@@ -1,8 +1,10 @@
-import { SETTINGS_DOC_GROUPS, type SettingsDoc } from '@seti/shared'
-import { Download, Pencil, PenLine, Search } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { apiGet, errorText } from '@/api'
+import { SETTINGS_DOC_GROUPS, type SettingsDoc, type SettingsImportPreview } from '@seti/shared'
+import { Download, Pencil, PenLine, Search, Upload } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { toast } from 'sonner'
+import { apiGet, apiPost, errorText } from '@/api'
 import { CopyIconButton } from '@/components/CopyButton'
+import { Hint } from '@/components/Hint'
 import { ToggleButton } from '@/components/ToggleButton'
 import { HighlightedCode } from '@/components/highlight/HighlightedCode'
 import { Button } from '@/components/ui/button'
@@ -11,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { RevisionHistory } from '@/panels/revisions/RevisionHistory'
 import { SettingsBody, SettingsCard, SettingsHeader } from '../layout'
 import { useMovedCard } from '../use-moved-card'
+import { ImportDialog } from './ImportDialog'
 import { JsonEditor } from './JsonEditor'
 import { SectionReset } from './SectionReset'
 import type { JsonSchema } from './json-complete'
@@ -27,11 +30,11 @@ const GROUP_LABELS: Record<string, string> = {
 }
 
 /** Saves the document as a file, which a phone offers to keep or share. */
-function exportDoc(doc: SettingsDoc): void {
+function exportDoc(doc: SettingsDoc, modified: boolean): void {
   const url = URL.createObjectURL(new Blob([asJson(doc)], { type: 'application/json' }))
   const link = document.createElement('a')
   link.href = url
-  link.download = exportName(new Date())
+  link.download = exportName(new Date(), modified)
   link.click()
   URL.revokeObjectURL(url)
 }
@@ -179,19 +182,84 @@ function useSettingsDoc() {
   return { doc, error, defaults, schema, version, load }
 }
 
-function HeaderActions({ doc, onEdit }: { doc: SettingsDoc; onEdit: () => void }) {
+/** Saves the document, or with Modified on only what differs from the defaults, as a file. */
+function exportNow(doc: SettingsDoc, modified: boolean): void {
+  if (!modified) {
+    exportDoc(doc, false)
+    return
+  }
+  apiGet<SettingsDoc>('/settings-doc?only=modified').then(
+    (changed) => {
+      exportDoc(changed, true)
+    },
+    (e: unknown) => {
+      toast.error(errorText(e), { duration: Infinity })
+    },
+  )
+}
+
+/** Reads a chosen file as JSON and asks Seti what importing it would do. */
+async function readImport(chosen: File): Promise<Importing> {
+  const parsed: unknown = JSON.parse(await chosen.text())
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+    throw new Error('A settings file holds one JSON object')
+  }
+  const file = parsed as Record<string, unknown>
+  return { file, preview: await apiPost<SettingsImportPreview>('/settings-doc/import/preview', { file }) }
+}
+
+interface Importing {
+  file: Record<string, unknown>
+  preview: SettingsImportPreview
+}
+
+function HeaderActions({
+  doc,
+  modified,
+  onEdit,
+  onImport,
+}: {
+  doc: SettingsDoc
+  modified: boolean
+  onEdit: () => void
+  onImport: (importing: Importing) => void
+}) {
+  const picker = useRef<HTMLInputElement>(null)
   return (
     <>
       <CopyIconButton text={asJson(doc)} label="Copy all settings" variant="outline" />
-      <Button
-        size="sm"
-        variant="outline"
-        onClick={() => {
-          exportDoc(doc)
+      <Hint text={modified ? 'Save only the settings that differ from their default' : 'Save every setting as a file'}>
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => {
+            exportNow(doc, modified)
+          }}
+        >
+          <Download />
+          Export
+        </Button>
+      </Hint>
+      <input
+        ref={picker}
+        type="file"
+        accept="application/json,.json"
+        aria-label="Settings file"
+        className="hidden"
+        onChange={(e) => {
+          const input = e.currentTarget
+          const chosen = input.files?.[0]
+          input.value = ''
+          if (chosen !== undefined) {
+            readImport(chosen).then(onImport, (err: unknown) => {
+              toast.error(errorText(err), { duration: Infinity })
+            })
+          }
         }}
-      >
-        <Download />
-        Export
+      />
+      <Button size="sm" variant="outline" onClick={() => picker.current?.click()}>
+        <Upload />
+        Import
       </Button>
       <Button size="sm" variant="outline" onClick={onEdit}>
         <Pencil />
@@ -206,6 +274,7 @@ export function SettingsJsonPage() {
   const { doc, error, defaults, schema, version, load } = useSettingsDoc()
   const [filter, setFilter] = useState<DocFilter>({ query: '', group: null, modified: false })
   const [editing, setEditing] = useState(false)
+  const [importing, setImporting] = useState<Importing | null>(null)
   useMovedCard(doc !== null)
   return (
     <SettingsBody
@@ -218,9 +287,11 @@ export function SettingsJsonPage() {
             !editing && (
               <HeaderActions
                 doc={doc}
+                modified={filter.modified}
                 onEdit={() => {
                   setEditing(true)
                 }}
+                onImport={setImporting}
               />
             )
           }
@@ -249,6 +320,16 @@ export function SettingsJsonPage() {
           )}
           <History version={version} onReverted={load} />
         </div>
+      )}
+      {importing !== null && (
+        <ImportDialog
+          file={importing.file}
+          preview={importing.preview}
+          onClose={() => {
+            setImporting(null)
+          }}
+          onImported={load}
+        />
       )}
     </SettingsBody>
   )

@@ -74,4 +74,5 @@ export function shownSections(sections: readonly DocSection[], filter: DocFilter
 export const asJson = (value: unknown) => JSON.stringify(value, null, 2)
 
 /** The file name of an export, dated so exports from different days sort and differ. */
-export const exportName = (at: Date) => `seti-settings-${at.toISOString().slice(0, 10)}.json`
+export const exportName = (at: Date, modified = false) =>
+  `seti-settings-${modified ? 'modified-' : ''}${at.toISOString().slice(0, 10)}.json`

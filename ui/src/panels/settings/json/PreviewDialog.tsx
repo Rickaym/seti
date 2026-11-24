@@ -4,7 +4,8 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { shown, type ChangeRow } from './json-edit'
 
-function Row({ row }: { row: ChangeRow }) {
+/** One change, old value struck through above the new one. */
+export function ChangeItem({ row }: { row: ChangeRow }) {
   return (
     <li className="space-y-0.5 border-b border-border py-2 last:border-b-0">
       <div className="font-mono text-xs font-medium wrap-anywhere">{pathText(row.path)}</div>
@@ -48,7 +49,7 @@ export function PreviewDialog({
         </DialogHeader>
         <ol aria-label="Changes" className="max-h-[50vh] overflow-y-auto">
           {rows.map((row) => (
-            <Row key={pathText(row.path)} row={row} />
+            <ChangeItem key={pathText(row.path)} row={row} />
           ))}
         </ol>
         {confirming && (
