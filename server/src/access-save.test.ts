@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import type { AccessSavePreview } from '@seti/shared'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { previewAccessSave, saveAccess } from './access-save.js'
 import { asAgent, asMod } from './access.js'
 import { createApp } from './app.js'
@@ -14,13 +14,16 @@ import { EA_AUTH, USER_AUTH } from './test-auth.js'
 
 const app = createApp()
 
-async function send(url: string, body: unknown, auth: Record<string, string> = USER_AUTH) {
+async function call(method: string, url: string, body: unknown, auth: Record<string, string> = USER_AUTH) {
   return app.request(`/api${url}`, {
-    method: 'POST',
+    method,
     headers: { host: 'localhost', ...auth, 'content-type': 'application/json' },
-    body: JSON.stringify(body),
+    ...(body === undefined ? {} : { body: JSON.stringify(body) }),
   })
 }
+
+const send = async (url: string, body: unknown, auth: Record<string, string> = USER_AUTH) =>
+  call('POST', url, body, auth)
 
 async function agent(profileId: string, title: string) {
   const id = randomUUID()
@@ -127,5 +130,38 @@ describe("saving an agent's access into its credential", () => {
       await expect(asMod({ id: 'sample', grants: [] }, write)).rejects.toMatchObject({ status: 403 })
     }
     expect(await credentialAccess.all(ops)).toEqual([])
+  })
+
+  it('never shows a secret value in a response, a log or the audit log', async () => {
+    const { ops, saver } = await setup()
+    const token = `github_pat_${'Acc5'.repeat(15)}`
+    const logged: string[] = []
+    const spies = (['log', 'info', 'warn', 'error'] as const).map((level) =>
+      vi.spyOn(console, level).mockImplementation((...args: unknown[]) => {
+        logged.push(args.map(String).join(' '))
+      }),
+    )
+    const responses = [
+      await call('PUT', `/credentials/profiles/${ops}/github/globex`, { value: token }),
+      await call('PUT', `/credentials/profiles/${ops}/access`, { kind: 'aws', id: 'aws', enabled: false }),
+      await call('POST', `/credentials/profiles/${ops}/hosts`, { host: 'api.example.com' }),
+      await call('DELETE', `/credentials/profiles/${ops}/hosts/api.example.com`, undefined),
+      await call('POST', `/tasks/${saver}/access/reset`, {}),
+      await call('PUT', `/tasks/${saver}/access`, { kind: 'aws', id: 'aws', enabled: true }),
+    ]
+    expect(responses.map((res) => res.status)).toEqual([200, 200, 200, 200, 200, 200])
+    const texts = responses.map(async (res) => res.text())
+    const preview = await previewAccessSave(ops, saver)
+    const saved = await send(`/credentials/profiles/${ops}/access/save`, {
+      task_id: saver,
+      expect: preview.fingerprint,
+    })
+    const audit = await call('GET', '/audit?limit=100', undefined)
+    for (const spy of spies) {
+      spy.mockRestore()
+    }
+    const seen = [...(await Promise.all(texts)), JSON.stringify(preview), await saved.text(), await audit.text()]
+    expect(saved.status).toBe(200)
+    expect([...seen, ...logged].filter((text) => text.includes(token.slice(11)))).toEqual([])
   })
 })
