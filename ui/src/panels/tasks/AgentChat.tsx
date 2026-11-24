@@ -13,6 +13,11 @@ import { QuickReplies } from '@/panels/tasks/QuickReplies'
 import { ShellLive } from '@/panels/tasks/ShellEntry'
 import { QueuedInputs } from '@/panels/tasks/TaskInputs'
 import { TranscriptPane } from '@/panels/tasks/TranscriptPane'
+import { BriefView } from '@/panels/tasks/proto/BriefView'
+import { ConversationBody, LanesBody } from '@/panels/tasks/proto/ConversationBody'
+import { chatDesign, type ChatDesign } from '@/panels/tasks/proto/chat-design'
+import { lastOwnMessage, worldState } from '@/panels/tasks/proto/digest'
+import { UpdatesStrip } from '@/panels/tasks/proto/parts'
 
 type TranscriptProps = ComponentProps<typeof TranscriptPane>
 
@@ -28,6 +33,19 @@ function usePendingRows(taskId: string, rows: TranscriptProps['stream']['message
     store.confirm(confirmed)
   }, [store, confirmed])
   return { store, unsent: { rows: <PendingSends sends={shown} store={store} />, count: shown.length, added } }
+}
+
+type BodyProps = Omit<ComponentProps<typeof ConversationBody>, 'messages'>
+
+/** The rows as the chosen prototype draws them; undefined keeps the classic transcript. */
+function bodyFor(design: ChatDesign, props: BodyProps) {
+  if (design === 'a') {
+    return (shown: readonly WireRow[]) => <ConversationBody {...props} messages={shown} />
+  }
+  if (design === 'c') {
+    return (shown: readonly WireRow[]) => <LanesBody {...props} messages={shown} />
+  }
+  return undefined
 }
 
 interface AgentChatProps {
@@ -62,31 +80,53 @@ export function AgentChat({
   const running = status === 'running'
   const { store, unsent } = usePendingRows(task.id, transcript.stream.messages)
   const blocks = useTranscriptBlocks(task.id)
+  const design = chatDesign()
+  const rows = transcript.stream.messages
+  const updates = useMemo(() => (design === 'a' ? worldState(rows, lastOwnMessage(rows)) : []), [design, rows])
+  const needs = (
+    <>
+      <PermissionRequests taskId={task.id} blocked={task.blocked} version={permissions} />
+      <ChangeRequests taskId={task.id} blocked={task.blocked} version={permissions} />
+      {task.asking && status === 'idle' && <QuickReplies key={task.updated_at} taskId={task.id} messages={messages} />}
+      {(status === 'error' || status === 'interrupted') && (
+        <TaskFailure task={task} status={status} onChanged={onChanged} />
+      )}
+      {compacting !== null && <CompactingNote since={compacting} />}
+      {shell !== null && (
+        <div className="mt-3">
+          <ShellLive progress={shell} />
+        </div>
+      )}
+    </>
+  )
+  const body = bodyFor(design, { taskId: task.id, running, subtasks: transcript.subtasks })
+  const pane = (
+    <TranscriptPane
+      taskId={task.id}
+      {...transcript}
+      unsent={unsent}
+      blocks={blocks}
+      running={running}
+      empty="No messages yet. A reply below starts this agent's first turn."
+      {...(body === undefined ? {} : { body })}
+    >
+      {needs}
+    </TranscriptPane>
+  )
   return (
     <>
-      <TranscriptPane
-        taskId={task.id}
-        {...transcript}
-        unsent={unsent}
-        blocks={blocks}
-        running={running}
-        empty="No messages yet. A reply below starts this agent's first turn."
-      >
-        <PermissionRequests taskId={task.id} blocked={task.blocked} version={permissions} />
-        <ChangeRequests taskId={task.id} blocked={task.blocked} version={permissions} />
-        {task.asking && status === 'idle' && (
-          <QuickReplies key={task.updated_at} taskId={task.id} messages={messages} />
-        )}
-        {(status === 'error' || status === 'interrupted') && (
-          <TaskFailure task={task} status={status} onChanged={onChanged} />
-        )}
-        {compacting !== null && <CompactingNote since={compacting} />}
-        {shell !== null && (
-          <div className="mt-3">
-            <ShellLive progress={shell} />
-          </div>
-        )}
-      </TranscriptPane>
+      {design === 'a' && (
+        <UpdatesStrip
+          taskId={task.id}
+          updates={updates}
+          className="shrink-0 border-b border-border bg-background px-5 py-1 max-md:px-3 in-data-agent-frame:px-3"
+        />
+      )}
+      {design === 'b' ? (
+        <BriefView taskId={task.id} messages={rows} running={running} needs={needs} history={pane} />
+      ) : (
+        pane
+      )}
       <QueuedInputs task={task} messages={messages} running={running} />
       <Composer
         taskId={task.id}

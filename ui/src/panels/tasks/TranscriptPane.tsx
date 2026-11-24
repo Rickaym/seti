@@ -8,6 +8,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type ComponentProps,
   type ReactNode,
 } from 'react'
 import { Button } from '@/components/ui/button'
@@ -100,6 +101,13 @@ function LatestButton({ stretch, unseen, onJump }: { stretch: TranscriptWindow; 
       {unseen} new
     </Button>
   )
+}
+
+type RowsBody = (messages: readonly WireRow[]) => ReactNode
+
+/** The classic transcript, or the rows drawn by `body` when one is given. */
+function PaneRows({ body, ...props }: ComponentProps<typeof Transcript> & { body: RowsBody | undefined }): ReactNode {
+  return body === undefined ? <Transcript {...props} /> : body(props.messages)
 }
 
 /** Messages sent from this page that the transcript has no rows for yet. */
@@ -209,6 +217,7 @@ export function TranscriptPane({
   empty,
   unsent,
   blocks,
+  body,
   children,
 }: {
   taskId: string
@@ -232,6 +241,8 @@ export function TranscriptPane({
   unsent?: PendingRows
   /** Blocks mods draw among the rows by time, such as asides. */
   blocks?: readonly TimedBlock[]
+  /** Draws the rows another way than the classic transcript, for the chat prototypes. */
+  body?: RowsBody
   children?: ReactNode
 }) {
   const { messages, hasOlder, loadingOlder, loadOlder } = stream
@@ -420,7 +431,8 @@ export function TranscriptPane({
               )}
               <EmptyLine text={empty} shown={messages.length + unsentCount} older={hasOlder} running={running} />
               <FindFocusContext value={find?.focusId ?? null}>
-                <Transcript
+                <PaneRows
+                  body={body}
                   taskId={taskId}
                   messages={messages}
                   rewinds={rewinds}
