@@ -83,7 +83,7 @@ async function turn(
     resume,
     toolServers,
     instructions: { append: HOUSE_RULES },
-    vendor: { binary, model: null, effort: null, skills },
+    vendor: { binary, model: null, effort: null, skills, servers: [] },
   } as unknown as SessionSpec<'codex'>
   const realised = await adapter.realise(
     spec,

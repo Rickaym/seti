@@ -10,7 +10,7 @@ const spec = {
   resume: null,
   toolServers,
   instructions: { append: '' },
-  vendor: { binary: '/c', model: null, effort: null, skills: [] },
+  vendor: { binary: '/c', model: null, effort: null, skills: [], servers: [] },
 } as unknown as SessionSpec<'codex'>
 const spawn: NonNullable<Launcher['spawn']> = () => {
   throw new Error('not started in this test')
@@ -123,6 +123,30 @@ describe('realising a Codex session', () => {
     expect(() => realiseCodex(spec, launcher(env), { ...answering, toolServers: servers, binary: '/c' })).toThrow(
       /tool server named "a.b"/,
     )
+  })
+
+  it("starts the user's servers in the sandbox, asking Seti about every call, never with the key", () => {
+    const servers = [
+      { name: 'play', transport: 'stdio', command: 'npx', args: ['@playwright/mcp'] },
+      { name: 'docs', transport: 'http', url: 'https://docs.example.com/mcp' },
+      { name: 'shared', transport: 'stdio', command: 'not-seti', args: [] },
+    ] as const
+    const withServers = { ...spec, vendor: { ...spec.vendor, servers: [...servers] } }
+    const env = { SETI_MODEL_KEY: 'seti-placeholder', GH_TOKEN: 'seti-sandbox-placeholder' }
+    const realised = realiseCodex(withServers, launcher(env), { ...answering, binary: '/c' })
+    const settings = settingsOf(realised.args)
+    expect(settings).toEqual(
+      expect.arrayContaining([
+        'mcp_servers.play.command="npx"',
+        'mcp_servers.play.args=["@playwright/mcp"]',
+        'mcp_servers.play.env_vars=["GH_TOKEN"]',
+        'mcp_servers.play.default_tools_approval_mode="prompt"',
+        'mcp_servers.docs.url="https://docs.example.com/mcp"',
+        'mcp_servers.docs.default_tools_approval_mode="prompt"',
+      ]),
+    )
+    expect(settings.filter((each) => each.startsWith('mcp_servers.docs.env_vars'))).toEqual([])
+    expect(settings.filter((each) => each.includes('not-seti'))).toEqual([])
   })
 
   it('refuses an agent without an OpenAI key', () => {

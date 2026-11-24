@@ -1,4 +1,5 @@
 import { SHARED_TOOL_SERVER } from '@seti/shared'
+import type { CodexToolServer } from '../../codex-tool-servers.js'
 import type { Launcher } from '../../launcher.js'
 import { MODEL_KEY_ENV } from '../../sandbox-codex.js'
 import type { SessionSpec } from '../../session-spec.js'
@@ -56,6 +57,37 @@ function serverSettings(servers: Record<string, StdioServer>, shared: StdioServe
       ...(passed.length === 0 ? [] : [[`${key}.env_vars`, passed] satisfies Setting]),
     ]
   })
+}
+
+/** How long a user's server may take to start, as long as Claude Code waits for one. */
+const STARTUP_TIMEOUT_S = 30
+
+/**
+ * The user's servers, each of whose tool calls Codex asks Seti about whatever the tool says of
+ * itself; a stdio one runs inside the sandbox with the agent's connection variables, never the
+ * model key's. A server named like one of Seti's own is left out.
+ */
+function userServerSettings(servers: CodexToolServer[], taken: ReadonlySet<string>, env: string[]): Setting[] {
+  const passed = env.filter((name) => name !== MODEL_KEY_ENV)
+  return servers
+    .filter((server) => !taken.has(server.name) && SERVER_NAME.test(server.name))
+    .flatMap((server): Setting[] => {
+      const key = `mcp_servers.${server.name}`
+      const reach: Setting[] =
+        server.transport === 'http'
+          ? [[`${key}.url`, server.url]]
+          : [
+              [`${key}.command`, server.command],
+              [`${key}.args`, server.args],
+              ...(passed.length === 0 ? [] : [[`${key}.env_vars`, passed] satisfies Setting]),
+            ]
+      return [
+        ...reach,
+        [`${key}.default_tools_approval_mode`, 'prompt'],
+        [`${key}.startup_timeout_sec`, STARTUP_TIMEOUT_S],
+        [`${key}.tool_timeout_sec`, TOOL_TIMEOUT_S],
+      ]
+    })
 }
 
 /**
@@ -130,7 +162,10 @@ export function realiseCodex(
   { decide, toolServers, abortController, binary, provider = OPENAI }: Answering,
 ): CodexRealised {
   const spawn = sandboxedSpawn(launcher, provider)
-  const servers = serverSettings(toolServers, sharedToolCommand(spec.toolServers.shared), Object.keys(launcher.env))
+  const env = Object.keys(launcher.env)
+  const shared = sharedToolCommand(spec.toolServers.shared)
+  const taken = new Set([...Object.keys(toolServers), SHARED_TOOL_SERVER])
+  const servers = [...serverSettings(toolServers, shared, env), ...userServerSettings(spec.vendor.servers, taken, env)]
   const model = spec.vendor.model ?? DEFAULT_MODEL
   const settings = [...overrides(provider, model, launcher.env.PATH), ...servers]
   return {
