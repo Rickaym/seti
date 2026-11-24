@@ -999,6 +999,7 @@ Optional and off by default: a maintenance session per agent that consolidates i
 - CFG-1: The control room MUST offer its stored settings as one JSON document with a `version`, a
   `revision` and a JSON Schema derived from the schemas that validate its settings writes. Its
   sections follow the settings groups and pages the user sees; lists are keyed by a stable name.
+  An agent's and a workspace's own settings are documents of their own.
 - CFG-2: The document, its schema and any error about it MUST NOT contain a secret value; a secret
   reads `set` or `not set`.
 - CFG-3: Agents, mods and devices MUST be refused the document and its schema. The EA reads plain
