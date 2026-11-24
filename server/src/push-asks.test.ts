@@ -5,6 +5,7 @@ import path from 'node:path'
 import { addPermissionRuleInput, type PermissionRequest, type Task, type ToolCall } from '@seti/shared'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { decideCodexCall } from './codex-decide.js'
+import { updateCodexSettings } from './codex-status.js'
 import { sql, tasks } from './db.js'
 import { composeRules } from './permission-policy.js'
 import { answerPermission } from './permission-rules.js'
@@ -94,6 +95,16 @@ describe('a push outside the user organisations', () => {
     expect(request.reason).toBe('Fork other/tool, outside your organisations')
     await answerPermission(codex, request.id, { decision: 'allow' })
     expect(await held).toEqual({ allow: true })
+  })
+
+  it('keeps a waiting push elsewhere waiting when the rules start to decide', async () => {
+    await codexSettings.set({ ...(await codexSettings.get()), evaluator_decides: false })
+    const held = decideCodexCall(codex.id, shell('git push theirs main'), signal)
+    const request = await pending(codex.id)
+    await updateCodexSettings({ evaluator_decides: true })
+    expect((await permissionRequests.get(request.id))?.state).toBe('pending')
+    await answerPermission(codex, request.id, { decision: 'deny' })
+    expect((await held).allow).toBe(false)
   })
 
   it("keeps PushTo rules the user's own allow, out of the runtimes' rule lists", () => {
