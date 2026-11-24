@@ -643,10 +643,12 @@ describe("a Codex agent's mounts", () => {
     const mounts = sandboxMounts(layout({ codex: true }))
     expect(dests(mounts).filter((dest) => dest.startsWith(path.join(home, '.claude')))).toEqual([])
     const codex = path.join(home, '.codex')
-    expect(find(mounts, path.join(codex, 'config.toml'))).toEqual([
-      { kind: 'mask', dest: path.join(codex, 'config.toml') },
-    ])
-    expect(find(mounts, path.join(codex, '.env'))).toEqual([{ kind: 'mask', dest: path.join(codex, '.env') }])
+    const blank = path.join(taskDir, 'empty-file')
+    for (const name of ['config.toml', '.env']) {
+      expect(find(mounts, path.join(codex, name))).toEqual([
+        { kind: 'ro-bind', src: blank, dest: path.join(codex, name) },
+      ])
+    }
     expect(find(mounts, path.join(codex, 'rules'))).toEqual([
       { kind: 'ro-bind', src: path.join(taskDir, 'empty'), dest: path.join(codex, 'rules') },
     ])
@@ -660,7 +662,7 @@ describe("a Codex agent's mounts", () => {
     )
     const startup = ['.zshenv', '.zshenv.zwc', '.zprofile', '.zlogin', '.zshrc', '.bash_profile', '.profile', '.bashrc']
     for (const dest of [...masked, ...startup.map((name) => path.join(home, name))]) {
-      expect(find(mounts, dest)).toEqual([{ kind: 'mask', dest }])
+      expect(find(mounts, dest)).toEqual([{ kind: 'ro-bind', src: path.join(taskDir, 'empty-file'), dest }])
     }
     for (const dest of [path.join(codex, 'agents'), path.join(home, '.agents')]) {
       expect(find(mounts, dest)).toEqual([{ kind: 'ro-bind', src: path.join(taskDir, 'empty'), dest }])

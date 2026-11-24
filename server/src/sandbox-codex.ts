@@ -11,6 +11,9 @@ export const CODEX_DIR = '.codex'
 /** An empty folder in the task's state, shown read-only where Codex would read rules. */
 export const EMPTY_DIR = 'empty'
 
+/** An empty file in the task's state, shown read-only over each file Codex reads settings from. */
+export const EMPTY_FILE = 'empty-file'
+
 /** Where Codex reads the machine's own settings, rules and skills. */
 const HOST_CONFIG = '/etc/codex'
 
@@ -53,10 +56,12 @@ export const codexMountPoints = (home: string): { files: string[]; dirs: string[
  */
 export function codexLocks(layout: SandboxLayout, hostConfig = HOST_CONFIG): Mount[] {
   const empty = path.join(layout.taskDir, EMPTY_DIR)
+  const blank = path.join(layout.taskDir, EMPTY_FILE)
   const { files, dirs } = codexMountPoints(layout.home)
   const host: Mount[] = fs.existsSync(hostConfig) ? [{ kind: 'ro-bind', src: empty, dest: hostConfig }] : []
   return [
-    ...files.map((dest): Mount => ({ kind: 'mask', dest })),
+    // Not a mask: /dev/null in a user namespace cannot be opened, and Codex fails reading it.
+    ...files.map((dest): Mount => ({ kind: 'ro-bind', src: blank, dest })),
     ...dirs.map((dest): Mount => ({ kind: 'ro-bind', src: empty, dest })),
     ...host,
   ]

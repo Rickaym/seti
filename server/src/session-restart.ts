@@ -1,5 +1,6 @@
-import type { Task } from '@seti/shared'
+import type { StoredRuntime, Task } from '@seti/shared'
 import { auditTask } from './audit.js'
+import { tasks } from './db.js'
 import { refuseOnSelf } from './ea-guard.js'
 import { HttpError } from './http.js'
 import {
@@ -16,14 +17,21 @@ import { inLane } from './task-lane.js'
 
 const NOTE = 'Session restarted; the conversation continues'
 
-const PREFACE =
-  'The user restarted your Claude Code session from Seti, so your tools, MCP servers and plugins ' +
-  'were loaded again. The conversation continues, but background shells, processes and subagents ' +
+const ENDED =
+  'The conversation continues, but background shells, processes and subagents ' +
   'you started before the restart have ended; start again any you still need.'
+
+const PREFACE: Record<StoredRuntime, string> = {
+  claude: `The user restarted your Claude Code session from Seti, so your tools, MCP servers and plugins were loaded again. ${ENDED}`,
+  codex: `The user restarted your Codex session from Seti, so your tools and Seti's tools were loaded again. ${ENDED}`,
+}
 
 /** The latest restart since the agent last read a message, so it knows what ended with it. */
 export async function restartPreface(taskId: string): Promise<TurnPreface | null> {
-  return (await sessionRestarts.sinceLastTurn(taskId)) ? { text: PREFACE, count: 1 } : null
+  if (!(await sessionRestarts.sinceLastTurn(taskId))) {
+    return null
+  }
+  return { text: PREFACE[(await tasks.get(taskId))?.runtime ?? 'claude'], count: 1 }
 }
 
 /**
