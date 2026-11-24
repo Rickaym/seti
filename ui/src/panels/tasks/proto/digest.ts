@@ -89,6 +89,10 @@ function collector(at: string, index: TranscriptIndex, running: boolean) {
   const span = newSpan(at)
   const addCall = (call: ToolCall, since: string) => {
     const result = index.results.get(call.callId)
+    if (span.calls.length === 0) {
+      span.start = since
+    }
+    span.end = result?.at ?? since
     span.calls.push(call)
     span.results.push(result)
     for (const change of call.edit?.changes ?? []) {
@@ -107,7 +111,6 @@ function collector(at: string, index: TranscriptIndex, running: boolean) {
   }
   const add = (row: WireRow) => {
     span.rows.push(row)
-    span.end = row.created_at
     if (row.kind === 'input') {
       span.updates.push(row)
       return
@@ -170,6 +173,18 @@ export function digest(rows: readonly WireRow[], running: boolean): ChatItem[] {
   return items
 }
 
+/** Updates of one subject replace each other only within a strand: CI, the PR's end, its talk. */
+const STRANDS: Record<string, string> = {
+  ci_failed: 'ci',
+  ci_passed: 'ci',
+  merged: 'end',
+  closed: 'end',
+  conflict: 'conflict',
+  review: 'talk',
+  comment: 'talk',
+  other: 'other',
+}
+
 /** Updates that change what the user might act on, newest state per subject, since `afterId`. */
 export function worldState(rows: readonly WireRow[], afterId: number): InputRow[] {
   const latest = new Map<string, InputRow>()
@@ -181,8 +196,9 @@ export function worldState(rows: readonly WireRow[], afterId: number): InputRow[
     if (input.source === 'pr' && input.quiet !== undefined) {
       continue
     }
-    latest.delete(input.subject)
-    latest.set(input.subject, row)
+    const key = `${input.subject} ${STRANDS[input.source === 'pr' ? input.kind : 'other'] ?? 'other'}`
+    latest.delete(key)
+    latest.set(key, row)
   }
   return [...latest.values()]
 }

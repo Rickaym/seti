@@ -29,7 +29,7 @@ function briefOf(items: readonly ChatItem[]): Brief {
       brief.asked = item
     } else if (item.type === 'person') {
       brief.people.push(item)
-    } else if (item.type === 'work') {
+    } else if (item.type === 'work' && item.span.calls.length > 0) {
       brief.work = item.span
     }
   }

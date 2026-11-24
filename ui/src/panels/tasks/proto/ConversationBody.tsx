@@ -46,12 +46,15 @@ function Said({ item, props }: { item: Exclude<ChatItem, { type: 'work' }>; prop
 const itemKey = (item: ChatItem) =>
   item.type === 'work' ? `w-${String(item.span.rows[0]?.id ?? 0)}` : `r-${String(item.row.id)}`
 
+/** Stretches without calls hold only updates, which the strip at the top already shows. */
+const shownInFlow = (item: ChatItem) => item.type !== 'work' || item.span.calls.length > 0
+
 /** A: the conversation, with each stretch of work folded into one quiet line. */
 export function ConversationBody(props: BodyProps) {
   const items = useMemo(() => digest(props.messages, props.running), [props.messages, props.running])
   return (
     <div className="space-y-3">
-      {items.map((item) => (
+      {items.filter(shownInFlow).map((item) => (
         <div key={itemKey(item)} data-message-id={item.type === 'work' ? undefined : item.row.id}>
           {item.type === 'work' ? (
             <WorkLine taskId={props.taskId} span={item.span} running={props.running} subtasks={props.subtasks} />
