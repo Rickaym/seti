@@ -62,6 +62,8 @@ export class ScriptedRuntime {
   private readonly pending = new Map<number, (verdict: Verdict) => void>()
   private readonly jobs = new Map<string, { call: string; label: string }>()
   private inputArrived: (() => void) | null = null
+  /** A resumed session's start, said with its first input as a resumed runtime says it. */
+  private hello: unknown = null
   /** The subagent thread whose steps play now; the agent's own when null. */
   private thread: string | null = null
   private ids = 0
@@ -78,6 +80,7 @@ export class ScriptedRuntime {
     if (command.t === 'open') {
       this.open(command.resume)
     } else if (command.t === 'input') {
+      this.sayHello()
       this.queue.push({ id: command.id, text: command.text })
       this.io.write({ t: 'inputState', id: command.id, state: 'queued' })
       this.inputArrived?.()
@@ -121,7 +124,17 @@ export class ScriptedRuntime {
     const id = resume ?? `scripted-${String(this.machine.sessions.size + 1)}`
     this.machine.sessions.set(id, saved)
     this.session = { id, inputs: saved }
-    this.io.write({ t: 'hello', session: id, model: MODEL, resumed: resume !== null })
+    this.hello = { t: 'hello', session: id, model: MODEL, resumed: resume !== null }
+    if (resume === null) {
+      this.sayHello()
+    }
+  }
+
+  private sayHello(): void {
+    if (this.hello !== null) {
+      this.io.write(this.hello)
+      this.hello = null
+    }
   }
 
   private next(prefix: string): string {

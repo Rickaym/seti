@@ -19,6 +19,8 @@ export type ToolUseBlock = ToolCall
 export interface ToolResultRef {
   callId: string
   failed: boolean
+  /** The call was stopped before it finished, as an interrupt does; set only then. */
+  stopped?: true
   result: ToolResult
   rowId: number
   /** When the result arrived, which ends the call's duration. */
@@ -64,7 +66,8 @@ export function rowResults(row: WireRow): readonly ToolResultRef[] {
       ? NO_RESULTS
       : ends.map((end) => ({
           callId: end.callId,
-          failed: end.status !== 'ok',
+          failed: end.status !== 'ok' && end.status !== 'cancelled',
+          ...(end.status === 'cancelled' ? { stopped: true as const } : {}),
           result: end.result,
           rowId: row.id,
           at: row.created_at,
