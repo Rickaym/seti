@@ -6,7 +6,7 @@ import { SETI_HOME } from './config.js'
 import { connectionPlaceholders, connectionRules, mcpLoginRules, type ConnectionValue } from './egress-connections.js'
 import { modelOnly } from './egress-hosts.js'
 import type { EgressPlaceholder } from './egress-placeholders.js'
-import { startEgressProxy, type EgressProxy } from './egress-proxy.js'
+import { startEgressProxy, type EgressProxy, type Upstream } from './egress-proxy.js'
 import type { EgressRule } from './egress-rules.js'
 import { nodeLink } from './node-link.js'
 import { sandboxDirOf } from './owned-dirs.js'
@@ -32,6 +32,23 @@ async function sandboxCa(): Promise<SandboxCa> {
 export const sandboxCaPublic = async () => proxyCa(sandboxCa, () => sandboxCaFiles(CA_DIR))
 
 const proxies = new Map<string, Promise<EgressProxy>>()
+
+/** Where proxies started from now on send their traffic, which only tests set; see below. */
+interface TestEgress {
+  upstream: Upstream
+  refused: (host: string) => void
+}
+
+let testEgress: TestEgress | null = null
+
+/**
+ * For tests only: proxies started from now on reach their hosts through `egress.upstream` and
+ * report each host they refuse. No setting, variable or route reaches this; a test proves that
+ * only test files call it.
+ */
+export function routeEgressForTests(egress: TestEgress | null): void {
+  testEgress = egress
+}
 
 /** What a task's session started with: its connection headers, MCP choices and login. */
 interface SessionAccess {
@@ -103,7 +120,9 @@ async function taskProxy(taskId: string, authority: SandboxCa): Promise<EgressPr
       token: awsToken(taskId),
       credentials: async () => (await askInTime(taskId, 'aws.credentials', {})).credentials,
     },
+    ...(testEgress === null ? {} : { upstream: testEgress.upstream }),
     onRefused: (host) => {
+      testEgress?.refused(host)
       if (!refused.has(host)) {
         refused.add(host)
         process.stderr.write(`sandbox: task ${taskId} was refused ${host}\n`)

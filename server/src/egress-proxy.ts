@@ -47,7 +47,7 @@ import { applyRules, ruleCovers, type Applied, type EgressRule } from './egress-
 import type { SandboxCa } from './sandbox-ca.js'
 
 /** Where connections for a host really go; tests point them at local fakes. */
-interface Upstream {
+export interface Upstream {
   address: (host: string, port: number) => Promise<Target>
   tls?: tls.ConnectionOptions
 }

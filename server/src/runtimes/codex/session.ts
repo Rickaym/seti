@@ -1,5 +1,4 @@
 import type { ChildProcess } from 'node:child_process'
-import { once } from 'node:events'
 import type { ToolCall } from '@seti/shared'
 import { z } from 'zod'
 import type { Launcher } from '../../launcher.js'
@@ -99,7 +98,18 @@ class Driver {
 
   /** Reads Codex's output, opens the thread, then takes inputs; reports go to `reports`. */
   async *events(inputs: AsyncIterable<SessionInput>): AsyncGenerator<SessionReport> {
-    const exited = once(this.child, 'exit') as Promise<[number | null, NodeJS.Signals | null]>
+    const exited = new Promise<[number | null, NodeJS.Signals | null]>((resolve) => {
+      this.child.once('exit', (code: number | null, signal: NodeJS.Signals | null) => {
+        resolve([code, signal])
+      })
+      this.child.once('error', () => {
+        if (this.child.pid === undefined) {
+          resolve([null, null])
+        }
+      })
+    })
+    // Closing the session aborts the spawn's signal: the exit, not this error, reports the end.
+    this.child.on('error', () => undefined)
     void this.rpc
       .read({
         notified: (message) => {

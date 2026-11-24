@@ -13,7 +13,8 @@
         "src/mods/logic/runner.ts",
         "src/demo/main.ts",
         "src/demo/agent.ts",
-        "src/demo/planner.ts"
+        "src/demo/planner.ts",
+        "src/test-codex-node.ts"
       ]
     },
     "shared": {},
