@@ -165,6 +165,12 @@ between two steps; an interrupt; a hook at subagent start.
   runtime's models are the ones it reports for the account, else its stable aliases. An agent
   started on a model and effort MUST run every session start, restart and resume on them; a
   fallback switch (RES-14) lasts until the next session start.
+- RT-11: A runtime declares whether it loads the user's MCP servers and connectors, Seti's
+  plugins and a compaction rule, whether it can run outside the sandbox, fork a side chat, dream
+  and rewind; `GET /api/runtimes/capabilities` serves each runtime's declaration. For an agent
+  whose runtime lacks one, its settings show the control as not on that runtime instead of a
+  working control, counts leave those items out, its `task.md` and system prompt do not offer
+  them, and the server refuses the change with the reason.
 
 ## 4. Turn lifecycle
 
