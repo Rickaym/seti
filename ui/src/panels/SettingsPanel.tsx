@@ -20,6 +20,7 @@ import { ReposPage } from '@/panels/settings/ReposPage'
 import { ResourcesPage } from '@/panels/settings/ResourcesPage'
 import { RuntimesPage } from '@/panels/settings/RuntimesPage'
 import { SandboxPage } from '@/panels/settings/SandboxPage'
+import { SharedToolsPage } from '@/panels/settings/SharedToolsPage'
 import { SharingPage } from '@/panels/settings/SharingPage'
 import { SignInPage } from '@/panels/settings/SignInPage'
 import { StoragePage } from '@/panels/settings/StoragePage'
@@ -48,6 +49,7 @@ const PAGES: Record<Exclude<SettingsPageKey, ProbedPageKey>, (detail: string | n
   ea: () => <EaPage />,
   resources: () => <ResourcesPage />,
   runtimes: () => <RuntimesPage />,
+  tools: () => <SharedToolsPage />,
   storage: () => <StoragePage />,
   channels: (detail) => <ChannelsPage detail={detail} />,
   about: () => <AboutPage />,
