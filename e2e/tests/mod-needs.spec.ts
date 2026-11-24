@@ -13,11 +13,11 @@ async function paletteAsk(page: Page) {
 test("a mod's command shows only on an agent whose runtime offers what it needs", async ({ page }) => {
   const codex = await seedCodexAgent(unique('Codex needs'))
   await page.goto(`/#agents/${codex}`)
-  await expect(page.getByRole('main').getByRole('heading', { name: /Codex needs/ })).toBeVisible()
+  const reply = page.getByRole('combobox', { name: 'Reply' })
+  await expect(reply).toBeVisible()
   await expect(await paletteAsk(page)).toHaveCount(0)
   await page.keyboard.press('Escape')
 
-  const reply = page.getByRole('combobox', { name: 'Reply' })
   await reply.fill('/btw why this approach?')
   await expect(page.getByRole('status', { name: 'Composer status' })).toContainText('/btw is not on Codex')
   await reply.press('Enter')
