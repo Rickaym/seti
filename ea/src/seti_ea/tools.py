@@ -62,6 +62,7 @@ from seti_ea.role_tools import role_lines
 from seti_ea.seti import SetiClient, SetiError
 from seti_ea.settings_json import settings_text
 from seti_ea.settings_tools import SETTINGS_SPECS, SettingsTools
+from seti_ea.thread_lines import thread_lines
 from seti_ea.toolkit import (
     TASK_REF,
     ToolError,
@@ -221,6 +222,8 @@ QUIET_KINDS = frozenset(
         "task.pr_unlinked",
         "task.subtask_pr_linked",
         "task.subtask_pr_unlinked",
+        "task.thread_followed",
+        "task.thread_stopped",
         "task.message_sent",
         "task.shell_run",
         "task.shell_stopped",
@@ -322,7 +325,8 @@ TOOL_SPECS: list[ToolSpec] = [
     ToolSpec(
         "get_task",
         "Details of one task: status, repos, cost, its todo list, linked PRs with CI and review, "
-        "updates waiting for the agent, and a condensed recent transcript, or with window what it "
+        "updates waiting for the agent, Slack threads it posted in and follows for replies, and a "
+        "condensed recent transcript, or with window what it "
         "did then, such as yesterday. To ask an agent why it did something, use the side chat mod's "
         "ask action through run_mod_action while that mod is on.",
         {
@@ -1204,6 +1208,7 @@ class EaTools:
         if isinstance(outward, int) and outward > 0:
             lines.append(f"It made {plural(outward, 'call')} that reach outside the machine.")
         lines.extend(await self._task_prs(task))
+        lines.extend(await thread_lines(self._seti, task_id, now))
         waiting = await self._waiting(task_id)
         if waiting:
             about = "; ".join(clip(str(u.get("title", "update")), 80) for u in waiting[:5])

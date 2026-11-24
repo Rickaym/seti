@@ -32,6 +32,7 @@ import { addTurnCost, recordTurnCost } from './store/cost.js'
 import { hadRunningSubtask } from './subtask-cache.js'
 import { publishFolded, publishSubtasks } from './subtask-prs.js'
 import { publish } from './task-events.js'
+import { followSentThreads } from './threads/follow.js'
 import { forgetToolCalls, trackToolCalls } from './tool-calls.js'
 import { turnAsks } from './turn-asking.js'
 import { auditRefusal, turnAnswers } from './turn-asks.js'
@@ -89,6 +90,7 @@ async function record(taskId: string, body: MessageBody, events: readonly Runtim
     await tasks.addOutward(taskId, outward.length)
   }
   await linkCreatedPrs(taskId, events, openQuerySince(taskId))
+  await followSentThreads(taskId, events)
 }
 
 /** Stores a message of the session, unless Seti does not keep it, and notes a session's start. */

@@ -37,6 +37,8 @@ import { channelSources } from '../channels/source-info.js'
 import { subscriptions } from '../channels/subscriptions.js'
 import { fromEa, notEa, refuseEa } from '../ea-guard.js'
 import { ok, valid, validJson } from '../http.js'
+import { threadFollows } from '../store/threads.js'
+import { requireTask } from '../tasks.js'
 import { pollerRoutes } from './pollers.js'
 import { reminderRoutes } from './reminders.js'
 
@@ -120,10 +122,10 @@ export const channelRoutes = new Hono()
     return ok(c, await unsubscribeChannel(id, sub))
   })
 
-/** Mounted beside taskRoutes under /api/tasks: the channels a task subscribes to. */
-export const taskChannelRoutes = new Hono().get('/:id/channels', async (c) =>
-  ok(c, await subscriptions.forTask(c.req.param('id'))),
-)
+/** Mounted beside taskRoutes under /api/tasks: a task's channels and the threads it posted in. */
+export const taskChannelRoutes = new Hono()
+  .get('/:id/channels', async (c) => ok(c, await subscriptions.forTask(c.req.param('id'))))
+  .get('/:id/threads', async (c) => ok(c, await threadFollows.forTask((await requireTask(c.req.param('id'))).id)))
 
 /** Mounted under /api/ea: the channels whose events reach the EA's inbox. */
 export const eaChannelRoutes = new Hono().get('/channels', async (c) => ok(c, await subscriptions.forEa()))

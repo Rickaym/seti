@@ -88,6 +88,7 @@ import {
   TEAM_DIRECT,
   TEAM_MESSAGE_SELF_HEADERS,
 } from './schema-team.js'
+import { THREAD_FOLLOWS } from './schema-threads.js'
 import { DROP_ESLINTCACHE_DEFAULT, WARM_CACHES } from './schema-warm-caches.js'
 import {
   CHANNEL_SECRET_PENDING,
@@ -236,4 +237,5 @@ export const MIGRATIONS: readonly Migration[] = [
   { version: 127, name: 'task_approval_ceiling', sql: TASK_APPROVAL_CEILING },
   { version: 128, name: 'codex_rules_decide_default', sql: CODEX_RULES_DECIDE_DEFAULT },
   { version: 129, name: 'task_second_opinion', sql: TASK_SECOND_OPINION },
+  { version: 130, name: 'thread_follows', sql: THREAD_FOLLOWS },
 ]
