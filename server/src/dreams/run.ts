@@ -225,7 +225,8 @@ async function dreamSession(job: DreamJob, tally: Tally, night: string): Promise
 
 /**
  * Runs one dream to its end: writes the day's digest, runs the session in the agent's maintenance
- * sandbox, records each memory file it changed as a revision, and stores and audits the outcome.
+ * sandbox, records each memory file it changed as a revision, and stores the outcome with its
+ * audit event in one transaction, so a dream is never seen ended without it.
  */
 export async function runDream(job: DreamJob): Promise<DreamRun | undefined> {
   const tally = new Tally()
@@ -251,21 +252,25 @@ export async function runDream(job: DreamJob): Promise<DreamRun | undefined> {
     report,
   }
   fs.writeFileSync(path.join(night, 'report.md'), reportMarkdown(job.task.title, job.run.night, end), { mode: 0o600 })
-  const ended = await dreamRuns.end(job.run.id, end)
-  await audit.record({
-    actor: 'system',
-    kind: 'dream.ended',
-    subject_type: 'task',
-    subject_id: job.task.id,
-    summary: `A dream of ${job.task.title} ended: ${end.state}, ${String(end.memory_changes)} memory files changed`,
-    detail: {
-      run: job.run.id,
-      state: end.state,
-      steps: end.steps,
-      cost_usd: end.cost_usd,
-      denials: end.denials,
-      memory_changes: end.memory_changes,
-    },
-  })
-  return ended
+  return audit.recordWith(
+    async (tx) => dreamRuns.end(job.run.id, end, tx),
+    (ended) =>
+      ended === undefined
+        ? null
+        : {
+            actor: 'system',
+            kind: 'dream.ended',
+            subject_type: 'task',
+            subject_id: job.task.id,
+            summary: `A dream of ${job.task.title} ended: ${end.state}, ${String(end.memory_changes)} memory files changed`,
+            detail: {
+              run: job.run.id,
+              state: end.state,
+              steps: end.steps,
+              cost_usd: end.cost_usd,
+              denials: end.denials,
+              memory_changes: end.memory_changes,
+            },
+          },
+  )
 }

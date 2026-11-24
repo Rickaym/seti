@@ -10,6 +10,8 @@ export interface EgressPlaceholder {
   hosts: readonly string[]
   /** The key, read for every request so a replaced value applies at once; null when unreadable. */
   value: () => Promise<string | null>
+  /** Whether the user lets the proxy swap the key into request bodies on its hosts too. */
+  body: boolean
 }
 
 export type Swapped =

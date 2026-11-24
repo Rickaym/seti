@@ -12,8 +12,14 @@ const HOST = 'app.login.test'
 const target = { host: HOST, port: 443 }
 
 const entries: EgressPlaceholder[] = [
-  { name: 'site_login', placeholder: HOLDER, hosts: [HOST], value: async () => Promise.resolve(VALUE) },
-  { name: 'vendor', placeholder: OTHER, hosts: ['api.vendor.test'], value: async () => Promise.resolve(VALUE) },
+  { name: 'site_login', placeholder: HOLDER, hosts: [HOST], body: false, value: async () => Promise.resolve(VALUE) },
+  {
+    name: 'vendor',
+    placeholder: OTHER,
+    hosts: ['api.vendor.test'],
+    body: false,
+    value: async () => Promise.resolve(VALUE),
+  },
 ]
 
 const json = { 'content-type': 'application/json' }
@@ -59,7 +65,7 @@ describe('planBody', () => {
     )
     expect(result).toMatchObject({ status: 403, names: ['site_login'] })
     expect(JSON.stringify(result)).toContain('site_login')
-    expect(JSON.stringify(result)).toContain('never into a request body')
+    expect(JSON.stringify(result)).toContain('turns on Body for that connection')
     expect(JSON.stringify(result)).not.toContain(VALUE)
   })
 
@@ -83,6 +89,42 @@ describe('planBody', () => {
     body.write('{"a":')
     body.destroy()
     expect(await planned).toBeNull()
+  })
+})
+
+describe('planBody with Body on', () => {
+  const on: EgressPlaceholder[] = entries.map((entry) => ({ ...entry, body: entry.name === 'site_login' }))
+  const planOn = async (headers: Record<string, string>, ...pieces: string[]) =>
+    planBody(target, headers, chunked(...pieces), on)
+
+  it('swaps the value into the body, even with the placeholder split across chunks', async () => {
+    const body = `{"password":"${HOLDER}"}`
+    const result = await planOn(json, body.slice(0, 20), body.slice(20))
+    expect(result).toEqual({ kind: 'whole', body: Buffer.from(`{"password":"${VALUE}"}`) })
+  })
+
+  it("still refuses another connection's placeholder toward this host", async () => {
+    const result = await planOn(json, `{"a":"${HOLDER}","b":"${OTHER}"}`)
+    expect(result).toMatchObject({ status: 403, names: ['vendor'] })
+    expect(JSON.stringify(result)).not.toContain(VALUE)
+  })
+
+  it('refuses a compressed text body on its hosts, since it cannot be searched, and nowhere else', async () => {
+    const gzip = { ...json, 'content-encoding': 'gzip' }
+    expect(await planOn(gzip, 'compressed')).toMatchObject({ status: 415, names: [] })
+    expect(await planOn({ ...gzip, 'content-type': 'application/octet-stream' }, 'x')).toEqual({ kind: 'stream' })
+    expect(await plan(gzip, 'compressed')).toEqual({ kind: 'stream' })
+  })
+
+  it('refuses a body over the limit that carries the placeholder instead of passing it through', async () => {
+    const result = await planOn({ 'content-type': 'text/plain' }, HOLDER, 'a'.repeat(BODY_LIMIT))
+    expect(result).toMatchObject({ status: 413, names: ['site_login'] })
+  })
+
+  it('answers 502 without a value and records no blocked connection', async () => {
+    const empty = on.map((entry) => ({ ...entry, value: async () => Promise.resolve(null) }))
+    const result = await planBody(target, json, chunked(`{"p":"${HOLDER}"}`), empty)
+    expect(result).toMatchObject({ status: 502, names: [] })
   })
 })
 
