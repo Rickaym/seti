@@ -212,11 +212,11 @@ describe.skipIf(!bwrap)('Dream now', () => {
     await sandboxPolicy.save({ enabled: true, allowed_domains: [], hidden_paths: [] })
     claude.capabilities.dream = fakeDream().dream
     const { id } = await agent()
-    const seen: { state?: string; kinds?: string[] } = {}
+    const seen: { state: string | null; kinds: string[] } = { state: null, kinds: [] }
     const end = dreamRuns.end.bind(dreamRuns)
     const spy = vi.spyOn(dreamRuns, 'end').mockImplementation(async (...args) => {
       const row = await end(...args)
-      seen.state = (await dreamRuns.get(args[0]))?.state
+      seen.state = (await dreamRuns.get(args[0]))?.state ?? null
       seen.kinds = await dreamKinds(id)
       return row
     })
