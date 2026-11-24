@@ -203,7 +203,7 @@ function CodexForm({ status }: { status: CodexStatus }) {
       <SettingRow
         label="Rules decide"
         stack
-        description="Lets your allow rules and Seti's read-only list answer a Codex agent's calls without asking you. Off: every call asks."
+        description="On by default: your allow rules and Seti's read-only list answer a Codex agent's calls, and the rest ask you. Off: every call asks."
       >
         <ToggleButton
           pressed={rulesDecide}

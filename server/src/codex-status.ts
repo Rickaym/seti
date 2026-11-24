@@ -1,6 +1,3 @@
-import { execFile } from 'node:child_process'
-import fs from 'node:fs'
-import { promisify } from 'node:util'
 import {
   DEFAULT_PROFILE_ID,
   type CodexSettings,
@@ -9,38 +6,18 @@ import {
   type StoredRuntime,
 } from '@seti/shared'
 import { audit } from './audit.js'
+import { redecideWaitingCodexCalls } from './codex-decide.js'
 import { copyState, followSettings, installCodex, type CodexInstallFailure } from './codex-install.js'
 import { codexKeyedCredentials, credentialHasKey, keyOutsideDefault } from './codex-key.js'
 import { CODEX_PIN } from './codex-pin.js'
 import { refuseAgent } from './ea-guard.js'
 import { HttpError } from './http.js'
+import { forgetVersions, programVersion } from './program-version.js'
 import { PRICES_AS_OF } from './runtimes/codex/prices.js'
 import { codexSettings } from './store/codex-settings.js'
 
-const run = promisify(execFile)
-
 /** The Codex version this Seti is built and tested against. */
 const PINNED = CODEX_PIN.version
-
-/** The last version read, by program and the file's change time, so a check runs once per file. */
-let known: { key: string; version: string | null } | null = null
-
-/** The version the program reports, or null when it is not there or does not run. */
-async function versionOf(program: string): Promise<string | null> {
-  let stat: fs.Stats
-  try {
-    stat = await fs.promises.stat(program)
-  } catch {
-    return null
-  }
-  const key = `${program}:${String(stat.mtimeMs)}:${String(stat.size)}`
-  if (known?.key !== key) {
-    const { stdout } = await run(program, ['--version'], { timeout: 10_000 }).catch(() => ({ stdout: '' }))
-    const word = stdout.trim().split(' ').at(-1) ?? ''
-    known = { key, version: word === '' ? null : word }
-  }
-  return known.version
-}
 
 /** Where the program agents start leaves Codex, before any key counts. */
 type ProgramNow =
@@ -50,7 +27,7 @@ type ProgramNow =
 
 /** The program the user named in place of Seti's copy, checked to report the pinned version. */
 async function ownProgram(program: string): Promise<ProgramNow> {
-  const version = await versionOf(program)
+  const version = await programVersion(program)
   if (version === PINNED) {
     return { state: 'runs', version, program }
   }
@@ -147,8 +124,9 @@ const changedKeys = (before: CodexSettings, after: CodexSettings) =>
 
 /**
  * Changes the Codex settings as the user, audited with what changed; turning Codex on installs
- * the pinned version in the background. The EA and agents are refused: the settings decide
- * whether agents run on another vendor's model and who answers their calls.
+ * the pinned version in the background; letting the rules decide answers the calls that wait.
+ * The EA and agents are refused: the settings decide whether agents run on another vendor's
+ * model and who answers their calls.
  */
 export async function updateCodexSettings(input: CodexSettingsInput): Promise<CodexStatus> {
   refuseAgent('change the Codex runtime settings')
@@ -167,6 +145,9 @@ export async function updateCodexSettings(input: CodexSettingsInput): Promise<Co
       detail: { runtime: 'codex', changed, enabled: after.enabled, evaluator_decides: after.evaluator_decides },
     })
     await followSettings(before, after)
+    if (!before.evaluator_decides && after.evaluator_decides) {
+      await redecideWaitingCodexCalls()
+    }
   }
   return codexStatus()
 }
@@ -178,7 +159,7 @@ export async function updateCodexSettings(input: CodexSettingsInput): Promise<Co
 export async function retryCodex(): Promise<CodexStatus> {
   refuseAgent('install the Codex runtime')
   const settings = await codexSettings.get()
-  known = null
+  forgetVersions()
   if (settings.enabled && settings.program === null) {
     void installCodex('user')
   }

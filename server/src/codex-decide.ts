@@ -2,7 +2,7 @@ import type { NodeAnswer, PolicyShadowCount, Task, ToolCall } from '@seti/shared
 import { audit } from './audit.js'
 import { tasks } from './db.js'
 import { guardCommand } from './permission-guard.js'
-import { askCodexUser, type UserAnswer } from './permission-requests.js'
+import { answerByRules, askCodexUser, type UserAnswer } from './permission-requests.js'
 import { compareOutcomes } from './policy/compare.js'
 import { decide } from './policy/evaluate.js'
 import { namedPaths } from './policy/named-paths.js'
@@ -52,6 +52,17 @@ function shownInput(call: ToolCall): Record<string, unknown> {
 }
 
 const USER_ANSWERS = 'Codex agents ask before every command, edit and tool call'
+
+/** A Codex call waiting for the user, by request id, which the rules decide once turned on. */
+interface WaitingCall {
+  taskId: string
+  call: ToolCall
+}
+
+const waitingCalls = new Map<string, WaitingCall>()
+
+/** Waiting calls the rules answered, which are not counted as the user's answers. */
+const answeredByRules = new WeakSet<WaitingCall>()
 
 /** Records what Seti's evaluator would have said beside the user's answer: counts and refs only. */
 function recordBeside(call: PolicyCall, decision: Decision, result: UserAnswer, slow: boolean): void {
@@ -107,9 +118,9 @@ async function askedUser(task: Task, call: ToolCall, signal: AbortSignal): Promi
 
 /**
  * Seti's answer to a Codex agent's call. Seti's guards and the user's deny rules refuse it at
- * once; a review or ask rule asks as it does for any agent; any other call goes to the user, with
- * Allow and Deny only, unless the user let Seti's rules decide for Codex agents and they allow
- * it. Beside each answer the user gives, the evaluator's own verdict is counted.
+ * once; a review or ask rule asks as it does for any agent; an allow runs the call while Seti's
+ * rules decide for Codex agents (the default); any other call goes to the user, with Allow and
+ * Deny only. Beside each answer the user gives, the evaluator's own verdict is counted.
  */
 export async function decideCodexCall(taskId: string, call: ToolCall, signal: AbortSignal): Promise<Verdict> {
   const task = await tasks.get(taskId)
@@ -133,8 +144,68 @@ export async function decideCodexCall(taskId: string, call: ToolCall, signal: Ab
   }
   const review = decision.verdict === 'review'
   const reason = review || decision.step === 'ask-rule' ? decision.reason : USER_ANSWERS
-  const ask = { tool: read.name, input: shownInput(call), review, reason }
-  const result = await askCodexUser(task.id, ask, [signal])
-  recordBeside(read, decision, result, slow)
-  return result.allow ? { allow: true } : { allow: false, message: result.message }
+  const waits: WaitingCall = { taskId: task.id, call }
+  const ids: string[] = []
+  const opened = (id: string) => {
+    ids.push(id)
+    waitingCalls.set(id, waits)
+  }
+  const ask = { tool: read.name, input: shownInput(call), review, reason, opened }
+  try {
+    const result = await askCodexUser(task.id, ask, [signal])
+    if (!answeredByRules.has(waits)) {
+      recordBeside(read, decision, result, slow)
+    }
+    return result.allow ? { allow: true } : { allow: false, message: result.message }
+  } finally {
+    for (const id of ids) {
+      waitingCalls.delete(id)
+    }
+  }
+}
+
+/** Records a waiting call the rules answered, without its input. */
+async function auditByRules(task: Task, call: PolicyCall, decision: Decision): Promise<void> {
+  const allow = decision.verdict === 'allow'
+  await audit.record({
+    actor: 'system',
+    kind: allow ? 'task.permission_allowed' : 'task.permission_denied',
+    subject_type: 'task',
+    subject_id: task.id,
+    summary: `${allow ? 'Allowed' : 'Refused'} a waiting call of task "${task.title}" by the rules: ${redactSecrets(decision.reason)}`,
+    detail: { title: task.title, tool: call.name, by: 'rules', step: decision.step, rule: decision.rule },
+  })
+}
+
+/** Decides one waiting call by the rules: an allow or a deny answers it, anything else waits on. */
+async function redecide(id: string, waits: WaitingCall): Promise<void> {
+  const task = await tasks.get(waits.taskId)
+  if (task === undefined) {
+    return
+  }
+  const ctx = await contextOf(task)
+  const read = await readCall(waits.call, ctx)
+  const decision = decide(read, ctx)
+  if (decision.verdict !== 'allow' && decision.verdict !== 'deny') {
+    return
+  }
+  const answer: UserAnswer =
+    decision.verdict === 'allow' ? { allow: true } : { allow: false, message: decision.reason, dropped: false }
+  const won = () => {
+    answeredByRules.add(waits)
+  }
+  if ((await answerByRules(id, answer, won)) === undefined) {
+    return
+  }
+  await auditByRules(task, read, decision)
+}
+
+/**
+ * Once the user lets the rules decide for Codex agents, decides every Codex call still waiting
+ * for them as a new call would be: allowed or refused by the rules, else it waits on.
+ */
+export async function redecideWaitingCodexCalls(): Promise<void> {
+  for (const [id, waits] of [...waitingCalls]) {
+    await redecide(id, waits)
+  }
 }

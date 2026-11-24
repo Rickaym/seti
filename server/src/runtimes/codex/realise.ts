@@ -4,6 +4,7 @@ import { MODEL_KEY_ENV } from '../../sandbox-codex.js'
 import type { SessionSpec } from '../../session-spec.js'
 import { sharedToolCommand } from '../../shared-tools.js'
 import type { StdioServer } from '../../tool-relay.js'
+import type { OneShotRequest } from '../one-shot.js'
 import type { CodexDecide } from './approvals.js'
 import type { CodexRealised } from './session.js'
 
@@ -61,8 +62,9 @@ function serverSettings(servers: Record<string, StdioServer>, shared: StdioServe
  * Terminals for `tty` commands are off, so nothing typed into a running command escapes a
  * decision; hooks, plugins, apps, goals, memories, skills, analytics and hosted web search are
  * off. Commands get no shell snapshot, which every later command would source, and the sandbox's
- * search path, which leaves out the helper folder Codex makes in its writable home. Approvals go
- * to Seti, never to a reviewer model.
+ * search path, which leaves out the helper folder Codex makes in its writable home. The model
+ * sends a summary of its reasoning, which Seti's models leave out unless asked. Approvals go to
+ * Seti, never to a reviewer model.
  */
 function overrides(provider: CodexProvider, model: string, searchPath: string | undefined): Setting[] {
   return [
@@ -86,6 +88,7 @@ function overrides(provider: CodexProvider, model: string, searchPath: string | 
     ['features.memories', false],
     ['features.shell_snapshot', false],
     ['skills.include_instructions', false],
+    ['model_reasoning_summary', 'auto'],
     ['approvals_reviewer', 'user'],
     ['analytics.enabled', false],
     ['web_search', 'disabled'],
@@ -106,18 +109,24 @@ interface Answering {
   provider?: CodexProvider
 }
 
-/** What starts one app-server: the program, where it works and what answers its asks. */
-export function realiseCodex(
-  spec: SessionSpec<'codex'>,
-  launcher: Launcher,
-  { decide, toolServers, abortController, binary, provider = OPENAI }: Answering,
-): CodexRealised {
+/** The launcher's spawn, once it is sandboxed and its environment holds the key's placeholder. */
+function sandboxedSpawn(launcher: Launcher, provider: CodexProvider) {
   if (!launcher.sandboxed || launcher.spawn === undefined) {
     throw new Error("Codex runs only in Seti's sandbox, started through its launcher")
   }
   if (launcher.env[provider.envKey] === undefined) {
     throw new Error('This Codex agent has no OpenAI key: its credential needs a connection for api.openai.com')
   }
+  return launcher.spawn
+}
+
+/** What starts one app-server: the program, where it works and what answers its asks. */
+export function realiseCodex(
+  spec: SessionSpec<'codex'>,
+  launcher: Launcher,
+  { decide, toolServers, abortController, binary, provider = OPENAI }: Answering,
+): CodexRealised {
+  const spawn = sandboxedSpawn(launcher, provider)
   const servers = serverSettings(toolServers, sharedToolCommand(spec.toolServers.shared), Object.keys(launcher.env))
   const model = spec.vendor.model ?? DEFAULT_MODEL
   const settings = [...overrides(provider, model, launcher.env.PATH), ...servers]
@@ -130,7 +139,30 @@ export function realiseCodex(
     model,
     effort: spec.vendor.effort,
     instructions: spec.instructions.append,
-    spawn: launcher.spawn,
+    spawn,
+    decide,
+    signal: abortController.signal,
+  }
+}
+
+/** What starts a one-shot's app-server: no tool server, a thread kept off disk, its one model. */
+export function realiseOneShot(
+  request: OneShotRequest,
+  launcher: Launcher,
+  { decide, abortController, binary, provider = OPENAI }: Omit<Answering, 'toolServers'>,
+): CodexRealised {
+  const spawn = sandboxedSpawn(launcher, provider)
+  return {
+    command: binary,
+    args: ['app-server', '--listen', 'stdio://', ...commandLine(overrides(provider, request.model, launcher.env.PATH))],
+    cwd: request.cwd,
+    env: { ...launcher.env },
+    resume: null,
+    ephemeral: true,
+    model: request.model,
+    effort: null,
+    instructions: request.system,
+    spawn,
     decide,
     signal: abortController.signal,
   }

@@ -1,31 +1,29 @@
 import type { AccountHealthState, AccountIdentity, AccountStatus, PlanUsage, UsageWindow } from '@seti/shared'
-import { RefreshCw } from 'lucide-react'
+import { CircleAlert, CircleCheck, CircleDashed, RefreshCw } from 'lucide-react'
 import { useState, type ReactNode } from 'react'
 import { toast } from 'sonner'
 import { errorText } from '@/api'
-import { authSource, clockTime, level, percent, planLabel, resetText, type Level } from '@/components/account/format'
+import { Hint } from '@/components/Hint'
+import { authSource, clockTime, level, percent, resetText, type Level } from '@/components/account/format'
 import { Button } from '@/components/ui/button'
 import { recheckAccount, useAccount } from '@/hooks/useAccount'
 import { navigate } from '@/lib/route'
 import { relativeTime } from '@/lib/time'
 import { cn } from '@/lib/utils'
+import { ClaudeRuntimeRows } from './ClaudeRuntimeRows'
 import { LoginsCard } from './LoginsCard'
-import { SettingsBody, SettingsCard, SettingsHeader } from './layout'
-
-const BANNER: Record<AccountHealthState, string> = {
-  ok: 'border-success/40 bg-success/10',
-  api_key: 'border-warning/60 bg-warning/15',
-  logged_out: 'border-destructive/40 bg-destructive/10 text-destructive',
-  error: 'border-destructive/40 bg-destructive/10 text-destructive',
-}
+import { SettingRow, SettingsCard } from './layout'
+import { useMovedCard } from './use-moved-card'
 
 const BAR: Record<Level, string> = { normal: 'bg-primary', warning: 'bg-warning-fill', danger: 'bg-destructive' }
 
+/** A titled part of the card, a region named by its title. */
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <SettingsCard title={title}>
-      <div className="grid gap-2 p-3">{children}</div>
-    </SettingsCard>
+    <section aria-label={title} className="grid gap-2 border-b border-border p-3 last:border-b-0">
+      <h4 className="text-sm font-medium">{title}</h4>
+      {children}
+    </section>
   )
 }
 
@@ -174,36 +172,39 @@ function ApiKeySteps() {
   )
 }
 
-function AccountDetails({ status }: { status: AccountStatus }) {
-  const { health, account } = status
+const STATE_WORDS: Record<AccountHealthState, string> = {
+  ok: 'Ready',
+  api_key: 'API key',
+  logged_out: 'Logged out',
+  error: 'Unreadable',
+}
+
+const STATE_ICONS: Record<AccountHealthState, typeof CircleCheck> = {
+  ok: CircleCheck,
+  api_key: CircleDashed,
+  logged_out: CircleAlert,
+  error: CircleAlert,
+}
+
+/** The login's state in a word, its full sentence in the tooltip. */
+function StateWord({ status }: { status: AccountStatus | undefined }) {
+  if (status === undefined) {
+    return null
+  }
+  const { state, message } = status.health
+  const Icon = STATE_ICONS[state]
   return (
-    <div className="space-y-4 text-xs">
-      <p role="status" className={cn('border px-3 py-2 text-sm', BANNER[health.state])}>
-        {health.message}
-      </p>
-      <LoginsCard logins={status.logins} />
-      {account && (
-        <Section title="Current login">
-          <Identity account={account} />
-        </Section>
-      )}
-      <Usage status={status} />
-      <TaskFailure
-        status={status}
-        onOpenTask={(id) => {
-          navigate('agents', id)
-        }}
-      />
-      {(health.state === 'logged_out' || health.state === 'error') && <LoginSteps />}
-      {health.state === 'api_key' && <ApiKeySteps />}
-    </div>
+    <Hint text={message}>
+      <span role="status" className="flex items-center gap-1 text-muted-foreground">
+        <Icon className="size-3.5" />
+        {STATE_WORDS[state]}
+      </span>
+    </Hint>
   )
 }
 
-export function AccountPage() {
-  const { data, error } = useAccount()
+function LoginRow({ status }: { status: AccountStatus }) {
   const [checking, setChecking] = useState(false)
-
   const recheck = async () => {
     setChecking(true)
     try {
@@ -214,35 +215,53 @@ export function AccountPage() {
       setChecking(false)
     }
   }
-
   return (
-    <SettingsBody
-      narrow
-      header={
-        <SettingsHeader
-          title="Account"
-          description={
-            (data?.account?.subscription_type ?? null) === null
-              ? 'The Claude login every agent runs on.'
-              : `The Claude login every agent runs on: ${planLabel(data?.account ?? null)}.`
-          }
-          actions={
-            <>
-              {data && <span className="text-xs text-muted-foreground">Checked {clockTime(data.fetched_at)}</span>}
-              <Button size="sm" variant="outline" onClick={() => void recheck()} disabled={checking}>
-                <RefreshCw className={cn(checking && 'animate-spin')} />
-                {checking ? 'Checking...' : 'Recheck'}
-              </Button>
-            </>
-          }
-        />
-      }
-    >
-      {data ? (
-        <AccountDetails status={data} />
-      ) : (
-        <p className="text-sm text-muted-foreground">{error ?? 'Checking the Claude login...'}</p>
+    <SettingRow label="Login" stack description={status.health.message}>
+      <span className="text-muted-foreground">Checked {clockTime(status.fetched_at)}</span>
+      <Button size="sm" variant="outline" onClick={() => void recheck()} disabled={checking}>
+        <RefreshCw className={cn(checking && 'animate-spin')} />
+        {checking ? 'Checking...' : 'Recheck'}
+      </Button>
+    </SettingRow>
+  )
+}
+
+function ClaudeDetails({ status }: { status: AccountStatus }) {
+  const { health, account } = status
+  return (
+    <>
+      <LoginRow status={status} />
+      <Usage status={status} />
+      <LoginsCard logins={status.logins} />
+      {account && (
+        <Section title="Current login">
+          <Identity account={account} />
+        </Section>
       )}
-    </SettingsBody>
+      <ClaudeRuntimeRows />
+      <TaskFailure
+        status={status}
+        onOpenTask={(id) => {
+          navigate('agents', id)
+        }}
+      />
+      {(health.state === 'logged_out' || health.state === 'error') && <LoginSteps />}
+      {health.state === 'api_key' && <ApiKeySteps />}
+    </>
+  )
+}
+
+/** Claude Code: the login every agent runs on, the saved logins, and the plan's usage. */
+export function ClaudeCard() {
+  const { data, error } = useAccount()
+  useMovedCard(data !== undefined)
+  return (
+    <SettingsCard id="claude" title="Claude Code" actions={<StateWord status={data} />}>
+      {data ? (
+        <ClaudeDetails status={data} />
+      ) : (
+        <p className="px-3 py-3 text-muted-foreground">{error ?? 'Checking the Claude login...'}</p>
+      )}
+    </SettingsCard>
   )
 }

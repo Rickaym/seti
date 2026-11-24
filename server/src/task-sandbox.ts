@@ -26,6 +26,7 @@ import {
   SANDBOX_RUN,
   SANDBOX_SSH_AGENT,
   sandboxMounts,
+  type Maintenance,
   type SandboxLayout,
 } from './sandbox-mounts.js'
 import { prepareSandboxSsh } from './sandbox-ssh-files.js'
@@ -236,7 +237,7 @@ export interface SandboxRequest {
    * these, its own home and /tmp, and egress to the model provider only, with no credential but
    * the agent's Claude login.
    */
-  maintenance?: { writable: readonly string[] }
+  maintenance?: Maintenance
 }
 
 /** The task's ssh files and agent for its usable hosts; none, and no agent, without any. */
@@ -283,11 +284,48 @@ async function grantedReach(task: Task, request: SandboxRequest, at: { dir: stri
   return { ssh, options }
 }
 
-/** A maintenance session's reach: the model provider through its own proxy, and nothing else. */
+/**
+ * A maintenance session's reach: the model provider through its own proxy, and nothing else. A
+ * Codex plan's provider is OpenAI, reached with the connection that carries the agent's key.
+ */
 async function modelReach(task: Task, request: SandboxRequest): Promise<Reach> {
-  const { login } = request.plan.grant
-  await modelProxyHere(task.id, login, async () => openModelProxy(task.id, login))
-  return { ssh: null, options: { github: false, connectors: false, memory: request.memory ?? null } }
+  const { grant, codex } = request.plan
+  const key = codex === undefined ? null : (grant.connections.find((each) => each.env === codex.modelKey) ?? null)
+  const reach = { login: grant.login, key }
+  await modelProxyHere(task.id, reach, async () => openModelProxy(task.id, reach))
+  const own = { github: false, connectors: false, memory: request.memory ?? null }
+  if (codex === undefined) {
+    return { ssh: null, options: own }
+  }
+  return { ssh: null, options: { ...own, codex, connections: connectionEnv(key === null ? [] : [key]) } }
+}
+
+/** Where a bare maintenance session of the agent works: an empty folder of its own. */
+export const bareWorkDir = (taskId: string) => path.join(maintenanceDirOf(taskId), 'work')
+
+/** The folders a sandbox works in: the agent's, or for a bare session only its empty folder. */
+function workOf(task: Task, maintenance: Maintenance | undefined) {
+  if (maintenance?.bare === true) {
+    return { cwd: bareWorkDir(task.id), dirs: [], homeAccess: false, workspace: null }
+  }
+  return { cwd: task.cwd, dirs: extraDirs(task), homeAccess: task.home_access, workspace: workspaceDir(task.id) }
+}
+
+/** Checks the work folders can be mounted and makes the ones Seti owns. */
+function prepareWork(layout: SandboxLayout): void {
+  if (layout.maintenance?.bare === true) {
+    fs.mkdirSync(layout.cwd, { recursive: true, mode: 0o700 })
+    return
+  }
+  for (const workDir of [layout.cwd, ...layout.dirs]) {
+    const problem = mountProblem(workDir, layout)
+    if (problem !== null) {
+      throw new Error(`The sandbox cannot run this agent: ${problem}. Start it without the sandbox instead.`)
+    }
+  }
+  if (layout.workspace !== undefined && layout.workspace !== null) {
+    fs.mkdirSync(layout.workspace, { recursive: true, mode: 0o700 })
+  }
 }
 
 /** Claude Code's configuration in the agent's private home, filtered to what the agent may use. */
@@ -337,11 +375,8 @@ export async function taskSandbox(task: Task, request: SandboxRequest): Promise<
     worktreeRoot: WORKTREE_ROOT,
     claudeHome: CLAUDE_HOME,
     taskDir: dir,
-    cwd: task.cwd,
-    dirs: extraDirs(task),
-    homeAccess: task.home_access,
+    ...workOf(task, maintenance),
     ownRoot: SCRATCH_ROOT,
-    workspace: workspaceDir(task.id),
     readOnly: plan.readOnly,
     caDir: '',
     systemBundle: null,
@@ -352,18 +387,12 @@ export async function taskSandbox(task: Task, request: SandboxRequest): Promise<
     ...(maintenance === undefined ? {} : { maintenance }),
     ...(plan.codex === undefined ? {} : { codex: true }),
   }
-  for (const workDir of [layout.cwd, ...layout.dirs]) {
-    const problem = mountProblem(workDir, layout)
-    if (problem !== null) {
-      throw new Error(`The sandbox cannot run this agent: ${problem}. Start it without the sandbox instead.`)
-    }
-  }
+  prepareWork(layout)
   prepareDirs(dir)
-  fs.mkdirSync(workspaceDir(task.id), { recursive: true, mode: 0o700 })
-  if (plan.codex === undefined) {
-    prepareClaude(task, plan, layout)
-  } else {
+  if (plan.codex !== undefined) {
     prepareCodex(dir)
+  } else if (maintenance?.bare !== true) {
+    prepareClaude(task, plan, layout)
   }
   const reach =
     maintenance === undefined
@@ -376,7 +405,7 @@ export async function taskSandbox(task: Task, request: SandboxRequest): Promise<
     const extra = path.isAbsolute(program) ? [program] : []
     const mounts = sandboxMounts({ ...ready, readOnly: [...ready.readOnly, ...extra] })
     const init = ['--', '/bin/sh', '-c', initScript(setpriv, socat), 'seti', program]
-    const argv = [...bwrapArgs(mounts, task.cwd, options.interactive === true), ...init, ...args]
+    const argv = [...bwrapArgs(mounts, layout.cwd, options.interactive === true), ...init, ...args]
     const scope = options.scope ?? null
     const base = options.env ?? env
     if (scope === null) {

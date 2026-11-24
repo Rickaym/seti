@@ -16,6 +16,7 @@ import { SETI_TOOLS } from './catalog.js'
 import { KNOWLEDGE_TOOLS } from './knowledge.js'
 import { EVERY_AGENT, ON_ONE_AGENT, READS_SETI, toolsFor } from './levels.js'
 import { REQUEST_TOOLS } from './requests.js'
+import { OPINION_TOOLS } from './second-opinion.js'
 import { callSetiTool, sessionTools } from './server.js'
 
 createApp()
@@ -63,7 +64,8 @@ describe('the Self level', () => {
       expect.arrayContaining([...EVERY_AGENT.map((e) => e.name), ...Object.keys(ON_ONE_AGENT), ...READS_SETI]),
     )
     const own = Object.keys(ON_ONE_AGENT).length + READS_SETI.length
-    expect(names).toHaveLength(EVERY_AGENT.length + REQUEST_TOOLS.length + KNOWLEDGE_TOOLS.length + own)
+    const asks = REQUEST_TOOLS.length + OPINION_TOOLS.length
+    expect(names).toHaveLength(EVERY_AGENT.length + asks + KNOWLEDGE_TOOLS.length + own)
     expect(names).toContain('request_change')
     expect(names).toContain('propose_knowledge')
     for (const name of ['start_task', 'post_team_chat', 'list_tasks', 'stop_task', 'create_channel', 'add_repo']) {

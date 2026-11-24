@@ -108,7 +108,7 @@ test('account usage dims the weekly fill behind the 5-hour one, past it when the
   await expect(hint(page)).toContainText(/Checked \d\d:\d\d [AP]M\. Click for details\.$/)
 
   await item.click()
-  await expect(page).toHaveURL(/#settings\/account$/)
+  await expect(page).toHaveURL(/#settings\/runtimes$/)
   const details = page.getByRole('main')
   await expect(details.getByRole('meter', { name: '5-hour usage' })).toHaveAttribute('aria-valuenow', '24')
   await expect(details.getByRole('meter', { name: 'Weekly usage' })).toHaveAttribute('aria-valuenow', '61')

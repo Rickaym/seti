@@ -5,7 +5,7 @@ import { expect, test } from './support/fixtures.js'
 
 test.use({ allowedHttpStatuses: [409], failureToasts: true })
 
-const CODEX_HINT = 'Codex: sandboxed; asks before each call.'
+const CODEX_HINT = 'Codex: sandboxed; asks unless your rules allow.'
 
 const groupsOf = async (page: Page) =>
   page
@@ -84,10 +84,10 @@ test('picking a Codex model hides the sandbox toggle and starts the agent on Cod
     await expect(effort).toHaveCount(0)
     await expect(main.getByText(CODEX_HINT)).toHaveCount(0)
 
-    await request.put('/api/runtimes/codex', { data: { evaluator_decides: true } })
+    await request.put('/api/runtimes/codex', { data: { evaluator_decides: false } })
     await startPage(page)
     await model.selectOption({ label: 'gpt-5.5' })
-    await expect(main.getByText('Codex: sandboxed; asks unless rules allow.')).toBeVisible()
+    await expect(main.getByText('Codex: sandboxed; asks before each call.')).toBeVisible()
   } finally {
     await codexOff(request)
   }

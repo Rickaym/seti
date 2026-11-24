@@ -312,7 +312,7 @@ const SETTINGS = [
   'resources',
   'channels',
   'about',
-  'account',
+  'runtimes',
   'mcp',
   'plugins',
   'skills',
