@@ -1023,7 +1023,9 @@ Optional and off by default: a maintenance session per agent that consolidates i
 - DRM-16: Dream now runs one dream of an agent at once, by the user, the EA after the user's yes,
   or an agent at `full` on another agent; it is refused on the agent itself. The EA, an agent or
   a mod starts at most one dream of an agent a day; only the user starts more. Dream now waits for
-  no window but keeps the night budget. The start is audited with who asked for it.
+  no window but keeps the night budget. The start is audited with who asked for it. A dream of an
+  agent whose transcript has nothing new since its last finished dream runs no session: it ends
+  at once, at no cost, with a one-line report that there was nothing to tidy.
 
 ## 16. Audit
 

@@ -102,7 +102,7 @@ async function lastDream(job: DreamJob): Promise<string | null> {
   return done?.ended_at ?? null
 }
 
-async function writeDigest(job: DreamJob, since: string | null): Promise<string> {
+async function writeDigest(job: DreamJob, since: string | null): Promise<{ file: string; empty: boolean }> {
   const { rows, truncated } = await dayRows(job.task.id, since)
   const text = composeDigest({
     title: job.task.title,
@@ -114,7 +114,17 @@ async function writeDigest(job: DreamJob, since: string | null): Promise<string>
   })
   const file = path.join(nightDir(job), 'digest.md')
   fs.writeFileSync(file, text, { mode: 0o600 })
-  return file
+  return { file, empty: rows.length === 0 }
+}
+
+/** The report of a dream that found nothing new since the last one, which runs no session. */
+const NOTHING_NEW: DreamReport = {
+  summary: 'Nothing new since the last dream, so nothing to tidy.',
+  tidied: [],
+  remembered: [],
+  asks: [],
+  found: [],
+  nothing_to_do: true,
 }
 
 /** Follows the session to its end, stopping it at the time limit or when the agent starts a turn. */
@@ -166,12 +176,16 @@ function placesOf(job: DreamJob, night: string): DreamPlaces {
 }
 
 async function dreamSession(job: DreamJob, tally: Tally, night: string): Promise<void> {
+  const since = await lastDream(job)
+  const { file: digest, empty } = await writeDigest(job, since)
+  if (empty && since !== null) {
+    tally.reported(NOTHING_NEW)
+    return
+  }
   const launcher = await maintenanceLauncher(job.task, { writable: [night] }, await launchPlan(job.task))
   if (launcher === null) {
     throw new Error('The agent runs without the sandbox, so a dream could not be contained.')
   }
-  const since = await lastDream(job)
-  const digest = await writeDigest(job, since)
   const places = placesOf(job, night)
   const gate = (call: Parameters<typeof dreamGate>[0]) => {
     const refusal = dreamGate(call, places, job.memory)
