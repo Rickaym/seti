@@ -2,7 +2,7 @@ import type { DigestLine, MessageBody, MessageRow, TaskDigest } from '@seti/shar
 import { beforeAll, describe, expect, it } from 'vitest'
 import { createApp } from './app.js'
 import { messages, tasks } from './db.js'
-import { buildDigest } from './digest.js'
+import { buildDigest, toolLabel } from './digest.js'
 import { USER_AUTH } from './test-auth.js'
 
 const SESSION = '5f0c3a52-9d7e-4d3a-8f5e-2b8f3c1e7a10'
@@ -233,5 +233,15 @@ describe('GET /api/tasks/:id/digest', () => {
     expect((await get('/digest-task/digest?limit=201')).status).toBe(400)
     expect((await get('/digest-task/digest?limit=0')).status).toBe(400)
     expect((await get('/missing/digest')).status).toBe(404)
+  })
+})
+
+describe('toolLabel', () => {
+  it('names the file of an edit given as patches, as it does an edit with a file path', () => {
+    const changes = [{ path: '/w/a.ts', op: 'update' as const, diff: '@@' }]
+    expect(toolLabel({ callId: 'p', kind: 'edit', name: 'Edit', input: { changes: [] }, edit: { changes } })).toBe(
+      'Edit /w/a.ts',
+    )
+    expect(toolLabel({ callId: 'e', kind: 'edit', name: 'Edit', input: { file_path: '/w/b.ts' } })).toBe('Edit /w/b.ts')
   })
 })

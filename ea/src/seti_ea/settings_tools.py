@@ -552,14 +552,31 @@ SETTINGS_SPECS: list[ToolSpec] = [
     ),
     ToolSpec(
         "get_security_settings",
-        "Read the sandbox setting, its network allowlist and hidden paths, and whether agents have a "
-        "GitHub token. Only the user changes these.",
+        "Read the sandbox setting, its network allowlist and hidden paths, whether agents have a "
+        "GitHub token, and whether Codex agents can start: off, installing, failed with why, no "
+        "OpenAI key, or ready. Only the user changes these.",
     ),
 ]
 
 SETTINGS_WRITES = frozenset(spec.name for spec in SETTINGS_SPECS if "confirmed" in spec.properties)
 
 Handler = Callable[[Mapping[str, Any]], Awaitable[ToolResult]]
+
+
+def codex_words(codex: Mapping[str, Any]) -> str:
+    """Where Codex stands, as one sentence and a space, from the runtimes route; empty if unknown."""
+    state = codex.get("state")
+    failure = field_dict(codex, "failure")
+    words = {
+        "off": "Codex is off, so agents run on Claude Code only.",
+        "installing": f"Codex {codex.get('pinned', '')} is installing.",
+        "failed": f"Codex cannot start: {failure.get('message', 'its install failed')}; the user "
+        "retries in Settings, Runtimes.",
+        "no_key": "Codex is on, but the default credential holds no OpenAI key, so new Codex agents "
+        "are refused.",
+        "ready": "Codex is ready for new agents.",
+    }
+    return f"{words[state]} " if isinstance(state, str) and state in words else ""
 
 
 def form_of_address(args: Mapping[str, Any]) -> str:
@@ -2135,9 +2152,11 @@ class SettingsTools:
             if fields.get("token_mode") == "agent"
             else "No GitHub token is set for agents."
         )
+        runtimes = await self._seti.get("/runtimes")
+        codex = codex_words(field_dict(runtimes if isinstance(runtimes, dict) else {}, "codex"))
         return ToolResult(
-            f"{sandbox}{hides} {token} These are the user's to change, in Settings under Security: Sandbox, "
-            "SSH and Credentials, and per agent in its access switches. You cannot change them or see any "
-            "secret.",
+            f"{sandbox}{hides} {token} {codex}These are the user's to change, in Settings under Security: "
+            "Sandbox, SSH and Credentials, in Settings, Runtimes, and per agent in its access switches. You "
+            "cannot change them or see any secret.",
             "Read security settings",
         )

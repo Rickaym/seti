@@ -54,7 +54,7 @@ describe("the node's host for a Codex agent", () => {
 
   it("asks the control plane for Seti's answer to each call", async () => {
     const host = await codexHost(task, new AbortController().signal)
-    const call: ToolCall = { callId: 'c1', kind: 'shell', name: 'exec_command', input: {}, shell: { action: 'run' } }
+    const call: ToolCall = { callId: 'c1', kind: 'shell', name: 'Bash', input: {}, shell: { action: 'run' } }
     expect(await host.decide(call, new AbortController().signal)).toEqual({ allow: false, message: 'Not in here.' })
     expect(decided).toEqual([call])
   })

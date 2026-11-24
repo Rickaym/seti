@@ -1,20 +1,18 @@
 import type { RuntimeEvent, ToolCall, ToolResult } from '../../events.js'
 import { isRecord } from '../../lenient.js'
 import { collabAgentToolCall, commandExecution, fileChange, mcpToolCall, webSearch, type Item } from './shapes.js'
+import { shellWord } from './shell-word.js'
 
 type Ended = Extract<RuntimeEvent, { type: 'tool.ended' }>
 type Status = Ended['status']
 
-/** Codex runs each command as `<shell> -lc '<command>'`; this is what the model asked to run. */
-const WRAPPED = /^\S*\/(?:ba|z|)sh -l?c (?:'((?:[^']|'\\'')*)'|(\S+))$/
+/** Codex runs each command as `<shell> -lc <command>`, the command quoted as one shell word. */
+const WRAPPER = /^\S*\/(?:ba|z|)sh -l?c (.+)$/s
 
 /** The command inside Codex's shell wrapper, or the whole text when it has none. */
 export function unwrapShell(command: string): string {
-  const match = WRAPPED.exec(command)
-  if (match === null) {
-    return command
-  }
-  return match[1] === undefined ? (match[2] ?? command) : match[1].replaceAll(`'\\''`, `'`)
+  const quoted = WRAPPER.exec(command)?.[1]
+  return quoted === undefined ? command : (shellWord(quoted) ?? command)
 }
 
 const OPS = { add: 'create', delete: 'delete', update: 'update' } as const
@@ -26,7 +24,7 @@ const shell: Reader = (raw) => {
   const command = unwrapShell(item.command)
   return {
     kind: 'shell',
-    name: 'exec_command',
+    name: 'Bash',
     input: { command, ...(item.cwd === null || item.cwd === undefined ? {} : { cwd: item.cwd }) },
     shell: { action: 'run', command },
   }
@@ -39,7 +37,8 @@ const edit: Reader = (raw) => {
       ? { path, op: 'move' as const, diff, to: kind.move_path }
       : { path, op: OPS[kind.type], diff },
   )
-  return { kind: 'edit', name: 'apply_patch', input: { changes: item.changes }, edit: { changes } }
+  const name = changes.every((change) => change.op === 'create') ? 'Write' : 'Edit'
+  return { kind: 'edit', name, input: { changes: item.changes }, edit: { changes } }
 }
 
 const mcp: Reader = (raw) => {
@@ -74,7 +73,7 @@ const collab: Reader = (raw) => {
 
 const web: Reader = (raw) => {
   const query = webSearch.parse(raw).query ?? undefined
-  return { kind: 'web', name: 'web_search', input: { query }, web: query === undefined ? {} : { query } }
+  return { kind: 'web', name: 'WebSearch', input: { query }, web: query === undefined ? {} : { query } }
 }
 
 const READERS: Partial<Record<string, Reader>> = {
