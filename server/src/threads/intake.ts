@@ -1,6 +1,7 @@
 import type { FollowedThread } from '@seti/shared'
 import { redactSecrets } from '../scrub.js'
 import type { ChannelRecord } from '../store/channels.js'
+import { slackNames } from '../store/slack-names.js'
 import { channelThreads, threadReplies } from '../store/thread-replies.js'
 import { threadSource, type InboundMessage, type ThreadSource } from './sources.js'
 
@@ -57,6 +58,10 @@ async function queue(source: ThreadSource, channel: ChannelRecord, msg: InboundM
  */
 export async function takeThreadMessage(channel: ChannelRecord, payload: unknown, at: string): Promise<ThreadMessage> {
   const source = threadSource(channel.preset)
+  const names = source?.names(payload) ?? []
+  if (names.length > 0) {
+    await slackNames.learn(names, 'webhook delivery', at)
+  }
   if (source?.isMessage(payload) !== true) {
     return NOT_A_MESSAGE
   }

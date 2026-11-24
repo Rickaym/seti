@@ -50,14 +50,16 @@ async function auditStop(follow: FollowedThread, reason: ThreadStopReason): Prom
   })
 }
 
-function threadInput(reply: PendingReply): ThreadInput {
-  const who = reply.author_name ?? reply.author
+async function threadInput(reply: PendingReply): Promise<ThreadInput> {
+  const source = threadSource(reply.service)
+  const who = (await source?.author(reply.author, reply.author_name)) ?? reply.author_name ?? reply.author
+  const where = (await source?.place(reply.channel)) ?? `${reply.service} ${reply.channel}`
   return {
     source: 'thread',
     kind: 'reply',
     subject: who,
-    title: `${who} replied in ${threadSource(reply.service)?.label ?? reply.service} ${reply.channel}`,
-    body: reply.text,
+    title: `${who} replied in ${where}`,
+    body: (await source?.readable(reply.text)) ?? reply.text,
     url: reply.url,
     service: reply.service,
     channel: reply.channel,
@@ -82,7 +84,7 @@ async function outcomeOf(reply: PendingReply, at: string): Promise<string> {
   if ((await threadReplies.sentSince(reply.follow_id, before(at, HOUR_MS))) >= THREAD_RATE) {
     return 'rate'
   }
-  const { outcome } = await deliverInputs(reply.task_id, [threadInput(reply)])
+  const { outcome } = await deliverInputs(reply.task_id, [await threadInput(reply)])
   if (outcome === 'skipped') {
     const stopped = await threadReplies.stop(reply.follow_id, 'archived', at)
     if (stopped !== undefined) {

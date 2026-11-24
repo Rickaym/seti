@@ -701,6 +701,11 @@ interrupted only for that.
   `warning`.
 - CHN-29: Each delivery is logged with its status, HTTP status, reason, a redacted excerpt and
   each subscription's outcome. Failed routes retry with doubling backoff (`route_retry`).
+- CHN-33: Seti learns Slack channel and person names only from what passes through it: markup and
+  profiles in verified Slack deliveries, and the results of agents' Slack MCP calls. A different
+  name for an id replaces the old one. Where Seti shows a Slack id (a Slack event's title and text,
+  a thread reply, a Slack send's request summary, transcript row and audit summary) it shows the
+  name it knows, else the id and "name not known"; it never guesses. Audit details keep the ids.
 - THR-1: A Slack message an agent sends, with an MCP `send_message` tool or `chat.postMessage`, is
   recorded when its successful result names the channel and ts (a Slack message link, or the Web
   API answer). Its thread is the link's or the call's `thread_ts`, else the message itself, and

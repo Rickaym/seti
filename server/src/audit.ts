@@ -1,5 +1,7 @@
 import {
   modActor,
+  slackPlace,
+  slackSendTarget,
   type AuditActor,
   type AuditDetail,
   type AuditEvent,
@@ -7,6 +9,7 @@ import {
   type AuditSubjectType,
   type ModAuditKind,
   type RuntimeEvent,
+  type ToolCall,
 } from '@seti/shared'
 import { anonymousRequest, currentRequestSource } from './access.js'
 import type { SendOutcome } from './agent-session.js'
@@ -15,6 +18,7 @@ import { now, tasks } from './db.js'
 import { outwardRecord } from './outward-detail.js'
 import { scrubDetail, scrubSummary } from './scrub.js'
 import { auditEvents } from './store/audit.js'
+import { slackNames } from './store/slack-names.js'
 import { openCommand } from './tool-calls.js'
 
 interface AuditInput {
@@ -111,6 +115,12 @@ function startRetention(): void {
   setInterval(() => void daily(), DAY_MS).unref()
 }
 
+/** A Slack send's summary with the channel or person by name; the detail keeps the id. */
+async function withSlackName(call: ToolCall, summary: string): Promise<string> {
+  const target = slackSendTarget(call.name, call.input)
+  return target === null ? summary : summary.replace(target, slackPlace(target, await slackNames.of([target])))
+}
+
 /** Records the tool calls among a message's events that the runner flagged as outward. */
 async function outwardCalls(
   taskId: string,
@@ -131,7 +141,7 @@ async function outwardCalls(
       kind: 'agent.outward',
       subject_type: 'task',
       subject_id: taskId,
-      summary: sent.summary,
+      summary: await withSlackName(call, sent.summary),
       detail: { tool: call.name, tool_use_id: call.callId, ...(title === undefined ? {} : { title }), ...sent.detail },
       long: ['text', 'input'],
     })

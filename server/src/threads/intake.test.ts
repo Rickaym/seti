@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { sql } from '../db.js'
 import { auditEvents } from '../store/audit.js'
 import { channelStore } from '../store/channels.js'
+import { slackNames } from '../store/slack-names.js'
 import { EA_AUTH } from '../test-auth.js'
 import { DM_WINDOW_MS } from './intake.js'
 import { agentSends, api, data, deliver, message, quietTask, slackWebhook } from './slack-test-kit.js'
@@ -38,6 +39,15 @@ describe('Slack message events at the webhook', () => {
     expect((await deliver(channel, message({ channel: 'C0PROJ1234', ts: '1700000003.000100' }))).status).toBe(
       'accepted',
     )
+  })
+
+  it('show names Seti knows in place of ids in what subscribers get', async () => {
+    const channel = await slackWebhook('Mentions with names')
+    await slackNames.learn([{ id: 'U0RICKY001', kind: 'user', name: 'Ricky' }], 'test', new Date().toISOString())
+    const text = '<@U0RICKY001> can you look at <#C0DEPLOY77|deploys> and C0DEPLOY77?'
+    await deliver(channel, { event: { type: 'app_mention', text, ts: '1700000004.000100' } })
+    const [event] = await channelStore.recent(channel.id, 1)
+    expect(event?.title).toBe('@Ricky can you look at #deploys and #deploys?')
   })
 
   it('queue nothing for agents while both switches are off', async () => {

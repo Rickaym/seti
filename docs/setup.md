@@ -708,6 +708,12 @@ api.slack.com/apps, under Event Subscriptions, subscribe to `message.channels`, 
 `message.im` and `message.mpim` (as events on behalf of users when the app acts as you), and
 reinstall the app if Slack asks.
 
+Seti shows Slack channels and people by name, as `#deploys` or `Dana`, wherever it would show an
+id: Slack alerts for the EA, thread replies, the permission request for a Slack send, its row in
+the transcript and the audit log's summary. It learns names only from what passes through it,
+such as an agent's channel search or a name in a Slack message, and says "name not known" for an
+id it has not seen named yet. It holds no Slack token for this.
+
 Upgrading: Slack `message` events no longer reach a Slack webhook's subscribers, such as the EA's
 inbox, unless its filter keeps them; a filter that returns `true` brings back the old behaviour.
 

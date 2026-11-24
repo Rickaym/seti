@@ -9,6 +9,7 @@ import {
   senderSampleInput,
   webhookFilterInput,
   webhookFilterTestInput,
+  slackNamesQuery,
   webhookThreadsInput,
 } from '@seti/shared'
 import { Hono } from 'hono'
@@ -38,6 +39,7 @@ import { channelSources } from '../channels/source-info.js'
 import { subscriptions } from '../channels/subscriptions.js'
 import { fromEa, notEa, refuseEa } from '../ea-guard.js'
 import { ok, valid, validJson } from '../http.js'
+import { slackNames } from '../store/slack-names.js'
 import { threadFollows } from '../store/threads.js'
 import { requireTask } from '../tasks.js'
 import { setWebhookThreads, THREAD_SWITCHES } from '../threads/actions.js'
@@ -52,6 +54,9 @@ export const channelRoutes = new Hono()
   .get('/', async (c) => ok(c, await listChannels()))
   .get('/summary', async (c) => ok(c, await channelsSummary()))
   .get('/sources', (c) => ok(c, channelSources()))
+  .get('/slack-names', valid('query', slackNamesQuery), async (c) =>
+    ok(c, Object.fromEntries(await slackNames.of(c.req.valid('query').ids))),
+  )
   .route('/pollers', pollerRoutes)
   .route('/reminders', reminderRoutes)
   .post('/', validJson(channelCreateInput), async (c) => {

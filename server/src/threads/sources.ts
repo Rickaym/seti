@@ -1,3 +1,7 @@
+import { shownSlackName, slackPlace } from '@seti/shared'
+import { idsIn, namesIn, readableSlack } from '../slack/names.js'
+import { slackNames, type SlackName } from '../store/slack-names.js'
+
 /** A message a webhook delivered from a conversation agents may have posted in. */
 export interface InboundMessage {
   service: string
@@ -23,6 +27,13 @@ export interface ThreadSource {
   isMessage: (payload: unknown) => boolean
   /** A new message someone wrote; null for edits, deletions, joins and anything else. */
   read: (payload: unknown) => InboundMessage | null
+  /** Names the delivery shows beside ids, such as a profile's display name or channel markup. */
+  names: (payload: unknown) => SlackName[]
+  /** How a conversation and an author read, by name when Seti knows it, as in `#deploys`. */
+  place: (container: string) => Promise<string>
+  author: (id: string, given: string | null) => Promise<string>
+  /** A message's text with names in place of the ids and markup Seti knows. */
+  readable: (text: string) => Promise<string>
   /** A link to a message, in its thread when it has one; null when the workspace is unknown. */
   link: (space: string, container: string, message: string, thread: string) => string | null
 }
@@ -82,6 +93,18 @@ function readSlack(payload: unknown): InboundMessage | null {
   }
 }
 
+/** Names a Slack event shows: its author's profile and names in channel and user markup. */
+function slackNamesOf(payload: unknown): SlackName[] {
+  const event = isFields(payload) && isFields(payload.event) ? payload.event : null
+  if (event === null) {
+    return []
+  }
+  const author = text(event.user) ?? text(event.bot_id)
+  const name = authorName(event)
+  const own: SlackName[] = author === null || name === null ? [] : [{ id: author, kind: 'user', name }]
+  return [...own, ...namesIn(typeof event.text === 'string' ? event.text : '')]
+}
+
 function slackLink(space: string, container: string, message: string, thread: string): string | null {
   if (space === '') {
     return null
@@ -95,6 +118,10 @@ const SLACK: ThreadSource = {
   label: 'Slack',
   isMessage: (payload) => slackEvent(payload) !== null,
   read: readSlack,
+  names: slackNamesOf,
+  place: async (container) => `Slack ${slackPlace(container, await slackNames.of([container]))}`,
+  author: async (id, given) => given ?? shownSlackName(id, await slackNames.of([id])) ?? id,
+  readable: async (body) => readableSlack(body, await slackNames.of(idsIn(body))),
   link: slackLink,
 }
 

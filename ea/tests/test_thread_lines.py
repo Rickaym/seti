@@ -21,13 +21,14 @@ def followed(n: int, **extra: Any) -> dict[str, Any]:
 
 async def test_get_task_lists_the_threads_the_agent_follows(tools: EaTools, fake_seti: FakeSeti) -> None:
     fake_seti.task_threads[TASK_LOGOUT] = [
-        followed(1),
+        followed(1, channel_name="proj"),
         followed(2),
         followed(3, stopped_at="2026-01-02T00:00:00Z"),
     ]
     text = (await tools.call("get_task", {"task": "logout"})).text
     assert "It follows 2 threads it posted in outside Seti, for replies:" in text
-    assert "- slack C0PROJ1234 thread 1700000000.000001: 0 replies, last activity" in text
+    assert "- slack #proj, thread 1700000000.000001: 0 replies, last activity" in text
+    assert "- slack channel C0PROJ1234, name not known, thread 1700000000.000002" in text
     assert "https://acme.slack.com/archives/C0PROJ1234/p1700000000000002" in text
     assert "000003" not in text
 

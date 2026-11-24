@@ -11,6 +11,7 @@ import { ASK_TOOL, askQuestions } from './questions.js'
 import { stoppingForRestart } from './restart-state.js'
 import { adapterFor, DEFAULT_RUNTIME } from './runtimes/registry.js'
 import { redactSecrets, scrubValue } from './scrub.js'
+import { slackSendSummary } from './slack/destination.js'
 import { permissionRequests, timeoutSettings } from './store/permissions.js'
 import { setStall, refreshBlocked } from './task-blocked.js'
 import { publish } from './task-events.js'
@@ -25,13 +26,17 @@ const firstText = (input: Record<string, unknown>, keys: readonly string[]) =>
 const SUMMARY_KEYS = ['command', 'file_path', 'notebook_path', 'url', 'query', 'path', 'pattern', 'description']
 const MESSAGE_KEYS = ['text', 'message', 'body', 'content', 'subject']
 
-/** One line of what the call does, such as its command, file or URL, else its first text field. */
-function summarize(tool: string, input: Record<string, unknown>): string {
+/**
+ * One line of what the call does, such as its command, file or URL, else its first text field. A
+ * Slack send names where it goes, by name when Seti knows it, else saying the name is not known.
+ */
+async function summarize(tool: string, input: Record<string, unknown>): Promise<string> {
   if (tool === 'ExitPlanMode') {
     return 'Approve the plan and start on it'
   }
   const text = firstText(input, [...SUMMARY_KEYS, ...MESSAGE_KEYS, ...Object.keys(input)]) ?? ''
-  return clip(redactSecrets(text.replace(/\s+/g, ' ').trim()), SUMMARY_CHARS)
+  const shown = (await slackSendSummary(tool, input)) ?? text
+  return clip(redactSecrets(shown.replace(/\s+/g, ' ').trim()), SUMMARY_CHARS)
 }
 
 /** Sets the task's reason line from its pending requests and tells its views about the request. */
@@ -202,7 +207,7 @@ async function askUser(taskId: string, ask: Ask, signals: readonly AbortSignal[]
       task_id: taskId,
       tool_name: ask.tool,
       kind: ask.kind,
-      summary: summarize(ask.tool, ask.input),
+      summary: await summarize(ask.tool, ask.input),
       input: inputText(ask.input),
       reason: ask.reason,
       suggestions: ask.suggestions,

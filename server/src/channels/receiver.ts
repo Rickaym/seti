@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto'
 import type { ChannelDeliveryStatus, ChannelRoute } from '@seti/shared'
 import type { ContentfulStatusCode } from 'hono/utils/http-status'
 import { redactSecrets } from '../scrub.js'
+import { readableFields } from '../slack/readable.js'
 import { channelStore, type Accepted, type ChannelRecord } from '../store/channels.js'
 import { takeThreadMessage, type ThreadMessage } from '../threads/intake.js'
 import { applyFilter, type Filtered } from './filter-apply.js'
@@ -214,7 +215,7 @@ export function createReceiver(deps: ReceiverDeps) {
       return finish(channel, at, result, { delivery_id: deliveryId, filtered })
     }
     const since = new Date(Date.parse(at) - DEDUPE_WINDOW_MS).toISOString()
-    const draft = eventDraft(filtered.fields, `${deliveryId}@${at}`)
+    const draft = eventDraft(await readableFields(channel.preset, filtered.fields), `${deliveryId}@${at}`)
     const claim = { id: deliveryId, since }
     const { accepted, routes } = await publishEvent(channel.id, draft, { at, route: deps.route, claim })
     const eventId = accepted.kind === 'event' ? { event_id: accepted.event.id } : {}
