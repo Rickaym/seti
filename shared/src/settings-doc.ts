@@ -72,8 +72,8 @@ export function visibleKeys(section: AnySettingsSection, reader: SettingsDocRead
   return plain.length === 0 ? null : plain
 }
 
-/** A section's schema as a reader sees it. */
-function sectionFor(section: AnySettingsSection, reader: SettingsDocReader): z.ZodObject | null {
+/** A section's schema as a reader sees it, or null when none of it is theirs. */
+export function sectionFor(section: AnySettingsSection, reader: SettingsDocReader): z.ZodObject | null {
   const keys = visibleKeys(section, reader)
   if (keys === null) {
     return null

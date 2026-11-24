@@ -23,7 +23,7 @@ const READERS: SectionReaders<SettingsSectionPath> = { ...APP_AGENT_READERS, ...
  * Who reads the settings document: the user whole, the EA its plain configuration. Agents, mods
  * and paired devices are refused, here and not only at the route.
  */
-function settingsDocReader(): SettingsDocReader {
+export function settingsDocReader(): SettingsDocReader {
   const via = currentRequestSource()?.via
   if (via === 'ea') {
     return 'ea'
@@ -58,6 +58,13 @@ async function sectionValue(path: SettingsSectionPath, reader: SettingsDocReader
   return Object.fromEntries(keys.map((key) => [key, value[key]]))
 }
 
+/** A document from its body: the version, then a revision that changes with any value. */
+export const withRevision = (body: Record<string, unknown>): SettingsDoc => ({
+  version: SETTINGS_DOC_VERSION,
+  revision: createHash('sha256').update(JSON.stringify(body)).digest('hex'),
+  ...body,
+})
+
 /** The settings document for the caller, from the stores the settings pages read. */
 export async function settingsDoc(): Promise<SettingsDoc> {
   const reader = settingsDocReader()
@@ -71,8 +78,7 @@ export async function settingsDoc(): Promise<SettingsDoc> {
   }
   const { mods } = await listMods()
   const body = { ...groups, mods: Object.fromEntries(mods.map((mod) => [mod.id, modEntry(mod, reader)])) }
-  const revision = createHash('sha256').update(JSON.stringify(body)).digest('hex')
-  return { version: SETTINGS_DOC_VERSION, revision, ...body }
+  return withRevision(body)
 }
 
 /** The JSON Schema of the caller's document, generated from the routes' own zod schemas. */
