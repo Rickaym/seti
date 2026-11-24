@@ -1,4 +1,4 @@
-import type { Task } from '@seti/shared'
+import { pushRuleOwner, type Task } from '@seti/shared'
 import { agentGitWithin } from './git.js'
 import { gh, viewerLogin } from './github.js'
 import { outwardCalls, type Outward, type OutwardAction } from './policy/outward.js'
@@ -118,8 +118,8 @@ async function reached(call: Outward): Promise<(string | null)[]> {
 async function allowedOwners(taskId: string): Promise<Set<string>> {
   const rules = [...(await permissionRules.list(null)), ...(await permissionRules.list(taskId))]
   const owners = rules.flatMap((rule) => {
-    const named = rule.behavior === 'allow' ? /^PushTo\(([\w.-]+)\)$/.exec(rule.rule)?.[1] : undefined
-    return named === undefined ? [] : [named.toLowerCase()]
+    const named = rule.behavior === 'allow' ? pushRuleOwner(rule.rule) : null
+    return named === null ? [] : [named.toLowerCase()]
   })
   return new Set(owners)
 }
