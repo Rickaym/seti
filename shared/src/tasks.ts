@@ -17,7 +17,7 @@ import { prUrl } from './pr-url.js'
 import type { RepoRef } from './repos.js'
 import type { ClaudeMessage } from './runtimes/claude/message.js'
 import type { CodexMessage } from './runtimes/codex/project.js'
-import { ONLY_CODEX_PICKS, onlyCodexPicks, runtimeFields } from './runtimes/settings.js'
+import { checkPicks, runtimeFields } from './runtimes/picks.js'
 import { STORED_RUNTIMES, type StoredRuntime } from './runtimes/stored.js'
 import { DEFAULT_SETI_CONTROL, setiControlLevel, type SetiControlLevel } from './seti-control.js'
 import type { ShellProgress, ShellResult } from './shell.js'
@@ -139,7 +139,7 @@ export const createTaskInput = z
     /** The runtime the agent runs on, Codex only while the user turned it on, and its model. */
     ...runtimeFields,
   })
-  .refine(onlyCodexPicks, ONLY_CODEX_PICKS)
+  .superRefine(checkPicks)
 export type CreateTaskInput = z.input<typeof createTaskInput>
 export type CreateTaskRequest = z.output<typeof createTaskInput>
 /** A create request with its title settled, and how the planner set it up when it did. */

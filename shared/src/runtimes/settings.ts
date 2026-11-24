@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { STORED_RUNTIMES } from './stored.js'
+import type { RuntimeOffer } from './picks.js'
 
 /**
  * Codex as Seti runs it, which only the user changes: off until they turn it on, the program
@@ -52,22 +52,6 @@ export const codexSettingsInput = z.strictObject({
 })
 export type CodexSettingsInput = z.input<typeof codexSettingsInput>
 
-/** The runtime a new agent runs on, and the model and effort only a Codex agent picks here. */
-export const runtimeFields = {
-  runtime: z.enum(STORED_RUNTIMES).default('claude'),
-  model: codexModel.optional(),
-  effort: codexEffort.optional(),
-}
-
-/** Refuses a model or effort for an agent that is not a Codex agent. */
-export const onlyCodexPicks = (input: {
-  runtime: string
-  model?: string | undefined
-  effort?: string | undefined
-}): boolean => input.runtime === 'codex' || (input.model === undefined && input.effort === undefined)
-
-export const ONLY_CODEX_PICKS = 'Only a Codex agent picks a model and effort here'
-
 /**
  * Where Codex stands on this Seti: off, on with no program named, a program that is not there or
  * not the pinned version, a default credential without an OpenAI key, or ready to start agents.
@@ -89,7 +73,11 @@ export interface CodexStatus {
   pricesAsOf: string
 }
 
-/** Every runtime besides Claude Code, as `GET /api/runtimes` answers. */
+/**
+ * Every runtime besides Claude Code, as `GET /api/runtimes` answers, and the runtimes a new agent
+ * may start on now: Claude Code always, Codex only while it is ready.
+ */
 export interface RuntimesStatus {
   codex: CodexStatus
+  offers: RuntimeOffer[]
 }

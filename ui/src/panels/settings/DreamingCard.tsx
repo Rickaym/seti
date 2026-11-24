@@ -109,7 +109,7 @@ function DreamingForm({ initial, night }: { initial: DreamSettings; night: Dream
       <SettingRow
         label="Nightly"
         stack
-        description="Agents active since their last dream tidy their memory at night, in a sandbox, one at a time."
+        description="Lets agents active since their last dream tidy their memory at night, in a sandbox, one at a time."
       >
         <ToggleButton
           pressed={saved.enabled}
@@ -123,7 +123,7 @@ function DreamingForm({ initial, night }: { initial: DreamSettings; night: Dream
       <SettingRow
         label="Clean-ups"
         stack
-        description="Dreams may propose a leftover to remove; you allow each one, and it waits 14 days in the trash."
+        description="Lets dreams propose a leftover to remove; you allow each one, and it waits 14 days in the trash."
       >
         <ToggleButton
           pressed={saved.cleanups}
