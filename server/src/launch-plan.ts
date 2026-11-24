@@ -4,6 +4,7 @@ import { taskSsh } from './agent-access.js'
 import { profileAws, taskAws } from './aws-access.js'
 import { connectorCredential } from './claude-credential.js'
 import { codexKeyConnection } from './codex-key.js'
+import { codexProgram } from './codex-status.js'
 import { effectiveCpuCap } from './cpu-cap.js'
 import { agentTokenStamp } from './github-token.js'
 import { launcherFrom, sandboxFrom } from './launcher.js'
@@ -15,7 +16,6 @@ import { proxyGrant } from './proxy-grant.js'
 import type { RuntimeId } from './runtimes/adapter.js'
 import { sharedToolFolders, TOOL_SERVER } from './shared-tools.js'
 import { knownHostsText, publicKeys } from './ssh-files.js'
-import { codexSettings } from './store/codex-settings.js'
 import { sandboxPolicy } from './store/sandbox.js'
 import type { SshHostRow } from './store/ssh.js'
 
@@ -74,7 +74,7 @@ async function sshPlan(taskId: string): Promise<SshPlan | null> {
 
 /** The folder of the program a Codex agent runs, which its sandbox mounts read-only. */
 async function codexFolders(): Promise<string[]> {
-  const { program } = await codexSettings.get()
+  const program = await codexProgram()
   return program === null ? [] : [path.dirname(program)]
 }
 

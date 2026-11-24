@@ -58,7 +58,8 @@ export function toolLabel(call: ToolCall): string {
     const command = call.shell.command ?? ''
     return clip(command === '' ? call.name : redactSecrets(command), TOOL_CHARS)
   }
-  const target = TARGET_FIELDS.map((key) => field(call.input, key)).find((value) => value !== null)
+  const target =
+    TARGET_FIELDS.map((key) => field(call.input, key)).find((value) => value !== null) ?? call.edit?.changes[0]?.path
   return clip(target === undefined ? toolName(call.name) : `${toolName(call.name)} ${target}`, TOOL_CHARS)
 }
 

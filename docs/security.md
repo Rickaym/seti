@@ -130,6 +130,17 @@ because a mask catches only an exact copy: a host that escapes, encodes, compres
 value would pass it anyway, and masking would mean holding and rewriting every response from the
 host. Treat a host with Body on as able to show the value to the agent if it echoes its input.
 
+## What Seti downloads
+
+Seti downloads one program by itself: OpenAI's Codex, and only after you turn Codex on in
+Settings, Runtimes. It fetches the version pinned in `server/src/runtimes/codex/pin.json` from the
+npm registry (`registry.npmjs.org`), when you turn Codex on, when you press Retry, and at a start
+of Seti after an upgrade moved the pin while Codex is on. It contacts no other host, follows no
+redirect, and checks the package's sha512 integrity and the program's sha256 against the pin
+before anything runs; a mismatch deletes the download. The program lives alone in
+`~/.seti/codex/<version>/`, read and run only, mounted read-only into each Codex agent's sandbox,
+and each install, failure and removal is in the audit log with the version and checksum.
+
 ## What is not protected
 
 - systemd 255's user manager cannot decrypt credentials, so the key files are plain files the Seti

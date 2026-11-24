@@ -86,6 +86,18 @@ describe('toolSummary', () => {
     expect(toolSummary(call('Monitor', { command: 'tail -f log', description: 'Watch the log' }))).toBe('Watch the log')
   })
 
+  it('names the files of an edit given as patches', () => {
+    const patched = (...paths: string[]) => ({
+      callId: 'p',
+      kind: 'edit' as const,
+      name: 'Edit',
+      input: { changes: [] },
+      edit: { changes: paths.map((path) => ({ path, op: 'update' as const, diff: '' })) },
+    })
+    expect(toolSummary(patched('/w/a.ts'))).toBe('/w/a.ts')
+    expect(toolSummary(patched('/w/a.ts', '/w/b.ts', '/w/c.ts'))).toBe('/w/a.ts and 2 more')
+  })
+
   it("says what a todo tool call did to the agent's list", () => {
     const todos = [
       { content: 'Read', status: 'completed', activeForm: 'Reading' },

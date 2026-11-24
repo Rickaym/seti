@@ -191,11 +191,20 @@ async function startNode(env: NodeJS.ProcessEnv): Promise<Started | null> {
   return SPLIT_NODE ? start(['--import', 'tsx', 'src/node/main.ts'], env, NODE_LISTENING) : null
 }
 
+/** Makes the read-only Codex folders a failed spec left in this worker's Seti removable. */
+function writableCodex(): void {
+  const root = path.join(paths.setiHome, 'codex')
+  for (const name of fs.existsSync(root) ? fs.readdirSync(root) : []) {
+    fs.chmodSync(path.join(root, name), 0o700)
+  }
+}
+
 /** Starts Node in the server folder and resolves once it listens; `drop` names its database. */
 async function launch(args: string[], given: NodeJS.ProcessEnv, drop: 'worker' | 'demo'): Promise<WorkerServer> {
   const env = drop === 'worker' && SPLIT_NODE ? { ...given, SETI_NODE: 'split' } : given
   const cleanUp = async () => {
     await dropDatabases(drop)
+    writableCodex()
     fs.rmSync(paths.root, { recursive: true, force: true, maxRetries: REMOVE_RETRIES, retryDelay: REMOVE_RETRY_MS })
   }
   const node = drop === 'worker' ? await startNode(env) : null

@@ -38,6 +38,8 @@ export const MOD_FETCH_ROOT = path.join(SETI_HOME, 'mod-fetch')
 export const SANDBOX_ROOT = path.join(SETI_HOME, 'sandbox')
 /** Plugin folders of the shared tools the user allowed, one per published version. */
 export const SHARED_TOOLS_ROOT = path.join(SETI_HOME, 'shared-tools')
+/** Seti's own copies of the Codex program, one read-only folder per pinned version. */
+export const CODEX_ROOT = path.join(SETI_HOME, 'codex')
 /** `split` runs sessions in a separate node process; anything else runs them in this one. */
 export const NODE_SPLIT = process.env.SETI_NODE === 'split'
 /** The unix socket the node listens on, in a folder only this user may enter. */
@@ -104,6 +106,9 @@ export const TERMINAL_SHELL = DEV_MODE ? env('SETI_TERMINAL_SHELL', '') : ''
 
 /** A module whose `query` replaces the Agent SDK's for sessions, as the e2e suite's fake does. */
 export const SDK_MODULE = DEV_MODE ? env('SETI_SDK_MODULE', '') : ''
+
+/** A pin file that replaces Codex's, so tests install from a registry on this machine. */
+export const CODEX_PIN_FILE = DEV_MODE ? env('SETI_CODEX_PIN', '') : ''
 
 export const CREDENTIALS = credentialSource(process.env, SETI_HOME, DEV_MODE)
 /** Agents and shells inherit the server's environment; they must not learn where its keys are. */
