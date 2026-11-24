@@ -25,6 +25,7 @@ import { AgentPermissions } from '@/panels/tasks/AgentPermissions'
 import { BypassToggle } from '@/panels/tasks/BypassToggle'
 import { DreamActions } from '@/panels/tasks/DreamActions'
 import { LifecycleActions } from '@/panels/tasks/LifecycleActions'
+import { NO_BYPASS, NotOnCodex } from '@/panels/tasks/NotOnCodex'
 import { NewRoleDialog, RolePicker, type RoleOwner } from '@/panels/tasks/RolePicker'
 import { SandboxToggle } from '@/panels/tasks/SandboxToggle'
 import { SessionFields } from '@/panels/tasks/SessionFields'
@@ -195,6 +196,7 @@ export const TaskSettings = memo(function TaskSettingsView({
         <Row label="Services">
           <AccessSummary
             taskId={task.id}
+            codex={task.runtime === 'codex'}
             onOpen={() => {
               setOpen(false)
               setAccessOpen(true)
@@ -210,7 +212,11 @@ export const TaskSettings = memo(function TaskSettingsView({
           </Row>
         )}
         <Row label="Bypass">
-          <BypassToggle task={task} onChanged={onChanged} />
+          {task.runtime === 'codex' ? (
+            <NotOnCodex reason={NO_BYPASS} />
+          ) : (
+            <BypassToggle task={task} onChanged={onChanged} />
+          )}
         </Row>
         <Row label="Rules">
           <AgentPermissions task={task} />

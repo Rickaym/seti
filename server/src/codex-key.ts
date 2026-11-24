@@ -1,6 +1,7 @@
 import { hostMatches, type GrantConnection, type Task } from '@seti/shared'
 import { grantConnections, taskConnections } from './connection-egress.js'
 import { connectionRows } from './store/connections.js'
+import { profiles } from './store/credentials.js'
 
 /** The host a Codex agent sends its model calls to. */
 const OPENAI_HOST = 'api.openai.com'
@@ -18,5 +19,13 @@ export async function codexKeyConnection(task: Task): Promise<GrantConnection | 
 const carriesKey = (each: Pick<GrantConnection, 'header' | 'hosts'>) =>
   each.header !== null && each.hosts.some((pattern) => hostMatches(pattern, OPENAI_HOST))
 
-/** How many of the user's connections could carry the key, for Settings; never a value. */
-export const codexKeyCount = async (): Promise<number> => (await connectionRows.list()).filter(carriesKey).length
+/** Whether an agent on this credential would hold an OpenAI key: one above with a value set. */
+export const credentialHasKey = async (profileId: string): Promise<boolean> =>
+  (await connectionRows.ofProfile(profileId)).some((row) => carriesKey(row) && Object.keys(row.slots).length > 0)
+
+/** The credentials whose agents would hold an OpenAI key, for Settings; ids, never a value. */
+export async function codexKeyedCredentials(): Promise<string[]> {
+  const ids = (await profiles.list()).map((profile) => profile.id)
+  const keyed = await Promise.all(ids.map(credentialHasKey))
+  return ids.filter((_, i) => keyed[i] === true)
+}

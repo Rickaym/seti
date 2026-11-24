@@ -494,11 +494,13 @@ Settings, Runtimes; it is off by default, and only you change it.
    against one version), for example with `node scripts/codex-binary.mjs <folder>` from a clone,
    which fetches it from the npm registry and checks its checksum.
 2. In Settings, Runtimes, turn Codex on and give the program's absolute path. The status reads
-   Ready once the program runs and reports that version.
-3. Add a connection with your OpenAI key for `api.openai.com`, with the header
-   `Authorization: Bearer {value}`, and add it to the credential your Codex agents use. The agent
-   holds a placeholder; the egress proxy puts the key on requests to OpenAI's API only.
-4. Start an agent with the Runtime choice set to Codex.
+   No key once the program runs and reports that version.
+3. In Settings, Connections, add a connection with your OpenAI key for `api.openai.com`, with the
+   header `Authorization: Bearer {{value}}`, and add it to the default credential, which new
+   agents get. The status then reads Ready. The agent holds a placeholder; the egress proxy puts
+   the key on requests to OpenAI's API only. A Codex agent on a credential without such a
+   connection is refused at start.
+4. On the start page, turn on Codex beside the message box and start the agent.
 
 A Codex agent runs only in the sandbox and asks you before every command, edit and tool call; a
 guard or deny rule still refuses at once. Settings, Runtimes can let Seti's rules answer the

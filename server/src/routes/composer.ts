@@ -1,6 +1,6 @@
 import fs from 'node:fs'
 import path from 'node:path'
-import { commandScopeQuery, shellInput, taskParams, type AuditKind, type Task } from '@seti/shared'
+import { commandScopeQuery, shellInput, taskParams, type AuditKind, type CommandCatalog, type Task } from '@seti/shared'
 import { Hono } from 'hono'
 import { compress } from 'hono/compress'
 import { audit } from '../audit.js'
@@ -15,6 +15,15 @@ import { scopeCwd } from './capabilities.js'
 
 const catalogFor = async (cwd: string, agent = false) =>
   commandCatalog(await capabilityCache.lookup(cwd, nearbyDirs(cwd)), { agent })
+
+/** A Codex agent takes no slash commands: Claude Code's and Seti's both act on Claude's session. */
+const noCommands = (cwd: string): CommandCatalog => ({
+  cwd,
+  probed_at: new Date().toISOString(),
+  fresh: true,
+  approximate: false,
+  commands: [],
+})
 
 async function auditShell(kind: Extract<AuditKind, `task.shell_${string}`>, task: Task, command: string) {
   const verb = kind === 'task.shell_run' ? 'Ran' : 'Stopped'
@@ -32,9 +41,10 @@ const validTask = valid('param', taskParams)
 
 /** Slash command lists, `!` shell runs and their cancellation, mounted under /api/tasks. */
 export const taskComposerRoutes = new Hono()
-  .get('/:id/commands', compress(), validTask, async (c) =>
-    ok(c, await catalogFor((await requireTask(c.req.valid('param').id)).cwd, true)),
-  )
+  .get('/:id/commands', compress(), validTask, async (c) => {
+    const task = await requireTask(c.req.valid('param').id)
+    return ok(c, task.runtime === 'codex' ? noCommands(task.cwd) : await catalogFor(task.cwd, true))
+  })
   .post('/:id/shell', notEa('run shell commands'), validTask, validJson(shellInput), async (c) => {
     const task = await requireTask(c.req.valid('param').id)
     const { command } = c.req.valid('json')

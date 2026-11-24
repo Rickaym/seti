@@ -225,6 +225,19 @@ async function answerable(task: Task, requestId: string, input: AnswerPermission
   return request
 }
 
+/** Refuses what a Codex agent cannot take: Always, whose rule would not answer for it, or a note. */
+function refuseOnCodex(task: Task, input: AnswerPermissionInput): void {
+  if (task.runtime !== 'codex') {
+    return
+  }
+  if (input.decision === 'always') {
+    throw new HttpError(400, "A Codex agent's request takes Allow or Deny; a rule would not answer for it")
+  }
+  if (input.decision === 'deny' && (input.message ?? '') !== '') {
+    throw new HttpError(400, 'Codex tells its agent only that you refused; it cannot pass on a note')
+  }
+}
+
 /**
  * The user's answer to a request the agent waits on; Always allow also keeps its rules, if any.
  * The answer to a request a restart cut off resumes the agent with it instead.
@@ -235,9 +248,7 @@ export async function answerPermission(
   input: AnswerPermissionInput,
 ): Promise<PermissionRequest> {
   refuseAgent('answer permission requests')
-  if (input.decision === 'always' && task.runtime === 'codex') {
-    throw new HttpError(400, "A Codex agent's request takes Allow or Deny; a rule would not answer for it")
-  }
+  refuseOnCodex(task, input)
   const request = await answerable(task, requestId, input)
   const late = isLateRequest(request.id)
   const message = input.decision === 'deny' ? (input.message ?? null) : null

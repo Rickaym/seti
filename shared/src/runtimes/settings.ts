@@ -70,9 +70,9 @@ export const ONLY_CODEX_PICKS = 'Only a Codex agent picks a model and effort her
 
 /**
  * Where Codex stands on this Seti: off, on with no program named, a program that is not there or
- * not the pinned version, or ready to start agents.
+ * not the pinned version, a default credential without an OpenAI key, or ready to start agents.
  */
-export const CODEX_STATES = ['off', 'not_set_up', 'missing', 'update_needed', 'ready'] as const
+export const CODEX_STATES = ['off', 'not_set_up', 'missing', 'update_needed', 'no_key', 'ready'] as const
 export type CodexState = (typeof CODEX_STATES)[number]
 
 /** The Codex runtime as Settings shows it; the key's state is counts, never a value. */
@@ -83,8 +83,13 @@ export interface CodexStatus {
   /** The version this Seti is built and tested against. */
   pinned: string
   settings: CodexSettings
-  /** Connections that put a header on OpenAI's API, which a Codex agent's credential carries. */
-  keys: number
+  /** Credentials holding a connection with a header on OpenAI's API, which a Codex agent needs. */
+  keyed: string[]
   /** The date of the price table a Codex agent's estimated cost comes from. */
   pricesAsOf: string
+}
+
+/** Every runtime besides Claude Code, as `GET /api/runtimes` answers. */
+export interface RuntimesStatus {
+  codex: CodexStatus
 }

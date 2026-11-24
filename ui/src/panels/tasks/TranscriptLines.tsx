@@ -120,6 +120,20 @@ function InitLine({ start }: { start: EventOf<'session.started'> }) {
 /** After the text, clear of the own-message nav; negative margins keep the line 16px tall. */
 const TURN_COPY = 'shrink-0 -my-1 pointer-coarse:-my-3.5'
 
+const kiloTokens = (tokens: number) => `${(tokens / 1000).toFixed(1)}k`
+
+/** The turn's cost; an estimate also shows the tokens it comes from. */
+function costParts(end: EventOf<'turn.ended'>): string[] {
+  if (end.costUsd === undefined) {
+    return []
+  }
+  if (end.costEstimated !== true || end.usage === undefined) {
+    return [usd(end.costUsd)]
+  }
+  const tokens = end.usage.input + end.usage.output
+  return [`${kiloTokens(tokens)} tokens`, `${usd(end.costUsd)} estimated`]
+}
+
 function ResultLine({
   end,
   interrupted,
@@ -134,7 +148,7 @@ function ResultLine({
     turnOutcome(end, interrupted),
     plural(end.steps ?? 0, 'step'),
     elapsedLabel(end.durationMs ?? 0),
-    ...(end.costUsd === undefined ? [] : [usd(end.costUsd)]),
+    ...costParts(end),
   ].join(DOT)
   return (
     <Line
@@ -146,8 +160,6 @@ function ResultLine({
     </Line>
   )
 }
-
-const kiloTokens = (tokens: number) => `${(tokens / 1000).toFixed(1)}k`
 
 function CompactLine({ compaction }: { compaction: EventOf<'compaction'> }) {
   const { trigger, before = 0, after, durationMs: took } = compaction

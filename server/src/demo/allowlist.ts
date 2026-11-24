@@ -26,6 +26,7 @@ const MIDDLEWARE = [
   'ALL /api/secrets/*',
   'ALL /api/sandbox/*',
   'ALL /api/ssh/*',
+  'ALL /api/runtimes/*',
 ]
 
 /** Reads of the demo database, its data folder and the in-process fakes; none runs a program. */
@@ -99,6 +100,7 @@ const READS = [
   '/api/resources/summary',
   '/api/revisions',
   '/api/revisions/unseen',
+  '/api/runtimes',
   '/api/sandbox',
   '/api/secrets',
   '/api/ssh',

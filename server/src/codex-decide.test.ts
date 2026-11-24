@@ -78,12 +78,13 @@ describe("Seti's answer to a Codex agent's call", () => {
     })
   })
 
-  it("hands the model the user's words when they deny", async () => {
+  it('refuses a note with a denial, which Codex cannot pass on, and denies without one', async () => {
     const decided = decideCodexCall(TASK, shell('git push'), new AbortController().signal)
     const request = await pending()
-    await answerPermission(task, request.id, { decision: 'deny', message: 'Not yet.' })
-    const verdict = await decided
-    expect(verdict.allow ? '' : verdict.message).toContain('Not yet.')
+    const note = answerPermission(task, request.id, { decision: 'deny', message: 'Not yet.' })
+    await expect(note).rejects.toThrow(/cannot pass on a note/)
+    await answerPermission(task, request.id, { decision: 'deny' })
+    expect((await decided).allow).toBe(false)
   })
 
   it("lets Seti's rules allow a call without the user once the user turned that on", async () => {

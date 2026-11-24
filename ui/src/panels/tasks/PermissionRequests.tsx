@@ -8,11 +8,12 @@ import { Check, CheckCheck, Hand, X } from 'lucide-react'
 import { useEffect, useId, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { apiGetValid, apiPost, errorText } from '@/api'
+import { Hint } from '@/components/Hint'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
 import { refreshRequests } from '@/hooks/useRequests'
-import { refreshTasks } from '@/hooks/useTasks'
+import { refreshTasks, useTasks } from '@/hooks/useTasks'
 import { toolLabel } from '@/lib/tool-label'
 import { cn } from '@/lib/utils'
 import { CallFields, EditButton, EditedNote } from '@/panels/tasks/CallFields'
@@ -55,6 +56,39 @@ function Details({ request }: { request: PermissionRequest }) {
   )
 }
 
+function DenyNote({ note, onChange }: { note: string; onChange: (note: string) => void }) {
+  const noteId = useId()
+  return (
+    <>
+      <label htmlFor={noteId} className="sr-only">
+        Note for the agent if you deny
+      </label>
+      <Input
+        id={noteId}
+        value={note}
+        maxLength={2000}
+        placeholder="Note if you deny (optional)"
+        className="h-7 text-xs"
+        onChange={(e) => {
+          onChange(e.target.value)
+        }}
+      />
+    </>
+  )
+}
+
+const CODEX_DENY = 'Codex tells its agent only that you refused; it cannot pass on a note'
+
+function DenyButton({ codex, busy, onDeny }: { codex: boolean; busy: boolean; onDeny: () => void }) {
+  const button = (
+    <Button size="sm" variant="ghost" className={ACTION} disabled={busy} onClick={onDeny}>
+      <X />
+      Deny
+    </Button>
+  )
+  return codex ? <Hint text={CODEX_DENY}>{button}</Hint> : button
+}
+
 interface CardProps {
   request: PermissionRequest
   onAnswered: () => void
@@ -67,7 +101,7 @@ export function PermissionCard({ request, onAnswered, className }: CardProps) {
   const [everyAgent, setEveryAgent] = useState(false)
   const [note, setNote] = useState('')
   const sending = useRef(false)
-  const noteId = useId()
+  const codex = useTasks().tasks.find((task) => task.id === request.task_id)?.runtime === 'codex'
   const scopeId = useId()
   const fields = useCallFields(request)
   const [editing, setEditing] = useState(request.editable && request.kind === 'review')
@@ -87,7 +121,7 @@ export function PermissionCard({ request, onAnswered, className }: CardProps) {
     const body: AnswerPermissionInput = {
       decision,
       scope: everyAgent ? 'global' : 'agent',
-      ...(decision === 'deny' && note.trim() !== '' ? { message: note.trim() } : {}),
+      ...(decision === 'deny' && !codex && note.trim() !== '' ? { message: note.trim() } : {}),
       ...(decision !== 'deny' && edited.length > 0 ? { fields: fields.changed } : {}),
     }
     try {
@@ -123,19 +157,7 @@ export function PermissionCard({ request, onAnswered, className }: CardProps) {
           {request.reason !== null && <p className="text-muted-foreground">{request.reason}</p>}
           <CallFields fields={fields} editing={editing} />
           <Details request={request} />
-          <label htmlFor={noteId} className="sr-only">
-            Note for the agent if you deny
-          </label>
-          <Input
-            id={noteId}
-            value={note}
-            maxLength={2000}
-            placeholder="Note if you deny (optional)"
-            className="h-7 text-xs"
-            onChange={(e) => {
-              setNote(e.target.value)
-            }}
-          />
+          {!codex && <DenyNote note={note} onChange={setNote} />}
           <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
             <Button size="sm" className={ACTION} disabled={busy} onClick={() => void answer('allow')}>
               <Check />
@@ -154,10 +176,7 @@ export function PermissionCard({ request, onAnswered, className }: CardProps) {
                 Always
               </Button>
             )}
-            <Button size="sm" variant="ghost" className={ACTION} disabled={busy} onClick={() => void answer('deny')}>
-              <X />
-              Deny
-            </Button>
+            <DenyButton codex={codex} busy={busy} onDeny={() => void answer('deny')} />
             <EditButton
               editable={request.editable}
               editing={editing}

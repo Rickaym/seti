@@ -4,6 +4,7 @@ import {
   Bell,
   Blocks,
   BotMessageSquare,
+  Cpu,
   FolderGit2,
   Gauge,
   Hand,
@@ -37,6 +38,7 @@ export type SettingsPageKey =
   | 'agents'
   | 'repos'
   | 'resources'
+  | 'runtimes'
   | 'storage'
   | 'channels'
   | 'account'
@@ -99,6 +101,7 @@ const CORE_GROUPS: { group: SettingsGroup; pages: (Omit<SettingsPage, 'group'> &
       },
       { key: 'repos', label: 'Repos', icon: FolderGit2, keywords: 'repositories checkouts warm caches' },
       { key: 'resources', label: 'Resources', icon: Gauge, keywords: 'memory cpu cap host usage' },
+      { key: 'runtimes', label: 'Runtimes', icon: Cpu, keywords: 'codex openai gpt claude code models' },
       {
         key: 'storage',
         label: 'Storage',

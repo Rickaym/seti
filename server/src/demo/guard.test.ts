@@ -171,6 +171,7 @@ const MIDDLEWARE_COUNTS: Record<string, number> = {
   'ALL /api/credentials/*': 1,
   'ALL /api/devices/*': 1,
   'ALL /api/permissions/*': 1,
+  'ALL /api/runtimes/*': 1,
   'ALL /api/sandbox/*': 1,
   'ALL /api/secrets/*': 1,
   'ALL /api/ssh/*': 1,
