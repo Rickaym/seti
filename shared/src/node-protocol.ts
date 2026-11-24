@@ -91,6 +91,8 @@ const grantConnection = z.object({
   header: z.object({ name: z.string(), template: z.string() }).nullable(),
   /** The value is a token Seti mints, which a refusal renews. */
   minted: z.boolean(),
+  /** The user lets the proxy swap the value into request bodies on its hosts too. */
+  body: z.boolean().default(false),
 })
 export type GrantConnection = z.infer<typeof grantConnection>
 

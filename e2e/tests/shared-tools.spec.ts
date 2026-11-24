@@ -74,7 +74,7 @@ test('an agent proposes a tool, its card shows arguments and code, and it is pub
   await expect(card).toHaveCount(0)
   expect(await sharedTool(request, name)).toMatchObject({ sha256: update.hash })
 
-  await page.goto('/#settings/plugins')
+  await page.goto('/#settings/tools')
   const main = page.getByRole('main')
   const tool = main.locator(`[data-shared-tool="${name}"]`)
   await expect(tool).toContainText(TOOL_DESCRIPTION)

@@ -29,7 +29,7 @@ test('a phone reviews a proposed tool, allows it, reads its code, turns it off a
   await expect(card).toHaveCount(0)
   expect(await sharedTool(request, name)).toMatchObject({ enabled: true })
 
-  await page.goto('/#settings/plugins')
+  await page.goto('/#settings/tools')
   const tool = page.getByRole('main').locator(`[data-shared-tool="${name}"]`)
   await expect(tool).toContainText('BILLING_KEY for api.billing.example.com')
   await tool.scrollIntoViewIfNeeded()

@@ -62,7 +62,10 @@ function diffOf(change: ListChange, scope: HostScope): [string, string] {
     case 'allow_host':
       return [hostEntry(change), `Network allowlist of ${scope === 'all' ? 'every agent' : 'this agent'}`]
     case 'api_key':
-      return [`${change.env} for ${change.hosts.join(', ')}`, "This agent's credential"]
+      return [
+        `${change.env} for ${change.hosts.join(', ')}${change.body === true ? ', in request bodies too' : ''}`,
+        "This agent's credential",
+      ]
     case 'mcp_server':
       return [change.server, 'MCP servers of this agent']
   }

@@ -153,6 +153,7 @@ const connection = documented(
     hosts: z.array(z.string()),
     header: headerDoc.nullable(),
     mint: mintDoc.nullable(),
+    body: z.boolean(),
     values: keyedBy(secretState),
   },
   {
@@ -161,6 +162,7 @@ const connection = documented(
     hosts: 'Hosts the proxy adds it on',
     header: 'The header the proxy adds, as a template; null puts it in the variable only',
     mint: 'How Seti mints a token; null for a plain key',
+    body: 'Whether the proxy also swaps the value into request bodies on its hosts',
     values: 'Whether each value is set; values never appear here',
   },
 )
