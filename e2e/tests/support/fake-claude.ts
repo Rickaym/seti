@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import { dreamQuery } from './fake-dream.js'
 import { FallbackPlayer } from './fake-fallback.js'
 import { Inbox, Outbox, type Message, type UserMessage } from './fake-inbox.js'
 import { asksForServers, loadedServers, type FakeSettings } from './fake-mcp-servers.js'
@@ -67,6 +68,8 @@ interface Options {
   resume?: string
   /** A side chat forks the session instead of resuming it. */
   forkSession?: boolean
+  /** A dream runs in dontAsk mode with its own tool server. */
+  permissionMode?: string
   tools?: string[]
   abortController?: AbortController
   env?: Record<string, string | undefined>
@@ -409,6 +412,9 @@ class FakeClaude {
 export function query({ prompt, options = {} }: { prompt: AsyncIterable<UserMessage>; options?: Options }) {
   if (options.forkSession === true) {
     return sideChatQuery(prompt, options)
+  }
+  if (options.permissionMode === 'dontAsk' && options.mcpServers?.dream !== undefined) {
+    return dreamQuery(prompt, options)
   }
   const fake = new FakeClaude(options)
   void fake.run(prompt)

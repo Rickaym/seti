@@ -9,6 +9,7 @@ import {
   type Task,
 } from '@seti/shared'
 import { tasks } from './db.js'
+import { dreamBriefLines } from './dreams/brief.js'
 import { eaTaskIds } from './ea-attention.js'
 import { needsYouTasks } from './needs-you-count.js'
 import { notifyBody } from './notifications.js'
@@ -103,7 +104,8 @@ export async function buildBrief(since: string, at: string): Promise<AttentionBr
     needing.slice(0, NEEDS_YOU_LISTED).map(async (task) => agentLine(task, await notifyBody(task, 'needs_you'))),
   )
   const { finished, updates } = await changedSince(since, new Set(needing.map((task) => task.id)), tiers)
-  const changed = [...finished, ...updates]
+  const dreams = await dreamBriefLines(since, at)
+  const changed = [...dreams, ...finished, ...updates]
   if (needing.length === 0 && changed.length === 0) {
     return null
   }
@@ -114,7 +116,10 @@ export async function buildBrief(since: string, at: string): Promise<AttentionBr
     needs_you,
     changed: changed.slice(0, CHANGED_LISTED),
     more: Math.max(0, needing.length - NEEDS_YOU_LISTED) + Math.max(0, changed.length - CHANGED_LISTED),
-    summary: briefSentence(needing.length, finished.length, updates.length),
+    summary:
+      needing.length + finished.length + updates.length === 0
+        ? `${dreams.map((line) => line.text).join('. ')}.`
+        : briefSentence(needing.length, finished.length, updates.length),
   }
 }
 

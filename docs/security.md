@@ -61,6 +61,7 @@ Report it privately through GitHub's private vulnerability reporting, never in a
 | `seti-ea.service`                | the Seti user                     | `127.0.0.1:3007`; its token only, but `/health` |
 | Agents, terminals, `!` commands  | the Seti user, in bubblewrap      | nothing; loopback to their own egress proxy     |
 | Converters, reminders, mod logic | the Seti user, in bubblewrap      | nothing                                         |
+| Dreams                           | the Seti user, in bubblewrap      | nothing; loopback to a model-only proxy         |
 | `seti-redis@<user>` (optional)   | a system unit, `--with-redis`     | a unix socket only the Seti user opens; no TCP  |
 | PostgreSQL                       | the system service                | its unix socket, peer authentication            |
 | `cloudflared.service` (optional) | the Seti user                     | nothing; outbound to Cloudflare                 |

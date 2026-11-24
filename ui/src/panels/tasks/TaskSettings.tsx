@@ -23,6 +23,7 @@ import { WIDE_BUTTON, WIDE_LABEL } from '@/lib/wide-label'
 import { AccessSummary, TaskAccessDialog } from '@/panels/access/TaskAccess'
 import { AgentPermissions } from '@/panels/tasks/AgentPermissions'
 import { BypassToggle } from '@/panels/tasks/BypassToggle'
+import { DreamActions } from '@/panels/tasks/DreamActions'
 import { LifecycleActions } from '@/panels/tasks/LifecycleActions'
 import { NewRoleDialog, RolePicker, type RoleOwner } from '@/panels/tasks/RolePicker'
 import { SandboxToggle } from '@/panels/tasks/SandboxToggle'
@@ -277,17 +278,20 @@ export const TaskSettings = memo(function TaskSettingsView({
     </Tabs>
   )
   const actions = (
-    <LifecycleActions
-      busy={busy}
-      onRestart={() => {
-        setOpen(false)
-        void restart()
-      }}
-      onArchive={() => {
-        setOpen(false)
-        void archive()
-      }}
-    />
+    <div className="grid gap-2">
+      <DreamActions taskId={task.id} open={open} />
+      <LifecycleActions
+        busy={busy}
+        onRestart={() => {
+          setOpen(false)
+          void restart()
+        }}
+        onArchive={() => {
+          setOpen(false)
+          void archive()
+        }}
+      />
+    </div>
   )
   return (
     <>

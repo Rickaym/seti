@@ -63,7 +63,7 @@ export type AgentProcess = z.infer<typeof agentProcessSchema>
 export const memoryScopeSchema = z.object({
   unit: z.string(),
   /** The agent's Claude Code, its side chat, a command the user ran in its shell, or the terminal. */
-  kind: z.enum(['agent', 'side_chat', 'shell', 'terminal']),
+  kind: z.enum(['agent', 'side_chat', 'dream', 'shell', 'terminal']),
   current_bytes: z.number().nonnegative(),
   swap_bytes: z.number().nonnegative(),
   high_bytes: z.number().nonnegative(),

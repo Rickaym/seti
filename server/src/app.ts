@@ -34,6 +34,7 @@ import { EA_URL, PERMISSION_MODE, PUBLIC_ACCESS, UI_DIST } from './config.js'
 import { connectionContext } from './connection-egress.js'
 import { cpuPrompt } from './cpu-cap.js'
 import { assetLinks } from './devices.js'
+import { dreamPreface } from './dreams/preface.js'
 import { watchDroppedPrompts } from './dropped-prompt.js'
 import { watchBlocked, watchTurnEnd } from './ea-turn-watch.js'
 import { jsonEtag } from './etag.js'
@@ -77,6 +78,7 @@ import { connectionRoutes } from './routes/connections.js'
 import { contextRoutes, eaContextPackRoutes, taskContextRoutes } from './routes/context.js'
 import { credentialRoutes, profileSummaryRoutes } from './routes/credentials.js'
 import { auditRefusedProof, deviceRoutes } from './routes/devices.js'
+import { dreamRoutes, taskDreamRoutes, workspaceDreamRoutes } from './routes/dreams.js'
 import { eaContextRoutes } from './routes/ea-context.js'
 import { eaReplyRoutes } from './routes/ea-replies.js'
 import { eaStateRoutes } from './routes/ea-state.js'
@@ -297,6 +299,8 @@ export function createApp(access: AccessGuardOptions = defaultAccess(), eaUrl: s
   app.route('/api/tasks', taskFileRoutes)
   app.route('/api/tasks', taskProcessRoutes)
   app.route('/api/tasks', taskCompactRoutes)
+  app.route('/api/tasks', taskDreamRoutes)
+  app.route('/api/dreams', dreamRoutes)
   app.route('/api/tasks', taskShareRoutes(access.access))
   app.route('/api/shares', shareRoutes(access.access))
   app.route('/api/terminals', terminalRoutes)
@@ -337,6 +341,7 @@ export function createApp(access: AccessGuardOptions = defaultAccess(), eaUrl: s
   app.route('/api/uploads', uploadRoutes)
   app.route('/api/user', userRoutes)
   app.route('/api/workspaces', workspaceRoutes)
+  app.route('/api/workspaces', workspaceDreamRoutes)
   app.route('/api/notifications', notificationRoutes)
   app.route('/api/attention', attentionRoutes)
   app.route('/api/permissions', permissionRoutes)
@@ -367,6 +372,7 @@ export function createApp(access: AccessGuardOptions = defaultAccess(), eaUrl: s
   registerTurnPreface(stoppedPreface)
   registerTurnPreface(restartPreface)
   registerTurnPreface(setiControlPreface)
+  registerTurnPreface(dreamPreface)
   onTurnEnd(watchTurnEnd)
   onTurnEnd(wakeAfterTurn)
   wakeWhenUnblocked()

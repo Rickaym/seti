@@ -84,11 +84,11 @@ export interface OomVictims {
   names: string[]
 }
 
-/** One memory event of a scope: an agent, its side chat, a `!` command or a terminal. */
+/** One memory event of a scope: an agent, its side chat or dream, a `!` command or a terminal. */
 export interface MemoryReport {
   event: MemoryEvent
   cap: MemoryCap
-  kind: 'agent' | 'side_chat' | 'shell' | 'terminal'
+  kind: 'agent' | 'side_chat' | 'dream' | 'shell' | 'terminal'
   /** Null when Seti could not tell which processes an OOM kill stopped. */
   victims: OomVictims | null
 }
@@ -104,6 +104,7 @@ function nameList(names: readonly string[]): string {
 const SCOPE_OWNERS: Record<MemoryReport['kind'], string> = {
   agent: "the agent's",
   side_chat: "the side chat's",
+  dream: "the dream's",
   shell: "the shell command's",
   terminal: "the terminal's",
 }
@@ -111,6 +112,7 @@ const SCOPE_OWNERS: Record<MemoryReport['kind'], string> = {
 const SCOPE_ROOTS: Record<MemoryReport['kind'], string> = {
   agent: 'Claude Code',
   side_chat: 'Claude Code',
+  dream: 'Claude Code',
   shell: 'The shell command',
   terminal: 'The terminal shell',
 }

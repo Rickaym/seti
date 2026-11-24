@@ -286,8 +286,15 @@ export const AUDIT_KINDS = [
   'system.device_proof_refused',
   'system.sharing_changed',
   'system.shares_revoked',
+  'dream.started',
+  'dream.ended',
   'dream.memory_changed',
   'dream.reverted',
+  'dream.settings_changed',
+  'dream.opt_changed',
+  'dream.night_planned',
+  'dream.night_ended',
+  'dream.night_missed',
 ] as const satisfies readonly `${AuditArea}.${string}`[]
 export type AuditKind = (typeof AUDIT_KINDS)[number]
 

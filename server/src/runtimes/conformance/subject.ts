@@ -24,6 +24,7 @@ function specFor<Id extends string>(runtime: Id, resume: string | null): Session
     toolServers: { shared: [], borrowed: { names: [], digest: '' }, signedIn: [], tokens: [] },
     setiControl: 'full',
     compaction: COMPACT_DEFAULTS,
+    setiDreams: false,
     // The stamp is read only by the setup key, never by an adapter.
     sandbox: {} as SessionSpec['sandbox'],
     account: null,
