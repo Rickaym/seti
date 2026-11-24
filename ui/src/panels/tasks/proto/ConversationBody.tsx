@@ -1,5 +1,5 @@
 import type { SubtaskBrief, WireRow } from '@seti/shared'
-import { CircleX, Loader } from 'lucide-react'
+import { CircleX, Inbox, Loader } from 'lucide-react'
 import { Fragment, useMemo, useState, type ReactNode } from 'react'
 import { rowCalls, rowResults } from '@/lib/transcript'
 import { cn } from '@/lib/utils'
@@ -7,7 +7,7 @@ import { PromptEntry } from '@/panels/tasks/PromptEntry'
 import { ToolKindIcon } from '@/panels/tasks/ToolCall'
 import { AgentText, Transcript } from '@/panels/tasks/Transcript'
 import { digest, type ChatItem, type WorkSpan } from '@/panels/tasks/proto/digest'
-import { chipLook, kindCounts, urgency, workFacts } from '@/panels/tasks/proto/facts'
+import { kindCounts, workFacts } from '@/panels/tasks/proto/facts'
 import { PersonMessage, SpanDetail, StandingFailure, WorkLine } from '@/panels/tasks/proto/parts'
 
 interface BodyProps {
@@ -107,7 +107,7 @@ interface Mark {
   className?: string
 }
 
-/** Failures first, then updates, then the busiest kinds of call, up to three marks in all. */
+/** Failures first, then how many updates arrived, then the busiest kinds of call; three at most. */
 function marksOf(span: WorkSpan, running: boolean): Mark[] {
   const marks: Mark[] = []
   const failed = span.failed + span.refused
@@ -119,15 +119,8 @@ function marksOf(span: WorkSpan, running: boolean): Mark[] {
       className: 'text-destructive',
     })
   }
-  const [newest] = [...span.updates].sort((a, b) => urgency(a.payload) - urgency(b.payload))
-  if (newest !== undefined) {
-    const look = chipLook(newest.payload)
-    const Icon = look.icon
-    marks.push({
-      key: 'updates',
-      icon: <Icon className={cn('size-3', look.className)} aria-hidden />,
-      count: span.updates.length,
-    })
+  if (span.updates.length > 0) {
+    marks.push({ key: 'updates', icon: <Inbox className="size-3" aria-hidden />, count: span.updates.length })
   }
   for (const count of kindCounts(span)) {
     marks.push({ key: count.kind, icon: <ToolKindIcon kind={count.kind} className="size-3" />, count: count.count })

@@ -118,6 +118,7 @@ async function grid(page: Page, design: string): Promise<void> {
   }
   await expect(page.locator('[data-grid-item]')).toHaveCount(4)
   await expect(page.getByText('Allow Bash?')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Allow', exact: true })).toBeInViewport()
 }
 
 /** Opens the hidden work of the first panel the way each design offers it. */

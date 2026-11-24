@@ -36,6 +36,7 @@ export function SpanDetail({
         running={running}
         subtasks={subtasks}
         subagentRows={false}
+        ungrouped
       />
     </div>
   )
