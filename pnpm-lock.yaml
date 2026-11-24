@@ -125,6 +125,28 @@ importers:
 
   mods/claude-theme: {}
 
+  mods/dreaming:
+    dependencies:
+      '@seti/mod-api':
+        specifier: workspace:*
+        version: link:../../packages/mod-api
+      lucide-react:
+        specifier: ^1.75.0
+        version: 1.75.0(@types/react@19.3.0)(react@19.3.1)
+      react:
+        specifier: ^19.3.1
+        version: 19.3.1
+    devDependencies:
+      '@types/react':
+        specifier: ^19.3.0
+        version: 19.3.0
+      typescript:
+        specifier: ~6.0.3
+        version: 6.0.3
+      vitest:
+        specifier: ^5.1.1
+        version: 5.1.1(@types/node@24.19.2)(jsdom@28.1.0)(vite@8.3.8(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
+
   mods/github-webhooks:
     dependencies:
       '@seti/mod-api':
@@ -406,6 +428,9 @@ importers:
       '@seti/mod-claude-theme':
         specifier: workspace:*
         version: link:../mods/claude-theme
+      '@seti/mod-dreaming':
+        specifier: workspace:*
+        version: link:../mods/dreaming
       '@seti/mod-github-webhooks':
         specifier: workspace:*
         version: link:../mods/github-webhooks
@@ -621,6 +646,9 @@ importers:
       '@seti/mod-claude-theme':
         specifier: workspace:*
         version: link:../mods/claude-theme
+      '@seti/mod-dreaming':
+        specifier: workspace:*
+        version: link:../mods/dreaming
       '@seti/mod-grid':
         specifier: workspace:*
         version: link:../mods/grid

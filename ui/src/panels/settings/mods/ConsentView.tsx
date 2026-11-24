@@ -14,6 +14,7 @@ import {
   TriangleAlert,
   Wrench,
   type LucideIcon,
+  Moon,
 } from 'lucide-react'
 import { Hint } from '@/components/Hint'
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
@@ -32,6 +33,7 @@ const ICONS: Readonly<Record<ModCapabilityName, LucideIcon>> = {
   'seti.version': Info,
   'workspaces.layout': LayoutGrid,
   'tasks.ask': MessageCircleQuestionMark,
+  'tasks.dream': Moon,
 }
 
 function ConnectionPicker({

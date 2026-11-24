@@ -882,7 +882,8 @@ Optional and off by default: a maintenance session per agent that consolidates i
 - DRM-8: Every memory file a dream changes is recorded as a revision with its text before and
   after, credentials redacted. The user, and the EA after the user's yes, MAY revert it; a revert
   of a file changed since, or of a text kept only redacted, MUST be refused (409). Every change
-  and revert is audited with the path and line counts, never the text.
+  and revert is audited with the path and line counts, never the text. The last dream's report
+  shows each changed file's diff, from that stored text, with its revert beside it.
 - DRM-9: Clean-ups are off by default and a setting. When on, a dream MAY propose a clean-up
   (`trash`, `remove_worktree`, `delete_branch`) with a reason, at most `dream_proposals` a dream.
   The control room checks it when filed and again when the user allows it, and applies it only
@@ -951,7 +952,9 @@ Optional and off by default: a maintenance session per agent that consolidates i
 - MOD-8: Capabilities, each scoped: `tasks.read`, `tasks.manage`, `chat.post`, `files.read`,
   `net.fetch` (named public hosts), `connection` (a value the control room adds and redacts),
   `storage`, `notify`, `agents.context`; bundled only `seti.version`, `workspaces.layout`,
-  `tasks.ask`. A mod's start or stop only records an ask for the user; an agent so started is
+  `tasks.ask`, `tasks.dream` (reads nights, whether Dreaming is on or has run, and waiting
+  clean-ups, and starts a dream as the mod,
+  under DRM-16; it never answers a clean-up). A mod's start or stop only records an ask for the user; an agent so started is
   sandboxed at `self` with the default credential and its first message marked as the mod's.
 - MOD-12: Third-party logic runs outside the control room's process, in a fresh engine per event
   with no network, files, environment or children (`mod_limits`), and repeated failures turn it

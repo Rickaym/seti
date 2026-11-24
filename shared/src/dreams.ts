@@ -105,11 +105,12 @@ export type DreamToggle = z.input<typeof dreamToggle>
 /** A night of Dreaming: its window, its dreams, and the agents left out by reason. */
 export interface DreamNight {
   night: string
-  zone: string
-  window_start: string
-  window_end: string
-  /** `open` while its window runs; `missed` when Seti was down for all of it. */
-  state: 'open' | 'ended' | 'missed'
+  /** The zone and window it was planned in; null on a day only Dream now ran. */
+  zone: string | null
+  window_start: string | null
+  window_end: string | null
+  /** `open` in its window; `missed` if Seti was down for all of it; `manual` for Dream now only. */
+  state: 'open' | 'ended' | 'missed' | 'manual'
   runs: DreamRun[]
   /** Agents left out when the night was planned, counted by reason. */
   skipped: Record<string, number>

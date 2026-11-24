@@ -1,13 +1,14 @@
-import { dreamDecision, dreamNowInput, dreamSettingsInput, dreamToggle, type DreamNight } from '@seti/shared'
+import { dreamDecision, dreamNowInput, dreamSettingsInput, dreamToggle } from '@seti/shared'
 import { Hono } from 'hono'
 import { z } from 'zod'
+import { dreamNight } from '../dreams/nights.js'
 import { decideProposal } from '../dreams/proposals.js'
 import { setTaskDreaming, setWorkspaceDreaming, updateDreamSettings } from '../dreams/settings.js'
 import { startDream } from '../dreams/start.js'
 import { emptyTrash, restoreFromTrash } from '../dreams/trash.js'
 import { refuseOnSelf } from '../ea-guard.js'
 import { ok, valid, validJson } from '../http.js'
-import { dreamNights, dreamOptOuts, dreamSettings, nightRuns } from '../store/dream-nights.js'
+import { dreamOptOuts, dreamSettings } from '../store/dream-nights.js'
 import { dreamProposals, trashItems } from '../store/dream-proposals.js'
 import { dreamRuns } from '../store/dreams.js'
 import { requireTask } from '../tasks.js'
@@ -17,16 +18,6 @@ const LISTED = 14
 const nightQuery = z.strictObject({ night: z.iso.date().optional() })
 const proposalQuery = z.strictObject({ task: z.string().min(1).max(64).optional() })
 const idParam = z.strictObject({ id: z.coerce.number().int().positive() })
-
-/** A night with its dreams and what they cost, the newest one when none is named. */
-async function nightOf(name: string | undefined): Promise<DreamNight | null> {
-  const night = name === undefined ? await dreamNights.latest() : await dreamNights.get(name)
-  if (night === undefined) {
-    return null
-  }
-  const runs = await nightRuns.of(night.night)
-  return { ...night, runs, cost_usd: runs.reduce((sum, run) => sum + run.cost_usd, 0) }
-}
 
 export const taskDreamRoutes = new Hono()
   .get('/:id/dreams', async (c) => ok(c, await dreamRuns.forTask((await requireTask(c.req.param('id'))).id, LISTED)))
@@ -48,7 +39,7 @@ export const workspaceDreamRoutes = new Hono().put('/:id/dreaming', validJson(dr
 })
 
 export const dreamRoutes = new Hono()
-  .get('/', valid('query', nightQuery), async (c) => ok(c, await nightOf(c.req.valid('query').night)))
+  .get('/', valid('query', nightQuery), async (c) => ok(c, await dreamNight(c.req.valid('query').night)))
   .get('/settings', async (c) => ok(c, await dreamSettings.get()))
   .put('/settings', validJson(dreamSettingsInput), async (c) => ok(c, await updateDreamSettings(c.req.valid('json'))))
   .get('/proposals', valid('query', proposalQuery), async (c) =>

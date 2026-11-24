@@ -15,6 +15,7 @@ import { cache } from '../redis.js'
 import { MOD_DATA_KEY_MAX } from '../store/mods.js'
 import { asideApi } from './aside.js'
 import { requireOp } from './capabilities.js'
+import { dreamApi } from './dreams.js'
 import { runModOp } from './ops/table.js'
 import { modCommands, modRouteEntries } from './points.js'
 import { hostProxyApi, prsApi } from './pr-api.js'
@@ -133,6 +134,7 @@ export function serverApi(target: ApiTarget): ServerModApi {
     streamRoute: (method, path, handle) =>
       target.track(modRouteEntries.register({ ...declaredRoute(manifest, method, path, true), stream: true, handle })),
     aside: asideApi(run, target.grants.includes('tasks.ask'), target.track),
+    dreams: dreamApi(run),
     transcript: transcriptApi(manifest, target.track),
     registerCommand: (id, handler) => {
       const command = manifest.contributes.commands.find((entry) => entry.id === id)

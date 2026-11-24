@@ -17,7 +17,6 @@ test('Dreaming turns on in the browser zone, keeps its window, and an agent can 
   await page.goto('/#settings/agents')
   const card = page.getByRole('region', { name: 'Dreaming' })
   await expect(card.getByRole('combobox', { name: 'Zone' })).toHaveValue('Europe/Istanbul')
-  await expect(card).toContainText('No night yet')
   await card.getByRole('button', { name: 'Dreaming' }).click()
   await expect(card.getByRole('button', { name: 'Dreaming' })).toHaveAttribute('aria-pressed', 'true')
   await card.getByLabel('Window start').fill('23:30')

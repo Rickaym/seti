@@ -1,4 +1,4 @@
-import { DREAM_SETTINGS_DEFAULTS, type DreamNight, type DreamSettings } from '@seti/shared'
+import { DREAM_SETTINGS_DEFAULTS, type DreamSettings } from '@seti/shared'
 import { now, sql, transaction } from '../db.js'
 import { toRun, type DreamRecord } from './dreams.js'
 
@@ -60,7 +60,14 @@ export const dreamOptOuts = {
   },
 }
 
-type NightRow = Omit<DreamNight, 'runs' | 'cost_usd'>
+interface NightRow {
+  night: string
+  zone: string
+  window_start: string
+  window_end: string
+  state: 'open' | 'ended' | 'missed'
+  skipped: Record<string, number>
+}
 
 /** A night as planned: its window in UTC and the agents left out by reason. */
 export interface NightPlan {
@@ -134,6 +141,12 @@ export const nightRuns = {
   /** Every dream of a night, nightly and manual, oldest first. */
   of: async (night: string) =>
     (await sql<DreamRecord[]>`SELECT * FROM dream_run WHERE night = ${night} ORDER BY id`).map(toRun),
+  /** The newest date any dream ran on, Dream now included. */
+  latestNight: async (): Promise<string | null> => {
+    const [row] = await sql<{ night: string | null }[]>`SELECT MAX(night) AS night FROM dream_run
+      WHERE state NOT IN ('planned', 'skipped')`
+    return row?.night ?? null
+  },
   /** What the night's dreams cost so far, Dream now included. */
   cost: async (night: string): Promise<number> => {
     const [row] = await sql<{ sum: string | null }[]>`SELECT SUM(cost_usd) AS sum FROM dream_run WHERE night = ${night}`

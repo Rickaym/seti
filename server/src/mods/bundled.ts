@@ -2,6 +2,7 @@ import type { ModDefinition } from '@seti/mod-api'
 import blobs from '@seti/mod-blobs/seti-mod.json' with { type: 'json' }
 import catppuccin from '@seti/mod-catppuccin/seti-mod.json' with { type: 'json' }
 import claudeTheme from '@seti/mod-claude-theme/seti-mod.json' with { type: 'json' }
+import { dreamingServer } from '@seti/mod-dreaming/server'
 import { githubWebhooksServer } from '@seti/mod-github-webhooks/server'
 import { gridServer } from '@seti/mod-grid/server'
 import htmlPreview from '@seti/mod-html-preview/seti-mod.json' with { type: 'json' }
@@ -24,6 +25,7 @@ import { installedMods, pinProblem } from './installed.js'
 /** Every mod in mods/ that ships with Seti, by its server half or, with none, its manifest. */
 export const BUNDLED_MODS: readonly ModDefinition[] = [
   { manifest: blobs },
+  dreamingServer,
   githubWebhooksServer,
   gridServer,
   { manifest: htmlPreview },
