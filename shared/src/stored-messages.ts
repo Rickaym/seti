@@ -119,7 +119,7 @@ const shellPayload = z.looseObject({
 })
 
 const inputPayload = z.looseObject({
-  source: z.enum(['pr', 'team', 'workspace', 'channel', 'agent', 'seti']),
+  source: z.enum(['pr', 'team', 'workspace', 'channel', 'thread', 'agent', 'seti']),
   kind: text,
   subject: text,
   title: text,

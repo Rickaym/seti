@@ -111,6 +111,7 @@ SOURCE_WORDS = {
     "pr": "PR update",
     "team": "group chat message",
     "channel": "channel event",
+    "thread": "thread reply",
     "workspace": "workspace notice",
 }
 

@@ -80,8 +80,29 @@ export interface ChannelInput extends InputBase {
   delivery?: DeliveryTiming
 }
 
+/** A reply in an outside thread the agent posted in, such as on Slack; subject is who wrote it. */
+export interface ThreadInput extends InputBase {
+  source: 'thread'
+  kind: 'reply'
+  /** Where the thread lives, such as slack. */
+  service: string
+  /** The conversation, such as a Slack channel id. */
+  channel: string
+  thread: string
+  /** The reply's own id, such as its Slack ts. */
+  message: string
+  /** The author's id in that service, such as a Slack user or bot id. */
+  from: string
+  bot: boolean
+  follow_id: number
+  received_at: string
+  /** A bot's reply waits for the user's next message; absent follows the agent's update mode. */
+  delivery?: DeliveryTiming
+}
+
 /** Whether an update waits for the user's next message, whatever else starts a turn meanwhile. */
-export const heldForMessage = (input: TaskInput) => input.source === 'channel' && input.delivery === 'with_message'
+export const heldForMessage = (input: TaskInput) =>
+  (input.source === 'channel' || input.source === 'thread') && input.delivery === 'with_message'
 
 /** How a turn of another agent ended, for an agent that asked Seti to tell it. */
 export const AGENT_INPUT_KINDS = ['idle', 'error', 'stopped'] as const
@@ -102,14 +123,14 @@ export interface SetiInput extends InputBase {
 }
 
 /** An update from outside the conversation that the task's agent receives on its next turn. */
-export type TaskInput = PrInput | TeamInput | WorkspaceInput | ChannelInput | AgentInput | SetiInput
+export type TaskInput = PrInput | TeamInput | WorkspaceInput | ChannelInput | ThreadInput | AgentInput | SetiInput
 
 /** Why Seti started no turn for the update, or undefined for one that waits for the agent. */
 export const quietReason = (input: TaskInput): PrQuietReason | undefined =>
   input.source === 'pr' ? input.quiet : undefined
 
 /** Updates of these sources start a turn in a task that wakes on updates. */
-export const WAKING_SOURCES: readonly TaskInput['source'][] = ['pr', 'channel', 'agent', 'seti']
+export const WAKING_SOURCES: readonly TaskInput['source'][] = ['pr', 'channel', 'thread', 'agent', 'seti']
 
 /** Dismisses the updates waiting for the agent, up to the newest one the user saw. */
 export const dismissInputsInput = z.object({ up_to: z.number().int().positive() })
@@ -124,6 +145,7 @@ const SOURCE_NOUNS: Record<TaskInput['source'], readonly [string, string]> = {
   pr: ['PR update', 'PR updates'],
   team: ['group chat message', 'group chat messages'],
   channel: ['channel event', 'channel events'],
+  thread: ['thread reply', 'thread replies'],
   workspace: ['workspace notice', 'workspace notices'],
   agent: ['agent update', 'agent updates'],
   seti: ['answered request', 'answered requests'],

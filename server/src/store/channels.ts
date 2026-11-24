@@ -33,6 +33,12 @@ export interface ChannelRecord {
   updated_at: string
   secret_rotated_at: string | null
   secret_pending: ChannelSecretPending | null
+  /** Replies in threads agents posted in reach those agents (THR-2). */
+  thread_replies: boolean
+  /** Messages in a direct message an agent wrote in reach it for a while, threaded or not. */
+  thread_dms: boolean
+  /** When the sender last delivered a message event, at most hourly; null before the first. */
+  message_seen_at: string | null
 }
 
 type Row = Omit<ChannelRecord, 'mapping' | 'secret' | 'sender'> & {
@@ -73,7 +79,10 @@ function toRecord(row: Row): ChannelRecord {
   }
 }
 
-export type NewChannel = Omit<ChannelRecord, 'updated_at' | 'secret_rotated_at' | 'secret'> & { secret: string }
+export type NewChannel = Omit<
+  ChannelRecord,
+  'updated_at' | 'secret_rotated_at' | 'secret' | 'thread_replies' | 'thread_dms' | 'message_seen_at'
+> & { secret: string }
 
 export interface ChannelChange {
   name?: string | undefined

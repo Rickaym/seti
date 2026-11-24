@@ -79,6 +79,7 @@ import { backfillMessageSearch } from './store/search.js'
 import { relayTaskEvents } from './task-events.js'
 import { relayTeamEvents } from './team-events.js'
 import { stopTerminals } from './terminal.js'
+import { startThreadRouting } from './threads/route.js'
 
 const CAPABILITY_REFRESH_MS = 15 * 60 * 1000
 const ACCOUNT_REFRESH_MS = 5 * 60 * 1000
@@ -233,6 +234,7 @@ startLoginKeeper()
 resourceSampler.start()
 startInboxSweeper()
 startRouteRetries()
+startThreadRouting()
 warmFilters()
 watchSilentSessions()
 followLiveContext()

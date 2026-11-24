@@ -3,6 +3,7 @@ import type { ChannelDeliveryStatus, ChannelRoute } from '@seti/shared'
 import type { ContentfulStatusCode } from 'hono/utils/http-status'
 import { redactSecrets } from '../scrub.js'
 import { channelStore, type Accepted, type ChannelRecord } from '../store/channels.js'
+import { takeThreadMessage, type ThreadMessage } from '../threads/intake.js'
 import { applyFilter, type Filtered } from './filter-apply.js'
 import type { FilterPool } from './filter-run.js'
 import { clip, eventDraft, publishEvent, routedReason, type RouteEvent } from './publish.js'
@@ -55,6 +56,18 @@ const DEFAULT_LIMITS: RateLimits = { perChannel: 60, global: 600, windowMs: 60_0
 const NOT_FOUND: HookResult = { http: 404, status: 'not_found', reason: 'no such webhook' }
 const UNREADABLE_SECRET = 'the stored secret does not open with the current key; rotate it'
 const URL_CHECK = "answered the sender's URL check"
+const MESSAGE_GATE = 'subscribers get message events only when the filter keeps them'
+
+/** Whether the filter passed a message event on: it ran and kept or changed it. */
+const filterPassed = (filtered: Filtered) =>
+  filtered.filter?.outcome === 'kept' || filtered.filter?.outcome === 'changed'
+
+/** Why a message event stopped before the subscribers, with the followed threads it reached. */
+function messageReason(thread: ThreadMessage): string {
+  const routed =
+    thread.queued === 0 ? 'in no followed thread' : `queued for ${String(thread.queued)} followed thread(s)`
+  return `a message ${routed}; ${MESSAGE_GATE}`
+}
 const SECRET_TO_PASTE = "the sender's secret is not pasted yet; paste it in Settings, Channels"
 
 /** Reads at most `max` bytes; null when the body is larger, whatever Content-Length said. */
@@ -175,6 +188,7 @@ export function createReceiver(deps: ReceiverDeps) {
     if (echo !== null) {
       return { ...(await finish(channel, at, { http: 200, status: 'ignored', reason: URL_CHECK })), echo }
     }
+    const thread = await takeThreadMessage(channel, decoded.payload, at)
     const excerpt = clip(redactSecrets(JSON.stringify(decoded.payload)), EXCERPT_MAX)
     const sent = preset.deliveryId(request)?.trim() ?? ''
     const deliveryId = sent === '' ? `sha256:${sha256Hex(request.body)}` : clip(sent, TEXT_MAX.id)
@@ -193,6 +207,10 @@ export function createReceiver(deps: ReceiverDeps) {
     const filtered = await applyFilter(subject, at, deps.filters)
     if (filtered.dropped !== null) {
       const result: Recorded = { http: 200, status: 'filtered', reason: filtered.dropped }
+      return finish(channel, at, result, { delivery_id: deliveryId, filtered })
+    }
+    if (thread.message && !filterPassed(filtered)) {
+      const result: Recorded = { http: 200, status: 'ignored', reason: messageReason(thread) }
       return finish(channel, at, result, { delivery_id: deliveryId, filtered })
     }
     const since = new Date(Date.parse(at) - DEDUPE_WINDOW_MS).toISOString()

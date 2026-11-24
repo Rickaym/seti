@@ -690,6 +690,27 @@ Zoom (a computed reply to its URL check), Notion (an unsigned token request), In
 check), Twitch EventSub (no separators in the signed text) and Supabase Auth hooks (a reply body).
 [Mods](mods.md#channel-sources) shows how to write one.
 
+### Slack thread replies
+
+A Slack webhook can hand replies to the agents that wrote in a thread (THR-1 to THR-6). Seti
+records each Slack message an agent sends with the Slack MCP server's `slack_send_message` or with
+`chat.postMessage`, and a later message in that thread reaches the agent as a `thread` update,
+framed as words from the named Slack person, not from you. A bot's reply waits for your next
+message, a thread sends at most 10 replies an hour, and following stops after 7 quiet days or 30
+days. Two switches, both off until you turn them on, decide what reaches agents: Thread replies,
+and DM replies, which hands the next messages in a direct message to the agent that wrote there in
+the last 24 hours even when they are not threaded. Turning Thread replies on turns DM replies on
+with it; you can turn DM replies off on its own. Only you change them, with
+`PUT /api/channels/<id>/threads` and `{"replies": true}`, `{"dms": false}` or both.
+
+Seti never calls Slack for this: replies come through the webhook. In the Slack app at
+api.slack.com/apps, under Event Subscriptions, subscribe to `message.channels`, `message.groups`,
+`message.im` and `message.mpim` (as events on behalf of users when the app acts as you), and
+reinstall the app if Slack asks.
+
+Upgrading: Slack `message` events no longer reach a Slack webhook's subscribers, such as the EA's
+inbox, unless its filter keeps them; a filter that returns `true` brings back the old behaviour.
+
 ### Webhook filters
 
 A filter is a short piece of JavaScript that runs on each verified delivery before any subscriber

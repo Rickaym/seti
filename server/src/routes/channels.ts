@@ -9,6 +9,7 @@ import {
   senderSampleInput,
   webhookFilterInput,
   webhookFilterTestInput,
+  webhookThreadsInput,
 } from '@seti/shared'
 import { Hono } from 'hono'
 import { z } from 'zod'
@@ -39,6 +40,7 @@ import { fromEa, notEa, refuseEa } from '../ea-guard.js'
 import { ok, valid, validJson } from '../http.js'
 import { threadFollows } from '../store/threads.js'
 import { requireTask } from '../tasks.js'
+import { setWebhookThreads, THREAD_SWITCHES } from '../threads/actions.js'
 import { pollerRoutes } from './pollers.js'
 import { reminderRoutes } from './reminders.js'
 
@@ -88,6 +90,9 @@ export const channelRoutes = new Hono()
     return ok(c, { id })
   })
   .post('/:id/test', valid('param', idParam), async (c) => ok(c, await webhooks.sendTest(c.req.valid('param').id)))
+  .put('/:id/threads', notEa(THREAD_SWITCHES), valid('param', idParam), validJson(webhookThreadsInput), async (c) =>
+    ok(c, await setWebhookThreads(c.req.valid('param').id, c.req.valid('json'))),
+  )
   .put('/:id/filter', valid('param', idParam), validJson(webhookFilterInput), async (c) =>
     ok(c, await setWebhookFilter(c.req.valid('param').id, c.req.valid('json'))),
   )
