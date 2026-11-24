@@ -48,7 +48,7 @@ function command(params: unknown, started: Started): Asked {
   const call: ToolCall = started(request.itemId) ?? {
     callId: request.itemId,
     kind: 'shell',
-    name: 'exec_command',
+    name: 'Bash',
     input: { command: fromRequest },
     shell: { action: 'run', command: fromRequest },
   }

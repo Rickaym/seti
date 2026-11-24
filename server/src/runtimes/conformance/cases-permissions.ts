@@ -144,6 +144,29 @@ export const PERMISSIONS: Case[] = [
     },
   },
   {
+    id: 'PM-7',
+    title: 'a call held at an interrupt ends by the end of its turn, and never as ok',
+    proves: 'RT-6 every call ends; TURN-3',
+    skip: (profile) => (profile.gated.shell ? null : 'the runtime decides no shell call before it runs'),
+    run: async (subject) => {
+      const host: NeutralHost = {
+        decide: async () => new Promise(() => undefined),
+        ask: async () => Promise.resolve({}),
+      }
+      const run = await subject.open(subject.rig({ turns: [[{ call: SHELL }]] }), { host })
+      run.send('go')
+      const started = await run.until((event) => event.type === 'tool.started', 'the call')
+      await settle()
+      await run.interrupt()
+      await turnEnd(run, 1)
+      const callId = started.type === 'tool.started' ? started.call.callId : ''
+      const ends = ofType(run, 'tool.ended').filter((end) => end.callId === callId)
+      expect(ends.map((end) => end.status === 'ok')).toEqual([false])
+      expect(run.events.indexOf(ends[0] ?? started)).toBeLessThan(run.events.findIndex((e) => e.type === 'turn.ended'))
+      await closed(run)
+    },
+  },
+  {
     id: 'PM-6',
     title: 'an identical call made again is decided again',
     proves: 'PERM-2; GRD-4: the runtime keeps no "always allow" of its own',

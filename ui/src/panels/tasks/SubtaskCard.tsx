@@ -12,7 +12,8 @@ import { progressLine, subtaskElapsed, subtaskRouteId } from '@/lib/subtasks'
 import { fullInputText, inputString, type ToolResultRef, type ToolUseBlock } from '@/lib/transcript'
 import { cn } from '@/lib/utils'
 import { SubtaskPill } from '@/panels/tasks/StatusPill'
-import { ToolOutput, TrimmedText } from '@/panels/tasks/ToolCall'
+import { ToolOutput } from '@/panels/tasks/ToolCall'
+import { TrimmedText } from '@/panels/tasks/TrimmedText'
 
 function provisionalStatus(result: ToolResultRef | undefined): SubtaskStatus {
   if (result === undefined) {

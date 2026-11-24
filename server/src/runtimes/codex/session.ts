@@ -7,6 +7,7 @@ import type { InputContent, RuntimeSession, SessionInput, SessionReport } from '
 import type { CodexDecide } from './approvals.js'
 import { Asks } from './asks.js'
 import { Background } from './background.js'
+import { OpenCalls } from './open-calls.js'
 import { OPTED_OUT } from './private.js'
 import { codexReport, ReportQueue } from './reports.js'
 import { CodexRpc, RpcError, type CodexCall } from './rpc.js'
@@ -77,6 +78,9 @@ class Driver {
   private readonly calls = new Map<string, ToolCall>()
   private readonly asks: Asks
   private readonly background: Background
+  private readonly openCalls = new OpenCalls(() => this.root)
+  /** A resumed thread's start, held until its first turn: opening the session is not work. */
+  private resumed: SessionReport | null = null
   private inbox: Promise<void> = Promise.resolve()
   private readonly rpc: CodexRpc
   private readonly realised: CodexRealised
@@ -127,7 +131,7 @@ class Driver {
               raw: null,
               events: [unreadable()],
               work: false,
-              byAgent: true,
+              byAgent: false,
               delivered: [],
             })
           })
@@ -183,7 +187,7 @@ class Driver {
     const reply = await this.rpc.request('thread/resume', { ...common, threadId: resume, excludeTurns: true })
     this.root = threadReply.parse(reply).thread.id
     // A resumed thread is announced only in this reply, so the reply is the row that starts it.
-    this.reports.push(codexReport(this.root, { method: 'thread/resume', params: { threadId: resume } }, { reply }))
+    this.resumed = codexReport(this.root, { method: 'thread/resume', params: { threadId: resume } }, { reply })
   }
 
   private async pump(inputs: AsyncIterable<SessionInput>): Promise<void> {
@@ -268,15 +272,21 @@ class Driver {
     if (OPTED_OUT.includes(message.method)) {
       return
     }
+    if (message.method === 'turn/started' && this.resumed !== null) {
+      this.reports.push(this.resumed)
+      this.resumed = null
+    }
     const job = this.background.note(message)
+    this.openCalls.note(message)
     if (message.method === 'turn/completed') {
       const listed = await this.background.listed().catch(() => null)
       if (listed !== null) {
         this.reports.push(codexReport(this.root, listed.message, { reply: listed.reply }))
       }
     }
+    const unfinished = this.openCalls.leftBy(message, (id) => this.background.isJob(id))
     const delivered = this.track(message)
-    this.reports.push(codexReport(this.root, message, { delivered, ...(job === undefined ? {} : { job }) }))
+    this.reports.push(codexReport(this.root, message, { delivered, unfinished, ...(job === undefined ? {} : { job }) }))
   }
 
   async stopBackground(jobId: string): Promise<void> {
