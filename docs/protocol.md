@@ -512,10 +512,13 @@ interrupted only for that.
   outside your organisations" or the like; it is an ask, never a refusal. The user's own are the
   owners of the signed-in code-host account and its organisations, read on the control plane and
   cached for about an hour, and the owners of the repositories the agent was given. The
-  implementation reads the command past wrappers, nested scripts and `cd`, resolves a remote in
-  the agent's folder under HST-2, and asks whenever it cannot place the target; a push to a
-  local path does not ask. An allow rule `PushTo(<owner>)`, which only the user adds, lets that
-  owner through; it is never handed to a runtime.
+  implementation reads the command past wrappers, nested scripts and `cd`, resolves a remote or
+  URL under HST-2 with the repository's and the agent's own global git config and URL rewrites,
+  in the folder as the agent sees it (a sandbox's private home and /tmp included), and asks
+  whenever it cannot place the target: the same command changes remotes, git config or git's
+  environment, sets the code host's repository or host variables, or pushes submodules. A push
+  to a local path does not ask. An allow rule `PushTo(<owner>)`, which only the user adds, lets
+  that code-host owner through; it is never handed to a runtime.
 
 ### 7.5 Guards
 
