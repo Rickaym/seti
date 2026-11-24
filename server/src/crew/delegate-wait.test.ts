@@ -10,14 +10,18 @@ import { waitIdle } from '../wait-idle.js'
 const sdk = await vi.hoisted(async () => {
   const { FakeSdk, fakeAssistant, fakeResult } = await import('../fake-sdk.js')
   const gates = new Map<string, () => void>()
+  const parked: (() => void)[] = []
   const fake = new FakeSdk(async function* (turn) {
     if (turn.text.includes('hold on')) {
       await new Promise<void>((resolve) => gates.set('held', resolve))
     }
+    if (turn.text.includes('park')) {
+      await new Promise<void>((resolve) => parked.push(resolve))
+    }
     yield fakeAssistant(turn.text.includes('check the logs') ? 'The logs show two retries.' : 'Reported.')
-    yield fakeResult()
+    yield { ...fakeResult(), total_cost_usd: turn.text.includes('expensive') ? 6 : 0 }
   })
-  return { fake, gates }
+  return { fake, gates, parked }
 })
 
 vi.mock('@anthropic-ai/claude-agent-sdk', async (importOriginal) => ({
@@ -48,6 +52,14 @@ async function start(caller: Task, input: Record<string, unknown>, signal?: Abor
   }
   const result = await callSetiTool(startTool, caller.id, input, signal)
   return { error: result.isError === true, text: result.content.map((block) => block.text).join('') }
+}
+
+function deleteTool() {
+  const tool = SETI_TOOLS.find((candidate) => candidate.name === 'delete_agent')
+  if (tool === undefined) {
+    throw new Error('no delete_agent tool')
+  }
+  return tool
 }
 
 const helperOf = async (callerId: string) => {
@@ -104,14 +116,38 @@ describe('limits on agents that agents start', () => {
     expect(text).toContain('Another agent started you')
   })
 
-  it('refuses a fifth running helper, and one past the daily budget', async () => {
+  it('refuses a fifth running helper, also when the starts come at once', async () => {
     const lead = await make()
-    for (let index = 0; index < 4; index += 1) {
-      const helper = await make({ delegated_by: lead.id })
-      await sql`UPDATE task SET status = 'running' WHERE id = ${helper.id}`
+    const results = await Promise.all(Array.from({ length: 6 }, async () => start(lead, { prompt: 'park here' })))
+    expect(results.filter((result) => !result.error)).toHaveLength(4)
+    for (const refused of results.filter((result) => result.error)) {
+      expect(refused.text).toContain('You have 4 agents running already')
     }
     expect((await start(lead, { prompt: 'one more' })).text).toContain('You have 4 agents running already')
-    await sql`UPDATE task SET status = 'idle', cost_usd = 2.5 WHERE delegated_by = ${lead.id}`
+    await vi.waitFor(() => {
+      expect(sdk.parked).toHaveLength(4)
+    })
+    for (const release of sdk.parked.splice(0)) {
+      release()
+    }
+    for (const helper of await sql<{ id: string }[]>`SELECT id FROM task WHERE delegated_by = ${lead.id}`) {
+      await waitIdle(helper.id)
+    }
+  })
+
+  it('refuses a start once a day of helpers cost the budget, as their turns recorded, and keeps them from deletion', async () => {
+    const lead = await make()
+    for (let index = 0; index < 2; index += 1) {
+      const { text } = await start(lead, { prompt: 'expensive work', wait_minutes: 5 })
+      expect(text).toContain('ended=\\"idle\\"')
+    }
+    const [spent] = await sql<{ usd: number }[]>`SELECT SUM(cost_usd)::float8 AS usd FROM task
+      WHERE delegated_by = ${lead.id}`
+    expect(spent?.usd).toBe(12)
     expect((await start(lead, { prompt: 'one more' })).text).toContain('have cost $10 or more')
+    const helper = await helperOf(lead.id)
+    const deleted = await callSetiTool(deleteTool(), lead.id, { task: helper })
+    expect(deleted.isError).toBe(true)
+    expect(await tasks.get(helper)).toBeDefined()
   })
 })

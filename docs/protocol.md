@@ -820,7 +820,9 @@ Why: an agent woken by its own actions or by news nobody waited for burns turns 
   it sits in Needs you on its own (ATT-1), never its caller. An agent another agent started MUST
   NOT start agents. A start by an agent MUST be refused while it has `delegates_running` running
   helpers, while `delegates_install` run on the install, and once the helpers it started in the
-  last 24 hours have cost `delegate_budget`.
+  last 24 hours have cost `delegate_budget` by the cost their turns recorded. Starts made at once
+  MUST count each other. Only the user MAY delete an agent another agent started, so its cost
+  keeps counting.
 - DLG-6: While a caller waits in its call (DLG-1), its status line MUST read `Waiting on` and
   the helper's title, and MUST return to what it was when the wait ends.
 - DLG-4: A start MAY ask for a brief of an agent's work (`include_brief` for the caller's own,

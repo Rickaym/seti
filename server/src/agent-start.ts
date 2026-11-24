@@ -8,7 +8,7 @@ import {
 import { capStart, type AccessCap } from './agent-cap.js'
 import { awaitTurnEnd, requestWaiter } from './agent-waits.js'
 import { sendKey, sendOnce } from './client-sends.js'
-import { checkDelegateLimits } from './crew/delegate-limits.js'
+import { withinDelegateLimits } from './crew/delegate-limits.js'
 import { withBrief } from './crew/handover.js'
 import { fromEa } from './ea-guard.js'
 import { planAgent, planTitle } from './planner.js'
@@ -50,17 +50,16 @@ export async function startAgent(
   cap?: AccessCap,
   hold?: (wait: AgentWait) => void,
 ): Promise<Task> {
-  if (cap !== undefined) {
-    await checkDelegateLimits(cap.task_id)
-  }
-  return sendOnce(
-    sendKey('task_start', 'new', input.client_id),
-    async () => startPlanned(cap === undefined ? input : { ...input, sandbox: true }, cap, hold),
-    {
-      save: (task) => task.id,
-      load: requireTask,
-    },
-  )
+  const start = async () =>
+    sendOnce(
+      sendKey('task_start', 'new', input.client_id),
+      async () => startPlanned(cap === undefined ? input : { ...input, sandbox: true }, cap, hold),
+      {
+        save: (task) => task.id,
+        load: requireTask,
+      },
+    )
+  return cap === undefined ? start() : withinDelegateLimits(cap.task_id, start)
 }
 
 /** The fields a start names only when its caller set them. */

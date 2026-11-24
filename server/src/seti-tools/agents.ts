@@ -213,11 +213,17 @@ const setUpdateMode = setiTool({
 const deleteAgent = setiTool({
   name: 'delete_agent',
   description:
-    'Permanently delete another agent, archived or not: its transcript, worktrees, scratch folder, workspace, archive bundle and session.',
+    'Permanently delete another agent, archived or not: its transcript, worktrees, scratch folder, workspace, archive bundle and session. Not an agent another agent started: archive that one.',
   input: { task: taskRef },
   run: async ({ task: ref }, ctx) => {
     const task = await anyTask(ref)
     notSelf(ctx, task, 'delete')
+    if (task.delegated_by !== null) {
+      throw new HttpError(
+        409,
+        'Only the user deletes an agent another agent started, since its cost counts; archive it',
+      )
+    }
     await deleteTask(task)
     return done(`Deleted ${task.title}.`)
   },
