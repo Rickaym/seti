@@ -236,6 +236,12 @@ JSON Schema; `GET /api/settings-doc/agents/<id>` and `GET /api/settings-doc/work
 one agent's or one workspace's own settings, with schemas under `/schema/agent` and
 `/schema/workspace`.
 
+Each section shows how many of its settings differ from their default, and Modified shows only
+those. Open as JSON, in the header of each settings page, opens the JSON page at that page's
+section. `GET /api/settings-doc/defaults` serves every setting's default, and
+`GET /api/settings-doc?only=modified` only what differs from it, as a merge patch onto the
+defaults.
+
 Settings Seti reads at start live in `~/.seti/seti.env` (one `NAME=value` per line) and secrets in
 `~/.seti/credentials`, one owner-only file each. Restart Seti after a change:
 `systemctl --user restart seti.service`. `pnpm seti:doctor` reads the same file and reports a value
