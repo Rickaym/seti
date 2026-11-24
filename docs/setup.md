@@ -4,7 +4,7 @@ TLDR: on Linux, run the one-line installer. It checks the machine, installs what
 (asking before anything that needs sudo), builds Seti, writes its settings and secrets, and runs it
 as a systemd user service on `127.0.0.1:3006`. Open `http://seti.localhost:3006` and sign in with
 the token in `~/.seti/credentials/local-token-user`. `scripts/upgrade.sh` updates it later, and
-`pnpm run doctor` says what is wrong and how to fix it.
+`pnpm seti:doctor` says what is wrong and how to fix it.
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/rickaym/seti/main/scripts/install.sh | bash
@@ -230,7 +230,7 @@ Settings, Sign-in (or `SETI_ANDROID_PACKAGE` and `SETI_ANDROID_CERT_SHA256`).
 
 Settings live in `~/.seti/seti.env` (one `NAME=value` per line) and secrets in
 `~/.seti/credentials`, one owner-only file each. Restart Seti after a change:
-`systemctl --user restart seti.service`. `pnpm run doctor` reads the same file and reports a value
+`systemctl --user restart seti.service`. `pnpm seti:doctor` reads the same file and reports a value
 Seti would refuse.
 
 ### Server
@@ -368,7 +368,7 @@ process, and `seti.service` reaches them over `~/.seti/run/node.sock`, a socket 
 your user may enter. A restart of `seti.service` then keeps running turns going.
 `scripts/upgrade.sh` restarts the node only when the code the node runs or the package files
 changed (`pnpm --dir server run build-id` prints the id it compares), and Seti records the node's
-running turns before the node cuts them. `pnpm run doctor`
+running turns before the node cuts them. `pnpm seti:doctor`
 checks the socket. Logs are in `journalctl --user -u seti-node.service`.
 
 Split mode still has gaps that a single process does not:
@@ -824,7 +824,7 @@ login, `gh`, the ports, the units and the EA keys, and prints a fix under each p
 with 1 when Seti cannot work.
 
 ```sh
-cd ~/seti && pnpm run doctor
+cd ~/seti && pnpm seti:doctor
 ```
 
 | Symptom                                                                 | Fix                                                                                                           |
@@ -913,7 +913,7 @@ sign in with `~/.seti/dev-credentials/local-token-user`.
 | `pnpm check`       | format, text, types, lint, knip, tests, EA checks, UI |
 | `pnpm e2e`         | Playwright suite, after `pnpm build`                  |
 | `pnpm screenshots` | Retakes the README screenshots from seeded demo data  |
-| `pnpm run doctor`  | Checks this machine and the install                   |
+| `pnpm seti:doctor` | Checks this machine and the install                   |
 
 Tests clone a template database per test file on the local PostgreSQL (or the server
 `SETI_TEST_DATABASE_URL` names) and drop it afterwards; the e2e suite starts its own Seti per

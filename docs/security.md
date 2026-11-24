@@ -43,7 +43,7 @@ Report it privately through GitHub's private vulnerability reporting, never in a
    ([Key custody](#key-custody)), and turn backups on with `SETI_BACKUP_PUBLIC_KEY`.
 4. Encrypt the host volume. Key files are plain owner-only files and the database is not
    encrypted by Seti ([What is not protected](#what-is-not-protected)).
-5. Keep agents sandboxed and Bypass off. Run `pnpm run doctor` after an upgrade: it says when the
+5. Keep agents sandboxed and Bypass off. Run `pnpm seti:doctor` after an upgrade: it says when the
    sandbox, the AppArmor profile, memory scopes or the CPU controller are missing.
 6. Run the live instance from a checkout no agent can write. Agents with home folders write every
    top-level non-dot folder of the home, and that includes a checkout there.

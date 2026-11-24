@@ -4,7 +4,7 @@ import path from 'node:path'
 import { parseArgs } from 'node:util'
 import { isLoopback, optionalKeys, report, type Check } from './doctor.js'
 
-const USAGE = `Usage: pnpm doctor [--env-file <file>]
+const USAGE = `Usage: pnpm seti:doctor [--env-file <file>]
 
 Checks what Seti needs on this machine and prints a fix for each problem. It reads the settings
 in SETI_HOME/seti.env (~/.seti/seti.env by default) like the service does, and never prints a
