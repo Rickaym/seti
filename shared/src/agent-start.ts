@@ -2,30 +2,28 @@ import { z } from 'zod'
 import { attachmentRefs } from './attachments.js'
 import { clientSendId } from './client-send.js'
 import { prUrl } from './pr-url.js'
-import { checkPicks, runtimeFields } from './runtimes/picks.js'
+import { runtimeFields } from './runtimes/picks.js'
 import { workspaceId } from './workspaces.js'
 
 /** Planned titles stay this short, so they fit the agent list. */
 export const PLANNED_TITLE_MAX = 60
 
 /** Starts an agent from one message; the planner picks whatever is not pinned here. */
-export const startAgentInput = z
-  .object({
-    prompt: z.string().trim().min(1, 'Type what the agent should do'),
-    title: z.string().trim().min(1).max(200).optional(),
-    pr_urls: z.array(prUrl).max(50).optional(),
-    attachments: attachmentRefs,
-    /** Left out, the agent joins its parent's workspace when an agent starts it, else the first. */
-    workspace_id: workspaceId.optional(),
-    /** Off starts it outside the sandbox, which only the user may; agents' starts stay sandboxed. */
-    sandbox: z.boolean().default(true),
-    /** Tells the agent or EA that starts it when its first turn ends, as an update. */
-    notify_when_done: z.boolean().default(false),
-    client_id: clientSendId,
-    /** The runtime the agent runs on, Codex only while the user turned it on, and its model. */
-    ...runtimeFields,
-  })
-  .superRefine(checkPicks)
+export const startAgentInput = z.object({
+  prompt: z.string().trim().min(1, 'Type what the agent should do'),
+  title: z.string().trim().min(1).max(200).optional(),
+  pr_urls: z.array(prUrl).max(50).optional(),
+  attachments: attachmentRefs,
+  /** Left out, the agent joins its parent's workspace when an agent starts it, else the first. */
+  workspace_id: workspaceId.optional(),
+  /** Off starts it outside the sandbox, which only the user may; agents' starts stay sandboxed. */
+  sandbox: z.boolean().default(true),
+  /** Tells the agent or EA that starts it when its first turn ends, as an update. */
+  notify_when_done: z.boolean().default(false),
+  client_id: clientSendId,
+  /** The runtime the agent runs on, Codex only while the user turned it on, and its model. */
+  ...runtimeFields,
+})
 export type StartAgentInput = z.input<typeof startAgentInput>
 export type StartAgentRequest = z.output<typeof startAgentInput>
 

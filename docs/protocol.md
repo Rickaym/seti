@@ -160,7 +160,10 @@ between two steps; an interrupt; a hook at subagent start.
 - RT-10: A new agent's start MAY name a runtime, a model and an effort. A model alone MUST pick the
   one runtime that offers it, and a start naming neither runs on the default runtime with the
   user's default model. A model no runtime offers, a runtime and model that disagree, and an
-  effort the runtime does not offer MUST be refused with the reason.
+  effort the model does not take MUST be refused with the reason, naming the offered models. A
+  runtime's models are the ones it reports for the account, else its stable aliases. An agent
+  started on a model and effort MUST run every session start, restart and resume on them; a
+  fallback switch (RES-14) lasts until the next session start.
 
 ## 4. Turn lifecycle
 
