@@ -48,6 +48,7 @@ describe('Settings, Mods', () => {
     })
     expect(list.mods.filter((mod) => mod.tier !== 'theme').map((mod) => mod.id)).toEqual([
       'blobs',
+      'dreaming',
       'github-webhooks',
       'grid',
       'html-preview',

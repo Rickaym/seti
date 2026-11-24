@@ -15,7 +15,7 @@ import { modAgentEntry, modGlob } from './mod-scopes.js'
 import { thirdPartyProblem } from './mod-third-party.js'
 
 /** The version of the mod API this Seti offers; a manifest's `seti` range must match it. */
-export const MOD_API_VERSION = '1.22.0'
+export const MOD_API_VERSION = '1.23.0'
 
 /** A mod's id: lowercase words joined by -, so `<mod>.<name>` never reads two ways. */
 export const MOD_ID = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/
@@ -47,6 +47,7 @@ export const MOD_CAPABILITIES = [
   'seti.version',
   'workspaces.layout',
   'tasks.ask',
+  'tasks.dream',
 ] as const
 export type ModCapabilityName = (typeof MOD_CAPABILITIES)[number]
 
@@ -84,6 +85,7 @@ export const modCapability = z.discriminatedUnion('name', [
   z.strictObject({ name: z.literal('seti.version') }),
   z.strictObject({ name: z.literal('workspaces.layout') }),
   z.strictObject({ name: z.literal('tasks.ask') }),
+  z.strictObject({ name: z.literal('tasks.dream') }),
 ])
 export type ModCapability = z.output<typeof modCapability>
 
@@ -304,6 +306,7 @@ const DESCRIBERS: { [K in ModCapabilityName]: Describer<K> } = {
   'seti.version': fixed('Reads which Seti runs, its changelog and whether a newer one is out.'),
   'workspaces.layout': fixed('Keeps a panel layout for each workspace.'),
   'tasks.ask': fixed('Asks agents side questions, answered from their context without interrupting them.'),
+  'tasks.dream': fixed("Reads agents' dreams and waiting clean-ups, and starts a dream under Seti's caps."),
 }
 
 /** A capability in plain words, written by Seti and never by the mod, as consent shows it. */

@@ -1,0 +1,20 @@
+{
+  "id": "dreaming",
+  "name": "Dreaming",
+  "version": "1.0.0",
+  "seti": "^1.23",
+  "description": "Shows each night of dreams: what wants you first, what each agent tidied, and who was left out.",
+  "author": "Seti",
+  "icon": "moon",
+  "categories": ["agents"],
+  "defaultEnabled": true,
+  "capabilities": [{ "name": "tasks.dream" }],
+  "contributes": {
+    "views": [{ "id": "dreams", "title": "Dreams", "icon": "moon", "where": "section", "phone": true }],
+    "routes": [
+      { "method": "GET", "path": "/night" },
+      { "method": "GET", "path": "/shown", "demo": true },
+      { "method": "GET", "path": "/waiting" }
+    ]
+  }
+}

@@ -441,7 +441,10 @@ stored off; safe mode and a mod bisect leave it on, and its settings still chang
 bundled mod's do. Settings, Mods shows it with a Core badge and a lock in place of its switch. Only
 a bundled mod may be required.
 
-This Seti offers mod API 1.22.0, which hands `tasks.transcript` the agent's runtime rows as
+This Seti offers mod API 1.23.0, which adds the bundled-only `tasks.dream` capability
+(`api.dreams`: a night of dreams, whether dreams have news, waiting clean-ups, and a dream started
+under Seti's caps); 1.22.0
+hands `tasks.transcript` the agent's runtime rows as
 neutral events (`{ kind: 'events', payload }`, typed as `SetiTranscriptEntry`) in place of the
 runtime's own messages, which were never typed; 1.21.0 added transcript blocks, `api.transcript.refresh` and
 stored asides (`aside.list`, `remove` and `clear` in place of `close`, and `done` events that

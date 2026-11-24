@@ -951,7 +951,9 @@ Optional and off by default: a maintenance session per agent that consolidates i
 - MOD-8: Capabilities, each scoped: `tasks.read`, `tasks.manage`, `chat.post`, `files.read`,
   `net.fetch` (named public hosts), `connection` (a value the control room adds and redacts),
   `storage`, `notify`, `agents.context`; bundled only `seti.version`, `workspaces.layout`,
-  `tasks.ask`. A mod's start or stop only records an ask for the user; an agent so started is
+  `tasks.ask`, `tasks.dream` (reads nights, whether Dreaming is on or has run, and waiting
+  clean-ups, and starts a dream as the mod,
+  under DRM-16; it never answers a clean-up). A mod's start or stop only records an ask for the user; an agent so started is
   sandboxed at `self` with the default credential and its first message marked as the mod's.
 - MOD-12: Third-party logic runs outside the control room's process, in a fresh engine per event
   with no network, files, environment or children (`mod_limits`), and repeated failures turn it

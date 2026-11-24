@@ -19,7 +19,12 @@ const RESERVED_IDS: ReadonlySet<string> = new Set([
 const RESERVED_NAMES: ReadonlySet<string> = new Set(['seti', 'ea', 'executive assistant'])
 
 /** Capabilities that reach core services, held only by mods reviewed with Seti. */
-const BUNDLED_ONLY_CAPABILITIES: ReadonlySet<string> = new Set(['seti.version', 'tasks.ask', 'workspaces.layout'])
+const BUNDLED_ONLY_CAPABILITIES: ReadonlySet<string> = new Set([
+  'seti.version',
+  'tasks.ask',
+  'tasks.dream',
+  'workspaces.layout',
+])
 
 type Rule = (manifest: ModManifest, bundledIds: ReadonlySet<string>) => string | null
 

@@ -43,6 +43,7 @@ const NARROWER: Narrower = {
   'seti.version': () => true,
   'workspaces.layout': () => true,
   'tasks.ask': () => true,
+  'tasks.dream': () => true,
 }
 
 const narrowerOrEqual = <K extends ModCapabilityName>(next: Scope<K>, old: Scope<K>): boolean =>

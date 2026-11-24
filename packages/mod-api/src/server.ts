@@ -5,6 +5,9 @@ import type {
   Changelog,
   ChangelogStatus,
   Disposer,
+  DreamNight,
+  DreamProposal,
+  DreamRun,
   EaNoticeSeverity,
   ModManifest,
   Preview,
@@ -196,6 +199,17 @@ export interface ModAsideAnswer {
  * caller of its route or command. Needs tasks.ask, which only bundled mods get; Seti stops every
  * answer being written when the mod is turned off.
  */
+export interface ModDreamsApi {
+  /** A night of dreams, `YYYY-MM-DD`, or the newest when none is named; null before the first. */
+  night: (night?: string) => Promise<DreamNight | null>
+  /** True while nightly Dreaming is on or once any dream has started: when dreams have news. */
+  shown: () => Promise<boolean>
+  /** Clean-ups dreams proposed that wait for the user, oldest first; only the user allows one. */
+  proposals: () => Promise<DreamProposal[]>
+  /** Starts a dream of an agent now under Seti's caps; a mod starts one an agent a day. */
+  start: (task: string) => Promise<DreamRun>
+}
+
 export interface ModAsideApi {
   /**
    * Asks in a new side chat, or follows up in `chat_id`, streaming the answer through `emit`.
@@ -273,6 +287,8 @@ export interface ServerModApi {
   ) => Disposer
   /** Side questions to agents; needs the tasks.ask capability. */
   readonly aside: ModAsideApi
+  /** Agents' dreams and the clean-ups they propose; needs the tasks.dream capability. */
+  readonly dreams: ModDreamsApi
   /** Its blocks in agents' transcripts; needs a transcriptBlocks entry. */
   readonly transcript: ModTranscriptApi
   /** Runs a command its manifest declares, from the palette, the EA or an agent's seti tool. */
