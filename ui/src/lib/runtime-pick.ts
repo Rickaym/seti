@@ -12,7 +12,9 @@ export interface RuntimePick {
 /** Today's default: Claude Code on the user's default model. */
 export const DEFAULT_PICK: RuntimePick = { runtime: DEFAULT_RUNTIME, model: null, effort: null }
 
-export const CODEX_HINT = 'Codex: sandboxed, asks before every command and edit.'
+/** What a Codex start says under the box: it always runs sandboxed, and asks unless rules decide. */
+export const codexHint = (rulesDecide: boolean): string =>
+  rulesDecide ? 'Codex: sandboxed; asks unless rules allow.' : 'Codex: sandboxed; asks before each call.'
 
 /** One option of the model selector, grouped under its runtime. */
 export interface ModelOption {
@@ -36,7 +38,7 @@ export const pickValue = (pick: RuntimePick): string => valueOf(pick.runtime, pi
 
 /** The default runtime leads with its default model; other runtimes list only their models. */
 function optionsOf({ runtime, models }: RuntimeOffer): ModelOption[] {
-  const named = models.map((model) => ({ value: valueOf(runtime, model), label: model, runtime, model }))
+  const named = models.map(({ id, label }) => ({ value: valueOf(runtime, id), label, runtime, model: id }))
   if (runtime !== DEFAULT_RUNTIME) {
     return named
   }
@@ -57,9 +59,9 @@ export function pickOf(value: string, offers: readonly RuntimeOffer[]): RuntimeP
   return option === undefined ? null : { runtime: option.runtime, model: option.model, effort: null }
 }
 
-/** The efforts the pick's runtime offers, none for a runtime that takes no effort. */
+/** The efforts the picked model takes; the default model keeps its own, so it offers none. */
 export const effortsOf = (pick: RuntimePick, offers: readonly RuntimeOffer[]): readonly string[] =>
-  offers.find((offer) => offer.runtime === pick.runtime)?.efforts ?? []
+  offers.find((offer) => offer.runtime === pick.runtime)?.models.find((model) => model.id === pick.model)?.efforts ?? []
 
 /** The pick while its model is still offered, else the default, as when Codex stops being ready. */
 export function offeredPick(pick: RuntimePick, offers: readonly RuntimeOffer[]): RuntimePick {

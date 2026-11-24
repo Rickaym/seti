@@ -461,14 +461,15 @@ TOOL_SPECS: list[ToolSpec] = [
             "model": {
                 "type": "string",
                 "description": "Only when the user names one: its model, which picks the runtime "
-                "that offers it, so a Codex model alone starts a Codex agent. Claude Code agents take "
-                "none and run on the user's default model. Seti refuses a model no runtime offers or "
-                "one that does not run on the named runtime.",
+                "that offers it: a Claude Code model such as opus, sonnet or haiku, or a Codex model. "
+                "Left out, it runs on the user's default model. Seti refuses a model no runtime offers, "
+                "naming the ones it offers, or one that does not run on the named runtime.",
             },
             "effort": {
                 "type": "string",
                 "enum": ["low", "medium", "high", "xhigh", "max"],
-                "description": "Only for a Codex agent, when the user names one: its reasoning effort.",
+                "description": "Only when the user names one: its reasoning effort, which Seti refuses "
+                "for a model that takes none.",
             },
         },
         ["prompt"],
