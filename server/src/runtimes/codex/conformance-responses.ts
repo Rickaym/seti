@@ -92,6 +92,8 @@ function conversation(body: unknown): { texts: string[]; spoken: number } {
 
 /** A local Responses API that answers Codex's model calls from a neutral script. */
 export class ScriptedResponses {
+  /** Every model call's request body as Codex sent it, in order. */
+  readonly bodies: string[] = []
   private turns: Step[][] = []
   private readonly states = new Map<string, TurnState>()
   private readonly order = new Map<string, number>()
@@ -137,6 +139,7 @@ export class ScriptedResponses {
         res.writeHead(404, { 'content-type': 'application/json' }).end('{"error":{"message":"not scripted"}}')
         return
       }
+      this.bodies.push(raw)
       const said = conversation(JSON.parse(raw) as unknown)
       const steps = this.answer(turnOf(req), said)
       const items = steps.filter((step) => !waits(step)).map((step) => this.item(step, said.texts))

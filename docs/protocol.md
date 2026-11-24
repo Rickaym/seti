@@ -370,6 +370,13 @@ interrupted only for that.
   own home, `/tmp` and proxy. It mounts the agent's folders, workspace, package caches and session
   folder read-only, except the agent's own memory folder and the folders the session names; a
   named folder under a hidden path MUST be refused.
+- SBX-13: A Codex agent MUST NOT be able to change how its runtime runs commands or asks about
+  them. Codex's settings, environment file, sign-in, execution environments, command rules, agent
+  roles and user-level instructions, the home's skills, the startup files of its shell in the
+  private home and the machine's Codex settings are empty and read-only in its sandbox; every
+  other setting and the command search path are passed on Codex's command line, and the approval
+  policy with every resume and turn, so stored session state cannot lower it. `AGENTS.md` in its
+  folders is input the agent wrote, read as a Claude agent reads `CLAUDE.md`.
 
 ### 7.3 Egress
 

@@ -27,6 +27,26 @@ describe('realising a Codex session', () => {
     )
   })
 
+  it('pins on the command line what a file the agent writes could otherwise change', () => {
+    const realised = realiseCodex(spec, launcher({ SETI_MODEL_KEY: 'seti-placeholder', PATH: '/usr/bin:/bin' }), {
+      ...answering,
+      binary: '/c',
+    })
+    const settings = realised.args.filter((_arg, index) => realised.args[index - 1] === '-c')
+    expect(settings).toEqual(
+      expect.arrayContaining([
+        'features.unified_exec_tty=false',
+        'features.hooks=false',
+        'features.goals=false',
+        'features.memories=false',
+        'features.shell_snapshot=false',
+        'skills.include_instructions=false',
+        'approvals_reviewer="user"',
+        'shell_environment_policy.set.PATH="/usr/bin:/bin"',
+      ]),
+    )
+  })
+
   it('refuses an agent without an OpenAI key', () => {
     expect(() => realiseCodex(spec, launcher({}), { ...answering, binary: '/c' })).toThrow(/no OpenAI key/)
   })
