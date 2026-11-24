@@ -521,6 +521,20 @@ interrupted only for that.
   waiting. Only one answer reaches the runtime, the user's or the rules', and it is audited once.
   A request whose turn has stopped is left as it is.
 
+- PERM-15: A command of any agent, on any runtime and in every mode including bypass, that
+  pushes to, forks, opens a pull request on or writes through the code host's API to a repository
+  outside the user's own MUST become a request before it runs, reading "Push to <owner>/<repo>,
+  outside your organisations" or the like; it is an ask, never a refusal. The user's own are the
+  owners of the signed-in code-host account and its organisations, read on the control plane and
+  cached for about an hour, and the owners of the repositories the agent was given. The
+  implementation reads the command past wrappers, nested scripts and `cd`, resolves a remote or
+  URL under HST-2 with the repository's and the agent's own global git config and URL rewrites,
+  in the folder as the agent sees it (a sandbox's private home and /tmp included), and asks
+  whenever it cannot place the target: the same command changes remotes, git config or git's
+  environment, sets the code host's repository or host variables, or pushes submodules. A push
+  to a local path does not ask. An allow rule `PushTo(<owner>)`, which only the user adds, lets
+  that code-host owner through; it is never handed to a runtime.
+
 ### 7.5 Guards
 
 - GRD-1: Shell guard, every agent, whatever the rules or bypass: recursive delete with a computed
@@ -1162,19 +1176,19 @@ An implementation is SETI-compatible when it meets all of:
 
 ### 20.2 Profiles
 
-| Profile       | Adds                                                                          |
-| ------------- | ----------------------------------------------------------------------------- |
-| Sandbox       | all SBX, EGR, HST, CAP, SEC and CHG; PERM-10, PERM-13; GRD-2, GRD-7 to GRD-12 |
-| Shared tools  | all TOOL (requires Sandbox)                                                   |
-| Events        | all CHN; PUB-2 (hooks)                                                        |
-| Pull requests | all PR                                                                        |
-| Team          | all CHAT                                                                      |
-| Assistant     | all EA; LVL-6                                                                 |
-| Separate node | all NODE                                                                      |
-| Mods          | all MOD                                                                       |
-| Sharing       | PUB-4, PUB-7                                                                  |
-| Devices       | API-11                                                                        |
-| Storage       | RES-16 to RES-19                                                              |
+| Profile       | Adds                                                                                   |
+| ------------- | -------------------------------------------------------------------------------------- |
+| Sandbox       | all SBX, EGR, HST, CAP, SEC and CHG; PERM-10, PERM-13, PERM-15; GRD-2, GRD-7 to GRD-12 |
+| Shared tools  | all TOOL (requires Sandbox)                                                            |
+| Events        | all CHN; PUB-2 (hooks)                                                                 |
+| Pull requests | all PR                                                                                 |
+| Team          | all CHAT                                                                               |
+| Assistant     | all EA; LVL-6                                                                          |
+| Separate node | all NODE                                                                               |
+| Mods          | all MOD                                                                                |
+| Sharing       | PUB-4, PUB-7                                                                           |
+| Devices       | API-11                                                                                 |
+| Storage       | RES-16 to RES-19                                                                       |
 
 An implementation without the Sandbox profile MUST NOT claim that agents are untrusted, and MUST
 treat every agent as holding the user's access.
