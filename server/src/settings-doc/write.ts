@@ -94,7 +94,7 @@ const DELETE_PATH = ['agents', 'lifecycle', 'auto_archive', 'delete_after_days']
 export const CONFIRM_IDS = [DELETE_PATH.join('.')]
 
 /** Changes the settings pages show a consequence for, which the user must confirm. */
-function needsConfirm(doc: unknown, next: unknown, confirmed: readonly string[]): SettingsConfirm[] {
+export function needsConfirm(doc: unknown, next: unknown, confirmed: readonly string[]): SettingsConfirm[] {
   const was = valueAt(doc, DELETE_PATH)
   const days = valueAt(next, DELETE_PATH)
   const id = DELETE_PATH.join('.')

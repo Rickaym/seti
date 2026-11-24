@@ -23,7 +23,7 @@ export const pointerOf = (path: DocPath) => path.map((key) => `/${escape(key)}`)
 export const pathOf = (pointer: string): string[] => pointer.split('/').slice(1).map(unescape)
 
 /** The smallest parts that changed: objects on both sides recurse, anything else is one part. */
-function changedParts(from: unknown, to: unknown, at: DocPath = []): DocPath[] {
+export function changedParts(from: unknown, to: unknown, at: DocPath = []): DocPath[] {
   if (isJsonObject(from) && isJsonObject(to)) {
     const keys = new Set([...Object.keys(from), ...Object.keys(to)])
     return [...keys].flatMap((key) => changedParts(from[key], to[key], [...at, key]))

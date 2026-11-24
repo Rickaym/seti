@@ -1,11 +1,12 @@
-import { settingsPatchInput, taskParams, workspaceId } from '@seti/shared'
-import { Hono } from 'hono'
+import { settingsImportInput, settingsPatchInput, taskParams, workspaceId } from '@seti/shared'
+import { Hono, type Context } from 'hono'
 import { bodyLimit } from 'hono/body-limit'
 import { z } from 'zod'
 import { currentRequestSource } from '../access.js'
 import { HttpError, ok, valid, validJson } from '../http.js'
 import { byUser } from '../revisions.js'
 import { settingsDoc, settingsDocDefaults, settingsDocJsonSchema } from '../settings-doc/document.js'
+import { applyImport, previewImport } from '../settings-doc/import.js'
 import { agentSettingsDoc, scopedJsonSchema, workspaceSettingsDoc } from '../settings-doc/scoped.js'
 import { SettingsRefused, writeSettings } from '../settings-doc/write.js'
 
@@ -23,6 +24,14 @@ function userOnly(): void {
   }
 }
 
+/** A refused write answers its reasons; anything else goes to the usual error handler. */
+function refused(c: Context, e: unknown) {
+  if (e instanceof SettingsRefused) {
+    return c.json({ error: e.refusal }, e.status)
+  }
+  throw e
+}
+
 /** Every setting as one JSON document, its defaults, an agent's or workspace's own, and schemas. */
 export const settingsDocRoutes = new Hono()
   .get('/', valid('query', docQuery), async (c) =>
@@ -34,10 +43,19 @@ export const settingsDocRoutes = new Hono()
     try {
       return ok(c, await writeSettings(c.req.valid('json'), byUser('Changed as JSON')))
     } catch (e) {
-      if (e instanceof SettingsRefused) {
-        return c.json({ error: e.refusal }, e.status)
-      }
-      throw e
+      return refused(c, e)
+    }
+  })
+  .post('/import/preview', bodyLimit({ maxSize: PATCH_BYTES_MAX }), validJson(settingsImportInput), async (c) => {
+    userOnly()
+    return ok(c, await previewImport(c.req.valid('json')))
+  })
+  .post('/import', bodyLimit({ maxSize: PATCH_BYTES_MAX }), validJson(settingsImportInput), async (c) => {
+    userOnly()
+    try {
+      return ok(c, await applyImport(c.req.valid('json')))
+    } catch (e) {
+      return refused(c, e)
     }
   })
   .get('/schema', async (c) => ok(c, await settingsDocJsonSchema()))
