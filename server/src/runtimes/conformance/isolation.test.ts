@@ -30,9 +30,9 @@ describe("ISO-1: the scripted adapter, the suite and adapters' suite glue are te
     expect(importing).toEqual([])
   })
 
-  it('the registry names Claude only', () => {
+  it('the registry names Claude and Codex only, never the scripted adapter', () => {
     const registry = readFileSync(path.join(SRC, 'runtimes/registry.ts'), 'utf8')
-    expect(registry).toMatch(/const ADAPTERS = \{ claude: claudeAdapter \}/)
+    expect(registry).toMatch(/const ADAPTERS = \{ claude: claudeAdapter, codex: codexAdapter \}/)
   })
 })
 

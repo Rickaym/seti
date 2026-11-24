@@ -28,7 +28,10 @@ function specFor<Id extends string>(runtime: Id, resume: string | null): Session
     // The stamp is read only by the setup key, never by an adapter.
     sandbox: {} as SessionSpec['sandbox'],
     account: null,
-    vendor: { plugins: [] },
+    // The vendor part of a spec is the runtime's own; no Codex program, so a bench names its own.
+    vendor: (runtime === 'codex'
+      ? { binary: '', model: null, effort: null }
+      : { plugins: [] }) as SessionSpec<Id>['vendor'],
   }
 }
 

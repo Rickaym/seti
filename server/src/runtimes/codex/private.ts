@@ -2,9 +2,24 @@ import type { CodexCall } from './rpc.js'
 
 /**
  * Notifications Seti asks Codex not to send. `remoteControl/status/changed` carries the host's
- * name and an installation id; remote control itself needs a ChatGPT sign-in no agent has.
+ * name and an installation id; remote control itself needs a ChatGPT sign-in no agent has. The
+ * streamed parts of items and the turn's running diff would be stored as rows of their own; the
+ * completed item carries the same text.
  */
-export const OPTED_OUT: readonly string[] = ['remoteControl/status/changed']
+export const OPTED_OUT: readonly string[] = [
+  'remoteControl/status/changed',
+  'item/agentMessage/delta',
+  'item/plan/delta',
+  'item/reasoning/summaryTextDelta',
+  'item/reasoning/summaryPartAdded',
+  'item/reasoning/textDelta',
+  'item/commandExecution/outputDelta',
+  'item/commandExecution/terminalInteraction',
+  'item/fileChange/outputDelta',
+  'item/fileChange/patchUpdated',
+  'item/mcpToolCall/progress',
+  'turn/diff/updated',
+]
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value)

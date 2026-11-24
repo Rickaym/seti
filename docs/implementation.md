@@ -59,7 +59,7 @@ with another top-level folder.
 | Section        | Main files                                                                                                                                                                                                                                                                                                                                                        |
 | -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 3 Entities     | `shared/src/tasks.ts`, `shared/src/inputs.ts`, `shared/src/requests.ts`, `shared/src/events.ts`, `shared/src/runtimes/`, `events/`, `db.ts`, `pending-requests.ts`                                                                                                                                                                                                |
-| 4 Turns        | `runner.ts`, `session-host.ts`, `session-ingest.ts`, `codex-spend.ts`, `session-spec.ts`, `session-realise.ts`, `runtime-host.ts`, `runtimes/`, `agent-session.ts`, `rewind.ts`, `turn-asking.ts`, `closing-line.ts`, `task-location.ts`                                                                                                                          |
+| 4 Turns        | `runner.ts`, `session-host.ts`, `session-ingest.ts`, `codex-spend.ts`, `codex-host.ts`, `codex-decide.ts`, `session-spec.ts`, `session-realise.ts`, `runtime-host.ts`, `runtimes/`, `agent-session.ts`, `rewind.ts`, `turn-asking.ts`, `closing-line.ts`, `task-location.ts`                                                                                      |
 | 4 Restarts     | `session-restart.ts`, `input-queue.ts`                                                                                                                                                                                                                                                                                                                            |
 | 4 Node link    | `node-link.ts`, `node-commands.ts`, `session-control.ts`, `session-mirror.ts`, `session-setup.ts`, `session-tools.ts`, `turn-asks.ts`, `shared/src/node-protocol.ts`                                                                                                                                                                                              |
 | 15.1 Node      | `node/`, `node-client.ts`, `node-split.ts`, `node-inbox.ts`, `node-outbox.ts`, `node-pid.ts`, `tool-calls-restore.ts`, `prompt-open.ts`, `store/node-*.ts`, `shared/src/node-frames.ts`                                                                                                                                                                           |
@@ -221,6 +221,20 @@ the AppArmor profile for `bwrap` that the installer adds ([Setup](setup.md#sandb
   line run that its own read-only list (`policy/read-only.ts`) passes: listed commands run
   directly, reading inside the working directories, with no redirect, substitution, variable or
   wrapper. Claude Code has a classifier, so this changes nothing while it is the only runtime.
+- **Codex agents' calls.** Codex asks before every command, edit and tool server call, and the
+  node hands each ask to the control plane as its neutral call (`call.decide`, `codex-decide.ts`).
+  The evaluator reads it under Claude Code's tool names, so the user's rules apply as written: a
+  command is `Bash`, an edit `Edit` or `Write`. A guard or deny rule refuses it at once and is
+  audited; a review or ask rule asks as for any agent; any other call becomes a request with Allow
+  and Deny only and no editable fields, and the answer route refuses Always allow for it. Beside
+  each answer the user gives, the evaluator's own verdict is counted in `policy_shadow` with mode
+  `codex` and the answer as `user-allow` or `user-deny`; the Claude Code summary leaves those rows
+  out. With `evaluator_decides` on in the Codex settings (`codex_settings`, off by default), an
+  allow from a rule or the read-only list answers without the user. A question goes to the user
+  as an AskUserQuestion call does. The node's Codex host (`codex-host.ts`) serves the agent's tool
+  servers through the relay. Codex is asked not to stream item parts or the turn's running diff,
+  so a Codex agent's rows are its whole items; a line Codex wrote that Seti cannot read is shown
+  live and not stored.
 - **Symlinks.** `decide` reads no disk. Before it runs, the shadow lists the paths a call names
   (`policy/named-paths.ts`) and resolves them where the session runs (`resolve-paths.ts`); links
   above a working directory or home do not count. A deny or ask rule matches a path as given or

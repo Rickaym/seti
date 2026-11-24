@@ -34,4 +34,10 @@ describe('what Seti keeps of a Codex message', () => {
   it("asks Codex not to send remote control's status, which names the host", () => {
     expect(OPTED_OUT).toContain('remoteControl/status/changed')
   })
+
+  it('asks Codex not to stream the parts of items, which the completed item carries', () => {
+    expect(OPTED_OUT).toEqual(
+      expect.arrayContaining(['item/agentMessage/delta', 'item/commandExecution/outputDelta', 'turn/diff/updated']),
+    )
+  })
 })

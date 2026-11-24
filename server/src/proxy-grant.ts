@@ -7,9 +7,6 @@ import { connectorIds, taskDeniedServers } from './mcp-selection.js'
 import type { RuntimeId } from './runtimes/adapter.js'
 import { mcpHosts, mcpTargets, mcpTokens } from './sandbox-mcp.js'
 
-/** The runtimes a sandbox is planned for; Codex joins RuntimeId when it is registered. */
-export type PlannedRuntime = RuntimeId | 'codex'
-
 /** A Codex agent's connections: its own, and its OpenAI key wherever that comes from. */
 async function codexConnections(task: Task): Promise<GrantConnection[]> {
   const own = grantConnections(await taskConnections(task))
@@ -36,7 +33,7 @@ async function codexGrant(task: Task): Promise<ProxyGrant> {
 /** What the agent's egress proxy applies, read from the store, and the MCP servers it turned off. */
 export async function proxyGrant(
   task: Task,
-  runtime: PlannedRuntime = 'claude',
+  runtime: RuntimeId = task.runtime,
 ): Promise<{ grant: ProxyGrant; denied: Set<string> }> {
   const denied = new Set(await taskDeniedServers(task.id))
   if (runtime === 'codex') {

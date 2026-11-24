@@ -52,7 +52,7 @@ export const compactSetup = (rule: CompactRule) => ({
  * Everything a Claude Code process starts with that needs a new process when it changes. The mode
  * is left out: Seti switches a running process's mode without a restart.
  */
-const claudeSetup = (spec: SessionSpec) =>
+const claudeSetup = (spec: SessionSpec<'claude'>) =>
   ({
     cwd: spec.cwd,
     ...(spec.dirs.length === 0 ? {} : { additionalDirectories: spec.dirs }),
@@ -78,7 +78,7 @@ export function claudeLaunch(launcher: Launcher) {
 }
 
 /** Rules for every task, the launcher, and an unsandboxed task's borrowed MCP servers. */
-async function sandboxOptions(spec: SessionSpec, launcher: Launcher) {
+async function sandboxOptions(spec: SessionSpec<'claude'>, launcher: Launcher) {
   const settings = { ...deniedMcpSettings(spec.deniedToolServers), permissions: spec.rules }
   const borrowed = launcher.sandboxed
     ? {}
@@ -98,7 +98,7 @@ function withHostServers(host: ClaudeHost, servers: Record<string, McpServerConf
 
 /** The SDK options a task's Claude Code process starts with, resuming the spec's session if any. */
 export async function realise(
-  spec: SessionSpec,
+  spec: SessionSpec<'claude'>,
   launcher: Launcher,
   host: ClaudeHost,
   abortController: AbortController,

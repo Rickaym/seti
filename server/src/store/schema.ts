@@ -77,6 +77,7 @@ import {
   TASK_WORKTREE_BACKFILL,
   TRIM_SESSION_INIT,
   TASK_RUNTIME,
+  CODEX_SETTINGS,
 } from './schema-tasks.js'
 import {
   EA_DOC_NO_DIRECT,
@@ -229,4 +230,5 @@ export const MIGRATIONS: readonly Migration[] = [
   { version: 123, name: 'dream_nights', sql: DREAM_NIGHTS },
   { version: 124, name: 'dream_proposals', sql: DREAM_PROPOSALS },
   { version: 125, name: 'task_runtime', sql: TASK_RUNTIME },
+  { version: 126, name: 'codex_settings', sql: CODEX_SETTINGS },
 ]

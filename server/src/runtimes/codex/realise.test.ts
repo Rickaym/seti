@@ -4,7 +4,14 @@ import type { SessionSpec } from '../../session-spec.js'
 import { realiseCodex } from './realise.js'
 
 const toolServers = { shared: [], borrowed: { names: [], digest: '' }, signedIn: [], tokens: [] }
-const spec = { runtime: 'codex', cwd: '/work/project', resume: null, toolServers } as unknown as SessionSpec<'codex'>
+const spec = {
+  runtime: 'codex',
+  cwd: '/work/project',
+  resume: null,
+  toolServers,
+  instructions: { append: '' },
+  vendor: { binary: '/c', model: null, effort: null },
+} as unknown as SessionSpec<'codex'>
 const spawn: NonNullable<Launcher['spawn']> = () => {
   throw new Error('not started in this test')
 }

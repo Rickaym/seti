@@ -12,9 +12,17 @@ import { OPTED_OUT } from './private.js'
 import { codexReport, ReportQueue } from './reports.js'
 import { CodexRpc, RpcError, type CodexCall } from './rpc.js'
 
+/** What a Codex agent's spec carries for Codex alone: the program, and the model and effort. */
+interface CodexVendor {
+  binary: string
+  /** Null for the runtime's default model. */
+  model: string | null
+  effort: string | null
+}
+
 /** Codex's shapes: a neutral decision, a JSON-RPC process, stdio tool servers, no hooks or modes. */
 export interface CodexShapes {
-  vendor: unknown
+  vendor: CodexVendor
   realised: CodexRealised
   decide: CodexDecide
   hooks: null
@@ -34,6 +42,8 @@ export interface CodexRealised {
   resume: string | null
   model: string
   effort: string | null
+  /** What Seti tells the agent beside Codex's own instructions, as a Claude agent's prompt gets. */
+  instructions: string
   spawn: Spawn
   decide: CodexDecide
   signal: AbortSignal
@@ -153,8 +163,9 @@ class Driver {
       capabilities: { experimentalApi: true, optOutNotificationMethods: OPTED_OUT },
     })
     this.rpc.notify('initialized')
-    const { resume, cwd, model } = this.realised
-    const common = { cwd, approvalPolicy: APPROVAL, model }
+    const { resume, cwd, model, instructions } = this.realised
+    const told = instructions === '' ? {} : { developerInstructions: instructions }
+    const common = { cwd, approvalPolicy: APPROVAL, model, ...told }
     if (resume === null) {
       this.root = threadReply.parse(await this.rpc.request('thread/start', common)).thread.id
       return

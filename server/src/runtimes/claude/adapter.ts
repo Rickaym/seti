@@ -11,7 +11,7 @@ import { claudeSession, type ClaudeShapes } from './session.js'
 let transport: typeof query = query
 
 /** Claude Code through the Claude Agent SDK, one process per session. */
-export const claudeAdapter: RuntimeAdapter<ClaudeShapes> = {
+export const claudeAdapter: RuntimeAdapter<ClaudeShapes, 'claude'> = {
   id: 'claude',
   capabilities: {
     gate: { rewriteInput: true, classifier: true },

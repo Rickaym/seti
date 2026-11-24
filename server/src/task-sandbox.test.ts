@@ -26,7 +26,7 @@ import { oomRun, oomRunBlocked, oomScriptArgs } from './oom-fixtures.js'
 import { TOOL_OOM_ADJ } from './oom-guard.js'
 import { Proc } from './proc.js'
 import './runner.js'
-import type { PlannedRuntime } from './proxy-grant.js'
+import type { RuntimeId } from './runtimes/adapter.js'
 import { loadSandboxCa, type SandboxCa } from './sandbox-ca.js'
 import { hostClaudeJson } from './sandbox-mcp.js'
 import { projectSlug } from './sandbox-mounts.js'
@@ -160,7 +160,7 @@ describe.skipIf(!available)('a real task sandbox', () => {
     script: string,
     scope: ScopePlan | null = null,
     as: Partial<Task> = {},
-    session: { maintenance?: { writable: readonly string[] }; runtime?: PlannedRuntime } = {},
+    session: { maintenance?: { writable: readonly string[] }; runtime?: RuntimeId } = {},
   ): Promise<{ code: number | null; out: string }> {
     const { maintenance, runtime = 'claude' } = session
     const ctx = { ...sandboxContext(), home }

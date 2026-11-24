@@ -235,6 +235,9 @@ export async function answerPermission(
   input: AnswerPermissionInput,
 ): Promise<PermissionRequest> {
   refuseAgent('answer permission requests')
+  if (input.decision === 'always' && task.runtime === 'codex') {
+    throw new HttpError(400, "A Codex agent's request takes Allow or Deny; a rule would not answer for it")
+  }
   const request = await answerable(task, requestId, input)
   const late = isLateRequest(request.id)
   const message = input.decision === 'deny' ? (input.message ?? null) : null

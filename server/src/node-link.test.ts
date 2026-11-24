@@ -25,6 +25,7 @@ function controlEnd(answer: ControlEnd['answer']['prompt.open']) {
     'ssh.keys': none,
     'tools.list': none,
     'tool.call': none,
+    'call.decide': none,
   }
   serveNode({ journal, answer: answers })
   return { journal, open }
