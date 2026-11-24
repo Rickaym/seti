@@ -149,15 +149,16 @@ between two steps; an interrupt; a hook at subagent start.
   the control room's own, and no question tool, subagents, web tools, plugins, hooks or tool
   servers of the user's. Every tool call passes the control room's gate first, which allows or
   denies it and never asks; the runtime's own memory consolidation is off in it.
-- RT-9: A runtime besides the default is off until the user turns it on and names its program.
-  While it is off, its program is missing or it is not the version the control room is built for,
-  a new agent or session on it MUST be refused with that reason; its agents stay readable. A
-  runtime that needs a model key MUST also refuse a new agent whose credential holds no connection
-  for that key, and its status MUST read "no key", not ready, while the default credential holds
-  none. Only the user changes a runtime's settings, and each change is audited. The control room
-  MUST offer a new agent the models of the default runtime always and those of another runtime
-  only while that runtime can start one; the runtimes it offers MUST be readable with their models
-  and efforts.
+- RT-9: A runtime besides the default is off until the user turns it on. Its status reads off,
+  installing, failed with a reason the user can retry, no key, or ready. While it is not ready, a
+  new agent or session on it MUST be refused with that reason; its agents stay readable. A runtime
+  that needs a model key MUST also refuse a new agent whose credential holds no connection for
+  that key, and its status MUST read "no key", not ready, while the default credential holds none.
+  The status MAY name the one connection for that key the default credential lacks, but nothing
+  but the user changes a credential or connection for it. Only the user changes a runtime's
+  settings, and each change is audited. The control room MUST offer a new agent the models of the
+  default runtime always and those of another runtime only while that runtime can start one; the
+  runtimes it offers MUST be readable with their models and efforts.
 - RT-10: A new agent's start MAY name a runtime, a model and an effort. A model alone MUST pick the
   one runtime that offers it, and a start naming neither runs on the default runtime with the
   user's default model. A model no runtime offers, a runtime and model that disagree, and an
@@ -165,6 +166,22 @@ between two steps; an interrupt; a hook at subagent start.
   runtime's models are the ones it reports for the account, else its stable aliases. An agent
   started on a model and effort MUST run every session start, restart and resume on them; a
   fallback switch (RES-14) lasts until the next session start.
+- RT-11: Turning a runtime on installs the version the control room pins, in the background;
+  pressing Retry and the control room's start while the runtime is on are the only other
+  triggers, and the EA and agents can trigger none of them. The install contacts only the host
+  the pin names, MUST check the downloaded package's sha512 integrity and then the program's
+  sha256, both from the pin, and MUST discard what it fetched and never run it when either
+  differs. The program lands alone in a folder of the control room's own data, one folder per
+  version, read and run only, which a sandbox mounts read-only. The install resumes a cut
+  download, fetches once however often it is asked, and records each install and failure in the
+  audit log with the version and checksum. A user MAY name a program of their own instead, for a
+  machine without network access; it MUST report the pinned version, and nothing is fetched for
+  it.
+- RT-12: When an upgrade moves the pin, the control room installs the new version at its start if
+  the runtime is on. A running session keeps the program it started with until it ends or
+  restarts; a version folder no running program uses, and that the settings no longer need, is
+  removed, as is every copy once the runtime is off or runs a program of the user's. Nothing
+  outside the control room's own folders is removed.
 
 ## 4. Turn lifecycle
 
