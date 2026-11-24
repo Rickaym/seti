@@ -15,6 +15,7 @@ import {
 import { accessSummary, applyStartAccess, awsWithProfile, planStartAccess } from './agent-access.js'
 import { audit, auditPrLink } from './audit.js'
 import { capabilityCache } from './capabilities.js'
+import { requireRuntime } from './codex-status.js'
 import { tasks, type BackfillMessage } from './db.js'
 import { promptAuthor, refuseAgent, refuseOtherAgent } from './ea-guard.js'
 import { watchPrLinked } from './ea-watch.js'
@@ -99,6 +100,7 @@ export async function startTask(
   await contextPacks.assertLinkable(packIds)
   await setiPlugins.assertExist(input.disabled_plugin_ids)
   await requireProfile(input.profile_id)
+  await requireRuntime(input.runtime)
   const access = await planStartAccess(input.access)
   const workspace = await startWorkspace(input.workspace_id)
   const id = randomUUID()
@@ -115,6 +117,9 @@ export async function startTask(
     pr_urls: [...new Set(input.pr_urls ?? [])],
     setup: input.setup ?? null,
     workspace_id: workspace.id,
+    runtime: input.runtime,
+    requested_model: input.model ?? null,
+    requested_effort: input.effort ?? null,
   })
   capabilityCache.prewarm(cwd)
   await taskContextPacks.set(id, packIds)

@@ -107,6 +107,7 @@ import { repoRoutes } from './routes/repos.js'
 import { requestRoutes } from './routes/requests.js'
 import { resourceRoutes } from './routes/resources.js'
 import { revisionRoutes } from './routes/revisions.js'
+import { runtimeRoutes } from './routes/runtimes.js'
 import { sandboxRoutes } from './routes/sandbox.js'
 import { secretRoutes } from './routes/secrets.js'
 import { sessionRoutes } from './routes/sessions.js'
@@ -301,6 +302,7 @@ export function createApp(access: AccessGuardOptions = defaultAccess(), eaUrl: s
   app.route('/api/tasks', taskCompactRoutes)
   app.route('/api/tasks', taskDreamRoutes)
   app.route('/api/dreams', dreamRoutes)
+  app.route('/api/runtimes', runtimeRoutes)
   app.route('/api/trash', trashRoutes)
   app.route('/api/tasks', taskShareRoutes(access.access))
   app.route('/api/shares', shareRoutes(access.access))
