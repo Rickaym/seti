@@ -1,5 +1,5 @@
 import { dreams, idleAgent, lastMemoryActor } from './support/dreams.js'
-import { DREAM_SUMMARY } from './support/fake-dream.js'
+import { DREAM_LINE, DREAM_SUMMARY } from './support/fake-dream.js'
 import { expect, test } from './support/fixtures.js'
 import { FAKE_CLAUDE_ENV } from './support/processes.js'
 
@@ -15,6 +15,12 @@ test('Dream now tidies the memory, shows the report and undoes a file', async ({
   await last.click()
   await expect(dreams(page)).toContainText(DREAM_SUMMARY)
   await expect(dreams(page)).toContainText('MEMORY.md: one rule')
+  await dreams(page).getByRole('button', { name: 'MEMORY.md', exact: true }).click()
+  const diff = page.getByRole('dialog', { name: 'MEMORY.md' })
+  await expect(diff.locator('[data-diff="add"]')).toContainText(DREAM_LINE)
+  await expect(diff.getByRole('button', { name: 'Undo MEMORY.md' })).toBeVisible()
+  await page.keyboard.press('Escape')
+  await expect(diff).toBeHidden()
   await dreams(page).getByRole('button', { name: 'Undo MEMORY.md' }).click()
   await expect.poll(async () => lastMemoryActor(request, id)).toBe('user')
 })

@@ -882,7 +882,8 @@ Optional and off by default: a maintenance session per agent that consolidates i
 - DRM-8: Every memory file a dream changes is recorded as a revision with its text before and
   after, credentials redacted. The user, and the EA after the user's yes, MAY revert it; a revert
   of a file changed since, or of a text kept only redacted, MUST be refused (409). Every change
-  and revert is audited with the path and line counts, never the text.
+  and revert is audited with the path and line counts, never the text. The last dream's report
+  shows each changed file's diff, from that stored text, with its revert beside it.
 - DRM-9: Clean-ups are off by default and a setting. When on, a dream MAY propose a clean-up
   (`trash`, `remove_worktree`, `delete_branch`) with a reason, at most `dream_proposals` a dream.
   The control room checks it when filed and again when the user allows it, and applies it only
