@@ -28,6 +28,7 @@ import { sessionMcp, sessionState } from './mcp-session-status.js'
 import { tokenServers } from './mcp-sign-in.js'
 import { pluginLoaded, setDefaultPluginEnabled } from './plugins.js'
 import { sshKeysChanged } from './proxy-owner.js'
+import { loadsUserServers } from './runtimes/capabilities.js'
 import { signedInServers } from './sandbox-mcp.js'
 import { hostMap, sshReach, sshRoute, type SshReach } from './ssh-config.js'
 import { accessDefaults, taskAccess } from './store/access.js'
@@ -147,7 +148,7 @@ async function mcpItems(task: Task | null): Promise<AccessItem[]> {
           borrowed: entry.local_to.length > 0,
         }))
       : await taskMcpServers(task.id)
-  const stateOf = task === null ? () => null : await sessionStates(task)
+  const stateOf = task === null || !loadsUserServers(task.runtime) ? () => null : await sessionStates(task)
   return servers.map((server) => ({
     kind: 'mcp',
     id: server.name,

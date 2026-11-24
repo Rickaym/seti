@@ -1,7 +1,7 @@
 import type { DreamSettings, Task } from '@seti/shared'
 import { audit } from '../audit.js'
 import { tasks } from '../db.js'
-import { adapterFor, DEFAULT_RUNTIME } from '../runtimes/registry.js'
+import { dreamsOf } from '../runtimes/capabilities.js'
 import { activitySinceLastDream, dreamNights, dreamOptOuts, type PlannedDream } from '../store/dream-nights.js'
 import { sandboxPolicy } from '../store/sandbox.js'
 import { dreamLimits } from './start.js'
@@ -24,7 +24,6 @@ export interface NightToPlan {
 interface Facts {
   off: Awaited<ReturnType<typeof dreamOptOuts.get>>
   sandboxed: boolean
-  memory: boolean
   activity: Map<string, number>
 }
 
@@ -35,7 +34,7 @@ function skipOf(task: Task, facts: Facts): PlanSkip | null {
   if (!facts.sandboxed || !task.sandbox) {
     return 'not_sandboxed'
   }
-  if (!facts.memory) {
+  if (dreamsOf(task.runtime) === null) {
     return 'no_memory'
   }
   return (facts.activity.get(task.id) ?? 0) > 0 ? null : 'nothing_new'
@@ -52,7 +51,6 @@ export async function planNight(input: NightToPlan): Promise<boolean> {
   const facts: Facts = {
     off: await dreamOptOuts.get(),
     sandboxed: (await sandboxPolicy.get()).enabled,
-    memory: adapterFor(DEFAULT_RUNTIME).capabilities.dream !== null,
     activity: await activitySinceLastDream(live.map((task) => task.id)),
   }
   const skipped: Record<string, number> = {}
