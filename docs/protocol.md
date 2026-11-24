@@ -409,8 +409,15 @@ interrupted only for that.
   name-constrained to them whose key stays outside the sandbox. Other hosts are tunnelled unread.
 - EGR-5: A placeholder is `seti-secret-<name>-<32 hex>`, in the connection's variable. The proxy
   swaps it for the value in the URL path and headers (Basic auth too), on the connection's hosts
-  and port 443 only; bodies are not read. A readable request that carries a placeholder elsewhere
-  MUST be refused (403) and audited. A connection with no value answers 502.
+  and port 443 only. A readable request that carries a placeholder elsewhere MUST be refused (403)
+  and audited. A connection with no value answers 502. The agent is told where the value is
+  swapped and that a body is not.
+- EGR-14: On its connections' hosts the proxy reads the body of a JSON, form, multipart or plain
+  text request without a content encoding, holding at most 1 MiB, before anything goes upstream;
+  every other body streams on unread. A held body carrying a placeholder MUST be refused (403)
+  and audited as in EGR-5, naming the connection and never its value, since Seti does not swap a
+  value into a body. A body over 1 MiB streams on while the proxy watches the rest; a placeholder
+  in it cuts the request off and answers 413. A held body goes upstream with its exact length.
 - EGR-7: A header "added by the proxy" is set from its template on every request to the
   connection's hosts, first matching rule winning. The code-host token is the credential's one for
   the owner named, else its default, never another credential's; minted tokens are cached until
@@ -1095,9 +1102,9 @@ treat every agent as holding the user's access.
   API-9.
 - The sandbox is the boundary for agents. Permission rules and the classifier are not; they bind
   the runtime's tools, not what a shell command can do.
-- The egress proxy cannot read tunnelled traffic or request bodies. A placeholder sent in a body,
-  or to an allowlisted host the proxy does not terminate, is not detected; it is still only a
-  placeholder.
+- The egress proxy cannot read tunnelled traffic, and it reads request bodies only as EGR-14
+  says. A placeholder sent in another body, or to an allowlisted host the proxy does not
+  terminate, is not detected; it is still only a placeholder.
 - A webhook delivery that carries its secret as a bearer or shared token proves the sender but not
   the body, and puts the secret on the wire with every delivery.
 - A custom sender definition decides how a public path authenticates, which is why only the user

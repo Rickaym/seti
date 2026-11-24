@@ -96,7 +96,7 @@ export async function swapPlaceholders(
 }
 
 /** Why a request carrying connection placeholders was refused, naming them but no value. */
-const blockedText = (host: string, names: readonly string[]) =>
+export const blockedText = (host: string, names: readonly string[]) =>
   `Seti sandbox proxy: refused a request to ${host} carrying the placeholder of ${names.join(', ')}. ` +
   'Seti sends a connection only to the hosts the user allowed for it.'
 
