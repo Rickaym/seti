@@ -20,7 +20,7 @@ const SECTIONS = [
   'settings/repos',
   'settings/ea',
   'settings/resources',
-  'settings/account',
+  'settings/runtimes',
   'settings/mcp',
   'settings/plugins',
   'settings/skills',

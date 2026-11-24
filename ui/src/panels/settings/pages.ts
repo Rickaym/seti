@@ -24,7 +24,6 @@ import {
   ShieldCheck,
   SlidersHorizontal,
   SquareSlash,
-  UserRound,
   Users,
 } from 'lucide-react'
 import { useSyncExternalStore, type ComponentType } from 'react'
@@ -43,7 +42,6 @@ export type SettingsPageKey =
   | 'runtimes'
   | 'storage'
   | 'channels'
-  | 'account'
   | 'mcp'
   | 'plugins'
   | 'skills'
@@ -104,7 +102,12 @@ const CORE_GROUPS: { group: SettingsGroup; pages: (Omit<SettingsPage, 'group'> &
       },
       { key: 'repos', label: 'Repos', icon: FolderGit2, keywords: 'repositories checkouts warm caches' },
       { key: 'resources', label: 'Resources', icon: Gauge, keywords: 'memory cpu cap host usage' },
-      { key: 'runtimes', label: 'Runtimes', icon: Cpu, keywords: 'codex openai gpt claude code models' },
+      {
+        key: 'runtimes',
+        label: 'Runtimes',
+        icon: Cpu,
+        keywords: 'codex openai gpt claude code models account login usage plan',
+      },
       {
         key: 'storage',
         label: 'Storage',
@@ -117,7 +120,6 @@ const CORE_GROUPS: { group: SettingsGroup; pages: (Omit<SettingsPage, 'group'> &
   {
     group: 'Claude Code',
     pages: [
-      { key: 'account', label: 'Account', icon: UserRound, keywords: 'claude login usage plan' },
       { key: 'mcp', label: 'MCP servers', icon: Blocks },
       { key: 'plugins', label: 'Plugins', icon: Puzzle, keywords: 'marketplaces shared tools' },
       { key: 'skills', label: 'Skills', icon: SquareSlash, keywords: 'slash commands' },

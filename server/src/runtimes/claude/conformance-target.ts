@@ -3,6 +3,7 @@ import { claudeToolCall } from '@seti/shared'
 import type { ConformanceTarget, NeutralHost } from '../conformance/target.js'
 import { claudeAdapter } from './adapter.js'
 import { claudeRig, type QuerySlot } from './conformance-rig.js'
+import { claudeOneShot } from './one-shot.js'
 import type { ClaudeShapes } from './session.js'
 
 /** Claude Code's permission callback, answered by the neutral host. */
@@ -44,4 +45,5 @@ export const claudeTarget = (slot: QuerySlot): ConformanceTarget<ClaudeShapes, '
   },
   host: (neutral) => ({ decide: decideWith(neutral), hooks: {}, toolServers: {} }),
   rig: (script) => claudeRig(slot, script),
+  oneShot: { runner: claudeOneShot, model: 'claude-suite-model' },
 })

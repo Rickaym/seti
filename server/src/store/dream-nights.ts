@@ -1,5 +1,5 @@
 import { DREAM_SETTINGS_DEFAULTS, type DreamSettings } from '@seti/shared'
-import { now, sql, transaction } from '../db.js'
+import { now, sql, transaction, type Db } from '../db.js'
 import { toRun, type DreamRecord } from './dreams.js'
 
 interface SettingsRow extends Omit<DreamSettings, 'dream_budget_usd' | 'night_budget_usd'> {
@@ -20,8 +20,8 @@ export const dreamSettings = {
           night_budget_usd: Number(row.night_budget_usd),
         }
   },
-  set: async (next: DreamSettings): Promise<void> => {
-    await sql`INSERT INTO dream_settings (id, enabled, window_start, window_end, zone, model,
+  set: async (next: DreamSettings, db: Db = sql): Promise<void> => {
+    await db`INSERT INTO dream_settings (id, enabled, window_start, window_end, zone, model,
         dream_budget_usd, night_budget_usd, at_once, cleanups, updated_at)
       VALUES (1, ${next.enabled}, ${next.window_start}, ${next.window_end}, ${next.zone}, ${next.model},
         ${next.dream_budget_usd}, ${next.night_budget_usd}, ${next.at_once}, ${next.cleanups}, ${now()})

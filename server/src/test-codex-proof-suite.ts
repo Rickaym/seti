@@ -1,15 +1,19 @@
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { CODEX_SETTINGS_DEFAULTS, type Task } from '@seti/shared'
+import { CODEX_SETTINGS_DEFAULTS, readSecondOpinion, type Task } from '@seti/shared'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { createApp } from './app.js'
 import { sweepCodex } from './codex-install.js'
 import { CODEX_ROOT } from './config.js'
 import { endSession } from './session-control.js'
+import { OPINION_TOOLS } from './seti-tools/second-opinion.js'
+import { callSetiTool } from './seti-tools/server.js'
 import { codexSettings } from './store/codex-settings.js'
+import { secondOpinions } from './store/second-opinions.js'
 import { canSandbox, proofRun, type ProofRun } from './test-codex-proof.js'
 import { clearConnections } from './test-connections.js'
+import { CLAUDE_OPINION } from './test-opinion-sdk.js'
 
 const PROOF_BINARY = process.env.SETI_CODEX_BIN ?? ''
 
@@ -88,6 +92,35 @@ export function proofSuite(split: boolean): void {
       expect(last).toMatch(/(\\n|")again"/)
       expect(last).toContain('<turn_aborted>')
       expect(last).toContain('The user restarted your Codex session from Seti')
+    }, 120_000)
+
+    it("asks Claude for a second opinion through Seti's tool relay and hears its answer as data", async () => {
+      await run.asksOpinion(task)
+      const told = run.model.told()
+      expect(told).toContain(CLAUDE_OPINION)
+      expect(told).toContain('<second-opinion runtime=\\"claude\\"')
+      expect(await secondOpinions.spend(task.id)).toMatchObject([{ runtime: 'claude', count: 1, usd: 0.002 }])
+    }, 120_000)
+
+    it("answers a Claude agent's second opinion from Codex in a bare sandbox, with the key only the proxy adds", async () => {
+      const claude = await run.claudeAgent()
+      run.model.play([[{ say: 'Codex says: release the queue lock before evict().' }]])
+      const [tool] = OPINION_TOOLS
+      if (tool === undefined) {
+        throw new Error('no second_opinion tool')
+      }
+      const result = await callSetiTool(tool, claude.id, { question: 'Is the lock order safe?' })
+      run.egressNoted()
+      const text = result.content[0]?.text ?? ''
+      expect(result.isError, text).toBeUndefined()
+      expect(readSecondOpinion(text)).toMatchObject({
+        runtime: 'codex',
+        answer: 'Codex says: release the queue lock before evict().',
+        estimated: true,
+      })
+      expect(new Set(run.model.authorizations)).toEqual(new Set([`Bearer ${run.key}`]))
+      expect(new Set(run.model.dialled)).toEqual(new Set(['api.openai.com']))
+      expect(run.model.refused).toEqual([])
     }, 120_000)
   })
 }

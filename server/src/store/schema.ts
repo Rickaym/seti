@@ -8,7 +8,7 @@ import { CHANGE_REQUESTS } from './schema-change-requests.js'
 import { CHANGELOG } from './schema-changelog.js'
 import { COMPACT_RULES } from './schema-compact.js'
 import { CONNECTIONS, secretsToConnections } from './schema-connections.js'
-import { recountTaskCosts, TASK_COST_SESSION, TASK_SIDE_CHAT_COST } from './schema-cost.js'
+import { recountTaskCosts, TASK_COST_SESSION, TASK_SECOND_OPINION, TASK_SIDE_CHAT_COST } from './schema-cost.js'
 import { CPU_CAPS } from './schema-cpu.js'
 import { ANDROID_OVERRIDE, DEVICE_SHOW_NAMES, DEVICES, dropOfficialAndroidRow } from './schema-devices.js'
 import { DREAM_NIGHTS, DREAM_PROPOSALS, DREAM_RUNS } from './schema-dreams.js'
@@ -77,6 +77,7 @@ import {
   TASK_WORKTREE_BACKFILL,
   TRIM_SESSION_INIT,
   TASK_RUNTIME,
+  CODEX_RULES_DECIDE_DEFAULT,
   CODEX_SETTINGS,
   TASK_APPROVAL_CEILING,
 } from './schema-tasks.js'
@@ -233,4 +234,6 @@ export const MIGRATIONS: readonly Migration[] = [
   { version: 125, name: 'task_runtime', sql: TASK_RUNTIME },
   { version: 126, name: 'codex_settings', sql: CODEX_SETTINGS },
   { version: 127, name: 'task_approval_ceiling', sql: TASK_APPROVAL_CEILING },
+  { version: 128, name: 'codex_rules_decide_default', sql: CODEX_RULES_DECIDE_DEFAULT },
+  { version: 129, name: 'task_second_opinion', sql: TASK_SECOND_OPINION },
 ]

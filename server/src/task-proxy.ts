@@ -1,13 +1,13 @@
 import fs from 'node:fs'
 import path from 'node:path'
-import type { NodeAsk, ProxyGrant } from '@seti/shared'
+import type { ModelReach, NodeAsk, ProxyGrant } from '@seti/shared'
 import { askInTime } from './ask-in-time.js'
 import { SETI_HOME } from './config.js'
 import { connectionPlaceholders, connectionRules, mcpLoginRules, type ConnectionValue } from './egress-connections.js'
 import { modelOnly } from './egress-hosts.js'
 import type { EgressPlaceholder } from './egress-placeholders.js'
 import { startEgressProxy, type EgressProxy, type Upstream } from './egress-proxy.js'
-import type { EgressRule } from './egress-rules.js'
+import { ruleCaHosts, type EgressRule } from './egress-rules.js'
 import { nodeLink } from './node-link.js'
 import { sandboxDirOf } from './owned-dirs.js'
 import { proxyCa } from './proxy-owner.js'
@@ -166,26 +166,39 @@ export async function openTaskProxy(taskId: string, grant: ProxyGrant): Promise<
 export const maintenanceDirOf = (taskId: string) => path.join(sandboxDirOf(taskId), 'maintenance')
 
 const modelProxies = new Map<string, Promise<EgressProxy>>()
-const modelLogins = new Map<string, string | null>()
+const modelReaches = new Map<string, ModelReach>()
+
+/** The key connection of a model reach as the proxy applies it, its value asked for each request. */
+function keyRules(taskId: string) {
+  const key = modelReaches.get(taskId)?.key ?? null
+  const value = connectionValueAsk(taskId)
+  return key === null
+    ? { rules: [], placeholders: [] }
+    : { rules: connectionRules([key], value), placeholders: connectionPlaceholders([key], value) }
+}
 
 /**
  * Opens the proxy of the agent's maintenance sandbox, which reaches the model provider with the
- * agent's login and nothing else: no allowlist, connection, connector, cloud or ssh.
+ * agent's login, or the connection of its OpenAI key, and nothing else: no allowlist, other
+ * connection, connector, cloud or ssh. A proxy already open applies the new reach at once.
  */
-export async function openModelProxy(taskId: string, login: string | null): Promise<void> {
-  modelLogins.set(taskId, login)
+export async function openModelProxy(taskId: string, model: ModelReach): Promise<void> {
+  modelReaches.set(taskId, model)
+  const authority = await sandboxCa()
+  await authority.cover(model.key === null ? [] : ruleCaHosts([model.key]))
   if (modelProxies.has(taskId)) {
     return
   }
   const run = path.join(maintenanceDirOf(taskId), 'run')
   fs.mkdirSync(run, { recursive: true, mode: 0o700 })
-  const started = sandboxCa().then(async (authority) =>
-    startEgressProxy({
-      socketPath: path.join(run, 'proxy.sock'),
-      ca: authority,
-      ...modelOnly(async () => mint(taskId, { kind: 'claude', login: modelLogins.get(taskId) ?? null })),
-    }),
-  )
+  const started = startEgressProxy({
+    socketPath: path.join(run, 'proxy.sock'),
+    ca: authority,
+    ...modelOnly(async () => mint(taskId, { kind: 'claude', login: modelReaches.get(taskId)?.login ?? null })),
+    rules: () => keyRules(taskId).rules,
+    placeholders: () => keyRules(taskId).placeholders,
+    ...(testEgress === null ? {} : { upstream: testEgress.upstream, onRefused: testEgress.refused }),
+  })
   modelProxies.set(taskId, started)
   started.catch(() => modelProxies.delete(taskId))
   await started
@@ -196,7 +209,7 @@ export async function closeTaskProxy(taskId: string): Promise<void> {
   const running = [proxies.get(taskId), modelProxies.get(taskId)]
   proxies.delete(taskId)
   modelProxies.delete(taskId)
-  modelLogins.delete(taskId)
+  modelReaches.delete(taskId)
   forgetAwsToken(taskId)
   access.delete(taskId)
   for (const proxy of running) {

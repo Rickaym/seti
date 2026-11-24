@@ -92,12 +92,12 @@ describe('the Codex runtime in Settings', () => {
     expect(recorded?.detail).toMatchObject({ runtime: 'codex', changed: ['program'] })
   })
 
-  it('refuses a change from the EA, an agent or a relative path, and keeps evaluator_decides off', async () => {
-    expect((await change({ evaluator_decides: true }, EA_AUTH)).status).toBe(403)
+  it('refuses a change from the EA, an agent or a relative path, and keeps evaluator_decides on', async () => {
+    expect((await change({ evaluator_decides: false }, EA_AUTH)).status).toBe(403)
     const caller = { id: 'runtimes-agent', title: 'Agent', seti_control: 'full' as const }
-    await expect(asAgent(caller, async () => updateCodexSettings({ evaluator_decides: true }))).rejects.toThrow()
+    await expect(asAgent(caller, async () => updateCodexSettings({ evaluator_decides: false }))).rejects.toThrow()
     expect((await change({ program: 'codex' })).status).toBe(400)
-    expect((await codexSettings.get()).evaluator_decides).toBe(false)
+    expect((await codexSettings.get()).evaluator_decides).toBe(true)
   })
 })
 

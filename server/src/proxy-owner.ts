@@ -1,11 +1,11 @@
-import type { ProxyGrant } from '@seti/shared'
+import type { ModelReach, ProxyGrant } from '@seti/shared'
 import { reloadSshAgents } from './ssh-agent.js'
 
 /** The process that runs agents' egress proxies, when it is not this one. */
 interface ProxyOwner {
   open: (taskId: string, grant: ProxyGrant) => Promise<void>
   /** Opens the proxy of the agent's maintenance sandbox, which reaches only the model provider. */
-  openModel: (taskId: string, login: string | null) => Promise<void>
+  openModel: (taskId: string, reach: ModelReach) => Promise<void>
   close: (taskId: string) => Promise<void>
   /** The token the agent's processes show the proxy to fetch AWS credentials. */
   awsToken: (taskId: string) => Promise<string>
@@ -31,8 +31,8 @@ export async function proxyHere(taskId: string, grant: ProxyGrant, start: () => 
 }
 
 /** Starts the proxy of the agent's maintenance sandbox here, or where agents' proxies run. */
-export async function modelProxyHere(taskId: string, login: string | null, start: () => Promise<void>): Promise<void> {
-  await (owner === null ? start() : owner.openModel(taskId, login))
+export async function modelProxyHere(taskId: string, reach: ModelReach, start: () => Promise<void>): Promise<void> {
+  await (owner === null ? start() : owner.openModel(taskId, reach))
 }
 
 /** Stops a removed agent's egress proxy where it runs. */

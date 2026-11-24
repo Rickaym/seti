@@ -90,8 +90,8 @@ export async function connectNode(): Promise<void> {
     open: async (agent, grant) => {
       await controlLink.command('proxy.open', { agent, grant })
     },
-    openModel: async (agent, login) => {
-      await controlLink.command('proxy.model', { agent, login })
+    openModel: async (agent, reach) => {
+      await controlLink.command('proxy.model', { agent, ...reach })
     },
     close: async (agent) => {
       await controlLink.command('proxy.close', { agent }).catch((e: unknown) => {
