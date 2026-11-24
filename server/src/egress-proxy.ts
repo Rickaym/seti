@@ -21,7 +21,7 @@ import {
   unlessLate,
 } from './egress-answers.js'
 import { isAwsCredentialsPath, serveAwsCredentials, type EgressAws } from './egress-aws.js'
-import { headersForBody, planBody, type BodyPlan } from './egress-body.js'
+import { headersForBody } from './egress-body.js'
 import {
   ANTHROPIC_HOST,
   ANTHROPIC_HOSTS,
@@ -45,7 +45,7 @@ import {
 import { relayUpgrade, tunnel } from './egress-relay.js'
 import { relayRenewing } from './egress-replay.js'
 import { applyRules, ruleCovers, type Applied, type EgressRule } from './egress-rules.js'
-import { relay } from './egress-send.js'
+import { bodyOf, relay } from './egress-send.js'
 import type { SandboxCa } from './sandbox-ca.js'
 
 /** Where connections for a host really go; tests point them at local fakes. */
@@ -170,18 +170,6 @@ class Egress {
     return keyRequest({ target, path, headers }, this.placeholders(), this.options.onBlocked)
   }
 
-  /** How the body goes on, or null once the request is refused or its client went away. */
-  private async bodyOf(target: Target, req: IncomingMessage, res: ServerResponse): Promise<BodyPlan | null> {
-    const plan = await planBody(target, req.headers, req, this.placeholders())
-    if (plan !== null && 'status' in plan) {
-      this.options.onBlocked?.(target.host, plan.names)
-      answer(res, plan.status, plan.body)
-      req.resume()
-      return null
-    }
-    return plan
-  }
-
   private hasRule(target: Target): boolean {
     return (
       this.rulesFor(target).length > 0 ||
@@ -229,7 +217,7 @@ class Egress {
       req.resume()
       return
     }
-    const plan = await this.bodyOf(target, req, res)
+    const plan = await bodyOf({ target, req, res }, this.placeholders(), this.options.onBlocked)
     const address = plan === null ? null : await this.reach(target)
     if (address instanceof Error) {
       answer(res, 502, address.message)
@@ -331,7 +319,7 @@ class Egress {
       req.resume()
       return
     }
-    const plan = await this.bodyOf(target, req, res)
+    const plan = await bodyOf({ target, req, res }, this.placeholders(), this.options.onBlocked)
     if (plan === null) {
       return
     }

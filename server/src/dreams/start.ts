@@ -8,7 +8,7 @@ import { fromDelegate } from '../ea-guard.js'
 import { HttpError } from '../http.js'
 import { pendingRequests } from '../pending-requests.js'
 import type { DreamSupport } from '../runtimes/adapter.js'
-import { adapterFor, DEFAULT_RUNTIME } from '../runtimes/registry.js'
+import { dreamsOf } from '../runtimes/capabilities.js'
 import { isRunning, sessionState } from '../session-mirror.js'
 import { dreamSettings, nightRuns } from '../store/dream-nights.js'
 import { dreamRuns } from '../store/dreams.js'
@@ -48,7 +48,7 @@ export interface DreamRefusal {
 
 /** Why the agent cannot dream now, or null when it can. */
 async function dreamRefusal(task: Task): Promise<DreamRefusal | null> {
-  const dream = adapterFor(DEFAULT_RUNTIME).capabilities.dream
+  const dream = dreamsOf(task.runtime)
   const checks: [boolean | (() => Promise<boolean>), string, boolean][] = [
     [task.archived_at !== null, 'The agent is archived.', false],
     [dream === null, "The agent's runtime keeps no memory Seti can find.", false],
@@ -98,7 +98,7 @@ interface Ready {
 
 /** The memory folder and its state before a dream, or why it cannot dream; claims the agent. */
 async function prepare(task: Task): Promise<Ready | string> {
-  const dream = adapterFor(DEFAULT_RUNTIME).capabilities.dream
+  const dream = dreamsOf(task.runtime)
   if (dream === null) {
     return "The agent's runtime keeps no memory Seti can find."
   }
@@ -207,8 +207,8 @@ export async function startNightly(
 async function changesOfCut(run: DreamRun): Promise<number> {
   const before = keptBefore(run.task_id, run.id)
   const task = await tasks.get(run.task_id)
-  const memory = adapterFor(DEFAULT_RUNTIME).capabilities.dream?.memory(task?.cwd ?? '') ?? null
-  if (before === null || task === undefined || memory === null) {
+  const memory = task === undefined ? null : (dreamsOf(task.runtime)?.memory(task.cwd) ?? null)
+  if (before === null || memory === null) {
     return 0
   }
   return (await recordAfter(run.task_id, run, memory, before)).changes
