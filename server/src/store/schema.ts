@@ -237,5 +237,5 @@ export const MIGRATIONS: readonly Migration[] = [
   { version: 128, name: 'codex_rules_decide_default', sql: CODEX_RULES_DECIDE_DEFAULT },
   { version: 129, name: 'task_second_opinion', sql: TASK_SECOND_OPINION },
   { version: 130, name: 'connection_body', sql: CONNECTION_BODY },
-  { version: 131, name: 'dream_prompt_version', sql: DREAM_PROMPT_VERSION },
+  { version: 132, name: 'dream_prompt_version', sql: DREAM_PROMPT_VERSION },
 ]
