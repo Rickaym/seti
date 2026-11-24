@@ -1,5 +1,6 @@
 import {
   AGENT_COLOR_PRESETS,
+  DELEGATE_LIMITS,
   agentColorFromWords,
   listedStatus,
   rewindInput,
@@ -14,6 +15,8 @@ import { z } from 'zod'
 import { capOf } from '../agent-cap.js'
 import { startAgent } from '../agent-start.js'
 import { archiveTask, listArchived, unarchiveTask } from '../archive.js'
+import { waitForFirstTurn, waitMinutes } from '../crew/delegate-call.js'
+import { heldWait } from '../crew/delegate-wait.js'
 import { HttpError } from '../http.js'
 import { deliverPending, dismissPending } from '../inputs.js'
 import { rewindTargets, rewindTask } from '../rewind-task.js'
@@ -128,20 +131,38 @@ const startTaskTool = setiTool({
       .describe(
         'Seti adds a brief of your work so far after the prompt: what you were asked, your plan, steps, files and PRs, redacted, without direct messages.',
       ),
+    wait_minutes: z
+      .number()
+      .int()
+      .min(0)
+      .max(DELEGATE_LIMITS.waitMinutes)
+      .default(0)
+      .describe(
+        'Wait in this call up to this many minutes for its first turn to end and get its final message as the result. Past that, or when you are interrupted, it goes on and its end reaches you as an update. While it asks the user for a permission, your call waits too. 0 returns at once.',
+      ),
   },
-  run: async ({ prompt, title, workspace, notify_when_done, runtime, model, effort, include_brief }, ctx) => {
+  run: async (args, ctx) => {
+    const minutes = waitMinutes(args.wait_minutes)
     const input = startAgentInput.parse({
-      prompt,
-      title,
-      workspace_id: workspace === undefined ? ctx.caller.workspace_id : (await resolveWorkspace(workspace)).id,
-      notify_when_done,
-      runtime,
-      model,
-      effort,
-      ...(include_brief ? { brief_of: ctx.caller.id } : {}),
+      prompt: args.prompt,
+      title: args.title,
+      workspace_id:
+        args.workspace === undefined ? ctx.caller.workspace_id : (await resolveWorkspace(args.workspace)).id,
+      notify_when_done: args.notify_when_done || minutes > 0,
+      runtime: args.runtime,
+      model: args.model,
+      effort: args.effort,
+      ...(args.include_brief ? { brief_of: ctx.caller.id } : {}),
     })
-    const task = await startAgent(input, await capOf(ctx.caller))
-    return { ...brief(task), setup: task.setup }
+    const held = heldWait()
+    const task = await startAgent(input, await capOf(ctx.caller), held.hold)
+    if (minutes === 0) {
+      return { ...brief(task), setup: task.setup }
+    }
+    return {
+      ...brief(task),
+      result: await waitForFirstTurn(ctx.caller, task, { wait: held, minutes, signal: ctx.signal }),
+    }
   },
 })
 

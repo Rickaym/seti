@@ -7,6 +7,12 @@ export const SECOND_OPINION_TOOL = 'second_opinion'
 /** The tag a second opinion reaches the asking agent in. */
 export const SECOND_OPINION_TAG = 'second-opinion'
 
+/**
+ * Limits on agents that agents start: running ones per caller and on the install, what one
+ * caller's may cost in 24 hours, and the longest a caller waits for one in its call.
+ */
+export const DELEGATE_LIMITS = { running: 4, install: 12, budgetUsd: 10, waitMinutes: 60 } as const
+
 /** The tag a brief of another agent's work reaches an agent in. */
 export const HANDOVER_TAG = 'handover-brief'
 

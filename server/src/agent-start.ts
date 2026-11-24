@@ -8,27 +8,29 @@ import {
 import { capStart, type AccessCap } from './agent-cap.js'
 import { awaitTurnEnd, requestWaiter } from './agent-waits.js'
 import { sendKey, sendOnce } from './client-sends.js'
+import { checkDelegateLimits } from './crew/delegate-limits.js'
 import { withBrief } from './crew/handover.js'
 import { fromEa } from './ea-guard.js'
 import { planAgent, planTitle } from './planner.js'
+import type { AgentWait } from './store/agent-waits.js'
 import { approvalCeilings } from './store/approval-ceilings.js'
 import { requireTask, startTask } from './tasks.js'
 import { checkStaged, refuseCommandAttachments } from './uploads.js'
 
 /** With notify, sets up the wait once the agent exists and before its first turn starts. */
-async function firstTurnWait(notify: boolean) {
+async function firstTurnWait(notify: boolean, hold: ((wait: AgentWait) => void) | undefined) {
   if (!notify) {
     return undefined
   }
   const waiter = await requestWaiter()
   return async (taskId: string) => {
-    await awaitTurnEnd(await requireTask(taskId), waiter)
+    hold?.(await awaitTurnEnd(await requireTask(taskId), waiter))
   }
 }
 
 /** Holds the new agent to its starter's approvals, then sets up the wait, before its first turn. */
-async function beforeFirstTurn(notify: boolean, cap: AccessCap | undefined) {
-  const waited = await firstTurnWait(notify)
+async function beforeFirstTurn(notify: boolean, cap: AccessCap | undefined, hold?: (wait: AgentWait) => void) {
+  const waited = await firstTurnWait(notify, hold)
   const ceiling = cap?.approvals ?? null
   return async (taskId: string) => {
     if (ceiling !== null) {
@@ -43,10 +45,17 @@ async function beforeFirstTurn(notify: boolean, cap: AccessCap | undefined) {
  * unless the user turned that off. An agent starting another passes its cap: the new one is
  * sandboxed, gets nothing its starter lacks, grants nothing and settles no call more loosely.
  */
-export async function startAgent(input: StartAgentRequest, cap?: AccessCap): Promise<Task> {
+export async function startAgent(
+  input: StartAgentRequest,
+  cap?: AccessCap,
+  hold?: (wait: AgentWait) => void,
+): Promise<Task> {
+  if (cap !== undefined) {
+    await checkDelegateLimits(cap.task_id)
+  }
   return sendOnce(
     sendKey('task_start', 'new', input.client_id),
-    async () => startPlanned(cap === undefined ? input : { ...input, sandbox: true }, cap),
+    async () => startPlanned(cap === undefined ? input : { ...input, sandbox: true }, cap, hold),
     {
       save: (task) => task.id,
       load: requireTask,
@@ -68,10 +77,10 @@ async function firstPrompt(input: StartAgentRequest): Promise<string> {
   return input.brief_of === undefined ? input.prompt : withBrief(input.prompt, await requireTask(input.brief_of))
 }
 
-async function startPlanned(input: StartAgentRequest, cap?: AccessCap): Promise<Task> {
+async function startPlanned(input: StartAgentRequest, cap?: AccessCap, hold?: (wait: AgentWait) => void) {
   refuseCommandAttachments(input.prompt, input.attachments)
   checkStaged(input.attachments)
-  const onCreated = await beforeFirstTurn(input.notify_when_done, cap)
+  const onCreated = await beforeFirstTurn(input.notify_when_done, cap, hold)
   const plan = await planAgent(input.prompt, {
     title: input.title,
     fromEa: fromEa(),
