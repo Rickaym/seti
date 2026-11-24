@@ -18,12 +18,12 @@ import {
   type TaskStatus,
 } from '@seti/shared'
 import { DATABASE_URL } from './config.js'
-import { messageColumns } from './events/columns.js'
 import { pickAgentColor } from './new-agent-color.js'
 import { connect, ensureDatabase, migrate, written, type Alongside, type Db } from './pg.js'
 import { scrubValue } from './scrub.js'
 import { eventFilters } from './store/event-filters.js'
-import { readBody, readOutward, readPayload, readStoredBody, storedJson, type StoredPayload } from './stored-rows.js'
+import { insertMessage } from './store/message-insert.js'
+import { readBody, readOutward, readPayload, readStoredBody, type StoredPayload } from './stored-rows.js'
 
 export type { Db, Pool } from './pg.js'
 
@@ -191,25 +191,6 @@ type PromptRecord = Pick<MessageRecord, 'id' | 'payload'>
 function sentPrompt(taskId: string, row: PromptRecord): DroppedPrompt | null {
   const prompt = readPayload({ task_id: taskId, id: row.id }, 'prompt', row.payload)
   return prompt && { id: row.id, text: prompt.text, attachments: prompt.attachments ?? [], from: prompt.from }
-}
-
-interface NewMessage {
-  taskId: string
-  body: MessageBody
-  outward: string[]
-  createdAt: string
-}
-
-/** Stores a message with its credentials redacted, so the database never holds them. */
-async function insertMessage(db: Db, { taskId, body, outward, createdAt }: NewMessage) {
-  const payload = storedJson(scrubValue(body.payload))
-  const row = { task_id: taskId, kind: body.kind, payload, outward: JSON.stringify(outward), created_at: createdAt }
-  const [stored] = await db<{ id: number }[]>`INSERT INTO task_message ${db({ ...row, ...messageColumns(body) })}
-    RETURNING id`
-  if (stored === undefined) {
-    throw new Error('Message was not recorded')
-  }
-  return stored.id
 }
 
 export const tasks = {
