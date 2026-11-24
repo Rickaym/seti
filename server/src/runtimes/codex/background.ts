@@ -87,6 +87,11 @@ export class Background {
       : { message: { method: 'thread/backgroundTerminals/list', params }, reply: { data } }
   }
 
+  /** Whether the call is a command running on in the background. */
+  isJob(id: string): boolean {
+    return this.jobs.has(id)
+  }
+
   /** Asks Codex to stop a background command; its end then reports it stopped. */
   async stop(jobId: string): Promise<void> {
     const job = [...this.jobs.values()].find((each) => each.id === jobId)

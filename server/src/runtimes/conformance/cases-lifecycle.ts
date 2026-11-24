@@ -1,6 +1,6 @@
 import { expect } from 'vitest'
 import { closed, ofType, turnEnd, type Case } from './case.js'
-import type { RunView } from './run.js'
+import { settle, type RunView } from './run.js'
 import { echoOf } from './script.js'
 
 /** The session id the session reported first. */
@@ -8,6 +8,16 @@ async function sessionIdOf(run: RunView): Promise<string> {
   const started = await run.until((event) => event.type === 'session.started', 'session.started')
   return started.type === 'session.started' ? started.sessionId : ''
 }
+
+/** How long a resumed runtime gets to report what it reports on its own before any input. */
+const QUIET_MS = 1000
+
+/** Reports that would mark the agent at work: its own output, or a session start. */
+const workReports = (run: RunView) =>
+  run.reports.filter(
+    (report) =>
+      report.type === 'message' && (report.byAgent || report.events.some((e) => e.type === 'session.started')),
+  )
 
 /** Session lifecycle: open, first and later turns, close, resume, abort, turn starts. */
 export const LIFECYCLE: Case[] = [
@@ -126,6 +136,29 @@ export const LIFECYCLE: Case[] = [
         expect(at).toBeLessThan(firstMessage)
       }
       await closed(run)
+    },
+  },
+  {
+    id: 'LC-8',
+    title: 'a resumed session reports no work and no session start until its first input',
+    proves: 'SessionMessage.byAgent; TURN-15 a restart leaves an idle agent idle',
+    run: async (subject) => {
+      const rig = subject.rig({ turns: [[{ say: 'noted' }], [{ say: 'again' }]] })
+      const first = await subject.open(rig)
+      first.send('one')
+      await turnEnd(first, 1)
+      const id = await sessionIdOf(first)
+      await closed(first)
+      const second = await subject.open(rig, { resume: id })
+      await settle()
+      await new Promise((resolve) => {
+        setTimeout(resolve, QUIET_MS)
+      })
+      expect(workReports(second)).toEqual([])
+      second.send('two')
+      await turnEnd(second, 1)
+      expect(ofType(second, 'session.started').map((started) => started.sessionId)).toEqual([id])
+      await closed(second)
     },
   },
 ]

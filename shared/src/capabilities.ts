@@ -60,6 +60,8 @@ export interface ModelEntry {
   value: string
   display_name: string
   description: string
+  /** The efforts the model takes; missing from snapshots probed before Seti read them. */
+  efforts?: string[]
 }
 
 export interface AccountSummary {

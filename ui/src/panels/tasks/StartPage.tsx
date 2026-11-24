@@ -15,7 +15,7 @@ import { RETRYING_LABEL, useClientSend } from '@/hooks/useClientSend'
 import { useCommandCatalog } from '@/hooks/useCommandCatalog'
 import { useDraft } from '@/hooks/useDraft'
 import { useCoarsePointer } from '@/hooks/useMedia'
-import { useRuntimes } from '@/hooks/useRuntimes'
+import { useStartPick } from '@/hooks/useStartPick'
 import { useSystem } from '@/hooks/useSystem'
 import { useTasks } from '@/hooks/useTasks'
 import { useUserName } from '@/hooks/useUserName'
@@ -23,7 +23,7 @@ import { useCurrentWorkspace } from '@/hooks/useWorkspaces'
 import { withTokens } from '@/lib/attachments'
 import { NEW_TASK_PROMPT } from '@/lib/drafts'
 import { navigate } from '@/lib/route'
-import { CODEX_HINT, DEFAULT_PICK, offeredPick, pickFields, type RuntimePick } from '@/lib/runtime-pick'
+import { pickFields } from '@/lib/runtime-pick'
 import { AttachButton, DraftAttachments } from '@/panels/tasks/AttachmentChips'
 import { CommandField, ComposerStatus } from '@/panels/tasks/CommandField'
 import { ModelPicker } from '@/panels/tasks/ModelPicker'
@@ -39,9 +39,9 @@ const inWorkspace = (input: StartAgentInput, workspaceId: string | null): StartA
   workspaceId === null ? input : { ...input, workspace_id: workspaceId }
 
 /** What the composer says while idle: a start on Codex or unsandboxed says so first. */
-function idleHint(sandboxed: boolean, touch: boolean, codex: boolean): string {
-  if (codex) {
-    return CODEX_HINT
+function idleHint(sandboxed: boolean, touch: boolean, runtimeHint: string | null): string {
+  if (runtimeHint !== null) {
+    return runtimeHint
   }
   if (!sandboxed) {
     return UNSANDBOXED
@@ -103,8 +103,7 @@ export function StartPage() {
   const find = useFind()
   const [starting, setStarting] = useState(false)
   const [sandboxed, setSandboxed] = useState(true)
-  const [picked, setPick] = useState<RuntimePick>(DEFAULT_PICK)
-  const pick = offeredPick(picked, useRuntimes().data?.offers ?? [])
+  const { pick, setPick, runtimeHint } = useStartPick()
   const codex = pick.runtime === 'codex'
   const clientSend = useClientSend()
   const commands = useCommandCatalog('/commands', prompt.trimStart().startsWith('/'))
@@ -211,7 +210,7 @@ export function StartPage() {
               check={check}
               commands={commands}
               shellCwd={null}
-              idle={attachments.pending ?? idleHint(sandboxed, touch, codex)}
+              idle={attachments.pending ?? idleHint(sandboxed, touch, runtimeHint)}
             />
           )}
         </div>

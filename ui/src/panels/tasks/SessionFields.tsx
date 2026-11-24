@@ -1,4 +1,4 @@
-import { warmCacheNote, type Task } from '@seti/shared'
+import { RUNTIME_NAMES, warmCacheNote, type Task } from '@seti/shared'
 import { Fields, Row } from '@/panels/tasks/SettingsFields'
 import { PlannerFallback, WarmCaches } from '@/panels/tasks/StartFacts'
 import { TaskCompact } from '@/panels/tasks/TaskCompact'
@@ -6,6 +6,14 @@ import { TaskCost } from '@/panels/tasks/TaskCost'
 import { TaskCpu } from '@/panels/tasks/TaskCpu'
 import { TaskMemory } from '@/panels/tasks/TaskMemory'
 import { TaskModel } from '@/panels/tasks/TaskModel'
+
+/** The runtime and what the agent was started with, shown for Codex and for a picked Claude model. */
+function runtimeLine(task: Task): string | null {
+  const model = task.runtime === 'codex' ? null : task.requested_model
+  const parts = [RUNTIME_NAMES[task.runtime], model, task.requested_effort]
+  const picked = parts.filter((part) => part !== null)
+  return task.runtime === 'codex' || picked.length > 1 ? picked.join(', ') : null
+}
 
 /** The Session tab of the agent settings: model, cost, caps, compaction and how it started. */
 export function SessionFields({ task, running }: { task: Task; running: boolean }) {
@@ -16,9 +24,7 @@ export function SessionFields({ task, running }: { task: Task; running: boolean 
           <TaskModel task={task} running={running} />
         </Row>
       )}
-      {task.runtime === 'codex' && (
-        <Row label="Runtime">{['Codex', task.requested_effort].filter((part) => part !== null).join(', ')}</Row>
-      )}
+      {runtimeLine(task) !== null && <Row label="Runtime">{runtimeLine(task)}</Row>}
       <Row label="Cost">
         <TaskCost cost={task.cost_usd} estimated={task.runtime === 'codex'} />
       </Row>
