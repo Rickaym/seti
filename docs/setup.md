@@ -567,11 +567,11 @@ instructions; skills in its own folders are never offered. A Codex agent gets th
 sandboxed Claude Code agent gets from your Claude Code config: local servers without keys run in
 its sandbox, and remote ones over streamable HTTP reach it when they need no key or the proxy signs
 them. Every call to them asks you, unless an allow rule of yours names the server or tool and Rules
-decide is on. SSE servers and claude.ai connectors are Claude only. Codex agents have no side chat,
-rewind, Bypass or plugins. Their cost is an estimate from the price table in
-`server/src/runtimes/codex/prices.ts`, which names the day it was read; to update it, copy the
-standard rates from OpenAI's pricing page into that table, set `asOf` to the day, and run
-`pnpm check`.
+decide is on. SSE servers and claude.ai connectors are Claude only; the agent's access marks each
+server it cannot use and says why. Codex agents have no side chat, rewind, Bypass or plugins.
+Their cost is an estimate from the price table in `server/src/runtimes/codex/prices.ts`, which
+names the day it was read; to update it, copy the standard rates from OpenAI's pricing page into
+that table, set `asOf` to the day, and run `pnpm check`.
 
 With both runtimes set up, any agent with Seti control can ask the other one for a second
 opinion with its `second_opinion` tool: a Claude agent asks Codex, a Codex agent asks Claude.

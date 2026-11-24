@@ -99,7 +99,7 @@ export async function taskFile(taskId: string): Promise<Rendered | null> {
     packs: linked.flatMap((pack) => (pack.kind === 'role' ? [] : (slugOf(slugs, pack.id) ?? []))),
     role: role === undefined ? null : { name: role.name, slug: slugOf(slugs, role.id) ?? '' },
     channels: await channelSubscriptions.forTask(taskId),
-    mcp: loadsUserServers(task.runtime) ? await taskMcpNames(taskId) : null,
+    mcp: loadsUserServers(task.runtime) ? await taskMcpNames(task) : null,
     access: await taskAccessNames(task),
   }
   return { text: renderTask(view), stamp: null }

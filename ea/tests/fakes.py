@@ -777,6 +777,7 @@ class FakeSeti:
     task_mcp: dict[str, dict[str, bool]] = field(default_factory=dict)
     ssh_hosts: list[str] = field(default_factory=lambda: ["jump", "k8s"])
     ssh_keys: dict[str, str | None] = field(default_factory=lambda: {"jump": "ops", "k8s": "ops"})
+    unusable_servers: dict[str, str] = field(default_factory=dict)
     ssh_sets: dict[str, list[str]] = field(default_factory=dict)
     access_defaults: dict[str, bool] = field(default_factory=dict)
     processes: dict[str, dict[str, Any]] = field(default_factory=dict)
@@ -1152,6 +1153,7 @@ class FakeSeti:
                     "jump_for": [],
                     "missing_key": [] if kind != "ssh" or self.ssh_keys.get(item_id) else [item_id],
                     "in_set": False,
+                    "unusable": self.unusable_servers.get(item_id) if kind == "mcp" else None,
                 }
             )
         return items

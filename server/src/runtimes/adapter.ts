@@ -148,8 +148,15 @@ export interface Capabilities {
   rewind: { conversation: boolean; code: boolean }
   /** Dreams, or null where the runtime keeps no memory Seti can find. */
   dream: DreamSupport | null
-  /** Transports of the user's own tool servers it loads, and Seti's plugins, beside Seti's tools. */
-  tools: { userServers: readonly McpTransport['type'][]; plugins: boolean }
+  /**
+   * Transports of the user's own tool servers it loads, the server names it can take and that
+   * rule in words (null for any name), and Seti's plugins, beside Seti's tools.
+   */
+  tools: {
+    userServers: readonly McpTransport['type'][]
+    serverNames: { pattern: RegExp; rule: string } | null
+    plugins: boolean
+  }
   /** It can run outside Seti's sandbox. */
   sandbox: { optional: boolean }
   /** It takes a rule for when to compact its context. */

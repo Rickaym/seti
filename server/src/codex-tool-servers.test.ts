@@ -17,6 +17,7 @@ const grant = (hosts: string[] = []): ProxyGrant => ({
             hosts,
             header: { name: 'Authorization', template: 'Bearer {value}' },
             minted: false,
+            body: false,
           },
         ],
   mcp: [],
@@ -88,7 +89,7 @@ describe("a Codex agent's MCP servers", () => {
       },
     }
     expect(codexServersOf(host, scope()).unusable).toEqual([
-      { name: 'events', reason: 'Codex reaches remote servers over streamable HTTP only, not SSE.' },
+      { name: 'events', reason: 'Codex agents cannot use SSE servers.' },
       { name: 'has space', reason: 'Codex takes server names of letters, digits, - and _ only.' },
     ])
   })

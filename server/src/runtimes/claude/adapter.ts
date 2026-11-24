@@ -18,7 +18,7 @@ export const claudeAdapter: RuntimeAdapter<ClaudeShapes, 'claude'> = {
     gate: { rewriteInput: true, classifier: true },
     session: { fork: 'ephemeral' },
     rewind: { conversation: true, code: true },
-    tools: { userServers: MCP_TRANSPORTS, plugins: true },
+    tools: { userServers: MCP_TRANSPORTS, serverNames: null, plugins: true },
     sandbox: { optional: true },
     compaction: true,
     dream: {

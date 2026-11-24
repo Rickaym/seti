@@ -3,8 +3,13 @@ import { describe, expect, it, vi } from 'vitest'
 import { createApp } from './app.js'
 import { sql, tasks } from './db.js'
 import { startDream } from './dreams/start.js'
-import { mcpOffContext } from './mcp-off-context.js'
-import { pluginRuntimes, runtimeCapabilities, serverRuntimes, withRuntimes } from './runtimes/capabilities.js'
+import {
+  pluginRuntimes,
+  runtimeCapabilities,
+  serverProblem,
+  serverRuntimes,
+  withRuntimes,
+} from './runtimes/capabilities.js'
 import { setTaskSandbox } from './tasks.js'
 import { USER_AUTH } from './test-auth.js'
 import { renderTask } from './workspace/task-file.js'
@@ -34,7 +39,7 @@ const app = createApp({ access: null, verify: null })
 const HEADERS = { host: 'localhost', ...USER_AUTH, 'content-type': 'application/json' }
 
 describe("what an agent's runtime declares", () => {
-  it('serves each runtime what its adapter declares: Claude Code all, Codex none of these', async () => {
+  it('serves each runtime what its adapter declares: Claude Code all, Codex some of these', async () => {
     const served = (await (await app.request('/api/runtimes/capabilities', { headers: HEADERS })).json()) as {
       data: unknown
     }
@@ -43,8 +48,8 @@ describe("what an agent's runtime declares", () => {
     expect(runtimeCapabilities().claude.mcp_transports).toEqual(['stdio', 'sse', 'http', 'sdk', 'claudeai-proxy'])
     expect(runtimeCapabilities().codex).toEqual({
       label: 'Codex',
-      mcp_servers: false,
-      mcp_transports: [],
+      mcp_servers: true,
+      mcp_transports: ['stdio', 'http'],
       plugins: false,
       unsandboxed: false,
       compaction: false,
@@ -54,8 +59,7 @@ describe("what an agent's runtime declares", () => {
     })
   })
 
-  it('tells a Codex agent of no MCP servers it could ask for, and says its sessions load none', async () => {
-    expect(await mcpOffContext(CODEX)).toBeNull()
+  it("says in the task file of a runtime that loads none of the user's MCP servers that it loads none", async () => {
     const text = renderTask({
       task: await codexTask(),
       handle: 'codex',
@@ -82,10 +86,21 @@ describe("what an agent's runtime declares", () => {
     await expect(startDream(task)).rejects.toThrow("The agent's runtime keeps no memory Seti can find.")
   })
 
-  it("says which runtimes can use each MCP server: those that take its transport, and a plugin's only where plugins load", () => {
-    const transport = (type: McpTransport['type']) => ({ type, target: null })
-    expect(serverRuntimes(transport('stdio'), null)).toEqual(['claude'])
-    expect(serverRuntimes(transport('http'), 'plugin:acme')).toEqual(['claude'])
+  it("says which runtimes can use each MCP server: those that take its transport and name, and a plugin's only where plugins load", () => {
+    const server = (type: McpTransport['type'], name = 'docs', plugin = false) => ({ name, type, plugin })
+    expect(serverRuntimes(server('stdio'))).toEqual(['claude', 'codex'])
+    expect(serverRuntimes(server('http'))).toEqual(['claude', 'codex'])
+    expect(serverRuntimes(server('sse'))).toEqual(['claude'])
+    expect(serverRuntimes(server('claudeai-proxy'))).toEqual(['claude'])
+    expect(serverRuntimes(server('stdio', 'has space'))).toEqual(['claude'])
+    expect(serverRuntimes(server('http', 'plugin:acme:docs', true))).toEqual(['claude'])
+    expect(serverProblem('codex', server('sse'))).toBe('Codex agents cannot use SSE servers.')
+    expect(serverProblem('codex', server('stdio', 'has space'))).toBe(
+      'Codex takes server names of letters, digits, - and _ only.',
+    )
+    expect(serverProblem('codex', server('stdio', 'plugin:acme:docs', true))).toBe(
+      'Codex agents load no plugins, so none of their servers.',
+    )
     expect(pluginRuntimes()).toEqual(['claude'])
   })
 
@@ -114,6 +129,6 @@ describe("what an agent's runtime declares", () => {
       subagents: [],
       models: [],
     }
-    expect(withRuntimes(snapshot).servers.map((s) => s.runtimes)).toEqual([['claude'], undefined])
+    expect(withRuntimes(snapshot).servers.map((s) => s.runtimes)).toEqual([['claude', 'codex'], undefined])
   })
 })

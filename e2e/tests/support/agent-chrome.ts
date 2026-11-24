@@ -60,6 +60,7 @@ const mcp = (n: number): AccessItem => ({
   missing_key: [],
   in_set: false,
   session: null,
+  unusable: null,
 })
 
 /**

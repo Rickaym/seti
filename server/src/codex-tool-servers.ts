@@ -1,5 +1,6 @@
-import { hostMatches, type ProxyGrant, type Task } from '@seti/shared'
+import { hostMatches, MCP_TRANSPORTS, type McpTransport, type ProxyGrant, type Task } from '@seti/shared'
 import { ownProjects, readHostConfig, taskBorrowedServers } from './mcp-borrowed.js'
+import { serverProblem } from './runtimes/capabilities.js'
 import { sandboxServers } from './sandbox-claude-json.js'
 import { signedInServers } from './sandbox-mcp.js'
 
@@ -16,33 +17,35 @@ export interface UnusableServer {
   reason: string
 }
 
-/** Codex reads an MCP server's name as a bare key of its settings. */
-const SERVER_NAME = /^[A-Za-z0-9_-]{1,64}$/
-
 const isObject = (value: unknown): value is Json => typeof value === 'object' && value !== null && !Array.isArray(value)
 
 const strings = (value: unknown): string[] | null =>
   Array.isArray(value) && value.every((each) => typeof each === 'string') ? value : null
 
+/** The transport a Claude Code config entry names; an entry without one is a local server. */
+const transportOf = (server: Json): McpTransport['type'] | null => {
+  const type = server.type ?? 'stdio'
+  return MCP_TRANSPORTS.find((each) => each === type) ?? null
+}
+
 /** One filtered server entry as Codex takes it, or why it cannot. */
 function codexServer(name: string, server: unknown): CodexToolServer | UnusableServer {
-  if (!SERVER_NAME.test(name)) {
-    return { name, reason: 'Codex takes server names of letters, digits, - and _ only.' }
-  }
-  if (!isObject(server)) {
+  const type = isObject(server) ? transportOf(server) : null
+  if (!isObject(server) || type === null) {
     return { name, reason: 'Its configuration cannot be read.' }
   }
-  if (server.type === 'sse') {
-    return { name, reason: 'Codex reaches remote servers over streamable HTTP only, not SSE.' }
+  const problem = serverProblem('codex', { name, type, plugin: false })
+  if (problem !== null) {
+    return { name, reason: problem }
   }
-  if (server.type === 'http' && typeof server.url === 'string') {
+  if (type === 'http' && typeof server.url === 'string') {
     return { name, transport: 'http', url: server.url }
   }
   const args = server.args === undefined ? [] : strings(server.args)
-  if ((server.type === undefined || server.type === 'stdio') && typeof server.command === 'string' && args !== null) {
+  if (type === 'stdio' && typeof server.command === 'string' && args !== null) {
     return { name, transport: 'stdio', command: server.command, args }
   }
-  return { name, reason: 'Codex has no transport for this kind of server.' }
+  return { name, reason: 'Its configuration cannot be read.' }
 }
 
 /**

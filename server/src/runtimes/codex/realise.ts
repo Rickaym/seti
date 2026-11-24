@@ -34,7 +34,10 @@ const toml = (value: Setting[1]) =>
 const TOOL_TIMEOUT_S = 7 * 24 * 60 * 60
 
 /** Codex reads an MCP server's name as a bare key of its settings. */
-const SERVER_NAME = /^[A-Za-z0-9_-]+$/
+const SERVER_NAME = /^[A-Za-z0-9_-]{1,64}$/
+
+/** The server names Codex takes, and that rule in words. */
+export const SERVER_NAMES = { pattern: SERVER_NAME, rule: 'letters, digits, - and _ only' }
 
 /**
  * The tool servers Codex starts: the host's, then the shared tools, which read the agent's

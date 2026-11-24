@@ -7,6 +7,7 @@ import {
   type McpSelectionEntry,
   type McpSelectionKind,
   type McpServer,
+  type StoredRuntime,
   type Task,
   type TaskMcpServer,
 } from '@seti/shared'
@@ -16,6 +17,7 @@ import { tasks } from './db.js'
 import { refuseAgent } from './ea-guard.js'
 import { isBorrowed, localServers, ownProjects, readHostConfig, tilde } from './mcp-borrowed.js'
 import { mcpGone } from './mcp-presence.js'
+import { probedServerProblem } from './runtimes/capabilities.js'
 import { DIRECT, type SettingsWrite } from './settings-write.js'
 import { mcpDefaults, taskMcpChoices } from './store/mcp.js'
 import { signalWorkspaces } from './workspace/dir.js'
@@ -125,11 +127,28 @@ export async function mcpDefaultFor(name: string, taskId: string | null): Promis
   return defaultOf(name, await mcpDefaults.all(), scope)
 }
 
-/** Names of the servers a task loads and leaves out, from what is probed already, for task.md. */
-export async function taskMcpNames(taskId: string): Promise<{ enabled: string[]; disabled: string[] }> {
-  const servers = await taskMcpServers(taskId, false)
+/** Why the runtime's agents cannot use each server probed so far, by name; null when they can. */
+export function serverProblems(runtime: StoredRuntime): (name: string) => string | null {
+  const known = new Map(knownServers().map((server) => [server.name, server]))
+  return (name) => {
+    const server = known.get(name)
+    return server === undefined ? null : probedServerProblem(runtime, server)
+  }
+}
+
+/**
+ * Names of the servers a task loads, leaves out and cannot use on its runtime, from what is
+ * probed already, for task.md.
+ */
+export async function taskMcpNames(
+  task: Pick<Task, 'id' | 'runtime'>,
+): Promise<{ enabled: string[]; disabled: string[]; unusable: string[] }> {
+  const problem = serverProblems(task.runtime)
+  const all = await taskMcpServers(task.id, false)
+  const servers = all.filter((s) => problem(s.name) === null)
   const names = (on: boolean) => servers.filter((s) => s.enabled === on && (s.known || !on)).map((s) => s.name)
-  return { enabled: names(true), disabled: names(false) }
+  const unusable = all.filter((s) => problem(s.name) !== null).map((s) => s.name)
+  return { enabled: names(true), disabled: names(false), unusable }
 }
 
 /** What a task's session leaves out, read at every session start and in its setup key. */
