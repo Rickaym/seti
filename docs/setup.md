@@ -22,7 +22,7 @@ curl -fsSL https://raw.githubusercontent.com/rickaym/seti/main/scripts/install.s
    `ssh -L 3006:127.0.0.1:3006 <host>`.
 4. Sign in with the local token: `cat ~/.seti/credentials/local-token-user` and paste it. The
    browser keeps an HttpOnly session cookie for 30 days.
-5. In Settings, check the Claude account under Account and the sandbox under Sandbox. An agent
+5. In Settings, check the Claude login under Runtimes and the sandbox under Sandbox. An agent
    starts in a fresh folder of its own under `~/work` and clones the repos it needs, so there is
    no repo or directory to pick first.
 

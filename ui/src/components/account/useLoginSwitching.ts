@@ -6,7 +6,7 @@ import { setLoginMenu } from '@/components/account/login-menu'
 import { useCommands } from '@/components/palette/useCommands'
 import { CHORDS, useChords } from '@/components/shortcuts/chords'
 import { switchLogin } from '@/hooks/useAccount'
-import { navigate } from '@/lib/route'
+import { openSettingsCard } from '@/lib/route'
 
 const NOTICED_KEY = 'seti:unsaved-login-noticed'
 
@@ -25,7 +25,7 @@ function noticeOnce(email: string): boolean {
 }
 
 const openAccountSettings = () => {
-  navigate('settings', 'account')
+  openSettingsCard('runtimes', 'claude')
 }
 
 /** Ctrl+K "Switch to" commands, the Alt chord for the switcher, and the unsaved login notice. */

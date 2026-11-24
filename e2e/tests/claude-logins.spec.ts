@@ -19,7 +19,7 @@ test('saves two logins, switches from the status bar and Ctrl+K, and restarts an
 }) => {
   await savedLogins(request)
   signInAs('work')
-  await page.goto('/#settings/account')
+  await page.goto('/#settings/runtimes')
   const main = page.getByRole('main')
   const logins = main.getByRole('region', { name: 'Saved logins' })
   const unsaved = logins.getByTestId('unsaved-login')

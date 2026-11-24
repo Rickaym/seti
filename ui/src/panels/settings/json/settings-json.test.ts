@@ -9,7 +9,6 @@ import { docSections, exportName, pruned, shownSections } from './settings-json'
  */
 const NO_SETTINGS: Record<string, string> = {
   about: "what's new and the version",
-  account: "Claude Code's login state, kept by Claude Code",
   skills: "Claude Code's skill files, read by the probe",
   subagents: "Claude Code's agent files, read by the probe",
   audit: 'a log, not settings',
