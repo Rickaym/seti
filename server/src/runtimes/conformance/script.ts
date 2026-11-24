@@ -61,6 +61,9 @@ export interface Script {
 /** The reply of a turn the script has no steps for: its inputs' text, joined by `|`. */
 export const echoOf = (inputs: readonly string[]): string => `heard: ${inputs.join('|')}`
 
+/** Reasoning a model keeps sealed for its own next call: a fake that seals sends this text. */
+export const SEALED_REASONING = 'gAAAAB-sealed-reasoning-of-the-scripted-model'
+
 /** A turn that uses most of what a runtime reports: reasoning, text, and calls of several kinds. */
 export const VARIED: Step[] = [
   { think: 'plan the work' },

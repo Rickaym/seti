@@ -1,10 +1,27 @@
-import type { AgentInput, ChannelInput, PrInput, SetiInput, TaskInput, TeamInput, WorkspaceInput } from '@seti/shared'
+import {
+  SECOND_OPINION_TAG,
+  type AgentInput,
+  type ChannelInput,
+  type PrInput,
+  type SetiInput,
+  type TaskInput,
+  type TeamInput,
+  type WorkspaceInput,
+} from '@seti/shared'
 import { subtaskNote } from './subtask-prs.js'
 
 const BODY_CHARS = 6000
 
 /** The tags updates reach an agent in; a body may neither open nor close any of them. */
-const FRAME_TAGS = ['update', 'team-chat', 'workspace-edit', 'channel-event', 'agent-turn', 'seti-answer']
+const FRAME_TAGS = [
+  'update',
+  'team-chat',
+  'workspace-edit',
+  'channel-event',
+  'agent-turn',
+  'seti-answer',
+  SECOND_OPINION_TAG,
+]
 
 /** An attribute value that cannot end its quotes or start a tag. */
 export const tagAttribute = (value: string): string =>
@@ -17,7 +34,7 @@ export function containTags(text: string, tags: readonly string[]): string {
 }
 
 /** A frame whose attributes are escaped and whose body cannot close it or fake another frame. */
-function tagged(tag: string, attributes: Record<string, string | undefined>, body: string): string {
+export function tagged(tag: string, attributes: Record<string, string | undefined>, body: string): string {
   const attrs = Object.entries(attributes).flatMap(([name, value]) =>
     value === undefined ? [] : [` ${name}="${tagAttribute(value)}"`],
   )

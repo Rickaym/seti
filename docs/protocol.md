@@ -184,6 +184,9 @@ between two steps; an interrupt; a hook at subagent start.
   restarts; a version folder no running program uses, and that the settings no longer need, is
   removed, as is every copy once the runtime is off or runs a program of the user's. Nothing
   outside the control room's own folders is removed.
+- RT-14: A runtime whose model can summarise its reasoning MUST ask for the summary, so its agents
+  show their thinking as the default runtime's do. Reasoning the model seals for its own next call
+  MUST NOT be stored, served or shown by the control room.
 
 ## 4. Turn lifecycle
 
@@ -263,6 +266,7 @@ between two steps; an interrupt; a hook at subagent start.
 <agent-turn agent="TITLE" task_id="ID" ended="idle|error|stopped">...</agent-turn>
 <seti-answer request_id="ID" outcome="allowed|denied|expired">...</seti-answer>
 <workspace-edit file="F">...</workspace-edit>
+<second-opinion runtime="R" model="M" seconds="S" cost_usd="C" estimated="true|false">...</second-opinion>
 ```
 
 ## 6. Attention
@@ -496,6 +500,11 @@ interrupted only for that.
   for the agent's life and leaves Bypass to the user. A Codex agent or a held one MUST NOT import
   sessions, which would run under the classifier. The user's and the EA's starts are not held:
   the EA has no regime of its own and starts agents only in a turn the user began (EA-8).
+- PERM-14: When the user lets the rules decide for a runtime with no classifier, each request of
+  that runtime's agents still waiting MUST be decided again as a new call would be: one the rules
+  allow runs, one a guard or deny rule refuses is refused with the reason, and the rest keep
+  waiting. Only one answer reaches the runtime, the user's or the rules', and it is audited once.
+  A request whose turn has stopped is left as it is.
 
 ### 7.5 Guards
 
@@ -782,6 +791,18 @@ Why: an agent woken by its own actions or by news nobody waited for burns turns 
 - LVL-15: Agents at `self` or `full` propose knowledge notes, at most `notes_waiting` each, refused
   with credentials or private paths. Only a bounded index of approved titles reaches prompts,
   framed as reference, not instructions. Notes go stale by `note_stale`.
+- DLG-5: An agent at `self` or `full` MAY ask a model on another runtime one question, with text
+  and up to `opinion_files` of its own files read under the file hand-off rules. The answering
+  model MUST be offered no tool and refuse any call unasked, run in a sandbox of its own that
+  mounts none of the agent's folders, reach only its provider, with the asking agent's
+  credential, and keep no session. With no runtime named, the first runtime in offer order that
+  is not the caller's and can answer for its credential answers, with its first model. What is
+  sent MUST be redacted and bounded by `opinion_sizes`, and MUST NOT quote a direct message the
+  agent can read. It is refused with the reason while no such runtime is ready, while the sandbox
+  is off, while the agent has one running, and past `opinion_rate`. The answer reaches the agent
+  as its tool result in a `<second-opinion>` tag (UPD-13) with a preface that it is data. The
+  cost is the caller's, marked estimated where the runtime reports none; the audit records the
+  runtime, model, sizes, cost and outcome, never the text.
 
 ## 14. The assistant
 
@@ -1113,7 +1134,7 @@ An implementation is SETI-compatible when it meets all of:
 3. Update delivery: UPD-1 to UPD-8, UPD-11, UPD-13.
 4. Attention: ATT-1 to ATT-11, ATT-14 to ATT-18, ATT-21, ATT-23, ATT-25.
 5. Actors and reserved powers: ACT-1 to ACT-6.
-6. Permission requests with timeout: PERM-1 to PERM-8; guards GRD-1, GRD-4.
+6. Permission requests with timeout: PERM-1 to PERM-8, PERM-14; guards GRD-1, GRD-4.
 7. Questions and levels: LVL-1 to LVL-5, LVL-8 to LVL-13.
 8. Resilience: RES-1 to RES-9, RES-11, RES-12.
 9. Audit chain: AUD-1 to AUD-12.
@@ -1208,6 +1229,7 @@ others.
 | Sharing      | Preview pages 1 to 50. `share_rate` a minute per client: 30 misses, 120 pages or downloads, 600 images. `share_size` 10 MB. Expiry 1, 7 or 30 days.                                                                                                                                                                                                                                    |
 | Client       | `sse_keepalive` 15 s. `body_max` 8 MB. `session_life` idle 7 days, absolute 30 days. Setup code 15 min. Attempts per 10 min: 20 sign-in, 20 setup, 10 pairing. `pair_ttl` 5 min.                                                                                                                                                                                                       |
 | Uploads      | `upload_file` 25 MB. `upload_stall` 30 s. `upload_idle` 60 s. `upload_time` 30 min.                                                                                                                                                                                                                                                                                                    |
+| Opinions     | `opinion_sizes`: question 8,000, context 60,000, files 40,000 in all, answer 8,000 characters. `opinion_files` 5. `opinion_rate` 1 at a time, 20 an hour, 60 a day an agent. Time 5 min. 4,000 output tokens. $1 a call.                                                                                                                                                               |
 | Dreams       | Window 01:00 to 05:00. `dream_gap` 2 min. `dream_retry` 10 min. `dream_steps` 60. `dream_time` 20 min. `dream_budget` $1. Night budget $5. `dream_gates`: five-hour use 60%, weekly 85%, load 0.75 x cores, 5 GB free. `dream_digest` 40,000 characters. Memory folder 512 KB, 100 files. `dream_proposals` 10. `proposal_expiry` 7 days. `trash_keep` 14 days. `trash_item_max` 5 GB. |
 
 ## Appendix B. Retired identifiers

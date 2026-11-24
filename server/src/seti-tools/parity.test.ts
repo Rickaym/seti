@@ -8,12 +8,20 @@ import { SETI_TOOLS } from './catalog.js'
 import { KNOWLEDGE_TOOLS } from './knowledge.js'
 import { modActionTools } from './mod-actions.js'
 import { REQUEST_TOOLS, SECRET_TOOLS } from './requests.js'
+import { OPINION_TOOLS } from './second-opinion.js'
 import { HANDOFF_TOOLS } from './team.js'
 
 const EA_SOURCES = path.resolve(import.meta.dirname, '../../../ea/src/seti_ea')
 
 /** Seti control tools and the ones every agent gets. */
-const AGENT_SIDE = [...SETI_TOOLS, ...HANDOFF_TOOLS, ...REQUEST_TOOLS, ...SECRET_TOOLS, ...KNOWLEDGE_TOOLS]
+const AGENT_SIDE = [
+  ...SETI_TOOLS,
+  ...HANDOFF_TOOLS,
+  ...REQUEST_TOOLS,
+  ...SECRET_TOOLS,
+  ...KNOWLEDGE_TOOLS,
+  ...OPINION_TOOLS,
+]
 
 /** EA tools agents do not get, each with the reason; everything else the EA has, agents have too. */
 const NOT_FOR_AGENTS: Record<string, string> = {
@@ -51,6 +59,9 @@ const ONLY_FOR_AGENTS: Record<string, string> = {
   read_transcript: "The EA reads a time window with get_task's window, which keeps it under its tool cap.",
   search_knowledge: "The EA searches notes with search_seti's knowledge scope, which keeps it under its tool cap.",
   verify_knowledge: 'A check runs the verify step in a repo, which the EA has no shell for.',
+  second_opinion:
+    "The EA asks its own reasoning model with think; a second opinion runs in the asking agent's sandbox on " +
+    'its credential and bills that agent.',
 }
 
 /**
