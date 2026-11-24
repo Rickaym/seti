@@ -14,6 +14,7 @@ const ROOT = '1700000000.000100'
 const reply = (ts: string, fields: Record<string, unknown> = {}) =>
   message({ channel: 'C0PROJ1234', ts, thread_ts: ROOT, ...fields })
 const MULTI = 'C0MULTI123'
+const OWNER = { authorizations: [{ user_id: 'U0OWNER001', is_bot: false }] }
 
 const queued = async (task: string) =>
   sql<{ message: string; text: string }[]>`SELECT r.message, r.text FROM thread_reply r
@@ -23,24 +24,41 @@ const switches = async (channel: WebhookChannelInfo, change: object) =>
   data<WebhookChannelInfo>(await api('PUT', `/channels/${channel.id}/threads`, change))
 
 describe('Slack message events at the webhook', () => {
-  it('keep plain messages from subscribers unless the filter keeps them, and note that they arrive', async () => {
+  it('with replies on and no filter, pass mentions either way and hold other messages', async () => {
     const channel = await slackWebhook('Slack mentions')
     expect(channel.threads).toEqual({ replies: false, dms: false, message_seen_at: null })
-    const ignored = await deliver(channel, message({ channel: 'C0PROJ1234', ts: '1700000001.000100' }))
-    expect(ignored.status).toBe('ignored')
-    expect(ignored.reason).toContain('in no followed thread')
-    const mention = await deliver(channel, { event: { type: 'app_mention', text: 'hi', ts: '1700000002.000100' } })
-    expect(mention.status).toBe('accepted')
-    expect((await channelStore.recent(channel.id, 5)).map((event) => event.kind)).toEqual(['app_mention'])
+    await switches(channel, { replies: true })
+    const owned = (fields: Record<string, unknown>) => ({ ...OWNER, ...message({ channel: 'C0PROJ1234', ...fields }) })
+    const ignored = await deliver(channel, owned({ ts: '1700000001.000100' }))
+    expect(ignored).toMatchObject({ status: 'ignored', reason: expect.stringContaining('mentions only') as string })
+    const app = { ...OWNER, event: { type: 'app_mention', text: '<@U0OWNER001> hi', ts: '1700000002.000100' } }
+    expect((await deliver(channel, app)).status).toBe('accepted')
+    const asMessage = await deliver(channel, owned({ ts: '1700000003.000100', text: 'hey <@U0OWNER001|ricky>' }))
+    expect(asMessage.status).toBe('accepted')
+    const other = await deliver(channel, owned({ ts: '1700000004.000100', text: 'hey <@U0SOMEONE1>' }))
+    expect(other.status).toBe('ignored')
+    expect((await channelStore.recent(channel.id, 5)).map((event) => event.kind)).toEqual(['message', 'app_mention'])
     const seen = (await data<WebhookChannelInfo[]>(await api('GET', '/channels'))).find((c) => c.id === channel.id)
     expect(seen?.threads?.message_seen_at).not.toBeNull()
+  })
 
-    await data(
-      await api('PUT', `/channels/${channel.id}/filter`, { script: 'export default () => true', enabled: true }),
-    )
-    expect((await deliver(channel, message({ channel: 'C0PROJ1234', ts: '1700000003.000100' }))).status).toBe(
+  it('with replies on and a filter, let the filter decide message events; a failing one passes mentions', async () => {
+    const channel = await slackWebhook('Filtered')
+    await switches(channel, { replies: true })
+    const filter = async (script: string) =>
+      data(await api('PUT', `/channels/${channel.id}/filter`, { script, enabled: true }))
+    await filter('export default () => true')
+    expect((await deliver(channel, message({ channel: 'C0PROJ1234', ts: '1700000005.000100' }))).status).toBe(
       'accepted',
     )
+    await filter('export default () => false')
+    const mention = { ...OWNER, ...message({ channel: 'C0PROJ1234', ts: '1700000006.000100', text: '<@U0OWNER001>' }) }
+    expect((await deliver(channel, mention)).status).toBe('filtered')
+    await filter("export default () => { throw new Error('broken') }")
+    expect((await deliver(channel, { ...mention, event: { ...mention.event, ts: '1700000007.000100' } })).status).toBe(
+      'accepted',
+    )
+    expect((await deliver(channel, message({ channel: 'C0PROJ1234', ts: '1700000008.000100' }))).status).toBe('ignored')
   })
 
   it('show names Seti knows in place of ids in what subscribers get', async () => {

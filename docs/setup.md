@@ -732,12 +732,19 @@ reinstall the app if Slack asks.
 
 Seti shows Slack channels and people by name, as `#deploys` or `Dana`, wherever it would show an
 id: Slack alerts for the EA, thread replies, the permission request for a Slack send, its row in
-the transcript and the audit log's summary. It learns names only from what passes through it,
-such as an agent's channel search or a name in a Slack message, and says "name not known" for an
-id it has not seen named yet. It holds no Slack token for this.
+the transcript and the audit log's summary. It learns a name only where Slack itself states it and
+no message author can write it: a person's own profile on a message the webhook delivers while a
+thread switch is on, and the first line of the Slack MCP server's answer when an agent reads a
+channel or a person's profile by id. A label inside a message, such as `<#C0123|deploys>`, may show
+where that message is shown but is never learned. An id Seti has not seen named reads "name not
+known", and a permission request says when a name was last seen if that was over 30 days ago. Seti
+holds no Slack token for this.
 
-Upgrading: Slack `message` events no longer reach a Slack webhook's subscribers, such as the EA's
-inbox, unless its filter keeps them; a filter that returns `true` brings back the old behaviour.
+While both switches are off, the Slack webhook works exactly as before. Once you turn one on,
+`app_mention` and other events still reach its subscribers, such as the EA's inbox, but a `message`
+event reaches them only when the webhook's filter keeps it, or, without a filter, when it mentions
+you. Other messages are recorded as ignored, so subscribing to message events does not flood the
+EA. A filter that returns `true` sends every message on, as before.
 
 ### Webhook filters
 

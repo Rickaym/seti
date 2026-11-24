@@ -1,5 +1,5 @@
 import { shownSlackName, slackPlace } from '@seti/shared'
-import { idsIn, namesIn, readableSlack } from '../slack/names.js'
+import { idsIn, readableSlack } from '../slack/names.js'
 import { slackNames, type SlackName } from '../store/slack-names.js'
 
 /** A message a webhook delivered from a conversation agents may have posted in. */
@@ -27,13 +27,15 @@ export interface ThreadSource {
   isMessage: (payload: unknown) => boolean
   /** A new message someone wrote; null for edits, deletions, joins and anything else. */
   read: (payload: unknown) => InboundMessage | null
-  /** Names the delivery shows beside ids, such as a profile's display name or channel markup. */
-  names: (payload: unknown) => SlackName[]
+  /** The author's own name on a message event, from the profile Slack sends with it. */
+  profileName: (payload: unknown) => SlackName | null
   /** How a conversation and an author read, by name when Seti knows it, as in `#deploys`. */
   place: (container: string) => Promise<string>
   author: (id: string, given: string | null) => Promise<string>
   /** A message's text with names in place of the ids and markup Seti knows. */
   readable: (text: string) => Promise<string>
+  /** Whether the message mentions the workspace user the sender's app is authorised for. */
+  mentionsOwner: (payload: unknown) => boolean
   /** A link to a message, in its thread when it has one; null when the workspace is unknown. */
   link: (space: string, container: string, message: string, thread: string) => string | null
 }
@@ -93,16 +95,29 @@ function readSlack(payload: unknown): InboundMessage | null {
   }
 }
 
-/** Names a Slack event shows: its author's profile and names in channel and user markup. */
-function slackNamesOf(payload: unknown): SlackName[] {
-  const event = isFields(payload) && isFields(payload.event) ? payload.event : null
-  if (event === null) {
-    return []
+/** The author of a Slack message event with the name its own profile gives. */
+function slackAuthorName(payload: unknown): SlackName | null {
+  const event = slackEvent(payload)
+  const author = event === null ? null : (text(event.user) ?? text(event.bot_id))
+  const name = event === null ? null : authorName(event)
+  return author === null || name === null ? null : { id: author, kind: 'user', name }
+}
+
+/** The users a Slack delivery is for: `authorizations[].user_id`, or the older `authed_users`. */
+function authorisedUsers(payload: Fields): string[] {
+  const authorizations = Array.isArray(payload.authorizations) ? payload.authorizations : []
+  const users = authorizations.map((a: unknown) => (isFields(a) ? text(a.user_id) : null))
+  const authed = Array.isArray(payload.authed_users) ? payload.authed_users.map(text) : []
+  return [...users, ...authed].filter((id): id is string => id !== null)
+}
+
+function slackMentionsOwner(payload: unknown): boolean {
+  const event = slackEvent(payload)
+  if (event === null || !isFields(payload) || typeof event.text !== 'string') {
+    return false
   }
-  const author = text(event.user) ?? text(event.bot_id)
-  const name = authorName(event)
-  const own: SlackName[] = author === null || name === null ? [] : [{ id: author, kind: 'user', name }]
-  return [...own, ...namesIn(typeof event.text === 'string' ? event.text : '')]
+  const said = event.text
+  return authorisedUsers(payload).some((id) => said.includes(`<@${id}>`) || said.includes(`<@${id}|`))
 }
 
 function slackLink(space: string, container: string, message: string, thread: string): string | null {
@@ -118,10 +133,11 @@ const SLACK: ThreadSource = {
   label: 'Slack',
   isMessage: (payload) => slackEvent(payload) !== null,
   read: readSlack,
-  names: slackNamesOf,
+  profileName: slackAuthorName,
   place: async (container) => `Slack ${slackPlace(container, await slackNames.of([container]))}`,
   author: async (id, given) => given ?? shownSlackName(id, await slackNames.of([id])) ?? id,
   readable: async (body) => readableSlack(body, await slackNames.of(idsIn(body))),
+  mentionsOwner: slackMentionsOwner,
   link: slackLink,
 }
 
