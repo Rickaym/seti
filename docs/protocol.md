@@ -965,7 +965,8 @@ Optional and off by default: a maintenance session per agent that consolidates i
 - DRM-4: A dream starts only while the agent is unarchived and sandboxed, its runtime declares
   dreams, it runs no turn or background work, holds no open question, permission or change
   request, has no dream running, and the runtime's own consolidation did not run in the last hour;
-  otherwise it is refused with the reason. A nightly dream refused for work or an open request is
+  otherwise it is refused with the reason, which counts the background commands and other
+  background tasks an agent with no turn still runs. A nightly dream refused for work or an open request is
   tried again every `dream_retry` until the window ends, then skipped with its last reason. None
   starts after the end; one running at the end is stopped.
 - DRM-5: Nightly starts are at most the setting at once and `dream_gap` apart, and wait while plan
