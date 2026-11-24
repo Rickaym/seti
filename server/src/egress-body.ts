@@ -95,12 +95,15 @@ function encoded(target: Target, entries: readonly EgressPlaceholder[]): BodyPla
     : { kind: 'stream' }
 }
 
-const refusal = (status: number, body: string, entries: readonly EgressPlaceholder[]): BodyRefusal => ({
-  status,
-  reason: 'Forbidden',
-  body,
-  names: entries.map((entry) => entry.name),
-})
+/** A 403 naming the connections whose placeholders the body carried, never a value. */
+function refused(
+  text: (host: string, names: readonly string[]) => string,
+  host: string,
+  entries: readonly EgressPlaceholder[],
+): BodyRefusal {
+  const names = entries.map((entry) => entry.name)
+  return { status: 403, reason: 'Forbidden', body: text(host, names), names }
+}
 
 /** A whole body to send with its connections' values swapped in, or why it is refused. */
 async function checkWhole(
@@ -115,25 +118,11 @@ async function checkWhole(
   }
   const blocked = found.filter((entry) => !placeholderAllowed(entry, target.host, target.port))
   if (blocked.length > 0) {
-    return refusal(
-      403,
-      blockedText(
-        target.host,
-        blocked.map((entry) => entry.name),
-      ),
-      blocked,
-    )
+    return refused(blockedText, target.host, blocked)
   }
   const off = found.filter((entry) => !entry.body)
   if (off.length > 0) {
-    return refusal(
-      403,
-      offText(
-        target.host,
-        off.map((entry) => entry.name),
-      ),
-      off,
-    )
+    return refused(offText, target.host, off)
   }
   const contentType = headers['content-type'] ?? ''
   const type = bodyTypeOf(contentType) ?? 'text'
