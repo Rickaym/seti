@@ -1,5 +1,5 @@
 import { CODEX_SETTINGS_DEFAULTS, type CodexSettings } from '@seti/shared'
-import { now, sql } from '../db.js'
+import { now, sql, type Db } from '../db.js'
 
 /** The Codex runtime's settings, the defaults until the user saves any. */
 export const codexSettings = {
@@ -8,8 +8,8 @@ export const codexSettings = {
       FROM codex_settings WHERE id = 1`
     return row ?? CODEX_SETTINGS_DEFAULTS
   },
-  set: async (next: CodexSettings): Promise<void> => {
-    await sql`INSERT INTO codex_settings (id, enabled, program, evaluator_decides, default_model, default_effort,
+  set: async (next: CodexSettings, db: Db = sql): Promise<void> => {
+    await db`INSERT INTO codex_settings (id, enabled, program, evaluator_decides, default_model, default_effort,
         updated_at)
       VALUES (1, ${next.enabled}, ${next.program}, ${next.evaluator_decides}, ${next.default_model},
         ${next.default_effort}, ${now()})

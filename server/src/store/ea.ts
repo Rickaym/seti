@@ -96,13 +96,13 @@ export const eaHistory = {
 }
 
 export const eaSettings = {
-  get: async (): Promise<EaSettings> => {
-    const [record] = await sql<SettingsRecord[]>`SELECT wake_enabled, wake_phrase, keep_awake_seconds, join_on_open,
+  get: async (db: Db = sql): Promise<EaSettings> => {
+    const [record] = await db<SettingsRecord[]>`SELECT wake_enabled, wake_phrase, keep_awake_seconds, join_on_open,
       form_of_address, language, updated_at FROM ea_settings WHERE id = 1`
     return record ? { ...record, wake_enabled: record.wake_enabled === 1 } : EA_SETTINGS_DEFAULT
   },
-  save: async (input: Omit<EaSettings, 'updated_at'>): Promise<EaSettings> => {
-    await sql`INSERT INTO ea_settings (id, wake_enabled, wake_phrase, keep_awake_seconds, join_on_open,
+  save: async (input: Omit<EaSettings, 'updated_at'>, db: Db = sql): Promise<EaSettings> => {
+    await db`INSERT INTO ea_settings (id, wake_enabled, wake_phrase, keep_awake_seconds, join_on_open,
         form_of_address, language, updated_at)
       VALUES (1, ${input.wake_enabled ? 1 : 0}, ${input.wake_phrase}, ${input.keep_awake_seconds},
         ${input.join_on_open}, ${input.form_of_address}, ${input.language}, ${now()})
@@ -110,6 +110,6 @@ export const eaSettings = {
         keep_awake_seconds = excluded.keep_awake_seconds, join_on_open = excluded.join_on_open,
         form_of_address = excluded.form_of_address, language = excluded.language,
         updated_at = excluded.updated_at`
-    return eaSettings.get()
+    return eaSettings.get(db)
   },
 }

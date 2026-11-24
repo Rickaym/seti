@@ -1,6 +1,6 @@
 import os from 'node:os'
 import { defaultMemoryCap, type MemoryCap } from '@seti/shared'
-import { now, sql } from '../db.js'
+import { now, sql, type Db } from '../db.js'
 
 /** The cap of every agent while the user has saved none, sized to this host's memory. */
 export const hostDefaultCap = (): MemoryCap => defaultMemoryCap(os.totalmem() / 1024 ** 2)
@@ -22,9 +22,9 @@ export const memorySettings = {
       ? { cap: hostDefaultCap(), updated_at: null }
       : { cap: toCap(row), updated_at: row.updated_at }
   },
-  set: async (cap: MemoryCap): Promise<string> => {
+  set: async (cap: MemoryCap, db: Db = sql): Promise<string> => {
     const at = now()
-    await sql`INSERT INTO memory_settings (id, high_mb, max_mb, swap_max_mb, updated_at)
+    await db`INSERT INTO memory_settings (id, high_mb, max_mb, swap_max_mb, updated_at)
       VALUES (1, ${cap.high_mb}, ${cap.max_mb}, ${cap.swap_max_mb}, ${at})
       ON CONFLICT (id) DO UPDATE SET high_mb = excluded.high_mb, max_mb = excluded.max_mb,
         swap_max_mb = excluded.swap_max_mb, updated_at = excluded.updated_at`
