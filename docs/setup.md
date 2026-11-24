@@ -520,8 +520,10 @@ A Codex agent runs only in the sandbox. Seti's rules answer its calls: a guard o
 refuses at once, an allow rule or Seti's read-only list runs the call, and every other command,
 edit and tool call asks you. A call to one of your tool servers runs without asking only when an
 allow rule of yours names that server or tool. Turn Rules decide off in the Codex card under
-Settings, Runtimes to answer every call yourself; an upgrade keeps the choice you made. Codex agents have no side chat, rewind, Bypass or
-plugins. Their cost is an estimate from the price table in
+Settings, Runtimes to answer every call yourself; an upgrade keeps the choice you made. A Codex
+agent shows a summary of its reasoning where a Claude agent shows its thinking, which costs a few
+output tokens per model call. Codex agents have no side chat, rewind, Bypass or plugins. Their
+cost is an estimate from the price table in
 `server/src/runtimes/codex/prices.ts`, which names the day it was read; to update it, copy the
 standard rates from OpenAI's pricing page into that table, set `asOf` to the day, and run
 `pnpm check`.

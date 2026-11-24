@@ -183,6 +183,9 @@ between two steps; an interrupt; a hook at subagent start.
   restarts; a version folder no running program uses, and that the settings no longer need, is
   removed, as is every copy once the runtime is off or runs a program of the user's. Nothing
   outside the control room's own folders is removed.
+- RT-14: A runtime whose model can summarise its reasoning MUST ask for the summary, so its agents
+  show their thinking as the default runtime's do. Reasoning the model seals for its own next call
+  MUST NOT be stored, served or shown by the control room.
 
 ## 4. Turn lifecycle
 
