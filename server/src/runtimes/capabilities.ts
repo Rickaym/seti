@@ -23,6 +23,9 @@ export const runsUnsandboxed = (runtime: StoredRuntime): boolean => declared(run
 /** The runtime takes a compaction rule. */
 export const takesCompaction = (runtime: StoredRuntime): boolean => declared(runtime).compaction
 
+/** The agent can hand work to background subagents of its own. */
+export const hasSubagents = (runtime: StoredRuntime): boolean => declared(runtime).subagents
+
 /** A side chat can fork the runtime's session. */
 export const forksSideChat = (runtime: StoredRuntime): boolean => declared(runtime).session.fork !== 'none'
 

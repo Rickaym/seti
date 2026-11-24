@@ -150,6 +150,8 @@ export interface Capabilities {
   sandbox: { optional: boolean }
   /** It takes a rule for when to compact its context. */
   compaction: boolean
+  /** The agent can hand work to subagents of its own that run in the background. */
+  subagents: boolean
 }
 
 /**

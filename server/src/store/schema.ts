@@ -39,7 +39,7 @@ import { PR_LIST_CACHE } from './schema-prs.js'
 import { QUESTION_SECRETS, QUESTIONS } from './schema-questions.js'
 import { DROP_ROUTINES, REMINDER_CHANNELS, REMINDER_CRON } from './schema-reminders.js'
 import { RESTART_CUTS } from './schema-restart.js'
-import { PACK_KIND, rolesToPacks } from './schema-roles.js'
+import { PACK_KIND, ROLE_RUNTIME, rolesToPacks } from './schema-roles.js'
 import { MESSAGE_SEARCH, MESSAGE_SEARCH_TALK, MESSAGE_TIME } from './schema-search.js'
 import {
   CLAUDE_LOGINS,
@@ -239,4 +239,5 @@ export const MIGRATIONS: readonly Migration[] = [
   { version: 129, name: 'task_second_opinion', sql: TASK_SECOND_OPINION },
   { version: 130, name: 'connection_body', sql: CONNECTION_BODY },
   { version: 131, name: 'task_delegated_by', sql: TASK_DELEGATED_BY },
+  { version: 132, name: 'role_runtime', sql: ROLE_RUNTIME },
 ]

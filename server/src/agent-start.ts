@@ -10,6 +10,7 @@ import { awaitTurnEnd, requestWaiter } from './agent-waits.js'
 import { sendKey, sendOnce } from './client-sends.js'
 import { withinDelegateLimits } from './crew/delegate-limits.js'
 import { withBrief } from './crew/handover.js'
+import { roleStart, withRole } from './crew/role-start.js'
 import { fromEa } from './ea-guard.js'
 import { planAgent, planTitle } from './planner.js'
 import type { AgentWait } from './store/agent-waits.js'
@@ -63,10 +64,10 @@ export async function startAgent(
 }
 
 /** The fields a start names only when its caller set them. */
-const optionalFields = (input: StartAgentRequest, cap: AccessCap | undefined) => ({
+const optionalFields = (input: StartAgentRequest, cap: AccessCap | undefined, model: string | undefined) => ({
   ...(input.pr_urls === undefined ? {} : { pr_urls: input.pr_urls }),
   ...(input.workspace_id === undefined ? {} : { workspace_id: input.workspace_id }),
-  ...(input.model === undefined ? {} : { model: input.model }),
+  ...(model === undefined ? {} : { model }),
   ...(input.effort === undefined ? {} : { effort: input.effort }),
   ...(cap === undefined ? {} : { delegated_by: cap.task_id }),
 })
@@ -87,22 +88,25 @@ async function startPlanned(input: StartAgentRequest, cap?: AccessCap, hold?: (w
   })
   const capped = cap === undefined ? null : await capStart(cap)
   const mcpOff = new Set([...plan.mcp_disabled, ...(capped?.mcp_disabled ?? [])])
+  const profileId = cap?.profile_id ?? DEFAULT_PROFILE_ID
+  const roled = await roleStart(input, profileId)
+  const held = [...plan.setup.withheld, ...(capped?.held ?? []), ...roled.held]
   return startTask(
     {
       title: plan.title,
       prompt: await firstPrompt(input),
-      context_pack_ids: plan.context_pack_ids,
+      context_pack_ids: await withRole(plan.context_pack_ids, roled.role),
       disabled_plugin_ids: capped?.disabled_plugin_ids ?? [],
       mcp_enabled: plan.mcp_enabled.filter((name) => cap === undefined || cap.mcp.has(name)),
       mcp_disabled: [...mcpOff],
       sandbox: input.sandbox,
       access: [...plan.access, ...(capped?.access ?? [])],
-      profile_id: cap?.profile_id ?? DEFAULT_PROFILE_ID,
+      profile_id: profileId,
       seti_control: DEFAULT_SETI_CONTROL,
-      setup: capped === null ? plan.setup : { ...plan.setup, withheld: [...plan.setup.withheld, ...capped.held] },
+      setup: { ...plan.setup, withheld: held },
       attachments: input.attachments,
-      runtime: input.runtime,
-      ...optionalFields(input, cap),
+      runtime: roled.runtime,
+      ...optionalFields(input, cap, roled.model),
     },
     onCreated,
   )

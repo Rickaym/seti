@@ -116,8 +116,11 @@ const startTaskTool = setiTool({
     title: startAgentInput.shape.title,
     workspace: workspaceRef.optional().describe('The workspace it joins; left out, your own.'),
     notify_when_done: NOTIFY_WHEN_DONE,
+    role: startAgentInput.shape.role.describe(
+      'A role pack by name, such as Reviewer. It runs in that role, on the runtime and model the user gave the role unless you name your own.',
+    ),
     runtime: startAgentInput.shape.runtime.describe(
-      "Left out, the model picks it, else claude. codex runs it on OpenAI's Codex, which Seti refuses while the user has it off.",
+      "Left out, the role's or the model's, else claude. codex runs it on OpenAI's Codex, which Seti refuses while the user has it off.",
     ),
     model: startAgentInput.shape.model.describe(
       'Only when the user names one: its model, which picks the runtime that offers it, a Claude Code model such as opus or a Codex model.',
@@ -149,6 +152,7 @@ const startTaskTool = setiTool({
       workspace_id:
         args.workspace === undefined ? ctx.caller.workspace_id : (await resolveWorkspace(args.workspace)).id,
       notify_when_done: args.notify_when_done || minutes > 0,
+      role: args.role,
       runtime: args.runtime,
       model: args.model,
       effort: args.effort,

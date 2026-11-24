@@ -458,11 +458,17 @@ TOOL_SPECS: list[ToolSpec] = [
                 "description": "Only when the user names one: the workspace it joins. Left out, the first.",
             },
             "notify_when_done": NOTIFY_WHEN_DONE,
+            "role": {
+                "type": "string",
+                "description": "Only when the user names one: a role pack by name, such as Reviewer. "
+                "The agent runs in that role, on the runtime and model the user gave the role unless "
+                "runtime or model is named here.",
+            },
             "runtime": {
                 "type": "string",
                 "enum": ["claude", "codex"],
                 "description": "Only when the user asks for Codex: the agent runs on OpenAI's Codex "
-                "instead of Claude Code. Left out, the model picks it. Seti refuses Codex while the "
+                "instead of Claude Code. Left out, the role's or the model's. Seti refuses Codex while the "
                 "user has it off.",
             },
             "model": {
@@ -1720,7 +1726,7 @@ class EaTools:
         notify = arg_bool(args, "notify_when_done")
         if notify:
             body["notify_when_done"] = True
-        for key in ("runtime", "model", "effort"):
+        for key in ("role", "runtime", "model", "effort"):
             value = arg_str(args, key, required=False)
             if value:
                 body[key] = value

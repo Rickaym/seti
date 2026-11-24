@@ -75,7 +75,7 @@ const POSTGRES_ONLY: Readonly<Record<string, readonly string[]>> = {
   task_context_pack: ['linked'],
   ea_settings: ['join_on_open', 'form_of_address', 'language'],
   ea_history: ['unseen'],
-  context_pack: ['builtin', 'linked_by_default', 'kind'],
+  context_pack: ['builtin', 'linked_by_default', 'kind', 'runtime', 'model'],
 }
 
 /** Rows migrations seed in Postgres, which no SQLite file holds. */
