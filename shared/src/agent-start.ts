@@ -2,7 +2,7 @@ import { z } from 'zod'
 import { attachmentRefs } from './attachments.js'
 import { clientSendId } from './client-send.js'
 import { prUrl } from './pr-url.js'
-import { ONLY_CODEX_PICKS, onlyCodexPicks, runtimeFields } from './runtimes/settings.js'
+import { checkPicks, runtimeFields } from './runtimes/picks.js'
 import { workspaceId } from './workspaces.js'
 
 /** Planned titles stay this short, so they fit the agent list. */
@@ -25,7 +25,7 @@ export const startAgentInput = z
     /** The runtime the agent runs on, Codex only while the user turned it on, and its model. */
     ...runtimeFields,
   })
-  .refine(onlyCodexPicks, ONLY_CODEX_PICKS)
+  .superRefine(checkPicks)
 export type StartAgentInput = z.input<typeof startAgentInput>
 export type StartAgentRequest = z.output<typeof startAgentInput>
 

@@ -182,7 +182,7 @@ function CodexForm({ status }: { status: CodexStatus }) {
       <SettingRow
         label="Codex agents"
         stack
-        description="Agents on OpenAI's models, sandboxed. They ask before every command and edit."
+        description="Lets new agents run on OpenAI's models through Codex, always sandboxed."
       >
         <ToggleButton
           pressed={enabled}
@@ -199,7 +199,7 @@ function CodexForm({ status }: { status: CodexStatus }) {
       <SettingRow
         label="Rules decide"
         stack
-        description="On, your allow rules and Seti's read-only list answer a Codex agent's calls without asking you."
+        description="Lets your allow rules and Seti's read-only list answer a Codex agent's calls without asking you. Off: every call asks."
       >
         <ToggleButton
           pressed={rulesDecide}
