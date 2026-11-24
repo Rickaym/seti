@@ -78,7 +78,7 @@ import { connectionRoutes } from './routes/connections.js'
 import { contextRoutes, eaContextPackRoutes, taskContextRoutes } from './routes/context.js'
 import { credentialRoutes, profileSummaryRoutes } from './routes/credentials.js'
 import { auditRefusedProof, deviceRoutes } from './routes/devices.js'
-import { dreamRoutes, taskDreamRoutes, workspaceDreamRoutes } from './routes/dreams.js'
+import { dreamRoutes, taskDreamRoutes, trashRoutes, workspaceDreamRoutes } from './routes/dreams.js'
 import { eaContextRoutes } from './routes/ea-context.js'
 import { eaReplyRoutes } from './routes/ea-replies.js'
 import { eaStateRoutes } from './routes/ea-state.js'
@@ -301,6 +301,7 @@ export function createApp(access: AccessGuardOptions = defaultAccess(), eaUrl: s
   app.route('/api/tasks', taskCompactRoutes)
   app.route('/api/tasks', taskDreamRoutes)
   app.route('/api/dreams', dreamRoutes)
+  app.route('/api/trash', trashRoutes)
   app.route('/api/tasks', taskShareRoutes(access.access))
   app.route('/api/shares', shareRoutes(access.access))
   app.route('/api/terminals', terminalRoutes)

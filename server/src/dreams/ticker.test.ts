@@ -26,6 +26,7 @@ const ISTANBUL: DreamSettings = {
   dream_budget_usd: 1,
   night_budget_usd: 5,
   at_once: 1,
+  cleanups: false,
 }
 
 async function agent(title: string, prompts: number, patch: { sandbox?: boolean } = {}): Promise<string> {

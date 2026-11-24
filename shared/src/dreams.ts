@@ -67,6 +67,8 @@ export interface DreamSettings {
   night_budget_usd: number
   /** How many dreams may run at once, 1 to 3. */
   at_once: number
+  /** Whether dreams may propose clean-ups for the user to allow; off means report only. */
+  cleanups: boolean
 }
 
 export const DREAM_SETTINGS_DEFAULTS: DreamSettings = {
@@ -78,6 +80,7 @@ export const DREAM_SETTINGS_DEFAULTS: DreamSettings = {
   dream_budget_usd: 1,
   night_budget_usd: 5,
   at_once: 1,
+  cleanups: false,
 }
 
 export const dreamSettingsInput = z
@@ -90,6 +93,7 @@ export const dreamSettingsInput = z
     dream_budget_usd: z.number().min(0.1).max(10).optional(),
     night_budget_usd: z.number().min(0.5).max(100).optional(),
     at_once: z.number().int().min(1).max(3).optional(),
+    cleanups: z.boolean().optional(),
   })
   .refine((input) => Object.keys(input).length > 0, 'Change at least one setting')
 export type DreamSettingsInput = z.input<typeof dreamSettingsInput>
@@ -110,4 +114,54 @@ export interface DreamNight {
   /** Agents left out when the night was planned, counted by reason. */
   skipped: Record<string, number>
   cost_usd: number
+}
+
+/** What a dream may propose to clean up; nothing changes until the user allows it. */
+export const DREAM_PROPOSAL_KINDS = ['trash', 'remove_worktree', 'delete_branch'] as const
+export type DreamProposalKind = (typeof DREAM_PROPOSAL_KINDS)[number]
+
+export const dreamProposalInput = z.strictObject({
+  kind: z.enum(DREAM_PROPOSAL_KINDS).describe('trash a file or folder, remove a worktree, or delete a branch'),
+  target: z
+    .string()
+    .trim()
+    .min(1)
+    .max(1000)
+    .describe('The absolute path; for a branch, the checkout path, a colon and the branch name'),
+  reason: line(200).describe('One line: why it is safe and worth removing'),
+})
+export type DreamProposalInput = z.infer<typeof dreamProposalInput>
+
+export const DREAM_PROPOSAL_STATES = ['pending', 'allowed', 'denied', 'expired', 'failed'] as const
+
+/** A clean-up a dream proposed, and what the user decided. */
+export interface DreamProposal {
+  id: number
+  run_id: number
+  task_id: string
+  kind: DreamProposalKind
+  target: string
+  reason: string
+  bytes: number
+  state: (typeof DREAM_PROPOSAL_STATES)[number]
+  /** Why it was refused or failed when the user allowed it. */
+  detail: string | null
+  created_at: string
+  decided_at: string | null
+}
+
+export const dreamDecision = z.strictObject({ decision: z.enum(['allow', 'deny']) })
+export type DreamDecision = z.infer<typeof dreamDecision>
+
+/** Something an allowed clean-up moved aside, kept until `purge_after`. */
+export interface TrashItem {
+  id: number
+  task_id: string
+  proposal_id: number
+  kind: DreamProposalKind
+  original_path: string
+  bytes: number
+  created_at: string
+  purge_after: string
+  restored_at: string | null
 }

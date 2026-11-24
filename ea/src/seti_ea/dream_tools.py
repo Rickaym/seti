@@ -27,6 +27,10 @@ SETTING_ARGS: dict[str, dict[str, Any]] = {
         "description": "Most a night's dreams may cost in dollars, 0.5 to 100.",
     },
     "at_once": {"type": "integer", "description": "How many dreams may run at once, 1 to 3."},
+    "cleanups": {
+        "type": "boolean",
+        "description": "true to let dreams propose clean-ups for the user to allow.",
+    },
 }
 
 DREAM_SPECS: list[ToolSpec] = [
@@ -36,12 +40,14 @@ DREAM_SPECS: list[ToolSpec] = [
         "Without task or workspace: nightly Dreaming's settings and how last night went, or change "
         "them with the setting arguments. With task: the agent's recent dreams with their reports; "
         "with start, run one dream of it now; with dreaming, switch it in or out of nightly Dreaming. "
-        "With workspace and dreaming: switch that workspace's agents together. Every change needs "
-        "the user's yes; undo a dream's change to a memory file with revert_change.",
+        "With workspace and dreaming: switch that workspace's agents together. With restore, put a "
+        "trash item back. Every change needs the user's yes; undo a dream's change to a memory file "
+        "with revert_change. Only the user allows a proposed clean-up, in Seti.",
         {
             "task": {"type": "string", "description": "The agent's title as the user said it."},
             "workspace": {"type": "string", "description": "A workspace's name, to switch its agents."},
             "start": {"type": "boolean", "description": "true to start a dream of the agent now."},
+            "restore": {"type": "integer", "description": "A trash item's id, to put it back where it was."},
             "dreaming": {
                 "type": "boolean",
                 "description": "true to switch into nightly Dreaming, false out.",
@@ -105,7 +111,7 @@ def _setting(args: Mapping[str, Any], key: str) -> Any:
     """A setting argument as Seti takes it: a switch, a count or an amount in dollars."""
     value = args[key]
     try:
-        if key == "enabled":
+        if key in ("enabled", "cleanups"):
             return arg_bool(args, key)
         if key == "at_once":
             return int(value)
@@ -114,14 +120,23 @@ def _setting(args: Mapping[str, Any], key: str) -> Any:
         raise ToolError(f"{key.replace('_', ' ')} must be a number.", "Bad setting") from e
 
 
+def _trash_line(trash: list[dict[str, Any]]) -> str:
+    if not trash:
+        return "The trash is empty."
+    items = "; ".join(f"{item.get('id')}: {item.get('original_path')}" for item in trash[:5])
+    return f"The trash holds {plural(len(trash), 'item')}: {items}."
+
+
+def _change_word(key: str, value: Any) -> str:
+    if key == "enabled":
+        return f"turns it {'on' if value else 'off'}"
+    if key == "cleanups":
+        return f"turns clean-up proposals {'on' if value else 'off'}"
+    return f"sets {key.replace('_', ' ')} to {value}"
+
+
 def _change_words(change: Mapping[str, Any]) -> str:
-    words = [
-        f"turns it {'on' if value else 'off'}"
-        if key == "enabled"
-        else f"sets {key.replace('_', ' ')} to {value}"
-        for key, value in change.items()
-    ]
-    return ", ".join(words)
+    return ", ".join(_change_word(key, value) for key, value in change.items())
 
 
 class DreamTools:
@@ -141,6 +156,8 @@ class DreamTools:
         }
 
     async def dreams(self, args: Mapping[str, Any]) -> ToolResult:
+        if "restore" in args:
+            return await self._restore(args)
         if arg_str(args, "workspace", required=False):
             return await self._workspace(args)
         if not arg_str(args, "task", required=False):
@@ -157,6 +174,11 @@ class DreamTools:
         lines = [f"Recent dreams of {title}, newest first:"]
         for run in runs[:SHOWN]:
             lines.extend(_run_lines(run))
+        pending = dicts(await self._seti.get("/dreams/proposals", {"task": str(task.get("id"))}))
+        lines.extend(
+            f"- Clean-up waiting for the user: {p.get('kind')} {p.get('target')} ({p.get('reason')})"
+            for p in pending
+        )
         return ToolResult("\n".join(lines), clip(f"Read the dreams of {title}", 70))
 
     async def _settings(self, args: Mapping[str, Any]) -> ToolResult:
@@ -164,7 +186,9 @@ class DreamTools:
         if not change:
             settings = await self._seti.get("/dreams/settings")
             night = await self._seti.get("/dreams")
-            text = f"{_settings_line(settings)} {_night_line(night if isinstance(night, dict) else None)}"
+            trash = dicts(await self._seti.get("/trash"))
+            night_line = _night_line(night if isinstance(night, dict) else None)
+            text = f"{_settings_line(settings)} {night_line} {_trash_line(trash)}"
             return ToolResult(text, "Read Dreaming")
         if not await self._gate.cleared(gate_key("dreams", "settings", change), arg_bool(args, "confirmed")):
             effect = f"This changes nightly Dreaming: {_change_words(change)}."
@@ -224,3 +248,19 @@ class DreamTools:
         return ToolResult(
             f"Started a dream of {title}; its report comes when it ends.", clip(f"Dreaming {title}", 70)
         )
+
+    async def _restore(self, args: Mapping[str, Any]) -> ToolResult:
+        item = args.get("restore")
+        if not isinstance(item, int) or isinstance(item, bool):
+            raise ToolError("Say which trash item to restore by its id.", "Missing restore")
+        if not await self._gate.cleared(gate_key("dreams", "restore", item), arg_bool(args, "confirmed")):
+            return ask(
+                "dreams", args, f"This puts trash item {item} back where it was.", "restore from the trash"
+            )
+        try:
+            restored = await self._seti.post(f"/trash/{item}/restore", {})
+        except SetiError as e:
+            if e.status in (404, 409):
+                raise ToolError(f"Not restored: {e.detail or e.title}", "Not restored") from e
+            raise
+        return ToolResult(f"Restored {restored.get('original_path')}.", "Restored")

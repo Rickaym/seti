@@ -1,6 +1,6 @@
 import fs from 'node:fs'
 import path from 'node:path'
-import type { DreamReport, DreamRun, RuntimeEvent, Task } from '@seti/shared'
+import type { DreamProposalInput, DreamReport, DreamRun, RuntimeEvent, Task } from '@seti/shared'
 import { audit } from '../audit.js'
 import { launchPlan } from '../launch-plan.js'
 import { maintenanceLauncher } from '../launcher.js'
@@ -15,6 +15,7 @@ import { dreamGate, type DreamPlaces } from './gate.js'
 import { forgetBefore, keepBefore, recordAfter } from './kept.js'
 import type { MemorySnapshot } from './memory-snapshot.js'
 import { dreamAppend, dreamMessage } from './prompt.js'
+import { fileProposal } from './proposals.js'
 import { reportMarkdown } from './report.js'
 import { dreamTools } from './tools.js'
 
@@ -26,6 +27,8 @@ export interface DreamLimits {
   budgetUsd: number
   /** When a nightly dream's window ends, as epoch milliseconds; it stops there. */
   until?: number
+  /** Whether it may propose clean-ups for the user to allow. */
+  cleanups?: boolean
 }
 
 export const DREAM_LIMITS: DreamLimits = { model: 'claude-sonnet-5-5', steps: 60, timeMs: 20 * 60_000, budgetUsd: 1 }
@@ -175,10 +178,12 @@ async function dreamSession(job: DreamJob, tally: Tally, night: string): Promise
     tally.denied(refusal)
     return refusal
   }
+  const propose =
+    job.limits.cleanups === true ? async (input: DreamProposalInput) => fileProposal(job.task, job.run, input) : null
   const tools = dreamTools(async (report) => {
     tally.reported(report)
     return Promise.resolve()
-  })
+  }, propose)
   const spec = {
     taskId: job.task.id,
     cwd: job.task.cwd,
@@ -193,6 +198,7 @@ async function dreamSession(job: DreamJob, tally: Tally, night: string): Promise
       shared: [],
       maxSteps: job.limits.steps,
       budgetUsd: job.limits.budgetUsd,
+      cleanups: job.limits.cleanups === true,
     }),
     maxTurns: job.limits.steps,
     budgetUsd: job.limits.budgetUsd,

@@ -1,8 +1,8 @@
-import { dreamReport, type DreamReport } from '@seti/shared'
+import { dreamProposalInput, dreamReport, type DreamProposalInput, type DreamReport } from '@seti/shared'
 import { describeIssues } from '../http.js'
 import type { DreamTool } from '../runtimes/adapter.js'
 import { redactSecrets } from '../scrub.js'
-import { DREAM_REPORT, DREAM_SERVER } from './gate.js'
+import { DREAM_PROPOSE, DREAM_REPORT, DREAM_SERVER } from './gate.js'
 
 const redacted = (report: DreamReport): DreamReport => ({
   summary: redactSecrets(report.summary),
@@ -13,9 +13,31 @@ const redacted = (report: DreamReport): DreamReport => ({
   nothing_to_do: report.nothing_to_do,
 })
 
-/** The tools the control room serves a dream: its report, stored redacted, the last one kept. */
-export function dreamTools(store: (report: DreamReport) => Promise<void>): DreamTool[] {
+/** The clean-up proposal tool: checked by the control room, applied only on the user's Allow. */
+function proposeTool(propose: (input: DreamProposalInput) => Promise<string>): DreamTool {
+  return {
+    server: DREAM_SERVER,
+    name: DREAM_PROPOSE,
+    description:
+      'Propose one clean-up for the user to allow in the morning: trash a file or folder, remove a worktree, or delete a merged branch. Nothing changes until they allow it; the control room checks it now and again then.',
+    input: dreamProposalInput.shape,
+    call: async (args) => {
+      const parsed = dreamProposalInput.safeParse(args)
+      return parsed.success ? propose(parsed.data) : `Not filed: ${describeIssues(parsed.error)}.`
+    },
+  }
+}
+
+/**
+ * The tools the control room serves a dream: its report, stored redacted, the last one kept;
+ * and, when the user turned clean-ups on, the proposal tool.
+ */
+export function dreamTools(
+  store: (report: DreamReport) => Promise<void>,
+  propose: ((input: DreamProposalInput) => Promise<string>) | null = null,
+): DreamTool[] {
   return [
+    ...(propose === null ? [] : [proposeTool(propose)]),
     {
       server: DREAM_SERVER,
       name: DREAM_REPORT,
