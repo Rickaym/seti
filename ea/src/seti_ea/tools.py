@@ -60,6 +60,7 @@ from seti_ea.process_tools import LIST_PROCESSES_SPEC
 from seti_ea.question_tools import list_questions, list_requests
 from seti_ea.role_tools import role_lines
 from seti_ea.seti import SetiClient, SetiError
+from seti_ea.settings_json import settings_text
 from seti_ea.settings_tools import SETTINGS_SPECS, SettingsTools
 from seti_ea.toolkit import (
     TASK_REF,
@@ -309,6 +310,12 @@ TOOL_SPECS: list[ToolSpec] = [
                 "Claude Code, compared with it over the last 7 days: calls by result, failed and slow "
                 "decisions, and the most frequent differences with the step and rule behind each. "
                 "Counts only; rules change only in Seti.",
+            },
+            "settings": {
+                "type": "string",
+                "description": "Instead, Seti's settings as JSON, plain configuration only: all, or "
+                "one part by its path, such as agents.lifecycle or app.ea. Security settings are not "
+                "in it; you change settings with their own tools, and the user changes the rest in Seti.",
             },
         },
     ),
@@ -2339,6 +2346,9 @@ class EaTools:
         if arg_bool(args, "permissions"):
             summary = await self._seti.get("/permissions/shadow")
             return ToolResult("\n".join(shadow_lines(summary)), "Read how Seti's permission shadow compares")
+        settings = arg_str(args, "settings", required=False)
+        if settings:
+            return settings_text(await self._seti.get("/settings-doc"), settings)
         if arg_bool(args, "mods"):
             listing, user = await asyncio.gather(self._seti.get("/mods"), _attempt(self._seti.get("/user")))
             text = mods_text(listing)
