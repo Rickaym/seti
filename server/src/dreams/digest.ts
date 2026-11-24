@@ -2,6 +2,7 @@ import { rowEvents, type DigestKind, type MessageRow, type RuntimeEvent, type Ta
 import { messages } from '../db.js'
 import { digestByRow, toolName } from '../digest.js'
 import { redactCredentials, redactSecrets } from '../scrub.js'
+import { tagAttribute } from '../update-frames.js'
 
 /** The most characters a dream's digest holds (`dream_digest`). */
 const DIGEST_CHARS = 40_000
@@ -52,12 +53,10 @@ function groupOf(kind: DigestKind, text: string): Group {
   }
 }
 
-const attr = (value: string) => value.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;')
-
 /** An update in the tag it reached the agent in, so text from outside reads as data. */
 function updateEntry(input: TaskInput): string {
   const title = redactCredentials(input.title).replace(/\s+/g, ' ').replace(/</g, '&lt;').slice(0, 600)
-  return `<update source="${attr(input.source)}" kind="${attr(input.kind)}" subject="${attr(input.subject)}">${title}</update>`
+  return `<update source="${tagAttribute(input.source)}" kind="${tagAttribute(input.kind)}" subject="${tagAttribute(input.subject)}">${title}</update>`
 }
 
 /** Tool names of question calls, whose answers the digest leaves out. */
