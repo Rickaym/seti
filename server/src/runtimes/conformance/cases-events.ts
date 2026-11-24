@@ -87,7 +87,7 @@ export const EVENTS: Case[] = [
   {
     id: 'EV-3',
     title: "the agent's text arrives as agent messages, its reasoning summary where the runtime shows it",
-    proves: 'RT-6 messages and reasoning, RT-13',
+    proves: 'RT-6 messages and reasoning, RT-14',
     run: async (subject) => {
       const run = await subject.open(subject.rig({ turns: [VARIED] }))
       run.send('go')

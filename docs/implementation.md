@@ -243,7 +243,7 @@ the AppArmor profile for `bwrap` that the installer adds ([Setup](setup.md#sandb
   servers through the relay. Codex runs with `model_reasoning_summary="auto"`, since the models
   Seti offers send no reasoning summary unless asked; its reasoning items carry the summary, which
   the projector serves as a `reasoning` event, and never the sealed `encrypted_content`, which stays
-  in Codex's session files in the sandbox's private home (RT-13). Codex is asked not to stream item
+  in Codex's session files in the sandbox's private home (RT-14). Codex is asked not to stream item
   parts or the turn's running diff,
   so a Codex agent's rows are its whole items; a line Codex wrote that Seti cannot read is shown
   live and not stored.
