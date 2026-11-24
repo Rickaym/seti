@@ -49,10 +49,11 @@ import { InputEntry } from '@/panels/tasks/InputEntry'
 import { NoticeEntry } from '@/panels/tasks/NoticeEntry'
 import { PromptEntry } from '@/panels/tasks/PromptEntry'
 import { RewindNote, RewoundGroup } from '@/panels/tasks/Rewound'
+import { CallRow } from '@/panels/tasks/SecondOpinionCall'
 import { SetiNote } from '@/panels/tasks/SetiNote'
 import { ShellEntry } from '@/panels/tasks/ShellEntry'
 import { SubtaskCard } from '@/panels/tasks/SubtaskCard'
-import { OrphanResult, ToolCall } from '@/panels/tasks/ToolCall'
+import { OrphanResult } from '@/panels/tasks/ToolCall'
 import { ToolGroup } from '@/panels/tasks/ToolGroup'
 import { TranscriptBlocks } from '@/panels/tasks/TranscriptBlocks'
 import { RuntimeLine } from '@/panels/tasks/TranscriptLines'
@@ -154,7 +155,7 @@ function AssistantMessage({ props, events }: { props: RowProps; events: readonly
           )
         }
         return (
-          <ToolCall
+          <CallRow
             key={key}
             taskId={taskId}
             rowId={row.id}

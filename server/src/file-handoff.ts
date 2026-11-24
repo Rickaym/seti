@@ -135,6 +135,33 @@ function closeAll(sources: readonly Source[]): void {
   }
 }
 
+/**
+ * The text of files the agent could send, under send_file's checks, each cut at `max` characters;
+ * a file that is not text is refused.
+ */
+export async function readSendable(task: Task, raws: readonly string[], max: number): Promise<SentText[]> {
+  const sources = openSources(raws, await reachOf(task))
+  try {
+    return sources.map((source) => {
+      const bytes = Buffer.alloc(Math.min(source.size, max * 4))
+      const text = bytes.subarray(0, fs.readSync(source.fd, bytes, 0, bytes.length, 0)).toString('utf8')
+      if (text.includes('\0')) {
+        throw refuse(400, source.raw, 'is not a text file')
+      }
+      return { path: source.raw, text: text.slice(0, max), cut: text.length > max || source.size > bytes.length }
+    })
+  } finally {
+    closeAll(sources)
+  }
+}
+
+/** A file's text as the agent named it, and whether it was cut. */
+interface SentText {
+  path: string
+  text: string
+  cut: boolean
+}
+
 async function recipientOf(handle: string, from: Task): Promise<{ task: Task; handle: string }> {
   const [member] = await teamMembers.byHandles([handle])
   const task = member === undefined ? undefined : await tasks.get(member.task_id)
