@@ -67,7 +67,7 @@ function HostsRow({ profile, onChanged }: { profile: CredentialProfile; onChange
                 variant="ghost"
                 aria-label={`Remove ${host}`}
                 disabled={busy}
-                className="text-muted-foreground pointer-coarse:size-9"
+                className="text-muted-foreground pointer-coarse:size-11"
                 onClick={() =>
                   void run(
                     async () => apiDelete(`/credentials/profiles/${profile.id}/hosts/${encodeURIComponent(host)}`),
@@ -91,13 +91,19 @@ function HostsRow({ profile, onChanged }: { profile: CredentialProfile; onChange
         <Input
           aria-label="Host to add"
           placeholder="api.example.com"
-          className="min-w-0 flex-1"
+          className="min-w-0 flex-1 pointer-coarse:h-11"
           value={draft}
           onChange={(event) => {
             setDraft(event.target.value)
           }}
         />
-        <Button type="submit" size="sm" variant="outline" disabled={busy || draft.trim() === ''}>
+        <Button
+          type="submit"
+          size="sm"
+          variant="outline"
+          className="pointer-coarse:h-11"
+          disabled={busy || draft.trim() === ''}
+        >
           <Plus />
           Add
         </Button>

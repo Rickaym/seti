@@ -21,6 +21,7 @@ test("a credential's access fits a phone, switches, hosts and all", async ({ pag
   await access.scrollIntoViewIfNeeded()
   await expectFitsPhone(page, 'credential access')
   await expectTouchTarget(hosts.getByRole('button', { name: 'Remove api.a-rather-long-payments-host.example' }))
+  await expectTouchTarget(hosts.getByRole('button', { name: 'Add' }))
   await page.screenshot({ path: test.info().outputPath('credential-access-phone.png'), fullPage: true })
   await request.delete(`/api/credentials/profiles/${profile.id}`)
 })
