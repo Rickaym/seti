@@ -63,12 +63,19 @@ describe('the Codex runtime in Settings', () => {
 
   it('is ready only on, with a program of the pinned version and a key, and records each change', async () => {
     await clearConnections()
-    expect((await change({ enabled: true })).status).toBe(200)
-    expect((await status()).state).toBe('not_set_up')
     await change({ program: path.join(scratch, 'nowhere') })
-    expect((await status()).state).toBe('missing')
+    expect((await status()).state).toBe('off')
+    expect((await change({ enabled: true })).status).toBe(200)
+    expect(await status()).toMatchObject({
+      state: 'failed',
+      failure: { reason: 'program', message: expect.stringContaining('is not there') as string },
+    })
     await change({ program: program('old-codex', '0.170.0') })
-    expect(await status()).toMatchObject({ state: 'update_needed', version: '0.170.0' })
+    expect(await status()).toMatchObject({
+      state: 'failed',
+      version: '0.170.0',
+      failure: { reason: 'program', message: expect.stringContaining('reports 0.170.0') as string },
+    })
     await change({ program: program('codex', '0.171.0') })
     expect(await status()).toMatchObject({ state: 'no_key', version: '0.171.0', keyed: [] })
     await openaiKey()

@@ -2,12 +2,13 @@ import { z } from 'zod'
 import { STORED_RUNTIMES } from './stored.js'
 
 /**
- * Codex as Seti runs it, which only the user changes: off until they turn it on, the program
- * agents start, and whether Seti's permission rules answer a Codex agent's calls without them.
+ * Codex as Seti runs it, which only the user changes: off until they turn it on, a program of
+ * their own in place of the copy Seti installs, and whether Seti's permission rules answer a
+ * Codex agent's calls without them.
  */
 export interface CodexSettings {
   enabled: boolean
-  /** The absolute path of the `codex` program agents start; null until the user names it. */
+  /** A `codex` program the user names instead of Seti's own copy, as on a machine offline. */
   program: string | null
   /** On, an allow rule or Seti's read-only list answers a call; off, the user answers every one. */
   evaluator_decides: boolean
@@ -23,6 +24,9 @@ export const CODEX_SETTINGS_DEFAULTS: CodexSettings = {
   default_model: null,
   default_effort: null,
 }
+
+/** The host a Codex agent sends its model calls to, where its OpenAI key connection applies. */
+export const CODEX_MODEL_HOST = 'api.openai.com'
 
 /**
  * The models a Codex agent may pick: those the pinned Codex sends its tools for, as CI proves.
@@ -69,22 +73,36 @@ export const onlyCodexPicks = (input: {
 export const ONLY_CODEX_PICKS = 'Only a Codex agent picks a model and effort here'
 
 /**
- * Where Codex stands on this Seti: off, on with no program named, a program that is not there or
- * not the pinned version, a default credential without an OpenAI key, or ready to start agents.
+ * Where Codex stands on this Seti: off, installing the pinned version, failed with a reason the
+ * user can retry, on without an OpenAI key in the default credential, or ready to start agents.
  */
-export const CODEX_STATES = ['off', 'not_set_up', 'missing', 'update_needed', 'no_key', 'ready'] as const
+export const CODEX_STATES = ['off', 'installing', 'failed', 'no_key', 'ready'] as const
 export type CodexState = (typeof CODEX_STATES)[number]
 
-/** The Codex runtime as Settings shows it; the key's state is counts, never a value. */
+/**
+ * Why Codex cannot run: the download failed, a checksum did not match, the pin has no build for
+ * this machine, the disk refused the write, Seti's copy is not there, or the program the user
+ * named is missing or another version.
+ */
+export const CODEX_FAILURES = ['network', 'checksum', 'platform', 'disk', 'missing', 'program'] as const
+export type CodexFailure = (typeof CODEX_FAILURES)[number]
+
+/** The Codex runtime as Settings shows it; the key's state is counts and names, never a value. */
 export interface CodexStatus {
   state: CodexState
-  /** The version the program reports, when it ran. */
+  /** Why Codex cannot run, present only in the failed state. */
+  failure: { reason: CodexFailure; message: string } | null
+  /** The version the program agents start reports or was verified as, when there is one. */
   version: string | null
-  /** The version this Seti is built and tested against. */
+  /** The version this Seti is built and tested against, which it installs itself. */
   pinned: string
+  /** The program new Codex agents start: Seti's own copy, or the one the user named. */
+  binary: string | null
   settings: CodexSettings
   /** Credentials holding a connection with a header on OpenAI's API, which a Codex agent needs. */
   keyed: string[]
+  /** The one connection with an OpenAI key that the default credential lacks, by name, if one. */
+  keyElsewhere: string | null
   /** The date of the price table a Codex agent's estimated cost comes from. */
   pricesAsOf: string
 }

@@ -1,6 +1,7 @@
 import type { CompactRule, Task } from '@seti/shared'
 import { permissionModeOf } from './bypass-mode.js'
 import { hostLoginKey } from './claude-logins.js'
+import { requireCodexProgram } from './codex-status.js'
 import { effectiveCompact } from './compact.js'
 import { dreamsOn } from './dreams/settings.js'
 import { launchPlan } from './launch-plan.js'
@@ -72,16 +73,14 @@ async function liveSpec(task: Task) {
 }
 
 /**
- * What a Codex agent's process starts: the program the user named, and the agent's model and
- * effort, else the runtime's defaults. A runtime that is off or has no program starts nothing.
+ * What a Codex agent's process starts: Seti's copy of the pinned Codex or the program the user
+ * named, and the agent's model and effort, else the runtime's defaults. A runtime that is off,
+ * installing or failed starts nothing.
  */
 async function codexVendor(task: Task): Promise<CodexShapes['vendor']> {
   const settings = await codexSettings.get()
-  if (!settings.enabled || settings.program === null) {
-    throw new Error('Codex is off on this Seti, so this agent cannot start; the user turns it on in Settings, Runtimes')
-  }
   return {
-    binary: settings.program,
+    binary: await requireCodexProgram(settings),
     model: task.requested_model ?? settings.default_model,
     effort: task.requested_effort ?? settings.default_effort,
   }
