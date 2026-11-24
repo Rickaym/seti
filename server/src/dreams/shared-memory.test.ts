@@ -130,7 +130,7 @@ describe.skipIf(!bwrap)('a dream of an agent in a worktree', () => {
       return now
     })
     expect(opened.spec.prompt).toContain(`Read-only memory the agent's sessions also see: ${checkoutMemory}.`)
-    expect(opened.spec.prompt).toMatch(/Read the MEMORY\.md of\s+each read-only memory folder too/)
+    expect(opened.spec.prompt).toMatch(/then the MEMORY\.md of each read-only memory\s+folder/)
     const file = path.join(checkoutMemory, 'MEMORY.md')
     const { gate } = opened.host
     expect(gate(claudeToolCall('r', 'Read', { file_path: file }))).toBeNull()

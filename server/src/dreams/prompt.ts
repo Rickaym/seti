@@ -61,8 +61,9 @@ export function dreamMessage(m: DreamMessage): string {
   return `Dream for the night of ${m.night}. Last dream: ${m.lastDream ?? 'never'}. Digest: ${m.digest}.
 Memory folder: ${m.memory}. Read-only memory the agent's sessions also see: ${shared}.
 
-1. Orient. List the memory folder, read MEMORY.md and skim the topic files. Read the MEMORY.md of
-   each read-only memory folder too, so you know what is kept there.
+1. Orient. List the memory folder and read MEMORY.md, then the MEMORY.md of each read-only memory
+   folder, so you know what is kept there. The indexes name every topic file: open one when the
+   digest or your work touches it, not all of them, since every file read is one of your steps.
 2. Gather. Read the digest. Check memories the day touched against the files and git state now.
    Do not read transcripts or large files end to end; open what the digest points at.
 3. Consolidate. Put each thing worth keeping in the topic file it belongs to, or a new one.
