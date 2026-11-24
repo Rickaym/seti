@@ -331,9 +331,9 @@ The EA reads its key files first, then its environment, then `SETI_EA_ENV`
 
 Development and tests also read `SETI_TEST_DATABASE_URL`, `SETI_TEST_REDIS_URL`,
 `SETI_POLLER_LOOPBACK`, `SETI_PUSH_LOOPBACK`, `SETI_MOD_TEST_UPSTREAM`, `SETI_PLANNER_MODULE`,
-`SETI_SDK_MODULE`, `SETI_TERMINAL_SHELL`, `SETI_PROBE_DELAY_MS`, `SETI_PR_POLL_MS`, `SETI_AWAY_MS`
-and the `SETI_E2E_*` variables; production ignores the loopback, upstream, module, terminal shell,
-probe, poll and away ones.
+`SETI_SDK_MODULE`, `SETI_TERMINAL_SHELL`, `SETI_CODEX_PIN`, `SETI_PROBE_DELAY_MS`,
+`SETI_PR_POLL_MS`, `SETI_AWAY_MS` and the `SETI_E2E_*` variables; production ignores the loopback,
+upstream, module, terminal shell, Codex pin, probe, poll and away ones.
 
 ## Optional pieces
 
@@ -493,22 +493,27 @@ prints its result to stdout, and is stopped after 120 seconds unless the proposa
 
 ### Codex agents
 
-Agents run on Claude Code. An agent can run on OpenAI's Codex instead once you turn Codex on in
-Settings, Runtimes; it is off by default, and only you change it.
+Agents run on Claude Code. An agent can run on OpenAI's Codex instead; Codex is off by default,
+and only you change that.
 
-1. Install the `codex` program of the version Settings, Runtimes names (Seti is built and tested
-   against one version), for example with `node scripts/codex-binary.mjs <folder>` from a clone,
-   which fetches it from the npm registry and checks its checksum.
-2. In Settings, Runtimes, turn Codex on and give the program's absolute path. The status reads
-   No key once the program runs and reports that version.
-3. In Settings, Connections, add a connection with your OpenAI key for `api.openai.com`, with the
-   header `Authorization: Bearer {{value}}`, and add it to the default credential, which new
-   agents get. The status then reads Ready. The agent holds a placeholder; the egress proxy puts
-   the key on requests to OpenAI's API only. A Codex agent on a credential without such a
-   connection is refused at start.
-4. On the start page, pick a Codex model in the Model selector beside the message box, and an
+1. In Settings, Runtimes, turn Codex on. Seti installs the version it is built for into
+   `~/.seti/codex/<version>/` and checks it first (RT-11 in [the protocol](protocol.md#35-runtime));
+   the status reads Installing, then No key.
+2. In Settings, Connections, add a connection with your OpenAI key for `api.openai.com`, with the
+   header `Authorization: Bearer {{value}}`, in the default credential. The status reads Ready.
+   The agent holds a placeholder; the egress proxy puts the key on requests to OpenAI's API only.
+3. On the start page, pick a Codex model in the Model selector beside the message box, and an
    effort if you want one, then start the agent. The selector lists Codex models only while the
    status reads Ready.
+
+When an upgrade moves the pinned version, Seti installs the new one at its start and removes the
+old one once no agent runs it. With a separate node (`SETI_NODE=split`), `seti.service` installs
+it; the node starts the program at the path the server hands it with each agent's spec, from the
+same `~/.seti`, and mounts its folder read-only into the sandbox as a single process does.
+
+On a machine without network access, put a `codex` program of the pinned version somewhere and
+name it under Advanced, Own program, in the Codex card; the status says when it is missing or
+another version. `pnpm seti:doctor` shows a Codex line while Codex is on.
 
 A Codex agent runs only in the sandbox and asks you before every command, edit and tool call; a
 guard or deny rule still refuses at once. Settings, Runtimes can let Seti's rules answer the

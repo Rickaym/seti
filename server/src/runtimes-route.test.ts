@@ -61,26 +61,33 @@ describe('the Codex runtime in Settings', () => {
     await codexSettings.set(CODEX_SETTINGS_DEFAULTS)
     expect(await status(EA_AUTH)).toMatchObject({ state: 'off', version: null, pinned: '0.171.0' })
     expect((await status()).pricesAsOf).toMatch(/^\d{4}-\d{2}-\d{2}$/)
-    expect((await runtimes()).offers).toEqual([{ runtime: 'claude', models: [], efforts: [] }])
+    expect(await offered()).toEqual(['claude'])
+    expect((await runtimes()).offers[0]?.models.map((model) => model.id)).toEqual(['opus', 'sonnet', 'haiku'])
   })
 
   it('is ready only on, with a program of the pinned version and a key, and records each change', async () => {
     await clearConnections()
-    expect((await change({ enabled: true })).status).toBe(200)
-    expect((await status()).state).toBe('not_set_up')
     await change({ program: path.join(scratch, 'nowhere') })
-    expect((await status()).state).toBe('missing')
+    expect((await status()).state).toBe('off')
+    expect((await change({ enabled: true })).status).toBe(200)
+    expect(await status()).toMatchObject({
+      state: 'failed',
+      failure: { reason: 'program', message: expect.stringContaining('is not there') as string },
+    })
     await change({ program: program('old-codex', '0.170.0') })
-    expect(await status()).toMatchObject({ state: 'update_needed', version: '0.170.0' })
+    expect(await status()).toMatchObject({
+      state: 'failed',
+      version: '0.170.0',
+      failure: { reason: 'program', message: expect.stringContaining('reports 0.170.0') as string },
+    })
     await change({ program: program('codex', '0.171.0') })
     expect(await status()).toMatchObject({ state: 'no_key', version: '0.171.0', keyed: [] })
     await openaiKey()
     expect(await status()).toMatchObject({ state: 'ready', keyed: [DEFAULT_PROFILE_ID] })
     expect(await offered()).toEqual(['claude', 'codex'])
-    expect((await runtimes()).offers[1]).toMatchObject({
-      models: ['gpt-5.5'],
-      efforts: ['low', 'medium', 'high', 'xhigh', 'max'],
-    })
+    expect((await runtimes()).offers[1]?.models).toEqual([
+      { id: 'gpt-5.5', label: 'gpt-5.5', efforts: ['low', 'medium', 'high', 'xhigh', 'max'] },
+    ])
     const recorded = await auditEvents.latest('system.runtime_changed')
     expect(recorded?.detail).toMatchObject({ runtime: 'codex', changed: ['program'] })
   })
@@ -111,7 +118,10 @@ describe('a new Codex agent', () => {
     expect(await mixed.text()).toContain('gpt-5.5 runs on Codex, not on Claude Code')
     const unknown = await start({ title: 'Port', prompt: 'port it', model: 'claude-opus-5-5' })
     expect(unknown.status).toBe(400)
-    expect(await unknown.text()).toContain('No runtime offers claude-opus-5-5')
+    expect(await unknown.text()).toContain('No runtime offers claude-opus-5-5; a new agent may name opus, sonnet')
+    const effortless = await start({ title: 'Port', prompt: 'port it', model: 'sonnet', effort: 'high' })
+    expect(effortless.status).toBe(400)
+    expect(await effortless.text()).toContain('sonnet takes no high effort here')
   })
 
   it('is refused on a credential without an OpenAI key, with where the user adds one', async () => {

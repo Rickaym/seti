@@ -149,6 +149,7 @@ function buildSnapshot(
       value: model.value,
       display_name: model.displayName,
       description: model.description,
+      efforts: model.supportedEffortLevels ?? [],
     })),
   }
 }

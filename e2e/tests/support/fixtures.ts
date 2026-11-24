@@ -9,6 +9,7 @@ import {
   type Route,
 } from '@playwright/test'
 import type { Envelope, Repo } from '@seti/shared'
+import { startCodexRegistry, stopCodexRegistry } from './codex-registry.js'
 import { openSeedDb } from './db.js'
 import { paths, USER_HEADERS } from './env.js'
 import { startDemoServer, startWorkerServer, type WorkerServer } from './server.js'
@@ -89,9 +90,12 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
   serverEnv: [{}, { scope: 'worker', option: true }],
   setiServer: [
     async ({ serverEnv }, use) => {
-      const server = await (serverEnv.SETI_DEMO === '1' ? startDemoServer() : startWorkerServer(serverEnv))
+      const demo = serverEnv.SETI_DEMO === '1'
+      const registry = demo ? {} : await startCodexRegistry()
+      const server = await (demo ? startDemoServer() : startWorkerServer({ ...registry, ...serverEnv }))
       await use(server)
       await server.close()
+      await stopCodexRegistry()
     },
     { scope: 'worker', auto: true, timeout: 90_000 },
   ],

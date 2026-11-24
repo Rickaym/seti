@@ -136,6 +136,7 @@ export const stored = z.looseObject({
   reply: z.unknown().optional(),
   job: z.looseObject({ id: text, stopped: z.boolean().optional() }).optional(),
   spent: turnSpend.optional(),
+  unfinished: z.array(text).optional(),
 })
 
 /** Codex's list of a thread's background terminals. */

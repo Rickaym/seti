@@ -6,6 +6,14 @@ import { echoOf, type Script, type ScriptCall, type Step } from '../conformance/
 import type { Rig, SpawnRecord } from '../conformance/target.js'
 import { answered, claudeTool, isGated } from './conformance-tools.js'
 
+/** When a call's tool answers: after its delay, or never for a held one. */
+const answerOf = async (call: ScriptCall): Promise<void> =>
+  new Promise((resolve) => {
+    if (call.hold !== true) {
+      setTimeout(resolve, call.delayMs ?? 0)
+    }
+  })
+
 /** What the SDK's query takes, as the rig answers it. */
 interface QueryArgs {
   prompt: string | AsyncIterable<SDKUserMessage>
@@ -267,10 +275,13 @@ class TurnPlayer {
       return null
     }
     this.machine.effects.push(`${call.tool} ${JSON.stringify(decision.updatedInput ?? input)}`)
-    if (call.hold === true) {
-      await aborted(this.turn.signal)
-      yield result('[Request interrupted by user for tool use]', true)
-      return null
+    if (call.hold === true || call.delayMs !== undefined) {
+      const cut = await Promise.race([answerOf(call).then(() => false), aborted(this.turn.signal).then(() => true)])
+      if (cut) {
+        this.machine.effects.push(`cancelled ${call.tool}`)
+        yield result('[Request interrupted by user for tool use]', true)
+        return null
+      }
     }
     const output = name === 'AskUserQuestion' ? answered(decision.updatedInput) : (call.output ?? '')
     yield result(output, call.fails === true)

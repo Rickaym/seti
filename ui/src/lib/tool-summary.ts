@@ -145,9 +145,18 @@ const SUMMARIES: Record<ToolKind, (field: Field, input: unknown) => string> = {
   other: (field, input) => field('description') ?? field('skill') ?? firstString(input) ?? JSON.stringify(input),
 }
 
+/** The files an edit given as patches changes: the first, and how many more. */
+function patchedFiles(call: ToolCall): string | null {
+  const [first, ...rest] = call.edit?.changes ?? []
+  if (first === undefined || inputString(call.input, 'file_path') !== undefined) {
+    return null
+  }
+  return rest.length === 0 ? first.path : `${first.path} and ${String(rest.length)} more`
+}
+
 /** One short line saying what a call does: its description, file, pattern or first command line. */
 export const toolSummary = (call: ToolCall): string =>
-  oneLine(SUMMARIES[toolKind(call)]((key) => inputString(call.input, key), call.input))
+  oneLine(patchedFiles(call) ?? SUMMARIES[toolKind(call)]((key) => inputString(call.input, key), call.input))
 
 /** The command line behind a summary that shows a description instead, for hover text. */
 export function commandLine(call: ToolCall): string | undefined {

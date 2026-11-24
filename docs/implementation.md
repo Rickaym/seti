@@ -58,7 +58,7 @@ with another top-level folder.
 
 | Section        | Main files                                                                                                                                                                                                                                                                                                                                                        |
 | -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 3 Entities     | `shared/src/tasks.ts`, `shared/src/inputs.ts`, `shared/src/requests.ts`, `shared/src/events.ts`, `shared/src/runtimes/`, `events/`, `db.ts`, `pending-requests.ts`                                                                                                                                                                                                |
+| 3 Entities     | `shared/src/tasks.ts`, `shared/src/inputs.ts`, `shared/src/requests.ts`, `shared/src/events.ts`, `shared/src/runtimes/`, `events/`, `db.ts`, `pending-requests.ts`, `codex-status.ts`, `codex-install.ts`, `codex-fetch.ts`, `codex-pin.ts`                                                                                                                       |
 | 4 Turns        | `runner.ts`, `session-host.ts`, `session-ingest.ts`, `codex-spend.ts`, `codex-host.ts`, `codex-decide.ts`, `session-spec.ts`, `session-realise.ts`, `runtime-host.ts`, `runtimes/`, `agent-session.ts`, `rewind.ts`, `turn-asking.ts`, `closing-line.ts`, `task-location.ts`                                                                                      |
 | 4 Restarts     | `session-restart.ts`, `input-queue.ts`                                                                                                                                                                                                                                                                                                                            |
 | 4 Node link    | `node-link.ts`, `node-commands.ts`, `session-control.ts`, `session-mirror.ts`, `session-setup.ts`, `session-tools.ts`, `turn-asks.ts`, `shared/src/node-protocol.ts`                                                                                                                                                                                              |
@@ -343,8 +343,9 @@ A rig may also run the vendor's real program. The Codex rig starts the pinned `c
 by `SETI_CODEX_BIN` through `conformance/real-process.ts`, answers its model calls from a scripted
 Responses API (`codex/conformance-responses.ts`), and puts a login shell profile in the program's
 home that prints each scripted command's output instead of running it. Without the variable its
-cases are skipped. `node scripts/codex-binary.mjs <folder>` fetches the pinned binary from the npm
-registry, checks it against `codex/pin.json` and prints its path; CI runs the cases with it.
+cases are skipped. `pnpm --silent --filter @seti/server run codex-binary <folder>` fetches the
+pinned binary with the same code Seti installs it with (`codex-fetch.ts`), checks it against
+`codex/pin.json` and prints its path; CI runs the cases with it.
 
 The rig drives Codex outside Seti. `codex-proof.test.ts` and `codex-proof-split.test.ts` run the
 same binary as an agent of Seti: started by the runner in the agent's sandbox, its model calls
