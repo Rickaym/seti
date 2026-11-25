@@ -257,6 +257,11 @@ describe('device proofs', () => {
     }
     const write = await proof(phone, { htm: 'POST', htu: `${ORIGIN}/api/devices/pairing` })
     expect((await call(app, 'POST /api/devices/pairing', { ...PUBLIC, ...write, origin: ORIGIN }, {})).status).toBe(403)
+    const live = await proof(phone, { htm: 'PUT', htu: `${ORIGIN}/api/shares/any/live` })
+    const liveBody = { live: true }
+    expect((await call(app, 'PUT /api/shares/any/live', { ...PUBLIC, ...live, origin: ORIGIN }, liveBody)).status).toBe(
+      403,
+    )
     const install = await proof(phone, { htm: 'POST', htu: `${ORIGIN}/api/plugins/installed` })
     const body = { id: 'datadog@claude-plugins-official' }
     const res = await call(app, 'POST /api/plugins/installed', { ...PUBLIC, ...install, origin: ORIGIN }, body)

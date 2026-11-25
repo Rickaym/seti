@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, 
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
-import type { RuntimeEvent, ToolCall } from '@seti/shared'
+import type { CompactRule, RuntimeEvent, ToolCall } from '@seti/shared'
 import { afterAll, describe, expect, it } from 'vitest'
 import type { CodexToolServer } from '../../codex-tool-servers.js'
 import type { Launcher } from '../../launcher.js'
@@ -68,7 +68,8 @@ async function turn(
     resume = null,
     skills = [],
     servers = [],
-  }: { resume?: string | null; skills?: UserSkill[]; servers?: CodexToolServer[] } = {},
+    compaction = { auto: true, window_k: null, threshold_pct: null, instructions: null },
+  }: { resume?: string | null; skills?: UserSkill[]; servers?: CodexToolServer[]; compaction?: CompactRule } = {},
 ) {
   if (model === null) {
     throw new Error('no binary')
@@ -89,6 +90,7 @@ async function turn(
     toolServers,
     instructions: { append: HOUSE_RULES },
     vendor: { binary, model: null, effort: null, skills, servers },
+    compaction,
   } as unknown as SessionSpec<'codex'>
   const realised = await adapter.realise(
     spec,
@@ -254,5 +256,28 @@ describe.skipIf(model === null)('Codex with MCP servers the agent planted', () =
     expect(outputs(events).join('\n')).toContain('USER PEEKED')
     expect(readFileSync(marker, 'utf8').trim().split('\n')).toEqual(['USER nokey'])
     expect(model?.bodies.join('\n') ?? '').not.toContain('planted')
+  })
+})
+
+describe.skipIf(model === null)('Codex with a compaction rule', () => {
+  it("compacts with the rule's instructions once a session passes the window's Compact at", async () => {
+    if (model === null) {
+      throw new Error('no binary')
+    }
+    const where = planted('compaction', {})
+    const rule = { auto: true, window_k: 100, threshold_pct: 10, instructions: 'SETI_COMPACT_RULES' }
+    model.tokens = 9_000
+    const first = await turn(where, [{ say: 'one' }], { compaction: rule })
+    const thread = first.events.find((event) => event.type === 'session.started')
+    const resume = thread?.type === 'session.started' ? thread.sessionId : null
+    const before = model.bodies.length
+    await turn(where, [{ say: 'two' }], { resume, compaction: rule })
+    expect(model.bodies.slice(before).join('\n'), 'under the limit').not.toContain('SETI_COMPACT_RULES')
+    model.tokens = 11_000
+    await turn(where, [{ say: 'three' }], { resume, compaction: rule })
+    const after = model.bodies.length
+    await turn(where, [{ say: 'four' }], { resume, compaction: rule })
+    model.tokens = 1240
+    expect(model.bodies.slice(after).some((body) => body.includes('SETI_COMPACT_RULES'))).toBe(true)
   })
 })

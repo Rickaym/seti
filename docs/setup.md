@@ -568,7 +568,10 @@ sandboxed Claude Code agent gets from your Claude Code config: local servers wit
 its sandbox, and remote ones over streamable HTTP reach it when they need no key or the proxy signs
 them. Every call to them asks you, unless an allow rule of yours names the server or tool and Rules
 decide is on. SSE servers and claude.ai connectors are Claude only; the agent's access marks each
-server it cannot use and says why. Codex agents have no side chat, rewind, Bypass or plugins.
+server it cannot use and says why. A Codex agent takes the compaction rule's instructions, and
+its Compact at with a Context window as a token limit; it always compacts near its own limit, so
+Auto compact off and a Context window alone do not apply, and its settings say so. Codex agents
+have no side chat, rewind, Bypass or plugins.
 Their cost is an estimate from the price table in `server/src/runtimes/codex/prices.ts`, which
 names the day it was read; to update it, copy the standard rates from OpenAI's pricing page into
 that table, set `asOf` to the day, and run `pnpm check`.

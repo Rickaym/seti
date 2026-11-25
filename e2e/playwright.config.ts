@@ -8,6 +8,15 @@ const PHONE_SPEC = /phone\.spec\.ts$/
 /** Phone profiles keep their viewport, touch and user agent but run in Chromium like the rest. */
 const phone = (device: (typeof devices)[string]) => ({ ...device, browserName: 'chromium' as const })
 
+/** WebKit runs only the live share isolation spec, and only where CI or a person installed it. */
+const WEBKIT = process.env.SETI_E2E_WEBKIT === '1'
+
+const webkitProject = {
+  name: 'webkit',
+  testMatch: /live-share-isolation\.spec\.ts$/,
+  use: { browserName: 'webkit' as const, launchOptions: { args: [] } },
+}
+
 /** Each worker runs its own Seti and Chromium, so the shared host caps them at four. */
 function workers(): number {
   const asked = Number(process.env.SETI_E2E_WORKERS)
@@ -44,5 +53,6 @@ export default defineConfig({
     { name: 'iphone-15', testMatch: PHONE_SPEC, use: phone(devices['iPhone 15']) },
     { name: 'pixel-7', testMatch: PHONE_SPEC, use: phone(devices['Pixel 7']) },
     { name: 'desktop', testIgnore: PHONE_SPEC },
+    ...(WEBKIT ? [webkitProject] : []),
   ],
 })
