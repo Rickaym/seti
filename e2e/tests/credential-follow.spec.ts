@@ -1,4 +1,4 @@
-import { agentOnCredential, openAccess } from './support/credential-access.js'
+import { agentOnCredential, awsRow, openAccess } from './support/credential-access.js'
 import { expect, test } from './support/fixtures.js'
 
 test("an agent's rows say what comes from its credential, and Reset all follows it again", async ({
@@ -8,7 +8,7 @@ test("an agent's rows say what comes from its credential, and Reset all follows 
   const { id, profile } = await agentOnCredential(request, 'Follow')
   const access = await openAccess(page, id)
   const aws = access.getByRole('switch', { name: 'AWS', exact: true })
-  const row = access.getByRole('listitem').filter({ has: aws })
+  const row = awsRow(page, access)
   await expect(row).toContainText('Credential')
   await expect(aws).toBeChecked()
   await expect(access.getByRole('button', { name: 'Reset all' })).toBeDisabled()

@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import type { APIRequestContext, Page } from '@playwright/test'
+import type { APIRequestContext, Locator, Page } from '@playwright/test'
 import type { CredentialProfile } from '@seti/shared'
 import { openAgentSettings } from './agent-settings.js'
 import { openSeedDb } from './db.js'
@@ -39,3 +39,7 @@ export async function openAccess(page: Page, id: string) {
   await expect(access).toBeVisible()
   return access
 }
+
+/** The AWS row of an access list, which holds its switch and its mark. */
+export const awsRow = (page: Page, access: Locator) =>
+  access.getByRole('listitem').filter({ has: page.getByRole('switch', { name: 'AWS', exact: true }) })
