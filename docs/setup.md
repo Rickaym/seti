@@ -492,7 +492,9 @@ credential carries:
   cannot reach. Without one, agents reach GitHub anonymously.
 - An AWS role that Seti assumes with the host's own AWS credentials, with the trust and
   permission policies to create it with.
-- SSH hosts it bundles: every agent using it gets them, whatever its own Access says.
+- An access set: on or off for SSH hosts, AWS, MCP servers, context packs and plugins, and hosts its
+  agents reach beside the shared allowlist. An item the set does not name follows the default for
+  every agent.
 - Connections: each connection is switched on per credential, from either page, and a new one is in
   none.
 
@@ -500,6 +502,17 @@ Each agent picks a credential in the New agent dialog or its details; a change a
 next turn. Credentials apply to sandboxed agents only (SEC-1 in
 [the protocol](protocol.md#8-secrets-and-connections)); an unsandboxed agent uses the host's own
 access.
+
+An agent follows its credential's set from its next turn, except where it has its own choice. Each
+row of the agent's Access says where its state comes from: Custom (its own choice), Credential (its
+credential's set) or Inherited (the default for every agent). Reset on a row goes back to the
+credential, and Reset all drops every own choice. Save access copies an agent's access into its
+credential after a preview that names which items change and which other agents each one turns on
+or off; a save after anything in the preview changed is refused, and the dialog shows it again.
+Picking a credential with a set says first what the switch turns on and off; Reset own drops the
+agent's own choices in the same step. Only you change a set or reset an agent's access: the EA,
+agents and mods cannot, and the EA cannot move an agent to a credential that turns on an SSH host,
+AWS or a host it lacks (SEC-15 to SEC-18 in [the protocol](protocol.md#8-secrets-and-connections)).
 
 ### MCP servers for agents
 

@@ -2,16 +2,7 @@ import type { AccessSaveChange, AccessSavePreview } from '@seti/shared'
 import { Upload } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-
-const KIND_WORD: Record<AccessSaveChange['kind'], string> = {
-  ssh: 'SSH',
-  aws: 'AWS',
-  mcp: 'MCP',
-  pack: 'Pack',
-  plugin: 'Plugin',
-}
-
-const label = (change: AccessSaveChange) => (change.kind === 'aws' ? 'AWS' : `${KIND_WORD[change.kind]} ${change.name}`)
+import { accessLabel } from './access'
 
 const count = (n: number, noun: string) => `${String(n)} ${noun}${n === 1 ? '' : 's'}`
 
@@ -25,7 +16,7 @@ function followLine(others: number, set: string): string {
 function ChangeLine({ change }: { change: AccessSaveChange }) {
   return (
     <li className="min-w-0 break-words">
-      Turns <span className="font-medium">{label(change)}</span> {change.enabled ? 'on' : 'off'} for{' '}
+      Turns <span className="font-medium">{accessLabel(change)}</span> {change.enabled ? 'on' : 'off'} for{' '}
       {count(change.turns.length, 'agent')}: {change.turns.join(', ')}
       {change.keeps.length > 0 && (
         <span className="text-muted-foreground"> ({change.keeps.join(', ')} keep their own choice)</span>

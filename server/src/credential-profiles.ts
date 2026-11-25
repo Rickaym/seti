@@ -58,12 +58,15 @@ async function profileView(id: string): Promise<CredentialProfile> {
 
 export async function profileSummaries(): Promise<ProfileSummary[]> {
   const [list, counts] = await Promise.all([profiles.list(), profiles.agentCounts()])
-  return list.map((profile) => ({
-    id: profile.id,
-    name: profile.name,
-    builtin: isDefault(profile.id),
-    agents: counts.get(profile.id) ?? 0,
-  }))
+  return Promise.all(
+    list.map(async (profile) => ({
+      id: profile.id,
+      name: profile.name,
+      builtin: isDefault(profile.id),
+      agents: counts.get(profile.id) ?? 0,
+      access_items: (await credentialAccess.all(profile.id)).length + (await credentialHosts.list(profile.id)).length,
+    })),
+  )
 }
 
 /** Names, hosts and settings only: never a secret value, token or mint result. */

@@ -135,6 +135,9 @@ export const taskRoutes = new Hono()
     if (fromEa() && input.home_access !== undefined) {
       return refuseEa(c, "change an agent's home folders")
     }
+    if (fromEa() && input.reset_access !== undefined) {
+      return refuseEa(c, "reset an agent's access")
+    }
     return ok(c, await updateTask(await taskIdOf(c.req.param('id')), input))
   })
   .get('/:id/access', async (c) => ok(c, await effectiveAccess(await requireTask(c.req.param('id')))))
