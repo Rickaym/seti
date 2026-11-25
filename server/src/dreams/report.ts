@@ -4,7 +4,10 @@ const section = (title: string, lines: readonly string[]) =>
   lines.length === 0 ? [] : ['', `## ${title}`, '', ...lines.map((line) => `- ${line}`)]
 
 /** The dream's report as Markdown, kept beside its digest for the agent and the Files view. */
-export function reportMarkdown(title: string, night: string, end: DreamEnd): string {
+export function reportMarkdown(
+  { title, night, prompt }: { title: string; night: string; prompt: string },
+  end: DreamEnd,
+): string {
   const report = end.report
   const outcome = end.reason === null ? end.state : `${end.state}: ${end.reason}`
   return [
@@ -17,6 +20,8 @@ export function reportMarkdown(title: string, night: string, end: DreamEnd): str
     ...section('Remembered', report?.remembered ?? []),
     ...section('Asks', report?.asks ?? []),
     ...section('Found', report?.found ?? []),
+    '',
+    `Prompt ${prompt}.`,
     '',
   ].join('\n')
 }

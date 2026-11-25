@@ -44,6 +44,8 @@ export interface DreamRun {
   denials: number
   memory_changes: number
   report: DreamReport | null
+  /** A short hash of the wording of Seti's dream prompt it ran under; null before it ran. */
+  prompt_version: string | null
 }
 
 export const dreamNowInput = z.strictObject({})

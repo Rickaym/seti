@@ -92,3 +92,6 @@ CREATE TABLE trash_item (
   purged_at TEXT
 );
 `
+
+/** Which wording of Seti's dream prompt a dream ran under, so tuning can be traced. */
+export const DREAM_PROMPT_VERSION = `ALTER TABLE dream_run ADD COLUMN prompt_version TEXT;`

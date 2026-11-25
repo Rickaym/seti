@@ -18,6 +18,7 @@ test('Dream now, its report and a memory diff fit a phone, undo included', async
   await expect(last).toContainText('done, 1 memory file changed')
   await last.tap()
   await expect(dreams(page)).toContainText(DREAM_SUMMARY)
+  await expect(dreams(page).getByText(/^\$\d+\.\d\d, \d+ steps?, prompt [0-9a-f]{8}$/)).toBeVisible()
   await expectFitsPhone(page, 'the last dream with its memory changes')
   await dreams(page).getByRole('button', { name: 'MEMORY.md', exact: true }).tap()
   const diff = page.getByRole('dialog', { name: 'MEMORY.md' })
