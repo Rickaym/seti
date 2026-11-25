@@ -3,6 +3,8 @@ import {
   DELEGATE_LIMITS,
   agentColorFromWords,
   listedStatus,
+  restartSessionInput,
+  RUNTIME_NAMES,
   rewindInput,
   sendMessageInput,
   startAgentInput,
@@ -323,13 +325,25 @@ const stopBackgroundWork = setiTool({
 const restartAgentSession = setiTool({
   name: 'restart_agent_session',
   description:
-    "Restart another agent's Claude Code session, as when its MCP servers failed or it seems stuck: the conversation is kept and its background work ends; a running turn stops first.",
-  input: { task: taskRef },
-  run: async ({ task: ref }, ctx) => {
+    "Restart another agent's session, as when its MCP servers failed or it seems stuck: the conversation is kept and its background work ends; a running turn stops first. With runtime, continue it on that runtime instead: a new session there in the same folders, which gets a brief of its work.",
+  input: {
+    task: taskRef,
+    runtime: restartSessionInput.shape.runtime.describe(
+      'Only when the user asks for it: the runtime to continue the agent on, which Seti refuses while the user has it off.',
+    ),
+    model: restartSessionInput.shape.model.describe(
+      "Only with runtime and when the user names one; else that runtime's default.",
+    ),
+  },
+  run: async ({ task: ref, runtime, model }, ctx) => {
     const task = await liveTask(ref)
-    notSelf(ctx, task, 'restart')
-    await restartSession(task, { interrupt: true })
-    return done(`Restarted the session of ${task.title}.`)
+    notSelf(ctx, task, runtime === undefined ? 'restart' : 'move to another runtime')
+    await restartSession(task, { interrupt: true, runtime, model })
+    return done(
+      runtime === undefined
+        ? `Restarted the session of ${task.title}.`
+        : `${task.title} continues on ${RUNTIME_NAMES[runtime]}; its next message brings a brief of its work.`,
+    )
   },
 })
 

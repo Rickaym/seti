@@ -88,6 +88,7 @@ import {
   CODEX_SETTINGS,
   TASK_APPROVAL_CEILING,
   TASK_DELEGATED_BY,
+  TASK_SESSION,
 } from './schema-tasks.js'
 import {
   EA_DOC_NO_DIRECT,
@@ -248,5 +249,6 @@ export const MIGRATIONS: readonly Migration[] = [
   { version: 131, name: 'second_opinion_reviews', sql: SECOND_OPINION_REVIEWS },
   { version: 132, name: 'task_delegated_by', sql: TASK_DELEGATED_BY },
   { version: 133, name: 'role_runtime', sql: ROLE_RUNTIME },
-  { version: 134, name: 'folder_settings_watch', sql: FOLDER_SETTINGS_WATCH },
+  { version: 134, name: 'task_session', sql: TASK_SESSION },
+  { version: 135, name: 'folder_settings_watch', sql: FOLDER_SETTINGS_WATCH },
 ]

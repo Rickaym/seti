@@ -39,6 +39,7 @@ export const AUDIT_KINDS = [
   'task.session_ended',
   'task.session_restarted',
   'task.folder_settings_held',
+  'task.runtime_changed',
   'task.worktree_restored',
   'task.deleted',
   'task.pr_linked',
