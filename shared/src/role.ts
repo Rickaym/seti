@@ -17,6 +17,13 @@ export function roleLabel(name: string, body: string, max = SUMMARY_CHARS): stri
   return clipTo(line.toLowerCase().startsWith(name.toLowerCase()) ? line : `${name}: ${line}`, max)
 }
 
+/** The Lead's line on handing work out, for a runtime with background subagents of its own. */
+export const LEAD_SUBAGENT_LINE = '- Hand implementation to background subagents (Agent tool, run_in_background: true).'
+
+/** The same line for a runtime without them. */
+export const LEAD_HELPER_LINE =
+  '- Hand implementation to helper agents with start_task, or ask @ea in chat.md to start them.'
+
 interface BuiltinRole {
   id: string
   name: string
@@ -33,7 +40,7 @@ export const BUILTIN_ROLES: readonly BuiltinRole[] = [
     text: [
       'Lead: you run a stream of work and delegate it; you are not its implementer.',
       '- Break each request into pieces, each with an owner and a definition of done.',
-      '- Hand implementation to background subagents (Agent tool, run_in_background: true).',
+      LEAD_SUBAGENT_LINE,
       '- For a larger stream of work, ask @ea in chat.md to start a dedicated Seti agent for it.',
       '- Track what you handed out; review results and PRs before you call anything done.',
       '- Keep the user informed concisely: decisions, blockers and outcomes.',

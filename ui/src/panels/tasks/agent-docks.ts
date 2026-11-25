@@ -1,6 +1,7 @@
 import type { ModDockProps, ModIcon } from '@seti/mod-api'
-import { Registry } from '@seti/shared'
+import { Registry, type AgentCapabilityName } from '@seti/shared'
 import { useEffect, useSyncExternalStore, type ComponentType } from 'react'
+import { agentLacks, useAgentLacks } from '@/mods/agent-needs'
 
 /** A dock a mod places over agents' chats: a panel on wide screens, a bottom sheet on a phone. */
 export interface AgentDock {
@@ -13,6 +14,8 @@ export interface AgentDock {
   view: ComponentType<ModDockProps>
   /** Runs when the dock closes over an agent, or the agent's view goes away. */
   onClose: ((agent: string) => void) | null
+  /** What an agent's runtime must offer for the dock to open over it. */
+  needs: readonly AgentCapabilityName[]
 }
 
 export const agentDocks = new Registry<AgentDock>('agent dock', (dock) => dock.key)
@@ -46,7 +49,8 @@ export function closeAgentDock(agent: string, key?: string): void {
 
 /** Opens a dock over the agent's chat, in place of another; opening it again refocuses it. */
 export function openAgentDock(agent: string, key: string): void {
-  if (!agentDocks.has(key)) {
+  const dock = agentDocks.get(key)
+  if (dock === undefined || agentLacks(agent, dock.needs) !== null) {
     return
   }
   const open = opened.get(agent)
@@ -89,6 +93,9 @@ export function useAgentDock(agent: string): { dock: AgentDock; focus: number } 
       closeAgentDock(agent)
     }
   }, [agent])
+  const lacks = useAgentLacks()
   const dock = open === undefined ? undefined : agentDocks.get(open.key)
-  return open === undefined || dock === undefined ? null : { dock, focus: open.focus }
+  return open === undefined || dock === undefined || lacks(agent, dock.needs) !== null
+    ? null
+    : { dock, focus: open.focus }
 }

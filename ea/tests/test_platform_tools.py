@@ -579,6 +579,17 @@ async def test_list_mcp_servers(tools: EaTools, fake_seti: FakeSeti) -> None:
     assert (await tools.call("list_mcp_servers", {})).text == "No MCP servers are configured."
 
 
+async def test_list_mcp_servers_says_which_runtimes_can_use_each(tools: EaTools, fake_seti: FakeSeti) -> None:
+    for s in fake_seti.capabilities["servers"]:
+        s["runtimes"] = ["claude"] if s["name"] == "posthog" else ["claude", "codex"]
+    alone = await tools.call("list_mcp_servers", {})
+    assert "Claude only" not in alone.text
+    fake_seti.runtimes["offers"] = [{"runtime": "claude"}, {"runtime": "codex"}]
+    both = (await tools.call("list_mcp_servers", {})).text.splitlines()
+    assert "- posthog: needs sign-in, user scope, Claude only" in both
+    assert "- slack: connected, user scope, 12 tools" in both
+
+
 async def test_list_mcp_servers_finds_connectors_to_add(tools: EaTools) -> None:
     gmail = await tools.call("list_mcp_servers", {"find": "gmail"})
     assert gmail.text.splitlines()[:2] == [
@@ -603,6 +614,9 @@ async def test_list_plugins(tools: EaTools, fake_seti: FakeSeti) -> None:
         "1 installed Claude Code plugin, 1 enabled:",
         "- posthog (user scope): enabled, 2 skills, 1 MCP server",
     ]
+    fake_seti.runtimes["offers"] = [{"runtime": "claude"}, {"runtime": "codex"}]
+    assert "Plugins do not load on Codex agents." in (await tools.call("list_plugins", {})).text
+    fake_seti.runtimes["offers"] = []
     fake_seti.shared_tools = [
         {"name": "invoices", "enabled": True, "needs": [{"env": "BILLING_KEY"}], "proposer_title": "Biller"},
         {"name": "lint-all", "enabled": False, "needs": [], "proposer_title": "Linter"},

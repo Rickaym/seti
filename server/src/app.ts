@@ -33,6 +33,7 @@ import { compressEventStreams } from './compress-events.js'
 import { EA_URL, PERMISSION_MODE, PUBLIC_ACCESS, UI_DIST } from './config.js'
 import { connectionContext } from './connection-egress.js'
 import { cpuPrompt } from './cpu-cap.js'
+import { continuedPreface } from './crew/continue-on.js'
 import { assetLinks } from './devices.js'
 import { dreamPreface } from './dreams/preface.js'
 import { watchDroppedPrompts } from './dropped-prompt.js'
@@ -376,6 +377,7 @@ export function createApp(access: AccessGuardOptions = defaultAccess(), eaUrl: s
   registerTurnPreface(inputPreface)
   registerTurnPreface(stoppedPreface)
   registerTurnPreface(restartPreface)
+  registerTurnPreface(continuedPreface)
   registerTurnPreface(setiControlPreface)
   registerTurnPreface(dreamPreface)
   onTurnEnd(watchTurnEnd)

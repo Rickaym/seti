@@ -133,30 +133,52 @@ async function sealPending(): Promise<void> {
   })
 }
 
-async function insertSealed(event: NewAuditEvent): Promise<number> {
-  return transaction(async (tx) => {
-    const { head_hash } = await lockChain(tx)
-    const detail = JSON.stringify(event.detail)
-    const [row] = await tx<{ id: number }[]>`INSERT INTO audit_event
-        (at, actor, kind, subject_type, subject_id, summary, detail, prev_hash)
-      VALUES (${event.at}, ${event.actor}, ${event.kind}, ${event.subject_type}, ${event.subject_id},
-        ${event.summary}, ${detail}, ${head_hash})
-      RETURNING id`
-    if (row === undefined) {
-      throw new Error('Audit event was not recorded')
-    }
-    await sealRecord(tx, { ...event, id: row.id, detail }, head_hash)
-    return row.id
-  })
+/** Stores the event as the new head; the caller holds the chain's lock in `tx`. */
+async function sealNew(tx: Db, event: NewAuditEvent, headHash: string): Promise<number> {
+  const detail = JSON.stringify(event.detail)
+  const [row] = await tx<{ id: number }[]>`INSERT INTO audit_event
+      (at, actor, kind, subject_type, subject_id, summary, detail, prev_hash)
+    VALUES (${event.at}, ${event.actor}, ${event.kind}, ${event.subject_type}, ${event.subject_id},
+      ${event.summary}, ${detail}, ${headHash})
+    RETURNING id`
+  if (row === undefined) {
+    throw new Error('Audit event was not recorded')
+  }
+  await sealRecord(tx, { ...event, id: row.id, detail }, headHash)
+  return row.id
 }
 
 /** Events recorded by this process join the chain in the order they were recorded. */
 let appended: Promise<unknown> = Promise.resolve()
 
-async function append(event: NewAuditEvent): Promise<number> {
-  const next = appended.then(async () => insertSealed(event))
+async function inOrder<T>(work: () => Promise<T>): Promise<T> {
+  const next = appended.then(work)
   appended = next.catch(() => undefined)
   return next
+}
+
+async function append(event: NewAuditEvent): Promise<number> {
+  return inOrder(async () =>
+    transaction(async (tx) => {
+      const { head_hash } = await lockChain(tx)
+      return sealNew(tx, event, head_hash)
+    }),
+  )
+}
+
+/** Runs a write and stores the event it yields in one transaction: both commit, or neither. */
+async function appendWith<T>(write: (tx: Db) => Promise<T>, eventOf: (result: T) => NewAuditEvent | null): Promise<T> {
+  return inOrder(async () =>
+    transaction(async (tx) => {
+      const { head_hash } = await lockChain(tx)
+      const result = await write(tx)
+      const event = eventOf(result)
+      if (event !== null) {
+        await sealNew(tx, event, head_hash)
+      }
+      return result
+    }),
+  )
 }
 
 /** Drops the oldest events up to the last one before the cutoff; the chain restarts from it. */
@@ -232,6 +254,7 @@ export async function verifyAuditChain(database: Pool): Promise<AuditChainStatus
 
 export const auditEvents = {
   insert: append,
+  insertWith: appendWith,
   /** Newest first; fetches one extra row to know whether an older page exists. */
   page: async (query: AuditQuery): Promise<AuditPage> => {
     const where = whereOf(query)

@@ -8,7 +8,13 @@ import { CHANGE_REQUESTS } from './schema-change-requests.js'
 import { CHANGELOG } from './schema-changelog.js'
 import { COMPACT_RULES } from './schema-compact.js'
 import { CONNECTION_BODY, CONNECTIONS, secretsToConnections } from './schema-connections.js'
-import { recountTaskCosts, TASK_COST_SESSION, TASK_SECOND_OPINION, TASK_SIDE_CHAT_COST } from './schema-cost.js'
+import {
+  recountTaskCosts,
+  SECOND_OPINION_REVIEWS,
+  TASK_COST_SESSION,
+  TASK_SECOND_OPINION,
+  TASK_SIDE_CHAT_COST,
+} from './schema-cost.js'
 import { CPU_CAPS } from './schema-cpu.js'
 import { ANDROID_OVERRIDE, DEVICE_SHOW_NAMES, DEVICES, dropOfficialAndroidRow } from './schema-devices.js'
 import { DREAM_NIGHTS, DREAM_PROPOSALS, DREAM_RUNS } from './schema-dreams.js'
@@ -39,7 +45,7 @@ import { PR_LIST_CACHE } from './schema-prs.js'
 import { QUESTION_SECRETS, QUESTIONS } from './schema-questions.js'
 import { DROP_ROUTINES, REMINDER_CHANNELS, REMINDER_CRON } from './schema-reminders.js'
 import { RESTART_CUTS } from './schema-restart.js'
-import { PACK_KIND, rolesToPacks } from './schema-roles.js'
+import { PACK_KIND, ROLE_RUNTIME, rolesToPacks } from './schema-roles.js'
 import { MESSAGE_SEARCH, MESSAGE_SEARCH_TALK, MESSAGE_TIME } from './schema-search.js'
 import {
   CLAUDE_LOGINS,
@@ -80,6 +86,8 @@ import {
   CODEX_RULES_DECIDE_DEFAULT,
   CODEX_SETTINGS,
   TASK_APPROVAL_CEILING,
+  TASK_DELEGATED_BY,
+  TASK_SESSION,
 } from './schema-tasks.js'
 import {
   EA_DOC_NO_DIRECT,
@@ -238,5 +246,9 @@ export const MIGRATIONS: readonly Migration[] = [
   { version: 128, name: 'codex_rules_decide_default', sql: CODEX_RULES_DECIDE_DEFAULT },
   { version: 129, name: 'task_second_opinion', sql: TASK_SECOND_OPINION },
   { version: 130, name: 'connection_body', sql: CONNECTION_BODY },
-  { version: 131, name: 'thread_follows', sql: THREAD_FOLLOWS },
+  { version: 131, name: 'second_opinion_reviews', sql: SECOND_OPINION_REVIEWS },
+  { version: 132, name: 'task_delegated_by', sql: TASK_DELEGATED_BY },
+  { version: 133, name: 'role_runtime', sql: ROLE_RUNTIME },
+  { version: 134, name: 'task_session', sql: TASK_SESSION },
+  { version: 135, name: 'thread_follows', sql: THREAD_FOLLOWS },
 ]

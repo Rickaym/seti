@@ -5,6 +5,7 @@ import { Hint } from '@/components/Hint'
 import { Button } from '@/components/ui/button'
 import { explainMcpError } from '@/lib/mcp-error'
 import { cn } from '@/lib/utils'
+import { RuntimeTag } from './RuntimeTag'
 import type { ServerView } from './filter'
 
 const STATUS_STYLE: Record<McpStatus, { label: string; className: string }> = {
@@ -154,7 +155,10 @@ function ServerRow({ view, open, onToggle, onAuthenticate, actions }: RowProps) 
         >
           <Chevron className={cn('size-4 text-muted-foreground', !expandable && 'invisible')} />
           <span className="min-w-0">
-            <span className="block truncate text-sm font-medium">{server.name}</span>
+            <span className="flex min-w-0 items-center gap-2">
+              <span className="truncate text-sm font-medium">{server.name}</span>
+              <RuntimeTag usable={server.runtimes} />
+            </span>
             {server.server_version !== null && (
               <span className="block truncate text-2xs text-muted-foreground">{server.server_version}</span>
             )}

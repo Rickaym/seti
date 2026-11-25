@@ -22,6 +22,8 @@ export interface AgentRow {
   task: TaskListEntry
   running: number
   status: TaskDisplayStatus
+  /** The listed agent that started it, which the row sits under; null at the top level. */
+  under?: string | null
 }
 
 function words(row: AgentRow): string {
@@ -64,6 +66,40 @@ export function groupAgents(rows: readonly AgentRow[]): { needsYou: AgentRow[]; 
     needsYou: rows.filter(waits).toSorted(newestFirst),
     others: rows.filter((row) => !waits(row)),
   }
+}
+
+/**
+ * The rows in their order with each agent's helpers right under it, named by `under`. A helper
+ * whose caller is not among the rows stays at the top level where it was.
+ */
+export function nestDelegates(rows: readonly AgentRow[]): AgentRow[] {
+  const listed = new Map(rows.map((row) => [row.task.id, row]))
+  const helpers = new Map<string, AgentRow[]>()
+  const top: AgentRow[] = []
+  for (const row of rows) {
+    const caller = row.task.delegated_by
+    if (caller !== null && caller !== row.task.id && listed.has(caller)) {
+      helpers.set(caller, [...(helpers.get(caller) ?? []), row])
+    } else {
+      top.push(row)
+    }
+  }
+  const out: AgentRow[] = []
+  const placed = new Set<string>()
+  const place = (row: AgentRow, under: string | null) => {
+    if (placed.has(row.task.id)) {
+      return
+    }
+    placed.add(row.task.id)
+    out.push({ ...row, under })
+    for (const helper of helpers.get(row.task.id) ?? []) {
+      place(helper, row.task.title)
+    }
+  }
+  for (const row of [...top, ...rows]) {
+    place(row, null)
+  }
+  return out
 }
 
 /** The unseen agent to open next, newest first, other than the one open now; null for none. */

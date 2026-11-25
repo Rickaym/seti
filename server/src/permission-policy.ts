@@ -1,6 +1,7 @@
 import type { PermissionUpdate } from '@anthropic-ai/claude-agent-sdk'
 import {
   permissionRuleText,
+  pushRuleOwner,
   SHARED_TOOL_SERVER,
   type BuiltInRule,
   type ClaudeBehavior,
@@ -98,7 +99,8 @@ export const appliesTo = (rule: BuiltInRule, sandboxed: boolean) =>
 
 /** Every rule an agent runs with, by behavior, each once. */
 export function composeRules(sources: RuleSources): PermissionSettings {
-  const rules = [...sources.builtIn.filter((rule) => appliesTo(rule, sources.sandboxed)), ...sources.stored]
+  const stored = sources.stored.filter((rule) => pushRuleOwner(rule.rule) === null)
+  const rules = [...sources.builtIn.filter((rule) => appliesTo(rule, sources.sandboxed)), ...stored]
   const of = (behavior: ClaudeBehavior) => [
     ...new Set(rules.filter((rule) => rule.behavior === behavior).map((rule) => rule.rule)),
   ]

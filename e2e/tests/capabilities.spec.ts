@@ -72,6 +72,7 @@ const agentSearch: AccessItem = {
   missing_key: [],
   in_set: false,
   session: { status: 'needs-auth', reason: 'Not signed in.', sign_in: 'required', at: '2026-10-08T07:17:35.000Z' },
+  unusable: null,
 }
 
 test("signs in from an agent's access when its session needs auth and the host probe is connected", async ({
