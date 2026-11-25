@@ -239,11 +239,26 @@ ACTION_SPECS: list[ToolSpec] = [
     ),
     ToolSpec(
         "restart_agent_session",
-        "Restart an agent's Claude Code session, as when its MCP servers failed to connect, a sign-in "
-        "or config change should take effect, or it seems stuck: the conversation is kept, and its "
-        "background shells, processes and subagents end. A running turn stops first. Needs the "
-        "user's yes.",
-        {"task": TASK_REF, "confirmed": CONFIRMED},
+        "Restart an agent's session, as when its MCP servers failed to connect, a sign-in or config "
+        "change should take effect, or it seems stuck: the conversation is kept, and its background "
+        "shells, processes and subagents end. A running turn stops first. With runtime, continue the "
+        "agent on that runtime instead: a new session there in the same folders, which gets a brief "
+        "of its work. Needs the user's yes.",
+        {
+            "task": TASK_REF,
+            "runtime": {
+                "type": "string",
+                "enum": ["claude", "codex"],
+                "description": "Only when the user asks for it: the runtime to continue the agent on. "
+                "Seti refuses one the user has off.",
+            },
+            "model": {
+                "type": "string",
+                "description": "Only with runtime and when the user names one; else that runtime's "
+                "default model.",
+            },
+            "confirmed": CONFIRMED,
+        },
         ["task"],
     ),
     ToolSpec(
@@ -450,6 +465,29 @@ CONFIRM_TOOLS = frozenset(
     spec.name for spec in [*ACTION_SPECS, *SETTINGS_SPECS] if "confirmed" in spec.properties
 )
 CHANGE_TOOLS = frozenset(spec.name for spec in ACTION_SPECS) | SETTINGS_WRITES
+
+
+RUNTIME_NAMES = {"claude": "Claude Code", "codex": "Codex"}
+
+
+def _restart_question(title: str, running: bool, runtime: str | None, model: str | None) -> tuple[str, str]:
+    """What restarting or moving the agent does, and the short form the user is asked."""
+    stop = " Its running turn stops first." if running else ""
+    if runtime is None:
+        effect = (
+            f"This restarts the Claude Code session of {title}: the conversation is kept, "
+            "Claude Code starts again with its MCP servers, plugins and tools loaded anew, and its "
+            f"background shells, processes and subagents end.{stop}"
+        )
+        return effect, f"restart the session of {title}"
+    name = RUNTIME_NAMES.get(runtime, runtime)
+    on = f"{name} with {model}" if model else name
+    effect = (
+        f"This moves {title} to {on}: a new session in the same folders, with a brief of its work "
+        "at its next message; its conversation, links and cost stay. Bypass ends, and its "
+        f"background shells, processes and subagents end.{stop}"
+    )
+    return effect, f"move {title} to {name}"
 
 
 class Resolver(Protocol):
@@ -892,22 +930,27 @@ class AgentActions:
     async def restart_agent_session(self, args: Mapping[str, Any]) -> ToolResult:
         task, title = await self._task_ref(args)
         running = task.get("status") == "running"
-        if not await self._cleared(args, gate_key("restart_agent_session", task.get("id"), running)):
-            stop = " Its running turn stops first." if running else ""
-            effect = (
-                f"This restarts the Claude Code session of {title}: the conversation is kept, "
-                "Claude Code starts again with its MCP servers, plugins and tools loaded anew, and its "
-                f"background shells, processes and subagents end.{stop}"
-            )
-            return ask("restart_agent_session", args, effect, f"restart the session of {title}")
+        runtime = arg_str(args, "runtime", required=False) or None
+        model = arg_str(args, "model", required=False) or None
+        key = gate_key("restart_agent_session", task.get("id"), running, runtime, model)
+        if not await self._cleared(args, key):
+            return ask("restart_agent_session", args, *_restart_question(title, running, runtime, model))
+        body: dict[str, Any] = {"interrupt": running}
+        if runtime is not None:
+            body = {**body, "runtime": runtime, **({"model": model} if model else {})}
+        verb = "restart the session of" if runtime is None else "move"
         try:
-            await self._seti.post(f"/tasks/{task.get('id')}/session/restart", {"interrupt": running})
+            await self._seti.post(f"/tasks/{task.get('id')}/session/restart", body)
         except SetiError as e:
             if e.status == 409:
-                raise ToolError(
-                    f"Could not restart the session of {title}: {e.detail or e.title}", "Not restarted"
-                ) from e
+                raise ToolError(f"Could not {verb} {title}: {e.detail or e.title}", "Not restarted") from e
             raise
+        if runtime is not None:
+            name = RUNTIME_NAMES.get(runtime, runtime)
+            return ToolResult(
+                f"{title} continues on {name}; its next message brings a brief of its work.",
+                clip(f"Moved {title} to {name}", 70),
+            )
         return ToolResult(
             f"Restarted the session of {title}; the conversation continues.",
             clip(f"Restarted the session of {title}", 70),

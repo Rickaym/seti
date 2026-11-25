@@ -346,6 +346,37 @@ async def test_session_restart_reports_a_refusal(tools: EaTools, fake_seti: Fake
     assert done.text == "Could not restart the session of Fix the logout button: Restore the agent first"
 
 
+async def test_continue_on_another_runtime_asks_and_moves_after_a_yes(
+    tools: EaTools, fake_seti: FakeSeti
+) -> None:
+    args = {"task": "logout", "runtime": "codex", "model": "gpt-5.5"}
+    asked, done = await confirm(tools, "restart_agent_session", args)
+    assert "This moves Fix the logout button to Codex with gpt-5.5: a new session" in asked.text
+    assert "Bypass ends" in asked.text
+    assert asked.summary == "Asked first: move Fix the logout button to Codex"
+    assert (
+        done.text == "Fix the logout button continues on Codex; its next message brings a brief of its work."
+    )
+    assert fake_seti.writes() == [
+        (
+            "POST",
+            f"{LOGOUT}/session/restart",
+            {},
+            {"interrupt": False, "runtime": "codex", "model": "gpt-5.5"},
+        ),
+    ]
+
+
+async def test_a_yes_to_a_restart_does_not_cover_a_move(tools: EaTools, fake_seti: FakeSeti) -> None:
+    await confirm(tools, "restart_agent_session", {"task": "logout"})
+    moved = await tools.call(
+        "restart_agent_session", {"task": "logout", "runtime": "codex", "confirmed": True}
+    )
+    assert moved.asked == "move Fix the logout button to Codex"
+    assert "This moves Fix the logout button to Codex" in moved.text
+    assert [write for write in fake_seti.writes() if "runtime" in write[3]] == []
+
+
 async def test_retry_sends_the_last_message_again(tools: EaTools, fake_seti: FakeSeti) -> None:
     result = await tools.call("retry_agent_turn", {"task": "logout"})
     assert result.ok
