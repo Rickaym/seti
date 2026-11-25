@@ -166,6 +166,22 @@ that server's host. Codex asks Seti about every call to these servers, even a to
 only reads. Codex's own config file stays empty and read-only, and a server defined in the agent's
 folder is never read.
 
+## Settings in an agent's folders
+
+A folder's Claude Code settings (`.claude/settings.json`, `.claude/settings.local.json`,
+`.claude/hooks`), its `.mcp.json` and its `.codex` folder decide what runs without asking and
+what runs later when you work there yourself. In a sandboxed agent's working folders, worktrees
+and added folders included, those that exist are read-only to the agent on both runtimes, however
+it tries to write them. A file that does not exist cannot be covered that way without leaving a
+file in your repository, so Seti watches it instead: one that appears in the agent's own folder
+after a sandboxed session started counts as the agent's writing. Until you change its content,
+Seti's gate and Claude Code ignore its allow rules and its tool servers stay off, while its ask
+and deny rules apply; the audit log records each file held back. A running Claude Code session
+takes no change to its folder's settings; the next session reads them.
+
+Rules are read from the agent's own folder only, so the settings of an added folder never decide
+an agent's calls. The user settings in a sandboxed agent's home are read-only.
+
 ## What is not protected
 
 - systemd 255's user manager cannot decrypt credentials, so the key files are plain files the Seti
@@ -189,6 +205,10 @@ folder is never read.
 - Review rules for one tool trust the server's own annotations to list its other writing tools; a
   rule for the whole server does not depend on them.
 - Seti writes to a GitHub PR in one case: the preview label, while the PR previews mod is on.
+- An unsandboxed agent can write its folders' settings like any other file; asking before a
+  command that is not read-only, and before an edit of those files, is the only guard there.
+- Claude Code applies a mid-session change of a folder's settings unless a hook blocks it; Seti's
+  sandboxed sessions block it, and Seti cannot test that against every Claude Code release.
 
 The public demo runs with a separate entry point and threat model; see [Public demo](demo.md).
 

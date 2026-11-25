@@ -189,12 +189,14 @@ between two steps; an interrupt; a hook at subagent start.
   removed, as is every copy once the runtime is off or runs a program of the user's. Nothing
   outside the control room's own folders is removed.
 - RT-13: A runtime declares whether it loads the user's MCP servers and connectors, Seti's
-  plugins and a compaction rule, whether it can run outside the sandbox, fork a side chat, dream,
-  rewind and run background subagents of its own; `GET /api/runtimes/capabilities` serves each runtime's declaration. For an agent
-  whose runtime lacks one, its settings show the control as not on that runtime instead of a
-  working control, counts leave those items out, its `task.md` and system prompt do not offer
-  them, and the server refuses the change with the reason. An agent whose runtime has no
-  subagents is pointed to helper agents instead, in the Seti guide and the Lead role.
+  plugins and a compaction rule, and which parts of that rule it does not honour, whether it can
+  run outside the sandbox, fork a side chat, dream, rewind and run background subagents of its
+  own; `GET /api/runtimes/capabilities` serves each runtime's declaration. For an agent whose
+  runtime lacks one, its settings show the control as not on that runtime instead of a working
+  control, counts leave those items out, its `task.md` and system prompt do not offer them, and
+  the server refuses the change with the reason. A control the runtime honours in part says which
+  part it does not. An agent whose runtime has no subagents is pointed to helper agents instead,
+  in the Seti guide and the Lead role.
 - RT-14: A runtime whose model can summarise its reasoning MUST ask for the summary, so its agents
   show their thinking as the default runtime's do. Reasoning the model seals for its own next call
   MUST NOT be stored, served or shown by the control room.
@@ -229,8 +231,9 @@ between two steps; an interrupt; a hook at subagent start.
   the filter a sandboxed agent's servers pass: no value of their own, or a remote server the egress
   proxy signs on its host. A local server runs inside the agent's sandbox, never in the control
   room. Every call to a user's tool server MUST pass the control room's gate whatever the tool or
-  the runtime says of it; where rules decide, a call runs unasked only when a rule of the user's
-  names its server or tool. A server definition the agent writes MUST NOT load. A server the
+  the runtime says of it; where rules decide, a call runs unasked only when an allow rule names
+  its server or tool from the control room, the user's settings, or a folder settings file the
+  agent could not have written (SBX-14). A server definition the agent writes MUST NOT load. A server the
   agent's runtime cannot use MUST show in the agent's access with the reason, and never count as on.
 
 ## 4. Turn lifecycle
@@ -467,6 +470,14 @@ interrupted only for that.
   other setting and the command search path are passed on Codex's command line, and the approval
   policy with every resume and turn, so stored session state cannot lower it. `AGENTS.md` in its
   folders is input the agent wrote, read as a Claude agent reads `CLAUDE.md`.
+- SBX-14: In every working folder of a sandboxed agent, on every runtime, the folder's runtime
+  settings that exist (Claude Code's project and local settings and hooks folder, `.mcp.json` and
+  Codex's folder config) MUST be read-only to the agent. A settings file of the agent's own folder
+  that was missing when a sandboxed session started, and appeared since, may be the agent's own
+  writing: until its content changes outside every agent's session, its allow rules MUST NOT
+  apply, neither in the control room's gate nor in the runtime, and its tool servers stay off;
+  its ask and deny rules apply. A running session takes no change to its folder's settings; the
+  next session reads them. The control room records each file it holds back.
 - SBX-15: A sandboxed agent's sessions keep and load their runtime's memory in the agent's own
   memory folder, its own project's, whatever repository its folders belong to, so they load what
   its dreams edit. The memory folders of the checkouts behind its folders, which other sessions of

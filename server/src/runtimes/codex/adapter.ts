@@ -16,7 +16,7 @@ export const codexAdapterFor = (binary?: string, provider?: CodexProvider): Runt
     rewind: { conversation: false, code: false },
     tools: { userServers: ['stdio', 'http'], serverNames: SERVER_NAMES, plugins: false },
     sandbox: { optional: false },
-    compaction: false,
+    compaction: { off: false, windowAlone: false },
     subagents: false,
     dream: null,
     oneShot: codexOneShotFor(binary, provider),
