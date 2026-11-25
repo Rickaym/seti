@@ -22,6 +22,7 @@ import { useCoarsePointer } from '@/hooks/useMedia'
 import { navigate } from '@/lib/route'
 import { cn } from '@/lib/utils'
 import { SourceMark } from '@/panels/access/SourceMark'
+import { NotOnRuntime } from '@/panels/tasks/NotOnCodex'
 import { McpSessionNote } from './McpSessionNote'
 
 interface Group {
@@ -163,6 +164,8 @@ function RowNotes({ item, profile }: { item: AccessItem; profile: AccessProfile 
   )
 }
 
+const ROW = 'flex min-w-0 items-center gap-2 border-b border-border px-2.5 py-1.5 last:border-b-0'
+
 /** Two columns from md up: a right divider on the left column, none under the last row. */
 const TWO_COLUMN_ROW = 'md:odd:border-r md:[&:nth-last-child(2):nth-child(odd)]:border-b-0'
 
@@ -173,6 +176,7 @@ function Row({
   profile,
   plain,
   columns,
+  runtime,
   onChange,
   onSignIn,
 }: {
@@ -182,9 +186,21 @@ function Row({
   profile: AccessProfile | null
   plain: boolean
   columns: 1 | 2
+  runtime: string | null
   onChange: (item: AccessItem, enabled: boolean | null) => void
   onSignIn?: (item: AccessItem) => void
 }) {
+  if (item.unusable !== null) {
+    return (
+      <li className={cn(ROW, columns === 2 && TWO_COLUMN_ROW)}>
+        <div className="min-w-0 flex-1">
+          <div className="truncate font-medium">{item.name}</div>
+          <RowNotes item={item} profile={profile} />
+        </div>
+        <NotOnRuntime label={runtime ?? 'this runtime'} reason={item.unusable} />
+      </li>
+    )
+  }
   const control = (
     <Switch
       aria-label={item.name}
@@ -196,12 +212,7 @@ function Row({
     />
   )
   return (
-    <li
-      className={cn(
-        'flex min-w-0 items-center gap-2 border-b border-border px-2.5 py-1.5 last:border-b-0',
-        columns === 2 && TWO_COLUMN_ROW,
-      )}
-    >
+    <li className={cn(ROW, columns === 2 && TWO_COLUMN_ROW)}>
       <div className="min-w-0 flex-1">
         <div className="truncate font-medium">{item.name}</div>
         <RowNotes item={item} profile={profile} />
@@ -297,6 +308,7 @@ export function AccessList({
   onSetAll,
   onSignIn,
   unavailable = {},
+  runtime = null,
 }: {
   items: readonly AccessItem[]
   onChange: (item: AccessItem, enabled: boolean | null) => void
@@ -323,6 +335,8 @@ export function AccessList({
   onSignIn?: (item: AccessItem) => void
   /** Kinds the agent's runtime cannot use, shown as this in place of their items. */
   unavailable?: Partial<Record<AccessKind, ReactNode>>
+  /** The agent's runtime by name, for the items it cannot use. */
+  runtime?: string | null
 }) {
   const needle = query.trim().toLowerCase()
   const groups = GROUPS.filter((group) => kinds.includes(group.kind)).flatMap((group) => {
@@ -352,15 +366,16 @@ export function AccessList({
             </section>
           )
         }
-        const on = all.filter((item) => item.enabled).length
-        const free = rows.filter((item) => locked(item) === null)
+        const usable = all.filter((item) => item.unusable === null)
+        const on = usable.filter((item) => item.enabled).length
+        const free = rows.filter((item) => item.unusable === null && locked(item) === null)
         return (
           <section key={group.kind} aria-label={group.title} className="flex min-w-0 flex-col gap-1">
             <h4 className="flex items-center gap-1.5 text-2xs font-medium text-muted-foreground">
               <Icon className="size-3.5" aria-hidden />
               {group.title}
-              {all.length > 0 && (
-                <span className="font-normal tabular-nums">{`${String(on)}/${String(all.length)} on`}</span>
+              {usable.length > 0 && (
+                <span className="font-normal tabular-nums">{`${String(on)}/${String(usable.length)} on`}</span>
               )}
               <About title={group.title} text={hints[group.kind] ?? group.hint} />
               {onSetAll !== undefined && free.length > 1 && (
@@ -383,6 +398,7 @@ export function AccessList({
                     profile={profile}
                     plain={plain}
                     columns={columns}
+                    runtime={runtime}
                     onChange={onChange}
                     {...(onSignIn === undefined ? {} : { onSignIn })}
                   />

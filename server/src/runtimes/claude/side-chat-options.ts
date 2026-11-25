@@ -2,7 +2,7 @@ import type { Options } from '@anthropic-ai/claude-agent-sdk'
 import type { Task } from '@seti/shared'
 import { taskLauncher } from '../../launch-plan.js'
 import { permissionSettings, systemAppend, workingDirs } from '../../session-options.js'
-import { claudeLaunch } from './realise.js'
+import { claudeLaunch, ownMemory } from './realise.js'
 
 /** Tools that only read, which a side chat the user or the EA starts may use. */
 export const READ_TOOLS = ['Read', 'Glob', 'Grep']
@@ -41,6 +41,7 @@ export async function sideChatOptions(
   const dirs = workingDirs(task)
   const tools = reads ? READ_TOOLS : []
   const append = [await systemAppend(task.id), sideNote(reads)].filter((text) => text !== '')
+  const launcher = await taskLauncher(task, 'side_chat', true)
   return {
     cwd: task.cwd,
     ...(task.model === null ? {} : { model: task.model }),
@@ -55,11 +56,15 @@ export async function sideChatOptions(
     mcpServers: {},
     strictMcpConfig: true,
     settingSources: ['user', 'project', 'local'],
-    settings: { permissions: await permissionSettings(task), disableAllHooks: true },
+    settings: {
+      permissions: await permissionSettings(task),
+      disableAllHooks: true,
+      ...(launcher.sandboxed ? ownMemory(task.cwd) : {}),
+    },
     systemPrompt: { type: 'preset', preset: 'claude_code', append: append.join('\n\n') },
     includePartialMessages: true,
     maxTurns: reads ? READING_TURNS : 1,
     abortController,
-    ...claudeLaunch(await taskLauncher(task, 'side_chat', true)),
+    ...claudeLaunch(launcher),
   }
 }

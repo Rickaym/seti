@@ -76,3 +76,14 @@ ALTER TABLE share_image ALTER COLUMN bytes SET STORAGE EXTERNAL;
 
 ALTER TABLE share_view ADD COLUMN unfurler TEXT;
 `
+
+/** Live shares: an HTML file's page runs its scripts in an isolated frame; off by default. */
+export const SHARE_LIVE = `
+ALTER TABLE share ADD COLUMN live BOOLEAN NOT NULL DEFAULT false;
+`
+
+/** An HTML share renders as its page unless the user turns that off; existing ones render too. */
+export const SHARE_RENDER = `
+ALTER TABLE share RENAME COLUMN live TO render;
+UPDATE share SET render = true WHERE lower(name) ~ '\\.html?$';
+`

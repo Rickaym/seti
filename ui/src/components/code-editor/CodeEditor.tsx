@@ -1,3 +1,4 @@
+import type { Extension } from '@codemirror/state'
 import type { CodeLanguage } from '@seti/shared'
 import { lazy, Suspense, useCallback, useRef, useState } from 'react'
 import { TextFindBar } from '@/components/find/FindBar'
@@ -16,6 +17,8 @@ const CodeMirrorEditor = lazy(async () => import('./CodeMirrorEditor').then((m) 
 /** The textarea's frame, so the editor that replaces it keeps its size and focus ring. */
 const FRAME =
   'flex w-full resize-y flex-col overflow-hidden rounded-none border border-input bg-transparent font-mono text-xs leading-relaxed [font-variant-ligatures:none] focus-within:border-ring focus-within:ring-1 focus-within:ring-ring/50 pointer-coarse:text-base dark:bg-input/30'
+
+const NONE: Extension = []
 
 const isSaveKey = (e: { ctrlKey: boolean; metaKey: boolean; key: string }) =>
   (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's'
@@ -36,6 +39,8 @@ interface CodeEditorProps {
   onSave?: () => void
   /** The find bar the screen shows for this editor; without it the editor shows its own. */
   find?: EditorFind
+  /** More CodeMirror behaviour, such as completion and error marks; keep the value stable. */
+  extensions?: Extension
 }
 
 /**
@@ -76,6 +81,7 @@ function LazyCodeEditor({
   focusOnMount = false,
   onSave,
   find,
+  extensions = NONE,
 }: CodeEditorProps) {
   const handoff = useRef<Caret | null>(null)
   const keepCaret = useCallback(
@@ -132,6 +138,7 @@ function LazyCodeEditor({
         focusOnMount={focusOnMount}
         onSave={onSave}
         find={find}
+        extensions={extensions}
       />
     </Suspense>
   )

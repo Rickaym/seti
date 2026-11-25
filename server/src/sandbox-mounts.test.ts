@@ -357,12 +357,12 @@ describe('the home directory of an older agent with home access', () => {
     expect(fromOther).toEqual(expect.arrayContaining([own, nested, missing]))
   })
 
-  it("binds the main checkout's memory for a worktree task, not its other sessions", () => {
+  it("binds the main checkout's memory read-only for a worktree task, not its other sessions", () => {
     const wt = sandboxMounts(layout({ cwd: worktree }))
     const memory = path.join('projects', projectSlug(mainRepo), 'memory')
     const inside = path.join(home, '.claude')
     expect(find(wt, path.join(inside, memory))).toEqual([
-      { kind: 'bind', src: path.join(claudeHome, memory), dest: path.join(inside, memory) },
+      { kind: 'ro-bind', src: path.join(claudeHome, memory), dest: path.join(inside, memory) },
     ])
     expect(fs.existsSync(path.join(claudeHome, memory))).toBe(true)
     expect(dests(wt)).not.toContain(path.join(inside, 'projects', projectSlug(mainRepo)))
@@ -664,9 +664,24 @@ describe("a Codex agent's mounts", () => {
     for (const dest of [...masked, ...startup.map((name) => path.join(home, name))]) {
       expect(find(mounts, dest)).toEqual([{ kind: 'ro-bind', src: path.join(taskDir, 'empty-file'), dest }])
     }
-    for (const dest of [path.join(codex, 'agents'), path.join(home, '.agents')]) {
-      expect(find(mounts, dest)).toEqual([{ kind: 'ro-bind', src: path.join(taskDir, 'empty'), dest }])
-    }
+    const agents = path.join(codex, 'agents')
+    expect(find(mounts, agents)).toEqual([{ kind: 'ro-bind', src: path.join(taskDir, 'empty'), dest: agents }])
+  })
+
+  it("show the user's skills read-only in a read-only skills home, and give Codex's own a fresh folder", () => {
+    const mounts = sandboxMounts(layout({ codex: true }))
+    const skillsHome = path.join(home, '.agents')
+    expect(find(mounts, skillsHome)).toEqual([
+      { kind: 'ro-bind', src: path.join(taskDir, 'agents-home'), dest: skillsHome },
+    ])
+    const skills = path.join(skillsHome, 'skills')
+    expect(find(mounts, skills)).toEqual([{ kind: 'ro-bind', src: path.join(claudeHome, 'skills'), dest: skills }])
+    const own = path.join(home, '.codex', 'skills')
+    expect(find(mounts, own)).toEqual([{ kind: 'tmpfs', dest: own }])
+    const without = make(root, 'claude-home-without-skills')
+    expect(find(codexLocks(layout({ codex: true, claudeHome: without })), skills)).toEqual([])
+    const bare = layout({ codex: true, maintenance: { writable: [], bare: true } })
+    expect(find(codexLocks(bare), skills)).toEqual([])
   })
 
   it("give Codex the user's own CLAUDE.md, read-only, as its global instructions", () => {

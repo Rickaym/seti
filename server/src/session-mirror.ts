@@ -5,12 +5,34 @@ type SessionChanged = Extract<JournalEntry, { type: 'session.changed' }>
 /** Each agent's open session as its node last reported it; an agent without one has no entry. */
 const mirror = new Map<string, SessionChanged>()
 
+/** Who wants to hear when an agent's turn starts, by agent. */
+const turnWatchers = new Map<string, Set<() => void>>()
+
+/** Calls `listener` each time a turn of the agent starts, however short; returns the unwatch. */
+export function watchTurnStarts(taskId: string, listener: () => void): () => void {
+  const listeners = turnWatchers.get(taskId) ?? new Set()
+  listeners.add(listener)
+  turnWatchers.set(taskId, listeners)
+  return () => {
+    listeners.delete(listener)
+    if (listeners.size === 0) {
+      turnWatchers.delete(taskId)
+    }
+  }
+}
+
 /** Takes the state a node reported for the agent's session. */
 export function mirrorSession(taskId: string, state: SessionChanged): void {
+  const started = state.running && mirror.get(taskId)?.running !== true
   if (state.open || state.running || state.background > 0) {
     mirror.set(taskId, state)
   } else {
     mirror.delete(taskId)
+  }
+  if (started) {
+    turnWatchers.get(taskId)?.forEach((listener) => {
+      listener()
+    })
   }
 }
 

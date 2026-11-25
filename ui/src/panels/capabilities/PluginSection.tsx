@@ -13,6 +13,7 @@ import { InstalledActions } from './InstalledActions'
 import { MarketplaceSection } from './MarketplaceSection'
 import { PluginCatalogDialog } from './PluginCatalogDialog'
 import { PluginList } from './PluginList'
+import { PluginTag } from './RuntimeTag'
 import { EmptyRow, Section } from './Section'
 import { matches } from './filter'
 import { filterPlugins, pluginRows } from './plugin-rows'
@@ -110,6 +111,7 @@ export function PluginSection({
         count={rows.length}
         actions={
           <>
+            <PluginTag />
             {loading && (
               <Loader2 className="size-3.5 animate-spin text-muted-foreground" aria-label="Loading plugins" />
             )}

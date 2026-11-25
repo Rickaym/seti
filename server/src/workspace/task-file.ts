@@ -9,9 +9,11 @@ export interface TaskView {
   /** The role pack linked to the task, with its pack file's slug. */
   role: { name: string; slug: string } | null
   channels: readonly ChannelSubscription[]
-  /** MCP servers the task's sessions load and leave out, by name. */
-  /** The servers on and off for the agent, or null where its runtime loads none of them. */
-  mcp: { enabled: readonly string[]; disabled: readonly string[] } | null
+  /**
+   * The servers on and off for the agent and those its runtime cannot use, or null where its
+   * runtime loads none of them.
+   */
+  mcp: { enabled: readonly string[]; disabled: readonly string[]; unusable: readonly string[] } | null
   /** Ssh aliases the task reaches, jump hosts only passed through, and what its AWS calls run as. */
   access: { ssh: readonly string[]; jumps: readonly string[]; aws: AwsOutcome }
 }
@@ -62,6 +64,7 @@ function mcpLines(mcp: TaskView['mcp']): string[] {
     '',
     `- On: ${list(mcp.enabled)}`,
     `- Off: ${list(mcp.disabled)}`,
+    ...(mcp.unusable.length === 0 ? [] : [`- Not for your runtime: ${list(mcp.unusable)}`]),
   ]
 }
 

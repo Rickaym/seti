@@ -188,6 +188,11 @@ the AppArmor profile for `bwrap` that the installer adds ([Setup](setup.md#sandb
   signed-in tool-server hosts and the agent's connection hosts with CAs in `~/.seti/sandbox-ca`,
   name-constrained to those hosts (EGR-4). SSH goes through a per-agent `ssh-agent` that holds
   only the keys of the agent's usable logins.
+- **Memory.** A sandboxed Claude Code agent keeps its auto memory in its own project folder,
+  `~/.claude/projects/<slug of its folder>/memory`, through the `autoMemoryDirectory` setting Seti
+  passes with `--settings` (`ownMemory` in `runtimes/claude/realise.ts`), so its sessions load the
+  folder its dreams edit even in a worktree. The memory folders of the checkouts behind its
+  folders are mounted read-only, and `agent-memory.ts` names their indexes in its prompt (SBX-15).
 - **Codex agents.** A sandbox planned for the Codex runtime (`launchPlan(task, 'codex')`) holds
   no Claude Code configuration: no `.claude.json`, no `~/.claude` mounts, no plugins, borrowed
   servers or claude.ai connectors. Its grant has `anthropic: false`, so the proxy mints no
@@ -315,8 +320,9 @@ egress proxy.
 
 ### One-shot calls
 
-A runtime may also answer one question with no tools, for a second opinion. Its `OneShot`
-(`server/src/runtimes/one-shot.ts`; `claude/one-shot.ts`, `codex/one-shot.ts`) opens a new
+Every runtime also answers one question with no tools, for a second opinion: its
+`capabilities.oneShot` (`server/src/runtimes/one-shot.ts` holds the types; `claude/one-shot.ts`
+and `codex/one-shot.ts` the runtimes' parts), read through `oneShotFor`. It opens a new
 session that offers the model no tool, refuses any call it makes without asking anyone, and keeps
 nothing to resume: Claude Code with no tools, settings or tool servers, one turn and no saved
 session; Codex with no tool server, an ephemeral thread and every ask declined. `runOneShot`
@@ -327,8 +333,9 @@ or when the model keeps calling tools.
 A one-shot runs in a bare maintenance sandbox (`maintenanceLauncher` with `bare`): an empty
 folder of its own, none of the agent's folders, memory or Claude Code state, and a proxy that
 reaches only the model provider, with the agent's Claude login or the connection that carries its
-OpenAI key. Until `capabilities` declares one-shots, the suite reads them from the target's
-`oneShot`, and cases OS-1 and OS-2 cover them.
+OpenAI key. The request names the runtime's program where Seti installs it (`runtimeProgram`),
+as a session's spec does. Cases OS-1 and OS-2 cover every adapter's one-shot, asking the model
+the target's `oneShotModel` names.
 
 ### The conformance suite
 

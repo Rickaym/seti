@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import type { FileKind } from './files.js'
+import { extensionOf, type FileKind } from './files.js'
 
 /** Public share links live under this path on Seti's own origin. */
 export const SHARE_PREFIX = '/share/'
@@ -66,6 +66,8 @@ export const createShareInput = z
     allow_findings: z.boolean().default(false),
     /** Chat apps show a card with the file's name, kind, size and a thumbnail when the link is pasted. */
     link_preview: z.boolean().default(true),
+    /** Shows an HTML file as its page, scripts in an isolated frame; unset, every HTML file does. */
+    render: z.boolean().optional(),
   })
   .strict()
 export type CreateShareInput = z.input<typeof createShareInput>
@@ -77,6 +79,12 @@ export type UpdateShareInput = z.input<typeof updateShareInput>
 
 export const shareLinkPreviewInput = z.object({ link_preview: z.boolean() }).strict()
 export type ShareLinkPreviewInput = z.input<typeof shareLinkPreviewInput>
+
+export const shareRenderInput = z.object({ render: z.boolean() }).strict()
+export type ShareRenderInput = z.input<typeof shareRenderInput>
+
+/** Only an HTML file renders as a page; every other file shows as its preview. */
+export const canRender = (name: string): boolean => ['html', 'htm'].includes(extensionOf(name))
 
 export const shareFileQuery = z.object(sharePath)
 
@@ -129,6 +137,8 @@ export interface Share {
   recent_views: ShareView[]
   /** Chat apps may show a card for the link; off, the page names only the file. */
   link_preview: boolean
+  /** The link shows the HTML file as its page, its scripts isolated from Seti; off, as code. */
+  render: boolean
   /** Fetches by link preview bots, which are not counted as views. */
   unfurl_count: number
   recent_unfurls: ShareView[]

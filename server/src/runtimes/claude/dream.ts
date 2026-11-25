@@ -5,7 +5,7 @@ import { CLAUDE_HOME } from '../../config.js'
 import type { Launcher } from '../../launcher.js'
 import { projectSlug } from '../../sandbox-mounts.js'
 import type { DreamHost, DreamSpec, DreamTool } from '../adapter.js'
-import { claudeLaunch } from './realise.js'
+import { claudeLaunch, ownMemory } from './realise.js'
 import { inProcessServer } from './tool-server.js'
 
 /** Claude Code's tools a dream gets; the gate decides each call to them. */
@@ -82,7 +82,7 @@ export function dreamOptions(
     mcpServers: hostServers(host.tools),
     strictMcpConfig: true,
     settingSources: [],
-    settings: { autoDreamEnabled: false },
+    settings: { autoDreamEnabled: false, ...ownMemory(spec.cwd) },
     systemPrompt: { type: 'preset', preset: 'claude_code', append: spec.append },
     persistSession: false,
     maxTurns: spec.maxTurns,

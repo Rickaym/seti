@@ -8,6 +8,7 @@ import {
 } from '@seti/shared'
 import { audit } from './audit.js'
 import { refuseAgent } from './ea-guard.js'
+import { DIRECT, type SettingsWrite } from './settings-write.js'
 import { compactSettings, taskCompactRules } from './store/compact.js'
 
 /** The rule a task's sessions compact by: its own, else the default. */
@@ -18,18 +19,23 @@ export async function effectiveCompact(taskId: string): Promise<CompactRule> {
 export const compactSettingsView = async (): Promise<CompactSettings> => compactSettings.get()
 
 /** Saves the default rule; agents without a rule of their own start their next turn with it. */
-export async function updateCompactSettings(rule: CompactRule, actor: AuditActor = 'user'): Promise<CompactSettings> {
+export async function updateCompactSettings(
+  rule: CompactRule,
+  actor: AuditActor = 'user',
+  write: SettingsWrite = DIRECT,
+): Promise<CompactSettings> {
   refuseAgent('change how agents compact their conversations')
-  await compactSettings.set(rule)
-  const saved = await compactSettings.get()
-  await audit.record({
-    actor,
-    kind: 'system.compact_changed',
-    subject_type: 'system',
-    summary: `Set how agents compact their conversations: ${compactLabel(saved.rule)}`,
-    detail: { ...saved.rule },
+  await compactSettings.set(rule, write.db)
+  await write.after(async () => {
+    await audit.record({
+      actor,
+      kind: 'system.compact_changed',
+      subject_type: 'system',
+      summary: `Set how agents compact their conversations: ${compactLabel(rule)}`,
+      detail: { ...rule },
+    })
   })
-  return saved
+  return compactSettings.get()
 }
 
 export async function taskCompact(taskId: string): Promise<TaskCompactRule> {

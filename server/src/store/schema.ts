@@ -8,10 +8,16 @@ import { CHANGE_REQUESTS } from './schema-change-requests.js'
 import { CHANGELOG } from './schema-changelog.js'
 import { COMPACT_RULES } from './schema-compact.js'
 import { CONNECTION_BODY, CONNECTIONS, secretsToConnections } from './schema-connections.js'
-import { recountTaskCosts, TASK_COST_SESSION, TASK_SECOND_OPINION, TASK_SIDE_CHAT_COST } from './schema-cost.js'
+import {
+  recountTaskCosts,
+  SECOND_OPINION_REVIEWS,
+  TASK_COST_SESSION,
+  TASK_SECOND_OPINION,
+  TASK_SIDE_CHAT_COST,
+} from './schema-cost.js'
 import { CPU_CAPS } from './schema-cpu.js'
 import { ANDROID_OVERRIDE, DEVICE_SHOW_NAMES, DEVICES, dropOfficialAndroidRow } from './schema-devices.js'
-import { DREAM_NIGHTS, DREAM_PROPOSALS, DREAM_RUNS } from './schema-dreams.js'
+import { DREAM_NIGHTS, DREAM_PROMPT_VERSION, DREAM_PROPOSALS, DREAM_RUNS } from './schema-dreams.js'
 import {
   ATTENTION_TIERS,
   EA_CONTEXT_PACKS,
@@ -26,6 +32,7 @@ import {
   EA_USAGE,
 } from './schema-ea.js'
 import { MESSAGE_EVENTS } from './schema-events.js'
+import { FOLDER_SETTINGS_WATCH } from './schema-folder-settings.js'
 import { INITIAL } from './schema-initial.js'
 import { KNOWLEDGE } from './schema-knowledge.js'
 import { MEMORY_CAPS } from './schema-memory.js'
@@ -39,7 +46,7 @@ import { PR_LIST_CACHE } from './schema-prs.js'
 import { QUESTION_SECRETS, QUESTIONS } from './schema-questions.js'
 import { DROP_ROUTINES, REMINDER_CHANNELS, REMINDER_CRON } from './schema-reminders.js'
 import { RESTART_CUTS } from './schema-restart.js'
-import { PACK_KIND, rolesToPacks } from './schema-roles.js'
+import { PACK_KIND, ROLE_RUNTIME, rolesToPacks } from './schema-roles.js'
 import { MESSAGE_SEARCH, MESSAGE_SEARCH_TALK, MESSAGE_TIME } from './schema-search.js'
 import {
   CLAUDE_LOGINS,
@@ -53,7 +60,7 @@ import {
 } from './schema-security.js'
 import { CLIENT_SENDS } from './schema-sends.js'
 import { SHARED_TOOLS } from './schema-shared-tools.js'
-import { SHARE_PREVIEWS, SHARES } from './schema-shares.js'
+import { SHARE_LIVE, SHARE_PREVIEWS, SHARE_RENDER, SHARES } from './schema-shares.js'
 import { loginsToHosts, SSH_HOST_KEYS } from './schema-ssh-keys.js'
 import { importSshHosts, SSH_HOSTS } from './schema-ssh.js'
 import { STORAGE_SETTINGS } from './schema-storage.js'
@@ -80,6 +87,8 @@ import {
   CODEX_RULES_DECIDE_DEFAULT,
   CODEX_SETTINGS,
   TASK_APPROVAL_CEILING,
+  TASK_DELEGATED_BY,
+  TASK_SESSION,
 } from './schema-tasks.js'
 import {
   EA_DOC_NO_DIRECT,
@@ -88,6 +97,7 @@ import {
   TEAM_DIRECT,
   TEAM_MESSAGE_SELF_HEADERS,
 } from './schema-team.js'
+import { THREAD_FOLLOWS } from './schema-threads.js'
 import { DROP_ESLINTCACHE_DEFAULT, WARM_CACHES } from './schema-warm-caches.js'
 import {
   CHANNEL_SECRET_PENDING,
@@ -237,5 +247,14 @@ export const MIGRATIONS: readonly Migration[] = [
   { version: 128, name: 'codex_rules_decide_default', sql: CODEX_RULES_DECIDE_DEFAULT },
   { version: 129, name: 'task_second_opinion', sql: TASK_SECOND_OPINION },
   { version: 130, name: 'connection_body', sql: CONNECTION_BODY },
-  { version: 131, name: 'credential_access', sql: CREDENTIAL_ACCESS },
+  { version: 131, name: 'second_opinion_reviews', sql: SECOND_OPINION_REVIEWS },
+  { version: 132, name: 'task_delegated_by', sql: TASK_DELEGATED_BY },
+  { version: 133, name: 'role_runtime', sql: ROLE_RUNTIME },
+  { version: 134, name: 'task_session', sql: TASK_SESSION },
+  { version: 135, name: 'folder_settings_watch', sql: FOLDER_SETTINGS_WATCH },
+  { version: 136, name: 'dream_prompt_version', sql: DREAM_PROMPT_VERSION },
+  { version: 137, name: 'share_live', sql: SHARE_LIVE },
+  { version: 138, name: 'thread_follows', sql: THREAD_FOLLOWS },
+  { version: 139, name: 'share_render', sql: SHARE_RENDER },
+  { version: 142, name: 'credential_access', sql: CREDENTIAL_ACCESS },
 ]

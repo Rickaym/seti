@@ -319,13 +319,23 @@ const channels = settingsSection({
           { extra_hosts: 'Hosts the poller may reach besides its own', secrets: 'Connections whose value it may send' },
         ),
       ),
+      thread_replies: keyedBy(
+        documented(
+          { replies: z.boolean(), dms: z.boolean() },
+          {
+            replies: 'Replies in threads agents posted in reach those agents',
+            dms: 'After an agent writes in a direct message, the next messages there reach it for 24 hours',
+          },
+        ),
+      ),
     },
     {
       channels: 'Each channel by its name',
       poller_access: 'What each poller may reach and which connections it may use; only you change these',
+      thread_replies: 'Which webhooks hand replies to the agents that posted; only you change these',
     },
   ),
-  security: ['poller_access'],
+  security: ['poller_access', 'thread_replies'],
 })
 
 /** The App and Agents groups. */

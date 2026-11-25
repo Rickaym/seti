@@ -11,6 +11,7 @@ import { currentRequestSource } from './access.js'
 import { refuseArchived } from './archive-guard.js'
 import { audit } from './audit.js'
 import { inBackground } from './background.js'
+import { takeHeldWait } from './crew/delegate-wait.js'
 import { messages, now, tasks } from './db.js'
 import { noticeAwaitedTurn } from './ea-turn-watch.js'
 import { HttpError } from './http.js'
@@ -111,7 +112,10 @@ async function agentInput(task: Task, status: TaskStatus): Promise<AgentInput> {
 async function deliver(task: Task, status: TaskStatus, waits: readonly AgentWait[]): Promise<void> {
   const input = await agentInput(task, status)
   for (const wait of waits) {
-    if (wait.waiter_id === null) {
+    const inCall = takeHeldWait(wait.id)
+    if (inCall !== undefined) {
+      inCall(input)
+    } else if (wait.waiter_id === null) {
       await noticeAwaitedTurn(task, status)
     } else {
       await deliverInputs(wait.waiter_id, [input])

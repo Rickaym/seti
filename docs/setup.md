@@ -218,7 +218,11 @@ zone, skip it for `/hooks/` too.
 Share links (Settings, Sharing) open at `/share/<token>` for anyone who has one. To let them past
 Access, add a Bypass application the same way with path `share/`; Seti itself lets through only a
 GET or HEAD of a share's page or download, and every other path under `/share/` still needs the
-login. Skip Bot Fight Mode or WAF challenges for `/share/` as for `/hooks/`.
+login. Skip Bot Fight Mode or WAF challenges for `/share/` as for `/hooks/`. An HTML file's link
+renders it as a page by default, its scripts running in the visitor's browser in a frame isolated
+from Seti; the page can still reach the internet, and Render in the share dialog turns this off
+([security](security.md#html-share-links)). The proxy must pass Seti's `Content-Security-Policy`
+header and the visitor's `Sec-Fetch-Dest` header unchanged.
 
 The phone app cannot pass Access, so with the app in use add Bypass applications the same way for
 `api/devices/pair`, `api/widget/` and `.well-known/assetlinks.json`; Seti still refuses them
@@ -241,6 +245,16 @@ those. Open as JSON, in the header of each settings page, opens the JSON page at
 section. `GET /api/settings-doc/defaults` serves every setting's default, and
 `GET /api/settings-doc?only=modified` only what differs from it, as a merge patch onto the
 defaults.
+
+Edit, on the JSON page, opens the plain settings in an editor that completes keys and values
+from the schema. Save shows every change, old value above new, before anything applies; a change
+with a consequence, such as deleting archived agents, asks you to confirm it. A save is one entry
+in the page's History, and Undo or Revert there sets it all back. Reset on a section sets one
+setting back to its default. Security settings and secrets stay read only here and change on
+their own pages; every setting stays editable on its own page, on a phone too.
+`PATCH /api/settings-doc` takes `{base_revision, patch, expect, confirm}`, where `patch` is a JSON
+merge patch of the document: `null` removes an item from a list keyed by name and sets any other
+setting to `null`.
 
 Settings Seti reads at start live in `~/.seti/seti.env` (one `NAME=value` per line) and secrets in
 `~/.seti/credentials`, one owner-only file each. Restart Seti after a change:
@@ -552,10 +566,19 @@ Settings, Runtimes to answer every call yourself; an upgrade keeps the choice yo
 agent shows a summary of its reasoning where a Claude agent shows its thinking, which costs a few
 output tokens per model call. A Codex agent reads your `~/.claude/CLAUDE.md` as its global
 instructions, read-only, and a folder's `CLAUDE.md` when the folder has no `AGENTS.md`, as a
-Claude Code agent does. Codex agents have no side chat, rewind, Bypass or plugins. Their cost is
-an estimate from the price table in `server/src/runtimes/codex/prices.ts`, which names the day
-it was read; to update it, copy the standard rates from OpenAI's pricing page into that table,
-set `asOf` to the day, and run `pnpm check`.
+Claude Code agent does. It also gets your skills from `~/.claude/skills`, read-only, listed in its
+instructions; skills in its own folders are never offered. A Codex agent gets the MCP servers a
+sandboxed Claude Code agent gets from your Claude Code config: local servers without keys run in
+its sandbox, and remote ones over streamable HTTP reach it when they need no key or the proxy signs
+them. Every call to them asks you, unless an allow rule of yours names the server or tool and Rules
+decide is on. SSE servers and claude.ai connectors are Claude only; the agent's access marks each
+server it cannot use and says why. A Codex agent takes the compaction rule's instructions, and
+its Compact at with a Context window as a token limit; it always compacts near its own limit, so
+Auto compact off and a Context window alone do not apply, and its settings say so. Codex agents
+have no side chat, rewind, Bypass or plugins.
+Their cost is an estimate from the price table in `server/src/runtimes/codex/prices.ts`, which
+names the day it was read; to update it, copy the standard rates from OpenAI's pricing page into
+that table, set `asOf` to the day, and run `pnpm check`.
 
 With both runtimes set up, any agent with Seti control can ask the other one for a second
 opinion with its `second_opinion` tool: a Claude agent asks Codex, a Codex agent asks Claude.
@@ -563,7 +586,34 @@ The other model answers once, with no tools and none of the agent's folders, in 
 reaches only its provider with the agent's credential, so the credential needs that runtime's
 key. The transcript shows one row, "Asked gpt-5.5: ...", that opens to the question and answer;
 its cost counts toward the agent's and shows under Cost in its settings. An agent may ask 20
-times an hour and 60 a day.
+times an hour and 60 a day. Given one of its linked pull requests instead, the other model
+reviews the PR's diff, which Seti reads with your `gh` login; the review goes back to the agent
+and folds under that PR in the agent's PR list, and nothing is posted to GitHub.
+
+An agent at Seti control Full can start a helper on either runtime with `start_task`, which
+runs sandboxed with at most the caller's access and approvals. The helper sits right under its
+caller in the agent list, and the Home graph links the two. With `include_brief`, Seti adds a
+brief of the caller's work after the prompt: what it was asked, its plan, steps, files and PRs,
+redacted and without direct messages. The EA's `start_task` takes `brief_of` to brief a new
+agent on any agent's work.
+With `wait_minutes`, the caller waits in its call for the helper's first turn and gets its final
+message back, while its row reads "Waiting on" and the helper's title; past the time, or when it
+is interrupted, the helper's end arrives as an update instead. A helper cannot start agents, and
+an agent may have 4 helpers running and spend $10 on helpers a day.
+
+A role can name the model its agents run on: open the role on the Context page and pick one under
+Runs on, built-in roles included. A start that names the role, such as `start_task` with
+`role: "Reviewer"`, then runs on that model unless it names its own; while that runtime is off
+the agent runs on your default and its setup says why. A Codex agent's Seti guide and Lead role
+send it to helper agents, since Codex has no subagents of its own.
+
+An agent can move to the other runtime and keep its work: open its settings and pick a model under
+Continue on, at the bottom beside Restart session. It keeps its title, folders, PR links,
+transcript and cost; it starts a new session on that runtime, or resumes the one it had there
+before, and its next message brings a brief of its work. Background work and Bypass end. A move
+to Codex needs the agent sandboxed and an OpenAI key in its credential. The EA does the same with
+`restart_agent_session` and a `runtime` after your yes, and a moved agent's approvals are never
+looser than before when the EA or another agent moved it.
 
 ### Access: defaults and per-agent choices
 
@@ -718,6 +768,30 @@ need a mod instead: Twilio (signs the URL and form fields), Discord (Ed25519 and
 Zoom (a computed reply to its URL check), Notion (an unsigned token request), Intercom (a HEAD URL
 check), Twitch EventSub (no separators in the signed text) and Supabase Auth hooks (a reply body).
 [Mods](mods.md#channel-sources) shows how to write one.
+
+### Slack thread replies
+
+A Slack webhook can hand replies to the agents that wrote in a thread (THR-1 to THR-6). Seti
+records each Slack message an agent sends with the Slack MCP server's `slack_send_message` or with
+`chat.postMessage`, and a later message in that thread reaches the agent as a `thread` update,
+framed as words from the named Slack person, not from you. A bot's reply waits for your next
+message, a thread sends at most 10 replies an hour, and following stops after 7 quiet days or 30
+days. Two switches, both off until you turn them on, decide what reaches agents: Thread replies,
+and DM replies, which hands the next messages in a direct message to the agent that wrote there in
+the last 24 hours even when they are not threaded. Turning Thread replies on turns DM replies on
+with it; you can turn DM replies off on its own. Only you change them, with
+`PUT /api/channels/<id>/threads` and `{"replies": true}`, `{"dms": false}` or both.
+
+Seti never calls Slack for this: replies come through the webhook. In the Slack app at
+api.slack.com/apps, under Event Subscriptions, subscribe to `message.channels`, `message.groups`,
+`message.im` and `message.mpim` (as events on behalf of users when the app acts as you), and
+reinstall the app if Slack asks.
+
+While both switches are off, the Slack webhook works exactly as before. Once you turn one on,
+`app_mention` and other events still reach its subscribers, such as the EA's inbox, but a `message`
+event reaches them only when the webhook's filter keeps it, or, without a filter, when it mentions
+you. Other messages are recorded as ignored, so subscribing to message events does not flood the
+EA. A filter that returns `true` sends every message on, as before.
 
 ### Webhook filters
 

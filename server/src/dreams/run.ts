@@ -1,20 +1,21 @@
 import fs from 'node:fs'
 import path from 'node:path'
-import type { DreamProposalInput, DreamReport, DreamRun, RuntimeEvent, Task } from '@seti/shared'
+import { type DreamProposalInput, type DreamReport, type DreamRun, type RuntimeEvent, type Task } from '@seti/shared'
+import { sharedMemory } from '../agent-memory.js'
 import { audit } from '../audit.js'
 import { launchPlan } from '../launch-plan.js'
 import { maintenanceLauncher } from '../launcher.js'
 import type { DreamSession, DreamSupport, SessionMessage } from '../runtimes/adapter.js'
 import { projectSlug } from '../sandbox-mounts.js'
-import { isRunning } from '../session-mirror.js'
+import { isRunning, watchTurnStarts } from '../session-mirror.js'
 import { sandboxContext, workingDirs } from '../session-options.js'
 import { dreamRuns, type DreamEnd } from '../store/dreams.js'
 import { workspaceDir } from '../workspace/dir.js'
 import { composeDigest, dayRows } from './digest.js'
-import { dreamGate, type DreamPlaces } from './gate.js'
+import { denialKind, dreamGate, type DreamPlaces } from './gate.js'
 import { forgetBefore, keepBefore, recordAfter } from './kept.js'
 import type { MemorySnapshot } from './memory-snapshot.js'
-import { dreamAppend, dreamMessage } from './prompt.js'
+import { DREAM_PROMPT_VERSION, dreamAppend, dreamMessage } from './prompt.js'
 import { fileProposal } from './proposals.js'
 import { reportMarkdown } from './report.js'
 import { dreamTools } from './tools.js'
@@ -43,9 +44,6 @@ export function stopDream(runId: number, reason: string): boolean {
   return stop !== undefined
 }
 
-/** How often a dream checks that its agent has not started a turn, which cuts the dream. */
-const WATCH_MS = 5000
-
 export interface DreamJob {
   task: Task
   run: DreamRun
@@ -70,8 +68,15 @@ class Tally {
     this.end ??= { state, reason }
   }
 
+  /** Refused calls by kind, never with their arguments. */
+  readonly deniedBy: Record<string, number> = {}
+
   denied(refusal: string | null): void {
-    this.denials += refusal === null ? 0 : 1
+    if (refusal !== null) {
+      this.denials += 1
+      const kind = denialKind(refusal)
+      this.deniedBy[kind] = (this.deniedBy[kind] ?? 0) + 1
+    }
   }
 
   reported(report: DreamReport): void {
@@ -117,8 +122,12 @@ async function lastDream(job: DreamJob): Promise<string | null> {
   return done?.ended_at ?? null
 }
 
+/** How far back the digest of an agent's first dream reaches: one day, not its whole history. */
+const FIRST_DAY_MS = 24 * 60 * 60_000
+
 async function writeDigest(job: DreamJob, since: string | null): Promise<{ file: string; empty: boolean }> {
-  const { rows, truncated } = await dayRows(job.task.id, since)
+  const from = since ?? new Date(Date.now() - FIRST_DAY_MS).toISOString()
+  const { rows, truncated } = await dayRows(job.task.id, from)
   const text = composeDigest({
     title: job.task.title,
     night: job.run.night,
@@ -142,8 +151,35 @@ const NOTHING_NEW: DreamReport = {
   nothing_to_do: true,
 }
 
+/** Hears every turn of the agent that starts from the dream's start on, however short. */
+class TurnWatch {
+  private started: boolean
+  private cut: (() => void) | null = null
+  readonly end: () => void
+
+  constructor(taskId: string) {
+    this.started = isRunning(taskId)
+    this.end = watchTurnStarts(taskId, () => {
+      this.started = true
+      this.cut?.()
+    })
+  }
+
+  /** Calls `cut` now if a turn started already, else when one starts, until disarmed. */
+  arm(cut: () => void): void {
+    this.cut = cut
+    if (this.started) {
+      cut()
+    }
+  }
+
+  disarm(): void {
+    this.cut = null
+  }
+}
+
 /** Follows the session to its end, stopping it at the time limit or when the agent starts a turn. */
-async function follow(session: DreamSession, job: DreamJob, tally: Tally): Promise<void> {
+async function follow(session: DreamSession, job: DreamJob, tally: Tally, turns: TurnWatch): Promise<void> {
   const stop = (state: DreamEnd['state'], reason: string) => {
     tally.ended(state, reason)
     void session.interrupt().finally(() => {
@@ -161,11 +197,9 @@ async function follow(session: DreamSession, job: DreamJob, tally: Tally): Promi
   stoppers.set(job.run.id, (reason) => {
     stop('stopped', reason)
   })
-  const watch = setInterval(() => {
-    if (isRunning(job.task.id)) {
-      stop('cut', 'The agent started a turn.')
-    }
-  }, WATCH_MS)
+  turns.arm(() => {
+    stop('cut', 'The agent started a turn.')
+  })
   try {
     for await (const report of session.events) {
       if (report.type === 'message') {
@@ -178,20 +212,21 @@ async function follow(session: DreamSession, job: DreamJob, tally: Tally): Promi
   } finally {
     stoppers.delete(job.run.id)
     clearTimeout(timer)
-    clearInterval(watch)
+    turns.disarm()
     session.close()
   }
 }
 
-/** Where the dream's folders are as its sandbox shows them, for the gate. */
-function placesOf(job: DreamJob, night: string): DreamPlaces {
+/** Where the dream's folders are as its sandbox shows them, for the gate and the prompt. */
+function placesOf(job: DreamJob, night: string): DreamPlaces & { shared: string[] } {
   const home = sandboxContext().home
   const memory = path.join(home, '.claude', 'projects', projectSlug(job.task.cwd), 'memory')
+  const shared = sharedMemory(job.task)
   const work = [job.task.cwd, ...workingDirs(job.task)]
-  return { cwd: job.task.cwd, home, readable: [...work, memory], memory, night }
+  return { cwd: job.task.cwd, home, readable: [...work, memory, ...shared], memory, night, shared }
 }
 
-async function dreamSession(job: DreamJob, tally: Tally, night: string): Promise<void> {
+async function dreamSession(job: DreamJob, tally: Tally, night: string, turns: TurnWatch): Promise<void> {
   const since = await lastDream(job)
   const { file: digest, empty } = await writeDigest(job, since)
   if (empty && since !== null) {
@@ -225,7 +260,7 @@ async function dreamSession(job: DreamJob, tally: Tally, night: string): Promise
       lastDream: since,
       digest,
       memory: places.memory,
-      shared: [],
+      shared: places.shared,
       maxSteps: job.limits.steps,
       budgetUsd: job.limits.budgetUsd,
       cleanups: job.limits.cleanups === true,
@@ -233,8 +268,9 @@ async function dreamSession(job: DreamJob, tally: Tally, night: string): Promise
     maxTurns: job.limits.steps,
     budgetUsd: job.limits.budgetUsd,
   }
+  await dreamRuns.promptUsed(job.run.id, DREAM_PROMPT_VERSION)
   const session = await job.dream.open(spec, launcher, { gate, tools }, new AbortController())
-  await follow(session, job, tally)
+  await follow(session, job, tally, turns)
 }
 
 /**
@@ -247,10 +283,13 @@ export async function runDream(job: DreamJob): Promise<DreamRun | undefined> {
   const night = nightDir(job)
   fs.mkdirSync(night, { recursive: true, mode: 0o700 })
   keepBefore(job.task.id, job.run.id, job.before)
+  const turns = new TurnWatch(job.task.id)
   try {
-    await dreamSession(job, tally, night)
+    await dreamSession(job, tally, night, turns)
   } catch (e) {
     tally.ended('failed', e instanceof Error ? e.message : String(e))
+  } finally {
+    turns.end()
   }
   const after = await recordAfter(job.task.id, job.run, job.memory, job.before)
   forgetBefore(job.task.id, job.run.id)
@@ -265,7 +304,8 @@ export async function runDream(job: DreamJob): Promise<DreamRun | undefined> {
     memory_changes: after.changes,
     report,
   }
-  fs.writeFileSync(path.join(night, 'report.md'), reportMarkdown(job.task.title, job.run.night, end), { mode: 0o600 })
+  const heading = { title: job.task.title, night: job.run.night, prompt: DREAM_PROMPT_VERSION }
+  fs.writeFileSync(path.join(night, 'report.md'), reportMarkdown(heading, end), { mode: 0o600 })
   return audit.recordWith(
     async (tx) => dreamRuns.end(job.run.id, end, tx),
     (ended) =>
@@ -283,6 +323,7 @@ export async function runDream(job: DreamJob): Promise<DreamRun | undefined> {
               steps: end.steps,
               cost_usd: end.cost_usd,
               denials: end.denials,
+              denied_by: Object.entries(tally.deniedBy).map(([kind, n]) => `${kind} ${String(n)}`),
               memory_changes: end.memory_changes,
             },
           },

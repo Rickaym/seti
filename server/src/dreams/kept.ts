@@ -35,9 +35,29 @@ export function keptBefore(taskId: string, runId: number): MemorySnapshot | null
   }
 }
 
+/** The index every session loads, which a dream may shorten but never remove. */
+const INDEX = 'MEMORY.md'
+
 /**
- * Reads the memory folder after a dream, records each changed file as a revision, and returns how
- * many changed and the lines Seti adds to the report's found list.
+ * Removes the topic files a dream left empty, since its tools cannot delete; each removal is then
+ * recorded like any change, with the text it had, so the user can put it back.
+ */
+function removeEmptied(memory: string, before: MemorySnapshot): void {
+  for (const [name, was] of before) {
+    const file = path.join(memory, name)
+    const stat = fs.lstatSync(file, { throwIfNoEntry: false })
+    if (name !== INDEX && was.text.trim() !== '' && stat?.isFile() === true && stat.size < 64) {
+      if (fs.readFileSync(file, 'utf8').trim() === '') {
+        fs.rmSync(file)
+      }
+    }
+  }
+}
+
+/**
+ * Reads the memory folder after a dream, removes the topic files it emptied, records each changed
+ * file as a revision, and returns how many changed and the lines Seti adds to the report's found
+ * list.
  */
 export async function recordAfter(
   taskId: string,
@@ -45,6 +65,7 @@ export async function recordAfter(
   memory: string,
   before: MemorySnapshot,
 ): Promise<{ changes: number; found: string[] }> {
+  removeEmptied(memory, before)
   const after = await snapshotMemory(memory, AFTER_LIMIT)
   if (!after.ok) {
     return { changes: 0, found: [`Seti: ${after.reason} Its changes were not recorded; check the folder by hand.`] }

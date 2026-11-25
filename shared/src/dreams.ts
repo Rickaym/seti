@@ -5,7 +5,11 @@ const line = (max: number) => z.string().trim().min(1).max(max)
 /** What a dream reports, the only thing of it the user reads. */
 export const dreamReport = z.strictObject({
   summary: line(120).describe('One line: what the dream did.'),
-  tidied: z.array(line(160)).max(10).default([]).describe('Memory changes, one line each.'),
+  tidied: z
+    .array(line(160))
+    .max(20)
+    .default([])
+    .describe('Every note removed, merged, moved or corrected, one line each with what and why.'),
   remembered: z.array(line(160)).max(10).default([]).describe('New things worth knowing.'),
   asks: z.array(line(120)).max(3).default([]).describe('At most 3 things only the user can decide.'),
   found: z
@@ -44,6 +48,8 @@ export interface DreamRun {
   denials: number
   memory_changes: number
   report: DreamReport | null
+  /** A short hash of the wording of Seti's dream prompt it ran under; null before it ran. */
+  prompt_version: string | null
 }
 
 export const dreamNowInput = z.strictObject({})

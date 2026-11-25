@@ -166,6 +166,13 @@ export const answerChangeInput = z.discriminatedUnion('decision', [
 ])
 export type AnswerChangeInput = z.input<typeof answerChangeInput>
 
+/** A host the sandbox refused that the user could allow: one name or address, never a wildcard. */
+export const refusedHost = requestHost.refine((host) => !host.startsWith('*.'), 'Name one host, not a wildcard')
+
+/** The user's Allow host on a host the agent's sandbox refused, for the agent or every agent. */
+export const allowRefusedHostInput = z.object({ host: refusedHost, scope: z.enum(HOST_SCOPES).default('agent') })
+export type AllowRefusedHostInput = z.input<typeof allowRefusedHostInput>
+
 export const changeRequestParams = z.object({ id: z.string().trim().min(1).max(100), request_id: z.uuid() })
 
 export const changeRequestSchema = z.object({

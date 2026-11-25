@@ -47,6 +47,7 @@ export async function awsItem(
     jump_for: [],
     missing_key: [],
     session: null,
+    unusable: null,
   }
 }
 

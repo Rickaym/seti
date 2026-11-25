@@ -1,5 +1,7 @@
-import { RUNTIME_NAMES, warmCacheNote, type Task } from '@seti/shared'
+import { RUNTIME_NAMES, warmCacheNote, type AgentCapabilities, type Task } from '@seti/shared'
+import { Hint } from '@/components/Hint'
 import { useCapabilities } from '@/hooks/useCapabilities'
+import { compactionGaps } from '@/lib/compaction-gaps'
 import { NotOnRuntime } from '@/panels/tasks/NotOnCodex'
 import { OpinionSpend } from '@/panels/tasks/OpinionSpend'
 import { Fields, Row } from '@/panels/tasks/SettingsFields'
@@ -41,7 +43,10 @@ export function SessionFields({ task, running }: { task: Task; running: boolean 
       </Row>
       <Row label="Compaction">
         {caps === null || caps.compaction ? (
-          <TaskCompact taskId={task.id} />
+          <div className="space-y-1">
+            <TaskCompact taskId={task.id} />
+            <CompactionGaps caps={caps} />
+          </div>
         ) : (
           <NotOnRuntime
             label={caps.label}
@@ -65,5 +70,18 @@ export function SessionFields({ task, running }: { task: Task; running: boolean 
         </Row>
       )}
     </Fields>
+  )
+}
+
+/** A quiet note, with the detail in its tooltip, when the runtime honours only part of the rule. */
+function CompactionGaps({ caps }: { caps: AgentCapabilities | null }) {
+  const gaps = caps === null ? null : compactionGaps(caps.label, caps.compaction_ignores)
+  if (caps === null || gaps === null) {
+    return null
+  }
+  return (
+    <Hint text={gaps}>
+      <span className="text-2xs text-muted-foreground">Partly on {caps.label}</span>
+    </Hint>
   )
 }

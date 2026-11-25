@@ -1,5 +1,7 @@
 import { z } from 'zod'
 import type { EaLanguage } from './ea-language.js'
+import { runtimeFields } from './runtimes/picks.js'
+import type { StoredRuntime } from './runtimes/stored.js'
 
 const MAX_CONTEXT_CHARS = 1_000_000
 
@@ -50,11 +52,21 @@ export interface ContextPack {
   builtin: boolean
   /** Linked to new agents unless they pick their packs themselves. */
   linked_by_default: boolean
+  /** A role's runtime and model, which an agent started in it takes unless its start names one. */
+  runtime: StoredRuntime | null
+  model: string | null
   created_at: string
   updated_at: string
 }
 
 export const contextPackDefaultInput = z.object({ linked_by_default: z.boolean() })
+
+/** A role pack's runtime and model; null for either leaves the start's or the install's own. */
+export const roleRuntimeInput = z.object({
+  runtime: runtimeFields.runtime.unwrap().nullable(),
+  model: runtimeFields.model.unwrap().nullable(),
+})
+export type RoleRuntimeInput = z.infer<typeof roleRuntimeInput>
 export type ContextPackDefaultInput = z.infer<typeof contextPackDefaultInput>
 
 export type ContextPackSummary = Pick<ContextPack, 'id' | 'name' | 'kind'>

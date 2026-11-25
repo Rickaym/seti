@@ -21,6 +21,7 @@ import { outwardCalls } from './outward.js'
 import type { Alongside } from './pg.js'
 import { openPrompt } from './prompt-open.js'
 import { markQueued } from './queued-prompts.js'
+import { noteRefusedHost } from './refused-hosts.js'
 import { sessionTotal, withTurnCost } from './runtimes/claude/cost.js'
 import { secretAnswers } from './secret-asks.js'
 import { mirrorSession } from './session-mirror.js'
@@ -32,6 +33,7 @@ import { addTurnCost, recordTurnCost } from './store/cost.js'
 import { hadRunningSubtask } from './subtask-cache.js'
 import { publishFolded, publishSubtasks } from './subtask-prs.js'
 import { publish } from './task-events.js'
+import { followSentThreads } from './threads/follow.js'
 import { forgetToolCalls, trackToolCalls } from './tool-calls.js'
 import { turnAsks } from './turn-asking.js'
 import { auditRefusal, turnAnswers } from './turn-asks.js'
@@ -89,6 +91,7 @@ async function record(taskId: string, body: MessageBody, events: readonly Runtim
     await tasks.addOutward(taskId, outward.length)
   }
   await linkCreatedPrs(taskId, events, openQuerySince(taskId))
+  await followSentThreads(taskId, events)
 }
 
 /** Stores a message of the session, unless Seti does not keep it, and notes a session's start. */
@@ -153,6 +156,7 @@ const ingest: Ingest = {
   },
   'guard.refused': async (taskId, { command, reason }) => auditRefusal(taskId, command, reason),
   'egress.blocked': async (taskId, { host, names }) => auditBlockedKey(taskId, host, names),
+  'egress.refused': async (taskId, { host, count }) => noteRefusedHost(taskId, host, count, appendMessage),
   'memory.event': (taskId, { report }) => {
     reportMemoryEvent(taskId, report)
   },

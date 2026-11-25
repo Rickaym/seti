@@ -7,7 +7,7 @@ import { unreadCount } from '@/components/team/team-store'
 import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet'
 import { subagentsLabel } from '@/lib/subtasks'
-import { agentTabs, showFrame, usePlacedFrames } from '@/mods/frame-places'
+import { showFrame, useAgentTabs } from '@/mods/frame-places'
 import { useModAgentActions } from '@/mods/useModCommands'
 import { SubagentsSheet } from '@/panels/tasks/SubagentStrip'
 import { agentActions, type ActionHandlers, type AgentAction, type Running } from '@/panels/tasks/agent-actions'
@@ -15,7 +15,7 @@ import { useOpenTerminal } from '@/panels/terminal/useOpenTerminal'
 
 /** Mod views placed beside agents, which the desktop header shows as icons, as rows. */
 function useModTabActions(taskId: string): AgentAction[] {
-  return usePlacedFrames(agentTabs).map((tab) => ({
+  return useAgentTabs(taskId).map((tab) => ({
     label: tab.title,
     icon: Package,
     onSelect: () => {

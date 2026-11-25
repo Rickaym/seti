@@ -42,7 +42,8 @@ async function defaultCredential(): Promise<
   }
   const { role_arn, external_id, region, session_minutes } = AWS_SETTINGS_DEFAULT
   const aws = { role_arn, external_id, region, session_minutes }
-  return { [made.name]: { aws, github: { default: 'not set', owners: {} }, connections: [], ssh_hosts: [] } }
+  const access = { items: {}, hosts: [] }
+  return { [made.name]: { aws, github: { default: 'not set', owners: {} }, connections: [], ssh_hosts: [], access } }
 }
 
 /** What each setting is until someone changes it; lists of things people add start empty. */
@@ -72,7 +73,7 @@ export const SECTION_DEFAULTS: SectionDefaults = {
   'agents.storage': () => ({
     auto_clean: { enabled: STORAGE_SCHEDULE_DEFAULTS.enabled, idle_days: STORAGE_SCHEDULE_DEFAULTS.idle_days },
   }),
-  'agents.channels': () => ({ channels: {}, poller_access: {} }),
+  'agents.channels': () => ({ channels: {}, poller_access: {}, thread_replies: {} }),
   'capabilities.mcp_servers': (current) => {
     const borrowed = isBorrowed(localServers(readHostConfig()), null)
     return { defaults: each(current.defaults, (name) => !borrowed(name)) }

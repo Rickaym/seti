@@ -18,6 +18,7 @@ import { subagentRules } from './house-rules.js'
 import { nodeLink } from './node-link.js'
 import { bashGuard, guardRefuses } from './permission-guard.js'
 import { ASK_TIMEOUT_S, asRecord, repeatHooks } from './repeat-hooks.js'
+import { folderConfigHook } from './runtimes/claude/config-hook.js'
 import type { DefaultHost, DefaultShapes } from './runtimes/registry.js'
 import { sandboxHooks } from './sandbox.js'
 import { guardScope } from './session-options.js'
@@ -124,7 +125,13 @@ function sessionHooks(task: Task, sandboxed: boolean, session: AbortSignal): Def
     ...(repeat.PreToolUse ?? []),
   ]
   const instructions = async () => (await nodeLink.ask(taskId, 'hook.compact', {})).instructions
-  return { ...repeat, PreToolUse, SubagentStart: [subagentRules()], PreCompact: [compactHook(instructions)] }
+  return {
+    ...repeat,
+    PreToolUse,
+    SubagentStart: [subagentRules()],
+    PreCompact: [compactHook(instructions)],
+    ...(sandboxed ? { ConfigChange: [folderConfigHook] } : {}),
+  }
 }
 
 type ListedServer = NodeAnswer<'tools.list'>['servers'][number]

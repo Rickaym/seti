@@ -70,15 +70,23 @@ These paths answer without a token, a session or Access, each with its own check
 `/api/local-session` (the local token, on loopback); `/api/auth` sign-in and setup calls (rate
 limited); `/api/devices/pair` (a one-time code) and `/api/widget/summary` (a device proof); the
 static `/pair` page and `/.well-known/assetlinks.json`; `POST /hooks/<id>`; and `GET` or `HEAD` of
-`/share/<token>`, its `/raw`, `/p/1` to `/p/50` and `/card.png`. The app's own page and static
-files need no API credential; on a public hostname they sit behind Access when Access is set up.
+`/share/<token>`, its `/raw`, `/p/1` to `/p/50`, `/card.png`, and an HTML share's `/frame` and
+`/code`. The app's own page and static files need no API credential; on a public hostname they
+sit behind Access when Access is set up.
 
 ## The settings document
 
 `GET /api/settings-doc` gives every stored setting as one JSON document. A secret appears only as
 `set` or `not set` beside a name; the builder reads the views the settings pages read, which never
 carry a value. The EA gets plain configuration only, with security settings left out; agents,
-mods and paired devices are refused (CFG-1 to CFG-3). The document only reads: no route writes it.
+mods and paired devices are refused (CFG-1 to CFG-3).
+
+`PATCH /api/settings-doc` writes plain settings only, and only for you, signed in or with the local
+token: the EA, agents, mods and paired devices are refused at the route, and agents, mods and
+devices again in the function that writes. A patch that names a security setting or a secret is
+refused whole, so no part of it applies. The write runs the same service functions as the
+settings pages, in one transaction, records the same audit events and one revision, and refuses a
+value that changed since it was read (CFG-5).
 
 ## Where each secret lives
 
@@ -148,6 +156,66 @@ before anything runs; a mismatch deletes the download. The program lives alone i
 `~/.seti/codex/<version>/`, read and run only, mounted read-only into each Codex agent's sandbox,
 and each install, failure and removal is in the audit log with the version and checksum.
 
+## HTML share links
+
+A share link to an HTML file renders the file as a page, in an isolated frame, so charts and
+interactive pages work. Render is on by default for every HTML file; turn it off in the share
+dialog to show the file as code instead. Only you can share a file or change Render: the EA,
+agents, mods and paired devices are refused. Every other file's share page is unchanged, and a
+file that is not HTML never renders.
+
+What the visitor's browser gets: a page from Seti with no script (a bar with the file's name, a
+View code link and Download) around a sandboxed frame that holds the copy. The frame has an
+opaque origin, so it has no cookies, no storage that outlives the page and no access to Seti or to
+the bar around it. Its policy refuses every fetch, socket, beacon, form, popup, download, worker,
+plugin and frame, and the bar's policy refuses any navigation of the frame other than to itself.
+The copy is only served to a frame; opened as a tab its address gives the same 404 as a wrong
+link. View code always shows the script-free page.
+
+What a rendered page can still do:
+
+- Reach the internet through WebRTC. No browser lets a page policy block it, so a rendered page
+  can send what it holds, and what a visitor types into it, to a host it names. Turn Render off
+  for a page you would not publish as a page.
+- Load scripts, styles and fonts from three CDN paths (`SHARE_PAGE_CDNS` in
+  `server/src/share-render.ts`): `cdnjs.cloudflare.com/ajax/libs/`, `cdn.jsdelivr.net/npm/` and
+  `unpkg.com/`. Each CDN sees the visitor's address when the page loads from it; what it serves
+  runs in the same isolated frame. Images from the web stay blocked.
+- Use the visitor's CPU and memory while open, like any web page.
+
+What a reverse proxy in front must keep: the `Content-Security-Policy`, `Permissions-Policy` and
+`X-Frame-Options` headers of `/share/` responses as Seti sends them, the visitor's
+`Sec-Fetch-Dest` request header, and the original `Host`. Removing `Sec-Fetch-Dest` or rewriting
+`Host` only stops HTML pages from rendering; removing `Content-Security-Policy` would let a
+rendered page reach the network and navigate its frame away.
+
+## Your tool servers on Codex agents
+
+A Codex agent gets the MCP servers from your Claude Code config that a sandboxed Claude Code agent
+gets, and no others: Seti reads the host's config, never a copy the agent could write, and passes
+the servers on Codex's command line, which wins over every config file. A local server runs inside
+the agent's sandbox with the placeholders of the agent's connections and never the model key. A
+remote server gets its URL only; the egress proxy adds the sign-in token or connection header on
+that server's host. Codex asks Seti about every call to these servers, even a tool that says it
+only reads. Codex's own config file stays empty and read-only, and a server defined in the agent's
+folder is never read.
+
+## Settings in an agent's folders
+
+A folder's Claude Code settings (`.claude/settings.json`, `.claude/settings.local.json`,
+`.claude/hooks`), its `.mcp.json` and its `.codex` folder decide what runs without asking and
+what runs later when you work there yourself. In a sandboxed agent's working folders, worktrees
+and added folders included, those that exist are read-only to the agent on both runtimes, however
+it tries to write them. A file that does not exist cannot be covered that way without leaving a
+file in your repository, so Seti watches it instead: one that appears in the agent's own folder
+after a sandboxed session started counts as the agent's writing. Until you change its content,
+Seti's gate and Claude Code ignore its allow rules and its tool servers stay off, while its ask
+and deny rules apply; the audit log records each file held back. A running Claude Code session
+takes no change to its folder's settings; the next session reads them.
+
+Rules are read from the agent's own folder only, so the settings of an added folder never decide
+an agent's calls. The user settings in a sandboxed agent's home are read-only.
+
 ## What is not protected
 
 - systemd 255's user manager cannot decrypt credentials, so the key files are plain files the Seti
@@ -160,6 +228,9 @@ and each install, failure and removal is in the audit log with the version and c
   request no policy names, and a host granted to a mod is two-way. The consent screen says both.
 - With Scripts on, an agent's HTML preview can still reach a STUN or TURN server the page names
   through WebRTC, which no page policy blocks yet. Scripts start off for each file.
+- A rendered HTML share's page can reach the internet through WebRTC, and the CDNs it loads from
+  see visitors' addresses (HTML share links above). Render is on for each HTML file unless you
+  turn it off.
 - A share link's preview card that a chat app already fetched stays in that app's cache after the
   share is revoked or expires. Share views are counted with Cloudflare's country header and a
   clipped user agent.
@@ -171,6 +242,10 @@ and each install, failure and removal is in the audit log with the version and c
 - Review rules for one tool trust the server's own annotations to list its other writing tools; a
   rule for the whole server does not depend on them.
 - Seti writes to a GitHub PR in one case: the preview label, while the PR previews mod is on.
+- An unsandboxed agent can write its folders' settings like any other file; asking before a
+  command that is not read-only, and before an edit of those files, is the only guard there.
+- Claude Code applies a mid-session change of a folder's settings unless a hook blocks it; Seti's
+  sandboxed sessions block it, and Seti cannot test that against every Claude Code release.
 
 The public demo runs with a separate entry point and threat model; see [Public demo](demo.md).
 

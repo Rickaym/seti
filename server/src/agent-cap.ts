@@ -14,6 +14,8 @@ import { sshHostStore } from './store/ssh.js'
 export interface AccessCap {
   /** The agent the cap comes from, named in what it holds back. */
   title: string
+  /** Its id, which an agent it starts records as `delegated_by`. */
+  task_id: string
   profile_id: string
   ssh: ReadonlySet<string>
   aws: boolean
@@ -28,6 +30,7 @@ export async function capOf(caller: Task): Promise<AccessCap> {
   const on = (kind: string) => new Set(view.items.filter((i) => i.kind === kind && i.enabled).map((i) => i.id))
   return {
     title: caller.title,
+    task_id: caller.id,
     profile_id: caller.profile_id,
     ssh: on('ssh'),
     aws: on('aws').size > 0,

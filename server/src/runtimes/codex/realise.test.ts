@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import type { CodexToolServer } from '../../codex-tool-servers.js'
 import type { Launcher } from '../../launcher.js'
 import type { SessionSpec } from '../../session-spec.js'
 import { realiseCodex } from './realise.js'
@@ -10,7 +11,8 @@ const spec = {
   resume: null,
   toolServers,
   instructions: { append: '' },
-  vendor: { binary: '/c', model: null, effort: null },
+  vendor: { binary: '/c', model: null, effort: null, skills: [], servers: [] },
+  compaction: { auto: true, window_k: null, threshold_pct: null, instructions: null },
 } as unknown as SessionSpec<'codex'>
 const spawn: NonNullable<Launcher['spawn']> = () => {
   throw new Error('not started in this test')
@@ -68,6 +70,45 @@ describe('realising a Codex session', () => {
     expect(settingsOf(realised.args)).toContain('model_reasoning_summary="auto"')
   })
 
+  it("lists the user's skills after the instructions, each at its read-only copy in the home", () => {
+    const skilled = {
+      ...spec,
+      vendor: { ...spec.vendor, skills: [{ name: 'pdf', description: 'PDFs', folder: 'pdf' }] },
+    }
+    const realised = realiseCodex(skilled, launcher({ SETI_MODEL_KEY: 'k', HOME: '/home/agent' }), {
+      ...answering,
+      binary: '/c',
+    })
+    expect(realised.instructions).toContain("## The user's skills")
+    expect(realised.instructions).toContain('- pdf: PDFs (file: /home/agent/.agents/skills/pdf/SKILL.md)')
+    const none = realiseCodex(spec, launcher({ SETI_MODEL_KEY: 'k', HOME: '/home/agent' }), {
+      ...answering,
+      binary: '/c',
+    })
+    expect(none.instructions).not.toContain('skills')
+  })
+
+  it('compacts at the window and Compact at of the rule, with its instructions, and else where Codex picks', () => {
+    const realise = (compaction: object) =>
+      settingsOf(
+        realiseCodex({ ...spec, compaction } as SessionSpec<'codex'>, launcher({ SETI_MODEL_KEY: 'p' }), {
+          ...answering,
+          binary: '/c',
+        }).args,
+      )
+    const rule = { auto: true, window_k: 200, threshold_pct: 60, instructions: 'Keep the branch names.' }
+    expect(realise(rule)).toEqual(
+      expect.arrayContaining([
+        'model_auto_compact_token_limit=120000',
+        expect.stringMatching(/^compact_prompt=".*Keep the branch names\."$/),
+      ]),
+    )
+    const loose = realise({ ...rule, auto: false, threshold_pct: null, instructions: null })
+    expect(
+      loose.filter((setting) => setting.startsWith('model_auto_compact') || setting.startsWith('compact_prompt')),
+    ).toEqual([])
+  })
+
   it("reads a folder's CLAUDE.md when it has no AGENTS.md, as a Claude Code agent reads it", () => {
     const realised = realiseCodex(spec, launcher({ SETI_MODEL_KEY: 'seti-placeholder' }), {
       ...answering,
@@ -105,6 +146,30 @@ describe('realising a Codex session', () => {
     expect(() => realiseCodex(spec, launcher(env), { ...answering, toolServers: servers, binary: '/c' })).toThrow(
       /tool server named "a.b"/,
     )
+  })
+
+  it("starts the user's servers in the sandbox, asking Seti about every call, never with the key", () => {
+    const servers: CodexToolServer[] = [
+      { name: 'play', transport: 'stdio', command: 'npx', args: ['@playwright/mcp'] },
+      { name: 'docs', transport: 'http', url: 'https://docs.example.com/mcp' },
+      { name: 'shared', transport: 'stdio', command: 'not-seti', args: [] },
+    ]
+    const withServers = { ...spec, vendor: { ...spec.vendor, servers } }
+    const env = { SETI_MODEL_KEY: 'seti-placeholder', GH_TOKEN: 'seti-sandbox-placeholder' }
+    const realised = realiseCodex(withServers, launcher(env), { ...answering, binary: '/c' })
+    const settings = settingsOf(realised.args)
+    expect(settings).toEqual(
+      expect.arrayContaining([
+        'mcp_servers.play.command="npx"',
+        'mcp_servers.play.args=["@playwright/mcp"]',
+        'mcp_servers.play.env_vars=["GH_TOKEN"]',
+        'mcp_servers.play.default_tools_approval_mode="prompt"',
+        'mcp_servers.docs.url="https://docs.example.com/mcp"',
+        'mcp_servers.docs.default_tools_approval_mode="prompt"',
+      ]),
+    )
+    expect(settings.filter((each) => each.startsWith('mcp_servers.docs.env_vars'))).toEqual([])
+    expect(settings.filter((each) => each.includes('not-seti'))).toEqual([])
   })
 
   it('refuses an agent without an OpenAI key', () => {

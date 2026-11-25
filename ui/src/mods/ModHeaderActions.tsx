@@ -5,6 +5,7 @@ import { Hint } from '@/components/Hint'
 import { chordAria, chordLabel } from '@/components/shortcuts/chords'
 import { Button } from '@/components/ui/button'
 import { useMods } from '@/hooks/useMods'
+import { useAgentLacks } from './agent-needs'
 import { commandContext, runModCommand, uiCommands } from './commands'
 import { parseModChord } from './mod-chords'
 
@@ -21,7 +22,8 @@ const headerCommands = (mods: readonly ModInfo[]) =>
 function HeaderAction({ mod, command, agent }: { mod: ModInfo; command: ModCommand; agent: string }) {
   const ui = useSyncExternalStore(uiCommands.subscribe, () => uiCommands.get(modScoped(mod.id, command.id)))
   const context = commandContext(agent)
-  if (ui?.when?.(context) === false) {
+  const lacks = useAgentLacks()(agent, command.needs)
+  if (lacks !== null || ui?.when?.(context) === false) {
     return null
   }
   const Icon = ui?.icon ?? Puzzle

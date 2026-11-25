@@ -5,7 +5,7 @@ import { createPolledResource } from '@/lib/polled'
 const NO_TASKS: readonly TaskListEntry[] = []
 const NO_ARCHIVED: readonly ArchivedTaskEntry[] = []
 
-const tasksResource = createPolledResource('/tasks', 5000, { schema: taskListSchema })
+export const tasksResource = createPolledResource('/tasks', 5000, { schema: taskListSchema })
 const archivedResource = createPolledResource<ArchivedTaskEntry[]>('/tasks/archived', 15_000)
 
 /** Task list shared by every consumer; `refresh` refetches now, `loaded` tells empty from loading. */

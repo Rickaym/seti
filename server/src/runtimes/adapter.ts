@@ -1,7 +1,8 @@
-import type { RuntimeEvent, ToolCall } from '@seti/shared'
+import type { McpTransport, RuntimeEvent, ToolCall } from '@seti/shared'
 import type { z } from 'zod'
 import type { Launcher } from '../launcher.js'
 import type { SessionSpec } from '../session-spec.js'
+import type { OneShot } from './one-shot.js'
 
 /** Names an agent runtime; Claude Code is the only one so far. */
 export type RuntimeId = 'claude' | 'codex'
@@ -113,7 +114,10 @@ export interface DreamSession {
 
 /** How a runtime runs dreams: where its agents keep memory, and a dream session. */
 export interface DreamSupport {
-  /** The folder the agent's own sessions keep their memory in, for its working folder. */
+  /**
+   * The folder a sandboxed agent's sessions keep their memory in, for its working folder; they
+   * load it whatever repository the folder belongs to.
+   */
   memory: (cwd: string) => string
   /**
    * Starts a dream: the runtime's read, search, edit and shell tools and the host's, no question
@@ -146,12 +150,27 @@ export interface Capabilities {
   rewind: { conversation: boolean; code: boolean }
   /** Dreams, or null where the runtime keeps no memory Seti can find. */
   dream: DreamSupport | null
-  /** It loads the user's own tool servers and connectors, and Seti's plugins, beside Seti's tools. */
-  tools: { userServers: boolean; plugins: boolean }
+  /** Answers one question with no tools, as a second opinion asks it. */
+  oneShot: OneShot
+  /**
+   * Transports of the user's own tool servers it loads, the server names it can take and that
+   * rule in words (null for any name), and Seti's plugins, beside Seti's tools.
+   */
+  tools: {
+    userServers: readonly McpTransport['type'][]
+    serverNames: { pattern: RegExp; rule: string } | null
+    plugins: boolean
+  }
   /** It can run outside Seti's sandbox. */
   sandbox: { optional: boolean }
-  /** It takes a rule for when to compact its context. */
-  compaction: boolean
+  /**
+   * The compaction rule it takes, or null for none. Every one takes a context window with a
+   * Compact at, and instructions; `off` it can stop compacting, `windowAlone` it takes a window
+   * without a Compact at.
+   */
+  compaction: { off: boolean; windowAlone: boolean } | null
+  /** The agent can hand work to subagents of its own that run in the background. */
+  subagents: boolean
 }
 
 /**

@@ -65,19 +65,55 @@ function linkTags(name: string, link: LinkPreview): string {
   return tags.join('')
 }
 
-/** The whole page of a share: styles inline, no script, nothing loaded from anywhere else. */
-export function sharePage(input: SharePageInput): string {
-  const name = escapeHtml(input.name)
-  const detail = `${sizeLabel(input.size)}, shared from Seti, updated ${when(input.updatedAt)}`
+function head(input: Pick<SharePageInput, 'name' | 'link'>, style: string): string {
   return [
     '<!doctype html>',
     '<html lang="en"><head><meta charset="utf-8">',
     '<meta name="viewport" content="width=device-width, initial-scale=1">',
     '<meta name="referrer" content="no-referrer"><meta name="robots" content="noindex, nofollow">',
-    `<title>${name}</title>${linkTags(input.name, input.link)}<style>${SHARE_STYLE}</style></head>`,
+    `<title>${escapeHtml(input.name)}</title>${linkTags(input.name, input.link)}<style>${style}</style></head>`,
+  ].join('')
+}
+
+const download = (input: Pick<SharePageInput, 'name' | 'rawHref'>) =>
+  `<a class="dl" href="${escapeHtml(input.rawHref)}" download="${escapeHtml(input.name)}">Download</a>`
+
+/** The whole page of a share: styles inline, no script, nothing loaded from anywhere else. */
+export function sharePage(input: SharePageInput): string {
+  const name = escapeHtml(input.name)
+  const detail = `${sizeLabel(input.size)}, shared from Seti, updated ${when(input.updatedAt)}`
+  return [
+    head(input, SHARE_STYLE),
     '<body><header><div class="meta">',
     `<h1>${name}</h1><div class="sub">${escapeHtml(detail)}</div></div>`,
-    `<a class="dl" href="${escapeHtml(input.rawHref)}" download="${name}">Download</a>`,
+    download(input),
     `</header><main>${input.body}</main></body></html>`,
+  ].join('')
+}
+
+export interface RenderedSharePageInput extends Omit<SharePageInput, 'body'> {
+  codeHref: string
+  frameHref: string
+}
+
+/** The bar stays put and the frame takes the rest; a page without a background shows on white. */
+const RENDER_STYLE = `${SHARE_STYLE}
+body{display:flex;flex-direction:column;height:100vh;height:100dvh}
+header{flex:none;padding:8px 16px}
+header .actions{display:flex;gap:8px}
+iframe.page{flex:1 1 auto;display:block;width:100%;min-height:0;border:0;background:#fff;color-scheme:light}
+`
+
+/** A rendered share's shell: Seti's bar, no script, and the page in a frame with an opaque origin. */
+export function renderedSharePage(input: RenderedSharePageInput): string {
+  const name = escapeHtml(input.name)
+  const detail = `${sizeLabel(input.size)}, shared from Seti, updated ${when(input.updatedAt)}`
+  return [
+    head(input, RENDER_STYLE),
+    '<body><header><div class="meta">',
+    `<h1>${name}</h1><div class="sub">${escapeHtml(detail)}</div></div><div class="actions">`,
+    `<a class="dl" href="${escapeHtml(input.codeHref)}">View code</a>${download(input)}</div></header>`,
+    `<iframe class="page" src="${escapeHtml(input.frameHref)}" sandbox="allow-scripts" referrerpolicy="no-referrer"`,
+    ` title="${name}"></iframe></body></html>`,
   ].join('')
 }

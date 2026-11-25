@@ -1,8 +1,10 @@
 import { randomUUID } from 'node:crypto'
 import {
   describeChange,
+  fileChangeInput,
   hostEntry,
   urlAllowed,
+  type AllowRefusedHostInput,
   type AnswerChangeInput,
   type ChangeRequest,
   type FileChangeRequest,
@@ -22,6 +24,7 @@ import { allowForEveryAgent } from './sandbox-policy.js'
 import { publishedAlready, snapshotProposal } from './shared-tool-proposals.js'
 import { auditTool, publishSharedTool } from './shared-tools.js'
 import { allowedFor, changeRequests, taskHosts } from './store/change-requests.js'
+import { refusedHostLines } from './store/refused-hosts.js'
 import { refreshBlocked } from './task-blocked.js'
 
 /** How long a request waits for the user before it expires. */
@@ -196,6 +199,25 @@ export async function answerChangeRequest(task: Task, id: string, answer: Answer
   }
   await closeRequest(settled, answer.decision === 'allow' ? 'allowed' : 'denied', value !== undefined)
   return settled
+}
+
+const REFUSED_REASON = 'The sandbox refused this host, and the user chose Allow host on the transcript line.'
+
+/**
+ * The user's Allow host on a refused host's transcript line: files the host request and
+ * answers it with the user's Allow, the path an agent's request takes. Never the EA or an agent.
+ */
+export async function allowRefusedHost(task: Task, input: AllowRefusedHostInput): Promise<ChangeRequest> {
+  refuseAgent("allow a host an agent's sandbox refused")
+  if ((await refusedHostLines.find(task.id, input.host)) === undefined) {
+    throw new HttpError(404, `The sandbox of this agent has not refused ${input.host}`)
+  }
+  const asked = fileChangeInput.parse({ change: { kind: 'allow_host', host: input.host }, reason: REFUSED_REASON })
+  const filed = await fileChangeRequest(task, asked)
+  if (filed.outcome === 'already') {
+    throw new HttpError(409, filed.text.replace(/^You can/, 'The agent can'))
+  }
+  return answerChangeRequest(task, filed.request.id, { decision: 'allow', scope: input.scope ?? 'agent' })
 }
 
 /** Adds an allowlist entry for one agent alone; its proxy lets it through from the next request. */

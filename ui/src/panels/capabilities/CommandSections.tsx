@@ -2,6 +2,7 @@ import type { CommandGroup, CommandInfo, ModelEntry, SubagentInfo } from '@seti/
 import { ChevronDown, ChevronRight } from 'lucide-react'
 import { useState } from 'react'
 import { cn } from '@/lib/utils'
+import { PluginTag } from './RuntimeTag'
 import { EmptyRow } from './Section'
 
 const GROUP_OPEN_LIMIT = 15
@@ -75,6 +76,7 @@ function Group({ group, forceOpen }: { group: CommandGroup; forceOpen: boolean }
         <Chevron className="size-3.5 text-muted-foreground" />
         {group.prefix ?? 'Standalone skills'}
         <span className="font-normal text-muted-foreground">{group.commands.length}</span>
+        {group.prefix !== null && <PluginTag />}
       </button>
       {shown && <CommandList commands={group.commands} />}
     </div>

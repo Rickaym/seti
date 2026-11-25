@@ -8,6 +8,7 @@ import {
   type WebhookChannelInfo,
   type WebhookFilterInfo,
   type WebhookSourceInfo,
+  type WebhookThreads,
   type channelCreateInput,
   type channelUpdateInput,
 } from '@seti/shared'
@@ -18,6 +19,7 @@ import { HttpError } from '../http.js'
 import { channelSubscriptions } from '../store/channel-subscriptions.js'
 import { channelStore, type ChannelRecord } from '../store/channels.js'
 import { webhookFilterStore } from '../store/webhook-filters.js'
+import { threadSource } from '../threads/sources.js'
 import { signalWorkspaces } from '../workspace/dir.js'
 import { createReceiver } from './receiver.js'
 import { routeEvent } from './router.js'
@@ -44,6 +46,12 @@ async function filterInfo(channel: string): Promise<WebhookFilterInfo | null> {
   return saved === undefined ? null : { ...saved, day: await webhookFilterStore.day(channel, now()) }
 }
 
+/** The thread switches of a webhook whose sender Seti reads replies from; null for the rest. */
+const threadsOf = (record: ChannelRecord): WebhookThreads | null =>
+  threadSource(record.preset) === undefined
+    ? null
+    : { replies: record.thread_replies, dms: record.thread_dms, message_seen_at: record.message_seen_at }
+
 async function info(record: ChannelRecord): Promise<WebhookChannelInfo> {
   const { id, name, preset, mapping, sender, created_at, updated_at, secret_rotated_at, secret_pending } = record
   const path = `${HOOKS_PREFIX}${id}`
@@ -65,6 +73,7 @@ async function info(record: ChannelRecord): Promise<WebhookChannelInfo> {
     recent: await channelStore.recent(id, CHANNEL_ACTIVITY_SHOWN),
     deliveries: await channelStore.deliveries(id, CHANNEL_ACTIVITY_SHOWN),
     filter: await filterInfo(id),
+    threads: threadsOf(record),
   }
 }
 

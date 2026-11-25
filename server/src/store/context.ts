@@ -37,6 +37,8 @@ export const contextPacks = {
       kind,
       builtin: false,
       linked_by_default: false,
+      runtime: null,
+      model: null,
       created_at: ts,
       updated_at: ts,
     }
@@ -62,6 +64,15 @@ export const contextPacks = {
       body = ${fields.body}, updated_at = ${now()} WHERE id = ${id}`
     return getPack(id)
   },
+  setRuntime: async (id: string, runtime: ContextPack['runtime'], model: string | null) => {
+    await sql`UPDATE context_pack SET runtime = ${runtime}, model = ${model}, updated_at = ${now()} WHERE id = ${id}`
+  },
+  /** The role pack with this name, any case, or this id. */
+  roleNamed: async (name: string) =>
+    (
+      await sql<ContextPack[]>`SELECT * FROM context_pack WHERE kind = 'role'
+        AND (lower(name) = lower(${name}) OR id::text = ${name}) ORDER BY builtin DESC LIMIT 1`
+    ).at(0),
   setLinkedByDefault: async (id: string, on: boolean) => {
     await sql`UPDATE context_pack SET linked_by_default = ${on}, updated_at = ${now()} WHERE id = ${id}`
   },

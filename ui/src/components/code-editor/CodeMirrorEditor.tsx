@@ -102,6 +102,7 @@ interface CodeMirrorEditorProps {
   /** Ctrl+S or Cmd+S in the editor. */
   onSave: (() => void) | undefined
   find: EditorFind | undefined
+  extensions: Extension
 }
 
 /** CodeMirror for code in one language, held in step with its value prop. */
@@ -116,16 +117,18 @@ export function CodeMirrorEditor({
   focusOnMount,
   onSave,
   find,
+  extensions,
 }: CodeMirrorEditorProps) {
   const host = useRef<HTMLDivElement>(null)
   const view = useRef<EditorView | null>(null)
-  const latest = useRef({ value, onChange, label, spellCheck, focusOnMount, onSave, language, find })
+  const latest = useRef({ value, onChange, label, spellCheck, focusOnMount, onSave, language, find, extensions })
   const echoes = useRef(createEchoes())
   const labelled = useRef(new Compartment())
   const grammar = useRef(new Compartment())
+  const extra = useRef(new Compartment())
 
   useLayoutEffect(() => {
-    latest.current = { value, onChange, label, spellCheck, focusOnMount, onSave, language, find }
+    latest.current = { value, onChange, label, spellCheck, focusOnMount, onSave, language, find, extensions }
   })
 
   useLayoutEffect(() => {
@@ -154,6 +157,7 @@ export function CodeMirrorEditor({
           BASE,
           grammar.current.of(latest.current.language === 'javascript' ? javascriptLanguage : []),
           labelled.current.of(fieldAttributes(latest.current.label, latest.current.spellCheck)),
+          extra.current.of(latest.current.extensions),
           EditorView.updateListener.of((update) => {
             if (update.transactions.some(isOwnEdit)) {
               const text = update.state.doc.toString()
@@ -208,6 +212,10 @@ export function CodeMirrorEditor({
   useEffect(() => {
     view.current?.dispatch({ effects: labelled.current.reconfigure(fieldAttributes(label, spellCheck)) })
   }, [label, spellCheck])
+
+  useEffect(() => {
+    view.current?.dispatch({ effects: extra.current.reconfigure(extensions) })
+  }, [extensions])
 
   useEffect(() => {
     let live = true

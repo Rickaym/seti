@@ -1,12 +1,13 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto'
-import type {
-  createShareInput,
-  FileShare,
-  Share,
-  ShareDiagramInput,
-  ShareLink,
-  ShareList,
-  ShareScanRefusal,
+import {
+  canRender,
+  type createShareInput,
+  type FileShare,
+  type Share,
+  type ShareDiagramInput,
+  type ShareLink,
+  type ShareList,
+  type ShareScanRefusal,
 } from '@seti/shared'
 import type { z } from 'zod'
 import { audit } from './audit.js'
@@ -100,6 +101,7 @@ function toShare(row: ShareListRow, recent: RecentViews = NO_VIEWS): Share {
     view_count: row.view_count,
     recent_views: recent.views,
     link_preview: row.link_preview,
+    render: row.render,
     unfurl_count: row.unfurl_count,
     recent_unfurls: recent.unfurls,
     preview: {
@@ -159,6 +161,20 @@ const checked = (snapshot: Snapshot, allowFindings: boolean) => {
   return snapshot.findings.length > 0
 }
 
+function requireRenderable(name: string): void {
+  if (!canRender(name)) {
+    throw new HttpError(400, `${name} is not an HTML file; only an HTML file renders as a page`)
+  }
+}
+
+/** Whether a new link renders the file as its page: as asked, else whenever the file is HTML. */
+function renderOf(name: string, asked: boolean | undefined): boolean {
+  if (asked === true) {
+    requireRenderable(name)
+  }
+  return asked ?? canRender(name)
+}
+
 const isOpen = (row: ShareListRow, at: string) => row.revoked_at === null && row.expires_at > at
 
 async function openShare(id: string): Promise<ShareListRow> {
@@ -187,6 +203,7 @@ export async function createShare(
   const at = now()
   await shareRows.purgeExpired(at)
   const snapshot = takeSnapshot(files, input.root, input.path)
+  const render = renderOf(snapshot.name, input.render)
   if ((await shareRows.openFor(taskId, input.root, snapshot.rel, at)) !== undefined) {
     throw new HttpError(409, `${snapshot.rel} is already shared; update it or make a new link`)
   }
@@ -217,6 +234,7 @@ export async function createShare(
       view_count: 0,
       scan_override: override,
       link_preview: input.link_preview,
+      render,
       unfurl_count: 0,
     },
     body,
@@ -228,7 +246,13 @@ export async function createShare(
     subject_type: 'task',
     subject_id: taskId,
     summary: `Shared ${snapshot.rel} of task "${files.task.title}" by public link until ${expires.slice(0, 10)}`,
-    detail: { ...shareDetail(share), expires_at: expires, bytes: share.size, scan_override: override },
+    detail: {
+      ...shareDetail(share),
+      expires_at: expires,
+      bytes: share.size,
+      scan_override: override,
+      render,
+    },
   })
   return { share, url: linkOf(origin, token) }
 }
@@ -346,6 +370,27 @@ export async function setShareLinkPreview(id: string, on: boolean): Promise<Shar
     subject_id: row.task_id,
     summary: `Turned ${on ? 'on' : 'off'} the link preview of ${row.path} of task "${row.task_title}"`,
     detail: { ...shareDetail(row), link_preview: on },
+  })
+  return shareOf(id)
+}
+
+/** Shows the file as its page or, off, as code: the script-free page a non-HTML share gets. */
+export async function setShareRender(id: string, on: boolean): Promise<Share> {
+  await requireSharing()
+  const row = await openShare(id)
+  if (on) {
+    requireRenderable(row.name)
+  }
+  if (!(await shareRows.setRender(id, on, now()))) {
+    throw new HttpError(404, 'This share has ended; share the file again')
+  }
+  await audit.record({
+    actor: 'user',
+    kind: 'task.share_render',
+    subject_type: 'task',
+    subject_id: row.task_id,
+    summary: `Turned ${on ? 'on' : 'off'} rendering of ${row.path} of task "${row.task_title}"`,
+    detail: { ...shareDetail(row), render: on },
   })
   return shareOf(id)
 }

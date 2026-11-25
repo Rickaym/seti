@@ -89,6 +89,7 @@ async function auditCreated(task: Task, actor: AuditActor): Promise<void> {
       ...plugins,
       ...mcp,
       ...(task.pr_urls.length === 0 ? {} : { pr_urls: task.pr_urls }),
+      ...(task.delegated_by === null ? {} : { delegated_by: task.delegated_by }),
       ...planDetail(task.setup),
     },
   })
@@ -125,6 +126,7 @@ export async function startTask(
     runtime,
     requested_model: input.model ?? null,
     requested_effort: input.effort ?? null,
+    delegated_by: input.delegated_by ?? null,
   })
   capabilityCache.prewarm(cwd)
   await taskContextPacks.set(id, packIds)

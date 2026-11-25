@@ -104,6 +104,10 @@ export async function requireCodexProgram(settings: CodexSettings): Promise<stri
   return now.program
 }
 
+/** The program a new process of the runtime starts where Seti installs it, else null. */
+export const runtimeProgram = async (runtime: StoredRuntime): Promise<string | null> =>
+  runtime === 'codex' ? codexProgram() : Promise.resolve(null)
+
 /** Refuses a new agent on a runtime that cannot start one now, or on a credential without its key. */
 export async function requireRuntime(runtime: StoredRuntime, profileId: string): Promise<void> {
   if (runtime !== 'codex') {

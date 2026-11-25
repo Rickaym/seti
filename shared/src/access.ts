@@ -42,6 +42,8 @@ export interface AccessItem extends AccessDefault {
   missing_key: string[]
   /** MCP only: how the agent's latest session has the server; null before any session. */
   session: McpSessionState | null
+  /** MCP only: why the agent's runtime cannot use it, such as a transport it lacks; else null. */
+  unusable: string | null
 }
 
 /** How a session has an MCP server: its connection, or not_loaded when its config lacks it. */

@@ -1,12 +1,14 @@
+import { canRender } from '@seti/shared'
 import type { Context, Handler } from 'hono'
 import { currentPublicHost } from '../access.js'
 import { parseRange, type ByteRange } from '../byte-range.js'
 import type { PublicAccess } from '../config.js'
 import { now } from '../db.js'
 import { clientKey, rateLimiter } from '../rate-limit.js'
-import { sharePage, sizeLabel, type LinkPreview } from '../share-page.js'
+import { renderedSharePage, sharePage, sizeLabel, type LinkPreview } from '../share-page.js'
 import { MEDIA_MARK, parseSharePath, shareOrigin, type ShareRequest } from '../share-path.js'
 import { fillImages } from '../share-preview/preview.js'
+import { frameDocument, isFrameLoad, RENDER_MARK } from '../share-render.js'
 import { unfurlerOf } from '../share-unfurlers.js'
 import { sharingEnabled, tokenHash } from '../shares.js'
 import { publicShares, type PublicPage, type PublicShareRow, type ShareImageRow } from '../store/shares.js'
@@ -112,7 +114,11 @@ async function serveRaw(c: Context, share: PublicShareRow): Promise<Response | n
 }
 
 /** The head's link preview; with previews off it names the file and nothing else. */
-function linkPreview(share: PublicShareRow, stored: PublicPage, url: string | null): LinkPreview {
+function linkPreview(
+  share: PublicShareRow,
+  stored: Pick<PublicPage, 'size' | 'preview_label' | 'card'>,
+  url: string | null,
+): LinkPreview {
   if (!share.link_preview) {
     return { url, description: null, image: null }
   }
@@ -128,11 +134,59 @@ async function servePage(c: Context, share: PublicShareRow, target: ShareRequest
   if (c.req.method === 'GET') {
     await recordView(c, share.id)
   }
-  const origin = shareOrigin(c.req.header('host') ?? '', access)
   const body = fillImages(stored.page, stored.image_key, target.token)
-  const link = linkPreview(share, stored, origin === null ? null : `${origin}/share/${target.token}`)
+  const link = linkPreview(share, stored, pageUrl(c, target, access))
   const page = { name: share.name, size: stored.size, updatedAt: share.updated_at, body, link }
-  return c.html(sharePage({ ...page, rawHref: `${c.req.path}/raw` }))
+  return c.html(sharePage({ ...page, rawHref: `/share/${target.token}/raw` }))
+}
+
+function pageUrl(c: Context, target: ShareRequest, access: PublicAccess | null): string | null {
+  const origin = shareOrigin(c.req.header('host') ?? '', access)
+  return origin === null ? null : `${origin}/share/${target.token}`
+}
+
+/** A rendered share's shell: the bar and a frame for the page; the frame's load is not a view. */
+async function serveShell(c: Context, share: PublicShareRow, target: ShareRequest, access: PublicAccess | null) {
+  const stored = await publicShares.head(share.id)
+  if (stored === undefined) {
+    return null
+  }
+  if (c.req.method === 'GET') {
+    await recordView(c, share.id)
+  }
+  const base = `/share/${target.token}`
+  const link = linkPreview(share, stored, pageUrl(c, target, access))
+  const page = { name: share.name, size: stored.size, updatedAt: share.updated_at, link }
+  return c.html(
+    renderedSharePage({ ...page, rawHref: `${base}/raw`, codeHref: `${base}/code`, frameHref: `${base}/frame` }),
+  )
+}
+
+/** The stored HTML itself, to a frame only; a tab gets the same 404 as an unknown link. */
+async function serveFrame(c: Context, share: PublicShareRow): Promise<Response | null> {
+  if (!isFrameLoad(c.req.header('sec-fetch-dest'))) {
+    return null
+  }
+  const headers = { 'Content-Type': 'text/html; charset=utf-8', 'Content-Disposition': 'inline' }
+  if (c.req.method === 'HEAD') {
+    return c.body(null, 200, headers)
+  }
+  const content = await publicShares.content(share.id)
+  return content === undefined ? null : c.body(new Uint8Array(frameDocument(content)), 200, headers)
+}
+
+/** Marks a rendered share's shell and frame, so the headers step isolates them. */
+function renderMarked(response: Response | null): Response | null {
+  response?.headers.set(RENDER_MARK, '1')
+  return response
+}
+
+/** Only an HTML file renders, whatever its row says; every other share keeps its stored page. */
+const renders = (share: PublicShareRow) => share.render && canRender(share.name)
+
+/** The link's page: the shell of a rendered share, else the stored script-free page. */
+async function servePageOrShell(c: Context, share: PublicShareRow, target: ShareRequest, access: PublicAccess | null) {
+  return renders(share) ? renderMarked(await serveShell(c, share, target, access)) : servePage(c, share, target, access)
 }
 
 /** A stored preview image or the link card; the policy lets the page and link bots fetch them. */
@@ -170,7 +224,11 @@ async function serve(c: Context, share: PublicShareRow, target: ShareRequest, ac
     case 'raw':
       return marked(await serveRaw(c, share), share)
     case 'page':
-      return marked(await servePage(c, share, target, access), share)
+      return marked(await servePageOrShell(c, share, target, access), share)
+    case 'code':
+      return renders(share) ? servePage(c, share, target, access) : null
+    case 'frame':
+      return renders(share) ? renderMarked(await serveFrame(c, share)) : null
     case 'image':
     case 'card':
       return serveImage(c, share, target)

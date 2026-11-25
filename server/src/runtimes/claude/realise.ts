@@ -1,8 +1,10 @@
+import path from 'node:path'
 import type { McpServerConfig, Options, PermissionMode, SdkPluginConfig } from '@anthropic-ai/claude-agent-sdk'
 import type { CompactRule, EffortLevel } from '@seti/shared'
 import { COMMAND_LIMIT_HOURS } from '../../house-rules.js'
 import type { Launcher } from '../../launcher.js'
 import { taskBorrowedServers } from '../../mcp-borrowed.js'
+import { projectSlug } from '../../sandbox-mounts.js'
 import type { SessionSpec } from '../../session-spec.js'
 import { sharedToolServer } from '../../shared-tools.js'
 import { workspaceDir, WORKSPACE_ENV } from '../../workspace/dir.js'
@@ -65,6 +67,15 @@ const claudeSetup = (spec: SessionSpec<'claude'>) =>
     systemPrompt: { type: 'preset', preset: 'claude_code', append: spec.instructions.append },
   }) satisfies Options
 
+/**
+ * Claude Code keys memory by the repository's main checkout, so an agent in a worktree would
+ * load the memory every session of that repository shares; this keeps it in the agent's own
+ * project folder, as its sandbox shows it under its home.
+ */
+export const ownMemory = (cwd: string) => ({
+  autoMemoryDirectory: `~/${path.join('.claude', 'projects', projectSlug(cwd), 'memory')}`,
+})
+
 /** Claude Code leaves out the MCP servers a task turned off, whatever config names them. */
 const deniedMcpSettings = (names: readonly string[]) => ({
   deniedMcpServers: names.map((serverName) => ({ serverName })),
@@ -83,7 +94,12 @@ export function claudeLaunch(launcher: Launcher) {
 
 /** Rules for every task, the launcher, and an unsandboxed task's borrowed MCP servers. */
 async function sandboxOptions(spec: SessionSpec<'claude'>, launcher: Launcher) {
-  const settings = { ...deniedMcpSettings(spec.deniedToolServers), permissions: spec.rules }
+  const { disabledServers } = spec.folderSettings
+  const settings = {
+    ...deniedMcpSettings(spec.deniedToolServers),
+    permissions: spec.rules,
+    ...(disabledServers.length === 0 ? {} : { disabledMcpjsonServers: disabledServers }),
+  }
   const borrowed = launcher.sandboxed
     ? {}
     : ((await taskBorrowedServers({ id: spec.taskId, cwd: spec.cwd })) as Record<string, McpServerConfig>)
@@ -118,13 +134,18 @@ export async function realise(
     abortController,
     canUseTool: host.decide,
     perTaskStopAffordance: true,
-    settingSources: ['user', 'project', 'local'],
+    settingSources: spec.folderSettings.local ? ['user', 'project', 'local'] : ['user', 'project'],
     ...sandbox,
     ...withHostServers(host, {
       ...('mcpServers' in sandbox ? sandbox.mcpServers : {}),
       ...sharedToolServer(spec.toolServers.shared),
     }),
-    settings: { ...sandbox.settings, ...compact.settings, ...(spec.setiDreams ? { autoDreamEnabled: false } : {}) },
+    settings: {
+      ...sandbox.settings,
+      ...compact.settings,
+      ...(spec.setiDreams ? { autoDreamEnabled: false } : {}),
+      ...(launcher.sandboxed ? ownMemory(spec.cwd) : {}),
+    },
     hooks: host.hooks,
     env: {
       ...BACKGROUND_LIMIT,

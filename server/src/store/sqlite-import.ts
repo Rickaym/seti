@@ -69,12 +69,13 @@ const POSTGRES_ONLY: Readonly<Record<string, readonly string[]>> = {
     'requested_model',
     'requested_effort',
     'approval_ceiling',
+    'delegated_by',
   ],
   task_message: EVENT_COLUMNS,
   task_context_pack: ['linked'],
   ea_settings: ['join_on_open', 'form_of_address', 'language'],
   ea_history: ['unseen'],
-  context_pack: ['builtin', 'linked_by_default', 'kind'],
+  context_pack: ['builtin', 'linked_by_default', 'kind', 'runtime', 'model'],
 }
 
 /** Rows migrations seed in Postgres, which no SQLite file holds. */

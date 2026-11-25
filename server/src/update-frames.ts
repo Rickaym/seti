@@ -1,4 +1,5 @@
 import {
+  HANDOVER_TAG,
   SECOND_OPINION_TAG,
   type AgentInput,
   type ChannelInput,
@@ -6,6 +7,7 @@ import {
   type SetiInput,
   type TaskInput,
   type TeamInput,
+  type ThreadInput,
   type WorkspaceInput,
 } from '@seti/shared'
 import { subtaskNote } from './subtask-prs.js'
@@ -18,9 +20,11 @@ const FRAME_TAGS = [
   'team-chat',
   'workspace-edit',
   'channel-event',
+  'thread-reply',
   'agent-turn',
   'seti-answer',
   SECOND_OPINION_TAG,
+  HANDOVER_TAG,
 ]
 
 /** An attribute value that cannot end its quotes or start a tag. */
@@ -85,6 +89,22 @@ function describeChannel(input: ChannelInput): string {
   )
 }
 
+const describeThread = (input: ThreadInput) =>
+  tagged(
+    'thread-reply',
+    {
+      service: input.service,
+      from: input.from,
+      name: input.subject,
+      bot: input.bot ? 'true' : undefined,
+      channel: input.channel,
+      thread: input.thread,
+      received_at: input.received_at,
+      url: input.url ?? undefined,
+    },
+    clip(input.body),
+  )
+
 const describeAgent = (input: AgentInput) =>
   tagged(
     'agent-turn',
@@ -106,6 +126,8 @@ export function describeInput(input: TaskInput): string {
       return describeWorkspace(input)
     case 'channel':
       return describeChannel(input)
+    case 'thread':
+      return describeThread(input)
     case 'agent':
       return describeAgent(input)
     case 'seti':
