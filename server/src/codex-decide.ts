@@ -1,6 +1,7 @@
 import type { NodeAnswer, PolicyShadowCount, Task, ToolCall } from '@seti/shared'
 import { audit } from './audit.js'
 import { tasks } from './db.js'
+import { heldFolderSettings } from './folder-settings-trust.js'
 import { outsidePushes } from './outward-push.js'
 import { guardCommand } from './permission-guard.js'
 import { answerByRules, askCodexUser, type UserAnswer } from './permission-requests.js'
@@ -25,7 +26,7 @@ async function contextOf(task: Task): Promise<PolicyContext> {
   const scope = guardScope(task, true)
   return {
     mode: 'ask',
-    rules: sourcedRules(await ruleSources(task)),
+    rules: sourcedRules(await ruleSources(task, await heldFolderSettings(task.cwd))),
     cwd: task.cwd,
     dirs: [task.cwd, ...workingDirs(task)],
     home: scope.home,
