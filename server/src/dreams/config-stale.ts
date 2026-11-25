@@ -46,7 +46,7 @@ function activity(facts: SubscriptionFacts): string {
 }
 
 /** One listed subscription as the dream reads it: names, dates and counts, never a secret. */
-export function factsLine(facts: SubscriptionFacts, at: number): string {
+function factsLine(facts: SubscriptionFacts, at: number): string {
   const last =
     facts.last_delivered_at === null
       ? 'nothing ever delivered'

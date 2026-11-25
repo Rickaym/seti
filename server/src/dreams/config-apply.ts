@@ -44,7 +44,7 @@ async function stillUnused(taskId: string, id: number, at: number): Promise<Subs
 }
 
 /** Unsubscribes the agent and keeps what Undo needs; `dream` marks the audit as the dream's. */
-export async function unsubscribeForDream(
+async function unsubscribeForDream(
   run: Pick<DreamRun, 'id' | 'task_id'>,
   facts: SubscriptionFacts,
   reason: string,

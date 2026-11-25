@@ -36,7 +36,8 @@ SETTING_ARGS: dict[str, dict[str, Any]] = {
 DREAM_SPECS: list[ToolSpec] = [
     ToolSpec(
         "dreams",
-        "Dreams: Seti's sandboxed sessions that tidy an agent's memory folder and change nothing else. "
+        "Dreams: Seti's sandboxed sessions that tidy an agent's memory folder and its unused channel "
+        "subscriptions, each change undoable. "
         "Without task or workspace: nightly Dreaming's settings and how last night went, or change "
         "them with the setting arguments. With task: the agent's recent dreams with their reports; "
         "with start, run one dream of it now; with dreaming, switch it in or out of nightly Dreaming. "
@@ -250,8 +251,8 @@ class DreamTools:
         if not await self._gate.cleared(gate_key("dreams", task.get("id")), arg_bool(args, "confirmed")):
             effect = (
                 f"This starts a dream of {title} now: a sandboxed session of a few minutes that reads its "
-                "day and tidies its memory folder, changes nothing else, and costs at most a dream's "
-                "budget. Each memory change can be undone."
+                "day, tidies its memory folder, may unsubscribe it from channels that delivered nothing "
+                "for 30 days, and costs at most a dream's budget. Each change can be undone."
             )
             return ask("dreams", args, effect, f"start a dream of {title}")
         try:
