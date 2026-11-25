@@ -155,7 +155,7 @@ const startTaskTool = setiTool({
       ...(args.include_brief ? { brief_of: ctx.caller.id } : {}),
     })
     const held = heldWait()
-    const task = await startAgent(input, await capOf(ctx.caller), held.hold)
+    const task = await startAgent(input, await capOf(ctx.caller), minutes > 0 ? held.hold : undefined)
     if (minutes === 0) {
       return { ...brief(task), setup: task.setup }
     }

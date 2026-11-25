@@ -24,7 +24,8 @@ async function firstTurnWait(notify: boolean, hold: ((wait: AgentWait) => void) 
   }
   const waiter = await requestWaiter()
   return async (taskId: string) => {
-    hold?.(await awaitTurnEnd(await requireTask(taskId), waiter))
+    const wait = await awaitTurnEnd(await requireTask(taskId), waiter)
+    hold?.(wait)
   }
 }
 
