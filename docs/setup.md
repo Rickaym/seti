@@ -550,11 +550,12 @@ edit and tool call asks you. A call to one of your tool servers runs without ask
 allow rule of yours names that server or tool. Turn Rules decide off in the Codex card under
 Settings, Runtimes to answer every call yourself; an upgrade keeps the choice you made. A Codex
 agent shows a summary of its reasoning where a Claude agent shows its thinking, which costs a few
-output tokens per model call. Codex agents have no side chat, rewind, Bypass or plugins. Their
-cost is an estimate from the price table in
-`server/src/runtimes/codex/prices.ts`, which names the day it was read; to update it, copy the
-standard rates from OpenAI's pricing page into that table, set `asOf` to the day, and run
-`pnpm check`.
+output tokens per model call. A Codex agent reads your `~/.claude/CLAUDE.md` as its global
+instructions, read-only, and a folder's `CLAUDE.md` when the folder has no `AGENTS.md`, as a
+Claude Code agent does. Codex agents have no side chat, rewind, Bypass or plugins. Their cost is
+an estimate from the price table in `server/src/runtimes/codex/prices.ts`, which names the day
+it was read; to update it, copy the standard rates from OpenAI's pricing page into that table,
+set `asOf` to the day, and run `pnpm check`.
 
 With both runtimes set up, any agent with Seti control can ask the other one for a second
 opinion with its `second_opinion` tool: a Claude agent asks Codex, a Codex agent asks Claude.
