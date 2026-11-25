@@ -6,6 +6,7 @@ import { answerQuestionsInput, CODEX_SETTINGS_DEFAULTS, DEFAULT_PROFILE_ID, type
 import { findBinary } from './binaries.js'
 import { copyState, installCodex } from './codex-install.js'
 import { CODEX_PIN } from './codex-pin.js'
+import { CLAUDE_HOME } from './config.js'
 import { sql, tasks } from './db.js'
 import { connectNode } from './node-split.js'
 import { answerPermission } from './permission-rules.js'
@@ -123,6 +124,24 @@ async function startNode(model: TestModelHost, notes: string): Promise<ChildProc
   return child
 }
 
+/** The user's own instructions and one skill, which Codex agents get read-only. */
+export const USER_FILES = { instructions: 'PROOF_USER_RULES', skill: 'PROOF_SKILL_BODY' }
+
+/** The second turn: the agent reads the user's skill from its read-only copy in the home. */
+const SKILL_TURN: Step[] = [
+  { call: { tool: 'sh', args: { cmd: 'cat ~/.agents/skills/proof/SKILL.md' } } },
+  { say: 'read' },
+]
+
+function writeUserFiles(): void {
+  fs.mkdirSync(CLAUDE_HOME, { recursive: true })
+  fs.writeFileSync(path.join(CLAUDE_HOME, 'CLAUDE.md'), `${USER_FILES.instructions}\n`)
+  const skill = path.join(CLAUDE_HOME, 'skills', 'proof')
+  fs.mkdirSync(skill, { recursive: true })
+  const head = '---\nname: proof\ndescription: PROOF_SKILL_LISTED\n---\n'
+  fs.writeFileSync(path.join(skill, 'SKILL.md'), `${head}${USER_FILES.skill}\n`)
+}
+
 /** Installs the pinned Codex into Seti's own folder from a registry here, as turning it on does. */
 async function installFrom(scratch: string, binary: string): Promise<string> {
   const registry = await new FakeRegistry().start()
@@ -152,6 +171,7 @@ export async function proofRun(scratch: string, binary: string, split: boolean) 
     routeEgressForTests(local)
   }
   await codexSettings.set({ ...CODEX_SETTINGS_DEFAULTS, enabled: true, evaluator_decides: false })
+  writeUserFiles()
   const program = await installFrom(scratch, binary)
   const key = `proof-${randomUUID()}`
   await keyConnection('proof_openai', key, {
@@ -178,7 +198,7 @@ export async function proofRun(scratch: string, binary: string, split: boolean) 
       return task
     },
     firstTurn: async (task: Task) => {
-      model.play([firstTurn(task, program), [{ hold: true }], [{ recall: true }]])
+      model.play([firstTurn(task, program), SKILL_TURN, [{ hold: true }], [{ recall: true }]])
       await runTurn(task.id, 'go')
       await untilIdle(task, model)
     },
@@ -199,6 +219,11 @@ export async function proofRun(scratch: string, binary: string, split: boolean) 
       const question = 'Is taking the cache lock before the queue lock safe?'
       model.play([[{ call: { tool: 'seti.second_opinion', args: { question } } }, { say: 'thanks' }]])
       await runTurn(task.id, 'ask')
+      await untilIdle(task, model)
+    },
+    /** A turn that reads the user's skill from its read-only copy in the sandbox's home. */
+    skillTurn: async (task: Task) => {
+      await runTurn(task.id, 'use the proof skill')
       await untilIdle(task, model)
     },
     interruptedTurn: async (task: Task) => {

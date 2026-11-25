@@ -97,6 +97,9 @@ function draftRefusal(
   if (modSlash?.kind === 'off') {
     return `${modSlash.mod.name} is off`
   }
+  if (modSlash?.kind === 'lacks') {
+    return modSlash.reason
+  }
   if (modSlash !== null) {
     return rest[1].items.length > 0 ? COMMAND_FILES : waiting
   }

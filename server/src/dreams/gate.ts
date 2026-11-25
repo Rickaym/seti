@@ -65,7 +65,7 @@ function shellAnswer(call: ToolCall, places: DreamPlaces): GateAnswer {
   if (command !== '' && (readOnly(command, context) || gitRead(command, places))) {
     return null
   }
-  return 'A dream runs only commands that read: ls, cat, head, tail, wc, stat, du, diff, grep, find without actions, and git status, log, diff, show, branch, worktree list and stash list. Read files with Read, Glob and Grep, and write memory with Write or Edit.'
+  return 'A dream runs only commands that read, one at a time on named paths, without globs, redirections or chains: ls, cat, head, tail, wc, stat, du, diff, grep, find without actions, and git status, log, diff, show, branch, worktree list and stash list. List and read files with Glob, Grep and Read, and write memory with Write or Edit.'
 }
 
 /** Bytes and files the memory folder holds now, as the host sees it. */
@@ -176,4 +176,21 @@ export function dreamGate(call: ToolCall, places: DreamPlaces, hostMemory: strin
   return decide === undefined
     ? `A dream cannot use ${call.name}: it reads, writes its memory folder and reports, and nothing else.`
     : decide(call, places, hostMemory)
+}
+
+/** The kinds of call a dream's gate refuses, by the start of the refusal it gives. */
+const DENIAL_KINDS: [string, string][] = [
+  ['A dream runs only commands that read', 'shell'],
+  ['A dream writes only its memory folder', 'write_outside'],
+  ['A dream does not write hidden', 'hidden'],
+  ['That text holds a credential', 'credential'],
+  ['That file is not text', 'not_text'],
+  ['The memory folder would pass its limit', 'memory_limit'],
+  ['A dream does not delete or move', 'delete_or_move'],
+  ['That edit names no file', 'no_file'],
+]
+
+/** The kind of a refusal the gate gave, for counting without the call's arguments. */
+export function denialKind(refusal: string): string {
+  return DENIAL_KINDS.find(([start]) => refusal.startsWith(start))?.[1] ?? 'tool'
 }

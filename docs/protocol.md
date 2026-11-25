@@ -203,6 +203,10 @@ between two steps; an interrupt; a hook at subagent start.
   room's own instructions: in the conversation as project instructions, never in the system or
   developer instructions. A runtime folder the agent can write MUST NOT carry instructions into a
   later session.
+- KIT-2: The user's own skills reach an agent read-only on every runtime that takes them. A
+  runtime that would offer skills from a folder the agent can write (its home, its runtime's
+  folder or its working folder) MUST NOT offer them; the control room lists the user's skills in
+  its own instructions instead, and the runtime's own skills folder starts empty in each process.
 
 ## 4. Turn lifecycle
 
@@ -478,6 +482,15 @@ interrupted only for that.
 - EGR-12: Tool servers an agent leaves out MUST be denied to its runtime and get no proxy sign-in.
 - EGR-13: A maintenance session's proxy allows the model provider alone, with the agent's model
   login: no connection, allowlist, claude.ai connector, cloud or SSH, and no placeholder is issued.
+- EGR-16: A host the proxy refuses as off the allowlist answers 403 with a body that tells the
+  agent retrying will not help and to ask with `request_change` (`allow_host`) or tell the user.
+  The first refusal of each host for an agent MUST add one quiet transcript line naming it,
+  audited once; later refusals raise the count that line shows and add nothing else, in a separate
+  node as in one process. Only a single host name or address the user could allow gets a line,
+  never a wildcard or any other text, at most 20 hosts per agent, and nothing of the request but
+  the host is recorded. The line's Allow host files the host request and answers it with the
+  user's own Allow (for the agent, or every agent), refused to the EA and agents (403) and to a
+  host the agent was not refused (404). A refusal alone never puts the agent in Needs you.
 
 ### 7.4 Permission rules and requests
 
@@ -1003,7 +1016,8 @@ Optional and off by default: a maintenance session per agent that consolidates i
 - DRM-4: A dream starts only while the agent is unarchived and sandboxed, its runtime declares
   dreams, it runs no turn or background work, holds no open question, permission or change
   request, has no dream running, and the runtime's own consolidation did not run in the last hour;
-  otherwise it is refused with the reason. A nightly dream refused for work or an open request is
+  otherwise it is refused with the reason, which counts the background commands and other
+  background tasks an agent with no turn still runs. A nightly dream refused for work or an open request is
   tried again every `dream_retry` until the window ends, then skipped with its last reason. None
   starts after the end; one running at the end is stopped.
 - DRM-5: Nightly starts are at most the setting at once and `dream_gap` apart, and wait while plan
@@ -1016,7 +1030,9 @@ Optional and off by default: a maintenance session per agent that consolidates i
   only in its memory folder and the night's dream folder of its workspace. It reads a digest of
   the agent's transcript since its last dream, built from neutral events, at most
   `dream_digest` characters, with credentials redacted and the user's messages and failures kept
-  first.
+  first. Its prompt names the other memory folders the agent's sessions see (its checkouts'),
+  which it reads before it writes and may not change. When it changed memory that the agent's
+  sessions do not load, because they load their repository's, its report says so in one line.
 - DRM-7: A dream MUST NOT start or change a turn of the agent, post, send an update, push or
   notify, or enter Needs you. Its outcome is one stored report, also written beside the digest,
   and the agent's next turn is told once which dreams changed its memory.
@@ -1100,6 +1116,11 @@ Optional and off by default: a maintenance session per agent that consolidates i
 - CFG-4: The control room MUST serve every setting's default in the shape of the document, and
   MUST show which settings differ from their default; the document filtered to those differences
   is a merge patch that turns the defaults into the document.
+- CFG-5: A write of the document MUST be a JSON merge patch that applies whole or not at all: it
+  names each invalid path, is refused whole when it names a security setting or a secret, refuses
+  a path whose value changed since the client read it, needs each change with a consequence
+  confirmed, records the audit events the settings pages record and one revision that undoes it,
+  and MUST be refused for the EA, agents, mods and devices.
 
 ## 17. Mods
 
@@ -1131,6 +1152,11 @@ Optional and off by default: a maintenance session per agent that consolidates i
 - MOD-23: Third-party mods MAY contribute settings, commands, slash commands, webhook senders,
   views, file viewers, status items, notification kinds, context text, themes, audit kinds,
   schedules and agent events (type, agent id and time only); all else is bundled only.
+- MOD-25: A mod's command that takes an agent, and its view beside or over one agent, MAY name
+  runtime capabilities it needs (RT-13). On an agent whose runtime's adapter does not declare one,
+  the control room MUST NOT offer the command or show the view there, its slash command says it is
+  not on that runtime, and the server refuses the command for that agent (409) to the user, the EA
+  and agents alike.
 
 ## 18. Public surfaces
 

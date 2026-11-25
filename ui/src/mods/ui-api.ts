@@ -142,9 +142,9 @@ export function uiApi(manifest: ModManifest, { track, ownPage, switches }: UiApi
       return track(sectionRegistry.register({ key, label: title, icon, group: 'Mods', digit: null, view: View }))
     },
     registerDock: ({ id: dock, icon, view, onClose }) => {
-      const { title, description } = declared(placed('agentDock'), dock, manifest)
+      const { title, description, needs } = declared(placed('agentDock'), dock, manifest)
       const key = modScoped(id, dock)
-      const entry = { key, title, description: description ?? null, icon, view, onClose: onClose ?? null }
+      const entry = { key, title, description: description ?? null, icon, view, onClose: onClose ?? null, needs }
       return track(agentDocks.register(entry))
     },
     registerView: ({ id: view, view: View }) => {

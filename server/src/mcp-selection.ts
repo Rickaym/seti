@@ -16,6 +16,7 @@ import { tasks } from './db.js'
 import { refuseAgent } from './ea-guard.js'
 import { isBorrowed, localServers, ownProjects, readHostConfig, tilde } from './mcp-borrowed.js'
 import { mcpGone } from './mcp-presence.js'
+import { DIRECT, type SettingsWrite } from './settings-write.js'
 import { mcpDefaults, taskMcpChoices } from './store/mcp.js'
 import { signalWorkspaces } from './workspace/dir.js'
 
@@ -143,23 +144,31 @@ export const connectorIds = (names: readonly string[], servers: readonly McpServ
     server.connector_id !== null && names.includes(server.name) ? [server.connector_id] : [],
   )
 
-export async function setMcpDefault(name: string, enabled: boolean): Promise<McpSelectionEntry[]> {
+export async function setMcpDefault(
+  name: string,
+  enabled: boolean,
+  write: SettingsWrite = DIRECT,
+): Promise<McpSelectionEntry[]> {
   refuseAgent('change which MCP servers agents get by default')
   const fallback = !localScope(null).borrowed(name)
   const before = (await mcpDefaults.all())[name] ?? fallback
-  await mcpDefaults.set(name, enabled, fallback)
+  await mcpDefaults.set(name, enabled, fallback, write.db)
   if (before !== enabled) {
-    await audit.record({
-      actor: 'user',
-      kind: 'mcp.default_changed',
-      subject_type: 'mcp_server',
-      subject_id: name,
-      summary: `Turned MCP server ${name} ${enabled ? 'on' : 'off'} by default for agents without their own choice`,
-      detail: { server: name, enabled },
-    })
-    signalWorkspaces('task')
+    await write.after(async () => mcpDefaultSaved(name, enabled))
   }
   return mcpCatalog()
+}
+
+async function mcpDefaultSaved(name: string, enabled: boolean): Promise<void> {
+  await audit.record({
+    actor: 'user',
+    kind: 'mcp.default_changed',
+    subject_type: 'mcp_server',
+    subject_id: name,
+    summary: `Turned MCP server ${name} ${enabled ? 'on' : 'off'} by default for agents without their own choice`,
+    detail: { server: name, enabled },
+  })
+  signalWorkspaces('task')
 }
 
 const choiceList = (choices: McpChoices) => {

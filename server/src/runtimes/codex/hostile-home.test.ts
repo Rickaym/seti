@@ -6,6 +6,7 @@ import type { RuntimeEvent, ToolCall } from '@seti/shared'
 import { afterAll, describe, expect, it } from 'vitest'
 import type { Launcher } from '../../launcher.js'
 import type { SessionSpec } from '../../session-spec.js'
+import type { UserSkill } from '../../user-skills.js'
 import type { SessionInput } from '../adapter.js'
 import { RealProcess } from '../conformance/real-process.js'
 import { Channel, isTurnEnd, Run } from '../conformance/run.js'
@@ -58,7 +59,12 @@ const launcherIn = (home: string): Launcher => ({
 })
 
 /** One turn of a real Codex session in the folders, allowing every call and noting each ask. */
-async function turn(where: { home: string; work: string }, steps: Step[], resume: string | null = null) {
+async function turn(
+  where: { home: string; work: string },
+  steps: Step[],
+  resume: string | null = null,
+  skills: UserSkill[] = [],
+) {
   if (model === null) {
     throw new Error('no binary')
   }
@@ -77,7 +83,7 @@ async function turn(where: { home: string; work: string }, steps: Step[], resume
     resume,
     toolServers,
     instructions: { append: HOUSE_RULES },
-    vendor: { binary, model: null, effort: null },
+    vendor: { binary, model: null, effort: null, skills },
   } as unknown as SessionSpec<'codex'>
   const realised = await adapter.realise(
     spec,
@@ -169,7 +175,7 @@ describe.skipIf(model === null)('Codex with files the agent planted in its home'
   })
 })
 
-describe.skipIf(model === null)('Codex with instruction files', () => {
+describe.skipIf(model === null)("Codex with the user's files", () => {
   it("reads the user's and the folder's CLAUDE.md as instructions below Seti's own", async () => {
     const where = planted('instructions', { '.codex/AGENTS.md': 'USER_FILE_RULES' })
     writeFileSync(path.join(where.work, 'CLAUDE.md'), 'REPO_FILE_RULES')
@@ -181,5 +187,25 @@ describe.skipIf(model === null)('Codex with instruction files', () => {
     expect(developer.join('\n')).not.toContain('FILE_RULES')
     const files = user.find((message) => message.includes('# AGENTS.md instructions for'))
     expect(files).toMatch(/<INSTRUCTIONS>\nUSER_FILE_RULES\n[\s\S]*REPO_FILE_RULES\n<\/INSTRUCTIONS>/)
+  })
+
+  it("lists the user's skills in Seti's instructions and never a skill planted where Codex looks", async () => {
+    const where = planted('skills', {
+      '.codex/skills/planted/SKILL.md': SKILL,
+      '.agents/skills/planted/SKILL.md': SKILL,
+    })
+    for (const repoFolder of ['.agents/skills/repo', '.codex/skills/repo']) {
+      mkdirSync(path.join(where.work, repoFolder), { recursive: true })
+      writeFileSync(path.join(where.work, repoFolder, 'SKILL.md'), SKILL)
+    }
+    const mine = [{ name: 'pdf', description: 'USER_SKILL_PDF', folder: 'pdf' }]
+    await turn(where, [{ say: 'done' }], null, mine)
+    const body = model?.bodies.at(-1) ?? ''
+    const input = (JSON.parse(body) as { input?: Message[] }).input ?? []
+    const developer = input.filter((item) => item.role === 'developer').map(text)
+    expect(developer.join('\n')).toContain(
+      `- pdf: USER_SKILL_PDF (file: ${path.join(where.home, '.agents', 'skills', 'pdf', 'SKILL.md')})`,
+    )
+    expect(body).not.toContain('PLANTED_SKILL')
   })
 })

@@ -10,11 +10,17 @@ import {
 } from '@seti/shared'
 import { useSyncExternalStore } from 'react'
 import { useMods } from '@/hooks/useMods'
+import { agentLacks, useAgentLacks, type AgentLacks } from './agent-needs'
 import { offBundled, uiCommands } from './commands'
 
-/** A composer line that is a mod's slash command: one to run, or one whose mod is off. */
+/**
+ * A composer line that is a mod's slash command: one to run, one whose mod is off, or one the
+ * agent's runtime lacks what it needs for, with the line that says so.
+ */
 export type ModSlash =
-  { kind: 'run'; mod: ModInfo; command: ModCommand; args: Record<string, unknown> } | { kind: 'off'; mod: ModInfo }
+  | { kind: 'run'; mod: ModInfo; command: ModCommand; args: Record<string, unknown> }
+  | { kind: 'off'; mod: ModInfo }
+  | { kind: 'lacks'; reason: string }
 
 function argsOf(command: ModCommand, text: string, agent: string): Record<string, unknown> {
   const args: Record<string, unknown> = MOD_TASK_ARG in command.args ? { [MOD_TASK_ARG]: agent } : {}
@@ -22,11 +28,31 @@ function argsOf(command: ModCommand, text: string, agent: string): Record<string
   return textArg === null || text === '' ? args : { ...args, [textArg]: text }
 }
 
+interface SlashLine {
+  name: string
+  text: string
+  agent: string
+  lacks: AgentLacks
+}
+
+/** The command to run on the agent, unless its runtime lacks what the command needs. */
+function toRun(mod: ModInfo, command: ModCommand, { name, text, agent, lacks }: SlashLine): ModSlash {
+  const runtime = lacks(agent, command.needs)
+  return runtime === null
+    ? { kind: 'run', mod, command, args: argsOf(command, text, agent) }
+    : { kind: 'lacks', reason: `/${name} is not on ${runtime}` }
+}
+
 /**
  * The mod slash command the line is, resolved against the mods Seti lists; null for anything
  * else, which goes on as before. A running mod's command without one to run is left to Seti.
  */
-export function resolveModSlash(text: string, list: ModList | undefined, agent: string): ModSlash | null {
+export function resolveModSlash(
+  text: string,
+  list: ModList | undefined,
+  agent: string,
+  lacks: AgentLacks = agentLacks,
+): ModSlash | null {
   const input = parseComposer(text)
   if (input.mode !== 'slash' || input.name === '') {
     return null
@@ -42,7 +68,7 @@ export function resolveModSlash(text: string, list: ModList | undefined, agent: 
       return { kind: 'off', mod }
     }
     const command = contributes?.commands.find((entry) => entry.id === slash.command)
-    return command === undefined ? null : { kind: 'run', mod, command, args: argsOf(command, input.args, agent) }
+    return command === undefined ? null : toRun(mod, command, { name, text: input.args, agent, lacks })
   }
   return null
 }
@@ -60,7 +86,7 @@ export interface ModSlashUi {
 
 /** The mod slash command a reply box line is, with what its mod's UI half says about it now. */
 export function useModSlash(text: string, agent: string): { slash: ModSlash | null; ui: ModSlashUi } {
-  const slash = resolveModSlash(text, useMods().data, agent)
+  const slash = resolveModSlash(text, useMods().data, agent, useAgentLacks())
   const entries = useSyncExternalStore(uiCommands.subscribe, uiCommands.list)
   const key = slash?.kind === 'run' ? modScoped(slash.mod.id, slash.command.id) : null
   const entry = entries.find((candidate) => candidate.key === key)

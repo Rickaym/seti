@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.2.0
+
+Ask aside, /btw and the side chat dock show only on agents whose runtime can fork its conversation
+for a side chat, and Seti refuses Ask aside for any other agent. Needs mod API 1.24.
+
 ## 1.1.0
 
 Answers stay as asides. Seti stores each answered question with who asked it, and the mod draws it

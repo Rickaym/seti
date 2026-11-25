@@ -16,6 +16,7 @@ import { refuseAgent } from './ea-guard.js'
 import { HttpError } from './http.js'
 import { scopeHost } from './memory-scope.js'
 import { capCpuScopes } from './scope-control.js'
+import { DIRECT, type SettingsWrite } from './settings-write.js'
 import { cpuSettings, taskCpuCaps } from './store/cpu.js'
 
 /** Every core of this host in percent of one, nproc x 100: the highest cap there is. */
@@ -58,11 +59,20 @@ function checkFits(cap: CpuCap): void {
 }
 
 /** Saves the default cap and applies it at once to running agents without a cap of their own. */
-export async function updateCpuCap(cap: CpuCap, actor: AuditActor = 'user'): Promise<CpuCapSettings> {
+export async function updateCpuCap(
+  cap: CpuCap,
+  actor: AuditActor = 'user',
+  write: SettingsWrite = DIRECT,
+): Promise<CpuCapSettings> {
   refuseAgent('change the CPU cap of agents')
   checkFits(cap)
   const before = await defaultCap()
-  await cpuSettings.set(cap)
+  await cpuSettings.set(cap, write.db)
+  await write.after(async () => cpuCapSaved(cap, before, actor))
+  return cpuCapSettings()
+}
+
+async function cpuCapSaved(cap: CpuCap, before: CpuCap, actor: AuditActor): Promise<void> {
   await audit.record({
     actor,
     kind: 'system.cpu_cap_changed',
@@ -72,7 +82,6 @@ export async function updateCpuCap(cap: CpuCap, actor: AuditActor = 'user'): Pro
     detail: { ...cap, was_quota_percent: before.quota_percent },
   })
   await capCpuScopes(async (taskId) => ((await taskCpuCaps.get(taskId)) === null ? cap : null))
-  return cpuCapSettings()
 }
 
 export async function taskCpuCap(taskId: string): Promise<TaskCpuCap> {
