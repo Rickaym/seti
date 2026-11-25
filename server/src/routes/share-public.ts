@@ -1,13 +1,14 @@
+import { canRender } from '@seti/shared'
 import type { Context, Handler } from 'hono'
 import { currentPublicHost } from '../access.js'
 import { parseRange, type ByteRange } from '../byte-range.js'
 import type { PublicAccess } from '../config.js'
 import { now } from '../db.js'
 import { clientKey, rateLimiter } from '../rate-limit.js'
-import { isFrameLoad, LIVE_MARK, liveDocument } from '../share-live.js'
-import { liveSharePage, sharePage, sizeLabel, type LinkPreview } from '../share-page.js'
+import { renderedSharePage, sharePage, sizeLabel, type LinkPreview } from '../share-page.js'
 import { MEDIA_MARK, parseSharePath, shareOrigin, type ShareRequest } from '../share-path.js'
 import { fillImages } from '../share-preview/preview.js'
+import { frameDocument, isFrameLoad, RENDER_MARK } from '../share-render.js'
 import { unfurlerOf } from '../share-unfurlers.js'
 import { sharingEnabled, tokenHash } from '../shares.js'
 import { publicShares, type PublicPage, type PublicShareRow, type ShareImageRow } from '../store/shares.js'
@@ -144,7 +145,7 @@ function pageUrl(c: Context, target: ShareRequest, access: PublicAccess | null):
   return origin === null ? null : `${origin}/share/${target.token}`
 }
 
-/** A live share's shell: the bar and a frame for the page; the frame's load is not a view. */
+/** A rendered share's shell: the bar and a frame for the page; the frame's load is not a view. */
 async function serveShell(c: Context, share: PublicShareRow, target: ShareRequest, access: PublicAccess | null) {
   const stored = await publicShares.head(share.id)
   if (stored === undefined) {
@@ -157,12 +158,12 @@ async function serveShell(c: Context, share: PublicShareRow, target: ShareReques
   const link = linkPreview(share, stored, pageUrl(c, target, access))
   const page = { name: share.name, size: stored.size, updatedAt: share.updated_at, link }
   return c.html(
-    liveSharePage({ ...page, rawHref: `${base}/raw`, staticHref: `${base}/static`, liveHref: `${base}/live` }),
+    renderedSharePage({ ...page, rawHref: `${base}/raw`, codeHref: `${base}/code`, frameHref: `${base}/frame` }),
   )
 }
 
 /** The stored HTML itself, to a frame only; a tab gets the same 404 as an unknown link. */
-async function serveLive(c: Context, share: PublicShareRow): Promise<Response | null> {
+async function serveFrame(c: Context, share: PublicShareRow): Promise<Response | null> {
   if (!isFrameLoad(c.req.header('sec-fetch-dest'))) {
     return null
   }
@@ -171,18 +172,21 @@ async function serveLive(c: Context, share: PublicShareRow): Promise<Response | 
     return c.body(null, 200, headers)
   }
   const content = await publicShares.content(share.id)
-  return content === undefined ? null : c.body(new Uint8Array(liveDocument(content)), 200, headers)
+  return content === undefined ? null : c.body(new Uint8Array(frameDocument(content)), 200, headers)
 }
 
-/** Marks a live share's shell and frame, so the headers step isolates them. */
-function liveMarked(response: Response | null): Response | null {
-  response?.headers.set(LIVE_MARK, '1')
+/** Marks a rendered share's shell and frame, so the headers step isolates them. */
+function renderMarked(response: Response | null): Response | null {
+  response?.headers.set(RENDER_MARK, '1')
   return response
 }
 
-/** The link's page: the shell of a live share, else the stored script-free page. */
+/** Only an HTML file renders, whatever its row says; every other share keeps its stored page. */
+const renders = (share: PublicShareRow) => share.render && canRender(share.name)
+
+/** The link's page: the shell of a rendered share, else the stored script-free page. */
 async function servePageOrShell(c: Context, share: PublicShareRow, target: ShareRequest, access: PublicAccess | null) {
-  return share.live ? liveMarked(await serveShell(c, share, target, access)) : servePage(c, share, target, access)
+  return renders(share) ? renderMarked(await serveShell(c, share, target, access)) : servePage(c, share, target, access)
 }
 
 /** A stored preview image or the link card; the policy lets the page and link bots fetch them. */
@@ -221,10 +225,10 @@ async function serve(c: Context, share: PublicShareRow, target: ShareRequest, ac
       return marked(await serveRaw(c, share), share)
     case 'page':
       return marked(await servePageOrShell(c, share, target, access), share)
-    case 'static':
-      return share.live ? servePage(c, share, target, access) : null
-    case 'live':
-      return share.live ? liveMarked(await serveLive(c, share)) : null
+    case 'code':
+      return renders(share) ? servePage(c, share, target, access) : null
+    case 'frame':
+      return renders(share) ? renderMarked(await serveFrame(c, share)) : null
     case 'image':
     case 'card':
       return serveImage(c, share, target)

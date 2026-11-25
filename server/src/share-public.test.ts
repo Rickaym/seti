@@ -387,12 +387,12 @@ describe('share responses', () => {
     expect(html).toContain(`href="/share/${tokenOf('notes.md')}/raw"`)
   })
 
-  it('show HTML as highlighted source, SVG as a picture with its source, and download both as text', async () => {
-    for (const [file, source] of [
-      ['page.html', PAGE],
-      ['logo.svg', SVG],
+  it('show HTML as highlighted source in its code view, SVG as a picture with its source, and download both as text', async () => {
+    for (const [file, source, view] of [
+      ['page.html', PAGE, '/code'],
+      ['logo.svg', SVG, ''],
     ] as const) {
-      const page = await (await publicGet(`/share/${tokenOf(file)}`)).text()
+      const page = await (await publicGet(`/share/${tokenOf(file)}${view}`)).text()
       expect(page).not.toContain('<script')
       expect(page).not.toContain('<svg')
       expect(page).toMatch(/&lt;(<span class="tok-keyword">)?script/)

@@ -21,7 +21,8 @@ checklist.
 - Every other platform action gets an EA tool in the same PR, because the EA is the hands-free way
   to run Seti. The EA has a 128-tool cap, so extend an existing tool before adding one.
 - Public surfaces stay minimal, because they face the internet without a login: exact anchored
-  paths, handlers that read only the database, rate limits, and served pages with no script.
+  paths, handlers that read only the database, rate limits, and pages of Seti's own with no script
+  (a shared HTML file's own scripts run only inside its isolated frame).
 - Secrets never land in logs, transcripts, audit details or chat, because those get read, copied
   and shared. Record that a secret changed, never its value.
 - Every change is audited, because the audit log is a verified hash chain the user relies on to
