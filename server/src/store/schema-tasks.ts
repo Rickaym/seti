@@ -212,3 +212,16 @@ export const TASK_DELEGATED_BY = `
 ALTER TABLE task ADD COLUMN delegated_by TEXT REFERENCES task(id) ON DELETE SET NULL;
 CREATE INDEX task_delegated_by ON task (delegated_by) WHERE delegated_by IS NOT NULL;
 `
+
+/** The session each agent last had on each runtime, which a move back to that runtime resumes. */
+export const TASK_SESSION = `
+CREATE TABLE task_session (
+  task_id TEXT NOT NULL REFERENCES task(id) ON DELETE CASCADE,
+  runtime TEXT NOT NULL,
+  session_id TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY (task_id, runtime)
+);
+INSERT INTO task_session (task_id, runtime, session_id, updated_at)
+  SELECT id, runtime, session_id, updated_at FROM task WHERE session_id IS NOT NULL;
+`

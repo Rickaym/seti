@@ -178,6 +178,7 @@ const TASK_VERBS = {
   'task.process_stopped': 'Stopped a process of',
   'task.session_ended': 'Stopped all background work of',
   'task.session_restarted': 'Restarted the session of',
+  'task.runtime_changed': 'Changed the runtime of',
   'task.deleted': 'Deleted',
 } as const satisfies Partial<Record<AuditKind, string>>
 
