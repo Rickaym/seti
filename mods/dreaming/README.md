@@ -7,3 +7,5 @@ then each agent that dreamt with what it tidied and remembered, then the agents 
 Dreaming itself is off until you turn it on in Settings, Lifecycle. The Dreams entry joins the
 sidebar once Dreaming is on or an agent has dreamt, so an unused Dreaming takes no slot. Allowing a clean-up is yours
 alone: open the agent from the view and allow or deny it under its last dream.
+
+What a dream is told, why, and how to tune it: [docs/dreaming.md](../../docs/dreaming.md).

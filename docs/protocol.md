@@ -189,12 +189,14 @@ between two steps; an interrupt; a hook at subagent start.
   removed, as is every copy once the runtime is off or runs a program of the user's. Nothing
   outside the control room's own folders is removed.
 - RT-13: A runtime declares whether it loads the user's MCP servers and connectors, Seti's
-  plugins and a compaction rule, whether it can run outside the sandbox, fork a side chat, dream,
-  rewind and run background subagents of its own; `GET /api/runtimes/capabilities` serves each runtime's declaration. For an agent
-  whose runtime lacks one, its settings show the control as not on that runtime instead of a
-  working control, counts leave those items out, its `task.md` and system prompt do not offer
-  them, and the server refuses the change with the reason. An agent whose runtime has no
-  subagents is pointed to helper agents instead, in the Seti guide and the Lead role.
+  plugins and a compaction rule, and which parts of that rule it does not honour, whether it can
+  run outside the sandbox, fork a side chat, dream, rewind and run background subagents of its
+  own; `GET /api/runtimes/capabilities` serves each runtime's declaration. For an agent whose
+  runtime lacks one, its settings show the control as not on that runtime instead of a working
+  control, counts leave those items out, its `task.md` and system prompt do not offer them, and
+  the server refuses the change with the reason. A control the runtime honours in part says which
+  part it does not. An agent whose runtime has no subagents is pointed to helper agents instead,
+  in the Seti guide and the Lead role.
 - RT-14: A runtime whose model can summarise its reasoning MUST ask for the summary, so its agents
   show their thinking as the default runtime's do. Reasoning the model seals for its own next call
   MUST NOT be stored, served or shown by the control room.

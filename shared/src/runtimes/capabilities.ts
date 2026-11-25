@@ -2,6 +2,9 @@ import { z } from 'zod'
 import type { McpTransport } from '../capabilities.js'
 import type { StoredRuntime } from './stored.js'
 
+/** A part of a compaction rule a runtime may not honour: turning it off, or a window alone. */
+export type CompactPart = 'off' | 'window'
+
 /**
  * What an agent's runtime can do where Seti would otherwise assume Claude Code, as its adapter
  * declares it. Each field is true for Claude Code; a control whose field is false is not offered.
@@ -19,6 +22,8 @@ export interface AgentCapabilities {
   unsandboxed: boolean
   /** It takes a compaction rule. */
   compaction: boolean
+  /** What of the rule it does not honour: turning compaction off, a window without Compact at. */
+  compaction_ignores: CompactPart[]
   /** A side chat can fork its session. */
   side_chat: boolean
   /** It keeps memory a dream can tidy. */
