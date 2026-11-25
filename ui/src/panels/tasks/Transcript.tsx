@@ -205,7 +205,7 @@ function PlainRow({ props, row }: { props: RowProps; row: Exclude<WireRow, Runti
     case 'notice':
       return <NoticeEntry notice={row.payload} />
     case 'seti':
-      return <SetiNote payload={row.payload} />
+      return <SetiNote taskId={props.taskId} payload={row.payload} />
     case 'shell':
       return <ShellEntry taskId={props.taskId} row={row} result={row.payload} delivery={props.shell} />
     case 'unreadable':

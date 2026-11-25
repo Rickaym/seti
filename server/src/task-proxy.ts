@@ -7,6 +7,7 @@ import { connectionPlaceholders, connectionRules, mcpLoginRules, type Connection
 import { modelOnly } from './egress-hosts.js'
 import type { EgressPlaceholder } from './egress-placeholders.js'
 import { startEgressProxy, type EgressProxy, type Upstream } from './egress-proxy.js'
+import { refusalReporter } from './egress-refusals.js'
 import { ruleCaHosts, type EgressRule } from './egress-rules.js'
 import { nodeLink } from './node-link.js'
 import { sandboxDirOf } from './owned-dirs.js'
@@ -98,7 +99,9 @@ async function taskProxy(taskId: string, authority: SandboxCa): Promise<EgressPr
   if (existing !== undefined) {
     return existing
   }
-  const refused = new Set<string>()
+  const reportRefused = refusalReporter((host, count) => {
+    void nodeLink.journal(taskId, { type: 'egress.refused', host, count }).catch(() => undefined)
+  })
   const started = startEgressProxy({
     socketPath: path.join(sandboxDirOf(taskId), 'run', 'proxy.sock'),
     allowed: async () => (await askInTime(taskId, 'sandbox.hosts', {})).hosts,
@@ -123,10 +126,7 @@ async function taskProxy(taskId: string, authority: SandboxCa): Promise<EgressPr
     ...(testEgress === null ? {} : { upstream: testEgress.upstream }),
     onRefused: (host) => {
       testEgress?.refused(host)
-      if (!refused.has(host)) {
-        refused.add(host)
-        process.stderr.write(`sandbox: task ${taskId} was refused ${host}\n`)
-      }
+      reportRefused(host)
     },
   })
   proxies.set(taskId, started)
