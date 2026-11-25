@@ -118,11 +118,11 @@ const matches = (item: AccessItem, query: string) => `${item.name} ${item.detail
 
 const onOff = (on: boolean) => (on ? 'on' : 'off')
 
-function sourceHint(item: AccessItem): string {
+function sourceHint(item: AccessItem, owner: string): string {
   if (item.override === null) {
     return `Inherited: ${onOff(item.default_enabled)} for every agent without its own choice.`
   }
-  return `This agent's own choice; agents inherit ${onOff(item.default_enabled)}.`
+  return `${owner}'s own choice; agents inherit ${onOff(item.default_enabled)}.`
 }
 
 /** An enabled host that cannot connect: it, or a jump host on its way, has no key yet. */
@@ -177,11 +177,13 @@ function Row({
   plain,
   columns,
   runtime,
+  owner,
   onChange,
   onSignIn,
 }: {
   item: AccessItem
   busy: boolean
+  owner: string
   locked: string | null
   profile: AccessProfile | null
   plain: boolean
@@ -218,7 +220,7 @@ function Row({
         <RowNotes item={item} profile={profile} />
         <McpSessionNote item={item} {...(onSignIn === undefined ? {} : { onSignIn })} />
       </div>
-      {!plain && <SourceMark custom={item.override !== null} hint={sourceHint(item)} />}
+      {!plain && <SourceMark custom={item.override !== null} hint={sourceHint(item, owner)} />}
       {!plain && item.override !== null && locked === null && (
         <Hint text={`Back to the default: ${onOff(item.default_enabled)}`}>
           <Button
@@ -309,6 +311,7 @@ export function AccessList({
   onSignIn,
   unavailable = {},
   runtime = null,
+  owner = 'This agent',
 }: {
   items: readonly AccessItem[]
   onChange: (item: AccessItem, enabled: boolean | null) => void
@@ -337,6 +340,8 @@ export function AccessList({
   unavailable?: Partial<Record<AccessKind, ReactNode>>
   /** The agent's runtime by name, for the items it cannot use. */
   runtime?: string | null
+  /** Whose choices the switches set, named in the marks' hints. */
+  owner?: string
 }) {
   const needle = query.trim().toLowerCase()
   const groups = GROUPS.filter((group) => kinds.includes(group.kind)).flatMap((group) => {
@@ -399,6 +404,7 @@ export function AccessList({
                     plain={plain}
                     columns={columns}
                     runtime={runtime}
+                    owner={owner}
                     onChange={onChange}
                     {...(onSignIn === undefined ? {} : { onSignIn })}
                   />

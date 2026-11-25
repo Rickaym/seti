@@ -15,6 +15,7 @@ import type { PublicAccess } from './config.js'
 import { tasks } from './db.js'
 import type { Db } from './pg.js'
 import { auditEvents } from './store/audit.js'
+import { credentialAccess } from './store/credential-access.js'
 import { EA_AUTH, USER_AUTH } from './test-auth.js'
 import { migrateWith } from './test-migration.js'
 
@@ -47,6 +48,12 @@ const app = createApp({ access: ACCESS, verify })
 const ORIGIN = ACCESS.origin
 const SUMMARY = `${ORIGIN}/api/widget/summary`
 const PUBLIC = { host: ACCESS.hostname }
+
+const CREDENTIAL_ACCESS_WRITES: readonly (readonly [string, unknown])[] = [
+  ['PUT /api/credentials/profiles/default/access', { kind: 'aws', id: 'aws', enabled: true }],
+  ['POST /api/credentials/profiles/default/hosts', { host: 'api.example.com' }],
+  ['DELETE /api/credentials/profiles/default/hosts/api.example.com', undefined],
+]
 const LOCAL = { host: '127.0.0.1:3006', origin: 'http://127.0.0.1:3006', ...USER_AUTH }
 
 type Headers = Record<string, string>
@@ -274,6 +281,16 @@ describe('device proofs', () => {
       { host: 'a.example.com' },
     )
     expect(allowed.status).toBe(403)
+  })
+
+  it("never writes a credential's access or an agent's, even with a valid proof", async () => {
+    const phone = await pair()
+    for (const [route, body] of CREDENTIAL_ACCESS_WRITES) {
+      const [method = 'POST', path = '/'] = route.split(' ')
+      const headers = await proof(phone, { htm: method, htu: `${ORIGIN}${path}` })
+      expect((await call(app, route, { ...PUBLIC, ...headers, origin: ORIGIN }, body)).status, route).toBe(403)
+    }
+    expect(await credentialAccess.all('default')).toEqual([])
   })
 
   it('does not fall back to Access or the local token when a proof fails', async () => {

@@ -46,6 +46,13 @@ export const credentialHosts = {
       await sql<{ host: string }[]>`SELECT host FROM credential_host WHERE profile_id = ${profileId}
         ORDER BY host`
     ).map((row) => row.host),
+  /** Adds or removes one host; true when that changed the list. */
+  set: async (profileId: string, host: string, on: boolean): Promise<boolean> =>
+    (on
+      ? await sql`INSERT INTO credential_host (profile_id, host, created_at) VALUES (${profileId}, ${host}, ${now()})
+          ON CONFLICT DO NOTHING`
+      : await sql`DELETE FROM credential_host WHERE profile_id = ${profileId} AND host = ${host}`
+    ).count > 0,
   forTask: async (taskId: string): Promise<string[]> =>
     (
       await sql<{ host: string }[]>`SELECT h.host FROM credential_host h JOIN task t ON t.profile_id = h.profile_id

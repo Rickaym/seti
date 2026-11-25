@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { useConfirm } from '@/components/ui/confirm-context'
 import { navigate } from '@/lib/route'
 import { SettingsBody } from '../layout'
+import { ProfileAccess } from './ProfileAccess'
 import { ProfileAgents } from './ProfileAgents'
 import { ProfileAws } from './ProfileAws'
 import { ProfileConnections } from './ProfileConnections'
@@ -119,6 +120,7 @@ export function ProfileDetail({
         />
         <ProfileConnections profile={profile} onChanged={reload} />
         <ProfileSshHosts profile={profile} onChanged={reload} />
+        <ProfileAccess profile={profile} onChanged={reload} />
         <ProfileAgents profile={profile} />
         <p className="flex items-center gap-1 text-xs text-muted-foreground">
           <Check className="size-3 shrink-0" />
