@@ -37,7 +37,7 @@ export const scriptedAdapter: RuntimeAdapter<ScriptedShapes, 'scripted'> = {
     rewind: { conversation: false, code: false },
     tools: { userServers: [], serverNames: null, plugins: false },
     sandbox: { optional: true },
-    compaction: false,
+    compaction: null,
     subagents: true,
     dream: null,
     oneShot: {

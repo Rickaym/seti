@@ -190,12 +190,14 @@ between two steps; an interrupt; a hook at subagent start.
   removed, as is every copy once the runtime is off or runs a program of the user's. Nothing
   outside the control room's own folders is removed.
 - RT-13: A runtime declares whether it loads the user's MCP servers and connectors, Seti's
-  plugins and a compaction rule, whether it can run outside the sandbox, fork a side chat, dream,
-  rewind and run background subagents of its own; `GET /api/runtimes/capabilities` serves each runtime's declaration. For an agent
-  whose runtime lacks one, its settings show the control as not on that runtime instead of a
-  working control, counts leave those items out, its `task.md` and system prompt do not offer
-  them, and the server refuses the change with the reason. An agent whose runtime has no
-  subagents is pointed to helper agents instead, in the Seti guide and the Lead role.
+  plugins and a compaction rule, and which parts of that rule it does not honour, whether it can
+  run outside the sandbox, fork a side chat, dream, rewind and run background subagents of its
+  own; `GET /api/runtimes/capabilities` serves each runtime's declaration. For an agent whose
+  runtime lacks one, its settings show the control as not on that runtime instead of a working
+  control, counts leave those items out, its `task.md` and system prompt do not offer them, and
+  the server refuses the change with the reason. A control the runtime honours in part says which
+  part it does not. An agent whose runtime has no subagents is pointed to helper agents instead,
+  in the Seti guide and the Lead role.
 - RT-14: A runtime whose model can summarise its reasoning MUST ask for the summary, so its agents
   show their thinking as the default runtime's do. Reasoning the model seals for its own next call
   MUST NOT be stored, served or shown by the control room.
@@ -1250,6 +1252,19 @@ Optional and off by default: a maintenance session per agent that consolidates i
   `noindex`, `no-referrer`, `nosniff` and `default-src 'none'`; downloads are never HTML or SVG. A
   file is shared only after path checks, a key and credential name deny list, `share_size` and a
   secret scan.
+  This holds for every share that is not live (PUB-10), and for a live share's static view.
+- PUB-10: A live share is the user's choice per link, off by default, for HTML files only; the EA
+  and agents cannot make one. Its link answers a page with no script around a frame
+  (`sandbox allow-scripts`) holding the stored copy, plus a static view at `/static`. The frame's
+  document is served only to a frame (`Sec-Fetch-Dest: iframe`; else the same 404) and is
+  sandboxed by its own policy too: an opaque origin with no cookies or storage (an in-memory stand-in
+  only), no network but scripts, styles and fonts from the `LIVE_SHARE_CDNS` prefixes, images only
+  from `data:` and `blob:`, no frames, workers, plugins, forms, popups, downloads or top
+  navigation, and `frame-ancestors 'self'`; the page's `frame-src` names only that frame, so it
+  cannot navigate elsewhere. Both carry PUB-7's headers, `Permissions-Policy` with every feature
+  off and `X-DNS-Prefetch-Control: off`. Known limit: browsers let a script reach the internet
+  through WebRTC, so a live page can send what it holds and what a visitor types to a host it
+  names; a live share promises isolation from Seti, not the absence of network.
 
 ## 19. Client contract
 
@@ -1320,7 +1335,7 @@ An implementation is SETI-compatible when it meets all of:
 | Assistant     | all EA; LVL-6                                                                          |
 | Separate node | all NODE                                                                               |
 | Mods          | all MOD                                                                                |
-| Sharing       | PUB-4, PUB-7                                                                           |
+| Sharing       | PUB-4, PUB-7, PUB-10                                                                   |
 | Devices       | API-11                                                                                 |
 | Storage       | RES-16 to RES-19                                                                       |
 

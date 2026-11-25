@@ -22,7 +22,7 @@ export const claudeAdapter: RuntimeAdapter<ClaudeShapes, 'claude'> = {
     rewind: { conversation: true, code: true },
     tools: { userServers: MCP_TRANSPORTS, serverNames: null, plugins: true },
     sandbox: { optional: true },
-    compaction: true,
+    compaction: { off: true, windowAlone: true },
     subagents: true,
     dream: {
       memory: claudeMemory,

@@ -1,12 +1,20 @@
+import { applyLiveHeaders, LIVE_MARK } from './share-live.js'
 import { IMAGES_MAX } from './share-preview/preview.js'
 
 /**
- * A share's page, its download, one of its stored preview images (1 to 50) or its link card:
- * the only paths anyone reaches without signing in.
+ * A share's page, its download, one of its stored preview images (1 to 50), its link card, or a
+ * live share's frame and static page: the only paths anyone reaches without signing in.
  */
-const SHARE_PATH = /^\/share\/([A-Za-z0-9_-]{43})(?:\/(raw|card\.png)|\/p\/([1-9]\d?))?$/
+const SHARE_PATH = /^\/share\/([A-Za-z0-9_-]{43})(?:\/(raw|card\.png|live|static)|\/p\/([1-9]\d?))?$/
 
-type SharePart = 'page' | 'raw' | 'image' | 'card'
+type SharePart = 'page' | 'raw' | 'image' | 'card' | 'live' | 'static'
+
+const NAMED_PARTS: Readonly<Record<string, SharePart>> = {
+  raw: 'raw',
+  'card.png': 'card',
+  live: 'live',
+  static: 'static',
+}
 
 export interface ShareRequest {
   token: string
@@ -19,10 +27,7 @@ function partOf(named: string | undefined, image: string | undefined): SharePart
   if (image !== undefined) {
     return 'image'
   }
-  if (named === undefined) {
-    return 'page'
-  }
-  return named === 'raw' ? 'raw' : 'card'
+  return named === undefined ? 'page' : (NAMED_PARTS[named] ?? 'page')
 }
 
 /** The token and part a path names, anchored on both ends, or null for any other path. */
@@ -69,7 +74,8 @@ export const MEDIA_MARK = 'X-Seti-Share-Media'
  * audio or video page may also play its own download, and nothing else.
  */
 function sharePolicy(request: ShareRequest | null, origin: string | null, media: boolean): string {
-  const own = request?.part === 'page' && origin !== null ? `${origin}/share/${request.token}` : null
+  const page = request?.part === 'page' || request?.part === 'static'
+  const own = page && origin !== null ? `${origin}/share/${request.token}` : null
   const images = own === null ? "'none'" : `${own}/p/`
   const policy = ['sandbox allow-downloads', "default-src 'none'", `img-src ${images}`]
   if (own !== null && media) {
@@ -98,11 +104,17 @@ const SHARE_HEADERS: Readonly<Record<string, string>> = {
 export function applyShareHeaders(headers: Headers, path: string, origin: string | null): void {
   const request = parseSharePath(path)
   const media = headers.get(MEDIA_MARK) === '1'
+  const live = headers.get(LIVE_MARK) === '1'
   headers.delete(MEDIA_MARK)
+  headers.delete(LIVE_MARK)
   for (const [name, value] of Object.entries(SHARE_HEADERS)) {
     headers.set(name, value)
   }
-  headers.set('Content-Security-Policy', sharePolicy(request, origin, media))
+  if (live && request !== null) {
+    applyLiveHeaders(headers, request, origin)
+  } else {
+    headers.set('Content-Security-Policy', sharePolicy(request, origin, media))
+  }
   if (request?.part === 'image' || request?.part === 'card' || (media && request?.part === 'raw')) {
     headers.set('Cross-Origin-Resource-Policy', 'cross-origin')
   }
