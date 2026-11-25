@@ -205,9 +205,12 @@ between two steps; an interrupt; a hook at subagent start.
   It MUST be refused to the agent's own runtime, to a runtime that is off or whose key the agent's
   credential lacks, to a runtime that runs only sandboxed while the agent runs unsandboxed, on
   itself (LVL-5), and while a turn runs unless `interrupt` stops it first. Background work ends as
-  on a restart, Bypass ends, and a move the EA or an agent makes MUST NOT leave the agent's
-  approvals looser than before it. Each move is audited as `task.runtime_changed` with the
-  runtimes, the model and who moved it.
+  on a restart, and Bypass ends on every move. A move MUST NOT change the agent's sandbox,
+  credential, Seti control or other access. A move the EA or an agent makes MUST NOT leave the
+  agent's approvals looser than before it: the agent stays held to the approvals of the runtime
+  it left (as DLG-3 holds a helper). The user's own move takes the new runtime's usual approvals.
+  The brief arrives with the agent's next message; a move starts no turn by itself. Each move is
+  audited as `task.runtime_changed` with the runtimes, the model and who moved it.
 
 ## 4. Turn lifecycle
 

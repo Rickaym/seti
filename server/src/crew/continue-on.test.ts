@@ -177,6 +177,41 @@ describe('Continue on another runtime', () => {
     expect(await regimeOfTask(await current(byUser.id))).toBe('classifier')
   })
 
+  it('a move by the EA or an agent never leaves looser approvals, a wider sandbox or more access', async () => {
+    const tool = SETI_TOOLS.find((each) => each.name === 'restart_agent_session')
+    if (tool === undefined) {
+      throw new Error('no restart_agent_session tool')
+    }
+    const caller = await make()
+    await tasks.setSetiControl(caller.id, 'full')
+    const movers = {
+      ea: async (id: string, runtime: string) => (await move(id, { runtime }, EA_AUTH)).status === 200,
+      agent: async (id: string, runtime: string) =>
+        (await callSetiTool(tool, caller.id, { task: id, runtime })).isError !== true,
+    }
+    const strictness = { user: 3, rules: 2, classifier: 1, bypass: 0 } as const
+    const access = (task: Task) => ({
+      sandbox: task.sandbox,
+      profile_id: task.profile_id,
+      seti_control: task.seti_control,
+      home_access: task.home_access,
+    })
+    for (const [who, moveBy] of Object.entries(movers)) {
+      const claude = await make()
+      await bypass.set(claude.id, new Date(Date.now() + 3_600_000).toISOString())
+      for (const runtime of ['codex', 'claude', 'codex', 'claude']) {
+        const before = await current(claude.id)
+        const regime = await regimeOfTask(before)
+        expect(await moveBy(claude.id, runtime), `${who} moves to ${runtime}`).toBe(true)
+        const after = await current(claude.id)
+        expect(after.runtime).toBe(runtime)
+        expect(access(after), `${who}: same access after the move to ${runtime}`).toEqual(access(before))
+        const now = await regimeOfTask(after)
+        expect(strictness[now], `${who}: ${regime} -> ${now}`).toBeGreaterThanOrEqual(strictness[regime])
+      }
+    }
+  })
+
   it('lets an agent at Full move another agent with restart_agent_session, never itself', async () => {
     const tool = SETI_TOOLS.find((each) => each.name === 'restart_agent_session')
     if (tool === undefined) {
