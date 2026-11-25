@@ -36,6 +36,11 @@ export function settingsRules(file: string, home = os.homedir()): InheritedRule[
 /** Rules every agent loads from the user's Claude Code settings, besides Seti's own. */
 export const userSettingsRules = (): InheritedRule[] => settingsRules(path.join(CLAUDE_HOME, 'settings.json'))
 
-/** Rules an agent loads from its working directory's project and local Claude Code settings. */
-export const projectSettingsRules = (cwd: string): InheritedRule[] =>
-  ['settings.json', 'settings.local.json'].flatMap((name) => settingsRules(path.join(cwd, '.claude', name)))
+/**
+ * Rules an agent loads from its working directory's project and local Claude Code settings; a
+ * held file, which an agent's session could have written, gives its ask and deny rules only.
+ */
+export const projectSettingsRules = (cwd: string, held: ReadonlySet<string> = new Set()): InheritedRule[] =>
+  ['.claude/settings.json', '.claude/settings.local.json'].flatMap((name) =>
+    settingsRules(path.join(cwd, name)).filter((rule) => rule.behavior !== 'allow' || !held.has(name)),
+  )

@@ -83,7 +83,12 @@ export function claudeLaunch(launcher: Launcher) {
 
 /** Rules for every task, the launcher, and an unsandboxed task's borrowed MCP servers. */
 async function sandboxOptions(spec: SessionSpec<'claude'>, launcher: Launcher) {
-  const settings = { ...deniedMcpSettings(spec.deniedToolServers), permissions: spec.rules }
+  const { disabledServers } = spec.folderSettings
+  const settings = {
+    ...deniedMcpSettings(spec.deniedToolServers),
+    permissions: spec.rules,
+    ...(disabledServers.length === 0 ? {} : { disabledMcpjsonServers: disabledServers }),
+  }
   const borrowed = launcher.sandboxed
     ? {}
     : ((await taskBorrowedServers({ id: spec.taskId, cwd: spec.cwd })) as Record<string, McpServerConfig>)
@@ -118,7 +123,7 @@ export async function realise(
     abortController,
     canUseTool: host.decide,
     perTaskStopAffordance: true,
-    settingSources: ['user', 'project', 'local'],
+    settingSources: spec.folderSettings.local ? ['user', 'project', 'local'] : ['user', 'project'],
     ...sandbox,
     ...withHostServers(host, {
       ...('mcpServers' in sandbox ? sandbox.mcpServers : {}),
