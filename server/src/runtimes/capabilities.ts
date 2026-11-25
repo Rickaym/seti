@@ -3,6 +3,7 @@ import {
   STORED_RUNTIMES,
   type AgentCapabilities,
   type CapabilitiesSnapshot,
+  type CompactPart,
   type McpServer,
   type McpTransport,
   type RuntimeCapabilities,
@@ -83,7 +84,15 @@ export const withRuntimes = (snapshot: CapabilitiesSnapshot): CapabilitiesSnapsh
 export const runsUnsandboxed = (runtime: StoredRuntime): boolean => declared(runtime).sandbox.optional
 
 /** The runtime takes a compaction rule. */
-export const takesCompaction = (runtime: StoredRuntime): boolean => declared(runtime).compaction
+export const takesCompaction = (runtime: StoredRuntime): boolean => declared(runtime).compaction !== null
+
+/** The parts of a compaction rule the runtime takes the rule without. */
+function compactionIgnores(runtime: StoredRuntime): CompactPart[] {
+  const parts = declared(runtime).compaction
+  return parts === null
+    ? []
+    : [...(parts.off ? [] : ['off' as const]), ...(parts.windowAlone ? [] : ['window' as const])]
+}
 
 /** The agent can hand work to background subagents of its own. */
 export const hasSubagents = (runtime: StoredRuntime): boolean => declared(runtime).subagents
@@ -105,6 +114,7 @@ export const agentCapabilities = (runtime: StoredRuntime): AgentCapabilities => 
   plugins: loadsPlugins(runtime),
   unsandboxed: runsUnsandboxed(runtime),
   compaction: takesCompaction(runtime),
+  compaction_ignores: compactionIgnores(runtime),
   side_chat: forksSideChat(runtime),
   dreams: dreamsOf(runtime) !== null,
   rewind: rewinds(runtime),

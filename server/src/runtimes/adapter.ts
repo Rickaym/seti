@@ -159,8 +159,12 @@ export interface Capabilities {
   }
   /** It can run outside Seti's sandbox. */
   sandbox: { optional: boolean }
-  /** It takes a rule for when to compact its context. */
-  compaction: boolean
+  /**
+   * The compaction rule it takes, or null for none. Every one takes a context window with a
+   * Compact at, and instructions; `off` it can stop compacting, `windowAlone` it takes a window
+   * without a Compact at.
+   */
+  compaction: { off: boolean; windowAlone: boolean } | null
   /** The agent can hand work to subagents of its own that run in the background. */
   subagents: boolean
 }
