@@ -146,7 +146,7 @@ def _local_note(item: Mapping[str, Any]) -> str | None:
 
 def _named(item: Mapping[str, Any], profile: str) -> str:
     notes = ["its own choice"] if item.get("override") is not None else []
-    if item.get("in_set") is True:
+    if item.get("override") is None and item.get("credential") is not None:
         notes = [f"from {profile}"]
     if (local := _local_note(item)) is not None:
         notes.append(local)

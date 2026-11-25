@@ -213,13 +213,14 @@ describe('ssh hosts, one by one', () => {
       summary: 'Every agent using Ops hosts gets the ssh host k8s',
       detail: { change: 'ssh_host_added', host: 'k8s' },
     })
-    expect(item(await view(inSet), 'ssh', 'k8s')).toMatchObject({ enabled: true, in_set: true, override: null })
+    expect(item(await view(inSet), 'ssh', 'k8s')).toMatchObject({ enabled: true, credential: true, override: null })
     expect(await taskSsh(inSet.id)).toMatchObject({ usable: ['db', 'k8s'] })
-    expect(item(await view(outside), 'ssh', 'k8s')).toMatchObject({ enabled: false, in_set: false })
+    expect(item(await view(outside), 'ssh', 'k8s')).toMatchObject({ enabled: false, credential: null })
 
-    const refused = await send('PUT', `/tasks/${inSet.id}/access`, { kind: 'ssh', id: 'k8s', enabled: false })
-    expect(refused.status).toBe(409)
-    expect(await refused.text()).toContain('k8s comes with the credential Ops hosts')
+    await setAccess(inSet, 'ssh', 'k8s', false)
+    expect(item(await view(inSet), 'ssh', 'k8s')).toMatchObject({ enabled: false, credential: true, override: false })
+    expect(await taskSsh(inSet.id)).toMatchObject({ usable: ['db'] })
+    await setAccess(inSet, 'ssh', 'k8s', null)
 
     await data(await send('DELETE', `/credentials/profiles/${set.id}/ssh-hosts/k8s`))
     expect(await taskSsh(inSet.id)).toMatchObject({ usable: ['db'] })

@@ -67,6 +67,7 @@ export async function mcpItems(task: Task | null): Promise<AccessItem[]> {
       ? (await mcpCatalog()).map((entry) => ({
           ...entry,
           choice: null,
+          credential: null,
           enabled: entry.default_enabled,
           borrowed: entry.local_to.length > 0,
         }))
@@ -81,11 +82,11 @@ export async function mcpItems(task: Task | null): Promise<AccessItem[]> {
       name: server.name,
       detail: mcpDetail(server),
       default_enabled: server.default_enabled,
+      credential: server.credential,
       override: server.choice,
       enabled: server.enabled,
       jump_for: [],
       missing_key: [],
-      in_set: false,
       session: server.enabled && unusable === null ? stateOf(server.name) : null,
       unusable,
     }

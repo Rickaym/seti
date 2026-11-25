@@ -4,8 +4,8 @@ import type { McpSignIn, McpStatus } from './capabilities.js'
 import type { SetiControlLevel } from './seti-control.js'
 
 /**
- * What an agent may reach, each with a default for every agent and a per-agent override:
- * ssh hosts of Seti's ssh config, AWS, MCP servers, context packs and Seti plugins.
+ * What an agent may reach, each with a default for every agent, its credential's choice and a
+ * per-agent override: ssh hosts of Seti's ssh config, AWS, MCP servers, context packs, plugins.
  */
 export const ACCESS_KINDS = ['ssh', 'aws', 'mcp', 'pack', 'plugin'] as const
 export type AccessKind = (typeof ACCESS_KINDS)[number]
@@ -29,17 +29,17 @@ export interface AccessDefault {
   default_enabled: boolean
 }
 
-/** The same for one agent: its override, if any, and the outcome. */
+/** The same for one agent: its credential's choice and its own override, if any, and the outcome. */
 export interface AccessItem extends AccessDefault {
-  /** Null while the agent follows the default. */
+  /** What the agent's credential sets; null when its access set has no opinion on the item. */
+  credential: boolean | null
+  /** Null while the agent follows its credential, else the default. */
   override: boolean | null
   enabled: boolean
   /** SSH only: enabled hosts whose connection passes through this one as a jump host. */
   jump_for: string[]
   /** SSH only: hosts on its way, itself first, without a key, so ssh cannot log in yet. */
   missing_key: string[]
-  /** SSH only: the agent's credential bundles it, so it is on whatever the agent's own choice. */
-  in_set: boolean
   /** MCP only: how the agent's latest session has the server; null before any session. */
   session: McpSessionState | null
   /** MCP only: why the agent's runtime cannot use it, such as a transport it lacks; else null. */
@@ -130,7 +130,7 @@ export const accessRef = {
     .refine((id) => !/\p{Cc}/u.test(id), 'ids cannot contain control characters'),
 }
 
-/** Turns an item on or off for one agent; null drops the override so the default applies again. */
+/** Turns an item on or off for one agent; null drops the override so its base applies again. */
 export const taskAccessInput = z.object({ ...accessRef, enabled: z.boolean().nullable() })
 export type TaskAccessInput = z.input<typeof taskAccessInput>
 
@@ -145,10 +145,14 @@ export type AccessChoice = z.output<typeof accessChoices>[number]
 export const accessDefaultInput = z.object({ ...accessRef, enabled: z.boolean() })
 export type AccessDefaultInput = z.input<typeof accessDefaultInput>
 
-/** An item's state for an agent: its override, else the default. */
-export const accessEnabled = (item: Pick<AccessItem, 'override' | 'default_enabled'>) =>
-  item.override ?? item.default_enabled
+type Base = Pick<AccessDefault, 'default_enabled'> & { credential?: boolean | null }
 
-/** The override a switch to `enabled` stores: none when it matches the default. */
-export const overrideFor = (item: Pick<AccessDefault, 'default_enabled'>, enabled: boolean): boolean | null =>
-  enabled === item.default_enabled ? null : enabled
+/** What an agent gets without its own choice: its credential's choice, else the default. */
+export const accessBase = (item: Base) => item.credential ?? item.default_enabled
+
+/** An item's state for an agent: its override, else its credential's choice, else the default. */
+export const accessEnabled = (item: Base & Pick<AccessItem, 'override'>) => item.override ?? accessBase(item)
+
+/** The override a switch to `enabled` stores: none when it matches the agent's base. */
+export const overrideFor = (item: Base, enabled: boolean): boolean | null =>
+  enabled === accessBase(item) ? null : enabled

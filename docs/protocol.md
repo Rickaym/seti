@@ -460,7 +460,8 @@ interrupted only for that.
   MUST run in its sandbox. An unsandboxed agent has the user's access to the host; credentials and
   the allowlist do not apply to it.
 - SBX-11: An agent MUST start another sandboxed, at level `self`, with at most its own access and
-  approvals no looser than its own (PERM-13); what was withheld is recorded.
+  approvals no looser than its own (PERM-13); what was withheld is recorded. Every item outside its
+  starter's access is the new agent's own off choice, so no default or credential set lifts it.
 - SBX-12: A maintenance session of an agent, such as a dream, runs in a sandbox of its own, with its
   own home, `/tmp` and proxy. It mounts the agent's folders, workspace, package caches and session
   folder read-only, except the agent's own memory folder and the folders the session names; a
@@ -734,6 +735,14 @@ interrupted only for that.
   nowhere.
 - SEC-14: Webhook secrets and tokens are sealed. Only the user pastes one an app issued, or reveals
   one the control room made, once.
+- SEC-15: A credential MAY hold an access set: on or off per SSH host, cloud access, MCP server,
+  context pack and plugin, and a list of hosts. An item it does not name has no opinion; a new
+  credential names none.
+- SEC-16: An item's state for an agent MUST be its own choice, else its credential's set, else the
+  default for every agent; a set change applies from each agent's next turn. Its allowlist MUST be
+  the shared list, its credential's hosts and its own.
+- SEC-18: Only the user changes a set. A delegate MUST NOT move an agent to a credential whose set
+  turns on an SSH host, cloud access or a host the agent lacks.
 
 ## 9. Shared tools
 

@@ -16,8 +16,9 @@ import { accessSummary, applyStartAccess, awsWithProfile, planStartAccess } from
 import { audit, auditPrLink } from './audit.js'
 import { capabilityCache } from './capabilities.js'
 import { requireRuntime } from './codex-status.js'
+import { securityGain } from './credential-access.js'
 import { tasks, type BackfillMessage } from './db.js'
-import { promptAuthor, refuseAgent, refuseOtherAgent } from './ea-guard.js'
+import { fromEa, promptAuthor, refuseAgent, refuseOtherAgent } from './ea-guard.js'
 import { watchPrLinked } from './ea-watch.js'
 import { HttpError } from './http.js'
 import { errorCode } from './pg.js'
@@ -106,7 +107,7 @@ export async function startTask(
   await requireProfile(input.profile_id)
   const runtime = pickedRuntime(input)
   await requireRuntime(runtime, input.profile_id)
-  const access = await planStartAccess(input.access)
+  const access = await planStartAccess(input.access, input.profile_id)
   const workspace = await startWorkspace(input.workspace_id)
   const id = randomUUID()
   const cwd = createScratchDir(id, input.title)
@@ -307,6 +308,10 @@ export async function setTaskProfile(task: Task, profileId: string, actor: Audit
     return
   }
   const profile = await requireProfile(profileId)
+  const gain = fromEa() ? await securityGain(task, profileId) : []
+  if (gain.length > 0) {
+    throw new HttpError(403, `The EA cannot move an agent to ${profile.name}, which turns on ${gain.join(', ')}`)
+  }
   await tasks.setProfile(task.id, profileId)
   await audit.record({
     actor,

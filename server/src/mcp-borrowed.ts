@@ -71,7 +71,7 @@ export function borrowedServers(host: Json, own: readonly string[], enabled: (na
 
 /** The servers of other directories a task turns on, which its session gets from Seti. */
 export async function taskBorrowedServers(task: Pick<Task, 'id' | 'cwd'>, host = readHostConfig()): Promise<Json> {
-  const [defaults, choices] = await Promise.all([mcpDefaults.all(), taskMcpChoices.get(task.id)])
+  const [defaults, choices] = await Promise.all([mcpDefaults.all(), taskMcpChoices.followed(task.id)])
   return borrowedServers(host, ownProjects(task.cwd), (name) => mcpEnabled(name, defaults, choices, false))
 }
 

@@ -149,17 +149,19 @@ const agentAccess = setiTool({
       ...view,
       aws: awsOutcomeLine(view.aws),
       github: githubOutcomeLine(view.github),
-      items: view.items.map(({ kind, id, name, detail, enabled, override, default_enabled, missing_key, in_set }) => ({
-        kind,
-        id,
-        name,
-        ...(detail === null ? {} : { detail }),
-        enabled,
-        own_choice: override !== null,
-        default_enabled,
-        ...(missing_key.length === 0 ? {} : { missing_key }),
-        ...(in_set ? { from_credential_set: true } : {}),
-      })),
+      items: view.items.map(
+        ({ kind, id, name, detail, enabled, override, default_enabled, missing_key, credential }) => ({
+          kind,
+          id,
+          name,
+          ...(detail === null ? {} : { detail }),
+          enabled,
+          own_choice: override !== null,
+          default_enabled,
+          ...(missing_key.length === 0 ? {} : { missing_key }),
+          ...(override === null && credential !== null ? { from_credential_set: true } : {}),
+        }),
+      ),
     }
   },
 })
