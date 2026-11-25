@@ -16,6 +16,7 @@ export const codexAdapterFor = (binary?: string, provider?: CodexProvider): Runt
     tools: { userServers: [], plugins: false },
     sandbox: { optional: false },
     compaction: false,
+    subagents: false,
     dream: null,
   },
   project: projectCodex,

@@ -21,6 +21,7 @@ export const claudeAdapter: RuntimeAdapter<ClaudeShapes, 'claude'> = {
     tools: { userServers: MCP_TRANSPORTS, plugins: true },
     sandbox: { optional: true },
     compaction: true,
+    subagents: true,
     dream: {
       memory: claudeMemory,
       loaded: claudeLoadedMemory,

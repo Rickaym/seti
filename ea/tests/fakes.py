@@ -987,6 +987,9 @@ class FakeSeti:
                 if body["pack_id"] is not None:
                     self.ea_pack_ids.append(body["pack_id"])
                 return ok(self.ea_packs())
+            case ["context", "packs", pack_id, "runtime"]:
+                pack = next((p for p in self.packs if p["id"] == pack_id), None)
+                return ok({**pack, **body}) if pack else err(404, "Context pack not found")
             case ["tasks", task_id, "role"]:
                 kept = [p for p in self.task_packs.get(task_id, []) if p.get("kind") != "role"]
                 pack = next((p for p in self.packs if p["id"] == body["pack_id"]), None)
