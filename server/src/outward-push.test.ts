@@ -170,6 +170,24 @@ describe('pushes outside the user organisations', () => {
     ['R=other/tool; gh api repos/$R/pulls -f title=x', ['Write to other/tool, outside your organisations']],
     ['R=x; R=my-org/tool; gh api repos/$R/pulls -f title=x', ['Write to a repository Seti cannot tell is yours']],
     ['cd $(mktemp -d) && git push', ['Push to a repository Seti cannot tell is yours']],
+    [
+      "cd ~/home-mine && cat > /tmp/x/pr.md <<'EOF'\n| `a.tsx:1` | it's | Converted; kept |\nEOF\nx.sh | head; git push -u origin HEAD",
+      [],
+    ],
+    [
+      "cd ~/home-theirs && cat > /tmp/x/pr.md <<'EOF'\nit's\nEOF\ngit push",
+      ['Push to other/tool, outside your organisations'],
+    ],
+    ['R=my-org/tool; for p in 1 2; do gh api -X POST repos/$R/pulls/$p/comments/$c/replies -f body=x; done', []],
+    [
+      'R=my-org/tool; c=$(gh api graphql -f q=x); id=${c##* }\ngh api -X POST repos/$R/pulls/3/comments/$id/replies -f b=x',
+      [],
+    ],
+    [
+      'gh api -X POST repos/other/tool/pulls/3/comments/$id/replies -f b=x',
+      ['Write to other/tool, outside your organisations'],
+    ],
+    ['gh api -X POST repos/$O/tool/pulls/3/comments -f b=x', ['Write to a repository Seti cannot tell is yours']],
   ])('reads ~ as the agent home and literal variables in %s', async (command, expected) => {
     homes()
     const home = vi.spyOn(os, 'homedir').mockReturnValue(root)

@@ -460,7 +460,8 @@ interrupted only for that.
   MUST run in its sandbox. An unsandboxed agent has the user's access to the host; credentials and
   the allowlist do not apply to it.
 - SBX-11: An agent MUST start another sandboxed, at level `self`, with at most its own access and
-  approvals no looser than its own (PERM-13); what was withheld is recorded.
+  approvals no looser than its own (PERM-13); what was withheld is recorded. Every item outside its
+  starter's access is the new agent's own off choice, so no default or credential set lifts it.
 - SBX-12: A maintenance session of an agent, such as a dream, runs in a sandbox of its own, with its
   own home, `/tmp` and proxy. It mounts the agent's folders, workspace, package caches and session
   folder read-only, except the agent's own memory folder and the folders the session names; a
@@ -556,7 +557,8 @@ interrupted only for that.
 - PERM-4: Built-in: reads, search and platform tools are allowed; shell and edits inside the
   agent's folders are allowed in the sandbox only; killing by name is denied.
 - PERM-5: Request fields: `id`, `task_id`, `tool_name`, `kind`, `summary`, `input`, `reason`,
-  `suggestions`, `editable`, `state`, `created_at`, `timeout_at`, `timed_out`. Decisions:
+  `suggestions`, `editable`, `state`, `edited` (field names, GRD-8), `created_at`, `timeout_at`,
+  `timed_out`. Decisions:
   `allow` (this call), `always` (adds the suggested allow rules, scope `agent` or `global`),
   `deny` (optional message to the agent).
 - PERM-7: Timeout is one install-wide setting: off, 15 min, 1 h (default), 4 h or 24 h from when
@@ -598,7 +600,8 @@ interrupted only for that.
   outside your organisations" or the like; it is an ask, never a refusal. The user's own are the
   owners of the signed-in code-host account and its organisations, read on the control plane and
   cached for about an hour, and the owners of the repositories the agent was given. The
-  implementation reads the command past wrappers and nested scripts; follows `cd`, `pushd`,
+  implementation reads the command past wrappers and nested scripts, and reads a heredoc body
+  as data unless a shell reads it (an unquoted body's substitutions still run); follows `cd`, `pushd`,
   `popd` and `git -C`, with `~` and `$HOME` as the agent's home, and variables the same line
   gives one literal value, each only as far as the line surely ran it; resolves a remote or URL
   under HST-2 with the repository's and the agent's own global git config and URL rewrites, in
@@ -627,8 +630,17 @@ interrupted only for that.
 - GRD-7: A review rule names a tool-server tool or a whole server. Each call it names MUST be held
   as a `review` request, in bypass too, with no `always`. Deny wins over review. If review rules
   cannot be read the call MUST be denied.
-- GRD-8: The user MAY edit a held call's top-level text fields before `allow`, only when the
-  request shows the input whole and unredacted. The audit records field names, never values.
+- GRD-8: The user MAY edit a held call's top-level text fields before `allow` or `deny`, only
+  when the request shows the input whole and unredacted and the runtime runs a call with the input
+  a decision hands back (not Codex, which runs a call as it asked). The audit, the request's
+  `edited` and the transcript's `Edited` mark record field names, never values. The agent MUST
+  learn of an edit from the control room's own record of it, never from the call's input: after an
+  edited call's result, in the same turn, it is told that the user edited the call and the text of
+  each changed field as it ran; an edited call the user denies is denied with the user's text for
+  each changed field and their note. Each field is cut at 2000 characters and all of them at 6000,
+  with a marker that says so. An answer with no edit reaches the agent exactly as before.
+  Why: the agent's own record keeps the text it wrote, so without this it believes its original
+  went out.
 - GRD-10: Outward: a tool-server call unless its name reads as a read or the tool declares no
   writes; a shell command that pushes, publishes, deploys, mutates a remote API or opens a remote
   shell; any unknown name. Every outward call MUST be audited and counted on the agent.
@@ -724,6 +736,19 @@ interrupted only for that.
   nowhere.
 - SEC-14: Webhook secrets and tokens are sealed. Only the user pastes one an app issued, or reveals
   one the control room made, once.
+- SEC-15: A credential MAY hold an access set: on or off per SSH host, cloud access, MCP server,
+  context pack and plugin, and a list of hosts. An item it does not name has no opinion; a new
+  credential names none.
+- SEC-16: An item's state for an agent MUST be its own choice, else its credential's set, else the
+  default for every agent; a set change applies from each agent's next turn. Its allowlist MUST be
+  the shared list, its credential's hosts and its own.
+- SEC-17: Only the user saves an agent's access into its credential's set. A save MUST first show
+  which items change and which other agents each one turns on or off, and MUST be refused when the
+  set, its hosts, its agents or their choices changed since. The saving agent's own choices and
+  hosts are cleared, since the set now gives them.
+- SEC-18: Only the user changes a set or drops all of an agent's own choices at once. A delegate
+  MUST NOT move an agent to a credential whose set turns on an SSH host, cloud access or a host the
+  agent lacks.
 
 ## 9. Shared tools
 

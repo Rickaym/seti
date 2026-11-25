@@ -1,21 +1,27 @@
 import {
   AWS_SETTINGS_DEFAULT,
   DEFAULT_PROFILE_ID,
+  type AccessKind,
   type AuditDetail,
   type AuditKind,
   type AwsSettings,
   type CredentialProfile,
   type CredentialsOverview,
   type ProfileSummary,
+  type TaskAccessInput,
 } from '@seti/shared'
+import { accessCatalog, overridesOf } from './agent-access.js'
 import { audit } from './audit.js'
 import { awsHostRole } from './aws-credentials.js'
+import { refuseDelegates } from './ea-guard.js'
 import { HttpError } from './http.js'
 import { sshKeysChanged } from './proxy-owner.js'
 import { githubTokens } from './secrets.js'
 import { profileSshHosts, setSetHost } from './ssh.js'
 import { connectionRows } from './store/connections.js'
+import { credentialAccess, credentialHosts } from './store/credential-access.js'
 import { profiles, type ProfileRow } from './store/credentials.js'
+import { signalWorkspaces } from './workspace/dir.js'
 
 const isDefault = (id: string) => id === DEFAULT_PROFILE_ID
 
@@ -28,13 +34,16 @@ async function requireProfile(id: string): Promise<ProfileRow> {
 }
 
 async function view(profile: ProfileRow): Promise<CredentialProfile> {
-  const [github, connections, agents, hosts] = await Promise.all([
+  const [github, connections, agents, hosts, items, allowed] = await Promise.all([
     githubTokens(profile.id).status(),
     connectionRows.profileList(profile.id),
     profiles.agents(profile.id),
     profileSshHosts(profile.id),
+    credentialAccess.all(profile.id),
+    credentialHosts.list(profile.id),
   ])
-  return { ...profile, builtin: isDefault(profile.id), github, connections, agents, ssh_hosts: hosts }
+  const access = { items: [...items], hosts: allowed }
+  return { ...profile, builtin: isDefault(profile.id), github, connections, agents, ssh_hosts: hosts, access }
 }
 
 export async function credentialsOverview(): Promise<CredentialsOverview> {
@@ -49,12 +58,15 @@ async function profileView(id: string): Promise<CredentialProfile> {
 
 export async function profileSummaries(): Promise<ProfileSummary[]> {
   const [list, counts] = await Promise.all([profiles.list(), profiles.agentCounts()])
-  return list.map((profile) => ({
-    id: profile.id,
-    name: profile.name,
-    builtin: isDefault(profile.id),
-    agents: counts.get(profile.id) ?? 0,
-  }))
+  return Promise.all(
+    list.map(async (profile) => ({
+      id: profile.id,
+      name: profile.name,
+      builtin: isDefault(profile.id),
+      agents: counts.get(profile.id) ?? 0,
+      access_items: (await credentialAccess.all(profile.id)).length + (await credentialHosts.list(profile.id)).length,
+    })),
+  )
 }
 
 /** Names, hosts and settings only: never a secret value, token or mint result. */
@@ -175,4 +187,73 @@ export async function setProfileGitHub(
     detail: { profile: profile.name, name: 'github_agent_token', owner },
   })
   return profileView(id)
+}
+
+const KIND_NAME: Record<AccessKind, string> = {
+  ssh: 'the ssh host',
+  aws: 'AWS',
+  mcp: 'the MCP server',
+  pack: 'the context pack',
+  plugin: 'the plugin',
+}
+
+const onOff = (on: boolean) => (on ? 'on' : 'off')
+
+/** How many of the credential's agents follow it on the item, having no choice of their own. */
+async function followers(profileId: string, kind: AccessKind, id: string): Promise<number> {
+  const agents = await profiles.agents(profileId)
+  const own = await Promise.all(agents.map(async (agent) => (await overridesOf(agent.id, kind))[id]))
+  return own.filter((choice) => choice === undefined).length
+}
+
+async function applied(profileId: string, kind: AccessKind | null): Promise<void> {
+  await profiles.touch(profileId)
+  signalWorkspaces('task')
+  if (kind === 'ssh') {
+    await sshKeysChanged()
+  }
+}
+
+/** Sets one item of a credential's access set, or with null drops it; its agents follow next turn. */
+export async function setProfileAccess(id: string, change: TaskAccessInput): Promise<CredentialProfile> {
+  refuseDelegates("change a credential's access")
+  const profile = await requireProfile(id)
+  const item = (await accessCatalog()).find((entry) => entry.kind === change.kind && entry.id === change.id)
+  if (item === undefined) {
+    throw new HttpError(404, `No ${KIND_NAME[change.kind]} ${change.id}`)
+  }
+  if (!(await credentialAccess.set(id, change.kind, change.id, change.enabled))) {
+    return view(profile)
+  }
+  await applied(id, change.kind)
+  const what = change.kind === 'aws' ? 'AWS' : `${KIND_NAME[change.kind]} ${item.name}`
+  const state = change.enabled === null ? 'the default' : onOff(change.enabled)
+  await auditProfile('system.profile_changed', profile, `Set ${what} to ${state} in the credential ${profile.name}`, {
+    change: 'access_item',
+    access: change.kind,
+    item: change.id,
+    name: item.name,
+    enabled: change.enabled,
+    agents_affected: await followers(id, change.kind, change.id),
+  })
+  return view(profile)
+}
+
+/** Adds a host every agent using the credential reaches, or takes it out. */
+export async function setProfileHost(id: string, host: string, on: boolean): Promise<CredentialProfile> {
+  refuseDelegates("change a credential's hosts")
+  const profile = await requireProfile(id)
+  if (!(await credentialHosts.set(id, host, on))) {
+    return view(profile)
+  }
+  await applied(id, null)
+  const summary = on
+    ? `Every agent using ${profile.name} reaches ${host}`
+    : `Agents using ${profile.name} no longer reach ${host} through it`
+  await auditProfile('system.profile_changed', profile, summary, {
+    change: on ? 'access_host_added' : 'access_host_removed',
+    host,
+    agents_affected: (await profiles.agents(id)).length,
+  })
+  return view(profile)
 }

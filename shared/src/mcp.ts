@@ -191,6 +191,8 @@ export interface McpSelectionEntry {
 /** One server as an agent gets it: its default, the agent's own choice, and the outcome. */
 export interface TaskMcpServer extends McpSelectionEntry {
   choice: boolean | null
+  /** What the agent's credential sets for the server; null when its access set has no opinion. */
+  credential: boolean | null
   enabled: boolean
   /** A local server of another directory, which the agent gets only when it is turned on. */
   borrowed: boolean

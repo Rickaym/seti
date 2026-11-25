@@ -1,5 +1,4 @@
 import { randomUUID } from 'node:crypto'
-import type { PermissionResult } from '@anthropic-ai/claude-agent-sdk'
 import { timedOutMessage } from '@seti/shared'
 import { describe, expect, it, vi } from 'vitest'
 import { messages, sql, tasks } from './db.js'
@@ -205,9 +204,9 @@ describe('a permission request a restart cut off', () => {
       expect(await permissionRequests.pending(id)).toHaveLength(1)
     })
     other.abort()
-    expect(await different).toMatchObject({ behavior: 'deny' })
+    expect((await different).result).toMatchObject({ behavior: 'deny' })
 
-    const again: PermissionResult | null = await canUseTool(
+    const { result: again } = await canUseTool(
       'Bash',
       { description: DEPLOY.description, command: DEPLOY.command },
       toolOptions(),
@@ -224,7 +223,7 @@ describe('a permission request a restart cut off', () => {
       expect(await permissionRequests.pending(id)).toHaveLength(1)
     })
     third.abort()
-    expect(await repeat).toMatchObject({ behavior: 'deny' })
+    expect((await repeat).result).toMatchObject({ behavior: 'deny' })
   })
 
   it('tells the agent when the user denies it, and grants nothing', async () => {
@@ -289,7 +288,7 @@ describe('stopping Seti while an agent waits on the user', () => {
     stopForRestart()
     session.abort()
     expect(await asking).toMatchObject({ behavior: 'deny', interrupt: true })
-    expect(await allowing).toMatchObject({ behavior: 'deny', interrupt: true })
+    expect((await allowing).result).toMatchObject({ behavior: 'deny', interrupt: true })
     expect(await questions.openList(id)).toHaveLength(1)
     expect(await permissionRequests.pending(id)).toHaveLength(1)
   })

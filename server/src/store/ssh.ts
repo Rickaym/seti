@@ -1,5 +1,5 @@
 import type { SshKeySource, SshKnownHost, SshOption } from '@seti/shared'
-import { now, sql, transaction } from '../db.js'
+import { now, sql, transaction, type Db } from '../db.js'
 
 /** A host as stored: its facts, user and key, without the defaults, routes and sets the views add. */
 export interface SshHostRow {
@@ -17,6 +17,14 @@ export interface SshHostRow {
 export type SshHostFacts = Pick<SshHostRow, 'hostname' | 'port' | 'user' | 'key_id' | 'jump' | 'options'>
 
 const HOST_COLUMNS = sql`alias, hostname, port, username AS user, key_id, jump, options, created_at, updated_at`
+
+/** Names of the credentials whose set turns the host on. */
+async function setsOf(tx: Db, alias: string): Promise<string[]> {
+  const sets = await tx<{ name: string }[]>`SELECT p.name FROM credential_access s
+    JOIN credential_profile p ON p.id = s.profile_id
+    WHERE s.kind = 'ssh' AND s.enabled AND s.item = ${alias} ORDER BY lower(p.name)`
+  return sets.map((row) => row.name)
+}
 
 const optionsJson = (options: readonly SshOption[]) => sql.json(options.map((option) => ({ ...option })))
 
@@ -45,23 +53,21 @@ export const sshHostStore = {
         SELECT ${next}, hostname, port, username, key_id, jump, options, created_at, ${now()}
         FROM ssh_host WHERE alias = ${alias}`
       await tx`UPDATE ssh_host SET jump = ${next} WHERE jump = ${alias}`
-      await tx`UPDATE credential_profile_ssh_host SET host = ${next} WHERE host = ${alias}`
+      await tx`UPDATE credential_access SET item = ${next} WHERE kind = 'ssh' AND item = ${alias}`
       await tx`UPDATE access_default SET item = ${next} WHERE kind = 'ssh' AND item = ${alias}`
       await tx`UPDATE task_access SET item = ${next} WHERE kind = 'ssh' AND item = ${alias}`
       await tx`DELETE FROM ssh_host WHERE alias = ${alias}`
-      const sets = await tx<{ name: string }[]>`SELECT p.name FROM credential_profile_ssh_host s
-        JOIN credential_profile p ON p.id = s.profile_id WHERE s.host = ${next} ORDER BY lower(p.name)`
-      return sets.map((row) => row.name)
+      return setsOf(tx, next)
     }),
   /** Deletes a host with every agent's choice for it; returns the sets that bundled it. */
   delete: async (alias: string): Promise<string[]> =>
     transaction(async (tx) => {
-      const sets = await tx<{ name: string }[]>`SELECT p.name FROM credential_profile_ssh_host s
-        JOIN credential_profile p ON p.id = s.profile_id WHERE s.host = ${alias} ORDER BY lower(p.name)`
+      const sets = await setsOf(tx, alias)
+      await tx`DELETE FROM credential_access WHERE kind = 'ssh' AND item = ${alias}`
       await tx`DELETE FROM access_default WHERE kind = 'ssh' AND item = ${alias}`
       await tx`DELETE FROM task_access WHERE kind = 'ssh' AND item = ${alias}`
       await tx`DELETE FROM ssh_host WHERE alias = ${alias}`
-      return sets.map((row) => row.name)
+      return sets
     }),
 }
 
@@ -72,26 +78,17 @@ export interface SetHostRow {
   host: string
 }
 
-/** Which hosts each credential bundles, so every agent using the set gets them. */
+/** Which hosts each credential turns on in its access set, so its agents get them. */
 export const setHosts = {
   list: async (): Promise<SetHostRow[]> =>
-    sql<SetHostRow[]>`SELECT s.profile_id, p.name AS profile_name, s.host FROM credential_profile_ssh_host s
-      JOIN credential_profile p ON p.id = s.profile_id ORDER BY (s.profile_id = 'default') DESC, lower(p.name)`,
+    sql<SetHostRow[]>`SELECT s.profile_id, p.name AS profile_name, s.item AS host FROM credential_access s
+      JOIN credential_profile p ON p.id = s.profile_id WHERE s.kind = 'ssh' AND s.enabled
+      ORDER BY (s.profile_id = 'default') DESC, lower(p.name)`,
   forProfile: async (profileId: string): Promise<string[]> =>
     (
-      await sql<{ host: string }[]>`SELECT host FROM credential_profile_ssh_host WHERE profile_id = ${profileId}
-        ORDER BY lower(host), host`
+      await sql<{ host: string }[]>`SELECT item AS host FROM credential_access
+        WHERE profile_id = ${profileId} AND kind = 'ssh' AND enabled ORDER BY lower(item), item`
     ).map((row) => row.host),
-  add: async (profileId: string, host: string): Promise<boolean> =>
-    (
-      await sql`INSERT INTO credential_profile_ssh_host (profile_id, host, created_at)
-        VALUES (${profileId}, ${host}, ${now()}) ON CONFLICT DO NOTHING RETURNING host`
-    ).length > 0,
-  remove: async (profileId: string, host: string): Promise<boolean> =>
-    (
-      await sql`DELETE FROM credential_profile_ssh_host WHERE profile_id = ${profileId} AND host = ${host}
-      RETURNING host`
-    ).length > 0,
 }
 
 /** A key as stored: its public half and, for a key file, where the private half is read from. */

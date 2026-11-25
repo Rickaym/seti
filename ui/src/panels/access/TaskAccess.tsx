@@ -24,6 +24,7 @@ import { useCapabilities } from '@/hooks/useCapabilities'
 import { cn } from '@/lib/utils'
 import { McpAuthDialog } from '@/panels/capabilities/McpAuthDialog'
 import { TaskCredentials } from '@/panels/tasks/TaskProfile'
+import { AccessFooter } from './AccessFooter'
 import { AccessList, KIND_ICONS } from './AccessList'
 import { SETI_CONTROL_ICONS, SetiControlRow } from './SetiControl'
 import { TaskHostsRow } from './TaskHosts'
@@ -312,6 +313,16 @@ export function TaskAccessDialog({
             </ErrorBoundary>
           )}
         </div>
+        {view !== null && (
+          <AccessFooter
+            task={task}
+            view={view}
+            onSaved={(next) => {
+              setView(next)
+              noteAccessChange(task.id)
+            }}
+          />
+        )}
       </DialogContent>
       {signIn !== null && (
         <McpAuthDialog

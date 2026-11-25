@@ -1,8 +1,21 @@
-import type { AccessDefault, AccessDefaultInput, AccessItem, McpSessionState, TaskAccessView } from '@seti/shared'
+import type {
+  AccessDefault,
+  AccessDefaultInput,
+  AccessItem,
+  AccessKind,
+  McpSessionState,
+  TaskAccessView,
+} from '@seti/shared'
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react'
 import { toast } from 'sonner'
 import { apiGet, apiPut, errorText } from '@/api'
 import { useMcpReports } from '@/lib/mcp-reports'
+
+const KIND_WORD: Record<AccessKind, string> = { ssh: 'SSH', aws: 'AWS', mcp: 'MCP', pack: 'Pack', plugin: 'Plugin' }
+
+/** An item named with its kind, as a preview lists it: "SSH db-bastion", "AWS". */
+export const accessLabel = (item: { kind: AccessKind; name: string }) =>
+  item.kind === 'aws' ? 'AWS' : `${KIND_WORD[item.kind]} ${item.name}`
 
 /** Every item agents may reach with its default, or null while loading. */
 export function useAccessCatalog() {

@@ -130,3 +130,8 @@ ALTER TABLE permission_rule ADD CONSTRAINT permission_rule_behavior_check
   CHECK (behavior IN ('allow', 'ask', 'deny', 'review'));
 ALTER TABLE permission_request ADD COLUMN editable BOOLEAN NOT NULL DEFAULT false;
 `
+
+/** The names of the fields the user edited before they answered a request. */
+export const PERMISSION_REQUEST_EDITED = `
+ALTER TABLE permission_request ADD COLUMN edited TEXT NOT NULL DEFAULT '[]';
+`

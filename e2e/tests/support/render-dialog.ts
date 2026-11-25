@@ -28,7 +28,7 @@ export function seedDashboard(dir: string): void {
 /** The rendered page's frame, where the dashboard's script wrote its text. */
 export async function expectRenderedDashboard(page: Page): Promise<void> {
   await expect(page.getByRole('heading', { name: 'dashboard.html' })).toBeVisible()
-  await expect(page.getByRole('link', { name: 'View code' })).toBeVisible()
+  await expect(page.getByRole('link', { name: 'View code', exact: true })).toBeVisible()
   const frame = page.frameLocator('iframe[title="dashboard.html"]')
   await expect(frame.locator('#out')).toHaveText('Drawn by its script')
   await expect(page.locator('script')).toHaveCount(0)

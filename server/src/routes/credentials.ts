@@ -1,20 +1,28 @@
 import {
+  accessPreviewInput,
+  accessSaveInput,
+  credentialHostInput,
+  credentialHostParams,
   githubOwnerName,
   profileAwsInput,
   profileInput,
   profileParams,
   secretSetInput,
   sshSetHostParams,
+  taskAccessInput,
 } from '@seti/shared'
 import { Hono, type Context } from 'hono'
+import { previewAccessSave, saveAccess } from '../access-save.js'
 import {
   createProfile,
   credentialsOverview,
   deleteProfile,
   profileSummaries,
   renameProfile,
+  setProfileAccess,
   setProfileAws,
   setProfileGitHub,
+  setProfileHost,
   setProfileSshHost,
 } from '../credential-profiles.js'
 import { notEa } from '../ea-guard.js'
@@ -57,6 +65,23 @@ export const credentialRoutes = new Hono()
   .delete('/profiles/:id/github/:owner', async (c) =>
     ok(c, await setProfileGitHub(c.req.param('id'), ownerOf(c), null)),
   )
+  .put('/profiles/:id/access', validId, validJson(taskAccessInput), async (c) =>
+    ok(c, await setProfileAccess(c.req.valid('param').id, c.req.valid('json'))),
+  )
+  .post('/profiles/:id/access/preview', validId, validJson(accessPreviewInput), async (c) =>
+    ok(c, await previewAccessSave(c.req.valid('param').id, c.req.valid('json').task_id)),
+  )
+  .post('/profiles/:id/access/save', validId, validJson(accessSaveInput), async (c) => {
+    const { task_id: taskId, expect } = c.req.valid('json')
+    return ok(c, await saveAccess(c.req.valid('param').id, taskId, expect))
+  })
+  .post('/profiles/:id/hosts', validId, validJson(credentialHostInput), async (c) =>
+    ok(c, await setProfileHost(c.req.valid('param').id, c.req.valid('json').host, true)),
+  )
+  .delete('/profiles/:id/hosts/:host', valid('param', credentialHostParams), async (c) => {
+    const { id, host } = c.req.valid('param')
+    return ok(c, await setProfileHost(id, host, false))
+  })
   .put('/profiles/:id/ssh-hosts/:alias', valid('param', sshSetHostParams), async (c) => {
     const { id, alias } = c.req.valid('param')
     return ok(c, await setProfileSshHost(id, alias, true))

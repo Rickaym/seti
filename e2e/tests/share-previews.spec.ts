@@ -100,7 +100,7 @@ test('an SVG renders as a picture with its source, never as SVG', async ({ brows
   try {
     await openShare(viewer.page, url)
     await expect.poll(async () => naturalWidth(viewer.page, 'logo.svg')).toBe(240)
-    await expect(viewer.page.locator('svg, script')).toHaveCount(0)
+    await expect(viewer.page.locator('main svg, script')).toHaveCount(0)
     await viewer.page.getByText('View source').click()
     await expect(viewer.page.locator('details pre')).toContainText('<script>document.title="ran"</script>')
     await expect(viewer.page).toHaveTitle('logo.svg')

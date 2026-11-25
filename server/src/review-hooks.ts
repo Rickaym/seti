@@ -17,13 +17,14 @@ async function reviewed(taskId: string, tool: string): Promise<boolean> {
 
 const decide = (
   permissionDecision: 'allow' | 'deny',
-  extra: { permissionDecisionReason?: string; updatedInput?: Record<string, unknown> },
+  extra: { permissionDecisionReason?: string; updatedInput?: Record<string, unknown>; additionalContext?: string },
 ): HookJSONOutput => ({ hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision, ...extra } })
 
 /**
  * Holds an MCP call a review rule names until the user allows it, with their edits, or denies it,
  * and answers what the agent's review hook returns; as a hook it asks in Bypass too. A call the
- * agent's deny rules refuse is left to them, never reviewed.
+ * agent's deny rules refuse is left to them, never reviewed. When the user's edits ran, the hook
+ * adds Seti's note of them, which the agent reads right after the call's result.
  */
 export async function reviewCall(
   task: Task,
@@ -34,8 +35,10 @@ export async function reviewCall(
   if (!(await reviewed(task.id, tool)) || (await permissionSettings(task)).deny.some((rule) => namesTool(rule, tool))) {
     return {}
   }
-  const answer = await askForReview(task.id, call, [signal])
-  return answer.behavior === 'deny'
-    ? decide('deny', { permissionDecisionReason: answer.message })
-    : decide('allow', { updatedInput: answer.updatedInput ?? input })
+  const { result, note } = await askForReview(task.id, call, [signal])
+  if (result.behavior === 'deny') {
+    return decide('deny', { permissionDecisionReason: result.message })
+  }
+  const updatedInput = result.updatedInput ?? input
+  return decide('allow', note === undefined ? { updatedInput } : { updatedInput, additionalContext: note })
 }

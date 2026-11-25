@@ -154,6 +154,8 @@ export interface PermissionRequest {
   state: PermissionRequestState
   /** What the user told the agent with a deny. */
   message: string | null
+  /** The names of the fields the user edited before they answered; never their text. */
+  edited: string[]
   created_at: string
   decided_at: string | null
   /** When Seti denies the request if nobody answers; null while the timeout is off. */
@@ -178,7 +180,10 @@ export const answerPermissionInput = z.object({
   scope: z.enum(PERMISSION_SCOPES).default('agent'),
   /** Told to the agent with a deny. */
   message: z.string().trim().max(MESSAGE_MAX).optional(),
-  /** New values for an editable call's top-level text fields, by name; an allow runs with them. */
+  /**
+   * New values for an editable call's top-level text fields, by name; an allow runs with them and a
+   * deny shows them to the agent.
+   */
   fields: z
     .record(z.string().max(200), z.string().max(FIELD_MAX))
     .refine((fields) => Object.keys(fields).length <= FIELDS_MAX, 'Too many fields')
@@ -202,6 +207,7 @@ export const permissionRequestSchema = z.object({
   editable: orDefault('editable', z.boolean(), false),
   state: orDefault<PermissionRequestState>('state', z.enum(PERMISSION_REQUEST_STATES), 'cancelled'),
   message: maybeText('message'),
+  edited: orDefault('edited', z.array(z.string()), []),
   created_at: z.string(),
   decided_at: maybeText('decided_at'),
   timeout_at: maybeText('timeout_at'),

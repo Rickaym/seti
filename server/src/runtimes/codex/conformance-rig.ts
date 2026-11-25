@@ -297,10 +297,18 @@ function liveEffects(log: string, changes: readonly Edit[]): readonly string[] {
 
 let rigs = 0
 
+/** Where rigs run: the scripted model, the folder for their homes, and every process they start. */
+export interface RigBench {
+  model: ScriptedResponses
+  folder: string
+  started: RealProcess[]
+}
+
 /** A rig for the real `codex` the adapter starts: a scripted model, a profile for commands. */
-export function codexRig(model: ScriptedResponses, base: string, script: Script): Rig {
+export function codexRig(bench: RigBench, script: Script): Rig {
+  const { model } = bench
   rigs += 1
-  const root = mkdtempSync(path.join(base, `rig-${String(rigs)}-`))
+  const root = mkdtempSync(path.join(bench.folder, `rig-${String(rigs)}-`))
   const home = path.join(root, 'home')
   const work = path.join(root, 'work')
   mkdirSync(home)
@@ -335,6 +343,7 @@ export function codexRig(model: ScriptedResponses, base: string, script: Script)
       request.signal,
     )
     started.push(real)
+    bench.started.push(real)
     return real
   }
   const launcherEnv = script.launcher?.env ?? SANDBOX_ENV
