@@ -23,7 +23,7 @@ async function briefRows(task: Task): Promise<MessageRow[]> {
 }
 
 /** A brief of `from`'s work in a `<handover-brief>` frame, with a preface saying it is data. */
-async function handoverBrief(from: Task): Promise<string> {
+export async function handoverBrief(from: Task): Promise<string> {
   const [rows, packs] = await Promise.all([briefRows(from), taskContextPacks.list(from.id)])
   const brief = buildBrief({
     title: from.title,
