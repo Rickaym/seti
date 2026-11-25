@@ -1,5 +1,6 @@
 import {
   AGENT_COLOR_PRESETS,
+  DELEGATE_LIMITS,
   agentColorFromWords,
   listedStatus,
   rewindInput,
@@ -14,6 +15,8 @@ import { z } from 'zod'
 import { capOf } from '../agent-cap.js'
 import { startAgent } from '../agent-start.js'
 import { archiveTask, listArchived, unarchiveTask } from '../archive.js'
+import { waitForFirstTurn, waitMinutes } from '../crew/delegate-call.js'
+import { heldWait } from '../crew/delegate-wait.js'
 import { HttpError } from '../http.js'
 import { deliverPending, dismissPending } from '../inputs.js'
 import { rewindTargets, rewindTask } from '../rewind-task.js'
@@ -107,7 +110,7 @@ const handOverUpdates = setiTool({
 const startTaskTool = setiTool({
   name: 'start_task',
   description:
-    "Start a new agent on a prompt. It works in a fresh folder of its own and clones the repos it needs, so name them in the prompt. Seti's planner titles it and picks context packs and MCP servers. It runs sandboxed with at most your own access: never SSH, AWS, MCP servers, plugins or credentials you lack, and Seti control Self, never Full. The user sees it listed under you. With notify_when_done, Seti sends you its final message as an update once its first turn ends.",
+    "Start a new agent on a prompt. It works in a fresh folder of its own and clones the repos it needs, so name them in the prompt. Seti's planner titles it and picks context packs and MCP servers. It runs sandboxed with at most your own access: never SSH, AWS, MCP servers, plugins or credentials you lack, and Seti control Self, never Full. The user sees it listed under you. It cannot start agents itself, and at most 4 you started run at once. With notify_when_done, Seti sends you its final message as an update once its first turn ends.",
   input: {
     prompt: startAgentInput.shape.prompt,
     title: startAgentInput.shape.title,
@@ -128,20 +131,38 @@ const startTaskTool = setiTool({
       .describe(
         'Seti adds a brief of your work so far after the prompt: what you were asked, your plan, steps, files and PRs, redacted, without direct messages.',
       ),
+    wait_minutes: z
+      .number()
+      .int()
+      .min(0)
+      .max(DELEGATE_LIMITS.waitMinutes)
+      .default(0)
+      .describe(
+        'Wait in this call up to this many minutes for its first turn to end and get its final message as the result. Past that, or when you are interrupted, it goes on and its end reaches you as an update. While it asks the user for a permission, your call waits too. 0 returns at once.',
+      ),
   },
-  run: async ({ prompt, title, workspace, notify_when_done, runtime, model, effort, include_brief }, ctx) => {
+  run: async (args, ctx) => {
+    const minutes = waitMinutes(args.wait_minutes)
     const input = startAgentInput.parse({
-      prompt,
-      title,
-      workspace_id: workspace === undefined ? ctx.caller.workspace_id : (await resolveWorkspace(workspace)).id,
-      notify_when_done,
-      runtime,
-      model,
-      effort,
-      ...(include_brief ? { brief_of: ctx.caller.id } : {}),
+      prompt: args.prompt,
+      title: args.title,
+      workspace_id:
+        args.workspace === undefined ? ctx.caller.workspace_id : (await resolveWorkspace(args.workspace)).id,
+      notify_when_done: args.notify_when_done || minutes > 0,
+      runtime: args.runtime,
+      model: args.model,
+      effort: args.effort,
+      ...(args.include_brief ? { brief_of: ctx.caller.id } : {}),
     })
-    const task = await startAgent(input, await capOf(ctx.caller))
-    return { ...brief(task), setup: task.setup }
+    const held = heldWait()
+    const task = await startAgent(input, await capOf(ctx.caller), minutes > 0 ? held.hold : undefined)
+    if (minutes === 0) {
+      return { ...brief(task), setup: task.setup }
+    }
+    return {
+      ...brief(task),
+      result: await waitForFirstTurn(ctx.caller, task, { wait: held, minutes, signal: ctx.signal }),
+    }
   },
 })
 
@@ -192,11 +213,17 @@ const setUpdateMode = setiTool({
 const deleteAgent = setiTool({
   name: 'delete_agent',
   description:
-    'Permanently delete another agent, archived or not: its transcript, worktrees, scratch folder, workspace, archive bundle and session.',
+    'Permanently delete another agent, archived or not: its transcript, worktrees, scratch folder, workspace, archive bundle and session. Not an agent another agent started: archive that one.',
   input: { task: taskRef },
   run: async ({ task: ref }, ctx) => {
     const task = await anyTask(ref)
     notSelf(ctx, task, 'delete')
+    if (task.delegated_by !== null) {
+      throw new HttpError(
+        409,
+        'Only the user deletes an agent another agent started, since its cost counts; archive it',
+      )
+    }
     await deleteTask(task)
     return done(`Deleted ${task.title}.`)
   },

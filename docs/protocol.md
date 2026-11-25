@@ -845,11 +845,23 @@ Why: an agent woken by its own actions or by news nobody waited for burns turns 
 - LVL-15: Agents at `self` or `full` propose knowledge notes, at most `notes_waiting` each, refused
   with credentials or private paths. Only a bounded index of approved titles reaches prompts,
   framed as reference, not instructions. Notes go stale by `note_stale`.
+- DLG-1: An agent's `start_task` MAY name `wait_minutes`, at most `delegate_wait`. The call MUST
+  return the helper's first turn end framed as an `agent-turn` update with a preface that it is
+  data, and that end MUST NOT also arrive as an update. At the limit, or when the call is
+  cancelled, it MUST say the helper still runs and the wait MUST become an ordinary one (TURN-19),
+  so the end arrives as an update; across a restart the same holds. No result is lost.
 - DLG-2: An agent another agent starts (`start_task`, `work_on_pr`) MUST record that agent as
   `delegated_by`, and the audit of its creation MUST name it; one the user or the EA starts
   records none. While both are listed, the agent list MUST show it on one line right under its
   caller, marked as started by it, and the Home graph MUST link the two; while it needs the user
-  it sits in Needs you on its own (ATT-1), never its caller.
+  it sits in Needs you on its own (ATT-1), never its caller. An agent another agent started MUST
+  NOT start agents. A start by an agent MUST be refused while it has `delegates_running` running
+  helpers, while `delegates_install` run on the install, and once the helpers it started in the
+  last 24 hours have cost `delegate_budget` by the cost their turns recorded. Starts made at once
+  MUST count each other. Only the user MAY delete an agent another agent started, so its cost
+  keeps counting.
+- DLG-6: While a caller waits in its call (DLG-1), its status line MUST read `Waiting on` and
+  the helper's title, and MUST return to what it was when the wait ends.
 - DLG-4: A start MAY ask for a brief of an agent's work (`include_brief` for the caller's own,
   `brief_of` for the user and the EA). The brief MUST be built from neutral events only, so it
   reads the same for every runtime, redacted, at most `brief_chars`, with every direct message
@@ -1322,6 +1334,7 @@ others.
 | Uploads      | `upload_file` 25 MB. `upload_stall` 30 s. `upload_idle` 60 s. `upload_time` 30 min.                                                                                                                                                                                                                                                                                                    |
 | Opinions     | `opinion_sizes`: question 8,000, context 60,000, files 40,000 in all, answer 8,000 characters. `opinion_files` 5. `opinion_rate` 1 at a time, 20 an hour, 60 a day an agent. Time 5 min. 4,000 output tokens. $1 a call.                                                                                                                                                               |
 | Briefs       | `brief_chars` 12,000. Built from the first 20 and the newest 1,200 transcript rows.                                                                                                                                                                                                                                                                                                    |
+| Delegates    | `delegate_wait` 60 min. `delegates_running` 4 a caller. `delegates_install` 12. `delegate_budget` $10 a caller in 24 hours. Depth 1.                                                                                                                                                                                                                                                   |
 | Dreams       | Window 01:00 to 05:00. `dream_gap` 2 min. `dream_retry` 10 min. `dream_steps` 60. `dream_time` 20 min. `dream_budget` $1. Night budget $5. `dream_gates`: five-hour use 60%, weekly 85%, load 0.75 x cores, 5 GB free. `dream_digest` 40,000 characters. Memory folder 512 KB, 100 files. `dream_proposals` 10. `proposal_expiry` 7 days. `trash_keep` 14 days. `trash_item_max` 5 GB. |
 
 ## Appendix B. Retired identifiers

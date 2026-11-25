@@ -585,6 +585,10 @@ caller in the agent list, and the Home graph links the two. With `include_brief`
 brief of the caller's work after the prompt: what it was asked, its plan, steps, files and PRs,
 redacted and without direct messages. The EA's `start_task` takes `brief_of` to brief a new
 agent on any agent's work.
+With `wait_minutes`, the caller waits in its call for the helper's first turn and gets its final
+message back, while its row reads "Waiting on" and the helper's title; past the time, or when it
+is interrupted, the helper's end arrives as an update instead. A helper cannot start agents, and
+an agent may have 4 helpers running and spend $10 on helpers a day.
 
 ### Access: defaults and per-agent choices
 
