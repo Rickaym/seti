@@ -1,4 +1,4 @@
-import { agentOnCredential, insertAgent, openAccess } from './support/credential-access.js'
+import { agentOnCredential, awsRow, insertAgent, openAccess } from './support/credential-access.js'
 import { expect, test } from './support/fixtures.js'
 
 test("Save access copies an agent's access into its credential after a preview", async ({ page, request }) => {
@@ -6,7 +6,7 @@ test("Save access copies an agent's access into its credential after a preview",
   await insertAgent(profile.id)
   const access = await openAccess(page, id)
   const aws = access.getByRole('switch', { name: 'AWS', exact: true })
-  const row = access.getByRole('listitem').filter({ has: aws })
+  const row = awsRow(page, access)
   await aws.click()
   await expect(row).toContainText('Custom')
 

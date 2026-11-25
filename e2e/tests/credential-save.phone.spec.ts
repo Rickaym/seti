@@ -3,7 +3,7 @@ import { expect, test } from './support/fixtures.js'
 import { expectFitsPhone, expectTouchTarget } from './support/phone-layout.js'
 
 test('the Save access preview fits a phone', async ({ page, request }) => {
-  const { id, profile } = await agentOnCredential(request, 'Save on a phone with a long name')
+  const { id, profile } = await agentOnCredential(request, 'Save on a long phone name')
   await insertAgent(profile.id)
   await insertAgent(profile.id)
   const access = await openAccess(page, id)
