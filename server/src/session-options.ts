@@ -104,10 +104,13 @@ async function setiRules(task: Task): Promise<Omit<RuleSources, 'inherited'>> {
 }
 
 /** Every rule the task's agent runs with, by source, Claude Code's settings files included. */
-export async function ruleSources(task: Task): Promise<RuleSources> {
+export async function ruleSources(task: Task, held: ReadonlySet<string> = new Set()): Promise<RuleSources> {
   const inherited = [
     ...userSettingsRules().map((rule) => ({ ...rule, anchor: CLAUDE_HOME })),
-    ...projectSettingsRules(task.cwd).map((rule) => ({ ...rule, anchor: task.cwd })),
+    ...projectSettingsRules(task.cwd, held).map((rule) => ({
+      ...rule,
+      anchor: task.cwd,
+    })),
   ]
   return { ...(await setiRules(task)), inherited }
 }

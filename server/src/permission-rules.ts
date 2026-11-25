@@ -15,6 +15,7 @@ import { audit } from './audit.js'
 import { permissionModeOf } from './bypass-mode.js'
 import { tasks } from './db.js'
 import { refuseAgent } from './ea-guard.js'
+import { heldFolderSettings } from './folder-settings-trust.js'
 import { HttpError } from './http.js'
 import { projectSettingsRules, userSettingsRules } from './inherited-rules.js'
 import { controlLink } from './node-link.js'
@@ -65,7 +66,7 @@ export async function agentPermissions(task: Task): Promise<AgentPermissions> {
   return {
     ...policy,
     own,
-    project: projectSettingsRules(task.cwd),
+    project: projectSettingsRules(task.cwd, await heldFolderSettings(task.cwd)),
     review_gaps: reviewGaps(review, [...reviewRules(policy.rules), ...review]),
   }
 }
