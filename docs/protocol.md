@@ -478,6 +478,15 @@ interrupted only for that.
   apply, neither in the control room's gate nor in the runtime, and its tool servers stay off;
   its ask and deny rules apply. A running session takes no change to its folder's settings; the
   next session reads them. The control room records each file it holds back.
+- SBX-15: A sandboxed agent's sessions keep and load their runtime's memory in the agent's own
+  memory folder, its own project's, whatever repository its folders belong to, so they load what
+  its dreams edit. The memory folders of the checkouts behind its folders, which other sessions of
+  those repositories share, are mounted read-only, and its prompt names each one's index. Seti
+  copies nothing between the folders and writes nothing into the agent's folders for this. An
+  unsandboxed agent's sessions keep the runtime's own choice.
+  Why: a runtime that keys memory by repository would give an agent in a worktree the memory
+  every session of the repository shares, the user's own included, and not the folder its dreams
+  tidy.
 
 ### 7.3 Egress
 
@@ -1092,9 +1101,9 @@ Optional and off by default: a maintenance session per agent that consolidates i
   only in its memory folder and the night's dream folder of its workspace. It reads a digest of
   the agent's transcript since its last dream, built from neutral events, at most
   `dream_digest` characters, with credentials redacted and the user's messages and failures kept
-  first. Its prompt names the other memory folders the agent's sessions see (its checkouts'),
-  which it reads before it writes and may not change. When it changed memory that the agent's
-  sessions do not load, because they load their repository's, its report says so in one line.
+  first. Its memory folder is the one the agent's sessions load (SBX-15). Its prompt names the
+  other memory folders the agent's sessions see read-only (its checkouts'), which it reads before
+  it writes and may not change.
 - DRM-7: A dream MUST NOT start or change a turn of the agent, post, send an update, push or
   notify, or enter Needs you. Its outcome is one stored report, also written beside the digest,
   and the agent's next turn is told once which dreams changed its memory.
