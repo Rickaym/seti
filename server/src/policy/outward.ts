@@ -146,8 +146,12 @@ function ghFork(args: readonly string[], dir: string | null): Outward[] {
 function ghApi(api: readonly string[], dir: string | null): Outward[] {
   const endpoint = (api[positional(api, 0, [...API_PAIRED, ...API_PAIRED_MORE])] ?? '').replace(/^\//, '')
   const repo = /^repos\/([^/?]+)\/([^/?]+)/.exec(endpoint)
-  if (repo === null || !apiWrites(api)) {
+  if (!apiWrites(api)) {
     return []
+  }
+  if (repo === null) {
+    const unread = /^(repos\/|[$`])/.test(endpoint)
+    return unread ? [{ action: 'api', where: { unknown: 'Seti cannot read the API path' } }] : []
   }
   const slug = `${repo[1] ?? ''}/${repo[2] ?? ''}`
   return slug.includes('{') ? [current('api', dir)] : [{ action: 'api', where: { repo: slug } }]
