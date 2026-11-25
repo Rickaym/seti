@@ -3,7 +3,6 @@ import os from 'node:os'
 import path from 'node:path'
 import { extraDirs, type MemoryCap, type Task } from '@seti/shared'
 import { CLAUDE_HOME, CREDENTIALS, DATABASE_URL, REDIS_URL, SETI_HOME } from './config.js'
-import { heldFolderSettings } from './folder-settings-trust.js'
 import { projectSettingsRules, userSettingsRules } from './inherited-rules.js'
 import { memoryEnv } from './node-heap.js'
 import type { GuardScope } from './permission-guard.js'
@@ -105,10 +104,10 @@ async function setiRules(task: Task): Promise<Omit<RuleSources, 'inherited'>> {
 }
 
 /** Every rule the task's agent runs with, by source, Claude Code's settings files included. */
-export async function ruleSources(task: Task): Promise<RuleSources> {
+export async function ruleSources(task: Task, held: ReadonlySet<string> = new Set()): Promise<RuleSources> {
   const inherited = [
     ...userSettingsRules().map((rule) => ({ ...rule, anchor: CLAUDE_HOME })),
-    ...projectSettingsRules(task.cwd, await heldFolderSettings(task.cwd)).map((rule) => ({
+    ...projectSettingsRules(task.cwd, held).map((rule) => ({
       ...rule,
       anchor: task.cwd,
     })),

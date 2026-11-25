@@ -20,7 +20,7 @@ import { readProcesses, stoppable, subtreeOf, terminate } from './agent-processe
 import { findBinary } from './binaries.js'
 import { CLAUDE_HOME, SCRATCH_ROOT, SETI_HOME } from './config.js'
 import { tasks } from './db.js'
-import { watchFolderSettings } from './folder-settings-trust.js'
+import { heldFolderSettings, watchFolderSettings } from './folder-settings-trust.js'
 import { sandboxPlanFor } from './launch-plan.js'
 import { detectScopeHost, type ScopePlan } from './memory-scope.js'
 import { oomRun, oomRunBlocked, oomScriptArgs } from './oom-fixtures.js'
@@ -839,7 +839,9 @@ describe.skipIf(!available)('a real task sandbox', () => {
           )
           expect(out, `${runtime} ${how} ${name}`).toContain('PLANTED_OK')
           for (const session of ['the session that wrote it', 'the next session']) {
-            const rules = (await ruleSources(task)).inherited.map((rule) => `${rule.behavior} ${rule.rule}`)
+            const rules = (await ruleSources(task, await heldFolderSettings(work))).inherited.map(
+              (rule) => `${rule.behavior} ${rule.rule}`,
+            )
             expect(rules, `${runtime} ${how} ${name}: ${session}`).not.toContain('allow mcp__seti_probe__peek')
             expect(rules).toEqual(expect.arrayContaining(['ask Bash(probe-ask:*)', 'deny Bash(probe-deny:*)']))
             const claude = await folderSettingsOf(work)
@@ -855,7 +857,9 @@ describe.skipIf(!available)('a real task sandbox', () => {
     }
     fs.writeFileSync(path.join(work, '.claude', 'settings.local.json'), planted.replace('probe-ask', 'user-ask'))
     await watchFolderSettings(task)
-    expect((await ruleSources(task)).inherited.map((rule) => rule.rule)).toContain('mcp__seti_probe__peek')
+    expect((await ruleSources(task, await heldFolderSettings(work))).inherited.map((rule) => rule.rule)).toContain(
+      'mcp__seti_probe__peek',
+    )
     fs.rmSync(path.join(work, '.claude'), { recursive: true, force: true })
     fs.rmSync(path.join(work, 'planted.json'), { force: true })
   })

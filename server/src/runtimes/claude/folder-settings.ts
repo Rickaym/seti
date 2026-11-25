@@ -1,6 +1,5 @@
 import fs from 'node:fs'
 import path from 'node:path'
-import type { HookCallbackMatcher } from '@anthropic-ai/claude-agent-sdk'
 import { heldFolderSettings } from '../../folder-settings-trust.js'
 import { settingsRules } from '../../inherited-rules.js'
 import type { PermissionSettings } from '../../permission-policy.js'
@@ -54,20 +53,4 @@ export async function folderSettingsOf(cwd: string): Promise<FolderSettings> {
     },
     disabledServers: held.has('.mcp.json') ? serverNames(path.join(cwd, '.mcp.json')) : [],
   }
-}
-
-/**
- * Keeps a sandboxed session on the folder settings it started with: a change to the folder's
- * project or local settings, by the agent or anyone, applies from the next session.
- */
-export const folderConfigHook: HookCallbackMatcher = {
-  hooks: [
-    async (input) =>
-      Promise.resolve(
-        input.hook_event_name === 'ConfigChange' &&
-          (input.source === 'project_settings' || input.source === 'local_settings')
-          ? { decision: 'block' as const, reason: "The folder's settings apply from the agent's next session." }
-          : {},
-      ),
-  ],
 }

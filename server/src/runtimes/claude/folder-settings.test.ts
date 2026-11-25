@@ -7,9 +7,12 @@ import { createApp } from '../../app.js'
 import { claudeRules } from '../../approval-ceiling.js'
 import { tasks } from '../../db.js'
 import { watchFolderSettings } from '../../folder-settings-trust.js'
+import { setupAnswers } from '../../session-setup.js'
 import { sessionOptions, setupKey } from '../../session-spec.js'
 import { auditEvents } from '../../store/audit.js'
-import { folderConfigHook, folderSettingsOf, holdsNothing } from './folder-settings.js'
+import { folderSettingsWatch } from '../../store/folder-settings.js'
+import { folderConfigHook } from './config-hook.js'
+import { folderSettingsOf, holdsNothing } from './folder-settings.js'
 
 createApp()
 
@@ -81,6 +84,15 @@ describe("a Claude Code agent's folder settings", () => {
     expect(permissions.allow).not.toContain('Bash(curl:*)')
     expect(await setupKey(task)).not.toBe(before)
     expect((await claudeRules(task)).deny, 'the rules a running session is handed again').toContain('Bash(rm:*)')
+  })
+
+  it("starts watching a sandboxed agent's missing settings when its session starts, and not an unsandboxed one's", async () => {
+    const boxed = await agentIn('boxed')
+    const open = await agentIn('open', false)
+    await setupAnswers['session.spec'](boxed.id)
+    await setupAnswers['session.spec'](open.id)
+    expect(await folderSettingsWatch.of([path.join(boxed.cwd, '.mcp.json')])).toHaveLength(1)
+    expect(await folderSettingsWatch.of([path.join(open.cwd, '.mcp.json')])).toEqual([])
   })
 
   it("blocks a change to the folder's project or local settings mid-session, and nothing else", async () => {
