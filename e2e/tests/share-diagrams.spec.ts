@@ -55,7 +55,7 @@ test('a shared Markdown file shows its mermaid fence as an image that zooms with
     await expect.poll(async () => image.evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(0)
     await expect(viewer.page.locator('pre code')).toHaveText('ship()')
     await expect(viewer.page.getByText('Collect laptops')).toHaveCount(0)
-    await expect(viewer.page.locator('svg, script')).toHaveCount(0)
+    await expect(viewer.page.locator('main svg, script')).toHaveCount(0)
     await expect(figure.getByRole('radio', { name: 'Fit' })).toBeChecked()
     const natural = await naturalOf(figure)
     expect(natural).toBeGreaterThan(50)

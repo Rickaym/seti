@@ -1,7 +1,8 @@
 import { expect, test } from './support/fixtures.js'
 import { expectFitsPhone, expectTouchTarget } from './support/phone-layout.js'
 import { expectDashboardCode, expectRenderedDashboard, RENDER_LINE, seedDashboard } from './support/render-dialog.js'
-import { seedShareAgent, setSharing, stranger } from './support/shares.js'
+import { expectThinBars, LONG_NAME, seedLongDashboard } from './support/share-bar.js'
+import { seedShareAgent, setSharing, shareByApi, stranger } from './support/shares.js'
 import { filesPanel, openViewerFile } from './support/viewer-files.js'
 
 test.beforeEach(async ({ request }) => {
@@ -47,8 +48,25 @@ test('a phone shares an HTML file, which renders as its page and fits the phone'
     )
     expect(overflow).toBeLessThanOrEqual(0)
     await viewer.page.screenshot({ path: test.info().outputPath('render-page-phone.png') })
-    await viewer.page.getByRole('link', { name: 'View code' }).tap()
+    await viewer.page.getByRole('link', { name: 'View code', exact: true }).tap()
     await expectDashboardCode(viewer.page)
+  } finally {
+    await viewer.close()
+  }
+})
+
+test('a phone sees a rendered share and its code view under one thin bar, light and dark', async ({
+  request,
+  browser,
+  viewport,
+}, info) => {
+  const { id, dir } = await seedShareAgent()
+  seedLongDashboard(dir)
+  const url = await shareByApi(request, id, LONG_NAME)
+  const viewer = await stranger(browser, viewport ?? { width: 390, height: 844 })
+  try {
+    await expectThinBars(viewer.page, url, info.project.name, true)
+    await expectFitsPhone(viewer.page, 'the code view under its bar')
   } finally {
     await viewer.close()
   }

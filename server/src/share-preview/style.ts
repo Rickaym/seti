@@ -27,11 +27,15 @@ export const SHARE_STYLE = `
 --page:#e6e8eb;--flag:#d29922}}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.6 system-ui,-apple-system,"Segoe UI",sans-serif}
-header{display:flex;flex-wrap:wrap;align-items:center;gap:8px 16px;padding:12px 16px;border-bottom:1px solid var(--line)}
-header .meta{flex:1 1 240px;min-width:0}
-header h1{margin:0;font-size:16px;font-weight:600;overflow-wrap:anywhere}
-.sub{color:var(--muted);font-size:13px}
-.dl{border:1px solid var(--line);border-radius:6px;padding:6px 12px;color:var(--fg);text-decoration:none;font-size:14px}
+header{display:flex;align-items:center;gap:12px;height:36px;padding:0 4px 0 12px;border-bottom:1px solid var(--line);white-space:nowrap;font-size:13px;line-height:20px}
+header h1{flex:0 1 auto;min-width:0;margin:0;overflow:hidden;text-overflow:ellipsis;font-size:13px;font-weight:600}
+header .info{flex:none;color:var(--muted)}
+header .by{flex:none;margin-left:auto;color:var(--muted);font-size:12px}
+header .acts{flex:none;display:flex;gap:4px}
+header .act{display:flex;align-items:center;justify-content:center;width:40px;height:34px;border-radius:6px;color:var(--muted)}
+header .act:hover{color:var(--fg);background:var(--code)}
+header .act:focus-visible{outline:2px solid var(--link);outline-offset:-2px;color:var(--fg)}
+@media (max-width:719px){header .info{display:none}}
 main{max-width:960px;margin:0 auto;padding:16px}
 pre{background:var(--code);border:1px solid var(--line);border-radius:6px;padding:12px;overflow:auto;font:13px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace}
 pre.text{white-space:pre}

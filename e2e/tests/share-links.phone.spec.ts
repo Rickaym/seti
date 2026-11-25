@@ -1,5 +1,6 @@
 import { expect, test } from './support/fixtures.js'
 import { expectFitsPhone, expectTouchTarget } from './support/phone-layout.js'
+import { expectThinBar } from './support/share-bar.js'
 import { openShare, seedShareAgent, setSharing, shareByApi, stranger } from './support/shares.js'
 import { filesPanel, openViewerFile } from './support/viewer-files.js'
 
@@ -34,10 +35,7 @@ test('a phone shares a file from Files, and the link reads well on a phone', asy
   try {
     await openShare(viewer.page, url)
     await expect(viewer.page.getByRole('img', { name: 'chart' })).toBeVisible()
-    const overflow = await viewer.page.evaluate(
-      () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
-    )
-    expect(overflow).toBeLessThanOrEqual(0)
+    await expectThinBar(viewer.page, 'notes.md', ['Download'])
     await expect(viewer.page.locator('script')).toHaveCount(0)
   } finally {
     await viewer.close()

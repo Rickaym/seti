@@ -7,7 +7,8 @@ import {
   RENDER_LINE,
   seedDashboard,
 } from './support/render-dialog.js'
-import { seedShareAgent, setSharing, stranger } from './support/shares.js'
+import { expectThinBars, LONG_NAME, seedLongDashboard } from './support/share-bar.js'
+import { seedShareAgent, setSharing, shareByApi, stranger } from './support/shares.js'
 import { filesPanel, openViewerFile } from './support/viewer-files.js'
 
 test.beforeEach(async ({ request }) => {
@@ -57,7 +58,7 @@ test('an HTML file renders as its page by default, and turning Render off shows 
     await viewer.page.goto(url)
     await expectRenderedDashboard(viewer.page)
     await viewer.page.screenshot({ path: test.info().outputPath('render-page.png') })
-    await viewer.page.getByRole('link', { name: 'View code' }).click()
+    await viewer.page.getByRole('link', { name: 'View code', exact: true }).click()
     await expect(viewer.page).toHaveURL(`${url}/code`)
     await expectDashboardCode(viewer.page)
 
@@ -88,6 +89,21 @@ test('an HTML file shared with Render off shows its code', async ({ page, browse
   try {
     await viewer.page.goto(await link.inputValue())
     await expectDashboardCode(viewer.page)
+  } finally {
+    await viewer.close()
+  }
+})
+
+test('a rendered share and its code view keep one thin bar with icon actions, light and dark', async ({
+  request,
+  browser,
+}) => {
+  const { id, dir } = await seedShareAgent()
+  seedLongDashboard(dir)
+  const url = await shareByApi(request, id, LONG_NAME)
+  const viewer = await stranger(browser)
+  try {
+    await expectThinBars(viewer.page, url, 'desktop', false)
   } finally {
     await viewer.close()
   }
