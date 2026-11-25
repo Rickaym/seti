@@ -197,6 +197,17 @@ between two steps; an interrupt; a hook at subagent start.
 - RT-14: A runtime whose model can summarise its reasoning MUST ask for the summary, so its agents
   show their thinking as the default runtime's do. Reasoning the model seals for its own next call
   MUST NOT be stored, served or shown by the control room.
+- RT-15: The user, the EA after the user's yes, or an agent at `full` MAY move another agent to a
+  runtime the user has on (Continue on, `POST /api/tasks/:id/session/restart` with `runtime` and
+  an optional `model`). The move MUST keep the agent, its title, folders, links, transcript and
+  cost; MUST start the new runtime's session afresh, or resume the session the agent last had on
+  that runtime; and MUST give the agent a brief of its work (DLG-4) once, with its next message.
+  It MUST be refused to the agent's own runtime, to a runtime that is off or whose key the agent's
+  credential lacks, to a runtime that runs only sandboxed while the agent runs unsandboxed, on
+  itself (LVL-5), and while a turn runs unless `interrupt` stops it first. Background work ends as
+  on a restart, Bypass ends, and a move the EA or an agent makes MUST NOT leave the agent's
+  approvals looser than before it. Each move is audited as `task.runtime_changed` with the
+  runtimes, the model and who moved it.
 
 ## 4. Turn lifecycle
 
