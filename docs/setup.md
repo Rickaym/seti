@@ -818,8 +818,10 @@ request says when a name was last seen if that was over 30 days ago. Seti holds 
 this.
 
 To fill the names in one go, ask any agent with the Slack MCP server: "Run slack_list_user_channels
-with types public_channel,private_channel,im,mpim and limit 200, follow every next cursor, and tell
-me how many you found." Its answer names each of your channels and the people you message.
+with types public_channel,private_channel,im,mpim, format full and limit 200, follow every next
+cursor, and tell me how many you found." Its answer names each of your channels and the people you
+message beside their ids. The `names_only` and `ids_only` formats leave out one or the other, so
+Seti learns nothing from them.
 
 While both switches are off, the Slack webhook works exactly as before. Once you turn one on,
 `app_mention` and other events still reach its subscribers, such as the EA's inbox, but a `message`

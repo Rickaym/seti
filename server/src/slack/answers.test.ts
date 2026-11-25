@@ -223,6 +223,16 @@ describe('Slack names in Slack MCP answers', () => {
     expect(namesInAnswer({ tool, input }, answer)).toEqual(names)
   })
 
+  it('learns nothing from a channel list in the names-only or ids-only format, which lacks ids or names', () => {
+    const namesOnly = JSON.stringify({
+      result: '## My Channels (showing 3, more results available)\n\n#deploys\n#release-train\nDM: Sam Lee\n',
+    })
+    const idsOnly = JSON.stringify({ result: '## My Channels (showing 2 of 2 total)\n\nC0DEPLOY01\nD0SAMLEE01\n' })
+    for (const answer of [namesOnly, idsOnly]) {
+      expect(namesInAnswer({ tool: 'slack_list_user_channels', input: { format: 'names_only' } }, answer)).toEqual([])
+    }
+  })
+
   it('reads nothing from a tool it does not know, or from an answer that is not its format', () => {
     expect(namesInAnswer({ tool: 'slack_search_public', input: {} }, channelRead('deploys', 'C0DEPLOY01'))).toEqual([])
     expect(namesInAnswer({ tool: 'slack_search_channels', input: {} }, 'No results found.')).toEqual([])
