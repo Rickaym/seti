@@ -1,11 +1,19 @@
 import fs from 'node:fs'
 import path from 'node:path'
-import type { DreamProposalInput, DreamReport, DreamRun, RuntimeEvent, Task } from '@seti/shared'
+import {
+  extraDirs,
+  type DreamProposalInput,
+  type DreamReport,
+  type DreamRun,
+  type RuntimeEvent,
+  type Task,
+} from '@seti/shared'
 import { audit } from '../audit.js'
+import { CLAUDE_HOME, WORKTREE_ROOT } from '../config.js'
 import { launchPlan } from '../launch-plan.js'
 import { maintenanceLauncher } from '../launcher.js'
 import type { DreamSession, DreamSupport, SessionMessage } from '../runtimes/adapter.js'
-import { projectSlug } from '../sandbox-mounts.js'
+import { memoryDirs, projectSlug } from '../sandbox-mounts.js'
 import { isRunning } from '../session-mirror.js'
 import { sandboxContext, workingDirs } from '../session-options.js'
 import { dreamRuns, type DreamEnd } from '../store/dreams.js'
@@ -124,7 +132,7 @@ async function lastDream(job: DreamJob): Promise<string | null> {
   return done?.ended_at ?? null
 }
 
-async function writeDigest(job: DreamJob, since: string | null): Promise<string> {
+async function writeDigest(job: DreamJob, since: string | null): Promise<{ file: string; empty: boolean }> {
   const { rows, truncated } = await dayRows(job.task.id, since)
   const text = composeDigest({
     title: job.task.title,
@@ -136,7 +144,17 @@ async function writeDigest(job: DreamJob, since: string | null): Promise<string>
   })
   const file = path.join(nightDir(job), 'digest.md')
   fs.writeFileSync(file, text, { mode: 0o600 })
-  return file
+  return { file, empty: rows.length === 0 }
+}
+
+/** The report of a dream that found nothing new since the last one, which runs no session. */
+const NOTHING_NEW: DreamReport = {
+  summary: 'Nothing new since the last dream, so nothing to tidy.',
+  tidied: [],
+  remembered: [],
+  asks: [],
+  found: [],
+  nothing_to_do: true,
 }
 
 /** Follows the session to its end, stopping it at the time limit or when the agent starts a turn. */
@@ -180,21 +198,34 @@ async function follow(session: DreamSession, job: DreamJob, tally: Tally): Promi
   }
 }
 
-/** Where the dream's folders are as its sandbox shows them, for the gate. */
-function placesOf(job: DreamJob, night: string): DreamPlaces {
+/** The checkouts' memory folders the agent's sessions also see, as its sandbox shows them. */
+function sharedMemory(task: Task, home: string): string[] {
+  const trust = { cwd: task.cwd, dirs: extraDirs(task), homeAccess: task.home_access, worktreeRoot: WORKTREE_ROOT }
+  return memoryDirs(trust)
+    .filter((dir) => fs.existsSync(path.join(CLAUDE_HOME, dir)))
+    .map((dir) => path.join(home, '.claude', dir))
+}
+
+/** Where the dream's folders are as its sandbox shows them, for the gate and the prompt. */
+function placesOf(job: DreamJob, night: string): DreamPlaces & { shared: string[] } {
   const home = sandboxContext().home
   const memory = path.join(home, '.claude', 'projects', projectSlug(job.task.cwd), 'memory')
+  const shared = sharedMemory(job.task, home)
   const work = [job.task.cwd, ...workingDirs(job.task)]
-  return { cwd: job.task.cwd, home, readable: [...work, memory], memory, night }
+  return { cwd: job.task.cwd, home, readable: [...work, memory, ...shared], memory, night, shared }
 }
 
 async function dreamSession(job: DreamJob, tally: Tally, night: string): Promise<void> {
+  const since = await lastDream(job)
+  const { file: digest, empty } = await writeDigest(job, since)
+  if (empty && since !== null) {
+    tally.reported(NOTHING_NEW)
+    return
+  }
   const launcher = await maintenanceLauncher(job.task, { writable: [night] }, await launchPlan(job.task))
   if (launcher === null) {
     throw new Error('The agent runs without the sandbox, so a dream could not be contained.')
   }
-  const since = await lastDream(job)
-  const digest = await writeDigest(job, since)
   const places = placesOf(job, night)
   const gate = (call: Parameters<typeof dreamGate>[0]) => {
     const refusal = dreamGate(call, places, job.memory)
@@ -218,7 +249,7 @@ async function dreamSession(job: DreamJob, tally: Tally, night: string): Promise
       lastDream: since,
       digest,
       memory: places.memory,
-      shared: [],
+      shared: places.shared,
       maxSteps: job.limits.steps,
       budgetUsd: job.limits.budgetUsd,
       cleanups: job.limits.cleanups === true,
@@ -228,6 +259,14 @@ async function dreamSession(job: DreamJob, tally: Tally, night: string): Promise
   }
   const session = await job.dream.open(spec, launcher, { gate, tools }, new AbortController())
   await follow(session, job, tally)
+}
+
+/** Seti's line for a dream that changed memory the agent's sessions do not load. */
+function unloaded(job: DreamJob, changes: number): string[] {
+  const loaded = job.dream.loaded?.(job.task.cwd) ?? job.memory
+  return changes > 0 && loaded !== job.memory
+    ? ["Seti: the agent's sessions load its repository's memory, not this folder, so they do not see these notes yet."]
+    : []
 }
 
 /**
@@ -247,7 +286,7 @@ export async function runDream(job: DreamJob): Promise<DreamRun | undefined> {
   }
   const after = await recordAfter(job.task.id, job.run, job.memory, job.before)
   forgetBefore(job.task.id, job.run.id)
-  const found = [...(tally.report?.found ?? []), ...after.found].slice(0, 10)
+  const found = [...(tally.report?.found ?? []), ...unloaded(job, after.changes), ...after.found].slice(0, 10)
   const report = tally.report === null ? null : { ...tally.report, found }
   const end: DreamEnd = {
     state: tally.end?.state ?? 'done',

@@ -68,6 +68,14 @@ describe('realising a Codex session', () => {
     expect(settingsOf(realised.args)).toContain('model_reasoning_summary="auto"')
   })
 
+  it("reads a folder's CLAUDE.md when it has no AGENTS.md, as a Claude Code agent reads it", () => {
+    const realised = realiseCodex(spec, launcher({ SETI_MODEL_KEY: 'seti-placeholder' }), {
+      ...answering,
+      binary: '/c',
+    })
+    expect(settingsOf(realised.args)).toContain('project_doc_fallback_filenames=["CLAUDE.md"]')
+  })
+
   it("starts Seti's tool servers through their relay, and the shared tools with the agent's variables", () => {
     const relay = { command: '/usr/bin/socat', args: ['STDIO', 'UNIX-CONNECT:/run/seti/tools-0.sock'] }
     const withShared = { ...spec, toolServers: { ...toolServers, shared: ['/tools/a'] } }

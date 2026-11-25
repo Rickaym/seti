@@ -22,14 +22,24 @@ export const SECOND_OPINION_LIMITS = {
   budgetUsd: 1,
 } as const
 
-/** What an agent sends with a question to a model on another runtime. */
-export const secondOpinionInput = z.strictObject({
-  question: z.string().trim().min(1).max(SECOND_OPINION_LIMITS.question),
-  context: z.string().max(SECOND_OPINION_LIMITS.context).optional(),
-  files: z.array(z.string().min(1)).max(SECOND_OPINION_LIMITS.files).optional(),
-  runtime: z.enum(STORED_RUNTIMES).optional(),
-  model: z.string().min(1).optional(),
-})
+/** What a light review of a pull request asks when the agent asks nothing else. */
+export const PR_REVIEW_QUESTION =
+  'Review this pull request. Name bugs, risky changes and missing tests, each with its file and line, ' +
+  'most serious first. Say plainly if you find nothing that needs a change.'
+
+/** What an agent sends with a question, or one of its PRs, to a model on another runtime. */
+export const secondOpinionInput = z
+  .strictObject({
+    question: z.string().trim().min(1).max(SECOND_OPINION_LIMITS.question).optional(),
+    context: z.string().max(SECOND_OPINION_LIMITS.context).optional(),
+    files: z.array(z.string().min(1)).max(SECOND_OPINION_LIMITS.files).optional(),
+    pr: z.url().optional(),
+    runtime: z.enum(STORED_RUNTIMES).optional(),
+    model: z.string().min(1).optional(),
+  })
+  .refine((input) => input.question !== undefined || input.pr !== undefined, {
+    message: 'Ask a question, or name one of your pull requests to review.',
+  })
 export type SecondOpinionInput = z.infer<typeof secondOpinionInput>
 
 /** A second opinion as its result reads: who answered, what it took and cost, and the answer. */
@@ -79,4 +89,19 @@ export interface SecondOpinionSpend {
   count: number
   usd: number
   estimated: boolean
+}
+
+/** The latest light review of one of an agent's pull requests, as the PR row shows it. */
+export interface PrOpinion {
+  pr_url: string
+  runtime: StoredRuntime
+  model: string
+  created_at: string
+  answer: string
+}
+
+/** What an agent's second opinions cost by runtime, and its pull requests' latest reviews. */
+export interface AgentOpinions {
+  spend: SecondOpinionSpend[]
+  reviews: PrOpinion[]
 }
