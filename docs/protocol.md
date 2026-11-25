@@ -792,6 +792,12 @@ interrupted only for that.
   `warning`.
 - CHN-29: Each delivery is logged with its status, HTTP status, reason, a redacted excerpt and
   each subscription's outcome. Failed routes retry with doubling backoff (`route_retry`).
+- THR-1: A Slack message an agent sends, with an MCP `send_message` tool or `chat.postMessage`, is
+  recorded when its successful result names the channel and ts (a Slack message link, or the Web
+  API answer). Its thread is the link's or the call's `thread_ts`, else the message itself, and
+  the agent follows it; a later send there follows it again after a stop. Seti keeps ids and the
+  link, never the text. An agent follows at most `thread_cap` threads; a new one stops the least
+  recently active.
 
 ## 11. Pull requests
 
@@ -1224,6 +1230,19 @@ Optional and off by default: a maintenance session per agent that consolidates i
   `noindex`, `no-referrer`, `nosniff` and `default-src 'none'`; downloads are never HTML or SVG. A
   file is shared only after path checks, a key and credential name deny list, `share_size` and a
   secret scan.
+  This holds for every share that is not live (PUB-10), and for a live share's static view.
+- PUB-10: A live share is the user's choice per link, off by default, for HTML files only; the EA
+  and agents cannot make one. Its link answers a page with no script around a frame
+  (`sandbox allow-scripts`) holding the stored copy, plus a static view at `/static`. The frame's
+  document is served only to a frame (`Sec-Fetch-Dest: iframe`; else the same 404) and is
+  sandboxed by its own policy too: an opaque origin with no cookies or storage (an in-memory stand-in
+  only), no network but scripts, styles and fonts from the `LIVE_SHARE_CDNS` prefixes, images only
+  from `data:` and `blob:`, no frames, workers, plugins, forms, popups, downloads or top
+  navigation, and `frame-ancestors 'self'`; the page's `frame-src` names only that frame, so it
+  cannot navigate elsewhere. Both carry PUB-7's headers, `Permissions-Policy` with every feature
+  off and `X-DNS-Prefetch-Control: off`. Known limit: browsers let a script reach the internet
+  through WebRTC, so a live page can send what it holds and what a visitor types to a host it
+  names; a live share promises isolation from Seti, not the absence of network.
 
 ## 19. Client contract
 
@@ -1294,7 +1313,7 @@ An implementation is SETI-compatible when it meets all of:
 | Assistant     | all EA; LVL-6                                                                          |
 | Separate node | all NODE                                                                               |
 | Mods          | all MOD                                                                                |
-| Sharing       | PUB-4, PUB-7                                                                           |
+| Sharing       | PUB-4, PUB-7, PUB-10                                                                   |
 | Devices       | API-11                                                                                 |
 | Storage       | RES-16 to RES-19                                                                       |
 
@@ -1360,6 +1379,7 @@ others.
 | Poller fetch | 20 requests a run, 5 redirects, 4 MB each, 12 MB a run. `poller_backoff` 6 h. `fail_streak` 5 (reminders 3).                                                                                                                                                                                                                                                                           |
 | Reminders    | `reminder_limits`: interval 1 min to 7 days; 5 s; 256 MB; message 2000; state 16 KB. `cron_catchup` 1 h.                                                                                                                                                                                                                                                                               |
 | PRs          | Create request 50 links. `pr_poll` 60 s. `pr_skew` 5 s. `subagent_wait` 30 min.                                                                                                                                                                                                                                                                                                        |
+| Threads      | `thread_cap` 50.                                                                                                                                                                                                                                                                                                                                                                       |
 | Chat         | Message 4000. Active agent: running, session open, or updated within 12 h. `chat_burst` 12 in 15 min. `chat_loop` 6 in 15 min.                                                                                                                                                                                                                                                         |
 | Questions    | Answer batch 100 items. `notes_waiting` 10. Index 1500 characters. `note_stale` 3 failed checks in a row, or unverified 30 days (fact, environment) or 90 days (how-to, gotcha).                                                                                                                                                                                                       |
 | Assistant    | `ask_ttl` 10 min. `settle` quiet 45 s, at most 3 min. `call_silence` 30 s. `wake_phrase` 2 to 40 characters, at most 4 words. `keep_awake_seconds` 5 to 600.                                                                                                                                                                                                                           |

@@ -76,3 +76,8 @@ ALTER TABLE share_image ALTER COLUMN bytes SET STORAGE EXTERNAL;
 
 ALTER TABLE share_view ADD COLUMN unfurler TEXT;
 `
+
+/** Live shares: an HTML file's page runs its scripts in an isolated frame; off by default. */
+export const SHARE_LIVE = `
+ALTER TABLE share ADD COLUMN live BOOLEAN NOT NULL DEFAULT false;
+`
