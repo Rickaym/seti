@@ -18,6 +18,15 @@ const inputIs =
   (report: SessionReport): boolean =>
     report.type === 'input' && report.id === id && report.state === state
 
+/**
+ * The report ends a turn that took the input: a later turn, or for a runtime that steers, the
+ * running turn itself when it took the input at its next step before an interrupt reached it.
+ */
+const turnTook =
+  (id: string) =>
+  (report: SessionReport): boolean =>
+    report.type === 'message' && report.delivered.includes(id) && report.events.some(isTurnEnd)
+
 /** The agent's own text, on its own thread. */
 const agentText = (event: RuntimeEvent) => event.type === 'message' && event.role === 'agent'
 
@@ -81,7 +90,7 @@ export const REPORTS: Case[] = [
         expect(statesOf(run, dropped)).not.toContain('started')
       }
       await run.interrupt()
-      await turnEnd(run, 2)
+      await run.untilReport(turnTook(kept), 'the turn that takes two')
       expect(statesOf(run, first)).toContain('started')
       const states = statesOf(run, kept).filter((state) => state !== 'other')
       expect(states).toEqual(['queued', 'started'])

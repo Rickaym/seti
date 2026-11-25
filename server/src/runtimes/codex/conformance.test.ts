@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
 import { CASES, describeAdapter } from '../conformance/describe.js'
+import { stopAll, type RealProcess } from '../conformance/real-process.js'
 import { ScriptedResponses } from './conformance-responses.js'
 import { codexCall } from './conformance-rig.js'
 import { CODEX_GAPS, codexTarget, type CodexBench } from './conformance-target.js'
@@ -15,11 +16,13 @@ async function benchFor(binary: string): Promise<CodexBench | null> {
   const model = new ScriptedResponses(codexCall)
   const baseUrl = await model.start()
   const folder = mkdtempSync(path.join(tmpdir(), 'seti-codex-rigs-'))
-  afterAll(() => {
+  const started: RealProcess[] = []
+  afterAll(async () => {
+    await stopAll(started)
     model.close()
     rmSync(folder, { recursive: true, force: true })
   })
-  return { binary, model, baseUrl, folder }
+  return { binary, model, baseUrl, folder, started }
 }
 
 const bench = await benchFor(process.env.SETI_CODEX_BIN ?? '')

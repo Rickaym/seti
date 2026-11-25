@@ -103,7 +103,7 @@ const asItem = (pack: ContextPack, linked: readonly ContextPackSummary[]): Acces
   enabled: linked.some((link) => link.id === pack.id),
   jump_for: [],
   missing_key: [],
-  in_set: false,
+  credential: null,
   session: null,
   unusable: null,
 })

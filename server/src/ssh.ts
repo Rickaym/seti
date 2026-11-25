@@ -1,9 +1,11 @@
 import type { SshHost, SshHostValues, SshKey, SshKnownHost, SshOption, SshStatus } from '@seti/shared'
 import { audit } from './audit.js'
+import { refuseDelegates } from './ea-guard.js'
 import { HttpError } from './http.js'
 import { sshKeysChanged } from './proxy-owner.js'
 import { checkJump, firstHop, hostMap, knownName, sshRoute, SshHostError } from './ssh-config.js'
 import { accessDefaults } from './store/access.js'
+import { credentialAccess } from './store/credential-access.js'
 import { profiles } from './store/credentials.js'
 import {
   setHosts,
@@ -250,6 +252,7 @@ export const profileSshHosts = async (profileId: string): Promise<string[]> => s
 
 /** Bundles a host into a credential, or with false takes it out; its agents follow next turn. */
 export async function setSetHost(profileId: string, alias: string, bundled: boolean): Promise<void> {
+  refuseDelegates("change a credential's access")
   const profile = await profiles.get(profileId)
   if (profile === undefined) {
     throw new HttpError(404, 'No such credential')
@@ -257,7 +260,7 @@ export async function setSetHost(profileId: string, alias: string, bundled: bool
   if ((await sshHostStore.get(alias)) === undefined) {
     throw new HttpError(404, `No ssh host ${alias}`)
   }
-  const changed = bundled ? await setHosts.add(profileId, alias) : await setHosts.remove(profileId, alias)
+  const changed = await credentialAccess.set(profileId, 'ssh', alias, bundled ? true : null)
   if (!changed) {
     return
   }

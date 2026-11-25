@@ -40,6 +40,12 @@ async function credentials() {
           github: { default: secretStateOf(profile.github.default.configured), owners: Object.fromEntries(owners) },
           connections: profile.connections.map((connection) => connection.name),
           ssh_hosts: profile.ssh_hosts,
+          access: {
+            items: Object.fromEntries(
+              profile.access.items.map((entry) => [`${entry.kind}:${entry.id}`, entry.enabled]),
+            ),
+            hosts: profile.access.hosts,
+          },
         }
         return [profile.name, credential]
       }),

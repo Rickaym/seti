@@ -119,3 +119,35 @@ WHERE p.linked_by_default
 DELETE FROM task_context_pack tp USING context_pack p
 WHERE p.id = tp.pack_id AND p.linked_by_default AND tp.linked;
 `
+
+/**
+ * A credential's access set: an on or off per item its agents follow unless they chose their own,
+ * and hosts they reach. The ssh hosts a credential bundled become its set's on entries; an
+ * agent's off choice for a bundled host never applied, so it goes and every agent stays the same.
+ */
+export const CREDENTIAL_ACCESS = `
+CREATE TABLE credential_access (
+  profile_id TEXT NOT NULL REFERENCES credential_profile(id) ON DELETE CASCADE,
+  kind TEXT NOT NULL,
+  item TEXT NOT NULL,
+  enabled BOOLEAN NOT NULL,
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY (profile_id, kind, item)
+);
+CREATE INDEX credential_access_item ON credential_access(kind, item);
+
+CREATE TABLE credential_host (
+  profile_id TEXT NOT NULL REFERENCES credential_profile(id) ON DELETE CASCADE,
+  host TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  PRIMARY KEY (profile_id, host)
+);
+
+INSERT INTO credential_access (profile_id, kind, item, enabled, updated_at)
+SELECT profile_id, 'ssh', host, true, created_at FROM credential_profile_ssh_host;
+
+DELETE FROM task_access a USING task t, credential_profile_ssh_host s
+WHERE a.task_id = t.id AND a.kind = 'ssh' AND NOT a.enabled AND s.profile_id = t.profile_id AND s.host = a.item;
+
+DROP TABLE credential_profile_ssh_host;
+`

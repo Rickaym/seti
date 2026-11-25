@@ -1,5 +1,5 @@
 import type { Db } from '../pg.js'
-import { ACCESS_DEFAULTS, CREDENTIAL_PROFILES, MCP_SELECTION } from './schema-access.js'
+import { ACCESS_DEFAULTS, CREDENTIAL_ACCESS, CREDENTIAL_PROFILES, MCP_SELECTION } from './schema-access.js'
 import { AGENT_GUIDE, SETI_GUIDE_PACK } from './schema-agent-guide.js'
 import { ARCHIVE_FILES, REPEAT_GUARD, RESTART_RESUME, TASK_ARCHIVE } from './schema-archive.js'
 import { TASK_ASIDE } from './schema-asides.js'
@@ -260,4 +260,5 @@ export const MIGRATIONS: readonly Migration[] = [
   { version: 139, name: 'share_render', sql: SHARE_RENDER },
   { version: 140, name: 'slack_names', sql: SLACK_NAMES },
   { version: 141, name: 'permission_request_edited', sql: PERMISSION_REQUEST_EDITED },
+  { version: 142, name: 'credential_access', sql: CREDENTIAL_ACCESS },
 ]

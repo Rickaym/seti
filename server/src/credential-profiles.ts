@@ -15,6 +15,7 @@ import { sshKeysChanged } from './proxy-owner.js'
 import { githubTokens } from './secrets.js'
 import { profileSshHosts, setSetHost } from './ssh.js'
 import { connectionRows } from './store/connections.js'
+import { credentialAccess, credentialHosts } from './store/credential-access.js'
 import { profiles, type ProfileRow } from './store/credentials.js'
 
 const isDefault = (id: string) => id === DEFAULT_PROFILE_ID
@@ -28,13 +29,16 @@ async function requireProfile(id: string): Promise<ProfileRow> {
 }
 
 async function view(profile: ProfileRow): Promise<CredentialProfile> {
-  const [github, connections, agents, hosts] = await Promise.all([
+  const [github, connections, agents, hosts, items, allowed] = await Promise.all([
     githubTokens(profile.id).status(),
     connectionRows.profileList(profile.id),
     profiles.agents(profile.id),
     profileSshHosts(profile.id),
+    credentialAccess.all(profile.id),
+    credentialHosts.list(profile.id),
   ])
-  return { ...profile, builtin: isDefault(profile.id), github, connections, agents, ssh_hosts: hosts }
+  const access = { items: [...items], hosts: allowed }
+  return { ...profile, builtin: isDefault(profile.id), github, connections, agents, ssh_hosts: hosts, access }
 }
 
 export async function credentialsOverview(): Promise<CredentialsOverview> {
