@@ -17,7 +17,7 @@ import {
 } from './schema-cost.js'
 import { CPU_CAPS } from './schema-cpu.js'
 import { ANDROID_OVERRIDE, DEVICE_SHOW_NAMES, DEVICES, dropOfficialAndroidRow } from './schema-devices.js'
-import { DREAM_NIGHTS, DREAM_PROPOSALS, DREAM_RUNS } from './schema-dreams.js'
+import { DREAM_NIGHTS, DREAM_PROMPT_VERSION, DREAM_PROPOSALS, DREAM_RUNS } from './schema-dreams.js'
 import {
   ATTENTION_TIERS,
   EA_CONTEXT_PACKS,
@@ -253,6 +253,7 @@ export const MIGRATIONS: readonly Migration[] = [
   { version: 133, name: 'role_runtime', sql: ROLE_RUNTIME },
   { version: 134, name: 'task_session', sql: TASK_SESSION },
   { version: 135, name: 'folder_settings_watch', sql: FOLDER_SETTINGS_WATCH },
-  { version: 136, name: 'thread_follows', sql: THREAD_FOLLOWS },
-  { version: 137, name: 'slack_names', sql: SLACK_NAMES },
+  { version: 136, name: 'dream_prompt_version', sql: DREAM_PROMPT_VERSION },
+  { version: 137, name: 'thread_follows', sql: THREAD_FOLLOWS },
+  { version: 138, name: 'slack_names', sql: SLACK_NAMES },
 ]
