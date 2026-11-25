@@ -9,6 +9,8 @@ const DIGEST_CHARS = 40_000
 const SHOWN_PATHS = 20
 const PATH_CHARS = 160
 
+const stamp = (at: string) => at.slice(0, 16).replace('T', ' ')
+
 /** Which steps a digest keeps first when the day does not fit: the user's words, then failures. */
 const PRIORITY = ['user', 'failure', 'reply', 'other'] as const
 type Group = (typeof PRIORITY)[number]
@@ -22,7 +24,7 @@ interface Entry {
 export interface DigestInput {
   title: string
   night: string
-  /** When the agent's last dream ended, or null for its first. */
+  /** When the agent's last dream ended, or null for its first, whose digest holds the last day. */
   since: string | null
   rows: readonly MessageRow[]
   prUrls: readonly string[]
@@ -109,7 +111,9 @@ function counts(rows: readonly MessageRow[], all: readonly Entry[]): Counts {
 }
 
 function header(input: DigestInput, total: Counts): string[] {
-  const since = input.since === null ? 'since the agent was created' : `since its last dream, ${input.since}`
+  const since =
+    input.since === null ? 'of the last day, before its first dream' : `since its last dream, ${input.since}`
+  const first = input.rows[0]?.created_at
   const edits = [...total.edits.entries()].sort((a, b) => b[1] - a[1])
   const edited = edits
     .slice(0, SHOWN_PATHS)
@@ -124,13 +128,15 @@ function header(input: DigestInput, total: Counts): string[] {
     `- Turns: ${String(total.turns)}. Tool calls: ${String(total.tools)}, shell commands among them: ${String(total.commands)}. Failures: ${String(total.failures)}.`,
     `- Files edited: ${edits.length === 0 ? 'none' : edited}${more}.`,
     `- Pull requests: ${input.prUrls.length === 0 ? 'none' : input.prUrls.join(', ')}.`,
-    ...(input.truncated ? ['- Older steps of the day were not read.'] : []),
+    ...(input.truncated && first !== undefined
+      ? [`- The day had more steps than a digest reads, so this one starts at ${stamp(first)}.`]
+      : []),
     '',
   ]
 }
 
 /** Keeps the entries that fit, by group priority and newest first, and counts what it cut. */
-function fit(all: readonly Entry[], room: number): { kept: Entry[]; cut: number } {
+function fit(all: readonly Entry[], room: number): { kept: Entry[]; cut: Map<Group, number> } {
   const keep = new Set<Entry>()
   let left = room
   for (const group of PRIORITY) {
@@ -142,10 +148,38 @@ function fit(all: readonly Entry[], room: number): { kept: Entry[]; cut: number 
       }
     }
   }
-  return { kept: all.filter((entry) => keep.has(entry)), cut: all.length - keep.size }
+  const cut = new Map<Group, number>()
+  for (const entry of all.filter((one) => !keep.has(one))) {
+    cut.set(entry.group, (cut.get(entry.group) ?? 0) + 1)
+  }
+  return { kept: all.filter((entry) => keep.has(entry)), cut }
 }
 
-const stamp = (at: string) => at.slice(0, 16).replace('T', ' ')
+const GROUP_NAMES: Record<Group, string> = {
+  user: "of the user's messages",
+  failure: 'failures',
+  reply: 'replies',
+  other: 'lesser steps',
+}
+
+/** What the digest left out to fit, so the dream knows the day is all there but for that. */
+function cutLine(cut: ReadonlyMap<Group, number>): string[] {
+  const total = [...cut.values()].reduce((sum, n) => sum + n, 0)
+  if (total === 0) {
+    return []
+  }
+  if (total === (cut.get('other') ?? 0)) {
+    return [
+      '',
+      `${String(total)} lesser steps (tool calls and updates) were left out to fit, the oldest first; the user's messages, the failures and the replies of the day are all here.`,
+    ]
+  }
+  const parts = PRIORITY.flatMap((group) => {
+    const n = cut.get(group) ?? 0
+    return n === 0 ? [] : [`${String(n)} ${GROUP_NAMES[group]}`]
+  })
+  return ['', `${String(total)} steps were left out to fit, the oldest of each kind first: ${parts.join(', ')}.`]
+}
 
 /**
  * A redacted, bounded account of an agent's day for its dream, built from Seti's neutral events,
@@ -159,23 +193,19 @@ export function composeDigest(input: DigestInput): string {
   const room = budget - top.length - 200
   const { kept, cut } = fit(all, room)
   const lines = kept.map((entry) => `- ${stamp(entry.at)} ${entry.text}`)
-  const tail = cut === 0 ? [] : ['', `${String(cut)} lesser steps were cut to stay within the digest's size.`]
-  return redactSecrets([top, ...lines, ...tail].join('\n')).slice(0, budget)
+  return redactSecrets([top, ...lines, ...cutLine(cut)].join('\n')).slice(0, budget)
 }
 
 const PAGE = 500
 const MAX_ROWS = 6000
 
 /** The agent's transcript rows after `since`, oldest first, reading back at most MAX_ROWS. */
-export async function dayRows(
-  taskId: string,
-  since: string | null,
-): Promise<{ rows: MessageRow[]; truncated: boolean }> {
+export async function dayRows(taskId: string, since: string): Promise<{ rows: MessageRow[]; truncated: boolean }> {
   const rows: MessageRow[] = []
   let before: number | undefined
   for (;;) {
     const page = await messages.page(taskId, PAGE, before)
-    const fresh = page.messages.filter((row) => since === null || row.created_at > since)
+    const fresh = page.messages.filter((row) => row.created_at > since)
     rows.unshift(...fresh)
     if (fresh.length < page.messages.length || !page.has_older) {
       return { rows, truncated: false }

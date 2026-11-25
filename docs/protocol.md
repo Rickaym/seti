@@ -1096,11 +1096,13 @@ Optional and off by default: a maintenance session per agent that consolidates i
 - DRM-6: A dream is a new session of the agent's runtime that resumes nothing (RT-8), in the
   agent's maintenance sandbox (SBX-12) with egress to the model provider only (EGR-13), writable
   only in its memory folder and the night's dream folder of its workspace. It reads a digest of
-  the agent's transcript since its last dream, built from neutral events, at most
-  `dream_digest` characters, with credentials redacted and the user's messages and failures kept
-  first. Its memory folder is the one the agent's sessions load (SBX-15). Its prompt names the
-  other memory folders the agent's sessions see read-only (its checkouts'), which it reads before
-  it writes and may not change.
+  the agent's transcript since its last dream, or for its first the last day, built from neutral
+  events, at most `dream_digest` characters, with credentials redacted, the user's messages and
+  failures kept first, and a last line counting what was left out by kind. Its prompt asks it to
+  read the whole digest and to review the notes already kept, not only those the day touched,
+  and never to remove one only because the day did not mention it. Its memory folder is the one
+  the agent's sessions load (SBX-15). Its prompt names the other memory folders the agent's
+  sessions see read-only (its checkouts'), which it reads before it writes and may not change.
 - DRM-7: A dream MUST NOT start or change a turn of the agent, post, send an update, push or
   notify, or enter Needs you. Its outcome is one stored report, also written beside the digest,
   and the agent's next turn is told once which dreams changed its memory.
@@ -1109,7 +1111,10 @@ Optional and off by default: a maintenance session per agent that consolidates i
   after, credentials redacted. The user, and the EA after the user's yes, MAY revert it; a revert
   of a file changed since, or of a text kept only redacted, MUST be refused (409). Every change
   and revert is audited with the path and line counts, never the text. The last dream's report
-  shows each changed file's diff, from that stored text, with its revert beside it.
+  shows each changed file's diff, from that stored text, with its revert beside it. A topic file
+  a dream leaves empty is removed after it, since a dream deletes nothing itself, and recorded
+  as a change like any other. The report's tidied lines name each note removed, merged, moved
+  or corrected, with the reason.
 - DRM-9: Clean-ups are off by default and a setting. When on, a dream MAY propose a clean-up
   (`trash`, `remove_worktree`, `delete_branch`) with a reason, at most `dream_proposals` a dream.
   The control room checks it when filed and again when the user allows it, and applies it only
