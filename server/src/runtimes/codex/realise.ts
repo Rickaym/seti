@@ -1,4 +1,4 @@
-import { SHARED_TOOL_SERVER } from '@seti/shared'
+import { SHARED_TOOL_SERVER, type CompactRule } from '@seti/shared'
 import type { CodexToolServer } from '../../codex-tool-servers.js'
 import type { Launcher } from '../../launcher.js'
 import { MODEL_KEY_ENV } from '../../sandbox-codex.js'
@@ -98,6 +98,23 @@ function userServerSettings(
     })
 }
 
+/** What Codex is told when it compacts, before the rule's own instructions. */
+const COMPACT_FRAME = 'Summarize this conversation for the model that continues the work, which sees only your summary.'
+
+/**
+ * The parts of a compaction rule Codex takes: a token limit from a context window and Compact
+ * at, and the prompt it summarizes with. It compacts near its own limit whatever the rule says.
+ */
+function compactSettings(rule: CompactRule): Setting[] {
+  const { window_k: window, threshold_pct: pct, instructions } = rule
+  return [
+    ...(window === null || pct === null
+      ? []
+      : [['model_auto_compact_token_limit', window * 10 * pct] satisfies Setting]),
+    ...(instructions === null ? [] : [['compact_prompt', `${COMPACT_FRAME}\n\n${instructions}`] satisfies Setting]),
+  ]
+}
+
 /**
  * Every setting the app-server runs with, on its command line, which wins over any config file.
  * Terminals for `tty` commands are off, so nothing typed into a running command escapes a
@@ -178,7 +195,7 @@ export function realiseCodex(
     ...userServerSettings(spec.vendor.servers, taken, env, provider.envKey),
   ]
   const model = spec.vendor.model ?? DEFAULT_MODEL
-  const settings = [...overrides(provider, model, launcher.env.PATH), ...servers]
+  const settings = [...overrides(provider, model, launcher.env.PATH), ...compactSettings(spec.compaction), ...servers]
   return {
     command: binary,
     args: ['app-server', '--listen', 'stdio://', ...commandLine(settings)],

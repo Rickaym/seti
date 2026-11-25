@@ -19,6 +19,7 @@ export interface ShareRow {
   view_count: number
   scan_override: boolean
   link_preview: boolean
+  live: boolean
   unfurl_count: number
 }
 
@@ -81,7 +82,8 @@ const VIEWS_KEPT = 100
 const RECENT_VIEWS = 5
 
 const LIST_COLUMNS = sql`s.id, s.task_id, s.root, s.path, s.real_path, s.name, s.kind, s.mime, s.created_at,
-  s.updated_at, s.expires_at, s.revoked_at, s.version, s.view_count, s.scan_override, s.link_preview, s.unfurl_count,
+  s.updated_at, s.expires_at, s.revoked_at, s.version, s.view_count, s.scan_override, s.link_preview, s.live,
+  s.unfurl_count,
   t.title AS task_title, coalesce(b.size, 0)::int AS size,
   (SELECT count(*)::int FROM share_asset a WHERE a.share_id = s.id) AS assets,
   b.preview_label, b.preview_note, b.preview_error, coalesce(b.card IS NOT NULL, false) AS card,
@@ -145,10 +147,11 @@ export const shareRows = {
   insert: async (row: ShareRow & { token_hash: string }, body: ShareContent): Promise<void> =>
     transaction(async (tx) => {
       await tx`INSERT INTO share (id, token_hash, task_id, root, path, real_path, name, kind, mime, created_at,
-          updated_at, expires_at, revoked_at, version, view_count, scan_override, link_preview, unfurl_count)
+          updated_at, expires_at, revoked_at, version, view_count, scan_override, link_preview, live, unfurl_count)
         VALUES (${row.id}, ${row.token_hash}, ${row.task_id}, ${row.root}, ${row.path}, ${row.real_path}, ${row.name},
           ${row.kind}, ${row.mime}, ${row.created_at}, ${row.updated_at}, ${row.expires_at}, ${row.revoked_at},
-          ${row.version}, ${row.view_count}, ${row.scan_override}, ${row.link_preview}, ${row.unfurl_count})`
+          ${row.version}, ${row.view_count}, ${row.scan_override}, ${row.link_preview}, ${row.live},
+          ${row.unfurl_count})`
       await writeContent(tx, row.id, body)
     }),
   /** Swaps in a new snapshot and bumps the version, while the share is still open. */
@@ -173,6 +176,11 @@ export const shareRows = {
     (
       await sql`UPDATE share SET link_preview = ${on}
         WHERE id = ${id} AND revoked_at IS NULL AND expires_at > ${at} RETURNING id`
+    ).length > 0,
+  /** Turns the live page on or off, while the share is still open. */
+  setLive: async (id: string, on: boolean, at: string): Promise<boolean> =>
+    (
+      await sql`UPDATE share SET live = ${on} WHERE id = ${id} AND revoked_at IS NULL AND expires_at > ${at} RETURNING id`
     ).length > 0,
   /** Ends the share and drops its bytes; the row stays for the list and the audit trail. */
   revoke: async (id: string, at: string): Promise<boolean> =>
@@ -232,7 +240,7 @@ export const shareRows = {
 /** The only reads the public share route makes. */
 export type PublicShareRow = Pick<
   ShareRow,
-  'id' | 'name' | 'kind' | 'mime' | 'updated_at' | 'expires_at' | 'revoked_at' | 'link_preview'
+  'id' | 'name' | 'kind' | 'mime' | 'updated_at' | 'expires_at' | 'revoked_at' | 'link_preview' | 'live'
 >
 
 /** The stored page and what its head tells link previews. */
@@ -247,8 +255,8 @@ export interface PublicPage {
 export const publicShares = {
   byTokenHash: async (hash: string): Promise<PublicShareRow | undefined> =>
     (
-      await sql<PublicShareRow[]>`SELECT id, name, kind, mime, updated_at, expires_at, revoked_at, link_preview
-        FROM share WHERE token_hash = ${hash}`
+      await sql<PublicShareRow[]>`SELECT id, name, kind, mime, updated_at, expires_at, revoked_at, link_preview,
+          live FROM share WHERE token_hash = ${hash}`
     ).at(0),
   content: async (id: string): Promise<Buffer | undefined> =>
     (await sql<{ content: Buffer }[]>`SELECT content FROM share_blob WHERE share_id = ${id}`).at(0)?.content,
@@ -265,6 +273,12 @@ export const publicShares = {
   page: async (id: string): Promise<PublicPage | undefined> =>
     (
       await sql<PublicPage[]>`SELECT page, size, image_key, preview_label, card IS NOT NULL AS card
+        FROM share_blob WHERE share_id = ${id}`
+    ).at(0),
+  /** What a live share's shell needs: the head's facts, without the stored page or the file. */
+  head: async (id: string): Promise<Omit<PublicPage, 'page' | 'image_key'> | undefined> =>
+    (
+      await sql<Omit<PublicPage, 'page' | 'image_key'>[]>`SELECT size, preview_label, card IS NOT NULL AS card
         FROM share_blob WHERE share_id = ${id}`
     ).at(0),
   /** One of the page's stored images, by its number. */
