@@ -478,6 +478,12 @@ TOOL_SPECS: list[ToolSpec] = [
                 "description": "Only when the user names one: its reasoning effort, which Seti refuses "
                 "for a model that takes none.",
             },
+            "brief_of": {
+                **TASK_REF,
+                "description": "Only when the user wants the new agent to carry on or help with "
+                "another agent's work: that agent. Seti adds a brief of what it did, as data, after "
+                "the prompt.",
+            },
         },
         ["prompt"],
     ),
@@ -943,6 +949,19 @@ async def _attempt[T](job: Awaitable[T]) -> T | SetiError:
         return e
 
 
+def lineage_lines(task: Mapping[str, Any], tasks: list[dict[str, Any]]) -> list[str]:
+    """Which agent started this one, and the agents it started, by title."""
+    titles = {str(t.get("id")): title_of(t) for t in tasks}
+    lines: list[str] = []
+    caller = task.get("delegated_by")
+    if caller:
+        lines.append(f"Another agent, {titles.get(str(caller), 'one archived since')}, started it.")
+    helpers = [title_of(t) for t in tasks if t.get("delegated_by") == task.get("id")]
+    if helpers:
+        lines.append(f"It started {plural(len(helpers), 'agent')}: {', '.join(helpers)}.")
+    return lines
+
+
 class EaTools:
     """The EA's tools over the Seti API."""
 
@@ -1187,6 +1206,7 @@ class EaTools:
             lines.append(f"It is in the workspace {workspace}.")
         lines.extend(location_lines(task))
         lines.extend(await role_lines(self._seti, task))
+        lines.extend(lineage_lines(task, await self._tasks()))
         subagents = running_subagents(task)
         if subagents > 0 and task.get("status") != "running":
             lines.append(f"Its own turn has ended; {plural(subagents, 'subagent')} it started still running.")
@@ -1704,6 +1724,9 @@ class EaTools:
             value = arg_str(args, key, required=False)
             if value:
                 body[key] = value
+        brief_ref = arg_str(args, "brief_of", required=False)
+        if brief_ref:
+            body["brief_of"] = (await self.resolve_task(brief_ref)).get("id")
         created = await self._seti.post("/tasks/start", body)
         task = created if isinstance(created, dict) else {}
         title = str(task.get("title") or title or "the new task")

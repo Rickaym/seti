@@ -107,7 +107,7 @@ const handOverUpdates = setiTool({
 const startTaskTool = setiTool({
   name: 'start_task',
   description:
-    "Start a new agent on a prompt. It works in a fresh folder of its own and clones the repos it needs, so name them in the prompt. Seti's planner titles it and picks context packs and MCP servers. It runs sandboxed with at most your own access: never SSH, AWS, MCP servers, plugins or credentials you lack, and Seti control Self, never Full. With notify_when_done, Seti sends you its final message as an update once its first turn ends.",
+    "Start a new agent on a prompt. It works in a fresh folder of its own and clones the repos it needs, so name them in the prompt. Seti's planner titles it and picks context packs and MCP servers. It runs sandboxed with at most your own access: never SSH, AWS, MCP servers, plugins or credentials you lack, and Seti control Self, never Full. The user sees it listed under you. With notify_when_done, Seti sends you its final message as an update once its first turn ends.",
   input: {
     prompt: startAgentInput.shape.prompt,
     title: startAgentInput.shape.title,
@@ -122,8 +122,14 @@ const startTaskTool = setiTool({
     effort: startAgentInput.shape.effort.describe(
       'Only when the user names one: its reasoning effort, if its model takes one.',
     ),
+    include_brief: z
+      .boolean()
+      .default(false)
+      .describe(
+        'Seti adds a brief of your work so far after the prompt: what you were asked, your plan, steps, files and PRs, redacted, without direct messages.',
+      ),
   },
-  run: async ({ prompt, title, workspace, notify_when_done, runtime, model, effort }, ctx) => {
+  run: async ({ prompt, title, workspace, notify_when_done, runtime, model, effort, include_brief }, ctx) => {
     const input = startAgentInput.parse({
       prompt,
       title,
@@ -132,6 +138,7 @@ const startTaskTool = setiTool({
       runtime,
       model,
       effort,
+      ...(include_brief ? { brief_of: ctx.caller.id } : {}),
     })
     const task = await startAgent(input, await capOf(ctx.caller))
     return { ...brief(task), setup: task.setup }

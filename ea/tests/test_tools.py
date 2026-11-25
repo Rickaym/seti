@@ -111,6 +111,16 @@ async def test_get_task_reads_the_agents_todo_list(tools: EaTools, fake_seti: Fa
     assert "todo list" not in (await tools.call("get_task", {"task": "logout"})).text
 
 
+async def test_get_task_names_the_agent_that_started_it_and_its_helpers(
+    tools: EaTools, fake_seti: FakeSeti
+) -> None:
+    fake_seti.tasks[1]["delegated_by"] = TASK_LOGIN
+    helper = await tools.call("get_task", {"task": "logout"})
+    assert "Another agent, Fix the login redirect bug, started it." in helper.text
+    lead = await tools.call("get_task", {"task": "login"})
+    assert "It started 1 agent: Fix the logout button." in lead.text
+
+
 async def test_list_tasks_says_which_agents_ask_the_user(tools: EaTools, fake_seti: FakeSeti) -> None:
     fake_seti.tasks[1]["asking"] = True
     result = await tools.call("list_tasks", {"status": "asking"})
@@ -206,6 +216,14 @@ async def test_start_can_ask_to_hear_when_the_turn_ends(tools: EaTools, fake_set
     started = await tools.call("start_task", {"prompt": "Fix the flaky test", "notify_when_done": True})
     assert started.text.endswith("You will hear in your inbox when that turn ends.")
     body = {"prompt": "Fix the flaky test", "notify_when_done": True}
+    assert fake_seti.posts() == [("/api/tasks/start", body)]
+
+
+async def test_start_can_brief_the_new_agent_on_another_agents_work(
+    tools: EaTools, fake_seti: FakeSeti
+) -> None:
+    await tools.call("start_task", {"prompt": "Carry on the login fix", "brief_of": "login"})
+    body = {"prompt": "Carry on the login fix", "brief_of": TASK_LOGIN}
     assert fake_seti.posts() == [("/api/tasks/start", body)]
 
 

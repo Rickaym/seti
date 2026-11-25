@@ -58,7 +58,7 @@ between two steps; an interrupt; a hook at subagent start.
 - ENT-1: An agent MUST have: `id`, `title`, `cwd`, `sandbox`, `home_access`, `profile_id`,
   `seti_control`, `bypass_until`, `pr_urls`, `input_mode`, `session_id`, `status`, `model`,
   `cost_usd`, `last_error`, `archived_at`, `pinned`, `workspace_id`, `notifications_muted`,
-  `status_line`, `unseen`, `asking`, `closing_line`, `blocked`.
+  `status_line`, `unseen`, `asking`, `closing_line`, `blocked`, `delegated_by`.
 - ENT-2: Stored status. A turn start clears each; the turn end clears `running`.
 
 | Stored status | Set when                                                              |
@@ -287,6 +287,7 @@ between two steps; an interrupt; a hook at subagent start.
 <seti-answer request_id="ID" outcome="allowed|denied|expired">...</seti-answer>
 <workspace-edit file="F">...</workspace-edit>
 <second-opinion runtime="R" model="M" seconds="S" cost_usd="C" estimated="true|false">...</second-opinion>
+<handover-brief from="TITLE" runtime="R" task_id="ID">...</handover-brief>
 ```
 
 ## 6. Attention
@@ -844,6 +845,16 @@ Why: an agent woken by its own actions or by news nobody waited for burns turns 
 - LVL-15: Agents at `self` or `full` propose knowledge notes, at most `notes_waiting` each, refused
   with credentials or private paths. Only a bounded index of approved titles reaches prompts,
   framed as reference, not instructions. Notes go stale by `note_stale`.
+- DLG-2: An agent another agent starts (`start_task`, `work_on_pr`) MUST record that agent as
+  `delegated_by`, and the audit of its creation MUST name it; one the user or the EA starts
+  records none. While both are listed, the agent list MUST show it on one line right under its
+  caller, marked as started by it, and the Home graph MUST link the two; while it needs the user
+  it sits in Needs you on its own (ATT-1), never its caller.
+- DLG-4: A start MAY ask for a brief of an agent's work (`include_brief` for the caller's own,
+  `brief_of` for the user and the EA). The brief MUST be built from neutral events only, so it
+  reads the same for every runtime, redacted, at most `brief_chars`, with every direct message
+  hidden (CHAT-6), and MUST follow the prompt in a `<handover-brief>` tag (UPD-13) with a preface
+  that it is data.
 - DLG-5: An agent at `self` or `full` MAY ask a model on another runtime one question, with text
   and up to `opinion_files` of its own files read under the file hand-off rules. The answering
   model MUST be offered no tool and refuse any call unasked, run in a sandbox of its own that
@@ -1310,6 +1321,7 @@ others.
 | Client       | `sse_keepalive` 15 s. `body_max` 8 MB. `session_life` idle 7 days, absolute 30 days. Setup code 15 min. Attempts per 10 min: 20 sign-in, 20 setup, 10 pairing. `pair_ttl` 5 min.                                                                                                                                                                                                       |
 | Uploads      | `upload_file` 25 MB. `upload_stall` 30 s. `upload_idle` 60 s. `upload_time` 30 min.                                                                                                                                                                                                                                                                                                    |
 | Opinions     | `opinion_sizes`: question 8,000, context 60,000, files 40,000 in all, answer 8,000 characters. `opinion_files` 5. `opinion_rate` 1 at a time, 20 an hour, 60 a day an agent. Time 5 min. 4,000 output tokens. $1 a call.                                                                                                                                                               |
+| Briefs       | `brief_chars` 12,000. Built from the first 20 and the newest 1,200 transcript rows.                                                                                                                                                                                                                                                                                                    |
 | Dreams       | Window 01:00 to 05:00. `dream_gap` 2 min. `dream_retry` 10 min. `dream_steps` 60. `dream_time` 20 min. `dream_budget` $1. Night budget $5. `dream_gates`: five-hour use 60%, weekly 85%, load 0.75 x cores, 5 GB free. `dream_digest` 40,000 characters. Memory folder 512 KB, 100 files. `dream_proposals` 10. `proposal_expiry` 7 days. `trash_keep` 14 days. `trash_item_max` 5 GB. |
 
 ## Appendix B. Retired identifiers
