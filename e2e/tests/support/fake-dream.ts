@@ -10,6 +10,8 @@ export const DREAM_LINE =
 export const LEFTOVER = 'old-notes.md'
 /** The summary every fake dream reports. */
 export const DREAM_SUMMARY = 'Kept one rule about replies'
+/** Why a fake dream lets go of every subscription Seti lists as unused. */
+export const UNSUBSCRIBE_REASON = 'The release it watched shipped on 2026-10-01'
 
 interface UserMessage {
   message: { content: string | { type: string; text?: string }[] }
@@ -39,6 +41,16 @@ async function allowed(options: DreamOptions, tool: string, input: object): Prom
   return answer?.hookSpecificOutput?.permissionDecision === 'allow'
 }
 
+/** Applies every item of the configuration list Seti wrote, when there is one. */
+function configDecisions(text: string) {
+  const file = /Configuration Seti found unused: (\S+)\.\n/.exec(text)?.[1]
+  if (file === undefined || file === 'none' || !fs.existsSync(file)) {
+    return []
+  }
+  const items = [...fs.readFileSync(file, 'utf8').matchAll(/^- (sub-\d+):/gm)].map((match) => match[1] ?? '')
+  return items.map((item) => ({ item, decision: 'apply', reason: UNSUBSCRIBE_REASON }))
+}
+
 /**
  * The fake's dream: adds one line to MEMORY.md in the memory folder its message names, when the
  * gate allows the write, reports through the dream server, and ends with a cost.
@@ -65,6 +77,7 @@ async function* dream(prompt: AsyncIterable<UserMessage>, options: DreamOptions)
       await client.call('dream_report', {
         summary: DREAM_SUMMARY,
         tidied: ['MEMORY.md: one rule'],
+        config: configDecisions(textOf(m)),
       })
     }
     yield sdk({ type: 'result', subtype: 'success', is_error: false, result: 'done', total_cost_usd: 0.05, errors: [] })

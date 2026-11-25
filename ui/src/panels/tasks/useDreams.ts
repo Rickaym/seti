@@ -1,4 +1,4 @@
-import type { DreamRun, DreamSettings, Revision } from '@seti/shared'
+import type { DreamRun, DreamSettings, DreamTidy, Revision } from '@seti/shared'
 import { useCallback, useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { apiGet, apiPost, apiPut, errorText } from '@/api'
@@ -18,6 +18,7 @@ const changesOf = (run: DreamRun, revisions: readonly Revision[]) =>
 export function useDreams(taskId: string, open: boolean) {
   const [latest, setLatest] = useState<DreamRun | null>(null)
   const [changes, setChanges] = useState<Revision[]>([])
+  const [tidies, setTidies] = useState<DreamTidy[]>([])
   const [reload, setReload] = useState(0)
 
   useEffect(() => {
@@ -29,9 +30,11 @@ export function useDreams(taskId: string, open: boolean) {
       const [run] = await apiGet<DreamRun[]>(`/tasks/${taskId}/dreams`)
       const revisions =
         run === undefined ? [] : await apiGet<Revision[]>(`/revisions?object_type=memory_file&task_id=${taskId}`)
+      const config = run === undefined ? [] : await apiGet<DreamTidy[]>(`/dreams/tidies?task=${taskId}`)
       if (!stale) {
         setLatest(run ?? null)
         setChanges(run === undefined ? [] : changesOf(run, revisions))
+        setTidies(config.filter((tidy) => tidy.run_id === run?.id))
       }
     }
     load().catch((e: unknown) => toast.error(errorText(e)))
@@ -59,7 +62,15 @@ export function useDreams(taskId: string, open: boolean) {
       .catch((e: unknown) => toast.error(errorText(e)))
   }, [])
 
-  return { latest, changes, dreamNow, undo }
+  const undoTidy = useCallback((tidy: DreamTidy) => {
+    apiPost(`/dreams/tidies/${String(tidy.id)}/undo`, {})
+      .then(() => {
+        setReload((n) => n + 1)
+      })
+      .catch((e: unknown) => toast.error(errorText(e)))
+  }, [])
+
+  return { latest, changes, tidies, dreamNow, undo, undoTidy }
 }
 
 /** Whether nightly Dreaming covers the agent: Dreaming's switch, and the agent's own. */

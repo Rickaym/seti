@@ -4,6 +4,7 @@ import { setTaskDreaming } from '../dreams/settings.js'
 import { startDream } from '../dreams/start.js'
 import { dreamNights, dreamOptOuts, dreamSettings, nightRuns } from '../store/dream-nights.js'
 import { dreamProposals } from '../store/dream-proposals.js'
+import { dreamTidies } from '../store/dream-tidies.js'
 import { dreamRuns } from '../store/dreams.js'
 import { liveTask, taskRef } from './refs.js'
 import { done, notSelf, setiTool } from './tool.js'
@@ -23,7 +24,7 @@ async function overview() {
 const dreams = setiTool({
   name: 'dreams',
   description:
-    "Dreams: sandboxed sessions that tidy an agent's memory folder and change nothing else. Without task, Dreaming's settings and last night. With task, that agent's recent dreams and reports; with start, run one dream of another agent now; with dreaming, switch another agent in or out of nightly Dreaming.",
+    "Dreams: sandboxed sessions that tidy an agent's memory folder and decide on its unused channel subscriptions, each change undoable. Without task, Dreaming's settings and last night. With task, that agent's recent dreams, reports and configuration changes; with start, run one dream of another agent now; with dreaming, switch another agent in or out of nightly Dreaming.",
   input: {
     task: taskRef.optional(),
     start: z.boolean().optional().describe('true to start a dream of the agent now'),
@@ -56,7 +57,12 @@ const dreams = setiTool({
         report,
       }),
     )
-    return { nightly: !off, runs, cleanups_waiting: await dreamProposals.pending(task.id) }
+    return {
+      nightly: !off,
+      runs,
+      cleanups_waiting: await dreamProposals.pending(task.id),
+      config_changes: await dreamTidies.forTask(task.id, SHOWN),
+    }
   },
 })
 

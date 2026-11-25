@@ -10,6 +10,7 @@ const KIND_WORDS: Record<DreamProposal['kind'], string> = {
   trash: 'Trash',
   remove_worktree: 'Remove worktree',
   delete_branch: 'Delete branch',
+  unsubscribe: 'Unsubscribe',
 }
 
 /**

@@ -36,18 +36,24 @@ SETTING_ARGS: dict[str, dict[str, Any]] = {
 DREAM_SPECS: list[ToolSpec] = [
     ToolSpec(
         "dreams",
-        "Dreams: Seti's sandboxed sessions that tidy an agent's memory folder and change nothing else. "
+        "Dreams: Seti's sandboxed sessions that tidy an agent's memory folder and its unused channel "
+        "subscriptions, each change undoable. "
         "Without task or workspace: nightly Dreaming's settings and how last night went, or change "
         "them with the setting arguments. With task: the agent's recent dreams with their reports; "
         "with start, run one dream of it now; with dreaming, switch it in or out of nightly Dreaming. "
         "With workspace and dreaming: switch that workspace's agents together. With restore, put a "
-        "trash item back. Every change needs the user's yes; undo a dream's change to a memory file "
-        "with revert_change. Only the user allows a proposed clean-up, in Seti.",
+        "trash item back; with undo, subscribe an agent again to a channel a dream unsubscribed it "
+        "from. Every change needs the user's yes; undo a dream's change to a memory file with "
+        "revert_change. Only the user allows a proposed clean-up, in Seti.",
         {
             "task": {"type": "string", "description": "The agent's title as the user said it."},
             "workspace": {"type": "string", "description": "A workspace's name, to switch its agents."},
             "start": {"type": "boolean", "description": "true to start a dream of the agent now."},
             "restore": {"type": "integer", "description": "A trash item's id, to put it back where it was."},
+            "undo": {
+                "type": "integer",
+                "description": "A dream's configuration change id, to put the subscription back as it was.",
+            },
             "dreaming": {
                 "type": "boolean",
                 "description": "true to switch into nightly Dreaming, false out.",
@@ -127,6 +133,12 @@ def _trash_line(trash: list[dict[str, Any]]) -> str:
     return f"The trash holds {plural(len(trash), 'item')}: {items}."
 
 
+def _tidy_line(tidy: Mapping[str, Any]) -> str:
+    state = "undone" if tidy.get("state") == "undone" else f"undo id {tidy.get('id')}"
+    reason = clip(str(tidy.get("reason") or ""), 120)
+    return f"- A dream unsubscribed it from {tidy.get('label')} ({reason}; {state})"
+
+
 def _change_word(key: str, value: Any) -> str:
     if key == "enabled":
         return f"turns it {'on' if value else 'off'}"
@@ -158,6 +170,8 @@ class DreamTools:
     async def dreams(self, args: Mapping[str, Any]) -> ToolResult:
         if "restore" in args:
             return await self._restore(args)
+        if "undo" in args:
+            return await self._undo(args)
         if arg_str(args, "workspace", required=False):
             return await self._workspace(args)
         if not arg_str(args, "task", required=False):
@@ -179,6 +193,8 @@ class DreamTools:
             f"- Clean-up waiting for the user: {p.get('kind')} {p.get('target')} ({p.get('reason')})"
             for p in pending
         )
+        tidies = dicts(await self._seti.get("/dreams/tidies", {"task": str(task.get("id"))}))
+        lines.extend(_tidy_line(t) for t in tidies[:SHOWN])
         return ToolResult("\n".join(lines), clip(f"Read the dreams of {title}", 70))
 
     async def _settings(self, args: Mapping[str, Any]) -> ToolResult:
@@ -235,8 +251,8 @@ class DreamTools:
         if not await self._gate.cleared(gate_key("dreams", task.get("id")), arg_bool(args, "confirmed")):
             effect = (
                 f"This starts a dream of {title} now: a sandboxed session of a few minutes that reads its "
-                "day and tidies its memory folder, changes nothing else, and costs at most a dream's "
-                "budget. Each memory change can be undone."
+                "day, tidies its memory folder, may unsubscribe it from channels that delivered nothing "
+                "for 30 days, and costs at most a dream's budget. Each change can be undone."
             )
             return ask("dreams", args, effect, f"start a dream of {title}")
         try:
@@ -264,3 +280,22 @@ class DreamTools:
                 raise ToolError(f"Not restored: {e.detail or e.title}", "Not restored") from e
             raise
         return ToolResult(f"Restored {restored.get('original_path')}.", "Restored")
+
+    async def _undo(self, args: Mapping[str, Any]) -> ToolResult:
+        change = args.get("undo")
+        if not isinstance(change, int) or isinstance(change, bool):
+            raise ToolError("Say which dream change to undo by its id.", "Missing undo")
+        if not await self._gate.cleared(gate_key("dreams", "undo", change), arg_bool(args, "confirmed")):
+            return ask(
+                "dreams",
+                args,
+                f"This subscribes the agent again to the channel dream change {change} removed, as it was.",
+                "undo a dream's change",
+            )
+        try:
+            undone = await self._seti.post(f"/dreams/tidies/{change}/undo", {})
+        except SetiError as e:
+            if e.status in (404, 409):
+                raise ToolError(f"Not undone: {e.detail or e.title}", "Not undone") from e
+            raise
+        return ToolResult(f"Subscribed it again to {undone.get('label')}.", "Undone")

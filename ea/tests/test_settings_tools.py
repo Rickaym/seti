@@ -119,6 +119,7 @@ class SettingsFake(FakeSeti):
         self.revisions: dict[tuple[str, str], list[dict[str, Any]]] = {}
         self.dreams: list[dict[str, Any]] = []
         self.proposals: list[dict[str, Any]] = []
+        self.tidies: list[dict[str, Any]] = []
         self.trash: list[dict[str, Any]] = []
         self.dream_settings: dict[str, Any] = {
             "enabled": False,
@@ -385,6 +386,10 @@ class SettingsFake(FakeSeti):
                 return ok(None)
             case "GET", ["dreams", "proposals"]:
                 return ok(self.proposals)
+            case "GET", ["dreams", "tidies"]:
+                return ok(self.tidies)
+            case "POST", ["dreams", "tidies", _, "undo"]:
+                return ok({"id": 7, "label": "ci-alerts", "state": "undone"})
             case "GET", ["trash"]:
                 return ok(self.trash)
             case "POST", ["trash", _, "restore"]:
@@ -1129,6 +1134,23 @@ async def test_dreaming_is_read_changed_and_switched_per_agent_and_workspace_aft
     fake.dreams = [{"night": "2026-11-24", "state": "done", "memory_changes": 0, "cost_usd": 0.1}]
     read = await tools.call("dreams", {"task": "logout"})
     assert read.text.endswith("- Clean-up waiting for the user: delete_branch /work/app:done (merged)")
+
+
+async def test_a_dreams_unsubscribe_is_listed_and_undone_after_a_yes(
+    tools: EaTools, fake: SettingsFake
+) -> None:
+    fake.dreams = [{"night": "2026-11-24", "state": "done", "memory_changes": 0, "cost_usd": 0.1}]
+    fake.tidies = [
+        {"id": 7, "label": "ci-alerts", "reason": "the release it watched shipped", "state": "applied"}
+    ]
+    read = await tools.call("dreams", {"task": "logout"})
+    assert read.text.endswith(
+        "- A dream unsubscribed it from ci-alerts (the release it watched shipped; undo id 7)"
+    )
+    asked, undone = await confirm(tools, "dreams", {"undo": 7})
+    assert "subscribes the agent again" in asked.text
+    assert undone.text == "Subscribed it again to ci-alerts."
+    assert writes(fake)[-1][0:2] == ("POST", "/api/dreams/tidies/7/undo")
 
 
 async def test_plugins_are_added_switched_and_removed(tools: EaTools, fake: SettingsFake) -> None:

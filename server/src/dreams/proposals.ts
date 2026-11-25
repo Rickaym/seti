@@ -1,5 +1,5 @@
 import fs from 'node:fs'
-import type { DreamDecision, DreamProposal, DreamProposalInput, DreamRun, Task } from '@seti/shared'
+import type { DreamDecision, DreamProposal, DreamProposalInput, DreamProposalKind, DreamRun, Task } from '@seti/shared'
 import { audit } from '../audit.js'
 import { tasks } from '../db.js'
 import { refuseDelegates } from '../ea-guard.js'
@@ -7,6 +7,7 @@ import { HttpError } from '../http.js'
 import { busyReason } from '../owned-dirs.js'
 import { isRunning, sessionState } from '../session-mirror.js'
 import { dreamProposals, PROPOSALS_PER_DREAM } from '../store/dream-proposals.js'
+import { allowUnsubscribe } from './config-apply.js'
 import { checkProposal } from './proposal-checks.js'
 import { applyIntoTrash } from './trash.js'
 
@@ -36,7 +37,20 @@ export async function fileProposal(task: Task, run: DreamRun, input: DreamPropos
   return 'Filed. The user allows or denies it in the morning; nothing changes until then.'
 }
 
-async function allow(proposal: DreamProposal, task: Task): Promise<DreamProposal> {
+/** Applies an unsubscribe a dream was unsure of, with an Undo like the ones it applied itself. */
+async function allowConfig(proposal: DreamProposal, subject: string | null): Promise<DreamProposal> {
+  const run = { id: proposal.run_id, task_id: proposal.task_id }
+  const applied = await allowUnsubscribe(run, subject ?? '', proposal.reason)
+  const failed = typeof applied === 'string' ? applied : null
+  return (await dreamProposals.decide(proposal.id, failed === null ? 'allowed' : 'failed', failed)) ?? proposal
+}
+
+async function allow(proposal: DreamProposal & { subject: string | null }, task: Task) {
+  const { kind, subject } = proposal
+  return kind === 'unsubscribe' ? allowConfig(proposal, subject) : allowCleanup({ ...proposal, kind }, task)
+}
+
+async function allowCleanup(proposal: DreamProposal & { kind: DreamProposalKind }, task: Task) {
   if (isRunning(task.id) || sessionState(task.id).background > 0) {
     throw new HttpError(409, 'The agent is at work; allow this once its turn ends')
   }

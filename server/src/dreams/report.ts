@@ -1,3 +1,4 @@
+import type { DreamTidy } from '@seti/shared'
 import type { DreamEnd } from '../store/dreams.js'
 
 const section = (title: string, lines: readonly string[]) =>
@@ -7,6 +8,7 @@ const section = (title: string, lines: readonly string[]) =>
 export function reportMarkdown(
   { title, night, prompt }: { title: string; night: string; prompt: string },
   end: DreamEnd,
+  config: readonly DreamTidy[] = [],
 ): string {
   const report = end.report
   const outcome = end.reason === null ? end.state : `${end.state}: ${end.reason}`
@@ -16,7 +18,10 @@ export function reportMarkdown(
     report?.summary ?? 'No report.',
     '',
     `Outcome: ${outcome}. Memory files changed: ${String(end.memory_changes)}. Steps: ${String(end.steps)}. Cost: $${end.cost_usd.toFixed(2)}.`,
-    ...section('Tidied', report?.tidied ?? []),
+    ...section('Tidied', [
+      ...(report?.tidied ?? []),
+      ...config.map((tidy) => `Seti unsubscribed it from ${tidy.label}: ${tidy.reason}`),
+    ]),
     ...section('Remembered', report?.remembered ?? []),
     ...section('Asks', report?.asks ?? []),
     ...section('Found', report?.found ?? []),
