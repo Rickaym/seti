@@ -4,6 +4,7 @@ import { webhookSourceId, type WebhookSourceInfo } from './channel-sources.js'
 import type { EaNoticeSeverity } from './ea.js'
 import { POLLER_EVENT_KINDS, type PollerInfo } from './pollers.js'
 import { REMINDER_EVENT_KINDS, type ReminderInfo } from './reminders.js'
+import type { WebhookThreads } from './threads.js'
 import type { DeliveryFilter, WebhookFilterInfo } from './webhook-filter.js'
 import { senderDefinition, type SenderDefinition } from './webhook-senders.js'
 
@@ -182,6 +183,8 @@ export interface WebhookChannelInfo extends ChannelCommon {
   secret_pending: ChannelSecretPending | null
   /** The code that drops or reshapes deliveries before subscribers get them; null without one. */
   filter: WebhookFilterInfo | null
+  /** Whether replies in threads agents posted in reach them; null for a sender Seti reads none from. */
+  threads: WebhookThreads | null
 }
 
 export interface PollerChannelInfo extends ChannelCommon {

@@ -125,6 +125,7 @@ between two steps; an interrupt; a hook at subagent start.
 | ----------- | ----------------------------------------------------------------------------- | ----------------------- |
 | `pr`        | `ci_failed`, `ci_passed`, `review`, `comment`, `conflict`, `merged`, `closed` | yes                     |
 | `channel`   | free text from the event                                                      | yes                     |
+| `thread`    | `reply`                                                                       | yes, a bot's never      |
 | `agent`     | `idle`, `error`, `stopped`                                                    | yes                     |
 | `seti`      | `allowed`, `denied`, `expired`                                                | yes                     |
 | `team`      | `mention`, `direct`, `broadcast`                                              | by CHAT rules           |
@@ -310,6 +311,7 @@ between two steps; an interrupt; a hook at subagent start.
 ```
 <update source="pr" kind="K" subject="S" url="U">TITLE BODY</update>
 <channel-event channel="C" source="S" kind="K" severity="V" received_at="T" url="U">...</channel-event>
+<thread-reply service="S" from="ID" name="N" bot="true" channel="C" thread="T" received_at="T" url="U">...</thread-reply>
 <team-chat from="H" kind="mention|direct|broadcast" message_id="N">...</team-chat>
 <agent-turn agent="TITLE" task_id="ID" ended="idle|error|stopped">...</agent-turn>
 <seti-answer request_id="ID" outcome="allowed|denied|expired">...</seti-answer>
@@ -807,6 +809,29 @@ interrupted only for that.
   the agent follows it; a later send there follows it again after a stop. Seti keeps ids and the
   link, never the text. An agent follows at most `thread_cap` threads; a new one stops the least
   recently active.
+- THR-2: While a webhook's `thread_replies` and `thread_dms` are both off, Seti handles its
+  deliveries exactly as it would without thread replies. With either on, a webhook whose sender Seti
+  reads threads from (the catalog `slack` sender) hands each verified message event to the thread
+  matcher before its filter. A new message (not an edit, deletion or join) in a followed thread is
+  queued for every agent following it whose first message there is older, once each, when
+  `thread_replies` is on. With `thread_dms` on, an unthreaded message in a direct message goes to
+  the agent that wrote there last within `dm_window`. A message any agent sent is never queued.
+  Queued text is redacted.
+- THR-3: With either switch on, other events such as `app_mention` reach subscribers as before. A
+  message event reaches them when the webhook's filter keeps or changes it, or, when the webhook
+  has no filter or its filter fails, when it mentions a user the sender's app is authorised for;
+  otherwise the delivery is `ignored` and keeps no excerpt.
+  Why: subscribing the app to message events for replies must not flood the EA's inbox, and a
+  mention that arrives as a message event must still reach it.
+- THR-4: A queued reply is routed after `reply_settle`, so an agent's own message whose echo came
+  first is recognised (`own`). It reaches the agent as a `thread` update unless the thread is
+  stopped or `thread_rate` replies of it were sent within the hour (`rate`). A bot's reply is held
+  for the user's next message (UPD-4). An archived agent gets nothing and the thread stops. Once
+  routed, the reply's text is forgotten; the audit keeps ids, author, size and outcome.
+- THR-5: Following stops after `thread_quiet` without a message in the thread, or `thread_age`
+  after it started.
+- THR-6: Only the user turns `thread_replies` and `thread_dms` on or off; both start off. Turning
+  `thread_replies` on turns `thread_dms` on too unless the same change says otherwise.
 
 ## 11. Pull requests
 
@@ -1400,7 +1425,7 @@ others.
 | Poller fetch | 20 requests a run, 5 redirects, 4 MB each, 12 MB a run. `poller_backoff` 6 h. `fail_streak` 5 (reminders 3).                                                                                                                                                                                                                                                                           |
 | Reminders    | `reminder_limits`: interval 1 min to 7 days; 5 s; 256 MB; message 2000; state 16 KB. `cron_catchup` 1 h.                                                                                                                                                                                                                                                                               |
 | PRs          | Create request 50 links. `pr_poll` 60 s. `pr_skew` 5 s. `subagent_wait` 30 min.                                                                                                                                                                                                                                                                                                        |
-| Threads      | `thread_cap` 50.                                                                                                                                                                                                                                                                                                                                                                       |
+| Threads      | `thread_cap` 50. `dm_window` 24 h. `reply_settle` 10 s. `thread_rate` 10 an hour. `thread_quiet` 7 days. `thread_age` 30 days.                                                                                                                                                                                                                                                         |
 | Chat         | Message 4000. Active agent: running, session open, or updated within 12 h. `chat_burst` 12 in 15 min. `chat_loop` 6 in 15 min.                                                                                                                                                                                                                                                         |
 | Questions    | Answer batch 100 items. `notes_waiting` 10. Index 1500 characters. `note_stale` 3 failed checks in a row, or unverified 30 days (fact, environment) or 90 days (how-to, gotcha).                                                                                                                                                                                                       |
 | Assistant    | `ask_ttl` 10 min. `settle` quiet 45 s, at most 3 min. `call_silence` 30 s. `wake_phrase` 2 to 40 characters, at most 4 words. `keep_awake_seconds` 5 to 600.                                                                                                                                                                                                                           |
