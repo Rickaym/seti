@@ -6,6 +6,7 @@ import {
   type StoredRuntime,
 } from '@seti/shared'
 import type { Capabilities } from './adapter.js'
+import type { OneShot } from './one-shot.js'
 import { adapterFor } from './registry.js'
 
 /** What the agent's runtime declares; read it through the readers below. */
@@ -28,6 +29,9 @@ export const forksSideChat = (runtime: StoredRuntime): boolean => declared(runti
 
 /** How the runtime runs dreams, or null where it keeps no memory. */
 export const dreamsOf = (runtime: StoredRuntime) => declared(runtime).dream
+
+/** How the runtime answers one question with no tools. */
+export const oneShotFor = (runtime: StoredRuntime): OneShot => declared(runtime).oneShot
 
 /** A later turn can go back to an earlier prompt. */
 const rewinds = (runtime: StoredRuntime): boolean => declared(runtime).rewind.conversation
