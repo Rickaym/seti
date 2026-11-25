@@ -70,8 +70,8 @@ These paths answer without a token, a session or Access, each with its own check
 `/api/local-session` (the local token, on loopback); `/api/auth` sign-in and setup calls (rate
 limited); `/api/devices/pair` (a one-time code) and `/api/widget/summary` (a device proof); the
 static `/pair` page and `/.well-known/assetlinks.json`; `POST /hooks/<id>`; and `GET` or `HEAD` of
-`/share/<token>`, its `/raw`, `/p/1` to `/p/50`, `/card.png`, and a live share's `/live` and
-`/static`. The app's own page and static files need no API credential; on a public hostname they
+`/share/<token>`, its `/raw`, `/p/1` to `/p/50`, `/card.png`, and an HTML share's `/frame` and
+`/code`. The app's own page and static files need no API credential; on a public hostname they
 sit behind Access when Access is set up.
 
 ## The settings document
@@ -156,28 +156,29 @@ before anything runs; a mismatch deletes the download. The program lives alone i
 `~/.seti/codex/<version>/`, read and run only, mounted read-only into each Codex agent's sandbox,
 and each install, failure and removal is in the audit log with the version and checksum.
 
-## Live share links
+## HTML share links
 
-A share link to an HTML file can be made Live in the share dialog. It is off by default, set per
-link, and only you can set it: the EA, agents, mods and paired devices are refused. A live link
-runs the frozen copy's scripts in the visitor's browser so charts and interactive pages work.
-Static shares are unchanged.
+A share link to an HTML file renders the file as a page, in an isolated frame, so charts and
+interactive pages work. Render is on by default for every HTML file; turn it off in the share
+dialog to show the file as code instead. Only you can share a file or change Render: the EA,
+agents, mods and paired devices are refused. Every other file's share page is unchanged, and a
+file that is not HTML never renders.
 
 What the visitor's browser gets: a page from Seti with no script (a bar with the file's name, a
-Static view link and Download) around a sandboxed frame that holds the copy. The frame has an
+View code link and Download) around a sandboxed frame that holds the copy. The frame has an
 opaque origin, so it has no cookies, no storage that outlives the page and no access to Seti or to
 the bar around it. Its policy refuses every fetch, socket, beacon, form, popup, download, worker,
 plugin and frame, and the bar's policy refuses any navigation of the frame other than to itself.
 The copy is only served to a frame; opened as a tab its address gives the same 404 as a wrong
-link. Static view always shows the script-free page.
+link. View code always shows the script-free page.
 
-What a live page can still do:
+What a rendered page can still do:
 
-- Reach the internet through WebRTC. No browser lets a page policy block it, so a live page can
-  send what it holds, and what a visitor types into it, to a host it names. Make a link live only
-  for a page you would publish anyway.
-- Load scripts, styles and fonts from three CDN paths (`LIVE_SHARE_CDNS` in
-  `server/src/share-live.ts`): `cdnjs.cloudflare.com/ajax/libs/`, `cdn.jsdelivr.net/npm/` and
+- Reach the internet through WebRTC. No browser lets a page policy block it, so a rendered page
+  can send what it holds, and what a visitor types into it, to a host it names. Turn Render off
+  for a page you would not publish as a page.
+- Load scripts, styles and fonts from three CDN paths (`SHARE_PAGE_CDNS` in
+  `server/src/share-render.ts`): `cdnjs.cloudflare.com/ajax/libs/`, `cdn.jsdelivr.net/npm/` and
   `unpkg.com/`. Each CDN sees the visitor's address when the page loads from it; what it serves
   runs in the same isolated frame. Images from the web stay blocked.
 - Use the visitor's CPU and memory while open, like any web page.
@@ -185,8 +186,8 @@ What a live page can still do:
 What a reverse proxy in front must keep: the `Content-Security-Policy`, `Permissions-Policy` and
 `X-Frame-Options` headers of `/share/` responses as Seti sends them, the visitor's
 `Sec-Fetch-Dest` request header, and the original `Host`. Removing `Sec-Fetch-Dest` or rewriting
-`Host` only stops live pages from showing; removing `Content-Security-Policy` would let a live
-page reach the network and navigate its frame away.
+`Host` only stops HTML pages from rendering; removing `Content-Security-Policy` would let a
+rendered page reach the network and navigate its frame away.
 
 ## Your tool servers on Codex agents
 
@@ -227,8 +228,9 @@ an agent's calls. The user settings in a sandboxed agent's home are read-only.
   request no policy names, and a host granted to a mod is two-way. The consent screen says both.
 - With Scripts on, an agent's HTML preview can still reach a STUN or TURN server the page names
   through WebRTC, which no page policy blocks yet. Scripts start off for each file.
-- A live share link's page can reach the internet through WebRTC, and the CDNs it loads from see
-  visitors' addresses (Live share links above). Live starts off for each link.
+- A rendered HTML share's page can reach the internet through WebRTC, and the CDNs it loads from
+  see visitors' addresses (HTML share links above). Render is on for each HTML file unless you
+  turn it off.
 - A share link's preview card that a chat app already fetched stays in that app's cache after the
   share is revoked or expires. Share views are counted with Cloudflare's country header and a
   clipped user agent.

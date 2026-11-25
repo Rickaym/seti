@@ -218,7 +218,11 @@ zone, skip it for `/hooks/` too.
 Share links (Settings, Sharing) open at `/share/<token>` for anyone who has one. To let them past
 Access, add a Bypass application the same way with path `share/`; Seti itself lets through only a
 GET or HEAD of a share's page or download, and every other path under `/share/` still needs the
-login. Skip Bot Fight Mode or WAF challenges for `/share/` as for `/hooks/`.
+login. Skip Bot Fight Mode or WAF challenges for `/share/` as for `/hooks/`. An HTML file's link
+renders it as a page by default, its scripts running in the visitor's browser in a frame isolated
+from Seti; the page can still reach the internet, and Render in the share dialog turns this off
+([security](security.md#html-share-links)). The proxy must pass Seti's `Content-Security-Policy`
+header and the visitor's `Sec-Fetch-Dest` header unchanged.
 
 The phone app cannot pass Access, so with the app in use add Bypass applications the same way for
 `api/devices/pair`, `api/widget/` and `.well-known/assetlinks.json`; Seti still refuses them

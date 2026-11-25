@@ -1,5 +1,5 @@
 import {
-  canShareLive,
+  canRender,
   SHARE_EXPIRY_DAYS,
   type FileShare,
   type Share,
@@ -22,8 +22,8 @@ import { Input } from '@/components/ui/input'
 import { useBusy } from '@/hooks/useBusy'
 import { useNow } from '@/hooks/useNow'
 import { durationLabel } from '@/lib/time'
-import { LiveSwitch, ShareLive } from './ShareLive'
 import { LinkPreviewSwitch, PreviewFact, ShareLinkPreview, UnfurlFact } from './SharePreview'
+import { RenderSwitch, ShareRender } from './ShareRender'
 import { shareDiagrams } from './share-diagrams'
 
 interface ShareTarget {
@@ -191,7 +191,7 @@ function SharedActions({ share, onChange, onSettings }: Shared) {
     <div className="space-y-3">
       <ShareFacts share={share} />
       <ShareLinkPreview share={share} onChange={onSettings} />
-      {canShareLive(share.name) && <ShareLive share={share} onChange={onSettings} />}
+      {canRender(share.name) && <ShareRender share={share} onChange={onSettings} />}
       {findings !== null && (
         <Findings findings={findings} busy={busy} onAnyway={() => void run(async () => update(true))} />
       )}
@@ -221,7 +221,7 @@ function SharedActions({ share, onChange, onSettings }: Shared) {
 function CreateShare({ target, onCreated }: { target: ShareTarget; onCreated: (made: ShareLink) => void }) {
   const [days, setDays] = useState<ShareExpiryDays>(7)
   const [linkPreview, setLinkPreview] = useState(true)
-  const [live, setLive] = useState(false)
+  const [render, setRender] = useState(true)
   const [findings, setFindings] = useState<ShareFinding[] | null>(null)
   const { busy, run } = useBusy()
   const create = async (anyway: boolean) => {
@@ -231,7 +231,7 @@ function CreateShare({ target, onCreated }: { target: ShareTarget; onCreated: (m
       expires_in_days: days,
       allow_findings: anyway,
       link_preview: linkPreview,
-      live,
+      ...(canRender(target.name) ? { render } : {}),
       diagrams: await shareDiagrams(target, AbortSignal.timeout(DRAW_MS)),
     }
     try {
@@ -251,7 +251,7 @@ function CreateShare({ target, onCreated }: { target: ShareTarget; onCreated: (m
       </p>
       <ExpiryChoice value={days} onChange={setDays} />
       <LinkPreviewSwitch checked={linkPreview} disabled={busy} onChange={setLinkPreview} />
-      {canShareLive(target.name) && <LiveSwitch checked={live} disabled={busy} onChange={setLive} />}
+      {canRender(target.name) && <RenderSwitch checked={render} disabled={busy} onChange={setRender} />}
       {busy && (
         <p className="text-xs text-muted-foreground">
           Making the preview; a long PDF, Office file or video takes a while.
