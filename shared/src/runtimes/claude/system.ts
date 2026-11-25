@@ -96,7 +96,12 @@ function ended(m: SDKTaskNotificationMessage): Event {
 const background = (m: SDKBackgroundTasksChangedMessage): Event => ({
   ...base,
   type: 'background.changed',
-  jobs: m.tasks.map((task) => ({ id: task.task_id, kind: jobKind(task.task_type), label: task.description })),
+  jobs: m.tasks.map((task) => ({
+    id: task.task_id,
+    kind: jobKind(task.task_type),
+    label: task.description,
+    ...(task.ambient === true ? { ambient: true as const } : {}),
+  })),
 })
 
 /** A session start; older stored starts may lack the mode or the server list. */

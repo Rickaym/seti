@@ -480,6 +480,15 @@ interrupted only for that.
   apply, neither in the control room's gate nor in the runtime, and its tool servers stay off;
   its ask and deny rules apply. A running session takes no change to its folder's settings; the
   next session reads them. The control room records each file it holds back.
+- SBX-15: A sandboxed agent's sessions keep and load their runtime's memory in the agent's own
+  memory folder, its own project's, whatever repository its folders belong to, so they load what
+  its dreams edit. The memory folders of the checkouts behind its folders, which other sessions of
+  those repositories share, are mounted read-only, and its prompt names each one's index. Seti
+  copies nothing between the folders and writes nothing into the agent's folders for this. An
+  unsandboxed agent's sessions keep the runtime's own choice.
+  Why: a runtime that keys memory by repository would give an agent in a worktree the memory
+  every session of the repository shares, the user's own included, and not the folder its dreams
+  tidy.
 
 ### 7.3 Egress
 
@@ -589,12 +598,15 @@ interrupted only for that.
   outside your organisations" or the like; it is an ask, never a refusal. The user's own are the
   owners of the signed-in code-host account and its organisations, read on the control plane and
   cached for about an hour, and the owners of the repositories the agent was given. The
-  implementation reads the command past wrappers, nested scripts and `cd`, resolves a remote or
-  URL under HST-2 with the repository's and the agent's own global git config and URL rewrites,
-  in the folder as the agent sees it (a sandbox's private home and /tmp included), and asks
-  whenever it cannot place the target: the same command changes remotes, git config or git's
-  environment, sets the code host's repository or host variables, or pushes submodules. A push
-  to a local path does not ask. An allow rule `PushTo(<owner>)`, which only the user adds, lets
+  implementation reads the command past wrappers and nested scripts; follows `cd`, `pushd`,
+  `popd` and `git -C`, with `~` and `$HOME` as the agent's home, and variables the same line
+  gives one literal value, each only as far as the line surely ran it; resolves a remote or URL
+  under HST-2 with the repository's and the agent's own global git config and URL rewrites, in
+  the folder as the agent sees it (a sandbox's private home and /tmp included); and asks whenever
+  it cannot place the target: a folder or variable the shell computes, the same command changes
+  remotes, git config or git's environment, sets the code host's repository or host variables,
+  or pushes submodules. A command that neither pushes, forks, opens a pull request nor writes
+  through the API never asks, and a push to a local path does not ask. An allow rule `PushTo(<owner>)`, which only the user adds, lets
   that code-host owner through; it is never handed to a runtime.
 
 ### 7.5 Guards
@@ -1107,12 +1119,17 @@ Optional and off by default: a maintenance session per agent that consolidates i
   night by the schedule. While Dreaming is on for an agent, its runtime's own memory
   consolidation is turned off in its sessions, so one consolidator owns the folder.
 - DRM-4: A dream starts only while the agent is unarchived and sandboxed, its runtime declares
-  dreams, it runs no turn or background work, holds no open question, permission or change
-  request, has no dream running, and the runtime's own consolidation did not run in the last hour;
-  otherwise it is refused with the reason, which counts the background commands and other
-  background tasks an agent with no turn still runs. A nightly dream refused for work or an open request is
-  tried again every `dream_retry` until the window ends, then skipped with its last reason. None
-  starts after the end; one running at the end is stopped.
+  dreams, it runs no turn and no background subagent or other background task, holds no open
+  question, permission or change request, has no dream running, and the runtime's own
+  consolidation did not run in the last hour; otherwise it is refused with the reason, which
+  counts the subagents and other background tasks an agent with no turn still runs. Background
+  commands and monitors do not hold a dream back, and background work the runtime does not list
+  by kind counts as other work.
+  Why: a dream only reads the folders a command works in, and the turn the runtime starts when a
+  command ends or reports cuts the dream (DRM-12); a subagent is model work that can write memory.
+  A nightly dream refused for work or an open request is tried again every `dream_retry` until
+  the window ends, then skipped with its last reason. None starts after the end; one running at
+  the end is stopped.
 - DRM-5: Nightly starts are at most the setting at once and `dream_gap` apart, and wait while plan
   use, host load or free disk on the root disk and on Seti's data disk is past `dream_gates`, or
   while the night's spend leaves less than one dream's budget. Turning Dreaming off ends the
@@ -1121,11 +1138,13 @@ Optional and off by default: a maintenance session per agent that consolidates i
 - DRM-6: A dream is a new session of the agent's runtime that resumes nothing (RT-8), in the
   agent's maintenance sandbox (SBX-12) with egress to the model provider only (EGR-13), writable
   only in its memory folder and the night's dream folder of its workspace. It reads a digest of
-  the agent's transcript since its last dream, built from neutral events, at most
-  `dream_digest` characters, with credentials redacted and the user's messages and failures kept
-  first. Its prompt names the other memory folders the agent's sessions see (its checkouts'),
-  which it reads before it writes and may not change. When it changed memory that the agent's
-  sessions do not load, because they load their repository's, its report says so in one line.
+  the agent's transcript since its last dream, or for its first the last day, built from neutral
+  events, at most `dream_digest` characters, with credentials redacted, the user's messages and
+  failures kept first, and a last line counting what was left out by kind. Its prompt asks it to
+  read the whole digest and to review the notes already kept, not only those the day touched,
+  and never to remove one only because the day did not mention it. Its memory folder is the one
+  the agent's sessions load (SBX-15). Its prompt names the other memory folders the agent's
+  sessions see read-only (its checkouts'), which it reads before it writes and may not change.
 - DRM-7: A dream MUST NOT start or change a turn of the agent, post, send an update, push or
   notify, or enter Needs you. Its outcome is one stored report, also written beside the digest,
   and the agent's next turn is told once which dreams changed its memory.
@@ -1134,7 +1153,10 @@ Optional and off by default: a maintenance session per agent that consolidates i
   after, credentials redacted. The user, and the EA after the user's yes, MAY revert it; a revert
   of a file changed since, or of a text kept only redacted, MUST be refused (409). Every change
   and revert is audited with the path and line counts, never the text. The last dream's report
-  shows each changed file's diff, from that stored text, with its revert beside it.
+  shows each changed file's diff, from that stored text, with its revert beside it. A topic file
+  a dream leaves empty is removed after it, since a dream deletes nothing itself, and recorded
+  as a change like any other. The report's tidied lines name each note removed, merged, moved
+  or corrected, with the reason.
 - DRM-9: Clean-ups are off by default and a setting. When on, a dream MAY propose a clean-up
   (`trash`, `remove_worktree`, `delete_branch`) with a reason, at most `dream_proposals` a dream.
   The control room checks it when filed and again when the user allows it, and applies it only
@@ -1151,12 +1173,12 @@ Optional and off by default: a maintenance session per agent that consolidates i
 - DRM-11: The trash keeps an item for `trash_keep`, then removes it. Restore puts it back if its
   path is free (else 409); a branch is recreated at its tip. Every move into the trash, restore
   and removal is audited with path and bytes, never content.
-- DRM-12: A turn of the agent that starts during its dream cuts the dream. A restart cuts it too;
-  the memory changes it made before the cut are still recorded. A cut nightly dream is planned
-  once more within its window; cut again, it has failed. A dream ends once: its end is stored
-  with its `dream.ended` event in one transaction, after the events of its memory changes, so no
-  reader finds an ended dream without that event. A restart leaves a dream running until both
-  are stored.
+- DRM-12: A turn of the agent that starts during its dream cuts the dream at once, however short
+  the turn. A restart cuts it too; the memory changes it made before the cut are still recorded.
+  A cut nightly dream is planned once more within its window; cut again, it has failed. A dream
+  ends once: its end is stored with its `dream.ended` event in one transaction, after the events
+  of its memory changes, so no reader finds an ended dream without that event. A restart leaves a
+  dream running until both are stored.
 - DRM-13: A dream stops at its budget per dream (`dream_budget` by default), `dream_steps` or
   `dream_time`, and runs on the model the settings name. Its cost is what its runtime reports for
   the dream's session, stored on the dream, not on the agent's turns; Seti stops a dream whose
@@ -1266,19 +1288,21 @@ Optional and off by default: a maintenance session per agent that consolidates i
   `noindex`, `no-referrer`, `nosniff` and `default-src 'none'`; downloads are never HTML or SVG. A
   file is shared only after path checks, a key and credential name deny list, `share_size` and a
   secret scan.
-  This holds for every share that is not live (PUB-10), and for a live share's static view.
-- PUB-10: A live share is the user's choice per link, off by default, for HTML files only; the EA
-  and agents cannot make one. Its link answers a page with no script around a frame
-  (`sandbox allow-scripts`) holding the stored copy, plus a static view at `/static`. The frame's
-  document is served only to a frame (`Sec-Fetch-Dest: iframe`; else the same 404) and is
+  This holds for every share but a rendered HTML share's page (PUB-10), whose code view at `/code`
+  is this page.
+- PUB-10: An HTML file's share renders as a page by default; the user may turn Render off per link,
+  and then the link shows the PUB-7 page. A file that is not HTML never renders, and the EA and
+  agents cannot share or change Render. A rendered link answers a page with no script around a
+  frame (`sandbox allow-scripts`) holding the stored copy, plus the code view at `/code`. The
+  frame's document is served only to a frame (`Sec-Fetch-Dest: iframe`; else the same 404) and is
   sandboxed by its own policy too: an opaque origin with no cookies or storage (an in-memory stand-in
-  only), no network but scripts, styles and fonts from the `LIVE_SHARE_CDNS` prefixes, images only
+  only), no network but scripts, styles and fonts from the `SHARE_PAGE_CDNS` prefixes, images only
   from `data:` and `blob:`, no frames, workers, plugins, forms, popups, downloads or top
   navigation, and `frame-ancestors 'self'`; the page's `frame-src` names only that frame, so it
   cannot navigate elsewhere. Both carry PUB-7's headers, `Permissions-Policy` with every feature
   off and `X-DNS-Prefetch-Control: off`. Known limit: browsers let a script reach the internet
-  through WebRTC, so a live page can send what it holds and what a visitor types to a host it
-  names; a live share promises isolation from Seti, not the absence of network.
+  through WebRTC, so a rendered page can send what it holds and what a visitor types to a host it
+  names; rendering promises isolation from Seti, not the absence of network.
 
 ## 19. Client contract
 

@@ -15,25 +15,27 @@ g.fillStyle = 'rgb(20, 90, 160)'
 ;[40, 90, 65, 110, 80].forEach(function (h, i) { g.fillRect(16 + i * 60, 120 - h, 40, h) })</script></body></html>
 `
 
-export const LIVE_LINE =
+export const RENDER_LINE =
   "Runs this page's scripts in the visitor's browser, isolated from Seti. The page can still reach the internet."
+
+export const CODE_LINE = 'Visitors see the file as code.'
 
 /** Writes the dashboard beside the agent's other docs. */
 export function seedDashboard(dir: string): void {
   fs.writeFileSync(path.join(dir, 'docs', 'dashboard.html'), DASHBOARD)
 }
 
-/** The live page's frame, where the dashboard's script wrote its text. */
-export async function expectLiveDashboard(page: Page): Promise<void> {
+/** The rendered page's frame, where the dashboard's script wrote its text. */
+export async function expectRenderedDashboard(page: Page): Promise<void> {
   await expect(page.getByRole('heading', { name: 'dashboard.html' })).toBeVisible()
-  await expect(page.getByRole('link', { name: 'Static view' })).toBeVisible()
+  await expect(page.getByRole('link', { name: 'View code' })).toBeVisible()
   const frame = page.frameLocator('iframe[title="dashboard.html"]')
   await expect(frame.locator('#out')).toHaveText('Drawn by its script')
   await expect(page.locator('script')).toHaveCount(0)
 }
 
-/** The static view: the file's source as text, no frame and no script. */
-export async function expectStaticDashboard(page: Page): Promise<void> {
+/** The code view: the file's source as text, no frame and no script. */
+export async function expectDashboardCode(page: Page): Promise<void> {
   await expect(page.getByRole('heading', { name: 'dashboard.html' })).toBeVisible()
   await expect(page.getByText('Waiting for the script').first()).toBeVisible()
   await expect(page.locator('iframe')).toHaveCount(0)

@@ -1,3 +1,4 @@
+import os from 'node:os'
 import { pushRuleOwner, type Task } from '@seti/shared'
 import { agentGitReading } from './git.js'
 import { gh, viewerLogin } from './github.js'
@@ -188,7 +189,7 @@ function outside(action: OutwardAction, given: string | null, own: Set<string>):
  * owner through. Read on the host with git's hostile-repository guards, never in the sandbox.
  */
 export async function outsidePushes(task: Task, command: string, cwd: string | null): Promise<OutsidePush[]> {
-  const calls = outwardCalls(command, cwd)
+  const calls = outwardCalls(command, cwd, os.homedir())
   if (calls.length === 0) {
     return []
   }

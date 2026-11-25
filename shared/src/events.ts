@@ -186,7 +186,11 @@ export type RuntimeEvent = EventBase &
         stopCause?: 'time_limit' | 'low_memory'
         usage?: JobUsage
       }
-    | { type: 'background.changed'; jobs: { id: string; kind: JobKind; label: string }[] }
+    | {
+        type: 'background.changed'
+        /** Every live background job; `ambient` marks a watcher that is not the agent's work. */
+        jobs: { id: string; kind: JobKind; label: string; ambient?: true }[]
+      }
     | { type: 'usage'; usage: Usage; contextWindow?: number }
     | {
         type: 'compaction'

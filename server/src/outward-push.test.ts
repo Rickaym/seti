@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process'
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
+import os, { tmpdir } from 'node:os'
 import path from 'node:path'
 import type { Task } from '@seti/shared'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -40,6 +40,14 @@ if (stored === undefined) {
   throw new Error('the task was not stored')
 }
 const task: Task = { ...stored, repos: [{ id: 'r1', slug: 'given-owner/app', dir: root, worktree: false }] }
+
+/** Clones in the agent home, one of the user's organisation and one outside it. */
+const homes = () => {
+  if (!existsSync(path.join(root, 'home-mine'))) {
+    repo('home-mine', { origin: 'git@github.com:My-Org/tool.git' })
+    repo('home-theirs', { origin: 'https://github.com/other/tool' })
+  }
+}
 
 const asked = async (command: string, cwd = root) => (await outsidePushes(task, command, cwd)).map(outsideText)
 
@@ -151,6 +159,22 @@ describe('pushes outside the user organisations', () => {
     expect(await asked('git push git@gitlab.com:other/tool.git')).toEqual([
       'Push to gitlab.com/other/tool, outside your organisations',
     ])
+  })
+
+  it.each<[string, string[]]>([
+    ['cd ~/home-mine && git add src tests && git commit -q -m "fix: x" && git push -q', []],
+    ['cd ~/home-mine; git add f && git commit -q -m x && git push -q origin HEAD', []],
+    ['cd ~/home-mine && git diff origin/some/branch -- src | head', []],
+    ['cd /some/dir; R=my-org/tool; gh api repos/$R/pulls -f title=x -f head=a -f base=b', []],
+    ['cd ~/home-theirs && git push', ['Push to other/tool, outside your organisations']],
+    ['R=other/tool; gh api repos/$R/pulls -f title=x', ['Write to other/tool, outside your organisations']],
+    ['R=x; R=my-org/tool; gh api repos/$R/pulls -f title=x', ['Write to a repository Seti cannot tell is yours']],
+    ['cd $(mktemp -d) && git push', ['Push to a repository Seti cannot tell is yours']],
+  ])('reads ~ as the agent home and literal variables in %s', async (command, expected) => {
+    homes()
+    const home = vi.spyOn(os, 'homedir').mockReturnValue(root)
+    expect(await asked(command, '/nowhere')).toEqual(expected)
+    home.mockRestore()
   })
 
   it('reads owners from every remote form and keeps tokens out', () => {

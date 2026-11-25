@@ -2,10 +2,10 @@ import { previewBody } from './html-preview.js'
 import type { ShareRequest } from './share-path.js'
 
 /**
- * Hosts a live page may load scripts, styles and fonts from. Each sees the visitor's address and
- * nothing else of Seti's: what it serves runs in the same opaque, networkless frame as the page.
+ * Hosts a rendered page may load scripts, styles and fonts from. Each sees the visitor's
+ * address and nothing else of Seti's: what it serves runs in the same isolated frame as the page.
  */
-export const LIVE_SHARE_CDNS: readonly { source: string; reason: string }[] = [
+export const SHARE_PAGE_CDNS: readonly { source: string; reason: string }[] = [
   {
     source: 'https://cdnjs.cloudflare.com/ajax/libs/',
     reason: 'Curated open-source libraries; nobody can publish arbitrary files there',
@@ -17,16 +17,16 @@ export const LIVE_SHARE_CDNS: readonly { source: string; reason: string }[] = [
   { source: 'https://unpkg.com/', reason: 'npm packages through the other mirror generated pages name' },
 ]
 
-/** Set by the share handler on a live share's shell and frame; the headers step drops it. */
-export const LIVE_MARK = 'X-Seti-Share-Live'
+/** Set by the share handler on a rendered share's shell and frame; the headers step drops it. */
+export const RENDER_MARK = 'X-Seti-Share-Render'
 
-const CDN_SOURCES = LIVE_SHARE_CDNS.map((cdn) => cdn.source).join(' ')
+const CDN_SOURCES = SHARE_PAGE_CDNS.map((cdn) => cdn.source).join(' ')
 
 /**
- * The live page: an opaque origin with scripts, no storage, no network but the CDNs' scripts,
+ * The rendered page: an opaque origin with scripts, no storage, no network but the CDNs' scripts,
  * styles and fonts, and no frames, workers, forms or plugins. Only a Seti page may frame it.
  */
-export const LIVE_PAGE_POLICY = [
+export const SHARE_FRAME_POLICY = [
   'sandbox allow-scripts',
   "default-src 'none'",
   `script-src 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' data: blob: ${CDN_SOURCES}`,
@@ -45,9 +45,9 @@ export const LIVE_PAGE_POLICY = [
   "frame-ancestors 'self'",
 ].join('; ')
 
-/** The shell runs nothing and frames only its own live page, which may not navigate elsewhere. */
+/** The shell runs nothing and frames only its own page, which may not navigate elsewhere. */
 function shellPolicy(own: string | null): string {
-  const frame = own === null ? "'none'" : `${own}/live`
+  const frame = own === null ? "'none'" : `${own}/frame`
   return [
     "default-src 'none'",
     "style-src 'unsafe-inline'",
@@ -59,7 +59,7 @@ function shellPolicy(own: string | null): string {
 }
 
 /** Every powerful feature off, for the shell and so for the frame it holds. */
-export const LIVE_PERMISSIONS = [
+export const RENDER_PERMISSIONS = [
   'accelerometer',
   'autoplay',
   'bluetooth',
@@ -93,19 +93,19 @@ export const LIVE_PERMISSIONS = [
   .map((feature) => `${feature}=()`)
   .join(', ')
 
-/** Headers of a live share's shell and of its frame, in place of the static page's policy. */
-export function applyLiveHeaders(headers: Headers, request: ShareRequest, origin: string | null): void {
+/** Headers of a rendered share's shell and of its frame, in place of the code view's policy. */
+export function applyRenderHeaders(headers: Headers, request: ShareRequest, origin: string | null): void {
   const own = origin === null ? null : `${origin}/share/${request.token}`
-  headers.set('Content-Security-Policy', request.part === 'live' ? LIVE_PAGE_POLICY : shellPolicy(own))
-  headers.set('Permissions-Policy', LIVE_PERMISSIONS)
+  headers.set('Content-Security-Policy', request.part === 'frame' ? SHARE_FRAME_POLICY : shellPolicy(own))
+  headers.set('Permissions-Policy', RENDER_PERMISSIONS)
   headers.set('X-DNS-Prefetch-Control', 'off')
-  if (request.part === 'live') {
+  if (request.part === 'frame') {
     headers.set('X-Frame-Options', 'SAMEORIGIN')
   }
 }
 
-/** Only a frame gets the live page; opened as a tab it could navigate itself to the web. */
+/** Only a frame gets the rendered page; opened as a tab it could navigate itself to the web. */
 export const isFrameLoad = (fetchDest: string | undefined): boolean => fetchDest === 'iframe'
 
 /** The stored HTML with in-memory storage, since the frame's opaque origin refuses the real one. */
-export const liveDocument = (content: Buffer): Buffer => previewBody(content, true)
+export const frameDocument = (content: Buffer): Buffer => previewBody(content, true)
