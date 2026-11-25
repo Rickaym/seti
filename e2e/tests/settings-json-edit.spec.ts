@@ -3,6 +3,9 @@ import type { SettingsDoc } from '@seti/shared'
 import { apiData, expect, test } from './support/fixtures.js'
 import { editedText, typeSettings } from './support/settings-json.js'
 
+/** The refusals these tests provoke: an invalid value and a security setting. */
+test.use({ allowedHttpStatuses: [400, 403] })
+
 const main = (page: Page) => page.getByRole('main')
 const section = (page: Page, path: string) => main(page).getByRole('region', { name: path, exact: true })
 
