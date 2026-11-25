@@ -1,6 +1,8 @@
 import { z } from 'zod'
 import { localName, title } from './mod-names.js'
+import { AGENT_VIEW_PLACES, agentPlaceIssues } from './mod-places.js'
 import { fenceRenderer, fileViewer } from './mod-viewers.js'
+import { capabilityNeeds as needs } from './runtimes/capabilities.js'
 
 export { MOD_LOCAL_NAME } from './mod-names.js'
 export { MOD_VIEWER_KINDS, VIEWER_BYTES_MAX, type ModFileViewer } from './mod-viewers.js'
@@ -77,20 +79,19 @@ const command = z
     level: z.enum(['self', 'full']).default('full'),
     /** How long Seti waits for its handler before it answers that the action timed out. */
     timeoutSeconds: z.number().int().min(1).max(600).default(30),
+    /** Hidden on an agent whose runtime lacks one of these, and refused there. */
+    needs,
   })
   .superRefine((entry, ctx) => {
     const task = entry.args[MOD_TASK_ARG]
+    for (const [path, message] of task === undefined ? agentPlaceIssues(entry) : []) {
+      ctx.addIssue({ code: 'custom', path: [path], message })
+    }
     if (task !== undefined && task.type !== 'string') {
       ctx.addIssue({ code: 'custom', path: ['args', MOD_TASK_ARG], message: 'The task argument is a string' })
     }
     if (entry.level === 'self' && (task === undefined || task.optional)) {
       ctx.addIssue({ code: 'custom', path: ['level'], message: 'A self command takes a required task argument' })
-    }
-    if (entry.for.includes('agentHeader') && task === undefined) {
-      ctx.addIssue({ code: 'custom', path: ['for'], message: "A command in an agent's header takes a task argument" })
-    }
-    if (entry.for.includes('agentMenu') && task === undefined) {
-      ctx.addIssue({ code: 'custom', path: ['for'], message: "A command in an agent's menu takes a task argument" })
     }
     const asked = Object.entries(entry.args).find(([name, arg]) => name !== MOD_TASK_ARG && !arg.optional)
     if (entry.chord !== undefined && asked !== undefined) {
@@ -159,21 +160,28 @@ const channelSource = z.discriminatedUnion('kind', [webhookSource, pollerSource]
 export type ModChannelSource = z.output<typeof channelSource>
 export type ModWebhookSource = z.output<typeof webhookSource>
 
-const view = z.strictObject({
-  id: localName,
-  title,
-  icon: lucideName.optional(),
-  /** A short line beside the title, where the place shows one, such as a dock's header. */
-  description: z.string().trim().max(80).optional(),
-  /**
-   * header is the band across the app header; about is a part of Settings, About; agentsLayout
-   * shows several agents at once in the Agents section; agentDock is a panel over one agent's
-   * chat, a bottom sheet on a phone.
-   */
-  where: z.enum(['agentTab', 'agentDock', 'sidePanel', 'section', 'agentsLayout', 'header', 'about']),
-  phone: z.boolean(),
-  entry: z.string().max(200).optional(),
-})
+const view = z
+  .strictObject({
+    id: localName,
+    title,
+    icon: lucideName.optional(),
+    /** A short line beside the title, where the place shows one, such as a dock's header. */
+    description: z.string().trim().max(80).optional(),
+    /**
+     * header is the band across the app header; about is a part of Settings, About; agentsLayout
+     * shows several agents at once in the Agents section; agentDock is a panel over one agent's
+     * chat, a bottom sheet on a phone.
+     */
+    where: z.enum(['agentTab', 'agentDock', 'sidePanel', 'section', 'agentsLayout', 'header', 'about']),
+    phone: z.boolean(),
+    entry: z.string().max(200).optional(),
+    /** Hidden on an agent whose runtime lacks one of these; only views placed on one agent. */
+    needs,
+  })
+  .refine((entry) => entry.needs.length === 0 || AGENT_VIEW_PLACES.includes(entry.where), {
+    path: ['needs'],
+    message: 'Only a view in agentTab or agentDock needs a capability',
+  })
 
 const statusItem = z.strictObject({
   id: localName,

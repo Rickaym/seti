@@ -236,6 +236,22 @@ JSON Schema; `GET /api/settings-doc/agents/<id>` and `GET /api/settings-doc/work
 one agent's or one workspace's own settings, with schemas under `/schema/agent` and
 `/schema/workspace`.
 
+Each section shows how many of its settings differ from their default, and Modified shows only
+those. Open as JSON, in the header of each settings page, opens the JSON page at that page's
+section. `GET /api/settings-doc/defaults` serves every setting's default, and
+`GET /api/settings-doc?only=modified` only what differs from it, as a merge patch onto the
+defaults.
+
+Edit, on the JSON page, opens the plain settings in an editor that completes keys and values
+from the schema. Save shows every change, old value above new, before anything applies; a change
+with a consequence, such as deleting archived agents, asks you to confirm it. A save is one entry
+in the page's History, and Undo or Revert there sets it all back. Reset on a section sets one
+setting back to its default. Security settings and secrets stay read only here and change on
+their own pages; every setting stays editable on its own page, on a phone too.
+`PATCH /api/settings-doc` takes `{base_revision, patch, expect, confirm}`, where `patch` is a JSON
+merge patch of the document: `null` removes an item from a list keyed by name and sets any other
+setting to `null`.
+
 Settings Seti reads at start live in `~/.seti/seti.env` (one `NAME=value` per line) and secrets in
 `~/.seti/credentials`, one owner-only file each. Restart Seti after a change:
 `systemctl --user restart seti.service`. `pnpm seti:doctor` reads the same file and reports a value
@@ -544,8 +560,11 @@ edit and tool call asks you. A call to one of your tool servers runs without ask
 allow rule of yours names that server or tool. Turn Rules decide off in the Codex card under
 Settings, Runtimes to answer every call yourself; an upgrade keeps the choice you made. A Codex
 agent shows a summary of its reasoning where a Claude agent shows its thinking, which costs a few
-output tokens per model call. Codex agents have no side chat, rewind, Bypass or plugins. Their
-cost is an estimate from the price table in
+output tokens per model call. A Codex agent reads your `~/.claude/CLAUDE.md` as its global
+instructions, read-only, and a folder's `CLAUDE.md` when the folder has no `AGENTS.md`, as a
+Claude Code agent does. It also gets your skills from `~/.claude/skills`, read-only, listed in its
+instructions; skills in its own folders are never offered. Codex agents have no side chat, rewind,
+Bypass or plugins. Their cost is an estimate from the price table in
 `server/src/runtimes/codex/prices.ts`, which names the day it was read; to update it, copy the
 standard rates from OpenAI's pricing page into that table, set `asOf` to the day, and run
 `pnpm check`.

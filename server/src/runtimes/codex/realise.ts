@@ -7,6 +7,7 @@ import type { StdioServer } from '../../tool-relay.js'
 import type { OneShotRequest } from '../one-shot.js'
 import type { CodexDecide } from './approvals.js'
 import type { CodexRealised } from './session.js'
+import { withSkills } from './skills.js'
 
 /** Where Codex sends its model calls, and the variable that holds the key's placeholder. */
 export interface CodexProvider {
@@ -64,7 +65,8 @@ function serverSettings(servers: Record<string, StdioServer>, shared: StdioServe
  * off. Commands get no shell snapshot, which every later command would source, and the sandbox's
  * search path, which leaves out the helper folder Codex makes in its writable home. The model
  * sends a summary of its reasoning, which Seti's models leave out unless asked. Approvals go to
- * Seti, never to a reviewer model.
+ * Seti, never to a reviewer model. A folder without AGENTS.md gives its CLAUDE.md instead, as
+ * a Claude Code agent reads it.
  */
 function overrides(provider: CodexProvider, model: string, searchPath: string | undefined): Setting[] {
   return [
@@ -92,6 +94,7 @@ function overrides(provider: CodexProvider, model: string, searchPath: string | 
     ['approvals_reviewer', 'user'],
     ['analytics.enabled', false],
     ['web_search', 'disabled'],
+    ['project_doc_fallback_filenames', ['CLAUDE.md']],
     ...(searchPath === undefined ? [] : [['shell_environment_policy.set.PATH', searchPath] satisfies Setting]),
   ]
 }
@@ -138,7 +141,7 @@ export function realiseCodex(
     resume: spec.resume,
     model,
     effort: spec.vendor.effort,
-    instructions: spec.instructions.append,
+    instructions: withSkills(spec.instructions.append, spec.vendor.skills, launcher.env.HOME),
     spawn,
     decide,
     signal: abortController.signal,

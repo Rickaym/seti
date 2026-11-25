@@ -65,6 +65,8 @@ export const journalEntry = z.discriminatedUnion('type', [
   z.object({ type: z.literal('guard.refused'), command: z.string(), reason: z.string() }),
   /** A request carried connection placeholders toward a host their connections do not allow. */
   z.object({ type: z.literal('egress.blocked'), host: z.string(), names: z.array(z.string()) }),
+  /** The sandbox refused a host off the allowed list, `count` times so far for the agent. */
+  z.object({ type: z.literal('egress.refused'), host: z.string().max(253), count: z.int().positive() }),
   z.object({ type: z.literal('memory.event'), report: memoryReport }),
   /** Seti's shadow compared a call with the runtime's outcome; null when its decision failed. */
   z.object({ type: z.literal('policy.compared'), count: policyShadowCount.nullable() }),
@@ -163,6 +165,8 @@ const askSchemas = {
   },
   /** Holds an MCP call a review rule names until the user answers; the hook's output. */
   'review.ask': { ask: toolCall, answer: z.object({ output: z.unknown() }) },
+  /** Holds a command pushing outside the user's organisations until they answer; the hook's output. */
+  'push.ask': { ask: toolCall.extend({ cwd: z.string() }), answer: z.object({ output: z.unknown() }) },
   /** Asks the user about a call the agent repeats with the same result, `results` times so far. */
   'repeat.ask': {
     ask: toolCall.extend({ results: z.int().positive() }),

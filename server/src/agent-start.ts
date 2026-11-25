@@ -77,7 +77,11 @@ async function firstPrompt(input: StartAgentRequest): Promise<string> {
   return input.brief_of === undefined ? input.prompt : withBrief(input.prompt, await requireTask(input.brief_of))
 }
 
-async function startPlanned(input: StartAgentRequest, cap?: AccessCap, hold?: (wait: AgentWait) => void) {
+async function startPlanned(
+  input: StartAgentRequest,
+  cap?: AccessCap,
+  hold?: (wait: AgentWait) => void,
+): Promise<Task> {
   refuseCommandAttachments(input.prompt, input.attachments)
   checkStaged(input.attachments)
   const onCreated = await beforeFirstTurn(input.notify_when_done, cap, hold)

@@ -9,11 +9,11 @@ import { HttpError } from '../http.js'
 import { pendingRequests } from '../pending-requests.js'
 import type { DreamSupport } from '../runtimes/adapter.js'
 import { dreamsOf } from '../runtimes/capabilities.js'
-import { isRunning, sessionState } from '../session-mirror.js'
 import { dreamSettings, nightRuns } from '../store/dream-nights.js'
 import { dreamRuns } from '../store/dreams.js'
 import { sandboxPolicy } from '../store/sandbox.js'
 import { todayZone } from '../team-active.js'
+import { atWork } from './busy.js'
 import { forgetBefore, keptBefore, recordAfter } from './kept.js'
 import { snapshotMemory, type MemorySnapshot } from './memory-snapshot.js'
 import { DREAM_LIMITS, runDream, type DreamLimits } from './run.js'
@@ -49,7 +49,7 @@ export interface DreamRefusal {
 /** Why the agent cannot dream now, or null when it can. */
 async function dreamRefusal(task: Task): Promise<DreamRefusal | null> {
   const dream = dreamsOf(task.runtime)
-  const checks: [boolean | (() => Promise<boolean>), string, boolean][] = [
+  const checks: [boolean | (() => Promise<boolean | string>), string, boolean][] = [
     [task.archived_at !== null, 'The agent is archived.', false],
     [dream === null, "The agent's runtime keeps no memory Seti can find.", false],
     [
@@ -58,11 +58,7 @@ async function dreamRefusal(task: Task): Promise<DreamRefusal | null> {
       false,
     ],
     [dreaming.has(task.id), 'The agent is dreaming already.', true],
-    [
-      isRunning(task.id) || sessionState(task.id).background > 0,
-      'The agent is at work; dream when its turn and background work end.',
-      true,
-    ],
+    [async () => (await atWork(task.id)) ?? false, 'The agent is at work.', true],
     [async () => waitsOnUser(task.id), 'The agent waits on you: answer its open request first.', true],
     [
       dream !== null && lockIsFresh(dream.memory(task.cwd)),
@@ -71,8 +67,9 @@ async function dreamRefusal(task: Task): Promise<DreamRefusal | null> {
     ],
   ]
   for (const [check, text, wait] of checks) {
-    if (typeof check === 'boolean' ? check : await check()) {
-      return { text, wait }
+    const found = typeof check === 'boolean' ? check : await check()
+    if (found !== false) {
+      return { text: typeof found === 'string' ? found : text, wait }
     }
   }
   return null
@@ -203,23 +200,39 @@ export async function startNightly(
   }
 }
 
-/** Marks the dreams a restart cut, since their session ended with the process. */
+/** Records what a cut dream changed in memory, from the snapshot kept at its start, if any. */
+async function changesOfCut(run: DreamRun): Promise<number> {
+  const before = keptBefore(run.task_id, run.id)
+  const task = await tasks.get(run.task_id)
+  const memory = task === undefined ? null : (dreamsOf(task.runtime)?.memory(task.cwd) ?? null)
+  if (before === null || memory === null) {
+    return 0
+  }
+  return (await recordAfter(run.task_id, run, memory, before)).changes
+}
+
+/**
+ * Ends the dreams a restart cut, since their session ended with the process: each one's memory
+ * changes are recorded first, then it is marked cut and audited in one transaction. A dream stays
+ * running until then, so a second restart in between finishes it rather than losing its record.
+ */
 export async function cutDreamsAtStart(): Promise<void> {
-  for (const run of await dreamRuns.cutRunning('Seti restarted during the dream.')) {
-    const before = keptBefore(run.task_id, run.id)
-    const task = await tasks.get(run.task_id)
-    const memory = task === undefined ? null : (dreamsOf(task.runtime)?.memory(task.cwd) ?? null)
-    if (before !== null && task !== undefined && memory !== null) {
-      await recordAfter(run.task_id, run, memory, before)
-    }
+  for (const run of await dreamRuns.allRunning()) {
+    const changes = await changesOfCut(run)
+    await audit.recordWith(
+      async (tx) => dreamRuns.cut(run.id, 'Seti restarted during the dream.', changes, tx),
+      (cut) =>
+        cut === undefined
+          ? null
+          : {
+              actor: 'system',
+              kind: 'dream.ended',
+              subject_type: 'task',
+              subject_id: run.task_id,
+              summary: `A restart cut a dream: ${String(changes)} memory files changed`,
+              detail: { run: run.id, state: cut.state, memory_changes: changes },
+            },
+    )
     forgetBefore(run.task_id, run.id)
-    await audit.record({
-      actor: 'system',
-      kind: 'dream.ended',
-      subject_type: 'task',
-      subject_id: run.task_id,
-      summary: 'A restart cut a dream',
-      detail: { run: run.id, state: run.state },
-    })
   }
 }

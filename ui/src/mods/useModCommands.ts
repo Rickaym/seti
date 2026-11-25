@@ -6,6 +6,7 @@ import { useCommands } from '@/components/palette/useCommands'
 import { chordLabel } from '@/components/shortcuts/chords'
 import { useMods } from '@/hooks/useMods'
 import type { AgentAction } from '@/panels/tasks/agent-actions'
+import { agentLacks, useAgentLacks, type AgentLacks } from './agent-needs'
 import { commandContext, offBundled, runModCommand, showModOff, uiCommands, type UiCommandEntry } from './commands'
 import { parseModChord } from './mod-chords'
 
@@ -17,7 +18,12 @@ function slashOf(mod: ModInfo, command: ModCommand): string | undefined {
   return slash === undefined ? undefined : `/${slash.name}`
 }
 
-function paletteCommand(mod: ModInfo, command: ModCommand, ui: UiCommandEntry | undefined): PaletteCommand {
+function paletteCommand(
+  mod: ModInfo,
+  command: ModCommand,
+  ui: UiCommandEntry | undefined,
+  lacks: AgentLacks,
+): PaletteCommand {
   const onAgent = takesTask(command)
   const entry: PaletteCommand = {
     id: `mod.${modScoped(mod.id, command.id)}`,
@@ -35,7 +41,9 @@ function paletteCommand(mod: ModInfo, command: ModCommand, ui: UiCommandEntry | 
       void runModCommand(mod, command, args, { agent: agent?.id ?? null })
     },
   }
-  const base = onAgent ? { ...entry, when: ({ agent }: { agent: { id: string } | null }) => agent !== null } : entry
+  const onHere = ({ agent }: { agent: { id: string } | null }) =>
+    agent !== null && lacks(agent.id, command.needs) === null
+  const base = onAgent ? { ...entry, when: onHere } : entry
   return mod.running ? withUi(base, mod, command, ui) : base
 }
 
@@ -70,24 +78,35 @@ const commandsFor = (list: ModList | undefined, where: ModCommand['for'][number]
     )
 
 /** The palette commands of mods: those of running mods, and of bundled mods that are off. */
-export function modPaletteCommands(list: ModList | undefined, ui: readonly UiCommandEntry[]): PaletteCommand[] {
+export function modPaletteCommands(
+  list: ModList | undefined,
+  ui: readonly UiCommandEntry[],
+  lacks: AgentLacks = agentLacks,
+): PaletteCommand[] {
   const byKey = new Map(ui.map((entry) => [entry.key, entry]))
   return commandsFor(list, 'palette', true).map(({ mod, command }) =>
-    paletteCommand(mod, command, byKey.get(modScoped(mod.id, command.id))),
+    paletteCommand(mod, command, byKey.get(modScoped(mod.id, command.id)), lacks),
   )
 }
 
 /** Offers mods' commands in the palette while the app runs. */
 export function useModPaletteCommands(list: ModList | undefined): void {
   const ui = useSyncExternalStore(uiCommands.subscribe, uiCommands.list)
-  const commands = useMemo(() => modPaletteCommands(list, ui), [list, ui])
+  const lacks = useAgentLacks()
+  const commands = useMemo(() => modPaletteCommands(list, ui, lacks), [list, ui, lacks])
   useCommands(commands)
 }
 
 /** The rows running mods add to an agent's More actions menu, each run on that agent. */
-export function modAgentActions(list: ModList | undefined, ui: readonly UiCommandEntry[], agent: string) {
+export function modAgentActions(
+  list: ModList | undefined,
+  ui: readonly UiCommandEntry[],
+  agent: string,
+  lacks: AgentLacks = agentLacks,
+) {
   const byKey = new Map(ui.map((entry) => [entry.key, entry]))
-  return commandsFor(list, 'agentMenu', false).map(({ mod, command }): AgentAction => {
+  const placed = commandsFor(list, 'agentMenu', false).filter(({ command }) => lacks(agent, command.needs) === null)
+  return placed.map(({ mod, command }): AgentAction => {
     const row: AgentAction = {
       label: command.title,
       icon: byKey.get(modScoped(mod.id, command.id))?.icon ?? Puzzle,
@@ -104,5 +123,6 @@ export function modAgentActions(list: ModList | undefined, ui: readonly UiComman
 export function useModAgentActions(agent: string): AgentAction[] {
   const list = useMods().data
   const ui = useSyncExternalStore(uiCommands.subscribe, uiCommands.list)
-  return useMemo(() => modAgentActions(list, ui, agent), [list, ui, agent])
+  const lacks = useAgentLacks()
+  return useMemo(() => modAgentActions(list, ui, agent, lacks), [list, ui, agent, lacks])
 }

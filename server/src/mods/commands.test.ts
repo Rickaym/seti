@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { modManifest, type ModActionResult, type SetiControlLevel, type Task } from '@seti/shared'
+import { modManifest, type ModActionResult, type SetiControlLevel, type StoredRuntime, type Task } from '@seti/shared'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { asAgent, asMod } from '../access.js'
 import { createApp } from '../app.js'
@@ -20,10 +20,11 @@ const post = async (route: string, body: unknown, auth: Record<string, string> =
     body: JSON.stringify(body),
   })
 
-async function newTask(level: SetiControlLevel): Promise<Task> {
+async function newTask(level: SetiControlLevel, runtime: StoredRuntime = 'claude'): Promise<Task> {
   const id = randomUUID()
   const title = `Mods ${id.slice(0, 8)}`
-  await tasks.insert({ id, title, repo_id: null, cwd: '/tmp', worktree: false, pr_urls: [], seti_control: level })
+  const fields = { title, repo_id: null, cwd: '/tmp', worktree: false, pr_urls: [], seti_control: level }
+  await tasks.insert({ id, ...fields, runtime })
   const task = await tasks.get(id)
   if (task === undefined) {
     throw new Error('task was not stored')
@@ -49,6 +50,20 @@ afterAll(async () => {
 })
 
 describe('mod commands', () => {
+  it('are refused on an agent whose runtime lacks what they need, to the user and the EA', async () => {
+    const codex = await newTask('full', 'codex')
+    await modHost.setEnabled('side-chat', true)
+    try {
+      for (const auth of [USER_AUTH, EA_AUTH]) {
+        const res = await post('/mods/side-chat/actions/ask', { args: { task: codex.id } }, auth)
+        expect(res.status).toBe(409)
+        expect(await res.text()).toContain('Ask aside is not on Codex agents')
+      }
+    } finally {
+      await modHost.setEnabled('side-chat', false)
+    }
+  })
+
   it('run from the palette as the user, audited as the user', async () => {
     const res = await post('/mods/sample/actions/count', { args: {} })
     expect(res.status, await res.clone().text()).toBe(200)

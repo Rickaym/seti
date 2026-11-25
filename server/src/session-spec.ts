@@ -20,6 +20,7 @@ import { systemAppend, workingDirs } from './session-options.js'
 import { isClaudeSpec, isCodexSpec, realiseClaude } from './session-realise.js'
 import { sharedToolFolders } from './shared-tools.js'
 import { codexSettings } from './store/codex-settings.js'
+import { userSkills } from './user-skills.js'
 
 /** What a task's session starts from, read from the database; it holds no secret values. */
 export interface SessionSpec<Id extends string = RuntimeId> {
@@ -84,6 +85,7 @@ async function codexVendor(task: Task): Promise<CodexShapes['vendor']> {
     binary: await requireCodexProgram(settings),
     model: task.requested_model ?? settings.default_model,
     effort: task.requested_effort ?? settings.default_effort,
+    skills: userSkills(),
   }
 }
 

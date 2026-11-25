@@ -42,3 +42,21 @@ test('export saves the whole document as the API serves it', async ({ page, requ
   expect(saved.version).toBe(1)
   expect(saved.revision).toBe(served.revision)
 })
+
+test('marks settings that differ from their default and opens a page as JSON', async ({ page, request }) => {
+  const dreams = await apiData<{ at_once: number }>(request, '/dreams/settings')
+  await request.put('/api/dreams/settings', { data: { at_once: dreams.at_once === 2 ? 3 : 2 } })
+  try {
+    await page.goto('/#settings/agents')
+    await main(page).getByRole('button', { name: 'Open as JSON' }).click()
+    await expect(main(page).getByRole('heading', { name: 'JSON', level: 2, exact: true })).toBeVisible()
+    await expect(section(page, 'agents.lifecycle')).toBeInViewport()
+    await expect(section(page, 'agents.lifecycle')).toContainText(' modified')
+
+    await main(page).getByRole('button', { name: 'Modified' }).click()
+    await expect(section(page, 'agents.lifecycle')).toContainText('"at_once"')
+    await expect(section(page, 'agents.lifecycle')).not.toContainText('"window_start"')
+  } finally {
+    await request.put('/api/dreams/settings', { data: { at_once: dreams.at_once } })
+  }
+})
