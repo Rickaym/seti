@@ -1,5 +1,5 @@
 import path from 'node:path'
-import { expand } from './shell-expand.js'
+import { expand, expandPartly } from './shell-expand.js'
 import { denyForms, rawWords } from './shell-forms.js'
 import { shellSteps, type ShellStep } from './shell-split.js'
 
@@ -15,21 +15,25 @@ const DIR = 'dir'
 
 const unquote = (word: string) => word.replace(/\\(.)/g, '$1').replace(/["']/g, '')
 
-/** Every word of a line and of the scripts it nests, quotes removed. */
+/** Every word of a line and of the scripts it nests, as written. */
 function lineWords(line: string, depth: number): string[] {
   return shellSteps(line).flatMap((step) => [
-    ...rawWords(step.text).map(unquote),
+    ...rawWords(step.text),
     ...(depth < NESTING ? step.nested.flatMap((script) => lineWords(script, depth + 1)) : []),
   ])
 }
+
+/** Whether a word as written runs arithmetic, which can set any name: `((...))`, `$((...))`. */
+const arithmetic = (word: string) => word.startsWith('((') || (!word.startsWith("'") && /\$\(\(|\$\[/.test(word))
 
 /**
  * Names the line sets only by one literal assignment, if at all. A name it also reads into,
  * loops over, unsets, exports or assigns twice never resolves; nor any name beside arithmetic.
  */
 function trustedNames(line: string): (name: string) => boolean {
-  const words = lineWords(line, 0)
-  if (line.includes('((') || words.some((word) => SETTERS.has(word))) {
+  const written = lineWords(line, 0)
+  const words = written.map(unquote)
+  if (written.some(arithmetic) || words.some((word) => SETTERS.has(word))) {
     return () => false
   }
   const uses = new Map<string, number>()
@@ -175,7 +179,7 @@ function walkSteps(line: string, scope: Scope, walk: Walk, depth: number): void 
     }
     const forms = denyForms(step.text).map((form) => rawWords(form))
     walk.visit(
-      forms.map((words) => words.map((word) => expand(word, scope.vars) ?? unquote(word))),
+      forms.map((words) => words.map((word) => expandPartly(word, scope.vars))),
       scope.dir,
     )
     const own = !PIPES.has(step.before) && !PIPES.has(step.after) && step.after !== '&'

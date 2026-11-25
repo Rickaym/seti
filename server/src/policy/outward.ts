@@ -1,7 +1,7 @@
 import path from 'node:path'
 import { denyForms, rawWords } from './shell-forms.js'
 import { walkLine } from './shell-scope.js'
-import { splitShell } from './shell-split.js'
+import { shellCommands } from './shell-split.js'
 
 /** What a command sends to a code host: a push, a fork, a pull request or an API write. */
 export type OutwardAction = 'push' | 'fork' | 'pr' | 'api'
@@ -221,8 +221,10 @@ function callsOf(words: readonly string[], dir: string | null, why: { git?: stri
 
 /** Where a call goes when a shell variable Seti could not read names it. */
 function computed(call: Outward): Outward {
-  const named: unknown[] = 'unknown' in call.where ? [] : Object.values(call.where)
-  return named.some((word) => typeof word === 'string' && /[$`]/.test(word))
+  const { where } = call
+  const named: unknown[] = 'unknown' in where ? [] : Object.values(where)
+  const globbed = ('repo' in where && /[*?[]/.test(where.repo)) || ('owner' in where && /[*?[]/.test(where.owner))
+  return globbed || named.some((word) => typeof word === 'string' && /[$`]/.test(word))
     ? { action: call.action, where: { unknown: 'a shell variable names it' } }
     : call
 }
@@ -235,7 +237,7 @@ function computed(call: Outward): Outward {
  */
 export function outwardCalls(command: string, cwd: string | null, home: string | null = null): Outward[] {
   const found: Outward[] = []
-  const why = rerouting(splitShell(command).all)
+  const why = rerouting(shellCommands(command))
   walkLine(command, { cwd, home }, (forms, dir) => {
     found.push(...forms.flatMap((words) => callsOf(words, dir, why)).map(computed))
   })

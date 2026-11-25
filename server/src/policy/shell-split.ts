@@ -1,4 +1,5 @@
 import { rawWords } from './shell-forms.js'
+import { heredocAt, heredocBody, runsInput, type Heredoc } from './shell-heredoc.js'
 
 /** A shell line cut into the commands rules match. */
 export interface ShellSplit {
@@ -37,10 +38,16 @@ class Scanner {
   private tickQuote: string | null = null
   private start = 0
   private dangling = false
+  /** Heredocs opened on the current line, whose bodies start at its end. */
+  private docs: Heredoc[] = []
   private readonly line: string
 
-  constructor(line: string) {
+  /** Whether heredoc bodies read as data rather than as commands. */
+  private readonly docsAsData: boolean
+
+  constructor(line: string, docsAsData = false) {
     this.line = line
+    this.docsAsData = docsAsData
   }
 
   run(): Scan {
@@ -69,8 +76,45 @@ class Scanner {
     this.scan.innerAt.push(this.scan.parts.length)
   }
 
+  /**
+   * Skips the bodies of the heredocs opened on the line a newline at `i` ends, as data: only a
+   * body handed to a shell, or the substitutions in an unquoted one, run. A body no delimiter
+   * line ends stays read as commands. Returns where reading goes on, or null to read on as usual.
+   */
+  private heredocs(i: number): number | null {
+    const docs = this.docs
+    const runs = runsInput(this.line.slice(this.line.lastIndexOf('\n', i - 1) + 1, i))
+    this.docs = []
+    const bodies: string[] = []
+    let at = i + 1
+    for (const doc of docs) {
+      const read = heredocBody(this.line, at, doc)
+      if (read === null) {
+        return null
+      }
+      bodies.push(...bodyScripts(read.body, doc, runs))
+      at = read.end
+    }
+    if (this.opens.length > 0 || this.tick !== -1) {
+      return at
+    }
+    bodies.forEach((script) => {
+      this.enclose(script)
+    })
+    this.cut(i, '\n')
+    this.start = at
+    this.dangling = false
+    return at
+  }
+
   private step(i: number): number {
     const char = this.line[i] ?? ''
+    if (char === '\n' && this.quote === null && this.docs.length > 0) {
+      const next = this.heredocs(i)
+      if (next !== null) {
+        return next
+      }
+    }
     if (char === '\\' && this.quote !== "'") {
       return i + 2
     }
@@ -142,6 +186,10 @@ class Scanner {
   private operator(i: number): number | null {
     if (this.line.startsWith('<<', i) && !this.line.startsWith('<<<', i)) {
       this.scan.complete = false
+      const doc = this.docsAsData ? heredocAt(this.line, i) : null
+      if (doc !== null) {
+        this.docs.push(doc)
+      }
       return i + 2
     }
     if (this.opens.length > 0 || this.tick !== -1) {
@@ -163,6 +211,14 @@ class Scanner {
     const after = this.line[i + 1] ?? ''
     return this.line[i] === '&' && after !== '>' && before !== '>' && before !== '<' ? '&' : undefined
   }
+}
+
+/** What a heredoc body runs: all of it when a shell reads it, else an unquoted one's $(...). */
+function bodyScripts(body: string, doc: Heredoc, runs: boolean): string[] {
+  if (runs) {
+    return [body]
+  }
+  return doc.quoted ? [] : new Scanner(`"${body.split('"').join('\\"')}"`).run().inner
 }
 
 const KEYWORDS = /^(?:(?:if|then|else|elif|do|while|until|!|\{|\}|done|fi|esac)\s+)+/
@@ -203,13 +259,13 @@ function scripts(part: string): string[] {
   return found.map(unwrap).filter((script) => script.trim() !== '')
 }
 
-function everything(line: string, depth: number): string[] {
-  const scan = new Scanner(line).run()
+function everything(line: string, depth: number, docsAsData = false): string[] {
+  const scan = new Scanner(line, docsAsData).run()
   const own = scan.parts.map(bare).filter((part) => part !== '')
   if (depth >= NESTING) {
     return own
   }
-  const deeper = [...scan.inner, ...own.flatMap(scripts)].flatMap((inner) => everything(inner, depth + 1))
+  const deeper = [...scan.inner, ...own.flatMap(scripts)].flatMap((inner) => everything(inner, depth + 1, docsAsData))
   return [...own, ...deeper]
 }
 
@@ -228,7 +284,7 @@ export interface ShellStep {
 
 /** Cuts a shell line into its own commands in order, each with the scripts nested in it. */
 export function shellSteps(line: string): ShellStep[] {
-  const scan = new Scanner(line).run()
+  const scan = new Scanner(line, true).run()
   const steps = scan.parts.map((part, at) => {
     const text = bare(part)
     const inner = scan.inner.filter((_, index) => scan.innerAt[index] === at)
@@ -237,6 +293,9 @@ export function shellSteps(line: string): ShellStep[] {
   })
   return steps.filter((step) => step.text !== '')
 }
+
+/** Every command a line runs, nested ones included, with heredoc bodies read as data. */
+export const shellCommands = (line: string): string[] => [...new Set(everything(line, 0, true))]
 
 /** Cuts a shell line into its commands, as Claude Code does before it matches Bash rules. */
 export function splitShell(line: string): ShellSplit {

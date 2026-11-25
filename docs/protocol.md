@@ -599,7 +599,8 @@ interrupted only for that.
   outside your organisations" or the like; it is an ask, never a refusal. The user's own are the
   owners of the signed-in code-host account and its organisations, read on the control plane and
   cached for about an hour, and the owners of the repositories the agent was given. The
-  implementation reads the command past wrappers and nested scripts; follows `cd`, `pushd`,
+  implementation reads the command past wrappers and nested scripts, and reads a heredoc body
+  as data unless a shell reads it (an unquoted body's substitutions still run); follows `cd`, `pushd`,
   `popd` and `git -C`, with `~` and `$HOME` as the agent's home, and variables the same line
   gives one literal value, each only as far as the line surely ran it; resolves a remote or URL
   under HST-2 with the repository's and the agent's own global git config and URL rewrites, in
