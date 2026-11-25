@@ -120,7 +120,7 @@ describe('credential profiles', () => {
     expect(page.text).not.toContain(GITHUB)
   })
 
-  it('lists names and agent counts for everyone, and nothing else', async () => {
+  it('lists names, agent counts and access set sizes for everyone, and nothing else', async () => {
     const work = await data<CredentialProfile>('POST', '/credentials/profiles', { name: 'Work' })
     await newTask(work.id)
     const summaries = await data<ProfileSummary[]>('GET', '/credential-profiles')
@@ -129,6 +129,7 @@ describe('credential profiles', () => {
       name: 'Work',
       builtin: false,
       agents: 1,
+      access_items: 0,
     })
   })
 })

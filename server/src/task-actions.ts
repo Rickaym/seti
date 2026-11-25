@@ -15,6 +15,7 @@ import {
   type WorkspaceEntry,
 } from '@seti/shared'
 import type { z } from 'zod'
+import { resetTaskAccess } from './access-reset.js'
 import { awaitTurnEnd, dropWait } from './agent-waits.js'
 import { removeTaskFiles } from './archive-files.js'
 import { auditMessage, auditTask } from './audit.js'
@@ -86,6 +87,12 @@ export async function updateTask(id: string, input: z.output<typeof updateTaskIn
     [input.sandbox, async (task) => setTaskSandbox(task, input.sandbox ?? task.sandbox)],
     [input.home_access, dropTaskHomeAccess],
     [input.profile_id, async (task) => setTaskProfile(task, input.profile_id ?? task.profile_id)],
+    [
+      input.reset_access,
+      async (task) => {
+        await resetTaskAccess(task)
+      },
+    ],
     [input.seti_control, async (task) => changeSetiControl(task, input.seti_control ?? task.seti_control)],
     [input.color, async (task) => setTaskColor(task, input.color === undefined ? task.color : input.color)],
     [input.workspace_id, async (task) => setTaskWorkspace(task, input.workspace_id ?? task.workspace_id)],

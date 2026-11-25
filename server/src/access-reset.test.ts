@@ -65,4 +65,20 @@ describe('resetting an agent to its credential', () => {
     })
     expect([await taskAccess.all(id, 'aws'), await taskMcpChoices.get(id)]).toEqual([{ aws: true }, { github: false }])
   })
+
+  it('switches the credential and resets in one step for the user, never for the EA', async () => {
+    const ops = (await profiles.create(`Ops ${randomUUID().slice(0, 6)}`)).id
+    const id = await agentOn('default')
+    await taskAccess.set(id, 'aws', 'aws', false)
+    const patch = async (auth: Record<string, string>) =>
+      app.request(`/api/tasks/${id}`, {
+        method: 'PATCH',
+        headers: { host: 'localhost', ...auth, 'content-type': 'application/json' },
+        body: JSON.stringify({ profile_id: ops, reset_access: true }),
+      })
+    expect((await patch(EA_AUTH)).status).toBe(403)
+    expect((await patch(USER_AUTH)).status).toBe(200)
+    expect((await tasks.get(id))?.profile_id).toBe(ops)
+    expect(await taskAccess.all(id, 'aws')).toEqual({})
+  })
 })

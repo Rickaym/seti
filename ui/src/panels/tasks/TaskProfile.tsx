@@ -9,6 +9,8 @@ import { Button } from '@/components/ui/button'
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 import { SourceMark } from '@/panels/access/SourceMark'
 import { noteAccessChange } from '@/panels/access/access'
+import { PickCredentialDialog } from './PickCredentialDialog'
+import { pickConsequence, type PickConsequence } from './pick-consequence'
 
 const APPLIES = 'Applies from the next turn'
 
@@ -26,8 +28,15 @@ function useProfiles(): ProfileSummary[] | null {
 }
 
 /** The credentials a sandboxed agent's proxy takes its tokens from. */
-function ProfileSelect({ value, onChange }: { value: string; onChange: (id: string) => void }) {
-  const profiles = useProfiles()
+function ProfileSelect({
+  value,
+  profiles,
+  onChange,
+}: {
+  value: string
+  profiles: ProfileSummary[] | null
+  onChange: (id: string) => void
+}) {
   return (
     <NativeSelect
       aria-label="Credentials"
@@ -38,7 +47,7 @@ function ProfileSelect({ value, onChange }: { value: string; onChange: (id: stri
         onChange(event.target.value)
       }}
     >
-      {(profiles ?? [{ id: value, name: value, builtin: true, agents: 0 }]).map((profile) => (
+      {(profiles ?? [{ id: value, name: value, builtin: true, agents: 0, access_items: 0 }]).map((profile) => (
         <NativeSelectOption key={profile.id} value={profile.id}>
           {profile.name}
         </NativeSelectOption>
@@ -57,9 +66,12 @@ const appliedText = (view: TaskAccessView) =>
  */
 export function TaskCredentials({ task, onChanged }: { task: Task; onChanged: () => void }) {
   const custom = task.profile_id !== DEFAULT_PROFILE_ID
-  const change = async (profileId: string) => {
+  const profiles = useProfiles()
+  const [pick, setPick] = useState<PickConsequence | null>(null)
+  const change = async (profileId: string, reset = false) => {
+    setPick(null)
     try {
-      await apiPatch<Task>(`/tasks/${task.id}`, { profile_id: profileId })
+      await apiPatch<Task>(`/tasks/${task.id}`, { profile_id: profileId, ...(reset ? { reset_access: true } : {}) })
       toast.success(appliedText(await apiGet<TaskAccessView>(`/tasks/${task.id}/access`)))
       noteAccessChange(task.id)
       onChanged()
@@ -67,9 +79,27 @@ export function TaskCredentials({ task, onChanged }: { task: Task; onChanged: ()
       toast.error(errorText(e))
     }
   }
+  const choose = (id: string) => {
+    const profile = profiles?.find((entry) => entry.id === id)
+    if (profile === undefined || profile.access_items === 0) {
+      void change(id)
+      return
+    }
+    pickConsequence(task.id, profile).then(setPick, (e: unknown) => toast.error(errorText(e)))
+  }
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <ProfileSelect value={task.profile_id} onChange={(id) => void change(id)} />
+      <ProfileSelect value={task.profile_id} profiles={profiles} onChange={choose} />
+      {pick !== null && (
+        <PickCredentialDialog
+          title={task.title}
+          pick={pick}
+          onPick={(reset) => void change(pick.profile.id, reset)}
+          onClose={() => {
+            setPick(null)
+          }}
+        />
+      )}
       <SourceMark
         custom={custom}
         hint={
@@ -84,7 +114,9 @@ export function TaskCredentials({ task, onChanged }: { task: Task; onChanged: ()
             size="icon-xs"
             variant="ghost"
             aria-label="Reset credentials to Default"
-            onClick={() => void change(DEFAULT_PROFILE_ID)}
+            onClick={() => {
+              choose(DEFAULT_PROFILE_ID)
+            }}
           >
             <RotateCcw />
           </Button>
