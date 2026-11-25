@@ -14,6 +14,8 @@ const COMMAND_CHARS = 2000
 
 type Ended = Exclude<BackgroundShellStatus, 'running'>
 
+type LiveJob = EventOf<'background.changed'>['jobs'][number]
+
 interface Draft {
   id: string
   tool_use_id: string
@@ -70,6 +72,8 @@ export class ShellIndex {
   private readonly drafts = new Map<string, Draft>()
   /** Shell calls that run or watch a command, waiting for the job that runs them. */
   private readonly calls = new Map<string, ShellCall>()
+  /** The runtime's last list of live background jobs, and the message that carried it. */
+  private live: { jobs: LiveJob[]; since: number } = { jobs: [], since: 0 }
 
   /** Folds one message in; older messages are ignored. */
   apply(row: MessageRow): void {
@@ -86,6 +90,8 @@ export class ShellIndex {
         this.started(row, event)
       } else if (event.type === 'job.updated' || event.type === 'job.ended') {
         this.applyJob(row, event)
+      } else if (event.type === 'background.changed') {
+        this.live = { jobs: event.jobs, since: row.id }
       }
     }
   }
@@ -110,6 +116,11 @@ export class ShellIndex {
         has_output: draft.output_file !== null,
         output_file: draft.output_file,
       }))
+  }
+
+  /** The background jobs the open session runs, as its runtime last listed them. */
+  liveJobs(openSince: number | null): LiveJob[] {
+    return openSince !== null && this.live.since >= openSince ? this.live.jobs : []
   }
 
   /** The commands of the shells the open session runs, as the agent wrote them, by shell id. */

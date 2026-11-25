@@ -1051,12 +1051,17 @@ Optional and off by default: a maintenance session per agent that consolidates i
   night by the schedule. While Dreaming is on for an agent, its runtime's own memory
   consolidation is turned off in its sessions, so one consolidator owns the folder.
 - DRM-4: A dream starts only while the agent is unarchived and sandboxed, its runtime declares
-  dreams, it runs no turn or background work, holds no open question, permission or change
-  request, has no dream running, and the runtime's own consolidation did not run in the last hour;
-  otherwise it is refused with the reason, which counts the background commands and other
-  background tasks an agent with no turn still runs. A nightly dream refused for work or an open request is
-  tried again every `dream_retry` until the window ends, then skipped with its last reason. None
-  starts after the end; one running at the end is stopped.
+  dreams, it runs no turn and no background subagent or other background task, holds no open
+  question, permission or change request, has no dream running, and the runtime's own
+  consolidation did not run in the last hour; otherwise it is refused with the reason, which
+  counts the subagents and other background tasks an agent with no turn still runs. Background
+  commands and monitors do not hold a dream back, and background work the runtime does not list
+  by kind counts as other work.
+  Why: a dream only reads the folders a command works in, and the turn the runtime starts when a
+  command ends or reports cuts the dream (DRM-12); a subagent is model work that can write memory.
+  A nightly dream refused for work or an open request is tried again every `dream_retry` until
+  the window ends, then skipped with its last reason. None starts after the end; one running at
+  the end is stopped.
 - DRM-5: Nightly starts are at most the setting at once and `dream_gap` apart, and wait while plan
   use, host load or free disk on the root disk and on Seti's data disk is past `dream_gates`, or
   while the night's spend leaves less than one dream's budget. Turning Dreaming off ends the
@@ -1095,12 +1100,12 @@ Optional and off by default: a maintenance session per agent that consolidates i
 - DRM-11: The trash keeps an item for `trash_keep`, then removes it. Restore puts it back if its
   path is free (else 409); a branch is recreated at its tip. Every move into the trash, restore
   and removal is audited with path and bytes, never content.
-- DRM-12: A turn of the agent that starts during its dream cuts the dream. A restart cuts it too;
-  the memory changes it made before the cut are still recorded. A cut nightly dream is planned
-  once more within its window; cut again, it has failed. A dream ends once: its end is stored
-  with its `dream.ended` event in one transaction, after the events of its memory changes, so no
-  reader finds an ended dream without that event. A restart leaves a dream running until both
-  are stored.
+- DRM-12: A turn of the agent that starts during its dream cuts the dream at once, however short
+  the turn. A restart cuts it too; the memory changes it made before the cut are still recorded.
+  A cut nightly dream is planned once more within its window; cut again, it has failed. A dream
+  ends once: its end is stored with its `dream.ended` event in one transaction, after the events
+  of its memory changes, so no reader finds an ended dream without that event. A restart leaves a
+  dream running until both are stored.
 - DRM-13: A dream stops at its budget per dream (`dream_budget` by default), `dream_steps` or
   `dream_time`, and runs on the model the settings name. Its cost is what its runtime reports for
   the dream's session, stored on the dream, not on the agent's turns; Seti stops a dream whose
