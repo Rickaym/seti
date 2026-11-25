@@ -5,7 +5,7 @@ import { auditEvents } from '../store/audit.js'
 import { taskInputs } from '../store/inputs.js'
 import { threadFollows } from '../store/threads.js'
 import { REPLY_SETTLE_MS, THREAD_RATE, expireThreads, routeDueReplies } from './route.js'
-import { agentSends, api, data, deliver, message, quietTask, slackWebhook } from './slack-test-kit.js'
+import { agentSends, api, data, deliver, message, quietTask, slackWebhook } from './test-slack-kit.js'
 
 const ROOT = '1700000000.000100'
 const ts = (n: number) => `17000001${String(n).padStart(2, '0')}.000100`

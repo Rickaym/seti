@@ -7,7 +7,7 @@ import { channelStore } from '../store/channels.js'
 import { EA_AUTH } from '../test-auth.js'
 import { setWebhookThreads } from './actions.js'
 import { DM_WINDOW_MS } from './intake.js'
-import { agentSends, api, data, deliver, message, quietTask, slackWebhook } from './slack-test-kit.js'
+import { agentSends, api, data, deliver, message, quietTask, slackWebhook } from './test-slack-kit.js'
 
 const ROOT = '1700000000.000100'
 const reply = (ts: string, fields: Record<string, unknown> = {}) =>

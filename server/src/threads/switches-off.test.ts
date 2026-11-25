@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { sql } from '../db.js'
 import { asciiJson } from '../golden/json.js'
 import { channelStore } from '../store/channels.js'
-import { agentSends, api, data, deliver, message, quietTask } from './slack-test-kit.js'
+import { agentSends, api, data, deliver, message, quietTask } from './test-slack-kit.js'
 
 const OWNER = { authorizations: [{ user_id: 'U0OWNER001', is_bot: false }] }
 const ROOT = '1700000000.000100'
