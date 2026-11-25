@@ -394,7 +394,7 @@ describe('share responses', () => {
     ] as const) {
       const page = await (await publicGet(`/share/${tokenOf(file)}${view}`)).text()
       expect(page).not.toContain('<script')
-      expect(page).not.toContain('<svg')
+      expect(page.slice(page.indexOf('<main>'))).not.toContain('<svg')
       expect(page).toMatch(/&lt;(<span class="tok-keyword">)?script/)
       const raw = await publicGet(`/share/${tokenOf(file)}/raw`)
       expect(raw.headers.get('content-type')).toBe('text/plain; charset=utf-8')
@@ -410,7 +410,8 @@ describe('share responses', () => {
     const res = await publicGet(`/share/${token}`)
     expectShareHeaders(res, imagesOf(token))
     const html = await res.text()
-    expect(html).not.toMatch(/<svg|<script|<form|\son\w+="/i)
+    expect(html).not.toMatch(/<script|<form|\son\w+="/i)
+    expect(html.slice(html.indexOf('<main>'))).not.toContain('<svg')
     expect(html).toContain(`<source media="(prefers-color-scheme: dark)" srcset="${token}/p/2">`)
     expect(html).toContain('<label for="seti-d1-1">100%</label>')
     const image = await publicGet(`/share/${token}/p/1`)

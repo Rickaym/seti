@@ -165,7 +165,7 @@ describe('a rendered share', () => {
     expect(body).toContain(
       `<iframe class="page" src="/share/${token}/frame" sandbox="allow-scripts" referrerpolicy="no-referrer"`,
     )
-    expect(body).toContain(`<a class="dl" href="/share/${token}/code">View code</a>`)
+    expect(body).toContain(`<a class="act" href="/share/${token}/code" aria-label="View code" title="View code"><svg `)
     expect(body).not.toMatch(/live/i)
     expect(shell.headers.get('content-security-policy')).toBe(
       `default-src 'none'; style-src 'unsafe-inline'; frame-src ${ACCESS.origin}/share/${token}/frame; ` +
