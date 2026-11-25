@@ -19,7 +19,7 @@ interface IconSelectProps {
 }
 
 /** A native select led by its icon, which a phone opens as its own picker, 44px tall to touch. */
-function IconSelect({ icon: Icon, label, hint, value, disabled, onChange, children }: IconSelectProps) {
+export function IconSelect({ icon: Icon, label, hint, value, disabled, onChange, children }: IconSelectProps) {
   return (
     <Hint text={hint}>
       <span className="relative flex min-w-0 items-center">

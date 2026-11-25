@@ -594,6 +594,12 @@ message back, while its row reads "Waiting on" and the helper's title; past the 
 is interrupted, the helper's end arrives as an update instead. A helper cannot start agents, and
 an agent may have 4 helpers running and spend $10 on helpers a day.
 
+A role can name the model its agents run on: open the role on the Context page and pick one under
+Runs on, built-in roles included. A start that names the role, such as `start_task` with
+`role: "Reviewer"`, then runs on that model unless it names its own; while that runtime is off
+the agent runs on your default and its setup says why. A Codex agent's Seti guide and Lead role
+send it to helper agents, since Codex has no subagents of its own.
+
 ### Access: defaults and per-agent choices
 
 Everything an agent may reach follows one model: each SSH host, AWS, MCP server, context

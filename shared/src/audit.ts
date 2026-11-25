@@ -120,6 +120,7 @@ export const AUDIT_KINDS = [
   'context.pack_updated',
   'context.pack_deleted',
   'context.pack_default_changed',
+  'context.pack_runtime_changed',
   'context.knowledge_proposed',
   'context.knowledge_approved',
   'context.knowledge_rejected',

@@ -19,6 +19,7 @@ import { DefaultSwitch } from '@/panels/access/DefaultSwitch'
 import { Banner, CodeArea, EditorFrame } from '@/panels/context/EditorFrame'
 import { HistoryAside, HistoryButton } from '@/panels/context/HistoryAside'
 import { PackLinks } from '@/panels/context/PackLinks'
+import { RoleRuntime } from '@/panels/context/RoleRuntime'
 import { RevisionHistory } from '@/panels/revisions/RevisionHistory'
 
 interface PackForm {
@@ -111,7 +112,14 @@ function BuiltinPack({
       readOnly
       onSave={() => undefined}
       actions={
-        role ? <DuplicateButton pack={pack} onCopied={onCopied} /> : <DefaultToggle pack={pack} onChanged={onChanged} />
+        role ? (
+          <>
+            <RoleRuntime pack={pack} onChanged={onChanged} />
+            <DuplicateButton pack={pack} onCopied={onCopied} />
+          </>
+        ) : (
+          <DefaultToggle pack={pack} onChanged={onChanged} />
+        )
       }
       banner={<Banner tone="info">{role ? BUILTIN_ROLE_NOTE : GUIDE_NOTE}</Banner>}
     >
@@ -271,7 +279,11 @@ export function PackEditor({
       actions={
         pack !== null && (
           <>
-            {pack.kind === 'reference' && <DefaultToggle pack={pack} onChanged={changed} />}
+            {pack.kind === 'reference' ? (
+              <DefaultToggle pack={pack} onChanged={changed} />
+            ) : (
+              <RoleRuntime pack={pack} onChanged={changed} />
+            )}
             <HistoryButton open={historyOpen} onToggle={onToggleHistory} />
             <Hint text={`Delete ${copy.noun}`}>
               <Button variant="outline" size="icon-sm" aria-label={`Delete ${copy.noun}`} onClick={() => void remove()}>

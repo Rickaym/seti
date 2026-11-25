@@ -374,8 +374,9 @@ ACTION_SPECS: list[ToolSpec] = [
     ToolSpec(
         "update_context_pack",
         "Change a context pack: rename it, change its description, replace its body or add text at its "
-        "end, or whether new agents get it by default. Agents that include it read the change. The "
-        "built-in Seti guide takes only the default. Needs the user's yes.",
+        "end, or whether new agents get it by default; for a role, the runtime and model agents "
+        "started in it run on. Agents that include it read the change. The built-in Seti guide takes "
+        "only the default. Needs the user's yes.",
         {
             "pack": PACK_REF,
             "name": {"type": "string", "description": "A new name."},
@@ -385,6 +386,16 @@ ACTION_SPECS: list[ToolSpec] = [
             "linked_by_default": {
                 "type": "boolean",
                 "description": "true links it to new agents by default, false stops that.",
+            },
+            "runtime": {
+                "type": "string",
+                "enum": ["claude", "codex", "default"],
+                "description": "Roles only: the runtime an agent started in this role runs on unless "
+                "its start names one; default leaves it to the start.",
+            },
+            "model": {
+                "type": "string",
+                "description": "Roles only: the model it runs with; an empty string clears it.",
             },
             "confirmed": CONFIRMED,
         },
@@ -485,6 +496,23 @@ def color_name(color: str) -> str:
     """The preset a colour is, or the hex called a custom colour, which reads well aloud."""
     preset = next((name for name, hex_ in AGENT_COLORS.items() if hex_ == color), None)
     return preset if preset is not None else f"a custom colour ({color})"
+
+
+def role_runtime_change(
+    pack: Mapping[str, Any], args: Mapping[str, Any]
+) -> tuple[dict[str, Any], str] | None:
+    """The role's new runtime and model as the server takes them, and the change in words; None if none."""
+    if "runtime" not in args and "model" not in args:
+        return None
+    if pack.get("kind") != "role":
+        raise ToolError(f"{name_of(pack)} is not a role; only a role names a runtime.", "Not a role")
+    runtime = arg_str(args, "runtime", required=False) if "runtime" in args else pack.get("runtime")
+    runtime = None if runtime in ("default", "") else runtime
+    model = (str(args.get("model") or "").strip() or None) if "model" in args else pack.get("model")
+    if (runtime, model) == (pack.get("runtime"), pack.get("model")):
+        return None
+    words = f"runs agents in it on {runtime or 'the default runtime'}{f' with {model}' if model else ''}"
+    return {"runtime": runtime, "model": model}, words
 
 
 class AgentActions:
@@ -1253,9 +1281,14 @@ class AgentActions:
         default_changed = default is not None and default != (pack.get("linked_by_default") is True)
         if default_changed:
             changes.append(f"{'links' if default else 'stops linking'} it to new agents by default")
+        runs_on = role_runtime_change(pack, args)
+        if runs_on is not None:
+            changes.append(runs_on[1])
         if not changes:
             raise ToolError(f"That changes nothing in the context pack {name}.", "Nothing to change")
-        if not await self._cleared(args, gate_key("update_context_pack", pack.get("id"), body, default)):
+        runs_body = None if runs_on is None else runs_on[0]
+        key = gate_key("update_context_pack", pack.get("id"), body, default, runs_body)
+        if not await self._cleared(args, key):
             effect = (
                 f"This changes the context pack {name}: it {and_list(changes)}. It reaches any agent that "
                 "includes it, from their next turn."
@@ -1265,6 +1298,8 @@ class AgentActions:
             await self._seti.put(f"/context/packs/{pack.get('id')}", body)
         if default_changed:
             await self._seti.put(f"/context/packs/{pack.get('id')}/default", {"linked_by_default": default})
+        if runs_body is not None:
+            await self._seti.put(f"/context/packs/{pack.get('id')}/runtime", runs_body)
         return ToolResult(
             f"Updated the context pack {name}: it {and_list(changes)}.",
             clip(f"Updated context pack {name}", 70),

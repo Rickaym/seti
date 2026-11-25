@@ -18,6 +18,7 @@ export const scriptedAdapter: RuntimeAdapter<ScriptedShapes, 'scripted'> = {
     tools: { userServers: [], serverNames: null, plugins: false },
     sandbox: { optional: true },
     compaction: false,
+    subagents: true,
     dream: null,
   },
   project: projectScripted,
