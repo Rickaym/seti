@@ -2,6 +2,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import type { Page } from '@playwright/test'
 import { expect, test } from './support/fixtures.js'
+import { expectThinBar } from './support/share-bar.js'
 import { openShare, seedShareAgent, setSharing, shareByApi, stranger } from './support/shares.js'
 import { filesPanel, openViewerFile } from './support/viewer-files.js'
 
@@ -43,14 +44,14 @@ test('shares a Markdown file from Files, and the link opens for anyone with its 
   try {
     const res = await openShare(viewer.page, url)
     expect(res.status()).toBe(200)
-    await expect(viewer.page.getByRole('heading', { name: 'notes.md' })).toBeVisible()
+    await expectThinBar(viewer.page, 'notes.md', ['Download'])
     await expect(viewer.page.getByRole('heading', { name: 'Launch notes' })).toBeVisible()
     await expect(viewer.page.locator('script')).toHaveCount(0)
     const chart = viewer.page.getByRole('img', { name: 'chart' })
     await expect(chart).toBeVisible()
     await expect.poll(async () => chart.evaluate((img: HTMLImageElement) => img.naturalWidth)).toBe(32)
     const download = viewer.page.waitForEvent('download')
-    await viewer.page.getByRole('link', { name: 'Download' }).click()
+    await viewer.page.getByRole('link', { name: 'Download', exact: true }).click()
     expect((await download).suggestedFilename()).toBe('notes.md')
     expect(viewer.errors).toEqual([])
   } finally {
