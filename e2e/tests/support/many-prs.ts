@@ -8,7 +8,7 @@ const SLUG = 'e2e/many'
 /** The linked PR whose title the search finds, and which the list unlinks. */
 export const LOGIN_PR = 120
 
-const manyPrUrl = (n: number) => `https://github.com/${SLUG}/pull/${String(n)}`
+export const manyPrUrl = (n: number) => `https://github.com/${SLUG}/pull/${String(n)}`
 
 /** Merged up to 60, closed to 80, open after; #150 fails CI, #149 conflicts, #148 is a draft. */
 const stateOf = (n: number): LinkedPrState => {

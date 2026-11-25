@@ -20,12 +20,14 @@ import { ReposPage } from '@/panels/settings/ReposPage'
 import { ResourcesPage } from '@/panels/settings/ResourcesPage'
 import { RuntimesPage } from '@/panels/settings/RuntimesPage'
 import { SandboxPage } from '@/panels/settings/SandboxPage'
+import { SharedToolsPage } from '@/panels/settings/SharedToolsPage'
 import { SharingPage } from '@/panels/settings/SharingPage'
 import { SignInPage } from '@/panels/settings/SignInPage'
 import { StoragePage } from '@/panels/settings/StoragePage'
 import { ConnectionsPage } from '@/panels/settings/connections/ConnectionsPage'
 import { CredentialSetsPage } from '@/panels/settings/credentials/CredentialSetsPage'
 import { SettingsJsonPage } from '@/panels/settings/json/SettingsJsonPage'
+import { SettingsPageContext } from '@/panels/settings/json/json-card'
 import { ModsPage } from '@/panels/settings/mods/ModsPage'
 import {
   isProbedPage,
@@ -48,6 +50,7 @@ const PAGES: Record<Exclude<SettingsPageKey, ProbedPageKey>, (detail: string | n
   ea: () => <EaPage />,
   resources: () => <ResourcesPage />,
   runtimes: () => <RuntimesPage />,
+  tools: () => <SharedToolsPage />,
   storage: () => <StoragePage />,
   channels: (detail) => <ChannelsPage detail={detail} />,
   about: () => <AboutPage />,
@@ -136,7 +139,9 @@ export function SettingsPanel({ page, detail }: { page: string | null; detail: s
         </div>
         <SettingsNav selected={selected} opened={opened} nested={detail !== null} />
       </ListPane>
-      <DetailPane detailOpen={opened}>{pageFor(selected, detail)}</DetailPane>
+      <DetailPane detailOpen={opened}>
+        <SettingsPageContext value={selected}>{pageFor(selected, detail)}</SettingsPageContext>
+      </DetailPane>
     </div>
   )
 }

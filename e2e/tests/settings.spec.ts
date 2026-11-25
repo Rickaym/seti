@@ -11,10 +11,10 @@ const PAGES = [
   { label: 'Repos', hash: 'repos', group: 'Agents' },
   { label: 'Resources', hash: 'resources', group: 'Agents' },
   { label: 'Channels', hash: 'channels', group: 'Agents' },
-  { label: 'MCP servers', hash: 'mcp', group: 'Claude Code' },
-  { label: 'Plugins', hash: 'plugins', group: 'Claude Code' },
-  { label: 'Skills', hash: 'skills', group: 'Claude Code' },
-  { label: 'Subagents', hash: 'subagents', group: 'Claude Code' },
+  { label: 'MCP servers', hash: 'mcp', group: 'Capabilities' },
+  { label: 'Skills', hash: 'skills', group: 'Capabilities' },
+  { label: 'Shared tools', hash: 'tools', group: 'Capabilities' },
+  { label: 'Plugins', hash: 'plugins', group: 'Capabilities' },
   { label: 'Sign-in', hash: 'signin', group: 'Security' },
   { label: 'Sandbox', hash: 'sandbox', group: 'Security' },
   { label: 'Permissions', hash: 'permissions', group: 'Security' },
@@ -31,7 +31,7 @@ const OLD_LINKS = [
   { from: 'general/repos', to: 'repos', title: 'Repos' },
   { from: 'general/about', to: 'about', title: 'About' },
   { from: 'plugins/skills', to: 'skills', title: 'Skills' },
-  { from: 'plugins/subagents', to: 'subagents', title: 'Subagents' },
+  { from: 'plugins/subagents', to: 'runtimes', title: 'Runtimes' },
   { from: 'signin/browsers', to: 'signin', title: 'Sign-in' },
   { from: 'signin/devices', to: 'signin', title: 'Sign-in' },
   { from: 'credentials/sets', to: 'credentials', title: 'Credentials' },
@@ -49,6 +49,7 @@ const MERGED = [
   { from: 'devices', to: 'signin', title: 'Sign-in', card: 'phones' },
   { from: 'secrets', to: 'credentials', title: 'Credentials', card: 'secrets' },
   { from: 'account', to: 'runtimes', title: 'Runtimes', card: 'claude' },
+  { from: 'subagents', to: 'runtimes', title: 'Runtimes', card: 'claude-agents' },
 ] as const
 
 const nav = (page: Page) => page.getByRole('navigation', { name: 'Settings pages' })

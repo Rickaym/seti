@@ -200,23 +200,39 @@ export async function startNightly(
   }
 }
 
-/** Marks the dreams a restart cut, since their session ended with the process. */
+/** Records what a cut dream changed in memory, from the snapshot kept at its start, if any. */
+async function changesOfCut(run: DreamRun): Promise<number> {
+  const before = keptBefore(run.task_id, run.id)
+  const task = await tasks.get(run.task_id)
+  const memory = task === undefined ? null : (dreamsOf(task.runtime)?.memory(task.cwd) ?? null)
+  if (before === null || memory === null) {
+    return 0
+  }
+  return (await recordAfter(run.task_id, run, memory, before)).changes
+}
+
+/**
+ * Ends the dreams a restart cut, since their session ended with the process: each one's memory
+ * changes are recorded first, then it is marked cut and audited in one transaction. A dream stays
+ * running until then, so a second restart in between finishes it rather than losing its record.
+ */
 export async function cutDreamsAtStart(): Promise<void> {
-  for (const run of await dreamRuns.cutRunning('Seti restarted during the dream.')) {
-    const before = keptBefore(run.task_id, run.id)
-    const task = await tasks.get(run.task_id)
-    const memory = task === undefined ? null : (dreamsOf(task.runtime)?.memory(task.cwd) ?? null)
-    if (before !== null && task !== undefined && memory !== null) {
-      await recordAfter(run.task_id, run, memory, before)
-    }
+  for (const run of await dreamRuns.allRunning()) {
+    const changes = await changesOfCut(run)
+    await audit.recordWith(
+      async (tx) => dreamRuns.cut(run.id, 'Seti restarted during the dream.', changes, tx),
+      (cut) =>
+        cut === undefined
+          ? null
+          : {
+              actor: 'system',
+              kind: 'dream.ended',
+              subject_type: 'task',
+              subject_id: run.task_id,
+              summary: `A restart cut a dream: ${String(changes)} memory files changed`,
+              detail: { run: run.id, state: cut.state, memory_changes: changes },
+            },
+    )
     forgetBefore(run.task_id, run.id)
-    await audit.record({
-      actor: 'system',
-      kind: 'dream.ended',
-      subject_type: 'task',
-      subject_id: run.task_id,
-      summary: 'A restart cut a dream',
-      detail: { run: run.id, state: run.state },
-    })
   }
 }

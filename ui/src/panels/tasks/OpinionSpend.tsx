@@ -1,13 +1,13 @@
 import { RUNTIME_NAMES, type SecondOpinionSpend } from '@seti/shared'
 import { useEffect, useState } from 'react'
-import { apiGet } from '@/api'
 import { usd } from '@/lib/money'
+import { agentOpinions } from '@/lib/opinions'
 
 /** What the agent's second opinions cost, by the runtime that answered; nothing before the first. */
 export function OpinionSpend({ taskId }: { taskId: string }) {
   const [spend, setSpend] = useState<SecondOpinionSpend[]>([])
   useEffect(() => {
-    apiGet<{ spend: SecondOpinionSpend[] }>(`/tasks/${taskId}/second-opinions`).then(
+    agentOpinions(taskId).then(
       (read) => {
         setSpend(read.spend)
       },

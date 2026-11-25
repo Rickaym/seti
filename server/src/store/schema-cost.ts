@@ -40,6 +40,12 @@ CREATE INDEX task_second_opinion_task ON task_second_opinion (task_id, created_a
 CREATE INDEX task_second_opinion_created ON task_second_opinion (created_at);
 `
 
+/** A light review of a pull request keeps which PR it read and its answer, for the PR's row. */
+export const SECOND_OPINION_REVIEWS = `
+ALTER TABLE task_second_opinion ADD COLUMN pr_url TEXT;
+ALTER TABLE task_second_opinion ADD COLUMN answer TEXT;
+`
+
 const BATCH = 500
 
 type Payload = Record<string, unknown>
