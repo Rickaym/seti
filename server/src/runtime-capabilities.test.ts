@@ -39,20 +39,22 @@ const app = createApp({ access: null, verify: null })
 const HEADERS = { host: 'localhost', ...USER_AUTH, 'content-type': 'application/json' }
 
 describe("what an agent's runtime declares", () => {
-  it('serves each runtime what its adapter declares: Claude Code all, Codex some of these', async () => {
+  it('serves each runtime what its adapter declares: Claude Code all, Codex a part of these', async () => {
     const served = (await (await app.request('/api/runtimes/capabilities', { headers: HEADERS })).json()) as {
       data: unknown
     }
     expect(served.data).toEqual(runtimeCapabilities())
     expect(runtimeCapabilities().claude).toMatchObject({ mcp_servers: true, plugins: true, dreams: true })
     expect(runtimeCapabilities().claude.mcp_transports).toEqual(['stdio', 'sse', 'http', 'sdk', 'claudeai-proxy'])
+    expect(runtimeCapabilities().claude.compaction_ignores).toEqual([])
     expect(runtimeCapabilities().codex).toEqual({
       label: 'Codex',
       mcp_servers: true,
       mcp_transports: ['stdio', 'http'],
       plugins: false,
       unsandboxed: false,
-      compaction: false,
+      compaction: true,
+      compaction_ignores: ['off', 'window'],
       side_chat: false,
       dreams: false,
       rewind: false,
@@ -73,7 +75,7 @@ describe("what an agent's runtime declares", () => {
     expect(text).not.toContain('- On:')
   })
 
-  it('refuses to run a Codex agent unsandboxed, a compaction rule and a dream', async () => {
+  it('refuses to run a Codex agent unsandboxed and a dream, and takes a compaction rule', async () => {
     const task = await codexTask()
     await expect(setTaskSandbox(task, false)).rejects.toThrow('Codex agents have no way to run outside the sandbox')
     await setTaskSandbox(task, true)
@@ -82,7 +84,7 @@ describe("what an agent's runtime declares", () => {
       headers: HEADERS,
       body: JSON.stringify({ rule: null }),
     })
-    expect(compact.status).toBe(409)
+    expect(compact.status).toBe(200)
     await expect(startDream(task)).rejects.toThrow("The agent's runtime keeps no memory Seti can find.")
   })
 
