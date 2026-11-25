@@ -60,7 +60,7 @@ import {
 } from './schema-security.js'
 import { CLIENT_SENDS } from './schema-sends.js'
 import { SHARED_TOOLS } from './schema-shared-tools.js'
-import { SHARE_PREVIEWS, SHARES } from './schema-shares.js'
+import { SHARE_LIVE, SHARE_PREVIEWS, SHARES } from './schema-shares.js'
 import { loginsToHosts, SSH_HOST_KEYS } from './schema-ssh-keys.js'
 import { importSshHosts, SSH_HOSTS } from './schema-ssh.js'
 import { STORAGE_SETTINGS } from './schema-storage.js'
@@ -252,4 +252,5 @@ export const MIGRATIONS: readonly Migration[] = [
   { version: 134, name: 'task_session', sql: TASK_SESSION },
   { version: 135, name: 'folder_settings_watch', sql: FOLDER_SETTINGS_WATCH },
   { version: 136, name: 'dream_prompt_version', sql: DREAM_PROMPT_VERSION },
+  { version: 137, name: 'share_live', sql: SHARE_LIVE },
 ]
