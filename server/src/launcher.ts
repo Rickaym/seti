@@ -2,6 +2,7 @@ import { spawn, type ChildProcess } from 'node:child_process'
 import type { Readable, Writable } from 'node:stream'
 import type { Task } from '@seti/shared'
 import { connectionEnv } from './egress-connections.js'
+import { watchFolderSettings } from './folder-settings-trust.js'
 import type { LaunchPlan } from './launch-plan.js'
 import { launch, scopeHost, type ScopeKind, type ScopePlan } from './memory-scope.js'
 import type { Maintenance } from './sandbox-mounts.js'
@@ -115,6 +116,7 @@ export async function sandboxFrom(task: Task, plan: LaunchPlan): Promise<TaskSan
     return null
   }
   const memory = (await scopeFrom(task.id, 'agent', plan))?.cap ?? null
+  await watchFolderSettings(task)
   return taskSandbox(task, { ctx: sandboxContext(), plan: plan.sandbox, memory })
 }
 

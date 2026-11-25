@@ -215,8 +215,9 @@ between two steps; an interrupt; a hook at subagent start.
   the filter a sandboxed agent's servers pass: no value of their own, or a remote server the egress
   proxy signs on its host. A local server runs inside the agent's sandbox, never in the control
   room. Every call to a user's tool server MUST pass the control room's gate whatever the tool or
-  the runtime says of it; where rules decide, a call runs unasked only when a rule of the user's
-  names its server or tool. A server definition the agent writes MUST NOT load. A server the
+  the runtime says of it; where rules decide, a call runs unasked only when an allow rule names
+  its server or tool from the control room, the user's settings, or a folder settings file the
+  agent could not have written (SBX-14). A server definition the agent writes MUST NOT load. A server the
   agent's runtime cannot use MUST show in the agent's access with the reason, and never count as on.
 
 ## 4. Turn lifecycle
@@ -453,6 +454,14 @@ interrupted only for that.
   other setting and the command search path are passed on Codex's command line, and the approval
   policy with every resume and turn, so stored session state cannot lower it. `AGENTS.md` in its
   folders is input the agent wrote, read as a Claude agent reads `CLAUDE.md`.
+- SBX-14: In every working folder of a sandboxed agent, on every runtime, the folder's runtime
+  settings that exist (Claude Code's project and local settings and hooks folder, `.mcp.json` and
+  Codex's folder config) MUST be read-only to the agent. A settings file of the agent's own folder
+  that was missing when a sandboxed session started, and appeared since, may be the agent's own
+  writing: until its content changes outside every agent's session, its allow rules MUST NOT
+  apply, neither in the control room's gate nor in the runtime, and its tool servers stay off;
+  its ask and deny rules apply. A running session takes no change to its folder's settings; the
+  next session reads them. The control room records each file it holds back.
 
 ### 7.3 Egress
 
