@@ -19,7 +19,7 @@ import { sandboxContext, workingDirs } from '../session-options.js'
 import { dreamRuns, type DreamEnd } from '../store/dreams.js'
 import { workspaceDir } from '../workspace/dir.js'
 import { composeDigest, dayRows } from './digest.js'
-import { dreamGate, type DreamPlaces } from './gate.js'
+import { denialKind, dreamGate, type DreamPlaces } from './gate.js'
 import { forgetBefore, keepBefore, recordAfter } from './kept.js'
 import type { MemorySnapshot } from './memory-snapshot.js'
 import { dreamAppend, dreamMessage } from './prompt.js'
@@ -78,8 +78,15 @@ class Tally {
     this.end ??= { state, reason }
   }
 
+  /** Refused calls by kind, never with their arguments. */
+  readonly deniedBy: Record<string, number> = {}
+
   denied(refusal: string | null): void {
-    this.denials += refusal === null ? 0 : 1
+    if (refusal !== null) {
+      this.denials += 1
+      const kind = denialKind(refusal)
+      this.deniedBy[kind] = (this.deniedBy[kind] ?? 0) + 1
+    }
   }
 
   reported(report: DreamReport): void {
@@ -308,6 +315,7 @@ export async function runDream(job: DreamJob): Promise<DreamRun | undefined> {
               steps: end.steps,
               cost_usd: end.cost_usd,
               denials: end.denials,
+              denied_by: Object.entries(tally.deniedBy).map(([kind, n]) => `${kind} ${String(n)}`),
               memory_changes: end.memory_changes,
             },
           },
