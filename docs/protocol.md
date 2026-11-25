@@ -195,6 +195,15 @@ between two steps; an interrupt; a hook at subagent start.
   show their thinking as the default runtime's do. Reasoning the model seals for its own next call
   MUST NOT be stored, served or shown by the control room.
 
+### 3.6 What an agent is given
+
+- KIT-1: The user's own instruction file reaches an agent read-only on every runtime that reads
+  instruction files, and a folder's instruction file (`CLAUDE.md`, or for Codex `AGENTS.md`
+  first) is read from the agent's folder as its input (HST-1). Both MUST come below the control
+  room's own instructions: in the conversation as project instructions, never in the system or
+  developer instructions. A runtime folder the agent can write MUST NOT carry instructions into a
+  later session.
+
 ## 4. Turn lifecycle
 
 - TURN-1: A user message (`prompt`, `interrupt`, `attachments`, `notify_when_done`, `client_id`)
@@ -833,7 +842,10 @@ Why: an agent woken by its own actions or by news nobody waited for burns turns 
   is off, while the agent has one running, and past `opinion_rate`. The answer reaches the agent
   as its tool result in a `<second-opinion>` tag (UPD-13) with a preface that it is data. The
   cost is the caller's, marked estimated where the runtime reports none; the audit records the
-  runtime, model, sizes, cost and outcome, never the text.
+  runtime, model, sizes, cost and outcome, never the text. An agent MAY instead name one of its
+  linked pull requests: the control room reads its diff with the host's code-host login, bounded
+  by the context size and redacted, keeps the answer for that PR's row, and posts nothing to the
+  code host; a PR not linked to the agent is refused.
 
 ## 14. The assistant
 
@@ -1042,7 +1054,9 @@ Optional and off by default: a maintenance session per agent that consolidates i
 - DRM-16: Dream now runs one dream of an agent at once, by the user, the EA after the user's yes,
   or an agent at `full` on another agent; it is refused on the agent itself. The EA, an agent or
   a mod starts at most one dream of an agent a day; only the user starts more. Dream now waits for
-  no window but keeps the night budget. The start is audited with who asked for it.
+  no window but keeps the night budget. The start is audited with who asked for it. A dream of an
+  agent whose transcript has nothing new since its last finished dream runs no session: it ends
+  at once, at no cost, with a one-line report that there was nothing to tidy.
 
 ## 16. Audit
 
@@ -1074,6 +1088,9 @@ Optional and off by default: a maintenance session per agent that consolidates i
   reads `set` or `not set`.
 - CFG-3: Agents, mods and devices MUST be refused the document and its schema. The EA reads plain
   configuration only; security settings are absent from its document and schema.
+- CFG-4: The control room MUST serve every setting's default in the shape of the document, and
+  MUST show which settings differ from their default; the document filtered to those differences
+  is a merge patch that turns the defaults into the document.
 
 ## 17. Mods
 

@@ -1,6 +1,7 @@
 import { readSecondOpinion, RUNTIME_NAMES, SECOND_OPINION_TOOL } from '@seti/shared'
 import { MessagesSquare } from 'lucide-react'
 import { usd } from '@/lib/money'
+import { shownAnswer } from '@/lib/opinions'
 import { toolName } from '@/lib/tool-summary'
 import { inputString, resultText, type ToolUseBlock } from '@/lib/transcript'
 import { cn } from '@/lib/utils'
@@ -13,12 +14,10 @@ const isSecondOpinion = (block: ToolUseBlock) => {
   return name.server === 'seti' && name.name === SECOND_OPINION_TOOL
 }
 
-/** The answer as the model wrote it: Seti escaped any tag it opened, which reads as text here. */
-const shownAnswer = (answer: string) => answer.replaceAll('&lt;', '<')
-
 /** What a second opinion's row shows: the question, the answer once there, who and what it cost. */
 function opinionView({ block, result }: Pick<ToolCallProps, 'block' | 'result'>) {
-  const question = inputString(block.input, 'question') ?? ''
+  const pr = inputString(block.input, 'pr')
+  const question = inputString(block.input, 'question') ?? (pr === undefined ? '' : `Review ${pr}`)
   const opinion = result === undefined || result.failed ? null : readSecondOpinion(resultText(result))
   const cost = opinion?.costUsd ?? null
   const model = opinion?.model ?? inputString(block.input, 'model') ?? 'another model'

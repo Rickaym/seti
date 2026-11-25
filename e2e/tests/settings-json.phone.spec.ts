@@ -21,3 +21,12 @@ test('the JSON page reads, searches and exports on a phone', async ({ page }) =>
   await main(page).getByRole('button', { name: 'Export' }).tap()
   expect((await download).suggestedFilename()).toMatch(/^seti-settings-.*\.json$/)
 })
+
+test('a phone opens a settings page as JSON and filters to modified settings', async ({ page }) => {
+  await page.goto('/#settings/ea')
+  await main(page).getByRole('button', { name: 'Open as JSON' }).tap()
+  await expect(section(page, 'app.ea')).toBeInViewport()
+  await main(page).getByRole('button', { name: 'Modified' }).tap()
+  await expect(main(page).getByRole('button', { name: 'Modified' })).toHaveAttribute('aria-pressed', 'true')
+  await expectFitsPhone(page, 'settings JSON modified')
+})
