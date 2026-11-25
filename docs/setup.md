@@ -603,6 +603,14 @@ Runs on, built-in roles included. A start that names the role, such as `start_ta
 the agent runs on your default and its setup says why. A Codex agent's Seti guide and Lead role
 send it to helper agents, since Codex has no subagents of its own.
 
+An agent can move to the other runtime and keep its work: open its settings and pick a model under
+Continue on, at the bottom beside Restart session. It keeps its title, folders, PR links,
+transcript and cost; it starts a new session on that runtime, or resumes the one it had there
+before, and its next message brings a brief of its work. Background work and Bypass end. A move
+to Codex needs the agent sandboxed and an OpenAI key in its credential. The EA does the same with
+`restart_agent_session` and a `runtime` after your yes, and a moved agent's approvals are never
+looser than before when the EA or another agent moved it.
+
 ### Access: defaults and per-agent choices
 
 Everything an agent may reach follows one model: each SSH host, AWS, MCP server, context
