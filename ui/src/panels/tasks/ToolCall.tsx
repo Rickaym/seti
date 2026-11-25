@@ -20,6 +20,7 @@ import {
 import { type ReactNode } from 'react'
 import { Hint } from '@/components/Hint'
 import { useNow } from '@/hooks/useNow'
+import { useSlackSummary } from '@/lib/slack-names'
 import { elapsedLabel } from '@/lib/time'
 import {
   commandLine,
@@ -210,7 +211,7 @@ export function CallStatus({ block, startedAt, result, running, background }: St
 /** The tool's icon and name, and one line saying what the call does. */
 function CallName({ block }: { block: ToolUseBlock }) {
   const name = toolName(block.name)
-  const summary = toolSummary(block)
+  const summary = useSlackSummary(block) ?? toolSummary(block)
   return (
     <>
       <ToolKindIcon kind={toolKind(block)} className="size-3 text-muted-foreground" />

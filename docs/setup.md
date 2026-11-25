@@ -779,13 +779,26 @@ message, a thread sends at most 10 replies an hour, and following stops after 7 
 days. Two switches, both off until you turn them on, decide what reaches agents: Thread replies,
 and DM replies, which hands the next messages in a direct message to the agent that wrote there in
 the last 24 hours even when they are not threaded. Turning Thread replies on turns DM replies on
-with it; you can turn DM replies off on its own. Only you change them, with
-`PUT /api/channels/<id>/threads` and `{"replies": true}`, `{"dms": false}` or both.
+with it; you can turn DM replies off on its own. Only you change them, on the Replies row of the
+Slack webhook's card in Settings, Channels. While a switch is on and no message event has
+arrived, the row says "No message events yet" and names the four events to subscribe to. An
+agent's settings list the threads it follows on the Team tab, each with Stop; the EA and the agent
+can stop one with `unlink_pr` and `thread`.
 
 Seti never calls Slack for this: replies come through the webhook. In the Slack app at
 api.slack.com/apps, under Event Subscriptions, subscribe to `message.channels`, `message.groups`,
 `message.im` and `message.mpim` (as events on behalf of users when the app acts as you), and
 reinstall the app if Slack asks.
+
+Seti shows Slack channels and people by name, as `#deploys` or `Dana`, wherever it would show an
+id: Slack alerts for the EA, thread replies, the permission request for a Slack send, its row in
+the transcript and the audit log's summary. It learns a name only where Slack itself states it and
+no message author can write it: a person's own profile on a message the webhook delivers while a
+thread switch is on, and the first line of the Slack MCP server's answer when an agent reads a
+channel or a person's profile by id. A label inside a message, such as `<#C0123|deploys>`, may show
+where that message is shown but is never learned. An id Seti has not seen named reads "name not
+known", and a permission request says when a name was last seen if that was over 30 days ago. Seti
+holds no Slack token for this.
 
 While both switches are off, the Slack webhook works exactly as before. Once you turn one on,
 `app_mention` and other events still reach its subscribers, such as the EA's inbox, but a `message`

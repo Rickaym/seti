@@ -145,7 +145,7 @@ describe('agent events', () => {
     await audit.outwardCalls('task-1', projectClaude(m), ['a', 'c'])
     const events = (await page({ kind: 'agent' })).events
     expect(events.map((e) => [e.actor, e.subject_id, e.summary])).toEqual([
-      ['agent', 'task-1', 'Slack send_message \u2192 C0123ABC: "hi there [redacted]"'],
+      ['agent', 'task-1', 'Slack send_message \u2192 channel C0123ABC, name not known: "hi there [redacted]"'],
       ['agent', 'task-1', 'Bash: git push https://[redacted]@github.com/o/r'],
     ])
     expect(events[0]?.detail).toEqual({

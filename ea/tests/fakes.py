@@ -1433,6 +1433,8 @@ class FakeSeti:
     def _post(self, parts: list[str], request: httpx.Request) -> httpx.Response:
         body = json.loads(request.content or b"{}")
         match parts:
+            case ["tasks", task_id, "threads", follow, "stop"]:
+                return ok({"id": int(follow), "task_id": task_id, "stopped_at": "2026-01-03T00:00:00Z"})
             case ["tasks", "start"]:
                 return ok(self._planned_task(body))
             case ["ea", "usage"]:
