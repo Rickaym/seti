@@ -232,6 +232,8 @@ const connectionBase = z.object({
   hosts: z.array(connectionHost).max(20).default([]),
   header: connectionHeader.nullable().default(null),
   mint: mintSettingsInput.nullable().default(null),
+  /** Whether the proxy also swaps the value into request bodies on its hosts; off by default. */
+  body: z.boolean().default(false),
 })
 
 type ConnectionShape = z.output<typeof connectionBase>
@@ -242,6 +244,9 @@ function checkConnection(connection: ConnectionShape, ctx: z.RefinementCtx): voi
   }
   if (connection.header !== null && connection.hosts.length === 0) {
     issue('A header needs at least one host', 'hosts')
+  }
+  if (connection.body && connection.hosts.length === 0) {
+    issue('Body needs at least one host', 'hosts')
   }
   if (connection.kind === 'key') {
     if (connection.mint !== null) {
@@ -311,6 +316,8 @@ export const connectionPlaceholderInput = z.object({
   env: connectionEnv.optional(),
   hosts: z.array(connectionHost).min(1, 'Name at least one host').max(20),
   adds_header: z.boolean().default(false),
+  /** Whether the proxy also swaps the value into request bodies, as a login needs. */
+  body: z.boolean().default(false),
 })
 export type ConnectionPlaceholderInput = z.input<typeof connectionPlaceholderInput>
 export type ConnectionPlaceholderRequest = z.output<typeof connectionPlaceholderInput>
@@ -330,6 +337,8 @@ export interface Connection {
   hosts: string[]
   header: ConnectionHeader | null
   mint: MintSettings | null
+  /** Whether the proxy also swaps the value into request bodies on its hosts. */
+  body: boolean
   slots: ConnectionSlotStatus[]
   /** Slots it needs before it works; empty when ready. */
   missing: ConnectionSlot[]

@@ -1,4 +1,4 @@
-import type { BuiltInRule, InheritedRule, PermissionRule } from '@seti/shared'
+import { pushRuleOwner, type BuiltInRule, type InheritedRule, type PermissionRule } from '@seti/shared'
 import { appliesTo } from '../permission-policy.js'
 import type { SourcedRule } from './types.js'
 
@@ -34,7 +34,9 @@ export function sourcedRules(sources: RuleSources): SourcedRule[] {
       .filter((rule) => appliesTo(rule, sources.sandboxed))
       .map((rule) => own(rule.behavior, rule.rule, `builtin:${rule.behavior}:${rule.rule}`)),
     own('allow', sources.workspace, 'workspace'),
-    ...sources.stored.map((rule) => own(rule.behavior, rule.rule, `rule:${String(rule.id)}`)),
+    ...sources.stored
+      .filter((rule) => pushRuleOwner(rule.rule) === null)
+      .map((rule) => own(rule.behavior, rule.rule, `rule:${String(rule.id)}`)),
     ...sources.fixedDeny.map((text, i) => own('deny', text, `fixed:${String(i)}`)),
     ...sources.inherited.map((rule, i) => ({
       behavior: rule.behavior,

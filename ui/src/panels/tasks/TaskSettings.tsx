@@ -17,6 +17,7 @@ import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { useCapabilities } from '@/hooks/useCapabilities'
 import { useNarrow } from '@/hooks/useMedia'
 import { useSandboxed } from '@/hooks/useSandboxed'
 import { WIDE_BUTTON, WIDE_LABEL } from '@/lib/wide-label'
@@ -27,7 +28,7 @@ import { DreamActions } from '@/panels/tasks/DreamActions'
 import { LifecycleActions } from '@/panels/tasks/LifecycleActions'
 import { NO_BYPASS, NotOnCodex } from '@/panels/tasks/NotOnCodex'
 import { NewRoleDialog, RolePicker, type RoleOwner } from '@/panels/tasks/RolePicker'
-import { SandboxToggle } from '@/panels/tasks/SandboxToggle'
+import { TaskIsolation } from '@/panels/tasks/SandboxToggle'
 import { SessionFields } from '@/panels/tasks/SessionFields'
 import { Fields, Row } from '@/panels/tasks/SettingsFields'
 import { HeldBack } from '@/panels/tasks/StartFacts'
@@ -93,6 +94,7 @@ export const TaskSettings = memo(function TaskSettingsView({
   compact,
 }: TaskSettingsProps) {
   const sandboxed = useSandboxed(task)
+  const caps = useCapabilities(task)
   const archive = useArchive(task)
   const restart = useSessionRestart(task, running, onChanged)
   const [channelCount, setChannelCount] = useState(0)
@@ -195,8 +197,7 @@ export const TaskSettings = memo(function TaskSettingsView({
         </Row>
         <Row label="Services">
           <AccessSummary
-            taskId={task.id}
-            codex={task.runtime === 'codex'}
+            task={task}
             onOpen={() => {
               setOpen(false)
               setAccessOpen(true)
@@ -204,7 +205,7 @@ export const TaskSettings = memo(function TaskSettingsView({
           />
         </Row>
         <Row label="Isolation" warn={!sandboxed}>
-          <SandboxToggle task={task} running={running} onChanged={onChanged} />
+          <TaskIsolation task={task} running={running} onChanged={onChanged} caps={caps} />
         </Row>
         {task.home_access && sandboxed && (
           <Row label="Home folders">
@@ -285,7 +286,7 @@ export const TaskSettings = memo(function TaskSettingsView({
   )
   const actions = (
     <div className="grid gap-2">
-      <DreamActions taskId={task.id} open={open} />
+      {caps?.dreams !== false && <DreamActions taskId={task.id} open={open} />}
       <LifecycleActions
         busy={busy}
         onRestart={() => {
