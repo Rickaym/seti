@@ -556,7 +556,9 @@ The other model answers once, with no tools and none of the agent's folders, in 
 reaches only its provider with the agent's credential, so the credential needs that runtime's
 key. The transcript shows one row, "Asked gpt-5.5: ...", that opens to the question and answer;
 its cost counts toward the agent's and shows under Cost in its settings. An agent may ask 20
-times an hour and 60 a day.
+times an hour and 60 a day. Given one of its linked pull requests instead, the other model
+reviews the PR's diff, which Seti reads with your `gh` login; the review goes back to the agent
+and folds under that PR in the agent's PR list, and nothing is posted to GitHub.
 
 An agent at Seti control Full can start a helper on either runtime with `start_task`, which
 runs sandboxed with at most the caller's access and approvals. The helper sits right under its

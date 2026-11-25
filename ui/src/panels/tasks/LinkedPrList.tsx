@@ -15,6 +15,7 @@ import { cn } from '@/lib/utils'
 import { AgentFixCi } from '@/panels/tasks/FixCi'
 import { PrChips } from '@/panels/tasks/PrChips'
 import { FailingChecks } from '@/panels/tasks/PrCiFailure'
+import { PrReview } from '@/panels/tasks/PrReview'
 import type { PrAgent } from '@/panels/tasks/fix-ci'
 import {
   failingPrs,
@@ -112,6 +113,7 @@ function LinkedPrRow({ item, path, owner, agent, onChanged, onSent }: RowProps) 
           <FailingChecks pr={pr} agent={agent} onSent={onSent} />
         </div>
       )}
+      <PrReview agentId={agent.id} url={item.url} />
     </li>
   )
 }

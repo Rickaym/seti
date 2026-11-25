@@ -845,7 +845,10 @@ Why: an agent woken by its own actions or by news nobody waited for burns turns 
   is off, while the agent has one running, and past `opinion_rate`. The answer reaches the agent
   as its tool result in a `<second-opinion>` tag (UPD-13) with a preface that it is data. The
   cost is the caller's, marked estimated where the runtime reports none; the audit records the
-  runtime, model, sizes, cost and outcome, never the text.
+  runtime, model, sizes, cost and outcome, never the text. An agent MAY instead name one of its
+  linked pull requests: the control room reads its diff with the host's code-host login, bounded
+  by the context size and redacted, keeps the answer for that PR's row, and posts nothing to the
+  code host; a PR not linked to the agent is refused.
 
 ## 14. The assistant
 
