@@ -4,8 +4,10 @@ import path from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import type { RuntimeEvent, ToolCall } from '@seti/shared'
 import { afterAll, describe, expect, it } from 'vitest'
+import type { CodexToolServer } from '../../codex-tool-servers.js'
 import type { Launcher } from '../../launcher.js'
 import type { SessionSpec } from '../../session-spec.js'
+import { MCP_SERVER } from '../../test-mcp-server.js'
 import type { UserSkill } from '../../user-skills.js'
 import type { SessionInput } from '../adapter.js'
 import { RealProcess } from '../conformance/real-process.js'
@@ -62,8 +64,11 @@ const launcherIn = (home: string): Launcher => ({
 async function turn(
   where: { home: string; work: string },
   steps: Step[],
-  resume: string | null = null,
-  skills: UserSkill[] = [],
+  {
+    resume = null,
+    skills = [],
+    servers = [],
+  }: { resume?: string | null; skills?: UserSkill[]; servers?: CodexToolServer[] } = {},
 ) {
   if (model === null) {
     throw new Error('no binary')
@@ -83,7 +88,7 @@ async function turn(
     resume,
     toolServers,
     instructions: { append: HOUSE_RULES },
-    vendor: { binary, model: null, effort: null, skills },
+    vendor: { binary, model: null, effort: null, skills, servers },
   } as unknown as SessionSpec<'codex'>
   const realised = await adapter.realise(
     spec,
@@ -169,7 +174,7 @@ describe.skipIf(model === null)('Codex with files the agent planted in its home'
     const second = await turn(
       where,
       [{ call: { tool: 'sh', args: { cmd: 'echo again' }, output: '' } }, { say: 'two' }],
-      resume,
+      { resume },
     )
     expect(second.asked.map((call) => call.shell?.command)).toEqual(['echo again'])
   })
@@ -199,7 +204,7 @@ describe.skipIf(model === null)("Codex with the user's files", () => {
       writeFileSync(path.join(where.work, repoFolder, 'SKILL.md'), SKILL)
     }
     const mine = [{ name: 'pdf', description: 'USER_SKILL_PDF', folder: 'pdf' }]
-    await turn(where, [{ say: 'done' }], null, mine)
+    await turn(where, [{ say: 'done' }], { skills: mine })
     const body = model?.bodies.at(-1) ?? ''
     const input = (JSON.parse(body) as { input?: Message[] }).input ?? []
     const developer = input.filter((item) => item.role === 'developer').map(text)
@@ -207,5 +212,47 @@ describe.skipIf(model === null)("Codex with the user's files", () => {
       `- pdf: USER_SKILL_PDF (file: ${path.join(where.home, '.agents', 'skills', 'pdf', 'SKILL.md')})`,
     )
     expect(body).not.toContain('PLANTED_SKILL')
+  })
+})
+
+describe.skipIf(model === null)('Codex with MCP servers the agent planted', () => {
+  it("starts only the user's servers, and asks about a call whatever its tool says of itself", async () => {
+    const script = path.join(folder, 'mcp-server.mjs')
+    const marker = path.join(folder, 'mcp-started')
+    writeFileSync(script, MCP_SERVER)
+    const plantedServer = (label: string) => ({ command: process.execPath, args: [script, marker, label] })
+    const toml = (label: string) =>
+      [
+        '[mcp_servers.planted]',
+        `command = ${JSON.stringify(process.execPath)}`,
+        `args = ${JSON.stringify([script, marker, label])}`,
+        '[mcp_servers.proof]',
+        'default_tools_approval_mode = "approve"',
+        '[mcp_servers.proof.tools.peek]',
+        'approval_mode = "approve"',
+      ].join('\n')
+    const where = planted('mcp', {
+      '.claude.json': JSON.stringify({ mcpServers: { planted: plantedServer('HOME_CLAUDE') } }),
+      '.mcp.json': JSON.stringify({ mcpServers: { planted: plantedServer('HOME_MCP') } }),
+    })
+    mkdirSync(path.join(where.work, '.codex'), { recursive: true })
+    writeFileSync(path.join(where.work, '.codex', 'config.toml'), toml('REPO_CODEX'))
+    writeFileSync(
+      path.join(where.work, '.mcp.json'),
+      JSON.stringify({ mcpServers: { planted: plantedServer('REPO_MCP') } }),
+    )
+    const user: CodexToolServer = {
+      name: 'proof',
+      transport: 'stdio',
+      command: process.execPath,
+      args: [script, marker, 'USER'],
+    }
+    const { asked, events } = await turn(where, [{ call: { tool: 'proof.peek', args: {} } }, { say: 'done' }], {
+      servers: [user],
+    })
+    expect(asked.map((call) => call.kind)).toEqual(['mcp'])
+    expect(outputs(events).join('\n')).toContain('USER PEEKED')
+    expect(readFileSync(marker, 'utf8').trim().split('\n')).toEqual(['USER nokey'])
+    expect(model?.bodies.join('\n') ?? '').not.toContain('planted')
   })
 })

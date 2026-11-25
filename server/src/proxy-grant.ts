@@ -15,18 +15,18 @@ async function codexConnections(task: Task): Promise<GrantConnection[]> {
 }
 
 /**
- * A Codex agent's grant: its connections and nothing of Claude's, so no Anthropic host, Claude
- * login, claude.ai connector or MCP sign-in of the host is in its reach.
+ * A Codex agent's grant: its connections and the MCP sign-ins of the servers it did not turn off,
+ * and nothing else of Claude's: no Anthropic host, Claude login or claude.ai connector.
  */
-async function codexGrant(task: Task): Promise<ProxyGrant> {
+async function codexGrant(task: Task, denied: ReadonlySet<string>): Promise<ProxyGrant> {
   const connections = await codexConnections(task)
   return {
     login: null,
     anthropic: false,
     connections,
-    mcp: [],
+    mcp: mcpTargets(mcpTokens, denied),
     deniedConnectors: [],
-    caHosts: ruleCaHosts(connections),
+    caHosts: [...new Set([...mcpHosts(), ...ruleCaHosts(connections)])],
   }
 }
 
@@ -37,7 +37,7 @@ export async function proxyGrant(
 ): Promise<{ grant: ProxyGrant; denied: Set<string> }> {
   const denied = new Set(await taskDeniedServers(task.id))
   if (runtime === 'codex') {
-    return { grant: await codexGrant(task), denied }
+    return { grant: await codexGrant(task, denied), denied }
   }
   const connections = grantConnections(await taskConnections(task))
   const grant: ProxyGrant = {

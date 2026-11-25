@@ -13,8 +13,16 @@ import {
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createApp } from './app.js'
 import type * as Capabilities from './capabilities.js'
-import { tasks } from './db.js'
-import { connectorIds, deniedServers, knownServers, selectionKind, taskDeniedServers } from './mcp-selection.js'
+import { sql, tasks } from './db.js'
+import { mcpItems } from './mcp-access.js'
+import {
+  connectorIds,
+  deniedServers,
+  knownServers,
+  selectionKind,
+  taskDeniedServers,
+  taskMcpNames,
+} from './mcp-selection.js'
 import { hostClaudeJson } from './sandbox-mcp.js'
 import { sessionOptions, setupKey } from './session-spec.js'
 import { auditEvents } from './store/audit.js'
@@ -271,14 +279,38 @@ describe('MCP servers of a task', () => {
       packs: [],
       role: null,
       channels: [],
-      mcp: { enabled: ['clickup', 'sentry'], disabled: ['claude.ai Gmail'] },
+      mcp: { enabled: ['clickup', 'sentry'], disabled: ['claude.ai Gmail'], unusable: ['events'] },
       access: { ssh: ['k8s'], jumps: ['jump'], aws: { state: 'no_role', profile: 'Default' } },
     })
     expect(text).toContain('## MCP servers')
     expect(text).toContain('- On: clickup, sentry')
     expect(text).toContain('- Off: claude.ai Gmail')
+    expect(text).toContain('- Not for your runtime: events')
     expect(text).toContain('- SSH hosts: k8s')
     expect(text).toContain('- Jump hosts on the way: jump')
     expect(text).toContain('- AWS: off; your credential Default has no AWS role.')
+  })
+
+  it("marks the servers a Codex agent's runtime cannot use, in its access and its task file", async () => {
+    const created = await newTask(true)
+    await sql`UPDATE task SET runtime = 'codex' WHERE id = ${created.id}`
+    const task = await tasks.get(created.id)
+    if (!task) {
+      throw new Error('Task was not stored')
+    }
+    const items = await mcpItems(task)
+    expect(items.map((item) => [item.name, item.unusable])).toEqual([
+      ['claude.ai Gmail', 'Codex agents cannot use claude.ai connectors.'],
+      ['clickup', null],
+      ['plugin:slack:slack', 'Codex agents load no plugins, so none of their servers.'],
+      ['sentry', null],
+    ])
+    expect(items.find((item) => item.name === 'claude.ai Gmail')?.session).toBeNull()
+    expect(await taskMcpNames(task)).toEqual({
+      enabled: ['clickup', 'sentry'],
+      disabled: [],
+      unusable: ['claude.ai Gmail', 'plugin:slack:slack'],
+    })
+    expect((await mcpItems(created)).every((item) => item.unusable === null)).toBe(true)
   })
 })

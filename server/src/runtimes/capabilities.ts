@@ -23,20 +23,55 @@ const loadsPlugins = (runtime: StoredRuntime): boolean => declared(runtime).tool
 /** The runtimes that load Seti's plugins and the Claude Code plugins installed. */
 export const pluginRuntimes = (): StoredRuntime[] => STORED_RUNTIMES.filter(loadsPlugins)
 
-/**
- * The runtimes whose agents can use an MCP server: those that take its transport, and for a
- * server a plugin brings, only those that load plugins.
- */
-export function serverRuntimes(transport: McpTransport, source: string | null): StoredRuntime[] {
-  const plugin = source?.startsWith('plugin') === true
-  return STORED_RUNTIMES.filter(
-    (runtime) => declared(runtime).tools.userServers.includes(transport.type) && (!plugin || loadsPlugins(runtime)),
-  )
+const TRANSPORT_WORDS: Record<McpTransport['type'], string> = {
+  stdio: 'local (stdio) servers',
+  sse: 'SSE servers',
+  http: 'HTTP servers',
+  sdk: 'in-process servers',
+  'claudeai-proxy': 'claude.ai connectors',
 }
+
+/** One of the user's MCP servers as a runtime would load it. */
+interface UserServer {
+  name: string
+  type: McpTransport['type']
+  plugin: boolean
+}
+
+/** Why the runtime's agents cannot use one of the user's MCP servers, or null when they can. */
+export function serverProblem(runtime: StoredRuntime, server: UserServer): string | null {
+  const label = RUNTIME_NAMES[runtime]
+  const { tools } = declared(runtime)
+  if (server.plugin && !tools.plugins) {
+    return `${label} agents load no plugins, so none of their servers.`
+  }
+  if (!tools.userServers.includes(server.type)) {
+    return `${label} agents cannot use ${TRANSPORT_WORDS[server.type]}.`
+  }
+  if (tools.serverNames !== null && !tools.serverNames.pattern.test(server.name)) {
+    return `${label} takes server names of ${tools.serverNames.rule}.`
+  }
+  return null
+}
+
+/** The runtimes whose agents can use one of the user's MCP servers. */
+export const serverRuntimes = (server: UserServer): StoredRuntime[] =>
+  STORED_RUNTIMES.filter((runtime) => serverProblem(runtime, server) === null)
+
+/** A probed server whose transport is known, as a runtime would load it. */
+const asUserServer = (server: McpServer, transport: McpTransport): UserServer => ({
+  name: server.name,
+  type: transport.type,
+  plugin: server.source?.startsWith('plugin') === true,
+})
+
+/** Why the runtime's agents cannot use a probed server; null when they can or it is unknown how. */
+export const probedServerProblem = (runtime: StoredRuntime, server: McpServer): string | null =>
+  server.transport === null ? null : serverProblem(runtime, asUserServer(server, server.transport))
 
 /** A server with the runtimes that can use it; left as it is while its transport is unknown. */
 const tagged = (server: McpServer): McpServer =>
-  server.transport === null ? server : { ...server, runtimes: serverRuntimes(server.transport, server.source) }
+  server.transport === null ? server : { ...server, runtimes: serverRuntimes(asUserServer(server, server.transport)) }
 
 /** The snapshot's servers, each with the runtimes that can use it. */
 export const withRuntimes = (snapshot: CapabilitiesSnapshot): CapabilitiesSnapshot => ({

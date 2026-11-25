@@ -16,13 +16,14 @@ import { runTurn, stopTurn } from './session-control.js'
 import { isRunning } from './session-mirror.js'
 import { restartSession } from './session-restart.js'
 import { codexSettings } from './store/codex-settings.js'
-import { permissionRequests } from './store/permissions.js'
+import { permissionRequests, permissionRules } from './store/permissions.js'
 import { questions } from './store/questions.js'
 import { routeEgressForTests } from './task-proxy.js'
 import { TestModelHost } from './test-codex-model.js'
 import { fakeBuild, FakeRegistry } from './test-codex-registry.js'
 import { MODEL_HOST } from './test-codex-upstream.js'
 import { keyConnection } from './test-connections.js'
+import { MCP_SERVER } from './test-mcp-server.js'
 
 /** Whether this host runs Seti's sandbox: bwrap with user namespaces, and socat. */
 export function canSandbox(): boolean {
@@ -142,6 +143,25 @@ function writeUserFiles(): void {
   fs.writeFileSync(path.join(skill, 'SKILL.md'), `${head}${USER_FILES.skill}\n`)
 }
 
+/** Names of the calls the agent asked the user about so far. */
+const askedOf = async (task: Task) =>
+  (await sql<{ tool_name: string }[]>`SELECT tool_name FROM permission_request WHERE task_id = ${task.id}`).map(
+    (row) => row.tool_name,
+  )
+
+/**
+ * Gives the user an MCP server in Claude Code's config whose program lies in the agent's folder,
+ * so the sandbox can run it; the agent's next turn starts a session that has it.
+ */
+function addUserServer(task: Task): string {
+  const script = path.join(task.cwd, 'mcp-proof.mjs')
+  const marker = path.join(task.cwd, 'mcp-started.txt')
+  fs.writeFileSync(script, MCP_SERVER)
+  const config = { mcpServers: { proof: { command: process.execPath, args: [script, marker, 'PROOF'] } } }
+  fs.writeFileSync(path.join(path.dirname(CLAUDE_HOME), '.claude.json'), JSON.stringify(config))
+  return marker
+}
+
 /** Installs the pinned Codex into Seti's own folder from a registry here, as turning it on does. */
 async function installFrom(scratch: string, binary: string): Promise<string> {
   const registry = await new FakeRegistry().start()
@@ -220,6 +240,27 @@ export async function proofRun(scratch: string, binary: string, split: boolean) 
       model.play([[{ call: { tool: 'seti.second_opinion', args: { question } } }, { say: 'thanks' }]])
       await runTurn(task.id, 'ask')
       await untilIdle(task, model)
+    },
+    /**
+     * Two turns that call the user's MCP server: one the user answers, then, with Rules decide
+     * on, one an allow rule of the user's naming the tool lets run unasked.
+     */
+    mcpTurns: async (task: Task) => {
+      const marker = addUserServer(task)
+      const before = (await askedOf(task)).length
+      model.play([[{ call: { tool: 'proof.peek', args: {} } }, { say: 'asked' }]])
+      await runTurn(task.id, 'peek')
+      await untilIdle(task, model)
+      const asked = (await askedOf(task)).slice(before)
+      await codexSettings.set({ ...CODEX_SETTINGS_DEFAULTS, enabled: true, evaluator_decides: true })
+      const { rule } = await permissionRules.add(task.id, 'allow', 'mcp__proof__peek')
+      model.play([[{ call: { tool: 'proof.peek', args: {} } }, { say: 'ruled' }]])
+      await runTurn(task.id, 'peek again')
+      await untilIdle(task, model)
+      const ruled = (await askedOf(task)).slice(before + asked.length)
+      await permissionRules.remove(task.id, rule.id)
+      await codexSettings.set({ ...CODEX_SETTINGS_DEFAULTS, enabled: true, evaluator_decides: false })
+      return { asked, ruled, started: fs.readFileSync(marker, 'utf8') }
     },
     /** A turn that reads the user's skill from its read-only copy in the sandbox's home. */
     skillTurn: async (task: Task) => {

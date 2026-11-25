@@ -155,6 +155,17 @@ before anything runs; a mismatch deletes the download. The program lives alone i
 `~/.seti/codex/<version>/`, read and run only, mounted read-only into each Codex agent's sandbox,
 and each install, failure and removal is in the audit log with the version and checksum.
 
+## Your tool servers on Codex agents
+
+A Codex agent gets the MCP servers from your Claude Code config that a sandboxed Claude Code agent
+gets, and no others: Seti reads the host's config, never a copy the agent could write, and passes
+the servers on Codex's command line, which wins over every config file. A local server runs inside
+the agent's sandbox with the placeholders of the agent's connections and never the model key. A
+remote server gets its URL only; the egress proxy adds the sign-in token or connection header on
+that server's host. Codex asks Seti about every call to these servers, even a tool that says it
+only reads. Codex's own config file stays empty and read-only, and a server defined in the agent's
+folder is never read.
+
 ## What is not protected
 
 - systemd 255's user manager cannot decrypt credentials, so the key files are plain files the Seti
