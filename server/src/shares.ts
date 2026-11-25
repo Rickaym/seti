@@ -1,12 +1,13 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto'
-import type {
-  createShareInput,
-  FileShare,
-  Share,
-  ShareDiagramInput,
-  ShareLink,
-  ShareList,
-  ShareScanRefusal,
+import {
+  canShareLive,
+  type createShareInput,
+  type FileShare,
+  type Share,
+  type ShareDiagramInput,
+  type ShareLink,
+  type ShareList,
+  type ShareScanRefusal,
 } from '@seti/shared'
 import type { z } from 'zod'
 import { audit } from './audit.js'
@@ -100,6 +101,7 @@ function toShare(row: ShareListRow, recent: RecentViews = NO_VIEWS): Share {
     view_count: row.view_count,
     recent_views: recent.views,
     link_preview: row.link_preview,
+    live: row.live,
     unfurl_count: row.unfurl_count,
     recent_unfurls: recent.unfurls,
     preview: {
@@ -159,6 +161,12 @@ const checked = (snapshot: Snapshot, allowFindings: boolean) => {
   return snapshot.findings.length > 0
 }
 
+function requireLiveFile(name: string): void {
+  if (!canShareLive(name)) {
+    throw new HttpError(400, `${name} is not an HTML file; only HTML files can be shared live`)
+  }
+}
+
 const isOpen = (row: ShareListRow, at: string) => row.revoked_at === null && row.expires_at > at
 
 async function openShare(id: string): Promise<ShareListRow> {
@@ -187,6 +195,9 @@ export async function createShare(
   const at = now()
   await shareRows.purgeExpired(at)
   const snapshot = takeSnapshot(files, input.root, input.path)
+  if (input.live) {
+    requireLiveFile(snapshot.name)
+  }
   if ((await shareRows.openFor(taskId, input.root, snapshot.rel, at)) !== undefined) {
     throw new HttpError(409, `${snapshot.rel} is already shared; update it or make a new link`)
   }
@@ -217,6 +228,7 @@ export async function createShare(
       view_count: 0,
       scan_override: override,
       link_preview: input.link_preview,
+      live: input.live,
       unfurl_count: 0,
     },
     body,
@@ -227,8 +239,14 @@ export async function createShare(
     kind: 'task.file_shared',
     subject_type: 'task',
     subject_id: taskId,
-    summary: `Shared ${snapshot.rel} of task "${files.task.title}" by public link until ${expires.slice(0, 10)}`,
-    detail: { ...shareDetail(share), expires_at: expires, bytes: share.size, scan_override: override },
+    summary: `Shared ${snapshot.rel} of task "${files.task.title}" by public link${input.live ? ' as a live page' : ''} until ${expires.slice(0, 10)}`,
+    detail: {
+      ...shareDetail(share),
+      expires_at: expires,
+      bytes: share.size,
+      scan_override: override,
+      live: input.live,
+    },
   })
   return { share, url: linkOf(origin, token) }
 }
@@ -346,6 +364,27 @@ export async function setShareLinkPreview(id: string, on: boolean): Promise<Shar
     subject_id: row.task_id,
     summary: `Turned ${on ? 'on' : 'off'} the link preview of ${row.path} of task "${row.task_title}"`,
     detail: { ...shareDetail(row), link_preview: on },
+  })
+  return shareOf(id)
+}
+
+/** Turns the live page on or off; off, the link shows the script-free page again. */
+export async function setShareLive(id: string, on: boolean): Promise<Share> {
+  await requireSharing()
+  const row = await openShare(id)
+  if (on) {
+    requireLiveFile(row.name)
+  }
+  if (!(await shareRows.setLive(id, on, now()))) {
+    throw new HttpError(404, 'This share has ended; share the file again')
+  }
+  await audit.record({
+    actor: 'user',
+    kind: 'task.share_live',
+    subject_type: 'task',
+    subject_id: row.task_id,
+    summary: `Turned ${on ? 'on' : 'off'} the live page of ${row.path} of task "${row.task_title}"`,
+    detail: { ...shareDetail(row), live: on },
   })
   return shareOf(id)
 }

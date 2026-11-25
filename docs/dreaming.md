@@ -66,6 +66,14 @@ main checkout, which every session of that repository shares, is read-only to th
 prompt names that index, and the dream reads it before writing so it does not copy what is
 there.
 
+## When a dream starts
+
+A dream waits while the agent runs a turn, a background subagent or another background task,
+since those are model work that can write memory; the refusal names what it waits for. It does
+not wait for background commands or monitors, such as a dev server: a dream only reads the
+folders they work in, and when one ends or reports, the turn the runtime starts cuts the dream at
+once. A cut nightly dream is planned once more within its window (DRM-12).
+
 ## Tuning dreams
 
 Change the wording in `server/src/dreams/prompt.ts`, keep each change small, and compare reports
