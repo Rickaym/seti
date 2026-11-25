@@ -1,26 +1,8 @@
-import { specFor } from '../conformance/subject.js'
 import type { ConformanceTarget } from '../conformance/target.js'
-import { oneInput, type OneShot } from '../one-shot.js'
 import { scriptedAdapter } from './adapter.js'
 import type { Verdict } from './dialect.js'
 import { scriptedMachine } from './machine.js'
 import type { ScriptedShapes } from './session.js'
-
-/** The scripted runtime's one-shot: a session of its own whose every call is refused. */
-const scriptedOneShot: OneShot = {
-  open: async (request, launcher, abortController) => {
-    const spec = { ...specFor('scripted', null), cwd: request.cwd }
-    const refuse = async (): Promise<Verdict> =>
-      Promise.resolve({ allow: false, message: 'This call offers no tools.' })
-    const realised = await scriptedAdapter.realise(
-      spec,
-      launcher,
-      { decide: refuse, hooks: null, toolServers: {} },
-      abortController,
-    )
-    return scriptedAdapter.open(realised, oneInput(request.prompt), null)
-  },
-}
 
 /** The scripted adapter as the suite drives it; it declares everything the suite reads. */
 export const scriptedTarget: ConformanceTarget<ScriptedShapes, 'scripted'> = {
@@ -49,5 +31,5 @@ export const scriptedTarget: ConformanceTarget<ScriptedShapes, 'scripted'> = {
     toolServers: {},
   }),
   rig: (script) => scriptedMachine(script),
-  oneShot: { runner: scriptedOneShot, model: 'scripted' },
+  oneShotModel: 'scripted',
 }

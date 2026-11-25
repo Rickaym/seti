@@ -10,7 +10,7 @@ import { shot } from './thread-replies.js'
 const SECRET = ['e2e', 'slack', 'names', 'secret'].join('-')
 
 /** Seti has seen these Slack names before, as an agent's channel search would have shown them. */
-export async function seedSlackNames(names: Record<string, string>): Promise<void> {
+async function seedSlackNames(names: Record<string, string>): Promise<void> {
   const db = openSeedDb()
   for (const [id, name] of Object.entries(names)) {
     await db.run(

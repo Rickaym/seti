@@ -21,6 +21,7 @@ import { outwardCalls } from './outward.js'
 import type { Alongside } from './pg.js'
 import { openPrompt } from './prompt-open.js'
 import { markQueued } from './queued-prompts.js'
+import { noteRefusedHost } from './refused-hosts.js'
 import { sessionTotal, withTurnCost } from './runtimes/claude/cost.js'
 import { secretAnswers } from './secret-asks.js'
 import { mirrorSession } from './session-mirror.js'
@@ -157,6 +158,7 @@ const ingest: Ingest = {
   },
   'guard.refused': async (taskId, { command, reason }) => auditRefusal(taskId, command, reason),
   'egress.blocked': async (taskId, { host, names }) => auditBlockedKey(taskId, host, names),
+  'egress.refused': async (taskId, { host, count }) => noteRefusedHost(taskId, host, count, appendMessage),
   'memory.event': (taskId, { report }) => {
     reportMemoryEvent(taskId, report)
   },

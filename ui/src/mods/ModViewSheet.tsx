@@ -4,14 +4,14 @@ import { Hint } from '@/components/Hint'
 import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from '@/components/ui/sheet'
 import { ModFrame } from './ModFrame'
-import { agentTabs, showFrame, sidePanels, useOpenFrame, usePlacedFrames } from './frame-places'
+import { showFrame, sidePanels, useAgentTabs, useOpenFrame, usePlacedFrames } from './frame-places'
 
 /** The side sheet that shows a mod's agent tab or side panel; Seti's own dialogs stay above it. */
 export function ModViewSheet() {
   const open = useOpenFrame()
-  const tabs = usePlacedFrames(agentTabs)
-  const panels = usePlacedFrames(sidePanels)
   const agentId = open?.agentId ?? null
+  const tabs = useAgentTabs(agentId)
+  const panels = usePlacedFrames(sidePanels)
   const placed = agentId === null ? panels : tabs
   const entry = open === null ? undefined : placed.find((view) => view.key === open.key)
   const key = `${entry?.key ?? ''}-${agentId ?? ''}`
@@ -68,7 +68,7 @@ export function ModViewSheet() {
 
 /** A button per mod view placed beside agents, which opens it with this agent as its context. */
 export function AgentModTabs({ taskId }: { taskId: string }) {
-  const tabs = usePlacedFrames(agentTabs)
+  const tabs = useAgentTabs(taskId)
   return tabs.map((tab) => (
     <Hint key={tab.key} text={`${tab.title}, a view of the ${tab.modName} mod`}>
       <Button

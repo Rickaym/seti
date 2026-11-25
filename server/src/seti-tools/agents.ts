@@ -1,7 +1,10 @@
 import {
   AGENT_COLOR_PRESETS,
+  DELEGATE_LIMITS,
   agentColorFromWords,
   listedStatus,
+  restartSessionInput,
+  RUNTIME_NAMES,
   rewindInput,
   sendMessageInput,
   startAgentInput,
@@ -14,6 +17,8 @@ import { z } from 'zod'
 import { capOf } from '../agent-cap.js'
 import { startAgent } from '../agent-start.js'
 import { archiveTask, listArchived, unarchiveTask } from '../archive.js'
+import { waitForFirstTurn, waitMinutes } from '../crew/delegate-call.js'
+import { heldWait } from '../crew/delegate-wait.js'
 import { HttpError } from '../http.js'
 import { deliverPending, dismissPending } from '../inputs.js'
 import { rewindTargets, rewindTask } from '../rewind-task.js'
@@ -107,14 +112,17 @@ const handOverUpdates = setiTool({
 const startTaskTool = setiTool({
   name: 'start_task',
   description:
-    "Start a new agent on a prompt. It works in a fresh folder of its own and clones the repos it needs, so name them in the prompt. Seti's planner titles it and picks context packs and MCP servers. It runs sandboxed with at most your own access: never SSH, AWS, MCP servers, plugins or credentials you lack, and Seti control Self, never Full. With notify_when_done, Seti sends you its final message as an update once its first turn ends.",
+    "Start a new agent on a prompt. It works in a fresh folder of its own and clones the repos it needs, so name them in the prompt. Seti's planner titles it and picks context packs and MCP servers. It runs sandboxed with at most your own access: never SSH, AWS, MCP servers, plugins or credentials you lack, and Seti control Self, never Full. The user sees it listed under you. It cannot start agents itself, and at most 4 you started run at once. With notify_when_done, Seti sends you its final message as an update once its first turn ends.",
   input: {
     prompt: startAgentInput.shape.prompt,
     title: startAgentInput.shape.title,
     workspace: workspaceRef.optional().describe('The workspace it joins; left out, your own.'),
     notify_when_done: NOTIFY_WHEN_DONE,
+    role: startAgentInput.shape.role.describe(
+      'A role pack by name, such as Reviewer. It runs in that role, on the runtime and model the user gave the role unless you name your own.',
+    ),
     runtime: startAgentInput.shape.runtime.describe(
-      "Left out, the model picks it, else claude. codex runs it on OpenAI's Codex, which Seti refuses while the user has it off.",
+      "Left out, the role's or the model's, else claude. codex runs it on OpenAI's Codex, which Seti refuses while the user has it off.",
     ),
     model: startAgentInput.shape.model.describe(
       'Only when the user names one: its model, which picks the runtime that offers it, a Claude Code model such as opus or a Codex model.',
@@ -122,19 +130,45 @@ const startTaskTool = setiTool({
     effort: startAgentInput.shape.effort.describe(
       'Only when the user names one: its reasoning effort, if its model takes one.',
     ),
+    include_brief: z
+      .boolean()
+      .default(false)
+      .describe(
+        'Seti adds a brief of your work so far after the prompt: what you were asked, your plan, steps, files and PRs, redacted, without direct messages.',
+      ),
+    wait_minutes: z
+      .number()
+      .int()
+      .min(0)
+      .max(DELEGATE_LIMITS.waitMinutes)
+      .default(0)
+      .describe(
+        'Wait in this call up to this many minutes for its first turn to end and get its final message as the result. Past that, or when you are interrupted, it goes on and its end reaches you as an update. While it asks the user for a permission, your call waits too. 0 returns at once.',
+      ),
   },
-  run: async ({ prompt, title, workspace, notify_when_done, runtime, model, effort }, ctx) => {
+  run: async (args, ctx) => {
+    const minutes = waitMinutes(args.wait_minutes)
     const input = startAgentInput.parse({
-      prompt,
-      title,
-      workspace_id: workspace === undefined ? ctx.caller.workspace_id : (await resolveWorkspace(workspace)).id,
-      notify_when_done,
-      runtime,
-      model,
-      effort,
+      prompt: args.prompt,
+      title: args.title,
+      workspace_id:
+        args.workspace === undefined ? ctx.caller.workspace_id : (await resolveWorkspace(args.workspace)).id,
+      notify_when_done: args.notify_when_done || minutes > 0,
+      role: args.role,
+      runtime: args.runtime,
+      model: args.model,
+      effort: args.effort,
+      ...(args.include_brief ? { brief_of: ctx.caller.id } : {}),
     })
-    const task = await startAgent(input, await capOf(ctx.caller))
-    return { ...brief(task), setup: task.setup }
+    const held = heldWait()
+    const task = await startAgent(input, await capOf(ctx.caller), minutes > 0 ? held.hold : undefined)
+    if (minutes === 0) {
+      return { ...brief(task), setup: task.setup }
+    }
+    return {
+      ...brief(task),
+      result: await waitForFirstTurn(ctx.caller, task, { wait: held, minutes, signal: ctx.signal }),
+    }
   },
 })
 
@@ -185,11 +219,17 @@ const setUpdateMode = setiTool({
 const deleteAgent = setiTool({
   name: 'delete_agent',
   description:
-    'Permanently delete another agent, archived or not: its transcript, worktrees, scratch folder, workspace, archive bundle and session.',
+    'Permanently delete another agent, archived or not: its transcript, worktrees, scratch folder, workspace, archive bundle and session. Not an agent another agent started: archive that one.',
   input: { task: taskRef },
   run: async ({ task: ref }, ctx) => {
     const task = await anyTask(ref)
     notSelf(ctx, task, 'delete')
+    if (task.delegated_by !== null) {
+      throw new HttpError(
+        409,
+        'Only the user deletes an agent another agent started, since its cost counts; archive it',
+      )
+    }
     await deleteTask(task)
     return done(`Deleted ${task.title}.`)
   },
@@ -285,13 +325,25 @@ const stopBackgroundWork = setiTool({
 const restartAgentSession = setiTool({
   name: 'restart_agent_session',
   description:
-    "Restart another agent's Claude Code session, as when its MCP servers failed or it seems stuck: the conversation is kept and its background work ends; a running turn stops first.",
-  input: { task: taskRef },
-  run: async ({ task: ref }, ctx) => {
+    "Restart another agent's session, as when its MCP servers failed or it seems stuck: the conversation is kept and its background work ends; a running turn stops first. With runtime, continue it on that runtime instead: a new session there in the same folders, which gets a brief of its work.",
+  input: {
+    task: taskRef,
+    runtime: restartSessionInput.shape.runtime.describe(
+      'Only when the user asks for it: the runtime to continue the agent on, which Seti refuses while the user has it off.',
+    ),
+    model: restartSessionInput.shape.model.describe(
+      "Only with runtime and when the user names one; else that runtime's default.",
+    ),
+  },
+  run: async ({ task: ref, runtime, model }, ctx) => {
     const task = await liveTask(ref)
-    notSelf(ctx, task, 'restart')
-    await restartSession(task, { interrupt: true })
-    return done(`Restarted the session of ${task.title}.`)
+    notSelf(ctx, task, runtime === undefined ? 'restart' : 'move to another runtime')
+    await restartSession(task, { interrupt: true, runtime, model })
+    return done(
+      runtime === undefined
+        ? `Restarted the session of ${task.title}.`
+        : `${task.title} continues on ${RUNTIME_NAMES[runtime]}; its next message brings a brief of its work.`,
+    )
   },
 })
 

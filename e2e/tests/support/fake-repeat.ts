@@ -19,7 +19,11 @@ type Hook = (input: Record<string, unknown>, toolUseId: string, options: { signa
 export type FakeHooks = Partial<Record<string, { matcher?: string; hooks: Hook[] }[]>>
 
 /** Runs the event's hooks that match the tool together, as Claude Code does. */
-async function fire(hooks: FakeHooks | undefined, input: Record<string, unknown>, id: string): Promise<HookOutput[]> {
+export async function fire(
+  hooks: FakeHooks | undefined,
+  input: Record<string, unknown>,
+  id: string,
+): Promise<HookOutput[]> {
   const event = String(input.hook_event_name)
   const tool = String(input.tool_name)
   const matching = (hooks?.[event] ?? []).filter(
@@ -30,7 +34,7 @@ async function fire(hooks: FakeHooks | undefined, input: Record<string, unknown>
   return Promise.all(matching.flatMap((m) => m.hooks.map(async (hook) => hook({ ...base, ...input }, id, { signal }))))
 }
 
-const denial = (outputs: readonly HookOutput[]) =>
+export const denial = (outputs: readonly HookOutput[]) =>
   outputs.find((output) => output.hookSpecificOutput?.permissionDecision === 'deny')?.hookSpecificOutput
     ?.permissionDecisionReason
 

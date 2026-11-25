@@ -24,6 +24,19 @@ describe('layout, header and chord contributions', () => {
     )
   })
 
+  it('takes needs on an agent command or an agent view only', () => {
+    const needs = ['side_chat' as const]
+    expect(issue({ commands: [{ id: 'ask', title: 'Ask', args: task, for: ['palette'], needs }] })).toBeNull()
+    expect(issue({ commands: [{ id: 'ask', title: 'Ask', for: ['palette'], needs }] })).toBe(
+      'A command that needs a capability takes a task argument',
+    )
+    const view = { id: 'chat', title: 'Chat', phone: true, needs }
+    expect(issue({ views: [{ ...view, where: 'agentDock' }] })).toBeNull()
+    expect(issue({ views: [{ ...view, where: 'section' }] })).toBe(
+      'Only a view in agentTab or agentDock needs a capability',
+    )
+  })
+
   it('takes Alt or Ctrl chords on commands without required arguments, and nothing else', () => {
     const chord = (value: string, args = {}) =>
       issue({ commands: [{ id: 'g', title: 'G', args, for: ['palette'], chord: value }] })

@@ -1,14 +1,20 @@
 import { SETTINGS_DOC_GROUPS, type SettingsDoc } from '@seti/shared'
-import { Download, Search } from 'lucide-react'
+import { Download, Pencil, PenLine, Search } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { apiGet, errorText } from '@/api'
 import { CopyIconButton } from '@/components/CopyButton'
+import { ToggleButton } from '@/components/ToggleButton'
 import { HighlightedCode } from '@/components/highlight/HighlightedCode'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { RevisionHistory } from '@/panels/revisions/RevisionHistory'
 import { SettingsBody, SettingsCard, SettingsHeader } from '../layout'
-import { asJson, docSections, exportName, shownSections } from './settings-json'
+import { useMovedCard } from '../use-moved-card'
+import { JsonEditor } from './JsonEditor'
+import { SectionReset } from './SectionReset'
+import type { JsonSchema } from './json-complete'
+import { asJson, docSections, exportName, shownSections, type DocFilter } from './settings-json'
 
 const ALL = 'all'
 
@@ -30,17 +36,7 @@ function exportDoc(doc: SettingsDoc): void {
   URL.revokeObjectURL(url)
 }
 
-function Filters({
-  query,
-  group,
-  onQuery,
-  onGroup,
-}: {
-  query: string
-  group: string | null
-  onQuery: (text: string) => void
-  onGroup: (group: string | null) => void
-}) {
+function Filters({ filter, onFilter }: { filter: DocFilter; onFilter: (filter: DocFilter) => void }) {
   return (
     <div className="flex flex-wrap items-center gap-3">
       <div className="relative min-w-0 flex-1 basis-56">
@@ -49,16 +45,16 @@ function Filters({
           aria-label="Search settings"
           placeholder="Search keys and values"
           className="h-7 pl-8"
-          value={query}
+          value={filter.query}
           onChange={(e) => {
-            onQuery(e.target.value)
+            onFilter({ ...filter, query: e.target.value })
           }}
         />
       </div>
       <Select
-        value={group ?? ALL}
+        value={filter.group ?? ALL}
         onValueChange={(value) => {
-          onGroup(value === ALL ? null : value)
+          onFilter({ ...filter, group: value === ALL ? null : value })
         }}
       >
         <SelectTrigger aria-label="Group" size="sm" className="w-40">
@@ -73,15 +69,51 @@ function Filters({
           ))}
         </SelectContent>
       </Select>
+      <ToggleButton
+        pressed={filter.modified}
+        onPressedChange={(modified) => {
+          onFilter({ ...filter, modified })
+        }}
+        icon={PenLine}
+        label="Modified"
+        hint="Show only settings that differ from their default"
+      />
     </div>
   )
 }
 
-function Sections({ doc, query, group }: { doc: SettingsDoc; query: string; group: string | null }) {
-  const sections = useMemo(() => docSections(doc), [doc])
-  const shown = shownSections(sections, query, group)
+/** How many of a section's settings differ from their default, beside its title. */
+function ModifiedMark({ count }: { count: number }) {
+  if (count === 0) {
+    return null
+  }
+  return (
+    <span className="flex items-center gap-1.5 text-muted-foreground">
+      <span aria-hidden className="size-1.5 rounded-full bg-primary" />
+      {count} modified
+    </span>
+  )
+}
+
+function Sections({
+  doc,
+  defaults,
+  filter,
+  onSaved,
+}: {
+  doc: SettingsDoc
+  defaults: SettingsDoc | null
+  filter: DocFilter
+  onSaved: () => void
+}) {
+  const sections = useMemo(() => docSections(doc, defaults), [doc, defaults])
+  const shown = shownSections(sections, filter)
   if (shown.length === 0) {
-    return <p className="text-sm text-muted-foreground">No setting matches.</p>
+    return (
+      <p className="text-sm text-muted-foreground">
+        {filter.modified ? 'No setting differs from its default.' : 'No setting matches.'}
+      </p>
+    )
   }
   return (
     <>
@@ -92,7 +124,13 @@ function Sections({ doc, query, group }: { doc: SettingsDoc; query: string; grou
             key={section.path}
             id={`json-${section.path}`}
             title={section.path}
-            actions={<CopyIconButton text={text} label={`Copy ${section.path}`} />}
+            actions={
+              <>
+                <ModifiedMark count={section.modified} />
+                <SectionReset doc={doc} section={section} onSaved={onSaved} />
+                <CopyIconButton text={text} label={`Copy ${section.path}`} />
+              </>
+            }
           >
             <pre className="px-3 py-2 font-mono text-xs whitespace-pre-wrap wrap-anywhere">
               <HighlightedCode code={text} language="json" />
@@ -104,54 +142,114 @@ function Sections({ doc, query, group }: { doc: SettingsDoc; query: string; grou
   )
 }
 
-/** Every setting as one JSON document, read only: search it, copy a part or export it whole. */
-export function SettingsJsonPage() {
+function History({ version, onReverted }: { version: number; onReverted: () => void }) {
+  return (
+    <SettingsCard id="json-history" title="History">
+      <RevisionHistory objectType="settings" objectId="settings-doc" version={version} onReverted={onReverted} />
+    </SettingsCard>
+  )
+}
+
+function useSettingsDoc() {
   const [doc, setDoc] = useState<SettingsDoc | null>(null)
   const [error, setError] = useState('')
-  const [query, setQuery] = useState('')
-  const [group, setGroup] = useState<string | null>(null)
+  const [defaults, setDefaults] = useState<SettingsDoc | null>(null)
+  const [schema, setSchema] = useState<JsonSchema | null>(null)
+  const [version, setVersion] = useState(0)
   const load = useCallback(() => {
-    apiGet<SettingsDoc>('/settings-doc').then(setDoc, (e: unknown) => {
-      setError(errorText(e))
+    apiGet<SettingsDoc>('/settings-doc').then(
+      (read) => {
+        setDoc(read)
+        setVersion((v) => v + 1)
+      },
+      (e: unknown) => {
+        setError(errorText(e))
+      },
+    )
+    apiGet<SettingsDoc>('/settings-doc/defaults').then(setDefaults, () => {
+      setDefaults(null)
     })
   }, [])
   useEffect(load, [load])
+  useEffect(() => {
+    apiGet<JsonSchema>('/settings-doc/schema').then(setSchema, () => {
+      setSchema(null)
+    })
+  }, [])
+  return { doc, error, defaults, schema, version, load }
+}
+
+function HeaderActions({ doc, onEdit }: { doc: SettingsDoc; onEdit: () => void }) {
+  return (
+    <>
+      <CopyIconButton text={asJson(doc)} label="Copy all settings" variant="outline" />
+      <Button
+        size="sm"
+        variant="outline"
+        onClick={() => {
+          exportDoc(doc)
+        }}
+      >
+        <Download />
+        Export
+      </Button>
+      <Button size="sm" variant="outline" onClick={onEdit}>
+        <Pencil />
+        Edit
+      </Button>
+    </>
+  )
+}
+
+/** Every setting as one document: search, copy or export it; edit plain settings, with undo. */
+export function SettingsJsonPage() {
+  const { doc, error, defaults, schema, version, load } = useSettingsDoc()
+  const [filter, setFilter] = useState<DocFilter>({ query: '', group: null, modified: false })
+  const [editing, setEditing] = useState(false)
+  useMovedCard(doc !== null)
   return (
     <SettingsBody
       header={
         <SettingsHeader
           title="JSON"
-          description="Every setting as one document. Secrets show only as set; change a setting on its own page."
+          description="Every setting as one document. Secrets show only as set; security settings change on their own pages."
           actions={
-            doc !== null && (
-              <>
-                <CopyIconButton text={asJson(doc)} label="Copy all settings" variant="outline" />
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => {
-                    exportDoc(doc)
-                  }}
-                >
-                  <Download />
-                  Export
-                </Button>
-              </>
+            doc !== null &&
+            !editing && (
+              <HeaderActions
+                doc={doc}
+                onEdit={() => {
+                  setEditing(true)
+                }}
+              />
             )
           }
         />
       }
     >
-      <div className="space-y-4">
-        <Filters query={query} group={group} onQuery={setQuery} onGroup={setGroup} />
-        {doc === null ? (
-          <p className={error === '' ? 'text-sm text-muted-foreground' : 'text-sm text-destructive'}>
-            {error === '' ? 'Loading...' : error}
-          </p>
-        ) : (
-          <Sections doc={doc} query={query} group={group} />
-        )}
-      </div>
+      {doc !== null && editing ? (
+        <JsonEditor
+          key={doc.revision}
+          doc={doc}
+          schema={schema}
+          onClose={() => {
+            setEditing(false)
+          }}
+          onSaved={load}
+        />
+      ) : (
+        <div className="space-y-4">
+          <Filters filter={filter} onFilter={setFilter} />
+          {doc === null ? (
+            <p className={error === '' ? 'text-sm text-muted-foreground' : 'text-sm text-destructive'}>
+              {error === '' ? 'Loading...' : error}
+            </p>
+          ) : (
+            <Sections doc={doc} defaults={defaults} filter={filter} onSaved={load} />
+          )}
+          <History version={version} onReverted={load} />
+        </div>
+      )}
     </SettingsBody>
   )
 }

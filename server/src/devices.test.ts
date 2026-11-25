@@ -261,6 +261,15 @@ describe('device proofs', () => {
     const body = { id: 'datadog@claude-plugins-official' }
     const res = await call(app, 'POST /api/plugins/installed', { ...PUBLIC, ...install, origin: ORIGIN }, body)
     expect(res.status).toBe(403)
+    const hostPath = '/api/tasks/any/refused-hosts'
+    const allow = await proof(phone, { htm: 'POST', htu: `${ORIGIN}${hostPath}` })
+    const allowed = await call(
+      app,
+      `POST ${hostPath}`,
+      { ...PUBLIC, ...allow, origin: ORIGIN },
+      { host: 'a.example.com' },
+    )
+    expect(allowed.status).toBe(403)
   })
 
   it('does not fall back to Access or the local token when a proof fails', async () => {

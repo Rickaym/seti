@@ -5,6 +5,7 @@ import { decideCodexCall } from './codex-decide.js'
 import { effectiveCompact } from './compact.js'
 import { tasks } from './db.js'
 import { askAboutRepeat, canUseToolFor } from './permission-requests.js'
+import { pushCall } from './push-asks.js'
 import { repeatReason } from './repeat-guard.js'
 import { reviewCall } from './review-hooks.js'
 import { redactSecrets } from './scrub.js'
@@ -73,6 +74,9 @@ export const turnAnswers = {
   },
   'review.ask': async (taskId: string, call: NodeAsk<'review.ask'>, signal: AbortSignal) => ({
     output: await reviewCall(await taskOf(taskId), call, signal),
+  }),
+  'push.ask': async (taskId: string, call: NodeAsk<'push.ask'>, signal: AbortSignal) => ({
+    output: await pushCall(await taskOf(taskId), call, signal),
   }),
   'repeat.ask': async (taskId: string, ask: NodeAsk<'repeat.ask'>, signal: AbortSignal) =>
     repeatCall(taskId, ask, signal),

@@ -4,7 +4,7 @@ import { audit } from '../audit.js'
 import { now } from '../db.js'
 import { auditEvents } from '../store/audit.js'
 import { slackNames } from '../store/slack-names.js'
-import { api, data, deliver, message, quietTask, slackWebhook } from '../threads/slack-test-kit.js'
+import { api, data, deliver, message, quietTask, slackWebhook } from '../threads/test-slack-kit.js'
 import { NAME_STALE_MS, slackSendSummary } from './destination.js'
 import { learnSlackNames } from './learn.js'
 

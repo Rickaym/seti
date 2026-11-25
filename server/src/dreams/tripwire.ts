@@ -1,11 +1,10 @@
+import { hostsIn } from '@seti/shared'
 import { redactSecrets } from '../scrub.js'
 
-const HOST = /\b(?:https?:\/\/)?((?:[a-z0-9-]+\.)+[a-z]{2,})(?::\d+)?\b/gi
 const PIPE_TO_SHELL = /\|\s*(?:sudo\s+)?(?:sh|bash|zsh|python3?|node|perl|ruby)\b/
 const COMMANDING = /\b(?:ignore (?:all |any |the |previous |your )?(?:rules|instructions)|always run|never tell)\b/i
-const SHOWN = 120
-
-const hostsOf = (text: string) => new Set([...text.matchAll(HOST)].map((m) => (m[1] ?? '').toLowerCase()))
+/** The most of a memory line Seti quotes, so its found line fits a phone. */
+const SHOWN = 80
 
 /** Lines the change added that are not in the earlier text, as a multiset. */
 function addedLines(before: string, after: string): string[] {
@@ -21,7 +20,7 @@ function addedLines(before: string, after: string): string[] {
 }
 
 function why(line: string, known: ReadonlySet<string>): string | null {
-  const host = [...hostsOf(line)].find((name) => !known.has(name) && !/\.(md|ts|js|json|py|txt)$/.test(name))
+  const host = [...hostsIn(line)].find((name) => !known.has(name))
   if (host !== undefined) {
     return `names a new host, ${host}`
   }
@@ -37,10 +36,11 @@ function why(line: string, known: ReadonlySet<string>): string | null {
  * never tell. A tripwire, not a filter: it says where to look, and the file can be undone.
  */
 export function tripwire(file: string, before: string, after: string): string[] {
-  const known = hostsOf(before)
+  const known = hostsIn(before)
   return addedLines(before, after).flatMap((line) => {
     const reason = why(line, known)
-    const shown = redactSecrets(line.trim()).slice(0, SHOWN)
+    const text = redactSecrets(line.trim())
+    const shown = text.length > SHOWN ? `${text.slice(0, SHOWN - 3)}...` : text
     return reason === null ? [] : [`Seti: ${file} gained a line that ${reason}: "${shown}"`]
   })
 }

@@ -2,6 +2,7 @@ import { DEFAULT_THEME, modScoped, type ThemeChoice } from '@seti/shared'
 import { audit } from '../audit.js'
 import { fromAgent, fromEa, refuseAtSelf, refuseMod } from '../ea-guard.js'
 import { HttpError } from '../http.js'
+import { DIRECT, type SettingsWrite } from '../settings-write.js'
 import { userSettings } from '../store/user.js'
 import { currentSettings } from '../user-settings.js'
 import { modHost } from './bundled.js'
@@ -61,7 +62,7 @@ function delegateProblem(theme: ThemeEntry, choice: ThemeChoice): string | null 
 }
 
 /** Keeps the theme for every device; the user may keep one whose mod is off, shown once it is on. */
-export async function saveTheme(choice: ThemeChoice): Promise<void> {
+export async function saveTheme(choice: ThemeChoice, write: SettingsWrite = DIRECT): Promise<void> {
   refuseMod('change the theme')
   const theme = themeEntries().find((entry) => entry.id === choice.id)
   if (theme === undefined) {
@@ -75,12 +76,14 @@ export async function saveTheme(choice: ThemeChoice): Promise<void> {
     }
   }
   await currentSettings()
-  await userSettings.setTheme(choice)
-  await audit.record({
-    actor: 'user',
-    kind: 'system.theme_changed',
-    subject_type: 'system',
-    summary: `Changed the theme to ${theme.title}`,
-    detail: { theme: choice.id, flavour: choice.flavour, accent: choice.accent },
-  })
+  await userSettings.setTheme(choice, write.db)
+  await write.after(async () =>
+    audit.record({
+      actor: 'user',
+      kind: 'system.theme_changed',
+      subject_type: 'system',
+      summary: `Changed the theme to ${theme.title}`,
+      detail: { theme: choice.id, flavour: choice.flavour, accent: choice.accent },
+    }),
+  )
 }

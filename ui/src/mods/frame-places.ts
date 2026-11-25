@@ -1,5 +1,6 @@
-import { Registry } from '@seti/shared'
+import { Registry, type AgentCapabilityName } from '@seti/shared'
 import { useSyncExternalStore } from 'react'
+import { useAgentLacks } from './agent-needs'
 
 /** A third-party mod's view placed in an agent tab or the side panel; Seti draws its frame. */
 export interface PlacedFrame {
@@ -10,6 +11,8 @@ export interface PlacedFrame {
   view: string
   title: string
   phone: boolean
+  /** What an agent's runtime must offer for the view to show beside it. */
+  needs: readonly AgentCapabilityName[]
 }
 
 /** Views that open beside one agent, with that agent as their context. */
@@ -20,6 +23,12 @@ export const sidePanels = new Registry<PlacedFrame>('side panel', (view) => view
 
 export const usePlacedFrames = (registry: Registry<PlacedFrame>): readonly PlacedFrame[] =>
   useSyncExternalStore(registry.subscribe, registry.list)
+
+/** The agent tabs that show beside the agent: those whose needs its runtime meets. */
+export function useAgentTabs(agent: string | null): readonly PlacedFrame[] {
+  const lacks = useAgentLacks()
+  return usePlacedFrames(agentTabs).filter((tab) => lacks(agent, tab.needs) === null)
+}
 
 /** The view the side sheet shows: an agent tab with its agent, or a side panel without one. */
 export interface OpenFrame {

@@ -72,3 +72,21 @@ export async function seedSecondOpinion(title: string): Promise<string> {
   await db.close()
   return id
 }
+
+/** The light review the seeded agent keeps for one of its linked PRs. */
+export const PR_REVIEW = 'queue.ts: evict() runs under the queue lock; move it after the release. No test covers it.'
+
+/** Keeps a light review by Codex of the PR at `url` for the agent. */
+export async function seedPrReview(taskId: string, url: string): Promise<void> {
+  const db = openSeedDb()
+  await db.run(
+    `INSERT INTO task_second_opinion
+      (task_id, runtime, model, outcome, cost_usd, estimated, pr_url, answer, created_at)
+      VALUES (?, 'codex', 'gpt-5.5', 'answered', 0.02, true, ?, ?, ?)`,
+    taskId,
+    url,
+    PR_REVIEW,
+    new Date(Date.now() - 5 * 60_000).toISOString(),
+  )
+  await db.close()
+}

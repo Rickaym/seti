@@ -3,36 +3,21 @@ import {
   eaCallEndInput,
   eaHistoryAppendInput,
   eaHistoryQuery,
-  eaLanguageName,
   eaSettingsInput,
   eaSummaryInput,
   type EaHistoryAppended,
   type EaHistoryCleared,
-  type EaSettings,
 } from '@seti/shared'
 import { Hono, type MiddlewareHandler } from 'hono'
 import { bodyLimit } from 'hono/body-limit'
 import { currentRequestSource } from '../access.js'
 import { audit } from '../audit.js'
 import { fromDelegate } from '../ea-guard.js'
+import { saveEaSettings } from '../ea-settings.js'
 import { fail, HttpError, ok, valid, validJson } from '../http.js'
 import { eaHistory, eaSettings } from '../store/ea.js'
 
 const BODY_MAX = 1024 * 1024
-
-/** The change a person cares about: the language, else the form of address, else the wake word. */
-function settingsSummary(before: EaSettings, saved: EaSettings): string {
-  if (saved.language !== before.language) {
-    return `EA language set to ${eaLanguageName(saved.language)}`
-  }
-  if (saved.form_of_address !== before.form_of_address) {
-    return saved.form_of_address === ''
-      ? 'EA addresses the user with no title'
-      : `EA addresses the user as "${saved.form_of_address}"`
-  }
-  const wake = saved.wake_enabled ? `on, "${saved.wake_phrase}"` : 'off'
-  return `EA wake word ${wake}`
-}
 
 /** Only the voice bot writes the conversation: loopback calls that carry its marker header. */
 export const botOnly: MiddlewareHandler = async (c, next) => {
@@ -94,30 +79,4 @@ export const eaStateRoutes = new Hono()
     return ok(c, { recorded: true })
   })
   .get('/settings', async (c) => ok(c, await eaSettings.get()))
-  .put('/settings', validJson(eaSettingsInput), async (c) => {
-    const before = await eaSettings.get()
-    const input = c.req.valid('json')
-    const saved = await eaSettings.save({
-      ...input,
-      form_of_address: input.form_of_address ?? before.form_of_address,
-      language: input.language ?? before.language,
-    })
-    await audit.record({
-      actor: 'user',
-      kind: 'ea.settings_changed',
-      subject_type: 'ea',
-      summary: settingsSummary(before, saved),
-      detail: {
-        wake_enabled: saved.wake_enabled,
-        wake_phrase: saved.wake_phrase,
-        keep_awake_seconds: saved.keep_awake_seconds,
-        join_on_open: saved.join_on_open,
-        form_of_address: saved.form_of_address,
-        language: saved.language,
-        was_enabled: before.wake_enabled,
-        was_form_of_address: before.form_of_address,
-        was_language: before.language,
-      },
-    })
-    return ok(c, saved)
-  })
+  .put('/settings', validJson(eaSettingsInput), async (c) => ok(c, await saveEaSettings(c.req.valid('json'))))

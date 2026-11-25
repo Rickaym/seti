@@ -62,7 +62,7 @@ const SUBJECT_LINKS: Record<AuditEvent['subject_type'], ((id: string) => Subject
   repo: settingsLink('repos', 'Repos'),
   mcp_server: settingsLink('mcp', 'MCP servers'),
   plugin: settingsLink('plugins', 'Plugins'),
-  shared_tool: settingsLink('plugins', 'Shared tools'),
+  shared_tool: settingsLink('tools', 'Shared tools'),
   credential_profile: (id) => ({ href: `#settings/credentials/${id}`, label: 'Credential' }),
   connection: (id) => ({ href: `#settings/connections/${id}`, label: 'Connection' }),
   account: settingsLink('runtimes', 'Runtimes'),
