@@ -2,7 +2,9 @@ import { randomUUID } from 'node:crypto'
 import type { ChannelDeliveryStatus, ChannelRoute } from '@seti/shared'
 import type { ContentfulStatusCode } from 'hono/utils/http-status'
 import { redactSecrets } from '../scrub.js'
+import { readableFields } from '../slack/readable.js'
 import { channelStore, type Accepted, type ChannelRecord } from '../store/channels.js'
+import { heldMessage, takeThreadMessage } from '../threads/intake.js'
 import { applyFilter, type Filtered } from './filter-apply.js'
 import type { FilterPool } from './filter-run.js'
 import { clip, eventDraft, publishEvent, routedReason, type RouteEvent } from './publish.js'
@@ -175,6 +177,7 @@ export function createReceiver(deps: ReceiverDeps) {
     if (echo !== null) {
       return { ...(await finish(channel, at, { http: 200, status: 'ignored', reason: URL_CHECK })), echo }
     }
+    const thread = await takeThreadMessage(channel, decoded.payload, at)
     const excerpt = clip(redactSecrets(JSON.stringify(decoded.payload)), EXCERPT_MAX)
     const sent = preset.deliveryId(request)?.trim() ?? ''
     const deliveryId = sent === '' ? `sha256:${sha256Hex(request.body)}` : clip(sent, TEXT_MAX.id)
@@ -195,8 +198,12 @@ export function createReceiver(deps: ReceiverDeps) {
       const result: Recorded = { http: 200, status: 'filtered', reason: filtered.dropped }
       return finish(channel, at, result, { delivery_id: deliveryId, filtered })
     }
+    const held = thread === null ? null : heldMessage(thread, filtered.filter)
+    if (held !== null) {
+      return finish(channel, at, { http: 200, status: 'ignored', reason: held }, { delivery_id: deliveryId, filtered })
+    }
     const since = new Date(Date.parse(at) - DEDUPE_WINDOW_MS).toISOString()
-    const draft = eventDraft(filtered.fields, `${deliveryId}@${at}`)
+    const draft = eventDraft(await readableFields(channel.preset, filtered.fields), `${deliveryId}@${at}`)
     const claim = { id: deliveryId, since }
     const { accepted, routes } = await publishEvent(channel.id, draft, { at, route: deps.route, claim })
     const eventId = accepted.kind === 'event' ? { event_id: accepted.event.id } : {}

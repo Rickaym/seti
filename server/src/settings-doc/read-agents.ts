@@ -44,6 +44,13 @@ async function channels(): Promise<Channels> {
     poller_access: Object.fromEntries(
       pollers.map(({ name, poller }) => [name, { extra_hosts: poller.extra_hosts, secrets: poller.secrets }]),
     ),
+    thread_replies: Object.fromEntries(
+      list.flatMap((channel) =>
+        channel.source === 'webhook' && channel.threads !== null
+          ? [[channel.name, { replies: channel.threads.replies, dms: channel.threads.dms }]]
+          : [],
+      ),
+    ),
   }
 }
 

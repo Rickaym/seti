@@ -16,7 +16,11 @@ const NESTING = 3
 
 interface Scan {
   parts: string[]
+  /** The operator that ends each part, '' for the last. */
+  ops: string[]
   inner: string[]
+  /** The index of the part each inner script sits in. */
+  innerAt: number[]
   complete: boolean
   nested: boolean
 }
@@ -25,7 +29,7 @@ const OPERATORS = ['&&', '||', '|&', ';;', '|', ';', '\n']
 
 /** Reads one shell line, tracking quotes and brackets, without running anything. */
 class Scanner {
-  readonly scan: Scan = { parts: [], inner: [], complete: true, nested: false }
+  readonly scan: Scan = { parts: [], ops: [], inner: [], innerAt: [], complete: true, nested: false }
   private quote: string | null = null
   /** Open brackets: where each opened, and the quote it opened inside, which its close restores. */
   private readonly opens: { at: number; quote: string | null }[] = []
@@ -44,19 +48,25 @@ class Scanner {
     while (i < this.line.length) {
       i = this.step(i)
     }
-    this.cut(this.line.length)
+    this.cut(this.line.length, '')
     if (this.quote !== null || this.opens.length > 0 || this.tick !== -1 || this.dangling) {
       this.scan.complete = false
     }
     return this.scan
   }
 
-  private cut(at: number): void {
+  private cut(at: number, op: string): void {
     const part = this.line.slice(this.start, at).trim()
     if (part !== '') {
       this.scan.parts.push(part)
+      this.scan.ops.push(op)
       this.dangling = false
     }
+  }
+
+  private enclose(text: string): void {
+    this.scan.inner.push(text)
+    this.scan.innerAt.push(this.scan.parts.length)
   }
 
   private step(i: number): number {
@@ -108,7 +118,7 @@ class Scanner {
       if (open === undefined) {
         this.scan.complete = false
       } else {
-        this.scan.inner.push(this.line.slice(open.at + 1, i))
+        this.enclose(this.line.slice(open.at + 1, i))
         this.quote = open.quote
       }
       return i + 1
@@ -123,7 +133,7 @@ class Scanner {
       this.tickQuote = this.quote
       this.quote = null
     } else {
-      this.scan.inner.push(this.line.slice(this.tick + 1, i))
+      this.enclose(this.line.slice(this.tick + 1, i))
       this.tick = -1
       this.quote = this.tickQuote
     }
@@ -141,7 +151,7 @@ class Scanner {
     if (op === undefined) {
       return null
     }
-    this.cut(i)
+    this.cut(i, op)
     this.start = i + op.length
     this.dangling = ['&&', '||', '|', '|&'].includes(op)
     return i + op.length
@@ -201,6 +211,31 @@ function everything(line: string, depth: number): string[] {
   }
   const deeper = [...scan.inner, ...own.flatMap(scripts)].flatMap((inner) => everything(inner, depth + 1))
   return [...own, ...deeper]
+}
+
+/** One command of a line in order, with what joins it to its neighbours and what it nests. */
+export interface ShellStep {
+  /** The command without loop, branch and group words. */
+  text: string
+  /** The operators before and after it, '' at the ends of the line. */
+  before: string
+  after: string
+  /** Whether it sits behind a loop, branch or group word, so it may run never or many times. */
+  guarded: boolean
+  /** Scripts it runs in a shell of their own: substitutions, subshells, `sh -c` and `eval`. */
+  nested: string[]
+}
+
+/** Cuts a shell line into its own commands in order, each with the scripts nested in it. */
+export function shellSteps(line: string): ShellStep[] {
+  const scan = new Scanner(line).run()
+  const steps = scan.parts.map((part, at) => {
+    const text = bare(part)
+    const inner = scan.inner.filter((_, index) => scan.innerAt[index] === at)
+    const nested = [...inner, ...scripts(text)]
+    return { text, before: scan.ops[at - 1] ?? '', after: scan.ops[at] ?? '', guarded: KEYWORDS.test(part), nested }
+  })
+  return steps.filter((step) => step.text !== '')
 }
 
 /** Cuts a shell line into its commands, as Claude Code does before it matches Bash rules. */
