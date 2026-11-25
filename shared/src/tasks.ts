@@ -479,6 +479,8 @@ export type TaskEvent =
   | { type: 'blocks'; mod: string }
   /** The session moved to a fallback model or off it. */
   | { type: 'model' }
+  /** Seti learned Slack names, by id, that rows and requests on screen may show in place of ids. */
+  | { type: 'slack-names'; names: Record<string, string> }
 
 /** Shown in place of a status a newer server sends that this UI does not know. */
 const UNKNOWN_STATUS: TaskStatus = 'idle'

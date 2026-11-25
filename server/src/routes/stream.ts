@@ -68,6 +68,8 @@ function dataOf(event: OtherEvent, form: WireForm): string {
       return JSON.stringify({ blocked: event.blocked })
     case 'blocks':
       return JSON.stringify({ mod: event.mod })
+    case 'slack-names':
+      return JSON.stringify(event.names)
   }
 }
 

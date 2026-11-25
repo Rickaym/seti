@@ -1,4 +1,5 @@
 import type {
+  SlackNames,
   AgentTodo,
   WirePage,
   WireRow,
@@ -16,6 +17,7 @@ import { refreshTasks } from '@/hooks/useTasks'
 import { openEventStream, type LiveEventStream } from '@/lib/event-stream'
 import { noteMcpReport } from '@/lib/mcp-reports'
 import type { OwnDirection } from '@/lib/own-messages'
+import { learnedSlackNames } from '@/lib/slack-names'
 import { mergeBriefs } from '@/lib/subtasks'
 import { mergeRows, replaceRow } from '@/lib/transcript'
 import { refreshTranscriptBlocks } from '@/lib/transcript-blocks'
@@ -157,6 +159,9 @@ export function useTaskStream(taskId: string): TaskStream {
           },
           model: () => {
             refreshTasks()
+          },
+          'slack-names': (event) => {
+            learnedSlackNames(JSON.parse(event.data) as SlackNames)
           },
           mcp: () => {
             noteMcpReport(taskId)

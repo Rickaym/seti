@@ -122,6 +122,12 @@ export const permissionRequests = {
       await sql<RequestRecord[]>`UPDATE permission_request SET timeout_at = ${deadline}
         WHERE id = ${id} AND state = 'pending' RETURNING *`,
     ).at(0),
+  /** Rewrites a pending request's summary; undefined when it is not pending any more. */
+  resummarize: async (id: string, summary: string): Promise<PermissionRequest | undefined> =>
+    requests(
+      await sql<RequestRecord[]>`UPDATE permission_request SET summary = ${summary}
+        WHERE id = ${id} AND state = 'pending' RETURNING *`,
+    ).at(0),
   /** The agent's pending requests, oldest first. */
   pending: async (taskId: string): Promise<PermissionRequest[]> =>
     requests(
