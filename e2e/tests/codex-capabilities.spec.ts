@@ -18,7 +18,8 @@ test("a Codex agent's settings say what its runtime lacks instead of offering co
   await expect(access.getByRole('switch', { name: /sandbox/i })).toHaveCount(0)
 
   const session = await showSection(dialog, 'Session')
-  await expect(session.getByText('Not on Codex')).toBeVisible()
+  await session.getByText('Partly on Codex').hover()
+  await expect(page.getByRole('tooltip')).toContainText('even with Auto compact off')
   await expect(dialog.getByRole('group', { name: 'Dreams' })).toHaveCount(0)
 
   await showSection(dialog, 'Access')
