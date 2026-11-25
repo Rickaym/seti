@@ -15,7 +15,7 @@ const NO_SKILLS: readonly UserSkill[] = []
 const NO_SERVERS: readonly CodexToolServer[] = []
 
 /** A spec with nothing in it but what a case varies; no adapter reads the sandbox stamp. */
-export function specFor<Id extends string>(runtime: Id, resume: string | null): SessionSpec<Id> {
+function specFor<Id extends string>(runtime: Id, resume: string | null): SessionSpec<Id> {
   return {
     runtime,
     taskId: 'conformance-task',
@@ -64,20 +64,21 @@ export interface Subject {
   open: (rig: Rig, options?: OpenOptions) => Promise<RunView>
   /** The promise's value, or a rejection once it took longer than this runtime may take. */
   within: <T>(promise: Promise<T>, label: string) => Promise<T>
-  /** Asks the runtime's one-shot on the rig's launcher; absent where the target has none. */
-  oneShot?: (rig: Rig, prompt: string) => Promise<OneShotResult>
+  /** Asks the runtime's one-shot on the rig's launcher. */
+  oneShot: (rig: Rig, prompt: string) => Promise<OneShotResult>
 }
 
 /** A one-shot call on the rig, bounded as a case is. */
-function oneShotOf(oneShot: { runner: OneShot; model: string }, bound: number) {
+function oneShotOf(oneShot: OneShot, model: string, bound: number) {
   return async (rig: Rig, prompt: string) =>
     runOneShot(
-      oneShot.runner,
+      oneShot,
       {
-        model: oneShot.model,
+        model,
         system: 'Answer in one line.',
         prompt,
         cwd: SUITE_CWD,
+        program: null,
         maxOutputTokens: 4000,
         budgetUsd: 1,
       },
@@ -107,6 +108,6 @@ export function subjectOf<S extends RuntimeShapes, Id extends string>(target: Co
       return new Run(session, target.adapter.project, inputs, { controller, bound }).start()
     },
     within: async (promise, label) => within(promise, label, bound),
-    ...(target.oneShot === undefined ? {} : { oneShot: oneShotOf(target.oneShot, bound) }),
+    oneShot: oneShotOf(target.adapter.capabilities.oneShot, target.oneShotModel, bound),
   }
 }

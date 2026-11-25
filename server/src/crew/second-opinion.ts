@@ -6,11 +6,12 @@ import {
   type Task,
 } from '@seti/shared'
 import { audit } from '../audit.js'
+import { runtimeProgram } from '../codex-status.js'
 import { HttpError } from '../http.js'
 import { oneShotPlan } from '../launch-plan.js'
 import { maintenanceLauncher } from '../launcher.js'
+import { oneShotFor } from '../runtimes/capabilities.js'
 import { runOneShot, type OneShotResult } from '../runtimes/one-shot.js'
-import { oneShotFor } from '../runtimes/one-shots.js'
 import { redactCredentials, redactSecrets } from '../scrub.js'
 import { secondOpinions } from '../store/second-opinions.js'
 import { bareWorkDir } from '../task-sandbox.js'
@@ -147,6 +148,7 @@ export async function askSecondOpinion(caller: Task, input: SecondOpinionInput, 
       system: SYSTEM,
       prompt: prompt.text,
       cwd: bareWorkDir(caller.id),
+      program: await runtimeProgram(answerer.runtime),
       maxOutputTokens: LIMITS.outputTokens,
       budgetUsd: LIMITS.budgetUsd,
     }

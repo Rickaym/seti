@@ -315,8 +315,9 @@ egress proxy.
 
 ### One-shot calls
 
-A runtime may also answer one question with no tools, for a second opinion. Its `OneShot`
-(`server/src/runtimes/one-shot.ts`; `claude/one-shot.ts`, `codex/one-shot.ts`) opens a new
+Every runtime also answers one question with no tools, for a second opinion: its
+`capabilities.oneShot` (`server/src/runtimes/one-shot.ts` holds the types; `claude/one-shot.ts`
+and `codex/one-shot.ts` the runtimes' parts), read through `oneShotFor`. It opens a new
 session that offers the model no tool, refuses any call it makes without asking anyone, and keeps
 nothing to resume: Claude Code with no tools, settings or tool servers, one turn and no saved
 session; Codex with no tool server, an ephemeral thread and every ask declined. `runOneShot`
@@ -327,8 +328,9 @@ or when the model keeps calling tools.
 A one-shot runs in a bare maintenance sandbox (`maintenanceLauncher` with `bare`): an empty
 folder of its own, none of the agent's folders, memory or Claude Code state, and a proxy that
 reaches only the model provider, with the agent's Claude login or the connection that carries its
-OpenAI key. Until `capabilities` declares one-shots, the suite reads them from the target's
-`oneShot`, and cases OS-1 and OS-2 cover them.
+OpenAI key. The request names the runtime's program where Seti installs it (`runtimeProgram`),
+as a session's spec does. Cases OS-1 and OS-2 cover every adapter's one-shot, asking the model
+the target's `oneShotModel` names.
 
 ### The conformance suite
 
