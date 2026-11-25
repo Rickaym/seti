@@ -15,6 +15,7 @@ test('Dream now tidies the memory, shows the report and undoes a file', async ({
   await last.click()
   await expect(dreams(page)).toContainText(DREAM_SUMMARY)
   await expect(dreams(page)).toContainText('MEMORY.md: one rule')
+  await expect(dreams(page).getByText(/^\$\d+\.\d\d, \d+ steps?, prompt [0-9a-f]{8}$/)).toBeVisible()
   await dreams(page).getByRole('button', { name: 'MEMORY.md', exact: true }).click()
   const diff = page.getByRole('dialog', { name: 'MEMORY.md' })
   await expect(diff.locator('[data-diff="add"]')).toContainText(DREAM_LINE)

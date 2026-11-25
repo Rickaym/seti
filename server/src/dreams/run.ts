@@ -22,7 +22,7 @@ import { composeDigest, dayRows } from './digest.js'
 import { denialKind, dreamGate, type DreamPlaces } from './gate.js'
 import { forgetBefore, keepBefore, recordAfter } from './kept.js'
 import type { MemorySnapshot } from './memory-snapshot.js'
-import { dreamAppend, dreamMessage } from './prompt.js'
+import { DREAM_PROMPT_VERSION, dreamAppend, dreamMessage } from './prompt.js'
 import { fileProposal } from './proposals.js'
 import { reportMarkdown } from './report.js'
 import { dreamTools } from './tools.js'
@@ -279,6 +279,7 @@ async function dreamSession(job: DreamJob, tally: Tally, night: string, turns: T
     maxTurns: job.limits.steps,
     budgetUsd: job.limits.budgetUsd,
   }
+  await dreamRuns.promptUsed(job.run.id, DREAM_PROMPT_VERSION)
   const session = await job.dream.open(spec, launcher, { gate, tools }, new AbortController())
   await follow(session, job, tally, turns)
 }
@@ -322,7 +323,8 @@ export async function runDream(job: DreamJob): Promise<DreamRun | undefined> {
     memory_changes: after.changes,
     report,
   }
-  fs.writeFileSync(path.join(night, 'report.md'), reportMarkdown(job.task.title, job.run.night, end), { mode: 0o600 })
+  const heading = { title: job.task.title, night: job.run.night, prompt: DREAM_PROMPT_VERSION }
+  fs.writeFileSync(path.join(night, 'report.md'), reportMarkdown(heading, end), { mode: 0o600 })
   return audit.recordWith(
     async (tx) => dreamRuns.end(job.run.id, end, tx),
     (ended) =>

@@ -17,7 +17,7 @@ import {
 } from './schema-cost.js'
 import { CPU_CAPS } from './schema-cpu.js'
 import { ANDROID_OVERRIDE, DEVICE_SHOW_NAMES, DEVICES, dropOfficialAndroidRow } from './schema-devices.js'
-import { DREAM_NIGHTS, DREAM_PROPOSALS, DREAM_RUNS } from './schema-dreams.js'
+import { DREAM_NIGHTS, DREAM_PROMPT_VERSION, DREAM_PROPOSALS, DREAM_RUNS } from './schema-dreams.js'
 import {
   ATTENTION_TIERS,
   EA_CONTEXT_PACKS,
@@ -32,6 +32,7 @@ import {
   EA_USAGE,
 } from './schema-ea.js'
 import { MESSAGE_EVENTS } from './schema-events.js'
+import { FOLDER_SETTINGS_WATCH } from './schema-folder-settings.js'
 import { INITIAL } from './schema-initial.js'
 import { KNOWLEDGE } from './schema-knowledge.js'
 import { MEMORY_CAPS } from './schema-memory.js'
@@ -249,4 +250,6 @@ export const MIGRATIONS: readonly Migration[] = [
   { version: 132, name: 'task_delegated_by', sql: TASK_DELEGATED_BY },
   { version: 133, name: 'role_runtime', sql: ROLE_RUNTIME },
   { version: 134, name: 'task_session', sql: TASK_SESSION },
+  { version: 135, name: 'folder_settings_watch', sql: FOLDER_SETTINGS_WATCH },
+  { version: 136, name: 'dream_prompt_version', sql: DREAM_PROMPT_VERSION },
 ]

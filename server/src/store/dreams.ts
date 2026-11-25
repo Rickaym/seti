@@ -41,6 +41,10 @@ export const dreamRuns = {
       WHERE id = ${id} AND state = 'running' RETURNING *`
     return row && toRun(row)
   },
+  /** Records which wording of the dream prompt the dream runs under. */
+  promptUsed: async (id: number, version: string): Promise<void> => {
+    await sql`UPDATE dream_run SET prompt_version = ${version} WHERE id = ${id}`
+  },
   get: async (id: number) => {
     const [row] = await sql<DreamRecord[]>`SELECT * FROM dream_run WHERE id = ${id}`
     return row && toRun(row)
