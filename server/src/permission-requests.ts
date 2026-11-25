@@ -41,7 +41,7 @@ export async function announce(request: PermissionRequest): Promise<void> {
 }
 
 /** The user's answer, and what the agent is told beside the call's result when they edited it. */
-export interface Answer {
+interface Answer {
   result: PermissionResult
   note?: string
 }

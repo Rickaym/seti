@@ -554,7 +554,8 @@ interrupted only for that.
 - PERM-4: Built-in: reads, search and platform tools are allowed; shell and edits inside the
   agent's folders are allowed in the sandbox only; killing by name is denied.
 - PERM-5: Request fields: `id`, `task_id`, `tool_name`, `kind`, `summary`, `input`, `reason`,
-  `suggestions`, `editable`, `state`, `created_at`, `timeout_at`, `timed_out`. Decisions:
+  `suggestions`, `editable`, `state`, `edited` (field names, GRD-8), `created_at`, `timeout_at`,
+  `timed_out`. Decisions:
   `allow` (this call), `always` (adds the suggested allow rules, scope `agent` or `global`),
   `deny` (optional message to the agent).
 - PERM-7: Timeout is one install-wide setting: off, 15 min, 1 h (default), 4 h or 24 h from when
@@ -622,8 +623,17 @@ interrupted only for that.
 - GRD-7: A review rule names a tool-server tool or a whole server. Each call it names MUST be held
   as a `review` request, in bypass too, with no `always`. Deny wins over review. If review rules
   cannot be read the call MUST be denied.
-- GRD-8: The user MAY edit a held call's top-level text fields before `allow`, only when the
-  request shows the input whole and unredacted. The audit records field names, never values.
+- GRD-8: The user MAY edit a held call's top-level text fields before `allow` or `deny`, only
+  when the request shows the input whole and unredacted and the runtime runs a call with the input
+  a decision hands back (not Codex, which runs a call as it asked). The audit, the request's
+  `edited` and the transcript's `Edited` mark record field names, never values. The agent MUST
+  learn of an edit from the control room's own record of it, never from the call's input: after an
+  edited call's result, in the same turn, it is told that the user edited the call and the text of
+  each changed field as it ran; an edited call the user denies is denied with the user's text for
+  each changed field and their note. Each field is cut at 2000 characters and all of them at 6000,
+  with a marker that says so. An answer with no edit reaches the agent exactly as before.
+  Why: the agent's own record keeps the text it wrote, so without this it believes its original
+  went out.
 - GRD-10: Outward: a tool-server call unless its name reads as a read or the tool declares no
   writes; a shell command that pushes, publishes, deploys, mutates a remote API or opens a remote
   shell; any unknown name. Every outward call MUST be audited and counted on the agent.

@@ -102,7 +102,7 @@ export const permissionRequests = {
     id: string,
     state: Exclude<PermissionRequestState, 'pending'>,
     message: string | null,
-    answer: { input?: string; edited?: readonly string[] } = {},
+    answer: { input?: string | undefined; edited?: readonly string[] } = {},
   ): Promise<PermissionRequest | undefined> =>
     requests(
       await sql<RequestRecord[]>`UPDATE permission_request

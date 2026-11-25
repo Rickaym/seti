@@ -8,7 +8,7 @@ export function EditedLine({ fields, denied }: { fields: readonly string[]; deni
     ? `You edited ${names}, then denied the call; the agent got your text`
     : `You edited ${names} before the call ran; the agent was told`
   return (
-    <Hint text={hint} side="top">
+    <Hint text={hint}>
       <span
         role="img"
         aria-label={`Edited: ${hint}`}
