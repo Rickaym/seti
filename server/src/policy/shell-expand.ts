@@ -48,28 +48,37 @@ function piece(raw: string, at: number, quoted: boolean, vars: Vars): Piece {
   return escaped ? { text: rest[1] ?? '', next: at + 2, quoted } : { text: char, next: at + 1, quoted }
 }
 
-/** The rest of a word from `at` as the shell expands it, or null where Seti cannot tell. */
-function expandFrom(raw: string, from: number, vars: Vars): string | null {
+/**
+ * The rest of a word from `at` as the shell expands it, or null where Seti cannot tell. `partly`
+ * keeps what it cannot tell as written instead, so a `$`, a backtick or a glob still shows.
+ */
+function expandFrom(raw: string, from: number, vars: Vars, partly: boolean): string | null {
   let out = ''
   let quoted = false
   for (let at = from; at < raw.length;) {
     const found = piece(raw, at, quoted, vars)
-    if (found.text === null) {
+    if (found.text === null && !partly) {
       return null
     }
-    out += found.text
-    at = found.next
+    out += found.text ?? raw[at] ?? ''
+    at = found.text === null ? at + 1 : found.next
     quoted = found.quoted
   }
-  return quoted ? null : out
+  return quoted && !partly ? null : out
 }
 
 /** A word as the shell expands it, or null where it computes, globs or reads an unknown name. */
 export function expand(raw: string, vars: Vars): string | null {
   if (!raw.startsWith('~')) {
-    return expandFrom(raw, 0, vars)
+    return expandFrom(raw, 0, vars, false)
   }
   const home = raw === '~' || raw.startsWith('~/') ? (vars.get('HOME') ?? null) : null
-  const rest = expandFrom(raw, 1, vars)
+  const rest = expandFrom(raw, 1, vars, false)
   return home === null || rest === null ? null : home + rest
+}
+
+/** A word as the shell expands it, with what Seti cannot tell kept as written. */
+export function expandPartly(raw: string, vars: Vars): string {
+  const home = raw === '~' || raw.startsWith('~/') ? (vars.get('HOME') ?? '~') : null
+  return home === null ? (expandFrom(raw, 0, vars, true) ?? raw) : home + (expandFrom(raw, 1, vars, true) ?? '')
 }

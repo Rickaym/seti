@@ -10,7 +10,7 @@ import type { SessionSpec } from '../../session-spec.js'
 import { MCP_SERVER } from '../../test-mcp-server.js'
 import type { UserSkill } from '../../user-skills.js'
 import type { SessionInput } from '../adapter.js'
-import { RealProcess } from '../conformance/real-process.js'
+import { RealProcess, stopAll } from '../conformance/real-process.js'
 import { Channel, isTurnEnd, Run } from '../conformance/run.js'
 import type { Step } from '../conformance/script.js'
 import { codexAdapterFor } from './adapter.js'
@@ -43,11 +43,12 @@ function planted(name: string, files: Record<string, string>): { home: string; w
   return { home, work }
 }
 
-const launcherIn = (home: string): Launcher => ({
+/** A sandboxed launcher in the home that notes each process it starts in `started`. */
+const launcherIn = (home: string, started: RealProcess[]): Launcher => ({
   sandboxed: true,
   env: { PATH: SEARCH_PATH, HOME: home, CODEX_HOME: path.join(home, '.codex'), OPENAI_API_KEY: 'placeholder' },
-  spawn: (request) =>
-    new RealProcess(
+  spawn: (request) => {
+    const real = new RealProcess(
       {
         command: request.command,
         args: request.args,
@@ -57,10 +58,16 @@ const launcherIn = (home: string): Launcher => ({
         deaf: false,
       },
       request.signal,
-    ),
+    )
+    started.push(real)
+    return real
+  },
 })
 
-/** One turn of a real Codex session in the folders, allowing every call and noting each ask. */
+/**
+ * One turn of a real Codex session in the folders, allowing every call and noting each ask.
+ * Codex has exited when it returns, so the test may change or remove what Codex wrote.
+ */
 async function turn(
   where: { home: string; work: string },
   steps: Step[],
@@ -92,21 +99,23 @@ async function turn(
     vendor: { binary, model: null, effort: null, skills, servers },
     compaction,
   } as unknown as SessionSpec<'codex'>
-  const realised = await adapter.realise(
-    spec,
-    launcherIn(where.home),
-    { decide, hooks: null, toolServers: {} },
-    controller,
-  )
-  const inputs = new Channel<SessionInput>()
-  const run = new Run(await adapter.open(realised, inputs, null), adapter.project, inputs, {
-    controller,
-    bound: 30_000,
-  })
-  run.start().send('go')
-  await run.until(isTurnEnd, 'the turn ends')
-  run.close()
-  return { asked, events: run.events }
+  const started: RealProcess[] = []
+  try {
+    const host = { decide, hooks: null, toolServers: {} }
+    const realised = await adapter.realise(spec, launcherIn(where.home, started), host, controller)
+    const inputs = new Channel<SessionInput>()
+    const run = new Run(await adapter.open(realised, inputs, null), adapter.project, inputs, {
+      controller,
+      bound: 30_000,
+    })
+    run.start().send('go')
+    await run.until(isTurnEnd, 'the turn ends')
+    run.close()
+    return { asked, events: run.events }
+  } finally {
+    controller.abort()
+    await stopAll(started)
+  }
 }
 
 const outputs = (events: RuntimeEvent[]) =>
