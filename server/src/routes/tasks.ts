@@ -25,6 +25,7 @@ import {
   type InputPause,
 } from '@seti/shared'
 import { Hono } from 'hono'
+import { resetTaskAccess } from '../access-reset.js'
 import { effectiveAccess, setTaskAccess } from '../agent-access.js'
 import { createTask, startAgent } from '../agent-start.js'
 import { archivedMessage } from '../archive.js'
@@ -142,6 +143,7 @@ export const taskRoutes = new Hono()
     const refusal = eaSecurityAccessRefusal(c, [change.kind])
     return refusal ?? ok(c, await setTaskAccess(await requireTask(c.req.param('id')), change))
   })
+  .post('/:id/access/reset', async (c) => ok(c, await resetTaskAccess(await requireTask(c.req.param('id')))))
   .get('/:id/mcp', async (c) => ok(c, await taskMcpServers(await taskIdOf(c.req.param('id')))))
   .put('/:id/mcp', validJson(taskMcpInput), async (c) => {
     const task = await requireTask(c.req.param('id'))

@@ -219,7 +219,8 @@ export async function overridesOf(taskId: string, kind: AccessKind): Promise<Cho
   }
 }
 
-async function storeOverride(task: Task, kind: AccessKind, id: string, override: boolean | null) {
+/** Stores or with null drops one own choice of a task, without auditing it. */
+export async function storeOverride(task: Task, kind: AccessKind, id: string, override: boolean | null) {
   switch (kind) {
     case 'ssh':
     case 'aws':
