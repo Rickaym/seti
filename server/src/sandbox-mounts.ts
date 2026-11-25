@@ -378,9 +378,10 @@ export function checkoutOf(dir: string, layout: Trust): string | null {
 }
 
 /**
- * The auto memory folders of the main checkouts behind the task's directories, which Claude Code
- * uses from worktrees too; the task's own project folder already holds its memory. Without home
- * access a checkout outside the task's folders counts only for a worktree Seti made.
+ * The auto memory folders of the main checkouts behind the task's directories, which every
+ * session of those repositories shares; a sandboxed agent reads them but keeps its memory in its
+ * own project folder. Without home access a checkout outside the task's folders counts only for
+ * a worktree Seti made.
  */
 export function memoryDirs(layout: Trust): string[] {
   const own = projectSlug(layout.cwd)
@@ -413,7 +414,7 @@ function claudeMounts(layout: SandboxLayout): Mount[] {
   mounts.push({ kind: 'bind', src: path.join(layout.claudeHome, project), dest: path.join(inside, project) })
   for (const memory of memoryDirs(layout)) {
     fs.mkdirSync(path.join(layout.claudeHome, memory), { recursive: true, mode: 0o700 })
-    mounts.push({ kind: 'bind', src: path.join(layout.claudeHome, memory), dest: path.join(inside, memory) })
+    mounts.push({ kind: 'ro-bind', src: path.join(layout.claudeHome, memory), dest: path.join(inside, memory) })
   }
   const history = layout.sessionId === null ? null : path.join('file-history', layout.sessionId)
   if (history !== null && exists(path.join(layout.claudeHome, history))) {

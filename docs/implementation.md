@@ -188,6 +188,11 @@ the AppArmor profile for `bwrap` that the installer adds ([Setup](setup.md#sandb
   signed-in tool-server hosts and the agent's connection hosts with CAs in `~/.seti/sandbox-ca`,
   name-constrained to those hosts (EGR-4). SSH goes through a per-agent `ssh-agent` that holds
   only the keys of the agent's usable logins.
+- **Memory.** A sandboxed Claude Code agent keeps its auto memory in its own project folder,
+  `~/.claude/projects/<slug of its folder>/memory`, through the `autoMemoryDirectory` setting Seti
+  passes with `--settings` (`ownMemory` in `runtimes/claude/realise.ts`), so its sessions load the
+  folder its dreams edit even in a worktree. The memory folders of the checkouts behind its
+  folders are mounted read-only, and `agent-memory.ts` names their indexes in its prompt (SBX-15).
 - **Codex agents.** A sandbox planned for the Codex runtime (`launchPlan(task, 'codex')`) holds
   no Claude Code configuration: no `.claude.json`, no `~/.claude` mounts, no plugins, borrowed
   servers or claude.ai connectors. Its grant has `anthropic: false`, so the proxy mints no
