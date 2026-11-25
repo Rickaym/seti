@@ -2,11 +2,12 @@ import { shellIndex } from '../background-shells.js'
 import { openQuerySince } from '../runner.js'
 import { isRunning, sessionState } from '../session-mirror.js'
 
-const counted = (n: number, one: string, many: string) => (n === 0 ? [] : [`${String(n)} ${n === 1 ? one : many}`])
-
 /**
- * Why the agent is at work, naming what: its turn, or the background work its session still runs
- * (commands it left running, and subagents or other tasks); null when it is not at work.
+ * Why the agent's work rules out a dream now, or null when it may dream. A turn and background
+ * subagents or other background tasks rule it out, since they are model work that can write
+ * memory. Background commands and monitors do not: a dream only reads the folders they work in,
+ * and the turn the runtime starts when one ends or reports cuts the dream. Background work the
+ * runtime has not listed by kind counts as other work.
  */
 export async function atWork(taskId: string): Promise<string | null> {
   if (isRunning(taskId)) {
@@ -16,12 +17,15 @@ export async function atWork(taskId: string): Promise<string | null> {
   if (count === 0) {
     return null
   }
-  const shells = (await shellIndex(taskId)).shells(openQuerySince(taskId))
-  const commands = Math.min(count, shells.filter((shell) => shell.status === 'running').length)
-  const parts = [
-    ...counted(commands, 'background command', 'background commands'),
-    ...counted(count - commands, 'subagent or other background task', 'subagents or other background tasks'),
-  ]
-  const [verb, them] = count === 1 ? ['runs', 'it ends'] : ['run', 'they end']
-  return `The agent runs no turn, but ${parts.join(' and ')} still ${verb} in its session; it dreams when ${them}, or stop ${count === 1 ? 'it' : 'them'} in its Processes.`
+  const jobs = (await shellIndex(taskId)).liveJobs(openQuerySince(taskId)).filter((job) => job.ambient !== true)
+  const commands = Math.min(count, jobs.filter((job) => job.kind === 'shell').length)
+  const others = Math.max(count - commands, jobs.length - commands)
+  if (others === 0) {
+    return null
+  }
+  const [what, verb, them] =
+    others === 1
+      ? ['1 subagent or other background task', 'runs', 'it ends, or stop it']
+      : [`${String(others)} subagents or other background tasks`, 'run', 'they end, or stop them']
+  return `The agent runs no turn, but ${what} still ${verb} in its session; it dreams when ${them} in its Processes.`
 }

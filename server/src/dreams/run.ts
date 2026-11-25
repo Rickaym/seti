@@ -14,7 +14,7 @@ import { launchPlan } from '../launch-plan.js'
 import { maintenanceLauncher } from '../launcher.js'
 import type { DreamSession, DreamSupport, SessionMessage } from '../runtimes/adapter.js'
 import { memoryDirs, projectSlug } from '../sandbox-mounts.js'
-import { isRunning } from '../session-mirror.js'
+import { isRunning, watchTurnStarts } from '../session-mirror.js'
 import { sandboxContext, workingDirs } from '../session-options.js'
 import { dreamRuns, type DreamEnd } from '../store/dreams.js'
 import { workspaceDir } from '../workspace/dir.js'
@@ -50,9 +50,6 @@ export function stopDream(runId: number, reason: string): boolean {
   stop?.(reason)
   return stop !== undefined
 }
-
-/** How often a dream checks that its agent has not started a turn, which cuts the dream. */
-const WATCH_MS = 5000
 
 export interface DreamJob {
   task: Task
@@ -161,8 +158,35 @@ const NOTHING_NEW: DreamReport = {
   nothing_to_do: true,
 }
 
+/** Hears every turn of the agent that starts from the dream's start on, however short. */
+class TurnWatch {
+  private started: boolean
+  private cut: (() => void) | null = null
+  readonly end: () => void
+
+  constructor(taskId: string) {
+    this.started = isRunning(taskId)
+    this.end = watchTurnStarts(taskId, () => {
+      this.started = true
+      this.cut?.()
+    })
+  }
+
+  /** Calls `cut` now if a turn started already, else when one starts, until disarmed. */
+  arm(cut: () => void): void {
+    this.cut = cut
+    if (this.started) {
+      cut()
+    }
+  }
+
+  disarm(): void {
+    this.cut = null
+  }
+}
+
 /** Follows the session to its end, stopping it at the time limit or when the agent starts a turn. */
-async function follow(session: DreamSession, job: DreamJob, tally: Tally): Promise<void> {
+async function follow(session: DreamSession, job: DreamJob, tally: Tally, turns: TurnWatch): Promise<void> {
   const stop = (state: DreamEnd['state'], reason: string) => {
     tally.ended(state, reason)
     void session.interrupt().finally(() => {
@@ -180,11 +204,9 @@ async function follow(session: DreamSession, job: DreamJob, tally: Tally): Promi
   stoppers.set(job.run.id, (reason) => {
     stop('stopped', reason)
   })
-  const watch = setInterval(() => {
-    if (isRunning(job.task.id)) {
-      stop('cut', 'The agent started a turn.')
-    }
-  }, WATCH_MS)
+  turns.arm(() => {
+    stop('cut', 'The agent started a turn.')
+  })
   try {
     for await (const report of session.events) {
       if (report.type === 'message') {
@@ -197,7 +219,7 @@ async function follow(session: DreamSession, job: DreamJob, tally: Tally): Promi
   } finally {
     stoppers.delete(job.run.id)
     clearTimeout(timer)
-    clearInterval(watch)
+    turns.disarm()
     session.close()
   }
 }
@@ -219,7 +241,7 @@ function placesOf(job: DreamJob, night: string): DreamPlaces & { shared: string[
   return { cwd: job.task.cwd, home, readable: [...work, memory, ...shared], memory, night, shared }
 }
 
-async function dreamSession(job: DreamJob, tally: Tally, night: string): Promise<void> {
+async function dreamSession(job: DreamJob, tally: Tally, night: string, turns: TurnWatch): Promise<void> {
   const since = await lastDream(job)
   const { file: digest, empty } = await writeDigest(job, since)
   if (empty && since !== null) {
@@ -263,7 +285,7 @@ async function dreamSession(job: DreamJob, tally: Tally, night: string): Promise
   }
   await dreamRuns.promptUsed(job.run.id, DREAM_PROMPT_VERSION)
   const session = await job.dream.open(spec, launcher, { gate, tools }, new AbortController())
-  await follow(session, job, tally)
+  await follow(session, job, tally, turns)
 }
 
 /** Seti's line for a dream that changed memory the agent's sessions do not load. */
@@ -284,10 +306,13 @@ export async function runDream(job: DreamJob): Promise<DreamRun | undefined> {
   const night = nightDir(job)
   fs.mkdirSync(night, { recursive: true, mode: 0o700 })
   keepBefore(job.task.id, job.run.id, job.before)
+  const turns = new TurnWatch(job.task.id)
   try {
-    await dreamSession(job, tally, night)
+    await dreamSession(job, tally, night, turns)
   } catch (e) {
     tally.ended('failed', e instanceof Error ? e.message : String(e))
+  } finally {
+    turns.end()
   }
   const after = await recordAfter(job.task.id, job.run, job.memory, job.before)
   forgetBefore(job.task.id, job.run.id)

@@ -12,6 +12,7 @@ const spec = {
   toolServers,
   instructions: { append: '' },
   vendor: { binary: '/c', model: null, effort: null, skills: [], servers: [] },
+  compaction: { auto: true, window_k: null, threshold_pct: null, instructions: null },
 } as unknown as SessionSpec<'codex'>
 const spawn: NonNullable<Launcher['spawn']> = () => {
   throw new Error('not started in this test')
@@ -85,6 +86,27 @@ describe('realising a Codex session', () => {
       binary: '/c',
     })
     expect(none.instructions).not.toContain('skills')
+  })
+
+  it('compacts at the window and Compact at of the rule, with its instructions, and else where Codex picks', () => {
+    const realise = (compaction: object) =>
+      settingsOf(
+        realiseCodex({ ...spec, compaction } as SessionSpec<'codex'>, launcher({ SETI_MODEL_KEY: 'p' }), {
+          ...answering,
+          binary: '/c',
+        }).args,
+      )
+    const rule = { auto: true, window_k: 200, threshold_pct: 60, instructions: 'Keep the branch names.' }
+    expect(realise(rule)).toEqual(
+      expect.arrayContaining([
+        'model_auto_compact_token_limit=120000',
+        expect.stringMatching(/^compact_prompt=".*Keep the branch names\."$/),
+      ]),
+    )
+    const loose = realise({ ...rule, auto: false, threshold_pct: null, instructions: null })
+    expect(
+      loose.filter((setting) => setting.startsWith('model_auto_compact') || setting.startsWith('compact_prompt')),
+    ).toEqual([])
   })
 
   it("reads a folder's CLAUDE.md when it has no AGENTS.md, as a Claude Code agent reads it", () => {

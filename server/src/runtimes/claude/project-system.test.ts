@@ -270,6 +270,9 @@ describe('Claude background work', () => {
         ],
       },
     ])
+    expect(project(backgroundChanged(['m1', 'Watcher', 'monitor_mcp', true]))).toMatchObject([
+      { type: 'background.changed', jobs: [{ id: 'm1', kind: 'other', label: 'Watcher', ambient: true }] },
+    ])
     expect(projectClaude(fakeBackground('a1') as unknown as SDKMessage)).toMatchObject([
       { type: 'background.changed', jobs: [{ id: 'a1', kind: 'subagent', label: 'a1' }] },
     ])

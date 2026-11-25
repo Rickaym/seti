@@ -12,7 +12,7 @@ import { atWork } from './busy.js'
 const TMP = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'seti-dream-busy-')))
 const payload = (body: MessageBody) => body.payload as { type: string }
 
-/** A turn that leaves a dev server running and, when asked, a second background task beside it. */
+/** A turn that leaves a dev server running and, when asked, a background subagent beside it. */
 const sdk = await vi.hoisted(async () => {
   const { FakeSdk, fakeResult } = await import('../fake-sdk.js')
   const state = { turn: (_text: string): { type: string }[] => [] }
@@ -30,17 +30,20 @@ vi.mock('@anthropic-ai/claude-agent-sdk', async (importOriginal) => ({
 
 const TASK = 'dream-busy'
 
-function devServer(withTask: boolean): { type: string }[] {
-  const call = 'toolu_bdev'
-  const running: [string, string][] = [
-    ['bdev', 'Dev server'],
-    ...(withTask ? [['agent1', 'Review'] as [string, string]] : []),
+/** A background command (a Bash run in the background, or a Monitor), with a subagent if asked. */
+function devServer(withAgent: boolean, tool: 'Bash' | 'Monitor' = 'Bash'): { type: string }[] {
+  const shell = tool === 'Bash' ? 'bdev' : 'bmon'
+  const call = `toolu_${shell}`
+  const running: [string, string, string?][] = [
+    [shell, 'Dev server'],
+    ...(withAgent ? [['agent1', 'Review', 'local_agent'] as [string, string, string]] : []),
   ]
+  const input = tool === 'Bash' ? { run_in_background: true } : {}
   return [
-    payload(shellCall(call, { command: 'npm run dev', description: 'Dev server', run_in_background: true })),
+    payload(shellCall(call, { command: 'npm run dev', description: 'Dev server', ...input }, tool)),
     payload(backgroundChanged(...running)),
-    payload(shellStarted({ shellId: 'bdev', toolUseId: call, description: 'Dev server', background: true })),
-    payload(backgroundResult(call, 'bdev', TMP)),
+    payload(shellStarted({ shellId: shell, toolUseId: call, description: 'Dev server', background: true })),
+    payload(backgroundResult(call, shell, TMP)),
   ]
 }
 
@@ -58,19 +61,26 @@ describe('why an agent is at work, for a dream', () => {
     expect(await atWork(TASK)).toBeNull()
   })
 
-  it('names a background command an idle agent left running', async () => {
+  it('lets an idle agent dream beside a long-lived background command', async () => {
     sdk.state.turn = () => devServer(false)
     await runTurn(TASK, 'start the dev server')
     await waitIdle(TASK)
-    expect(await atWork(TASK)).toBe(
-      'The agent runs no turn, but 1 background command still runs in its session; it dreams when it ends, or stop it in its Processes.',
-    )
+    expect(await atWork(TASK)).toBeNull()
   })
 
-  it('counts background work that is not a command apart', async () => {
+  it('lets it dream beside a monitor', async () => {
+    sdk.state.turn = () => devServer(false, 'Monitor')
+    await runTurn(TASK, 'watch the logs')
+    await waitIdle(TASK)
+    expect(await atWork(TASK)).toBeNull()
+  })
+
+  it('still refuses while a background subagent runs beside the command', async () => {
     sdk.state.turn = () => devServer(true)
     await runTurn(TASK, 'start the dev server and a review')
     await waitIdle(TASK)
-    expect(await atWork(TASK)).toMatch(/1 background command and 1 subagent or other background task still run/)
+    expect(await atWork(TASK)).toBe(
+      'The agent runs no turn, but 1 subagent or other background task still runs in its session; it dreams when it ends, or stop it in its Processes.',
+    )
   })
 })

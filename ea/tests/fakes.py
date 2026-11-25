@@ -757,6 +757,7 @@ class FakeSeti:
     rewind_targets: dict[str, list[dict[str, Any]]] = field(default_factory=dict)
     rewind_files: dict[str, Any] = field(default_factory=dict)
     task_packs: dict[str, list[dict[str, Any]]] = field(default_factory=dict)
+    task_threads: dict[str, list[dict[str, Any]]] = field(default_factory=dict)
     ea_pack_ids: list[str] = field(default_factory=list)
     ea_pack_max: int = 8000
     handles: dict[str, str] = field(default_factory=dict)
@@ -1243,6 +1244,8 @@ class FakeSeti:
                 return ok(self.rewind_files)
             case ["tasks", task_id, "context-packs"]:
                 return ok(self.task_packs.get(task_id, []))
+            case ["tasks", task_id, "threads"]:
+                return ok(self.task_threads.get(task_id, []))
             case ["tasks", task_id, "mcp"]:
                 return (
                     ok(self.task_mcp_servers(task_id)) if self._task(task_id) else err(404, "Task not found")
