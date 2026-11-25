@@ -46,6 +46,8 @@ export const AUDIT_KINDS = [
   'task.pr_unlinked',
   'task.subtask_pr_linked',
   'task.subtask_pr_unlinked',
+  'task.thread_followed',
+  'task.thread_stopped',
   'task.context_packs_changed',
   'task.shell_run',
   'task.shell_stopped',

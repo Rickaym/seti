@@ -97,6 +97,7 @@ import {
   TEAM_DIRECT,
   TEAM_MESSAGE_SELF_HEADERS,
 } from './schema-team.js'
+import { THREAD_FOLLOWS } from './schema-threads.js'
 import { DROP_ESLINTCACHE_DEFAULT, WARM_CACHES } from './schema-warm-caches.js'
 import {
   CHANNEL_SECRET_PENDING,
@@ -253,4 +254,5 @@ export const MIGRATIONS: readonly Migration[] = [
   { version: 135, name: 'folder_settings_watch', sql: FOLDER_SETTINGS_WATCH },
   { version: 136, name: 'dream_prompt_version', sql: DREAM_PROMPT_VERSION },
   { version: 137, name: 'share_live', sql: SHARE_LIVE },
+  { version: 138, name: 'thread_follows', sql: THREAD_FOLLOWS },
 ]
