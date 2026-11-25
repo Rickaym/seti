@@ -3,6 +3,7 @@ import type { CanUseTool, PermissionMode, PermissionResult, PermissionUpdate } f
 import type { PermissionRequest, PermissionRequestKind } from '@seti/shared'
 import { permissionModeOf } from './bypass-mode.js'
 import { tasks } from './db.js'
+import { editedDenial, type EditedValues } from './edit-notes.js'
 import { askBeingAnswered } from './node-link.js'
 import { INPUT_CHARS, isEditable } from './permission-edits.js'
 import { callHash, takeGrant } from './permission-grants.js'
@@ -39,18 +40,24 @@ export async function announce(request: PermissionRequest): Promise<void> {
   publish(request.task_id, { type: 'permission', request, blocked: await refreshBlocked(request.task_id) })
 }
 
+/** The user's answer, and what the agent is told beside the call's result when they edited it. */
+export interface Answer {
+  result: PermissionResult
+  note?: string
+}
+
 /** Answers waiting for the user, by request id; each resolves the agent's tool call. */
-const waiting = new Map<string, (result: PermissionResult) => void>()
+const waiting = new Map<string, (answer: Answer) => void>()
 
 /** Whether a running session still waits on the request. */
 export const waitsFor = (requestId: string) => waiting.has(requestId)
 
-/** Hands the agent the user's answer; false when no session waits on it any more. */
-export async function resolveRequest(request: PermissionRequest, result: PermissionResult): Promise<boolean> {
+/** Hands the agent the user's answer, and any note of their edits; false when no session waits. */
+export async function resolveRequest(request: PermissionRequest, result: PermissionResult, note?: string) {
   const resolve = waiting.get(request.id)
   waiting.delete(request.id)
   await announce(request)
-  resolve?.(result)
+  resolve?.(note === undefined ? { result } : { result, note })
   return resolve !== undefined
 }
 
@@ -68,14 +75,14 @@ function reasonOf(options: AskOptions): string | null {
   return text === '' ? null : redactSecrets(text)
 }
 
-const DROPPED: PermissionResult = { behavior: 'deny', message: 'The request was dropped.', interrupt: true }
+const DROPPED: Answer = { result: { behavior: 'deny', message: 'The request was dropped.', interrupt: true } }
 
 /**
  * Waits for the user's answer to the request, from before it is recorded so no answer comes too
  * early; a turn cut short or a closed session drops the request. A turn Seti's own stop cuts off
  * leaves it pending, so the user's answer still reaches the agent after the start.
  */
-async function answerOf(id: string, signals: readonly AbortSignal[]): Promise<PermissionResult> {
+async function answerOf(id: string, signals: readonly AbortSignal[]): Promise<Answer> {
   const signal = AbortSignal.any([...signals])
   return new Promise((resolve) => {
     const drop = () => {
@@ -94,9 +101,9 @@ async function answerOf(id: string, signals: readonly AbortSignal[]): Promise<Pe
           resolve(DROPPED)
         })
     }
-    waiting.set(id, (result) => {
+    waiting.set(id, (answer) => {
       signal.removeEventListener('abort', drop)
-      resolve(result)
+      resolve(answer)
     })
     if (signal.aborted) {
       drop()
@@ -131,14 +138,19 @@ export const allowed = (
     ...(always ? { decisionClassification: 'user_permanent' } : {}),
   }) satisfies PermissionResult
 
-/** What the agent gets for a denied call, with the user's words when they gave any. */
-export const denied = (message: string | null): PermissionResult => ({
-  behavior: 'deny',
-  message:
-    message === null || message === ''
-      ? 'The user denied this tool call. Do not retry it; ask the user how to go on if you need it.'
-      : `The user denied this tool call and said: ${message}`,
-})
+/** What the agent gets for a denied call, with the user's words and edits when they gave any. */
+export const denied = (message: string | null, edited: EditedValues = {}): PermissionResult => {
+  if (Object.keys(edited).length > 0) {
+    return { behavior: 'deny', message: editedDenial(edited, message) }
+  }
+  return {
+    behavior: 'deny',
+    message:
+      message === null || message === ''
+        ? 'The user denied this tool call. Do not retry it; ask the user how to go on if you need it.'
+        : `The user denied this tool call and said: ${message}`,
+  }
+}
 
 /** The input of each waiting call, which an allow hands back to Claude Code unchanged. */
 const inputs = new Map<string, Record<string, unknown>>()
@@ -159,9 +171,11 @@ interface Ask {
 }
 
 /** The call the user allowed after a restart cut it off runs once without a second request. */
-async function allowedAlready(taskId: string, ask: Ask, hash: string): Promise<PermissionResult | null> {
+async function allowedAlready(taskId: string, ask: Ask, hash: string): Promise<Answer | null> {
   const task = takeGrant(taskId, hash) ? await tasks.get(taskId) : undefined
-  return task === undefined ? null : allowed({ tool_name: ask.tool }, ask.input, await permissionModeOf(task))
+  return task === undefined
+    ? null
+    : { result: allowed({ tool_name: ask.tool }, ask.input, await permissionModeOf(task)) }
 }
 
 /** Waits again on a request a node's ask recorded before this control plane restarted. */
@@ -182,7 +196,7 @@ async function waitAgain(request: PermissionRequest, ask: Ask, signals: readonly
  * Records the call, shows it to the user, and waits for their answer. A node's ask names the
  * request, so the same ask sent again after a restart waits on the request it recorded.
  */
-async function askUser(taskId: string, ask: Ask, signals: readonly AbortSignal[]): Promise<PermissionResult> {
+async function askUser(taskId: string, ask: Ask, signals: readonly AbortSignal[]): Promise<Answer> {
   const hash = callHash(ask.tool, ask.input)
   const granted = await allowedAlready(taskId, ask, hash)
   if (granted !== null) {
@@ -241,15 +255,15 @@ const signInMessage = (server: string) =>
 
 /** Decides each tool call Claude Code would ask about: the user answers a request or a question. */
 export const canUseToolFor =
-  (taskId: string, session: AbortSignal): CanUseTool =>
-  async (tool, input, options) => {
+  (taskId: string, session: AbortSignal) =>
+  async (...[tool, input, options]: Parameters<CanUseTool>): Promise<Answer> => {
     if (tool === ASK_TOOL) {
-      return askQuestions(taskId, input, options, session)
+      return { result: await askQuestions(taskId, input, options, session) }
     }
     const server = signInServer(tool)
     if (server !== null) {
       await setStall(taskId, 'mcp', `Sign in to the ${server} MCP server in Seti`)
-      return { behavior: 'deny', message: signInMessage(server) }
+      return { result: { behavior: 'deny', message: signInMessage(server) } }
     }
     const ask: Ask = {
       tool,
@@ -267,19 +281,18 @@ export const askAboutRepeat = async (
   call: { tool: string; input: Record<string, unknown> },
   reason: string,
   signals: readonly AbortSignal[],
-): Promise<PermissionResult> => askUser(taskId, { ...call, kind: 'repeat', reason, suggestions: [] }, signals)
+): Promise<PermissionResult> =>
+  (await askUser(taskId, { ...call, kind: 'repeat', reason, suggestions: [] }, signals)).result
 
 /** Asks the user about a command that pushes outside their organisations; Always adds `PushTo`. */
 export const askAboutPush = async (
   taskId: string,
   call: { tool: string; input: Record<string, unknown>; reason: string; owners: readonly string[] },
   signals: readonly AbortSignal[],
-): Promise<PermissionResult> =>
-  askUser(
-    taskId,
-    { ...call, kind: 'tool', suggestions: [...new Set(call.owners)].map((owner) => `PushTo(${owner})`) },
-    signals,
-  )
+): Promise<PermissionResult> => {
+  const owners = [...new Set(call.owners)].map((owner) => `PushTo(${owner})`)
+  return (await askUser(taskId, { ...call, kind: 'tool', suggestions: owners }, signals)).result
+}
 
 const REVIEW_REASON = 'A review rule holds this call for you to check, and edit, before it runs'
 
@@ -288,8 +301,7 @@ export const askForReview = async (
   taskId: string,
   call: { tool: string; input: Record<string, unknown> },
   signals: readonly AbortSignal[],
-): Promise<PermissionResult> =>
-  askUser(taskId, { ...call, kind: 'review', reason: REVIEW_REASON, suggestions: [] }, signals)
+): Promise<Answer> => askUser(taskId, { ...call, kind: 'review', reason: REVIEW_REASON, suggestions: [] }, signals)
 
 /** What the user answered a request, or that the session dropped it before they did. */
 export type UserAnswer = { allow: true } | { allow: false; message: string; dropped: boolean }
@@ -305,7 +317,7 @@ export async function askCodexUser(
 ): Promise<UserAnswer> {
   const kind = call.review ? 'review' : 'tool'
   const ask: Ask = { ...call, kind, suggestions: [], rewrites: false }
-  const result = await askUser(taskId, ask, signals)
+  const { result } = await askUser(taskId, ask, signals)
   if (result.behavior === 'allow') {
     return { allow: true }
   }

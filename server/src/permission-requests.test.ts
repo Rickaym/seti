@@ -1,4 +1,4 @@
-import type { CanUseTool, PermissionResult } from '@anthropic-ai/claude-agent-sdk'
+import type { CanUseTool, Options, PermissionResult } from '@anthropic-ai/claude-agent-sdk'
 import {
   displayStatus,
   prStates,
@@ -11,6 +11,7 @@ import { afterAll, describe, expect, it, vi } from 'vitest'
 import { asAgent } from './access.js'
 import { createApp } from './app.js'
 import { tasks } from './db.js'
+import { editedRunNote } from './edit-notes.js'
 import { addPermissionRule } from './permission-rules.js'
 import { endSession, runTurn, stopTurn } from './runner.js'
 import { auditEvents } from './store/audit.js'
@@ -41,6 +42,34 @@ const sdk = await vi.hoisted(async () => {
       { ...options, suggestions: [suggestion(command)], decisionReason: 'Not allowed' },
     )
   }
+  /** Asks to send a chat message, then runs the PostToolUse hooks and says what they add. */
+  const sendThenRead = async (options: Options, canUseTool: CanUseTool, text: string, signal: AbortSignal) => {
+    const tool = 'mcp__chat__send_message'
+    const asked = { signal, toolUseID: 'toolu_send', requestId: 'req_send' }
+    const result = await canUseTool(tool, { channel: 'C1', text: text.replace(/^send /, '') }, asked)
+    const event = {
+      session_id: 's',
+      transcript_path: '',
+      cwd: '/tmp',
+      hook_event_name: 'PostToolUse' as const,
+      tool_name: tool,
+      tool_input: {},
+      tool_response: 'sent',
+      tool_use_id: 'toolu_send',
+    }
+    const matching = (options.hooks?.PostToolUse ?? []).filter(
+      (m) => m.matcher === undefined || new RegExp(`^(?:${m.matcher})$`).test(tool),
+    )
+    const outputs = await Promise.all(
+      matching.flatMap((m) => m.hooks.map(async (hook) => hook(event, 'toolu_send', { signal }))),
+    )
+    const context = outputs.flatMap((output) =>
+      'hookSpecificOutput' in output && output.hookSpecificOutput.hookEventName === 'PostToolUse'
+        ? [output.hookSpecificOutput.additionalContext ?? []].flat()
+        : [],
+    )
+    return { result, context }
+  }
   const classified = (command: string) => {
     const denial = 'Permission for this action was denied by the Claude Code auto mode classifier.'
     return [
@@ -69,6 +98,11 @@ const sdk = await vi.hoisted(async () => {
       return
     }
     const { canUseTool } = turn.session.options
+    if (turn.text.startsWith('send ') && canUseTool !== undefined) {
+      yield fakeAssistant(JSON.stringify(await sendThenRead(turn.session.options, canUseTool, turn.text, turn.signal)))
+      yield fakeResult()
+      return
+    }
     const result = canUseTool === undefined ? null : await ask(canUseTool, turn.text, turn.signal)
     yield fakeAssistant(JSON.stringify(result))
     yield fakeResult()
@@ -207,6 +241,31 @@ describe('permission requests', () => {
     expect(reply.message).toContain('Open a PR instead')
     const requests = await call<PermissionRequest[]>('GET', `/tasks/${task.id}/permission-requests`)
     expect(requests.at(-1)).toMatchObject({ state: 'denied', message: 'Open a PR instead' })
+  })
+
+  it('tells the agent after the result when the user edited an MCP call it asked about', async () => {
+    const task = await newTask()
+    await runTurn(task.id, 'send Deploy is dnoe')
+    const request = await pending(task.id)
+    expect(request).toMatchObject({ tool_name: 'mcp__chat__send_message', editable: true })
+    await call('POST', `/tasks/${task.id}/permission-requests/${request.id}`, {
+      decision: 'allow',
+      fields: { text: 'Deploy is done' },
+    })
+    await waitIdle(task.id)
+    expect(JSON.parse(await lastReply(task.id))).toEqual({
+      result: { behavior: 'allow', updatedInput: { channel: 'C1', text: 'Deploy is done' } },
+      context: [editedRunNote({ text: 'Deploy is done' })],
+    })
+
+    await runTurn(task.id, 'send Deploy is done')
+    const unedited = await pending(task.id)
+    await call('POST', `/tasks/${task.id}/permission-requests/${unedited.id}`, { decision: 'allow' })
+    await waitIdle(task.id)
+    expect(JSON.parse(await lastReply(task.id))).toEqual({
+      result: { behavior: 'allow', updatedInput: { channel: 'C1', text: 'Deploy is done' } },
+      context: [],
+    })
   })
 
   it('drops the request when the turn is stopped, and refuses an answer after that', async () => {

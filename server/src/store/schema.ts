@@ -50,6 +50,7 @@ import { PACK_KIND, ROLE_RUNTIME, rolesToPacks } from './schema-roles.js'
 import { MESSAGE_SEARCH, MESSAGE_SEARCH_TALK, MESSAGE_TIME } from './schema-search.js'
 import {
   CLAUDE_LOGINS,
+  PERMISSION_REQUEST_EDITED,
   PERMISSION_REVIEW,
   PERMISSION_TIMEOUT,
   PERMISSIONS,
@@ -256,4 +257,5 @@ export const MIGRATIONS: readonly Migration[] = [
   { version: 137, name: 'share_live', sql: SHARE_LIVE },
   { version: 138, name: 'thread_follows', sql: THREAD_FOLLOWS },
   { version: 139, name: 'share_render', sql: SHARE_RENDER },
+  { version: 140, name: 'permission_request_edited', sql: PERMISSION_REQUEST_EDITED },
 ]

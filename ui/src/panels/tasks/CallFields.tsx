@@ -60,14 +60,15 @@ export function EditButton({ editable, editing, busy, className, onEdit }: EditP
   )
 }
 
-/** Says which fields Allow sends changed, once the user changed any. */
+/** Says which fields the user changed: Allow runs them, and Deny shows them to the agent. */
 export function EditedNote({ edited }: { edited: readonly string[] }) {
   if (edited.length === 0) {
     return null
   }
   return (
     <p className="text-2xs text-muted-foreground">
-      Allow runs it with your edits to <span className="font-mono">{edited.join(', ')}</span>
+      Allow runs it with your edits to <span className="font-mono">{edited.join(', ')}</span>; Deny shows the agent your
+      edits.
     </p>
   )
 }

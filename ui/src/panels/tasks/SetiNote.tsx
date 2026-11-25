@@ -10,14 +10,18 @@ import {
   TimerOff,
 } from 'lucide-react'
 import { isFailureNote, type SetiPayload } from '@/lib/seti-notes'
+import { EditedLine } from '@/panels/tasks/EditedLine'
 import { FailureLine } from '@/panels/tasks/FailureNotice'
 import { RefusedHostLine } from '@/panels/tasks/RefusedHostLine'
 import { Line } from '@/panels/tasks/TranscriptLines'
 
 const SESSION_ICONS = { fresh: Eraser, restarted: RotateCw, continued: ArrowRightLeft }
 
-/** A note from Seti: memory, a restart, Seti control, a timeout, a refused host, a failure. */
+/** A note from Seti: memory, restart, Seti control, timeout, refused host, edit or failure. */
 export function SetiNote({ taskId, payload }: { taskId: string; payload: SetiPayload }) {
+  if (payload.edited !== undefined) {
+    return <EditedLine fields={payload.edited.fields} denied={payload.edited.denied} />
+  }
   if (payload.refused_host !== undefined) {
     return <RefusedHostLine taskId={taskId} host={payload.refused_host} count={payload.refused_count ?? 1} />
   }

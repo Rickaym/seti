@@ -19,6 +19,7 @@ import { nodeLink } from './node-link.js'
 import { bashGuard, guardRefuses } from './permission-guard.js'
 import { ASK_TIMEOUT_S, asRecord, repeatHooks } from './repeat-hooks.js'
 import { folderConfigHook } from './runtimes/claude/config-hook.js'
+import { editNoteHooks } from './runtimes/claude/edit-note-hooks.js'
 import type { DefaultHost, DefaultShapes } from './runtimes/registry.js'
 import { sandboxHooks } from './sandbox.js'
 import { guardScope } from './session-options.js'
@@ -37,12 +38,18 @@ const compactHook = (instructions: () => Promise<string | null>): HookCallbackMa
   ],
 })
 
-/** Decides each tool call the runtime would ask about by asking the control plane. */
+type EditNotes = ReturnType<typeof editNoteHooks>
+
+/**
+ * Decides each tool call the runtime would ask about by asking the control plane, and keeps its
+ * note of the user's edits for the agent once the call has run.
+ */
 const decideByAsking =
-  (taskId: string, session: AbortSignal): CanUseTool =>
+  (taskId: string, session: AbortSignal, edits: EditNotes): CanUseTool =>
   async (tool, input, { signal, ...options }) => {
     const both = AbortSignal.any([signal, session])
-    const { result } = await nodeLink.ask(taskId, 'permission.ask', { tool, input, options }, both)
+    const { result, context } = await nodeLink.ask(taskId, 'permission.ask', { tool, input, options }, both)
+    edits.keep(options.toolUseID, context)
     // The control plane answered with what canUseToolFor decided.
     return result as PermissionResult
   }
@@ -165,9 +172,11 @@ function withHooks(first: Hooks, second: Hooks): Hooks {
 export async function sessionHost(task: Task, sandboxed: boolean, session: AbortSignal): Promise<DefaultHost> {
   const { servers } = await nodeLink.ask(task.id, 'tools.list', {})
   const shadow = shadowHooks(task, sandboxed, session)
+  const edits = editNoteHooks()
+  const notes = { PostToolUse: edits.PostToolUse, PostToolUseFailure: edits.PostToolUseFailure }
   return {
-    decide: shadow.observe(decideByAsking(task.id, session)),
-    hooks: withHooks(sessionHooks(task, sandboxed, session), shadow.hooks),
+    decide: shadow.observe(decideByAsking(task.id, session, edits)),
+    hooks: withHooks(withHooks(sessionHooks(task, sandboxed, session), notes), shadow.hooks),
     toolServers: Object.fromEntries(servers.map((server) => [server.name, hostedServer(task.id, server)])),
   }
 }

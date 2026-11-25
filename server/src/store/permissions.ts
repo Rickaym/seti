@@ -22,9 +22,13 @@ export type NewPermissionRequest = Pick<
   timeout_minutes: number
 }
 
-type RequestRecord = Omit<PermissionRequest, 'suggestions'> & { suggestions: string; input_hash: string | null }
+type RequestRecord = Omit<PermissionRequest, 'suggestions' | 'edited'> & {
+  suggestions: string
+  edited: string
+  input_hash: string | null
+}
 
-function readSuggestions(text: string): string[] {
+function readStrings(text: string): string[] {
   try {
     const parsed: unknown = JSON.parse(text)
     return Array.isArray(parsed) ? parsed.filter((item) => typeof item === 'string') : []
@@ -35,7 +39,8 @@ function readSuggestions(text: string): string[] {
 
 const toRequest = ({ input_hash: _hash, ...row }: RequestRecord): PermissionRequest => ({
   ...row,
-  suggestions: readSuggestions(row.suggestions),
+  suggestions: readStrings(row.suggestions),
+  edited: readStrings(row.edited),
 })
 
 const requests = (rows: readonly RequestRecord[]) => rows.map(toRequest)
@@ -97,11 +102,12 @@ export const permissionRequests = {
     id: string,
     state: Exclude<PermissionRequestState, 'pending'>,
     message: string | null,
-    input?: string,
+    answer: { input?: string; edited?: readonly string[] } = {},
   ): Promise<PermissionRequest | undefined> =>
     requests(
       await sql<RequestRecord[]>`UPDATE permission_request
-        SET state = ${state}, message = ${message}, decided_at = ${now()}, input = COALESCE(${input ?? null}, input)
+        SET state = ${state}, message = ${message}, decided_at = ${now()},
+          input = COALESCE(${answer.input ?? null}, input), edited = ${JSON.stringify(answer.edited ?? [])}
         WHERE id = ${id} AND state = 'pending' RETURNING *`,
     ).at(0),
   /** Denies a pending request whose time ran out by `at`; undefined when it was answered or retimed. */
