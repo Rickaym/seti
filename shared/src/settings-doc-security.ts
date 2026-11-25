@@ -183,12 +183,20 @@ const credential = documented(
     ),
     connections: z.array(z.string()),
     ssh_hosts: z.array(z.string()),
+    access: documented(
+      { items: keyedBy(z.boolean()), hosts: z.array(z.string()) },
+      {
+        items: 'On or off for its agents without their own choice, by kind:id such as mcp:github',
+        hosts: 'Hosts its agents reach beside the shared allowlist',
+      },
+    ),
   },
   {
     aws: 'The AWS role agents assume',
     github: 'Whether code-host tokens are set; tokens never appear here',
     connections: 'Connections it carries, by name',
-    ssh_hosts: 'SSH hosts it carries, by alias',
+    ssh_hosts: 'SSH hosts its access set turns on, by alias',
+    access: 'What its agents get unless they chose their own; an item not named follows the default',
   },
 )
 

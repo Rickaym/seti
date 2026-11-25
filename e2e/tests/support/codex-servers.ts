@@ -11,7 +11,7 @@ const server = (name: string, unusable: string | null): AccessItem => ({
   enabled: true,
   jump_for: [],
   missing_key: [],
-  in_set: false,
+  credential: null,
   session: null,
   unusable,
 })

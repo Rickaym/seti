@@ -1,7 +1,16 @@
 import path from 'node:path'
 import type { SdkPluginConfig } from '@anthropic-ai/claude-agent-sdk'
-import type { InstalledPlugin, PluginComponents, PluginListing, SetiPlugin, SetiPluginView } from '@seti/shared'
+import {
+  DEFAULT_PROFILE_ID,
+  type InstalledPlugin,
+  type PluginComponents,
+  type PluginListing,
+  type SetiPlugin,
+  type SetiPluginView,
+} from '@seti/shared'
 import { audit } from './audit.js'
+import { followedChoices } from './credential-access.js'
+import { tasks } from './db.js'
 import { refuseAgent } from './ea-guard.js'
 import { HttpError } from './http.js'
 import { cliErrorText, createPluginCli, type DetailsTarget, type PluginCli } from './plugin-cli.js'
@@ -24,9 +33,14 @@ export function sdkPlugins(plugins: readonly SetiPlugin[], choices: PluginChoice
 /** Plugins the capability probe loads, so Capabilities lists what a new task would get. */
 export const defaultPluginConfigs = async () => sdkPlugins(await setiPlugins.list(), {})
 
-/** Read on every turn, so changing a default or a choice applies to the next message. */
-export const taskPluginConfigs = async (taskId: string) =>
-  sdkPlugins(await setiPlugins.list(), await taskPluginChoices.get(taskId))
+/** Read on every turn, so a default, credential set or choice applies to the next message. */
+export async function taskPluginConfigs(taskId: string) {
+  const profileId = (await tasks.get(taskId))?.profile_id ?? DEFAULT_PROFILE_ID
+  return sdkPlugins(
+    await setiPlugins.list(),
+    await followedChoices(profileId, 'plugin', await taskPluginChoices.get(taskId)),
+  )
+}
 
 /** Names of the plugins a task loads and the ones on by default it left out, for the audit log. */
 export async function taskPluginNames(

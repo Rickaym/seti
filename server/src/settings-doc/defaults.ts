@@ -42,7 +42,8 @@ async function defaultCredential(): Promise<
   }
   const { role_arn, external_id, region, session_minutes } = AWS_SETTINGS_DEFAULT
   const aws = { role_arn, external_id, region, session_minutes }
-  return { [made.name]: { aws, github: { default: 'not set', owners: {} }, connections: [], ssh_hosts: [] } }
+  const access = { items: {}, hosts: [] }
+  return { [made.name]: { aws, github: { default: 'not set', owners: {} }, connections: [], ssh_hosts: [], access } }
 }
 
 /** What each setting is until someone changes it; lists of things people add start empty. */
