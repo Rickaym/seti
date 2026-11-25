@@ -830,14 +830,24 @@ interrupted only for that.
   each subscription's outcome. Failed routes retry with doubling backoff (`route_retry`).
 - CHN-33: Seti learns a Slack channel or person name only where Slack states it and no message
   author can write it: the author's own profile on a message event a Slack webhook delivers while a
-  thread switch is on, and the first line of a Slack MCP answer that reads a channel or a person's
-  profile by id, when that line names the same id. It never learns from message text, markup labels
-  or search results; a label inside a message may show in place where that message is shown. A newer
-  sighting replaces the name and when it was last seen. Where Seti shows a Slack id (a Slack event's
-  title and text, a thread reply, a Slack send's request summary, transcript row and audit summary)
-  it shows the name it knows, else the id and "name not known"; it never guesses. A name shown on a
-  permission request never comes from text a message author controls, and says when it was last
-  seen if that was over `slack_name_stale` ago. Audit details keep the ids.
+  thread switch is on, and the places the Slack MCP server's own format gives a name beside an id
+  in its answer to an agent's call: the first line of a channel read or a profile read for the id
+  asked for, the author line under a thread read's parent banner, each entry of a channel search
+  (name, creator, permalink), of the user's channel list (channels and the people of direct
+  messages), of a people search and of a channel's member list, and the channel a draft names. It
+  reads each entry's fields at their fixed places, takes nothing from an answer whose entry count
+  differs from the count it states or from an entry with two permalinks, and drops a person's name
+  that carries an id or markup. It never learns from a topic, purpose, title, message text, markup
+  label, message search or a call's own input; a label inside a message may show in place where
+  that message is shown. A newer sighting replaces the name and when it was last seen. Where Seti
+  shows a Slack id (a Slack event's title and text, a thread reply, a Slack send's request summary,
+  transcript row and audit summary) it shows the name it knows, else the id and "name not known";
+  it never guesses. A newly learned name replaces "name not known" at once in the summary of each
+  pending request and in every open transcript. A name shown on a permission request never comes
+  from text a message author controls, and says when it was last seen if that was over
+  `slack_name_stale` ago. A request for a Slack send to an id with no known name offers Look up,
+  which denies the send with a note that asks the agent to read that channel or person and send
+  again. Audit details keep the ids.
 - THR-1: A Slack message an agent sends, with an MCP `send_message` tool or `chat.postMessage`, is
   recorded when its successful result names the channel and ts (a Slack message link, or the Web
   API answer). Its thread is the link's or the call's `thread_ts`, else the message itself, and

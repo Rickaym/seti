@@ -103,12 +103,36 @@ export function publish(taskId: string, event: TaskEvent): void {
   void broadcast(`${CHANNEL}${taskId}`, JSON.stringify({ origin: ORIGIN, event } satisfies Relayed))
 }
 
+const OPEN_CHANNEL = 'open-tasks'
+
+/** Delivers to every task stream open in this process; no task listener hears it. */
+function emitToOpen(event: TaskEvent): void {
+  for (const taskId of bus.eventNames()) {
+    if (typeof taskId === 'string') {
+      seq += 1
+      bus.emit(taskId, event, seq)
+    }
+  }
+}
+
+/** Delivers to every open task stream, in this process and others, such as names Seti learned. */
+export function publishToOpenStreams(event: TaskEvent): void {
+  emitToOpen(event)
+  void broadcast(OPEN_CHANNEL, JSON.stringify({ origin: ORIGIN, event } satisfies Relayed))
+}
+
 /** Hands events that other processes publish to this process's streams. */
 export function relayTaskEvents(): void {
   listen(`${CHANNEL}*`, (channel, message) => {
     const relayed = JSON.parse(message) as Relayed
     if (relayed.origin !== ORIGIN) {
       emit(channel.slice(CHANNEL.length), relayed.event)
+    }
+  })
+  listen(OPEN_CHANNEL, (_channel, message) => {
+    const relayed = JSON.parse(message) as Relayed
+    if (relayed.origin !== ORIGIN) {
+      emitToOpen(relayed.event)
     }
   })
 }

@@ -11,12 +11,44 @@ export const SLACK_PROMPT = 'post the deploy note to Slack once I allow it'
 export const SLACK_CHANNEL = 'C0E2EDEPLOY'
 export const SLACK_POSTED = 'Posted the deploy note.'
 const SLACK_SEND = 'mcp__plugin_slack_slack__slack_send_message'
-/** A Slack channel Seti has never seen named; a prompt that names it posts there instead. */
+/** A Slack channel Seti has never seen named; a prompt that names a channel posts there instead. */
 export const SLACK_UNNAMED_CHANNEL = 'C0E2EUNNAMED'
+const CHANNEL_ID = /\bC0[A-Z0-9]{8,}\b/
 const slackInput = (prompt: string) => ({
-  channel_id: prompt.includes(SLACK_UNNAMED_CHANNEL) ? SLACK_UNNAMED_CHANNEL : SLACK_CHANNEL,
+  channel_id: CHANNEL_ID.exec(prompt)?.[0] ?? SLACK_CHANNEL,
   message: 'Deploy done',
 })
+/** Asks for a channel search whose answer names the channel id in the prompt `as #name`. */
+export const SLACK_LOOKUP_PROMPT = 'look up the Slack channel'
+const SLACK_SEARCH = 'mcp__plugin_slack_slack__slack_search_channels'
+const lookUpInput = (prompt: string) => ({
+  query: `${/ as #(\S+)/.exec(prompt)?.[1] ?? ''} ${slackInput(prompt).channel_id}`,
+})
+
+/** Answers a channel search as the Slack MCP server does; no permission is asked. */
+async function searchChannels(
+  _canUseTool: CanUseTool | undefined,
+  _toolUseId: string,
+  input: Record<string, unknown>,
+): Promise<{ result: string; reply: string }> {
+  const [name = '', id = ''] = String(input.query).split(' ')
+  const results = [
+    `# Search Results for: ${name}`,
+    '',
+    '## Channels (1 results)',
+    '### Result 1 of 1',
+    `Name: #${name}`,
+    'Creator: Dana Reyes (<@U0E2EDANA01>)',
+    'Created: 2025-01-15 09:30:00 +0000',
+    `Permalink: [link](https://acme.slack.com/archives/${id})`,
+    'Is Archived: false',
+    'Channel Type: public_channel',
+  ].join('\n')
+  return Promise.resolve({
+    result: JSON.stringify({ results, pagination_info: 'End of results.' }),
+    reply: 'Found it.',
+  })
+}
 
 /** What Seti answers a tool call with, as far as the stand-in reads it. */
 interface PermissionAnswer {
@@ -121,6 +153,7 @@ const DEPLOY: Ask = { prompt: PERMISSION_PROMPT, tool: 'Bash', input: () => PERM
 const asks: Ask[] = [
   { prompt: PLAN_APPROVAL_PROMPT, tool: 'ExitPlanMode', input: () => ({ plan: PLAN_TEXT }), run: askToStart },
   { prompt: SLACK_PROMPT, tool: SLACK_SEND, input: slackInput, run: askToPost },
+  { prompt: SLACK_LOOKUP_PROMPT, tool: SLACK_SEARCH, input: lookUpInput, run: searchChannels },
 ]
 
 /**

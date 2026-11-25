@@ -3,7 +3,13 @@ import type { APIRequestContext, Page } from '@playwright/test'
 import type { ChannelSecret, Envelope, Task } from '@seti/shared'
 import { openSeedDb } from './db.js'
 import { EA_HEADERS } from './env.js'
-import { SLACK_CHANNEL, SLACK_POSTED, SLACK_PROMPT, SLACK_UNNAMED_CHANNEL } from './fake-permission.js'
+import {
+  SLACK_CHANNEL,
+  SLACK_LOOKUP_PROMPT,
+  SLACK_POSTED,
+  SLACK_PROMPT,
+  SLACK_UNNAMED_CHANNEL,
+} from './fake-permission.js'
 import { apiData, expect, unique } from './fixtures.js'
 import { shot } from './thread-replies.js'
 
@@ -25,15 +31,21 @@ async function seedSlackNames(names: Record<string, string>): Promise<void> {
   await db.close()
 }
 
-/** An agent that asks to post the deploy note to #deploys, or to a channel Seti never saw named. */
-export async function startSlackPoster(request: APIRequestContext, named: boolean): Promise<string> {
-  await seedSlackNames({ [SLACK_CHANNEL]: 'deploys' })
-  const prompt = named ? `Please ${SLACK_PROMPT}` : `Please ${SLACK_PROMPT}, in ${SLACK_UNNAMED_CHANNEL}`
-  const response = await request.post('/api/tasks', {
-    data: { title: unique('Slack poster'), prompt, sandbox: false },
-  })
+async function startAgent(request: APIRequestContext, title: string, prompt: string): Promise<string> {
+  const response = await request.post('/api/tasks', { data: { title: unique(title), prompt, sandbox: false } })
   expect(response.ok(), 'POST /api/tasks').toBe(true)
-  const { id } = ((await response.json()) as Envelope<Task>).data
+  return ((await response.json()) as Envelope<Task>).data.id
+}
+
+/** An agent that asks to post the deploy note to #deploys, or to a channel Seti never saw named. */
+export async function startSlackPoster(
+  request: APIRequestContext,
+  named: boolean,
+  channel = SLACK_UNNAMED_CHANNEL,
+): Promise<string> {
+  await seedSlackNames({ [SLACK_CHANNEL]: 'deploys' })
+  const where = named ? '' : `, in ${channel}`
+  const id = await startAgent(request, 'Slack poster', `Please ${SLACK_PROMPT}${where}`)
   await expect.poll(async () => (await apiData<Task>(request, `/tasks/${id}`)).blocked).not.toBeNull()
   return id
 }
@@ -48,6 +60,7 @@ export async function expectSendRequestAndRow(page: Page, id: string, tap: boole
   const main = page.getByRole('main')
   const card = main.getByRole('region', { name: /^Permission request for/ })
   await expect(card).toContainText(`${shown(named)}: Deploy done`)
+  await expect(card.getByRole('button', { name: 'Look up' })).toHaveCount(named ? 0 : 1)
   await card.scrollIntoViewIfNeeded()
   await shot(page, `slack-request-${named ? 'named' : 'unnamed'}`)
   const allow = card.getByRole('button', { name: 'Allow', exact: true })
@@ -57,6 +70,40 @@ export async function expectSendRequestAndRow(page: Page, id: string, tap: boole
     `${shown(named)}: Deploy done`,
   )
   await shot(page, `slack-send-row-${named ? 'named' : 'unnamed'}`)
+}
+
+/** A Slack channel id no other test uses, so Seti has never seen it named. */
+const freshChannel = () =>
+  `C0LK${randomUUID()
+    .replace(/[^0-9a-f]/g, '')
+    .slice(0, 8)
+    .toUpperCase()}`
+
+/**
+ * While a send to an unnamed channel waits, another agent's channel search states the name: the
+ * request and the transcript row show it without a reload, and Look up goes away.
+ */
+export async function expectNameArrivesLive(page: Page, request: APIRequestContext, tap: boolean): Promise<void> {
+  const channel = freshChannel()
+  const poster = await startSlackPoster(request, false, channel)
+  await page.goto(`/#agents/${poster}`)
+  const main = page.getByRole('main')
+  const card = main.getByRole('region', { name: /^Permission request for/ })
+  const unnamed = `Send to channel ${channel}, name not known: Deploy done`
+  await expect(card).toContainText(unnamed)
+  await expect(main.getByTestId('tool-summary').filter({ hasText: channel })).toHaveText(unnamed)
+  await expect(card.getByRole('button', { name: 'Look up' })).toBeVisible()
+  await startAgent(request, 'Slack lookup', `Please ${SLACK_LOOKUP_PROMPT} ${channel} as #releases`)
+  await expect(card).toContainText('Send to #releases: Deploy done')
+  await expect(main.getByTestId('tool-summary').filter({ hasText: '#releases' })).toHaveText(
+    'Send to #releases: Deploy done',
+  )
+  await expect(card.getByRole('button', { name: 'Look up' })).toHaveCount(0)
+  await card.scrollIntoViewIfNeeded()
+  await shot(page, 'slack-name-live')
+  const allow = card.getByRole('button', { name: 'Allow', exact: true })
+  await (tap ? allow.tap() : allow.click())
+  await expect(main.getByText(SLACK_POSTED, { exact: true })).toBeVisible()
 }
 
 /** A signed Slack app_mention to a new webhook that reports to the EA; the webhook's id. */

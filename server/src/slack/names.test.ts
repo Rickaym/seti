@@ -1,4 +1,4 @@
-import { slackDestination, slackPlace } from '@seti/shared'
+import { slackDestination, slackLookUpNote, slackPlace } from '@seti/shared'
 import { describe, expect, it } from 'vitest'
 import { idsIn, readableSlack } from './names.js'
 
@@ -40,5 +40,16 @@ describe('readableSlack', () => {
     expect(
       slackDestination('mcp__plugin_slack_slack__slack_read_channel', { channel_id: 'C0DEPLOY01' }, names),
     ).toBeNull()
+    const dm = new Map([['D0SAMLEE01', 'Sam Lee']])
+    expect(slackDestination(send, { channel_id: 'D0SAMLEE01', message: 'x' }, dm)).toBe('DM to Sam Lee')
+    expect(slackDestination(send, { channel_id: 'D0NOPE0001', message: 'x' }, dm)).toBe(
+      'Send to direct message D0NOPE0001, name not known',
+    )
+  })
+
+  it('tells the agent which read states the name it should look up', () => {
+    expect(slackLookUpNote('C0NOPE0001')).toContain('slack_read_channel with channel_id C0NOPE0001')
+    expect(slackLookUpNote('U0NOPE0001')).toContain('slack_read_user_profile with user_id U0NOPE0001')
+    expect(slackLookUpNote('D0NOPE0001')).toContain('slack_list_user_channels')
   })
 })

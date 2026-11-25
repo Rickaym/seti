@@ -18,6 +18,7 @@ import { toolLabel } from '@/lib/tool-label'
 import { cn } from '@/lib/utils'
 import { CallFields, EditButton, EditedNote } from '@/panels/tasks/CallFields'
 import { PermissionCountdown } from '@/panels/tasks/PermissionCountdown'
+import { SlackLookUp } from '@/panels/tasks/SlackLookUp'
 import { useCallFields } from '@/panels/tasks/use-call-fields'
 
 const isPlan = (request: PermissionRequest) => request.tool_name === 'ExitPlanMode'
@@ -89,6 +90,10 @@ function DenyButton({ codex, busy, onDeny }: { codex: boolean; busy: boolean; on
   return codex ? <Hint text={CODEX_DENY}>{button}</Hint> : button
 }
 
+/** The note a deny passes on; Codex tells its agent only that the user refused. */
+const denial = (decision: PermissionDecision, codex: boolean, message: string) =>
+  decision === 'deny' && !codex && message !== '' ? { message } : {}
+
 interface CardProps {
   request: PermissionRequest
   onAnswered: () => void
@@ -112,7 +117,7 @@ export function PermissionCard({ request, onAnswered, className }: CardProps) {
   const always = rules || repeat
   const alwaysHint = repeat ? REPEAT_ALWAYS : `Adds ${request.suggestions.join(', ')}`
 
-  const answer = async (decision: PermissionDecision) => {
+  const answer = async (decision: PermissionDecision, lookUp?: string) => {
     if (sending.current) {
       return
     }
@@ -121,7 +126,7 @@ export function PermissionCard({ request, onAnswered, className }: CardProps) {
     const body: AnswerPermissionInput = {
       decision,
       scope: everyAgent ? 'global' : 'agent',
-      ...(decision === 'deny' && !codex && note.trim() !== '' ? { message: note.trim() } : {}),
+      ...denial(decision, codex, lookUp ?? note.trim()),
       ...(edited.length > 0 ? { fields: fields.changed } : {}),
     }
     try {
@@ -177,6 +182,13 @@ export function PermissionCard({ request, onAnswered, className }: CardProps) {
               </Button>
             )}
             <DenyButton codex={codex} busy={busy} onDeny={() => void answer('deny')} />
+            <SlackLookUp
+              request={request}
+              busy={busy}
+              noted={!codex}
+              className={ACTION}
+              onLookUp={(lookUp) => void answer('deny', lookUp)}
+            />
             <EditButton
               editable={request.editable}
               editing={editing}

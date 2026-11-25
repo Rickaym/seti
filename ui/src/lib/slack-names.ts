@@ -33,6 +33,11 @@ function flush(): void {
     })
 }
 
+/** Names Seti just learned, as the task stream reports them; rows on screen show them at once. */
+export function learnedSlackNames(found: SlackNames): void {
+  settle(Object.keys(found), found)
+}
+
 const subscribe = (listener: () => void) => {
   listeners.add(listener)
   return () => {
@@ -41,7 +46,7 @@ const subscribe = (listener: () => void) => {
 }
 
 /** The names Seti knows of these Slack ids; an id stays out of the map until its name is known. */
-function useSlackNames(ids: readonly string[]): ReadonlyMap<string, string> {
+export function useSlackNames(ids: readonly string[]): ReadonlyMap<string, string> {
   const key = ids.join(',')
   useEffect(() => {
     const missing = key.split(',').filter((id) => id !== '' && !known.has(id))

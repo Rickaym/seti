@@ -1,7 +1,7 @@
 import { test } from './support/fixtures.js'
 import { expectFitsPhone } from './support/phone-layout.js'
 import { FAKE_CLAUDE_ENV } from './support/processes.js'
-import { expectSendRequestAndRow, startSlackPoster } from './support/slack-names.js'
+import { expectNameArrivesLive, expectSendRequestAndRow, startSlackPoster } from './support/slack-names.js'
 
 test.use({ serverEnv: FAKE_CLAUDE_ENV })
 
@@ -14,3 +14,8 @@ for (const named of [true, false]) {
     await expectFitsPhone(page, 'a Slack send in the transcript')
   })
 }
+
+test('a Slack name an agent learns shows on the waiting request at once on a phone', async ({ page, request }) => {
+  await expectNameArrivesLive(page, request, true)
+  await expectFitsPhone(page, 'a Slack send named while it waited')
+})
