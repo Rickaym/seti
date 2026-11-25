@@ -96,7 +96,7 @@ export function SkillGroups({ groups, forceOpen }: { groups: CommandGroup[]; for
 
 export function SubagentList({ agents }: { agents: SubagentInfo[] }) {
   if (agents.length === 0) {
-    return <EmptyRow>No matching subagents.</EmptyRow>
+    return <EmptyRow>No subagents.</EmptyRow>
   }
   return (
     <ul>
@@ -115,7 +115,7 @@ export function SubagentList({ agents }: { agents: SubagentInfo[] }) {
 
 export function ModelList({ models }: { models: ModelEntry[] }) {
   if (models.length === 0) {
-    return <EmptyRow>No matching models.</EmptyRow>
+    return <EmptyRow>No models.</EmptyRow>
   }
   return (
     <ul>
