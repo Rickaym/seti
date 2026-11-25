@@ -13,7 +13,7 @@ test("a phone shows what a Codex agent's runtime lacks in its settings and acces
   await expect(access.getByText('Sandboxed')).toBeVisible()
   await expectFitsPhone(page, "a Codex agent's access section")
   const session = await showSection(dialog, 'Session')
-  await expect(session.getByText('Not on Codex')).toBeVisible()
+  await expect(session.getByText('Partly on Codex')).toBeVisible()
   await showSection(dialog, 'Access')
   await access.getByRole('button', { name: 'Edit access' }).tap()
   const edit = page.getByRole('dialog', { name: /Access of/ })
