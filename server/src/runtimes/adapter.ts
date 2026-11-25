@@ -1,4 +1,4 @@
-import type { RuntimeEvent, ToolCall } from '@seti/shared'
+import type { McpTransport, RuntimeEvent, ToolCall } from '@seti/shared'
 import type { z } from 'zod'
 import type { Launcher } from '../launcher.js'
 import type { SessionSpec } from '../session-spec.js'
@@ -151,12 +151,21 @@ export interface Capabilities {
   dream: DreamSupport | null
   /** Answers one question with no tools, as a second opinion asks it. */
   oneShot: OneShot
-  /** It loads the user's own tool servers and connectors, and Seti's plugins, beside Seti's tools. */
-  tools: { userServers: boolean; plugins: boolean }
+  /**
+   * Transports of the user's own tool servers it loads, the server names it can take and that
+   * rule in words (null for any name), and Seti's plugins, beside Seti's tools.
+   */
+  tools: {
+    userServers: readonly McpTransport['type'][]
+    serverNames: { pattern: RegExp; rule: string } | null
+    plugins: boolean
+  }
   /** It can run outside Seti's sandbox. */
   sandbox: { optional: boolean }
   /** It takes a rule for when to compact its context. */
   compaction: boolean
+  /** The agent can hand work to subagents of its own that run in the background. */
+  subagents: boolean
 }
 
 /**

@@ -1,8 +1,10 @@
 import type { ChildProcess } from 'node:child_process'
 import type { ToolCall } from '@seti/shared'
 import { z } from 'zod'
+import type { CodexToolServer } from '../../codex-tool-servers.js'
 import type { Launcher } from '../../launcher.js'
 import type { StdioServer } from '../../tool-relay.js'
+import type { UserSkill } from '../../user-skills.js'
 import type { InputContent, RuntimeSession, SessionInput, SessionReport } from '../adapter.js'
 import type { CodexDecide } from './approvals.js'
 import { Asks } from './asks.js'
@@ -11,13 +13,18 @@ import { OpenCalls } from './open-calls.js'
 import { OPTED_OUT } from './private.js'
 import { codexReport, ReportQueue } from './reports.js'
 import { CodexRpc, RpcError, type CodexCall } from './rpc.js'
+import { ServerStatus } from './server-status.js'
 
-/** What a Codex agent's spec carries for Codex alone: the program, and the model and effort. */
+/** What a Codex agent's spec carries for Codex alone: program, model, effort, skills, servers. */
 interface CodexVendor {
   binary: string
   /** Null for the runtime's default model. */
   model: string | null
   effort: string | null
+  /** The user's own skills, which Seti lists for the agent itself; Codex's skill list stays off. */
+  skills: readonly UserSkill[]
+  /** The user's MCP servers the agent starts with, without a value. */
+  servers: readonly CodexToolServer[]
 }
 
 /** Codex's shapes: a neutral decision, a JSON-RPC process, stdio tool servers, no hooks or modes. */
@@ -70,6 +77,7 @@ function codexInput(content: InputContent) {
 /** Drives one Codex app-server process over its stdio. */
 class Driver {
   readonly reports = new ReportQueue()
+  readonly servers: ServerStatus
   private root = ''
   private turn: string | null = null
   private starting: Promise<string> | null = null
@@ -91,6 +99,7 @@ class Driver {
   constructor(child: ChildProcess, realised: CodexRealised) {
     this.child = child
     this.realised = realised
+    this.servers = new ServerStatus(realised.args)
     this.rpc = new CodexRpc(child)
     this.background = new Background(this.rpc, () => this.root)
     this.asks = new Asks({
@@ -280,6 +289,7 @@ class Driver {
       this.resumed = null
     }
     const job = this.background.note(message)
+    this.servers.note(message)
     this.openCalls.note(message)
     if (message.method === 'turn/completed') {
       const listed = await this.background.listed().catch(() => null)
@@ -378,6 +388,7 @@ export function codexSession(
     events: driver.events(inputs),
     interrupt: async () => driver.interrupt(),
     stopBackground: async (jobId) => driver.stopBackground(jobId),
+    toolServers: async () => Promise.resolve(driver.servers.list()),
     close: () => {
       driver.close()
     },

@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import type { StoredRuntime } from './runtimes/stored.js'
 
 export const MCP_STATUSES = ['connected', 'needs-auth', 'failed', 'pending', 'disabled'] as const
 export type McpStatus = (typeof MCP_STATUSES)[number]
@@ -19,8 +20,10 @@ export interface McpTool {
 }
 
 /** Transport kind plus a URL (origin and path only) or a command name; never env, headers or args. */
+export const MCP_TRANSPORTS = ['stdio', 'sse', 'http', 'sdk', 'claudeai-proxy'] as const
+
 export interface McpTransport {
-  type: 'stdio' | 'sse' | 'http' | 'sdk' | 'claudeai-proxy'
+  type: (typeof MCP_TRANSPORTS)[number]
   target: string | null
 }
 
@@ -36,6 +39,8 @@ export interface McpServer {
   error: string | null
   tools: McpTool[]
   sign_in: McpSignIn
+  /** The runtimes whose agents can use it; absent from a probe as stored or of unknown transport. */
+  runtimes?: StoredRuntime[]
 }
 
 export interface CommandInfo {

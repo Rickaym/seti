@@ -35,9 +35,10 @@ export const scriptedAdapter: RuntimeAdapter<ScriptedShapes, 'scripted'> = {
     gate: { rewriteInput: true, classifier: false },
     session: { fork: 'none' },
     rewind: { conversation: false, code: false },
-    tools: { userServers: false, plugins: false },
+    tools: { userServers: [], serverNames: null, plugins: false },
     sandbox: { optional: true },
     compaction: false,
+    subagents: true,
     dream: null,
     oneShot: {
       open: async (request, launcher, abortController) => {

@@ -58,7 +58,7 @@ between two steps; an interrupt; a hook at subagent start.
 - ENT-1: An agent MUST have: `id`, `title`, `cwd`, `sandbox`, `home_access`, `profile_id`,
   `seti_control`, `bypass_until`, `pr_urls`, `input_mode`, `session_id`, `status`, `model`,
   `cost_usd`, `last_error`, `archived_at`, `pinned`, `workspace_id`, `notifications_muted`,
-  `status_line`, `unseen`, `asking`, `closing_line`, `blocked`.
+  `status_line`, `unseen`, `asking`, `closing_line`, `blocked`, `delegated_by`.
 - ENT-2: Stored status. A turn start clears each; the turn end clears `running`.
 
 | Stored status | Set when                                                              |
@@ -99,7 +99,10 @@ between two steps; an interrupt; a hook at subagent start.
 - ENT-17: Workspace: `id`, `name` (at most 60, unique ignoring case), `position`, `created_at`. An
   agent started without one joins the first by position. The last workspace, and one holding any
   agent (archived included), MUST NOT be deleted.
-- ENT-23: A role is a context text, at most one per agent; peers see its first line.
+- ENT-23: A role is a context text, at most one per agent; peers see its first line. A role MAY
+  name a runtime and a model, built-in roles included; only the user sets them. A start MAY name
+  a role, which links it; its runtime and model apply where the start names neither, and while
+  that runtime cannot start an agent the start runs on the default and its setup says why.
 
 ### 3.3 Requests
 
@@ -186,11 +189,12 @@ between two steps; an interrupt; a hook at subagent start.
   removed, as is every copy once the runtime is off or runs a program of the user's. Nothing
   outside the control room's own folders is removed.
 - RT-13: A runtime declares whether it loads the user's MCP servers and connectors, Seti's
-  plugins and a compaction rule, whether it can run outside the sandbox, fork a side chat, dream
-  and rewind; `GET /api/runtimes/capabilities` serves each runtime's declaration. For an agent
+  plugins and a compaction rule, whether it can run outside the sandbox, fork a side chat, dream,
+  rewind and run background subagents of its own; `GET /api/runtimes/capabilities` serves each runtime's declaration. For an agent
   whose runtime lacks one, its settings show the control as not on that runtime instead of a
   working control, counts leave those items out, its `task.md` and system prompt do not offer
-  them, and the server refuses the change with the reason.
+  them, and the server refuses the change with the reason. An agent whose runtime has no
+  subagents is pointed to helper agents instead, in the Seti guide and the Lead role.
 - RT-14: A runtime whose model can summarise its reasoning MUST ask for the summary, so its agents
   show their thinking as the default runtime's do. Reasoning the model seals for its own next call
   MUST NOT be stored, served or shown by the control room.
@@ -203,6 +207,17 @@ between two steps; an interrupt; a hook at subagent start.
   room's own instructions: in the conversation as project instructions, never in the system or
   developer instructions. A runtime folder the agent can write MUST NOT carry instructions into a
   later session.
+- KIT-2: The user's own skills reach an agent read-only on every runtime that takes them. A
+  runtime that would offer skills from a folder the agent can write (its home, its runtime's
+  folder or its working folder) MUST NOT offer them; the control room lists the user's skills in
+  its own instructions instead, and the runtime's own skills folder starts empty in each process.
+- KIT-3: The user's tool servers reach an agent on every runtime that takes their transport, with
+  the filter a sandboxed agent's servers pass: no value of their own, or a remote server the egress
+  proxy signs on its host. A local server runs inside the agent's sandbox, never in the control
+  room. Every call to a user's tool server MUST pass the control room's gate whatever the tool or
+  the runtime says of it; where rules decide, a call runs unasked only when a rule of the user's
+  names its server or tool. A server definition the agent writes MUST NOT load. A server the
+  agent's runtime cannot use MUST show in the agent's access with the reason, and never count as on.
 
 ## 4. Turn lifecycle
 
@@ -283,6 +298,7 @@ between two steps; an interrupt; a hook at subagent start.
 <seti-answer request_id="ID" outcome="allowed|denied|expired">...</seti-answer>
 <workspace-edit file="F">...</workspace-edit>
 <second-opinion runtime="R" model="M" seconds="S" cost_usd="C" estimated="true|false">...</second-opinion>
+<handover-brief from="TITLE" runtime="R" task_id="ID">...</handover-brief>
 ```
 
 ## 6. Attention
@@ -840,6 +856,28 @@ Why: an agent woken by its own actions or by news nobody waited for burns turns 
 - LVL-15: Agents at `self` or `full` propose knowledge notes, at most `notes_waiting` each, refused
   with credentials or private paths. Only a bounded index of approved titles reaches prompts,
   framed as reference, not instructions. Notes go stale by `note_stale`.
+- DLG-1: An agent's `start_task` MAY name `wait_minutes`, at most `delegate_wait`. The call MUST
+  return the helper's first turn end framed as an `agent-turn` update with a preface that it is
+  data, and that end MUST NOT also arrive as an update. At the limit, or when the call is
+  cancelled, it MUST say the helper still runs and the wait MUST become an ordinary one (TURN-19),
+  so the end arrives as an update; across a restart the same holds. No result is lost.
+- DLG-2: An agent another agent starts (`start_task`, `work_on_pr`) MUST record that agent as
+  `delegated_by`, and the audit of its creation MUST name it; one the user or the EA starts
+  records none. While both are listed, the agent list MUST show it on one line right under its
+  caller, marked as started by it, and the Home graph MUST link the two; while it needs the user
+  it sits in Needs you on its own (ATT-1), never its caller. An agent another agent started MUST
+  NOT start agents. A start by an agent MUST be refused while it has `delegates_running` running
+  helpers, while `delegates_install` run on the install, and once the helpers it started in the
+  last 24 hours have cost `delegate_budget` by the cost their turns recorded. Starts made at once
+  MUST count each other. Only the user MAY delete an agent another agent started, so its cost
+  keeps counting.
+- DLG-6: While a caller waits in its call (DLG-1), its status line MUST read `Waiting on` and
+  the helper's title, and MUST return to what it was when the wait ends.
+- DLG-4: A start MAY ask for a brief of an agent's work (`include_brief` for the caller's own,
+  `brief_of` for the user and the EA). The brief MUST be built from neutral events only, so it
+  reads the same for every runtime, redacted, at most `brief_chars`, with every direct message
+  hidden (CHAT-6), and MUST follow the prompt in a `<handover-brief>` tag (UPD-13) with a preface
+  that it is data.
 - DLG-5: An agent at `self` or `full` MAY ask a model on another runtime one question, with text
   and up to `opinion_files` of its own files read under the file hand-off rules. The answering
   model MUST be offered no tool and refuse any call unasked, run in a sandbox of its own that
@@ -1101,6 +1139,11 @@ Optional and off by default: a maintenance session per agent that consolidates i
 - CFG-4: The control room MUST serve every setting's default in the shape of the document, and
   MUST show which settings differ from their default; the document filtered to those differences
   is a merge patch that turns the defaults into the document.
+- CFG-5: A write of the document MUST be a JSON merge patch that applies whole or not at all: it
+  names each invalid path, is refused whole when it names a security setting or a secret, refuses
+  a path whose value changed since the client read it, needs each change with a consequence
+  confirmed, records the audit events the settings pages record and one revision that undoes it,
+  and MUST be refused for the EA, agents, mods and devices.
 
 ## 17. Mods
 
@@ -1132,6 +1175,11 @@ Optional and off by default: a maintenance session per agent that consolidates i
 - MOD-23: Third-party mods MAY contribute settings, commands, slash commands, webhook senders,
   views, file viewers, status items, notification kinds, context text, themes, audit kinds,
   schedules and agent events (type, agent id and time only); all else is bundled only.
+- MOD-25: A mod's command that takes an agent, and its view beside or over one agent, MAY name
+  runtime capabilities it needs (RT-13). On an agent whose runtime's adapter does not declare one,
+  the control room MUST NOT offer the command or show the view there, its slash command says it is
+  not on that runtime, and the server refuses the command for that agent (409) to the user, the EA
+  and agents alike.
 
 ## 18. Public surfaces
 
@@ -1296,6 +1344,8 @@ others.
 | Client       | `sse_keepalive` 15 s. `body_max` 8 MB. `session_life` idle 7 days, absolute 30 days. Setup code 15 min. Attempts per 10 min: 20 sign-in, 20 setup, 10 pairing. `pair_ttl` 5 min.                                                                                                                                                                                                       |
 | Uploads      | `upload_file` 25 MB. `upload_stall` 30 s. `upload_idle` 60 s. `upload_time` 30 min.                                                                                                                                                                                                                                                                                                    |
 | Opinions     | `opinion_sizes`: question 8,000, context 60,000, files 40,000 in all, answer 8,000 characters. `opinion_files` 5. `opinion_rate` 1 at a time, 20 an hour, 60 a day an agent. Time 5 min. 4,000 output tokens. $1 a call.                                                                                                                                                               |
+| Briefs       | `brief_chars` 12,000. Built from the first 20 and the newest 1,200 transcript rows.                                                                                                                                                                                                                                                                                                    |
+| Delegates    | `delegate_wait` 60 min. `delegates_running` 4 a caller. `delegates_install` 12. `delegate_budget` $10 a caller in 24 hours. Depth 1.                                                                                                                                                                                                                                                   |
 | Dreams       | Window 01:00 to 05:00. `dream_gap` 2 min. `dream_retry` 10 min. `dream_steps` 60. `dream_time` 20 min. `dream_budget` $1. Night budget $5. `dream_gates`: five-hour use 60%, weekly 85%, load 0.75 x cores, 5 GB free. `dream_digest` 40,000 characters. Memory folder 512 KB, 100 files. `dream_proposals` 10. `proposal_expiry` 7 days. `trash_keep` 14 days. `trash_item_max` 5 GB. |
 
 ## Appendix B. Retired identifiers

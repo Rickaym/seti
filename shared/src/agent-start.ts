@@ -21,6 +21,10 @@ export const startAgentInput = z.object({
   /** Tells the agent or EA that starts it when its first turn ends, as an update. */
   notify_when_done: z.boolean().default(false),
   client_id: clientSendId,
+  /** An agent whose work the new one carries on or helps with; a brief of it follows the prompt. */
+  brief_of: z.string().trim().min(1).max(64).optional(),
+  /** A role pack by name; its runtime and model apply where the start names neither. */
+  role: z.string().trim().min(1).max(80).optional(),
   /** The runtime the agent runs on, Codex only while the user turned it on, and its model. */
   ...runtimeFields,
 })

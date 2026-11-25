@@ -1,6 +1,6 @@
 import { normalizeAgentColor, type TaskDisplayStatus, type TaskListEntry } from '@seti/shared'
 import { describe, expect, it } from 'vitest'
-import { filterAgents, groupAgents, nextUnseen, type AgentRow } from './agent-list'
+import { filterAgents, groupAgents, nestDelegates, nextUnseen, type AgentRow } from './agent-list'
 
 function row(id: string, status: TaskDisplayStatus, extra: Partial<TaskListEntry> = {}): AgentRow {
   const task = {
@@ -12,6 +12,7 @@ function row(id: string, status: TaskDisplayStatus, extra: Partial<TaskListEntry
     color: null,
     unseen: true,
     updated_at: '2026-10-02T12:00:00Z',
+    delegated_by: null,
     ...extra,
   } as unknown as TaskListEntry
   return { task, running: 0, status }
@@ -75,6 +76,31 @@ describe('filterAgents', () => {
   it('keeps everything for a blank query and nothing for a miss', () => {
     expect(ids(filterAgents(rows, '  '))).toEqual(['a', 'b', 'c'])
     expect(filterAgents(rows, 'database')).toEqual([])
+  })
+})
+
+describe('nestDelegates', () => {
+  it('puts each helper right under its caller and names the caller', () => {
+    const rows = [
+      row('helper-b', 'running', { delegated_by: 'lead' }),
+      row('other', 'idle'),
+      row('lead', 'running'),
+      row('helper-a', 'idle', { delegated_by: 'lead' }),
+    ]
+    const nested = nestDelegates(rows)
+    expect(ids(nested)).toEqual(['other', 'lead', 'helper-b', 'helper-a'])
+    expect(nested.map((r) => r.under)).toEqual([null, null, 'Agent lead', 'Agent lead'])
+  })
+
+  it('keeps a helper at the top level when its caller is not listed', () => {
+    const nested = nestDelegates([row('helper', 'idle', { delegated_by: 'archived' }), row('other', 'idle')])
+    expect(ids(nested)).toEqual(['helper', 'other'])
+    expect(nested.map((r) => r.under)).toEqual([null, null])
+  })
+
+  it('lists every row once even when callers point at each other', () => {
+    const nested = nestDelegates([row('a', 'idle', { delegated_by: 'b' }), row('b', 'idle', { delegated_by: 'a' })])
+    expect(ids(nested).toSorted((a, b) => a.localeCompare(b))).toEqual(['a', 'b'])
   })
 })
 

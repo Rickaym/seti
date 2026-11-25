@@ -2,6 +2,7 @@ import { scheduleIssue, type DreamSettings, type DreamSettingsInput, type Task }
 import { audit } from '../audit.js'
 import { refuseAgent, refuseAtSelf, refuseOnSelf } from '../ea-guard.js'
 import { HttpError } from '../http.js'
+import { DIRECT, type SettingsWrite } from '../settings-write.js'
 import { dreamOptOuts, dreamSettings } from '../store/dream-nights.js'
 import { workspaceRows } from '../store/workspaces.js'
 
@@ -37,7 +38,10 @@ function merged(current: DreamSettings, input: DreamSettingsInput): DreamSetting
  * Changes Dreaming's settings as the user, or as the EA after the user's yes, audited with what
  * changed. Agents and mods are refused: the settings hold the caps every dream runs under.
  */
-export async function updateDreamSettings(input: DreamSettingsInput): Promise<DreamSettings> {
+export async function updateDreamSettings(
+  input: DreamSettingsInput,
+  write: SettingsWrite = DIRECT,
+): Promise<DreamSettings> {
   refuseAgent('change Dreaming settings')
   const current = await dreamSettings.get()
   const next = merged(current, input)
@@ -45,23 +49,25 @@ export async function updateDreamSettings(input: DreamSettingsInput): Promise<Dr
   if (changed.length === 0) {
     return current
   }
-  await dreamSettings.set(next)
+  await dreamSettings.set(next, write.db)
   const turned = `Turned Dreaming ${next.enabled ? 'on' : 'off'}`
-  await audit.record({
-    actor: 'user',
-    kind: 'dream.settings_changed',
-    subject_type: 'system',
-    summary: changed.includes('enabled') ? turned : `Changed Dreaming: ${changed.join(', ')}`,
-    detail: {
-      changed,
-      ...Object.fromEntries(
-        changed.flatMap((key) => [
-          [key, next[key]],
-          [`${key}_was`, current[key]],
-        ]),
-      ),
-    },
-  })
+  await write.after(async () =>
+    audit.record({
+      actor: 'user',
+      kind: 'dream.settings_changed',
+      subject_type: 'system',
+      summary: changed.includes('enabled') ? turned : `Changed Dreaming: ${changed.join(', ')}`,
+      detail: {
+        changed,
+        ...Object.fromEntries(
+          changed.flatMap((key) => [
+            [key, next[key]],
+            [`${key}_was`, current[key]],
+          ]),
+        ),
+      },
+    }),
+  )
   return next
 }
 

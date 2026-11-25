@@ -105,6 +105,7 @@ const asItem = (pack: ContextPack, linked: readonly ContextPackSummary[]): Acces
   missing_key: [],
   in_set: false,
   session: null,
+  unusable: null,
 })
 
 /** Links reference packs to the EA or unlinks them, with the agents' pack switches. */

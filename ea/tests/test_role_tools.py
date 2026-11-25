@@ -122,3 +122,20 @@ async def test_get_task_shows_the_role_pack(tools: EaTools) -> None:
     await confirm(tools, "set_agent_role", {"task": "logout", "role": "Lead"})
     text = (await tools.call("get_task", {"task": "logout"})).text
     assert "Role: the role pack Lead, in its system prompt; get_context_pack reads it." in text
+
+
+async def test_a_role_runs_on_a_runtime_after_a_yes(tools: EaTools, fake_seti: FakeSeti) -> None:
+    args = {"pack": "Lead", "runtime": "codex", "model": "gpt-5.5"}
+    asked, done = await confirm(tools, "update_context_pack", args)
+    assert "runs agents in it on codex with gpt-5.5" in asked.text
+    assert done.ok
+    assert fake_seti.writes() == [
+        ("PUT", f"/api/context/packs/{LEAD}/runtime", {}, {"runtime": "codex", "model": "gpt-5.5"})
+    ]
+    reference = await tools.call("update_context_pack", {"pack": "Seti guide", "runtime": "codex"})
+    assert not reference.ok
+
+
+async def test_start_task_names_a_role(tools: EaTools, fake_seti: FakeSeti) -> None:
+    await tools.call("start_task", {"prompt": "Review PR 12", "role": "Reviewer"})
+    assert fake_seti.writes()[-1][3] == {"prompt": "Review PR 12", "role": "Reviewer"}
