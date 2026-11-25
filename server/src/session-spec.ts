@@ -14,6 +14,7 @@ import type { PermissionSettings } from './permission-policy.js'
 import { taskPluginConfigs } from './plugins.js'
 import { proxyGrant } from './proxy-grant.js'
 import type { RuntimeId } from './runtimes/adapter.js'
+import { folderSettingsOf, holdsNothing, type FolderSettings } from './runtimes/claude/folder-settings.js'
 import type { CodexShapes } from './runtimes/codex/session.js'
 import type { DefaultShapes } from './runtimes/registry.js'
 import { signedInServers } from './sandbox-mcp.js'
@@ -48,6 +49,8 @@ export interface SessionSpec<Id extends string = RuntimeId> {
   }
   setiControl: Task['seti_control']
   compaction: CompactRule
+  /** How the agent's folder settings load where an agent's session could have written some. */
+  folderSettings: FolderSettings
   /** Seti's nightly dreams tidy this agent's memory, so the runtime's own consolidation stays off. */
   setiDreams: boolean
   sandbox: Awaited<ReturnType<typeof sandboxStamp>>
@@ -71,6 +74,7 @@ async function liveSpec(task: Task) {
       tokens: sorted(tokenServers()),
     },
     compaction: await effectiveCompact(task.id),
+    folderSettings: await folderSettingsOf(task.cwd),
     account: hostLoginKey(),
     sandbox: await sandboxStamp(task),
   }
@@ -138,6 +142,7 @@ const setupOf = <Id extends RuntimeId>(spec: SessionSpec<Id>) => ({
   toolServers: spec.toolServers,
   setiControl: spec.setiControl,
   compaction: spec.compaction,
+  folderSettings: spec.folderSettings,
   account: spec.account,
   sandbox: spec.sandbox,
 })
@@ -195,6 +200,7 @@ function specKey(spec: SessionSpec): string {
     mcp_tokens: setup.toolServers.tokens,
     seti_control: setup.setiControl,
     compact: compactionKey(setup.compaction),
+    ...(holdsNothing(setup.folderSettings) ? {} : { folder_settings: setup.folderSettings }),
     claude_login: setup.account,
     sandbox: setup.sandbox,
   })

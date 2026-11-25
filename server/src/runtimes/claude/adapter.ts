@@ -1,9 +1,11 @@
 import { query, type Options, type Query, type SDKMessage } from '@anthropic-ai/claude-agent-sdk'
 import { MCP_TRANSPORTS, projectClaude } from '@seti/shared'
 import type { RuntimeAdapter, SessionInput } from '../adapter.js'
+import { oneInput } from '../one-shot.js'
 import { reportedCost } from './cost.js'
 import { claudeLoadedMemory, claudeMemory, dreamOptions } from './dream.js'
 import { claudePrompt } from './input.js'
+import { oneShotOptions } from './one-shot.js'
 import { realise } from './realise.js'
 import { rewoundOptions } from './resume.js'
 import { claudeSession, type ClaudeShapes } from './session.js'
@@ -29,6 +31,16 @@ export const claudeAdapter: RuntimeAdapter<ClaudeShapes, 'claude'> = {
         const options = dreamOptions(spec, launcher, host, abortController)
         return Promise.resolve(claudeSession(transport({ prompt: claudePrompt(once(spec.prompt)), options }), false))
       },
+      reportedCost,
+    },
+    oneShot: {
+      open: async (request, launcher, abortController) =>
+        Promise.resolve(
+          claudeSession(
+            queryClaude(oneShotOptions(request, launcher, abortController), oneInput(request.prompt)),
+            false,
+          ),
+        ),
       reportedCost,
     },
   },

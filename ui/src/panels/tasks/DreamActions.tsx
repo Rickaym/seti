@@ -36,6 +36,13 @@ function ReportList({ title, items }: { title: string; items: readonly string[] 
   )
 }
 
+/** What the dream cost and took, and the prompt wording it ran under, for tuning. */
+function dreamFooter(run: DreamRun): string {
+  const steps = `${String(run.steps)} ${run.steps === 1 ? 'step' : 'steps'}`
+  const prompt = run.prompt_version === null ? [] : [`prompt ${run.prompt_version}`]
+  return [`$${run.cost_usd.toFixed(2)}`, steps, ...prompt].join(', ')
+}
+
 function LastDream({
   run,
   changes,
@@ -66,6 +73,7 @@ function LastDream({
         <ReportList title="Asks" items={report?.asks ?? []} />
         <ReportList title="Found" items={report?.found ?? []} />
         {changes.length > 0 && <MemoryChanges changes={changes} onUndo={onUndo} />}
+        <p className={CONSEQUENCE}>{dreamFooter(run)}</p>
       </CollapsibleContent>
     </Collapsible>
   )

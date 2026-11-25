@@ -9,6 +9,7 @@ const REQUEST: OneShotRequest = {
   system: 'Answer briefly.',
   prompt: 'Why?',
   cwd: '/work/one-shot',
+  program: null,
   maxOutputTokens: 100,
   budgetUsd: 0.5,
 }
