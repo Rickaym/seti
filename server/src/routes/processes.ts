@@ -1,4 +1,4 @@
-import { shellParams, stopProcessInput, taskCpuCapInput, taskMemoryCapInput } from '@seti/shared'
+import { shellParams, type AgentOpinions, stopProcessInput, taskCpuCapInput, taskMemoryCapInput } from '@seti/shared'
 import { Hono } from 'hono'
 import { agentProcesses } from '../agent-processes.js'
 import { setTaskCpuCap, taskCpuCap } from '../cpu-cap.js'
@@ -28,9 +28,11 @@ export const taskProcessRoutes = new Hono()
     return ok(c, await stopShell(id, shell_id))
   })
   .get('/:id/memory', async (c) => ok(c, await taskMemoryCap((await requireTask(c.req.param('id'))).id)))
-  .get('/:id/second-opinions', async (c) =>
-    ok(c, { spend: await secondOpinions.spend((await requireTask(c.req.param('id'))).id) }),
-  )
+  .get('/:id/second-opinions', async (c) => {
+    const { id } = await requireTask(c.req.param('id'))
+    const opinions: AgentOpinions = { spend: await secondOpinions.spend(id), reviews: await secondOpinions.reviews(id) }
+    return ok(c, opinions)
+  })
   .put('/:id/memory', validJson(taskMemoryCapInput), async (c) => {
     const task = await requireTask(c.req.param('id'))
     return ok(c, await setTaskMemoryCap(task, c.req.valid('json').cap))
