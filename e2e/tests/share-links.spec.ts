@@ -64,12 +64,16 @@ test('shares a Markdown file from Files, and the link opens for anyone with its 
   await expect(again.getByRole('textbox', { name: 'Share link' })).toHaveCount(0)
 })
 
-test('an HTML file shows as source, and Revoke makes its link a 404', async ({ page, browser, request }) => {
+test("an HTML file's code view shows its source, and Revoke makes its link a 404", async ({
+  page,
+  browser,
+  request,
+}) => {
   const { id } = await seedShareAgent()
   const url = await shareByApi(request, id, 'page.html')
   const viewer = await stranger(browser)
   try {
-    await openShare(viewer.page, url)
+    await viewer.page.goto(`${url}/code`)
     await expect(viewer.page.locator('pre')).toContainText('<script>document.title = "ran"</script>')
     await expect(viewer.page.locator('script')).toHaveCount(0)
     await expect(viewer.page).toHaveTitle('page.html')

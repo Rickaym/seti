@@ -1,19 +1,12 @@
 import fs from 'node:fs'
 import path from 'node:path'
-import {
-  extraDirs,
-  type DreamProposalInput,
-  type DreamReport,
-  type DreamRun,
-  type RuntimeEvent,
-  type Task,
-} from '@seti/shared'
+import { type DreamProposalInput, type DreamReport, type DreamRun, type RuntimeEvent, type Task } from '@seti/shared'
+import { sharedMemory } from '../agent-memory.js'
 import { audit } from '../audit.js'
-import { CLAUDE_HOME, WORKTREE_ROOT } from '../config.js'
 import { launchPlan } from '../launch-plan.js'
 import { maintenanceLauncher } from '../launcher.js'
 import type { DreamSession, DreamSupport, SessionMessage } from '../runtimes/adapter.js'
-import { memoryDirs, projectSlug } from '../sandbox-mounts.js'
+import { projectSlug } from '../sandbox-mounts.js'
 import { isRunning, watchTurnStarts } from '../session-mirror.js'
 import { sandboxContext, workingDirs } from '../session-options.js'
 import { dreamRuns, type DreamEnd } from '../store/dreams.js'
@@ -224,19 +217,11 @@ async function follow(session: DreamSession, job: DreamJob, tally: Tally, turns:
   }
 }
 
-/** The checkouts' memory folders the agent's sessions also see, as its sandbox shows them. */
-function sharedMemory(task: Task, home: string): string[] {
-  const trust = { cwd: task.cwd, dirs: extraDirs(task), homeAccess: task.home_access, worktreeRoot: WORKTREE_ROOT }
-  return memoryDirs(trust)
-    .filter((dir) => fs.existsSync(path.join(CLAUDE_HOME, dir)))
-    .map((dir) => path.join(home, '.claude', dir))
-}
-
 /** Where the dream's folders are as its sandbox shows them, for the gate and the prompt. */
 function placesOf(job: DreamJob, night: string): DreamPlaces & { shared: string[] } {
   const home = sandboxContext().home
   const memory = path.join(home, '.claude', 'projects', projectSlug(job.task.cwd), 'memory')
-  const shared = sharedMemory(job.task, home)
+  const shared = sharedMemory(job.task)
   const work = [job.task.cwd, ...workingDirs(job.task)]
   return { cwd: job.task.cwd, home, readable: [...work, memory, ...shared], memory, night, shared }
 }
@@ -288,14 +273,6 @@ async function dreamSession(job: DreamJob, tally: Tally, night: string, turns: T
   await follow(session, job, tally, turns)
 }
 
-/** Seti's line for a dream that changed memory the agent's sessions do not load. */
-function unloaded(job: DreamJob, changes: number): string[] {
-  const loaded = job.dream.loaded?.(job.task.cwd) ?? job.memory
-  return changes > 0 && loaded !== job.memory
-    ? ["Seti: the agent's sessions load its repository's memory, not this folder, so they do not see these notes yet."]
-    : []
-}
-
 /**
  * Runs one dream to its end: writes the day's digest, runs the session in the agent's maintenance
  * sandbox, records each memory file it changed as a revision, and stores the outcome with its
@@ -316,7 +293,7 @@ export async function runDream(job: DreamJob): Promise<DreamRun | undefined> {
   }
   const after = await recordAfter(job.task.id, job.run, job.memory, job.before)
   forgetBefore(job.task.id, job.run.id)
-  const found = [...(tally.report?.found ?? []), ...unloaded(job, after.changes), ...after.found].slice(0, 10)
+  const found = [...(tally.report?.found ?? []), ...after.found].slice(0, 10)
   const report = tally.report === null ? null : { ...tally.report, found }
   const end: DreamEnd = {
     state: tally.end?.state ?? 'done',

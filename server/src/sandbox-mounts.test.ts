@@ -357,12 +357,12 @@ describe('the home directory of an older agent with home access', () => {
     expect(fromOther).toEqual(expect.arrayContaining([own, nested, missing]))
   })
 
-  it("binds the main checkout's memory for a worktree task, not its other sessions", () => {
+  it("binds the main checkout's memory read-only for a worktree task, not its other sessions", () => {
     const wt = sandboxMounts(layout({ cwd: worktree }))
     const memory = path.join('projects', projectSlug(mainRepo), 'memory')
     const inside = path.join(home, '.claude')
     expect(find(wt, path.join(inside, memory))).toEqual([
-      { kind: 'bind', src: path.join(claudeHome, memory), dest: path.join(inside, memory) },
+      { kind: 'ro-bind', src: path.join(claudeHome, memory), dest: path.join(inside, memory) },
     ])
     expect(fs.existsSync(path.join(claudeHome, memory))).toBe(true)
     expect(dests(wt)).not.toContain(path.join(inside, 'projects', projectSlug(mainRepo)))

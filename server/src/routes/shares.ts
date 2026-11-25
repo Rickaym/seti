@@ -3,7 +3,7 @@ import {
   emptyShareInput,
   shareFileQuery,
   shareLinkPreviewInput,
-  shareLiveInput,
+  shareRenderInput,
   sharingInput,
   updateShareInput,
   type ShareScanRefusal,
@@ -21,7 +21,7 @@ import {
   revokeShare,
   rotateShare,
   setShareLinkPreview,
-  setShareLive,
+  setShareRender,
   setSharing,
   ShareScanError,
   updateShare,
@@ -94,7 +94,7 @@ export const shareRoutes = (access: PublicAccess | null) =>
     .put('/:id/link-preview', validJson(shareLinkPreviewInput), async (c) =>
       ok(c, await setShareLinkPreview(c.req.param('id'), c.req.valid('json').link_preview)),
     )
-    .put('/:id/live', validJson(shareLiveInput), async (c) =>
-      ok(c, await setShareLive(c.req.param('id'), c.req.valid('json').live)),
+    .put('/:id/render', validJson(shareRenderInput), async (c) =>
+      ok(c, await setShareRender(c.req.param('id'), c.req.valid('json').render)),
     )
     .delete('/:id', async (c) => ok(c, await revokeShare(c.req.param('id'))))

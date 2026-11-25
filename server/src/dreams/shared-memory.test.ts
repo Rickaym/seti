@@ -47,8 +47,8 @@ afterAll(() => {
 const git = (cwd: string, ...args: string[]) =>
   execFileSync(findBinary('git'), ['-c', 'user.name=t', '-c', 'user.email=t@t', ...args], { cwd, stdio: 'ignore' })
 
-/** A runtime whose dream ends at once, writing one memory line if told, and how it opened. */
-function quietDream(writes = false): { dream: DreamSupport; seen: () => { spec: DreamSpec; host: DreamHost } | null } {
+/** A runtime whose dream ends at once, and how it opened. */
+function quietDream(): { dream: DreamSupport; seen: () => { spec: DreamSpec; host: DreamHost } | null } {
   let opened: { spec: DreamSpec; host: DreamHost } | null = null
   const session: DreamSession = {
     events: (async function* () {
@@ -64,10 +64,6 @@ function quietDream(writes = false): { dream: DreamSupport; seen: () => { spec: 
     ...real,
     open: async (spec, _launcher, host) => {
       opened = { spec, host }
-      if (writes) {
-        fs.writeFileSync(path.join(claudeMemory(spec.cwd), 'MEMORY.md'), '- deploy through the proxy\n')
-        await host.tools[0]?.call({ summary: 'Kept one rule' })
-      }
       return Promise.resolve(session)
     },
   }
@@ -89,25 +85,6 @@ async function worktreeAgent(): Promise<{ id: string; checkoutMemory: string }> 
   fs.mkdirSync(claudeMemory(cwd), { recursive: true })
   await tasks.insert({ id, title: 'Lead', repo_id: null, cwd, worktree: true, pr_urls: [], sandbox: true })
   return { id, checkoutMemory: path.join(os.homedir(), '.claude', 'projects', projectSlug(checkout), 'memory') }
-}
-
-async function dreamOf(id: string): Promise<DreamRun> {
-  const res = await app.request(`/api/tasks/${id}/dream`, {
-    method: 'POST',
-    headers: { host: 'localhost', ...USER_AUTH, 'content-type': 'application/json' },
-    body: '{}',
-  })
-  expect(res.status).toBe(200)
-  return vi.waitFor(async () => {
-    const list = (await (
-      await app.request(`/api/tasks/${id}/dreams`, { headers: { host: 'localhost', ...USER_AUTH } })
-    ).json()) as { data: DreamRun[] }
-    const [run] = list.data
-    if (run === undefined || run.state === 'running') {
-      throw new Error('still dreaming')
-    }
-    return run
-  })
 }
 
 describe.skipIf(!bwrap)('a dream of an agent in a worktree', () => {
@@ -144,20 +121,5 @@ describe.skipIf(!bwrap)('a dream of an agent in a worktree', () => {
       }
       expect(list.data[0]?.state).not.toBe('running')
     })
-  })
-
-  it("says in the report when the agent's sessions load another memory folder than the one changed", async () => {
-    const UNLOADED = "Seti: the agent's sessions load its repository's memory, not this folder"
-    claude.capabilities.dream = quietDream(true).dream
-    const { id } = await worktreeAgent()
-    expect((await dreamOf(id)).report?.found).toEqual([expect.stringContaining(UNLOADED)])
-    const plain = randomUUID()
-    const cwd = path.join(scratch, 'work', plain)
-    fs.mkdirSync(claudeMemory(cwd), { recursive: true })
-    fs.mkdirSync(cwd, { recursive: true })
-    await tasks.insert({ id: plain, title: 'Lead', repo_id: null, cwd, worktree: false, pr_urls: [], sandbox: true })
-    const run = await dreamOf(plain)
-    expect(run.memory_changes).toBe(1)
-    expect(run.report?.found).toEqual([])
   })
 })

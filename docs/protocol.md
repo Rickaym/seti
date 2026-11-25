@@ -478,6 +478,15 @@ interrupted only for that.
   apply, neither in the control room's gate nor in the runtime, and its tool servers stay off;
   its ask and deny rules apply. A running session takes no change to its folder's settings; the
   next session reads them. The control room records each file it holds back.
+- SBX-15: A sandboxed agent's sessions keep and load their runtime's memory in the agent's own
+  memory folder, its own project's, whatever repository its folders belong to, so they load what
+  its dreams edit. The memory folders of the checkouts behind its folders, which other sessions of
+  those repositories share, are mounted read-only, and its prompt names each one's index. Seti
+  copies nothing between the folders and writes nothing into the agent's folders for this. An
+  unsandboxed agent's sessions keep the runtime's own choice.
+  Why: a runtime that keys memory by repository would give an agent in a worktree the memory
+  every session of the repository shares, the user's own included, and not the folder its dreams
+  tidy.
 
 ### 7.3 Egress
 
@@ -1091,9 +1100,9 @@ Optional and off by default: a maintenance session per agent that consolidates i
   events, at most `dream_digest` characters, with credentials redacted, the user's messages and
   failures kept first, and a last line counting what was left out by kind. Its prompt asks it to
   read the whole digest and to review the notes already kept, not only those the day touched,
-  and never to remove one only because the day did not mention it. Its prompt names the other memory folders the agent's sessions see (its checkouts'),
-  which it reads before it writes and may not change. When it changed memory that the agent's
-  sessions do not load, because they load their repository's, its report says so in one line.
+  and never to remove one only because the day did not mention it. Its memory folder is the one
+  the agent's sessions load (SBX-15). Its prompt names the other memory folders the agent's
+  sessions see read-only (its checkouts'), which it reads before it writes and may not change.
 - DRM-7: A dream MUST NOT start or change a turn of the agent, post, send an update, push or
   notify, or enter Needs you. Its outcome is one stored report, also written beside the digest,
   and the agent's next turn is told once which dreams changed its memory.
@@ -1237,19 +1246,21 @@ Optional and off by default: a maintenance session per agent that consolidates i
   `noindex`, `no-referrer`, `nosniff` and `default-src 'none'`; downloads are never HTML or SVG. A
   file is shared only after path checks, a key and credential name deny list, `share_size` and a
   secret scan.
-  This holds for every share that is not live (PUB-10), and for a live share's static view.
-- PUB-10: A live share is the user's choice per link, off by default, for HTML files only; the EA
-  and agents cannot make one. Its link answers a page with no script around a frame
-  (`sandbox allow-scripts`) holding the stored copy, plus a static view at `/static`. The frame's
-  document is served only to a frame (`Sec-Fetch-Dest: iframe`; else the same 404) and is
+  This holds for every share but a rendered HTML share's page (PUB-10), whose code view at `/code`
+  is this page.
+- PUB-10: An HTML file's share renders as a page by default; the user may turn Render off per link,
+  and then the link shows the PUB-7 page. A file that is not HTML never renders, and the EA and
+  agents cannot share or change Render. A rendered link answers a page with no script around a
+  frame (`sandbox allow-scripts`) holding the stored copy, plus the code view at `/code`. The
+  frame's document is served only to a frame (`Sec-Fetch-Dest: iframe`; else the same 404) and is
   sandboxed by its own policy too: an opaque origin with no cookies or storage (an in-memory stand-in
-  only), no network but scripts, styles and fonts from the `LIVE_SHARE_CDNS` prefixes, images only
+  only), no network but scripts, styles and fonts from the `SHARE_PAGE_CDNS` prefixes, images only
   from `data:` and `blob:`, no frames, workers, plugins, forms, popups, downloads or top
   navigation, and `frame-ancestors 'self'`; the page's `frame-src` names only that frame, so it
   cannot navigate elsewhere. Both carry PUB-7's headers, `Permissions-Policy` with every feature
   off and `X-DNS-Prefetch-Control: off`. Known limit: browsers let a script reach the internet
-  through WebRTC, so a live page can send what it holds and what a visitor types to a host it
-  names; a live share promises isolation from Seti, not the absence of network.
+  through WebRTC, so a rendered page can send what it holds and what a visitor types to a host it
+  names; rendering promises isolation from Seti, not the absence of network.
 
 ## 19. Client contract
 
