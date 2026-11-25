@@ -27,7 +27,7 @@ afterAll(() => {
 const app = createApp()
 const DAY_MS = 24 * 60 * 60_000
 const daysAgo = (days: number) => new Date(Date.now() - days * DAY_MS).toISOString()
-const SECRET = 'whsec-never-in-a-dream-5f2c'
+const SECRET = 'webhook-secret-fixture'
 
 // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-parameters -- names the response data type
 async function send<T>(method: string, url: string, auth: Record<string, string> = USER_AUTH) {
