@@ -10,7 +10,7 @@ import type { ConformanceTarget, NeutralHost, Profile, Rig } from './target.js'
 export const SUITE_CWD = '/work/conformance'
 
 /** A spec with nothing in it but what a case varies; no adapter reads the sandbox stamp. */
-export function specFor<Id extends string>(runtime: Id, resume: string | null): SessionSpec<Id> {
+function specFor<Id extends string>(runtime: Id, resume: string | null): SessionSpec<Id> {
   return {
     runtime,
     taskId: 'conformance-task',
