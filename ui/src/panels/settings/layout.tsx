@@ -1,15 +1,27 @@
-import type { ComponentProps, ReactNode } from 'react'
+import { useContext, type ComponentProps, type ReactNode } from 'react'
 import { BackButton } from '@/components/SplitPane'
 import { PageHeader, PageLayout } from '@/components/crud/PageHeader'
 import { cn } from '@/lib/utils'
+import { OpenAsJson } from './json/OpenAsJson'
+import { jsonCardOf, SettingsPageContext } from './json/json-card'
 
 /** Back to the list of settings pages, on phones where a page fills the screen. */
 function SettingsBack() {
   return <BackButton section="settings" label="settings" />
 }
 
-export function SettingsHeader(props: Omit<ComponentProps<typeof PageHeader>, 'back' | 'level'>) {
-  return <PageHeader {...props} level={2} back={<SettingsBack />} />
+/** A settings page's header; a page whose settings the JSON page holds gets a way there. */
+export function SettingsHeader({ actions, ...props }: Omit<ComponentProps<typeof PageHeader>, 'back' | 'level'>) {
+  const json = jsonCardOf(useContext(SettingsPageContext)) !== null
+  const all = json ? (
+    <>
+      {actions}
+      <OpenAsJson />
+    </>
+  ) : (
+    actions
+  )
+  return <PageHeader {...props} actions={all} level={2} back={<SettingsBack />} />
 }
 
 /** A settings page: its header, then a body that scrolls; `narrow` caps forms. */
