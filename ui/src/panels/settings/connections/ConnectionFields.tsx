@@ -1,4 +1,6 @@
 import { CLIENT_AUTHS, envFor } from '@seti/shared'
+import { Braces } from 'lucide-react'
+import { Hint } from '@/components/Hint'
 import { Field } from '@/components/crud/CrudForm'
 import { FindableTextarea } from '@/components/find/FindableTextarea'
 import { Input } from '@/components/ui/input'
@@ -77,6 +79,34 @@ function HeaderFields({ form, set }: { form: ConnectionForm; set: Patch }) {
         </>
       )}
     </>
+  )
+}
+
+const BODY_HINT =
+  'Also swaps the value into JSON, form and plain text request bodies sent to these hosts. A host that ' +
+  'echoes what it was sent could show the value to the agent, so turn it on only for a login you trust.'
+
+/** Whether the proxy also swaps the value into request bodies; off is the normal state. */
+function BodyField({ form, set }: { form: ConnectionForm; set: Patch }) {
+  return (
+    <div className="col-span-full grid grid-cols-[minmax(0,1fr)] gap-1.5">
+      <div className="flex items-center gap-2">
+        <Braces aria-hidden className="size-3.5 text-muted-foreground" />
+        <span className="text-xs font-medium text-foreground">Body</span>
+        <Hint text={BODY_HINT}>
+          <Switch
+            aria-label="Body"
+            checked={form.body}
+            onCheckedChange={(on) => {
+              set({ body: on })
+            }}
+          />
+        </Hint>
+      </div>
+      <span className="text-xs text-muted-foreground">
+        Also swaps the value into request bodies on these hosts, for logins that send the password as JSON or a form
+      </span>
+    </div>
   )
 }
 
@@ -190,6 +220,7 @@ export function ConnectionFields({ form, set }: { form: ConnectionForm; set: Pat
       </Field>
       <TextInput label="Hosts" field="hosts" form={form} set={set} placeholder="api.example.com, *.example.com" full />
       <HeaderFields form={form} set={set} />
+      <BodyField form={form} set={set} />
       {form.kind !== 'key' && <MintFields form={form} set={set} />}
     </>
   )

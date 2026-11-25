@@ -592,6 +592,13 @@ def default_runtimes() -> dict[str, Any]:
     return {"claude": claude, "codex": {"state": "off"}, "offers": []}
 
 
+def default_runtime_capabilities() -> dict[str, Any]:
+    return {
+        "claude": {"label": "Claude Code", "mcp_servers": True, "plugins": True},
+        "codex": {"label": "Codex", "mcp_servers": False, "plugins": False},
+    }
+
+
 def default_account() -> dict[str, Any]:
     return {
         "account": {
@@ -700,6 +707,7 @@ class FakeSeti:
     shared_tools: list[dict[str, Any]] = field(default_factory=list)
     account: dict[str, Any] = field(default_factory=default_account)
     runtimes: dict[str, Any] = field(default_factory=default_runtimes)
+    runtime_capabilities: dict[str, Any] = field(default_factory=default_runtime_capabilities)
     changelog: dict[str, Any] = field(default_factory=default_changelog)
     update: dict[str, Any] = field(default_factory=default_update)
     home: dict[str, Any] = field(default_factory=default_home)
@@ -769,6 +777,7 @@ class FakeSeti:
     task_mcp: dict[str, dict[str, bool]] = field(default_factory=dict)
     ssh_hosts: list[str] = field(default_factory=lambda: ["jump", "k8s"])
     ssh_keys: dict[str, str | None] = field(default_factory=lambda: {"jump": "ops", "k8s": "ops"})
+    unusable_servers: dict[str, str] = field(default_factory=dict)
     ssh_sets: dict[str, list[str]] = field(default_factory=dict)
     access_defaults: dict[str, bool] = field(default_factory=dict)
     processes: dict[str, dict[str, Any]] = field(default_factory=dict)
@@ -979,6 +988,9 @@ class FakeSeti:
                 if body["pack_id"] is not None:
                     self.ea_pack_ids.append(body["pack_id"])
                 return ok(self.ea_packs())
+            case ["context", "packs", pack_id, "runtime"]:
+                pack = next((p for p in self.packs if p["id"] == pack_id), None)
+                return ok({**pack, **body}) if pack else err(404, "Context pack not found")
             case ["tasks", task_id, "role"]:
                 kept = [p for p in self.task_packs.get(task_id, []) if p.get("kind") != "role"]
                 pack = next((p for p in self.packs if p["id"] == body["pack_id"]), None)
@@ -1144,6 +1156,7 @@ class FakeSeti:
                     "jump_for": [],
                     "missing_key": [] if kind != "ssh" or self.ssh_keys.get(item_id) else [item_id],
                     "in_set": False,
+                    "unusable": self.unusable_servers.get(item_id) if kind == "mcp" else None,
                 }
             )
         return items
@@ -1293,6 +1306,8 @@ class FakeSeti:
                 return ok(self.account)
             case ["runtimes"]:
                 return ok(self.runtimes)
+            case ["runtimes", "capabilities"]:
+                return ok(self.runtime_capabilities)
             case ["mods", "whats-new", "changelog"]:
                 limit = int(params.get("limit", "200"))
                 return ok({**self.changelog, "entries": self.changelog["entries"][:limit]})

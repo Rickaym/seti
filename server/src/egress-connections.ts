@@ -21,6 +21,7 @@ export const connectionPlaceholders = (
     name: connection.name,
     placeholder: connection.placeholder,
     hosts: connection.hosts,
+    body: connection.body,
     value: async () => value(connection, null),
   }))
 

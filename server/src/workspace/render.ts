@@ -4,6 +4,7 @@ import { taskAwsOutcome } from '../aws-access.js'
 import { listContextFiles, readContextFile } from '../context-files.js'
 import { tasks } from '../db.js'
 import { taskMcpNames } from '../mcp-selection.js'
+import { loadsUserServers } from '../runtimes/capabilities.js'
 import { packForTask } from '../seti-guide.js'
 import { channelSubscriptions } from '../store/channel-subscriptions.js'
 import { taskContextPacks, contextPacks } from '../store/context.js'
@@ -98,7 +99,7 @@ export async function taskFile(taskId: string): Promise<Rendered | null> {
     packs: linked.flatMap((pack) => (pack.kind === 'role' ? [] : (slugOf(slugs, pack.id) ?? []))),
     role: role === undefined ? null : { name: role.name, slug: slugOf(slugs, role.id) ?? '' },
     channels: await channelSubscriptions.forTask(taskId),
-    mcp: await taskMcpNames(taskId),
+    mcp: loadsUserServers(task.runtime) ? await taskMcpNames(task) : null,
     access: await taskAccessNames(task),
   }
   return { text: renderTask(view), stamp: null }

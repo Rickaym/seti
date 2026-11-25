@@ -14,6 +14,12 @@ export const EMPTY_DIR = 'empty'
 /** An empty file in the task's state, shown read-only over each file Codex reads settings from. */
 export const EMPTY_FILE = 'empty-file'
 
+/** The user's own instructions for every Claude Code agent, which Codex agents read as theirs. */
+const USER_INSTRUCTIONS = 'CLAUDE.md'
+
+/** Where Codex reads the instructions it gives every session. */
+const CODEX_INSTRUCTIONS = 'AGENTS.md'
+
 /** Where Codex reads the machine's own settings, rules and skills. */
 const HOST_CONFIG = '/etc/codex'
 
@@ -22,7 +28,7 @@ const HOST_CONFIG = '/etc/codex'
  * it loads, its sign-in, the execution environments it sends commands to, and the instructions
  * it gives every session.
  */
-const LOCKED_FILES = ['config.toml', '.env', 'auth.json', 'environments.toml', 'AGENTS.md', 'AGENTS.override.md']
+const LOCKED_FILES = ['config.toml', '.env', 'auth.json', 'environments.toml', CODEX_INSTRUCTIONS, 'AGENTS.override.md']
 
 /** Folders in Codex's home: command rules that run commands without asking, and agent roles. */
 const LOCKED_DIRS = ['rules', 'agents']
@@ -37,8 +43,17 @@ const SHELL_STARTUP = [
   '.bash_logout',
 ]
 
-/** The home's skills folder, which Codex would offer every session. */
+/** The home's folder Codex reads skills under, read-only, holding only the user's own skills. */
 const HOME_SKILLS = '.agents'
+
+/** Where a Codex agent finds the user's skills, under its home. */
+export const USER_SKILLS = path.join(HOME_SKILLS, 'skills')
+
+/** The task's folder shown read-only at the home's skills folder, with a place for the user's. */
+export const SKILLS_HOME = 'agents-home'
+
+/** Codex's own skills folder, empty for each process so nothing written there reaches the next. */
+const CODEX_SKILLS = 'skills'
 
 /** The files and folders of a private home the sandbox covers; bwrap mounts only on what exists. */
 export const codexMountPoints = (home: string): { files: string[]; dirs: string[] } => ({
@@ -46,23 +61,64 @@ export const codexMountPoints = (home: string): { files: string[]; dirs: string[
     ...LOCKED_FILES.map((name) => path.join(home, CODEX_DIR, name)),
     ...SHELL_STARTUP.map((name) => path.join(home, name)),
   ],
-  dirs: [...LOCKED_DIRS.map((name) => path.join(home, CODEX_DIR, name)), path.join(home, HOME_SKILLS)],
+  dirs: [
+    ...LOCKED_DIRS.map((name) => path.join(home, CODEX_DIR, name)),
+    path.join(home, HOME_SKILLS),
+    path.join(home, CODEX_DIR, CODEX_SKILLS),
+  ],
 })
+
+/**
+ * The home's skills folder: read-only, holding the user's own skills read-only when there are
+ * any and the session is not bare; and Codex's own skills folder, a fresh one for each process.
+ */
+function skillMounts(layout: SandboxLayout): Mount[] {
+  const own = path.join(layout.claudeHome, 'skills')
+  const mine: Mount[] =
+    layout.maintenance?.bare !== true && fs.statSync(own, { throwIfNoEntry: false })?.isDirectory() === true
+      ? [{ kind: 'ro-bind', src: own, dest: path.join(layout.home, USER_SKILLS) }]
+      : []
+  return [
+    { kind: 'ro-bind', src: path.join(layout.taskDir, SKILLS_HOME), dest: path.join(layout.home, HOME_SKILLS) },
+    ...mine,
+    { kind: 'tmpfs', dest: path.join(layout.home, CODEX_DIR, CODEX_SKILLS) },
+  ]
+}
+
+/**
+ * The user's own CLAUDE.md when it is a file, which a Codex agent reads as its global AGENTS.md;
+ * none for a bare session, which gets none of the user's files.
+ */
+function userInstructions(layout: SandboxLayout): string | null {
+  if (layout.maintenance?.bare === true) {
+    return null
+  }
+  const file = path.join(layout.claudeHome, USER_INSTRUCTIONS)
+  return fs.statSync(file, { throwIfNoEntry: false })?.isFile() === true ? file : null
+}
 
 /**
  * Everything Codex or its shell reads that the agent could write to change how commands run or
  * are asked about, in this session or the next: empty and read-only. The machine's own Codex
- * settings are covered too, so only Seti's apply.
+ * settings are covered too, so only Seti's apply. The one file with content is the user's own
+ * CLAUDE.md, read-only, as Codex's global instructions.
  */
 export function codexLocks(layout: SandboxLayout, hostConfig = HOST_CONFIG): Mount[] {
   const empty = path.join(layout.taskDir, EMPTY_DIR)
   const blank = path.join(layout.taskDir, EMPTY_FILE)
-  const { files, dirs } = codexMountPoints(layout.home)
+  const { files } = codexMountPoints(layout.home)
   const host: Mount[] = fs.existsSync(hostConfig) ? [{ kind: 'ro-bind', src: empty, dest: hostConfig }] : []
+  const instructions = path.join(layout.home, CODEX_DIR, CODEX_INSTRUCTIONS)
+  const own = userInstructions(layout)
   return [
     // Not a mask: /dev/null in a user namespace cannot be opened, and Codex fails reading it.
-    ...files.map((dest): Mount => ({ kind: 'ro-bind', src: blank, dest })),
-    ...dirs.map((dest): Mount => ({ kind: 'ro-bind', src: empty, dest })),
+    ...files.map((dest): Mount => ({ kind: 'ro-bind', src: dest === instructions ? (own ?? blank) : blank, dest })),
+    ...LOCKED_DIRS.map((name): Mount => ({
+      kind: 'ro-bind',
+      src: empty,
+      dest: path.join(layout.home, CODEX_DIR, name),
+    })),
+    ...skillMounts(layout),
     ...host,
   ]
 }

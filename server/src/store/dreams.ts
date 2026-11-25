@@ -1,5 +1,5 @@
 import type { DreamReport, DreamRun, DreamState } from '@seti/shared'
-import { now, sql } from '../db.js'
+import { now, sql, type Db } from '../db.js'
 
 export type DreamRecord = Omit<DreamRun, 'cost_usd' | 'report'> & {
   cost_usd: number | string
@@ -32,12 +32,13 @@ export const dreamRuns = {
     }
     return toRun(row)
   },
-  end: async (id: number, end: DreamEnd): Promise<DreamRun | undefined> => {
+  /** Ends a running dream; undefined when it runs no more, so a dream ends once. */
+  end: async (id: number, end: DreamEnd, db: Db = sql): Promise<DreamRun | undefined> => {
     const report = end.report === null ? null : sql.json({ ...end.report })
-    const [row] = await sql<DreamRecord[]>`UPDATE dream_run SET state = ${end.state}, reason = ${end.reason},
+    const [row] = await db<DreamRecord[]>`UPDATE dream_run SET state = ${end.state}, reason = ${end.reason},
         cost_usd = ${end.cost_usd}, steps = ${end.steps}, denials = ${end.denials},
         memory_changes = ${end.memory_changes}, report = ${report}, ended_at = ${now()}
-      WHERE id = ${id} RETURNING *`
+      WHERE id = ${id} AND state = 'running' RETURNING *`
     return row && toRun(row)
   },
   get: async (id: number) => {
@@ -69,10 +70,14 @@ export const dreamRuns = {
           WHERE m.task_id = ${taskId} AND m.kind = 'prompt'), '')
         ORDER BY d.id`
     ).map(toRun),
-  /** Dreams a restart cut: every one still marked running when Seti starts. */
-  cutRunning: async (reason: string) =>
-    (
-      await sql<DreamRecord[]>`UPDATE dream_run SET state = 'cut', reason = ${reason}, ended_at = ${now()}
-        WHERE state = 'running' RETURNING *`
-    ).map(toRun),
+  /** Every dream still marked running, oldest first; when Seti starts, a restart cut them. */
+  allRunning: async () =>
+    (await sql<DreamRecord[]>`SELECT * FROM dream_run WHERE state = 'running' ORDER BY id`).map(toRun),
+  /** Marks a running dream cut, with the memory files it changed; undefined when it runs no more. */
+  cut: async (id: number, reason: string, memoryChanges: number, db: Db): Promise<DreamRun | undefined> => {
+    const [row] = await db<DreamRecord[]>`UPDATE dream_run SET state = 'cut', reason = ${reason},
+        memory_changes = ${memoryChanges}, ended_at = ${now()}
+      WHERE id = ${id} AND state = 'running' RETURNING *`
+    return row && toRun(row)
+  },
 }

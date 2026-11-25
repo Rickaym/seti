@@ -1,7 +1,6 @@
 import {
   AWS_ACCESS_ID,
   DEFAULT_PROFILE_ID,
-  localServerNote,
   overrideFor,
   type AccessChoice,
   type AccessDefault,
@@ -9,12 +8,9 @@ import {
   type AccessKind,
   type AuditActor,
   type AuditKind,
-  type McpSelectionKind,
-  type McpSessionState,
   type Task,
   type TaskAccessInput,
   type TaskAccessView,
-  type TaskMcpServer,
 } from '@seti/shared'
 import { audit } from './audit.js'
 import { AWS_NAME, awsItem, sandboxed, taskAws, taskAwsOutcome, taskGitHubOutcome } from './aws-access.js'
@@ -22,13 +18,10 @@ import { setPackLinkedByDefault } from './context-changes.js'
 import { tasks } from './db.js'
 import { fromEa, refuseAgent } from './ea-guard.js'
 import { HttpError } from './http.js'
-import { ownProjects, readHostConfig, taskBorrowedServers } from './mcp-borrowed.js'
-import { mcpCatalog, mcpDefaultFor, setMcpDefault, taskMcpServers } from './mcp-selection.js'
-import { sessionMcp, sessionState } from './mcp-session-status.js'
-import { tokenServers } from './mcp-sign-in.js'
+import { mcpItems } from './mcp-access.js'
+import { mcpDefaultFor, setMcpDefault } from './mcp-selection.js'
 import { pluginLoaded, setDefaultPluginEnabled } from './plugins.js'
 import { sshKeysChanged } from './proxy-owner.js'
-import { signedInServers } from './sandbox-mcp.js'
 import { hostMap, sshReach, sshRoute, type SshReach } from './ssh-config.js'
 import { accessDefaults, taskAccess } from './store/access.js'
 import { taskHosts } from './store/change-requests.js'
@@ -38,8 +31,6 @@ import { taskMcpChoices } from './store/mcp.js'
 import { setiPlugins, taskPluginChoices } from './store/plugins.js'
 import { setHosts, sshHostStore } from './store/ssh.js'
 import { signalWorkspaces } from './workspace/dir.js'
-
-const MCP_KIND: Record<McpSelectionKind, string> = { config: 'configured', plugin: 'plugin', connector: 'claude.ai' }
 
 const KIND_LABEL: Record<AccessKind, string> = {
   ssh: 'ssh host',
@@ -90,76 +81,7 @@ async function sshItems(overrides: Choices, profileId: string | null): Promise<A
     missing_key: reach.missing.get(host.alias) ?? [],
     in_set: bundled.includes(host.alias),
     session: null,
-  }))
-}
-
-type Json = Record<string, unknown>
-
-const entryOf = (servers: unknown, name: string): unknown =>
-  typeof servers === 'object' && servers !== null && name in servers ? (servers as Json)[name] : undefined
-
-/** How each enabled server stands in the task's latest session; null before its first session. */
-async function sessionStates(task: Task): Promise<(name: string) => McpSessionState | null> {
-  const report = await sessionMcp(task.id)
-  if (report === null) {
-    return () => null
-  }
-  const host = readHostConfig()
-  const projects = (host.projects ?? {}) as Json
-  const borrowed = await taskBorrowedServers(task, host)
-  const own = [host, ...ownProjects(task.cwd).map((key) => projects[key])].map((entry) =>
-    typeof entry === 'object' && entry !== null && 'mcpServers' in entry ? entry.mcpServers : undefined,
-  )
-  const isSandboxed = await sandboxed(task)
-  const signedIn = signedInServers()
-  const stored = tokenServers()
-  return (name) => {
-    const config = [...own, borrowed].map((servers) => entryOf(servers, name)).find((entry) => entry !== undefined)
-    const context = {
-      config,
-      sandboxed: isSandboxed,
-      signedIn: signedIn.has(name),
-      tokenStored: stored.has(name),
-      inSetup: config !== undefined,
-    }
-    return sessionState(name, report, context)
-  }
-}
-
-/** How the agent's latest session has an enabled server; null when off or before any session. */
-export const taskMcpSession = async (task: Task, name: string): Promise<McpSessionState | null> =>
-  (await mcpItems(task)).find((item) => item.id === name)?.session ?? null
-
-function mcpDetail(server: TaskMcpServer): string {
-  if (server.borrowed) {
-    return localServerNote(server.local_to, server.default_enabled)
-  }
-  return server.kind === null ? 'not configured' : MCP_KIND[server.kind]
-}
-
-async function mcpItems(task: Task | null): Promise<AccessItem[]> {
-  const servers: TaskMcpServer[] =
-    task === null
-      ? (await mcpCatalog()).map((entry) => ({
-          ...entry,
-          choice: null,
-          enabled: entry.default_enabled,
-          borrowed: entry.local_to.length > 0,
-        }))
-      : await taskMcpServers(task.id)
-  const stateOf = task === null ? () => null : await sessionStates(task)
-  return servers.map((server) => ({
-    kind: 'mcp',
-    id: server.name,
-    name: server.name,
-    detail: mcpDetail(server),
-    default_enabled: server.default_enabled,
-    override: server.choice,
-    enabled: server.enabled,
-    jump_for: [],
-    missing_key: [],
-    in_set: false,
-    session: server.enabled ? stateOf(server.name) : null,
+    unusable: null,
   }))
 }
 
@@ -181,6 +103,7 @@ async function packItems(choices: Choices): Promise<AccessItem[]> {
             missing_key: [],
             in_set: false,
             session: null,
+            unusable: null,
           },
         ],
   )
@@ -199,6 +122,7 @@ async function pluginItems(choices: Choices): Promise<AccessItem[]> {
     missing_key: [],
     in_set: false,
     session: null,
+    unusable: null,
   }))
 }
 

@@ -1,5 +1,6 @@
 import type { NodeAnswer, NodeAsk, RuntimeEvent } from '@seti/shared'
 import { tasks } from './db.js'
+import { watchFolderSettings } from './folder-settings-trust.js'
 import { launchPlan } from './launch-plan.js'
 import { watchSessionMcp } from './mcp-session-status.js'
 import { controlLink } from './node-link.js'
@@ -32,8 +33,12 @@ export const setupAnswers = {
   },
   'session.spec': async (taskId: string): Promise<NodeAnswer<'session.spec'>> => {
     const task = await taskOf(taskId)
+    const launch = await launchPlan(task)
+    if (launch.sandbox !== null) {
+      await watchFolderSettings(task)
+    }
     const { spec, key } = await startingSpec(task)
-    return { spec, launch: await launchPlan(task), key, rewind: (await rewinds.pending(taskId)) ?? null }
+    return { spec, launch, key, rewind: (await rewinds.pending(taskId)) ?? null }
   },
   'setup.key': async (taskId: string, { spec }: NodeAsk<'setup.key'>): Promise<NodeAnswer<'setup.key'>> => {
     if (spec !== null && spec !== undefined) {

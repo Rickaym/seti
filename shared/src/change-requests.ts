@@ -88,7 +88,13 @@ export const requestedChange = z.discriminatedUnion('kind', [
     host: requestHost,
     port: z.number().int().min(1).max(65_535).default(HTTPS_PORT),
   }),
-  z.object({ kind: z.literal('api_key'), env: connectionEnv, hosts: z.array(connectionHost).min(1).max(5) }),
+  z.object({
+    kind: z.literal('api_key'),
+    env: connectionEnv,
+    hosts: z.array(connectionHost).min(1).max(5),
+    /** The value also goes into request bodies, as a login that posts it needs. */
+    body: z.boolean().optional(),
+  }),
   z.object({ kind: z.literal('mcp_server'), server: z.string().trim().min(1).max(255) }),
   sharedToolProposal,
 ])
@@ -116,7 +122,7 @@ export function describeChange(change: RequestedChange): string {
     case 'allow_host':
       return `access to ${hostEntry(change)}`
     case 'api_key':
-      return `an API key ${change.env} for ${change.hosts.join(', ')}`
+      return `an API key ${change.env} for ${change.hosts.join(', ')}${change.body === true ? ', in request bodies too' : ''}`
     case 'mcp_server':
       return `the MCP server ${change.server}`
     case 'shared_tool':
@@ -159,6 +165,13 @@ export const answerChangeInput = z.discriminatedUnion('decision', [
   z.object({ decision: z.literal('deny') }),
 ])
 export type AnswerChangeInput = z.input<typeof answerChangeInput>
+
+/** A host the sandbox refused that the user could allow: one name or address, never a wildcard. */
+export const refusedHost = requestHost.refine((host) => !host.startsWith('*.'), 'Name one host, not a wildcard')
+
+/** The user's Allow host on a host the agent's sandbox refused, for the agent or every agent. */
+export const allowRefusedHostInput = z.object({ host: refusedHost, scope: z.enum(HOST_SCOPES).default('agent') })
+export type AllowRefusedHostInput = z.input<typeof allowRefusedHostInput>
 
 export const changeRequestParams = z.object({ id: z.string().trim().min(1).max(100), request_id: z.uuid() })
 

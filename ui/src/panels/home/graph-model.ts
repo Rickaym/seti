@@ -32,7 +32,7 @@ export interface GraphEdgeSpec {
   id: string
   source: string
   target: string
-  kind: 'repo' | 'subagent' | 'tool'
+  kind: 'repo' | 'subagent' | 'tool' | 'delegate'
   /** A subagent or tool call that runs now; it animates. */
   live: boolean
 }
@@ -178,6 +178,18 @@ function addLiveCalls(b: Builder, summary: HomeSummary): void {
   }
 }
 
+/** A line from each shown agent to the helpers it started that are shown too; live while one runs. */
+function addDelegates(b: Builder, shown: readonly (TaskListEntry | ArchivedTaskEntry)[]): void {
+  for (const task of shown) {
+    const caller = task.delegated_by
+    const target = b.nodes.get(agentNodeId(task.id))
+    if (caller === null || caller === task.id || target === undefined || !b.nodes.has(agentNodeId(caller))) {
+      continue
+    }
+    b.edge({ source: agentNodeId(caller), target: target.id, kind: 'delegate', live: target.status === 'running' })
+  }
+}
+
 /** The nodes and edges the Home graph draws, from the agent list and the Home summary. */
 export function buildGraph(input: GraphInput): GraphModel {
   const stats = new Map(input.summary?.agents.map((agent) => [agent.task_id, agent]))
@@ -191,6 +203,7 @@ export function buildGraph(input: GraphInput): GraphModel {
   for (const task of shown) {
     addAgent(b, task, agentRadius(size(task.id), top), input)
   }
+  addDelegates(b, shown)
   if (input.summary !== null && input.filters.tools) {
     addLiveCalls(b, input.summary)
   }

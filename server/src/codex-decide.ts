@@ -1,6 +1,8 @@
 import type { NodeAnswer, PolicyShadowCount, Task, ToolCall } from '@seti/shared'
 import { audit } from './audit.js'
 import { tasks } from './db.js'
+import { heldFolderSettings } from './folder-settings-trust.js'
+import { outsidePushes } from './outward-push.js'
 import { guardCommand } from './permission-guard.js'
 import { answerByRules, askCodexUser, type UserAnswer } from './permission-requests.js'
 import { compareOutcomes } from './policy/compare.js'
@@ -9,6 +11,7 @@ import { namedPaths } from './policy/named-paths.js'
 import { sourcedRules } from './policy/sources.js'
 import { policyCall } from './policy/tool-call.js'
 import type { Decision, PolicyCall, PolicyContext } from './policy/types.js'
+import { pushReason } from './push-asks.js'
 import { askQuestions } from './questions.js'
 import { resolvePaths } from './resolve-paths.js'
 import { redactSecrets } from './scrub.js'
@@ -23,7 +26,7 @@ async function contextOf(task: Task): Promise<PolicyContext> {
   const scope = guardScope(task, true)
   return {
     mode: 'ask',
-    rules: sourcedRules(await ruleSources(task)),
+    rules: sourcedRules(await ruleSources(task, await heldFolderSettings(task.cwd))),
     cwd: task.cwd,
     dirs: [task.cwd, ...workingDirs(task)],
     home: scope.home,
@@ -49,6 +52,12 @@ function shownInput(call: ToolCall): Record<string, unknown> {
     return { file_path: changes.map((change) => change.path).join(', '), diff: changes[0]?.diff ?? '' }
   }
   return typeof call.input === 'object' && call.input !== null ? { ...call.input } : {}
+}
+
+/** The folder Codex runs a command in, which it names with each call. */
+const cwdOf = (call: ToolCall): string | null => {
+  const input = call.input as { cwd?: unknown } | null
+  return typeof input?.cwd === 'string' ? input.cwd : null
 }
 
 const USER_ANSWERS = 'Codex agents ask before every command, edit and tool call'
@@ -139,11 +148,13 @@ export async function decideCodexCall(taskId: string, call: ToolCall, signal: Ab
     await auditRefused(task, read, decision)
     return { allow: false, message: decision.reason }
   }
-  if (decision.verdict === 'allow' && (await codexSettings.get()).evaluator_decides) {
+  const pushes = read.command === undefined ? [] : await outsidePushes(task, read.command, cwdOf(call) ?? task.cwd)
+  if (pushes.length === 0 && decision.verdict === 'allow' && (await codexSettings.get()).evaluator_decides) {
     return { allow: true }
   }
   const review = decision.verdict === 'review'
-  const reason = review || decision.step === 'ask-rule' ? decision.reason : USER_ANSWERS
+  const ruled = review || decision.step === 'ask-rule' ? decision.reason : USER_ANSWERS
+  const reason = pushes.length > 0 ? pushReason(pushes) : ruled
   const waits: WaitingCall = { taskId: task.id, call }
   const ids: string[] = []
   const opened = (id: string) => {
@@ -188,6 +199,12 @@ async function redecide(id: string, waits: WaitingCall): Promise<void> {
   const decision = decide(read, ctx)
   if (decision.verdict !== 'allow' && decision.verdict !== 'deny') {
     return
+  }
+  if (decision.verdict === 'allow' && read.command !== undefined) {
+    const pushes = await outsidePushes(task, read.command, cwdOf(waits.call) ?? task.cwd)
+    if (pushes.length > 0) {
+      return
+    }
   }
   const answer: UserAnswer =
     decision.verdict === 'allow' ? { allow: true } : { allow: false, message: decision.reason, dropped: false }

@@ -3,6 +3,7 @@ import { claudeRules } from './approval-ceiling.js'
 import { permissionModeOf } from './bypass-mode.js'
 import { hostLoginKey } from './claude-logins.js'
 import { requireCodexProgram } from './codex-status.js'
+import { codexToolServers } from './codex-tool-servers.js'
 import { effectiveCompact } from './compact.js'
 import { dreamsOn } from './dreams/settings.js'
 import { launchPlan } from './launch-plan.js'
@@ -11,7 +12,9 @@ import { taskDeniedServers } from './mcp-selection.js'
 import { tokenServers } from './mcp-sign-in.js'
 import type { PermissionSettings } from './permission-policy.js'
 import { taskPluginConfigs } from './plugins.js'
+import { proxyGrant } from './proxy-grant.js'
 import type { RuntimeId } from './runtimes/adapter.js'
+import { folderSettingsOf, holdsNothing, type FolderSettings } from './runtimes/claude/folder-settings.js'
 import type { CodexShapes } from './runtimes/codex/session.js'
 import type { DefaultShapes } from './runtimes/registry.js'
 import { signedInServers } from './sandbox-mcp.js'
@@ -20,6 +23,7 @@ import { systemAppend, workingDirs } from './session-options.js'
 import { isClaudeSpec, isCodexSpec, realiseClaude } from './session-realise.js'
 import { sharedToolFolders } from './shared-tools.js'
 import { codexSettings } from './store/codex-settings.js'
+import { userSkills } from './user-skills.js'
 
 /** What a task's session starts from, read from the database; it holds no secret values. */
 export interface SessionSpec<Id extends string = RuntimeId> {
@@ -45,6 +49,8 @@ export interface SessionSpec<Id extends string = RuntimeId> {
   }
   setiControl: Task['seti_control']
   compaction: CompactRule
+  /** How the agent's folder settings load where an agent's session could have written some. */
+  folderSettings: FolderSettings
   /** Seti's nightly dreams tidy this agent's memory, so the runtime's own consolidation stays off. */
   setiDreams: boolean
   sandbox: Awaited<ReturnType<typeof sandboxStamp>>
@@ -68,6 +74,7 @@ async function liveSpec(task: Task) {
       tokens: sorted(tokenServers()),
     },
     compaction: await effectiveCompact(task.id),
+    folderSettings: await folderSettingsOf(task.cwd),
     account: hostLoginKey(),
     sandbox: await sandboxStamp(task),
   }
@@ -80,10 +87,13 @@ async function liveSpec(task: Task) {
  */
 async function codexVendor(task: Task): Promise<CodexShapes['vendor']> {
   const settings = await codexSettings.get()
+  const { grant, denied } = await proxyGrant(task, 'codex')
   return {
     binary: await requireCodexProgram(settings),
     model: task.requested_model ?? settings.default_model,
     effort: task.requested_effort ?? settings.default_effort,
+    skills: userSkills(),
+    servers: (await codexToolServers(task, grant, denied)).servers,
   }
 }
 
@@ -132,6 +142,7 @@ const setupOf = <Id extends RuntimeId>(spec: SessionSpec<Id>) => ({
   toolServers: spec.toolServers,
   setiControl: spec.setiControl,
   compaction: spec.compaction,
+  folderSettings: spec.folderSettings,
   account: spec.account,
   sandbox: spec.sandbox,
 })
@@ -188,6 +199,7 @@ function specKey(spec: SessionSpec): string {
     mcp_tokens: setup.toolServers.tokens,
     seti_control: setup.setiControl,
     compact: compactionKey(setup.compaction),
+    ...(holdsNothing(setup.folderSettings) ? {} : { folder_settings: setup.folderSettings }),
     claude_login: setup.account,
     sandbox: setup.sandbox,
   })

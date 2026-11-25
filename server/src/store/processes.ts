@@ -1,4 +1,4 @@
-import type { SetiControlLevel } from '@seti/shared'
+import { storedRuntime, type SetiControlLevel, type StoredRuntime } from '@seti/shared'
 import { sql } from '../db.js'
 
 /** The id of the last prompt the agent read, or 0 before its first. */
@@ -30,6 +30,18 @@ export const sessionRestarts = {
           AND id > ${lastTurn(taskId)}
         LIMIT 1`
     ).length > 0,
+}
+
+export const continuedNotes = {
+  /** The runtime the agent left in its latest move since it last read a message; null for none. */
+  sinceLastTurn: async (taskId: string): Promise<StoredRuntime | null> => {
+    const [row] = await sql<{ was: string | null }[]>`SELECT payload::json ->> 'runtime_was' AS was
+      FROM task_message
+      WHERE task_id = ${taskId} AND kind = 'seti' AND (payload::json ->> 'session') = 'continued'
+        AND id > ${lastTurn(taskId)}
+      ORDER BY id DESC LIMIT 1`
+    return row === undefined ? null : storedRuntime(row.was)
+  },
 }
 
 export const setiControlNotes = {

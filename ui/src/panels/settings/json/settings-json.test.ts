@@ -10,7 +10,7 @@ import { docSections, exportName, pruned, shownSections } from './settings-json'
 const NO_SETTINGS: Record<string, string> = {
   about: "what's new and the version",
   skills: "Claude Code's skill files, read by the probe",
-  subagents: "Claude Code's agent files, read by the probe",
+  tools: 'scripts agents proposed and the user published, not settings',
   audit: 'a log, not settings',
   json: 'this view of the document itself',
   mods: 'each mod is its own section under mods',
@@ -46,10 +46,26 @@ describe('the settings JSON page', () => {
       allowed_domains: ['registry.npmjs.org'],
     })
     expect(pruned(DOC.app.ea, 'nothing', 'app.ea')).toBeUndefined()
-    expect(shownSections(docSections(DOC), 'Sandbox', null).map((section) => section.path)).toEqual([
-      'security.sandbox',
-    ])
-    expect(shownSections(docSections(DOC), '', 'mods').map((section) => section.path)).toEqual(['mods.weather'])
+    expect(
+      shownSections(docSections(DOC), { query: 'Sandbox', group: null, modified: false }).map(
+        (section) => section.path,
+      ),
+    ).toEqual(['security.sandbox'])
+    expect(
+      shownSections(docSections(DOC), { query: '', group: 'mods', modified: false }).map((section) => section.path),
+    ).toEqual(['mods.weather'])
+  })
+
+  it('counts and filters to what differs from the defaults', () => {
+    const defaults = {
+      ...DOC,
+      app: { ea: { wake_enabled: false, wake_phrase: 'Hey Seti' } },
+    } satisfies SettingsDoc
+    const sections = docSections(DOC, defaults)
+    expect(sections.map((section) => section.modified)).toEqual([1, 0, 0])
+    const shown = shownSections(sections, { query: '', group: null, modified: true })
+    expect(shown).toMatchObject([{ path: 'app.ea', value: { wake_enabled: true } }])
+    expect(shownSections(sections, { query: 'phrase', group: null, modified: true })).toEqual([])
   })
 
   it('dates the export', () => {

@@ -6,11 +6,12 @@ import {
   type Task,
 } from '@seti/shared'
 import { audit } from '../audit.js'
+import { runtimeProgram } from '../codex-status.js'
 import { HttpError } from '../http.js'
 import { oneShotPlan } from '../launch-plan.js'
 import { maintenanceLauncher } from '../launcher.js'
+import { oneShotFor } from '../runtimes/capabilities.js'
 import { runOneShot, type OneShotResult } from '../runtimes/one-shot.js'
-import { oneShotFor } from '../runtimes/one-shots.js'
 import { redactCredentials, redactSecrets } from '../scrub.js'
 import { secondOpinions } from '../store/second-opinions.js'
 import { bareWorkDir } from '../task-sandbox.js'
@@ -62,8 +63,6 @@ async function launcherFor(caller: Task, answerer: Answerer) {
 
 /** The answer as the asking agent reads it: framed as data, with who answered and what it cost. */
 function answerText(answerer: Answerer, result: OneShotResult): string {
-  const answer = redactSecrets(redactCredentials(result.text.trim()))
-  const shown = answer.length <= LIMITS.answer ? answer : `${answer.slice(0, LIMITS.answer)}\n[... cut]`
   const frame = tagged(
     SECOND_OPINION_TAG,
     {
@@ -73,9 +72,15 @@ function answerText(answerer: Answerer, result: OneShotResult): string {
       cost_usd: result.costUsd === null ? undefined : result.costUsd.toFixed(4),
       estimated: String(result.costEstimated),
     },
-    shown,
+    shownAnswer(result),
   )
   return `${PREFACE}\n${frame}`
+}
+
+/** The answer redacted and cut to its limit, as the agent and a PR row see it. */
+function shownAnswer(result: OneShotResult): string {
+  const answer = redactSecrets(redactCredentials(result.text.trim()))
+  return answer.length <= LIMITS.answer ? answer : `${answer.slice(0, LIMITS.answer)}\n[... cut]`
 }
 
 interface Outcome {
@@ -83,7 +88,10 @@ interface Outcome {
   error: string | null
 }
 
-/** Records and audits one second opinion by its sizes and cost, never its text. */
+/**
+ * Records and audits one second opinion by its sizes and cost; the audit never holds its text,
+ * and only a PR review keeps its answer, for the PR's row.
+ */
 async function recordOutcome(caller: Task, answerer: Answerer, prompt: OpinionPrompt, outcome: Outcome) {
   const { result } = outcome
   const costUsd = result?.costUsd ?? null
@@ -94,6 +102,7 @@ async function recordOutcome(caller: Task, answerer: Answerer, prompt: OpinionPr
     outcome: result === null ? 'failed' : 'answered',
     costUsd,
     estimated,
+    review: prompt.pr === null || result === null ? null : { prUrl: prompt.pr, answer: shownAnswer(result) },
   })
   await audit.record({
     actor: 'agent',
@@ -109,6 +118,8 @@ async function recordOutcome(caller: Task, answerer: Answerer, prompt: OpinionPr
       context_chars: prompt.sizes.context,
       files: prompt.sizes.files,
       file_chars: prompt.sizes.fileChars,
+      pr: prompt.pr,
+      diff_chars: prompt.sizes.diff,
       answer_chars: result?.text.length ?? 0,
       seconds: result === null ? null : Math.round(result.durationMs / 1000),
       cost_usd: costUsd,
@@ -137,6 +148,7 @@ export async function askSecondOpinion(caller: Task, input: SecondOpinionInput, 
       system: SYSTEM,
       prompt: prompt.text,
       cwd: bareWorkDir(caller.id),
+      program: await runtimeProgram(answerer.runtime),
       maxOutputTokens: LIMITS.outputTokens,
       budgetUsd: LIMITS.budgetUsd,
     }

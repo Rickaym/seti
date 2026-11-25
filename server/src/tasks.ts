@@ -24,7 +24,9 @@ import { errorCode } from './pg.js'
 import { taskPluginNames } from './plugins.js'
 import { sshKeysChanged } from './proxy-owner.js'
 import { publish, runTurn } from './runner.js'
+import { refuseUndeclared } from './runtime-features.js'
 import { pickedRuntime } from './runtime-offers.js'
+import { runsUnsandboxed } from './runtimes/capabilities.js'
 import { contextPacks, taskContextPacks } from './store/context.js'
 import { profiles } from './store/credentials.js'
 import { taskMcpChoices } from './store/mcp.js'
@@ -86,6 +88,7 @@ async function auditCreated(task: Task, actor: AuditActor): Promise<void> {
       ...plugins,
       ...mcp,
       ...(task.pr_urls.length === 0 ? {} : { pr_urls: task.pr_urls }),
+      ...(task.delegated_by === null ? {} : { delegated_by: task.delegated_by }),
       ...planDetail(task.setup),
     },
   })
@@ -122,6 +125,7 @@ export async function startTask(
     runtime,
     requested_model: input.model ?? null,
     requested_effort: input.effort ?? null,
+    delegated_by: input.delegated_by ?? null,
   })
   capabilityCache.prewarm(cwd)
   await taskContextPacks.set(id, packIds)
@@ -235,6 +239,7 @@ export async function renameTask(task: Task, title: string): Promise<void> {
 /** Turns a task's sandbox on or off; the change applies at its next turn. */
 export async function setTaskSandbox(task: Task, on: boolean): Promise<void> {
   refuseAgent("change an agent's sandbox")
+  refuseUndeclared(task, on || runsUnsandboxed(task.runtime), 'way to run outside the sandbox')
   if (task.sandbox === on) {
     return
   }

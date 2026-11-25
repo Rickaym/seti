@@ -1,6 +1,7 @@
 import { projectCodex } from '@seti/shared'
 import type { RuntimeAdapter } from '../adapter.js'
-import { realiseCodex, type CodexProvider } from './realise.js'
+import { codexOneShotFor } from './one-shot.js'
+import { realiseCodex, SERVER_NAMES, type CodexProvider } from './realise.js'
 import { codexSession, type CodexShapes } from './session.js'
 
 /**
@@ -13,7 +14,12 @@ export const codexAdapterFor = (binary?: string, provider?: CodexProvider): Runt
     gate: { rewriteInput: false, classifier: false },
     session: { fork: 'none' },
     rewind: { conversation: false, code: false },
+    tools: { userServers: ['stdio', 'http'], serverNames: SERVER_NAMES, plugins: false },
+    sandbox: { optional: false },
+    compaction: false,
+    subagents: false,
     dream: null,
+    oneShot: codexOneShotFor(binary, provider),
   },
   project: projectCodex,
   realise: async (spec, launcher, host, abortController) =>

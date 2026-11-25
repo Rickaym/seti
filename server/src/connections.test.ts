@@ -127,7 +127,7 @@ describe('connections', () => {
     const context = await connectionContext(task.id)
     expect(context).toContain('VENDOR_KEY (api.vendor.test, *.vendor-cdn.test)')
     expect(context).toContain('in the URL and headers')
-    expect(context).toContain('never swaps one in a request body')
+    expect(context).toContain('never swaps one into a request body')
     await nodeLink.journal(task.id, { type: 'egress.blocked', host: 'evil.test', names: ['vendor'] })
     const blocked = await auditEvents.latest('task.api_key_blocked')
     expect(blocked).toMatchObject({ subject_id: task.id, detail: { host: 'evil.test', keys: ['vendor'] } })
@@ -258,7 +258,7 @@ describe('connections', () => {
 
   it('makes a connection an approved request asked for, with no value and in no credential', async () => {
     const made = await createConnectionPlaceholder(
-      { name: 'ci_token', hosts: ['ci.vendor.test'], adds_header: true },
+      { name: 'ci_token', hosts: ['ci.vendor.test'], adds_header: true, body: false },
       'agent',
     )
     expect(made).toMatchObject({
@@ -269,7 +269,7 @@ describe('connections', () => {
     })
     expect(await auditEvents.latest('system.connection_created')).toMatchObject({ actor: 'agent' })
     const again = await createConnectionPlaceholder(
-      { name: 'ci', hosts: ['ci.vendor.test'], adds_header: false },
+      { name: 'ci', hosts: ['ci.vendor.test'], adds_header: false, body: false },
       'agent',
     )
     expect(again.env).toBe('CI')
@@ -305,6 +305,32 @@ describe('connections', () => {
       mint: { ...google.mint, issuer: 'app-id' },
     })
     expect(signed.missing).toEqual(['private_key'])
+    expectNoValues()
+  })
+
+  it('keeps Body off until the user turns it on, audits it and tells the agent', async () => {
+    const added = await data<Connection>('POST', '/connections', {
+      ...vendor(),
+      values: { value: KEY },
+      profile_ids: ['default'],
+    })
+    expect(added.body).toBe(false)
+    const task = await newTask()
+    expect(await connectionContext(task.id)).toContain('never swaps one into a request body')
+    expect((await send('PUT', `/connections/${added.id}`, vendor({ body: true }), EA_AUTH)).status).toBe(403)
+    expect((await data<Connection>('GET', `/connections/${added.id}`)).body).toBe(false)
+    expect((await data<Connection>('PUT', `/connections/${added.id}`, vendor({ body: true }))).body).toBe(true)
+    expect(await auditEvents.latest('system.connection_changed')).toMatchObject({
+      actor: 'user',
+      detail: { connection: 'vendor', body: true },
+    })
+    const grants = grantConnections(await taskConnections(task))
+    expect(grants[0]?.body).toBe(true)
+    expect(connectionPlaceholders(grants, connectionValueAsk(task.id))[0]?.body).toBe(true)
+    const context = await connectionContext(task.id)
+    expect(context).toContain('VENDOR_KEY (api.vendor.test, *.vendor-cdn.test; bodies too)')
+    expect(context).toContain('multipart text and plain text request bodies')
+    expect((await send('PUT', `/connections/${added.id}`, vendor({ body: true, hosts: [] }))).status).toBe(400)
     expectNoValues()
   })
 

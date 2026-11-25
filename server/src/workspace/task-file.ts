@@ -9,8 +9,11 @@ export interface TaskView {
   /** The role pack linked to the task, with its pack file's slug. */
   role: { name: string; slug: string } | null
   channels: readonly ChannelSubscription[]
-  /** MCP servers the task's sessions load and leave out, by name. */
-  mcp: { enabled: readonly string[]; disabled: readonly string[] }
+  /**
+   * The servers on and off for the agent and those its runtime cannot use, or null where its
+   * runtime loads none of them.
+   */
+  mcp: { enabled: readonly string[]; disabled: readonly string[]; unusable: readonly string[] } | null
   /** Ssh aliases the task reaches, jump hosts only passed through, and what its AWS calls run as. */
   access: { ssh: readonly string[]; jumps: readonly string[]; aws: AwsOutcome }
 }
@@ -51,6 +54,20 @@ function awsLine(aws: AwsOutcome): string {
   }
 }
 
+/** What the agent's sessions load of the user's MCP servers. */
+function mcpLines(mcp: TaskView['mcp']): string[] {
+  if (mcp === null) {
+    return ["Your sessions load none of the user's MCP servers; only Seti's own tools reach you."]
+  }
+  return [
+    'Your sessions load the servers that are on. Only the user or the EA changes them; ask @ea in chat.md.',
+    '',
+    `- On: ${list(mcp.enabled)}`,
+    `- Off: ${list(mcp.disabled)}`,
+    ...(mcp.unusable.length === 0 ? [] : [`- Not for your runtime: ${list(mcp.unusable)}`]),
+  ]
+}
+
 export function renderTask({ task, handle, packs, role, channels, mcp, access }: TaskView): string {
   const repos = task.repos.map((repo) => `${repo.slug} at ${repo.dir}`)
   const packFiles = packs.map((slug) => `packs/${slug}.md`)
@@ -84,10 +101,7 @@ export function renderTask({ task, handle, packs, role, channels, mcp, access }:
     '',
     '## MCP servers',
     '',
-    'Your sessions load the servers that are on. Only the user or the EA changes them; ask @ea in chat.md.',
-    '',
-    `- On: ${list(mcp.enabled)}`,
-    `- Off: ${list(mcp.disabled)}`,
+    ...mcpLines(mcp),
     '',
     '## SSH and AWS',
     '',

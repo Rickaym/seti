@@ -79,7 +79,14 @@ files need no API credential; on a public hostname they sit behind Access when A
 `GET /api/settings-doc` gives every stored setting as one JSON document. A secret appears only as
 `set` or `not set` beside a name; the builder reads the views the settings pages read, which never
 carry a value. The EA gets plain configuration only, with security settings left out; agents,
-mods and paired devices are refused (CFG-1 to CFG-3). The document only reads: no route writes it.
+mods and paired devices are refused (CFG-1 to CFG-3).
+
+`PATCH /api/settings-doc` writes plain settings only, and only for you, signed in or with the local
+token: the EA, agents, mods and paired devices are refused at the route, and agents, mods and
+devices again in the function that writes. A patch that names a security setting or a secret is
+refused whole, so no part of it applies. The write runs the same service functions as the
+settings pages, in one transaction, records the same audit events and one revision, and refuses a
+value that changed since it was read (CFG-5).
 
 ## Where each secret lives
 
@@ -109,6 +116,34 @@ create what is missing; production never creates a key file and stops naming the
 bound to their name, never leave the server, and are set and cleared in Settings, Credentials and
 Settings, Connections. The host's `gh` login, which the PR views use, is neither stored nor read
 by Seti. Seti keeps `~/.seti` owner-only and tightens anything more open at startup.
+
+## Connection values in request bodies
+
+A connection's value goes into a request body only when the user turns on Body for that
+connection in Settings, Connections; it is off for every connection until then. With Body off, the
+proxy refuses a request whose body carries the placeholder and sends nothing, so a login is never
+tried with the placeholder (EGR-14). With Body on, the proxy swaps the value into JSON, form,
+multipart text and plain text bodies of at most 1 MiB, on that connection's hosts only (EGR-15).
+
+What Body adds over a header swap is the chance that a host shows a request body back to the
+agent, as a validation error that quotes the input does. A host that echoes headers has the same
+risk today, so Body widens the surface rather than opening a new kind of leak. The hosts are the
+ones you chose for the connection, and the setting is per connection, so turn it on for a login
+endpoint you trust and leave it off elsewhere.
+
+What stays impossible with Body on:
+
+- The value going to any other host: a placeholder in a body toward a host its connection does not
+  name is refused and audited, as in a header.
+- The value in Seti's logs, audit details, error messages, transcripts or the proxy's own refusal
+  text: a refusal names the connection, never its value.
+- The value in a compressed body, a file part of a multipart body, or a body over 1 MiB: the proxy
+  refuses those instead of sending the placeholder or guessing.
+
+Response bodies are not scrubbed. The proxy does not mask an echo of the value in a response,
+because a mask catches only an exact copy: a host that escapes, encodes, compresses or splits the
+value would pass it anyway, and masking would mean holding and rewriting every response from the
+host. Treat a host with Body on as able to show the value to the agent if it echoes its input.
 
 ## What Seti downloads
 
@@ -153,6 +188,33 @@ What a reverse proxy in front must keep: the `Content-Security-Policy`, `Permiss
 `Host` only stops live pages from showing; removing `Content-Security-Policy` would let a live
 page reach the network and navigate its frame away.
 
+## Your tool servers on Codex agents
+
+A Codex agent gets the MCP servers from your Claude Code config that a sandboxed Claude Code agent
+gets, and no others: Seti reads the host's config, never a copy the agent could write, and passes
+the servers on Codex's command line, which wins over every config file. A local server runs inside
+the agent's sandbox with the placeholders of the agent's connections and never the model key. A
+remote server gets its URL only; the egress proxy adds the sign-in token or connection header on
+that server's host. Codex asks Seti about every call to these servers, even a tool that says it
+only reads. Codex's own config file stays empty and read-only, and a server defined in the agent's
+folder is never read.
+
+## Settings in an agent's folders
+
+A folder's Claude Code settings (`.claude/settings.json`, `.claude/settings.local.json`,
+`.claude/hooks`), its `.mcp.json` and its `.codex` folder decide what runs without asking and
+what runs later when you work there yourself. In a sandboxed agent's working folders, worktrees
+and added folders included, those that exist are read-only to the agent on both runtimes, however
+it tries to write them. A file that does not exist cannot be covered that way without leaving a
+file in your repository, so Seti watches it instead: one that appears in the agent's own folder
+after a sandboxed session started counts as the agent's writing. Until you change its content,
+Seti's gate and Claude Code ignore its allow rules and its tool servers stay off, while its ask
+and deny rules apply; the audit log records each file held back. A running Claude Code session
+takes no change to its folder's settings; the next session reads them.
+
+Rules are read from the agent's own folder only, so the settings of an added folder never decide
+an agent's calls. The user settings in a sandboxed agent's home are read-only.
+
 ## What is not protected
 
 - systemd 255's user manager cannot decrypt credentials, so the key files are plain files the Seti
@@ -178,6 +240,10 @@ page reach the network and navigate its frame away.
 - Review rules for one tool trust the server's own annotations to list its other writing tools; a
   rule for the whole server does not depend on them.
 - Seti writes to a GitHub PR in one case: the preview label, while the PR previews mod is on.
+- An unsandboxed agent can write its folders' settings like any other file; asking before a
+  command that is not read-only, and before an edit of those files, is the only guard there.
+- Claude Code applies a mid-session change of a folder's settings unless a hook blocks it; Seti's
+  sandboxed sessions block it, and Seti cannot test that against every Claude Code release.
 
 The public demo runs with a separate entry point and threat model; see [Public demo](demo.md).
 

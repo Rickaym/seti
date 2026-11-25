@@ -3,6 +3,7 @@ import {
   SETI_CONTROL_HINTS,
   SETI_CONTROL_LABELS,
   type AccessItem,
+  type AccessKind,
   type AwsOutcome,
   type SetiControlLevel,
   type Task,
@@ -19,6 +20,7 @@ import { InfoTip } from '@/components/InfoTip'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
+import { useCapabilities } from '@/hooks/useCapabilities'
 import { cn } from '@/lib/utils'
 import { McpAuthDialog } from '@/panels/capabilities/McpAuthDialog'
 import { TaskCredentials } from '@/panels/tasks/TaskProfile'
@@ -26,6 +28,7 @@ import { AccessList, KIND_ICONS } from './AccessList'
 import { SETI_CONTROL_ICONS, SetiControlRow } from './SetiControl'
 import { TaskHostsRow } from './TaskHosts'
 import { mcpBroken, noteAccessChange, useTaskAccess } from './access'
+import { unavailableKinds } from './unavailable'
 
 const APPLIES = 'Applies from the next turn'
 
@@ -68,7 +71,7 @@ function sshChip(items: readonly AccessItem[]): Chip {
 }
 
 function mcpChip(items: readonly AccessItem[]): Chip {
-  const enabled = items.filter((item) => item.kind === 'mcp' && item.enabled)
+  const enabled = items.filter((item) => item.kind === 'mcp' && item.enabled && item.unusable === null)
   const broken = enabled.filter(mcpBroken).map((item) => item.name)
   const hint = `${String(enabled.length)} MCP servers on`
   return {
@@ -96,8 +99,8 @@ function awsChipState(aws: AwsOutcome, enabled: number): ChipState {
   return chipState(enabled, aws.state === 'no_role' ? 1 : 0)
 }
 
-/** The chips of what is on; a Codex agent runs without plugins, so it shows none for them. */
-function chips({ items, aws }: TaskAccessView, codex: boolean): Chip[] {
+/** The chips of what is on, without those the agent's runtime cannot use. */
+function chips({ items, aws }: TaskAccessView, unavailable: Partial<Record<AccessKind, unknown>>): Chip[] {
   const on = (kind: AccessItem['kind']) => items.filter((item) => item.kind === kind && item.enabled)
   const count = (kind: AccessItem['kind'], label: string, noun: string): Chip => {
     const n = on(kind).length
@@ -119,9 +122,9 @@ function chips({ items, aws }: TaskAccessView, codex: boolean): Chip[] {
       state: awsChipState(aws, on('aws').length),
       hint: awsOutcomeLine(aws),
     },
-    mcpChip(items),
+    ...(unavailable.mcp === undefined ? [mcpChip(items)] : []),
     count('pack', 'packs', 'context packs'),
-    ...(codex ? [] : [count('plugin', 'plugins', 'plugins')]),
+    ...(unavailable.plugin === undefined ? [count('plugin', 'plugins', 'plugins')] : []),
   ]
 }
 
@@ -135,23 +138,16 @@ function CredentialsRow({ task, onChanged }: { task: Task; onChanged: () => void
 }
 
 /** The agent's access at a glance in its details: what is on, muted what is off. */
-export function AccessSummary({
-  taskId,
-  codex = false,
-  onOpen,
-}: {
-  taskId: string
-  codex?: boolean
-  onOpen: () => void
-}) {
-  const { view } = useTaskAccess(taskId)
+export function AccessSummary({ task, onOpen }: { task: Pick<Task, 'id' | 'runtime'>; onOpen: () => void }) {
+  const { view } = useTaskAccess(task.id)
+  const unavailable = unavailableKinds(useCapabilities(task))
   return (
     <div className="flex min-w-0 items-start gap-1">
       {view === null ? (
         <span className="text-muted-foreground">Loading...</span>
       ) : (
         <ul aria-label="Access" className="flex min-w-0 flex-1 flex-wrap gap-1">
-          {[...chips(view, codex), setiChip(view.seti_control)].map((chip) => {
+          {[...chips(view, unavailable), setiChip(view.seti_control)].map((chip) => {
             const Icon = chip.icon
             return (
               <li key={chip.key} className="min-w-0">
@@ -200,6 +196,8 @@ export function TaskAccessDialog({
   const [query, setQuery] = useState('')
   const [signIn, setSignIn] = useState<string | null>(null)
   const { view, setView, load } = useTaskAccess(task.id, task.profile_id)
+  const caps = useCapabilities(task)
+  const unavailable = unavailableKinds(caps)
 
   const [bulk, setBulk] = useState(false)
 
@@ -308,6 +306,8 @@ export function TaskAccessDialog({
                 onSignIn={(item) => {
                   setSignIn(item.name)
                 }}
+                unavailable={unavailable}
+                runtime={caps?.label ?? null}
               />
             </ErrorBoundary>
           )}

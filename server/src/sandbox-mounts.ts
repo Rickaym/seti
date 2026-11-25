@@ -1,6 +1,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { codexLocks } from './sandbox-codex.js'
+import { folderSettingsGuards } from './sandbox-folder-settings.js'
 import { readOnlyWork } from './sandbox-read-only.js'
 
 export type Mount =
@@ -358,7 +359,11 @@ function hostBinds(layout: SandboxLayout): HostBinds {
   const repos = [...new Set(git.flatMap((entry) => (entry.common === null ? [] : [entry.common])))]
   const seen = (worktree: string) =>
     writable.some((root) => within(worktree, root)) || inPrivateHome(worktree, layout, [...writable, ...readOnly])
-  const guards = [...git.flatMap((entry) => entry.guards), ...unseenWorktrees(repos, seen)]
+  const guards = [
+    ...git.flatMap((entry) => entry.guards),
+    ...unseenWorktrees(repos, seen),
+    ...folderSettingsGuards(workDirs),
+  ]
   return { writable, readOnly, guards: [...new Set(guards)] }
 }
 
@@ -382,7 +387,7 @@ export function checkoutOf(dir: string, layout: Trust): string | null {
  * uses from worktrees too; the task's own project folder already holds its memory. Without home
  * access a checkout outside the task's folders counts only for a worktree Seti made.
  */
-function memoryDirs(layout: SandboxLayout): string[] {
+export function memoryDirs(layout: Trust): string[] {
   const own = projectSlug(layout.cwd)
   const slugs = [layout.cwd, ...layout.dirs]
     .flatMap((dir) => {

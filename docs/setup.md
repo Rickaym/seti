@@ -236,6 +236,22 @@ JSON Schema; `GET /api/settings-doc/agents/<id>` and `GET /api/settings-doc/work
 one agent's or one workspace's own settings, with schemas under `/schema/agent` and
 `/schema/workspace`.
 
+Each section shows how many of its settings differ from their default, and Modified shows only
+those. Open as JSON, in the header of each settings page, opens the JSON page at that page's
+section. `GET /api/settings-doc/defaults` serves every setting's default, and
+`GET /api/settings-doc?only=modified` only what differs from it, as a merge patch onto the
+defaults.
+
+Edit, on the JSON page, opens the plain settings in an editor that completes keys and values
+from the schema. Save shows every change, old value above new, before anything applies; a change
+with a consequence, such as deleting archived agents, asks you to confirm it. A save is one entry
+in the page's History, and Undo or Revert there sets it all back. Reset on a section sets one
+setting back to its default. Security settings and secrets stay read only here and change on
+their own pages; every setting stays editable on its own page, on a phone too.
+`PATCH /api/settings-doc` takes `{base_revision, patch, expect, confirm}`, where `patch` is a JSON
+merge patch of the document: `null` removes an item from a list keyed by name and sets any other
+setting to `null`.
+
 Settings Seti reads at start live in `~/.seti/seti.env` (one `NAME=value` per line) and secrets in
 `~/.seti/credentials`, one owner-only file each. Restart Seti after a change:
 `systemctl --user restart seti.service`. `pnpm seti:doctor` reads the same file and reports a value
@@ -427,10 +443,11 @@ Custom opens the form with every field for a service the list does not have. The
 A connection is one service's access, made in Settings, Connections: its name, the hosts it may
 reach (exact or `*.suffix`), how Seti signs in, and the values that takes. Agents see its variable,
 such as `STRIPE`, holding a placeholder that the proxy swaps for the value on those hosts only, in
-the URL and headers (EGR-5 in [the protocol](protocol.md#73-egress)). It never swaps a value into a
-request body, and refuses a request that carries a placeholder in its body unsent (EGR-14). With
-"Seti adds it" on, the proxy also sets a header from a template (`Bearer {{value}}`) on every
-request to those hosts (EGR-7). A connection signs in one of four ways:
+the URL and headers (EGR-5 in [the protocol](protocol.md#73-egress)). With "Seti adds it" on, the
+proxy also sets a header from a template (`Bearer {{value}}`) on every request to those hosts
+(EGR-7). The value goes into a request body only when Body is on for the connection, which it is
+not until you turn it on; without it, the proxy refuses a request that carries a placeholder in
+its body and sends nothing (EGR-14, EGR-15). A connection signs in one of four ways:
 
 - A key the user pastes.
 - OAuth client credentials, with a client secret, Basic auth or a private key JWT (Entra
@@ -443,6 +460,25 @@ request to those hosts (EGR-7). A connection signs in one of four ways:
 For the OAuth kinds Seti mints a short-lived token and mints again after a 401; Test mints one
 without showing it. A connection can be added without its values, which you fill in later. Values
 are write-only. Pollers send a connection by its name.
+
+### Logging in to a web app
+
+An agent that tests a web app often logs in by posting an email and a password, as JSON or a
+form, to the app's login endpoint. The password is a connection like any key, with Body on so the
+proxy swaps it into the request body:
+
+1. In Settings, Connections, add a Custom connection and pick the kind Web login, which starts
+   with Body on.
+2. Name it, such as `staging_login`, and give the app's host, such as `app.staging.example.com`,
+   and the API host too if the login posts there.
+3. Paste the password as its key and switch the connection on in the agent's credential.
+
+The agent sees `STAGING_LOGIN` and posts `{"email": "qa@example.com", "password":
+"$STAGING_LOGIN"}`; the app receives the real password, and nothing else does. Give the agent the
+email in its task, since it is not a secret. Body also swaps into form and plain text bodies and
+multipart text fields, never into a file. A host that echoes a request body back, as some
+validation errors quote the input, can show the value to the agent, so turn Body on only for a
+host you trust; [Security](security.md#connection-values-in-request-bodies) has the trade-off.
 
 A credential is the bundle an agent picks, managed in Settings, Credentials. The built-in Default
 holds what Seti had before credentials; more of them let different agents use different access. A
@@ -524,11 +560,18 @@ edit and tool call asks you. A call to one of your tool servers runs without ask
 allow rule of yours names that server or tool. Turn Rules decide off in the Codex card under
 Settings, Runtimes to answer every call yourself; an upgrade keeps the choice you made. A Codex
 agent shows a summary of its reasoning where a Claude agent shows its thinking, which costs a few
-output tokens per model call. Codex agents have no side chat, rewind, Bypass or plugins. Their
-cost is an estimate from the price table in
-`server/src/runtimes/codex/prices.ts`, which names the day it was read; to update it, copy the
-standard rates from OpenAI's pricing page into that table, set `asOf` to the day, and run
-`pnpm check`.
+output tokens per model call. A Codex agent reads your `~/.claude/CLAUDE.md` as its global
+instructions, read-only, and a folder's `CLAUDE.md` when the folder has no `AGENTS.md`, as a
+Claude Code agent does. It also gets your skills from `~/.claude/skills`, read-only, listed in its
+instructions; skills in its own folders are never offered. A Codex agent gets the MCP servers a
+sandboxed Claude Code agent gets from your Claude Code config: local servers without keys run in
+its sandbox, and remote ones over streamable HTTP reach it when they need no key or the proxy signs
+them. Every call to them asks you, unless an allow rule of yours names the server or tool and Rules
+decide is on. SSE servers and claude.ai connectors are Claude only; the agent's access marks each
+server it cannot use and says why. Codex agents have no side chat, rewind, Bypass or plugins.
+Their cost is an estimate from the price table in `server/src/runtimes/codex/prices.ts`, which
+names the day it was read; to update it, copy the standard rates from OpenAI's pricing page into
+that table, set `asOf` to the day, and run `pnpm check`.
 
 With both runtimes set up, any agent with Seti control can ask the other one for a second
 opinion with its `second_opinion` tool: a Claude agent asks Codex, a Codex agent asks Claude.
@@ -536,7 +579,34 @@ The other model answers once, with no tools and none of the agent's folders, in 
 reaches only its provider with the agent's credential, so the credential needs that runtime's
 key. The transcript shows one row, "Asked gpt-5.5: ...", that opens to the question and answer;
 its cost counts toward the agent's and shows under Cost in its settings. An agent may ask 20
-times an hour and 60 a day.
+times an hour and 60 a day. Given one of its linked pull requests instead, the other model
+reviews the PR's diff, which Seti reads with your `gh` login; the review goes back to the agent
+and folds under that PR in the agent's PR list, and nothing is posted to GitHub.
+
+An agent at Seti control Full can start a helper on either runtime with `start_task`, which
+runs sandboxed with at most the caller's access and approvals. The helper sits right under its
+caller in the agent list, and the Home graph links the two. With `include_brief`, Seti adds a
+brief of the caller's work after the prompt: what it was asked, its plan, steps, files and PRs,
+redacted and without direct messages. The EA's `start_task` takes `brief_of` to brief a new
+agent on any agent's work.
+With `wait_minutes`, the caller waits in its call for the helper's first turn and gets its final
+message back, while its row reads "Waiting on" and the helper's title; past the time, or when it
+is interrupted, the helper's end arrives as an update instead. A helper cannot start agents, and
+an agent may have 4 helpers running and spend $10 on helpers a day.
+
+A role can name the model its agents run on: open the role on the Context page and pick one under
+Runs on, built-in roles included. A start that names the role, such as `start_task` with
+`role: "Reviewer"`, then runs on that model unless it names its own; while that runtime is off
+the agent runs on your default and its setup says why. A Codex agent's Seti guide and Lead role
+send it to helper agents, since Codex has no subagents of its own.
+
+An agent can move to the other runtime and keep its work: open its settings and pick a model under
+Continue on, at the bottom beside Restart session. It keeps its title, folders, PR links,
+transcript and cost; it starts a new session on that runtime, or resumes the one it had there
+before, and its next message brings a brief of its work. Background work and Bypass end. A move
+to Codex needs the agent sandboxed and an OpenAI key in its credential. The EA does the same with
+`restart_agent_session` and a `runtime` after your yes, and a moved agent's approvals are never
+looser than before when the EA or another agent moved it.
 
 ### Access: defaults and per-agent choices
 
