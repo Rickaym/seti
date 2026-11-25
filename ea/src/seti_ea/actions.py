@@ -498,7 +498,9 @@ def color_name(color: str) -> str:
     return preset if preset is not None else f"a custom colour ({color})"
 
 
-def role_runtime_change(pack: Mapping[str, Any], args: Mapping[str, Any]) -> tuple[dict[str, Any], str] | None:
+def role_runtime_change(
+    pack: Mapping[str, Any], args: Mapping[str, Any]
+) -> tuple[dict[str, Any], str] | None:
     """The role's new runtime and model as the server takes them, and the change in words; None if none."""
     if "runtime" not in args and "model" not in args:
         return None
