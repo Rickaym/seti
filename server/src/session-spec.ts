@@ -168,6 +168,7 @@ function codexKey(spec: SessionSpec<'codex'>): string {
     shared_tools: setup.toolServers.shared,
     seti_control: setup.setiControl,
     sandbox: setup.sandbox,
+    compaction: setup.compaction,
   })
 }
 

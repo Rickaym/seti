@@ -120,6 +120,8 @@ function conversation(body: unknown): { texts: string[]; spoken: number } {
 export class ScriptedResponses {
   /** Every model call's request body as Codex sent it, in order. */
   readonly bodies: string[] = []
+  /** The tokens each response reports it used. */
+  tokens = 1240
   private turns: Step[][] = []
   private readonly states = new Map<string, TurnState>()
   private readonly order = new Map<string, number>()
@@ -175,11 +177,11 @@ export class ScriptedResponses {
         state.done -= 1
         const before = steps.slice(0, -1).filter((step) => !waits(step))
         const searched = [...before.map((step) => this.item(step, said.texts, body)), search(unsearched)]
-        stream(res, searched, Promise.resolve())
+        stream(res, searched, Promise.resolve(), this.tokens)
         return
       }
       const items = steps.filter((step) => !waits(step)).map((step) => this.item(step, said.texts, body))
-      stream(res, items, this.endOf(steps))
+      stream(res, items, this.endOf(steps), this.tokens)
     })
   }
 
@@ -274,7 +276,7 @@ function sse(res: ServerResponse, event: Record<string, unknown>): void {
 }
 
 /** Streams one response the way the Responses API does; it ends with usage once `ended` settles. */
-function stream(res: ServerResponse, items: readonly OutputItem[], ended: Promise<void> | null): void {
+function stream(res: ServerResponse, items: readonly OutputItem[], ended: Promise<void> | null, tokens: number): void {
   const id = nextId('resp')
   res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' })
   sse(res, { type: 'response.created', response: { id, status: 'in_progress' } })
@@ -283,17 +285,17 @@ function stream(res: ServerResponse, items: readonly OutputItem[], ended: Promis
     sse(res, { type: 'response.output_item.done', output_index: index, item })
   })
   void ended?.then(() => {
-    complete(res, id)
+    complete(res, id, tokens)
   })
 }
 
-function complete(res: ServerResponse, id: string): void {
+function complete(res: ServerResponse, id: string, tokens: number): void {
   const usage = {
-    input_tokens: 1200,
+    input_tokens: tokens - 40,
     input_tokens_details: { cached_tokens: 1000 },
     output_tokens: 40,
     output_tokens_details: { reasoning_tokens: 12 },
-    total_tokens: 1240,
+    total_tokens: tokens,
   }
   sse(res, { type: 'response.completed', response: { id, status: 'completed', usage } })
   res.end()
