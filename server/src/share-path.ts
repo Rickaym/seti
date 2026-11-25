@@ -1,19 +1,19 @@
-import { applyLiveHeaders, LIVE_MARK } from './share-live.js'
 import { IMAGES_MAX } from './share-preview/preview.js'
+import { applyRenderHeaders, RENDER_MARK } from './share-render.js'
 
 /**
  * A share's page, its download, one of its stored preview images (1 to 50), its link card, or a
- * live share's frame and static page: the only paths anyone reaches without signing in.
+ * rendered share's frame and code view: the only paths anyone reaches without signing in.
  */
-const SHARE_PATH = /^\/share\/([A-Za-z0-9_-]{43})(?:\/(raw|card\.png|live|static)|\/p\/([1-9]\d?))?$/
+const SHARE_PATH = /^\/share\/([A-Za-z0-9_-]{43})(?:\/(raw|card\.png|frame|code)|\/p\/([1-9]\d?))?$/
 
-type SharePart = 'page' | 'raw' | 'image' | 'card' | 'live' | 'static'
+type SharePart = 'page' | 'raw' | 'image' | 'card' | 'frame' | 'code'
 
 const NAMED_PARTS: Readonly<Record<string, SharePart>> = {
   raw: 'raw',
   'card.png': 'card',
-  live: 'live',
-  static: 'static',
+  frame: 'frame',
+  code: 'code',
 }
 
 export interface ShareRequest {
@@ -74,7 +74,7 @@ export const MEDIA_MARK = 'X-Seti-Share-Media'
  * audio or video page may also play its own download, and nothing else.
  */
 function sharePolicy(request: ShareRequest | null, origin: string | null, media: boolean): string {
-  const page = request?.part === 'page' || request?.part === 'static'
+  const page = request?.part === 'page' || request?.part === 'code'
   const own = page && origin !== null ? `${origin}/share/${request.token}` : null
   const images = own === null ? "'none'" : `${own}/p/`
   const policy = ['sandbox allow-downloads', "default-src 'none'", `img-src ${images}`]
@@ -104,14 +104,14 @@ const SHARE_HEADERS: Readonly<Record<string, string>> = {
 export function applyShareHeaders(headers: Headers, path: string, origin: string | null): void {
   const request = parseSharePath(path)
   const media = headers.get(MEDIA_MARK) === '1'
-  const live = headers.get(LIVE_MARK) === '1'
+  const rendered = headers.get(RENDER_MARK) === '1'
   headers.delete(MEDIA_MARK)
-  headers.delete(LIVE_MARK)
+  headers.delete(RENDER_MARK)
   for (const [name, value] of Object.entries(SHARE_HEADERS)) {
     headers.set(name, value)
   }
-  if (live && request !== null) {
-    applyLiveHeaders(headers, request, origin)
+  if (rendered && request !== null) {
+    applyRenderHeaders(headers, request, origin)
   } else {
     headers.set('Content-Security-Policy', sharePolicy(request, origin, media))
   }

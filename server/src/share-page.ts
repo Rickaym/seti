@@ -91,29 +91,29 @@ export function sharePage(input: SharePageInput): string {
   ].join('')
 }
 
-export interface LiveSharePageInput extends Omit<SharePageInput, 'body'> {
-  staticHref: string
-  liveHref: string
+export interface RenderedSharePageInput extends Omit<SharePageInput, 'body'> {
+  codeHref: string
+  frameHref: string
 }
 
 /** The bar stays put and the frame takes the rest; a page without a background shows on white. */
-const LIVE_STYLE = `${SHARE_STYLE}
+const RENDER_STYLE = `${SHARE_STYLE}
 body{display:flex;flex-direction:column;height:100vh;height:100dvh}
 header{flex:none;padding:8px 16px}
 header .actions{display:flex;gap:8px}
-iframe.live{flex:1 1 auto;display:block;width:100%;min-height:0;border:0;background:#fff;color-scheme:light}
+iframe.page{flex:1 1 auto;display:block;width:100%;min-height:0;border:0;background:#fff;color-scheme:light}
 `
 
-/** A live share's shell: Seti's bar, no script, and the page in a frame with an opaque origin. */
-export function liveSharePage(input: LiveSharePageInput): string {
+/** A rendered share's shell: Seti's bar, no script, and the page in a frame with an opaque origin. */
+export function renderedSharePage(input: RenderedSharePageInput): string {
   const name = escapeHtml(input.name)
-  const detail = `Live page, ${sizeLabel(input.size)}, shared from Seti, updated ${when(input.updatedAt)}`
+  const detail = `${sizeLabel(input.size)}, shared from Seti, updated ${when(input.updatedAt)}`
   return [
-    head(input, LIVE_STYLE),
+    head(input, RENDER_STYLE),
     '<body><header><div class="meta">',
     `<h1>${name}</h1><div class="sub">${escapeHtml(detail)}</div></div><div class="actions">`,
-    `<a class="dl" href="${escapeHtml(input.staticHref)}">Static view</a>${download(input)}</div></header>`,
-    `<iframe class="live" src="${escapeHtml(input.liveHref)}" sandbox="allow-scripts" referrerpolicy="no-referrer"`,
+    `<a class="dl" href="${escapeHtml(input.codeHref)}">View code</a>${download(input)}</div></header>`,
+    `<iframe class="page" src="${escapeHtml(input.frameHref)}" sandbox="allow-scripts" referrerpolicy="no-referrer"`,
     ` title="${name}"></iframe></body></html>`,
   ].join('')
 }
