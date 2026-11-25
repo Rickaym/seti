@@ -7,19 +7,18 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { relativeTime } from '@/lib/time'
 import { cn } from '@/lib/utils'
-import { CommandList, ModelList, SkillGroups, SubagentList } from '@/panels/capabilities/CommandSections'
+import { CommandList, SkillGroups } from '@/panels/capabilities/CommandSections'
 import { McpSection } from '@/panels/capabilities/McpSection'
 import { PluginSection } from '@/panels/capabilities/PluginSection'
 import { Section } from '@/panels/capabilities/Section'
-import { SharedToolSection } from '@/panels/capabilities/SharedToolSection'
-import { filterCommands, filterGroups, filterServers, matches, normalize } from '@/panels/capabilities/filter'
+import { filterCommands, filterGroups, filterServers, normalize } from '@/panels/capabilities/filter'
 import { useCapabilities, USER_SCOPE } from '@/panels/capabilities/useCapabilities'
 import { SettingsBody, SettingsHeader } from './layout'
 import type { ProbedPageKey } from './pages'
 
 const TICK_MS = 15_000
 
-type ProbedKind = 'mcp' | 'skills' | 'subagents'
+type ProbedKind = 'mcp' | 'skills'
 
 const VIEWS: Record<ProbedKind, { label: string; description: string; search: string }> = {
   mcp: {
@@ -31,11 +30,6 @@ const VIEWS: Record<ProbedKind, { label: string; description: string; search: st
     label: 'Skills',
     description: 'Skills and slash commands agents get from plugins and from Claude Code.',
     search: 'Search skills and commands',
-  },
-  subagents: {
-    label: 'Subagents',
-    description: 'Subagents agents can hand work to, and the models they can pick.',
-    search: 'Search subagents and models',
   },
 }
 
@@ -93,8 +87,6 @@ function ProbedBody({ view, snapshot, query, repoId, onReload, onRefresh }: Body
   const views = useMemo(() => filterServers(snapshot.servers, q), [snapshot, q])
   const groups = useMemo(() => filterGroups(snapshot.skill_groups, q), [snapshot, q])
   const builtins = useMemo(() => filterCommands(snapshot.builtin_commands, q), [snapshot, q])
-  const agents = snapshot.subagents.filter((agent) => matches(q, agent.name, agent.description))
-  const models = snapshot.models.filter((model) => matches(q, model.display_name, model.value, model.description))
 
   switch (view) {
     case 'mcp':
@@ -112,17 +104,6 @@ function ProbedBody({ view, snapshot, query, repoId, onReload, onRefresh }: Body
           </Section>
           <Section title="Built-in commands" count={builtins.length} defaultOpen={false} forceOpen={searching}>
             <CommandList commands={builtins} />
-          </Section>
-        </div>
-      )
-    case 'subagents':
-      return (
-        <div className="grid grid-cols-2 items-start gap-4 max-md:grid-cols-1">
-          <Section title="Subagents" count={agents.length}>
-            <SubagentList agents={agents} />
-          </Section>
-          <Section title="Models" count={models.length}>
-            <ModelList models={models} />
           </Section>
         </div>
       )
@@ -235,7 +216,6 @@ function PluginList({
     <div className="space-y-4 text-xs">
       <SearchBox label="Search plugins" placeholder="Search plugins" value={query} onChange={setQuery} />
       <PluginSection query={normalize(query)} refreshToken={refreshes} onChanged={onChanged} onLoading={onLoading} />
-      <SharedToolSection query={normalize(query)} refreshToken={refreshes} />
     </div>
   )
 }
@@ -254,7 +234,7 @@ function PluginsPage({ capabilities, refreshes, onRefresh }: PageProps) {
       header={
         <SettingsHeader
           title="Plugins"
-          description="Seti's plugin folders, the Claude Code plugins agents load and the shared tools you allowed."
+          description="Seti's plugin folders and the Claude Code plugins agents load."
           actions={<RefreshButton busy={pluginsLoading} onClick={onRefresh} />}
         />
       }

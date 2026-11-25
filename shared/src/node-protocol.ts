@@ -163,6 +163,8 @@ const askSchemas = {
   },
   /** Holds an MCP call a review rule names until the user answers; the hook's output. */
   'review.ask': { ask: toolCall, answer: z.object({ output: z.unknown() }) },
+  /** Holds a command pushing outside the user's organisations until they answer; the hook's output. */
+  'push.ask': { ask: toolCall.extend({ cwd: z.string() }), answer: z.object({ output: z.unknown() }) },
   /** Asks the user about a call the agent repeats with the same result, `results` times so far. */
   'repeat.ask': {
     ask: toolCall.extend({ results: z.int().positive() }),

@@ -316,7 +316,7 @@ const SETTINGS = [
   'mcp',
   'plugins',
   'skills',
-  'subagents',
+  'tools',
   'signin',
   'devices',
   'sandbox',

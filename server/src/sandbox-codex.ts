@@ -14,6 +14,12 @@ export const EMPTY_DIR = 'empty'
 /** An empty file in the task's state, shown read-only over each file Codex reads settings from. */
 export const EMPTY_FILE = 'empty-file'
 
+/** The user's own instructions for every Claude Code agent, which Codex agents read as theirs. */
+const USER_INSTRUCTIONS = 'CLAUDE.md'
+
+/** Where Codex reads the instructions it gives every session. */
+const CODEX_INSTRUCTIONS = 'AGENTS.md'
+
 /** Where Codex reads the machine's own settings, rules and skills. */
 const HOST_CONFIG = '/etc/codex'
 
@@ -22,7 +28,7 @@ const HOST_CONFIG = '/etc/codex'
  * it loads, its sign-in, the execution environments it sends commands to, and the instructions
  * it gives every session.
  */
-const LOCKED_FILES = ['config.toml', '.env', 'auth.json', 'environments.toml', 'AGENTS.md', 'AGENTS.override.md']
+const LOCKED_FILES = ['config.toml', '.env', 'auth.json', 'environments.toml', CODEX_INSTRUCTIONS, 'AGENTS.override.md']
 
 /** Folders in Codex's home: command rules that run commands without asking, and agent roles. */
 const LOCKED_DIRS = ['rules', 'agents']
@@ -50,18 +56,33 @@ export const codexMountPoints = (home: string): { files: string[]; dirs: string[
 })
 
 /**
+ * The user's own CLAUDE.md when it is a file, which a Codex agent reads as its global AGENTS.md;
+ * none for a bare session, which gets none of the user's files.
+ */
+function userInstructions(layout: SandboxLayout): string | null {
+  if (layout.maintenance?.bare === true) {
+    return null
+  }
+  const file = path.join(layout.claudeHome, USER_INSTRUCTIONS)
+  return fs.statSync(file, { throwIfNoEntry: false })?.isFile() === true ? file : null
+}
+
+/**
  * Everything Codex or its shell reads that the agent could write to change how commands run or
  * are asked about, in this session or the next: empty and read-only. The machine's own Codex
- * settings are covered too, so only Seti's apply.
+ * settings are covered too, so only Seti's apply. The one file with content is the user's own
+ * CLAUDE.md, read-only, as Codex's global instructions.
  */
 export function codexLocks(layout: SandboxLayout, hostConfig = HOST_CONFIG): Mount[] {
   const empty = path.join(layout.taskDir, EMPTY_DIR)
   const blank = path.join(layout.taskDir, EMPTY_FILE)
   const { files, dirs } = codexMountPoints(layout.home)
   const host: Mount[] = fs.existsSync(hostConfig) ? [{ kind: 'ro-bind', src: empty, dest: hostConfig }] : []
+  const instructions = path.join(layout.home, CODEX_DIR, CODEX_INSTRUCTIONS)
+  const own = userInstructions(layout)
   return [
     // Not a mask: /dev/null in a user namespace cannot be opened, and Codex fails reading it.
-    ...files.map((dest): Mount => ({ kind: 'ro-bind', src: blank, dest })),
+    ...files.map((dest): Mount => ({ kind: 'ro-bind', src: dest === instructions ? (own ?? blank) : blank, dest })),
     ...dirs.map((dest): Mount => ({ kind: 'ro-bind', src: empty, dest })),
     ...host,
   ]

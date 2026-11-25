@@ -20,6 +20,18 @@ const RULE_MAX = 500
 /** An MCP server, which covers all its tools, or one tool, as in mcp__slack or mcp__slack__send. */
 const MCP_RULE = /^mcp__[\w-]+$/
 
+/** An allow rule for pushes to one owner outside the user's organisations, as in PushTo(acme). */
+const PUSH_RULE = /^PushTo\(([\w.-]+)\)$/
+
+/** The owner a `PushTo` rule names, or null for any other rule. */
+export const pushRuleOwner = (rule: string): string | null => PUSH_RULE.exec(rule)?.[1] ?? null
+
+const PUSH_HINT = 'PushTo takes one owner and only allows, such as PushTo(acme)'
+
+/** A rule may name PushTo only as an allow of one owner. */
+const pushRuleFits = (behavior: string, rule: string) =>
+  !rule.startsWith('PushTo') || (behavior === 'allow' && pushRuleOwner(rule) !== null)
+
 const REVIEW_HINT = 'Review takes an MCP tool or server, such as mcp__slack__send_message or mcp__slack'
 
 export const permissionRuleText = z
@@ -86,6 +98,7 @@ export const addPermissionRuleInput = z
     message: REVIEW_HINT,
     path: ['rule'],
   })
+  .refine((input) => pushRuleFits(input.behavior, input.rule), { message: PUSH_HINT, path: ['rule'] })
 export type AddPermissionRuleInput = z.input<typeof addPermissionRuleInput>
 
 const BATCH_MAX = 300
@@ -98,6 +111,10 @@ export const addPermissionRulesInput = z
   })
   .refine((input) => input.behavior !== 'review' || input.rules.every((rule) => MCP_RULE.test(rule)), {
     message: REVIEW_HINT,
+    path: ['rules'],
+  })
+  .refine((input) => input.rules.every((rule) => pushRuleFits(input.behavior, rule)), {
+    message: PUSH_HINT,
     path: ['rules'],
   })
 export type AddPermissionRulesInput = z.input<typeof addPermissionRulesInput>
