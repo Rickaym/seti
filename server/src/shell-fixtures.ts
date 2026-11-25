@@ -123,9 +123,15 @@ export const shellNotification = (
     summary,
   })
 
-export const backgroundChanged = (...shells: [id: string, description: string][]) =>
+/** The live background tasks; each is a shell unless it names its task type, and may be ambient. */
+export const backgroundChanged = (...tasks: [id: string, description: string, type?: string, ambient?: true][]) =>
   sdk({
     type: 'system',
     subtype: 'background_tasks_changed',
-    tasks: shells.map(([id, description]) => ({ task_id: id, task_type: 'local_bash', description })),
+    tasks: tasks.map(([id, description, type, ambient]) => ({
+      task_id: id,
+      task_type: type ?? 'local_bash',
+      description,
+      ...(ambient === undefined ? {} : { ambient }),
+    })),
   })

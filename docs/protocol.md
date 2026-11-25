@@ -1071,12 +1071,17 @@ Optional and off by default: a maintenance session per agent that consolidates i
   night by the schedule. While Dreaming is on for an agent, its runtime's own memory
   consolidation is turned off in its sessions, so one consolidator owns the folder.
 - DRM-4: A dream starts only while the agent is unarchived and sandboxed, its runtime declares
-  dreams, it runs no turn or background work, holds no open question, permission or change
-  request, has no dream running, and the runtime's own consolidation did not run in the last hour;
-  otherwise it is refused with the reason, which counts the background commands and other
-  background tasks an agent with no turn still runs. A nightly dream refused for work or an open request is
-  tried again every `dream_retry` until the window ends, then skipped with its last reason. None
-  starts after the end; one running at the end is stopped.
+  dreams, it runs no turn and no background subagent or other background task, holds no open
+  question, permission or change request, has no dream running, and the runtime's own
+  consolidation did not run in the last hour; otherwise it is refused with the reason, which
+  counts the subagents and other background tasks an agent with no turn still runs. Background
+  commands and monitors do not hold a dream back, and background work the runtime does not list
+  by kind counts as other work.
+  Why: a dream only reads the folders a command works in, and the turn the runtime starts when a
+  command ends or reports cuts the dream (DRM-12); a subagent is model work that can write memory.
+  A nightly dream refused for work or an open request is tried again every `dream_retry` until
+  the window ends, then skipped with its last reason. None starts after the end; one running at
+  the end is stopped.
 - DRM-5: Nightly starts are at most the setting at once and `dream_gap` apart, and wait while plan
   use, host load or free disk on the root disk and on Seti's data disk is past `dream_gates`, or
   while the night's spend leaves less than one dream's budget. Turning Dreaming off ends the
@@ -1115,12 +1120,12 @@ Optional and off by default: a maintenance session per agent that consolidates i
 - DRM-11: The trash keeps an item for `trash_keep`, then removes it. Restore puts it back if its
   path is free (else 409); a branch is recreated at its tip. Every move into the trash, restore
   and removal is audited with path and bytes, never content.
-- DRM-12: A turn of the agent that starts during its dream cuts the dream. A restart cuts it too;
-  the memory changes it made before the cut are still recorded. A cut nightly dream is planned
-  once more within its window; cut again, it has failed. A dream ends once: its end is stored
-  with its `dream.ended` event in one transaction, after the events of its memory changes, so no
-  reader finds an ended dream without that event. A restart leaves a dream running until both
-  are stored.
+- DRM-12: A turn of the agent that starts during its dream cuts the dream at once, however short
+  the turn. A restart cuts it too; the memory changes it made before the cut are still recorded.
+  A cut nightly dream is planned once more within its window; cut again, it has failed. A dream
+  ends once: its end is stored with its `dream.ended` event in one transaction, after the events
+  of its memory changes, so no reader finds an ended dream without that event. A restart leaves a
+  dream running until both are stored.
 - DRM-13: A dream stops at its budget per dream (`dream_budget` by default), `dream_steps` or
   `dream_time`, and runs on the model the settings name. Its cost is what its runtime reports for
   the dream's session, stored on the dream, not on the agent's turns; Seti stops a dream whose
@@ -1230,19 +1235,21 @@ Optional and off by default: a maintenance session per agent that consolidates i
   `noindex`, `no-referrer`, `nosniff` and `default-src 'none'`; downloads are never HTML or SVG. A
   file is shared only after path checks, a key and credential name deny list, `share_size` and a
   secret scan.
-  This holds for every share that is not live (PUB-10), and for a live share's static view.
-- PUB-10: A live share is the user's choice per link, off by default, for HTML files only; the EA
-  and agents cannot make one. Its link answers a page with no script around a frame
-  (`sandbox allow-scripts`) holding the stored copy, plus a static view at `/static`. The frame's
-  document is served only to a frame (`Sec-Fetch-Dest: iframe`; else the same 404) and is
+  This holds for every share but a rendered HTML share's page (PUB-10), whose code view at `/code`
+  is this page.
+- PUB-10: An HTML file's share renders as a page by default; the user may turn Render off per link,
+  and then the link shows the PUB-7 page. A file that is not HTML never renders, and the EA and
+  agents cannot share or change Render. A rendered link answers a page with no script around a
+  frame (`sandbox allow-scripts`) holding the stored copy, plus the code view at `/code`. The
+  frame's document is served only to a frame (`Sec-Fetch-Dest: iframe`; else the same 404) and is
   sandboxed by its own policy too: an opaque origin with no cookies or storage (an in-memory stand-in
-  only), no network but scripts, styles and fonts from the `LIVE_SHARE_CDNS` prefixes, images only
+  only), no network but scripts, styles and fonts from the `SHARE_PAGE_CDNS` prefixes, images only
   from `data:` and `blob:`, no frames, workers, plugins, forms, popups, downloads or top
   navigation, and `frame-ancestors 'self'`; the page's `frame-src` names only that frame, so it
   cannot navigate elsewhere. Both carry PUB-7's headers, `Permissions-Policy` with every feature
   off and `X-DNS-Prefetch-Control: off`. Known limit: browsers let a script reach the internet
-  through WebRTC, so a live page can send what it holds and what a visitor types to a host it
-  names; a live share promises isolation from Seti, not the absence of network.
+  through WebRTC, so a rendered page can send what it holds and what a visitor types to a host it
+  names; rendering promises isolation from Seti, not the absence of network.
 
 ## 19. Client contract
 

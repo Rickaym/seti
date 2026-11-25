@@ -81,3 +81,9 @@ ALTER TABLE share_view ADD COLUMN unfurler TEXT;
 export const SHARE_LIVE = `
 ALTER TABLE share ADD COLUMN live BOOLEAN NOT NULL DEFAULT false;
 `
+
+/** An HTML share renders as its page unless the user turns that off; existing ones render too. */
+export const SHARE_RENDER = `
+ALTER TABLE share RENAME COLUMN live TO render;
+UPDATE share SET render = true WHERE lower(name) ~ '\\.html?$';
+`

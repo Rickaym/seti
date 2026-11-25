@@ -6,17 +6,17 @@ import {
   expectNothingReached,
   expectOwnerSignedIn,
   LEAVERS,
-  liveFrame,
+  pageFrame,
   ownerContext,
   PROBE,
   PROBE_BLOCKED,
   PROBE_LATER,
   responses,
-  seedLiveAgent,
-  shareLive,
+  seedProbeAgent,
+  shareHtml,
   startElsewhere,
   type Elsewhere,
-} from './support/live-shares.js'
+} from './support/render-shares.js'
 import { setSharing } from './support/shares.js'
 
 // WebKit runs too with SETI_E2E_WEBKIT=1; WebRTC, the known limit, is left unasserted.
@@ -43,7 +43,7 @@ async function visit(browser: Browser, base: string, work: (v: Visit) => Promise
   const web = await startElsewhere()
   const owner = await ownerContext(browser, base)
   try {
-    const { id } = await seedLiveAgent(web.url, base)
+    const { id } = await seedProbeAgent(web.url, base)
     await work({ web, owner, id, base })
   } finally {
     await owner.close()
@@ -54,7 +54,7 @@ async function visit(browser: Browser, base: string, work: (v: Visit) => Promise
 function expectShellHeaders(res: Response, url: string): void {
   const headers = res.headers()
   expect(headers['content-security-policy']).toBe(
-    `default-src 'none'; style-src 'unsafe-inline'; frame-src ${url}/live; frame-ancestors 'none'; ` +
+    `default-src 'none'; style-src 'unsafe-inline'; frame-src ${url}/frame; frame-ancestors 'none'; ` +
       "base-uri 'none'; form-action 'none'",
   )
   expect(headers['x-frame-options']).toBe('DENY')
@@ -83,7 +83,7 @@ function expectCommonHeaders(res: Response): void {
 
 /** The probe's report: fixed lines first, then the asynchronous ones in whatever order they ended. */
 async function expectProbeBlocked(page: Page): Promise<void> {
-  const frame = await liveFrame(page)
+  const frame = await pageFrame(page)
   await expect(frame.locator('#done')).toHaveText('done')
   const lines = await frame.locator('#results li').allTextContents()
   expect(lines.slice(0, PROBE_BLOCKED.length)).toEqual(PROBE_BLOCKED)
@@ -96,16 +96,16 @@ function expectOnlySeti(seen: string[], base: string): void {
   expect(seen.filter((url) => new URL(url).pathname.startsWith('/api/'))).toEqual([])
 }
 
-test('a live page runs in an opaque origin, reaches neither Seti nor the web, and leaves the owner signed in', async ({
+test('a rendered page runs in an opaque origin, reaches neither Seti nor the web, and leaves the owner signed in', async ({
   browser,
   baseURL,
 }) => {
   await visit(browser, baseURL ?? '', async ({ web, owner, id, base }) => {
-    const url = await shareLive(owner, id, 'probe.html')
+    const url = await shareHtml(owner, id, 'probe.html')
     const page = await owner.newPage()
     const seen = responses(owner)
     const shell = page.waitForResponse((res) => res.url() === url)
-    const frame = page.waitForResponse((res) => res.url() === `${url}/live`)
+    const frame = page.waitForResponse((res) => res.url() === `${url}/frame`)
     await page.goto(url)
     for (const res of [await shell, await frame]) {
       expectCommonHeaders(res)
@@ -113,10 +113,7 @@ test('a live page runs in an opaque origin, reaches neither Seti nor the web, an
     expectShellHeaders(await shell, url)
     expectFrameHeaders(await frame)
     await expect(page.getByRole('heading', { name: 'probe.html' })).toBeVisible()
-    await expect(page.getByRole('link', { name: 'Static view' })).toHaveAttribute(
-      'href',
-      `${new URL(url).pathname}/static`,
-    )
+    await expect(page.getByRole('link', { name: 'View code' })).toHaveAttribute('href', `${new URL(url).pathname}/code`)
     await expect(page.locator('script')).toHaveCount(0)
     await expectProbeBlocked(page)
     await page.reload()
@@ -129,9 +126,9 @@ test('a live page runs in an opaque origin, reaches neither Seti nor the web, an
   })
 })
 
-test('links, forms, downloads and popups in a live page go nowhere', async ({ browser, baseURL }) => {
+test('links, forms, downloads and popups in a rendered page go nowhere', async ({ browser, baseURL }) => {
   await visit(browser, baseURL ?? '', async ({ web, owner, id, base }) => {
-    const url = await shareLive(owner, id, 'probe.html')
+    const url = await shareHtml(owner, id, 'probe.html')
     const page = await owner.newPage()
     const seen = responses(owner)
     let downloads = 0
@@ -140,7 +137,7 @@ test('links, forms, downloads and popups in a live page go nowhere', async ({ br
     })
     for (const target of ['#self', '#to-top', '#blank', '#save', '#send', '#send-top']) {
       await page.goto(url)
-      const frame = await liveFrame(page)
+      const frame = await pageFrame(page)
       await frame.locator(target).click()
       await expectNothingReached(web)
       expect(page.url(), target).toBe(url)
@@ -152,18 +149,18 @@ test('links, forms, downloads and popups in a live page go nowhere', async ({ br
   })
 })
 
-test('a live page cannot navigate its frame to the web, to Seti or to data', async ({ browser, baseURL }) => {
+test('a rendered page cannot navigate its frame to the web, to Seti or to data', async ({ browser, baseURL }) => {
   await visit(browser, baseURL ?? '', async ({ web, owner, id, base }) => {
     const page = await owner.newPage()
     const seen = responses(owner)
     for (const file of LEAVERS) {
-      const url = await shareLive(owner, id, file)
+      const url = await shareHtml(owner, id, file)
       await page.goto(url)
       await expectNothingReached(web)
       expect(page.url(), file).toBe(url)
       const framed = page.frames().filter((frame) => frame.url().startsWith(base))
       expect(
-        framed.map((frame) => frame.url()).filter((at) => at !== url && at !== `${url}/live`),
+        framed.map((frame) => frame.url()).filter((at) => at !== url && at !== `${url}/frame`),
         file,
       ).toEqual([])
     }
@@ -174,12 +171,12 @@ test('a live page cannot navigate its frame to the web, to Seti or to data', asy
 
 test('the frame never opens as a tab, and neither part opens inside another site', async ({ browser, baseURL }) => {
   await visit(browser, baseURL ?? '', async ({ web, owner, id }) => {
-    const url = await shareLive(owner, id, 'probe.html')
+    const url = await shareHtml(owner, id, 'probe.html')
     const page = await owner.newPage()
-    expect((await page.goto(`${url}/live`))?.status()).toBe(404)
+    expect((await page.goto(`${url}/frame`))?.status()).toBe(404)
     for (const [src, heading] of [
       [url, 'probe.html'],
-      [`${url}/live`, 'Live probe'],
+      [`${url}/frame`, 'Page probe'],
     ] as const) {
       await page.goto(`${web.url}/frame?src=${encodeURIComponent(src)}`)
       await expectNothingReached(web)
@@ -207,11 +204,11 @@ test('a script from an allowed CDN path gains nothing an inline one lacks; other
         await route.fulfill({ status: 404, body: '' })
       }
     })
-    const url = await shareLive(owner, id, 'cdn.html')
+    const url = await shareHtml(owner, id, 'cdn.html')
     const page = await owner.newPage()
     await page.goto(url)
     await expectProbeBlocked(page)
-    const frame = await liveFrame(page)
+    const frame = await pageFrame(page)
     await expect(frame.getByRole('heading', { name: 'CDN probe' })).toHaveCSS('color', 'rgb(1, 2, 3)')
     await expectNothingReached(web)
     expect([...new Set(asked)].sort(byText)).toEqual([CDN_PROBE_URL, CDN_STYLE_URL].sort(byText))

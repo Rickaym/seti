@@ -120,7 +120,7 @@ const embeds = (web: string) => `<img src="${web}/img" alt=""><img src="relative
 
 /** The probe page; `seti` is Seti's origin, which the probe asks for the owner's shares. */
 const probePage = (web: string, seti: string) => `<!doctype html>
-<html><head><meta charset="utf-8"><title>Probe</title>${loaders(web)}</head><body><h1>Live probe</h1>
+<html><head><meta charset="utf-8"><title>Probe</title>${loaders(web)}</head><body><h1>Page probe</h1>
 <ul id="results"></ul><p id="done"></p>${embeds(web)}
 <script>${PROBE(web, seti)}</script></body></html>
 `
@@ -136,21 +136,21 @@ const leavers = (web: string, seti: string): Record<string, string> => ({
 
 /** A page that loads its probe from an allowed CDN path, and tries paths and images it may not. */
 const cdnPage = `<!doctype html>
-<html><head><meta charset="utf-8"><link rel="stylesheet" href="https://unpkg.com/live-probe@1.0.0/probe.css">
+<html><head><meta charset="utf-8"><link rel="stylesheet" href="https://unpkg.com/page-probe@1.0.0/probe.css">
 <script src="https://cdnjs.cloudflare.com/other/probe.js"></script>
 <script src="https://cdn.jsdelivr.net/gh/someone/repo/probe.js"></script></head>
 <body><h1>CDN probe</h1><ul id="results"></ul><p id="done"></p>
-<img src="https://cdn.jsdelivr.net/npm/live-probe@1.0.0/pixel.png" alt="">
-<script src="https://cdn.jsdelivr.net/npm/live-probe@1.0.0/probe.js"></script></body></html>
+<img src="https://cdn.jsdelivr.net/npm/page-probe@1.0.0/pixel.png" alt="">
+<script src="https://cdn.jsdelivr.net/npm/page-probe@1.0.0/probe.js"></script></body></html>
 `
 
-export const CDN_PROBE_URL = 'https://cdn.jsdelivr.net/npm/live-probe@1.0.0/probe.js'
-export const CDN_STYLE_URL = 'https://unpkg.com/live-probe@1.0.0/probe.css'
+export const CDN_PROBE_URL = 'https://cdn.jsdelivr.net/npm/page-probe@1.0.0/probe.js'
+export const CDN_STYLE_URL = 'https://unpkg.com/page-probe@1.0.0/probe.css'
 
 /** An idle agent whose docs hold the probe, the pages that try to leave, and the CDN probe. */
-export async function seedLiveAgent(web: string, seti: string): Promise<{ id: string }> {
+export async function seedProbeAgent(web: string, seti: string): Promise<{ id: string }> {
   const id = randomUUID()
-  const docs = path.join(paths.root, `live-${id.slice(0, 8)}`, 'docs')
+  const docs = path.join(paths.root, `pages-${id.slice(0, 8)}`, 'docs')
   fs.mkdirSync(docs, { recursive: true })
   fs.writeFileSync(path.join(docs, 'probe.html'), probePage(web, seti))
   fs.writeFileSync(path.join(docs, 'cdn.html'), cdnPage)
@@ -158,17 +158,17 @@ export async function seedLiveAgent(web: string, seti: string): Promise<{ id: st
     fs.writeFileSync(path.join(docs, name), page)
   }
   const db = openSeedDb()
-  await db.idleTask(id, 'Live pages', path.dirname(docs), new Date(Date.now() - 60_000).toISOString())
+  await db.idleTask(id, 'Shared pages', path.dirname(docs), new Date(Date.now() - 60_000).toISOString())
   await db.close()
   return { id }
 }
 
 export const LEAVERS = ['away.html', 'refresh.html', 'api.html', 'app.html', 'data.html']
 
-/** Shares one of the agent's docs as a live page through the API and returns its link. */
-export async function shareLive(context: BrowserContext, taskId: string, file: string): Promise<string> {
+/** Shares one of the agent's docs as a rendered page through the API and returns its link. */
+export async function shareHtml(context: BrowserContext, taskId: string, file: string): Promise<string> {
   const res = await context.request.post(`/api/tasks/${taskId}/shares`, {
-    data: { root: 'cwd', path: `docs/${file}`, live: true },
+    data: { root: 'cwd', path: `docs/${file}` },
   })
   expect(res.ok(), await res.text()).toBe(true)
   return ((await res.json()) as Envelope<ShareLink>).data.url
@@ -191,12 +191,14 @@ export async function expectOwnerSignedIn(context: BrowserContext): Promise<void
   expect((await context.request.get('/api/shares')).status()).toBe(200)
 }
 
-/** The live frame of a shell page, once its document has loaded. */
-export async function liveFrame(page: Page): Promise<Frame> {
-  await expect.poll(() => page.frames().some((frame) => frame.url().endsWith('/live'))).toBe(true)
-  const frame = page.frames().find((each) => each.url().endsWith('/live'))
+const FRAME_PATH = /\/share\/[A-Za-z0-9_-]{43}\/frame$/
+
+/** The page frame of a shell page, once its document has loaded. */
+export async function pageFrame(page: Page): Promise<Frame> {
+  await expect.poll(() => page.frames().some((frame) => FRAME_PATH.test(frame.url()))).toBe(true)
+  const frame = page.frames().find((each) => FRAME_PATH.test(each.url()))
   if (frame === undefined) {
-    throw new Error('no live frame')
+    throw new Error('no page frame')
   }
   await frame.waitForLoadState()
   return frame
