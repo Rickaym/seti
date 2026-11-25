@@ -742,6 +742,10 @@ interrupted only for that.
 - SEC-16: An item's state for an agent MUST be its own choice, else its credential's set, else the
   default for every agent; a set change applies from each agent's next turn. Its allowlist MUST be
   the shared list, its credential's hosts and its own.
+- SEC-17: Only the user saves an agent's access into its credential's set. A save MUST first show
+  which items change and which other agents each one turns on or off, and MUST be refused when the
+  set, its hosts, its agents or their choices changed since. The saving agent's own choices and
+  hosts are cleared, since the set now gives them.
 - SEC-18: Only the user changes a set or drops all of an agent's own choices at once. A delegate
   MUST NOT move an agent to a credential whose set turns on an SSH host, cloud access or a host the
   agent lacks.
