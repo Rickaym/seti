@@ -48,3 +48,12 @@ test("the Claude Code card shows the agents' token, the program and its default 
   await expect(page).toHaveURL(/#settings\/credentials$/)
   await expect(page.locator('#secrets')).toBeInViewport()
 })
+
+test('an old Subagents link opens Claude Code subagents and models on Runtimes', async ({ page }) => {
+  await page.goto('/#settings/subagents')
+  await expect(page).toHaveURL(/#settings\/runtimes$/)
+  const section = page.getByRole('main').getByRole('region', { name: 'Subagents and models' })
+  await expect(section.getByRole('button', { name: 'Subagents and models' })).toHaveAttribute('aria-expanded', 'true')
+  await expect(section.getByRole('region', { name: 'Models' })).toBeVisible({ timeout: 30_000 })
+  await expect(section).toBeInViewport()
+})

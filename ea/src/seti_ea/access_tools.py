@@ -154,6 +154,8 @@ def _named(item: Mapping[str, Any], profile: str) -> str:
     if item.get("enabled") is True and missing:
         where = "" if missing[0] == item.get("id") else f" for its jump host {missing[0]}"
         notes.append(f"no key{where}, so it cannot connect")
+    if isinstance(unusable := item.get("unusable"), str):
+        notes.append(unusable.rstrip("."))
     return f"{name_of(item)} ({'; '.join(notes)})" if notes else name_of(item)
 
 

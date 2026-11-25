@@ -11,7 +11,7 @@ import { OPINION_TOOLS } from './seti-tools/second-opinion.js'
 import { callSetiTool } from './seti-tools/server.js'
 import { codexSettings } from './store/codex-settings.js'
 import { secondOpinions } from './store/second-opinions.js'
-import { canSandbox, proofRun, type ProofRun } from './test-codex-proof.js'
+import { canSandbox, proofRun, USER_FILES, type ProofRun } from './test-codex-proof.js'
 import { clearConnections } from './test-connections.js'
 import { CLAUDE_OPINION } from './test-opinion-sdk.js'
 
@@ -83,6 +83,14 @@ export function proofSuite(split: boolean): void {
       expect(fs.existsSync(path.join(path.dirname(run.program), 'seti-proof'))).toBe(false)
     })
 
+    it("reads the user's CLAUDE.md and lists and loads the user's skill, read-only", async () => {
+      await run.skillTurn(task)
+      const told = run.model.told()
+      expect(told, "the user's CLAUDE.md is the agent's global instructions").toContain(USER_FILES.instructions)
+      expect(told, "Seti lists the user's skill").toContain('- proof: PROOF_SKILL_LISTED')
+      expect(told, 'the skill loads in the sandbox').toContain(USER_FILES.skill)
+    }, 120_000)
+
     it('stops a turn on an interrupt, and resumes the conversation after a restart', async () => {
       await run.interruptedTurn(task)
       await run.restartAndResume(task)
@@ -93,6 +101,15 @@ export function proofSuite(split: boolean): void {
       expect(last).toContain('<turn_aborted>')
       expect(last).toContain('The user restarted your Codex session from Seti')
     }, 120_000)
+
+    it("runs the user's MCP server in the sandbox, asks about its call, and lets the user's rule allow it", async () => {
+      const { asked, ruled, started } = await run.mcpTurns(task)
+      expect(asked, 'a read-only tool of a user server is still asked about').toEqual(['mcp__proof__peek'])
+      expect(ruled, "the user's allow rule decides the second call").toEqual([])
+      const last = run.model.fake.bodies.at(-1) ?? ''
+      expect(last.split('PROOF PEEKED').length - 1, 'both calls ran').toBe(2)
+      expect(started.trim().split('\n'), 'one server process, without the model key').toEqual(['PROOF nokey'])
+    }, 180_000)
 
     it("asks Claude for a second opinion through Seti's tool relay and hears its answer as data", async () => {
       await run.asksOpinion(task)

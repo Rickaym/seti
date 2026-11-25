@@ -2,7 +2,7 @@ import { z } from 'zod'
 import { firstIssue } from './lenient.js'
 import { modelFallbackMessage } from './model-fallback.js'
 import { stored as codexPayload } from './runtimes/codex/shapes.js'
-import type { StoredRuntime } from './runtimes/stored.js'
+import { STORED_RUNTIMES, type StoredRuntime } from './runtimes/stored.js'
 import { setiControlLevel } from './seti-control.js'
 import type { MessageBody } from './tasks.js'
 
@@ -99,12 +99,16 @@ const promptPayload = z.looseObject({
 const setiPayload = z.looseObject({
   error: text,
   stopped: z.boolean().optional(),
-  session: z.enum(['restarted', 'fresh']).optional(),
+  session: z.enum(['restarted', 'fresh', 'continued']).optional(),
+  runtime_was: z.enum(STORED_RUNTIMES).optional(),
   seti_control: z.union([z.boolean(), setiControlLevel]).optional(),
   seti_control_was: setiControlLevel.optional(),
   bypass: z.boolean().optional(),
   resumed: z.boolean().optional(),
   timed_out: text.optional(),
+  /** A host the agent's sandbox refused, and how many times so far. */
+  refused_host: text.optional(),
+  refused_count: z.number().optional(),
 })
 
 const shellPayload = z.looseObject({

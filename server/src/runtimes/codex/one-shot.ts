@@ -7,21 +7,21 @@ const REFUSAL = 'This call offers no tools; answer from what you were given.'
 
 /**
  * Codex's one-shot: an app-server with no tool server and an ephemeral thread, whose every ask
- * Seti declines at once, run with the program `program` finds when the call starts.
+ * Seti declines at once, run with the request's program unless a test bench names its own.
  */
-export const codexOneShotFor = (program: () => Promise<string | null>, provider?: CodexProvider): OneShot => ({
+export const codexOneShotFor = (binary?: string, provider?: CodexProvider): OneShot => ({
   open: async (request, launcher, abortController) => {
-    const binary = await program()
-    if (binary === null) {
+    const program = binary ?? request.program
+    if (program === null) {
       throw new Error('Codex is not installed.')
     }
     const realised = realiseOneShot(request, launcher, {
       decide: async () => Promise.resolve({ allow: false, message: REFUSAL }),
       abortController,
-      binary,
+      binary: program,
       ...(provider === undefined ? {} : { provider }),
     })
-    return codexSession(realised, oneInput(request.prompt))
+    return Promise.resolve(codexSession(realised, oneInput(request.prompt)))
   },
   price: callCost,
 })

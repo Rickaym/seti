@@ -29,6 +29,7 @@ import { needsYouCount } from './needs-you-count.js'
 import { audienceOf } from './notify-scope.js'
 import { onScreen } from './presence.js'
 import { sealedSecrets, secret, SecretUnreadableError } from './secrets.js'
+import { DIRECT, type SettingsWrite } from './settings-write.js'
 import { notificationSettings, pushDevices, type PushTarget } from './store/notifications.js'
 import { attentionOf } from './task-attention.js'
 import { askedQuestion } from './turn-asking.js'
@@ -326,19 +327,23 @@ export async function notificationStatus(): Promise<NotificationStatus> {
   return { public_key: key, settings, devices }
 }
 
-export async function changeNotificationSettings(change: Partial<NotificationSettings>): Promise<NotificationStatus> {
+export async function changeNotificationSettings(
+  change: Partial<NotificationSettings>,
+  write: SettingsWrite = DIRECT,
+): Promise<NotificationStatus> {
   const before = await notificationSettings.get()
   const next: NotificationSettings = { ...before, ...change }
   if (ATTENTION_TIERS.some((tier) => next[tier] !== before[tier])) {
-    await notificationSettings.set(next)
-    const tiers = ATTENTION_TIERS.map((tier) => `${tier} ${next[tier]}`).join(', ')
-    await audit.record({
-      actor: 'user',
-      kind: 'system.notifications_changed',
-      subject_type: 'system',
-      summary: `Notifications: ${tiers}`,
-      detail: { ...next },
-    })
+    await notificationSettings.set(next, write.db)
+    await write.after(async () =>
+      audit.record({
+        actor: 'user',
+        kind: 'system.notifications_changed',
+        subject_type: 'system',
+        summary: `Notifications: ${ATTENTION_TIERS.map((tier) => [tier, next[tier]].join(' ')).join(', ')}`,
+        detail: { ...next },
+      }),
+    )
   }
   return notificationStatus()
 }

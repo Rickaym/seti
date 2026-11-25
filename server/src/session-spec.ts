@@ -3,6 +3,7 @@ import { claudeRules } from './approval-ceiling.js'
 import { permissionModeOf } from './bypass-mode.js'
 import { hostLoginKey } from './claude-logins.js'
 import { requireCodexProgram } from './codex-status.js'
+import { codexToolServers } from './codex-tool-servers.js'
 import { effectiveCompact } from './compact.js'
 import { dreamsOn } from './dreams/settings.js'
 import { launchPlan } from './launch-plan.js'
@@ -11,6 +12,7 @@ import { taskDeniedServers } from './mcp-selection.js'
 import { tokenServers } from './mcp-sign-in.js'
 import type { PermissionSettings } from './permission-policy.js'
 import { taskPluginConfigs } from './plugins.js'
+import { proxyGrant } from './proxy-grant.js'
 import type { RuntimeId } from './runtimes/adapter.js'
 import type { CodexShapes } from './runtimes/codex/session.js'
 import type { DefaultShapes } from './runtimes/registry.js'
@@ -20,6 +22,7 @@ import { systemAppend, workingDirs } from './session-options.js'
 import { isClaudeSpec, isCodexSpec, realiseClaude } from './session-realise.js'
 import { sharedToolFolders } from './shared-tools.js'
 import { codexSettings } from './store/codex-settings.js'
+import { userSkills } from './user-skills.js'
 
 /** What a task's session starts from, read from the database; it holds no secret values. */
 export interface SessionSpec<Id extends string = RuntimeId> {
@@ -80,10 +83,13 @@ async function liveSpec(task: Task) {
  */
 async function codexVendor(task: Task): Promise<CodexShapes['vendor']> {
   const settings = await codexSettings.get()
+  const { grant, denied } = await proxyGrant(task, 'codex')
   return {
     binary: await requireCodexProgram(settings),
     model: task.requested_model ?? settings.default_model,
     effort: task.requested_effort ?? settings.default_effort,
+    skills: userSkills(),
+    servers: (await codexToolServers(task, grant, denied)).servers,
   }
 }
 

@@ -1,5 +1,5 @@
 import { todoProgress, type AgentTodo } from '@seti/shared'
-import { Archive, Pin } from 'lucide-react'
+import { Archive, CornerDownRight, Pin } from 'lucide-react'
 import { useState } from 'react'
 import { Hint } from '@/components/Hint'
 import { RuntimeBadge } from '@/components/RuntimeBadge'
@@ -94,13 +94,15 @@ function ArchiveButton({ row, pinned }: { row: AgentRow; pinned: boolean }) {
 export function AgentListRow({ row, selected, draggable, place, archiving, onOpen }: AgentListRowProps) {
   const { task, running, status } = row
   const reason = reasonLine(task, status)
+  const under = row.under ?? null
+  const startedBy = under === null ? null : `Started by ${under}`
   return (
     <div className="group/row relative">
       <div data-task-id={task.id}>
         <button
           type="button"
           {...agentColorAttr(task.color)}
-          title={[rowHint(task, task.updated_at), status, reason].filter((line) => line !== null).join('\n')}
+          title={[rowHint(task, task.updated_at), status, reason, startedBy].filter((line) => line !== null).join('\n')}
           draggable={draggable}
           onDragStart={(event) => {
             event.dataTransfer.setData(AGENT_DRAG_TYPE, task.id)
@@ -113,9 +115,17 @@ export function AgentListRow({ row, selected, draggable, place, archiving, onOpe
             ROW,
             'agent-stripe group-hover/row:bg-accent',
             selected && (task.color === null ? 'bg-accent' : 'agent-tint'),
+            under !== null && 'pl-5',
           )}
         >
           <ModAgentAccent status={status} subagents={running} agent={task} place={place} className={ACCENT} />
+          {startedBy !== null && (
+            <CornerDownRight
+              data-testid="agent-delegate-mark"
+              className="size-3 shrink-0 text-muted-foreground"
+              aria-label={startedBy}
+            />
+          )}
           {task.pinned && <Pin className="size-3 shrink-0 text-muted-foreground" aria-label="Pinned" />}
           <span className={cn('min-w-0 truncate text-sm font-medium', reason === null && 'flex-1')}>{task.title}</span>
           <StatusLine text={reason} hint={false} className="min-w-[10ch] flex-1" />

@@ -67,7 +67,7 @@ with another top-level folder.
 | 6 Attention    | `shared/src/attention.ts`, `task-blocked.ts`, `stall-watch.ts`, `ea-attention.ts`, `notifications.ts`, `notify-scope.ts`, `presence.ts`, `attention-brief.ts`                                                                                                                                                                                                     |
 | 7.1 Actors     | `access.ts`, `ea-guard.ts`                                                                                                                                                                                                                                                                                                                                        |
 | 7.2, 7.3       | `sandbox.ts`, `sandbox-mounts.ts`, `sandbox-bwrap.ts`, `sandbox-codex.ts`, `sandbox-read-only.ts`, `egress-*.ts`, `sandbox-ca.ts`, `sandbox-aws-token.ts`, `task-proxy.ts`, `launch-plan.ts`, `proxy-grant.ts`, `codex-key.ts`, `egress-connections.ts`, `proxy-owner.ts`, `secret-asks.ts`, `ask-in-time.ts`, `ssh-agent.ts`, `agent-access.ts`, `tool-relay.ts` |
-| 7.4, 7.5       | `permission-policy.ts`, `policy/`, `permission-requests.ts`, `permission-timeout.ts`, `permission-guard.ts`, `repeat-hooks.ts`, `review-hooks.ts`, `shadow-hooks.ts`, `outward.ts`                                                                                                                                                                                |
+| 7.4, 7.5       | `permission-policy.ts`, `policy/`, `permission-requests.ts`, `permission-timeout.ts`, `permission-guard.ts`, `repeat-hooks.ts`, `review-hooks.ts`, `shadow-hooks.ts`, `outward.ts`, `outward-push.ts` and `push-asks.ts` (PERM-15: `policy/outward.ts` reads the command, the Claude agent's `Bash` hook in `runtime-host.ts` and `codex-decide.ts` ask)          |
 | 7.6 Changes    | `change-requests.ts`, `change-request-notes.ts`, `mcp-off-context.ts`, `shared/src/change-requests.ts`                                                                                                                                                                                                                                                            |
 | 7.7 Hostile    | `git.ts`, `runtimes/claude/probe-launch.ts`, `task-files.ts`, `html-preview.ts`, `uploads.ts`                                                                                                                                                                                                                                                                     |
 | 7.8 Caps       | `launcher.ts`, `memory-scope.ts`, `scope-cpu.ts`, `scope-limits.ts`, `scope-control.ts`, `oom-guard.ts`                                                                                                                                                                                                                                                           |
@@ -132,7 +132,8 @@ with another top-level folder.
   with, each key described; `server/src/settings-doc/` reads them through the functions the pages
   read. A new column in a settings table fails `settings-doc/columns.test.ts` until it has a path
   or a reason it is state, and a new settings page fails `settings/json/settings-json.test.ts`
-  until it has a section. A section's `security` keys are left out of the EA's document.
+  until it has a section. A section's `security` keys are left out of the EA's document. Its
+  defaults are in `server/src/settings-doc/defaults.ts`, which the compiler holds complete.
 
 [Setup](setup.md#where-data-lives) lists every path on disk.
 
@@ -314,8 +315,9 @@ egress proxy.
 
 ### One-shot calls
 
-A runtime may also answer one question with no tools, for a second opinion. Its `OneShot`
-(`server/src/runtimes/one-shot.ts`; `claude/one-shot.ts`, `codex/one-shot.ts`) opens a new
+Every runtime also answers one question with no tools, for a second opinion: its
+`capabilities.oneShot` (`server/src/runtimes/one-shot.ts` holds the types; `claude/one-shot.ts`
+and `codex/one-shot.ts` the runtimes' parts), read through `oneShotFor`. It opens a new
 session that offers the model no tool, refuses any call it makes without asking anyone, and keeps
 nothing to resume: Claude Code with no tools, settings or tool servers, one turn and no saved
 session; Codex with no tool server, an ephemeral thread and every ask declined. `runOneShot`
@@ -326,8 +328,9 @@ or when the model keeps calling tools.
 A one-shot runs in a bare maintenance sandbox (`maintenanceLauncher` with `bare`): an empty
 folder of its own, none of the agent's folders, memory or Claude Code state, and a proxy that
 reaches only the model provider, with the agent's Claude login or the connection that carries its
-OpenAI key. Until `capabilities` declares one-shots, the suite reads them from the target's
-`oneShot`, and cases OS-1 and OS-2 cover them.
+OpenAI key. The request names the runtime's program where Seti installs it (`runtimeProgram`),
+as a session's spec does. Cases OS-1 and OS-2 cover every adapter's one-shot, asking the model
+the target's `oneShotModel` names.
 
 ### The conformance suite
 

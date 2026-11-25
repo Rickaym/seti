@@ -1,4 +1,4 @@
-import { now, sql, transaction } from '../db.js'
+import { now, sql, transaction, type Db } from '../db.js'
 
 /** One value of a mod's store at most, and all of one mod's values together. */
 const MOD_DATA_VALUE_MAX = 64 * 1024
@@ -39,16 +39,17 @@ export const modSettings = {
         (row) => [row.key, row.value],
       ),
     ),
-  /** Saves the given keys in one go; the caller validated them against the manifest. */
-  put: async (modId: string, values: Readonly<Record<string, unknown>>): Promise<void> => {
+  /** Saves the given keys in one go, in the caller's transaction if given; they are validated. */
+  put: async (modId: string, values: Readonly<Record<string, unknown>>, db?: Db): Promise<void> => {
     const at = now()
-    await transaction(async (tx) => {
+    const write = async (tx: Db) => {
       for (const [key, value] of Object.entries(values)) {
         await tx`INSERT INTO mod_settings (mod_id, key, value, updated_at)
           VALUES (${modId}, ${key}, ${JSON.stringify(value)}::text::jsonb, ${at})
           ON CONFLICT (mod_id, key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`
       }
-    })
+    }
+    await (db === undefined ? transaction(write) : write(db))
   },
 }
 

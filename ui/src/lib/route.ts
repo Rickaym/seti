@@ -93,6 +93,7 @@ const SSH_HOSTS: Moved = { page: 'ssh', card: 'ssh-hosts' }
 const SSH_KEYS: Moved = { page: 'ssh', under: 'keys', card: 'ssh-keys' }
 const PHONES: Moved = { page: 'signin', card: 'phones' }
 const SECRETS: Moved = { page: 'credentials', card: 'secrets' }
+const CLAUDE_AGENTS: Moved = { page: 'runtimes', card: 'claude-agents' }
 
 /** Parts of settings pages that became pages of their own, by their old `<page>/<part>` path. */
 const MOVED_PARTS: Partial<Record<string, string | Moved>> = {
@@ -101,7 +102,7 @@ const MOVED_PARTS: Partial<Record<string, string | Moved>> = {
   'general/repos': 'repos',
   'general/about': 'about',
   'plugins/skills': 'skills',
-  'plugins/subagents': 'subagents',
+  'plugins/subagents': CLAUDE_AGENTS,
   'signin/browsers': 'signin',
   'signin/devices': PHONES,
   'credentials/sets': 'credentials',
@@ -118,6 +119,7 @@ const MERGED_PAGES: Partial<Record<string, Moved>> = {
   devices: PHONES,
   secrets: SECRETS,
   account: { page: 'runtimes', card: 'claude' },
+  subagents: CLAUDE_AGENTS,
 }
 
 interface Target {

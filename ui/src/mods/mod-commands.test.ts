@@ -100,4 +100,20 @@ describe("mods' rows in an agent's menu", () => {
     expect(on.map((c) => [c.title, c.shortcut, c.group])).toEqual([['Ask aside', '/btw', 'Current agent']])
     expect(modPaletteCommands(list(side({})), [])[0]?.shortcut).toBeUndefined()
   })
+
+  it('leave out a command on an agent whose runtime lacks what it needs, and say so for its slash command', () => {
+    const running = list(side({ enabled: true, running: true }))
+    const lacks = (agent: string | null) => (agent === 'codex-agent' ? 'Codex' : null)
+    expect(modAgentActions(running, [], 'codex-agent', lacks)).toEqual([])
+    expect(modAgentActions(running, [], 'agent-1', lacks)).toHaveLength(1)
+    const [ask] = modPaletteCommands(running, [], lacks)
+    const route = { section: 'agents', id: 'codex-agent', sub: null, detail: null, terminal: null } as const
+    expect(ask?.when?.({ route, agent: { id: 'codex-agent' } as TaskListEntry })).toBe(false)
+    expect(ask?.when?.({ route, agent: { id: 'agent-1' } as TaskListEntry })).toBe(true)
+    expect(resolveModSlash('/btw why', running, 'codex-agent', lacks)).toEqual({
+      kind: 'lacks',
+      reason: '/btw is not on Codex',
+    })
+    expect(resolveModSlash('/btw why', running, 'agent-1', lacks)?.kind).toBe('run')
+  })
 })

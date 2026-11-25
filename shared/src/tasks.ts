@@ -141,7 +141,13 @@ export const createTaskInput = z.object({
 export type CreateTaskInput = z.input<typeof createTaskInput>
 export type CreateTaskRequest = z.output<typeof createTaskInput>
 /** A create request with its title settled, and how the planner set it up when it did. */
-export type TaskRequest = CreateTaskRequest & { title: string; setup?: TaskSetup; attachments?: AttachmentRef[] }
+export type TaskRequest = CreateTaskRequest & {
+  title: string
+  setup?: TaskSetup
+  attachments?: AttachmentRef[]
+  /** The agent that starts it, when an agent does. */
+  delegated_by?: string
+}
 
 export const updateTaskInput = z.object({
   title: z.string().trim().min(1).optional(),
@@ -175,12 +181,22 @@ export const sendMessageInput = z.object({
 })
 export type SendMessageInput = z.input<typeof sendMessageInput>
 
-/** Ends the agent's Claude Code process and starts a new one at once. */
-export const restartSessionInput = z.object({
-  /** Stop a running turn first; without it a running agent is refused. */
-  interrupt: z.boolean().default(false),
-})
+/** Ends the agent's runtime process and starts a new one at once, on `runtime` when it names one. */
+export const restartSessionInput = z
+  .object({
+    /** Stop a running turn first; without it a running agent is refused. */
+    interrupt: z.boolean().default(false),
+    /** Continue on this runtime instead, with a brief of the agent's work. */
+    runtime: runtimeFields.runtime,
+    /** The model on that runtime; its default when absent. */
+    model: runtimeFields.model,
+  })
+  .refine((input) => input.model === undefined || input.runtime !== undefined, {
+    message: 'A model needs the runtime it runs on',
+    path: ['model'],
+  })
 export type RestartSessionInput = z.input<typeof restartSessionInput>
+export type RestartSessionRequest = z.output<typeof restartSessionInput>
 
 /** What a stop does with queued messages: takes them back, or hands written ones to the agent. */
 export const stopTurnQuery = z.object({ queued: z.enum(['remove', 'deliver']).default('remove') })
@@ -318,6 +334,8 @@ export interface Task {
   closing_line: string | null
   /** Why its work cannot go on without the user, such as a tool call to allow; null otherwise. */
   blocked: string | null
+  /** The agent whose start_task started it; null when the user or the EA started it. */
+  delegated_by: string | null
 }
 
 /**
@@ -364,11 +382,12 @@ export type MessageBody =
   | { kind: 'sdk'; payload: CodexMessage; runtime: 'codex' }
   /**
    * A note from Seti; `stopped` marks one about a process the user stopped, `session` one about a
-   * session restart and `seti_control` one about the agent's Seti control level, which the agent
-   * reads; `memory` one about the agent's memory cap, with `ended_turn` when the cap stopped Claude
-   * Code itself; `bypass` one about Bypass turning on or off; `resumed` one about a turn that a
-   * restart of Seti cut off and Seti resumed by itself; `timed_out` holds when a permission
-   * request was denied for want of an answer.
+   * session restart or a move to another runtime (`runtime_was` names the one it left) and
+   * `seti_control` one about the agent's Seti control level, which the agent reads; `memory` one
+   * about the agent's memory cap, with `ended_turn` when the cap stopped Claude Code itself;
+   * `bypass` one about Bypass turning on or off; `resumed` one about a turn that a restart of Seti
+   * cut off and Seti resumed by itself; `timed_out` holds when a permission request was denied for
+   * want of an answer.
    */
   | {
       kind: 'seti'
@@ -376,6 +395,7 @@ export type MessageBody =
         error: string
         stopped?: boolean
         session?: SessionRestart
+        runtime_was?: StoredRuntime
         /** A level; notes written before levels existed hold true for on and false for off. */
         seti_control?: SetiControlLevel | boolean
         /** The level before this change, so a change undone before the next turn says nothing. */
@@ -385,6 +405,9 @@ export type MessageBody =
         timed_out?: string
         memory?: MemoryEvent
         ended_turn?: boolean
+        /** A host the agent's sandbox refused, and how many times so far. */
+        refused_host?: string
+        refused_count?: number
       }
     }
   | { kind: 'shell'; payload: ShellResult }
@@ -428,7 +451,7 @@ export const RESENT_NOTE =
   'of the previous session), so Seti sent it again.'
 
 /** What a restart note says of the session; `fresh` marks one begun without the conversation. */
-export type SessionRestart = 'restarted' | 'fresh'
+export type SessionRestart = 'restarted' | 'fresh' | 'continued'
 
 export type TaskEvent =
   | { type: 'message'; row: MessageRow }
@@ -511,6 +534,7 @@ export const taskFields = {
   asking: flag('asking'),
   closing_line: maybeText('closing_line'),
   blocked: maybeText('blocked'),
+  delegated_by: maybeText('delegated_by'),
 }
 
 export const taskSchema = z.object(taskFields) satisfies ResponseSchema<Task>

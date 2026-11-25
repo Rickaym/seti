@@ -5,6 +5,7 @@ import type {
   ContextPackSummary,
   PackKind,
   RevisionState,
+  RoleRuntimeInput,
   Task,
 } from '@seti/shared'
 import { audit } from './audit.js'
@@ -12,6 +13,7 @@ import { readContextFile, writeContextFile } from './context-files.js'
 import { refuseAtSelf, refuseOtherAgent } from './ea-guard.js'
 import { HttpError } from './http.js'
 import { byUser, recordRevision, sourceDetail, type ChangeSource, type Saved } from './revisions.js'
+import { pickedRuntime } from './runtime-offers.js'
 import { packForDisplay } from './seti-guide.js'
 import { contextPacks, eaContextPacks, taskContextPacks } from './store/context.js'
 import { signalWorkspaces } from './workspace/dir.js'
@@ -51,6 +53,28 @@ export async function setPackLinkedByDefault(id: string, on: boolean): Promise<C
     subject_id: id,
     summary: `${on ? 'Linked' : 'Unlinked'} context pack "${pack.name}" by default for agents without their own choice`,
     detail: { name: pack.name, linked_by_default: on },
+  })
+  signalWorkspaces('packs')
+  return pack
+}
+
+/** Sets the runtime and model an agent started in this role takes; built-in roles take them too. */
+export async function setRoleRuntime(id: string, input: RoleRuntimeInput): Promise<ContextPack> {
+  const before = await requirePack(id)
+  if (before.kind !== 'role') {
+    throw new HttpError(400, `${before.name} is not a role pack; only a role names a runtime`)
+  }
+  const runtime =
+    input.model === null ? input.runtime : pickedRuntime({ runtime: input.runtime ?? undefined, model: input.model })
+  await contextPacks.setRuntime(id, runtime, input.model)
+  const pack = await requirePack(id)
+  await audit.record({
+    actor: 'user',
+    kind: 'context.pack_runtime_changed',
+    subject_type: 'context_pack',
+    subject_id: id,
+    summary: `Set role "${pack.name}" to run on ${[runtime ?? 'the default runtime', input.model].filter(Boolean).join(' with ')}`,
+    detail: { name: pack.name, runtime, model: input.model },
   })
   signalWorkspaces('packs')
   return pack

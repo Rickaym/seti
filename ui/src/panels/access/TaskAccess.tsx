@@ -71,7 +71,7 @@ function sshChip(items: readonly AccessItem[]): Chip {
 }
 
 function mcpChip(items: readonly AccessItem[]): Chip {
-  const enabled = items.filter((item) => item.kind === 'mcp' && item.enabled)
+  const enabled = items.filter((item) => item.kind === 'mcp' && item.enabled && item.unusable === null)
   const broken = enabled.filter(mcpBroken).map((item) => item.name)
   const hint = `${String(enabled.length)} MCP servers on`
   return {
@@ -196,7 +196,8 @@ export function TaskAccessDialog({
   const [query, setQuery] = useState('')
   const [signIn, setSignIn] = useState<string | null>(null)
   const { view, setView, load } = useTaskAccess(task.id, task.profile_id)
-  const unavailable = unavailableKinds(useCapabilities(task))
+  const caps = useCapabilities(task)
+  const unavailable = unavailableKinds(caps)
 
   const [bulk, setBulk] = useState(false)
 
@@ -306,6 +307,7 @@ export function TaskAccessDialog({
                   setSignIn(item.name)
                 }}
                 unavailable={unavailable}
+                runtime={caps?.label ?? null}
               />
             </ErrorBoundary>
           )}

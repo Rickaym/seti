@@ -2,6 +2,8 @@ import { createHash } from 'node:crypto'
 import {
   SETTINGS_DOC_VERSION,
   SETTINGS_SECTIONS,
+  diffPatch,
+  isJsonObject,
   settingsDocSchema,
   visibleKeys,
   type ModDocShape,
@@ -14,6 +16,7 @@ import { z } from 'zod'
 import { currentRequestSource } from '../access.js'
 import { HttpError } from '../http.js'
 import { listMods } from '../mods/actions.js'
+import { SECTION_DEFAULTS } from './defaults.js'
 import { APP_AGENT_READERS, type SectionReaders } from './read-agents.js'
 import { SECURITY_READERS } from './read-security.js'
 
@@ -44,17 +47,41 @@ const modShape = (mod: ModInfo): ModDocShape => ({
   userSwitch: userSwitch(mod),
 })
 
-function modEntry(mod: ModInfo, reader: SettingsDocReader) {
-  const settings = Object.fromEntries(mod.settings.map(({ key, value }) => [key, value]))
-  return reader === 'ea' && userSwitch(mod) ? { settings } : { enabled: mod.enabled, settings }
+type ModValue = (mod: ModInfo) => { enabled: boolean; settings: Record<string, unknown> }
+
+const current: ModValue = (mod) => ({
+  enabled: mod.enabled,
+  settings: Object.fromEntries(mod.settings.map(({ key, value }) => [key, value])),
+})
+
+const byDefault: ModValue = (mod) => ({
+  enabled: mod.required || (mod.manifest?.defaultEnabled ?? false),
+  settings: Object.fromEntries(mod.settings.map(({ key, field }) => [key, field.default])),
+})
+
+function modEntry(mod: ModInfo, reader: SettingsDocReader, value: ModValue) {
+  const { enabled, settings } = value(mod)
+  return reader === 'ea' && userSwitch(mod) ? { settings } : { enabled, settings }
 }
 
-async function sectionValue(path: SettingsSectionPath, reader: SettingsDocReader) {
+type SectionValue = (path: SettingsSectionPath) => Promise<Record<string, unknown>>
+
+const stored: SectionValue = async (path) => READERS[path]()
+
+/** A section's defaults; some lists default per item, so they start from what is stored. */
+const defaults: SectionValue = async (path) => {
+  const toDefault = SECTION_DEFAULTS[path] as (
+    value: unknown,
+  ) => Record<string, unknown> | Promise<Record<string, unknown>>
+  return toDefault(await READERS[path]())
+}
+
+async function sectionValue(path: SettingsSectionPath, reader: SettingsDocReader, read: SectionValue) {
   const keys = visibleKeys(SETTINGS_SECTIONS[path], reader)
   if (keys === null) {
     return null
   }
-  const value: Record<string, unknown> = await READERS[path]()
+  const value = await read(path)
   return Object.fromEntries(keys.map((key) => [key, value[key]]))
 }
 
@@ -65,27 +92,48 @@ export const withRevision = (body: Record<string, unknown>): SettingsDoc => ({
   ...body,
 })
 
-/** The settings document for the caller, from the stores the settings pages read. */
-export async function settingsDoc(): Promise<SettingsDoc> {
-  const reader = settingsDocReader()
+async function docBody(reader: SettingsDocReader, read: SectionValue, mod: ModValue): Promise<Record<string, unknown>> {
   const groups: Record<string, Record<string, unknown>> = {}
   for (const path of Object.keys(SETTINGS_SECTIONS) as SettingsSectionPath[]) {
-    const value = await sectionValue(path, reader)
+    const value = await sectionValue(path, reader, read)
     if (value !== null) {
       const [group = '', page = ''] = path.split('.')
       groups[group] = { ...groups[group], [page]: value }
     }
   }
   const { mods } = await listMods()
-  const body = { ...groups, mods: Object.fromEntries(mods.map((mod) => [mod.id, modEntry(mod, reader)])) }
-  return withRevision(body)
+  return { ...groups, mods: Object.fromEntries(mods.map((info) => [info.id, modEntry(info, reader, mod)])) }
+}
+
+/**
+ * The settings document for the caller, from the stores the settings pages read; `modified`
+ * keeps only what differs from the defaults, as a merge patch onto them.
+ */
+export async function settingsDoc({ modified = false }: { modified?: boolean } = {}): Promise<SettingsDoc> {
+  const reader = settingsDocReader()
+  const body = await docBody(reader, stored, current)
+  const doc = withRevision(body)
+  if (!modified) {
+    return doc
+  }
+  const changed = diffPatch(await docBody(reader, defaults, byDefault), body)
+  return { version: doc.version, revision: doc.revision, ...(isJsonObject(changed) ? changed : {}) }
+}
+
+/** What every setting the caller reads is until someone changes it. */
+export async function settingsDocDefaults(): Promise<SettingsDoc> {
+  return withRevision(await docBody(settingsDocReader(), defaults, byDefault))
+}
+
+/** The zod schema of the caller's document, which validates a JSON write whole. */
+export async function settingsDocZod(): Promise<z.ZodObject> {
+  const { mods } = await listMods()
+  return settingsDocSchema(SETTINGS_SECTIONS, mods.map(modShape), settingsDocReader())
 }
 
 /** The JSON Schema of the caller's document, generated from the routes' own zod schemas. */
 export async function settingsDocJsonSchema(): Promise<Record<string, unknown>> {
-  const reader = settingsDocReader()
-  const { mods } = await listMods()
-  const schema = settingsDocSchema(SETTINGS_SECTIONS, mods.map(modShape), reader)
+  const schema = await settingsDocZod()
   return {
     ...z.toJSONSchema(schema, { io: 'input', unrepresentable: 'any' }),
     title: 'Seti settings',

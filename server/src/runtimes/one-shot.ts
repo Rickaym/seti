@@ -10,6 +10,8 @@ export interface OneShotRequest {
   prompt: string
   /** An empty folder the session starts in, holding nothing of the agent's. */
   cwd: string
+  /** The program the runtime starts where Seti installs it; null where the runtime finds its own. */
+  program: string | null
   /** The most tokens the model may write. */
   maxOutputTokens: number
   /** The most the call may spend, in US dollars at list price. */
