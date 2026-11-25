@@ -148,7 +148,8 @@ between two steps; an interrupt; a hook at subagent start.
   that resumes nothing and saves nothing, with the runtime's read, search, edit and shell tools and
   the control room's own, and no question tool, subagents, web tools, plugins, hooks or tool
   servers of the user's. Every tool call passes the control room's gate first, which allows or
-  denies it and never asks; the runtime's own memory consolidation is off in it.
+  denies it and never asks; the runtime's own memory consolidation is off in it. It also says how
+  to read the session's cost so far from the runtime's messages.
 - RT-9: A runtime besides the default is off until the user turns it on. Its status reads off,
   installing, failed with a reason the user can retry, no key, or ready. While it is not ready, a
   new agent or session on it MUST be refused with that reason; its agents stay readable. A runtime
@@ -193,6 +194,15 @@ between two steps; an interrupt; a hook at subagent start.
 - RT-14: A runtime whose model can summarise its reasoning MUST ask for the summary, so its agents
   show their thinking as the default runtime's do. Reasoning the model seals for its own next call
   MUST NOT be stored, served or shown by the control room.
+
+### 3.6 What an agent is given
+
+- KIT-1: The user's own instruction file reaches an agent read-only on every runtime that reads
+  instruction files, and a folder's instruction file (`CLAUDE.md`, or for Codex `AGENTS.md`
+  first) is read from the agent's folder as its input (HST-1). Both MUST come below the control
+  room's own instructions: in the conversation as project instructions, never in the system or
+  developer instructions. A runtime folder the agent can write MUST NOT carry instructions into a
+  later session.
 
 ## 4. Turn lifecycle
 
@@ -520,6 +530,20 @@ interrupted only for that.
   allow runs, one a guard or deny rule refuses is refused with the reason, and the rest keep
   waiting. Only one answer reaches the runtime, the user's or the rules', and it is audited once.
   A request whose turn has stopped is left as it is.
+
+- PERM-15: A command of any agent, on any runtime and in every mode including bypass, that
+  pushes to, forks, opens a pull request on or writes through the code host's API to a repository
+  outside the user's own MUST become a request before it runs, reading "Push to <owner>/<repo>,
+  outside your organisations" or the like; it is an ask, never a refusal. The user's own are the
+  owners of the signed-in code-host account and its organisations, read on the control plane and
+  cached for about an hour, and the owners of the repositories the agent was given. The
+  implementation reads the command past wrappers, nested scripts and `cd`, resolves a remote or
+  URL under HST-2 with the repository's and the agent's own global git config and URL rewrites,
+  in the folder as the agent sees it (a sandbox's private home and /tmp included), and asks
+  whenever it cannot place the target: the same command changes remotes, git config or git's
+  environment, sets the code host's repository or host variables, or pushes submodules. A push
+  to a local path does not ask. An allow rule `PushTo(<owner>)`, which only the user adds, lets
+  that code-host owner through; it is never handed to a runtime.
 
 ### 7.5 Guards
 
@@ -1009,21 +1033,28 @@ Optional and off by default: a maintenance session per agent that consolidates i
   and removal is audited with path and bytes, never content.
 - DRM-12: A turn of the agent that starts during its dream cuts the dream. A restart cuts it too;
   the memory changes it made before the cut are still recorded. A cut nightly dream is planned
-  once more within its window; cut again, it has failed.
+  once more within its window; cut again, it has failed. A dream ends once: its end is stored
+  with its `dream.ended` event in one transaction, after the events of its memory changes, so no
+  reader finds an ended dream without that event. A restart leaves a dream running until both
+  are stored.
 - DRM-13: A dream stops at its budget per dream (`dream_budget` by default), `dream_steps` or
-  `dream_time`, and runs on the model the settings name. Its cost is stored on the dream, not on
-  the agent's turns.
+  `dream_time`, and runs on the model the settings name. Its cost is what its runtime reports for
+  the dream's session, stored on the dream, not on the agent's turns; Seti stops a dream whose
+  reported cost passes its budget while the runtime lets it go on.
 - DRM-14: The first brief after a night's window holds one line for the night: agents dreamt, how
   many want the user, the cost. It never counts toward Needs you, and nothing about dreams
   notifies at night.
 - DRM-15: Text a dream reads is data. A memory write that carries a credential, a hidden file or a
   file that is not text MUST be refused, and so MUST every tool call the gate does not allow.
-  Added memory lines that name a new host, pipe into an interpreter or read as commands are listed
-  in the report as Seti's own findings.
+  Added memory lines that name a new host (an IP address, or a name under a public or
+  private-network suffix; not a file name, path, version or dotted identifier), pipe into an
+  interpreter or read as commands are listed in the report as Seti's own findings.
 - DRM-16: Dream now runs one dream of an agent at once, by the user, the EA after the user's yes,
   or an agent at `full` on another agent; it is refused on the agent itself. The EA, an agent or
   a mod starts at most one dream of an agent a day; only the user starts more. Dream now waits for
-  no window but keeps the night budget. The start is audited with who asked for it.
+  no window but keeps the night budget. The start is audited with who asked for it. A dream of an
+  agent whose transcript has nothing new since its last finished dream runs no session: it ends
+  at once, at no cost, with a one-line report that there was nothing to tidy.
 
 ## 16. Audit
 
@@ -1055,6 +1086,9 @@ Optional and off by default: a maintenance session per agent that consolidates i
   reads `set` or `not set`.
 - CFG-3: Agents, mods and devices MUST be refused the document and its schema. The EA reads plain
   configuration only; security settings are absent from its document and schema.
+- CFG-4: The control room MUST serve every setting's default in the shape of the document, and
+  MUST show which settings differ from their default; the document filtered to those differences
+  is a merge patch that turns the defaults into the document.
 
 ## 17. Mods
 
@@ -1162,19 +1196,19 @@ An implementation is SETI-compatible when it meets all of:
 
 ### 20.2 Profiles
 
-| Profile       | Adds                                                                          |
-| ------------- | ----------------------------------------------------------------------------- |
-| Sandbox       | all SBX, EGR, HST, CAP, SEC and CHG; PERM-10, PERM-13; GRD-2, GRD-7 to GRD-12 |
-| Shared tools  | all TOOL (requires Sandbox)                                                   |
-| Events        | all CHN; PUB-2 (hooks)                                                        |
-| Pull requests | all PR                                                                        |
-| Team          | all CHAT                                                                      |
-| Assistant     | all EA; LVL-6                                                                 |
-| Separate node | all NODE                                                                      |
-| Mods          | all MOD                                                                       |
-| Sharing       | PUB-4, PUB-7                                                                  |
-| Devices       | API-11                                                                        |
-| Storage       | RES-16 to RES-19                                                              |
+| Profile       | Adds                                                                                   |
+| ------------- | -------------------------------------------------------------------------------------- |
+| Sandbox       | all SBX, EGR, HST, CAP, SEC and CHG; PERM-10, PERM-13, PERM-15; GRD-2, GRD-7 to GRD-12 |
+| Shared tools  | all TOOL (requires Sandbox)                                                            |
+| Events        | all CHN; PUB-2 (hooks)                                                                 |
+| Pull requests | all PR                                                                                 |
+| Team          | all CHAT                                                                               |
+| Assistant     | all EA; LVL-6                                                                          |
+| Separate node | all NODE                                                                               |
+| Mods          | all MOD                                                                                |
+| Sharing       | PUB-4, PUB-7                                                                           |
+| Devices       | API-11                                                                                 |
+| Storage       | RES-16 to RES-19                                                                       |
 
 An implementation without the Sandbox profile MUST NOT claim that agents are untrusted, and MUST
 treat every agent as holding the user's access.

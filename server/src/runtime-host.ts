@@ -48,6 +48,12 @@ const decideByAsking =
 
 const UNCHECKED = 'Seti could not check its review rules, so it held this call back. Tell the user.'
 
+const UNCHECKED_PUSH = 'Seti could not check where this command pushes, so it held it back. Tell the user.'
+
+const held = (reason: string): HookJSONOutput => ({
+  hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: 'deny', permissionDecisionReason: reason },
+})
+
 /**
  * A PreToolUse hook that holds each MCP call a review rule names until the user answers; when the
  * control plane cannot say, the call is held back.
@@ -64,16 +70,32 @@ function reviewHook(taskId: string, session: AbortSignal): HookCallbackMatcher {
       return output as HookJSONOutput
     } catch (e) {
       process.stderr.write(`review hook: task ${taskId}: ${String(e)}\n`)
-      return {
-        hookSpecificOutput: {
-          hookEventName: 'PreToolUse',
-          permissionDecision: 'deny',
-          permissionDecisionReason: UNCHECKED,
-        },
-      }
+      return held(UNCHECKED)
     }
   }
   return { matcher: 'mcp__.*', hooks: [hook], timeout: ASK_TIMEOUT_S }
+}
+
+/**
+ * A PreToolUse hook that holds a command pushing outside the user's organisations until the user
+ * answers, in Bypass too; when the control plane cannot say, the command is held back.
+ */
+function pushHook(taskId: string, session: AbortSignal): HookCallbackMatcher {
+  const hook: HookCallback = async (input, _toolUseId, { signal }) => {
+    if (input.hook_event_name !== 'PreToolUse') {
+      return {}
+    }
+    const call = { tool: input.tool_name, input: asRecord(input.tool_input), cwd: input.cwd }
+    try {
+      const { output } = await nodeLink.ask(taskId, 'push.ask', call, AbortSignal.any([signal, session]))
+      // The control plane answered with what pushCall decided.
+      return output as HookJSONOutput
+    } catch (e) {
+      process.stderr.write(`push hook: task ${taskId}: ${String(e)}\n`)
+      return held(UNCHECKED_PUSH)
+    }
+  }
+  return { matcher: 'Bash', hooks: [hook], timeout: ASK_TIMEOUT_S }
 }
 
 /**
@@ -94,7 +116,13 @@ function sessionHooks(task: Task, sandboxed: boolean, session: AbortSignal): Def
     refused: (tool, input) => guardRefuses(tool, input, scope),
     ask: async (call, results, signal) => nodeLink.ask(taskId, 'repeat.ask', { ...call, results }, signal),
   })
-  const PreToolUse = [guard, ...sandbox, reviewHook(taskId, session), ...(repeat.PreToolUse ?? [])]
+  const PreToolUse = [
+    guard,
+    ...sandbox,
+    reviewHook(taskId, session),
+    pushHook(taskId, session),
+    ...(repeat.PreToolUse ?? []),
+  ]
   const instructions = async () => (await nodeLink.ask(taskId, 'hook.compact', {})).instructions
   return { ...repeat, PreToolUse, SubagentStart: [subagentRules()], PreCompact: [compactHook(instructions)] }
 }
