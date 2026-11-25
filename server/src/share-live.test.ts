@@ -4,7 +4,7 @@ import type { Options } from '@anthropic-ai/claude-agent-sdk'
 import type * as Sdk from '@anthropic-ai/claude-agent-sdk'
 import type { Share, ShareLink } from '@seti/shared'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
-import { asAgent } from './access.js'
+import { asAgent, asMod } from './access.js'
 import { createApp } from './app.js'
 import { SETI_HOME, type PublicAccess } from './config.js'
 import { tasks } from './db.js'
@@ -195,6 +195,19 @@ describe('a live share', () => {
     expect(await viewsOf()).toBe(before + 2)
   })
 
+  it('takes its shell, frame and static page from the one per-address request budget', async () => {
+    const token = tokenOf(linkOf('other.htm'))
+    const from = { 'cf-connecting-ip': '198.51.100.77' }
+    for (let i = 0; i < 40; i++) {
+      for (const part of ['', '/live', '/static']) {
+        expect((await publicGet(`/share/${token}${part}`, { ...FRAME, ...from })).status, part).toBe(200)
+      }
+    }
+    for (const part of ['', '/live', '/static']) {
+      expect((await publicGet(`/share/${token}${part}`, { ...FRAME, ...from })).status, part).toBe(429)
+    }
+  })
+
   it('allows its CDNs only by path prefix and keeps images and the network closed', () => {
     for (const cdn of LIVE_SHARE_CDNS) {
       expect(cdn.source.endsWith('/'), cdn.source).toBe(true)
@@ -214,6 +227,17 @@ describe('who makes a link live', () => {
     const link = await share('plain.txt')
     expect((await setLive(link.share.id, true)).status).toBe(400)
     expect((await publicGet(`/share/${tokenOf(link)}/live`, FRAME)).status).toBe(404)
+  })
+
+  it('refuses mods, through the API and the service alike', async () => {
+    const mod = { id: 'sample', grants: [] }
+    const viaApi = await asMod(mod, async () => api(LOOPBACK, 'PUT', '/shares/x/live', { live: true }))
+    expect(viaApi.status).toBe(403)
+    const create = { root: 'cwd', path: 'page.html', live: true }
+    expect((await asMod(mod, async () => api(LOOPBACK, 'POST', `/tasks/${TASK}/shares`, create))).status).toBe(403)
+    await expect(asMod(mod, async () => setShareLive('x', true))).rejects.toThrow(
+      'Mods cannot share files outside Seti',
+    )
   })
 
   it('refuses the EA and agents, through the API and the service alike', async () => {

@@ -71,8 +71,8 @@ These paths answer without a token, a session or Access, each with its own check
 limited); `/api/devices/pair` (a one-time code) and `/api/widget/summary` (a device proof); the
 static `/pair` page and `/.well-known/assetlinks.json`; `POST /hooks/<id>`; and `GET` or `HEAD` of
 `/share/<token>`, its `/raw`, `/p/1` to `/p/50`, `/card.png`, and a live share's `/live` and
-`/static`. The app's own page and static
-files need no API credential; on a public hostname they sit behind Access when Access is set up.
+`/static`. The app's own page and static files need no API credential; on a public hostname they
+sit behind Access when Access is set up.
 
 ## The settings document
 
@@ -159,9 +159,9 @@ and each install, failure and removal is in the audit log with the version and c
 ## Live share links
 
 A share link to an HTML file can be made Live in the share dialog. It is off by default, set per
-link, and only you can set it: the EA and agents are refused. A live link runs the frozen copy's
-scripts in the visitor's browser so charts and interactive pages work. Static shares are
-unchanged.
+link, and only you can set it: the EA, agents, mods and paired devices are refused. A live link
+runs the frozen copy's scripts in the visitor's browser so charts and interactive pages work.
+Static shares are unchanged.
 
 What the visitor's browser gets: a page from Seti with no script (a bar with the file's name, a
 Static view link and Download) around a sandboxed frame that holds the copy. The frame has an

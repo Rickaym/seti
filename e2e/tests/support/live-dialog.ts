@@ -3,12 +3,16 @@ import path from 'node:path'
 import type { Page } from '@playwright/test'
 import { expect } from './fixtures.js'
 
-/** An agent-made dashboard whose script draws its text, so the live page shows the script ran. */
+/** An agent-made dashboard whose script writes text and draws a chart, to show it ran. */
 const DASHBOARD = `<!doctype html>
 <html><head><meta charset="utf-8"><title>Dashboard</title>
-<style>body { font: 16px system-ui; margin: 24px } #out { font-size: 28px; color: rgb(20, 90, 160) }</style></head>
-<body><h2>Weekly builds</h2><p id="out">Waiting for the script</p>
-<script>document.getElementById('out').textContent = 'Drawn by its script'</script></body></html>
+<style>body { font: 16px system-ui; margin: 24px } #out { font-size: 28px; color: rgb(20, 90, 160) }
+canvas { max-width: 100% }</style></head>
+<body><h2>Weekly builds</h2><p id="out">Waiting for the script</p><canvas id="chart" width="320" height="120"></canvas>
+<script>document.getElementById('out').textContent = 'Drawn by its script'
+var g = document.getElementById('chart').getContext('2d')
+g.fillStyle = 'rgb(20, 90, 160)'
+;[40, 90, 65, 110, 80].forEach(function (h, i) { g.fillRect(16 + i * 60, 120 - h, 40, h) })</script></body></html>
 `
 
 export const LIVE_LINE =
