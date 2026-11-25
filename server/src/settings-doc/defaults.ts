@@ -72,7 +72,7 @@ export const SECTION_DEFAULTS: SectionDefaults = {
   'agents.storage': () => ({
     auto_clean: { enabled: STORAGE_SCHEDULE_DEFAULTS.enabled, idle_days: STORAGE_SCHEDULE_DEFAULTS.idle_days },
   }),
-  'agents.channels': () => ({ channels: {}, poller_access: {} }),
+  'agents.channels': () => ({ channels: {}, poller_access: {}, thread_replies: {} }),
   'capabilities.mcp_servers': (current) => {
     const borrowed = isBorrowed(localServers(readHostConfig()), null)
     return { defaults: each(current.defaults, (name) => !borrowed(name)) }
