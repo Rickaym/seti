@@ -2,6 +2,7 @@ import { XIcon } from 'lucide-react'
 import { Dialog as DialogPrimitive } from 'radix-ui'
 import * as React from 'react'
 import { Button } from '@/components/ui/button'
+import { Z_PORTAL } from '@/lib/stacking'
 import { cn } from '@/lib/utils'
 
 const CloseButtonContext = React.createContext(true)
@@ -10,17 +11,17 @@ function Dialog({ ...props }: React.ComponentProps<typeof DialogPrimitive.Root>)
   return <DialogPrimitive.Root data-slot="dialog" {...props} />
 }
 
-/** Portaled selects/menus: keep z-order above this layer (`@/lib/stacking`). */
 function DialogPortal({ ...props }: React.ComponentProps<typeof DialogPrimitive.Portal>) {
   return <DialogPrimitive.Portal data-slot="dialog-portal" {...props} />
 }
 
-function DialogOverlay({ className, ...props }: React.ComponentProps<typeof DialogPrimitive.Overlay>) {
+function DialogOverlay({ className, style, ...props }: React.ComponentProps<typeof DialogPrimitive.Overlay>) {
   return (
     <DialogPrimitive.Overlay
       data-slot="dialog-overlay"
+      style={{ zIndex: Z_PORTAL, ...style }}
       className={cn(
-        'fixed inset-0 isolate z-[10050] bg-overlay duration-100 supports-backdrop-filter:backdrop-blur-xs data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0',
+        'fixed inset-0 isolate bg-overlay duration-100 supports-backdrop-filter:backdrop-blur-xs data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0',
         className,
       )}
       {...props}
@@ -32,6 +33,7 @@ function DialogContent({
   className,
   children,
   showCloseButton = true,
+  style,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
   showCloseButton?: boolean
@@ -41,8 +43,9 @@ function DialogContent({
       <DialogOverlay />
       <DialogPrimitive.Content
         data-slot="dialog-content"
+        style={{ zIndex: Z_PORTAL, ...style }}
         className={cn(
-          'fixed top-1/2 left-1/2 z-[10051] grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 rounded-none bg-popover p-4 text-xs/relaxed text-popover-foreground ring-1 ring-foreground/10 duration-100 outline-none sm:max-w-sm max-md:max-h-[calc(100dvh-2rem)] max-md:grid-cols-[minmax(0,1fr)] max-md:overflow-y-auto data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95',
+          'fixed top-1/2 left-1/2 grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 rounded-none bg-popover p-4 text-xs/relaxed text-popover-foreground ring-1 ring-foreground/10 duration-100 outline-none sm:max-w-sm max-md:max-h-[calc(100dvh-2rem)] max-md:grid-cols-[minmax(0,1fr)] max-md:overflow-y-auto data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95',
           className,
         )}
         {...props}
