@@ -80,4 +80,5 @@ export async function answerLate(to: ServerResponse | Duplex, run: () => Promise
 
 /** Why a host was refused, in the words a command's error output shows the agent. */
 export const refusalText = (host: string) =>
-  `Seti sandbox: ${host} is not on the allowed hosts list. Ask the user to add it in Settings, Sandbox.`
+  `Seti sandbox: ${host} is not on the allowed hosts list, so retrying will not help. Ask for it with ` +
+  `the request_change tool ({kind: "allow_host", host: "${host}"}), or tell the user, and wait.`
