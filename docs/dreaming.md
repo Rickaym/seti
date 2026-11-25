@@ -59,6 +59,14 @@ command, and one line says when the agent's sessions load their repository's mem
 the folder the dream changed, since those sessions do not see the new notes. Another says when
 the dream's memory changes could not be recorded, so the folder needs a look by hand.
 
+## When a dream starts
+
+A dream waits while the agent runs a turn, a background subagent or another background task,
+since those are model work that can write memory; the refusal names what it waits for. It does
+not wait for background commands or monitors, such as a dev server: a dream only reads the
+folders they work in, and when one ends or reports, the turn the runtime starts cuts the dream at
+once. A cut nightly dream is planned once more within its window (DRM-12).
+
 ## Tuning dreams
 
 Change the wording in `server/src/dreams/prompt.ts`, keep each change small, and compare reports
