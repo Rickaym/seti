@@ -55,9 +55,28 @@ export function slackDestination(tool: string, input: unknown, names: ReadonlyMa
   const name = tool.split('__').at(-1) ?? tool
   const verb = VERBS[SEND_TOOL.exec(name)?.[1] ?? ''] ?? 'Send'
   const thread = fieldOf(input, 'thread_ts') === null ? '' : ', in a thread'
-  const where = isPerson(target) ? `DM to ${slackPlace(target, names)}` : `${verb} to ${slackPlace(target, names)}`
-  return isPerson(target) && verb !== 'Send' ? `${verb} a ${where}${thread}` : `${where}${thread}`
+  const dm = isPerson(target) || (target.startsWith('D') && names.has(target))
+  const where = dm ? `DM to ${slackPlace(target, names)}` : `${verb} to ${slackPlace(target, names)}`
+  return dm && verb !== 'Send' ? `${verb} a ${where}${thread}` : `${where}${thread}`
 }
+
+/** The read that makes the Slack MCP server state a channel's or person's name, which Seti learns. */
+function lookUpCall(target: string): string {
+  if (isChannel(target)) {
+    return `slack_read_channel with channel_id ${target} and limit 1`
+  }
+  return isPerson(target)
+    ? `slack_read_user_profile with user_id ${target}`
+    : 'slack_list_user_channels with types im,mpim'
+}
+
+/**
+ * What a denied Slack send tells the agent when the user asks it to look the destination up
+ * first, so the request it makes next shows the name.
+ */
+export const slackLookUpNote = (target: string): string =>
+  `The user wants to see where this goes before allowing it, and Seti does not know the name of ${target}. ` +
+  `Look it up with ${lookUpCall(target)}, then make the same send again.`
 
 /** Asks for the names Seti knows of some Slack ids, comma separated. */
 export const slackNamesQuery = z.object({

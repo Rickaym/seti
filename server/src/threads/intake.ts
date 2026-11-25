@@ -1,7 +1,7 @@
 import type { DeliveryFilter, FollowedThread } from '@seti/shared'
 import { redactSecrets } from '../scrub.js'
+import { rememberSlackNames } from '../slack/directory.js'
 import type { ChannelRecord } from '../store/channels.js'
-import { slackNames } from '../store/slack-names.js'
 import { channelThreads, threadReplies } from '../store/thread-replies.js'
 import { threadSource, type InboundMessage, type ThreadSource } from './sources.js'
 
@@ -66,7 +66,7 @@ export async function takeThreadMessage(
   }
   const author = source.profileName(payload)
   if (author !== null) {
-    await slackNames.learn([author], 'webhook delivery', at)
+    await rememberSlackNames([author], 'webhook delivery', at)
   }
   await channelThreads.sawMessage(channel.id, at, before(at, HOUR_MS))
   const msg = source.read(payload)

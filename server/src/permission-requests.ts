@@ -31,7 +31,7 @@ const MESSAGE_KEYS = ['text', 'message', 'body', 'content', 'subject']
  * One line of what the call does, such as its command, file or URL, else its first text field. A
  * Slack send names where it goes, by name when Seti knows it, else saying the name is not known.
  */
-async function summarize(tool: string, input: Record<string, unknown>): Promise<string> {
+export async function summarize(tool: string, input: Record<string, unknown>): Promise<string> {
   if (tool === 'ExitPlanMode') {
     return 'Approve the plan and start on it'
   }
