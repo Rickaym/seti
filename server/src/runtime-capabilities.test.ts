@@ -1,10 +1,10 @@
-import type { Task } from '@seti/shared'
+import type { CapabilitiesSnapshot, McpServer, McpTransport, Task } from '@seti/shared'
 import { describe, expect, it, vi } from 'vitest'
 import { createApp } from './app.js'
 import { sql, tasks } from './db.js'
 import { startDream } from './dreams/start.js'
 import { mcpOffContext } from './mcp-off-context.js'
-import { runtimeCapabilities } from './runtimes/capabilities.js'
+import { pluginRuntimes, runtimeCapabilities, serverRuntimes, withRuntimes } from './runtimes/capabilities.js'
 import { setTaskSandbox } from './tasks.js'
 import { USER_AUTH } from './test-auth.js'
 import { renderTask } from './workspace/task-file.js'
@@ -40,9 +40,11 @@ describe("what an agent's runtime declares", () => {
     }
     expect(served.data).toEqual(runtimeCapabilities())
     expect(runtimeCapabilities().claude).toMatchObject({ mcp_servers: true, plugins: true, dreams: true })
+    expect(runtimeCapabilities().claude.mcp_transports).toEqual(['stdio', 'sse', 'http', 'sdk', 'claudeai-proxy'])
     expect(runtimeCapabilities().codex).toEqual({
       label: 'Codex',
       mcp_servers: false,
+      mcp_transports: [],
       plugins: false,
       unsandboxed: false,
       compaction: false,
@@ -78,5 +80,40 @@ describe("what an agent's runtime declares", () => {
     })
     expect(compact.status).toBe(409)
     await expect(startDream(task)).rejects.toThrow("The agent's runtime keeps no memory Seti can find.")
+  })
+
+  it("says which runtimes can use each MCP server: those that take its transport, and a plugin's only where plugins load", () => {
+    const transport = (type: McpTransport['type']) => ({ type, target: null })
+    expect(serverRuntimes(transport('stdio'), null)).toEqual(['claude'])
+    expect(serverRuntimes(transport('http'), 'plugin:acme')).toEqual(['claude'])
+    expect(pluginRuntimes()).toEqual(['claude'])
+  })
+
+  it('leaves a server untagged while its transport is unknown', () => {
+    const server = (name: string, transport: McpTransport | null): McpServer => ({
+      name,
+      status: 'connected',
+      scope: 'user',
+      source: null,
+      transport,
+      connector_id: null,
+      server_version: null,
+      error: null,
+      tools: [],
+      sign_in: 'none',
+    })
+    const snapshot: CapabilitiesSnapshot = {
+      cwd: '/work',
+      probed_at: '2026-11-24T00:00:00.000Z',
+      duration_ms: 1,
+      pending_timed_out: false,
+      account: { email: null, organization: null, subscription_type: null, api_provider: null },
+      servers: [server('known', { type: 'stdio', target: 'node' }), server('unknown', null)],
+      skill_groups: [],
+      builtin_commands: [],
+      subagents: [],
+      models: [],
+    }
+    expect(withRuntimes(snapshot).servers.map((s) => s.runtimes)).toEqual([['claude'], undefined])
   })
 })

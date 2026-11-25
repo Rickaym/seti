@@ -592,6 +592,13 @@ def default_runtimes() -> dict[str, Any]:
     return {"claude": claude, "codex": {"state": "off"}, "offers": []}
 
 
+def default_runtime_capabilities() -> dict[str, Any]:
+    return {
+        "claude": {"label": "Claude Code", "mcp_servers": True, "plugins": True},
+        "codex": {"label": "Codex", "mcp_servers": False, "plugins": False},
+    }
+
+
 def default_account() -> dict[str, Any]:
     return {
         "account": {
@@ -700,6 +707,7 @@ class FakeSeti:
     shared_tools: list[dict[str, Any]] = field(default_factory=list)
     account: dict[str, Any] = field(default_factory=default_account)
     runtimes: dict[str, Any] = field(default_factory=default_runtimes)
+    runtime_capabilities: dict[str, Any] = field(default_factory=default_runtime_capabilities)
     changelog: dict[str, Any] = field(default_factory=default_changelog)
     update: dict[str, Any] = field(default_factory=default_update)
     home: dict[str, Any] = field(default_factory=default_home)
@@ -1296,6 +1304,8 @@ class FakeSeti:
                 return ok(self.account)
             case ["runtimes"]:
                 return ok(self.runtimes)
+            case ["runtimes", "capabilities"]:
+                return ok(self.runtime_capabilities)
             case ["mods", "whats-new", "changelog"]:
                 limit = int(params.get("limit", "200"))
                 return ok({**self.changelog, "entries": self.changelog["entries"][:limit]})

@@ -13,7 +13,7 @@ export const codexAdapterFor = (binary?: string, provider?: CodexProvider): Runt
     gate: { rewriteInput: false, classifier: false },
     session: { fork: 'none' },
     rewind: { conversation: false, code: false },
-    tools: { userServers: false, plugins: false },
+    tools: { userServers: [], plugins: false },
     sandbox: { optional: false },
     compaction: false,
     subagents: false,

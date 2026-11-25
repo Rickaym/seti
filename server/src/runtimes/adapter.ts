@@ -1,4 +1,4 @@
-import type { RuntimeEvent, ToolCall } from '@seti/shared'
+import type { McpTransport, RuntimeEvent, ToolCall } from '@seti/shared'
 import type { z } from 'zod'
 import type { Launcher } from '../launcher.js'
 import type { SessionSpec } from '../session-spec.js'
@@ -148,8 +148,8 @@ export interface Capabilities {
   rewind: { conversation: boolean; code: boolean }
   /** Dreams, or null where the runtime keeps no memory Seti can find. */
   dream: DreamSupport | null
-  /** It loads the user's own tool servers and connectors, and Seti's plugins, beside Seti's tools. */
-  tools: { userServers: boolean; plugins: boolean }
+  /** Transports of the user's own tool servers it loads, and Seti's plugins, beside Seti's tools. */
+  tools: { userServers: readonly McpTransport['type'][]; plugins: boolean }
   /** It can run outside Seti's sandbox. */
   sandbox: { optional: boolean }
   /** It takes a rule for when to compact its context. */
