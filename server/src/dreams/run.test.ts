@@ -72,6 +72,7 @@ function fakeDream(): { dream: DreamSupport; seen: { spec?: DreamSpec; refused?:
   const seen: { spec?: DreamSpec; refused?: string | null } = {}
   const dream: DreamSupport = {
     memory: claudeMemory,
+    reportedCost: () => null,
     open: async (spec: DreamSpec, _launcher, host: DreamHost) => {
       seen.spec = spec
       const inside = /Memory folder: (\S+)\./.exec(spec.prompt)?.[1] ?? ''
@@ -251,6 +252,7 @@ describe.skipIf(!bwrap)('Dream now', () => {
     expect(JSON.stringify(revision)).not.toContain(TOKEN)
     expect(fs.readFileSync(path.join(memory, 'MEMORY.md'), 'utf8')).toContain('through the proxy')
     expect(await dreamKinds(id)).toEqual(['dream.started', 'dream.memory_changed', 'dream.ended'])
+    expect((await dreamEvents(id)).at(-1)?.detail).toMatchObject({ denials: 1, denied_by: ['write_outside 1'] })
     expect((await dreamPreface(id))?.text).toMatch(/changed 1 of your memory files/)
   })
 

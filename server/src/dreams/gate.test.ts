@@ -3,7 +3,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { claudeToolCall, type DreamReport } from '@seti/shared'
 import { afterAll, describe, expect, it } from 'vitest'
-import { dreamGate, type DreamPlaces } from './gate.js'
+import { denialKind, dreamGate, type DreamPlaces } from './gate.js'
 import { dreamTools } from './tools.js'
 
 const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'seti-dream-gate-')))
@@ -94,6 +94,26 @@ describe('dreamGate', () => {
       expect(gate(name, { url: 'https://example.com', notebook_path: path.join(cwd, 'a.ipynb') }), name).not.toBeNull()
     }
     expect(gate('ToolSearch', { query: 'slack' })).toMatch(/no tools to search/)
+  })
+})
+
+describe('denialKind', () => {
+  it('names the kind of each refusal without its call', () => {
+    const big = 'x'.repeat(600 * 1024)
+    const refusals: [string | null, string][] = [
+      [gate('Bash', { command: `wc -l ${memory}/*.md` }), 'shell'],
+      [gate('Bash', { command: `git -C ${cwd} status 2>/dev/null` }), 'shell'],
+      [gate('Write', { file_path: path.join(cwd, 'README.md'), content: 'x' }), 'write_outside'],
+      [gate('Write', { file_path: path.join(memory, '.consolidate-lock'), content: '1' }), 'hidden'],
+      [gate('Write', { file_path: path.join(memory, 'MEMORY.md'), content: TOKEN }), 'credential'],
+      [gate('Write', { file_path: path.join(memory, 'blob.bin'), content: 'x' }), 'not_text'],
+      [gate('Write', { file_path: path.join(memory, 'big.md'), content: big }), 'memory_limit'],
+      [gate('Agent', { prompt: 'x' }), 'tool'],
+      [gate('mcp__seti__post_team_chat', {}), 'tool'],
+    ]
+    for (const [refusal, kind] of refusals) {
+      expect(denialKind(refusal ?? ''), kind).toBe(kind)
+    }
   })
 })
 

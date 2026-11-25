@@ -67,7 +67,7 @@ with another top-level folder.
 | 6 Attention    | `shared/src/attention.ts`, `task-blocked.ts`, `stall-watch.ts`, `ea-attention.ts`, `notifications.ts`, `notify-scope.ts`, `presence.ts`, `attention-brief.ts`                                                                                                                                                                                                     |
 | 7.1 Actors     | `access.ts`, `ea-guard.ts`                                                                                                                                                                                                                                                                                                                                        |
 | 7.2, 7.3       | `sandbox.ts`, `sandbox-mounts.ts`, `sandbox-bwrap.ts`, `sandbox-codex.ts`, `sandbox-read-only.ts`, `egress-*.ts`, `sandbox-ca.ts`, `sandbox-aws-token.ts`, `task-proxy.ts`, `launch-plan.ts`, `proxy-grant.ts`, `codex-key.ts`, `egress-connections.ts`, `proxy-owner.ts`, `secret-asks.ts`, `ask-in-time.ts`, `ssh-agent.ts`, `agent-access.ts`, `tool-relay.ts` |
-| 7.4, 7.5       | `permission-policy.ts`, `policy/`, `permission-requests.ts`, `permission-timeout.ts`, `permission-guard.ts`, `repeat-hooks.ts`, `review-hooks.ts`, `shadow-hooks.ts`, `outward.ts`                                                                                                                                                                                |
+| 7.4, 7.5       | `permission-policy.ts`, `policy/`, `permission-requests.ts`, `permission-timeout.ts`, `permission-guard.ts`, `repeat-hooks.ts`, `review-hooks.ts`, `shadow-hooks.ts`, `outward.ts`, `outward-push.ts` and `push-asks.ts` (PERM-15: `policy/outward.ts` reads the command, the Claude agent's `Bash` hook in `runtime-host.ts` and `codex-decide.ts` ask)          |
 | 7.6 Changes    | `change-requests.ts`, `change-request-notes.ts`, `mcp-off-context.ts`, `shared/src/change-requests.ts`                                                                                                                                                                                                                                                            |
 | 7.7 Hostile    | `git.ts`, `runtimes/claude/probe-launch.ts`, `task-files.ts`, `html-preview.ts`, `uploads.ts`                                                                                                                                                                                                                                                                     |
 | 7.8 Caps       | `launcher.ts`, `memory-scope.ts`, `scope-cpu.ts`, `scope-limits.ts`, `scope-control.ts`, `oom-guard.ts`                                                                                                                                                                                                                                                           |
@@ -132,7 +132,8 @@ with another top-level folder.
   with, each key described; `server/src/settings-doc/` reads them through the functions the pages
   read. A new column in a settings table fails `settings-doc/columns.test.ts` until it has a path
   or a reason it is state, and a new settings page fails `settings/json/settings-json.test.ts`
-  until it has a section. A section's `security` keys are left out of the EA's document.
+  until it has a section. A section's `security` keys are left out of the EA's document. Its
+  defaults are in `server/src/settings-doc/defaults.ts`, which the compiler holds complete.
 
 [Setup](setup.md#where-data-lives) lists every path on disk.
 

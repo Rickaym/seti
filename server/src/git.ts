@@ -52,10 +52,11 @@ function closedEnv(extra: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv {
 const DIFFING = new Set(['diff', 'show', 'log'])
 
 /** The arguments of a git command in a folder an agent can write to, where config is hostile. */
-function guarded(cwd: string, args: readonly string[]): string[] {
+function guarded(cwd: string, args: readonly string[], files: readonly string[] = []): string[] {
   const [command = '', ...rest] = args
   const plainDiff = DIFFING.has(command) ? ['--no-ext-diff', '--no-textconv'] : []
-  return [...NO_PROGRAMS, '-C', cwd, command, ...plainDiff, ...rest]
+  const included = files.flatMap((file) => ['-c', `include.path=${file}`])
+  return [...included, ...NO_PROGRAMS, '-C', cwd, command, ...plainDiff, ...rest]
 }
 
 /**
@@ -68,8 +69,18 @@ export async function agentGit(cwd: string, ...args: string[]): Promise<string> 
 
 /** Like agentGit, stopping git after `timeoutMs`; 0 waits for as long as it takes. */
 export async function agentGitWithin(timeoutMs: number, cwd: string, ...args: string[]): Promise<string> {
+  return agentGitReading(timeoutMs, cwd, [], ...args)
+}
+
+/** Like agentGitWithin, also reading config files the agent's git reads, such as its global one. */
+export async function agentGitReading(
+  timeoutMs: number,
+  cwd: string,
+  files: readonly string[],
+  ...args: string[]
+): Promise<string> {
   const options = { maxBuffer: 16 * 1024 * 1024, env: closedEnv(), timeout: timeoutMs, killSignal: 'SIGKILL' as const }
-  const { stdout } = await exec('git', guarded(cwd, args), options)
+  const { stdout } = await exec('git', guarded(cwd, args, files), options)
   return stdout.trim()
 }
 
