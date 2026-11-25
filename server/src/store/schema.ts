@@ -61,6 +61,7 @@ import {
 import { CLIENT_SENDS } from './schema-sends.js'
 import { SHARED_TOOLS } from './schema-shared-tools.js'
 import { SHARE_LIVE, SHARE_PREVIEWS, SHARE_RENDER, SHARES } from './schema-shares.js'
+import { SLACK_NAMES } from './schema-slack-names.js'
 import { loginsToHosts, SSH_HOST_KEYS } from './schema-ssh-keys.js'
 import { importSshHosts, SSH_HOSTS } from './schema-ssh.js'
 import { STORAGE_SETTINGS } from './schema-storage.js'
@@ -256,5 +257,6 @@ export const MIGRATIONS: readonly Migration[] = [
   { version: 137, name: 'share_live', sql: SHARE_LIVE },
   { version: 138, name: 'thread_follows', sql: THREAD_FOLLOWS },
   { version: 139, name: 'share_render', sql: SHARE_RENDER },
+  { version: 140, name: 'slack_names', sql: SLACK_NAMES },
   { version: 142, name: 'credential_access', sql: CREDENTIAL_ACCESS },
 ]

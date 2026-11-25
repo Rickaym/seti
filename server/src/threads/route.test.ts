@@ -11,16 +11,28 @@ const ROOT = '1700000000.000100'
 const ts = (n: number) => `17000001${String(n).padStart(2, '0')}.000100`
 const reply = (n: number, fields: Record<string, unknown> = {}) =>
   message({ channel: 'C0PROJ1234', ts: ts(n), thread_ts: ROOT, ...fields })
+let slackChannels = 0
+/** A Slack channel id no other test's agent posted in. */
+const freshChannel = () => `C0ROUTE${String(++slackChannels).padStart(3, '0')}`
 
 /** Routes every reply as if the settle time had passed. */
 const settle = async () => routeDueReplies(new Date(Date.now() + REPLY_SETTLE_MS + 1000).toISOString())
 
-async function replying(name: string): Promise<{ channel: WebhookChannelInfo; task: string }> {
+interface Replying {
+  channel: WebhookChannelInfo
+  task: string
+  /** A reply in the agent's thread, in a Slack channel of its own. */
+  replyIn: (n: number, fields?: Record<string, unknown>) => ReturnType<typeof message>
+  slack: string
+}
+
+async function replying(name: string): Promise<Replying> {
   const channel = await slackWebhook(name)
   await data(await api('PUT', `/channels/${channel.id}/threads`, { replies: true }))
   const task = await quietTask()
-  await agentSends(task, 'C0PROJ1234', ROOT)
-  return { channel, task }
+  const slack = freshChannel()
+  await agentSends(task, slack, ROOT)
+  return { channel, task, slack, replyIn: (n, fields = {}) => reply(n, { channel: slack, ...fields }) }
 }
 
 const outcomes = async (task: string) =>
@@ -31,8 +43,8 @@ const outcomes = async (task: string) =>
 
 describe('routing Slack thread replies', () => {
   it('waits the settle time, then hands the reply over as a thread update and keeps no text', async () => {
-    const { channel, task } = await replying('Route')
-    await deliver(channel, reply(1, { text: 'Can you also check staging?', user_profile: { display_name: 'Dana' } }))
+    const { channel, task, replyIn, slack } = await replying('Route')
+    await deliver(channel, replyIn(1, { text: 'Can you also check staging?', user_profile: { display_name: 'Dana' } }))
     await routeDueReplies()
     expect(await outcomes(task)).toEqual(['waiting with text'])
     await settle()
@@ -42,12 +54,12 @@ describe('routing Slack thread replies', () => {
       source: 'thread',
       kind: 'reply',
       subject: 'Dana',
-      title: 'Dana replied in Slack C0PROJ1234',
+      title: `Dana replied in Slack channel ${slack}, name not known`,
       body: 'Can you also check staging?',
       from: 'U0OTHER0001',
       thread: ROOT,
       message: ts(1),
-      url: `https://acme.slack.com/archives/C0PROJ1234/p${ts(1).replace('.', '')}?thread_ts=${ROOT}&cid=C0PROJ1234`,
+      url: `https://acme.slack.com/archives/${slack}/p${ts(1).replace('.', '')}?thread_ts=${ROOT}&cid=${slack}`,
     })
     const [followed] = await threadFollows.forTask(task)
     expect(followed?.replies).toBe(1)
@@ -55,6 +67,17 @@ describe('routing Slack thread replies', () => {
     const mine = audited.find((event) => event.subject_id === task)
     expect(mine?.detail).toMatchObject({ bytes: 27, outcome: 'queued', author: 'U0OTHER0001' })
     expect(JSON.stringify(mine)).not.toContain('staging')
+  })
+
+  it('shows the labels a reply carries in place, and learns no name from them', async () => {
+    const { channel, task, replyIn, slack } = await replying('Names')
+    await deliver(channel, replyIn(5, { user: 'U0NAMES001', text: `<@U0SAM00001|Sam> look at <#${slack}|proj>` }))
+    await deliver(channel, replyIn(6, { user: 'U0NAMES001', text: 'and <@U0SAM00001>' }))
+    await settle()
+    const titles = (await taskInputs.pending(task, 10)).map((input) => `${input.title}: ${input.body}`)
+    const where = `Slack channel ${slack}, name not known`
+    expect(titles).toContain(`U0NAMES001 replied in ${where}: @Sam look at #proj`)
+    expect(titles).toContain(`U0NAMES001 replied in ${where}: and <@U0SAM00001>`)
   })
 
   it("drops the agent's own message whose echo came before its result", async () => {
@@ -70,17 +93,17 @@ describe('routing Slack thread replies', () => {
   })
 
   it("holds a bot's reply for the user's next message", async () => {
-    const { channel, task } = await replying('Bot')
-    await deliver(channel, reply(3, { user: undefined, bot_id: 'B0CIBOT001', bot_profile: { name: 'CI' } }))
+    const { channel, task, replyIn } = await replying('Bot')
+    await deliver(channel, replyIn(3, { user: undefined, bot_id: 'B0CIBOT001', bot_profile: { name: 'CI' } }))
     await settle()
     const [update] = await taskInputs.pending(task, 10)
     expect(update).toMatchObject({ source: 'thread', subject: 'CI', bot: true, delivery: 'with_message' })
   })
 
   it(`sends at most ${String(THREAD_RATE)} replies of one thread an hour`, async () => {
-    const { channel, task } = await replying('Rate')
+    const { channel, task, replyIn } = await replying('Rate')
     for (let n = 10; n < 11 + THREAD_RATE; n++) {
-      await deliver(channel, reply(n))
+      await deliver(channel, replyIn(n))
     }
     await settle()
     const seen = await outcomes(task)
@@ -89,9 +112,9 @@ describe('routing Slack thread replies', () => {
   })
 
   it('gives an archived agent nothing and stops following', async () => {
-    const { channel, task } = await replying('Archived')
+    const { channel, task, replyIn } = await replying('Archived')
     await sql`UPDATE task SET archived_at = ${new Date().toISOString()} WHERE id = ${task}`
-    await deliver(channel, reply(40))
+    await deliver(channel, replyIn(40))
     await settle()
     expect(await outcomes(task)).toEqual(['skipped'])
     expect((await threadFollows.forTask(task))[0]).toMatchObject({ stop_reason: 'archived' })
