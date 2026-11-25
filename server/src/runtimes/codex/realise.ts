@@ -7,6 +7,7 @@ import type { StdioServer } from '../../tool-relay.js'
 import type { OneShotRequest } from '../one-shot.js'
 import type { CodexDecide } from './approvals.js'
 import type { CodexRealised } from './session.js'
+import { withSkills } from './skills.js'
 
 /** Where Codex sends its model calls, and the variable that holds the key's placeholder. */
 export interface CodexProvider {
@@ -140,7 +141,7 @@ export function realiseCodex(
     resume: spec.resume,
     model,
     effort: spec.vendor.effort,
-    instructions: spec.instructions.append,
+    instructions: withSkills(spec.instructions.append, spec.vendor.skills, launcher.env.HOME),
     spawn,
     decide,
     signal: abortController.signal,
