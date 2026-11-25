@@ -1,5 +1,6 @@
 import { bypassOn, type Task } from '@seti/shared'
 import type { PermissionSettings } from './permission-policy.js'
+import { folderSettingsOf } from './runtimes/claude/folder-settings.js'
 import { permissionSettings } from './session-options.js'
 import { approvalCeilings } from './store/approval-ceilings.js'
 import { codexSettings } from './store/codex-settings.js'
@@ -70,7 +71,9 @@ export async function regimeOfTask(task: Pick<Task, 'id' | 'runtime' | 'bypass_u
  * agent's approvals and the user answers every Codex call.
  */
 export async function claudeRules(task: Task): Promise<PermissionSettings> {
-  const rules = await permissionSettings(task)
+  const own = await permissionSettings(task)
+  const held = (await folderSettingsOf(task.cwd)).rules
+  const rules = { ...own, ask: [...own.ask, ...held.ask], deny: [...own.deny, ...held.deny] }
   return task.runtime === 'claude' && (await regimeOfTask(task)) === 'user' ? { ...rules, allow: [] } : rules
 }
 
