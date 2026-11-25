@@ -17,7 +17,7 @@ import {
 } from './schema-cost.js'
 import { CPU_CAPS } from './schema-cpu.js'
 import { ANDROID_OVERRIDE, DEVICE_SHOW_NAMES, DEVICES, dropOfficialAndroidRow } from './schema-devices.js'
-import { DREAM_NIGHTS, DREAM_PROMPT_VERSION, DREAM_PROPOSALS, DREAM_RUNS } from './schema-dreams.js'
+import { DREAM_NIGHTS, DREAM_PROMPT_VERSION, DREAM_PROPOSALS, DREAM_RUNS, DREAM_TIDIES } from './schema-dreams.js'
 import {
   ATTENTION_TIERS,
   EA_CONTEXT_PACKS,
@@ -256,4 +256,5 @@ export const MIGRATIONS: readonly Migration[] = [
   { version: 137, name: 'share_live', sql: SHARE_LIVE },
   { version: 138, name: 'thread_follows', sql: THREAD_FOLLOWS },
   { version: 139, name: 'share_render', sql: SHARE_RENDER },
+  { version: 140, name: 'dream_tidies', sql: DREAM_TIDIES },
 ]

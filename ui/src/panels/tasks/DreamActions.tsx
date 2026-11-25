@@ -1,10 +1,11 @@
-import type { DreamRun, Revision } from '@seti/shared'
+import type { DreamRun, DreamTidy, Revision } from '@seti/shared'
 import { ChevronDown, Moon, Sparkles } from 'lucide-react'
 import { useId, useState } from 'react'
 import { ToggleButton } from '@/components/ToggleButton'
 import { Button } from '@/components/ui/button'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { DreamProposals } from './DreamProposals'
+import { DreamTidied } from './DreamTidied'
 import { MemoryChanges } from './MemoryDiff'
 import { useDreams, useNightly } from './useDreams'
 
@@ -46,11 +47,15 @@ function dreamFooter(run: DreamRun): string {
 function LastDream({
   run,
   changes,
+  tidies,
   onUndo,
+  onUndoTidy,
 }: {
   run: DreamRun
   changes: readonly Revision[]
+  tidies: readonly DreamTidy[]
   onUndo: (r: Revision) => void
+  onUndoTidy: (tidy: DreamTidy) => void
 }) {
   const [open, setOpen] = useState(false)
   const report = run.report
@@ -68,7 +73,7 @@ function LastDream({
       </CollapsibleTrigger>
       <CollapsibleContent className="grid gap-2 px-2 pb-1">
         <p className="text-2xs">{report?.summary ?? run.reason ?? 'No report yet.'}</p>
-        <ReportList title="Tidied" items={report?.tidied ?? []} />
+        <DreamTidied lines={report?.tidied ?? []} tidies={tidies} onUndo={onUndoTidy} />
         <ReportList title="Remembered" items={report?.remembered ?? []} />
         <ReportList title="Asks" items={report?.asks ?? []} />
         <ReportList title="Found" items={report?.found ?? []} />
@@ -91,7 +96,7 @@ function nightlyHint(nightly: { enabled: boolean; on: boolean } | null): string 
 /** Dream now, the agent's nightly switch, and the last dream's report with undo. */
 export function DreamActions({ taskId, open }: { taskId: string; open: boolean }) {
   const id = useId()
-  const { latest, changes, dreamNow, undo } = useDreams(taskId, open)
+  const { latest, changes, tidies, dreamNow, undo, undoTidy } = useDreams(taskId, open)
   const { nightly, switchTo } = useNightly(taskId, open)
   const dreaming = latest?.state === 'running'
   return (
@@ -118,9 +123,11 @@ export function DreamActions({ taskId, open }: { taskId: string; open: boolean }
         />
       </div>
       <p id={id} className={CONSEQUENCE}>
-        Tidies its memory in a sandbox; changes nothing else
+        Tidies its memory and unused subscriptions; each change can be undone
       </p>
-      {latest !== null && <LastDream run={latest} changes={changes} onUndo={undo} />}
+      {latest !== null && (
+        <LastDream run={latest} changes={changes} tidies={tidies} onUndo={undo} onUndoTidy={undoTidy} />
+      )}
       <DreamProposals taskId={taskId} open={open} latest={`${String(latest?.id)}:${latest?.state ?? ''}`} />
     </div>
   )

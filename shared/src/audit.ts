@@ -315,6 +315,7 @@ export const AUDIT_KINDS = [
   'dream.trashed',
   'dream.restored',
   'dream.trash_purged',
+  'dream.tidy_undone',
 ] as const satisfies readonly `${AuditArea}.${string}`[]
 export type AuditKind = (typeof AUDIT_KINDS)[number]
 

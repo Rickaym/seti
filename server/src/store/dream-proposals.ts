@@ -1,7 +1,7 @@
-import type { DreamProposal, DreamProposalInput, TrashItem } from '@seti/shared'
+import type { DreamProposal, DreamProposalAnyKind, TrashItem } from '@seti/shared'
 import { now, sql } from '../db.js'
 
-type ProposalRow = Omit<DreamProposal, 'bytes'> & { bytes: number | string }
+type ProposalRow = Omit<DreamProposal, 'bytes'> & { bytes: number | string; subject: string | null }
 type TrashRow = Omit<TrashItem, 'bytes'> & { bytes: number | string; trash_path: string; meta: TrashMeta }
 
 /** What a restore needs besides the folder: the branch and its tip, for branches and worktrees. */
@@ -11,7 +11,15 @@ export interface TrashMeta {
   tip?: string
 }
 
-const toProposal = (row: ProposalRow): DreamProposal => ({ ...row, bytes: Number(row.bytes) })
+const toProposal = ({ subject: _subject, ...row }: ProposalRow): DreamProposal => ({ ...row, bytes: Number(row.bytes) })
+
+/** A proposal to file: a clean-up, or an unsubscribe with the subscription it names as subject. */
+export interface NewProposal {
+  kind: DreamProposalAnyKind
+  target: string
+  reason: string
+  subject?: string
+}
 const toTrash = ({ trash_path: _path, meta: _meta, ...row }: TrashRow): TrashItem => ({
   ...row,
   bytes: Number(row.bytes),
@@ -21,10 +29,11 @@ const toTrash = ({ trash_path: _path, meta: _meta, ...row }: TrashRow): TrashIte
 export const PROPOSALS_PER_DREAM = 10
 
 export const dreamProposals = {
-  add: async (run: { id: number; task_id: string }, input: DreamProposalInput, bytes: number) => {
+  add: async (run: { id: number; task_id: string }, input: NewProposal, bytes: number) => {
     const [row] = await sql<ProposalRow[]>`INSERT INTO dream_proposal
-        (run_id, task_id, kind, target, reason, bytes, state, created_at)
-      VALUES (${run.id}, ${run.task_id}, ${input.kind}, ${input.target}, ${input.reason}, ${bytes}, 'pending', ${now()})
+        (run_id, task_id, kind, target, reason, bytes, state, created_at, subject)
+      VALUES (${run.id}, ${run.task_id}, ${input.kind}, ${input.target}, ${input.reason}, ${bytes}, 'pending', ${now()},
+        ${input.subject ?? null})
       RETURNING *`
     if (row === undefined) {
       throw new Error('The proposal was not stored')
@@ -33,7 +42,7 @@ export const dreamProposals = {
   },
   get: async (id: number) => {
     const [row] = await sql<ProposalRow[]>`SELECT * FROM dream_proposal WHERE id = ${id}`
-    return row && toProposal(row)
+    return row && { ...toProposal(row), subject: row.subject }
   },
   countForRun: async (runId: number): Promise<number> => {
     const [row] = await sql<{ count: string }[]>`SELECT COUNT(*) AS count FROM dream_proposal WHERE run_id = ${runId}`

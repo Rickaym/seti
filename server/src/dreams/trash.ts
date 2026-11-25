@@ -1,6 +1,6 @@
 import fs from 'node:fs'
 import path from 'node:path'
-import type { DreamProposal, TrashItem } from '@seti/shared'
+import type { DreamProposal, DreamProposalKind, TrashItem } from '@seti/shared'
 import { audit } from '../audit.js'
 import { TRASH_ROOT } from '../config.js'
 import { refuseAgent, refuseDelegates } from '../ea-guard.js'
@@ -36,7 +36,10 @@ async function moveIn(from: string, slot: string): Promise<string> {
 }
 
 /** Applies an allowed clean-up: moves it into the trash, or deletes the branch and keeps its tip. */
-export async function applyIntoTrash(proposal: DreamProposal, checked: Checked): Promise<TrashItem> {
+export async function applyIntoTrash(
+  proposal: DreamProposal & { kind: DreamProposalKind },
+  checked: Checked,
+): Promise<TrashItem> {
   let meta: TrashMeta = {}
   let trashPath = ''
   if (proposal.kind === 'delete_branch' && checked.branch !== undefined) {

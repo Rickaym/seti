@@ -11,6 +11,9 @@ const redacted = (report: DreamReport): DreamReport => ({
   asks: report.asks.map(redactSecrets),
   found: report.found.map(redactSecrets),
   nothing_to_do: report.nothing_to_do,
+  ...(report.config === undefined
+    ? {}
+    : { config: report.config.map((decision) => ({ ...decision, reason: redactSecrets(decision.reason) })) }),
 })
 
 /** The clean-up proposal tool: checked by the control room, applied only on the user's Allow. */
