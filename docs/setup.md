@@ -807,11 +807,19 @@ Seti shows Slack channels and people by name, as `#deploys` or `Dana`, wherever 
 id: Slack alerts for the EA, thread replies, the permission request for a Slack send, its row in
 the transcript and the audit log's summary. It learns a name only where Slack itself states it and
 no message author can write it: a person's own profile on a message the webhook delivers while a
-thread switch is on, and the first line of the Slack MCP server's answer when an agent reads a
-channel or a person's profile by id. A label inside a message, such as `<#C0123|deploys>`, may show
-where that message is shown but is never learned. An id Seti has not seen named reads "name not
-known", and a permission request says when a name was last seen if that was over 30 days ago. Seti
-holds no Slack token for this.
+thread switch is on, and the names the Slack MCP server lists beside ids when an agent reads a
+channel, a thread or a profile, searches channels or people, lists your channels or a channel's
+members, or writes a draft. A topic, purpose, title or message is never read for names, and a
+label inside a message, such as `<#C0123|deploys>`, may show where that message is shown but is
+never learned. An id Seti has not seen named reads "name not known" until an agent's call states
+it, and the request and transcript update at once when it does. On such a request, Look up denies
+the send and asks the agent to read that channel or person first and send again. A permission
+request says when a name was last seen if that was over 30 days ago. Seti holds no Slack token for
+this.
+
+To fill the names in one go, ask any agent with the Slack MCP server: "Run slack_list_user_channels
+with types public_channel,private_channel,im,mpim and limit 200, follow every next cursor, and tell
+me how many you found." Its answer names each of your channels and the people you message.
 
 While both switches are off, the Slack webhook works exactly as before. Once you turn one on,
 `app_mention` and other events still reach its subscribers, such as the EA's inbox, but a `message`
