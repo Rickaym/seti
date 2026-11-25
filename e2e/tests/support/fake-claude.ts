@@ -12,6 +12,7 @@ import {
   actPermission,
   PERMISSION_PROMPT,
   PLAN_APPROVAL_PROMPT,
+  SLACK_LOOKUP_PROMPT,
   SLACK_PROMPT,
   type CanUseTool,
 } from './fake-permission.js'
@@ -334,7 +335,9 @@ class FakeClaude {
         this.outbox.fail(new Error(`Claude Code process exited with code 1: ${reason}`))
         return
       }
-      await ([PERMISSION_PROMPT, PLAN_APPROVAL_PROMPT, SLACK_PROMPT].some((ask) => text(m).includes(ask))
+      await ([PERMISSION_PROMPT, PLAN_APPROVAL_PROMPT, SLACK_PROMPT, SLACK_LOOKUP_PROMPT].some((ask) =>
+        text(m).includes(ask),
+      )
         ? actPermission(this.options.canUseTool, this.actor(), text(m))
         : (this.fallback.play(text(m), this.actor()) ?? this.answer(text(m))))
       this.result()
