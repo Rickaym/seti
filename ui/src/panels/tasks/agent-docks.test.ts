@@ -9,6 +9,7 @@ const dock = (key: string, onClose: (agent: string) => void): AgentDock => ({
   icon: MessageCircle,
   view: () => null,
   onClose,
+  needs: [],
 })
 
 describe('agent docks', () => {

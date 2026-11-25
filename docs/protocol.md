@@ -195,6 +195,15 @@ between two steps; an interrupt; a hook at subagent start.
   show their thinking as the default runtime's do. Reasoning the model seals for its own next call
   MUST NOT be stored, served or shown by the control room.
 
+### 3.6 What an agent is given
+
+- KIT-1: The user's own instruction file reaches an agent read-only on every runtime that reads
+  instruction files, and a folder's instruction file (`CLAUDE.md`, or for Codex `AGENTS.md`
+  first) is read from the agent's folder as its input (HST-1). Both MUST come below the control
+  room's own instructions: in the conversation as project instructions, never in the system or
+  developer instructions. A runtime folder the agent can write MUST NOT carry instructions into a
+  later session.
+
 ## 4. Turn lifecycle
 
 - TURN-1: A user message (`prompt`, `interrupt`, `attachments`, `notify_when_done`, `client_id`)
@@ -468,6 +477,15 @@ interrupted only for that.
 - EGR-12: Tool servers an agent leaves out MUST be denied to its runtime and get no proxy sign-in.
 - EGR-13: A maintenance session's proxy allows the model provider alone, with the agent's model
   login: no connection, allowlist, claude.ai connector, cloud or SSH, and no placeholder is issued.
+- EGR-16: A host the proxy refuses as off the allowlist answers 403 with a body that tells the
+  agent retrying will not help and to ask with `request_change` (`allow_host`) or tell the user.
+  The first refusal of each host for an agent MUST add one quiet transcript line naming it,
+  audited once; later refusals raise the count that line shows and add nothing else, in a separate
+  node as in one process. Only a single host name or address the user could allow gets a line,
+  never a wildcard or any other text, at most 20 hosts per agent, and nothing of the request but
+  the host is recorded. The line's Allow host files the host request and answers it with the
+  user's own Allow (for the agent, or every agent), refused to the EA and agents (403) and to a
+  host the agent was not refused (404). A refusal alone never puts the agent in Needs you.
 
 ### 7.4 Permission rules and requests
 
@@ -833,7 +851,10 @@ Why: an agent woken by its own actions or by news nobody waited for burns turns 
   is off, while the agent has one running, and past `opinion_rate`. The answer reaches the agent
   as its tool result in a `<second-opinion>` tag (UPD-13) with a preface that it is data. The
   cost is the caller's, marked estimated where the runtime reports none; the audit records the
-  runtime, model, sizes, cost and outcome, never the text.
+  runtime, model, sizes, cost and outcome, never the text. An agent MAY instead name one of its
+  linked pull requests: the control room reads its diff with the host's code-host login, bounded
+  by the context size and redacted, keeps the answer for that PR's row, and posts nothing to the
+  code host; a PR not linked to the agent is refused.
 
 ## 14. The assistant
 
@@ -980,7 +1001,8 @@ Optional and off by default: a maintenance session per agent that consolidates i
 - DRM-4: A dream starts only while the agent is unarchived and sandboxed, its runtime declares
   dreams, it runs no turn or background work, holds no open question, permission or change
   request, has no dream running, and the runtime's own consolidation did not run in the last hour;
-  otherwise it is refused with the reason. A nightly dream refused for work or an open request is
+  otherwise it is refused with the reason, which counts the background commands and other
+  background tasks an agent with no turn still runs. A nightly dream refused for work or an open request is
   tried again every `dream_retry` until the window ends, then skipped with its last reason. None
   starts after the end; one running at the end is stopped.
 - DRM-5: Nightly starts are at most the setting at once and `dream_gap` apart, and wait while plan
@@ -993,7 +1015,9 @@ Optional and off by default: a maintenance session per agent that consolidates i
   only in its memory folder and the night's dream folder of its workspace. It reads a digest of
   the agent's transcript since its last dream, built from neutral events, at most
   `dream_digest` characters, with credentials redacted and the user's messages and failures kept
-  first.
+  first. Its prompt names the other memory folders the agent's sessions see (its checkouts'),
+  which it reads before it writes and may not change. When it changed memory that the agent's
+  sessions do not load, because they load their repository's, its report says so in one line.
 - DRM-7: A dream MUST NOT start or change a turn of the agent, post, send an update, push or
   notify, or enter Needs you. Its outcome is one stored report, also written beside the digest,
   and the agent's next turn is told once which dreams changed its memory.
@@ -1040,7 +1064,9 @@ Optional and off by default: a maintenance session per agent that consolidates i
 - DRM-16: Dream now runs one dream of an agent at once, by the user, the EA after the user's yes,
   or an agent at `full` on another agent; it is refused on the agent itself. The EA, an agent or
   a mod starts at most one dream of an agent a day; only the user starts more. Dream now waits for
-  no window but keeps the night budget. The start is audited with who asked for it.
+  no window but keeps the night budget. The start is audited with who asked for it. A dream of an
+  agent whose transcript has nothing new since its last finished dream runs no session: it ends
+  at once, at no cost, with a one-line report that there was nothing to tidy.
 
 ## 16. Audit
 
@@ -1111,6 +1137,11 @@ Optional and off by default: a maintenance session per agent that consolidates i
 - MOD-23: Third-party mods MAY contribute settings, commands, slash commands, webhook senders,
   views, file viewers, status items, notification kinds, context text, themes, audit kinds,
   schedules and agent events (type, agent id and time only); all else is bundled only.
+- MOD-25: A mod's command that takes an agent, and its view beside or over one agent, MAY name
+  runtime capabilities it needs (RT-13). On an agent whose runtime's adapter does not declare one,
+  the control room MUST NOT offer the command or show the view there, its slash command says it is
+  not on that runtime, and the server refuses the command for that agent (409) to the user, the EA
+  and agents alike.
 
 ## 18. Public surfaces
 
