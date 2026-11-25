@@ -3,7 +3,7 @@ import { MCP_TRANSPORTS, projectClaude } from '@seti/shared'
 import type { RuntimeAdapter, SessionInput } from '../adapter.js'
 import { oneInput } from '../one-shot.js'
 import { reportedCost } from './cost.js'
-import { claudeLoadedMemory, claudeMemory, dreamOptions } from './dream.js'
+import { claudeMemory, dreamOptions } from './dream.js'
 import { claudePrompt } from './input.js'
 import { oneShotOptions } from './one-shot.js'
 import { realise } from './realise.js'
@@ -26,7 +26,6 @@ export const claudeAdapter: RuntimeAdapter<ClaudeShapes, 'claude'> = {
     subagents: true,
     dream: {
       memory: claudeMemory,
-      loaded: claudeLoadedMemory,
       open: async (spec, launcher, host, abortController) => {
         const options = dreamOptions(spec, launcher, host, abortController)
         return Promise.resolve(claudeSession(transport({ prompt: claudePrompt(once(spec.prompt)), options }), false))

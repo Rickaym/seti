@@ -8,12 +8,12 @@ const PHONE_SPEC = /phone\.spec\.ts$/
 /** Phone profiles keep their viewport, touch and user agent but run in Chromium like the rest. */
 const phone = (device: (typeof devices)[string]) => ({ ...device, browserName: 'chromium' as const })
 
-/** WebKit runs only the live share isolation spec, and only where CI or a person installed it. */
+/** WebKit runs only the rendered share isolation spec, and only where CI or a person installed it. */
 const WEBKIT = process.env.SETI_E2E_WEBKIT === '1'
 
 const webkitProject = {
   name: 'webkit',
-  testMatch: /live-share-isolation\.spec\.ts$/,
+  testMatch: /share-render-isolation\.spec\.ts$/,
   use: { browserName: 'webkit' as const, launchOptions: { args: [] } },
 }
 
