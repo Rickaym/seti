@@ -122,8 +122,12 @@ async function lastDream(job: DreamJob): Promise<string | null> {
   return done?.ended_at ?? null
 }
 
+/** How far back the digest of an agent's first dream reaches: one day, not its whole history. */
+const FIRST_DAY_MS = 24 * 60 * 60_000
+
 async function writeDigest(job: DreamJob, since: string | null): Promise<{ file: string; empty: boolean }> {
-  const { rows, truncated } = await dayRows(job.task.id, since)
+  const from = since ?? new Date(Date.now() - FIRST_DAY_MS).toISOString()
+  const { rows, truncated } = await dayRows(job.task.id, from)
   const text = composeDigest({
     title: job.task.title,
     night: job.run.night,

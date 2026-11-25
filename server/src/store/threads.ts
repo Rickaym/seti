@@ -1,4 +1,4 @@
-import type { FollowedThread, ThreadStopReason } from '@seti/shared'
+import type { FollowedThread, ListedThread, ThreadStopReason } from '@seti/shared'
 import { sql } from '../db.js'
 
 /** A message an agent sent outside Seti, with the thread it belongs to. */
@@ -52,9 +52,14 @@ export const threadFollows = {
   },
 
   /** The agent's threads, the ones it still follows first, newest activity first. */
-  forTask: async (taskId: string): Promise<FollowedThread[]> =>
-    sql<FollowedThread[]>`${SELECT} WHERE task_id = ${taskId}
-      ORDER BY (stopped_at IS NULL) DESC, last_activity_at DESC, id DESC`,
+  forTask: async (taskId: string): Promise<ListedThread[]> =>
+    sql<ListedThread[]>`SELECT f.id::int AS id, f.task_id, f.service, f.space, f.container AS channel, f.thread,
+        f.since, f.url, f.last_sent_at, f.last_activity_at, f.replies, f.stopped_at, f.stop_reason, f.created_at,
+        n.name AS channel_name
+      FROM thread_follow f
+      LEFT JOIN slack_name n ON n.id = f.container AND f.service = 'slack'
+      WHERE f.task_id = ${taskId}
+      ORDER BY (f.stopped_at IS NULL) DESC, f.last_activity_at DESC, f.id DESC`,
 
   /** Stops the agent's least recently active threads beyond `cap`; returns the ones stopped. */
   stopOverCap: async (taskId: string, cap: number, at: string): Promise<FollowedThread[]> =>

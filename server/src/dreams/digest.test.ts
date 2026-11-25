@@ -133,6 +133,26 @@ describe('composeDigest', () => {
     expect(text).toContain('Ran: git push. Failed')
     expect(text).toContain('Reply 199')
     expect(text).not.toContain('Reply 0 ')
-    expect(text).toContain('lesser steps were cut')
+    expect(text).toMatch(/\n\d+ steps were left out to fit, the oldest of each kind first: \d+ replies\.$/)
+  })
+
+  it('says when only lesser steps were left out, so the dream knows the rest of the day is there', () => {
+    const rows = [prompt('Ship the login fix', '2026-11-23T08:00:00.000Z')]
+    for (let i = 0; i < 100; i++) {
+      rows.push(tool(`r${String(i)}`, 'Read', { file_path: `/w/app/file-${String(i)}-${'y'.repeat(80)}.ts` }))
+    }
+    const text = day(rows, 4000)
+    expect(text).toContain('user: Ship the login fix')
+    expect(text).toContain('file-99-')
+    expect(text).not.toContain('file-0-')
+    expect(text).toMatch(/lesser steps \(tool calls and updates\) were left out to fit, the oldest first; the user's/)
+  })
+
+  it("covers the last day before an agent's first dream, and names where a day too long starts", () => {
+    const rows = [prompt('Ship it', '2026-11-23T08:00:00.000Z')]
+    const first = composeDigest({ title: 'Lead', night: '2026-11-23', since: null, rows, prUrls: [], truncated: true })
+    expect(first).toContain('Steps of the last day, before its first dream, oldest first.')
+    expect(first).toContain('- The day had more steps than a digest reads, so this one starts at 2026-11-23 08:00.')
+    expect(day(rows)).not.toContain('more steps than a digest reads')
   })
 })

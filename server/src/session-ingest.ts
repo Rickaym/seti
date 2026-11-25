@@ -29,6 +29,7 @@ import { processStarted, recordStart, settleRewind, setupAnswers } from './sessi
 import { unstored } from './session-start.js'
 import { forgetSessionTools } from './session-tools.js'
 import { countShadow } from './shadow-counts.js'
+import { learnSlackNames } from './slack/learn.js'
 import { addTurnCost, recordTurnCost } from './store/cost.js'
 import { hadRunningSubtask } from './subtask-cache.js'
 import { publishFolded, publishSubtasks } from './subtask-prs.js'
@@ -92,6 +93,7 @@ async function record(taskId: string, body: MessageBody, events: readonly Runtim
   }
   await linkCreatedPrs(taskId, events, openQuerySince(taskId))
   await followSentThreads(taskId, events)
+  await learnSlackNames(taskId, events)
 }
 
 /** Stores a message of the session, unless Seti does not keep it, and notes a session's start. */

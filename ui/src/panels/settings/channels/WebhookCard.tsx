@@ -25,6 +25,7 @@ import { FilterRow } from './FilterRow'
 import { MappingEditor } from './MappingEditor'
 import { SenderRow } from './SenderRow'
 import { Subscribers } from './Subscribers'
+import { ThreadsRow } from './ThreadsRow'
 import { hookUrl } from './hook-url'
 
 /** Asks for the new secret a sender such as Sentry issued. */
@@ -223,6 +224,7 @@ export function WebhookCard({
       )}
       <SenderRow info={info} onChange={onChange} />
       <FilterRow info={info} onChange={onChange} />
+      <ThreadsRow info={info} onChange={onChange} />
       <Subscribers info={info} onChange={onChange} />
       {info.preset === CORE_WEBHOOK_SOURCE && (
         <MappingEditor

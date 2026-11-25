@@ -12,6 +12,7 @@ import {
   type SetiInput,
   type TaskInput,
   type TeamInput,
+  type ThreadInput,
   type WorkspaceInput,
 } from '@seti/shared'
 import {
@@ -27,6 +28,7 @@ import {
   GitPullRequestClosed,
   Lock,
   MessageSquare,
+  MessageSquareReply,
   MessageSquareText,
   MessagesSquare,
   Webhook,
@@ -204,6 +206,37 @@ function ChannelEntry({ input, queued }: { input: ChannelInput; queued: boolean 
   )
 }
 
+/** A reply in a thread outside Seti the agent posted in: who, where, the first words and a link. */
+function ThreadEntry({ input, queued }: { input: ThreadInput; queued: boolean }) {
+  return (
+    <div className="border-l-2 border-border bg-muted/40 text-xs" data-kind="input" data-input="thread">
+      <div className="flex items-start gap-2 px-2 py-1.5">
+        <MessageSquareReply className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
+        <span className="min-w-0 flex-1 text-foreground">
+          <span className="font-medium">{input.title}</span>
+          {input.body !== '' && (
+            <span className="line-clamp-2 break-words text-muted-foreground" title={input.body}>
+              {input.body}
+            </span>
+          )}
+        </span>
+        <StateBadge input={input} queued={queued} />
+        {input.url !== null && (
+          <a
+            href={input.url}
+            target="_blank"
+            rel="noreferrer"
+            aria-label={`Open the thread of ${input.title}`}
+            className="relative shrink-0 text-muted-foreground hover:text-foreground pointer-coarse:after:absolute pointer-coarse:after:-inset-3"
+          >
+            <ExternalLink className="size-3.5" />
+          </a>
+        )}
+      </div>
+    </div>
+  )
+}
+
 const AGENT_STYLES: Record<AgentInputKind, string> = {
   idle: 'border-success text-success',
   error: 'border-destructive text-destructive',
@@ -325,6 +358,8 @@ function SourceEntry({ taskId, input, queued }: { taskId: string; input: TaskInp
       return <WorkspaceEntry input={input} queued={queued} />
     case 'channel':
       return <ChannelEntry input={input} queued={queued} />
+    case 'thread':
+      return <ThreadEntry input={input} queued={queued} />
     case 'pr':
       return <PrEntry taskId={taskId} input={input} queued={queued} />
     case 'agent':

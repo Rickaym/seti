@@ -125,6 +125,7 @@ between two steps; an interrupt; a hook at subagent start.
 | ----------- | ----------------------------------------------------------------------------- | ----------------------- |
 | `pr`        | `ci_failed`, `ci_passed`, `review`, `comment`, `conflict`, `merged`, `closed` | yes                     |
 | `channel`   | free text from the event                                                      | yes                     |
+| `thread`    | `reply`                                                                       | yes, a bot's never      |
 | `agent`     | `idle`, `error`, `stopped`                                                    | yes                     |
 | `seti`      | `allowed`, `denied`, `expired`                                                | yes                     |
 | `team`      | `mention`, `direct`, `broadcast`                                              | by CHAT rules           |
@@ -310,6 +311,7 @@ between two steps; an interrupt; a hook at subagent start.
 ```
 <update source="pr" kind="K" subject="S" url="U">TITLE BODY</update>
 <channel-event channel="C" source="S" kind="K" severity="V" received_at="T" url="U">...</channel-event>
+<thread-reply service="S" from="ID" name="N" bot="true" channel="C" thread="T" received_at="T" url="U">...</thread-reply>
 <team-chat from="H" kind="mention|direct|broadcast" message_id="N">...</team-chat>
 <agent-turn agent="TITLE" task_id="ID" ended="idle|error|stopped">...</agent-turn>
 <seti-answer request_id="ID" outcome="allowed|denied|expired">...</seti-answer>
@@ -596,12 +598,15 @@ interrupted only for that.
   outside your organisations" or the like; it is an ask, never a refusal. The user's own are the
   owners of the signed-in code-host account and its organisations, read on the control plane and
   cached for about an hour, and the owners of the repositories the agent was given. The
-  implementation reads the command past wrappers, nested scripts and `cd`, resolves a remote or
-  URL under HST-2 with the repository's and the agent's own global git config and URL rewrites,
-  in the folder as the agent sees it (a sandbox's private home and /tmp included), and asks
-  whenever it cannot place the target: the same command changes remotes, git config or git's
-  environment, sets the code host's repository or host variables, or pushes submodules. A push
-  to a local path does not ask. An allow rule `PushTo(<owner>)`, which only the user adds, lets
+  implementation reads the command past wrappers and nested scripts; follows `cd`, `pushd`,
+  `popd` and `git -C`, with `~` and `$HOME` as the agent's home, and variables the same line
+  gives one literal value, each only as far as the line surely ran it; resolves a remote or URL
+  under HST-2 with the repository's and the agent's own global git config and URL rewrites, in
+  the folder as the agent sees it (a sandbox's private home and /tmp included); and asks whenever
+  it cannot place the target: a folder or variable the shell computes, the same command changes
+  remotes, git config or git's environment, sets the code host's repository or host variables,
+  or pushes submodules. A command that neither pushes, forks, opens a pull request nor writes
+  through the API never asks, and a push to a local path does not ask. An allow rule `PushTo(<owner>)`, which only the user adds, lets
   that code-host owner through; it is never handed to a runtime.
 
 ### 7.5 Guards
@@ -798,12 +803,49 @@ interrupted only for that.
   `warning`.
 - CHN-29: Each delivery is logged with its status, HTTP status, reason, a redacted excerpt and
   each subscription's outcome. Failed routes retry with doubling backoff (`route_retry`).
+- CHN-33: Seti learns a Slack channel or person name only where Slack states it and no message
+  author can write it: the author's own profile on a message event a Slack webhook delivers while a
+  thread switch is on, and the first line of a Slack MCP answer that reads a channel or a person's
+  profile by id, when that line names the same id. It never learns from message text, markup labels
+  or search results; a label inside a message may show in place where that message is shown. A newer
+  sighting replaces the name and when it was last seen. Where Seti shows a Slack id (a Slack event's
+  title and text, a thread reply, a Slack send's request summary, transcript row and audit summary)
+  it shows the name it knows, else the id and "name not known"; it never guesses. A name shown on a
+  permission request never comes from text a message author controls, and says when it was last
+  seen if that was over `slack_name_stale` ago. Audit details keep the ids.
 - THR-1: A Slack message an agent sends, with an MCP `send_message` tool or `chat.postMessage`, is
   recorded when its successful result names the channel and ts (a Slack message link, or the Web
   API answer). Its thread is the link's or the call's `thread_ts`, else the message itself, and
   the agent follows it; a later send there follows it again after a stop. Seti keeps ids and the
   link, never the text. An agent follows at most `thread_cap` threads; a new one stops the least
   recently active.
+- THR-2: While a webhook's `thread_replies` and `thread_dms` are both off, Seti handles its
+  deliveries exactly as it would without thread replies. With either on, a webhook whose sender Seti
+  reads threads from (the catalog `slack` sender) hands each verified message event to the thread
+  matcher before its filter. A new message (not an edit, deletion or join) in a followed thread is
+  queued for every agent following it whose first message there is older, once each, when
+  `thread_replies` is on. With `thread_dms` on, an unthreaded message in a direct message goes to
+  the agent that wrote there last within `dm_window`. A message any agent sent is never queued.
+  Queued text is redacted.
+- THR-3: With either switch on, other events such as `app_mention` reach subscribers as before. A
+  message event reaches them when the webhook's filter keeps or changes it, or, when the webhook
+  has no filter or its filter fails, when it mentions a user the sender's app is authorised for;
+  otherwise the delivery is `ignored` and keeps no excerpt.
+  Why: subscribing the app to message events for replies must not flood the EA's inbox, and a
+  mention that arrives as a message event must still reach it.
+- THR-4: A queued reply is routed after `reply_settle`, so an agent's own message whose echo came
+  first is recognised (`own`). It reaches the agent as a `thread` update unless the thread is
+  stopped or `thread_rate` replies of it were sent within the hour (`rate`). A bot's reply is held
+  for the user's next message (UPD-4). An archived agent gets nothing and the thread stops. Once
+  routed, the reply's text is forgotten; the audit keeps ids, author, size and outcome.
+- THR-5: Following stops after `thread_quiet` without a message in the thread, or `thread_age`
+  after it started.
+- THR-6: Only the user turns `thread_replies` and `thread_dms` on or off; both start off. Turning
+  `thread_replies` on turns `thread_dms` on too unless the same change says otherwise.
+- THR-7: The user, the EA after the user's yes, or the agent itself MAY stop an agent following a
+  thread; each stop is audited with who stopped it. An agent's settings list the threads it follows
+  with Stop, and a Slack webhook's card shows both switches and, while one is on and none has
+  arrived, that no message event came yet.
 
 ## 11. Pull requests
 
@@ -1096,11 +1138,13 @@ Optional and off by default: a maintenance session per agent that consolidates i
 - DRM-6: A dream is a new session of the agent's runtime that resumes nothing (RT-8), in the
   agent's maintenance sandbox (SBX-12) with egress to the model provider only (EGR-13), writable
   only in its memory folder and the night's dream folder of its workspace. It reads a digest of
-  the agent's transcript since its last dream, built from neutral events, at most
-  `dream_digest` characters, with credentials redacted and the user's messages and failures kept
-  first. Its memory folder is the one the agent's sessions load (SBX-15). Its prompt names the
-  other memory folders the agent's sessions see read-only (its checkouts'), which it reads before
-  it writes and may not change.
+  the agent's transcript since its last dream, or for its first the last day, built from neutral
+  events, at most `dream_digest` characters, with credentials redacted, the user's messages and
+  failures kept first, and a last line counting what was left out by kind. Its prompt asks it to
+  read the whole digest and to review the notes already kept, not only those the day touched,
+  and never to remove one only because the day did not mention it. Its memory folder is the one
+  the agent's sessions load (SBX-15). Its prompt names the other memory folders the agent's
+  sessions see read-only (its checkouts'), which it reads before it writes and may not change.
 - DRM-7: A dream MUST NOT start or change a turn of the agent, post, send an update, push or
   notify, or enter Needs you. Its outcome is one stored report, also written beside the digest,
   and the agent's next turn is told once which dreams changed its memory.
@@ -1109,7 +1153,10 @@ Optional and off by default: a maintenance session per agent that consolidates i
   after, credentials redacted. The user, and the EA after the user's yes, MAY revert it; a revert
   of a file changed since, or of a text kept only redacted, MUST be refused (409). Every change
   and revert is audited with the path and line counts, never the text. The last dream's report
-  shows each changed file's diff, from that stored text, with its revert beside it.
+  shows each changed file's diff, from that stored text, with its revert beside it. A topic file
+  a dream leaves empty is removed after it, since a dream deletes nothing itself, and recorded
+  as a change like any other. The report's tidied lines name each note removed, merged, moved
+  or corrected, with the reason.
 - DRM-9: Clean-ups are off by default and a setting. When on, a dream MAY propose a clean-up
   (`trash`, `remove_worktree`, `delete_branch`) with a reason, at most `dream_proposals` a dream.
   The control room checks it when filed and again when the user allows it, and applies it only
@@ -1392,7 +1439,7 @@ others.
 | Poller fetch | 20 requests a run, 5 redirects, 4 MB each, 12 MB a run. `poller_backoff` 6 h. `fail_streak` 5 (reminders 3).                                                                                                                                                                                                                                                                           |
 | Reminders    | `reminder_limits`: interval 1 min to 7 days; 5 s; 256 MB; message 2000; state 16 KB. `cron_catchup` 1 h.                                                                                                                                                                                                                                                                               |
 | PRs          | Create request 50 links. `pr_poll` 60 s. `pr_skew` 5 s. `subagent_wait` 30 min.                                                                                                                                                                                                                                                                                                        |
-| Threads      | `thread_cap` 50.                                                                                                                                                                                                                                                                                                                                                                       |
+| Threads      | `thread_cap` 50. `dm_window` 24 h. `reply_settle` 10 s. `thread_rate` 10 an hour. `thread_quiet` 7 days. `thread_age` 30 days. `slack_name_stale` 30 days.                                                                                                                                                                                                                             |
 | Chat         | Message 4000. Active agent: running, session open, or updated within 12 h. `chat_burst` 12 in 15 min. `chat_loop` 6 in 15 min.                                                                                                                                                                                                                                                         |
 | Questions    | Answer batch 100 items. `notes_waiting` 10. Index 1500 characters. `note_stale` 3 failed checks in a row, or unverified 30 days (fact, environment) or 90 days (how-to, gotcha).                                                                                                                                                                                                       |
 | Assistant    | `ask_ttl` 10 min. `settle` quiet 45 s, at most 3 min. `call_silence` 30 s. `wake_phrase` 2 to 40 characters, at most 4 words. `keep_awake_seconds` 5 to 600.                                                                                                                                                                                                                           |

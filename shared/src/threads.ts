@@ -1,3 +1,5 @@
+import { z } from 'zod'
+
 /** Why Seti stopped following a thread: who stopped it, or it went quiet, old or over the cap. */
 export type ThreadStopReason = 'user' | 'ea' | 'agent' | 'quiet' | 'age' | 'cap' | 'archived'
 
@@ -24,3 +26,24 @@ export interface FollowedThread {
   stop_reason: ThreadStopReason | null
   created_at: string
 }
+
+/** A followed thread as lists show it, with its channel's name when Seti has seen it. */
+export interface ListedThread extends FollowedThread {
+  /** Such as deploys for #deploys; null while Seti does not know it. */
+  channel_name: string | null
+}
+
+/** A webhook's thread switches, for a sender Seti reads replies from; both start off. */
+export interface WebhookThreads {
+  /** Replies in threads agents posted in reach those agents. */
+  replies: boolean
+  /** After an agent writes in a direct message, the next messages there reach it for 24 hours. */
+  dms: boolean
+  /** When the sender last delivered a message event; null before the first. */
+  message_seen_at: string | null
+}
+
+/** Turns a webhook's thread switches on or off; only the user does. */
+export const webhookThreadsInput = z
+  .object({ replies: z.boolean().optional(), dms: z.boolean().optional() })
+  .refine((change) => change.replies !== undefined || change.dms !== undefined, 'Give replies, dms or both')

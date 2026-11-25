@@ -8,7 +8,7 @@ export type SettingsSection = 'General' | 'Access' | 'Team' | 'Session'
 const SECTIONS: readonly (readonly [SettingsSection, readonly string[]])[] = [
   ['General', ['Role', 'Workspace', 'Color', 'Notify', 'Folder']],
   ['Access', ['Credentials', 'Services', 'Isolation', 'Bypass', 'Rules']],
-  ['Team', ['Group chat', 'Channels']],
+  ['Team', ['Group chat', 'Channels', 'Threads']],
   ['Session', ['Cost', 'Memory', 'CPU', 'Compaction']],
 ]
 
