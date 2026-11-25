@@ -11,6 +11,7 @@ export const isFailureNote = (note: SetiPayload) =>
   note.resumed !== true &&
   note.timed_out === undefined &&
   note.refused_host === undefined &&
+  note.edited === undefined &&
   note.error !== RESENT_NOTE
 
 /** The failed turn no message has followed yet, which the notice under the transcript shows. */

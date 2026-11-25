@@ -122,7 +122,7 @@ export function PermissionCard({ request, onAnswered, className }: CardProps) {
       decision,
       scope: everyAgent ? 'global' : 'agent',
       ...(decision === 'deny' && !codex && note.trim() !== '' ? { message: note.trim() } : {}),
-      ...(decision !== 'deny' && edited.length > 0 ? { fields: fields.changed } : {}),
+      ...(edited.length > 0 ? { fields: fields.changed } : {}),
     }
     try {
       await apiPost(`/tasks/${request.task_id}/permission-requests/${request.id}`, body)

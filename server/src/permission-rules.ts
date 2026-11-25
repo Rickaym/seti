@@ -15,6 +15,8 @@ import { audit } from './audit.js'
 import { permissionModeOf } from './bypass-mode.js'
 import { tasks } from './db.js'
 import { refuseAgent } from './ea-guard.js'
+import { noteEdit } from './edit-marks.js'
+import { editedRunNote, type EditedValues } from './edit-notes.js'
 import { heldFolderSettings } from './folder-settings-trust.js'
 import { HttpError } from './http.js'
 import { projectSettingsRules, userSettingsRules } from './inherited-rules.js'
@@ -188,27 +190,28 @@ async function auditAnswer(
 }
 
 /**
- * The input an allowed call runs with, the fields the user's edits change by name only, and the
- * input the request keeps when they changed any.
+ * The input an allowed call runs with, the fields the user's edits change with their new values,
+ * and the input the request keeps when an allowed call runs changed.
  */
 function callOf(request: PermissionRequest, input: AnswerPermissionInput) {
   const original = waitingInput(request.id)
-  const fields = input.decision === 'deny' ? {} : (input.fields ?? {})
+  const fields = input.fields ?? {}
   if (isLateRequest(request.id)) {
     if (Object.keys(fields).length > 0) {
       throw new HttpError(409, 'A restart ended this call, so it cannot be edited; allow or deny it as it is')
     }
-    return { call: original, edited: [], shown: undefined }
+    return { call: original, edited: {}, shown: undefined }
   }
-  const edited = changedFields(original, fields)
-  if (edited.length === 0) {
-    return { call: original, edited, shown: undefined }
+  const changed = changedFields(original, fields)
+  if (changed.length === 0) {
+    return { call: original, edited: {}, shown: undefined }
   }
   if (!request.editable) {
     throw new HttpError(409, 'This call cannot be edited; allow or deny it as it is')
   }
   const call = withFields(original, fields)
-  return { call, edited, shown: inputText(call) }
+  const edited: EditedValues = Object.fromEntries(changed.map((key) => [key, fields[key] ?? '']))
+  return { call, edited, shown: input.decision === 'deny' ? undefined : inputText(call) }
 }
 
 /** The task's request the answer is for; refused unless a call or a restart's leftover waits. */
@@ -252,25 +255,26 @@ export async function answerPermission(
   refuseOnCodex(task, input)
   const request = await answerable(task, requestId, input)
   const late = isLateRequest(request.id)
-  const message = input.decision === 'deny' ? (input.message ?? null) : null
+  const deny = input.decision === 'deny'
+  const message = deny ? (input.message ?? null) : null
   const { call, edited, shown } = callOf(request, input)
-  const settled = await permissionRequests.settle(
-    request.id,
-    input.decision === 'deny' ? 'denied' : 'allowed',
-    message,
-    shown,
-  )
+  const names = Object.keys(edited)
+  const settled = await permissionRequests.settle(request.id, deny ? 'denied' : 'allowed', message, {
+    input: shown,
+    edited: names,
+  })
   if (settled === undefined) {
     throw new HttpError(409, 'The agent no longer waits on this request')
   }
   if (input.decision === 'always') {
     await keepRules(task, settled, input.scope ?? 'agent')
   }
-  await auditAnswer(task, settled, input, edited)
-  const always = input.decision === 'always'
-  const result =
-    input.decision === 'deny' ? denied(message) : allowed(settled, call, await permissionModeOf(task), always)
-  await resolveRequest(settled, result)
+  await auditAnswer(task, settled, input, names)
+  const result = deny
+    ? denied(message, edited)
+    : allowed(settled, call, await permissionModeOf(task), input.decision === 'always')
+  await noteEdit(task, settled)
+  await resolveRequest(settled, result, deny || names.length === 0 ? undefined : editedRunNote(edited))
   if (late) {
     await deliverLateDecision(settled)
   }

@@ -158,10 +158,13 @@ const askSchemas = {
       z.object({ rewind: z.literal(false), key: z.string() }),
     ]),
   },
-  /** Decides a tool call the runtime would ask about: the user answers a request or a question. */
+  /**
+   * Decides a tool call the runtime would ask about: the user answers a request or a question.
+   * `context` is Seti's note of the user's edits, for the agent once an edited call has run.
+   */
   'permission.ask': {
     ask: z.object({ tool: z.string(), input: z.record(z.string(), z.unknown()), options: z.unknown() }),
-    answer: z.object({ result: z.unknown() }),
+    answer: z.object({ result: z.unknown(), context: z.string().optional() }),
   },
   /** Holds an MCP call a review rule names until the user answers; the hook's output. */
   'review.ask': { ask: toolCall, answer: z.object({ output: z.unknown() }) },
