@@ -1,5 +1,6 @@
 import path from 'node:path'
 import { denyForms, rawWords } from './shell-forms.js'
+import { walkLine } from './shell-scope.js'
 import { splitShell } from './shell-split.js'
 
 /** What a command sends to a code host: a push, a fork, a pull request or an API write. */
@@ -168,17 +169,6 @@ function ghCall(words: readonly string[], dir: string | null, retargeted: boolea
   return group === 'api' ? ghApi(words.slice(2), dir) : []
 }
 
-/** The folder a `cd` or `pushd` moves to, or undefined when the command is neither. */
-function moves(words: readonly string[], dir: string | null): string | null | undefined {
-  if (words[0] !== 'cd' && words[0] !== 'pushd') {
-    return undefined
-  }
-  return folder(
-    dir,
-    words.slice(1).find((word) => !word.startsWith('-')),
-  )
-}
-
 const HARMLESS_GIT_ENV =
   /^GIT_(TRACE\w*|TERMINAL_PROMPT|(AUTHOR|COMMITTER)_\w+|EDITOR|PAGER|OPTIONAL_LOCKS|PROGRESS_DELAY)$/
 
@@ -229,25 +219,26 @@ function callsOf(words: readonly string[], dir: string | null, why: { git?: stri
   return why.gh === undefined ? calls : calls.map(({ action }) => ({ action, where: { unknown: why.gh ?? '' } }))
 }
 
+/** Where a call goes when a shell variable Seti could not read names it. */
+function computed(call: Outward): Outward {
+  const named: unknown[] = 'unknown' in call.where ? [] : Object.values(call.where)
+  return named.some((word) => typeof word === 'string' && /[$`]/.test(word))
+    ? { action: call.action, where: { unknown: 'a shell variable names it' } }
+    : call
+}
+
 /**
- * What a shell line sends to a code host, read past wrappers, nested scripts and `cd`: each push,
- * fork, pull request on a named repository and API write to `repos/<owner>/...`. A line that
- * changes git's remotes, config or environment, or sets GH_REPO or GH_HOST, leaves them unknown.
+ * What a shell line sends to a code host, read past wrappers, nested scripts, `cd` and literal
+ * variables: each push, fork, pull request on a named repository and API write to
+ * `repos/<owner>/...`. A line that changes git's remotes, config or environment, or sets GH_REPO
+ * or GH_HOST, leaves them unknown. `home` is what `~` and `$HOME` name for the agent.
  */
-export function outwardCalls(command: string, cwd: string | null): Outward[] {
+export function outwardCalls(command: string, cwd: string | null, home: string | null = null): Outward[] {
   const found: Outward[] = []
-  const parts = splitShell(command).all
-  const why = rerouting(parts)
-  let dir = cwd
-  for (const part of parts) {
-    const forms = denyForms(part).map((form) => rawWords(form).map(unquote))
-    const moved = moves(forms[forms.length - 1] ?? [], dir)
-    if (moved !== undefined) {
-      dir = moved
-      continue
-    }
-    found.push(...forms.flatMap((words) => callsOf(words, dir, why)))
-  }
+  const why = rerouting(splitShell(command).all)
+  walkLine(command, { cwd, home }, (forms, dir) => {
+    found.push(...forms.flatMap((words) => callsOf(words, dir, why)).map(computed))
+  })
   const seen = new Set<string>()
   return found.filter((one) => {
     const key = JSON.stringify(one)
