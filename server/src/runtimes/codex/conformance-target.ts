@@ -3,8 +3,7 @@ import type { RuntimeAdapter } from '../adapter.js'
 import type { ConformanceTarget, NeutralHost } from '../conformance/target.js'
 import { codexAdapterFor } from './adapter.js'
 import type { CodexDecide } from './approvals.js'
-import type { ScriptedResponses } from './conformance-responses.js'
-import { codexRig } from './conformance-rig.js'
+import { codexRig, type RigBench } from './conformance-rig.js'
 import { rigTools } from './conformance-tools.js'
 import type { CodexShapes } from './session.js'
 
@@ -38,11 +37,9 @@ export const CODEX_GAPS: Partial<Record<string, string>> = {
 }
 
 /** Where the suite runs Codex: its binary, the scripted model, and a folder for the rigs' homes. */
-export interface CodexBench {
+export interface CodexBench extends RigBench {
   binary: string
-  model: ScriptedResponses
   baseUrl: string
-  folder: string
 }
 
 /** The adapter, given the rig's tool servers through Seti's relay as a session host gives its own. */
@@ -74,6 +71,6 @@ export const codexTarget = (bench: CodexBench): ConformanceTarget<CodexShapes, '
   },
   gaps: CODEX_GAPS,
   host: (neutral) => ({ decide: decideWith(neutral), hooks: null, toolServers: {} }),
-  rig: (script) => codexRig(bench.model, bench.folder, script),
+  rig: (script) => codexRig(bench, script),
   oneShotModel: 'gpt-5.5',
 })
