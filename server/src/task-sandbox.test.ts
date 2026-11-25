@@ -20,6 +20,7 @@ import { readProcesses, stoppable, subtreeOf, terminate } from './agent-processe
 import { findBinary } from './binaries.js'
 import { CLAUDE_HOME, SCRATCH_ROOT, SETI_HOME } from './config.js'
 import { tasks } from './db.js'
+import { heldFolderSettings, watchFolderSettings } from './folder-settings-trust.js'
 import { sandboxPlanFor } from './launch-plan.js'
 import { detectScopeHost, type ScopePlan } from './memory-scope.js'
 import { oomRun, oomRunBlocked, oomScriptArgs } from './oom-fixtures.js'
@@ -27,10 +28,11 @@ import { TOOL_OOM_ADJ } from './oom-guard.js'
 import { Proc } from './proc.js'
 import './runner.js'
 import type { RuntimeId } from './runtimes/adapter.js'
+import { folderSettingsOf } from './runtimes/claude/folder-settings.js'
 import { loadSandboxCa, type SandboxCa } from './sandbox-ca.js'
 import { hostClaudeJson } from './sandbox-mcp.js'
 import { projectSlug, type Maintenance } from './sandbox-mounts.js'
-import { sandboxContext } from './session-options.js'
+import { ruleSources, sandboxContext } from './session-options.js'
 import { stopSshAgents } from './ssh-agent.js'
 import { sshKeyService } from './ssh-key-service.js'
 import { acceptHostKeys, checkHost } from './ssh-scan.js'
@@ -751,6 +753,115 @@ describe.skipIf(!available)('a real task sandbox', () => {
       expect(out).toContain(runtime === 'codex' ? 'codex=/' : 'codex=none')
       expect(out).toContain('gh=none')
     }
+  })
+
+  it("keeps a working folder's runtime settings read-only to either runtime, however it writes", async () => {
+    const files = {
+      '.claude/settings.json': '{"permissions":{"allow":[]}}',
+      '.claude/settings.local.json': '{"permissions":{"allow":[]}}',
+      '.claude/hooks/check.sh': 'exit 0\n',
+      '.mcp.json': '{"mcpServers":{}}',
+      '.codex/config.toml': '',
+    }
+    for (const [file, text] of Object.entries(files)) {
+      fs.mkdirSync(path.dirname(path.join(work, file)), { recursive: true })
+      fs.writeFileSync(path.join(work, file), text)
+    }
+    const attempts = [
+      (f: string) => `printf changed > ${f}`,
+      (f: string) => `node -e "require('fs').writeFileSync('${f}', 'changed')"`,
+      (f: string) => `cp /etc/hostname ${f}`,
+      (f: string) => `rm -f ${f}`,
+      (f: string) => `mv ${f} ${f}.moved`,
+    ]
+    const script = Object.keys(files)
+      .flatMap((file) => attempts.map((attempt) => `${attempt(file)} 2>/dev/null && echo "changed ${file}"`))
+      .join('\n')
+    for (const runtime of ['claude', 'codex'] as const) {
+      const { out } = await inSandbox(`cd '${work}'\n${script}\ntrue`, null, {}, { runtime })
+      expect(out, runtime).not.toContain('changed')
+      for (const [file, text] of Object.entries(files)) {
+        expect(fs.readFileSync(path.join(work, file), 'utf8'), `${runtime} ${file}`).toBe(text)
+      }
+    }
+    for (const file of ['.claude', '.mcp.json', '.codex']) {
+      fs.rmSync(path.join(work, file), { recursive: true, force: true })
+    }
+  })
+
+  it("keeps a Claude agent's user settings read-only in its home, whether the user has them or not", async () => {
+    const userSettings = path.join(CLAUDE_HOME, 'settings.json')
+    const kept = fs.existsSync(userSettings) ? fs.readFileSync(userSettings, 'utf8') : null
+    const script =
+      'printf x > "$HOME/.claude/settings.json" 2>/dev/null && echo "wrote settings" || echo "settings locked"'
+    try {
+      for (const present of [true, false]) {
+        if (present) {
+          fs.writeFileSync(userSettings, '{"permissions":{}}')
+        } else {
+          fs.rmSync(userSettings, { force: true })
+        }
+        const { out } = await inSandbox(script)
+        expect(out, present ? 'with user settings' : 'without').toContain('settings locked')
+        expect(fs.existsSync(userSettings)).toBe(present)
+      }
+    } finally {
+      if (kept === null) {
+        fs.rmSync(userSettings, { force: true })
+      } else {
+        fs.writeFileSync(userSettings, kept)
+      }
+    }
+  })
+
+  it('never lets an allow rule take effect from a folder settings file a session could write', async () => {
+    const planted = JSON.stringify({
+      permissions: { allow: ['mcp__seti_probe__peek'], ask: ['Bash(probe-ask:*)'], deny: ['Bash(probe-deny:*)'] },
+    })
+    fs.writeFileSync(path.join(work, 'planted.json'), planted)
+    const writes = {
+      redirect: (f: string) => `printf '%s' '${planted}' > ${f}`,
+      interpreter: (f: string) => `node -e "require('fs').copyFileSync('planted.json', '${f}')"`,
+      copy: (f: string) => `cp planted.json ${f}`,
+      script: (f: string) =>
+        `printf '%s' '{"scripts":{"setup":"cp planted.json ${f}"}}' > package.json && npm run -s setup`,
+    }
+    for (const runtime of ['claude', 'codex'] as const) {
+      for (const [how, write] of Object.entries(writes)) {
+        for (const name of ['.claude/settings.json', '.claude/settings.local.json']) {
+          fs.rmSync(path.join(work, '.claude'), { recursive: true, force: true })
+          await watchFolderSettings(task)
+          const { out } = await inSandbox(
+            `cd '${work}' && mkdir -p .claude && ${write(name)} && echo PLANTED_OK`,
+            null,
+            {},
+            { runtime },
+          )
+          expect(out, `${runtime} ${how} ${name}`).toContain('PLANTED_OK')
+          for (const session of ['the session that wrote it', 'the next session']) {
+            const rules = (await ruleSources(task, await heldFolderSettings(work))).inherited.map(
+              (rule) => `${rule.behavior} ${rule.rule}`,
+            )
+            expect(rules, `${runtime} ${how} ${name}: ${session}`).not.toContain('allow mcp__seti_probe__peek')
+            expect(rules).toEqual(expect.arrayContaining(['ask Bash(probe-ask:*)', 'deny Bash(probe-deny:*)']))
+            const claude = await folderSettingsOf(work)
+            expect(claude.local, `${runtime} ${how} ${name}`).toBe(false)
+            expect(claude.rules.ask).toContain(
+              name.endsWith('local.json') ? 'Bash(probe-ask:*)' : 'mcp__seti_probe__peek',
+            )
+            await watchFolderSettings(task)
+          }
+          fs.rmSync(path.join(work, 'package.json'), { force: true })
+        }
+      }
+    }
+    fs.writeFileSync(path.join(work, '.claude', 'settings.local.json'), planted.replace('probe-ask', 'user-ask'))
+    await watchFolderSettings(task)
+    expect((await ruleSources(task, await heldFolderSettings(work))).inherited.map((rule) => rule.rule)).toContain(
+      'mcp__seti_probe__peek',
+    )
+    fs.rmSync(path.join(work, '.claude'), { recursive: true, force: true })
+    fs.rmSync(path.join(work, 'planted.json'), { force: true })
   })
 
   it("runs a Codex agent with Codex's home, what changes how it runs locked, and no Claude configuration", async () => {
