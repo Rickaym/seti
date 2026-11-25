@@ -51,8 +51,10 @@ async function uncoveredPoint(under: Locator, over: Locator): Promise<[number, n
     [u.x + u.width - inset, u.y + u.height - inset],
   ]
   const free = corners.find(([x, y]) => !contains(o, x, y))
-  expect(free, 'part of the lower layer shows beside the nested dialog').toBeDefined()
-  return free ?? corners[0]
+  if (free === undefined) {
+    throw new Error('the nested dialog hides every corner of the layer under it')
+  }
+  return free
 }
 
 /** The nested dialog's overlay paints over the part of `parent` that the dialog leaves visible. */
