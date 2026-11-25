@@ -165,11 +165,12 @@ describe('agents a Codex agent starts', () => {
     expect(await permissionModeOf(child)).toBe('default')
   })
 
-  it('pass the ceiling on when the user later gives one Full', async () => {
+  it('cannot start agents even once the user gives one Full, so no start escapes the ceiling', async () => {
     const child = await startFrom(await newTask('codex'))
     await setTaskSetiControl(child, 'full')
-    const grandchild = await startFrom(child)
-    expect(await approvalCeilings.get(grandchild.id)).toBe('codex')
+    const refused = startTool === undefined ? null : await callSetiTool(startTool, child.id, { prompt: 'look again' })
+    expect(refused?.isError).toBe(true)
+    expect(refused?.content.map((block) => block.text).join('')).toContain('Another agent started you')
   })
 
   it('may still be put in Bypass by the user, and fall back to Codex regime after', async () => {

@@ -125,11 +125,15 @@ export async function settingsDocDefaults(): Promise<SettingsDoc> {
   return withRevision(await docBody(settingsDocReader(), defaults, byDefault))
 }
 
+/** The zod schema of the caller's document, which validates a JSON write whole. */
+export async function settingsDocZod(): Promise<z.ZodObject> {
+  const { mods } = await listMods()
+  return settingsDocSchema(SETTINGS_SECTIONS, mods.map(modShape), settingsDocReader())
+}
+
 /** The JSON Schema of the caller's document, generated from the routes' own zod schemas. */
 export async function settingsDocJsonSchema(): Promise<Record<string, unknown>> {
-  const reader = settingsDocReader()
-  const { mods } = await listMods()
-  const schema = settingsDocSchema(SETTINGS_SECTIONS, mods.map(modShape), reader)
+  const schema = await settingsDocZod()
   return {
     ...z.toJSONSchema(schema, { io: 'input', unrepresentable: 'any' }),
     title: 'Seti settings',

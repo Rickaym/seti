@@ -13,6 +13,7 @@ import { refuseAgent } from './ea-guard.js'
 import { scopeHost, type ScopeKind, type ScopePlan } from './memory-scope.js'
 import { agentHeapMb } from './node-heap.js'
 import { capMemoryScopes } from './scope-control.js'
+import { DIRECT, type SettingsWrite } from './settings-write.js'
 import { hostDefaultCap, memorySettings, taskMemoryCaps } from './store/memory.js'
 
 /** The cap a task's processes run under: its own, else the default. */
@@ -40,10 +41,19 @@ export async function memoryCapSettings(): Promise<MemoryCapSettings> {
 }
 
 /** Saves the default cap and applies it at once to running agents without a cap of their own. */
-export async function updateMemoryCap(cap: MemoryCap, actor: AuditActor = 'user'): Promise<MemoryCapSettings> {
+export async function updateMemoryCap(
+  cap: MemoryCap,
+  actor: AuditActor = 'user',
+  write: SettingsWrite = DIRECT,
+): Promise<MemoryCapSettings> {
   refuseAgent('change the memory cap of agents')
   const before = (await memorySettings.get()).cap
-  await memorySettings.set(cap)
+  await memorySettings.set(cap, write.db)
+  await write.after(async () => memoryCapSaved(cap, before, actor))
+  return memoryCapSettings()
+}
+
+async function memoryCapSaved(cap: MemoryCap, before: MemoryCap, actor: AuditActor): Promise<void> {
   await audit.record({
     actor,
     kind: 'system.memory_cap_changed',
@@ -57,7 +67,6 @@ export async function updateMemoryCap(cap: MemoryCap, actor: AuditActor = 'user'
     },
   })
   await capMemoryScopes(async (taskId) => ((await taskMemoryCaps.get(taskId)) === null ? cap : null))
-  return memoryCapSettings()
 }
 
 export async function taskMemoryCap(taskId: string): Promise<TaskMemoryCap> {

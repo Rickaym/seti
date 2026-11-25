@@ -43,8 +43,17 @@ const SHELL_STARTUP = [
   '.bash_logout',
 ]
 
-/** The home's skills folder, which Codex would offer every session. */
+/** The home's folder Codex reads skills under, read-only, holding only the user's own skills. */
 const HOME_SKILLS = '.agents'
+
+/** Where a Codex agent finds the user's skills, under its home. */
+export const USER_SKILLS = path.join(HOME_SKILLS, 'skills')
+
+/** The task's folder shown read-only at the home's skills folder, with a place for the user's. */
+export const SKILLS_HOME = 'agents-home'
+
+/** Codex's own skills folder, empty for each process so nothing written there reaches the next. */
+const CODEX_SKILLS = 'skills'
 
 /** The files and folders of a private home the sandbox covers; bwrap mounts only on what exists. */
 export const codexMountPoints = (home: string): { files: string[]; dirs: string[] } => ({
@@ -52,8 +61,29 @@ export const codexMountPoints = (home: string): { files: string[]; dirs: string[
     ...LOCKED_FILES.map((name) => path.join(home, CODEX_DIR, name)),
     ...SHELL_STARTUP.map((name) => path.join(home, name)),
   ],
-  dirs: [...LOCKED_DIRS.map((name) => path.join(home, CODEX_DIR, name)), path.join(home, HOME_SKILLS)],
+  dirs: [
+    ...LOCKED_DIRS.map((name) => path.join(home, CODEX_DIR, name)),
+    path.join(home, HOME_SKILLS),
+    path.join(home, CODEX_DIR, CODEX_SKILLS),
+  ],
 })
+
+/**
+ * The home's skills folder: read-only, holding the user's own skills read-only when there are
+ * any and the session is not bare; and Codex's own skills folder, a fresh one for each process.
+ */
+function skillMounts(layout: SandboxLayout): Mount[] {
+  const own = path.join(layout.claudeHome, 'skills')
+  const mine: Mount[] =
+    layout.maintenance?.bare !== true && fs.statSync(own, { throwIfNoEntry: false })?.isDirectory() === true
+      ? [{ kind: 'ro-bind', src: own, dest: path.join(layout.home, USER_SKILLS) }]
+      : []
+  return [
+    { kind: 'ro-bind', src: path.join(layout.taskDir, SKILLS_HOME), dest: path.join(layout.home, HOME_SKILLS) },
+    ...mine,
+    { kind: 'tmpfs', dest: path.join(layout.home, CODEX_DIR, CODEX_SKILLS) },
+  ]
+}
 
 /**
  * The user's own CLAUDE.md when it is a file, which a Codex agent reads as its global AGENTS.md;
@@ -76,14 +106,19 @@ function userInstructions(layout: SandboxLayout): string | null {
 export function codexLocks(layout: SandboxLayout, hostConfig = HOST_CONFIG): Mount[] {
   const empty = path.join(layout.taskDir, EMPTY_DIR)
   const blank = path.join(layout.taskDir, EMPTY_FILE)
-  const { files, dirs } = codexMountPoints(layout.home)
+  const { files } = codexMountPoints(layout.home)
   const host: Mount[] = fs.existsSync(hostConfig) ? [{ kind: 'ro-bind', src: empty, dest: hostConfig }] : []
   const instructions = path.join(layout.home, CODEX_DIR, CODEX_INSTRUCTIONS)
   const own = userInstructions(layout)
   return [
     // Not a mask: /dev/null in a user namespace cannot be opened, and Codex fails reading it.
     ...files.map((dest): Mount => ({ kind: 'ro-bind', src: dest === instructions ? (own ?? blank) : blank, dest })),
-    ...dirs.map((dest): Mount => ({ kind: 'ro-bind', src: empty, dest })),
+    ...LOCKED_DIRS.map((name): Mount => ({
+      kind: 'ro-bind',
+      src: empty,
+      dest: path.join(layout.home, CODEX_DIR, name),
+    })),
+    ...skillMounts(layout),
     ...host,
   ]
 }

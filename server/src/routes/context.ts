@@ -2,6 +2,7 @@ import {
   contextPackDefaultInput,
   contextPackInput,
   newContextPackInput,
+  roleRuntimeInput,
   taskContextPacksInput,
   taskRoleInput,
   writeContextFileInput,
@@ -16,6 +17,7 @@ import {
   setEaPacks,
   setEaRole,
   setPackLinkedByDefault,
+  setRoleRuntime,
   setTaskPacks,
   setTaskRole,
   updatePack,
@@ -46,6 +48,9 @@ export const contextRoutes = new Hono()
   )
   .put('/packs/:id/default', validJson(contextPackDefaultInput), async (c) =>
     ok(c, packForDisplay(await setPackLinkedByDefault(c.req.param('id'), c.req.valid('json').linked_by_default))),
+  )
+  .put('/packs/:id/runtime', validJson(roleRuntimeInput), async (c) =>
+    ok(c, packForDisplay(await setRoleRuntime(c.req.param('id'), c.req.valid('json')))),
   )
   .delete('/packs/:id', async (c) => {
     await deletePack(c.req.param('id'))

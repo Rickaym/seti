@@ -59,3 +59,8 @@ export async function rolesToPacks(tx: Db): Promise<void> {
   await tx`INSERT INTO audit_event (at, actor, kind, subject_type, subject_id, summary, detail)
     VALUES (${at}, 'system', 'system.roles_migrated', 'system', NULL, ${summary}, ${JSON.stringify(detail)})`
 }
+
+/** The runtime and model an agent started in a role takes, unless its start names its own. */
+export const ROLE_RUNTIME = `
+ALTER TABLE context_pack ADD COLUMN runtime TEXT, ADD COLUMN model TEXT;
+`

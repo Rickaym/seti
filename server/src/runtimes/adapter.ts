@@ -1,4 +1,4 @@
-import type { RuntimeEvent, ToolCall } from '@seti/shared'
+import type { McpTransport, RuntimeEvent, ToolCall } from '@seti/shared'
 import type { z } from 'zod'
 import type { Launcher } from '../launcher.js'
 import type { SessionSpec } from '../session-spec.js'
@@ -115,6 +115,8 @@ export interface DreamSession {
 export interface DreamSupport {
   /** The folder the agent's own sessions keep their memory in, for its working folder. */
   memory: (cwd: string) => string
+  /** The memory folder the agent's sessions load at their start, where it is not `memory`'s. */
+  loaded?: (cwd: string) => string
   /**
    * Starts a dream: the runtime's read, search, edit and shell tools and the host's, no question
    * tool, subagents, web, plugins or other tool servers, and a call the gate refuses is denied,
@@ -146,12 +148,21 @@ export interface Capabilities {
   rewind: { conversation: boolean; code: boolean }
   /** Dreams, or null where the runtime keeps no memory Seti can find. */
   dream: DreamSupport | null
-  /** It loads the user's own tool servers and connectors, and Seti's plugins, beside Seti's tools. */
-  tools: { userServers: boolean; plugins: boolean }
+  /**
+   * Transports of the user's own tool servers it loads, the server names it can take and that
+   * rule in words (null for any name), and Seti's plugins, beside Seti's tools.
+   */
+  tools: {
+    userServers: readonly McpTransport['type'][]
+    serverNames: { pattern: RegExp; rule: string } | null
+    plugins: boolean
+  }
   /** It can run outside Seti's sandbox. */
   sandbox: { optional: boolean }
   /** It takes a rule for when to compact its context. */
   compaction: boolean
+  /** The agent can hand work to subagents of its own that run in the background. */
+  subagents: boolean
 }
 
 /**

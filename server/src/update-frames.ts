@@ -1,4 +1,5 @@
 import {
+  HANDOVER_TAG,
   SECOND_OPINION_TAG,
   type AgentInput,
   type ChannelInput,
@@ -21,6 +22,7 @@ const FRAME_TAGS = [
   'agent-turn',
   'seti-answer',
   SECOND_OPINION_TAG,
+  HANDOVER_TAG,
 ]
 
 /** An attribute value that cannot end its quotes or start a tag. */

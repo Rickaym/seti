@@ -1,6 +1,6 @@
-import { answerChangeInput, changeRequestParams, taskHostParams } from '@seti/shared'
+import { allowRefusedHostInput, answerChangeInput, changeRequestParams, taskHostParams } from '@seti/shared'
 import { Hono } from 'hono'
-import { answerChangeRequest, pendingChanges, removeTaskHost } from '../change-requests.js'
+import { allowRefusedHost, answerChangeRequest, pendingChanges, removeTaskHost } from '../change-requests.js'
 import { eaReadOnly } from '../ea-guard.js'
 import { ok, valid, validJson } from '../http.js'
 import { requireTask } from '../tasks.js'
@@ -20,6 +20,9 @@ export const changeRequestRoutes = new Hono()
       const { id, request_id } = c.req.valid('param')
       return ok(c, await answerChangeRequest(await requireTask(id), request_id, c.req.valid('json')))
     },
+  )
+  .post('/:id/refused-hosts', userOnly, validJson(allowRefusedHostInput), async (c) =>
+    ok(c, await allowRefusedHost(await requireTask(c.req.param('id')), c.req.valid('json'))),
   )
   .delete('/:id/hosts/:entry', userOnly, valid('param', taskHostParams), async (c) => {
     const { id, entry } = c.req.valid('param')

@@ -3,6 +3,7 @@ import { tasks } from './db.js'
 import { noteSessionInit, watchSessionMcp } from './mcp-session-status.js'
 import { noteModelFallback, replayedFallback, settleModelFallback } from './model-fallback.js'
 import type { ToolServerState } from './runtimes/adapter.js'
+import { taskSessions } from './store/task-sessions.js'
 
 /** Messages Seti does not store: a fallback notice a replayed stream repeats. */
 export const unstored = async (taskId: string, m: unknown): Promise<boolean> => replayedFallback(taskId, m)
@@ -21,6 +22,7 @@ export async function recordSessionStart(
   }
   for (const started of eventsOf(events, 'session.started')) {
     await tasks.setSession(taskId, { sessionId: started.sessionId, permissionMode: started.mode, model: started.model })
+    await taskSessions.record(taskId, started.sessionId)
     await settleModelFallback(taskId, started.model)
     await noteSessionInit(taskId, started.servers)
     void watchSessionMcp(taskId, read)
