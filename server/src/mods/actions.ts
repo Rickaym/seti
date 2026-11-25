@@ -11,11 +11,13 @@ import {
   type ModDetail,
   type ModInfo,
   type ModList,
+  type ModManifest,
 } from '@seti/shared'
 import { audit } from '../audit.js'
 import { fromAgent, fromEa, refuseAtSelf, refuseMod } from '../ea-guard.js'
 import { describeIssues, HttpError } from '../http.js'
 import { isolation } from '../script-sandbox.js'
+import { DIRECT, type SettingsWrite } from '../settings-write.js'
 import { modDevMode } from '../store/mod-lifecycle.js'
 import { modNotifications, modSettings } from '../store/mods.js'
 import { bisectState } from './bisect.js'
@@ -169,6 +171,10 @@ async function saveSettings(mod: HostedMod, change: ModChangeInput): Promise<voi
   await modSettings.put(manifest.id, parsed.data)
   await modNotifications.put(manifest.id, kinds)
   const keys = [...Object.keys(parsed.data), ...Object.keys(kinds).map((kind) => `notifications.${kind}`)]
+  await auditModSettings(manifest, keys)
+}
+
+async function auditModSettings(manifest: ModManifest, keys: string[]): Promise<void> {
   await audit.record({
     actor: 'user',
     kind: 'mod.settings_changed',
@@ -177,6 +183,26 @@ async function saveSettings(mod: HostedMod, change: ModChangeInput): Promise<voi
     summary: `Changed the settings of the ${manifest.name} mod`,
     detail: { mod: manifest.id, keys },
   })
+}
+
+/** Saves some of a mod's settings, checked against its manifest, as the settings JSON writes them. */
+export async function saveModSettings(
+  id: string,
+  values: Record<string, unknown>,
+  write: SettingsWrite = DIRECT,
+): Promise<void> {
+  const mod = hostedMod(id)
+  refuseDelegates(mod)
+  const manifest = mod.manifest
+  if (manifest === null) {
+    throw new HttpError(409, `The ${id} mod has no valid manifest`)
+  }
+  const parsed = modSettingsSchema(manifest.contributes.settings).safeParse(values)
+  if (!parsed.success) {
+    throw new HttpError(400, describeIssues(parsed.error))
+  }
+  await modSettings.put(manifest.id, parsed.data, write.db)
+  await write.after(async () => auditModSettings(manifest, Object.keys(parsed.data)))
 }
 
 /** Turns a mod on or off and saves its settings and notification kinds, as the caller may. */

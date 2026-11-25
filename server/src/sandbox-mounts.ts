@@ -382,7 +382,7 @@ export function checkoutOf(dir: string, layout: Trust): string | null {
  * uses from worktrees too; the task's own project folder already holds its memory. Without home
  * access a checkout outside the task's folders counts only for a worktree Seti made.
  */
-function memoryDirs(layout: SandboxLayout): string[] {
+export function memoryDirs(layout: Trust): string[] {
   const own = projectSlug(layout.cwd)
   const slugs = [layout.cwd, ...layout.dirs]
     .flatMap((dir) => {

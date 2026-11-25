@@ -78,7 +78,14 @@ files need no API credential; on a public hostname they sit behind Access when A
 `GET /api/settings-doc` gives every stored setting as one JSON document. A secret appears only as
 `set` or `not set` beside a name; the builder reads the views the settings pages read, which never
 carry a value. The EA gets plain configuration only, with security settings left out; agents,
-mods and paired devices are refused (CFG-1 to CFG-3). The document only reads: no route writes it.
+mods and paired devices are refused (CFG-1 to CFG-3).
+
+`PATCH /api/settings-doc` writes plain settings only, and only for you, signed in or with the local
+token: the EA, agents, mods and paired devices are refused at the route, and agents, mods and
+devices again in the function that writes. A patch that names a security setting or a secret is
+refused whole, so no part of it applies. The write runs the same service functions as the
+settings pages, in one transaction, records the same audit events and one revision, and refuses a
+value that changed since it was read (CFG-5).
 
 ## Where each secret lives
 
@@ -147,6 +154,17 @@ redirect, and checks the package's sha512 integrity and the program's sha256 aga
 before anything runs; a mismatch deletes the download. The program lives alone in
 `~/.seti/codex/<version>/`, read and run only, mounted read-only into each Codex agent's sandbox,
 and each install, failure and removal is in the audit log with the version and checksum.
+
+## Your tool servers on Codex agents
+
+A Codex agent gets the MCP servers from your Claude Code config that a sandboxed Claude Code agent
+gets, and no others: Seti reads the host's config, never a copy the agent could write, and passes
+the servers on Codex's command line, which wins over every config file. A local server runs inside
+the agent's sandbox with the placeholders of the agent's connections and never the model key. A
+remote server gets its URL only; the egress proxy adds the sign-in token or connection header on
+that server's host. Codex asks Seti about every call to these servers, even a tool that says it
+only reads. Codex's own config file stays empty and read-only, and a server defined in the agent's
+folder is never read.
 
 ## What is not protected
 

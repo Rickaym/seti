@@ -298,6 +298,14 @@ manifest first and resolves a `task` argument to the agent's id. A result that i
 `<mod_output mod="<id>">`, labelled as data from the mod and not from the user, so text inside it
 never passes for Seti or the user.
 
+A command that takes `task`, and a view in an `agentTab`, may list what the agent's runtime must
+offer in `needs`: `mcp_servers`, `plugins`, `unsandboxed`, `compaction`, `side_chat`, `dreams` or
+`rewind`, the fields of `GET /api/runtimes/capabilities`, which each runtime's adapter declares.
+On an agent whose runtime lacks one, Seti hides the command from the palette, the agent's header and
+menu and its chord, its slash command says it is not on that runtime, and the server refuses it
+with 409 for the EA and agents too; the view does not show beside that agent. A command or view
+without `needs` shows on every runtime.
+
 ### Views and file viewers
 
 A view or viewer is one HTML page from the package. Seti serves it in a frame with no network, an
@@ -441,7 +449,9 @@ stored off; safe mode and a mod bisect leave it on, and its settings still chang
 bundled mod's do. Settings, Mods shows it with a Core badge and a lock in place of its switch. Only
 a bundled mod may be required.
 
-This Seti offers mod API 1.23.0, which adds the bundled-only `tasks.dream` capability
+This Seti offers mod API 1.24.0, which adds `needs` to commands and agent views, so they show
+only on runtimes that offer what they need (see Commands and where their results go); 1.23.0 adds
+the bundled-only `tasks.dream` capability
 (`api.dreams`: a night of dreams, whether dreams have news, waiting clean-ups, and a dream started
 under Seti's caps); 1.22.0
 hands `tasks.transcript` the agent's runtime rows as
@@ -562,7 +572,9 @@ it in the UI instead of on the server, offers it only where `when` answers true,
 state with `title`, such as Unlock while locked; both get the agent, the section and whether the
 layout is narrow. `status` is what the reply box says its slash command will do, and `waits` holds
 the slash command in the box with a reason while it cannot run, such as while an answer streams.
-The palette and menus show a command's chord, else the slash command that runs it. While a bundled
+`needs` hides the command on an agent whose runtime lacks a capability, as for third-party mods;
+the side chat's Ask aside needs `side_chat`. The palette and menus show a command's chord, else the
+slash command that runs it. While a bundled
 mod is off its slash commands and palette commands say it is off, with a Turn on button, and never
 reach Claude Code.
 
@@ -674,7 +686,8 @@ the way to an `about` view while its signal is on. `registerDock` draws a view t
 in `agentDock` over an agent's chat: a panel on a wide screen and in a layout's panel, a bottom
 sheet on a phone. Seti draws its frame, with the view's icon, title, `description` and a close
 button, and Esc closes it; `api.agents.openDock(agent, id)` opens it, again to focus it, and
-`onClose` runs when it closes or the agent's view goes away. `api.agents.send` messages an agent as
+`onClose` runs when it closes or the agent's view goes away. A dock whose view lists `needs` never
+opens over an agent whose runtime lacks one. `api.agents.send` messages an agent as
 the user, and `api.stream` reads one of the mod's `stream` routes. `mods/side-chat/` is the example. `registerSettingsPage` replaces the page Seti
 draws from the mod's settings. `api.request` calls the mod's own routes, `api.poll` polls one
 while a view reads it, `api.useSettings` and `api.saveSettings` read and save its settings on the

@@ -405,6 +405,9 @@ export type MessageBody =
         timed_out?: string
         memory?: MemoryEvent
         ended_turn?: boolean
+        /** A host the agent's sandbox refused, and how many times so far. */
+        refused_host?: string
+        refused_count?: number
       }
     }
   | { kind: 'shell'; payload: ShellResult }

@@ -15,6 +15,7 @@ import {
   type RestoreReport,
   type Task,
 } from '@seti/shared'
+import { auditArchiveChange } from './archive-audit.js'
 import { decodeChunk, type StoredMessage } from './archive-codec.js'
 import { bundleTaskFiles, unpackTaskFiles, type Unpacked } from './archive-files.js'
 import { freeWorktrees, recreateWorktrees } from './archive-worktrees.js'
@@ -26,6 +27,7 @@ import { refuseAgent, refuseOnSelf } from './ea-guard.js'
 import { storedColumns } from './events/columns.js'
 import { HttpError } from './http.js'
 import { endSession, isRunning, publish, sessionState } from './runner.js'
+import { DIRECT, type SettingsWrite } from './settings-write.js'
 import { shellTurnGuard } from './shell-context.js'
 import { closeAgentChats } from './side-chat/chats.js'
 import { archiveSettings, taskArchives, type ArchiveRecord } from './store/archive.js'
@@ -344,64 +346,26 @@ export async function autoArchiveStatus(days?: number, at = Date.now()): Promise
   }
 }
 
-const dayWords = (days: number) => (days === 1 ? '1 day' : `${String(days)} days`)
-
-function ruleWords(settings: AutoArchiveSettings, before: AutoArchiveSettings): string {
-  const archive = settings.enabled ? `on, for COMPLETE agents idle ${dayWords(settings.days)} or more` : 'off'
-  const turned = settings.resume_after_restart ? 'on' : 'off'
-  const resume = settings.resume_after_restart === before.resume_after_restart ? '' : `; resume after restart ${turned}`
-  if (settings.delete_after_days !== null) {
-    return `${archive}; delete archived agents after ${dayWords(settings.delete_after_days)}${resume}`
-  }
-  return before.delete_after_days === null ? `${archive}${resume}` : `${archive}; keep archived agents${resume}`
-}
-
-const SETTING_KEYS = ['enabled', 'days', 'delete_after_days', 'resume_after_restart'] as const
-
-async function auditRepeatGuard(on: boolean): Promise<void> {
-  await audit.record({
-    actor: 'user',
-    kind: 'system.repeat_guard_changed',
-    subject_type: 'system',
-    summary: `Turned the repeat guard ${on ? 'on' : 'off'}`,
-    detail: { repeat_guard: on },
-  })
-}
-
 /** Saves the fields the input carries and keeps the rest; agents never turn off their own guard. */
-export async function updateAutoArchive(input: AutoArchiveInput): Promise<AutoArchiveSettings> {
+export async function updateAutoArchive(
+  input: AutoArchiveInput,
+  write: SettingsWrite = DIRECT,
+): Promise<AutoArchiveSettings> {
   const before = await archiveSettings.get()
   if (input.repeat_guard !== undefined && input.repeat_guard !== before.repeat_guard) {
     refuseAgent('turn the repeat guard on or off')
   }
-  const after = await archiveSettings.set({
-    enabled: input.enabled ?? before.enabled,
-    days: input.days ?? before.days,
-    delete_after_days: input.delete_after_days === undefined ? before.delete_after_days : input.delete_after_days,
-    resume_after_restart: input.resume_after_restart ?? before.resume_after_restart,
-    repeat_guard: input.repeat_guard ?? before.repeat_guard,
-  })
-  if (before.repeat_guard !== after.repeat_guard) {
-    await auditRepeatGuard(after.repeat_guard)
-  }
-  if (SETTING_KEYS.some((key) => before[key] !== after[key])) {
-    await audit.record({
-      actor: 'user',
-      kind: 'system.auto_archive_changed',
-      subject_type: 'system',
-      summary: `Set auto archive ${ruleWords(after, before)}`,
-      detail: {
-        enabled: after.enabled,
-        days: after.days,
-        delete_after_days: after.delete_after_days,
-        resume_after_restart: after.resume_after_restart,
-        was_enabled: before.enabled,
-        was_days: before.days,
-        was_delete_after_days: before.delete_after_days,
-        was_resume_after_restart: before.resume_after_restart,
-      },
-    })
-  }
+  const after = await archiveSettings.set(
+    {
+      enabled: input.enabled ?? before.enabled,
+      days: input.days ?? before.days,
+      delete_after_days: input.delete_after_days === undefined ? before.delete_after_days : input.delete_after_days,
+      resume_after_restart: input.resume_after_restart ?? before.resume_after_restart,
+      repeat_guard: input.repeat_guard ?? before.repeat_guard,
+    },
+    write.db,
+  )
+  await write.after(async () => auditArchiveChange(before, after))
   return after
 }
 

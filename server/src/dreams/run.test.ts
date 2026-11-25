@@ -5,6 +5,7 @@ import path from 'node:path'
 import { claudeToolCall, type AuditPage, type DreamRun, type Revision } from '@seti/shared'
 import { afterAll, describe, expect, it, vi } from 'vitest'
 import { createApp } from '../app.js'
+import { audit } from '../audit.js'
 import { findBinary } from '../binaries.js'
 import { messages, tasks } from '../db.js'
 import type { DreamHost, DreamSession, DreamSpec, DreamSupport, SessionReport } from '../runtimes/adapter.js'
@@ -13,9 +14,13 @@ import { adapterFor } from '../runtimes/registry.js'
 import { DREAM_TOOLS } from '../seti-tools/dreams.js'
 import { callSetiTool } from '../seti-tools/server.js'
 import { taskArchives } from '../store/archive.js'
+import { dreamRuns, type DreamEnd } from '../store/dreams.js'
 import { sandboxPolicy } from '../store/sandbox.js'
 import { EA_AUTH, USER_AUTH } from '../test-auth.js'
+import { keepBefore, keptBefore } from './kept.js'
+import { snapshotMemory } from './memory-snapshot.js'
 import { dreamPreface } from './preface.js'
+import { cutDreamsAtStart } from './start.js'
 
 const scratch = await vi.hoisted(async () => {
   const { mkdtempSync } = await import('node:fs')
@@ -67,6 +72,7 @@ function fakeDream(): { dream: DreamSupport; seen: { spec?: DreamSpec; refused?:
   const seen: { spec?: DreamSpec; refused?: string | null } = {}
   const dream: DreamSupport = {
     memory: claudeMemory,
+    reportedCost: () => null,
     open: async (spec: DreamSpec, _launcher, host: DreamHost) => {
       seen.spec = spec
       const inside = /Memory folder: (\S+)\./.exec(spec.prompt)?.[1] ?? ''
@@ -137,7 +143,91 @@ async function ended(taskId: string): Promise<DreamRun> {
   )
 }
 
+/** The agent's dream events as the audit chain holds them, oldest first. */
+async function dreamEvents(taskId: string): Promise<AuditPage['events']> {
+  const page = await send<AuditPage>('GET', '/audit?area=dream&limit=200')
+  return page.data.events.filter((event) => event.subject_id === taskId).reverse()
+}
+
+const dreamKinds = async (taskId: string) => (await dreamEvents(taskId)).map((event) => event.kind)
+
+const DONE: DreamEnd = {
+  state: 'done',
+  reason: null,
+  cost_usd: 0,
+  steps: 0,
+  denials: 0,
+  memory_changes: 0,
+  report: null,
+}
+
+describe('the end of a dream', () => {
+  it('ends a dream that a restart cut once, after recording what it changed in memory', async () => {
+    const { id, memory } = await agent()
+    const run = await dreamRuns.start({ task_id: id, night: '2026-11-23', kind: 'manual', model: 'claude-sonnet-5-5' })
+    const before = await snapshotMemory(memory)
+    if (!before.ok) {
+      throw new Error(before.reason)
+    }
+    keepBefore(id, run.id, before.files)
+    fs.writeFileSync(path.join(memory, 'MEMORY.md'), '- deploy through the proxy\n')
+    await cutDreamsAtStart()
+    await cutDreamsAtStart()
+    expect(await dreamRuns.get(run.id)).toMatchObject({ state: 'cut', memory_changes: 1 })
+    const events = await dreamEvents(id)
+    expect(events.map((event) => event.kind)).toEqual(['dream.memory_changed', 'dream.ended'])
+    expect(events[1]?.detail).toMatchObject({ run: run.id, state: 'cut', memory_changes: 1 })
+    expect(keptBefore(id, run.id)).toBeNull()
+    expect((await dreamPreface(id))?.text).toMatch(/changed 1 of your memory files/)
+  })
+
+  it('leaves a dream that ended already as it ended, with no second end in the audit', async () => {
+    const { id } = await agent()
+    const run = await dreamRuns.start({ task_id: id, night: '2026-11-23', kind: 'manual', model: 'claude-sonnet-5-5' })
+    expect(await dreamRuns.end(run.id, DONE)).toMatchObject({ state: 'done' })
+    expect(await dreamRuns.end(run.id, { ...DONE, state: 'failed' })).toBeUndefined()
+    await cutDreamsAtStart()
+    expect(await dreamRuns.get(run.id)).toMatchObject({ state: 'done' })
+    expect(await dreamKinds(id)).toEqual([])
+  })
+
+  it('still ends the dream when its audit event cannot be written', async () => {
+    const { id } = await agent()
+    const run = await dreamRuns.start({ task_id: id, night: '2026-11-23', kind: 'manual', model: 'claude-sonnet-5-5' })
+    const stderr = vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
+    const row = await audit.recordWith(
+      async (tx) => dreamRuns.end(run.id, DONE, tx),
+      () => {
+        throw new Error('no audit')
+      },
+    )
+    expect(stderr).toHaveBeenCalledWith(expect.stringContaining('no audit'))
+    stderr.mockRestore()
+    expect(row).toMatchObject({ state: 'done' })
+    expect(await dreamRuns.get(run.id)).toMatchObject({ state: 'done' })
+  })
+})
+
 describe.skipIf(!bwrap)('Dream now', () => {
+  it('shows no dream as ended before its end is in the audit, after its memory changes', async () => {
+    await sandboxPolicy.save({ enabled: true, allowed_domains: [], hidden_paths: [] })
+    claude.capabilities.dream = fakeDream().dream
+    const { id } = await agent()
+    const seen: { state: string | null; kinds: string[] } = { state: null, kinds: [] }
+    const end = dreamRuns.end.bind(dreamRuns)
+    const spy = vi.spyOn(dreamRuns, 'end').mockImplementation(async (...args) => {
+      const row = await end(...args)
+      seen.state = (await dreamRuns.get(args[0]))?.state ?? null
+      seen.kinds = await dreamKinds(id)
+      return row
+    })
+    expect((await send<DreamRun>('POST', `/tasks/${id}/dream`, {})).status).toBe(200)
+    await ended(id)
+    spy.mockRestore()
+    expect(seen).toEqual({ state: 'running', kinds: ['dream.started', 'dream.memory_changed'] })
+    expect(await dreamKinds(id)).toEqual(['dream.started', 'dream.memory_changed', 'dream.ended'])
+  })
+
   it('runs a dream that changes memory, records it, and reports, keeping secrets out', async () => {
     await sandboxPolicy.save({ enabled: true, allowed_domains: [], hidden_paths: [] })
     const { dream, seen } = fakeDream()
@@ -161,10 +251,8 @@ describe.skipIf(!bwrap)('Dream now', () => {
     expect(revision).toMatchObject({ actor: 'system', reason: `dream ${run.night}` })
     expect(JSON.stringify(revision)).not.toContain(TOKEN)
     expect(fs.readFileSync(path.join(memory, 'MEMORY.md'), 'utf8')).toContain('through the proxy')
-    const audit = await send<AuditPage>('GET', '/audit?area=dream&limit=10')
-    expect(audit.data.events.map((e) => e.kind)).toEqual(
-      expect.arrayContaining(['dream.started', 'dream.memory_changed', 'dream.ended']),
-    )
+    expect(await dreamKinds(id)).toEqual(['dream.started', 'dream.memory_changed', 'dream.ended'])
+    expect((await dreamEvents(id)).at(-1)?.detail).toMatchObject({ denials: 1, denied_by: ['write_outside 1'] })
     expect((await dreamPreface(id))?.text).toMatch(/changed 1 of your memory files/)
   })
 
@@ -187,8 +275,7 @@ describe.skipIf(!bwrap)('Dream now', () => {
     const { id } = await agent()
     expect((await send<DreamRun>('POST', `/tasks/${id}/dream`, {}, EA_AUTH)).status).toBe(200)
     await ended(id)
-    const audit = await send<AuditPage>('GET', `/audit?area=dream&limit=50`)
-    const started = audit.data.events.find((e) => e.kind === 'dream.started' && e.subject_id === id)
+    const started = (await dreamEvents(id)).find((e) => e.kind === 'dream.started')
     expect(started?.detail).toMatchObject({ via: 'ea' })
     const again = await send<string>('POST', `/tasks/${id}/dream`, {}, EA_AUTH)
     expect([again.status, again.data]).toEqual([409, expect.stringMatching(/dreamt today already/)])

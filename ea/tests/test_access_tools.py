@@ -84,6 +84,14 @@ async def test_agent_access_says_when_a_host_has_no_key(tools: EaTools, fake_set
     )
 
 
+async def test_agent_access_says_why_its_runtime_cannot_use_a_server(
+    tools: EaTools, fake_seti: FakeSeti
+) -> None:
+    fake_seti.unusable_servers["posthog"] = "Codex agents cannot use SSE servers."
+    state = await tools.call("agent_access", {"task": "logout"})
+    assert "posthog (Codex agents cannot use SSE servers)" in state.text
+
+
 async def test_ssh_hosts_lists_hosts_with_their_keys_and_sets_and_changes_nothing(
     tools: EaTools, fake_seti: FakeSeti
 ) -> None:

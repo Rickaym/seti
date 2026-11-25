@@ -106,6 +106,9 @@ const setiPayload = z.looseObject({
   bypass: z.boolean().optional(),
   resumed: z.boolean().optional(),
   timed_out: text.optional(),
+  /** A host the agent's sandbox refused, and how many times so far. */
+  refused_host: text.optional(),
+  refused_count: z.number().optional(),
 })
 
 const shellPayload = z.looseObject({

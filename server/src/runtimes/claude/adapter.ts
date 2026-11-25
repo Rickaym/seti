@@ -1,7 +1,8 @@
 import { query, type Options, type Query, type SDKMessage } from '@anthropic-ai/claude-agent-sdk'
-import { projectClaude } from '@seti/shared'
+import { MCP_TRANSPORTS, projectClaude } from '@seti/shared'
 import type { RuntimeAdapter, SessionInput } from '../adapter.js'
-import { claudeMemory, dreamOptions } from './dream.js'
+import { reportedCost } from './cost.js'
+import { claudeLoadedMemory, claudeMemory, dreamOptions } from './dream.js'
 import { claudePrompt } from './input.js'
 import { realise } from './realise.js'
 import { rewoundOptions } from './resume.js'
@@ -17,16 +18,18 @@ export const claudeAdapter: RuntimeAdapter<ClaudeShapes, 'claude'> = {
     gate: { rewriteInput: true, classifier: true },
     session: { fork: 'ephemeral' },
     rewind: { conversation: true, code: true },
-    tools: { userServers: true, plugins: true },
+    tools: { userServers: MCP_TRANSPORTS, serverNames: null, plugins: true },
     sandbox: { optional: true },
     compaction: true,
     subagents: true,
     dream: {
       memory: claudeMemory,
+      loaded: claudeLoadedMemory,
       open: async (spec, launcher, host, abortController) => {
         const options = dreamOptions(spec, launcher, host, abortController)
         return Promise.resolve(claudeSession(transport({ prompt: claudePrompt(once(spec.prompt)), options }), false))
       },
+      reportedCost,
     },
   },
   // Claude Code wrote it, live or as Seti stored it.
