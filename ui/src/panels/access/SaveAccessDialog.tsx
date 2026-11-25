@@ -81,7 +81,8 @@ export function SaveAccessDialog({
             ))}
             {quiet > 0 && (
               <li className="text-muted-foreground">
-                {count(quiet, 'more item')} saved as they are now; no agent changes.
+                {count(quiet, 'more item')} {quiet === 1 ? 'is saved as it is' : 'are saved as they are'} now; no agent
+                changes.
               </li>
             )}
             {own > 0 && (
