@@ -3,9 +3,9 @@ import type { HookCallback, HookInput, HookJSONOutput, Options } from '@anthropi
 import { claudeToolCall } from '@seti/shared'
 import { CLAUDE_HOME } from '../../config.js'
 import type { Launcher } from '../../launcher.js'
-import { canonicalRoot, projectSlug } from '../../sandbox-mounts.js'
+import { projectSlug } from '../../sandbox-mounts.js'
 import type { DreamHost, DreamSpec, DreamTool } from '../adapter.js'
-import { claudeLaunch } from './realise.js'
+import { claudeLaunch, ownMemory } from './realise.js'
 import { inProcessServer } from './tool-server.js'
 
 /** Claude Code's tools a dream gets; the gate decides each call to them. */
@@ -13,10 +13,6 @@ const DREAM_TOOLS = ['Read', 'Glob', 'Grep', 'Edit', 'Write', 'Bash']
 
 /** Where Claude Code keeps an agent's memory: its project folder's memory, by working folder. */
 export const claudeMemory = (cwd: string) => path.join(CLAUDE_HOME, 'projects', projectSlug(cwd), 'memory')
-
-/** The memory folder Claude Code loads for a working folder: its repository's main checkout's. */
-export const claudeLoadedMemory = (cwd: string) =>
-  path.join(CLAUDE_HOME, 'projects', projectSlug(canonicalRoot(cwd) ?? cwd), 'memory')
 
 const decision = (permissionDecision: 'allow' | 'deny', reason?: string): HookJSONOutput => ({
   hookSpecificOutput: {
@@ -86,7 +82,7 @@ export function dreamOptions(
     mcpServers: hostServers(host.tools),
     strictMcpConfig: true,
     settingSources: [],
-    settings: { autoDreamEnabled: false },
+    settings: { autoDreamEnabled: false, ...ownMemory(spec.cwd) },
     systemPrompt: { type: 'preset', preset: 'claude_code', append: spec.append },
     persistSession: false,
     maxTurns: spec.maxTurns,

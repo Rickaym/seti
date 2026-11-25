@@ -1,5 +1,6 @@
 import type { Task } from '@seti/shared'
 import { taskSsh } from './agent-access.js'
+import { sharedMemoryLines } from './agent-memory.js'
 import { taskAws } from './aws-access.js'
 import { tasks } from './db.js'
 import { connectionRows } from './store/connections.js'
@@ -68,5 +69,5 @@ export async function sandboxPrompt(taskId: string): Promise<string | null> {
     ...((await taskAws(task.id)) ? [await awsLine(task)] : []),
     ...(ssh.length === 0 ? [] : [sshLine(ssh)]),
   ]
-  return [...homeLines(task), ...SANDBOX_LINES, ...extra].join('\n')
+  return [...homeLines(task), ...SANDBOX_LINES, ...extra, ...sharedMemoryLines(task)].join('\n')
 }
