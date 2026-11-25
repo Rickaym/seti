@@ -1,5 +1,6 @@
 import { COMPACT_DEFAULTS } from '@seti/shared'
 import type { SessionSpec } from '../../session-spec.js'
+import type { UserSkill } from '../../user-skills.js'
 import type { RuntimeShapes, SessionInput } from '../adapter.js'
 import { runOneShot, type OneShot, type OneShotResult } from '../one-shot.js'
 import { CASE_BOUND_MS, Channel, Run, within, type RunView } from './run.js'
@@ -8,6 +9,8 @@ import type { ConformanceTarget, NeutralHost, Profile, Rig } from './target.js'
 
 /** The folder every suite session works in; no adapter may touch it, since the runtime is fake. */
 export const SUITE_CWD = '/work/conformance'
+
+const NO_SKILLS: readonly UserSkill[] = []
 
 /** A spec with nothing in it but what a case varies; no adapter reads the sandbox stamp. */
 export function specFor<Id extends string>(runtime: Id, resume: string | null): SessionSpec<Id> {
@@ -31,7 +34,7 @@ export function specFor<Id extends string>(runtime: Id, resume: string | null): 
     account: null,
     // The vendor part of a spec is the runtime's own; no Codex program, so a bench names its own.
     vendor: (runtime === 'codex'
-      ? { binary: '', model: null, effort: null }
+      ? { binary: '', model: null, effort: null, skills: NO_SKILLS }
       : { plugins: [] }) as SessionSpec<Id>['vendor'],
   }
 }

@@ -2,6 +2,7 @@ import type { CanUseTool, HookCallback, Options } from '@anthropic-ai/claude-age
 import type { Launcher } from '../../launcher.js'
 import { oneInput, type OneShot, type OneShotRequest } from '../one-shot.js'
 import { queryClaude } from './adapter.js'
+import { reportedCost } from './cost.js'
 import { claudeLaunch } from './realise.js'
 import { claudeSession } from './session.js'
 
@@ -41,18 +42,11 @@ export function oneShotOptions(request: OneShotRequest, launcher: Launcher, abor
   }
 }
 
-const costOf = (raw: unknown): number | null => {
-  if (typeof raw !== 'object' || raw === null || !('total_cost_usd' in raw)) {
-    return null
-  }
-  return typeof raw.total_cost_usd === 'number' ? raw.total_cost_usd : null
-}
-
 /** Claude Code's one-shot; a new session's running cost is the call's own. */
 export const claudeOneShot: OneShot = {
   open: async (request, launcher, abortController) =>
     Promise.resolve(
       claudeSession(queryClaude(oneShotOptions(request, launcher, abortController), oneInput(request.prompt)), false),
     ),
-  reportedCost: costOf,
+  reportedCost,
 }

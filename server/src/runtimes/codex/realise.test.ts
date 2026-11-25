@@ -10,7 +10,7 @@ const spec = {
   resume: null,
   toolServers,
   instructions: { append: '' },
-  vendor: { binary: '/c', model: null, effort: null },
+  vendor: { binary: '/c', model: null, effort: null, skills: [] },
 } as unknown as SessionSpec<'codex'>
 const spawn: NonNullable<Launcher['spawn']> = () => {
   throw new Error('not started in this test')
@@ -66,6 +66,32 @@ describe('realising a Codex session', () => {
       binary: '/c',
     })
     expect(settingsOf(realised.args)).toContain('model_reasoning_summary="auto"')
+  })
+
+  it("lists the user's skills after the instructions, each at its read-only copy in the home", () => {
+    const skilled = {
+      ...spec,
+      vendor: { ...spec.vendor, skills: [{ name: 'pdf', description: 'PDFs', folder: 'pdf' }] },
+    }
+    const realised = realiseCodex(skilled, launcher({ SETI_MODEL_KEY: 'k', HOME: '/home/agent' }), {
+      ...answering,
+      binary: '/c',
+    })
+    expect(realised.instructions).toContain("## The user's skills")
+    expect(realised.instructions).toContain('- pdf: PDFs (file: /home/agent/.agents/skills/pdf/SKILL.md)')
+    const none = realiseCodex(spec, launcher({ SETI_MODEL_KEY: 'k', HOME: '/home/agent' }), {
+      ...answering,
+      binary: '/c',
+    })
+    expect(none.instructions).not.toContain('skills')
+  })
+
+  it("reads a folder's CLAUDE.md when it has no AGENTS.md, as a Claude Code agent reads it", () => {
+    const realised = realiseCodex(spec, launcher({ SETI_MODEL_KEY: 'seti-placeholder' }), {
+      ...answering,
+      binary: '/c',
+    })
+    expect(settingsOf(realised.args)).toContain('project_doc_fallback_filenames=["CLAUDE.md"]')
   })
 
   it("starts Seti's tool servers through their relay, and the shared tools with the agent's variables", () => {

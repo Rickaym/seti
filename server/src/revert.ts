@@ -6,6 +6,8 @@ import { revertMemoryFile } from './dreams/memory-revisions.js'
 import { describeIssues, HttpError } from './http.js'
 import { restoreKnowledge } from './knowledge-review.js'
 import { byUser, type ChangeSource } from './revisions.js'
+import { revertChange } from './settings-doc/write-revision.js'
+import { CONFIRM_IDS, writeSettings } from './settings-doc/write.js'
 import { revisions } from './store/revisions.js'
 
 /** The current state with the given fields set back to their values in `before`. */
@@ -50,6 +52,10 @@ async function restore(
       return restoreKnowledge(id, before, fields, source)
     case 'memory_file':
       return revertMemoryFile(target, source)
+    case 'settings': {
+      const change = { base_revision: '', ...revertChange(target), confirm: CONFIRM_IDS }
+      return (await writeSettings(change, source)).revision
+    }
   }
 }
 

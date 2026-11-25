@@ -1,5 +1,6 @@
 import type { ModCommandCall } from '@seti/mod-api'
 import {
+  meetsNeeds,
   MOD_TASK_ARG,
   modCommandArgs,
   parseComposer,
@@ -11,6 +12,7 @@ import { currentRequestSource } from '../access.js'
 import { audit } from '../audit.js'
 import { refuseMod } from '../ea-guard.js'
 import { describeIssues, HttpError } from '../http.js'
+import { agentCapabilities } from '../runtimes/capabilities.js'
 import { liveTask } from '../seti-tools/refs.js'
 import { modHost } from './bundled.js'
 import type { HostedMod } from './host.js'
@@ -86,7 +88,7 @@ function entryOf(modId: string, action: string): ModCommandEntry {
   throw new HttpError(409, isOn(mod) ? `${manifest.name} does not answer ${action}` : `${manifest.name} is off`)
 }
 
-/** The arguments as the manifest declares them, with task resolved to the agent's id. */
+/** The arguments as the manifest declares them, with task resolved to an agent that can take it. */
 async function checkedArgs(command: ModCommand, raw: Record<string, unknown>): Promise<Record<string, unknown>> {
   const parsed = modCommandArgs(command).safeParse(raw)
   if (!parsed.success) {
@@ -95,7 +97,12 @@ async function checkedArgs(command: ModCommand, raw: Record<string, unknown>): P
   const args: Record<string, unknown> = { ...parsed.data }
   const ref = args[MOD_TASK_ARG]
   if (typeof ref === 'string') {
-    args[MOD_TASK_ARG] = (await liveTask(ref)).id
+    const task = await liveTask(ref)
+    const caps = agentCapabilities(task.runtime)
+    if (!meetsNeeds(caps, command.needs)) {
+      throw new HttpError(409, `${command.title} is not on ${caps.label} agents`)
+    }
+    args[MOD_TASK_ARG] = task.id
   }
   return args
 }

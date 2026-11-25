@@ -3,7 +3,7 @@ import type { HookCallback, HookInput, HookJSONOutput, Options } from '@anthropi
 import { claudeToolCall } from '@seti/shared'
 import { CLAUDE_HOME } from '../../config.js'
 import type { Launcher } from '../../launcher.js'
-import { projectSlug } from '../../sandbox-mounts.js'
+import { canonicalRoot, projectSlug } from '../../sandbox-mounts.js'
 import type { DreamHost, DreamSpec, DreamTool } from '../adapter.js'
 import { claudeLaunch } from './realise.js'
 import { inProcessServer } from './tool-server.js'
@@ -13,6 +13,10 @@ const DREAM_TOOLS = ['Read', 'Glob', 'Grep', 'Edit', 'Write', 'Bash']
 
 /** Where Claude Code keeps an agent's memory: its project folder's memory, by working folder. */
 export const claudeMemory = (cwd: string) => path.join(CLAUDE_HOME, 'projects', projectSlug(cwd), 'memory')
+
+/** The memory folder Claude Code loads for a working folder: its repository's main checkout's. */
+export const claudeLoadedMemory = (cwd: string) =>
+  path.join(CLAUDE_HOME, 'projects', projectSlug(canonicalRoot(cwd) ?? cwd), 'memory')
 
 const decision = (permissionDecision: 'allow' | 'deny', reason?: string): HookJSONOutput => ({
   hookSpecificOutput: {
