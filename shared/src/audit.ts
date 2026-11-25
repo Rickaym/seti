@@ -214,6 +214,7 @@ export const AUDIT_KINDS = [
   'system.sandbox_changed',
   'system.aws_changed',
   'system.theme_changed',
+  'system.name_changed',
   'system.access_default_changed',
   'system.profile_created',
   'system.profile_changed',
