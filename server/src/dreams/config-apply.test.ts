@@ -34,7 +34,7 @@ async function send<T>(method: string, url: string, auth: Record<string, string>
   const res = await app.request(`/api${url}`, {
     method,
     headers: { host: 'localhost', ...auth, 'content-type': 'application/json' },
-    body: method === 'GET' ? undefined : '{}',
+    ...(method === 'GET' ? {} : { body: '{}' }),
   })
   const parsed = (await res.json()) as { data?: T; error?: { detail: string } }
   return { status: res.status, data: parsed.data, error: parsed.error?.detail ?? '' }

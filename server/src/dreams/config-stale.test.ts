@@ -26,7 +26,7 @@ const facts = (over: Partial<SubscriptionFacts>): SubscriptionFacts => ({
 })
 
 describe('the unused-subscription rule', () => {
-  it.each([
+  it.each<[string, Partial<SubscriptionFacts>, boolean]>([
     ['old and never delivered', {}, true],
     ['old and last delivered before the window', { last_delivered_at: ago(QUIET_DAYS + 1) }, true],
     ['delivered inside the window', { last_delivered_at: ago(QUIET_DAYS - 1) }, false],
@@ -36,7 +36,7 @@ describe('the unused-subscription rule', () => {
     ['put back by the user after a dream', { kept: true }, false],
     ['a poller that is off', { source: 'poller', enabled: false }, true],
     ['a filter the channel no longer matches', { events: '["deploy"]', channel_events: 40, kinds: ['push'] }, true],
-  ] as const)('%s: %s', (_name, over, expected) => {
+  ])('%s', (_name, over, expected) => {
     expect(unused(facts(over), AT)).toBe(expected)
   })
 })
