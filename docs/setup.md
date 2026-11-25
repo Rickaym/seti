@@ -242,6 +242,16 @@ section. `GET /api/settings-doc/defaults` serves every setting's default, and
 `GET /api/settings-doc?only=modified` only what differs from it, as a merge patch onto the
 defaults.
 
+Edit, on the JSON page, opens the plain settings in an editor that completes keys and values
+from the schema. Save shows every change, old value above new, before anything applies; a change
+with a consequence, such as deleting archived agents, asks you to confirm it. A save is one entry
+in the page's History, and Undo or Revert there sets it all back. Reset on a section sets one
+setting back to its default. Security settings and secrets stay read only here and change on
+their own pages; every setting stays editable on its own page, on a phone too.
+`PATCH /api/settings-doc` takes `{base_revision, patch, expect, confirm}`, where `patch` is a JSON
+merge patch of the document: `null` removes an item from a list keyed by name and sets any other
+setting to `null`.
+
 Settings Seti reads at start live in `~/.seti/seti.env` (one `NAME=value` per line) and secrets in
 `~/.seti/credentials`, one owner-only file each. Restart Seti after a change:
 `systemctl --user restart seti.service`. `pnpm seti:doctor` reads the same file and reports a value
@@ -565,7 +575,9 @@ The other model answers once, with no tools and none of the agent's folders, in 
 reaches only its provider with the agent's credential, so the credential needs that runtime's
 key. The transcript shows one row, "Asked gpt-5.5: ...", that opens to the question and answer;
 its cost counts toward the agent's and shows under Cost in its settings. An agent may ask 20
-times an hour and 60 a day.
+times an hour and 60 a day. Given one of its linked pull requests instead, the other model
+reviews the PR's diff, which Seti reads with your `gh` login; the review goes back to the agent
+and folds under that PR in the agent's PR list, and nothing is posted to GitHub.
 
 ### Access: defaults and per-agent choices
 

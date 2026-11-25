@@ -39,6 +39,12 @@ vi.mock('../runtimes/one-shots.js', async (importOriginal) => ({
   }),
 }))
 
+vi.mock('../github.js', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  gh: async (args: string[]) =>
+    Promise.resolve(args[0] === 'pr' && args[1] === 'diff' ? `diff --git a/x.ts b/x.ts\n+const token = 1\n` : ''),
+}))
+
 vi.mock('../launch-plan.js', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   oneShotPlan: async () => Promise.resolve(model.sandboxOff ? null : { sandbox: {} }),
@@ -49,9 +55,9 @@ vi.mock('../launcher.js', async (importOriginal) => ({
   maintenanceLauncher: async () => Promise.resolve({ sandboxed: true, env: {}, spawn: () => undefined }),
 }))
 
-async function newAgent(runtime: 'claude' | 'codex'): Promise<Task> {
+async function newAgent(runtime: 'claude' | 'codex', prUrls: string[] = []): Promise<Task> {
   const id = randomUUID()
-  const fields = { title: `Asker ${id.slice(0, 8)}`, repo_id: null, cwd: '/tmp', worktree: false, pr_urls: [] }
+  const fields = { title: `Asker ${id.slice(0, 8)}`, repo_id: null, cwd: '/tmp', worktree: false, pr_urls: prUrls }
   await tasks.insert({ id, ...fields, runtime })
   const task = await tasks.get(id)
   if (task === undefined) {
@@ -148,6 +154,25 @@ describe('askSecondOpinion', () => {
       })
     }
     await expect(askSecondOpinion(caller, { question: 'Again' })).rejects.toThrow('in the last hour')
+  })
+
+  it('reviews a linked pull request from its diff, keeps the review for its row and refuses others', async () => {
+    const pr = 'https://github.com/acme/app/pull/7'
+    const caller = await newAgent('codex', [pr])
+    model.answer = 'x.ts adds an unused constant.'
+    const text = await askSecondOpinion(caller, { pr })
+    expect(promptOf()).toContain(`<pull-request-diff url="${pr}">\ndiff --git a/x.ts b/x.ts`)
+    expect(promptOf()).toContain('<question>\nReview this pull request.')
+    expect(readSecondOpinion(text)?.answer).toBe('x.ts adds an unused constant.')
+    expect(await secondOpinions.reviews(caller.id)).toMatchObject([
+      { pr_url: pr, runtime: 'claude', answer: 'x.ts adds an unused constant.' },
+    ])
+    const event = (await auditEvents.page(auditQuery.parse({ kind: 'agent.second_opinion', limit: 1 }))).events[0]
+    expect(event?.detail).toMatchObject({ pr, diff_chars: 42 })
+    expect(JSON.stringify(event)).not.toContain('unused constant')
+    await expect(askSecondOpinion(caller, { pr: 'https://github.com/acme/app/pull/8' })).rejects.toThrow(
+      'is not linked to you',
+    )
   })
 
   it('refuses with the reason when no other runtime can answer or the sandbox is off', async () => {

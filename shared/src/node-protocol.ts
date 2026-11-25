@@ -65,6 +65,8 @@ export const journalEntry = z.discriminatedUnion('type', [
   z.object({ type: z.literal('guard.refused'), command: z.string(), reason: z.string() }),
   /** A request carried connection placeholders toward a host their connections do not allow. */
   z.object({ type: z.literal('egress.blocked'), host: z.string(), names: z.array(z.string()) }),
+  /** The sandbox refused a host off the allowed list, `count` times so far for the agent. */
+  z.object({ type: z.literal('egress.refused'), host: z.string().max(253), count: z.int().positive() }),
   z.object({ type: z.literal('memory.event'), report: memoryReport }),
   /** Seti's shadow compared a call with the runtime's outcome; null when its decision failed. */
   z.object({ type: z.literal('policy.compared'), count: policyShadowCount.nullable() }),

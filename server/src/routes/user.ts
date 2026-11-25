@@ -2,8 +2,7 @@ import { userSettingsInput } from '@seti/shared'
 import { Hono } from 'hono'
 import { ok, validJson } from '../http.js'
 import { saveTheme } from '../mods/themes.js'
-import { userSettings } from '../store/user.js'
-import { currentSettings } from '../user-settings.js'
+import { currentSettings, saveName } from '../user-settings.js'
 
 export const userRoutes = new Hono()
   .get('/', async (c) => ok(c, await currentSettings()))
@@ -13,7 +12,7 @@ export const userRoutes = new Hono()
       await saveTheme(theme)
     }
     if (name !== undefined) {
-      await userSettings.set({ name })
+      await saveName(name)
     }
     return ok(c, await currentSettings())
   })
