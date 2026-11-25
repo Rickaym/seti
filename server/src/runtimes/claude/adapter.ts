@@ -1,6 +1,7 @@
 import { query, type Options, type Query, type SDKMessage } from '@anthropic-ai/claude-agent-sdk'
 import { projectClaude } from '@seti/shared'
 import type { RuntimeAdapter, SessionInput } from '../adapter.js'
+import { reportedCost } from './cost.js'
 import { claudeMemory, dreamOptions } from './dream.js'
 import { claudePrompt } from './input.js'
 import { realise } from './realise.js'
@@ -26,6 +27,7 @@ export const claudeAdapter: RuntimeAdapter<ClaudeShapes, 'claude'> = {
         const options = dreamOptions(spec, launcher, host, abortController)
         return Promise.resolve(claudeSession(transport({ prompt: claudePrompt(once(spec.prompt)), options }), false))
       },
+      reportedCost,
     },
   },
   // Claude Code wrote it, live or as Seti stored it.

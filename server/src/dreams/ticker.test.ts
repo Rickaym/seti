@@ -8,6 +8,7 @@ import { dreamRuns } from '../store/dreams.js'
 import { sandboxPolicy } from '../store/sandbox.js'
 import { USER_AUTH } from '../test-auth.js'
 import { dreamBriefLines } from './brief.js'
+import { cutDreamsAtStart } from './start.js'
 import { dreamTick, type DreamTickDeps } from './ticker.js'
 
 const app = createApp()
@@ -159,11 +160,11 @@ describe('nightly Dreaming', () => {
     const { started, tick } = harness('2026-11-26T22:05:00Z')
     await tick()
     expect(started).toEqual(['Cut twice'])
-    await dreamRuns.cutRunning('Seti restarted during the dream.')
+    await cutDreamsAtStart()
     await tick('2026-11-26T22:30:00Z')
     await tick('2026-11-26T22:35:00Z')
     expect(started).toEqual(['Cut twice', 'Cut twice'])
-    await dreamRuns.cutRunning('Seti restarted during the dream.')
+    await cutDreamsAtStart()
     await tick('2026-11-26T22:45:00Z')
     expect(started).toHaveLength(2)
     await tick('2026-11-27T02:00:00Z')

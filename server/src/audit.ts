@@ -11,10 +11,10 @@ import {
 import { anonymousRequest, currentRequestSource } from './access.js'
 import type { SendOutcome } from './agent-session.js'
 import { AUDIT_RETENTION_DAYS } from './config.js'
-import { now, tasks } from './db.js'
+import { now, tasks, transaction, type Db } from './db.js'
 import { outwardRecord } from './outward-detail.js'
 import { scrubDetail, scrubSummary } from './scrub.js'
-import { auditEvents } from './store/audit.js'
+import { auditEvents, type NewAuditEvent } from './store/audit.js'
 import { openCommand } from './tool-calls.js'
 
 interface AuditInput {
@@ -62,21 +62,42 @@ function actorOf(input: AuditInput): { actor: AuditEvent['actor']; detail: Audit
   }
 }
 
+/** The event as it is stored: scrubbed, with who acted and when. */
+function stored(input: AuditInput): NewAuditEvent {
+  const { actor, detail } = actorOf(input)
+  return {
+    at: now(),
+    actor,
+    kind: input.kind,
+    subject_type: input.subject_type,
+    subject_id: input.subject_id ?? null,
+    summary: scrubSummary(input.summary),
+    detail: scrubDetail(detail, input.long),
+  }
+}
+
 /** Stores one scrubbed event; failures go to stderr and never reach the caller. */
 async function record(input: AuditInput): Promise<void> {
-  const { actor, detail } = actorOf(input)
   try {
-    await auditEvents.insert({
-      at: now(),
-      actor,
-      kind: input.kind,
-      subject_type: input.subject_type,
-      subject_id: input.subject_id ?? null,
-      summary: scrubSummary(input.summary),
-      detail: scrubDetail(detail, input.long),
-    })
+    await auditEvents.insert(stored(input))
   } catch (e) {
     process.stderr.write(`audit: could not record ${input.kind}: ${errorText(e)}\n`)
+  }
+}
+
+/**
+ * Runs a write and records the event it yields in one transaction, so no reader and no crash
+ * finds one without the other. When that fails the write runs alone, and stderr says so.
+ */
+async function recordWith<T>(write: (tx: Db) => Promise<T>, eventOf: (result: T) => AuditInput | null): Promise<T> {
+  try {
+    return await auditEvents.insertWith(write, (result) => {
+      const input = eventOf(result)
+      return input === null ? null : stored(input)
+    })
+  } catch (e) {
+    process.stderr.write(`audit: could not record a change with its event: ${errorText(e)}\n`)
+    return transaction(write)
   }
 }
 
@@ -168,7 +189,7 @@ async function recordDenial(taskId: string, denial: Extract<RuntimeEvent, { type
   })
 }
 
-export const audit = { record, prune, checkChain, startRetention, outwardCalls, classifierDenial }
+export const audit = { record, recordWith, prune, checkChain, startRetention, outwardCalls, classifierDenial }
 
 const TASK_VERBS = {
   'task.message_sent': 'Sent a message to',

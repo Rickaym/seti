@@ -15,6 +15,7 @@ function controlEnd(answer: ControlEnd['answer']['prompt.open']) {
     'setup.key': none,
     'permission.ask': none,
     'review.ask': none,
+    'push.ask': none,
     'repeat.ask': none,
     'hook.compact': none,
     'sandbox.hosts': none,

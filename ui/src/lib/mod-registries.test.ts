@@ -37,7 +37,7 @@ describe('the registries mods add to', () => {
 
   it("hold Seti's settings pages with Mods last, and a mod's page joins that group", () => {
     const groups = settingsGroups()
-    expect(groups.map((group) => group.group)).toEqual(['App', 'Agents', 'Claude Code', 'Security', 'Mods'])
+    expect(groups.map((group) => group.group)).toEqual(['App', 'Agents', 'Capabilities', 'Security', 'Mods'])
     expect(groups.at(-1)?.pages.map((page) => page.key)).toEqual(['mods'])
     const dispose = settingsPages.register({
       key: 'sample.settings',
