@@ -1,6 +1,7 @@
 import { dreamDecision, dreamNowInput, dreamSettingsInput, dreamToggle } from '@seti/shared'
 import { Hono } from 'hono'
 import { z } from 'zod'
+import { undoTidy } from '../dreams/config-undo.js'
 import { dreamNight } from '../dreams/nights.js'
 import { decideProposal } from '../dreams/proposals.js'
 import { setTaskDreaming, setWorkspaceDreaming, updateDreamSettings } from '../dreams/settings.js'
@@ -10,6 +11,7 @@ import { refuseOnSelf } from '../ea-guard.js'
 import { ok, valid, validJson } from '../http.js'
 import { dreamOptOuts, dreamSettings } from '../store/dream-nights.js'
 import { dreamProposals, trashItems } from '../store/dream-proposals.js'
+import { dreamTidies } from '../store/dream-tidies.js'
 import { dreamRuns } from '../store/dreams.js'
 import { requireTask } from '../tasks.js'
 
@@ -18,6 +20,7 @@ const LISTED = 14
 const nightQuery = z.strictObject({ night: z.iso.date().optional() })
 const proposalQuery = z.strictObject({ task: z.string().min(1).max(64).optional() })
 const idParam = z.strictObject({ id: z.coerce.number().int().positive() })
+const tidyQuery = z.strictObject({ task: z.string().min(1).max(64) })
 
 export const taskDreamRoutes = new Hono()
   .get('/:id/dreams', async (c) => ok(c, await dreamRuns.forTask((await requireTask(c.req.param('id'))).id, LISTED)))
@@ -48,6 +51,10 @@ export const dreamRoutes = new Hono()
   .post('/proposals/:id', valid('param', idParam), validJson(dreamDecision), async (c) =>
     ok(c, await decideProposal(c.req.valid('param').id, c.req.valid('json'))),
   )
+  .get('/tidies', valid('query', tidyQuery), async (c) =>
+    ok(c, await dreamTidies.forTask((await requireTask(c.req.valid('query').task)).id, LISTED)),
+  )
+  .post('/tidies/:id/undo', valid('param', idParam), async (c) => ok(c, await undoTidy(c.req.valid('param').id)))
   .get('/off', async (c) => {
     const off = await dreamOptOuts.get()
     return ok(c, { tasks: [...off.tasks], workspaces: [...off.workspaces] })

@@ -11,6 +11,7 @@ import { isRunning, watchTurnStarts } from '../session-mirror.js'
 import { sandboxContext, workingDirs } from '../session-options.js'
 import { dreamRuns, type DreamEnd } from '../store/dreams.js'
 import { workspaceDir } from '../workspace/dir.js'
+import { applyConfig, configSnapshot, type ConfigOutcome, type ConfigSnapshot } from './config-apply.js'
 import { composeDigest, dayRows } from './digest.js'
 import { denialKind, dreamGate, type DreamPlaces } from './gate.js'
 import { forgetBefore, keepBefore, recordAfter } from './kept.js'
@@ -226,13 +227,24 @@ function placesOf(job: DreamJob, night: string): DreamPlaces & { shared: string[
   return { cwd: job.task.cwd, home, readable: [...work, memory, ...shared], memory, night, shared }
 }
 
-async function dreamSession(job: DreamJob, tally: Tally, night: string, turns: TurnWatch): Promise<void> {
+/** Lists the configuration Seti's rule finds unused beside the digest; null when there is none. */
+async function writeConfig(job: DreamJob, snapshot: ConfigSnapshot): Promise<string | null> {
+  if (snapshot.text === null) {
+    return null
+  }
+  const file = path.join(nightDir(job), 'config.md')
+  await fs.promises.writeFile(file, snapshot.text, { mode: 0o600 })
+  return file
+}
+
+async function dreamSession(job: DreamJob, tally: Tally, night: string, turns: TurnWatch): Promise<ConfigSnapshot> {
   const since = await lastDream(job)
   const { file: digest, empty } = await writeDigest(job, since)
   if (empty && since !== null) {
     tally.reported(NOTHING_NEW)
-    return
+    return { items: new Map(), text: null }
   }
+  const snapshot = await configSnapshot(job.task.id, job.run.night)
   const launcher = await maintenanceLauncher(job.task, { writable: [night] }, await launchPlan(job.task))
   if (launcher === null) {
     throw new Error('The agent runs without the sandbox, so a dream could not be contained.')
@@ -259,6 +271,7 @@ async function dreamSession(job: DreamJob, tally: Tally, night: string, turns: T
       night: job.run.night,
       lastDream: since,
       digest,
+      config: await writeConfig(job, snapshot),
       memory: places.memory,
       shared: places.shared,
       maxSteps: job.limits.steps,
@@ -271,6 +284,22 @@ async function dreamSession(job: DreamJob, tally: Tally, night: string, turns: T
   await dreamRuns.promptUsed(job.run.id, DREAM_PROMPT_VERSION)
   const session = await job.dream.open(spec, launcher, { gate, tools }, new AbortController())
   await follow(session, job, tally, turns)
+  return snapshot
+}
+
+/** Applies the dream's configuration decisions; a failure becomes a line of the report. */
+async function configAfter(job: DreamJob, tally: Tally, snapshot: ConfigSnapshot | null): Promise<ConfigOutcome> {
+  if (snapshot === null) {
+    return { applied: [], found: [] }
+  }
+  try {
+    return await applyConfig({ ...job, snapshot }, tally.report?.config ?? [], tally.end?.state ?? 'done')
+  } catch (e) {
+    return {
+      applied: [],
+      found: [`Seti: the configuration changes stopped: ${e instanceof Error ? e.message : String(e)}`],
+    }
+  }
 }
 
 /**
@@ -284,8 +313,9 @@ export async function runDream(job: DreamJob): Promise<DreamRun | undefined> {
   fs.mkdirSync(night, { recursive: true, mode: 0o700 })
   keepBefore(job.task.id, job.run.id, job.before)
   const turns = new TurnWatch(job.task.id)
+  let snapshot: ConfigSnapshot | null = null
   try {
-    await dreamSession(job, tally, night, turns)
+    snapshot = await dreamSession(job, tally, night, turns)
   } catch (e) {
     tally.ended('failed', e instanceof Error ? e.message : String(e))
   } finally {
@@ -293,7 +323,8 @@ export async function runDream(job: DreamJob): Promise<DreamRun | undefined> {
   }
   const after = await recordAfter(job.task.id, job.run, job.memory, job.before)
   forgetBefore(job.task.id, job.run.id)
-  const found = [...(tally.report?.found ?? []), ...after.found].slice(0, 10)
+  const config = await configAfter(job, tally, snapshot)
+  const found = [...(tally.report?.found ?? []), ...after.found, ...config.found].slice(0, 10)
   const report = tally.report === null ? null : { ...tally.report, found }
   const end: DreamEnd = {
     state: tally.end?.state ?? 'done',
@@ -305,7 +336,7 @@ export async function runDream(job: DreamJob): Promise<DreamRun | undefined> {
     report,
   }
   const heading = { title: job.task.title, night: job.run.night, prompt: DREAM_PROMPT_VERSION }
-  fs.writeFileSync(path.join(night, 'report.md'), reportMarkdown(heading, end), { mode: 0o600 })
+  fs.writeFileSync(path.join(night, 'report.md'), reportMarkdown(heading, end, config.applied), { mode: 0o600 })
   return audit.recordWith(
     async (tx) => dreamRuns.end(job.run.id, end, tx),
     (ended) =>
@@ -325,6 +356,7 @@ export async function runDream(job: DreamJob): Promise<DreamRun | undefined> {
               denials: end.denials,
               denied_by: Object.entries(tally.deniedBy).map(([kind, n]) => `${kind} ${String(n)}`),
               memory_changes: end.memory_changes,
+              config_changes: config.applied.length,
             },
           },
   )
