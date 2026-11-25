@@ -8,7 +8,13 @@ import { FallbackPlayer } from './fake-fallback.js'
 import { Inbox, Outbox, type Message, type UserMessage } from './fake-inbox.js'
 import { asksForServers, loadedServers, type FakeSettings } from './fake-mcp-servers.js'
 import { InProcessClient, type SdkServer } from './fake-mcp.js'
-import { actPermission, PERMISSION_PROMPT, PLAN_APPROVAL_PROMPT, type CanUseTool } from './fake-permission.js'
+import {
+  actPermission,
+  PERMISSION_PROMPT,
+  PLAN_APPROVAL_PROMPT,
+  SLACK_PROMPT,
+  type CanUseTool,
+} from './fake-permission.js'
 import { actQuestions, QUESTION_PROMPT } from './fake-question.js'
 import type { FakeHooks } from './fake-repeat.js'
 import { ASK_REPLY, plainReply } from './fake-replies.js'
@@ -328,7 +334,7 @@ class FakeClaude {
         this.outbox.fail(new Error(`Claude Code process exited with code 1: ${reason}`))
         return
       }
-      await (text(m).includes(PERMISSION_PROMPT) || text(m).includes(PLAN_APPROVAL_PROMPT)
+      await ([PERMISSION_PROMPT, PLAN_APPROVAL_PROMPT, SLACK_PROMPT].some((ask) => text(m).includes(ask))
         ? actPermission(this.options.canUseTool, this.actor(), text(m))
         : (this.fallback.play(text(m), this.actor()) ?? this.answer(text(m))))
       this.result()

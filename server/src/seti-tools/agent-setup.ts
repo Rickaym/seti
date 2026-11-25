@@ -6,6 +6,7 @@ import { contextPacks, taskContextPacks } from '../store/context.js'
 import { subtaskBriefs } from '../subtask-cache.js'
 import { linkSubtaskPrUrl, unlinkSubtaskPrUrl } from '../task-actions.js'
 import { linkTaskPr, requireTask, unlinkTaskPr } from '../tasks.js'
+import { stopFollowing } from '../threads/stop.js'
 import { AGENT_INFO_TOOLS } from './agent-info.js'
 import { liveTask, pickOne, taskRef } from './refs.js'
 import { done, setiTool, ToolRefusal } from './tool.js'
@@ -48,10 +49,27 @@ function linkedPr(urls: readonly string[], ref: string, owner: string): string {
 const unlinkPr = setiTool({
   name: 'unlink_pr',
   description:
-    'Unlink a pull request from an agent or one of its subagents; Seti then never links it to that agent again on its own.',
-  input: { task: taskRef, pr: z.string().trim().min(1).describe('The PR URL, or its number.'), subagent: subagentRef },
-  run: async ({ task: ref, pr, subagent }) => {
+    'Unlink a pull request from an agent or one of its subagents; Seti then never links it to that agent again on its own. Or, with thread instead of pr, stop the agent following a Slack thread it posted in, so replies there no longer reach it.',
+  input: {
+    task: taskRef,
+    pr: z.string().trim().min(1).optional().describe('The PR URL, or its number.'),
+    thread: z
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe("A followed thread's thread_id from get_task's followed_threads, instead of pr."),
+    subagent: subagentRef,
+  },
+  run: async ({ task: ref, pr, thread, subagent }) => {
     const task = await liveTask(ref)
+    if (thread !== undefined) {
+      await stopFollowing(task.id, thread)
+      return done(`${task.title} no longer follows thread ${String(thread)}.`)
+    }
+    if (pr === undefined) {
+      throw new ToolRefusal('Give pr to unlink a PR, or thread to stop following a thread.')
+    }
     if (subagent !== undefined) {
       const sub = await subagentOf(task, subagent)
       const url = linkedPr(sub.pr_urls, pr, `the subagent "${sub.description}"`)

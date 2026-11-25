@@ -27,6 +27,12 @@ export interface FollowedThread {
   created_at: string
 }
 
+/** A followed thread as lists show it, with its channel's name when Seti has seen it. */
+export interface ListedThread extends FollowedThread {
+  /** Such as deploys for #deploys; null while Seti does not know it. */
+  channel_name: string | null
+}
+
 /** A webhook's thread switches, for a sender Seti reads replies from; both start off. */
 export interface WebhookThreads {
   /** Replies in threads agents posted in reach those agents. */
