@@ -24,6 +24,7 @@ import { WIDE_BUTTON, WIDE_LABEL } from '@/lib/wide-label'
 import { AccessSummary, TaskAccessDialog } from '@/panels/access/TaskAccess'
 import { AgentPermissions } from '@/panels/tasks/AgentPermissions'
 import { BypassToggle } from '@/panels/tasks/BypassToggle'
+import { ContinueOn } from '@/panels/tasks/ContinueOn'
 import { DreamActions } from '@/panels/tasks/DreamActions'
 import { LifecycleActions } from '@/panels/tasks/LifecycleActions'
 import { NO_BYPASS, NotOnCodex } from '@/panels/tasks/NotOnCodex'
@@ -287,6 +288,7 @@ export const TaskSettings = memo(function TaskSettingsView({
   const actions = (
     <div className="grid gap-2">
       {caps?.dreams !== false && <DreamActions taskId={task.id} open={open} />}
+      <ContinueOn task={task} running={running} onChanged={onChanged} />
       <LifecycleActions
         busy={busy}
         onRestart={() => {

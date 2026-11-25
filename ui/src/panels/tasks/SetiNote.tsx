@@ -1,7 +1,19 @@
-import { CircleStop, Eraser, FastForward, MemoryStick, RotateCw, ShieldCheck, ShieldOff, TimerOff } from 'lucide-react'
+import {
+  ArrowRightLeft,
+  CircleStop,
+  Eraser,
+  FastForward,
+  MemoryStick,
+  RotateCw,
+  ShieldCheck,
+  ShieldOff,
+  TimerOff,
+} from 'lucide-react'
 import { isFailureNote, type SetiPayload } from '@/lib/seti-notes'
 import { FailureLine } from '@/panels/tasks/FailureNotice'
 import { Line } from '@/panels/tasks/TranscriptLines'
+
+const SESSION_ICONS = { fresh: Eraser, restarted: RotateCw, continued: ArrowRightLeft }
 
 /** A note from Seti: memory, a restart, a stopped process, Seti control, a timeout, a failure. */
 export function SetiNote({ payload }: { payload: SetiPayload }) {
@@ -13,7 +25,7 @@ export function SetiNote({ payload }: { payload: SetiPayload }) {
     )
   }
   if (payload.session !== undefined) {
-    return <Line icon={payload.session === 'fresh' ? Eraser : RotateCw}>{payload.error}</Line>
+    return <Line icon={SESSION_ICONS[payload.session]}>{payload.error}</Line>
   }
   if (payload.stopped === true) {
     return <Line icon={CircleStop}>{payload.error}</Line>
