@@ -64,6 +64,7 @@ const PERMISSION: PermissionRequest = {
   editable: false,
   state: 'pending',
   message: null,
+  edited: [],
   created_at: at(1),
   decided_at: null,
   timeout_at: null,

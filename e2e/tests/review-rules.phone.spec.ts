@@ -36,6 +36,10 @@ test('a review fits the phone, and its message is edited and sent with taps', as
     await text.fill('Deploy is done')
     await card.getByRole('button', { name: 'Allow', exact: true }).tap()
     await expect(page.getByRole('main').getByText(reviewSent('Deploy is done'), { exact: true })).toBeVisible()
+    const edited = page.getByRole('main').getByRole('img', { name: /^Edited: / })
+    await expect(edited).toHaveText('Edited')
+    await expect(edited).toHaveAccessibleName('Edited: You edited text before the call ran; the agent was told')
+    await expectFitsPhone(page, 'edited mark')
   } finally {
     const policy = await apiData<PermissionPolicy>(request, '/permissions')
     for (const own of policy.rules.filter((r: PermissionRule) => r.rule === rule)) {

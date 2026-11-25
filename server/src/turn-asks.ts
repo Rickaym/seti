@@ -70,7 +70,8 @@ export const turnAnswers = {
   ): Promise<NodeAnswer<'permission.ask'>> => {
     // The node handed on the runtime's own options, without their signal.
     const asked = { ...(options as Omit<AskOptions, 'signal'>), signal }
-    return { result: await canUseToolFor(taskId, signal)(tool, input, asked) }
+    const { result, note } = await canUseToolFor(taskId, signal)(tool, input, asked)
+    return note === undefined ? { result } : { result, context: note }
   },
   'review.ask': async (taskId: string, call: NodeAsk<'review.ask'>, signal: AbortSignal) => ({
     output: await reviewCall(await taskOf(taskId), call, signal),
