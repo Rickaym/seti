@@ -2,6 +2,7 @@ import type { McpTransport, RuntimeEvent, ToolCall } from '@seti/shared'
 import type { z } from 'zod'
 import type { Launcher } from '../launcher.js'
 import type { SessionSpec } from '../session-spec.js'
+import type { OneShot } from './one-shot.js'
 
 /** Names an agent runtime; Claude Code is the only one so far. */
 export type RuntimeId = 'claude' | 'codex'
@@ -148,6 +149,8 @@ export interface Capabilities {
   rewind: { conversation: boolean; code: boolean }
   /** Dreams, or null where the runtime keeps no memory Seti can find. */
   dream: DreamSupport | null
+  /** Answers one question with no tools, as a second opinion asks it. */
+  oneShot: OneShot
   /**
    * Transports of the user's own tool servers it loads, the server names it can take and that
    * rule in words (null for any name), and Seti's plugins, beside Seti's tools.

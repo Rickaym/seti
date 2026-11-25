@@ -16,7 +16,7 @@ const model = vi.hoisted(() => ({
   sandboxOff: false,
 }))
 
-vi.mock('../runtimes/one-shots.js', async (importOriginal) => ({
+vi.mock('../runtimes/capabilities.js', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   oneShotFor: (runtime: string): OneShot => ({
     open: async (request) => {
