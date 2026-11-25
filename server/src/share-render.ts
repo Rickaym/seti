@@ -2,8 +2,8 @@ import { previewBody } from './html-preview.js'
 import type { ShareRequest } from './share-path.js'
 
 /**
- * Hosts a live page may load scripts, styles and fonts from. Each sees the visitor's address and
- * nothing else of Seti's: what it serves runs in the same opaque, networkless frame as the page.
+ * Hosts a rendered page may load scripts, styles and fonts from. Each sees the visitor's
+ * address and nothing else of Seti's: what it serves runs in the same isolated frame as the page.
  */
 export const SHARE_PAGE_CDNS: readonly { source: string; reason: string }[] = [
   {
@@ -23,7 +23,7 @@ export const RENDER_MARK = 'X-Seti-Share-Render'
 const CDN_SOURCES = SHARE_PAGE_CDNS.map((cdn) => cdn.source).join(' ')
 
 /**
- * The live page: an opaque origin with scripts, no storage, no network but the CDNs' scripts,
+ * The rendered page: an opaque origin with scripts, no storage, no network but the CDNs' scripts,
  * styles and fonts, and no frames, workers, forms or plugins. Only a Seti page may frame it.
  */
 export const SHARE_FRAME_POLICY = [
@@ -45,7 +45,7 @@ export const SHARE_FRAME_POLICY = [
   "frame-ancestors 'self'",
 ].join('; ')
 
-/** The shell runs nothing and frames only its own live page, which may not navigate elsewhere. */
+/** The shell runs nothing and frames only its own page, which may not navigate elsewhere. */
 function shellPolicy(own: string | null): string {
   const frame = own === null ? "'none'" : `${own}/frame`
   return [
@@ -104,7 +104,7 @@ export function applyRenderHeaders(headers: Headers, request: ShareRequest, orig
   }
 }
 
-/** Only a frame gets the live page; opened as a tab it could navigate itself to the web. */
+/** Only a frame gets the rendered page; opened as a tab it could navigate itself to the web. */
 export const isFrameLoad = (fetchDest: string | undefined): boolean => fetchDest === 'iframe'
 
 /** The stored HTML with in-memory storage, since the frame's opaque origin refuses the real one. */

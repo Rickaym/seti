@@ -104,13 +104,13 @@ const SHARE_HEADERS: Readonly<Record<string, string>> = {
 export function applyShareHeaders(headers: Headers, path: string, origin: string | null): void {
   const request = parseSharePath(path)
   const media = headers.get(MEDIA_MARK) === '1'
-  const live = headers.get(RENDER_MARK) === '1'
+  const rendered = headers.get(RENDER_MARK) === '1'
   headers.delete(MEDIA_MARK)
   headers.delete(RENDER_MARK)
   for (const [name, value] of Object.entries(SHARE_HEADERS)) {
     headers.set(name, value)
   }
-  if (live && request !== null) {
+  if (rendered && request !== null) {
     applyRenderHeaders(headers, request, origin)
   } else {
     headers.set('Content-Security-Policy', sharePolicy(request, origin, media))
