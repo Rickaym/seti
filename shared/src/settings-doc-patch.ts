@@ -58,7 +58,7 @@ export function applyPatch(
   const kept = Object.entries(base).filter(([key]) => !(removes && patch[key] === null))
   const result: Record<string, unknown> = Object.fromEntries(kept)
   for (const [key, value] of Object.entries(patch)) {
-    if (value !== null || !removes) {
+    if (key !== '__proto__' && (value !== null || !removes)) {
       result[key] = value === null ? null : applyPatch(result[key], value, keyed, [...at, key])
     }
   }
@@ -69,7 +69,7 @@ export function applyPatch(
 export function valueAt(doc: unknown, path: DocPath): unknown {
   let at = doc
   for (const key of path) {
-    at = isJsonObject(at) ? at[key] : undefined
+    at = isJsonObject(at) && Object.hasOwn(at, key) ? at[key] : undefined
   }
   return at
 }

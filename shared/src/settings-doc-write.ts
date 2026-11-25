@@ -74,14 +74,24 @@ const MOD_SWITCH = 'Mods are turned on and off on the Mods page'
 
 const isSection = (path: string): path is SettingsSectionPath => Object.hasOwn(SETTINGS_SECTIONS, path)
 
+/** Keys that name an object's prototype in JavaScript, which no setting is called. */
+const PROTOTYPE_KEYS = new Set(['__proto__', 'constructor', 'prototype'])
+
+function modRefusal(key: string, rest: readonly string[]): Omit<SettingsProblem, 'path'> | null {
+  if (key === 'settings' && rest.length > 0) {
+    return null
+  }
+  return { message: key === 'enabled' ? MOD_SWITCH : 'Only the settings of a mod change here', page: 'mods' }
+}
+
 /** Why a JSON write may not change a path, or null when it may. */
 export function jsonWriteRefusal(path: DocPath): Omit<SettingsProblem, 'path'> | null {
   const [group = '', page = '', key = '', ...rest] = path
+  if (path.some((part) => PROTOTYPE_KEYS.has(part))) {
+    return { message: 'Not a setting' }
+  }
   if (group === 'mods') {
-    if (key === 'settings' && rest.length > 0) {
-      return null
-    }
-    return { message: key === 'enabled' ? MOD_SWITCH : 'Only the settings of a mod change here', page: 'mods' }
+    return modRefusal(key, rest)
   }
   const sectionPath = `${group}.${page}`
   if (!isSection(sectionPath)) {
@@ -95,6 +105,7 @@ export function jsonWriteRefusal(path: DocPath): Omit<SettingsProblem, 'path'> |
   if (JSON_WRITABLE[sectionPath]?.includes(key) === true) {
     return null
   }
-  const why = JSON_READ_ONLY[sectionPath]?.[key]
+  const readOnly = JSON_READ_ONLY[sectionPath] ?? {}
+  const why = Object.hasOwn(readOnly, key) ? readOnly[key] : undefined
   return { message: why ?? 'Not a setting', page: section.page }
 }

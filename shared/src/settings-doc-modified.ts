@@ -14,13 +14,13 @@ export function diffPatch(from: unknown, to: unknown): unknown {
   }
   const changed: [string, unknown][] = []
   for (const [key, value] of Object.entries(to)) {
-    const part = key in from ? diffPatch(from[key], value) : value
+    const part = Object.hasOwn(from, key) ? diffPatch(from[key], value) : value
     if (part !== undefined) {
       changed.push([key, part])
     }
   }
   for (const key of Object.keys(from)) {
-    if (!(key in to)) {
+    if (!Object.hasOwn(to, key)) {
       changed.push([key, null])
     }
   }
