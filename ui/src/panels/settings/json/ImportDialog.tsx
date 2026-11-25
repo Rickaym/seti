@@ -57,14 +57,17 @@ function Skipped({ preview }: { preview: SettingsImportPreview }) {
       {preview.skipped.map((item) => (
         <li
           key={pathText(item.path)}
-          className="flex flex-wrap items-center gap-x-2 border-b border-border py-2 text-xs last:border-b-0"
+          className="flex items-start gap-2 border-b border-border py-2 text-xs last:border-b-0"
         >
-          <span className="font-mono font-medium wrap-anywhere">{pathText(item.path)}</span>
-          <span className="min-w-0 flex-1 text-muted-foreground">{item.message}</span>
+          <div className="min-w-0 flex-1 space-y-0.5">
+            <div className="font-mono font-medium wrap-anywhere">{pathText(item.path)}</div>
+            <div className="text-muted-foreground">{item.message}</div>
+          </div>
           {item.page !== undefined && (
             <Button
               size="xs"
               variant="ghost"
+              aria-label={`Open the page of ${pathText(item.path)}`}
               onClick={() => {
                 navigate('settings', item.page)
               }}
