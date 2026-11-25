@@ -74,7 +74,7 @@ Memory folder: ${m.memory}. Read-only memory the agent's sessions also see: ${sh
    folder, so you know what is kept there. The indexes name every topic file: open one when the
    digest, the review or your work needs it, since every file read is one of your steps.
 2. Gather. Read the whole digest, from its first line to its last: it is sized to fit one read,
-   and the morning's steps matter as much as the evening's. Check memories the day touched
+   and the day's first steps matter as much as its last. Check memories the day touched
    against the files and git state now. Do not read transcripts or large files end to end; open
    what the digest points at.
 3. Consolidate. Put each thing worth keeping in the topic file it belongs to, or a new one.
