@@ -288,7 +288,14 @@ export const TaskSettings = memo(function TaskSettingsView({
   const actions = (
     <div className="grid gap-2">
       {caps?.dreams !== false && <DreamActions taskId={task.id} open={open} />}
-      <ContinueOn task={task} running={running} onChanged={onChanged} />
+      <ContinueOn
+        task={task}
+        running={running}
+        onChanged={() => {
+          setOpen(false)
+          onChanged()
+        }}
+      />
       <LifecycleActions
         busy={busy}
         onRestart={() => {

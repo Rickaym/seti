@@ -50,6 +50,14 @@ export async function refuseMove(task: Task, to: StoredRuntime): Promise<void> {
  * ends; a move the EA or an agent made never loosens the approvals the agent had.
  */
 export async function moveRuntime(task: Task, to: Move): Promise<Moved> {
+  const was = await tasks.get(task.id)
+  if (was === undefined || was.runtime === to.runtime) {
+    throw new HttpError(409, `${task.title} already runs on ${RUNTIME_NAMES[to.runtime]}.`)
+  }
+  return moveFrom(was, to)
+}
+
+async function moveFrom(task: Task, to: Move): Promise<Moved> {
   const ceiling = fromDelegate() ? await ceilingOf(task) : null
   const resumed = (await taskSessions.moveTo(task.id, to.runtime, to.model)) !== null
   if (ceiling !== null) {
