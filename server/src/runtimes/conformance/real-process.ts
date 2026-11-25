@@ -37,6 +37,8 @@ const eachLine = (input: Readable, take: (line: string) => void): void => {
  * stops what it started; its exit is reported as the process's own unless the rig crashed it.
  */
 export class RealProcess extends FakeProcess {
+  /** Settles once the program has exited and its process group was stopped, or it never started. */
+  readonly exited: Promise<void>
   private readonly child: ChildProcess
   private crashed = false
 
@@ -48,15 +50,21 @@ export class RealProcess extends FakeProcess {
       stdio: ['pipe', 'pipe', 'pipe'],
       detached: true,
     })
-    this.child.on('error', (e) => {
-      this.stderr.write(`${e.message}\n`)
-      this.finish(127, null)
-    })
-    this.child.on('exit', (code, exitSignal) => {
-      this.stopGroup()
-      if (!this.crashed && !start.deaf) {
-        this.finish(code, exitSignal)
-      }
+    this.exited = new Promise((resolve) => {
+      this.child.on('error', (e) => {
+        this.stderr.write(`${e.message}\n`)
+        this.finish(127, null)
+        if (this.child.pid === undefined) {
+          resolve()
+        }
+      })
+      this.child.on('exit', (code, exitSignal) => {
+        this.stopGroup()
+        if (!this.crashed && !start.deaf) {
+          this.finish(code, exitSignal)
+        }
+        resolve()
+      })
     })
     this.child.stderr?.pipe(this.stderr, { end: false })
     eachLine(this.stdin, (line) => {
@@ -83,6 +91,12 @@ export class RealProcess extends FakeProcess {
   override kill(signal?: NodeJS.Signals | number): boolean {
     this.child.kill(typeof signal === 'string' ? signal : 'SIGTERM')
     return true
+  }
+
+  /** Asks the program to stop and settles once it and its process group are gone. */
+  async stop(): Promise<void> {
+    this.kill()
+    return this.exited
   }
 
   /** Kills the program at once and reports this exit code, as the kernel would after a crash. */
@@ -112,4 +126,9 @@ export class RealProcess extends FakeProcess {
       // The group is already gone.
     }
   }
+}
+
+/** Stops each process and settles once every one has exited, so nothing writes to its folders. */
+export async function stopAll(processes: readonly RealProcess[]): Promise<void> {
+  await Promise.all(processes.map(async (each) => each.stop()))
 }
