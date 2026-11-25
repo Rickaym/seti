@@ -69,6 +69,7 @@ function task(id: string, title: string, status: TaskStatus, extra: Partial<Task
     asking: false,
     closing_line: null,
     blocked: null,
+    delegated_by: null,
     ...rest,
   }
 }

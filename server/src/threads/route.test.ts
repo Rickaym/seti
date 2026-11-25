@@ -5,7 +5,7 @@ import { auditEvents } from '../store/audit.js'
 import { taskInputs } from '../store/inputs.js'
 import { threadFollows } from '../store/threads.js'
 import { REPLY_SETTLE_MS, THREAD_RATE, expireThreads, routeDueReplies } from './route.js'
-import { agentSends, api, data, deliver, message, quietTask, slackWebhook } from './slack-test-kit.js'
+import { agentSends, api, data, deliver, message, quietTask, slackWebhook } from './test-slack-kit.js'
 
 const ROOT = '1700000000.000100'
 const ts = (n: number) => `17000001${String(n).padStart(2, '0')}.000100`
@@ -69,14 +69,15 @@ describe('routing Slack thread replies', () => {
     expect(JSON.stringify(mine)).not.toContain('staging')
   })
 
-  it('names the channel and the people a reply mentions once Seti has seen their names', async () => {
+  it('shows the labels a reply carries in place, and learns no name from them', async () => {
     const { channel, task, replyIn, slack } = await replying('Names')
     await deliver(channel, replyIn(5, { user: 'U0NAMES001', text: `<@U0SAM00001|Sam> look at <#${slack}|proj>` }))
     await deliver(channel, replyIn(6, { user: 'U0NAMES001', text: 'and <@U0SAM00001>' }))
     await settle()
     const titles = (await taskInputs.pending(task, 10)).map((input) => `${input.title}: ${input.body}`)
-    expect(titles).toContain('U0NAMES001 replied in Slack #proj: @Sam look at #proj')
-    expect(titles).toContain('U0NAMES001 replied in Slack #proj: and @Sam')
+    const where = `Slack channel ${slack}, name not known`
+    expect(titles).toContain(`U0NAMES001 replied in ${where}: @Sam look at #proj`)
+    expect(titles).toContain(`U0NAMES001 replied in ${where}: and <@U0SAM00001>`)
   })
 
   it("drops the agent's own message whose echo came before its result", async () => {

@@ -54,6 +54,7 @@ function task(id: string, extra: Partial<TaskListEntry> = {}): TaskListEntry {
     asking: false,
     closing_line: null,
     blocked: null,
+    delegated_by: null,
     ...listedSubtasks([]),
     todos: [],
     pr_states: prStates({}),

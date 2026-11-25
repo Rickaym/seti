@@ -16,8 +16,6 @@ export interface Case {
   proves: string
   /** Why the case does not apply to a runtime with this profile; absent or null when it does. */
   skip?: (profile: Profile, declared: Declared) => string | null
-  /** The case drives the runtime's one-shot, which a target may not supply yet. */
-  needsOneShot?: true
   run: (subject: Subject) => Promise<void>
 }
 

@@ -1,7 +1,6 @@
 import type { ToolCall } from '@seti/shared'
 import type { Launcher } from '../../launcher.js'
 import type { RuntimeAdapter, RuntimeShapes, SessionHost } from '../adapter.js'
-import type { OneShot } from '../one-shot.js'
 import type { Script } from './script.js'
 
 /**
@@ -85,6 +84,6 @@ export interface ConformanceTarget<S extends RuntimeShapes, Id extends string = 
   host: (neutral: NeutralHost) => SessionHost<S>
   /** A fake runtime that plays the script. */
   rig: (script: Script) => Rig
-  /** The runtime's one-shot and a model it offers, until `Capabilities` declares one-shots. */
-  oneShot?: { runner: OneShot; model: string }
+  /** A model the runtime offers, which the one-shot cases ask. */
+  oneShotModel: string
 }

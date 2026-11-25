@@ -41,7 +41,7 @@ const subscribe = (listener: () => void) => {
 }
 
 /** The names Seti knows of these Slack ids; an id stays out of the map until its name is known. */
-export function useSlackNames(ids: readonly string[]): ReadonlyMap<string, string> {
+function useSlackNames(ids: readonly string[]): ReadonlyMap<string, string> {
   const key = ids.join(',')
   useEffect(() => {
     const missing = key.split(',').filter((id) => id !== '' && !known.has(id))

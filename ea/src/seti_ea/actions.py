@@ -240,11 +240,26 @@ ACTION_SPECS: list[ToolSpec] = [
     ),
     ToolSpec(
         "restart_agent_session",
-        "Restart an agent's Claude Code session, as when its MCP servers failed to connect, a sign-in "
-        "or config change should take effect, or it seems stuck: the conversation is kept, and its "
-        "background shells, processes and subagents end. A running turn stops first. Needs the "
-        "user's yes.",
-        {"task": TASK_REF, "confirmed": CONFIRMED},
+        "Restart an agent's session, as when its MCP servers failed to connect, a sign-in or config "
+        "change should take effect, or it seems stuck: the conversation is kept, and its background "
+        "shells, processes and subagents end. A running turn stops first. With runtime, continue the "
+        "agent on that runtime instead: a new session there in the same folders, which gets a brief "
+        "of its work. Needs the user's yes.",
+        {
+            "task": TASK_REF,
+            "runtime": {
+                "type": "string",
+                "enum": ["claude", "codex"],
+                "description": "Only when the user asks for it: the runtime to continue the agent on. "
+                "Seti refuses one the user has off.",
+            },
+            "model": {
+                "type": "string",
+                "description": "Only with runtime and when the user names one; else that runtime's "
+                "default model.",
+            },
+            "confirmed": CONFIRMED,
+        },
         ["task"],
     ),
     ToolSpec(
@@ -382,8 +397,9 @@ ACTION_SPECS: list[ToolSpec] = [
     ToolSpec(
         "update_context_pack",
         "Change a context pack: rename it, change its description, replace its body or add text at its "
-        "end, or whether new agents get it by default. Agents that include it read the change. The "
-        "built-in Seti guide takes only the default. Needs the user's yes.",
+        "end, or whether new agents get it by default; for a role, the runtime and model agents "
+        "started in it run on. Agents that include it read the change. The built-in Seti guide takes "
+        "only the default. Needs the user's yes.",
         {
             "pack": PACK_REF,
             "name": {"type": "string", "description": "A new name."},
@@ -393,6 +409,16 @@ ACTION_SPECS: list[ToolSpec] = [
             "linked_by_default": {
                 "type": "boolean",
                 "description": "true links it to new agents by default, false stops that.",
+            },
+            "runtime": {
+                "type": "string",
+                "enum": ["claude", "codex", "default"],
+                "description": "Roles only: the runtime an agent started in this role runs on unless "
+                "its start names one; default leaves it to the start.",
+            },
+            "model": {
+                "type": "string",
+                "description": "Roles only: the model it runs with; an empty string clears it.",
             },
             "confirmed": CONFIRMED,
         },
@@ -449,6 +475,29 @@ CONFIRM_TOOLS = frozenset(
 CHANGE_TOOLS = frozenset(spec.name for spec in ACTION_SPECS) | SETTINGS_WRITES
 
 
+RUNTIME_NAMES = {"claude": "Claude Code", "codex": "Codex"}
+
+
+def _restart_question(title: str, running: bool, runtime: str | None, model: str | None) -> tuple[str, str]:
+    """What restarting or moving the agent does, and the short form the user is asked."""
+    stop = " Its running turn stops first." if running else ""
+    if runtime is None:
+        effect = (
+            f"This restarts the Claude Code session of {title}: the conversation is kept, "
+            "Claude Code starts again with its MCP servers, plugins and tools loaded anew, and its "
+            f"background shells, processes and subagents end.{stop}"
+        )
+        return effect, f"restart the session of {title}"
+    name = RUNTIME_NAMES.get(runtime, runtime)
+    on = f"{name} with {model}" if model else name
+    effect = (
+        f"This moves {title} to {on}: a new session in the same folders, with a brief of its work "
+        "at its next message; its conversation, links and cost stay. Bypass ends, and its "
+        f"background shells, processes and subagents end.{stop}"
+    )
+    return effect, f"move {title} to {name}"
+
+
 class Resolver(Protocol):
     """How the action tools find what the user named."""
 
@@ -493,6 +542,23 @@ def color_name(color: str) -> str:
     """The preset a colour is, or the hex called a custom colour, which reads well aloud."""
     preset = next((name for name, hex_ in AGENT_COLORS.items() if hex_ == color), None)
     return preset if preset is not None else f"a custom colour ({color})"
+
+
+def role_runtime_change(
+    pack: Mapping[str, Any], args: Mapping[str, Any]
+) -> tuple[dict[str, Any], str] | None:
+    """The role's new runtime and model as the server takes them, and the change in words; None if none."""
+    if "runtime" not in args and "model" not in args:
+        return None
+    if pack.get("kind") != "role":
+        raise ToolError(f"{name_of(pack)} is not a role; only a role names a runtime.", "Not a role")
+    runtime = arg_str(args, "runtime", required=False) if "runtime" in args else pack.get("runtime")
+    runtime = None if runtime in ("default", "") else runtime
+    model = (str(args.get("model") or "").strip() or None) if "model" in args else pack.get("model")
+    if (runtime, model) == (pack.get("runtime"), pack.get("model")):
+        return None
+    words = f"runs agents in it on {runtime or 'the default runtime'}{f' with {model}' if model else ''}"
+    return {"runtime": runtime, "model": model}, words
 
 
 class AgentActions:
@@ -872,22 +938,27 @@ class AgentActions:
     async def restart_agent_session(self, args: Mapping[str, Any]) -> ToolResult:
         task, title = await self._task_ref(args)
         running = task.get("status") == "running"
-        if not await self._cleared(args, gate_key("restart_agent_session", task.get("id"), running)):
-            stop = " Its running turn stops first." if running else ""
-            effect = (
-                f"This restarts the Claude Code session of {title}: the conversation is kept, "
-                "Claude Code starts again with its MCP servers, plugins and tools loaded anew, and its "
-                f"background shells, processes and subagents end.{stop}"
-            )
-            return ask("restart_agent_session", args, effect, f"restart the session of {title}")
+        runtime = arg_str(args, "runtime", required=False) or None
+        model = arg_str(args, "model", required=False) or None
+        key = gate_key("restart_agent_session", task.get("id"), running, runtime, model)
+        if not await self._cleared(args, key):
+            return ask("restart_agent_session", args, *_restart_question(title, running, runtime, model))
+        body: dict[str, Any] = {"interrupt": running}
+        if runtime is not None:
+            body = {**body, "runtime": runtime, **({"model": model} if model else {})}
+        verb = "restart the session of" if runtime is None else "move"
         try:
-            await self._seti.post(f"/tasks/{task.get('id')}/session/restart", {"interrupt": running})
+            await self._seti.post(f"/tasks/{task.get('id')}/session/restart", body)
         except SetiError as e:
             if e.status == 409:
-                raise ToolError(
-                    f"Could not restart the session of {title}: {e.detail or e.title}", "Not restarted"
-                ) from e
+                raise ToolError(f"Could not {verb} {title}: {e.detail or e.title}", "Not restarted") from e
             raise
+        if runtime is not None:
+            name = RUNTIME_NAMES.get(runtime, runtime)
+            return ToolResult(
+                f"{title} continues on {name}; its next message brings a brief of its work.",
+                clip(f"Moved {title} to {name}", 70),
+            )
         return ToolResult(
             f"Restarted the session of {title}; the conversation continues.",
             clip(f"Restarted the session of {title}", 70),
@@ -1276,9 +1347,14 @@ class AgentActions:
         default_changed = default is not None and default != (pack.get("linked_by_default") is True)
         if default_changed:
             changes.append(f"{'links' if default else 'stops linking'} it to new agents by default")
+        runs_on = role_runtime_change(pack, args)
+        if runs_on is not None:
+            changes.append(runs_on[1])
         if not changes:
             raise ToolError(f"That changes nothing in the context pack {name}.", "Nothing to change")
-        if not await self._cleared(args, gate_key("update_context_pack", pack.get("id"), body, default)):
+        runs_body = None if runs_on is None else runs_on[0]
+        key = gate_key("update_context_pack", pack.get("id"), body, default, runs_body)
+        if not await self._cleared(args, key):
             effect = (
                 f"This changes the context pack {name}: it {and_list(changes)}. It reaches any agent that "
                 "includes it, from their next turn."
@@ -1288,6 +1364,8 @@ class AgentActions:
             await self._seti.put(f"/context/packs/{pack.get('id')}", body)
         if default_changed:
             await self._seti.put(f"/context/packs/{pack.get('id')}/default", {"linked_by_default": default})
+        if runs_body is not None:
+            await self._seti.put(f"/context/packs/{pack.get('id')}/runtime", runs_body)
         return ToolResult(
             f"Updated the context pack {name}: it {and_list(changes)}.",
             clip(f"Updated context pack {name}", 70),

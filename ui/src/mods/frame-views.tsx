@@ -66,6 +66,7 @@ const placed = (manifest: ModManifest, view: View): PlacedFrame => ({
   view: view.id,
   title: view.title,
   phone: view.phone,
+  needs: view.needs,
 })
 
 function registerView(manifest: ModManifest, view: View, track: (dispose: Disposer) => Disposer): void {
