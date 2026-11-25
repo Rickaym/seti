@@ -83,15 +83,10 @@ export function claudeLaunch(launcher: Launcher) {
 
 /** Rules for every task, the launcher, and an unsandboxed task's borrowed MCP servers. */
 async function sandboxOptions(spec: SessionSpec<'claude'>, launcher: Launcher) {
-  const { rules, disabledServers } = spec.folderSettings
-  const permissions = {
-    ...spec.rules,
-    ask: [...spec.rules.ask, ...rules.ask],
-    deny: [...spec.rules.deny, ...rules.deny],
-  }
+  const { disabledServers } = spec.folderSettings
   const settings = {
     ...deniedMcpSettings(spec.deniedToolServers),
-    permissions,
+    permissions: spec.rules,
     ...(disabledServers.length === 0 ? {} : { disabledMcpjsonServers: disabledServers }),
   }
   const borrowed = launcher.sandboxed

@@ -4,6 +4,7 @@ import path from 'node:path'
 import type { HookInput } from '@anthropic-ai/claude-agent-sdk'
 import { afterAll, describe, expect, it } from 'vitest'
 import { createApp } from '../../app.js'
+import { claudeRules } from '../../approval-ceiling.js'
 import { tasks } from '../../db.js'
 import { watchFolderSettings } from '../../folder-settings-trust.js'
 import { sessionOptions, setupKey } from '../../session-spec.js'
@@ -79,6 +80,7 @@ describe("a Claude Code agent's folder settings", () => {
     expect(permissions.deny).toContain('Bash(rm:*)')
     expect(permissions.allow).not.toContain('Bash(curl:*)')
     expect(await setupKey(task)).not.toBe(before)
+    expect((await claudeRules(task)).deny, 'the rules a running session is handed again').toContain('Bash(rm:*)')
   })
 
   it("blocks a change to the folder's project or local settings mid-session, and nothing else", async () => {
