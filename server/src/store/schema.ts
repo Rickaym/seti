@@ -86,6 +86,7 @@ import {
   CODEX_RULES_DECIDE_DEFAULT,
   CODEX_SETTINGS,
   TASK_APPROVAL_CEILING,
+  TASK_DELEGATED_BY,
 } from './schema-tasks.js'
 import {
   EA_DOC_NO_DIRECT,
@@ -244,4 +245,5 @@ export const MIGRATIONS: readonly Migration[] = [
   { version: 129, name: 'task_second_opinion', sql: TASK_SECOND_OPINION },
   { version: 130, name: 'connection_body', sql: CONNECTION_BODY },
   { version: 131, name: 'second_opinion_reviews', sql: SECOND_OPINION_REVIEWS },
+  { version: 132, name: 'task_delegated_by', sql: TASK_DELEGATED_BY },
 ]

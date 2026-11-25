@@ -69,6 +69,7 @@ const POSTGRES_ONLY: Readonly<Record<string, readonly string[]>> = {
     'requested_model',
     'requested_effort',
     'approval_ceiling',
+    'delegated_by',
   ],
   task_message: EVENT_COLUMNS,
   task_context_pack: ['linked'],

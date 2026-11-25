@@ -579,6 +579,13 @@ times an hour and 60 a day. Given one of its linked pull requests instead, the o
 reviews the PR's diff, which Seti reads with your `gh` login; the review goes back to the agent
 and folds under that PR in the agent's PR list, and nothing is posted to GitHub.
 
+An agent at Seti control Full can start a helper on either runtime with `start_task`, which
+runs sandboxed with at most the caller's access and approvals. The helper sits right under its
+caller in the agent list, and the Home graph links the two. With `include_brief`, Seti adds a
+brief of the caller's work after the prompt: what it was asked, its plan, steps, files and PRs,
+redacted and without direct messages. The EA's `start_task` takes `brief_of` to brief a new
+agent on any agent's work.
+
 ### Access: defaults and per-agent choices
 
 Everything an agent may reach follows one model: each SSH host, AWS, MCP server, context

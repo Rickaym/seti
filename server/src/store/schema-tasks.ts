@@ -206,3 +206,9 @@ export const TASK_APPROVAL_CEILING = 'ALTER TABLE task ADD COLUMN approval_ceili
 export const CODEX_RULES_DECIDE_DEFAULT = `
 ALTER TABLE codex_settings ALTER COLUMN evaluator_decides SET DEFAULT true;
 `
+
+/** The agent whose start_task started this one; null for agents the user or the EA started. */
+export const TASK_DELEGATED_BY = `
+ALTER TABLE task ADD COLUMN delegated_by TEXT REFERENCES task(id) ON DELETE SET NULL;
+CREATE INDEX task_delegated_by ON task (delegated_by) WHERE delegated_by IS NOT NULL;
+`
