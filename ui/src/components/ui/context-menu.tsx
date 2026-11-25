@@ -1,6 +1,6 @@
 import { ContextMenu as ContextMenuPrimitive } from 'radix-ui'
 import type * as React from 'react'
-import { Z_PORTAL_POPOVER } from '@/lib/stacking'
+import { Z_PORTAL } from '@/lib/stacking'
 import { cn } from '@/lib/utils'
 
 function ContextMenu({ ...props }: React.ComponentProps<typeof ContextMenuPrimitive.Root>) {
@@ -22,7 +22,7 @@ function ContextMenuContent({
       <ContextMenuPrimitive.Content
         data-slot="context-menu-content"
         collisionPadding={collisionPadding}
-        style={{ zIndex: Z_PORTAL_POPOVER, ...style }}
+        style={{ zIndex: Z_PORTAL, ...style }}
         className={cn(
           'max-h-(--radix-context-menu-content-available-height) min-w-36 origin-(--radix-context-menu-content-transform-origin) overflow-x-hidden overflow-y-auto rounded-none bg-popover py-1 text-popover-foreground shadow-md ring-1 ring-foreground/10 duration-100 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95',
           className,
