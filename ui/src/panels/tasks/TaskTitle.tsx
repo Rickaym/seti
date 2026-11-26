@@ -1,9 +1,8 @@
 import type { Task } from '@seti/shared'
-import { Pencil, PencilLine } from 'lucide-react'
+import { Pencil } from 'lucide-react'
 import { useEffect, useRef, type KeyboardEvent } from 'react'
 import { Hint } from '@/components/Hint'
 import { DetailTitle } from '@/components/SplitPane'
-import { useCommands } from '@/components/palette/useCommands'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { renameTask } from '@/panels/tasks/rename'
@@ -24,21 +23,6 @@ interface TaskTitleProps {
 export function TaskTitle({ task, onChanged, draft, onDraftChange: setDraft, compact = false }: TaskTitleProps) {
   const input = useRef<HTMLInputElement>(null)
   const editing = draft !== null
-
-  useCommands([
-    {
-      id: 'agent.rename',
-      title: 'Rename agent',
-      detail: task.title,
-      icon: PencilLine,
-      group: 'Current agent',
-      keywords: 'title name',
-      when: (context) => context.agent?.id === task.id,
-      run: () => {
-        setDraft(task.title)
-      },
-    },
-  ])
 
   useEffect(() => {
     if (editing) {

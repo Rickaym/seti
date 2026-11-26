@@ -277,5 +277,5 @@ def test_the_prompt_forbids_empty_promises_and_re_asking_relays() -> None:
     assert "Never say you did, or will do, something unless its tool call is in the same reply" in (
         SYSTEM_PROMPT
     )
-    assert "send the direct message in the same reply, without asking first" in SYSTEM_PROMPT
+    assert "send the direct message in the same reply, even while it runs a turn" in SYSTEM_PROMPT
     assert "show them in a quote block before sending" not in SYSTEM_PROMPT

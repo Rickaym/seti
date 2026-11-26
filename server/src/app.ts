@@ -1,4 +1,3 @@
-import fs from 'node:fs'
 import path from 'node:path'
 import { serveStatic } from '@hono/node-server/serve-static'
 import {
@@ -24,6 +23,7 @@ import {
   onProofRefused,
   type AccessGuardOptions,
 } from './access.js'
+import { onAccessChanged } from './agent-access.js'
 import { cancelWaitsOnArchive, deliverAgentWaits } from './agent-waits.js'
 import { remindWhenAsking } from './asking-reminder.js'
 import { briefOnReturn } from './attention-brief.js'
@@ -112,6 +112,7 @@ import { runtimeRoutes } from './routes/runtimes.js'
 import { sandboxRoutes } from './routes/sandbox.js'
 import { secretRoutes } from './routes/secrets.js'
 import { sessionRoutes } from './routes/sessions.js'
+import { setiCommandRoutes } from './routes/seti-commands.js'
 import { settingsDocRoutes } from './routes/settings-doc.js'
 import { publicShareHandler } from './routes/share-public.js'
 import { sharedToolRoutes } from './routes/shared-tools.js'
@@ -138,6 +139,7 @@ import { importedContext } from './sessions.js'
 import { setiControlPreface } from './seti-control-note.js'
 import { contextPackPrompt, workspaceContext } from './seti-guide.js'
 import { sessionSetiServers, setiToolsContext } from './seti-tools/server.js'
+import { noteSetting } from './setting-notes.js'
 import { shellPreface } from './shell-context.js'
 import { restartQuietOnAnswer } from './stall-watch.js'
 import { clearStatusLinesWhenIdle, statusLineTurnEnded } from './status-line.js'
@@ -147,6 +149,7 @@ import { subdomainProxy } from './subdomain-proxy.js'
 import { clearStallsOnTurnStart } from './task-blocked.js'
 import { onAnyTaskEvent } from './task-events.js'
 import { taskFolderContext } from './task-location.js'
+import { createUiShell, shellFallback } from './ui-shell.js'
 import { openWorkspace, startWorkspaceSync, workspaceTurnEnded } from './workspace/engine.js'
 
 /** Large enough for a full context file or prompt, small enough to refuse memory floods. */
@@ -254,12 +257,14 @@ const defaultAccess = (): AccessGuardOptions => ({
 export function createApp(access: AccessGuardOptions = defaultAccess(), eaUrl: string = EA_URL): Hono {
   const local = access.local ?? defaultLocalAuth()
   const app = new Hono()
+  const shell = createUiShell(UI_DIST)
   app.onError((e, c) =>
     e instanceof HttpError ? fail(c, e.status, e.message) : fail(c, 500, 'Server error', e.message),
   )
   app.use('*', logServerErrors)
   app.use('*', securityHeaders(access.access))
   onProofRefused(auditRefusedProof)
+  onAccessChanged(async (taskId, line) => noteSetting(taskId, 'access', line))
   app.use('*', accessGuard({ ...access, local }))
   app.route('/hooks', hookRoutes)
   app.use('*', subdomainProxy)
@@ -274,7 +279,7 @@ export function createApp(access: AccessGuardOptions = defaultAccess(), eaUrl: s
   app.get('/api/ping', (c) => c.body(null, 204))
   app.get('/api/system', async (c) => {
     const sandbox = { enabled: (await sandboxPolicy.get()).enabled, token_mode: await githubTokenMode() }
-    return ok(c, { permission_mode: PERMISSION_MODE, sandbox } satisfies SystemInfo)
+    return ok(c, { permission_mode: PERMISSION_MODE, sandbox, build: shell.build() } satisfies SystemInfo)
   })
   app.use('/api/tasks/:id', archivedGuard)
   app.use('/api/tasks/:id/*', archivedGuard)
@@ -320,6 +325,7 @@ export function createApp(access: AccessGuardOptions = defaultAccess(), eaUrl: s
   app.route('/api/tasks', taskComposerRoutes)
   app.route('/api/tasks', taskPermissionRoutes)
   app.route('/api/tasks', changeRequestRoutes)
+  app.route('/api/tasks', setiCommandRoutes)
   app.route('/api/commands', commandRoutes)
   app.route('/api/compact', compactRoutes)
   app.route('/api/context', contextRoutes)
@@ -413,12 +419,6 @@ export function createApp(access: AccessGuardOptions = defaultAccess(), eaUrl: s
   app.get('/agent/:id', (c) => c.redirect(`/#agents/${encodeURIComponent(c.req.param('id'))}`))
   app.use('/*', cacheHeaders)
   app.use('/*', serveStatic({ root: path.relative(process.cwd(), UI_DIST) }))
-  app.get('/*', (c) => {
-    const index = path.join(UI_DIST, 'index.html')
-    if (!fs.existsSync(index)) {
-      return c.text('UI not built. Run: pnpm build', 503)
-    }
-    return c.html(fs.readFileSync(index, 'utf8'))
-  })
+  app.get('/*', shellFallback(shell))
   return app
 }

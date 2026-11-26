@@ -85,7 +85,7 @@ with another top-level folder.
 | 16 Audit       | `audit.ts`, `store/audit.ts`                                                                                                                                                                                                                                                                                                                                      |
 | 17 Mods        | `mods/`, `shared/src/mods.ts`, `packages/mod-api/`; [Mods](mods.md) is the authoring guide                                                                                                                                                                                                                                                                        |
 | 18 Public      | `access.ts`, `routes/share-public.ts`, `share-preview/`, `converter.ts`, `rate-limit.ts`, `security-headers.ts`                                                                                                                                                                                                                                                   |
-| 19 Client      | `http.ts`, `etag.ts`, `devices.ts`, `shared/src/lenient.ts`, `ui/src/lib/poll-loop.ts`, `ui/src/lib/stale-build.ts`, `ui/src/lib/uploader.ts`                                                                                                                                                                                                                     |
+| 19 Client      | `http.ts`, `etag.ts`, `devices.ts`, `shared/src/lenient.ts`, `ui/src/lib/poll-loop.ts`, `ui/src/lib/stale-build.ts`, `ui/src/lib/app-update.ts`, `server/src/ui-shell.ts`, `ui/build/dist-swap.ts`, `ui/src/lib/uploader.ts`                                                                                                                                      |
 
 ## Storage
 
@@ -428,6 +428,29 @@ works. `promises.py` implements EA-12 without a model call. `settle.py` and `hel
 EA-10. The EA posts usage records (numbers and model names, never text) to `ea_usage`, kept 30
 days. The language setting reaches Deepgram, ElevenLabs and the prompt; the wake word model knows
 English sounds only.
+
+### How the EA speaks
+
+The EA's manner lives in its base prompt (`ea/src/seti_ea/prompt.py`) and in the short lines Seti
+speaks while its tools run (`ea/src/seti_ea/announce.py`). It gives the answer first and stops. On a
+call it aims for fifteen words, two sentences at most unless the user asks for detail, never reads
+a list aloud and never ends with an offer. In the chat an overview is one line per item. Its tone is
+composed and precise, with dry wit now and then and none about an error, a refusal or security.
+
+The user's request is the EA's yes. It asks first only for tools that take `confirmed` (EA-3,
+EA-4), a public group chat post, stopping several agents at once, and work it proposes itself. It
+refuses a security change rather than asking. An ask is one sentence of effect and a short
+question; in the chat it ends with exactly "Shall I go ahead?", which shows the Yes and No buttons.
+
+### Call audio
+
+A call is WebRTC through pipecat's SmallWebRTC transport, which runs on aiortc. aiortc has no
+settings for speech on a lossy network, so two small modules replace what it creates, and their
+tests fail when the pinned aiortc version or the code they replace changes. `aiortc_opus.py`
+encodes the EA's voice as 48 kbps mono Opus with in-band FEC and a 10% loss hint, so the browser
+rebuilds a single lost packet instead of concealing it. `aiortc_jitter.py` buffers the user's audio
+three packets deep and skips a packet the network lost, where aiortc's own buffer also drops
+packets that arrived after it.
 
 ## Reference values
 
