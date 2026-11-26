@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { drafts } from '@/lib/drafts'
+import { drafts, openDrafts } from '@/lib/drafts'
 
 const SAVE_DELAY_MS = 400
 
@@ -11,6 +11,18 @@ export function useDraft(key: string | null, fallback = ''): [string, (text: str
   })
   const unsaved = useRef<string | null>(null)
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined)
+  const [id] = useState(() => Symbol('draft'))
+
+  useEffect(() => {
+    openDrafts.set(id, text, key !== null)
+  }, [id, text, key])
+
+  useEffect(
+    () => () => {
+      openDrafts.drop(id)
+    },
+    [id],
+  )
 
   const save = useCallback(() => {
     clearTimeout(timer.current)
