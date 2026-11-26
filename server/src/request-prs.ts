@@ -1,7 +1,9 @@
 import os from 'node:os'
+import { setTimeout as sleep } from 'node:timers/promises'
 import type { PermissionRequest, RequestPr, Task } from '@seti/shared'
 import { tasks } from './db.js'
 import { agentGitReading } from './git.js'
+import { prStates, type PrState } from './github-pr-states.js'
 import { agentGitView } from './outward-folder.js'
 import { repoOf } from './outward-push.js'
 import { prMentions, type PrMention } from './policy/pr-mentions.js'
@@ -62,23 +64,37 @@ async function resolve(task: Task, mentions: readonly PrMention[]): Promise<Requ
   for (const { repo, number } of found) {
     const url = repo === null ? null : prUrl(repo, number)
     if (repo !== null && url !== null && !prs.has(url.toLowerCase())) {
-      prs.set(url.toLowerCase(), { url, repo, number, title: null, ci: null })
+      prs.set(url.toLowerCase(), { url, repo, number, title: null, ci: null, state: null })
     }
   }
   return [...prs.values()].slice(0, MAX_PRS)
 }
 
-/** The PRs with the title and CI Seti tracks, else read once through the cached lookup. */
+/**
+ * The PRs with the title, CI and state Seti tracks for open ones, else read once through a cached
+ * lookup that also answers for merged and closed ones.
+ */
 async function withDetails(prs: readonly RequestPr[]): Promise<RequestPr[]> {
   const { details } = await prDetails(
     prs.map((pr) => pr.url),
     LOOKUP_WAIT_MS,
   )
+  const ended = prs.filter((pr) => (details.get(pr.url) ?? null) === null).map((pr) => pr.url)
+  const none = new Map<string, PrState>()
+  const states = ended.length === 0 ? none : await within(prStates(ended), none)
   return prs.map((pr) => {
-    const detail = details.get(pr.url) ?? null
-    return detail === null ? pr : { ...pr, title: detail.title, ci: detail.ci }
+    const open = details.get(pr.url) ?? null
+    const read = states.get(pr.url)
+    if (open !== null) {
+      return { ...pr, title: open.title, ci: open.ci, state: 'open' }
+    }
+    return read === undefined ? pr : { ...pr, ...read }
   })
 }
+
+/** The work's answer, or `fallback` when it fails or takes longer than a lookup may. */
+const within = async <T>(work: Promise<T>, fallback: T): Promise<T> =>
+  Promise.race([work.catch(() => fallback), sleep(LOOKUP_WAIT_MS, fallback, { ref: false })])
 
 /** The command of a shell call, for the PRs it names. */
 export const shellCommand = (tool: string, input: Record<string, unknown>): string | undefined =>
@@ -112,7 +128,7 @@ export async function addRequestPrs(
   }
   await show(named)
   const detailed = await withDetails(prs)
-  if (detailed.every((pr) => pr.title === null && pr.ci === null)) {
+  if (detailed.every((pr) => pr.title === null && pr.ci === null && pr.state === null)) {
     return
   }
   const filled = await permissionRequests.setPrs(request.id, detailed)

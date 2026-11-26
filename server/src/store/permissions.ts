@@ -18,6 +18,8 @@ export type NewPermissionRequest = Pick<
   PermissionRequest,
   'id' | 'task_id' | 'tool_name' | 'kind' | 'summary' | 'input' | 'reason' | 'suggestions' | 'editable'
 > & {
+  /** What the agent says the call is for; none by default. */
+  description?: string | null
   /** A hash of the exact call, which an answer given after a restart allows once. */
   input_hash?: string
   /** Minutes until Seti denies it unanswered; 0 never does. */
@@ -95,10 +97,10 @@ export const permissionRequests = {
   open: async (request: NewPermissionRequest): Promise<PermissionRequest> => {
     const at = now()
     const [row] = await sql<RequestRecord[]>`INSERT INTO permission_request
-      (id, task_id, tool_name, kind, summary, input, reason, suggestions, editable, state, created_at,
-        timeout_at, input_hash)
+      (id, task_id, tool_name, kind, summary, description, input, reason, suggestions, editable, state,
+        created_at, timeout_at, input_hash)
       VALUES (${request.id}, ${request.task_id}, ${request.tool_name}, ${request.kind}, ${request.summary},
-        ${request.input}, ${request.reason}, ${JSON.stringify(request.suggestions)}, ${request.editable},
+        ${request.description ?? null}, ${request.input}, ${request.reason}, ${JSON.stringify(request.suggestions)}, ${request.editable},
         'pending', ${at}, ${timeoutAt(at, request.timeout_minutes)}, ${request.input_hash ?? null}) RETURNING *`
     if (row === undefined) {
       throw new Error('The permission request was not recorded')

@@ -560,12 +560,16 @@ interrupted only for that.
   Beside each answer the user gives, the implementation counts its own verdict (PERM-12).
 - PERM-4: Built-in: reads, search and platform tools are allowed; shell and edits inside the
   agent's folders are allowed in the sandbox only; killing by name is denied.
-- PERM-5: Request fields: `id`, `task_id`, `tool_name`, `kind`, `summary`, `input`, `reason`,
-  `suggestions`, `editable`, `prs` (PERM-16), `state`, `edited` (field names, GRD-8),
-  `created_at`, `timeout_at`, `timed_out`. Decisions:
+- PERM-5: Request fields: `id`, `task_id`, `tool_name`, `kind`, `summary`, `description` (what
+  the agent says the call is for, as one line of plain text of at most 200 characters, or null),
+  `input`, `reason`, `suggestions`, `editable`, `prs` (PERM-16), `state`, `edited` (field names,
+  GRD-8), `created_at`, `timeout_at`, `timed_out`. Decisions:
   `allow` (this call), `always` (adds the suggested allow rules, scope `agent` or `global`),
   `deny` (optional message to the agent). A call an `ask` rule holds has no suggestions and
-  offers no `always`, since an allow rule never lifts an ask rule.
+  offers no `always`, since an allow rule never lifts an ask rule. A card shows the agent's
+  description first, cut to two lines with the whole text in a tooltip, then the call, then the
+  implementation's own reason line; the agent's reason line reads the description in place of
+  the call when there is one.
 - PERM-7: Timeout is one install-wide setting: off, 15 min, 1 h (default), 4 h or 24 h from when
   the request was raised. A new value applies to waiting requests.
 - PERM-8: At the deadline the request MUST be denied with `timed_out`. The agent is told nobody
@@ -641,7 +645,8 @@ interrupted only for that.
   or changes remotes gives no pull request rather than a wrong one. The link is built from the
   owner, repository and number, never taken from the text. The request MUST be shown without
   waiting on them: the pull requests follow with their links, then title and CI from the data the
-  implementation tracks or one bounded, cached lookup; a failed lookup leaves the link. A request
+  implementation tracks or one bounded, cached lookup, which reads merged and closed ones too and
+  shows them as such; a failed lookup leaves the link. A request
   whose command names none is shown as before, on every runtime whose command is known.
 
 ### 7.5 Guards

@@ -12,6 +12,7 @@ const commandRequest = z.looseObject({
   kind: z.string().optional(),
   command: z.string().nullish(),
   cwd: z.string().nullish(),
+  reason: z.string().nullish(),
   commandActions: z.array(z.looseObject({ command: z.string() })).nullish(),
 })
 
@@ -52,7 +53,10 @@ function command(params: unknown, started: Started): Asked {
     input: { command: fromRequest },
     shell: { action: 'run', command: fromRequest },
   }
-  return { call, reply: accept, cancelled: { decision: 'cancel' } }
+  const why = request.reason ?? undefined
+  const told =
+    why === undefined || call.shell === undefined ? call : { ...call, shell: { ...call.shell, description: why } }
+  return { call: told, reply: accept, cancelled: { decision: 'cancel' } }
 }
 
 function fileChange(params: unknown, started: Started): Asked {

@@ -137,6 +137,9 @@ export type PermissionRequestState = (typeof PERMISSION_REQUEST_STATES)[number]
 export const PERMISSION_REQUEST_KINDS = ['tool', 'repeat', 'review'] as const
 export type PermissionRequestKind = (typeof PERMISSION_REQUEST_KINDS)[number]
 
+export const REQUEST_PR_STATES = ['open', 'merged', 'closed'] as const
+export type RequestPrState = (typeof REQUEST_PR_STATES)[number]
+
 /** A GitHub pull request a request's command names, with its title and CI once Seti knows them. */
 export interface RequestPr {
   /** Built by Seti from the repository and number, never taken from the command's text. */
@@ -146,6 +149,8 @@ export interface RequestPr {
   number: number
   title: string | null
   ci: CiState | null
+  /** Open, merged or closed, once Seti has read it. */
+  state: RequestPrState | null
 }
 
 /** A tool call the agent waits on the user to allow or deny. */
@@ -156,6 +161,8 @@ export interface PermissionRequest {
   kind: PermissionRequestKind
   /** One line of what the call does, such as its command or file. */
   summary: string
+  /** What the agent says the call is for, such as a Bash call's description; plain, short text. */
+  description: string | null
   /** The call's input with secrets redacted, cut to a size the page can show. */
   input: string
   /** Why Claude Code asked, such as a path outside the agent's directories. */
@@ -216,6 +223,7 @@ const requestPrSchema = z.object({
   number: z.number(),
   title: maybeText('title'),
   ci: orDefault<CiState | null>('ci', z.enum(CI_STATES).nullable(), null),
+  state: orDefault<RequestPrState | null>('state', z.enum(REQUEST_PR_STATES).nullable(), null),
 }) satisfies ResponseSchema<RequestPr>
 
 /** The PRs a request names, as stored and sent. */
@@ -227,6 +235,7 @@ export const permissionRequestSchema = z.object({
   tool_name: orDefault('tool_name', z.string(), 'tool'),
   kind: orDefault<PermissionRequestKind>('kind', z.enum(PERMISSION_REQUEST_KINDS), 'tool'),
   summary: orDefault('summary', z.string(), ''),
+  description: maybeText('description'),
   input: orDefault('input', z.string(), ''),
   reason: maybeText('reason'),
   suggestions: orDefault('suggestions', z.array(z.string()), []),

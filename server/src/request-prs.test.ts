@@ -27,11 +27,13 @@ const sdk = await vi.hoisted(async () => {
           type: 'addRules' as const,
           behavior: 'allow' as const,
           destination: 'localSettings' as const,
-          rules: [{ toolName: 'Bash', ruleContent: turn.text }],
+          rules: [{ toolName: 'Bash', ruleContent: turn.text.split(' ## ')[0] ?? '' }],
         },
       ],
     }
-    const result = await canUseTool?.('Bash', { command: turn.text }, options)
+    const [command = '', description] = turn.text.split(' ## ')
+    const input = description === undefined ? { command } : { command, description }
+    const result = await canUseTool?.('Bash', input, options)
     yield fakeAssistant(JSON.stringify(result ?? null))
     yield fakeResult()
   })
@@ -71,6 +73,17 @@ vi.mock('./pr-details.js', async (importOriginal) => ({
     const pr = { title: 'Fix lease renewal after TTL', ci: 'success' }
     return { details: new Map(urls.map((url) => [url, url.endsWith('/2136') ? pr : null])), pending: [] } as never
   },
+}))
+
+vi.mock('./github-pr-states.js', () => ({
+  prStates: async (urls: readonly string[]) =>
+    Promise.resolve(
+      new Map(
+        urls
+          .filter((url) => url.endsWith('/7'))
+          .map((url) => [url, { title: 'Retry the lease', state: 'merged', ci: 'success' }]),
+      ),
+    ),
 }))
 
 const app = createApp()
@@ -119,8 +132,15 @@ describe('the PRs a request names', () => {
     await runTurn(task.id, 'gh pr merge 2136 -R acme/tool --merge 2>&1 | tail -2; gh pr view 7 -R acme/tool')
     const linked = await pending(task.id, (request) => request.prs.length > 0)
     expect(linked.prs).toEqual([
-      { url: 'https://github.com/acme/tool/pull/2136', repo: 'acme/tool', number: 2136, title: null, ci: null },
-      { url: 'https://github.com/acme/tool/pull/7', repo: 'acme/tool', number: 7, title: null, ci: null },
+      {
+        url: 'https://github.com/acme/tool/pull/2136',
+        repo: 'acme/tool',
+        number: 2136,
+        title: null,
+        ci: null,
+        state: null,
+      },
+      { url: 'https://github.com/acme/tool/pull/7', repo: 'acme/tool', number: 7, title: null, ci: null, state: null },
     ])
     await vi.waitFor(() => {
       expect(lookup.calls.at(-1)).toEqual(linked.prs.map((pr) => pr.url))
@@ -129,7 +149,8 @@ describe('the PRs a request names', () => {
     lookup.release()
     const filled = await pending(task.id, (request) => request.prs[0]?.title !== null)
     expect(filled.prs[0]).toMatchObject({ title: 'Fix lease renewal after TTL', ci: 'success' })
-    expect(filled.prs[1]).toMatchObject({ title: null, ci: null })
+    expect(filled.prs[0]).toMatchObject({ state: 'open' })
+    expect(filled.prs[1]).toMatchObject({ title: 'Retry the lease', ci: 'success', state: 'merged' })
   })
 
   it('reads the repository of the folder the command runs in, and names none for other calls', async () => {
@@ -163,5 +184,25 @@ describe('the PRs a request names', () => {
     const free = await newTask()
     await runTurn(free.id, 'gh pr merge 5 -R acme/tool')
     expect((await pending(free.id)).suggestions).toEqual(['Bash(gh pr merge 5 -R acme/tool)'])
+  })
+
+  it("keeps the agent's description as one plain, short line, and the reason line reads it", async () => {
+    const task = await newTask()
+    const said = `Merge \u202Etool#5\n  now${'!'.repeat(300)}`
+    await runTurn(task.id, `gh pr merge 5 -R acme/tool ## ${said}`)
+    const request = await pending(task.id)
+    expect(request.summary).toBe('gh pr merge 5 -R acme/tool')
+    expect(request.description?.startsWith('Merge tool#5 now!!!')).toBe(true)
+    expect(request.description).toHaveLength(200)
+    const blocked = await vi.waitFor(async () => {
+      const line = (await tasks.get(task.id))?.blocked ?? null
+      expect(line).not.toBeNull()
+      return line
+    })
+    expect(blocked?.startsWith('Asks to use Bash: Merge tool#5 now')).toBe(true)
+
+    const plain = await newTask()
+    await runTurn(plain.id, 'gh pr view 6 -R acme/tool')
+    expect((await pending(plain.id)).description).toBeNull()
   })
 })

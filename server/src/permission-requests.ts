@@ -42,6 +42,24 @@ export async function summarize(tool: string, input: Record<string, unknown>): P
   return clip(redactSecrets(shown.replace(/\s+/g, ' ').trim()), SUMMARY_CHARS)
 }
 
+const DESCRIPTION_CHARS = 200
+
+/**
+ * What the agent says a shell call is for, as one line of plain text: a Bash call's description,
+ * or the one its runtime gave; null when it says nothing.
+ */
+function describe(ask: Pick<Ask, 'tool' | 'input' | 'description'>): string | null {
+  const given = ask.tool === 'Bash' ? ask.input.description : undefined
+  const text = ask.description ?? (typeof given === 'string' ? given : '')
+  const line = redactSecrets(
+    text
+      .replace(/[\p{Cc}\p{Cf}]/gu, ' ')
+      .replace(/\s+/g, ' ')
+      .trim(),
+  )
+  return line === '' ? null : clip(line, DESCRIPTION_CHARS)
+}
+
 /** Sets the task's reason line from its pending requests and tells its views about the request. */
 export async function announce(request: PermissionRequest): Promise<void> {
   publish(request.task_id, { type: 'permission', request, blocked: await refreshBlocked(request.task_id) })
@@ -173,6 +191,8 @@ interface Ask {
   suggestions: string[]
   /** Whether the agent's runtime would run the call with input the user edited. */
   rewrites?: boolean
+  /** What the runtime says the call is for, where it says it apart from the input. */
+  description?: string
   /** The shell command whose PRs the request shows, and where it runs; else read from a Bash call. */
   shell?: PrSource
   /** Told the request's id once it waits for the user. */
@@ -226,6 +246,7 @@ async function askUser(taskId: string, ask: Ask, signals: readonly AbortSignal[]
       tool_name: ask.tool,
       kind: ask.kind,
       summary: await summarize(ask.tool, ask.input),
+      description: describe(ask),
       input: inputText(ask.input),
       reason: ask.reason,
       suggestions: ask.suggestions,
@@ -334,7 +355,7 @@ export type UserAnswer = { allow: true } | { allow: false; message: string; drop
  */
 export async function askCodexUser(
   taskId: string,
-  call: Pick<Ask, 'tool' | 'input' | 'reason' | 'opened' | 'shell'> & { review: boolean },
+  call: Pick<Ask, 'tool' | 'input' | 'reason' | 'opened' | 'shell' | 'description'> & { review: boolean },
   signals: readonly AbortSignal[],
 ): Promise<UserAnswer> {
   const kind = call.review ? 'review' : 'tool'

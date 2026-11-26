@@ -60,9 +60,11 @@ const cwdOf = (call: ToolCall): string | null => {
   return typeof input?.cwd === 'string' ? input.cwd : null
 }
 
-/** The command whose PRs the request shows, run in the folder Codex names. */
-const shellOf = (read: PolicyCall, call: ToolCall, task: Task) =>
-  read.command === undefined ? {} : { shell: { command: read.command, cwd: cwdOf(call) ?? task.cwd } }
+/** The command whose PRs the request shows, run in the folder Codex names, and why Codex runs it. */
+const shellOf = (read: PolicyCall, call: ToolCall, task: Task) => ({
+  ...(read.command === undefined ? {} : { shell: { command: read.command, cwd: cwdOf(call) ?? task.cwd } }),
+  ...(call.shell?.description === undefined ? {} : { description: call.shell.description }),
+})
 
 const USER_ANSWERS = 'Codex agents ask before every command, edit and tool call'
 

@@ -50,6 +50,7 @@ import { PACK_KIND, retireBuiltinRoles, ROLE_RUNTIME, rolesToPacks } from './sch
 import { MESSAGE_SEARCH, MESSAGE_SEARCH_TALK, MESSAGE_TIME } from './schema-search.js'
 import {
   CLAUDE_LOGINS,
+  PERMISSION_REQUEST_DESCRIPTION,
   PERMISSION_REQUEST_EDITED,
   PERMISSION_REQUEST_PRS,
   PERMISSION_REVIEW,
@@ -265,4 +266,5 @@ export const MIGRATIONS: readonly Migration[] = [
   { version: 143, name: 'dream_tidies', sql: DREAM_TIDIES },
   { version: 144, name: 'permission_request_prs', sql: PERMISSION_REQUEST_PRS },
   { version: 145, name: 'no_builtin_roles', sql: '', run: retireBuiltinRoles },
+  { version: 146, name: 'permission_request_description', sql: PERMISSION_REQUEST_DESCRIPTION },
 ]
