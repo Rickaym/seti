@@ -5,6 +5,7 @@ import type { ContextPack } from '@seti/shared'
 import { openAgentSettings } from './support/agent-settings.js'
 import { paths } from './support/env.js'
 import { apiData, expect, test, unique, waitForToastsToClear } from './support/fixtures.js'
+import { removeAllRoles, rolesSection, seedKeptLead } from './support/roles.js'
 
 const SAVE = 'Control+s'
 const PACK_PATH = /^\/api\/context\/packs\/[0-9a-f-]{36}$/
@@ -175,33 +176,22 @@ test.describe('the built-in Seti guide pack', () => {
 
 const named = (name: string) => new RegExp(`^${name.replace(/[()]/g, '\\$&')}`)
 
-test('roles have their own section, built-in roles duplicate into editable ones, new roles go there', async ({
+test('with no roles the section shows one line and Add, which makes a role that lists there', async ({
   page,
   request,
 }) => {
+  await removeAllRoles(request)
   await page.goto('/#context')
-  const roles = page.getByRole('region', { name: 'Roles' })
+  const roles = rolesSection(page)
   const packs = page.getByRole('region', { name: 'Context packs' })
-  for (const name of ['Lead', 'Reviewer', 'Watcher']) {
-    await expect(roles.getByRole('button', { name: named(`${name} Built in`) })).toBeVisible()
-    await expect(packs.getByRole('button', { name: named(`${name} Built in`) })).toBeHidden()
-  }
+  const empty = roles.getByTestId('no-roles')
+  await expect(empty).toHaveText(/^No roles yet\./)
+  await expect(page.getByRole('main').getByRole('alert')).toBeHidden()
   await expect(packs.getByRole('button', { name: /^Seti guide/ })).toBeVisible()
-
-  await roles.getByRole('button', { name: /^Reviewer Built in/ }).click()
   const main = page.getByRole('main')
-  await expect(main.getByRole('status')).toContainText('Built into Seti and read-only')
-  await expect(main.getByText("Reviewer: you review PRs and other agents' work; you do not build it.")).toBeVisible()
-  await expect(main.getByRole('switch')).toBeHidden()
-  await expect(main.getByRole('button', { name: 'Save' })).toBeHidden()
-  await main.getByRole('button', { name: 'Duplicate to edit' }).click()
-  const title = main.getByRole('heading', { name: /^Reviewer \(copy( \d+)?\)$/, level: 2 })
-  await expect(title).toBeVisible()
-  await expect(main.getByLabel('Role content')).toHaveValue(/^Reviewer: you review PRs/)
-  await expect(roles.getByRole('button', { name: named((await title.textContent()) ?? '') })).toBeVisible()
 
   const name = unique('e2e-role')
-  await roles.getByRole('button', { name: 'New role' }).click()
+  await empty.getByRole('button', { name: 'Add' }).click()
   await expect(main.getByRole('heading', { name: 'New role' })).toBeVisible()
   await main.getByLabel('Name', { exact: true }).fill(name)
   await main.getByLabel('Role content').fill('Docs owner: you keep the docs current.')
@@ -209,6 +199,7 @@ test('roles have their own section, built-in roles duplicate into editable ones,
   await expect(page).toHaveURL(/#context\/pack:[0-9a-f-]{36}$/)
   await expect(roles.getByRole('button', { name: named(name) })).toBeVisible()
   await expect(packs.getByRole('button', { name: named(name) })).toBeHidden()
+  await expect(empty).toBeHidden()
   const saved = (await apiData<ContextPack[]>(request, '/context/packs')).find((pack) => pack.name === name)
   expect(saved).toMatchObject({ kind: 'role', builtin: false, linked_by_default: false })
 
@@ -216,4 +207,35 @@ test('roles have their own section, built-in roles duplicate into editable ones,
   await main.getByRole('button', { name: 'Delete role' }).click()
   await page.getByRole('dialog', { name: 'Confirm' }).getByRole('button', { name: 'Delete' }).click()
   await expect(roles.getByRole('button', { name: named(name) })).toBeHidden()
+  await expect(empty).toBeVisible()
+})
+
+test('a role kept from the built-in ones on upgrade reads, edits and deletes like any other', async ({
+  page,
+  request,
+}) => {
+  await removeAllRoles(request)
+  const lead = await seedKeptLead()
+  await page.goto('/#context')
+  const roles = rolesSection(page)
+  const item = roles.getByRole('button', { name: /^Lead / })
+  await expect(item).toHaveText(/Runs a stream of work/)
+  await expect(item).not.toContainText('Built in')
+  await expect(roles.getByTestId('no-roles')).toBeHidden()
+  await item.click()
+  const main = page.getByRole('main')
+  await expect(main.getByRole('heading', { name: 'Lead', level: 2 })).toBeVisible()
+  await expect(main.getByRole('status')).toBeHidden()
+  await expect(main.getByLabel('Role content')).toHaveValue(/^Lead: you run a stream of work/)
+  await main.getByLabel('Role content').fill('Lead: you run the release and delegate it.')
+  await page.keyboard.press(SAVE)
+  await expect(page.getByText('unsaved', { exact: true })).toBeHidden()
+  const saved = (await apiData<ContextPack[]>(request, '/context/packs')).find((pack) => pack.id === lead.id)
+  expect(saved).toMatchObject({ name: 'Lead', builtin: false, body: 'Lead: you run the release and delegate it.' })
+
+  await waitForToastsToClear(page)
+  await main.getByRole('button', { name: 'Delete role' }).click()
+  await page.getByRole('dialog', { name: 'Confirm' }).getByRole('button', { name: 'Delete' }).click()
+  await expect(roles.getByTestId('no-roles')).toBeVisible()
+  expect((await request.delete(`/api/tasks/${lead.task}`)).ok()).toBe(true)
 })
