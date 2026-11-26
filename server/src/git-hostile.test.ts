@@ -3,6 +3,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
+import { binaryPath } from './binaries.js'
 import { CLAUDE_HOME, SETI_HOME, WORKTREE_ROOT } from './config.js'
 import { gitBadge, unsavedWork } from './git-state.js'
 import {
@@ -335,8 +336,11 @@ function inSandbox(cwd: string, script: string): string {
     sessionId: null,
   })
   const args = [...bwrapArgs(mounts, cwd), 'sh', '-c', script]
-  // eslint-disable-next-line sonarjs/no-os-command-from-path -- the sandbox runs the bwrap on PATH
-  return execFileSync('bwrap', args, { encoding: 'utf8', stdio: 'pipe' }).trim()
+  const bwrap = binaryPath('bwrap')
+  if (bwrap === null) {
+    throw new Error('bwrap is not installed')
+  }
+  return execFileSync(bwrap, args, { encoding: 'utf8', stdio: 'pipe' }).trim()
 }
 
 describe('git over a checkout of the user that an agent works in through a worktree', () => {
