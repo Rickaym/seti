@@ -146,7 +146,7 @@ class Driver {
     }
     this.cut = new Set(this.open)
     this.rpc.notify('session/cancel', { sessionId: this.session })
-    this.permissions.dropAll()
+    this.permissions.cancel()
     await Promise.resolve()
   }
 
@@ -203,6 +203,7 @@ class Driver {
     }
     const turnId = randomUUID()
     this.turn = turnId
+    this.permissions.resume()
     if (this.resumed !== null) {
       this.reports.push(acpReport(this.resumed))
       this.resumed = null

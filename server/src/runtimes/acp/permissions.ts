@@ -46,6 +46,8 @@ interface PermissionContext {
 export class Permissions {
   private readonly waiting = new Map<number | string, AbortController>()
   private readonly context: PermissionContext
+  /** Set by a cancel until the next turn: a request arriving after it is answered cancelled. */
+  private cancelled = false
 
   constructor(context: PermissionContext) {
     this.context = context
@@ -55,7 +57,7 @@ export class Permissions {
     const { rpc, decide } = this.context
     const parsed = request.safeParse(params)
     const call = parsed.success ? askedCall(parsed.data.toolCall) : null
-    if (!parsed.success || call === null) {
+    if (!parsed.success || call === null || this.cancelled) {
       rpc.answer(id, CANCELLED)
       return
     }
@@ -79,6 +81,17 @@ export class Permissions {
         answer(false)
       },
     )
+  }
+
+  /** After a cancel: answers each waiting request, and any before the next turn, cancelled. */
+  cancel(): void {
+    this.cancelled = true
+    this.dropAll()
+  }
+
+  /** A new turn decides its requests again. */
+  resume(): void {
+    this.cancelled = false
   }
 
   /** Answers every request still waiting as cancelled, as ACP asks after a cancel. */
