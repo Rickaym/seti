@@ -1,5 +1,5 @@
 import { SHARE_TARGET_PATH } from '@seti/shared/attachment-limits'
-import { isHashed, passesThrough, planPrecache, type Precache } from './precache'
+import { fitsKind, isHashed, passesThrough, planPrecache, type Precache } from './precache'
 import { receiveShare } from './share-inbox'
 
 declare const self: ServiceWorkerGlobalScope
@@ -33,8 +33,10 @@ async function heldPaths(): Promise<Map<string, string>> {
 
 async function fetchFresh(url: string): Promise<Response> {
   const response = await fetch(new Request(url, { cache: 'reload' }))
-  if (!response.ok) {
-    throw new Error(`Precache got ${String(response.status)} for ${url}`)
+  if (!response.ok || !fitsKind(url, response.headers.get('content-type'))) {
+    throw new Error(
+      `Precache got ${String(response.status)} ${String(response.headers.get('content-type'))} for ${url}`,
+    )
   }
   return response
 }
@@ -71,13 +73,19 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('message', (event) => {
   if (event.data === 'skip-waiting') {
     void self.skipWaiting()
+  } else if (event.data === 'build') {
+    event.ports[0]?.postMessage(PRECACHE.version)
   }
 })
 
+/** What a proxy answers while Seti restarts; the page then starts offline and updates later. */
+const RESTARTING = new Set([502, 503, 504])
+
 /** The network answers first, redirects to the Access login included; the shell covers offline. */
 async function navigate(request: Request): Promise<Response> {
+  let response: Response
   try {
-    return await fetch(request)
+    response = await fetch(request)
   } catch (error) {
     const shell = await caches.match(SHELL, { cacheName: CACHE })
     if (shell === undefined) {
@@ -85,22 +93,33 @@ async function navigate(request: Request): Promise<Response> {
     }
     return shell
   }
+  if (!RESTARTING.has(response.status)) {
+    return response
+  }
+  return (await caches.match(SHELL, { cacheName: CACHE })) ?? response
 }
 
 async function precached(request: Request): Promise<Response> {
   return (await caches.match(request, { cacheName: CACHE })) ?? fetch(request)
 }
 
-/** Hashed files never change, so the first full response is kept for every later load. */
+/** Stores into this worker's cache only while it exists, so a replaced worker never revives it. */
+async function keep(request: Request, response: Response): Promise<void> {
+  if (await caches.has(CACHE)) {
+    await (await caches.open(CACHE)).put(request, response)
+  }
+}
+
+/** Hashed files never change, so the first full response of the right kind is kept for good. */
 async function hashedAsset(event: FetchEvent): Promise<Response> {
   const cached = await caches.match(event.request, { cacheName: CACHE })
   if (cached !== undefined) {
     return cached
   }
   const response = await fetch(event.request)
-  if (response.status === 200) {
+  if (response.status === 200 && fitsKind(new URL(event.request.url).pathname, response.headers.get('content-type'))) {
     const copy = response.clone()
-    event.waitUntil(caches.open(CACHE).then(async (cache) => cache.put(event.request, copy)))
+    event.waitUntil(keep(event.request, copy))
   }
   return response
 }
