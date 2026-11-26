@@ -1,4 +1,4 @@
-import { CODEX_EFFORTS, CODEX_MODELS, type CodexSettingsInput, type CodexStatus } from '@seti/shared'
+import { CODEX_EFFORTS, CODEX_MODELS, codexModelLabel, type CodexSettingsInput, type CodexStatus } from '@seti/shared'
 import { ChevronRight, Save } from 'lucide-react'
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
@@ -72,7 +72,7 @@ function DefaultsRow({ status, busy, put }: CodexRowProps) {
           <NativeSelectOption value={DEFAULT}>Default model</NativeSelectOption>
           {CODEX_MODELS.map((id) => (
             <NativeSelectOption key={id} value={id}>
-              {id}
+              {codexModelLabel(id)}
             </NativeSelectOption>
           ))}
         </NativeSelect>
