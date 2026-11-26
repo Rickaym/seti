@@ -54,9 +54,9 @@ export function parseComposer(text: string): ComposerInput {
 }
 
 /**
- * An agent's commands with the ones mods add, which Seti answers itself. A Seti name always
- * wins: a Claude Code or plugin command of that name is dropped and an alias of it removed, since
- * Seti never forwards it.
+ * An agent's commands with Seti's and the ones mods add, which Seti answers itself. A Seti name
+ * always wins: a runtime or plugin command of that name, or any named `seti:`, is dropped and an
+ * alias of it removed, since Seti never forwards it.
  */
 export function withSetiCommands(
   commands: readonly ComposerCommand[],
@@ -64,7 +64,7 @@ export function withSetiCommands(
 ): ComposerCommand[] {
   const names: ReadonlySet<string> = new Set(seti.map((command) => command.name))
   const others = commands
-    .filter((command) => !names.has(command.name.toLowerCase()))
+    .filter((command) => !names.has(command.name.toLowerCase()) && !command.name.toLowerCase().startsWith('seti:'))
     .map((command) =>
       command.aliases.some((alias) => names.has(alias.toLowerCase()))
         ? { ...command, aliases: command.aliases.filter((alias) => !names.has(alias.toLowerCase())) }

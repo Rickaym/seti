@@ -3,9 +3,9 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { pipeline } from 'node:stream/promises'
 import { promisify } from 'node:util'
-import { binaryPath } from './binaries.js'
 import { WORKTREE_ROOT } from './config.js'
-import { canonicalRoot } from './sandbox-mounts.js'
+import { canonicalRoot } from './git-dirs.js'
+import { jailCommand, jailTools } from './git-jail.js'
 
 const exec = promisify(execFile)
 
@@ -59,9 +59,39 @@ function guarded(cwd: string, args: readonly string[], files: readonly string[] 
   return [...included, ...NO_PROGRAMS, '-C', cwd, command, ...plainDiff, ...rest]
 }
 
+/** One git command in a folder an agent can write; reads unless `write`. */
+interface AgentRun {
+  cwd: string
+  args: readonly string[]
+  write?: boolean
+  files?: readonly string[]
+  folders?: readonly string[]
+  env?: Readonly<Record<string, string>>
+}
+
+/** How an agent's git runs: in the jail (see git-jail.ts), or guarded where no jail can start. */
+async function agentCommand(run: AgentRun): Promise<{ file: string; args: string[]; env: NodeJS.ProcessEnv }> {
+  const files = run.files ?? []
+  const argv = guarded(run.cwd, run.args, files)
+  const env = run.env ?? {}
+  const tools = await jailTools()
+  if (tools === null) {
+    return { file: 'git', args: argv, env: closedEnv(env) }
+  }
+  const jailed = { cwd: run.cwd, argv, write: run.write === true, files, folders: run.folders ?? [], env }
+  return jailCommand(jailed, tools.bwrap, tools.git)
+}
+
+async function runAgentGit(run: AgentRun, timeoutMs = 0): Promise<string> {
+  const { file, args, env } = await agentCommand(run)
+  const options = { maxBuffer: 16 * 1024 * 1024, env, timeout: timeoutMs, killSignal: 'SIGKILL' as const }
+  const { stdout } = await exec(file, args, options)
+  return stdout.trim()
+}
+
 /**
  * Runs git where an agent controls the repository: its config, hooks and attributes are input,
- * and nothing they name runs. Local commands only; the repository's remotes are never contacted.
+ * and what they name runs only in the jail. Local commands only; no remote is contacted.
  */
 export async function agentGit(cwd: string, ...args: string[]): Promise<string> {
   return agentGitWithin(0, cwd, ...args)
@@ -69,7 +99,7 @@ export async function agentGit(cwd: string, ...args: string[]): Promise<string> 
 
 /** Like agentGit, stopping git after `timeoutMs`; 0 waits for as long as it takes. */
 export async function agentGitWithin(timeoutMs: number, cwd: string, ...args: string[]): Promise<string> {
-  return agentGitReading(timeoutMs, cwd, [], ...args)
+  return runAgentGit({ cwd, args }, timeoutMs)
 }
 
 /** Like agentGitWithin, also reading config files the agent's git reads, such as its global one. */
@@ -79,9 +109,12 @@ export async function agentGitReading(
   files: readonly string[],
   ...args: string[]
 ): Promise<string> {
-  const options = { maxBuffer: 16 * 1024 * 1024, env: closedEnv(), timeout: timeoutMs, killSignal: 'SIGKILL' as const }
-  const { stdout } = await exec('git', guarded(cwd, args, files), options)
-  return stdout.trim()
+  return runAgentGit({ cwd, args, files }, timeoutMs)
+}
+
+/** Like agentGit for a command that changes the repository, such as deleting a branch. */
+export async function agentGitWrite(cwd: string, ...args: string[]): Promise<string> {
+  return runAgentGit({ cwd, args, write: true })
 }
 
 /** Detached worktree at origin/<ref>, so the agent names its own branch. */
@@ -157,7 +190,7 @@ export async function directoryBytes(dir: string): Promise<number | null> {
 export async function forgetWorktree(repoPath: string, dir: string): Promise<void> {
   if (!fs.existsSync(dir)) {
     // git fails when it holds no record of the folder, which leaves nothing to drop
-    await git(repoPath, 'worktree', 'remove', '--force', dir).catch(() => '')
+    await agentGitWrite(repoPath, 'worktree', 'remove', '--force', dir).catch(() => '')
   }
 }
 
@@ -192,18 +225,12 @@ export async function removeWorktree(repoPath: string, dir: string): Promise<voi
  */
 export async function saveUncommitted(dir: string, file: string): Promise<void> {
   const index = `${file}.index`
-  const env = closedEnv({ GIT_INDEX_FILE: index })
+  const staged = { cwd: dir, write: true, folders: [path.dirname(index)], env: { GIT_INDEX_FILE: index } }
   try {
-    await exec('git', guarded(dir, ['read-tree', 'HEAD']), { env })
-    await exec('git', guarded(dir, ['add', '-A']), { env })
-    const bin = binaryPath('git')
-    if (bin === null) {
-      throw new Error('git is not installed')
-    }
-    const child = spawn(bin, guarded(dir, ['diff', '--cached', '--binary', 'HEAD']), {
-      env,
-      stdio: ['ignore', 'pipe', 'ignore'],
-    })
+    await runAgentGit({ ...staged, args: ['read-tree', 'HEAD'] })
+    await runAgentGit({ ...staged, args: ['add', '-A'] })
+    const diff = await agentCommand({ ...staged, args: ['diff', '--cached', '--binary', 'HEAD'] })
+    const child = spawn(diff.file, diff.args, { env: diff.env, stdio: ['ignore', 'pipe', 'ignore'] })
     const exited = new Promise<number | null>((resolve, reject) => {
       child.on('error', reject)
       child.on('close', resolve)
@@ -216,16 +243,6 @@ export async function saveUncommitted(dir: string, file: string): Promise<void> 
   } finally {
     fs.rmSync(index, { force: true })
   }
-}
-
-/** Removes a linked worktree through its main checkout so git forgets it; false when it has none. */
-export async function removeLinkedWorktree(dir: string): Promise<boolean> {
-  const main = mainCheckout(dir)
-  if (main === null) {
-    return false
-  }
-  await agentGit(main, 'worktree', 'remove', '--force', dir)
-  return true
 }
 
 /** The first word of `git config user.name` on this machine, or null when it has none. */

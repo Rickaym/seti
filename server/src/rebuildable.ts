@@ -1,9 +1,9 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { REBUILDABLE_DIRS, REBUILDABLE_IF_IGNORED } from '@seti/shared'
+import { isRepoRoot } from './git-dirs.js'
 import { agentGitWithin } from './git.js'
 import { within, type NestedIn } from './owned-dirs.js'
-import { isRepoRoot } from './sandbox-mounts.js'
 
 const ALWAYS = new Set<string>(REBUILDABLE_DIRS)
 const IF_IGNORED = new Set<string>(REBUILDABLE_IF_IGNORED)

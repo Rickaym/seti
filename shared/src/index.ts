@@ -51,6 +51,7 @@ export * from './ea.js'
 export * from './ea-authority.js'
 export type * from './events.js'
 export * from './event-rows.js'
+export * from './ea-relays.js'
 export * from './ea-replies.js'
 export * from './ea-usage.js'
 export * from './inbox.js'
@@ -147,10 +148,18 @@ export { projectAcp } from './runtimes/acp/project.js'
 export { promptUsage, type AcpRecord } from './runtimes/acp/shapes.js'
 export type { TurnSpend } from './runtimes/codex/shapes.js'
 export * from './runtimes/picks.js'
+export { PROVIDERS, reachesProvider, type ProviderId } from './providers.js'
 export * from './runtimes/capabilities.js'
 export * from './runtimes/settings.js'
 export * from './runtimes/stored.js'
 export { setiCommandInput, type SetiCommandInput, type SetiCommandResult } from './seti-commands/input.js'
-export { isSetiLine, SETI_NAMES, sourcesOf } from './seti-commands/names.js'
-export { completeSetiLine, parseSetiLine, SETI_LINE_MAX, type SetiCommand } from './seti-commands/parse.js'
+export { isSetiLine, SETI_NAMES, setiComposerCommands, sourcesOf } from './seti-commands/names.js'
+export {
+  completeSetiLine,
+  parseSetiLine,
+  SETI_LINE_MAX,
+  type SetiCommand,
+  type SetiCompletion,
+} from './seti-commands/parse.js'
+export { OWN_TOOLS } from './seti-commands/rules.js'
 export type { CommandAuthor, CommandSource, CommandWorld } from './seti-commands/world.js'

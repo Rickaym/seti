@@ -70,7 +70,7 @@ with another top-level folder.
 | 7.2, 7.3       | `sandbox.ts`, `sandbox-mounts.ts`, `sandbox-bwrap.ts`, `sandbox-codex.ts`, `sandbox-read-only.ts`, `egress-*.ts`, `sandbox-ca.ts`, `sandbox-aws-token.ts`, `task-proxy.ts`, `launch-plan.ts`, `proxy-grant.ts`, `codex-key.ts`, `egress-connections.ts`, `proxy-owner.ts`, `secret-asks.ts`, `ask-in-time.ts`, `ssh-agent.ts`, `agent-access.ts`, `tool-relay.ts` |
 | 7.4, 7.5       | `permission-policy.ts`, `policy/`, `permission-requests.ts`, `permission-timeout.ts`, `permission-guard.ts`, `repeat-hooks.ts`, `review-hooks.ts`, `shadow-hooks.ts`, `outward.ts`, `outward-push.ts` and `push-asks.ts` (PERM-15: `policy/outward.ts` reads the command, the Claude agent's `Bash` hook in `runtime-host.ts` and `codex-decide.ts` ask)          |
 | 7.6 Changes    | `change-requests.ts`, `change-request-notes.ts`, `mcp-off-context.ts`, `shared/src/change-requests.ts`                                                                                                                                                                                                                                                            |
-| 7.7 Hostile    | `git.ts`, `runtimes/claude/probe-launch.ts`, `task-files.ts`, `html-preview.ts`, `uploads.ts`                                                                                                                                                                                                                                                                     |
+| 7.7 Hostile    | `git.ts`, `git-jail.ts`, `runtimes/claude/probe-launch.ts`, `task-files.ts`, `html-preview.ts`, `uploads.ts`                                                                                                                                                                                                                                                      |
 | 7.8 Caps       | `launcher.ts`, `memory-scope.ts`, `scope-cpu.ts`, `scope-limits.ts`, `scope-control.ts`, `oom-guard.ts`                                                                                                                                                                                                                                                           |
 | 8 Secrets      | `secret-box.ts`, `connections.ts`, `scrub.ts`, `secret-questions.ts`, `secret-delivery.ts`                                                                                                                                                                                                                                                                        |
 | 9 Shared tools | `shared/src/shared-tools.ts`, `shared-tool-proposals.ts`, `shared-tool-files.ts`, `shared-tool-server.ts`                                                                                                                                                                                                                                                         |
@@ -107,9 +107,9 @@ with another top-level folder.
   of any other runtime are filled when stored. A Codex message keeps the notification as Codex
   sent it beside the agent's own thread id. Codex reports tokens per model call, so at a turn's
   end ingest adds up the turn's calls and estimates their cost from OpenAI's public prices
-  (`server/src/codex-spend.ts`, `runtimes/codex/prices.ts`, dated); the turn end marks the cost
-  as estimated. Archives keep each row's runtime. Readers that filter on JSON text read such a
-  row by its event columns instead (`callText`, `callOrResultText` in `event-filters.ts`), and
+  (`server/src/codex-spend.ts`, `runtimes/prices.ts`), read from the provider registry's dated
+  table (`shared/src/providers.ts`); the turn end marks the cost as estimated. Archives keep
+  each row's runtime. Readers that filter on JSON text read such a row by its event columns instead (`callText`, `callOrResultText` in `event-filters.ts`), and
   search indexes it from its neutral events (`server/src/events/search-text.ts`) where the search
   trigger indexes Claude Code's rows from their JSON.
 - The evidence ledger (`source_item`) keeps one row per item an agent read: kind, container,
@@ -290,8 +290,11 @@ the AppArmor profile for `bwrap` that the installer adds ([Setup](setup.md#sandb
   input, prlimit caps (512 MB to 1.5 GB of memory, CPU time, file size, open files), a wall-clock
   timeout on the process group, capped output, and at most two at once at low priority.
   LibreOffice starts from a fresh profile with macros disabled and Java off.
-- **Agent-writable folders.** Seti runs git there only through `agentGit` in `server/src/git.ts`
-  (HST-2), probes capabilities through `server/src/runtimes/claude/probe-launch.ts` (HST-4), and
+- **Agent-writable folders.** Seti runs git there only through `agentGit` in `server/src/git.ts`,
+  which starts it in the jail of `server/src/git-jail.ts`: bwrap with its own user, process and
+  network namespaces, `/usr`, `/etc` and the repository's top and git folders mounted, nothing
+  else of the home or Seti's data, and an environment of git variables only (HST-2). Seti probes
+  capabilities through `server/src/runtimes/claude/probe-launch.ts` (HST-4), and
   serves HTML previews under the policy in `server/src/html-preview.ts` (HST-5).
 
 ## Writing a runtime adapter
@@ -434,8 +437,10 @@ English sounds only.
 The EA's manner lives in its base prompt (`ea/src/seti_ea/prompt.py`) and in the short lines Seti
 speaks while its tools run (`ea/src/seti_ea/announce.py`). It gives the answer first and stops. On a
 call it aims for fifteen words, two sentences at most unless the user asks for detail, never reads
-a list aloud and never ends with an offer. In the chat an overview is one line per item. Its tone is
-composed and precise, with dry wit now and then and none about an error, a refusal or security.
+a list aloud and never ends with an offer. In the chat an overview is one line per item. After it
+messages or starts an agent it says whom and the gist in a few words, on a call and in the chat, and
+never quotes or restates what it sent unless the user asks. Its tone is composed and precise, with
+dry wit now and then and none about an error, a refusal or security.
 
 The user's request is the EA's yes. It asks first only for tools that take `confirmed` (EA-3,
 EA-4), a public group chat post, stopping several agents at once, and work it proposes itself. It
@@ -451,6 +456,23 @@ encodes the EA's voice as 48 kbps mono Opus with in-band FEC and a 10% loss hint
 rebuilds a single lost packet instead of concealing it. `aiortc_jitter.py` buffers the user's audio
 three packets deep and skips a packet the network lost, where aiortc's own buffer also drops
 packets that arrived after it.
+
+`link.py` watches the caller's microphone audio: while it is missing, the EA's speech waits up to
+8 s and goes on where it stopped, and the gate forgets the user's last words (EA-18). The browser
+reads `getStats` every two seconds (`call-quality.ts`) and reports the call's loss, filled-in
+speech, jitter, round trip, path type and reconnects with its call end, as numbers only; the EA
+logs one line per call with the user's audio loss, drops and the seconds of speech it held.
+
+### Inbox relays
+
+`server/src/ea-relay.ts` implements EA-19 behind `POST /api/ea/relays`, which only the EA's bot
+token reaches. It checks the switch (`ea_settings.inbox_relays`, changed only through
+`PUT /api/ea/settings/inbox-relays` by the user), then the recipient against `relayTargets`, then
+the text, then the hourly limits, and claims the item in `ea_relay` before it posts the framed
+direct message through `postTeamMessage`. A channel alert records its `channel_id` on `ea_inbox`
+so the subscribed agents come from Seti's tables, not the payload. History pages attach each
+inbox entry's relays, and `POST /api/ea/relays/:id/take-back` dismisses the relay's update while
+it still waits for the agent.
 
 ## Reference values
 

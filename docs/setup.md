@@ -598,9 +598,9 @@ server it cannot use and says why. A Codex agent takes the compaction rule's ins
 its Compact at with a Context window as a token limit; it always compacts near its own limit, so
 Auto compact off and a Context window alone do not apply, and its settings say so. Codex agents
 have no side chat, rewind, Bypass or plugins.
-Their cost is an estimate from the price table in `server/src/runtimes/codex/prices.ts`, which
-names the day it was read; to update it, copy the standard rates from OpenAI's pricing page into
-that table, set `asOf` to the day, and run `pnpm check`.
+Their cost is an estimate from OpenAI's price table in `shared/src/providers.ts`, which names the
+day it was read; to update it, copy the standard rates from OpenAI's pricing page into that table,
+set `asOf` to the day, and run `pnpm check`.
 
 With both runtimes set up, any agent with Seti control can ask the other one for a second
 opinion with its `second_opinion` tool: a Claude agent asks Codex, a Codex agent asks Claude.
@@ -793,7 +793,7 @@ check), Twitch EventSub (no separators in the signed text) and Supabase Auth hoo
 
 ### Slack thread replies
 
-A Slack webhook can hand replies to the agents that wrote in a thread (THR-1 to THR-6). Seti
+A Slack webhook can hand replies to the agents that wrote in a thread (THR-1 to THR-8). Seti
 records each Slack message an agent sends with the Slack MCP server's `slack_send_message` or with
 `chat.postMessage`, and a later message in that thread reaches the agent as a `thread` update,
 framed as words from the named Slack person, not from you. A bot's reply waits for your next
@@ -807,10 +807,28 @@ arrived, the row says "No message events yet" and names the four events to subsc
 agent's settings list the threads it follows on the Team tab, each with Stop; the EA and the agent
 can stop one with `unlink_pr` and `thread`.
 
-Seti never calls Slack for this: replies come through the webhook. In the Slack app at
-api.slack.com/apps, under Event Subscriptions, subscribe to `message.channels`, `message.groups`,
-`message.im` and `message.mpim` (as events on behalf of users when the app acts as you), and
-reinstall the app if Slack asks.
+Seti never calls Slack for this: replies come only through a Slack webhook, which Slack must be
+able to reach at its public URL (behind Cloudflare Access, `/hooks/` needs the Bypass application in
+[Cloudflare Tunnel and Access](#cloudflare-tunnel-and-access)).
+A poller does not read replies, even one that already reads your Slack mentions; while agents
+follow threads and no webhook has Thread replies on, the poller's card and the agent's Team tab say
+"Replies need a Slack webhook". To set it up:
+
+1. At api.slack.com/apps, choose Create New App, From scratch, and pick your workspace. A separate
+   app keeps the history scopes away from any token you gave a poller.
+2. Under OAuth & Permissions, User Token Scopes, add `channels:history`, `groups:history`,
+   `im:history` and `mpim:history`, then Install to Workspace and Allow. Seti needs no token from
+   this app, so do not copy one anywhere.
+3. Under Basic Information, copy the Signing Secret.
+4. In Seti, Settings, Channels, New, Webhook, pick Slack, create it and paste the Signing Secret.
+   Copy the URL it shows. The webhook needs no subscriber for replies.
+5. In the Slack app, turn Event Subscriptions on and paste the URL as the Request URL; Slack checks
+   it at once. Under Subscribe to events on behalf of users, add `message.channels`,
+   `message.groups`, `message.im` and `message.mpim`, save, and reinstall if Slack asks.
+6. On the webhook's card in Seti, turn on Threads in the Replies row.
+
+A reply written before step 5 never arrives: Slack does not send old messages. User events send
+Seti every message in the conversations you belong to, up to the webhook's 60 deliveries a minute.
 
 Seti shows Slack channels and people by name, as `#deploys` or `Dana`, wherever it would show an
 id: Slack alerts for the EA, thread replies, the permission request for a Slack send, its row in

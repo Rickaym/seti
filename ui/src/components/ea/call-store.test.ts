@@ -46,6 +46,7 @@ function setup(overrides: Partial<CallDeps> = {}) {
         call.stopped = true
         await Promise.resolve()
       },
+      quality: () => null,
       enableMic: (on) => {
         call.mic.push(on)
       },
@@ -198,7 +199,7 @@ describe('EaCallStore', () => {
     calls[1]?.handlers.dropped('The EA hit an error.', 'bot-error')
     expect(store.getSnapshot()).toMatchObject({ phase: 'error', error: 'The EA hit an error.' })
     expect(store.getSnapshot().failure).toEqual({ at: 1, dropped: true, auto: false })
-    expect(store.getSnapshot().lastEnd).toEqual({ reason: 'bot-error', at: 1, hidden: false })
+    expect(store.getSnapshot().lastEnd).toEqual({ reason: 'bot-error', at: 1, hidden: false, quality: null })
   })
 
   it('records who ended a live call and whether the page was in the background', async () => {
@@ -208,7 +209,7 @@ describe('EaCallStore', () => {
     calls[0]?.answer()
     await connecting
     await store.hangUp('page-closed')
-    expect(store.getSnapshot().lastEnd).toEqual({ reason: 'page-closed', at: 1, hidden: true })
+    expect(store.getSnapshot().lastEnd).toEqual({ reason: 'page-closed', at: 1, hidden: true, quality: null })
   })
 
   it('stops before creating a call when the page or the microphone cannot capture audio', async () => {

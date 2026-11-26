@@ -1,23 +1,12 @@
 import { Pencil } from 'lucide-react'
-import { Hint } from '@/components/Hint'
+import { editMarkText, type EditMark } from '@/lib/edit-mark'
 
-/** Marks a call the user edited before they answered it, naming the fields in its tooltip. */
-export function EditedLine({ fields, denied }: { fields: readonly string[]; denied: boolean }) {
-  const names = fields.join(', ')
-  const hint = denied
-    ? `You edited ${names}, then denied the call; the agent got your text`
-    : `You edited ${names} before the call ran; the agent was told`
+/** Says, under the call it marks, what the user edited and whether the call then went out. */
+export function EditedLine({ mark }: { mark: EditMark }) {
   return (
-    <Hint text={hint}>
-      <span
-        role="img"
-        aria-label={`Edited: ${hint}`}
-        data-testid="edited-mark"
-        className="inline-flex w-fit items-center gap-1.5 text-xs text-muted-foreground"
-      >
-        <Pencil className="size-3.5 shrink-0" aria-hidden />
-        Edited
-      </span>
-    </Hint>
+    <p data-testid="edited-mark" className="flex items-start gap-2 text-xs text-muted-foreground">
+      <Pencil className="mt-px size-3.5 shrink-0" aria-hidden />
+      <span className="min-w-0">{editMarkText(mark)}</span>
+    </p>
   )
 }

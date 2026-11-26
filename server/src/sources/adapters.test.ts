@@ -2,7 +2,7 @@ import { claudeToolCall } from '@seti/shared'
 import { describe, expect, it } from 'vitest'
 import { githubRead } from './github.js'
 import { itemText } from './item.js'
-import { linearRead } from './linear.js'
+import { linearKeyIn, linearRead } from './linear.js'
 import { slackHostIn, slackRead } from './slack.js'
 import {
   CHANNEL,
@@ -242,56 +242,21 @@ describe('Linear adapter', () => {
       want: [{ ref: 'linear:ENG-1', text: 'Title of ENG-1' }, { ref: 'linear:ENG-2' }],
     },
     {
-      name: 'a view cut by a pipe is the pull request the call named, its text what was printed',
-      call: bash('gh pr view 12 -R acme/api 2>&1 | head -5'),
-      answer: 'title:\tRoll out',
-      want: [{ ref: 'github:acme/api#12', permalink: 'https://github.com/acme/api/pull/12', text: 'title:\tRoll out' }],
+      name: 'a comment list on a known workspace links each comment',
+      call: [`${LINEAR}list_comments`, { issueId: 'ENG-12' }] as const,
+      answer: linearComments(['first comment']),
+      key: 'acme',
+      want: [{ permalink: 'https://linear.app/acme/issue/ENG-12#comment-00000000', text: 'first comment' }],
     },
     {
-      name: 'a jq field is the pull request the call named',
-      call: bash("gh pr view 12 --repo acme/api --json title,body --jq '.body'"),
-      answer: 'the body',
-      want: [{ ref: 'github:acme/api#12', text: 'the body' }],
+      name: 'an issue list whose fields omit the URL links each issue on a known workspace',
+      call: [`${LINEAR}list_issues`, { project: 'Rollout' }] as const,
+      answer: JSON.stringify({ issues: [{ id: 'ENG-1', title: 'Title of ENG-1' }], hasNextPage: false }),
+      key: 'acme',
+      want: [{ ref: 'linear:ENG-1', permalink: 'https://linear.app/acme/issue/ENG-1' }],
     },
-    {
-      name: 'a diff links to the changed files',
-      call: bash("R=acme/api; gh pr diff 12 -R $R | grep -n 'build'"),
-      answer: '3:+build it',
-      want: [
-        { ref: 'github:acme/api#12', permalink: 'https://github.com/acme/api/pull/12/files', text: '3:+build it' },
-      ],
-    },
-    {
-      name: 'an api read through jq is the issue its path names',
-      call: bash("gh api repos/acme/api/issues/7/comments --jq '.[].body'"),
-      answer: 'one\ntwo',
-      want: [{ ref: 'github:acme/api#7', permalink: 'https://github.com/acme/api/issues/7', text: 'one\ntwo' }],
-    },
-    {
-      name: 'a jq program that can print its own text records the item, never its text',
-      call: bash(`gh pr view 12 -R acme/api --json title --jq '"the build was never pushed"'`),
-      answer: 'the build was never pushed',
-      want: [{ ref: 'github:acme/api#12', text: null }],
-    },
-    {
-      name: 'an echo beside the read records the item, never its text',
-      call: bash("echo 'the build was never pushed'; gh pr view 12 -R acme/api --json title --jq .title"),
-      answer: 'the build was never pushed\nRoll out',
-      want: [{ ref: 'github:acme/api#12', text: null }],
-    },
-    {
-      name: 'two reads in one line record both, neither with text',
-      call: bash(
-        'gh pr view 12 -R acme/api --json title --jq .title; gh issue view 3 -R acme/web --json title --jq .title',
-      ),
-      answer: 'Roll out\nFix it',
-      want: [
-        { ref: 'github:acme/api#12', text: null },
-        { ref: 'github:acme/web#3', permalink: 'https://github.com/acme/web/issues/3', text: null },
-      ],
-    },
-  ])('$name', ({ call, answer, want }) => {
-    const found = recorded(call[0], call[1], answer)
+  ])('$name', ({ call, answer, want, ...rest }) => {
+    const found = recorded(call[0], call[1], answer, 'key' in rest ? rest.key : null)
     expect(found).toHaveLength(want.length)
     want.forEach((one, i) => {
       expect(found[i]).toMatchObject(one)
@@ -302,8 +267,37 @@ describe('Linear adapter', () => {
     ['another issue than the one asked for', linearIssue('ENG-13', 'x'), []],
     ['a URL on another host or issue', linearIssue('ENG-12', 'x', 'https://evil.example/issue/ENG-12'), ['']],
   ] as const)('spoof: %s', (_name, answer, permalinks) => {
-    const found = recorded(`${LINEAR}get_issue`, { id: 'ENG-12' }, answer)
+    const found = recorded(`${LINEAR}get_issue`, { id: 'ENG-12' }, answer, null)
     expect(found.map((item) => item.permalink)).toEqual(permalinks)
+  })
+
+  const issueAt = (url: string, id = 'ENG-12') => JSON.stringify({ id, title: 't', description: 'd', url })
+  it.each([
+    ['an issue', issueAt('https://linear.app/acme/issue/ENG-12/a-title'), 'acme'],
+    [
+      'an issue list',
+      JSON.stringify({ issues: [JSON.parse(issueAt('https://linear.app/acme/issue/ENG-12'))] }),
+      'acme',
+    ],
+    ['a URL that names another issue', issueAt('https://linear.app/acme/issue/ENG-13'), null],
+    ['a URL on another host', issueAt('https://linear.example/acme/issue/ENG-12'), null],
+    [
+      'a URL in a description',
+      JSON.stringify({ id: 'ENG-12', description: 'https://linear.app/evil/issue/ENG-12' }),
+      null,
+    ],
+    [
+      'two workspaces',
+      JSON.stringify({
+        issues: [
+          JSON.parse(issueAt('https://linear.app/acme/issue/ENG-1', 'ENG-1')),
+          JSON.parse(issueAt('https://linear.app/evil/issue/ENG-2', 'ENG-2')),
+        ],
+      }),
+      null,
+    ],
+  ])('the workspace key of %s is %s', (_name, answer, key) => {
+    expect(linearKeyIn(answer)).toBe(key)
   })
 })
 
