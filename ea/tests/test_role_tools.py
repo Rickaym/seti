@@ -112,7 +112,7 @@ async def test_role_packs_are_given_by_set_agent_role_only(tools: EaTools, fake_
     default = await tools.call("update_context_pack", {"pack": "Release owner", "linked_by_default": True})
     assert not default.ok
     listed = (await tools.call("list_context_packs", {})).text
-    assert "- Lead (about 2 words; a role, given per agent with set_agent_role, built into Seti" in listed
+    assert "- Lead (about 2 words; a role, given per agent with set_agent_role)" in listed
     assert fake_seti.writes() == []
 
 
