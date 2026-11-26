@@ -65,6 +65,7 @@ def test_every_confirm_tool_takes_confirmed_and_every_action_is_held_in_inbox_re
         "set_agent_access",
         "set_agent_profile",
         "change_workspace",
+        "answer_question",
     } | SETTINGS_WRITES == CONFIRM_TOOLS
     assert {spec.name for spec in ACTION_SPECS} | SETTINGS_WRITES == CHANGE_TOOLS
     assert CHANGE_TOOLS <= ACTION_TOOLS

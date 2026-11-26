@@ -1,7 +1,10 @@
-import { isSecurityAccess, type AccessKind } from '@seti/shared'
+import { isDeepStrictEqual } from 'node:util'
+import { EA_ASK_HEADER, isSecurityAccess, type AccessKind, type EaOnWordTool } from '@seti/shared'
 import type { Context, MiddlewareHandler } from 'hono'
 import { currentRequestSource } from './access.js'
+import { now } from './db.js'
 import { fail, HttpError } from './http.js'
+import { eaAsks } from './store/ea-replies.js'
 
 /** True for a request the EA voice bot made with its own token. */
 export const fromEa = (): boolean => currentRequestSource()?.via === 'ea'
@@ -134,6 +137,37 @@ export const eaSecurityAccessRefusal = (c: Context, kinds: readonly AccessKind[]
 
 /** SSH hosts, keys and trusted host keys are security settings the EA may only view. */
 export const eaSshReadOnly = eaReadOnly('change ssh hosts, keys or trusted host keys')
+
+/** The refusal of an EA action that needs the user's own yes and has none to use. */
+export const NO_WORD =
+  "The EA does this only on the user's own yes, spoken or typed in the turn right after it read the " +
+  'change back; ask the user again'
+
+/**
+ * The one refusal the EA may pass, for the actions in EA_ON_WORD_TOOLS: the request names the EA
+ * question (EA_ASK_HEADER) whose spoken or typed yes, given in the user turn right after it was
+ * asked, has not been used yet, and whose arguments equal `expected`, which the route recomputes
+ * from what the request targets now. Uses that yes and returns the question's id.
+ */
+export async function onUsersWord(
+  c: Context,
+  tool: EaOnWordTool,
+  expected: Readonly<Record<string, unknown>>,
+): Promise<number> {
+  const id = Number(c.req.header(EA_ASK_HEADER) ?? '')
+  const args = Number.isSafeInteger(id) && id > 0 ? await eaAsks.useOnWord(id, tool, now()) : null
+  if (args === null) {
+    throw new HttpError(403, NO_WORD)
+  }
+  const changed = Object.keys(expected).filter((key) => !isDeepStrictEqual(args[key], expected[key]))
+  if (changed.length > 0) {
+    throw new HttpError(
+      403,
+      `What the user said yes to is not this request as it stands (${changed.join(', ')}); read it back again`,
+    )
+  }
+  return id
+}
 
 /** What only the user does, refused for the EA, agents and mods in the function that does it. */
 export function refuseDelegates(what: string): void {

@@ -222,7 +222,8 @@ MCP servers that run a command or need key headers are added by the user in Sett
 where the user copies it once; never ask the user to tell you a secret or token.
 - An agent shown as waiting on the user is blocked until the user acts: a tool call to allow on \
 its card in Seti, an MCP server to sign in to, or a turn that stopped producing output. Remind \
-the user and say what it waits for; you cannot allow, deny or change permission rules.
+the user and say what it waits for. You never change permission rules; you allow a held tool \
+call or plan once, or deny it, only when the user tells you to and then says yes to your read-back.
 - Knowledge notes are lessons agents share. You may search them and list the proposals waiting \
 with search_seti, and propose one with propose_knowledge, but only the user approves, rejects or \
 edits notes, in Seti, Context, Knowledge. A proposal never holds an agent up, so it is no reason \
@@ -235,7 +236,8 @@ answer on your own judgment or guess. A secret question only the user answers, o
 page in Seti; say so and never take a secret, token or password through an answer.
 - search_seti in requests lists everything that waits on the user in Seti's Requests panel: \
 questions, access changes, tool calls, plans and knowledge notes. You pass on answers to \
-questions only; the rest only the user allows, denies or approves there, so remind them instead.
+questions, and allow or deny tool calls and plans as the user says, with answer_question; access \
+changes and notes only the user answers there, so remind them instead.
 - Messaging a task needs no confirmation, even while it runs a turn: send it a direct message, \
 which joins the running turn without cutting it short. Repeat the gist back in a few words.
 - When the user tells you to pass something to an agent, such as "keep it going", "tell him to \

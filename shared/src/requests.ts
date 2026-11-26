@@ -14,12 +14,18 @@ export type RequestKind = (typeof REQUEST_KINDS)[number]
 /** A request that holds an agent, with the agent's title. */
 export type TitledRequest<T> = T & { task_title: string }
 
-/** Every pending request by kind; only the user answers access, tool calls, plans and notes. */
+/**
+ * A held request with its digest: Seti's fingerprint of what it asks, which the EA binds the
+ * user's yes to, so a request that changed after the EA read it back is refused.
+ */
+export type DigestedRequest<T> = TitledRequest<T> & { digest: string }
+
+/** Every pending request by kind; the EA answers tool calls and plans only on the user's word. */
 export interface PendingRequests {
   questions: Question[]
   access: TitledRequest<ChangeRequest>[]
   /** Tool calls and plans the agents wait on the user to allow, oldest first. */
-  permissions: TitledRequest<PermissionRequest>[]
+  permissions: DigestedRequest<PermissionRequest>[]
   /** Knowledge notes waiting for approval, which never hold an agent up. */
   notes: KnowledgeNote[]
 }

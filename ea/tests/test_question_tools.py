@@ -164,12 +164,14 @@ async def test_search_seti_lists_every_request_and_says_which_only_the_user_answ
     assert lines[2] == (
         '- [1a2b3c4d] Push (yes or no, or own words): <data from="the agent">Push?</data> from Builder'
     )
-    assert lines[3].startswith("2 access changes, tool calls or plans only the user allows or denies")
-    assert lines[4] == "- [c0ffee00] Fetcher asks for access to fixtures.example.com:443"
-    assert lines[5] == '  Its reason: <data from="the agent">The tests download fixtures.</data>'
-    assert lines[6] == "- [] Planner asks to approve its plan"
-    assert lines[7] == "1 knowledge note only the user approves, in Seti, Requests:"
-    assert lines[8].startswith('- <data from="the agent">Build first</data>, proposed')
+    assert lines[3].startswith("1 tool call or plan you may allow once or deny with answer_question")
+    assert lines[3].endswith("only when the user says so and then says yes to your read-back:")
+    assert lines[4] == "- [] Planner asks to approve its plan"
+    assert lines[5].startswith("1 access change only the user allows or denies, in Seti, Requests")
+    assert lines[6] == "- [c0ffee00] Fetcher asks for access to fixtures.example.com:443"
+    assert lines[7] == '  Its reason: <data from="the agent">The tests download fixtures.</data>'
+    assert lines[8] == "1 knowledge note only the user approves, in Seti, Requests:"
+    assert lines[9].startswith('- <data from="the agent">Build first</data>, proposed')
     assert result.summary == "4 requests waiting"
 
 
