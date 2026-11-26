@@ -19,7 +19,7 @@ export type Principle = keyof typeof PRINCIPLES
  * the same action as another route, the user's alone, view state, plumbing, or a known gap.
  */
 export type Coverage =
-  | { kind: 'ea'; tool: string }
+  | { kind: 'ea'; tool: string; onWord?: string }
   | { kind: 'agent'; tool: string; level: 'self' | 'full' }
   | { kind: 'same'; route: string }
   | { kind: 'user'; principle: Principle; why: string }
@@ -32,6 +32,13 @@ export type CoverageTable = Readonly<Record<string, Coverage>>
 
 /** The EA does it with this tool; agents at Full get the same tool unless parity lists it. */
 export const ea = (tool: string): Coverage => ({ kind: 'ea', tool })
+
+/**
+ * The EA does it with this tool only on the user's own spoken or typed yes to its read-back,
+ * which ea-guard.ts checks; `row` names the approved row and what stays the user's. Agents get
+ * none of it: the tool must be in parity's NOT_FOR_AGENTS.
+ */
+export const eaOnWord = (tool: string, row: string): Coverage => ({ kind: 'ea', tool, onWord: row })
 
 /** The same action as another declared route, such as a summary or a batch form. */
 export const same = (route: string): Coverage => ({ kind: 'same', route })

@@ -22,6 +22,7 @@ import {
   ATTENTION_TIERS,
   EA_CONTEXT_PACKS,
   EA_FORM_OF_ADDRESS,
+  EA_ASK_WORD,
   EA_LANGUAGE,
   EA_INBOX,
   EA_INBOX_COALESCE,
@@ -270,5 +271,6 @@ export const MIGRATIONS: readonly Migration[] = [
   { version: 145, name: 'no_builtin_roles', sql: '', run: retireBuiltinRoles },
   { version: 146, name: 'permission_request_description', sql: PERMISSION_REQUEST_DESCRIPTION },
   { version: 147, name: 'source_items', sql: SOURCE_ITEMS },
-  { version: 148, name: 'session_rescrub', sql: SESSION_RESCRUB },
+  { version: 148, name: 'ea_ask_word', sql: EA_ASK_WORD },
+  { version: 149, name: 'session_rescrub', sql: SESSION_RESCRUB },
 ]

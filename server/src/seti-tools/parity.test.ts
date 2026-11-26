@@ -1,6 +1,6 @@
 import fs from 'node:fs'
 import path from 'node:path'
-import { AGENT_COLOR_ALIASES, AGENT_COLOR_PRESETS, modManifest, modToolName } from '@seti/shared'
+import { AGENT_COLOR_ALIASES, AGENT_COLOR_PRESETS, EA_ON_WORD_TOOLS, modManifest, modToolName } from '@seti/shared'
 import { describe, expect, it } from 'vitest'
 import { createApp } from '../app.js'
 import { BUNDLED_MODS, modHost, TEST_MODS } from '../mods/bundled.js'
@@ -54,7 +54,9 @@ const NOT_FOR_AGENTS: Record<string, string> = {
   add_plugin: 'A plugin folder an agent wrote would run its hooks in other agents, unsandboxed ones too.',
   set_plugin_enabled: 'It turns a plugin on for every new agent.',
   run_mod_action: 'Agents get one mod_<mod>_<command> tool per mod command offered to them.',
-  answer_question: "Passes on the user's own answer to an agent's question; agents never answer for the user.",
+  answer_question:
+    "Passes on the user's own answer to an agent's question, and answers a held call only on the user's " +
+    'spoken or typed yes; agents never answer for the user.',
 }
 
 /** Agent tools the EA has no tool of the same name for, each with how the EA does the same. */
@@ -84,7 +86,7 @@ const USER_ONLY: Record<string, RegExp> = {
 }
 
 /** Known gaps in the route registry; a PR that closes one lowers it, one that adds one raises it. */
-const GAPS_LEFT = 27
+const GAPS_LEFT = 24
 
 const eaSources = () =>
   fs
@@ -279,6 +281,19 @@ describe('the route registry', () => {
     expect(reasons.filter(([, why]) => why.trim().length < 12).map(([route]) => route)).toEqual([])
     const principles = entriesOf('user').filter(([, c]) => c.kind === 'user' && !(c.principle in PRINCIPLES))
     expect(principles.map(([route]) => route)).toEqual([])
+  })
+
+  it("keeps what the EA does on the user's word to the listed tools, and from agents", () => {
+    const byName = (a: string, b: string) => a.localeCompare(b, 'en')
+    const listed = [...EA_ON_WORD_TOOLS].toSorted(byName)
+    const onWord = Object.values(ROUTES).flatMap((c) => (c.kind === 'ea' && c.onWord !== undefined ? [c.tool] : []))
+    expect([...new Set(onWord)].toSorted(byName)).toEqual(listed)
+    expect(onWord.filter((tool) => !(tool in NOT_FOR_AGENTS))).toEqual([])
+    const gate = fs.readFileSync(path.join(EA_SOURCES, 'gate.py'), 'utf8')
+    const set = /^ON_WORD_TOOLS = frozenset\(\{([^}]*)\}\)$/m.exec(gate)?.[1] ?? ''
+    expect([...set.matchAll(/"(\w+)"/g)].map((m) => m[1] ?? '').toSorted(byName)).toEqual(listed)
+    const agents = new Set(AGENT_SIDE.map((tool) => tool.name))
+    expect(EA_ON_WORD_TOOLS.filter((tool) => agents.has(tool))).toEqual([])
   })
 
   it('holds the known gaps at GAPS_LEFT', () => {

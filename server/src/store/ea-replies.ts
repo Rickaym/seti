@@ -1,5 +1,6 @@
 import {
   EA_ASK_TTL_MS,
+  EA_WORD_USE_MS,
   type EaAnsweredAsk,
   type EaAsk,
   type EaAskDecision,
@@ -37,6 +38,9 @@ interface AskRecord {
   taken_at: string | null
   outcome: 'done' | 'failed' | null
   detail: string | null
+  confirm_epoch: string | null
+  confirm_turn: number | null
+  used_at: string | null
 }
 
 function askState(record: Pick<AskRecord, 'decision' | 'outcome' | 'expires_at'>, at: string): EaAskState {
@@ -202,12 +206,27 @@ export const eaAsks = {
    * earlier turn or an earlier EA process, and returns them with the calls to run.
    */
   confirm: async (input: EaAskConfirmInput, at: string): Promise<EaAnsweredAsk[]> => {
-    const rows = await sql<AskRecord[]>`UPDATE ea_ask SET decision = 'allow', decided_at = ${at}, taken_at = ${at}
+    const rows = await sql<AskRecord[]>`UPDATE ea_ask SET decision = 'allow', decided_at = ${at}, taken_at = ${at},
+        confirm_epoch = ${input.epoch}, confirm_turn = ${input.turn}
       WHERE decision IS NULL AND expires_at > ${at}
         AND (ask_epoch <> ${input.epoch} OR ask_turn < ${input.turn})
         AND (id = ANY(${input.ids ?? []}::bigint[]) OR gate_key = ${input.key ?? null})
       RETURNING *`
     return answered(rows)
+  },
+  /**
+   * Uses the user's spoken or typed yes to the question once, for `tool`: only a yes given in the
+   * user turn right after the question, in the same EA process, within EA_WORD_USE_MS of `at`.
+   * Returns the question's call arguments, or null when no such yes is left to use.
+   */
+  useOnWord: async (id: number, tool: string, at: string): Promise<Record<string, unknown> | null> => {
+    const since = new Date(Date.parse(at) - EA_WORD_USE_MS).toISOString()
+    const [row] = await sql<AskRecord[]>`UPDATE ea_ask SET used_at = ${at}
+      WHERE id = ${id} AND tool = ${tool} AND decision = 'allow' AND used_at IS NULL
+        AND confirm_epoch = ask_epoch AND confirm_turn = ask_turn + 1
+        AND decided_at >= ${since} AND decided_at <= expires_at
+      RETURNING *`
+    return row === undefined ? null : (JSON.parse(row.args) as Record<string, unknown>)
   },
   get: async (id: number, at: string): Promise<EaAsk | undefined> => {
     const [row] = await sql<AskRecord[]>`SELECT * FROM ea_ask WHERE id = ${id}`
