@@ -40,6 +40,8 @@ export const SANDBOX_ROOT = path.join(SETI_HOME, 'sandbox')
 export const SHARED_TOOLS_ROOT = path.join(SETI_HOME, 'shared-tools')
 /** Seti's own copies of the Codex program, one read-only folder per pinned version. */
 export const CODEX_ROOT = path.join(SETI_HOME, 'codex')
+/** Seti's own copies of Gemini CLI, one read-only folder per pinned version. */
+export const GEMINI_ROOT = path.join(SETI_HOME, 'gemini')
 /** `split` runs sessions in a separate node process; anything else runs them in this one. */
 export const NODE_SPLIT = process.env.SETI_NODE === 'split'
 /** The unix socket the node listens on, in a folder only this user may enter. */

@@ -31,6 +31,9 @@ function trimRow(row: MessageRow): MessageRow {
   if (row.kind !== 'sdk') {
     return row
   }
+  if (row.runtime === 'gemini') {
+    return row
+  }
   if (row.runtime === 'codex') {
     const { value, cut } = wireCodex(row.payload)
     return cut.length === 0 ? { ...row, payload: value } : { ...row, payload: value, trimmed: cut }

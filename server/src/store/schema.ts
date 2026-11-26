@@ -93,6 +93,7 @@ import {
   TASK_RUNTIME,
   CODEX_RULES_DECIDE_DEFAULT,
   CODEX_SETTINGS,
+  GEMINI_SETTINGS,
   TASK_APPROVAL_CEILING,
   TASK_DELEGATED_BY,
   TASK_SESSION,
@@ -273,4 +274,5 @@ export const MIGRATIONS: readonly Migration[] = [
   { version: 147, name: 'source_items', sql: SOURCE_ITEMS },
   { version: 148, name: 'ea_ask_word', sql: EA_ASK_WORD },
   { version: 149, name: 'session_rescrub', sql: SESSION_RESCRUB },
+  { version: 150, name: 'gemini_settings', sql: GEMINI_SETTINGS },
 ]

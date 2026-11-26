@@ -1,4 +1,4 @@
-import type { NodeAnswer, PolicyShadowCount, Task, ToolCall } from '@seti/shared'
+import { RUNTIME_NAMES, type NodeAnswer, type PolicyShadowCount, type Task, type ToolCall } from '@seti/shared'
 import { reasonForRef } from './ask-rule-held.js'
 import { audit } from './audit.js'
 import { tasks } from './db.js'
@@ -15,10 +15,10 @@ import type { Decision, PolicyCall, PolicyContext } from './policy/types.js'
 import { pushReason } from './push-asks.js'
 import { askQuestions } from './questions.js'
 import { resolvePaths } from './resolve-paths.js'
+import { rulesDecide } from './rules-decide.js'
 import { redactSecrets } from './scrub.js'
 import { guardScope, ruleSources, workingDirs } from './session-options.js'
 import { countShadow } from './shadow-counts.js'
-import { codexSettings } from './store/codex-settings.js'
 
 type Verdict = NodeAnswer<'call.decide'>
 
@@ -71,7 +71,8 @@ const shellOf = (read: PolicyCall, call: ToolCall, task: Task) => ({
 const ruleReason = (decision: Decision, ctx: PolicyContext) =>
   decision.step === 'ask-rule' ? (reasonForRef(ctx.rules, decision.rule) ?? decision.reason) : null
 
-const USER_ANSWERS = 'Codex agents ask before every command, edit and tool call'
+/** The reason line of a call that goes to the user because nothing else answers it. */
+const userAnswers = (task: Task) => `${RUNTIME_NAMES[task.runtime]} agents ask before every command, edit and tool call`
 
 /** A Codex call waiting for the user, by request id, which the rules decide once turned on. */
 interface WaitingCall {
@@ -160,11 +161,11 @@ export async function decideCodexCall(taskId: string, call: ToolCall, signal: Ab
     return { allow: false, message: decision.reason }
   }
   const pushes = read.command === undefined ? [] : await outsidePushes(task, read.command, cwdOf(call) ?? task.cwd)
-  if (pushes.length === 0 && decision.verdict === 'allow' && (await codexSettings.get()).evaluator_decides) {
+  if (pushes.length === 0 && decision.verdict === 'allow' && (await rulesDecide(task.runtime))) {
     return { allow: true }
   }
   const review = decision.verdict === 'review'
-  const ruled = ruleReason(decision, ctx) ?? (review ? decision.reason : USER_ANSWERS)
+  const ruled = ruleReason(decision, ctx) ?? (review ? decision.reason : userAnswers(task))
   const reason = pushes.length > 0 ? pushReason(pushes) : ruled
   const waits: WaitingCall = { taskId: task.id, call }
   const ids: string[] = []
@@ -232,8 +233,10 @@ async function redecide(id: string, waits: WaitingCall): Promise<void> {
  * Once the user lets the rules decide for Codex agents, decides every Codex call still waiting
  * for them as a new call would be: allowed or refused by the rules, else it waits on.
  */
-export async function redecideWaitingCodexCalls(): Promise<void> {
+export async function redecideWaitingCodexCalls(runtime: Task['runtime'] = 'codex'): Promise<void> {
   for (const [id, waits] of [...waitingCalls]) {
-    await redecide(id, waits)
+    if ((await tasks.get(waits.taskId))?.runtime === runtime) {
+      await redecide(id, waits)
+    }
   }
 }

@@ -6,7 +6,7 @@ const codexEvents = (payload: string) => payloadEvents(payload, 'codex')
 
 /** The model the agent's latest session runs on, or null before one started. */
 async function sessionModel(taskId: string): Promise<string | null> {
-  const start = await codexTurns.sessionStart(taskId)
+  const start = await codexTurns.sessionStart(taskId, 'codex')
   return start === null ? null : (eventsOf(codexEvents(start), 'session.started').at(0)?.model ?? null)
 }
 

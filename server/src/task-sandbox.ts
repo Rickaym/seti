@@ -13,10 +13,12 @@ import { launch, type ScopePlan } from './memory-scope.js'
 import { memoryEnv } from './node-heap.js'
 import { sandboxDirOf } from './owned-dirs.js'
 import { modelProxyHere, proxyAwsToken, proxyGone, proxyHere, sshAgentHere } from './proxy-owner.js'
+import { GEMINI_KEY_ENV } from './runtimes/gemini/launch.js'
 import { awsToken } from './sandbox-aws-token.js'
 import { bwrapArgs } from './sandbox-bwrap.js'
 import { sandboxClaudeJson } from './sandbox-claude-json.js'
 import { CODEX_DIR, codexMountPoints, EMPTY_DIR, EMPTY_FILE, MODEL_KEY_ENV, SKILLS_HOME } from './sandbox-codex.js'
+import { prepareGemini } from './sandbox-gemini.js'
 import { gitEnv } from './sandbox-git.js'
 import { forgetSandboxSignIns, hostClaudeJson, mcpTokens, proxiedServers, signedInServers } from './sandbox-mcp.js'
 import {
@@ -103,13 +105,23 @@ export interface SandboxEnvOptions {
   connections?: Readonly<Record<string, string>>
   /** A Codex agent: its runtime's home, and the connection variable that holds its OpenAI key. */
   codex?: { modelKey: string | null }
+  /** A Gemini agent: the connection variable that holds its Gemini API key. */
+  gemini?: { modelKey: string | null }
 }
 
 /** Where the sandbox sees the prefix its tools start through, in its read-only run directory. */
 const SANDBOX_TOOL_SHELL = `${SANDBOX_RUN}/tool-shell`
 
-/** Claude Code's model settings, or a Codex agent's home and its key's placeholder. */
+/** The placeholder of the connection variable that holds the agent's model key, if it has one. */
+const keyPlaceholder = (options: SandboxEnvOptions, modelKey: string | null) =>
+  modelKey === null ? undefined : options.connections?.[modelKey]
+
+/** Claude Code's model settings, or a Codex or Gemini agent's home and its key's placeholder. */
 function runtimeEnv(home: string, options: SandboxEnvOptions): Record<string, string> {
+  if (options.gemini !== undefined) {
+    const placeholder = keyPlaceholder(options, options.gemini.modelKey)
+    return placeholder === undefined ? {} : { [GEMINI_KEY_ENV]: placeholder }
+  }
   if (options.codex === undefined) {
     return {
       ANTHROPIC_BASE_URL: PROXY_URL,
@@ -117,8 +129,7 @@ function runtimeEnv(home: string, options: SandboxEnvOptions): Record<string, st
       ...(options.connectors ? { CLAUDE_CODE_OAUTH_SCOPES: `user:inference ${CONNECTOR_SCOPE}` } : {}),
     }
   }
-  const { modelKey } = options.codex
-  const placeholder = modelKey === null ? undefined : options.connections?.[modelKey]
+  const placeholder = keyPlaceholder(options, options.codex.modelKey)
   return {
     CODEX_HOME: path.join(home, CODEX_DIR),
     ...(placeholder === undefined ? {} : { [MODEL_KEY_ENV]: placeholder }),
@@ -281,6 +292,7 @@ async function grantedReach(task: Task, request: SandboxRequest, at: { dir: stri
     memory: request.memory ?? null,
     connections: connectionEnv(plan.grant.connections),
     ...(plan.codex === undefined ? {} : { codex: plan.codex }),
+    ...(plan.gemini === undefined ? {} : { gemini: plan.gemini }),
   }
   return { ssh, options }
 }
@@ -389,11 +401,14 @@ export async function taskSandbox(task: Task, request: SandboxRequest): Promise<
     sessionId: maintenance === undefined ? task.session_id : null,
     ...(maintenance === undefined ? {} : { maintenance }),
     ...(plan.codex === undefined ? {} : { codex: true }),
+    ...(plan.gemini === undefined ? {} : { gemini: true }),
   }
   prepareWork(layout)
   prepareDirs(dir)
   if (plan.codex !== undefined) {
     prepareCodex(dir)
+  } else if (plan.gemini !== undefined) {
+    prepareGemini(dir, layout)
   } else if (maintenance?.bare !== true) {
     prepareClaude(task, plan, layout)
   }

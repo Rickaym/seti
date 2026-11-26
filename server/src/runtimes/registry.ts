@@ -2,10 +2,13 @@ import type { RuntimeId, RuntimeSession, SessionHost } from './adapter.js'
 import { claudeAdapter } from './claude/adapter.js'
 import type { ClaudeShapes } from './claude/session.js'
 import { codexAdapter } from './codex/adapter.js'
+import { geminiAdapter } from './gemini/adapter.js'
 
 export { loadSdkModule } from './claude/adapter.js'
 
-const ADAPTERS = { claude: claudeAdapter, codex: codexAdapter } satisfies { [Id in RuntimeId]: { id: Id } }
+const ADAPTERS = { claude: claudeAdapter, codex: codexAdapter, gemini: geminiAdapter } satisfies {
+  [Id in RuntimeId]: { id: Id }
+}
 
 type Adapters = typeof ADAPTERS
 

@@ -8,7 +8,7 @@ import { refuseHiddenDirect } from '../direct-privacy.js'
 import { refuseOtherAgent } from '../ea-guard.js'
 import { HttpError } from '../http.js'
 import { sessionState } from '../runner.js'
-import { refuseOnCodex } from '../runtime-features.js'
+import { refuseOffClaude } from '../runtime-features.js'
 import type { SessionInput } from '../runtimes/adapter.js'
 import { forksSideChat } from '../runtimes/capabilities.js'
 import { queryClaude } from '../runtimes/claude/adapter.js'
@@ -169,7 +169,7 @@ async function answer(task: Task, question: string, run: Running): Promise<void>
 export async function prepareAsk(taskId: string, input: SideChatInput, reads: boolean): Promise<Ask> {
   const task = await requireTask(taskId)
   refuseArchived(task)
-  refuseOnCodex(task, 'side chat')
+  refuseOffClaude(task, 'side chat')
   await refuseHiddenDirect(task.id)
   await forkPoint(task)
   const chat = input.chat_id === undefined ? await openChat(task, reads) : await followUp(task.id, input.chat_id)

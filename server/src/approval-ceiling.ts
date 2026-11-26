@@ -1,9 +1,9 @@
 import { bypassOn, type Task } from '@seti/shared'
 import type { PermissionSettings } from './permission-policy.js'
+import { rulesDecide } from './rules-decide.js'
 import { folderSettingsOf } from './runtimes/claude/folder-settings.js'
 import { permissionSettings } from './session-options.js'
 import { approvalCeilings } from './store/approval-ceilings.js'
-import { codexSettings } from './store/codex-settings.js'
 
 /**
  * Who settles the tool calls no guard or rule refuses, strictest first. `user`: the user answers
@@ -27,14 +27,14 @@ export interface RegimeFacts {
   rulesDecide: boolean
 }
 
-const codexRegime = (rulesDecide: boolean): ApprovalRegime => (rulesDecide ? 'rules' : 'user')
+const codexRegime = (decides: boolean): ApprovalRegime => (decides ? 'rules' : 'user')
 
 /**
  * Where an agent's approvals sit. A Codex agent asks Seti about every call; a Claude agent runs
  * Claude Code's `auto` mode unless a ceiling holds it to Codex's regime; Bypass is the user's.
  */
 export function regimeOf(facts: RegimeFacts): ApprovalRegime {
-  if (facts.runtime === 'codex') {
+  if (facts.runtime !== 'claude') {
     return codexRegime(facts.rulesDecide)
   }
   if (facts.bypass) {
@@ -48,22 +48,17 @@ export function regimeOf(facts: RegimeFacts): ApprovalRegime {
  * does: a Codex agent, or one held to Codex's regime, hands on Codex's. Bypass never passes on.
  */
 export const ceilingFrom = (caller: Pick<RegimeFacts, 'runtime' | 'ceiling'>): ApprovalCeiling | null =>
-  caller.runtime === 'codex' || caller.ceiling === 'codex' ? 'codex' : null
+  caller.runtime !== 'claude' || caller.ceiling === 'codex' ? 'codex' : null
 
 /** The ceiling the agent passes on, read from the store. */
 export async function ceilingOf(caller: Pick<Task, 'id' | 'runtime'>): Promise<ApprovalCeiling | null> {
   return ceilingFrom({ runtime: caller.runtime, ceiling: await approvalCeilings.get(caller.id) })
 }
 
-/** Where the agent's approvals sit now, from the store and the Codex setting. */
+/** Where the agent's approvals sit now, from the store and its runtime's Rules decide setting. */
 export async function regimeOfTask(task: Pick<Task, 'id' | 'runtime' | 'bypass_until'>): Promise<ApprovalRegime> {
-  const [ceiling, settings] = await Promise.all([approvalCeilings.get(task.id), codexSettings.get()])
-  return regimeOf({
-    runtime: task.runtime,
-    bypass: bypassOn(task.bypass_until),
-    ceiling,
-    rulesDecide: settings.evaluator_decides,
-  })
+  const [ceiling, decides] = await Promise.all([approvalCeilings.get(task.id), rulesDecide(task.runtime)])
+  return regimeOf({ runtime: task.runtime, bypass: bypassOn(task.bypass_until), ceiling, rulesDecide: decides })
 }
 
 /**

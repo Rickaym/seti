@@ -199,6 +199,16 @@ CREATE TABLE codex_settings (
 );
 `
 
+export const GEMINI_SETTINGS = `
+CREATE TABLE gemini_settings (
+  id INTEGER PRIMARY KEY CHECK (id = 1),
+  enabled BOOLEAN NOT NULL DEFAULT false,
+  evaluator_decides BOOLEAN NOT NULL DEFAULT true,
+  default_model TEXT,
+  updated_at TEXT NOT NULL
+);
+`
+
 /** The approvals an agent-started agent may not go beyond: those of a Codex agent, or none. */
 export const TASK_APPROVAL_CEILING = 'ALTER TABLE task ADD COLUMN approval_ceiling TEXT;'
 

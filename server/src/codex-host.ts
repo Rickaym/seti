@@ -9,13 +9,13 @@ import { SANDBOX_RUN } from './sandbox-mounts.js'
 import { openToolRelay, type RelayedServer } from './tool-relay.js'
 
 /** Asks the control plane for Seti's answer to each call; the user may take as long as they like. */
-const decideByAsking =
+export const decideByAsking =
   (taskId: string, session: AbortSignal): CodexDecide =>
   async (call: ToolCall, signal: AbortSignal) =>
     nodeLink.ask(taskId, 'call.decide', { call }, AbortSignal.any([signal, session]))
 
 /** Each of the agent's tool servers, whose calls run on the control plane as the agent. */
-function relayed(taskId: string, servers: { name: string; tools: RelayedServer['tools'] }[]): RelayedServer[] {
+export function relayed(taskId: string, servers: { name: string; tools: RelayedServer['tools'] }[]): RelayedServer[] {
   return servers.map(({ name, tools }) => ({
     name,
     tools,

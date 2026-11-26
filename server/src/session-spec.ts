@@ -6,6 +6,7 @@ import { requireCodexProgram } from './codex-status.js'
 import { codexToolServers } from './codex-tool-servers.js'
 import { effectiveCompact } from './compact.js'
 import { dreamsOn } from './dreams/settings.js'
+import { requireGeminiEntry } from './gemini-status.js'
 import { launchPlan } from './launch-plan.js'
 import { borrowedStamp, taskBorrowedServers } from './mcp-borrowed.js'
 import { taskDeniedServers } from './mcp-selection.js'
@@ -13,6 +14,7 @@ import { tokenServers } from './mcp-sign-in.js'
 import type { PermissionSettings } from './permission-policy.js'
 import { taskPluginConfigs } from './plugins.js'
 import { proxyGrant } from './proxy-grant.js'
+import type { AcpShapes } from './runtimes/acp/session.js'
 import type { RuntimeId } from './runtimes/adapter.js'
 import { folderSettingsOf, holdsNothing, type FolderSettings } from './runtimes/claude/folder-settings.js'
 import type { CodexShapes } from './runtimes/codex/session.js'
@@ -20,9 +22,10 @@ import type { DefaultShapes } from './runtimes/registry.js'
 import { signedInServers } from './sandbox-mcp.js'
 import { sandboxStamp } from './sandbox-stamp.js'
 import { systemAppend, workingDirs } from './session-options.js'
-import { isClaudeSpec, isCodexSpec, realiseClaude } from './session-realise.js'
+import { isClaudeSpec, isCodexSpec, isGeminiSpec, realiseClaude } from './session-realise.js'
 import { sharedToolFolders } from './shared-tools.js'
 import { codexSettings } from './store/codex-settings.js'
+import { geminiSettings } from './store/gemini-settings.js'
 import { userSkills } from './user-skills.js'
 
 /** What a task's session starts from, read from the database; it holds no secret values. */
@@ -57,7 +60,11 @@ export interface SessionSpec<Id extends string = RuntimeId> {
   /** The login the host's runtime process signs in with. */
   account: string | null
   /** What only the runtime's own adapter reads. */
-  vendor: Id extends 'codex' ? CodexShapes['vendor'] : DefaultShapes['vendor']
+  vendor: Id extends 'codex'
+    ? CodexShapes['vendor']
+    : Id extends 'gemini'
+      ? AcpShapes['vendor']
+      : DefaultShapes['vendor']
 }
 
 const sorted = (names: Set<string>) => [...names].toSorted((a, b) => a.localeCompare(b, 'en'))
@@ -97,6 +104,15 @@ async function codexVendor(task: Task): Promise<CodexShapes['vendor']> {
   }
 }
 
+/**
+ * What a Gemini agent's process starts: the agent's model, else the runtime's default. A runtime
+ * that is off or not installed starts nothing.
+ */
+async function geminiVendor(task: Task): Promise<AcpShapes['vendor']> {
+  await requireGeminiEntry()
+  return { model: task.requested_model ?? (await geminiSettings.get()).default_model }
+}
+
 /** A Claude Code agent's plugins, and the model and effort it was started with, if any. */
 async function claudeVendor(task: Task): Promise<DefaultShapes['vendor']> {
   const effort = effortLevel(task.requested_effort)
@@ -107,8 +123,16 @@ async function claudeVendor(task: Task): Promise<DefaultShapes['vendor']> {
   }
 }
 
-const vendorOf = async (task: Task): Promise<SessionSpec['vendor']> =>
-  task.runtime === 'codex' ? codexVendor(task) : claudeVendor(task)
+async function vendorOf(task: Task): Promise<SessionSpec['vendor']> {
+  switch (task.runtime) {
+    case 'codex':
+      return codexVendor(task)
+    case 'gemini':
+      return geminiVendor(task)
+    case 'claude':
+      return claudeVendor(task)
+  }
+}
 
 /** The task's session spec, resuming its session if it has one. */
 async function sessionSpec(task: Task): Promise<SessionSpec> {
@@ -119,7 +143,7 @@ async function sessionSpec(task: Task): Promise<SessionSpec> {
     resume: task.session_id,
     cwd: task.cwd,
     dirs: workingDirs(task),
-    mode: task.runtime === 'codex' ? 'default' : await permissionModeOf(task),
+    mode: task.runtime === 'claude' ? await permissionModeOf(task) : 'default',
     instructions: { append: await systemAppend(task.id) },
     setiControl: task.seti_control,
     setiDreams: await dreamsOn(task),
@@ -156,14 +180,14 @@ const compactionKey = (rule: CompactRule) => ({
   env: rule.threshold_pct === null ? {} : { CLAUDE_AUTOCOMPACT_PCT_OVERRIDE: String(rule.threshold_pct) },
 })
 
-/** A digest of a Codex agent's setup: what Codex starts with, by the runtime's own names. */
-function codexKey(spec: SessionSpec<'codex'>): string {
+/** A digest of a Codex or Gemini agent's setup: what the runtime starts with, by its own names. */
+function sandboxedKey(spec: SessionSpec<'codex'> | SessionSpec<'gemini'>): string {
   const setup = setupOf(spec)
   return JSON.stringify({
-    runtime: 'codex',
+    runtime: spec.runtime,
     cwd: setup.cwd,
     dirs: setup.dirs,
-    codex: setup.vendor,
+    [spec.runtime]: setup.vendor,
     instructions: setup.instructions,
     shared_tools: setup.toolServers.shared,
     seti_control: setup.setiControl,
@@ -178,8 +202,8 @@ function codexKey(spec: SessionSpec<'codex'>): string {
  * deploy; only an agent started on a picked model or effort has them in its key.
  */
 function specKey(spec: SessionSpec): string {
-  if (isCodexSpec(spec)) {
-    return codexKey(spec)
+  if (isCodexSpec(spec) || isGeminiSpec(spec)) {
+    return sandboxedKey(spec)
   }
   if (!isClaudeSpec(spec)) {
     throw new Error('Seti has no such runtime')

@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { firstIssue } from './lenient.js'
 import { modelFallbackMessage } from './model-fallback.js'
+import { acpRecord } from './runtimes/acp/shapes.js'
 import { stored as codexPayload } from './runtimes/codex/shapes.js'
 import { STORED_RUNTIMES, type StoredRuntime } from './runtimes/stored.js'
 import { setiControlLevel } from './seti-control.js'
@@ -148,6 +149,13 @@ const PAYLOADS = new Map<string, z.ZodType>([
   ['notice', noticePayload],
 ])
 
+/** The schema of a runtime's stored message where it is not Claude Code's. */
+const RUNTIME_PAYLOADS: Record<StoredRuntime, z.ZodType | undefined> = {
+  claude: undefined,
+  codex: codexPayload,
+  gemini: acpRecord,
+}
+
 export type BodyCheck = { ok: true; body: MessageBody } | { ok: false; reason: string }
 
 /**
@@ -155,8 +163,8 @@ export type BodyCheck = { ok: true; body: MessageBody } | { ok: false; reason: s
  * runtime's message is checked as the stored row's `runtime` wrote it.
  */
 export function checkMessageBody(kind: string, payload: unknown, runtime: StoredRuntime = 'claude'): BodyCheck {
-  const codex = kind === 'sdk' && runtime === 'codex'
-  const schema = codex ? codexPayload : PAYLOADS.get(kind)
+  const runtimeSchema = kind === 'sdk' ? RUNTIME_PAYLOADS[runtime] : undefined
+  const schema = runtimeSchema ?? PAYLOADS.get(kind)
   if (schema === undefined) {
     return { ok: false, reason: 'unknown kind' }
   }
@@ -164,6 +172,6 @@ export function checkMessageBody(kind: string, payload: unknown, runtime: Stored
   if (!parsed.success) {
     return { ok: false, reason: firstIssue(parsed.error) }
   }
-  const body = codex ? { kind, payload, runtime } : { kind, payload }
+  const body = runtimeSchema === undefined ? { kind, payload } : { kind, payload, runtime }
   return { ok: true, body } as { ok: true; body: MessageBody }
 }
