@@ -1,0 +1,404 @@
+{
+  "envs": {
+    "claude": {
+      "PATH": "/usr/bin",
+      "LANG": "C.UTF-8",
+      "LC_ALL": "C",
+      "HOME": "/home/agent",
+      "USER": "<user>",
+      "LOGNAME": "<user>",
+      "SHELL": "/bin/bash",
+      "TMPDIR": "/tmp",
+      "SETI_SANDBOX": "1",
+      "ANTHROPIC_BASE_URL": "http://127.0.0.1:3128",
+      "CLAUDE_CODE_OAUTH_TOKEN": "sk-ant-oat01-seti-sandbox-placeholder",
+      "HTTPS_PROXY": "http://127.0.0.1:3128",
+      "HTTP_PROXY": "http://127.0.0.1:3128",
+      "https_proxy": "http://127.0.0.1:3128",
+      "http_proxy": "http://127.0.0.1:3128",
+      "NO_PROXY": "localhost,127.0.0.1,::1",
+      "no_proxy": "localhost,127.0.0.1,::1",
+      "NODE_USE_ENV_PROXY": "1",
+      "NODE_OPTIONS": "--max-old-space-size=6144",
+      "NODE_EXTRA_CA_CERTS": "/run/seti-ca/ca.pem",
+      "SSL_CERT_FILE": "/run/seti-ca/bundle.pem",
+      "GIT_SSL_CAINFO": "/run/seti-ca/bundle.pem",
+      "CURL_CA_BUNDLE": "/run/seti-ca/bundle.pem",
+      "REQUESTS_CA_BUNDLE": "/run/seti-ca/bundle.pem",
+      "GH_PROMPT_DISABLED": "1",
+      "GH_TOKEN": "seti-sandbox-placeholder",
+      "GIT_CONFIG_COUNT": "4",
+      "GIT_TERMINAL_PROMPT": "0",
+      "GIT_CONFIG_KEY_0": "credential.https://github.com.helper",
+      "GIT_CONFIG_VALUE_0": "",
+      "GIT_CONFIG_KEY_1": "url.https://github.com/.insteadOf",
+      "GIT_CONFIG_VALUE_1": "git@github.com:",
+      "GIT_CONFIG_KEY_2": "url.https://github.com/.insteadOf",
+      "GIT_CONFIG_VALUE_2": "ssh://git@github.com/",
+      "GIT_CONFIG_KEY_3": "push.default",
+      "GIT_CONFIG_VALUE_3": "current"
+    },
+    "claudeWithConnectors": {
+      "PATH": "/usr/bin",
+      "LANG": "C.UTF-8",
+      "LC_ALL": "C",
+      "STRIPE_KEY": "seti-placeholder-stripe",
+      "OPENAI_API_KEY": "seti-placeholder-openai",
+      "DOCS_TOKEN": "seti-placeholder-docs",
+      "HOME": "/home/agent",
+      "USER": "<user>",
+      "LOGNAME": "<user>",
+      "SHELL": "/bin/bash",
+      "TMPDIR": "/tmp",
+      "SETI_SANDBOX": "1",
+      "ANTHROPIC_BASE_URL": "http://127.0.0.1:3128",
+      "CLAUDE_CODE_OAUTH_TOKEN": "sk-ant-oat01-seti-sandbox-placeholder",
+      "CLAUDE_CODE_OAUTH_SCOPES": "user:inference user:mcp_servers",
+      "HTTPS_PROXY": "http://127.0.0.1:3128",
+      "HTTP_PROXY": "http://127.0.0.1:3128",
+      "https_proxy": "http://127.0.0.1:3128",
+      "http_proxy": "http://127.0.0.1:3128",
+      "NO_PROXY": "localhost,127.0.0.1,::1",
+      "no_proxy": "localhost,127.0.0.1,::1",
+      "NODE_USE_ENV_PROXY": "1",
+      "NODE_OPTIONS": "--max-old-space-size=6144",
+      "NODE_EXTRA_CA_CERTS": "/run/seti-ca/ca.pem",
+      "SSL_CERT_FILE": "/run/seti-ca/bundle.pem",
+      "GIT_SSL_CAINFO": "/run/seti-ca/bundle.pem",
+      "CURL_CA_BUNDLE": "/run/seti-ca/bundle.pem",
+      "REQUESTS_CA_BUNDLE": "/run/seti-ca/bundle.pem",
+      "GH_PROMPT_DISABLED": "1",
+      "GH_TOKEN": "seti-sandbox-placeholder",
+      "GIT_CONFIG_COUNT": "4",
+      "GIT_TERMINAL_PROMPT": "0",
+      "GIT_CONFIG_KEY_0": "credential.https://github.com.helper",
+      "GIT_CONFIG_VALUE_0": "",
+      "GIT_CONFIG_KEY_1": "url.https://github.com/.insteadOf",
+      "GIT_CONFIG_VALUE_1": "git@github.com:",
+      "GIT_CONFIG_KEY_2": "url.https://github.com/.insteadOf",
+      "GIT_CONFIG_VALUE_2": "ssh://git@github.com/",
+      "GIT_CONFIG_KEY_3": "push.default",
+      "GIT_CONFIG_VALUE_3": "current"
+    },
+    "codex": {
+      "PATH": "/usr/bin",
+      "LANG": "C.UTF-8",
+      "LC_ALL": "C",
+      "STRIPE_KEY": "seti-placeholder-stripe",
+      "OPENAI_API_KEY": "seti-placeholder-openai",
+      "DOCS_TOKEN": "seti-placeholder-docs",
+      "HOME": "/home/agent",
+      "USER": "<user>",
+      "LOGNAME": "<user>",
+      "SHELL": "/bin/bash",
+      "TMPDIR": "/tmp",
+      "SETI_SANDBOX": "1",
+      "CODEX_HOME": "/home/agent/.codex",
+      "SETI_MODEL_KEY": "seti-placeholder-openai",
+      "HTTPS_PROXY": "http://127.0.0.1:3128",
+      "HTTP_PROXY": "http://127.0.0.1:3128",
+      "https_proxy": "http://127.0.0.1:3128",
+      "http_proxy": "http://127.0.0.1:3128",
+      "NO_PROXY": "localhost,127.0.0.1,::1",
+      "no_proxy": "localhost,127.0.0.1,::1",
+      "NODE_USE_ENV_PROXY": "1",
+      "NODE_OPTIONS": "--max-old-space-size=6144",
+      "NODE_EXTRA_CA_CERTS": "/run/seti-ca/ca.pem",
+      "SSL_CERT_FILE": "/run/seti-ca/bundle.pem",
+      "GIT_SSL_CAINFO": "/run/seti-ca/bundle.pem",
+      "CURL_CA_BUNDLE": "/run/seti-ca/bundle.pem",
+      "REQUESTS_CA_BUNDLE": "/run/seti-ca/bundle.pem",
+      "GH_PROMPT_DISABLED": "1",
+      "GH_TOKEN": "seti-sandbox-placeholder",
+      "GIT_CONFIG_COUNT": "4",
+      "GIT_TERMINAL_PROMPT": "0",
+      "GIT_CONFIG_KEY_0": "credential.https://github.com.helper",
+      "GIT_CONFIG_VALUE_0": "",
+      "GIT_CONFIG_KEY_1": "url.https://github.com/.insteadOf",
+      "GIT_CONFIG_VALUE_1": "git@github.com:",
+      "GIT_CONFIG_KEY_2": "url.https://github.com/.insteadOf",
+      "GIT_CONFIG_VALUE_2": "ssh://git@github.com/",
+      "GIT_CONFIG_KEY_3": "push.default",
+      "GIT_CONFIG_VALUE_3": "current"
+    },
+    "codexKeyless": {
+      "PATH": "/usr/bin",
+      "LANG": "C.UTF-8",
+      "LC_ALL": "C",
+      "HOME": "/home/agent",
+      "USER": "<user>",
+      "LOGNAME": "<user>",
+      "SHELL": "/bin/bash",
+      "TMPDIR": "/tmp",
+      "SETI_SANDBOX": "1",
+      "CODEX_HOME": "/home/agent/.codex",
+      "HTTPS_PROXY": "http://127.0.0.1:3128",
+      "HTTP_PROXY": "http://127.0.0.1:3128",
+      "https_proxy": "http://127.0.0.1:3128",
+      "http_proxy": "http://127.0.0.1:3128",
+      "NO_PROXY": "localhost,127.0.0.1,::1",
+      "no_proxy": "localhost,127.0.0.1,::1",
+      "NODE_USE_ENV_PROXY": "1",
+      "NODE_OPTIONS": "--max-old-space-size=6144",
+      "NODE_EXTRA_CA_CERTS": "/run/seti-ca/ca.pem",
+      "SSL_CERT_FILE": "/run/seti-ca/bundle.pem",
+      "GIT_SSL_CAINFO": "/run/seti-ca/bundle.pem",
+      "CURL_CA_BUNDLE": "/run/seti-ca/bundle.pem",
+      "REQUESTS_CA_BUNDLE": "/run/seti-ca/bundle.pem",
+      "GH_PROMPT_DISABLED": "1",
+      "GIT_CONFIG_COUNT": "4",
+      "GIT_TERMINAL_PROMPT": "0",
+      "GIT_CONFIG_KEY_0": "credential.https://github.com.helper",
+      "GIT_CONFIG_VALUE_0": "",
+      "GIT_CONFIG_KEY_1": "url.https://github.com/.insteadOf",
+      "GIT_CONFIG_VALUE_1": "git@github.com:",
+      "GIT_CONFIG_KEY_2": "url.https://github.com/.insteadOf",
+      "GIT_CONFIG_VALUE_2": "ssh://git@github.com/",
+      "GIT_CONFIG_KEY_3": "push.default",
+      "GIT_CONFIG_VALUE_3": "current"
+    }
+  },
+  "grants": {
+    "claude": {
+      "grant": {
+        "login": "host-login",
+        "anthropic": true,
+        "connections": [
+          {
+            "id": "stripe",
+            "name": "stripe",
+            "env": "STRIPE_KEY",
+            "placeholder": "seti-placeholder-stripe",
+            "hosts": [
+              "api.stripe.com"
+            ],
+            "header": {
+              "name": "Authorization",
+              "template": "Bearer {value}"
+            },
+            "minted": false,
+            "body": false
+          },
+          {
+            "id": "openai",
+            "name": "openai",
+            "env": "OPENAI_API_KEY",
+            "placeholder": "seti-placeholder-openai",
+            "hosts": [
+              "api.openai.com"
+            ],
+            "header": {
+              "name": "Authorization",
+              "template": "Bearer {value}"
+            },
+            "minted": false,
+            "body": false
+          },
+          {
+            "id": "docs",
+            "name": "docs",
+            "env": "DOCS_TOKEN",
+            "placeholder": "seti-placeholder-docs",
+            "hosts": [
+              "*.docs.example.test"
+            ],
+            "header": null,
+            "minted": false,
+            "body": false
+          }
+        ],
+        "mcp": [
+          "https://mcp.example.test/mcp"
+        ],
+        "deniedConnectors": [],
+        "caHosts": [
+          "mcp.example.test",
+          "api.stripe.com",
+          "api.openai.com",
+          "docs.example.test"
+        ]
+      },
+      "denied": [
+        "claude.ai Gmail",
+        "srv_off"
+      ]
+    },
+    "codex": {
+      "grant": {
+        "login": null,
+        "anthropic": false,
+        "connections": [
+          {
+            "id": "stripe",
+            "name": "stripe",
+            "env": "STRIPE_KEY",
+            "placeholder": "seti-placeholder-stripe",
+            "hosts": [
+              "api.stripe.com"
+            ],
+            "header": {
+              "name": "Authorization",
+              "template": "Bearer {value}"
+            },
+            "minted": false,
+            "body": false
+          },
+          {
+            "id": "openai",
+            "name": "openai",
+            "env": "OPENAI_API_KEY",
+            "placeholder": "seti-placeholder-openai",
+            "hosts": [
+              "api.openai.com"
+            ],
+            "header": {
+              "name": "Authorization",
+              "template": "Bearer {value}"
+            },
+            "minted": false,
+            "body": false
+          },
+          {
+            "id": "docs",
+            "name": "docs",
+            "env": "DOCS_TOKEN",
+            "placeholder": "seti-placeholder-docs",
+            "hosts": [
+              "*.docs.example.test"
+            ],
+            "header": null,
+            "minted": false,
+            "body": false
+          }
+        ],
+        "mcp": [
+          "https://mcp.example.test/mcp"
+        ],
+        "deniedConnectors": [],
+        "caHosts": [
+          "mcp.example.test",
+          "api.stripe.com",
+          "api.openai.com",
+          "docs.example.test"
+        ]
+      },
+      "denied": [
+        "claude.ai Gmail",
+        "srv_off"
+      ]
+    }
+  },
+  "declared": {
+    "claude": {
+      "gate": {
+        "rewriteInput": true,
+        "classifier": true
+      },
+      "session": {
+        "fork": "ephemeral"
+      },
+      "rewind": {
+        "conversation": true,
+        "code": true
+      },
+      "sandbox": {
+        "optional": true
+      },
+      "compaction": {
+        "off": true,
+        "windowAlone": true
+      },
+      "subagents": true,
+      "bypass": true,
+      "slashCommands": true,
+      "dream": true,
+      "oneShot": true,
+      "tools": {
+        "userServers": [
+          "stdio",
+          "sse",
+          "http",
+          "sdk",
+          "claudeai-proxy"
+        ],
+        "serverNames": null,
+        "plugins": true
+      }
+    },
+    "codex": {
+      "gate": {
+        "rewriteInput": false,
+        "classifier": false
+      },
+      "session": {
+        "fork": "none"
+      },
+      "rewind": {
+        "conversation": false,
+        "code": false
+      },
+      "sandbox": {
+        "optional": false
+      },
+      "compaction": {
+        "off": false,
+        "windowAlone": false
+      },
+      "subagents": false,
+      "bypass": false,
+      "slashCommands": false,
+      "dream": false,
+      "oneShot": true,
+      "tools": {
+        "userServers": [
+          "stdio",
+          "http"
+        ],
+        "serverNames": "letters, digits, - and _ only",
+        "plugins": false
+      }
+    }
+  },
+  "capabilities": {
+    "claude": {
+      "label": "Claude Code",
+      "mcp_servers": true,
+      "mcp_transports": [
+        "stdio",
+        "sse",
+        "http",
+        "sdk",
+        "claudeai-proxy"
+      ],
+      "plugins": true,
+      "unsandboxed": true,
+      "compaction": true,
+      "compaction_ignores": [],
+      "side_chat": true,
+      "dreams": true,
+      "rewind": true,
+      "bypass": true,
+      "slash_commands": true
+    },
+    "codex": {
+      "label": "Codex",
+      "mcp_servers": true,
+      "mcp_transports": [
+        "stdio",
+        "http"
+      ],
+      "plugins": false,
+      "unsandboxed": false,
+      "compaction": true,
+      "compaction_ignores": [
+        "off",
+        "window"
+      ],
+      "side_chat": false,
+      "dreams": false,
+      "rewind": false,
+      "bypass": false,
+      "slash_commands": false
+    }
+  }
+}
