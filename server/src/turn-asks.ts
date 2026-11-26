@@ -65,12 +65,12 @@ export async function auditRefusal(taskId: string, command: string, reason: stri
 export const turnAnswers = {
   'permission.ask': async (
     taskId: string,
-    { tool, input, options }: NodeAsk<'permission.ask'>,
+    { tool, input, options, cwd }: NodeAsk<'permission.ask'>,
     signal: AbortSignal,
   ): Promise<NodeAnswer<'permission.ask'>> => {
     // The node handed on the runtime's own options, without their signal.
     const asked = { ...(options as Omit<AskOptions, 'signal'>), signal }
-    const { result, note } = await canUseToolFor(taskId, signal)(tool, input, asked)
+    const { result, note } = await canUseToolFor(taskId, signal)(tool, input, asked, cwd)
     return note === undefined ? { result } : { result, context: note }
   },
   'review.ask': async (taskId: string, call: NodeAsk<'review.ask'>, signal: AbortSignal) => ({
