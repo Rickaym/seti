@@ -238,6 +238,39 @@ between two steps; an interrupt; a hook at subagent start.
   agent could not have written (SBX-14). A server definition the agent writes MUST NOT load. A server the
   agent's runtime cannot use MUST show in the agent's access with the reason, and never count as on.
 
+### 3.7 Evidence ledger
+
+- SRC-1: The control room keeps an evidence ledger per agent. When a tool call ends well and an
+  adapter recognises it as a read from a source system (a Slack tool server's channel, thread and
+  message search reads; a Linear tool server's issue, issue list and comment reads; `gh pr view`,
+  `gh issue view` and `gh api` GETs of pull requests, issues, comments and reviews), it records one
+  row per item read: the source kind, its container (channel, repository or team), the key a cited
+  link is matched by, its permalink, its time and a pointer to the tool result in the stored
+  transcript. The ledger MUST NOT copy the item's text: it reads the result as the transcript
+  stores it, so credential redaction applies, and it reads both runtimes from neutral events.
+- SRC-2: An adapter reads only the structure the source's server writes: fields at their fixed
+  places, the counts the answer states, and the ids the call asked for. An answer that does not
+  fit gives no item, and so does a shell command that uses anything beyond plain words and quotes,
+  or filters or pipes the output. A permalink is the one the answer states, else one built from
+  parts the call and answers stated (Slack: the workspace host the agent's Slack answers stated, the
+  channel and the `ts`; GitHub: the repository and number); one that cannot be built so stays
+  empty and is never guessed.
+- SRC-3: An agent's ledger follows its transcript: archiving removes it, restoring reads it again
+  from the restored transcript, and deleting the agent or a transcript row deletes its items.
+- SRC-4: A client MAY ask which ledger item each link of an agent's message names; the answer
+  comes from that agent's ledger only and carries the item's kind, container and its name when
+  known, time and permalink, never its text. A link names an item by its key, else the thread or
+  channel that holds it, else the pull request or issue that holds a comment. A quote tied to the
+  link is verified when, normalised, it stands in the item's text: Slack and Markdown markup cut to
+  their text, HTML entities decoded, quote marks, bullets and heading marks at a line's start,
+  emphasis marks, backslashes, `@` and quotation marks dropped, white space collapsed. Parts a
+  quote separates with an ellipsis must appear in order, and a quote under 12 characters never
+  verifies. A client shows a verified quote with a quiet mark and any other with none, never as an
+  error.
+- SRC-5: A Slack message permalink, or a GitHub pull request, issue or comment link, that names no
+  item and whose id appears in no row of the agent's transcript is reported as not read by the
+  agent; a client says so in muted text. An agent with no transcript rows gets no such report.
+
 ## 4. Turn lifecycle
 
 - TURN-1: A user message (`prompt`, `interrupt`, `attachments`, `notify_when_done`, `client_id`)
