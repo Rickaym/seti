@@ -119,7 +119,7 @@ const startTaskTool = setiTool({
     workspace: workspaceRef.optional().describe('The workspace it joins; left out, your own.'),
     notify_when_done: NOTIFY_WHEN_DONE,
     role: startAgentInput.shape.role.describe(
-      'A role pack by name, such as Reviewer. It runs in that role, on the runtime and model the user gave the role unless you name your own.',
+      "One of the user's role packs by name (list_context_packs, kind role). It runs in that role, on the runtime and model the user gave the role unless you name your own.",
     ),
     runtime: startAgentInput.shape.runtime.describe(
       "Left out, the role's or the model's, else claude. codex runs it on OpenAI's Codex, which Seti refuses while the user has it off.",

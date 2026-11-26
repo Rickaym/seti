@@ -75,8 +75,8 @@ beforeAll(async () => {
   write(path.join(outside, '.ssh', 'id_ed25519'), 'PRIVATE\n')
   fs.symlinkSync(path.join(outside, '.ssh', 'id_ed25519'), path.join(cwd, 'notes', 'ssh.md'))
   fs.symlinkSync(path.join(cwd, 'src', 'main.ts'), path.join(cwd, 'notes', 'main.md'))
-  const role = (await contextPacks.list()).find((pack) => pack.name === 'Reviewer' && pack.kind === 'role')
-  await taskContextPacks.setRole(reviewer.task.id, role?.id ?? expect.fail('no Reviewer role'))
+  const role = await contextPacks.create({ name: 'Reviewer', description: '', body: 'Reviewer: review PRs.' }, 'role')
+  await taskContextPacks.setRole(reviewer.task.id, role.id)
 })
 
 describe('the op table', () => {

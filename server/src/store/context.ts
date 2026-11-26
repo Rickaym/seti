@@ -9,7 +9,7 @@ const getPack = async (id: string) => (await sql<ContextPack[]>`SELECT * FROM co
 
 /**
  * The packs linked to a task: its own link or unlink, else its credential's, else the pack's
- * default. Built-in packs' bodies are left for Seti to render.
+ * default. The built-in guide's body is left for Seti to render.
  */
 export const packsOfTask = async (taskId: string) =>
   sql<ContextPack[]>`SELECT p.* FROM context_pack p
@@ -71,7 +71,7 @@ export const contextPacks = {
   roleNamed: async (name: string) =>
     (
       await sql<ContextPack[]>`SELECT * FROM context_pack WHERE kind = 'role'
-        AND (lower(name) = lower(${name}) OR id::text = ${name}) ORDER BY builtin DESC LIMIT 1`
+        AND (lower(name) = lower(${name}) OR id::text = ${name}) LIMIT 1`
     ).at(0),
   setLinkedByDefault: async (id: string, on: boolean) => {
     await sql`UPDATE context_pack SET linked_by_default = ${on}, updated_at = ${now()} WHERE id = ${id}`

@@ -5,9 +5,9 @@ import { MIGRATIONS } from './store/schema.js'
 /** Where test databases live: SETI_TEST_DATABASE_URL (CI), else the local server's socket. */
 const TEST_SERVER_URL = process.env.SETI_TEST_DATABASE_URL ?? socketUrl('postgres')
 
-/** Test files clone this database, so each starts from the current schema in milliseconds. */
+/** Test files clone this database; a changed `run` builds a new one, as a changed `sql` does. */
 const TEMPLATE = `seti_test_tpl_${createHash('sha256')
-  .update(MIGRATIONS.map((migration) => `${String(migration.version)}\n${migration.sql}`).join('\n'))
+  .update(MIGRATIONS.map((m) => `${String(m.version)}\n${m.sql}\n${m.run?.toString() ?? ''}`).join('\n'))
   .digest('hex')
   .slice(0, 12)}`
 
