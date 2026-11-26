@@ -63,6 +63,7 @@ export function useSourceMatches(refs: readonly Reference[]): ReadonlyMap<string
       ask(key, taskId, links)
     }
   })
-  const entry = useSyncExternalStore(subscribe, () => (key === null ? undefined : answers.get(key)))
+  const snapshot = () => (key === null ? undefined : answers.get(key))
+  const entry = useSyncExternalStore(subscribe, snapshot, snapshot)
   return entry?.state === 'done' ? entry.matches : NONE
 }
