@@ -1,5 +1,5 @@
 import path from 'node:path'
-import { CODEX_MODEL_HOST, hostMatches } from '@seti/shared'
+import { reachesProvider } from '@seti/shared'
 import { holdsSum, platformOf, programIn } from './codex-fetch.js'
 import { CODEX_PIN } from './codex-pin.js'
 import { CODEX_ROOT, DATABASE_URL } from './config.js'
@@ -46,7 +46,7 @@ export async function doctorCodex(): Promise<Check[]> {
     if (codex === null) {
       return []
     }
-    const keyed = codex.keyHosts.some((hosts) => hosts.some((pattern) => hostMatches(pattern, CODEX_MODEL_HOST)))
+    const keyed = codex.keyHosts.some((hosts) => reachesProvider('openai', hosts))
     const key: Check = keyed
       ? { section: SECTION, state: 'ok', label: 'the default credential holds an OpenAI key' }
       : {

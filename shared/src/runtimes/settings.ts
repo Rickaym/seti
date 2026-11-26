@@ -26,9 +26,6 @@ export const CODEX_SETTINGS_DEFAULTS: CodexSettings = {
   default_effort: null,
 }
 
-/** The host a Codex agent sends its model calls to, where its OpenAI key connection applies. */
-export const CODEX_MODEL_HOST = 'api.openai.com'
-
 /**
  * The models a Codex agent may pick: those the pinned Codex sends its tools for, as CI proves.
  * Newer models in its catalog send none from the client, so no test shows them working.

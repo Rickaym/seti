@@ -1,4 +1,4 @@
-import { CODEX_MODEL_HOST, DEFAULT_PROFILE_ID, hostMatches, type GrantConnection, type Task } from '@seti/shared'
+import { DEFAULT_PROFILE_ID, reachesProvider, type GrantConnection, type Task } from '@seti/shared'
 import { grantConnections, taskConnections } from './connection-egress.js'
 import { connectionRows, type ConnectionRow } from './store/connections.js'
 import { profiles } from './store/credentials.js'
@@ -14,7 +14,7 @@ export async function codexKeyConnection(task: Task): Promise<GrantConnection | 
 
 /** Whether a connection could carry a Codex agent's OpenAI key: a header on OpenAI's API. */
 const carriesKey = (each: Pick<GrantConnection, 'header' | 'hosts'>) =>
-  each.header !== null && each.hosts.some((pattern) => hostMatches(pattern, CODEX_MODEL_HOST))
+  each.header !== null && reachesProvider('openai', each.hosts)
 
 /** A connection that holds an OpenAI key: one above with a value set. */
 const holdsKey = (row: ConnectionRow) => carriesKey(row) && Object.keys(row.slots).length > 0

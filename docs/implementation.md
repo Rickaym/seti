@@ -107,9 +107,9 @@ with another top-level folder.
   of any other runtime are filled when stored. A Codex message keeps the notification as Codex
   sent it beside the agent's own thread id. Codex reports tokens per model call, so at a turn's
   end ingest adds up the turn's calls and estimates their cost from OpenAI's public prices
-  (`server/src/codex-spend.ts`, `runtimes/codex/prices.ts`, dated); the turn end marks the cost
-  as estimated. Archives keep each row's runtime. Readers that filter on JSON text read such a
-  row by its event columns instead (`callText`, `callOrResultText` in `event-filters.ts`), and
+  (`server/src/codex-spend.ts`, `runtimes/prices.ts`), read from the provider registry's dated
+  table (`shared/src/providers.ts`); the turn end marks the cost as estimated. Archives keep
+  each row's runtime. Readers that filter on JSON text read such a row by its event columns instead (`callText`, `callOrResultText` in `event-filters.ts`), and
   search indexes it from its neutral events (`server/src/events/search-text.ts`) where the search
   trigger indexes Claude Code's rows from their JSON.
 - The evidence ledger (`source_item`) keeps one row per item an agent read: kind, container,

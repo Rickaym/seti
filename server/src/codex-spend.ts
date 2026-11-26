@@ -1,5 +1,5 @@
 import { eventsOf, payloadEvents, type CodexMessage, type RuntimeEvent, type TurnSpend } from '@seti/shared'
-import { callCost } from './runtimes/codex/prices.js'
+import { callCost } from './runtimes/prices.js'
 import { codexTurns } from './store/codex-turns.js'
 
 const codexEvents = (payload: string) => payloadEvents(payload, 'codex')
@@ -21,7 +21,7 @@ function summed(usages: readonly Extract<RuntimeEvent, { type: 'usage' }>['usage
     spent.cacheRead += usage.cacheRead ?? 0
     spent.reasoning += usage.reasoning ?? 0
     cacheWrite = usage.cacheWrite === undefined ? cacheWrite : (cacheWrite ?? 0) + usage.cacheWrite
-    const cost = model === null ? null : callCost(model, usage)
+    const cost = model === null ? null : callCost('openai', model, usage)
     usd = usd === null || cost === null ? null : usd + cost
   }
   return { ...spent, ...(cacheWrite === undefined ? {} : { cacheWrite }), ...(usd === null ? {} : { usd }) }
