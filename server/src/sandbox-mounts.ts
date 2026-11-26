@@ -35,6 +35,8 @@ export interface SandboxLayout {
   readOnly: readonly string[]
   caDir: string
   systemBundle: string | null
+  /** The sandbox's copy of the CA's NSS database, mounted as `~/.pki/nssdb` for Chromium and Chrome. */
+  browserDb: string | null
   /** Credentials and user-hidden paths, masked wherever a mounted directory contains them. */
   hidden: readonly string[]
   /** Home folders kept out of the code share but not secret; pinned read-only extras may sit inside. */
@@ -486,6 +488,9 @@ export function sandboxMounts(layout: SandboxLayout): Mount[] {
   ]
   if (layout.systemBundle !== null) {
     ca.push({ kind: 'ro-bind', src: path.join(layout.caDir, 'bundle.pem'), dest: layout.systemBundle })
+  }
+  if (layout.browserDb !== null) {
+    ca.push({ kind: 'bind', src: layout.browserDb, dest: path.join(layout.home, '.pki', 'nssdb') })
   }
   if (layout.ssh !== undefined && layout.ssh !== null) {
     ca.push(

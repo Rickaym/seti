@@ -5,6 +5,7 @@ import path from 'node:path'
 import tls from 'node:tls'
 import { promisify } from 'node:util'
 import { findBinary } from './binaries.js'
+import { writeBrowserDb, writtenBrowserDb } from './sandbox-nssdb.js'
 
 const exec = promisify(execFile)
 
@@ -18,10 +19,12 @@ const CA_DAYS = '3650'
 const LEAF_DAYS = '397'
 
 export interface SandboxCa {
-  /** Holds ca.pem and bundle.pem, the only CA files a sandbox mounts. */
+  /** Holds ca.pem, bundle.pem and nssdb, the only CA files a sandbox mounts. */
   publicDir: string
   /** The system bundle a sandbox sees replaced by bundle.pem, or null when the host has none. */
   systemBundle: string | null
+  /** The NSS database each sandbox copies to `~/.pki/nssdb`; null when the host has no certutil. */
+  browserDb: string | null
   /** A TLS context presenting a certificate for the host; rejects for hosts no CA may sign. */
   contextFor: (host: string) => Promise<tls.SecureContext>
   /**
@@ -130,19 +133,24 @@ function replaceFile(file: string, text: string): void {
 }
 
 /** Where a sandbox finds the CA files, without writing them: the process that runs proxies does. */
-export const sandboxCaFiles = (root: string): Pick<SandboxCa, 'publicDir' | 'systemBundle'> => ({
-  publicDir: path.join(root, 'public'),
-  systemBundle: SYSTEM_BUNDLES.find((file) => fs.existsSync(file)) ?? null,
-})
+export const sandboxCaFiles = (root: string): Pick<SandboxCa, 'publicDir' | 'systemBundle' | 'browserDb'> => {
+  const publicDir = path.join(root, 'public')
+  return {
+    publicDir,
+    systemBundle: SYSTEM_BUNDLES.find((file) => fs.existsSync(file)) ?? null,
+    browserDb: writtenBrowserDb(publicDir),
+  }
+}
 
-function writePublic(root: string, authorities: readonly Authority[], systemBundle: string | null): string {
-  const publicDir = sandboxCaFiles(root).publicDir
+async function writePublic(root: string, authorities: readonly Authority[], systemBundle: string | null) {
+  const publicDir = path.join(root, 'public')
   fs.mkdirSync(publicDir, { recursive: true, mode: 0o755 })
-  const certs = authorities.map((ca) => fs.readFileSync(path.join(ca.dir, 'ca.pem'), 'utf8').trimEnd()).join('\n')
+  const pems = authorities.map((ca) => fs.readFileSync(path.join(ca.dir, 'ca.pem'), 'utf8').trimEnd())
+  const certs = pems.join('\n')
   const system = systemBundle === null ? '' : fs.readFileSync(systemBundle, 'utf8')
   replaceFile(path.join(publicDir, 'ca.pem'), `${certs}\n`)
   replaceFile(path.join(publicDir, 'bundle.pem'), `${system.trimEnd()}\n${certs}\n`)
-  return publicDir
+  await writeBrowserDb(publicDir, pems)
 }
 
 /**
@@ -164,7 +172,7 @@ export async function loadSandboxCa(root: string): Promise<SandboxCa> {
   const key = fs.readFileSync(leafKey)
   const authorities: Authority[] = [{ dir: root, permitted: PERMITTED_DOMAINS }, ...readExtras(root)]
   const { systemBundle } = sandboxCaFiles(root)
-  const publicDir = writePublic(root, authorities, systemBundle)
+  await writePublic(root, authorities, systemBundle)
   const contexts = new Map<string, Promise<tls.SecureContext>>()
   let adding: Promise<boolean> = Promise.resolve(false)
 
@@ -189,13 +197,12 @@ export async function loadSandboxCa(root: string): Promise<SandboxCa> {
     await createCa(dir, missing)
     fs.writeFileSync(path.join(dir, 'hosts.json'), `${JSON.stringify(missing)}\n`)
     authorities.push({ dir, permitted: missing })
-    writePublic(root, authorities, systemBundle)
+    await writePublic(root, authorities, systemBundle)
     return true
   }
 
   return {
-    publicDir,
-    systemBundle,
+    ...sandboxCaFiles(root),
     contextFor: async (host) => {
       let context = contexts.get(host)
       if (context === undefined) {

@@ -208,6 +208,10 @@ export async function sandboxChecks(): Promise<Check[]> {
     return [check(s, 'fail', `missing ${missing.join(', ')}`, `sudo apt-get install ${packages}`)]
   }
   const checks = [check(s, 'ok', 'bwrap, socat, setpriv, openssl and ssh tools installed')]
+  if (binaryPath('certutil') === null) {
+    const label = 'certutil not found (optional): browsers in the sandbox do not trust the egress CA'
+    checks.push(check(s, 'info', label, 'sudo apt-get install libnss3-tools'))
+  }
   const args = ['--unshare-user', '--unshare-pid', '--unshare-net', '--ro-bind', '/', '/', '--dev', '/dev']
   const probe = await runQuiet('bwrap', [...args, '--proc', '/proc', 'true'])
   if (probe.code === 0) {

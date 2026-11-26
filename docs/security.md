@@ -117,6 +117,20 @@ bound to their name, never leave the server, and are set and cleared in Settings
 Settings, Connections. The host's `gh` login, which the PR views use, is neither stored nor read
 by Seti. Seti keeps `~/.seti` owner-only and tightens anything more open at startup.
 
+## The egress CA inside a sandbox
+
+The proxy signs the hosts where it adds a credential with CAs Seti makes, each name-constrained to
+the hosts it was made for ([EGR-4](protocol.md#73-egress)). Their private keys stay in
+`~/.seti/sandbox-ca`, which no sandbox mounts. A sandbox sees `/run/seti-ca` read-only: the
+certificates, the system bundle with them appended, and an NSS database that holds the
+certificates and no key. `SSL_CERT_FILE`, `NODE_EXTRA_CA_CERTS`, `REQUESTS_CA_BUNDLE`,
+`CURL_CA_BUNDLE` and `GIT_SSL_CAINFO` point at those files, and the system bundle path shows the
+appended copy. Chromium and Chrome read `~/.pki/nssdb` instead, which NSS opens read-write, so each
+sandbox gets a fresh copy of the database there at every start, trusting the CAs for TLS servers
+only. An agent can change its copy, which changes only its own browsers until its next start.
+Unsandboxed agents and the host's own browsers never trust these CAs. Firefox keeps its own store
+and does not read the copy.
+
 ## Connection values in request bodies
 
 A connection's value goes into a request body only when the user turns on Body for that

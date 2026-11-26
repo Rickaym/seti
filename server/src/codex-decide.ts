@@ -60,6 +60,10 @@ const cwdOf = (call: ToolCall): string | null => {
   return typeof input?.cwd === 'string' ? input.cwd : null
 }
 
+/** The command whose PRs the request shows, run in the folder Codex names. */
+const shellOf = (read: PolicyCall, call: ToolCall, task: Task) =>
+  read.command === undefined ? {} : { shell: { command: read.command, cwd: cwdOf(call) ?? task.cwd } }
+
 const USER_ANSWERS = 'Codex agents ask before every command, edit and tool call'
 
 /** A Codex call waiting for the user, by request id, which the rules decide once turned on. */
@@ -161,7 +165,7 @@ export async function decideCodexCall(taskId: string, call: ToolCall, signal: Ab
     ids.push(id)
     waitingCalls.set(id, waits)
   }
-  const ask = { tool: read.name, input: shownInput(call), review, reason, opened }
+  const ask = { tool: read.name, input: shownInput(call), review, reason, opened, ...shellOf(read, call, task) }
   try {
     const result = await askCodexUser(task.id, ask, [signal])
     if (!answeredByRules.has(waits)) {

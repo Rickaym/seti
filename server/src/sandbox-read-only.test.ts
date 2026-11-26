@@ -39,6 +39,7 @@ const layout = (patch: Partial<SandboxLayout> = {}, maintenance = true): Sandbox
   readOnly: [],
   caDir: make(setiHome, 'sandbox-ca', 'public'),
   systemBundle: null,
+  browserDb: null,
   hidden: [secret],
   pathEnv: '/usr/bin:/bin',
   sessionId: null,
