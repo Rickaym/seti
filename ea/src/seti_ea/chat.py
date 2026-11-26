@@ -408,7 +408,7 @@ class TextChat:
 
         CURRENT_CLOCK.set(clock)
         self._conversation.last_clock = clock
-        self._tools.user_turn()
+        self._tools.user_turn(text)
         asked: list[int] = []
         ASKED.set(asked)
         thought_usage = UsageRecorder(self._tools.seti)

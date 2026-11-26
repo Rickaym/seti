@@ -9,7 +9,7 @@ from typing import Any, cast
 from loguru import logger
 
 from seti_ea.format import ago, clip
-from seti_ea.gate import Confirmations
+from seti_ea.gate import ON_WORD_TOOLS, Confirmations
 from seti_ea.seti import SetiClient, SetiError
 from seti_ea.toolkit import ToolResult, ToolSpec
 
@@ -72,7 +72,7 @@ async def record_ask(
     """Records the question a gated tool asked and gives the model its id."""
     body = {
         "tool": tool,
-        "args": {k: v for k, v in args.items() if k != "confirmed"},
+        "args": {**{k: v for k, v in args.items() if k != "confirmed"}, **(result.bound or {})},
         "summary": clip(result.asked or tool, 300),
         "key": key,
         **gate.asked_in,
@@ -91,7 +91,7 @@ async def record_ask(
     if not isinstance(ask_id, int):
         return result
     asked = ASKED.get()
-    if asked is not None and ask_id not in asked:
+    if asked is not None and ask_id not in asked and tool not in ON_WORD_TOOLS:
         asked.append(ask_id)
     return replace(result, text=f"{result.text} Question id: {ask_id}.")
 

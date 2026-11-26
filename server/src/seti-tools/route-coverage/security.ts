@@ -1,4 +1,4 @@
-import { ea, gap, ui, user, type CoverageTable } from './kinds.js'
+import { ea, gap, same, ui, user, type CoverageTable } from './kinds.js'
 
 /** Security settings, credentials, connections, sign-in, devices, shares and installs. */
 export const SECURITY_ROUTES: CoverageTable = {
@@ -97,14 +97,15 @@ export const SECURITY_ROUTES: CoverageTable = {
   'POST /api/mod-admin/preview': user('installs', 'Preview a mod package before install. Install flow'),
   'GET /api/mod-asks': user('installs', 'Mods asking for consent. Consent'),
   'POST /api/mod-asks/:id': user('installs', "Answer a mod's consent ask. Consent"),
-  'GET /api/permissions': gap('Permission rules for every agent, built-in and inherited. Read; route lets the EA read'),
-  'GET /api/permissions/requests': gap(
-    'Pending tool calls and plans across agents, with description, command, reason and PR chips. search_seti lists them without command, description, reason or PR chips',
-  ),
+  'GET /api/permissions': ea('get_security_settings'),
+  'GET /api/permissions/requests': same('GET /api/requests'),
   'POST /api/permissions/rules': user('security', 'Add a rule. Permission rules'),
   'DELETE /api/permissions/rules/:rule_id': user('security', 'Remove a rule. Permission rules'),
   'POST /api/permissions/rules/batch': user('security', 'Add several rules. Permission rules'),
-  'GET /api/permissions/rules/coverage': gap('Which rules a review checklist covers. Read'),
+  'GET /api/permissions/rules/coverage': user(
+    'security',
+    'Checks a review rule while the user writes it, which is part of editing permission rules',
+  ),
   'GET /api/permissions/shadow': ea('seti_overview'),
   'GET /api/permissions/timeout': ea('search_seti'),
   'PUT /api/permissions/timeout': user('security', 'Change the request timeout. Permission settings'),

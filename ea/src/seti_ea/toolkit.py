@@ -26,6 +26,8 @@ class ToolResult:
     ok: bool = True
     # What a gated tool asks the user to allow, such as "delete agent Voicemail retry".
     asked: str | None = None
+    # Arguments the tool resolved, such as a full id, that the recorded question keeps for its call.
+    bound: Mapping[str, Any] | None = None
 
 
 @dataclass(frozen=True)

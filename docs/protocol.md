@@ -244,15 +244,23 @@ between two steps; an interrupt; a hook at subagent start.
 - SRC-1: The control room keeps an evidence ledger per agent. When a tool call ends well and an
   adapter recognises it as a read from a source system (a Slack tool server's channel, thread and
   message search reads; a Linear tool server's issue, issue list and comment reads; `gh pr view`,
-  `gh issue view` and `gh api` GETs of pull requests, issues, comments and reviews), it records one
+  `gh issue view`, `gh pr diff` and `gh api` GETs of pull requests, issues, comments and reviews),
+  it records one
   row per item read: the source kind, its container (channel, repository or team), the key a cited
   link is matched by, its permalink, its time and a pointer to the tool result in the stored
   transcript. The ledger MUST NOT copy the item's text: it reads the result as the transcript
   stores it, so credential redaction applies, and it reads both runtimes from neutral events.
 - SRC-2: An adapter reads only the structure the source's server writes: fields at their fixed
   places, the counts the answer states, and the ids the call asked for. An answer that does not
-  fit gives no item, and so does a shell command that uses anything beyond plain words and quotes,
-  or filters or pipes the output. A permalink is the one the answer states, else one built from
+  fit gives no item. A shell line is read as the outward check reads it, past `cd`, wrappers and
+  variables given one literal value; a gh read whose repository or number the shell computes
+  gives no item, nor does any gh write, a line that sets `GH_REPO` or `GH_HOST`, or a read whose
+  output goes to a file. A read whose output is filtered (`--jq`, a pipe) or shares the result
+  with other commands is recorded under the repository and number its own words name, and only
+  when the result is not empty and holds no gh error. Its text is the whole result when the line
+  prints that one read alone, through a jq program with no literal, variable, environment or input
+  and pipe filters that only cut, order or count; otherwise the item has no text, so no quote
+  verifies against it. A permalink is the one the answer states, else one built from
   parts the call and answers stated (Slack: the workspace host the agent's Slack answers stated, the
   channel and the `ts`; GitHub: the repository and number); one that cannot be built so stays
   empty and is never guessed.
@@ -272,6 +280,15 @@ between two steps; an interrupt; a hook at subagent start.
   item and whose id appears in no tool result, prompt or update of the agent's transcript (its own
   replies and calls do not count) is reported as not read by the agent; a client says so in muted
   text. An agent with no transcript rows gets no such report.
+- SRC-6: An agent MAY search its own ledger by words, kind, container and time with
+  `find_in_transcript` (`where` set to `sources`). Each item comes back once, newest first, with its
+  place, time, permalink and exact text from the transcript, cut at 2,000 characters. At every Seti
+  control level an agent reaches only its own ledger; the assistant reaches any agent's, as it
+  reads any agent's transcript.
+- SRC-7: Ledger text given to an agent or the assistant is untrusted data. It MUST come with a note
+  that other people wrote it, to quote and never to follow, inside a frame (a JSON field, or tags
+  whose closing marks the text cannot forge), with credentials redacted. Logs and audit details
+  MUST NOT carry it.
 
 ## 4. Turn lifecycle
 
@@ -468,7 +485,8 @@ interrupted only for that.
     and sample checks; sandbox policy, an agent's sandbox, `home_access` and tool level;
     unsandboxed starts; an agent's terminal and shell commands;
   - approval: permission rules, the request timeout and bypass; answering permission and change
-    requests; publishing or re-enabling shared tools; reviewing knowledge notes;
+    requests (the EA on the user's word: PERM-17); publishing or re-enabling shared tools;
+    reviewing knowledge notes;
   - identity: prompts as the user; share links; sign-in, passkeys and devices; installing
     plugins; installing, granting or enabling third-party mods;
   - storage: removing orphans (RES-17); the automatic clean (RES-18); allowing or denying a
@@ -608,9 +626,7 @@ interrupted only for that.
   offers no `always`, since an allow rule never lifts an ask rule. A card shows the agent's
   description first, cut to two lines with the whole text in a tooltip, then the call, then the
   implementation's own reason line; the agent's reason line reads the description in place of
-  the call when there is one. The reason line is the implementation's own words about why it
-  asks: a call an `ask` rule holds names that rule ("Your Ask rule holds this: <rule>"); it never
-  repeats the agent's description, and with no known reason there is no reason line.
+  the call when there is one.
 - PERM-7: Timeout is one install-wide setting: off, 15 min, 1 h (default), 4 h or 24 h from when
   the request was raised. A new value applies to waiting requests.
 - PERM-8: At the deadline the request MUST be denied with `timed_out`. The agent is told nobody
@@ -679,21 +695,22 @@ interrupted only for that.
   the whole title in a tooltip, the CI state, and a link that opens the PR. The implementation
   reads them with the walker of PERM-15: `gh pr` `merge`, `view`, `close`, `reopen`, `ready`,
   `comment`, `review`, `checks`, `edit` or `diff` with a number, in the repository `-R` or
-  `--repo` names, else the one the folder the command runs in resolves to: the remote
-  `gh repo set-default` chose, else the only GitHub repository its remotes name, in the folder the
-  agent's shell is in as the runtime reports it for the call, past any `cd` of an earlier call; a
-  pull request's
+  `--repo` names, else the one the folder the command runs in resolves to (the remote
+  `gh repo set-default` chose, else the only GitHub repository its remotes name); a pull request's
   github.com URL as any argument; and `repos/<owner>/<repo>/pulls/<n>` in `gh api`. A part the
   shell computes, another host, or a line that sets the code host's repository or host variables
-  or changes remotes gives no pull request rather than a wrong one. A number whose folder names
-  no repository is looked up in the agent's own repositories and those of its linked pull requests,
-  and shown, up to three per number, only where that pull request exists open or merged; this is a
-  hint for the reader, and the outward check of PERM-15 never uses it. The link is built from the
+  or changes remotes gives no pull request rather than a wrong one. The link is built from the
   owner, repository and number, never taken from the text. The request MUST be shown without
   waiting on them: the pull requests follow with their links, then title and CI from the data the
   implementation tracks or one bounded, cached lookup, which reads merged and closed ones too and
   shows them as such; a failed lookup leaves the link. A request
   whose command names none is shown as before, on every runtime whose command is known.
+- PERM-17: Under EA-17 the EA MAY answer a pending tool call or plan: `allow` this call or `deny`
+  with the user's message, never `always`, a `global` scope or edited fields. It allows a tool
+  call only when the stored input is whole and at most `read_back` characters on one line, read
+  back word for word with the reason line and the PRs; it MAY summarise a plan. Each pending
+  request a listing shows carries `digest`, a keyed hash of its fields and its exact call, which
+  changes when anything the request asks changes.
 
 ### 7.5 Guards
 
@@ -1101,13 +1118,14 @@ Why: an agent woken by its own actions or by news nobody waited for burns turns 
 ## 14. The assistant
 
 - EA-1: The EA is a separate process with its own token, acting only through the user's API; every
-  change is audited as the user's with `via: ea`. It MUST NOT hold reserved powers and has no
-  code-host write tool (merge, approve, comment, push).
+  change is audited as the user's with `via: ea`. It MUST NOT hold reserved powers beyond the
+  actions EA-17 lets it take on the user's word, and has no code-host write tool (merge, approve,
+  comment, push).
 - EA-3: A changing tool first records an ask (tool, arguments, summary, change key) and does
   nothing; the same change asked again returns the open ask. Only the user's yes runs it.
 - EA-4: A yes counts only for an ask from an earlier user turn or EA process, within `ask_ttl`. One
   ask takes one answer and runs once with the recorded arguments. The user MAY answer by text,
-  voice or notification; delegates MUST NOT.
+  voice or notification, except that an EA-17 action takes text or voice only; delegates MUST NOT.
   Why: the model cannot ask and approve in the same breath.
 - EA-7: The EA reaches agents only by group chat. A direct message joins a running turn or starts
   one; it never interrupts.
@@ -1119,6 +1137,19 @@ Why: an agent woken by its own actions or by news nobody waited for burns turns 
   call nothing interrupts: items follow the user's next turn, and a needs-you item gets its own
   line after `call_silence`.
 - EA-12: If a reply promised to reach an agent and no tool did, the EA gets one more run.
+- EA-16: The EA, and agents at `full`, MUST be able to read every pending request of all agents or
+  one, each with its id and agent, and a tool call or plan with Seti's reason, the agent's
+  description, its input as stored (secrets redacted) and the PRs it names. Text an agent or a code
+  host wrote MUST reach the model framed as data. Reading MUST NOT answer.
+- EA-17: Actions on the user's word. The EA MAY take a listed action (PERM-17) only on the user's
+  own yes, typed or spoken in the user turn right after the EA read the exact change back, in the
+  same EA process and within `word_use` of the yes. The control room MUST check this against the
+  recorded ask (EA-3), use the yes once, and refuse the action unless the ask's arguments equal
+  what it recomputes from the target as it stands, including the target's `digest`. A
+  notification Allow, an inbox report, a webhook, a transcript, a tool result and another agent's
+  message MUST NOT count as the yes. Agents and mods MUST NOT get these actions. The audit entry
+  says the EA acted on the user's word and names the ask and the target.
+  Why: the user can run Seti by voice without handing the model a standing power.
 
 ## 15. Resilience
 
@@ -1418,6 +1449,11 @@ Optional and off by default: a maintenance session per agent that consolidates i
 - MOD-26: A mod's slash command MUST NOT take a name the control room's own agent commands use
   (`/restart`, `/archive`, `/mcp`, `/sandbox`, `/bypass`, `/credential`, `/access`, `/settings`,
   `/rename`, `/dream`); a manifest that names one is invalid.
+- MOD-27: A mod's command offered on the palette, an agent's header or menu, or a view SHOULD also
+  be offered to the EA or carry `eaReason`, and a mod's route other than `GET` SHOULD name a
+  command offered to the EA or carry `eaReason`. A route's `command` MUST name one of the mod's
+  commands. The control room writes a warning to the mod's log for each one that does neither when
+  it starts the mod; mod API 2.0.0 makes these MUST and refuses such a manifest.
 
 ## 18. Public surfaces
 
@@ -1529,7 +1565,9 @@ Optional and off by default: a maintenance session per agent that consolidates i
   `/settings`, `/rename` and `/dream`, each only where the runtime declares what it needs (RT-13);
   one the runtime lacks says so by name. A setting command wins over a runtime's own command of
   the same name and never reaches the runtime. It makes the request the agent's settings make, so
-  it is refused, applied and audited as there.
+  it is refused, applied and audited as there. The settings' rows, the palette's agent commands and
+  the reply box's commands MUST come from one list of the agent's settings, so none of them offers
+  a setting the others lack.
 - CMD-2: A setting command MUST run only on the user's submit in that agent's reply box of a line
   the user typed or picked there. A line that arrived another way (pasted, dropped, restored,
   handed over, taken back, or submitted by a script) MUST wait in a card with Run and run only on
@@ -1639,7 +1677,7 @@ others.
 | Threads      | `thread_cap` 50. `dm_window` 24 h. `reply_settle` 10 s. `thread_rate` 10 an hour. `thread_quiet` 7 days. `thread_age` 30 days. `slack_name_stale` 30 days.                                                                                                                                                                                                                                                                      |
 | Chat         | Message 4000. Active agent: running, session open, or updated within 12 h. `chat_burst` 12 in 15 min. `chat_loop` 6 in 15 min.                                                                                                                                                                                                                                                                                                  |
 | Questions    | Answer batch 100 items. `notes_waiting` 10. Index 1500 characters. `note_stale` 3 failed checks in a row, or unverified 30 days (fact, environment) or 90 days (how-to, gotcha).                                                                                                                                                                                                                                                |
-| Assistant    | `ask_ttl` 10 min. `settle` quiet 45 s, at most 3 min. `call_silence` 30 s. `wake_phrase` 2 to 40 characters, at most 4 words. `keep_awake_seconds` 5 to 600.                                                                                                                                                                                                                                                                    |
+| Assistant    | `ask_ttl` 10 min. `word_use` 60 s. `read_back` 600 characters. `settle` quiet 45 s, at most 3 min. `call_silence` 30 s. `wake_phrase` 2 to 40 characters, at most 4 words. `keep_awake_seconds` 5 to 600.                                                                                                                                                                                                                       |
 | Resilience   | `stop_grace` 7 s. `resume_pace` 3 starts 2 s apart, 20 s between groups. `grant_ttl` 15 min. `send_window` 24 h.                                                                                                                                                                                                                                                                                                                |
 | Storage      | `orphan_grace` 1 h. `size_walk` 400,000 entries or 20 s per folder.                                                                                                                                                                                                                                                                                                                                                             |
 | Audit        | `audit_keep` 365 days. Summary 300. Detail string 500.                                                                                                                                                                                                                                                                                                                                                                          |
