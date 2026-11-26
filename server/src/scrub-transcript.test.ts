@@ -167,7 +167,7 @@ describe('stored transcripts', () => {
     const [stored] = await sql<{ payload: string }[]>`SELECT payload FROM task_message WHERE id = ${inserted.id}`
     expect(stored?.payload).not.toContain(session.slice(0, 24))
     expect(stored?.payload).not.toContain(session.slice(-24))
-    expect(stored?.payload).toContain('cookie: sb-abcdefghijklmnopqrst-auth-token=[redacted]; theme=[redacted]')
+    expect(stored?.payload).toContain('cookie: sb-abcdefghijklmnopqrst-auth-token=[redacted]; theme=dark')
     expect(stored?.payload).toContain('accept: text/html')
   })
 

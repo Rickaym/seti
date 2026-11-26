@@ -197,7 +197,7 @@ describe('session material', () => {
   ]
 
   it.each([
-    ['a raw cookie header', `Cookie: ${sb}=${blob}; theme=dark`, `Cookie: ${sb}=[redacted]; theme=[redacted]`],
+    ['a raw cookie header', `Cookie: ${sb}=${blob}; theme=dark`, `Cookie: ${sb}=[redacted]; theme=dark`],
     [
       'a chunked cookie',
       `cookie: ${sb}.0=${blob.slice(0, 60)}; ${sb}.1=${blob.slice(60)}`,
@@ -257,14 +257,14 @@ describe('session material', () => {
     [
       'curl -b',
       `curl -b 'sid=${refresh}; theme=dark' https://x.test`,
-      `curl -b 'sid=[redacted]; theme=[redacted]' https://x.test`,
+      `curl -b 'sid=[redacted]; theme=dark' https://x.test`,
     ],
     ['curl --cookie', `curl --cookie ${sb}=${refresh} https://x.test`, `--cookie ${sb}=[redacted] https://x.test`],
     ['curl -H with a session header', `curl -H 'X-Session-Token: ${refresh}' x`, `-H 'X-Session-Token: [redacted]' x`],
     [
       'document.cookie output',
       `> document.cookie\n'_ga=GA1.1.123.456; ${sb}=${blob}'`,
-      `'_ga=[redacted]; ${sb}=[redacted]'`,
+      `'_ga=GA1.1.123.456; ${sb}=[redacted]'`,
     ],
   ])('redacts %s', (_name, input, expected) => {
     expect(redactCredentials(input)).toContain(expected)
@@ -321,6 +321,9 @@ describe('session material', () => {
     'machine learning password manager',
     'curl -H "Content-Type: application/json" -b cookies.txt https://x.test',
     'Bearer authentication tokens expire after an hour.',
+    "attempt('cookie write', function () { document.cookie = 'probe=1'; return 'written' })",
+    'Cookie: theme=dark; lang=en; consent=yes',
+    'Set-Cookie: theme=dark; Path=/; Max-Age=31536000',
   ])('leaves %s alone', (input) => {
     expect(redactCredentials(input)).toBe(input)
     expect(credentialFindings(input)).toEqual([])

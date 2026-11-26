@@ -277,8 +277,9 @@ shape or by the name that carries it, and keeps the name so the row still reads:
 - Private keys, vendor token prefixes, cloud access keys, passwords in URLs and secret-named env
   lines.
 - JWTs wherever they appear, and base64 JSON sessions such as a Supabase `base64-` cookie.
-- The values of `Cookie` and `Set-Cookie` headers, of `curl -b` and `--cookie`, and of
-  `document.cookie` output. Cookie names and attributes stay.
+- Session and token-like values in `Cookie` and `Set-Cookie` headers, in `curl -b` and
+  `--cookie`, and in `document.cookie` output. Cookie names, attributes and short values such as
+  `theme=dark` stay.
 - The credential of an `Authorization` or `Proxy-Authorization` header of any scheme. The scheme
   stays.
 - Values under session names in cookies, query strings, form bodies and JSON: Supabase

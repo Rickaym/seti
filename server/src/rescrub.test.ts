@@ -59,7 +59,7 @@ describe('scrubStoredPayload', () => {
     const blob = sessionBlob()
     const out = scrubStoredPayload(toolResult(cookieLine(blob)))
     expect(out).not.toContain(blob.slice(7, 40))
-    expect(out).toContain('auth-token=[redacted]; theme=[redacted]')
+    expect(out).toContain('auth-token=[redacted]; theme=dark')
   })
 
   it('redacts a payload that is not JSON as text', () => {

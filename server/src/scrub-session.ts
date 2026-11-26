@@ -57,11 +57,18 @@ function isSessionValue(name: string, value: string): boolean {
 }
 
 /** A cookie list with each value redacted and each name and attribute kept. */
+/** A cookie value worth hiding: under a session name, or long and generated like a token. */
+const isCookieSecret = (name: string, value: string) =>
+  !COOKIE_ATTRIBUTE.test(name) &&
+  !isPlaceholder(value) &&
+  (isSessionValue(name, value) || (value.length >= 16 && /\d/.test(value) && /[A-Za-z]/.test(value)))
+
+/** A cookie list with each secret value redacted and every name, attribute and short value kept. */
 function redactCookiePairs(text: string): string {
   return text.replace(
     /(^|[;\s])([^\s=;,]{1,256})=([^;\s]{1,8192})/g,
     (pair: string, lead: string, name: string, value: string) =>
-      COOKIE_ATTRIBUTE.test(name) || isPlaceholder(value) ? pair : `${lead}${name}=${REDACTED}`,
+      isCookieSecret(name, value) ? `${lead}${name}=${REDACTED}` : pair,
   )
 }
 
