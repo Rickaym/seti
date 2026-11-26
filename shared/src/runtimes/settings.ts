@@ -30,10 +30,16 @@ export const CODEX_SETTINGS_DEFAULTS: CodexSettings = {
 export const CODEX_MODEL_HOST = 'api.openai.com'
 
 /**
- * The models a Codex agent may pick: those the pinned Codex sends its tools for, as CI proves.
- * Newer models in its catalog send none from the client, so no test shows them working.
+ * The models a Codex agent may pick. gpt-5.5 calls its tools directly; the newer ones call them
+ * from scripts Codex's code mode host runs, and CI proves both shapes against a scripted model.
  */
-export const CODEX_MODELS = ['gpt-5.5'] as const
+export const CODEX_MODELS = ['gpt-5.5', 'gpt-6.2-sol', 'gpt-6.2-astra', 'gpt-6.1-terra', 'gpt-6-luna'] as const
+
+/** Models no run against OpenAI's own API has shown working yet, marked so in every list. */
+const UNPROVEN: ReadonlySet<string> = new Set(['gpt-6.2-sol', 'gpt-6.2-astra', 'gpt-6.1-terra', 'gpt-6-luna'])
+
+/** A Codex model as lists show it. */
+export const codexModelLabel = (id: string): string => (UNPROVEN.has(id) ? `${id} (unproven)` : id)
 
 /** Reasoning efforts of those models, without `ultra`, which hands work to subagents. */
 export const CODEX_EFFORTS = ['low', 'medium', 'high', 'xhigh', 'max'] as const
