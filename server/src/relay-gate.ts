@@ -8,7 +8,7 @@ type RelayVerdict = { allow: true } | { allow: false; message: string }
 export type RelayDecide = (call: ToolCall, signal: AbortSignal) => Promise<RelayVerdict>
 
 /** A tool server call as Seti decides it: the input is the arguments the relay received. */
-export const relayedCall = (server: string, tool: string, args: Record<string, unknown>, id: string): ToolCall => ({
+const relayedCall = (server: string, tool: string, args: Record<string, unknown>, id: string): ToolCall => ({
   callId: id,
   kind: 'mcp',
   name: `mcp__${server}__${tool}`,

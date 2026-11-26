@@ -1,7 +1,7 @@
 import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { HOSTILE_ENTRY, HostileBench } from './hostile-rig.js'
+import { HOSTILE_ENTRY, HostileBench } from './conformance-hostile.js'
 
 const bench = new HostileBench()
 const missing = HOSTILE_ENTRY === ''
