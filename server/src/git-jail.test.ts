@@ -51,14 +51,18 @@ const run = (cwd: string, write: boolean): JailedGit => ({
 })
 
 describe('the git jail', () => {
-  it('mounts the system folders and the repository only, read-only unless the command writes', () => {
+  it('mounts the system folders and the repository only, its git folder writable for a write', () => {
     const repo = filteredRepo('mounts', 'true')
     const read = jailCommand(run(repo, false), '/usr/bin/bwrap', '/usr/bin/git')
     expect(read.args).toEqual(expect.arrayContaining(['--unshare-net', '--unshare-user', '--die-with-parent']))
-    const binds = read.args.flatMap((arg, i) => (arg.endsWith('bind') ? [`${arg} ${read.args[i + 1] ?? ''}`] : []))
     const system = /^--ro-bind \/(usr|etc|bin|sbin|lib\w*)$/
-    expect(binds.filter((bind) => !system.test(bind))).toEqual([`--ro-bind ${repo}`])
-    expect(jailCommand(run(repo, true), '/usr/bin/bwrap', '/usr/bin/git').args).toContain('--bind')
+    const binds = (args: string[]) =>
+      args
+        .flatMap((arg, i) => (arg.endsWith('bind') ? [`${arg} ${args[i + 1] ?? ''}`] : []))
+        .filter((bind) => !system.test(bind))
+    expect(binds(read.args)).toEqual([`--ro-bind ${repo}`])
+    const write = jailCommand(run(repo, true), '/usr/bin/bwrap', '/usr/bin/git')
+    expect(binds(write.args)).toEqual([`--ro-bind ${repo}`, `--bind ${repo}/.git`])
     expect(Object.keys(read.env).filter((name) => !/^(GIT_\w+|PATH|HOME|LANG)$/.test(name))).toEqual([])
   })
 

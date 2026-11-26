@@ -18,9 +18,12 @@ key off the host.
   agent, or one in Bypass, is a per-agent choice of the user's.
 - An agent's folder, PR text and every webhook payload are hostile input
   ([7.7 Hostile repositories](protocol.md#77-hostile-repositories)). Git that Seti runs in an
-  agent's folder, for its badges, safety checks and archives, runs in a jail with no network that
-  sees only the system folders and that repository, so a program the repository names runs with
-  no more access than the agent that wrote it (HST-2).
+  agent's folder, for its badges, safety checks and archives, and in your own checkout of a
+  repository its worktrees share, runs in a jail with no network that sees only the system
+  folders and that repository, so a program the repository names runs with no more access than
+  the agent that wrote it (HST-2). Every file git reads as config or hooks in a git folder an
+  agent can write stays read-only to it, even one that does not exist yet (SBX-16), so your own
+  git there runs only what you configured.
 - Secret values are write-only and sealed ([8 Secrets](protocol.md#8-secrets-and-connections)).
 - Only a short list of paths answers without a credential
   ([18 Public surfaces](protocol.md#18-public-surfaces)).

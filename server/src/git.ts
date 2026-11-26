@@ -9,6 +9,10 @@ import { jailCommand, jailTools } from './git-jail.js'
 
 const exec = promisify(execFile)
 
+/**
+ * Git on the host, for Seti's own checkout only. Git in any repository a sandbox can write, a
+ * registered repository's own checkout included, runs through the agentGit functions below.
+ */
 export async function git(cwd: string, ...args: string[]): Promise<string> {
   const { stdout } = await exec('git', ['-C', cwd, ...args], { maxBuffer: 16 * 1024 * 1024 })
   return stdout.trim()
@@ -82,11 +86,24 @@ async function agentCommand(run: AgentRun): Promise<{ file: string; args: string
   return jailCommand(jailed, tools.bwrap, tools.git)
 }
 
-async function runAgentGit(run: AgentRun, timeoutMs = 0): Promise<string> {
+/** The whole output of one command; `input` goes to its standard input. */
+async function agentOutput(run: AgentRun, timeoutMs = 0, input?: string): Promise<string> {
   const { file, args, env } = await agentCommand(run)
-  const options = { maxBuffer: 16 * 1024 * 1024, env, timeout: timeoutMs, killSignal: 'SIGKILL' as const }
-  const { stdout } = await exec(file, args, options)
-  return stdout.trim()
+  const options = { maxBuffer: 64 * 1024 * 1024, env, timeout: timeoutMs, killSignal: 'SIGKILL' as const }
+  const pending = exec(file, args, options)
+  if (input !== undefined) {
+    pending.child.stdin?.end(input)
+  }
+  return (await pending).stdout
+}
+
+async function runAgentGit(run: AgentRun, timeoutMs = 0): Promise<string> {
+  return (await agentOutput(run, timeoutMs)).trim()
+}
+
+/** Like agentGit with the output untrimmed, for `-z` lists, and `input` on standard input. */
+export async function agentGitRaw(cwd: string, args: readonly string[], input?: string): Promise<string> {
+  return agentOutput({ cwd, args }, 0, input)
 }
 
 /**
@@ -117,12 +134,21 @@ export async function agentGitWrite(cwd: string, ...args: string[]): Promise<str
   return runAgentGit({ cwd, args, write: true })
 }
 
-/** Detached worktree at origin/<ref>, so the agent names its own branch. */
+/**
+ * Checks a new folder out as a worktree of a repository Seti does not own, in the jail like an
+ * agent's git: the repository's config and attributes name what runs, and an agent may have
+ * written them. Only the new folder and the repository's git folder are writable there.
+ */
+async function addWorktree(repoPath: string, dir: string, ...args: string[]): Promise<void> {
+  fs.mkdirSync(dir, { recursive: true })
+  await runAgentGit({ cwd: repoPath, args: ['worktree', 'add', ...args], write: true, folders: [dir] })
+}
+
+/** Detached worktree at origin/<ref> as last fetched, so the agent names its own branch. */
 export async function createWorktree(repoPath: string, ref: string, name: string): Promise<string> {
   const dir = path.join(WORKTREE_ROOT, name)
   if (!fs.existsSync(dir)) {
-    await git(repoPath, 'fetch', 'origin', ref)
-    await git(repoPath, 'worktree', 'add', '--detach', dir, `origin/${ref}`)
+    await addWorktree(repoPath, dir, '--detach', dir, `origin/${ref}`)
   }
   return dir
 }
@@ -130,7 +156,7 @@ export async function createWorktree(repoPath: string, ref: string, name: string
 /** Paths of every worktree of a checkout, the main one included; empty when git fails. */
 export async function listWorktrees(repoPath: string): Promise<string[]> {
   try {
-    const out = await git(repoPath, 'worktree', 'list', '--porcelain')
+    const out = await agentGit(repoPath, 'worktree', 'list', '--porcelain')
     return out.split('\n').flatMap((line) => (line.startsWith('worktree ') ? [line.slice('worktree '.length)] : []))
   } catch {
     return []
@@ -199,24 +225,13 @@ export async function recreateWorktree(repoPath: string, dir: string, branch: st
   await forgetWorktree(repoPath, dir)
   if (branch !== null) {
     try {
-      await git(repoPath, 'worktree', 'add', dir, branch)
+      await addWorktree(repoPath, dir, dir, branch)
       return
     } catch {
-      fs.rmSync(dir, { recursive: true, force: true })
+      // the branch is gone or checked out elsewhere, so its commit is checked out instead
     }
   }
-  await git(repoPath, 'worktree', 'add', '--detach', dir, head)
-}
-
-export async function removeWorktree(repoPath: string, dir: string): Promise<void> {
-  if (!dir.startsWith(WORKTREE_ROOT + path.sep)) {
-    return
-  }
-  if (fs.existsSync(dir)) {
-    await git(repoPath, 'worktree', 'remove', '--force', dir)
-  } else {
-    await forgetWorktree(repoPath, dir)
-  }
+  await addWorktree(repoPath, dir, '--detach', dir, head)
 }
 
 /**
