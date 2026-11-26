@@ -26,9 +26,6 @@ export const CODEX_SETTINGS_DEFAULTS: CodexSettings = {
   default_effort: null,
 }
 
-/** The host a Codex agent sends its model calls to, where its OpenAI key connection applies. */
-export const CODEX_MODEL_HOST = 'api.openai.com'
-
 /**
  * The models a Codex agent may pick. gpt-5.5 calls its tools directly; the newer ones call them
  * from scripts Codex's code mode host runs, and CI proves both shapes against a scripted model.
