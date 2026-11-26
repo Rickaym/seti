@@ -45,7 +45,7 @@ const REVIEW_TIP =
   'Review holds each call of an MCP tool or server for you to check and edit before it runs, in Bypass too.'
 
 const PUSH_TIP =
-  "Agents ask before they push, fork or open a pull request outside your organisations. PushTo(owner), such as PushTo(acme), lets them do it on that owner's repositories without asking."
+  "Agents ask before they push, fork, open a pull request, or comment on, review, merge or change a pull request, issue or release outside your organisations. PushTo(owner), such as PushTo(acme), lets them do it on that owner's repositories without asking."
 
 const TIPS: Partial<Record<PermissionBehavior, { label: string; text: string }>> = {
   allow: { label: 'About pushes elsewhere', text: PUSH_TIP },

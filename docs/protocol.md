@@ -601,10 +601,21 @@ interrupted only for that.
 
 - PERM-15: A command of any agent, on any runtime and in every mode including bypass, that
   pushes to, forks, opens a pull request on or writes through the code host's API to a repository
-  outside the user's own MUST become a request before it runs, reading "Push to <owner>/<repo>,
-  outside your organisations" or the like; it is an ask, never a refusal. The user's own are the
+  outside the user's own, or that writes to such a repository's pull requests, issues or releases
+  with the code host's CLI (comment, review, merge, close, reopen, mark ready, edit, lock, unlock,
+  update or revert a pull request; open, comment on, close, reopen, edit, delete, lock, unlock,
+  pin, unpin, transfer or branch from an issue; create, edit, delete or upload to a release),
+  MUST become a request before it runs, reading "Push to <owner>/<repo>, outside your
+  organisations", "Comment on <owner>/<repo>, outside your organisations" or the like, one short
+  verb per write; it is an ask, never a refusal. The user's own are the
   owners of the signed-in code-host account and its organisations, read on the control plane and
-  cached for about an hour, and the owners of the repositories the agent was given. The
+  cached for about an hour, and the owners of the repositories the agent was given. Such a CLI
+  write targets the repository of each pull request or issue URL it names, else its `-R`
+  repository, else every remote of the folder it runs in, since the CLI may pick any of them (in a
+  folder outside any repository the CLI fails without writing, so it does not ask). A
+  number the shell computes (a whole computed word without a slash) leaves that repository as it
+  is, while a computed owner, repository or URL cannot be placed. A write to one of the user's own
+  repositories never asks under this requirement; other rules still apply to it. The
   implementation reads the command past wrappers and nested scripts, and reads a heredoc body
   as data unless a shell reads it (an unquoted body's substitutions still run); follows `cd`, `pushd`,
   `popd` and `git -C`, with `~` and `$HOME` as the agent's home, and variables the same line
@@ -613,9 +624,10 @@ interrupted only for that.
   the folder as the agent sees it (a sandbox's private home and /tmp included); and asks whenever
   it cannot place the target: a folder or variable the shell computes, the same command changes
   remotes, git config or git's environment, sets the code host's repository or host variables,
-  or pushes submodules. A command that neither pushes, forks, opens a pull request nor writes
-  through the API never asks, and a push to a local path does not ask. An allow rule `PushTo(<owner>)`, which only the user adds, lets
-  that code-host owner through; it is never handed to a runtime.
+  or pushes submodules. A command that does none of these writes never asks (reads such as
+  viewing, listing or checking a pull request, and GraphQL calls, are not read), and a push to a
+  local path does not ask. An allow rule `PushTo(<owner>)`, which only the user adds, lets
+  that code-host owner through for every one of these writes; it is never handed to a runtime.
 - PERM-16: A request whose shell command names GitHub pull requests lists each once in `prs`
   (`url`, `repo`, `number`, `title`, `ci`), and its card shows up to three, then "+N", between the
   reason and the full input: the repository's short name and number, the title on one line with
