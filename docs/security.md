@@ -239,7 +239,9 @@ which Seti stores with credentials redacted, and rows are deleted with the trans
 agent is archived and when it is deleted. Checking a link reads only the agent's own rows, and the
 answer carries the item's place, time and permalink, never its text. The adapters read the
 structure each server writes and the ids the call asked for, never a message body, so text someone
-posted in Slack or GitHub cannot add an item or change a permalink. Seti does not fetch anything
+posted in Slack or GitHub cannot add an item or change a permalink. An agent's own shell line can
+print text of its own, through `echo`, a jq literal or `sed`, so a filtered gh read lets a quote
+verify only when nothing in the line could add text to the result. Seti does not fetch anything
 for the ledger: an item exists only because the agent read it.
 
 A file the agent reads in a GitHub clone is placed with git on the host, in a clone the agent can

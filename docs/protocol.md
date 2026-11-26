@@ -243,15 +243,23 @@ between two steps; an interrupt; a hook at subagent start.
 - SRC-1: The control room keeps an evidence ledger per agent. When a tool call ends well and an
   adapter recognises it as a read from a source system (a Slack tool server's channel, thread and
   message search reads; a Linear tool server's issue, issue list and comment reads; `gh pr view`,
-  `gh issue view` and `gh api` GETs of pull requests, issues, comments and reviews), it records one
+  `gh issue view`, `gh pr diff` and `gh api` GETs of pull requests, issues, comments and reviews),
+  it records one
   row per item read: the source kind, its container (channel, repository or team), the key a cited
   link is matched by, its permalink, its time and a pointer to the tool result in the stored
   transcript. The ledger MUST NOT copy the item's text: it reads the result as the transcript
   stores it, so credential redaction applies, and it reads both runtimes from neutral events.
 - SRC-2: An adapter reads only the structure the source's server writes: fields at their fixed
   places, the counts the answer states, and the ids the call asked for. An answer that does not
-  fit gives no item, and so does a shell command that uses anything beyond plain words and quotes,
-  or filters or pipes the output. A permalink is the one the answer states, else one built from
+  fit gives no item. A shell line is read as the outward check reads it, past `cd`, wrappers and
+  variables given one literal value; a gh read whose repository or number the shell computes
+  gives no item, nor does any gh write, a line that sets `GH_REPO` or `GH_HOST`, or a read whose
+  output goes to a file. A read whose output is filtered (`--jq`, a pipe) or shares the result
+  with other commands is recorded under the repository and number its own words name, and only
+  when the result is not empty and holds no gh error. Its text is the whole result when the line
+  prints that one read alone, through a jq program with no literal, variable, environment or input
+  and pipe filters that only cut, order or count; otherwise the item has no text, so no quote
+  verifies against it. A permalink is the one the answer states, else one built from
   parts the call and answers stated (Slack: the workspace host the agent's Slack answers stated, the
   channel and the `ts`; GitHub: the repository and number); one that cannot be built so stays
   empty and is never guessed.
