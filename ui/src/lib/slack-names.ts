@@ -55,7 +55,11 @@ export function useSlackLookup(ids: readonly string[]): { names: ReadonlyMap<str
       timer = setTimeout(flush, 50)
     }
   }, [key])
-  useSyncExternalStore(subscribe, () => version)
+  useSyncExternalStore(
+    subscribe,
+    () => version,
+    () => version,
+  )
   const names = new Map(
     ids.flatMap((id) => {
       const name = known.get(id)
