@@ -1484,9 +1484,8 @@ Optional and off by default: a maintenance session per agent that consolidates i
   the control room MUST NOT offer the command or show the view there, its slash command says it is
   not on that runtime, and the server refuses the command for that agent (409) to the user, the EA
   and agents alike.
-- MOD-26: A mod's slash command MUST NOT take a name the control room's own agent commands use
-  (`/restart`, `/archive`, `/mcp`, `/sandbox`, `/bypass`, `/credential`, `/access`, `/settings`,
-  `/rename`, `/dream`); a manifest that names one is invalid.
+- MOD-26: A mod's slash command MUST NOT take the name of one of an agent's settings, such as
+  `restart`, `mcp` or `settings`, nor any name with `seti:`; a manifest that names one is invalid.
 - MOD-27: A mod's command offered on the palette, an agent's header or menu, or a view SHOULD also
   be offered to the EA or carry `eaReason`, and a mod's route other than `GET` SHOULD name a
   command offered to the EA or carry `eaReason`. A route's `command` MUST name one of the mod's
@@ -1598,24 +1597,25 @@ Optional and off by default: a maintenance session per agent that consolidates i
 
 ### 19.1 Agent commands
 
-- CMD-1: An agent's reply box MUST offer the control room's own setting commands, the same on every
-  runtime: `/restart`, `/archive`, `/mcp`, `/sandbox`, `/bypass`, `/credential`, `/access`,
-  `/settings`, `/rename` and `/dream`, each only where the runtime declares what it needs (RT-13);
-  one the runtime lacks says so by name. A setting command wins over a runtime's own command of
-  the same name and never reaches the runtime. It makes the request the agent's settings make, so
-  it is refused, applied and audited as there. The settings' rows, the palette's agent commands and
-  the reply box's commands MUST come from one list of the agent's settings, so none of them offers
-  a setting the others lack.
-- CMD-2: A setting command MUST run only on the user's submit in that agent's reply box of a line
+- CMD-1: An agent's reply box MUST offer the control room's own commands for the agent's settings,
+  each named `/seti:<setting>` (with `/seti:mcp` short for `/seti:access mcp`), the same on every
+  runtime, each only where the runtime declares what it needs (RT-13); one the runtime lacks says
+  so by name. A runtime's own command keeps its name: the control room MUST NOT hide one, except
+  one named `seti:`, and typing a bare name such as `/acc` or `/mcp` MUST still offer the `seti:`
+  command. The settings' rows, the palette's agent commands and the reply box's commands MUST come
+  from one list of the agent's settings, so none of them offers a setting the others lack.
+- CMD-2: A Seti command MUST run only on the user's submit in that agent's reply box of a line
   the user typed or picked there. A line that arrived another way (pasted, dropped, restored,
   handed over, taken back, or submitted by a script) MUST wait in a card with Run and run only on
-  its tap, also after a command picked from the completion list replaced it. Transcript rows,
-  updates, group chat and Slack messages, webhooks, the EA, agents and mods MUST NOT run one, and
-  the control room MUST refuse a setting command sent to an agent as a prompt (400).
-- CMD-3: A setting command that needs a value and has none MUST offer its choices, the current one
-  marked, never an error. Archive, restart, Bypass on and sandbox off MUST ask the settings' own
-  question inline with Confirm and Cancel first; a credential that changes access opens the dialog
-  the settings open. Esc closes the card and leaves the draft.
+  its tap, also after a choice picked from the completion list replaced it. Transcript rows,
+  updates, group chat and Slack messages, webhooks, the EA, agents and mods MUST NOT run one.
+- CMD-3: Each word of a Seti command MUST complete from a list: the setting's values, or the
+  agent's own items with their state and where it comes from (Custom, Credential, Inherited), then
+  each operation the item allows, each with one line. A choice that cannot be taken MUST show
+  muted with its reason and MUST NOT be picked. Archive, restart, Bypass on, sandbox off, a raised
+  Seti control and access that widens MUST ask the settings' own question inline with Confirm and
+  Cancel first; a credential that changes access opens the dialog the settings open. Esc closes
+  the card and leaves the draft.
 - CMD-4: A Seti command line starts `/seti:` and MUST be read by one grammar built from the list of
   the agent's settings: each setting's words, each item from the agent's own state, and each
   operation the setting allows. The control room MUST refuse a line the grammar does not define,
