@@ -51,9 +51,12 @@ export function SuggestionList({
   updating,
   placement,
   onPick,
+  heading,
 }: {
   listId: string
   label: string
+  /** One line over a word's choices saying what to pick; none over the commands. */
+  heading?: string | undefined
   rows: readonly SuggestionRow[]
   active: number
   loading: boolean
@@ -71,6 +74,7 @@ export function SuggestionList({
         placement === 'above' ? 'absolute bottom-full left-0 mb-1' : 'mt-1',
       )}
     >
+      {heading !== undefined && <div className="px-2 py-1 text-2xs text-muted-foreground">{heading}</div>}
       {rows.map((row, index) => (
         <Suggestion
           key={row.key}

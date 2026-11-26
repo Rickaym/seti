@@ -135,10 +135,11 @@ function menuOf(value: string, commands: CommandState, words: SetiCompletion | n
   const typingName = input.mode === 'slash' && !/\s/.test(value.trimStart())
   if (typingName) {
     const rows = rankCommands(commands.commands ?? [], input.name, SUGGESTION_LIMIT).map(commandRow)
-    return { typingName, rows, listed: rows.length > 0 || commands.loading || commands.commands !== null }
+    const listed = rows.length > 0 || commands.loading || commands.commands !== null
+    return { typingName, rows, listed, heading: undefined, updating: commands.updating }
   }
   const rows = words === null ? [] : optionRows(words)
-  return { typingName, rows, listed: rows.length > 0 }
+  return { typingName, rows, listed: rows.length > 0, heading: `Pick ${words?.prompt ?? 'a choice'}`, updating: false }
 }
 
 /** A textarea that suggests slash commands, then the choices for each word of a Seti command. */
@@ -151,7 +152,7 @@ export function CommandField(props: CommandFieldProps) {
   const [dismissedAt, setDismissedAt] = useState<string | null>(null)
   const [focused, setFocused] = useState(false)
   const words = props.completion ?? null
-  const { typingName, rows: items, listed } = menuOf(value, commands, words)
+  const { typingName, rows: items, listed, heading, updating } = menuOf(value, commands, words)
   const shellMode = parseComposer(value).mode === 'shell'
   const open = listed && focused && !disabled && dismissedAt !== value
   const current = Math.min(active, Math.max(items.length - 1, 0))
@@ -255,8 +256,9 @@ export function CommandField(props: CommandFieldProps) {
           label={typingName ? 'Command suggestions' : (words?.prompt ?? 'Choices')}
           rows={items}
           active={current}
+          heading={heading}
           loading={commands.loading}
-          updating={commands.updating}
+          updating={updating}
           placement={placement}
           onPick={accept}
         />
