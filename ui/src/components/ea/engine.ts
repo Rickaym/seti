@@ -23,6 +23,7 @@ import type { CallAction } from './call-state'
 import type { CallHandlers, LiveCall } from './call-store'
 import { inputKind } from './device-kind'
 import { responseError } from './ice'
+import { LinkMonitor } from './link-monitor'
 import { describeBotError } from './media'
 import { handOver, Rerouter, watchDevices } from './reroute'
 import { everySecond } from './ticker'
@@ -77,8 +78,6 @@ function installMicDefaults(defaults: () => MediaTrackConstraints): void {
 
 interface TransportInternals {
   attemptReconnection: (recreate?: boolean) => Promise<void>
-  stop: (error?: Error) => Promise<void>
-  buildTransportStartError: () => Error
   addUserMedia: () => Promise<void>
   getAudioTransceiver: () => RTCRtpTransceiver | undefined
   pc: RTCPeerConnection | null
@@ -94,15 +93,11 @@ function sendLocalAudio(transport: SmallWebRTCTransport): void {
   }
 }
 
-/**
- * A reconnect that recreates the peer connection would start a new bot session, so the call ends
- * instead. A path that is only disconnected, as in a short network stall, gets until the browser
- * declares it failed, about 30 s, rather than the transport's 5 s.
- */
+/** A dropped path is rebuilt with the same id; the EA keeps its session and the reply goes on. */
 function buildTransport(
   iceServers: RTCIceServer[],
   mediaManager: MicManager,
-  onIceFailure: () => void,
+  onRebuild: (negotiated: boolean) => void,
 ): SmallWebRTCTransport {
   const transport = new SmallWebRTCTransport({
     iceServers,
@@ -112,17 +107,10 @@ function buildTransport(
   const internals = transport as unknown as TransportInternals
   const reconnect = internals.attemptReconnection.bind(transport)
   internals.attemptReconnection = async (recreate = false) => {
-    if (!recreate) {
-      await reconnect(false)
-      return
+    if (recreate) {
+      onRebuild(internals._lastNegotiationError === null)
     }
-    if (internals.pc?.iceConnectionState === 'disconnected') {
-      return
-    }
-    if (internals._lastNegotiationError === null) {
-      onIceFailure()
-    }
-    await internals.stop(internals.buildTransportStartError())
+    await reconnect(recreate)
   }
   return transport
 }
@@ -220,14 +208,15 @@ function listen(client: PipecatClient, dispatch: (action: CallAction) => void): 
   })
 }
 
-/** The bot drops the EA's voice 3 s after its last ping, and the transport pings on page timers. */
-function keepAlive(transport: SmallWebRTCTransport): () => void {
+/** Pings the bot each second, as the transport pings on page timers, and reads the path. */
+function keepAlive(transport: SmallWebRTCTransport, link: LinkMonitor): () => void {
   const internals = transport as unknown as TransportInternals
   return everySecond(() => {
     const channel = internals.dc
     if (channel?.readyState === 'open') {
       channel.send(`ping: ${String(Date.now())}`)
     }
+    link.observe(internals.pc?.connectionState, internals.pc?.iceConnectionState)
   })
 }
 
@@ -283,8 +272,17 @@ export function createCall(
   const recent = () => (note !== null && Date.now() - note.at < BOT_ERROR_TTL_MS ? note : null)
   const recentReason = () => recent()?.text ?? null
   const manager = micManager()
-  const transport = buildTransport(iceServers, manager, () => {
-    note = { text: ICE_FAILED, reason: 'ice-failed', at: Date.now() }
+  const link = new LinkMonitor((reconnecting) => {
+    dispatch({ type: 'link', reconnecting, at: Date.now() })
+    if (!reconnecting && note?.reason === 'ice-failed') {
+      note = null
+    }
+  })
+  const transport = buildTransport(iceServers, manager, (negotiated) => {
+    if (negotiated) {
+      note = { text: ICE_FAILED, reason: 'ice-failed', at: Date.now() }
+    }
+    link.rebuilding()
   })
   const rerouter = routeCall(manager, transport, handlers)
   let choseDevice = false
@@ -339,7 +337,7 @@ export function createCall(
   return {
     connect: async (requestData: EaRequestData) => {
       await client.initDevices()
-      stopPings = keepAlive(transport)
+      stopPings = keepAlive(transport, link)
       await client.connect({ webrtcRequestParams: { endpoint: OFFER_PATH, requestData } })
       if (!stopping) {
         stopWatching = watchDevices(navigator.mediaDevices, rerouter.devicesChanged)
