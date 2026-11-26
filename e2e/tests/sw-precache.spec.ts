@@ -55,7 +55,7 @@ const sorted = (paths: string[]) => paths.toSorted((a, b) => a.localeCompare(b))
 
 const cacheNames = async (page: Page) => page.evaluate(async () => caches.keys())
 
-test('a new worker copies the hashed files it has, fetches the rest and takes over a current page', async ({
+test('a new worker copies the hashed files it already has and fetches only the rest', async ({
   page,
   context,
   request,
@@ -72,7 +72,7 @@ test('a new worker copies the hashed files it has, fetches the rest and takes ov
     await navigator.serviceWorker.register('/sw.js?next')
   })
   await expect
-    .poll(async () => page.evaluate(() => navigator.serviceWorker.controller?.scriptURL ?? ''))
+    .poll(async () => page.evaluate(async () => (await navigator.serviceWorker.getRegistration())?.waiting?.scriptURL))
     .toMatch(/\/sw\.js\?next$/)
 
   const unhashed = urls.filter((url) => !url.startsWith('/assets/'))
@@ -83,6 +83,9 @@ test('a new worker copies the hashed files it has, fetches the rest and takes ov
   })
   expect(sorted(held)).toEqual(sorted(urls))
 
+  await page.evaluate(async () => {
+    ;(await navigator.serviceWorker.getRegistration())?.waiting?.postMessage('skip-waiting')
+  })
   await expect.poll(async () => cacheNames(page)).toEqual(['seti-shell-e2e-next'])
 })
 
@@ -108,7 +111,7 @@ test('a failed fetch fails the install and the old worker keeps its cache', asyn
   })
   expect(state).toBe('redundant')
   expect(await cacheNames(page)).toEqual(before)
-  expect(await page.evaluate(() => navigator.serviceWorker.controller?.scriptURL ?? '')).toMatch(/\/sw\.js$/)
+  expect(await page.evaluate(() => navigator.serviceWorker.controller?.scriptURL ?? '')).toMatch(/\/sw\.js\?build=/)
   await page.reload()
   await expect(page.getByRole('banner')).toBeVisible()
 })

@@ -2,6 +2,10 @@
 export const pageBuild = (doc: Document): string =>
   doc.querySelector<HTMLMetaElement>('meta[name="seti-build"]')?.content ?? ''
 
+/** The worker script of a build; its own address per build, so no cache can hand out an older one. */
+export const workerScript = (build: string): string =>
+  build === '' ? '/sw.js' : `/sw.js?build=${encodeURIComponent(build)}`
+
 /** Whether the server hands out a build other than the one this page runs. */
 export const isBehind = (page: string, server: string | null | undefined): boolean =>
   page !== '' && typeof server === 'string' && server !== '' && server !== page

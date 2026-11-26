@@ -73,6 +73,8 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('message', (event) => {
   if (event.data === 'skip-waiting') {
     void self.skipWaiting()
+  } else if (event.data === 'build') {
+    event.ports[0]?.postMessage(PRECACHE.version)
   }
 })
 
@@ -101,6 +103,13 @@ async function precached(request: Request): Promise<Response> {
   return (await caches.match(request, { cacheName: CACHE })) ?? fetch(request)
 }
 
+/** Stores into this worker's cache only while it exists, so a replaced worker never revives it. */
+async function keep(request: Request, response: Response): Promise<void> {
+  if (await caches.has(CACHE)) {
+    await (await caches.open(CACHE)).put(request, response)
+  }
+}
+
 /** Hashed files never change, so the first full response of the right kind is kept for good. */
 async function hashedAsset(event: FetchEvent): Promise<Response> {
   const cached = await caches.match(event.request, { cacheName: CACHE })
@@ -110,7 +119,7 @@ async function hashedAsset(event: FetchEvent): Promise<Response> {
   const response = await fetch(event.request)
   if (response.status === 200 && fitsKind(new URL(event.request.url).pathname, response.headers.get('content-type'))) {
     const copy = response.clone()
-    event.waitUntil(caches.open(CACHE).then(async (cache) => cache.put(event.request, copy)))
+    event.waitUntil(keep(event.request, copy))
   }
   return response
 }

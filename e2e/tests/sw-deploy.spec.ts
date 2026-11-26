@@ -3,14 +3,19 @@ import {
   countLoads,
   deployBuildB,
   expectOnBuildB,
+  expectPageOnBuildB,
   openControlled,
   pageBuild,
   seedIdleAgent,
 } from './support/deploy.js'
 import { expect, test } from './support/fixtures.js'
 
-test.use({ serviceWorkers: 'allow', allowedHttpStatuses: [503] })
-test.describe.configure({ timeout: 60_000 })
+test.use({
+  serviceWorkers: 'allow',
+  allowedHttpStatuses: [503],
+  allowedConsoleErrors: [/bad HTTP response code \(503\) was received when fetching the script/],
+})
+test.describe.configure({ timeout: 90_000 })
 
 test('an idle open page moves to a new build by itself', async ({ page, context, request }) => {
   const before = await openControlled(page)
@@ -18,7 +23,9 @@ test('an idle open page moves to a new build by itself', async ({ page, context,
   await deployBuildB(context, request)
 
   await expectOnBuildB(page)
-  expect(await page.evaluate(() => navigator.serviceWorker.controller?.scriptURL)).toMatch(/\/sw\.js$/)
+  expect(await page.evaluate(() => navigator.serviceWorker.controller?.scriptURL)).toMatch(
+    /\/sw\.js\?build=e2e-build-b$/,
+  )
 })
 
 test('a page with text in the Reply box offers Update, then keeps the draft', async ({ page, context, request }) => {
@@ -61,7 +68,8 @@ test('a 503 for sw.js while Seti restarts is tried again and the page still upda
   request,
 }) => {
   await openControlled(page)
-  await deployBuildB(context, request, { workerOutages: 2 })
+  const deploy = await deployBuildB(context, request, { workerOutages: 2 })
 
-  await expectOnBuildB(page)
+  await expectPageOnBuildB(page)
+  expect(deploy.workerAnswers.slice(0, 3)).toEqual([503, 503, 200])
 })

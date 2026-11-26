@@ -1,5 +1,5 @@
 import { systemResource } from '@/hooks/useSystem'
-import { isBehind, pageBuild, retryDelay, updateMoment } from '@/lib/app-build'
+import { isBehind, pageBuild, retryDelay, updateMoment, workerScript } from '@/lib/app-build'
 import { readActivity, watchTyping } from '@/lib/page-activity'
 import { claimReload } from '@/lib/stale-build'
 
@@ -85,13 +85,32 @@ async function installs(worker: ServiceWorker): Promise<boolean> {
   })
 }
 
-/** The installed new worker, null when there is none to fetch, or 'failed'. */
-async function fetchWorker(): Promise<ServiceWorker | null | 'failed'> {
+const ASK_WAIT_MS = 2_000
+
+/** The build a worker was made with, as it answers; null when it does not answer in time. */
+async function workerBuild(worker: ServiceWorker): Promise<string | null> {
+  const channel = new MessageChannel()
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => {
+      resolve(null)
+    }, ASK_WAIT_MS)
+    channel.port1.onmessage = (event: MessageEvent) => {
+      clearTimeout(timer)
+      resolve(typeof event.data === 'string' ? event.data : null)
+    }
+    worker.postMessage('build', [channel.port2])
+  })
+}
+
+/** The installed worker of the target build, null when there is none to fetch, or 'failed'. */
+async function fetchWorker(target: string): Promise<ServiceWorker | null | 'failed'> {
   if (registration === null) {
     return null
   }
   try {
-    await registration.update()
+    await (target === ''
+      ? registration.update()
+      : navigator.serviceWorker.register(workerScript(target), { updateViaCache: 'none' }))
   } catch {
     return 'failed'
   }
@@ -99,7 +118,10 @@ async function fetchWorker(): Promise<ServiceWorker | null | 'failed'> {
   if (worker === null) {
     return null
   }
-  return (await installs(worker)) ? worker : 'failed'
+  if (!(await installs(worker))) {
+    return 'failed'
+  }
+  return target === '' || (await workerBuild(worker)) === target ? worker : 'failed'
 }
 
 function reloadInto(worker: ServiceWorker | null): void {
@@ -127,7 +149,7 @@ async function apply(byUser: boolean): Promise<void> {
   }
   applying = true
   try {
-    const worker = await fetchWorker()
+    const worker = await fetchWorker(next.target)
     if (worker === 'failed' && !byUser && next.tries < WORKER_TRIES) {
       next.tries += 1
       next.retryAt = Date.now() + retryDelay(next.tries)
@@ -158,9 +180,12 @@ function consider(): void {
   void apply(false)
 }
 
-/** Lets a waiting worker take over a page that already runs its build. */
-function letWaitingIn(): void {
-  registration?.waiting?.postMessage('skip-waiting')
+/** Lets a waiting worker take over a page that already runs the build the worker was made with. */
+async function letWaitingIn(page: string): Promise<void> {
+  const waiting = registration?.waiting ?? null
+  if (waiting !== null && (await workerBuild(waiting)) === page) {
+    waiting.postMessage('skip-waiting')
+  }
 }
 
 function noteServerBuild(server: string | null | undefined): void {
@@ -176,7 +201,7 @@ function noteServerBuild(server: string | null | undefined): void {
       pending = null
       setOffered(false)
     }
-    letWaitingIn()
+    void letWaitingIn(page)
   }
 }
 

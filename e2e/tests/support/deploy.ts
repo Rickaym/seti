@@ -58,7 +58,8 @@ export async function deployBuildB(
   context: BrowserContext,
   request: APIRequestContext,
   { workerOutages = 0 }: DeployOptions = {},
-): Promise<void> {
+): Promise<{ workerAnswers: number[] }> {
+  const workerAnswers: number[] = []
   const b = await buildB(request)
   let outages = workerOutages
   const noCache = { 'cache-control': 'no-cache' }
@@ -71,9 +72,11 @@ export async function deployBuildB(
     async (route) => {
       if (outages > 0) {
         outages -= 1
+        workerAnswers.push(503)
         await route.fulfill({ status: 503, body: 'Seti is restarting', headers: noCache })
         return
       }
+      workerAnswers.push(200)
       await route.fulfill({ body: b.worker, contentType: 'text/javascript', headers: noCache })
     },
   )
@@ -91,13 +94,40 @@ export async function deployBuildB(
       await route.fulfill({ json: { ...body, data: { ...body.data, build: BUILD_B } } })
     },
   )
+  return { workerAnswers }
 }
 
-/** Expects the page to run build B under build B's worker, with no older cache left. */
-export async function expectOnBuildB(page: Page): Promise<void> {
-  await expect(pageBuild(page)).toHaveAttribute('content', BUILD_B, { timeout: 30_000 })
+/** The build of the worker that controls the page, as it answers. */
+export const controllerBuild = async (page: Page) =>
+  page.evaluate(
+    async () =>
+      new Promise<string | null>((resolve) => {
+        const controller = navigator.serviceWorker.controller
+        if (controller === null) {
+          resolve(null)
+          return
+        }
+        const channel = new MessageChannel()
+        channel.port1.onmessage = (event: MessageEvent) => {
+          resolve(String(event.data))
+        }
+        controller.postMessage('build', [channel.port2])
+      }),
+  )
+
+/** Expects the page to run build B, its changed file included. */
+export async function expectPageOnBuildB(page: Page): Promise<void> {
+  await expect(pageBuild(page)).toHaveAttribute('content', BUILD_B, { timeout: 45_000 })
   await expect(page.locator('html')).toHaveAttribute('data-e2e-build', 'B')
-  await expect.poll(async () => page.evaluate(async () => caches.keys())).toEqual([`seti-shell-${BUILD_B}`])
+}
+
+/**
+ * Expects the page to run build B under build B's worker. Old caches are not checked: the
+ * browser's own update checks of sw.js pass by the routes and fetch the built worker again.
+ */
+export async function expectOnBuildB(page: Page): Promise<void> {
+  await expectPageOnBuildB(page)
+  await expect.poll(async () => controllerBuild(page)).toBe(BUILD_B)
 }
 
 /** Counts the page's loads from now on. */

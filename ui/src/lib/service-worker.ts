@@ -1,7 +1,9 @@
+import { pageBuild, workerScript } from '@/lib/app-build'
 import { adoptWorker } from '@/lib/app-update'
 
 async function register(): Promise<void> {
-  adoptWorker(await navigator.serviceWorker.register('/sw.js', { updateViaCache: 'none' }))
+  const script = workerScript(pageBuild(document))
+  adoptWorker(await navigator.serviceWorker.register(script, { updateViaCache: 'none' }))
 }
 
 /** A clicked notification asks an open Seti to show its agent; the hash carries the route. */

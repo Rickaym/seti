@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { isBehind, retryDelay, updateMoment, type PageActivity } from '@/lib/app-build'
+import { isBehind, retryDelay, updateMoment, workerScript, type PageActivity } from '@/lib/app-build'
 
 const IDLE: PageActivity = {
   hidden: false,
@@ -52,5 +52,12 @@ describe('retryDelay', () => {
   it('starts at five seconds, doubles and stops at five minutes', () => {
     expect([1, 2, 3, 4].map(retryDelay)).toEqual([5_000, 10_000, 20_000, 40_000])
     expect(retryDelay(20)).toBe(300_000)
+  })
+})
+
+describe('workerScript', () => {
+  it('gives each build its own worker address, and development the plain one', () => {
+    expect(workerScript('aaaa1111')).toBe('/sw.js?build=aaaa1111')
+    expect(workerScript('')).toBe('/sw.js')
   })
 })
