@@ -13,6 +13,8 @@ import { expect, test } from './support/fixtures.js'
 
 test.use({ permissions: ['microphone'] })
 
+const CALL_AUDIO = /^\d+(\.\d)?% lost, \d+(\.\d)? s filled in, direct over UDP$/
+
 const READY: EaHealth = { ok: true, configured: true, missing: [], model: 'gpt-4.1-mini', turn: true }
 const AWAY_MS = 4500
 
@@ -53,11 +55,13 @@ test('a call keeps pinging the EA in the background, and the media controls mute
   expect(await mediaSession(page)).toEqual({ title: null, state: 'none' })
   await expect.poll(() => ends).toHaveLength(1)
   expect(ends[0]).toMatchObject({ reason: 'hang-up', auto: false, hidden: true })
+  expect(ends[0]?.quality).toMatchObject({ path: 'host', protocol: 'udp', reconnects: 0 })
   expect(ends[0]?.hidden_s).toBeGreaterThanOrEqual(4)
 
   await toBackground(page, false)
   await page.goto('/#settings/ea')
   await expect(page.getByTestId('ea-last-end')).toHaveText('Hung up, in the background')
+  await expect(page.getByTestId('ea-call-audio')).toHaveText(CALL_AUDIO)
 })
 
 test('a call the EA ends on its own is recorded with its reason', async ({ page }) => {

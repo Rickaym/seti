@@ -1,12 +1,11 @@
 import {
   AGENT_SETTING_ENTRIES,
   AGENT_SETTING_TABS,
-  COMMAND_SETTINGS,
-  parseSettingCommand,
   RESERVED_COMMAND_NAMES,
-  settingCommandRefusal,
-  settingCommands,
+  setiComposerCommands,
+  withSetiCommands,
   type AgentCapabilities,
+  type ComposerCommand,
 } from '@seti/shared'
 import { describe, expect, it, vi } from 'vitest'
 import { createApp } from './app.js'
@@ -30,26 +29,25 @@ await tasks.insert({ id: TASK, title: 'Commands', repo_id: null, cwd: '/tmp', wo
 const app = createApp({ access: null, verify: null })
 const HEADERS = { host: 'localhost', ...USER_AUTH, 'content-type': 'application/json' }
 
-const names = (caps: AgentCapabilities | null) => settingCommands(caps).map((command) => command.name)
+const names = (caps: AgentCapabilities | null) => setiComposerCommands(caps).map((command) => command.name)
 
-describe("an agent's setting commands", () => {
-  it('names each command once and reserves exactly those names', () => {
-    const all = COMMAND_SETTINGS.map((entry) => entry.command.name)
+const runtimeCommand = (name: string): ComposerCommand => ({
+  name,
+  description: `The runtime's ${name}`,
+  argument_hint: '',
+  aliases: [],
+  builtin: true,
+  unsupported: null,
+})
+
+describe("an agent's Seti commands", () => {
+  it('names every command seti: and reserves the names of every setting from mods', () => {
+    const all = names(null)
     expect(new Set(all).size).toBe(all.length)
-    const byName = (a: string, b: string) => a.localeCompare(b)
-    expect([...RESERVED_COMMAND_NAMES].toSorted(byName)).toEqual(all.toSorted(byName))
-    expect(all.toSorted(byName)).toEqual([
-      'access',
-      'archive',
-      'bypass',
-      'credential',
-      'dream',
-      'mcp',
-      'rename',
-      'restart',
-      'sandbox',
-      'settings',
-    ])
+    expect(all.every((name) => name.startsWith('seti:'))).toBe(true)
+    expect(all).toEqual(expect.arrayContaining(['seti:access', 'seti:mcp', 'seti:restart', 'seti:memory']))
+    expect(all).not.toContain('seti:credential')
+    expect([...RESERVED_COMMAND_NAMES]).toEqual(AGENT_SETTING_ENTRIES.map((entry) => entry.id))
   })
 
   it('lists every setting once, each tab of the settings with its rows', () => {
@@ -58,37 +56,34 @@ describe("an agent's setting commands", () => {
     for (const tab of AGENT_SETTING_TABS) {
       expect(AGENT_SETTING_ENTRIES.some((entry) => entry.place === tab)).toBe(true)
     }
-    expect(AGENT_SETTING_ENTRIES.filter((entry) => entry.place === 'dialog').map((entry) => entry.id)).toEqual([
-      'mcp',
-      'control',
-    ])
   })
 
   it("lists only what the agent's runtime declares it can take", () => {
-    expect(names(agentCapabilities('claude'))).toHaveLength(10)
-    expect(names(agentCapabilities('codex'))).not.toEqual(expect.arrayContaining(['sandbox']))
-    expect(names(agentCapabilities('codex'))).not.toContain('bypass')
-    expect(names(agentCapabilities('codex'))).not.toContain('dream')
-    expect(names(agentCapabilities('codex'))).toContain('mcp')
+    expect(names(agentCapabilities('codex'))).not.toContain('seti:sandbox')
+    expect(names(agentCapabilities('codex'))).not.toContain('seti:bypass')
+    expect(names(agentCapabilities('codex'))).toContain('seti:mcp')
+    expect(names(agentCapabilities('claude'))).toContain('seti:bypass')
   })
 
-  it('reads a setting command only as the whole line from its start, in any case', () => {
-    expect(parseSettingCommand('/archive')?.setting.id).toBe('archive')
-    expect(parseSettingCommand('  /MCP github on')).toMatchObject({ setting: { id: 'mcp' }, args: 'github on' })
-    expect(parseSettingCommand('please /archive')).toBeNull()
-    expect(parseSettingCommand('!archive')).toBeNull()
-    expect(parseSettingCommand('/archived')).toBeNull()
-    expect(parseSettingCommand('/compact')).toBeNull()
+  it("gives the bare names back to the runtime and drops a runtime's own seti: command", () => {
+    const merged = withSetiCommands(
+      [runtimeCommand('mcp'), runtimeCommand('rename'), runtimeCommand('seti:access')],
+      setiComposerCommands(null),
+    )
+    expect(merged.filter((command) => command.name === 'mcp')).toEqual([runtimeCommand('mcp')])
+    expect(merged.filter((command) => command.name === 'rename')).toHaveLength(1)
+    expect(merged.filter((command) => command.name === 'seti:access')).toHaveLength(1)
+    expect(merged.find((command) => command.name === 'seti:access')?.description).not.toContain("runtime's")
   })
 
-  it('refuses a setting command sent to the agent as a prompt, so it never reaches the runtime', async () => {
-    expect(settingCommandRefusal('/archive')).toContain('never goes to the agent')
-    expect(slashRefusal('/sandbox off')).toContain('/sandbox is a Seti command')
+  it('refuses a /seti: line sent to the agent as a prompt; a bare name goes to the runtime', async () => {
+    expect(slashRefusal('/seti:sandbox off')).toContain('never goes to the agent')
+    expect(slashRefusal('/sandbox off')).toBeNull()
     expect(slashRefusal('Archive the old branch')).toBeNull()
     const queued = await app.request(`/api/tasks/${TASK}/messages`, {
       method: 'POST',
       headers: HEADERS,
-      body: JSON.stringify({ prompt: '/archive', interrupt: false }),
+      body: JSON.stringify({ prompt: '/seti:archive', interrupt: false }),
     })
     expect(queued.status).toBe(400)
     expect((await tasks.get(TASK))?.archived_at).toBeNull()
