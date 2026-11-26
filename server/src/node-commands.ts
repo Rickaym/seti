@@ -15,7 +15,7 @@ import {
   stopTurn,
 } from './session-host.js'
 import { reloadSshAgents } from './ssh-agent.js'
-import { closeTaskProxy, openModelProxy, openTaskProxy, openTaskSsh } from './task-proxy.js'
+import { closeTaskProxy, openModelProxy, openTaskProxy, openTaskSsh, regrantConnections } from './task-proxy.js'
 
 const sessionOf = (agent: string): LiveSession | undefined => liveSessions().find(([id]) => id === agent)?.[1]
 
@@ -101,6 +101,9 @@ serveControl({
     await openTaskProxy(agent, grant)
     return {}
   },
+  'proxy.connections': async ({ agent, connections }) => ({
+    applied: await regrantConnections(agent, connections),
+  }),
   'proxy.model': async ({ agent, login, key }) => {
     await openModelProxy(agent, { login, key })
     return {}

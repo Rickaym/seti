@@ -26,6 +26,10 @@ vi.mock('@anthropic-ai/claude-agent-sdk', async (importOriginal) => {
   return { ...(await importOriginal<typeof Sdk>()), query: fake.query }
 })
 
+/** Whether the agent's running sandbox took the allowed connection; none runs in these tests. */
+const live = vi.hoisted(() => ({ now: vi.fn(async (_task: Task) => Promise.resolve(false)) }))
+vi.mock('./live-connections.js', () => ({ connectionsNow: live.now }))
+
 const app = createApp()
 const [requestChange] = REQUEST_TOOLS
 
@@ -183,6 +187,25 @@ describe('answering a request', () => {
     expect(JSON.stringify(await messages.page(caller.id, 50))).not.toContain(value)
     expect(JSON.stringify(await auditEvents.page(auditQuery.parse({ limit: 20 })))).not.toContain(value)
     expect((await ask(caller, change)).text).toContain('Your credential already has FIXTURE_API_KEY.')
+  })
+
+  it('tells the agent it can use the variable in this turn once its running sandbox took it', async () => {
+    const caller = await newTask()
+    const later = { kind: 'api_key', env: 'LATER_API_KEY', hosts: ['api.later.example.com'] }
+    const first = (await ask(caller, later)).json()
+    expect((await answer(caller, first.request.id, { decision: 'allow' })).status).toBe(200)
+    expect((await updates(caller.id)).at(-1)?.body).toMatch(/^From your next turn your session has \$LATER_API_KEY/)
+    live.now.mockResolvedValueOnce(true)
+    const now = { kind: 'api_key', env: 'NOW_API_KEY', hosts: ['api.now.example.com'] }
+    const second = (await ask(caller, now)).json()
+    expect((await answer(caller, second.request.id, { decision: 'allow' })).status).toBe(200)
+    expect(live.now).toHaveBeenLastCalledWith(expect.objectContaining({ id: caller.id }))
+    const body = (await updates(caller.id)).at(-1)?.body ?? ''
+    expect(body).toMatch(/^Your bash commands have \$NOW_API_KEY from now on, so carry on with your work in this turn/)
+    expect(body).toContain(
+      "It holds a placeholder that Seti's proxy swaps for the key on its hosts once the user pastes it",
+    )
+    expect(body).not.toMatch(/next turn|\d/)
   })
 
   it('allows a request for request bodies by turning on Body, also for a variable the agent has', async () => {
