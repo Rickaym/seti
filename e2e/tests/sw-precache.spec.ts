@@ -1,5 +1,5 @@
 import type { APIRequestContext, BrowserContext, Page } from '@playwright/test'
-import { expect, test, toasts } from './support/fixtures.js'
+import { expect, test } from './support/fixtures.js'
 
 test.use({ serviceWorkers: 'allow', allowedHttpStatuses: [500] })
 
@@ -55,7 +55,7 @@ const sorted = (paths: string[]) => paths.toSorted((a, b) => a.localeCompare(b))
 
 const cacheNames = async (page: Page) => page.evaluate(async () => caches.keys())
 
-test('a new worker copies the hashed files it already has and fetches only the rest', async ({
+test('a new worker copies the hashed files it has, fetches the rest and takes over a current page', async ({
   page,
   context,
   request,
@@ -71,8 +71,9 @@ test('a new worker copies the hashed files it already has and fetches only the r
   await page.evaluate(async () => {
     await navigator.serviceWorker.register('/sw.js?next')
   })
-  const toast = toasts(page).filter({ hasText: 'Seti updated' })
-  await expect(toast).toBeVisible()
+  await expect
+    .poll(async () => page.evaluate(() => navigator.serviceWorker.controller?.scriptURL ?? ''))
+    .toMatch(/\/sw\.js\?next$/)
 
   const unhashed = urls.filter((url) => !url.startsWith('/assets/'))
   expect(sorted(fetched.filter((path) => path !== '/sw.js'))).toEqual(sorted([...unhashed, ADDED]))
@@ -82,7 +83,6 @@ test('a new worker copies the hashed files it already has and fetches only the r
   })
   expect(sorted(held)).toEqual(sorted(urls))
 
-  await Promise.all([page.waitForEvent('load'), toast.getByRole('button', { name: 'Reload' }).click()])
   await expect.poll(async () => cacheNames(page)).toEqual(['seti-shell-e2e-next'])
 })
 

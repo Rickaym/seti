@@ -172,8 +172,10 @@ function noteServerBuild(server: string | null | undefined): void {
     }
     consider()
   } else if (page !== '' && server === page) {
-    pending = null
-    setOffered(false)
+    if (pending?.target !== '') {
+      pending = null
+      setOffered(false)
+    }
     letWaitingIn()
   }
 }
@@ -192,7 +194,18 @@ export function updateNow(): void {
 /** Hands over the service worker registration, so updates go through the new worker. */
 export function adoptWorker(next: ServiceWorkerRegistration): void {
   registration = next
-  noteServerBuild(systemResource.getSnapshot().data?.build)
+  const recheck = () => {
+    noteServerBuild(systemResource.getSnapshot().data?.build)
+  }
+  next.addEventListener('updatefound', () => {
+    const worker = next.installing
+    worker?.addEventListener('statechange', () => {
+      if (worker.state === 'installed') {
+        recheck()
+      }
+    })
+  })
+  recheck()
 }
 
 const checkServer = () => {
