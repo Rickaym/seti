@@ -3,12 +3,15 @@ import {
   isPlanRequest,
   readsBackWhole,
   type AnswerPermissionInput,
+  type EaOnWordTool,
   type PermissionRequest,
   type Task,
 } from '@seti/shared'
 import type { Context } from 'hono'
-import { fromEa, onUsersWord } from './ea-guard.js'
+import { now } from './db.js'
+import { askNamed, fromEa, refuseUnlessOnWord } from './ea-guard.js'
 import { HttpError } from './http.js'
+import { eaAsks } from './store/ea-replies.js'
 import { permissionRequests } from './store/permissions.js'
 
 /** Keys this process's digests, so a digest reveals nothing of the redacted values in a call. */
@@ -29,6 +32,16 @@ export async function requestDigest(request: PermissionRequest): Promise<string>
     exact,
   ]
   return createHmac('sha256', DIGEST_KEY).update(JSON.stringify(parts)).digest('hex')
+}
+
+/**
+ * Uses the user's spoken or typed yes to the question the EA request names, once, and returns
+ * the question's id; refuses unless ea-guard.ts's rule holds for `expected`.
+ */
+async function onUsersWord(c: Context, tool: EaOnWordTool, expected: Readonly<Record<string, unknown>>) {
+  const id = askNamed(c)
+  refuseUnlessOnWord(id === null ? null : await eaAsks.useOnWord(id, tool, now()), expected)
+  return id ?? 0
 }
 
 /**

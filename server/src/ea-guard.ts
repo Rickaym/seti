@@ -1,10 +1,8 @@
 import { isDeepStrictEqual } from 'node:util'
-import { EA_ASK_HEADER, isSecurityAccess, type AccessKind, type EaOnWordTool } from '@seti/shared'
+import { EA_ASK_HEADER, isSecurityAccess, type AccessKind } from '@seti/shared'
 import type { Context, MiddlewareHandler } from 'hono'
 import { currentRequestSource } from './access.js'
-import { now } from './db.js'
 import { fail, HttpError } from './http.js'
-import { eaAsks } from './store/ea-replies.js'
 
 /** True for a request the EA voice bot made with its own token. */
 export const fromEa = (): boolean => currentRequestSource()?.via === 'ea'
@@ -138,26 +136,28 @@ export const eaSecurityAccessRefusal = (c: Context, kinds: readonly AccessKind[]
 /** SSH hosts, keys and trusted host keys are security settings the EA may only view. */
 export const eaSshReadOnly = eaReadOnly('change ssh hosts, keys or trusted host keys')
 
-/** The refusal of an EA action that needs the user's own yes and has none to use. */
-const NO_WORD =
-  "The EA does this only on the user's own yes, spoken or typed in the turn right after it read the " +
-  'change back; ask the user again'
+/** The question id an EA request names (EA_ASK_HEADER) for an action on the user's word, or null. */
+export function askNamed(c: Context): number | null {
+  const id = Number(c.req.header(EA_ASK_HEADER) ?? '')
+  return Number.isSafeInteger(id) && id > 0 ? id : null
+}
 
 /**
- * The one refusal the EA may pass, for the actions in EA_ON_WORD_TOOLS: the request names the EA
- * question (EA_ASK_HEADER) whose spoken or typed yes, given in the user turn right after it was
- * asked, has not been used yet, and whose arguments equal `expected`, which the route recomputes
- * from what the request targets now. Uses that yes and returns the question's id.
+ * The one refusal the EA may pass, for the actions in EA_ON_WORD_TOOLS: Seti found the question
+ * the request names, its spoken or typed yes came in the user turn right after it was asked and
+ * was unused (`args` null otherwise), and its arguments equal `expected`, which the route
+ * recomputes from what the request targets now. Throws the refusal otherwise.
  */
-export async function onUsersWord(
-  c: Context,
-  tool: EaOnWordTool,
+export function refuseUnlessOnWord(
+  args: Readonly<Record<string, unknown>> | null,
   expected: Readonly<Record<string, unknown>>,
-): Promise<number> {
-  const id = Number(c.req.header(EA_ASK_HEADER) ?? '')
-  const args = Number.isSafeInteger(id) && id > 0 ? await eaAsks.useOnWord(id, tool, now()) : null
+): void {
   if (args === null) {
-    throw new HttpError(403, NO_WORD)
+    throw new HttpError(
+      403,
+      "The EA does this only on the user's own yes, spoken or typed in the turn right after it read " +
+        'the change back; ask the user again',
+    )
   }
   const changed = Object.keys(expected).filter((key) => !isDeepStrictEqual(args[key], expected[key]))
   if (changed.length > 0) {
@@ -166,7 +166,6 @@ export async function onUsersWord(
       `What the user said yes to is not this request as it stands (${changed.join(', ')}); read it back again`,
     )
   }
-  return id
 }
 
 /** What only the user does, refused for the EA, agents and mods in the function that does it. */

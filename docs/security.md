@@ -37,7 +37,7 @@ say yes to its read-back of that one change ([EA-17](protocol.md#14-the-assistan
 | Approve a plan                              | The plan in one sentence                                      | Editing the plan                                                                               |
 | Deny a tool call or plan, with your message | The call and your message                                     | -                                                                                              |
 
-The server, not the EA's prompt, holds the rule (`onUsersWord` in `server/src/ea-guard.ts`):
+The server, not the EA's prompt, holds the rule (`refuseUnlessOnWord` in `server/src/ea-guard.ts`):
 
 - The EA's request names the question it asked. Seti accepts it only if you said yes in your very
   next message or spoken turn, to the same EA process, less than a minute earlier, and only once.
