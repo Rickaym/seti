@@ -189,6 +189,11 @@ the `client_max_body_size` line above, and a proxy with a timeout for the whole 
 long enough for a slow phone link. The reply box refuses a larger file before sending it, and
 when a proxy refuses or cuts an upload it says so on the file.
 
+Seti sets `Cache-Control` on what it serves: the page, `sw.js` and the manifest revalidate on every
+load, and the hashed files under `/assets/` keep for a year. The proxy must pass these headers on
+and cache nothing itself; Caddy and nginx cache nothing unless told to. A proxy cache in front of
+`/` or `/sw.js` keeps browsers and installed apps on an old build after an upgrade.
+
 ### Cloudflare Tunnel and Access
 
 1. Create a Cloudflare Tunnel with a public hostname pointing at `http://127.0.0.1:3006`. Leave the
@@ -965,6 +970,9 @@ It refuses a checkout with local changes, fetches `origin/main` (`--ref` picks a
 1. Fast-forwards the branch, or moves a detached checkout, to the new commit.
 2. Runs `pnpm install --frozen-lockfile` and `pnpm build`, and `uv sync` when the EA is set up.
    When the build fails, it puts the previous commit back and stops; the running Seti is untouched.
+   The UI is built beside `ui/dist` and swapped in whole once complete, so open pages keep
+   working during the build; after the restart each open page moves to the new version by itself
+   when you are not typing, or shows Update in the status bar.
 3. Rewrites the units the installer wrote, so they follow changes to `deploy/`.
 4. Dumps the database to `~/.seti/pg-dumps/seti-<time>-<previous commit>.pgdump`, owner-only,
    keeping the newest 10 of its own dumps.

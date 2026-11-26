@@ -1,18 +1,7 @@
 import type { Task } from '@seti/shared'
-import {
-  Activity,
-  KeyRound,
-  Layers,
-  Settings,
-  SlidersHorizontal,
-  UserCog,
-  Users,
-  X,
-  type LucideIcon,
-} from 'lucide-react'
+import { Activity, KeyRound, Settings, SlidersHorizontal, Users, X, type LucideIcon } from 'lucide-react'
 import { memo, useState, type ReactNode } from 'react'
 import { Hint } from '@/components/Hint'
-import { useCommands } from '@/components/palette/useCommands'
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet'
@@ -23,11 +12,10 @@ import { useSandboxed } from '@/hooks/useSandboxed'
 import { WIDE_BUTTON, WIDE_LABEL } from '@/lib/wide-label'
 import { AccessSummary, TaskAccessDialog } from '@/panels/access/TaskAccess'
 import { AgentPermissions } from '@/panels/tasks/AgentPermissions'
-import { BypassToggle } from '@/panels/tasks/BypassToggle'
+import { TaskBypass } from '@/panels/tasks/BypassToggle'
 import { ContinueOn } from '@/panels/tasks/ContinueOn'
 import { DreamActions } from '@/panels/tasks/DreamActions'
 import { LifecycleActions } from '@/panels/tasks/LifecycleActions'
-import { NotOnRuntime } from '@/panels/tasks/NotOnCodex'
 import { NewRoleDialog, RolePicker, type RoleOwner } from '@/panels/tasks/RolePicker'
 import { TaskIsolation } from '@/panels/tasks/SandboxToggle'
 import { SessionFields } from '@/panels/tasks/SessionFields'
@@ -42,11 +30,11 @@ import { TaskNotify } from '@/panels/tasks/TaskNotify'
 import { TaskCredentials } from '@/panels/tasks/TaskProfile'
 import { TaskTeam } from '@/panels/tasks/TaskTeam'
 import { TaskThreads } from '@/panels/tasks/TaskThreads'
+import type { SettingsRequest } from '@/panels/tasks/commands/types'
 import { useArchive } from '@/panels/tasks/useArchive'
+import { useCogState, type SectionId } from '@/panels/tasks/useCogState'
 import { useSessionRestart } from '@/panels/tasks/useSessionRestart'
 import { WorkspaceSelect } from '@/panels/tasks/workspaces/WorkspaceSelect'
-
-type SectionId = 'general' | 'access' | 'team' | 'session'
 
 /** The tabs in reading order, the most used first. */
 const SECTIONS: readonly { id: SectionId; label: string; icon: LucideIcon }[] = [
@@ -72,6 +60,8 @@ interface TaskSettingsProps {
   running: boolean
   /** The smaller size compact agent headers use. */
   compact?: boolean
+  /** A setting command's request to open a tab or the access dialog. */
+  request?: SettingsRequest | null
 }
 
 /** The cog's size and wide label; framed agents take the smaller size and no label. */
@@ -93,67 +83,18 @@ export const TaskSettings = memo(function TaskSettingsView({
   busy,
   running,
   compact,
+  request = null,
 }: TaskSettingsProps) {
   const sandboxed = useSandboxed(task)
   const caps = useCapabilities(task)
   const archive = useArchive(task)
   const restart = useSessionRestart(task, running, onChanged)
   const [channelCount, setChannelCount] = useState(0)
-  const [open, setOpen] = useState(false)
+  const { open, setOpen, section, setSection, accessOpen, setAccessOpen, roleFocus, workspaceFocus, onOpenChange } =
+    useCogState(task, request)
   const narrow = useNarrow()
   const cog = cogStyle(compact)
-  const [accessOpen, setAccessOpen] = useState(false)
-  const [roleFocus, setRoleFocus] = useState(false)
-  const [workspaceFocus, setWorkspaceFocus] = useState(false)
   const [newRole, setNewRole] = useState<string | null>(null)
-  const [section, setSection] = useState<SectionId>('general')
-  useCommands([
-    {
-      id: 'agent.access',
-      title: 'Open access',
-      detail: task.title,
-      icon: KeyRound,
-      group: 'Current agent',
-      keywords: 'ssh aws mcp servers packs plugins permissions',
-      when: (context) => context.agent?.id === task.id,
-      run: () => {
-        setAccessOpen(true)
-      },
-    },
-    {
-      id: 'agent.role',
-      title: 'Change role',
-      detail: task.title,
-      icon: UserCog,
-      group: 'Current agent',
-      keywords: 'role pack system prompt standing instructions lead delegate reviewer watcher',
-      when: (context) => context.agent?.id === task.id,
-      run: () => {
-        setSection('general')
-        setRoleFocus(true)
-        setOpen(true)
-      },
-    },
-    {
-      id: 'agent.workspace',
-      title: 'Move to workspace...',
-      detail: task.title,
-      icon: Layers,
-      group: 'Current agent',
-      keywords: 'workspace move group',
-      when: (context) => context.agent?.id === task.id,
-      run: () => {
-        setSection('general')
-        setWorkspaceFocus(true)
-        setOpen(true)
-      },
-    },
-  ])
-  const onOpenChange = (next: boolean) => {
-    setOpen(next)
-    setRoleFocus(false)
-    setWorkspaceFocus(false)
-  }
   const focusContent = (e: Event) => {
     e.preventDefault()
     if (e.currentTarget instanceof HTMLElement) {
@@ -214,14 +155,7 @@ export const TaskSettings = memo(function TaskSettingsView({
           </Row>
         )}
         <Row label="Bypass">
-          {caps?.bypass === false ? (
-            <NotOnRuntime
-              label={caps.label}
-              reason={`${caps.label} agents ask before every command and edit; Bypass is not offered.`}
-            />
-          ) : (
-            <BypassToggle task={task} onChanged={onChanged} />
-          )}
+          <TaskBypass task={task} caps={caps} onChanged={onChanged} />
         </Row>
         <Row label="Rules">
           <AgentPermissions task={task} />

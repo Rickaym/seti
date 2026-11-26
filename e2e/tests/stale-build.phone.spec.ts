@@ -1,4 +1,4 @@
-import { expect, test, toasts } from './support/fixtures.js'
+import { expect, test } from './support/fixtures.js'
 import { expectFitsPhone } from './support/phone-layout.js'
 import {
   CAUGHT_CRASH,
@@ -39,7 +39,7 @@ test('a phone gets a Reload it can tap when the panel still fails after the relo
   expect(build.loads()).toBe(3)
 })
 
-test('a phone with unsaved changes keeps the page and gets a New version notice', async ({ page }) => {
+test('a phone with unsaved changes keeps the page and offers Update', async ({ page }) => {
   let loads = 0
   page.on('load', () => {
     loads += 1
@@ -49,9 +49,9 @@ test('a phone with unsaved changes keeps the page and gets a New version notice'
   await name.fill('Unsaved name')
   await reportPreloadError(page)
 
-  const notice = toasts(page).filter({ hasText: 'New version' })
-  await expect(notice.getByRole('button', { name: 'Reload' })).toBeVisible()
+  await name.blur()
+  await expect(page.getByRole('contentinfo').getByRole('button', { name: 'Update', exact: true })).toBeVisible()
   await expect(name).toHaveValue('Unsaved name')
   expect(loads).toBe(1)
-  await expectFitsPhone(page, 'new version notice')
+  await expectFitsPhone(page, 'Update in the status bar')
 })

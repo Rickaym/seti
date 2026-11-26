@@ -266,7 +266,7 @@ async def test_actions_wait_for_a_typed_yes(fake_seti: FakeSeti) -> None:
     asked = await events_of(chat, "Stop the login task.")
     assert texts(asked).endswith(CONFIRM_QUESTION)
     assert [path for path, _ in fake_seti.posts() if path == stop] == []
-    assert "explicit yes" in SYSTEM_PROMPT
+    assert "Ask first only for these, and only once" in SYSTEM_PROMPT
     assert f'"{CONFIRM_QUESTION}"' in SYSTEM_PROMPT
 
     done = await events_of(chat, "Yes")

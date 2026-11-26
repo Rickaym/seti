@@ -1,5 +1,6 @@
 import { generateKeyPairSync, randomBytes, type KeyObject } from 'node:crypto'
 import {
+  EA_ASK_HEADER,
   OFFICIAL_ANDROID_APP,
   type DeviceInfo,
   type DevicePaired,
@@ -295,6 +296,14 @@ describe('device proofs', () => {
       expect((await call(app, route, { ...PUBLIC, ...headers, origin: ORIGIN }, body)).status, route).toBe(403)
     }
     expect(await credentialAccess.all('default')).toEqual([])
+  })
+
+  it('never answers a held call, even naming a question the user said yes to the EA', async () => {
+    const phone = await pair()
+    const path = '/api/tasks/any/permission-requests/5e1f00d5-0000-4000-8000-00000000000a'
+    const headers = await proof(phone, { htm: 'POST', htu: `${ORIGIN}${path}` })
+    const asked = { ...PUBLIC, ...headers, origin: ORIGIN, [EA_ASK_HEADER]: '1' }
+    expect((await call(app, `POST ${path}`, asked, { decision: 'allow' })).status).toBe(403)
   })
 
   it('does not fall back to Access or the local token when a proof fails', async () => {

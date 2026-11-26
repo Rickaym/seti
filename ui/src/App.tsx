@@ -29,6 +29,7 @@ import { useAppHeight } from '@/hooks/useAppHeight'
 import { useNarrow } from '@/hooks/useMedia'
 import { useTypingMode } from '@/hooks/useTypingMode'
 import { useWindowControlsOverlay } from '@/hooks/useWindowControlsOverlay'
+import { watchServerBuild } from '@/lib/app-update'
 import { useInputHookKeys } from '@/lib/input-hooks'
 import { openNeedsYouShortcut } from '@/lib/needs-you'
 import { PANEL } from '@/lib/panels'
@@ -232,6 +233,7 @@ export function App() {
   useModHost()
   useInputHookKeys()
   useThemeSync()
+  useEffect(watchServerBuild, [])
   const chatOverLayout = useActiveLayout(narrow)?.overlay === true && route.section === 'agents'
 
   useEffect(openNeedsYouShortcut, [])
