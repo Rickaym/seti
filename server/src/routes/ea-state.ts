@@ -1,5 +1,6 @@
 import {
   callEndSummary,
+  callQualityDetail,
   eaCallEndInput,
   eaHistoryAppendInput,
   eaHistoryQuery,
@@ -68,13 +69,13 @@ export const eaStateRoutes = new Hono()
     if (fromDelegate()) {
       throw new HttpError(403, 'Only the browser on the call reports how it ended')
     }
-    const input = c.req.valid('json')
+    const { quality, ...input } = c.req.valid('json')
     await audit.record({
       actor: 'user',
       kind: 'ea.call_ended',
       subject_type: 'ea',
       summary: callEndSummary(input),
-      detail: input,
+      detail: { ...input, ...callQualityDetail(quality) },
     })
     return ok(c, { recorded: true })
   })

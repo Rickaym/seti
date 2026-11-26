@@ -1,4 +1,4 @@
-import type { FollowedThread, ListedThread, ThreadStopReason } from '@seti/shared'
+import type { FollowedThread, ListedThread, ThreadReach, ThreadStopReason } from '@seti/shared'
 import { sql } from '../db.js'
 
 /** A message an agent sent outside Seti, with the thread it belongs to. */
@@ -49,6 +49,15 @@ export const threadFollows = {
       throw new Error('the followed thread was not stored')
     }
     return { follow: row, started: before?.stopped_at !== null }
+  },
+
+  /** Threads live agents follow, and webhooks with thread replies on (THR-8). */
+  reach: async (): Promise<ThreadReach> => {
+    const [row] = await sql<ThreadReach[]>`SELECT
+        (SELECT count(*)::int FROM thread_follow f JOIN task t ON t.id = f.task_id
+          WHERE f.stopped_at IS NULL AND t.archived_at IS NULL) AS following,
+        (SELECT count(*)::int FROM channel WHERE thread_replies) AS reading`
+    return row ?? { following: 0, reading: 0 }
   },
 
   /** The agent's threads, the ones it still follows first, newest activity first. */

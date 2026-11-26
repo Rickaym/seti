@@ -1055,6 +1055,14 @@ class EaTools:
         """The user spoke or typed `said`, so a question a destructive tool asked may now be answered."""
         self._actions.confirmations.user_turn(said)
 
+    def user_turn_started(self) -> None:
+        """The user began to speak; a drop in the call's audio before the turn ends voids its yes."""
+        self._actions.confirmations.user_turn_started()
+
+    def audio_lost(self) -> None:
+        """The call's audio broke off or a call began, so no earlier word of the user's is a yes."""
+        self._actions.confirmations.audio_lost()
+
     async def call(self, name: str, args: Mapping[str, Any]) -> ToolResult:
         """Run a tool; Seti errors and bad arguments come back as a failed result, never raise."""
         gate = self._actions.confirmations

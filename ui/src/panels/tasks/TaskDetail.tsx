@@ -195,7 +195,6 @@ export function TaskDetail({ task, onChanged, onSubtasks }: TaskDetailProps) {
     () => ({
       task,
       running: status === 'running',
-      busy: busy || background > 0,
       onChanged,
       openSettings: (target) => {
         setSettingsRequest({ target, at: Date.now() })
@@ -204,7 +203,7 @@ export function TaskDetail({ task, onChanged, onSubtasks }: TaskDetailProps) {
         setTitleDraft(task.title)
       },
     }),
-    [task, status, busy, background, onChanged],
+    [task, status, onChanged],
   )
   const endSession = async () => {
     const work = background === 1 ? 'the background subagent or command' : `${String(background)} background jobs`

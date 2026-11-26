@@ -1,4 +1,4 @@
-import { EA_MAX_INPUTS, type EaCallEndReason, type EaInputKind, type EaWake } from '@seti/shared'
+import { EA_MAX_INPUTS, type EaCallEndReason, type EaCallQuality, type EaInputKind, type EaWake } from '@seti/shared'
 import { captionsReducer, initialCaptions, type CaptionEvent, type CaptionState, type SpeechItem } from './captions'
 
 export type CallPhase = 'idle' | 'connecting' | 'connected' | 'error'
@@ -33,6 +33,8 @@ export interface CallEnd {
   reason: EaCallEndReason
   at: number
   hidden: boolean
+  /** How the EA's voice fared on the call, when the call sampled it. */
+  quality: EaCallQuality | null
 }
 
 /** The kinds of microphone a call used, in order, and how often it rerouted; for its audit record. */
@@ -63,12 +65,21 @@ export interface CallState {
   replies: { count: number; totalMs: number }
   lastEnd: CallEnd | null
   route: CallRoute
+  /** The network path dropped and the call is rebuilding it, keeping the conversation. */
+  reconnecting: boolean
 }
 
 export type CallAction =
   | { type: 'connecting'; auto: boolean }
   | { type: 'connected'; at: number }
-  | { type: 'ended'; at: number; error: string | null; reason: EaCallEndReason; hidden: boolean }
+  | {
+      type: 'ended'
+      at: number
+      error: string | null
+      reason: EaCallEndReason
+      hidden: boolean
+      quality?: EaCallQuality | null
+    }
   | { type: 'caption'; event: CaptionEvent }
   | { type: 'user-speaking'; speaking: boolean; at: number }
   | { type: 'bot-speaking'; speaking: boolean; at: number }
@@ -80,6 +91,7 @@ export type CallAction =
   | { type: 'captions-cleared' }
   | { type: 'audio-blocked'; blocked: boolean }
   | { type: 'route'; event: RouteEvent }
+  | { type: 'link'; reconnecting: boolean; at: number }
 
 const QUIET: CallSignals = { userSpeaking: false, botSpeaking: false, micHeld: false, latency: null }
 const NO_TRACKS: CallTracks = { local: null, bot: null }
@@ -100,6 +112,7 @@ export const initialCallState: CallState = {
   replies: { count: 0, totalMs: 0 },
   lastEnd: null,
   route: { inputs: [], reroutes: 0 },
+  reconnecting: false,
 }
 
 /** A kind joins the list when it differs from the last one, up to the cap. */
@@ -120,7 +133,7 @@ const withCaption = (state: CallState, event: CaptionEvent): CallState => ({
 })
 
 function ended(state: CallState, action: Extract<CallAction, { type: 'ended' }>): CallState {
-  const { at, error, reason, hidden } = action
+  const { at, error, reason, hidden, quality = null } = action
   if (state.phase === 'idle' && error === null) {
     return state
   }
@@ -129,7 +142,7 @@ function ended(state: CallState, action: Extract<CallAction, { type: 'ended' }>)
   const signals = { ...QUIET, latency: state.signals.latency }
   const failure = error === null ? null : { at, dropped: live, auto: state.auto }
   const phase = error === null ? 'idle' : 'error'
-  const lastEnd = live ? { reason, at, hidden } : state.lastEnd
+  const lastEnd = live ? { reason, at, hidden, quality } : state.lastEnd
   return { ...marked, phase, error, failure, signals, tracks: NO_TRACKS, wake: null, lastEnd }
 }
 
@@ -187,6 +200,7 @@ export function callReducer(state: CallState, action: CallAction): CallState {
         userStoppedAt: null,
         replies: initialCallState.replies,
         route: initialCallState.route,
+        reconnecting: false,
       }
     case 'connected':
       return withCaption({ ...state, phase: 'connected' }, { type: 'marker', text: 'Call started', at: action.at })
@@ -210,7 +224,17 @@ export function callReducer(state: CallState, action: CallAction): CallState {
       return { ...state, wake: action.wake }
     case 'captions-cleared':
       return { ...state, captions: initialCaptions }
+    case 'link':
+      return linkChanged(state, action)
   }
+}
+
+function linkChanged(state: CallState, action: Extract<CallAction, { type: 'link' }>): CallState {
+  if (action.reconnecting === state.reconnecting || state.phase !== 'connected') {
+    return state
+  }
+  const text = action.reconnecting ? 'Reconnecting' : 'Reconnected'
+  return withCaption({ ...state, reconnecting: action.reconnecting }, { type: 'marker', text, at: action.at })
 }
 
 export const callActive = (phase: CallPhase) => phase === 'connecting' || phase === 'connected'

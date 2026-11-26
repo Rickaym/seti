@@ -56,6 +56,7 @@ export const channelRoutes = new Hono()
   .get('/', async (c) => ok(c, await listChannels()))
   .get('/summary', async (c) => ok(c, await channelsSummary()))
   .get('/sources', (c) => ok(c, channelSources()))
+  .get('/thread-reach', async (c) => ok(c, await threadFollows.reach()))
   .get('/slack-names', valid('query', slackNamesQuery), async (c) =>
     ok(c, Object.fromEntries(await slackNames.of(c.req.valid('query').ids))),
   )

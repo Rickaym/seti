@@ -1,8 +1,7 @@
-import { COMMAND_SETTINGS, meetsNeeds, type CommandSettingId, type Task } from '@seti/shared'
+import { meetsNeeds, SETI_NAMES, type Task } from '@seti/shared'
 import {
   Archive,
   FastForward,
-  KeyRound,
   Pencil,
   Plug,
   RotateCw,
@@ -15,8 +14,7 @@ import {
 import { useCommands } from '@/components/palette/useCommands'
 import { useCapabilities } from '@/hooks/useCapabilities'
 
-const ICONS: Readonly<Record<CommandSettingId, LucideIcon>> = {
-  credential: KeyRound,
+const ICONS: Readonly<Record<string, LucideIcon>> = {
   access: SlidersHorizontal,
   mcp: Plug,
   sandbox: Shield,
@@ -29,22 +27,22 @@ const ICONS: Readonly<Record<CommandSettingId, LucideIcon>> = {
 }
 
 /**
- * Offers the agent's setting commands in the palette, from the same registry as its reply box: a
- * pick runs the command as if typed in the box, where its choices or question show.
+ * Offers the agent's Seti commands in the palette, from the same grammar as its reply box: a pick
+ * runs a command that needs no more words, or puts it in the box, where its choices complete it.
  */
-export function useCommandPalette(task: Task, fill: (text: string) => void): void {
+export function useCommandPalette(task: Task, pick: (name: string) => void): void {
   const caps = useCapabilities(task)
   useCommands(
-    COMMAND_SETTINGS.filter((entry) => meetsNeeds(caps, entry.needs)).map((entry) => ({
-      id: `agent.command.${entry.id}`,
-      title: `/${entry.command.name}`,
-      detail: entry.command.description,
-      icon: ICONS[entry.id],
+    SETI_NAMES.filter((entry) => meetsNeeds(caps, entry.entry.needs)).map((entry) => ({
+      id: `agent.command.${entry.name}`,
+      title: `/seti:${entry.name}`,
+      detail: entry.description,
+      icon: ICONS[entry.name] ?? Settings,
       group: 'Current agent',
-      keywords: entry.label,
+      keywords: entry.entry.label,
       when: (context) => context.agent?.id === task.id,
       run: () => {
-        fill(`/${entry.command.name} `)
+        pick(entry.name)
       },
     })),
   )

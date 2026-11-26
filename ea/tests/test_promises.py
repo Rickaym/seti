@@ -7,8 +7,8 @@ from test_chat import Script, events_of, make_chat, stored, texts
 from seti_ea.clock import CALL_NOTE_PREFIX
 from seti_ea.conversation import Conversation
 from seti_ea.history import SUMMARY_PREFIX
-from seti_ea.promises import NOTE_PREFIX, PromiseCheck, unkept
-from seti_ea.prompt import SYSTEM_PROMPT, VOICE_HELD_NOTE
+from seti_ea.promises import NOTE_PREFIX, PromiseCheck, promise_note, relay_note, unkept
+from seti_ea.prompt import ACT_NOTE, SYSTEM_PROMPT, VOICE_HELD_NOTE
 
 Message = dict[str, Any]
 
@@ -25,8 +25,8 @@ def developer(text: str) -> Message:
     return {"role": "developer", "content": text}
 
 
-def called(name: str, call_id: str = "call-1") -> list[Message]:
-    call = {"id": call_id, "type": "function", "function": {"name": name, "arguments": "{}"}}
+def called(name: str, call_id: str = "call-1", arguments: str = "{}") -> list[Message]:
+    call = {"id": call_id, "type": "function", "function": {"name": name, "arguments": arguments}}
     return [
         {"role": "assistant", "tool_calls": [call]},
         {"role": "tool", "tool_call_id": call_id, "content": "Done."},
@@ -98,7 +98,6 @@ def test_a_claim_with_no_tool_call_is_caught_but_an_earlier_one_is_not() -> None
 
 def test_offers_questions_and_words_for_the_user_are_not_promises() -> None:
     assert check(user("Fix it."), said("I'll start an agent to fix it. Shall I go ahead?")) is None
-    assert check(user("How long?"), said("I'll let you know when it finishes.")) is None
     assert check(user("Ideas?"), said("If you like, I'll tell the docs agent.")) is None
     assert check(user("What did it say?"), said('It said: "I\'ll tell the docs agent."')) is None
     assert check(user("Status?"), said("He'll ask the reviewer next.")) is None
@@ -113,6 +112,37 @@ def test_nouns_that_double_as_verbs_and_restated_sends_are_not_promises() -> Non
         check(*sent, user("Go for it."), *called("schedule_followup", "call-2"), said("I've sent it."))
         is None
     )
+
+
+def test_a_check_in_promised_with_nothing_scheduled_is_caught() -> None:
+    start = [user("Start an agent on the login test."), *called("start_task")]
+    note = check(*start, said("Started. I'll check its progress in thirty minutes."))
+    assert note is not None
+    assert "I'll check its progress in thirty minutes" in note
+    assert "schedule_followup" in note
+    assert check(*start, said("Started. I'll tell you when it's done.")) is not None
+    assert check(user("How long?"), said("I'll let you know when it finishes.")) is not None
+    sent = [user("Tell him to rebase."), *called("post_team_chat")]
+    assert check(*sent, said("Sent. I'll check back in twenty minutes.")) is not None
+
+
+def test_a_check_in_with_its_follow_up_watch_or_notify_is_kept() -> None:
+    start = [user("Start an agent on the login test."), *called("start_task")]
+    scheduled = [*start, *called("schedule_followup", "call-2")]
+    assert check(*scheduled, said("Started. I'll check its progress in thirty minutes.")) is None
+    assert check(*start, *called("watch_task", "call-2"), said("I'll tell you when it's done.")) is None
+    notify = called("start_task", arguments='{"prompt": "Fix it.", "notify_when_done": true}')
+    assert check(user("Start one."), *notify, said("Started. I'll tell you when it's done.")) is None
+    earlier = [user("Check back at two."), *scheduled, said("Done.")]
+    assert check(*earlier, user("When?"), said("I'll check back at two.")) is None
+
+
+def test_lookups_offers_and_questions_are_not_check_in_promises() -> None:
+    assert check(user("Is it ready?"), said("I'll check the brief before asking you to approve it.")) is None
+    assert check(user("Status?"), said("Let me check on it.")) is None
+    assert check(user("Later?"), said("If you like, I'll check back at two.")) is None
+    assert check(user("Later?"), said("Shall I check back in twenty minutes?")) is None
+    assert check(user("What did it find?"), said("I'll tell you what it found: two bugs.")) is None
 
 
 def test_asking_the_user_to_repeat_unclear_words_is_left_alone() -> None:
@@ -249,3 +279,14 @@ def test_the_prompt_forbids_empty_promises_and_re_asking_relays() -> None:
     )
     assert "send the direct message in the same reply, even while it runs a turn" in SYSTEM_PROMPT
     assert "show them in a quote block before sending" not in SYSTEM_PROMPT
+
+
+def test_after_a_relay_the_ea_says_whom_and_the_gist_and_never_reads_the_message_back() -> None:
+    prompt = " ".join(SYSTEM_PROMPT.split())
+    assert "say whom and the gist in a few words" in prompt
+    assert "never quote, read back or restate it, whole or step by step" in prompt
+    assert "Give it only when the user asks what you sent." in prompt
+    assert "quote what you sent" not in prompt
+    for text in (prompt, ACT_NOTE, promise_note("I told it."), relay_note("tell it", "Shall I send it?")):
+        assert "what you sent to whom" not in text
+        assert "the gist in a few words" in text

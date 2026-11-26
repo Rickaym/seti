@@ -142,8 +142,20 @@ export { claudeToolCall } from './runtimes/claude/tools.js'
 export { isCall as isCodexCall } from './runtimes/codex/calls.js'
 export { type CodexJob } from './runtimes/codex/jobs.js'
 export { projectCodex, type CodexMessage } from './runtimes/codex/project.js'
+export { projectAcp } from './runtimes/acp/project.js'
+export type { AcpRecord } from './runtimes/acp/shapes.js'
 export type { TurnSpend } from './runtimes/codex/shapes.js'
 export * from './runtimes/picks.js'
 export * from './runtimes/capabilities.js'
 export * from './runtimes/settings.js'
 export * from './runtimes/stored.js'
+export { setiCommandInput, type SetiCommandInput, type SetiCommandResult } from './seti-commands/input.js'
+export { isSetiLine, SETI_NAMES, setiComposerCommands, sourcesOf } from './seti-commands/names.js'
+export {
+  completeSetiLine,
+  parseSetiLine,
+  SETI_LINE_MAX,
+  type SetiCommand,
+  type SetiCompletion,
+} from './seti-commands/parse.js'
+export type { CommandAuthor, CommandSource, CommandWorld } from './seti-commands/world.js'
