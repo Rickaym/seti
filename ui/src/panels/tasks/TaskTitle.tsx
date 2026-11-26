@@ -1,14 +1,11 @@
 import type { Task } from '@seti/shared'
-import { Pencil, PencilLine } from 'lucide-react'
+import { Pencil } from 'lucide-react'
 import { useEffect, useRef, type KeyboardEvent } from 'react'
-import { toast } from 'sonner'
-import { apiPatch, errorText } from '@/api'
 import { Hint } from '@/components/Hint'
 import { DetailTitle } from '@/components/SplitPane'
-import { useCommands } from '@/components/palette/useCommands'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { refreshTaskLists } from '@/hooks/useTasks'
+import { renameTask } from '@/panels/tasks/rename'
 
 const TITLE_MAX = 200
 
@@ -27,21 +24,6 @@ export function TaskTitle({ task, onChanged, draft, onDraftChange: setDraft, com
   const input = useRef<HTMLInputElement>(null)
   const editing = draft !== null
 
-  useCommands([
-    {
-      id: 'agent.rename',
-      title: 'Rename agent',
-      detail: task.title,
-      icon: PencilLine,
-      group: 'Current agent',
-      keywords: 'title name',
-      when: (context) => context.agent?.id === task.id,
-      run: () => {
-        setDraft(task.title)
-      },
-    },
-  ])
-
   useEffect(() => {
     if (editing) {
       input.current?.select()
@@ -54,14 +36,7 @@ export function TaskTitle({ task, onChanged, draft, onDraftChange: setDraft, com
     if (title === '' || title === task.title) {
       return
     }
-    try {
-      await apiPatch<Task>(`/tasks/${task.id}`, { title })
-      toast.success(`Renamed to "${title}"`)
-      onChanged()
-      refreshTaskLists()
-    } catch (e) {
-      toast.error(errorText(e))
-    }
+    await renameTask(task, title, onChanged)
   }
 
   const onKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {

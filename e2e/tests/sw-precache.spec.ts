@@ -1,5 +1,5 @@
 import type { APIRequestContext, BrowserContext, Page } from '@playwright/test'
-import { expect, test, toasts } from './support/fixtures.js'
+import { expect, test } from './support/fixtures.js'
 
 test.use({ serviceWorkers: 'allow', allowedHttpStatuses: [500] })
 
@@ -71,8 +71,9 @@ test('a new worker copies the hashed files it already has and fetches only the r
   await page.evaluate(async () => {
     await navigator.serviceWorker.register('/sw.js?next')
   })
-  const toast = toasts(page).filter({ hasText: 'Seti updated' })
-  await expect(toast).toBeVisible()
+  await expect
+    .poll(async () => page.evaluate(async () => (await navigator.serviceWorker.getRegistration())?.waiting?.scriptURL))
+    .toMatch(/\/sw\.js\?next$/)
 
   const unhashed = urls.filter((url) => !url.startsWith('/assets/'))
   expect(sorted(fetched.filter((path) => path !== '/sw.js'))).toEqual(sorted([...unhashed, ADDED]))
@@ -82,7 +83,9 @@ test('a new worker copies the hashed files it already has and fetches only the r
   })
   expect(sorted(held)).toEqual(sorted(urls))
 
-  await Promise.all([page.waitForEvent('load'), toast.getByRole('button', { name: 'Reload' }).click()])
+  await page.evaluate(async () => {
+    ;(await navigator.serviceWorker.getRegistration())?.waiting?.postMessage('skip-waiting')
+  })
   await expect.poll(async () => cacheNames(page)).toEqual(['seti-shell-e2e-next'])
 })
 
@@ -108,7 +111,7 @@ test('a failed fetch fails the install and the old worker keeps its cache', asyn
   })
   expect(state).toBe('redundant')
   expect(await cacheNames(page)).toEqual(before)
-  expect(await page.evaluate(() => navigator.serviceWorker.controller?.scriptURL ?? '')).toMatch(/\/sw\.js$/)
+  expect(await page.evaluate(() => navigator.serviceWorker.controller?.scriptURL ?? '')).toMatch(/\/sw\.js\?build=/)
   await page.reload()
   await expect(page.getByRole('banner')).toBeVisible()
 })

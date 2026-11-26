@@ -39,3 +39,21 @@ export function planPrecache(precache: Precache, held: ReadonlyMap<string, strin
   }
   return plan
 }
+
+/** The content types each kind of file may arrive as; anything else is never cached as that file. */
+const KINDS: readonly (readonly [file: RegExp, type: RegExp])[] = [
+  [/\.m?js$/, /javascript/],
+  [/\.css$/, /^text\/css/],
+  [/\.(?:png|jpe?g|gif|webp|avif|svg|ico)$/, /^image\//],
+  [/\.(?:woff2?|ttf|otf)$/, /^(?:font\/|application\/octet-stream)/],
+  [/\.(?:json|webmanifest)$/, /json/],
+  [/\.wasm$/, /^application\/wasm/],
+  [/\.html$/, /^text\/html/],
+]
+
+/** Whether a response's content type fits the file asked for; a page never stands in for a file. */
+export function fitsKind(pathname: string, contentType: string | null): boolean {
+  const type = contentType ?? ''
+  const kind = KINDS.find(([file]) => file.test(pathname))
+  return kind === undefined ? !type.startsWith('text/html') : kind[1].test(type)
+}

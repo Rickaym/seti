@@ -2,7 +2,6 @@ import type { AgentCapabilities, RestartSessionInput, Task } from '@seti/shared'
 import { RotateCw } from 'lucide-react'
 import { toast } from 'sonner'
 import { apiPost, errorText } from '@/api'
-import { useCommands } from '@/components/palette/useCommands'
 import { useConfirm, type ConfirmOptions } from '@/components/ui/confirm-context'
 import { useCapabilities } from '@/hooks/useCapabilities'
 
@@ -16,7 +15,8 @@ function reloaded(caps: AgentCapabilities | null): string {
   return `${named.join(', ')} and settings`
 }
 
-function question(task: Task, running: boolean, caps: AgentCapabilities | null): ConfirmOptions {
+/** The question before a restart, with what it ends and loads anew. */
+export function restartQuestion(task: Task, running: boolean, caps: AgentCapabilities | null): ConfirmOptions {
   const effect = `${caps?.label ?? 'The runtime'} for "${task.title}" starts again with its ${reloaded(caps)} loaded anew.`
   return {
     title: 'Restart session',
@@ -27,39 +27,27 @@ function question(task: Task, running: boolean, caps: AgentCapabilities | null):
   }
 }
 
+/** Restarts the agent's session, stopping its turn first when `running`; false when it failed. */
+export async function restartTask(task: Task, running: boolean, onChanged: () => void): Promise<boolean> {
+  try {
+    const body: RestartSessionInput = { interrupt: running }
+    await apiPost(`/tasks/${task.id}/session/restart`, body)
+    toast.success('Session restarted')
+    onChanged()
+    return true
+  } catch (e) {
+    toast.error(errorText(e))
+    return false
+  }
+}
+
 /** Restarts the agent's session after a confirmation; `running` offers to stop the turn first. */
 export function useRestartAction(task: Task, running: boolean, onChanged: () => void) {
   const confirm = useConfirm()
   const caps = useCapabilities(task)
   return async () => {
-    if (!(await confirm(question(task, running, caps)))) {
-      return
-    }
-    try {
-      const body: RestartSessionInput = { interrupt: running }
-      await apiPost(`/tasks/${task.id}/session/restart`, body)
-      toast.success('Session restarted')
-      onChanged()
-    } catch (e) {
-      toast.error(errorText(e))
+    if (await confirm(restartQuestion(task, running, caps))) {
+      await restartTask(task, running, onChanged)
     }
   }
-}
-
-/** Restarting the agent's session, which keeps the conversation; it is in the palette too. */
-export function useSessionRestart(task: Task, running: boolean, onChanged: () => void) {
-  const restart = useRestartAction(task, running, onChanged)
-  useCommands([
-    {
-      id: 'agent.restart-session',
-      title: 'Restart session',
-      detail: task.title,
-      icon: RotateCw,
-      group: 'Current agent',
-      keywords: 'reload reconnect mcp servers plugins tools runtime process',
-      when: (context) => context.agent?.id === task.id,
-      run: () => void restart(),
-    },
-  ])
-  return restart
 }

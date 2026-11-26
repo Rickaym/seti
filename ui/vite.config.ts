@@ -5,10 +5,14 @@ import path from 'node:path'
 import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
 import { build, defineConfig, type Plugin, type Rolldown } from 'vite'
+import { swapIn, tagBuild } from './build/dist-swap'
 import { HASHED_PREFIX, type Precache } from './sw/precache'
 
 const SW_SOURCE = path.resolve(import.meta.dirname, 'sw/sw.ts')
 const SW_FILE = 'sw.js'
+/** The served build; a build is made beside it and swapped in whole when it is complete. */
+const LIVE_DIR = path.resolve(import.meta.dirname, 'dist')
+const STAGING = path.resolve(import.meta.dirname, 'node_modules/.seti-dist')
 const PRECACHE_PLACEHOLDER = /(["'`])__SETI_PRECACHE__\1/
 
 /** Viewer libraries the precache leaves out; they load from the network when a viewer first opens. */
@@ -130,6 +134,9 @@ function serviceWorker(): Plugin {
         swPath,
         code.replace(PRECACHE_PLACEHOLDER, () => JSON.stringify(JSON.stringify(precache))),
       )
+      const indexPath = path.join(outDir, 'index.html')
+      fs.writeFileSync(indexPath, tagBuild(fs.readFileSync(indexPath, 'utf8'), precache.version))
+      swapIn({ staged: outDir, live: LIVE_DIR, retired: path.join(STAGING, 'retired'), id: precache.version })
     },
   }
 }
@@ -148,7 +155,7 @@ export default defineConfig({
     },
   },
   build: {
-    outDir: 'dist',
+    outDir: path.join(STAGING, 'next'),
     emptyOutDir: true,
   },
   test: {
