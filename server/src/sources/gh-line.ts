@@ -10,7 +10,7 @@ import { cleanFilter } from './gh-filters.js'
  * What a line's result holds: one read's output as gh printed it, that output cut by filters
  * that add nothing, or more than one read's text.
  */
-export type GhOutput = 'whole' | 'cut' | 'mixed'
+type GhOutput = 'whole' | 'cut' | 'mixed'
 
 /** The GitHub reads of one shell line and what its result holds. */
 export interface GhLine {

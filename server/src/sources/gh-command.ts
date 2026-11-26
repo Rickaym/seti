@@ -5,7 +5,7 @@ import { githubRepo } from './refs.js'
  * How a read's own options shape its output: as gh prints it, cut by a jq program that adds no
  * text of its own, or by a program or template that can print anything.
  */
-export type GhFilter = 'none' | 'clean' | 'any'
+type GhFilter = 'none' | 'clean' | 'any'
 
 /** A `gh pr|issue view` or `gh pr diff` the ledger reads; `item` is a number, a URL, or null. */
 export interface GhView {
