@@ -499,6 +499,9 @@ interrupted only for that.
   refuse a name that resolves to a loopback or link-local address.
 - EGR-4: The proxy terminates TLS only for hosts where it adds a credential, with a local CA
   name-constrained to them whose key stays outside the sandbox. Other hosts are tunnelled unread.
+  A sandbox trusts those CAs through the system bundle and the usual CA variables and, when the
+  host has certutil, through its own copy of an NSS database at `~/.pki/nssdb` that holds their
+  certificates only, trusted for TLS servers, so browsers inside trust the proxy too.
 - EGR-5: A placeholder is `seti-secret-<name>-<32 hex>`, in the connection's variable. The proxy
   swaps it for the value in the URL path and headers (Basic auth too), on the connection's hosts
   and port 443 only. A readable request that carries a placeholder elsewhere MUST be refused (403)

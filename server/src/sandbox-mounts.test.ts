@@ -85,6 +85,7 @@ const layout = (patch: Partial<SandboxLayout> = {}): SandboxLayout => ({
   readOnly: [],
   caDir,
   systemBundle: '/etc/ssl/certs/ca-certificates.crt',
+  browserDb: null,
   hidden: [
     path.join(home, '.ssh'),
     path.join(home, '.cargo', 'credentials.toml'),
@@ -250,6 +251,17 @@ describe('sandboxMounts', () => {
       { kind: 'ro-bind', src: path.join(taskDir, 'run'), dest: SANDBOX_RUN },
       { kind: 'ro-bind', src: path.join(caDir, 'bundle.pem'), dest: '/etc/ssl/certs/ca-certificates.crt' },
     ])
+  })
+
+  it("shows browsers the sandbox's copy of the CA's NSS database in its home, after the home itself", () => {
+    const browserDb = path.join(taskDir, 'nssdb')
+    const withDb = sandboxMounts(layout({ browserDb }))
+    const nssdb = path.join(home, '.pki', 'nssdb')
+    expect(find(withDb, nssdb)).toEqual([{ kind: 'bind', src: browserDb, dest: nssdb }])
+    expect(withDb.findIndex((mount) => mount.dest === nssdb)).toBeGreaterThan(
+      withDb.findIndex((mount) => mount.dest === home),
+    )
+    expect(find(mounts, nssdb)).toEqual([])
   })
 
   it('applies parents before the directories inside them', () => {
