@@ -119,7 +119,8 @@ function compactSettings(rule: CompactRule): Setting[] {
  * Every setting the app-server runs with, on its command line, which wins over any config file.
  * Terminals for `tty` commands are off, so nothing typed into a running command escapes a
  * decision; hooks, plugins, apps, goals, memories, skills, analytics and hosted web search are
- * off. Commands get no shell snapshot, which every later command would source, and the sandbox's
+ * off, as are subagents, which newer models' catalog entries turn on unless `agents` is off.
+ * Commands get no shell snapshot, which every later command would source, and the sandbox's
  * search path, which leaves out the helper folder Codex makes in its writable home. The model
  * sends a summary of its reasoning, which Seti's models leave out unless asked. Approvals go to
  * Seti, never to a reviewer model. A folder without AGENTS.md gives its CLAUDE.md instead, as
@@ -143,6 +144,7 @@ function overrides(provider: CodexProvider, model: string, searchPath: string | 
     ['features.skill_mcp_dependency_install', false],
     ['features.multi_agent', false],
     ['features.multi_agent_v2', false],
+    ['agents.enabled', false],
     ['features.goals', false],
     ['features.memories', false],
     ['features.shell_snapshot', false],

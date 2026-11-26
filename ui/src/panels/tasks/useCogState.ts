@@ -1,5 +1,5 @@
 import type { Task } from '@seti/shared'
-import { KeyRound, Layers, UserCog } from 'lucide-react'
+import { Layers, UserCog } from 'lucide-react'
 import { useState } from 'react'
 import { useCommands } from '@/components/palette/useCommands'
 import type { SettingsRequest } from '@/panels/tasks/commands/types'
@@ -8,7 +8,7 @@ export type SectionId = 'general' | 'access' | 'team' | 'session'
 
 /**
  * Whether the agent's settings and its access dialog are open, on which tab and with which field
- * focused; the palette's agent commands and a setting command's request open them too.
+ * focused; the palette's role and workspace commands and a setting command's request open them.
  */
 export function useCogState(task: Task, request: SettingsRequest | null) {
   const [open, setOpen] = useState(false)
@@ -27,18 +27,6 @@ export function useCogState(task: Task, request: SettingsRequest | null) {
     }
   }
   useCommands([
-    {
-      id: 'agent.access',
-      title: 'Open access',
-      detail: task.title,
-      icon: KeyRound,
-      group: 'Current agent',
-      keywords: 'ssh aws mcp servers packs plugins permissions',
-      when: (context) => context.agent?.id === task.id,
-      run: () => {
-        setAccessOpen(true)
-      },
-    },
     {
       id: 'agent.role',
       title: 'Change role',

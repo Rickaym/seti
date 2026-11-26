@@ -34,9 +34,9 @@ def test_spoken_lines_carry_no_honorific() -> None:
 def test_a_chosen_form_of_address_is_used_sparingly() -> None:
     titled = base_prompt("ma'am")
     assert NO_TITLE_RULE not in titled
-    assert 'The user likes to be addressed as "ma\'am". Use it sparingly' in titled
+    assert 'The user likes to be addressed as "ma\'am". Use it rarely' in titled
     assert '"Good evening, ma\'am."' in titled
-    assert 'the question "Shall I go ahead?" never does' in titled
+    assert 'a question asking for a yes, such as "Shall I go ahead?", never does' in titled
     assert base_prompt("Dr. Okafor").count('"Dr. Okafor"') == 1
     assert titled.isascii()
 

@@ -86,6 +86,18 @@ export const sourceItems = {
       WHERE task_id = ${taskId} AND kind = ${kind} AND permalink <> '' ORDER BY id DESC LIMIT 1`
     return row?.permalink ?? null
   },
+  /** The agent's newest items, of one kind when given, each with when the agent read it. */
+  recent: async (
+    taskId: string,
+    kind: SourceKind | null,
+    limit: number,
+  ): Promise<(SourceItem & { read_at: string })[]> => {
+    const rows = await sql<(Row & { read_at: string })[]>`SELECT s.*, m.created_at AS read_at FROM source_item s
+      JOIN task_message m ON m.id = s.message_id
+      WHERE s.task_id = ${taskId} AND (${kind}::text IS NULL OR s.kind = ${kind})
+      ORDER BY s.id DESC LIMIT ${limit}`
+    return rows.map((row) => ({ ...toItem(row), read_at: row.read_at }))
+  },
   /** Every item of the agent, oldest first. */
   forTask: async (taskId: string): Promise<SourceItem[]> =>
     (await sql<Row[]>`SELECT * FROM source_item WHERE task_id = ${taskId} ORDER BY id`).map(toItem),

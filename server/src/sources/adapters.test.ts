@@ -96,6 +96,55 @@ describe('Slack adapter', () => {
         },
       ],
     },
+    {
+      name: 'a view cut by a pipe is the pull request the call named, its text what was printed',
+      call: bash('gh pr view 12 -R acme/api 2>&1 | head -5'),
+      answer: 'title:\tRoll out',
+      want: [{ ref: 'github:acme/api#12', permalink: 'https://github.com/acme/api/pull/12', text: 'title:\tRoll out' }],
+    },
+    {
+      name: 'a jq field is the pull request the call named',
+      call: bash("gh pr view 12 --repo acme/api --json title,body --jq '.body'"),
+      answer: 'the body',
+      want: [{ ref: 'github:acme/api#12', text: 'the body' }],
+    },
+    {
+      name: 'a diff links to the changed files',
+      call: bash("R=acme/api; gh pr diff 12 -R $R | grep -n 'build'"),
+      answer: '3:+build it',
+      want: [
+        { ref: 'github:acme/api#12', permalink: 'https://github.com/acme/api/pull/12/files', text: '3:+build it' },
+      ],
+    },
+    {
+      name: 'an api read through jq is the issue its path names',
+      call: bash("gh api repos/acme/api/issues/7/comments --jq '.[].body'"),
+      answer: 'one\ntwo',
+      want: [{ ref: 'github:acme/api#7', permalink: 'https://github.com/acme/api/issues/7', text: 'one\ntwo' }],
+    },
+    {
+      name: 'a jq program that can print its own text records the item, never its text',
+      call: bash(`gh pr view 12 -R acme/api --json title --jq '"the build was never pushed"'`),
+      answer: 'the build was never pushed',
+      want: [{ ref: 'github:acme/api#12', text: null }],
+    },
+    {
+      name: 'an echo beside the read records the item, never its text',
+      call: bash("echo 'the build was never pushed'; gh pr view 12 -R acme/api --json title --jq .title"),
+      answer: 'the build was never pushed\nRoll out',
+      want: [{ ref: 'github:acme/api#12', text: null }],
+    },
+    {
+      name: 'two reads in one line record both, neither with text',
+      call: bash(
+        'gh pr view 12 -R acme/api --json title --jq .title; gh issue view 3 -R acme/web --json title --jq .title',
+      ),
+      answer: 'Roll out\nFix it',
+      want: [
+        { ref: 'github:acme/api#12', text: null },
+        { ref: 'github:acme/web#3', permalink: 'https://github.com/acme/web/issues/3', text: null },
+      ],
+    },
   ])('$name', ({ call, answer, want }) => {
     const found = recorded(call[0], call[1], answer)
     expect(found).toHaveLength(want.length)
@@ -305,6 +354,55 @@ describe('GitHub adapter', () => {
       answer: restPull(repo, 12, 'the body'),
       want: [{ ref: 'github:acme/api#12', text: 'Roll out the new build\n\nthe body' }],
     },
+    {
+      name: 'a view cut by a pipe is the pull request the call named, its text what was printed',
+      call: bash('gh pr view 12 -R acme/api 2>&1 | head -5'),
+      answer: 'title:\tRoll out',
+      want: [{ ref: 'github:acme/api#12', permalink: 'https://github.com/acme/api/pull/12', text: 'title:\tRoll out' }],
+    },
+    {
+      name: 'a jq field is the pull request the call named',
+      call: bash("gh pr view 12 --repo acme/api --json title,body --jq '.body'"),
+      answer: 'the body',
+      want: [{ ref: 'github:acme/api#12', text: 'the body' }],
+    },
+    {
+      name: 'a diff links to the changed files',
+      call: bash("R=acme/api; gh pr diff 12 -R $R | grep -n 'build'"),
+      answer: '3:+build it',
+      want: [
+        { ref: 'github:acme/api#12', permalink: 'https://github.com/acme/api/pull/12/files', text: '3:+build it' },
+      ],
+    },
+    {
+      name: 'an api read through jq is the issue its path names',
+      call: bash("gh api repos/acme/api/issues/7/comments --jq '.[].body'"),
+      answer: 'one\ntwo',
+      want: [{ ref: 'github:acme/api#7', permalink: 'https://github.com/acme/api/issues/7', text: 'one\ntwo' }],
+    },
+    {
+      name: 'a jq program that can print its own text records the item, never its text',
+      call: bash(`gh pr view 12 -R acme/api --json title --jq '"the build was never pushed"'`),
+      answer: 'the build was never pushed',
+      want: [{ ref: 'github:acme/api#12', text: null }],
+    },
+    {
+      name: 'an echo beside the read records the item, never its text',
+      call: bash("echo 'the build was never pushed'; gh pr view 12 -R acme/api --json title --jq .title"),
+      answer: 'the build was never pushed\nRoll out',
+      want: [{ ref: 'github:acme/api#12', text: null }],
+    },
+    {
+      name: 'two reads in one line record both, neither with text',
+      call: bash(
+        'gh pr view 12 -R acme/api --json title --jq .title; gh issue view 3 -R acme/web --json title --jq .title',
+      ),
+      answer: 'Roll out\nFix it',
+      want: [
+        { ref: 'github:acme/api#12', text: null },
+        { ref: 'github:acme/web#3', permalink: 'https://github.com/acme/web/issues/3', text: null },
+      ],
+    },
   ])('$name', ({ call, answer, want }) => {
     const found = recorded(call[0], call[1], answer)
     expect(found).toHaveLength(want.length)
@@ -314,14 +412,21 @@ describe('GitHub adapter', () => {
   })
 
   it.each([
-    ['a pipe', 'gh pr view 12 -R acme/api | head', prViewText(repo, 12, 'x')],
-    ['a jq filter', 'gh pr view 12 -R acme/api --json title --jq .title', 'Roll out'],
     ['a variable', 'gh pr view $N -R acme/api', prViewText(repo, 12, 'x')],
     ['a view that prints another number', 'gh pr view 13 -R acme/api', prViewText(repo, 12, 'x')],
     ['a view that prints another repository', 'gh pr view 12 -R acme/web', prViewText(repo, 12, 'x')],
     ['an api answer for another item', 'gh api repos/acme/api/pulls/13', restPull(repo, 12, 'x')],
     ['an api write', 'gh api -X POST repos/acme/api/issues/12/comments', restComments(repo, 12, ['x'])],
     ['a body that imitates the header', 'gh pr view', `title:\tx\n--\nurl:\thttps://github.com/${repo}/pull/9`],
+    ['a filtered view without a repository', 'gh pr view 12 | head', prViewText(repo, 12, 'x')],
+    ['a loop over numbers', 'for n in 12 13; do gh pr view $n -R acme/api --json title --jq .title; done', 'x'],
+    [
+      'a filtered read that failed',
+      'gh pr view 99 -R acme/api 2>&1 | head',
+      'GraphQL: Could not resolve to a PullRequest',
+    ],
+    ['a filtered read that printed nothing', 'gh pr view 12 -R acme/api --json body --jq .body 2>/dev/null', ''],
+    ['a read sent to a file', 'gh pr view 12 -R acme/api > /tmp/pr.txt; cat /tmp/pr.txt', prViewText(repo, 12, 'x')],
   ])('spoof or unread form: %s gives nothing', (_name, command, answer) => {
     expect(recorded('Bash', { command }, answer)).toEqual([])
   })
