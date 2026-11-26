@@ -268,8 +268,9 @@ between two steps; an interrupt; a hook at subagent start.
   verifies. A client shows a verified quote with a quiet mark and any other with none, never as an
   error.
 - SRC-5: A Slack message permalink, or a GitHub pull request, issue or comment link, that names no
-  item and whose id appears in no row of the agent's transcript is reported as not read by the
-  agent; a client says so in muted text. An agent with no transcript rows gets no such report.
+  item and whose id appears in no tool result, prompt or update of the agent's transcript (its own
+  replies and calls do not count) is reported as not read by the agent; a client says so in muted
+  text. An agent with no transcript rows gets no such report.
 - SRC-6: An agent MAY search its own ledger by words, kind, container and time with
   `find_in_transcript` (`where` set to `sources`). Each item comes back once, newest first, with its
   place, time, permalink and exact text from the transcript, cut at 2,000 characters. At every Seti
