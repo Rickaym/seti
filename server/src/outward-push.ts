@@ -153,7 +153,14 @@ async function remoteUrls(git: Git, repoOnly: Git, remote: string | null): Promi
   return [...new Set(urls.flatMap((out) => out.split('\n')).filter((line) => line.trim() !== ''))]
 }
 
-/** The places a push from a folder reaches, or [null] where git cannot say or it reaches more. */
+/** Whether git failed because the folder is in no repository, where gh cannot pick one either. */
+const noRepository = (error: unknown) =>
+  error instanceof Error && 'stderr' in error && /not a git repository/i.test(String(error.stderr))
+
+/**
+ * The places a push from a folder reaches, or [null] where git cannot say or it reaches more. A
+ * gh call in a folder outside any repository reaches none, since gh fails there without writing.
+ */
 async function pushedFrom(view: AgentGitView, dir: string, where: { remote?: string | null; url?: string }) {
   const at = view.folder(dir)
   const git: Git = async (...args) => agentGitReading(GIT_TIMEOUT_MS, at, view.globals, ...args)
@@ -167,8 +174,8 @@ async function pushedFrom(view: AgentGitView, dir: string, where: { remote?: str
         ? await remoteUrls(git, repoOnly, where.remote ?? null)
         : [rewriteUrl(where.url, await git('config', '--get-regexp', '^url\\.').catch(() => ''))]
     return urls.length === 0 ? [null] : urls
-  } catch {
-    return [null]
+  } catch (error) {
+    return where.remote === '*' && noRepository(error) ? [] : [null]
   }
 }
 
