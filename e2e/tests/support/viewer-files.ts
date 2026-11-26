@@ -75,6 +75,14 @@ export async function seedViewerAgent(rows = CSV_ROWS): Promise<{ id: string; di
 
 export const filesPanel = (page: Page) => page.getByRole('region', { name: 'Files', exact: true })
 
+/** How many elements outside the Root select show exactly this text; runs in the page. */
+export const textOutsideSelect = (panel: Element, text: string) =>
+  Array.from(panel.querySelectorAll('*')).filter(
+    (el) =>
+      el.closest('select') === null &&
+      Array.from(el.childNodes).some((node) => node.nodeType === Node.TEXT_NODE && node.textContent?.trim() === text),
+  ).length
+
 /** Opens the agent's Files panel and, from the docs folder, the file with this name. */
 export async function openViewerFile(page: Page, name: string): Promise<void> {
   const panel = filesPanel(page)
