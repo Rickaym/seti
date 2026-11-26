@@ -634,14 +634,11 @@ async def test_seti_errors_come_back_plainly(tools: EaTools, fake_seti: FakeSeti
 
 def test_announcements_do_not_claim_an_action_that_only_asks() -> None:
     assert action_line(ToolCall("delete_agent", {"task": "x"})) is None
-    assert (
-        action_line(ToolCall("delete_agent", {"task": "x", "confirmed": True}))
-        == "Very good. Deleting it now."
-    )
-    assert action_line(ToolCall("link_pr", {"task": "x", "pr": "y"})) == "Of course. Linking the PR."
+    assert action_line(ToolCall("delete_agent", {"task": "x", "confirmed": True})) == "Deleting it."
+    assert action_line(ToolCall("link_pr", {"task": "x", "pr": "y"})) == "Linking the PR."
     assert (
         action_line(ToolCall("set_agent_group_chat", {"task": "x", "muted": True}))
-        == "Certainly. Muting it in the group chat."
+        == "Muting it in the group chat."
     )
     for spec in [*ACTION_SPECS, *(s for s in SETTINGS_SPECS if s.name in SETTINGS_WRITES)]:
         line = action_line(ToolCall(spec.name, {"confirmed": True}))
@@ -675,7 +672,7 @@ async def test_a_subagent_of_another_agent_and_a_vanished_agent(tools: EaTools, 
 def test_the_prompt_explains_the_new_abilities_and_how_to_ask() -> None:
     assert "Tools that take a confirmed argument" in SYSTEM_PROMPT
     assert "call confirm_asked with the ids of every question that yes answers" in SYSTEM_PROMPT
-    assert "Small changes that are easy to undo need no yes" in SYSTEM_PROMPT
+    assert "The user's request is their yes" in SYSTEM_PROMPT
     assert "never guess" in SYSTEM_PROMPT
     assert "change you make there is the preview label" in SYSTEM_PROMPT
     assert "# How you sound" in SYSTEM_PROMPT

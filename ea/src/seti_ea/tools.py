@@ -433,7 +433,7 @@ TOOL_SPECS: list[ToolSpec] = [
     ),
     ToolSpec(
         "stop_task",
-        "Stop a running task's current turn. Confirm with the user first.",
+        "Stop a running task's current turn. Ask first unless the user named this one agent to stop.",
         {"task": TASK_REF},
         ["task"],
     ),
@@ -451,7 +451,7 @@ TOOL_SPECS: list[ToolSpec] = [
         "of its own and clones the repos it needs, so name them in the prompt. Seti's planner titles "
         "it and picks context packs and MCP servers from the prompt. Unclear permissions are not "
         "given: it runs sandboxed with SSH hosts and AWS only as their defaults say; only the user "
-        "grants more. Confirm the prompt with the user first.",
+        "grants more. When the user asked for it and named the work, start it without asking first.",
         {
             "prompt": {"type": "string", "description": "The full instructions for the agent."},
             "title": {
