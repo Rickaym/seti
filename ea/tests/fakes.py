@@ -737,6 +737,8 @@ class FakeSeti:
     permission_requests: list[dict[str, Any]] = field(default_factory=list)
     answered_requests: list[dict[str, Any]] = field(default_factory=list)
     request_timeout_minutes: int = 60
+    permission_policy: dict[str, Any] = field(default_factory=dict)
+    agent_permissions: dict[str, dict[str, Any]] = field(default_factory=dict)
     settings_doc: dict[str, Any] = field(
         default_factory=lambda: {
             "version": 1,
@@ -1386,6 +1388,11 @@ class FakeSeti:
                 return ok(self.policy_shadow)
             case ["settings-doc"]:
                 return ok(self.settings_doc)
+            case ["permissions"]:
+                return ok(self.permission_policy)
+            case ["tasks", task_id, "permissions"]:
+                found = self.agent_permissions.get(task_id)
+                return ok(found) if found is not None else err(404, "Task not found")
             case ["permissions", "timeout"]:
                 return ok({"request_timeout_minutes": self.request_timeout_minutes, "updated_at": None})
             case ["requests"]:
