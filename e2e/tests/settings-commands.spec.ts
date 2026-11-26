@@ -27,15 +27,6 @@ async function leaveDraft(page: Page, taskId: string, text: string): Promise<voi
 const reply = (page: Page) => page.getByRole('combobox', { name: 'Reply' })
 const card = (page: Page, name: string) => page.getByRole('group', { name: `Command /${name}` })
 
-/** Esc closes the command list, whose Enter would pick the command rather than send the line. */
-async function closeList(page: Page): Promise<void> {
-  const list = page.getByRole('listbox', { name: 'Command suggestions' })
-  await reply(page).click()
-  await expect(list).toBeVisible()
-  await reply(page).press('Escape')
-  await expect(list).toBeHidden()
-}
-
 async function shot(page: Page, name: string): Promise<void> {
   await test.info().attach(name, { body: await page.screenshot(), contentType: 'image/png' })
 }
@@ -81,7 +72,10 @@ test('a handed-over or pasted /archive waits for Run, then asks as Archive does'
   await leaveDraft(page, id, '/archive')
   await page.goto(`/#agents/${id}`)
   await expect(reply(page)).toHaveValue('/archive')
-  await closeList(page)
+  await reply(page).click()
+  await expect(page.getByRole('listbox', { name: 'Command suggestions' })).toBeVisible()
+  await reply(page).press('Enter')
+  await expect(reply(page), 'Enter picks the command from the list').toHaveValue('/archive ')
   await reply(page).press('Enter')
   const archive = card(page, 'archive')
   await expect(archive).toContainText('This line was not typed here')
@@ -95,7 +89,8 @@ test('a handed-over or pasted /archive waits for Run, then asks as Archive does'
   await page.evaluate(async () => navigator.clipboard.writeText('/archive'))
   await reply(page).press('ControlOrMeta+V')
   await expect(reply(page)).toHaveValue('/archive')
-  await expect(page.getByRole('listbox', { name: 'Command suggestions' })).toBeHidden()
+  await reply(page).press('Enter')
+  await expect(reply(page), 'Enter picks the pasted command from the list').toHaveValue('/archive ')
   await reply(page).press('Enter')
   await expect(archive).toContainText('This line was not typed here')
   await archive.getByRole('button', { name: 'Run' }).click()

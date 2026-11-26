@@ -442,6 +442,16 @@ EA-4), a public group chat post, stopping several agents at once, and work it pr
 refuses a security change rather than asking. An ask is one sentence of effect and a short
 question; in the chat it ends with exactly "Shall I go ahead?", which shows the Yes and No buttons.
 
+### Call audio
+
+A call is WebRTC through pipecat's SmallWebRTC transport, which runs on aiortc. aiortc has no
+settings for speech on a lossy network, so two small modules replace what it creates, and their
+tests fail when the pinned aiortc version or the code they replace changes. `aiortc_opus.py`
+encodes the EA's voice as 48 kbps mono Opus with in-band FEC and a 10% loss hint, so the browser
+rebuilds a single lost packet instead of concealing it. `aiortc_jitter.py` buffers the user's audio
+three packets deep and skips a packet the network lost, where aiortc's own buffer also drops
+packets that arrived after it.
+
 ## Reference values
 
 Seti uses every value in [Appendix A](protocol.md#appendix-a-reference-constants) of the

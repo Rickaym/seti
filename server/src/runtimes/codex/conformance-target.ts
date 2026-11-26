@@ -36,28 +36,39 @@ export const CODEX_GAPS: Partial<Record<string, string>> = {
   'CP-1': 'the rig does not make Codex compact yet',
 }
 
-/** Where the suite runs Codex: its binary, the scripted model, and a folder for the rigs' homes. */
+/**
+ * Where the suite runs Codex: its binary, the model the agents pick, the scripted model that
+ * answers for it, and a folder for the rigs' homes.
+ */
 export interface CodexBench extends RigBench {
   binary: string
   baseUrl: string
+  agentModel: string
 }
 
-/** The adapter, given the rig's tool servers through Seti's relay as a session host gives its own. */
-function withRigTools(adapter: RuntimeAdapter<CodexShapes, 'codex'>): RuntimeAdapter<CodexShapes, 'codex'> {
+/**
+ * The adapter with the bench's model picked, given the rig's tool servers through Seti's relay as
+ * a session host gives its own.
+ */
+function onBench(adapter: RuntimeAdapter<CodexShapes, 'codex'>, model: string): RuntimeAdapter<CodexShapes, 'codex'> {
   return {
     ...adapter,
     realise: async (spec, launcher, host, abortController) => {
       const tools = rigTools(launcher)
       const toolServers =
         tools === undefined ? {} : await openToolRelay(tools.place, tools.servers, abortController.signal)
-      return adapter.realise(spec, launcher, { ...host, toolServers }, abortController)
+      const picked = { ...spec, vendor: { ...spec.vendor, model } }
+      return adapter.realise(picked, launcher, { ...host, toolServers }, abortController)
     },
   }
 }
 
 /** The Codex adapter as the suite drives it, over the real binary and a scripted model. */
 export const codexTarget = (bench: CodexBench): ConformanceTarget<CodexShapes, 'codex'> => ({
-  adapter: withRigTools(codexAdapterFor(bench.binary, { baseUrl: bench.baseUrl, envKey: 'OPENAI_API_KEY' })),
+  adapter: onBench(
+    codexAdapterFor(bench.binary, { baseUrl: bench.baseUrl, envKey: 'OPENAI_API_KEY' }),
+    bench.agentModel,
+  ),
   // A real binary on a busy machine takes seconds where an in-process fake takes milliseconds.
   boundMs: 8000,
   profile: {
@@ -72,5 +83,5 @@ export const codexTarget = (bench: CodexBench): ConformanceTarget<CodexShapes, '
   gaps: CODEX_GAPS,
   host: (neutral) => ({ decide: decideWith(neutral), hooks: null, toolServers: {} }),
   rig: (script) => codexRig(bench, script),
-  oneShotModel: 'gpt-5.5',
+  oneShotModel: bench.agentModel,
 })

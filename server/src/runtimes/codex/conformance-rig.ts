@@ -90,6 +90,26 @@ export function codexCall(call: ScriptCall): ModelCall {
   return { name: call.tool, args: call.args }
 }
 
+/** A nested tool's name on the `tools` object of a code mode script. */
+const scriptName = (call: Extract<ModelCall, { args: unknown }>): string =>
+  (call.namespace === undefined ? call.name : `${call.namespace}__${call.name}`).replaceAll(/\W/g, '_')
+
+/**
+ * The model's call for a script call when its model writes code: a command, an edit or a
+ * tool server call becomes an `exec` script that calls the nested tool; a question stays direct.
+ */
+export function codeModeCall(call: ScriptCall): ModelCall {
+  const direct = codexCall(call)
+  if (
+    direct.name === 'request_user_input' ||
+    (!('input' in direct) && commandOf(call) === null && !call.tool.includes('.'))
+  ) {
+    return direct
+  }
+  const argument = 'input' in direct ? JSON.stringify(direct.input) : JSON.stringify(direct.args)
+  return { name: 'exec', input: `text(await tools.${scriptName({ ...direct, args: {} })}(${argument}))` }
+}
+
 const ESCAPED_QUOTE = `'\\''`
 
 const quoted = (text: string): string => `'${text.replaceAll("'", ESCAPED_QUOTE)}'`
