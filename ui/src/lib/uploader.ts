@@ -27,6 +27,11 @@ interface UploaderHooks {
   stallMs?: number
 }
 
+/** Every upload request in flight on this page, so an update can wait for them. */
+const flights = new Set<AbortController>()
+
+export const uploadsInFlight = (): boolean => flights.size > 0
+
 /** One file's upload: its request in flight, its state and the watch for a stall. */
 class Transfer {
   readonly request: UploadRequest
@@ -48,7 +53,11 @@ class Transfer {
   take(): AbortController {
     this.paused = false
     this.state = started(this.request.body.size)
+    if (this.flight !== null) {
+      flights.delete(this.flight)
+    }
     this.flight = new AbortController()
+    flights.add(this.flight)
     return this.flight
   }
 
@@ -74,6 +83,9 @@ class Transfer {
   /** Stops watching a request that ended by itself. */
   landed(): void {
     clearTimeout(this.quiet)
+    if (this.flight !== null) {
+      flights.delete(this.flight)
+    }
     this.flight = null
   }
 
