@@ -63,6 +63,7 @@ from seti_ea.seti import SetiClient, SetiError
 from seti_ea.settings_json import settings_text
 from seti_ea.settings_tools import SETTINGS_SPECS, SettingsTools
 from seti_ea.source_tools import SOURCE_CONTAINER, SOURCE_KIND, SOURCE_SINCE, SOURCE_UNTIL, find_sources
+from seti_ea.task_extras import FILES_ARG, opinion_lines, recent_files
 from seti_ea.thread_lines import thread_lines
 from seti_ea.toolkit import (
     TASK_REF,
@@ -327,8 +328,9 @@ TOOL_SPECS: list[ToolSpec] = [
     ToolSpec(
         "get_task",
         "Details of one task: status, repos, cost, its todo list, linked PRs with CI and review, "
-        "updates waiting for the agent, Slack threads it posted in and follows for replies, and a "
-        "condensed recent transcript, or with window what it "
+        "updates waiting for the agent, Slack threads it posted in and follows for replies, what its "
+        "second opinions cost and the latest reviews of its PRs, and a condensed recent transcript, "
+        "or with files the files it changed, or with window what it "
         "did then, such as yesterday. To ask an agent why it did something, use the side chat mod's "
         "ask action through run_mod_action while that mod is on.",
         {
@@ -338,6 +340,7 @@ TOOL_SPECS: list[ToolSpec] = [
                 "description": "Read its prompts and replies in this window instead of the recent "
                 "transcript. " + str(HISTORY_WINDOW["description"]),
             },
+            "files": FILES_ARG,
         },
         ["task"],
     ),
@@ -1245,6 +1248,8 @@ class EaTools:
 
     async def get_task(self, args: Mapping[str, Any]) -> ToolResult:
         task = await self.resolve_task(arg_str(args, "task"))
+        if arg_bool(args, "files"):
+            return await recent_files(self._seti, task, self._now())
         task_id = str(task.get("id"))
         now = self._now()
         worktree = " in a worktree" if task.get("worktree") is True else ""
@@ -1277,6 +1282,7 @@ class EaTools:
             lines.append(f"It made {plural(outward, 'call')} that reach outside the machine.")
         lines.extend(await self._task_prs(task))
         lines.extend(await thread_lines(self._seti, task_id, now))
+        lines.extend(await opinion_lines(self._seti, task_id, now))
         waiting = await self._waiting(task_id)
         if waiting:
             about = "; ".join(clip(str(u.get("title", "update")), 80) for u in waiting[:5])
