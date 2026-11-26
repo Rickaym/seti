@@ -118,12 +118,12 @@ def test_posting_waits_for_the_user_in_inbox_reports() -> None:
 
 def test_posting_says_what_it_does() -> None:
     announcer = ToolAnnouncer()
-    assert announcer.phrase([ToolCall("post_team_chat", {"text": "x"})]) == "Very good. Posting it now."
+    assert announcer.phrase([ToolCall("post_team_chat", {"text": "x"})]) == "Posting it."
 
 
 def test_the_prompt_asks_for_a_yes_before_posting() -> None:
     assert "# Group chat" in SYSTEM_PROMPT
-    assert "stop_task or a public post_team_chat, say" in SYSTEM_PROMPT
+    assert "A public post_team_chat, which reaches every agent: give the text, then ask." in SYSTEM_PROMPT
     assert "You never write into an agent's conversation as the user" in SYSTEM_PROMPT
     assert SYSTEM_PROMPT.isascii()
 
