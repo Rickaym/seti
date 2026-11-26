@@ -47,6 +47,7 @@ import { CHANNEL_EVENT_ROUTING, CHANNEL_RUN_DUE, POLLER_CHANNELS } from './schem
 import { PR_LIST_CACHE } from './schema-prs.js'
 import { QUESTION_SECRETS, QUESTIONS } from './schema-questions.js'
 import { DROP_ROUTINES, REMINDER_CHANNELS, REMINDER_CRON } from './schema-reminders.js'
+import { SESSION_RESCRUB } from './schema-rescrub.js'
 import { RESTART_CUTS } from './schema-restart.js'
 import { PACK_KIND, retireBuiltinRoles, ROLE_RUNTIME, rolesToPacks } from './schema-roles.js'
 import { MESSAGE_SEARCH, MESSAGE_SEARCH_TALK, MESSAGE_TIME } from './schema-search.js'
@@ -272,5 +273,6 @@ export const MIGRATIONS: readonly Migration[] = [
   { version: 146, name: 'permission_request_description', sql: PERMISSION_REQUEST_DESCRIPTION },
   { version: 147, name: 'source_items', sql: SOURCE_ITEMS },
   { version: 148, name: 'ea_ask_word', sql: EA_ASK_WORD },
-  { version: 149, name: 'ea_inbox_relays', sql: EA_INBOX_RELAYS },
+  { version: 149, name: 'session_rescrub', sql: SESSION_RESCRUB },
+  { version: 150, name: 'ea_inbox_relays', sql: EA_INBOX_RELAYS },
 ]

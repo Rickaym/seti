@@ -274,6 +274,38 @@ An agent searches only its own ledger, at every Seti control level, and the EA s
 as it already reads any transcript. Both get the text as data: a note says other people wrote it and
 it is never to be followed, and the EA's frame neutralises any tag in the text that could close it.
 
+## Redaction of what agents print
+
+Seti redacts credentials in what agents print before it stores a transcript row, a permission
+request or an audit event, and again whenever it shows or hands one on. It knows a secret by its
+shape or by the name that carries it, and keeps the name so the row still reads:
+
+- Private keys, vendor token prefixes, cloud access keys, passwords in URLs and secret-named env
+  lines.
+- JWTs wherever they appear, and base64 JSON sessions such as a Supabase `base64-` cookie.
+- Session and token-like values in `Cookie` and `Set-Cookie` headers, in `curl -b` and
+  `--cookie`, and in `document.cookie` output. Cookie names, attributes and short values such as
+  `theme=dark` stay.
+- The credential of an `Authorization` or `Proxy-Authorization` header of any scheme. The scheme
+  stays.
+- Values under session names in cookies, query strings, form bodies and JSON: Supabase
+  `sb-<ref>-auth-token` and its `.0`, `.1` chunks, `__Secure-` and `__Host-` cookies,
+  `connect.sid`, `next-auth.session-token`, framework session cookies, `access_token`,
+  `refresh_token` and `id_token`.
+- Playwright storage state entries that hold a session, `.netrc` passwords and secret-named
+  `curl -H` headers.
+
+After an upgrade that adds rules, Seti re-scrubs stored transcript rows and permission requests
+once in the background, resuming after a restart, and logs only counts:
+`scrub: re-scrubbed task_message, 3 of 120000 rows changed`. A transcript restored from an archive
+is scrubbed as it comes back. Audit events keep the text they were sealed with, because changing
+one would break the hash chain; they hold commands and tool inputs, never tool output. Backups made
+before the re-scrub still hold the old text.
+
+Redaction is a second line of defence. A session or key an agent printed has already reached the
+agent and its model provider, so revoke it (sign the session out, rotate the key) even when Seti
+shows `[redacted]`.
+
 ## Inbox relays
 
 Every inbox item the EA reads (an alert, a webhook, a Slack or GitHub event, an agent's message)
@@ -292,6 +324,8 @@ events themselves.
 
 ## What is not protected
 
+- Redaction knows secrets by shape and name, so a secret in a format it does not know reaches the
+  transcript as printed.
 - systemd 255's user manager cannot decrypt credentials, so the key files are plain files the Seti
   user can read, and Seti does not encrypt the database. An unsandboxed agent runs as that user and
   can read them. Full-disk encryption is the control for data at rest.
