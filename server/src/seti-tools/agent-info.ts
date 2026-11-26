@@ -2,6 +2,7 @@ import {
   awsOutcomeLine,
   chatSearchQuery,
   githubOutcomeLine,
+  shellParams,
   SUBTASK_STATUSES,
   todoSummary,
   type AgentProcesses,
@@ -17,13 +18,16 @@ import { agentProcesses } from '../agent-processes.js'
 import { cpuCapSettings, taskCpuCap } from '../cpu-cap.js'
 import { tasks } from '../db.js'
 import { memoryCapSettings, taskMemoryCap } from '../memory-cap.js'
-import { stopProcess, stopShell } from '../process-stop.js'
+import { readShellOutput, stopProcess, stopShell } from '../process-stop.js'
 import { openQuerySince } from '../runner.js'
 import { taskInputs } from '../store/inputs.js'
 import { messageSearch } from '../store/search.js'
+import { secondOpinions } from '../store/second-opinions.js'
 import { threadFollows } from '../store/threads.js'
 import { agentTodos, subtaskBriefs } from '../subtask-cache.js'
 import { requireSubtask, taskDigest } from '../task-actions.js'
+import { taskFileContext } from '../task-file-context.js'
+import { recentFiles } from '../task-files-list.js'
 import { brief as briefOf } from './agents.js'
 import { anyTask, liveTask, pickOne, taskRef } from './refs.js'
 import { setiTool, ToolRefusal } from './tool.js'
@@ -43,10 +47,15 @@ const listProcesses = setiTool({
   name: 'list_processes',
   description:
     "An agent's background shells (commands it left running, such as dev servers and watches) with status and how long they ran, and the other processes running for it now with CPU and memory.",
-  input: { task: taskRef },
-  run: async ({ task: ref }) => {
+  input: {
+    task: taskRef,
+    shell: shellParams.shape.shell_id
+      .optional()
+      .describe("Instead, the end of this background shell's output, by its id, with credentials redacted."),
+  },
+  run: async ({ task: ref, shell }) => {
     const task = await anyTask(ref)
-    return agentProcesses(task.id, openQuerySince(task.id))
+    return shell === undefined ? agentProcesses(task.id, openQuerySince(task.id)) : readShellOutput(task.id, shell)
   },
 })
 
@@ -233,17 +242,29 @@ function digestText(lines: readonly DigestLine[]): string[] {
 const getTask = setiTool({
   name: 'get_task',
   description:
-    'One agent in detail: status, a condensed recent transcript, its todo list, updates waiting for it, running subagents and counts of the rest, where it works, its setup, cost at API prices, the Slack threads it posted in and follows for replies, and linked PRs. For an earlier day use read_transcript.',
-  input: { task: taskRef },
-  run: async ({ task: ref }) => {
+    'One agent in detail: status, a condensed recent transcript, its todo list, updates waiting for it, running subagents and counts of the rest, where it works, its setup, cost at API prices, what its second opinions cost and the latest reviews of its PRs, the Slack threads it posted in and follows for replies, and linked PRs. For an earlier day use read_transcript.',
+  input: {
+    task: taskRef,
+    files: z.boolean().default(false).describe('Instead, the files it changed since it started, newest first.'),
+  },
+  run: async ({ task: ref, files }) => {
     const task = await anyTask(ref)
-    const [subtasks, names, digest, todos, waiting, threads] = await Promise.all([
+    if (files) {
+      return recentFiles(await taskFileContext(task.id), {
+        since: new Date(task.created_at),
+        limit: 50,
+        setiFiles: false,
+      })
+    }
+    const [subtasks, names, digest, todos, waiting, threads, spend, reviews] = await Promise.all([
       subtaskBriefs(task.id, openQuerySince(task.id)),
       workspaceNames(),
       taskDigest(task.id, DIGEST_LINES),
       agentTodos(task.id),
       taskInputs.pending(task.id, QUEUE_SCAN),
       threadFollows.forTask(task.id),
+      secondOpinions.spend(task.id),
+      secondOpinions.reviews(task.id),
     ])
     const running = subtasks.filter((s) => s.status === 'running')
     const { id, title, status, ...rest } = briefOf(task)
@@ -264,6 +285,7 @@ const getTask = setiTool({
       dirs: task.dirs,
       input_mode: task.input_mode,
       cost_usd: task.cost_usd,
+      second_opinions: { spend, reviews },
       setup: task.setup,
       followed_threads: threads
         .filter((thread) => thread.stopped_at === null)
