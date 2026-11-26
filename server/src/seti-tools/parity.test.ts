@@ -84,7 +84,7 @@ const USER_ONLY: Record<string, RegExp> = {
 }
 
 /** Known gaps in the route registry; a PR that closes one lowers it, one that adds one raises it. */
-const GAPS_LEFT = 27
+const GAPS_LEFT = 24
 
 const eaSources = () =>
   fs

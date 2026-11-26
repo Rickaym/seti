@@ -24,6 +24,11 @@ PR_SETI = "https://github.com/Octocat/seti/pull/28"
 PR_GONE = "https://github.com/Octocat/seti/pull/7"
 
 
+def _for_task(request: dict[str, Any], params: Any) -> bool:
+    wanted = params.get("task_id")
+    return wanted is None or request.get("task_id") == wanted
+
+
 def make_task(task_id: str, title: str, status: str, **extra: Any) -> dict[str, Any]:
     task: dict[str, Any] = {
         "id": task_id,
@@ -1354,8 +1359,8 @@ class FakeSeti:
                 return ok(
                     {
                         "questions": [q for q in self.questions if q["status"] == "open"],
-                        "access": self.change_requests,
-                        "permissions": self.permission_requests,
+                        "access": [r for r in self.change_requests if _for_task(r, params)],
+                        "permissions": [r for r in self.permission_requests if _for_task(r, params)],
                         "notes": [n for n in self.knowledge if n["status"] == "proposed"],
                     }
                 )

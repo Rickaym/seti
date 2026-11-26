@@ -346,8 +346,9 @@ TOOL_SPECS: list[ToolSpec] = [
         "found or was told, which the live context does not hold. With in knowledge, search the "
         "approved knowledge notes agents share instead; with in proposals, list the notes waiting "
         "for the user to approve; with in questions, list the questions agents wait on the user for; "
-        "with in requests, list everything that waits on the user: questions, access changes, tool "
-        "calls, plans and notes.",
+        "with in requests, list everything that waits on the user, of every task or the one named: "
+        "questions, access changes, and tool calls and plans with their id, Seti's reason, the "
+        "agent's description, the input or plan and the PRs they name, and notes.",
         {
             "query": {"type": "string", "description": "What to look for, in a few keywords."},
             "task": {
@@ -1274,7 +1275,9 @@ class EaTools:
         if scope == "questions":
             return await list_questions(self._seti, self._now())
         if scope == "requests":
-            return await list_requests(self._seti, self._now())
+            ref = arg_str(args, "task", required=False)
+            task = await self.resolve_task(ref) if ref else None
+            return await list_requests(self._seti, self._now(), str(task.get("id")) if task else None)
         query = arg_str(args, "query")
         if scope == "knowledge":
             return await search_knowledge(self._seti, query, self._now())
