@@ -262,8 +262,9 @@ between two steps; an interrupt; a hook at subagent start.
   and pipe filters that only cut, order or count; otherwise the item has no text, so no quote
   verifies against it. A permalink is the one the answer states, else one built from
   parts the call and answers stated (Slack: the workspace host the agent's Slack answers stated, the
-  channel and the `ts`; GitHub: the repository and number); one that cannot be built so stays
-  empty and is never guessed.
+  channel and the `ts`; Linear: the workspace URL key that issues' own `url` fields in the agent's
+  Linear answers stated, the identifier and a comment's id; GitHub: the repository and number);
+  one that cannot be built so stays empty and is never guessed.
 - SRC-3: An agent's ledger follows its transcript: archiving removes it, restoring reads it again
   from the restored transcript, and deleting the agent or a transcript row deletes its items.
 - SRC-4: A client MAY ask which ledger item each link of an agent's message names; the answer
