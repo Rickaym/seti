@@ -8,6 +8,7 @@ import {
 import { ArchiveWriter, decodeArchive, type ChunkRef, type StoredMessage } from '../archive-codec.js'
 import { now, sql, transaction, type Db } from '../db.js'
 import { EVENT_COLUMNS, storedColumns } from '../events/columns.js'
+import { scrubStoredPayload } from './rescrub.js'
 import { indexRuntimeRows } from './search-runtime.js'
 
 /** An archive's index and sizes; the blob stays in the database until a chunk is read. */
@@ -84,6 +85,7 @@ async function insertRows(tx: Db, taskId: string, rows: readonly StoredMessage[]
     const batch = rows.slice(start, start + INSERT_BATCH)
     const filled = batch.map((row) => ({
       ...row,
+      payload: scrubStoredPayload(row.payload),
       task_id: taskId,
       ...storedColumns(row.kind, row.payload, row.runtime ?? null),
     }))

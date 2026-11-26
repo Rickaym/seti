@@ -1,10 +1,10 @@
 import type { AuditDetail } from '@seti/shared'
+import { REDACTED, redactSessions, scrubField, scrubStoragePair, sessionFindings } from './scrub-session.js'
 
 export const MAX_SUMMARY = 300
 const MAX_DETAIL_TEXT = 500
 /** Detail fields named as long keep their line breaks up to this length. */
 export const MAX_LONG_DETAIL_TEXT = 4000
-const REDACTED = '[redacted]'
 
 const SECRET_WORD = String.raw`(?:password|passwd|secret|token|credentials?|api[_-]?key|apikey|access[_-]?key|private[_-]?key|key)`
 const VALUE = String.raw`("[^"]*"|'[^']*'|[^\s&"',;]+)`
@@ -43,16 +43,11 @@ const CREDENTIAL_RULES: CredentialRule[] = [
   { pattern: /\bsk_[a-f0-9]{32,}\b/g, replacement: REDACTED, kind: 'secret key' },
   { pattern: /\bAIza[\w-]{35}\b/g, replacement: REDACTED, kind: 'Google API key' },
   { pattern: /\bAKIA[0-9A-Z]{16}\b/g, replacement: REDACTED, kind: 'AWS access key' },
-  { pattern: /\beyJ[\w-]{8,4096}\.[\w-]{8,4096}\.[\w-]{8,4096}/g, replacement: REDACTED, kind: 'JWT' },
+  { pattern: /(?<![A-Za-z])eyJ[\w-]{8,4096}\.[\w-]{8,4096}\.[\w-]{8,4096}/g, replacement: REDACTED, kind: 'JWT' },
   {
     pattern: /(\b[a-z][\w+.-]{0,30}:\/\/[^\s/@:]{1,256}:)[^\s/@$<{][^\s/@]{0,256}@/gi,
     replacement: `$1${REDACTED}@`,
     kind: 'password in a URL',
-  },
-  {
-    pattern: /\b((?:proxy-)?authorization\s*:\s*(?:bearer|basic|token)\s+)[\w.~+/=-]{16,}/gi,
-    replacement: `$1${REDACTED}`,
-    kind: 'authorization header',
   },
 ]
 
@@ -74,7 +69,7 @@ function redactEnvLines(text: string): string {
 /** Redacts only unmistakable credentials; used on transcripts, where code must stay readable. */
 export function redactCredentials(text: string): string {
   const shaped = CREDENTIAL_RULES.reduce((out, rule) => out.replace(rule.pattern, rule.replacement), text)
-  return redactEnvLines(shaped)
+  return redactSessions(redactEnvLines(shaped))
 }
 
 /** A credential redactCredentials would hide, by its 1-based line and kind, never its value. */
@@ -115,6 +110,9 @@ export function credentialFindings(text: string): CredentialFinding[] {
       add(match.index, rule.kind)
     }
   }
+  for (const { index, kind } of sessionFindings(text)) {
+    add(index, kind)
+  }
   for (const match of text.matchAll(ENV_LINE)) {
     if (isSecretEnv(match[2] ?? '', match[3] ?? '')) {
       add(match.index, 'secret in an env line')
@@ -130,18 +128,24 @@ export function redactSecrets(text: string): string {
 
 const isBase64Source = (value: object) => 'type' in value && value.type === 'base64'
 
-function scrubJson(value: unknown): unknown {
+function scrubObject(value: object): object {
+  const entries = Object.entries(value)
+  const next = entries.map(([name, item]) => [name, scrubJson(item, name)] as const)
+  const changed = next.some(([, item], index) => item !== entries[index]?.[1])
+  return scrubStoragePair(changed ? Object.fromEntries(next) : value)
+}
+
+/** Every string redacted, read in the light of the key that holds it. */
+function scrubJson(value: unknown, key = ''): unknown {
   if (typeof value === 'string') {
-    return redactCredentials(value)
+    return redactCredentials(scrubField(key, value))
   }
   if (Array.isArray(value)) {
-    const next = value.map(scrubJson)
+    const next = value.map((item) => scrubJson(item))
     return next.some((item, index) => item !== value[index]) ? next : value
   }
   if (typeof value === 'object' && value !== null && !isBase64Source(value)) {
-    const entries = Object.entries(value)
-    const next = entries.map(([key, item]) => [key, scrubJson(item)] as const)
-    return next.some(([, item], index) => item !== entries[index]?.[1]) ? Object.fromEntries(next) : value
+    return scrubObject(value)
   }
   return value
 }
@@ -150,7 +154,7 @@ function scrubJson(value: unknown): unknown {
 export const scrubValue = <T>(value: T): T => scrubJson(value) as T
 
 const SECRET_FIELD =
-  /password|passwd|secret|token|credential|api[_-]?key|apikey|access[_-]?key|private[_-]?key|authorization/i
+  /password|passwd|secret|token|credential|api[_-]?key|apikey|access[_-]?key|private[_-]?key|authorization|cookie/i
 
 /** A tool input with secret-named string fields blanked and secret-looking text redacted. */
 export function scrubInput(value: unknown): unknown {
