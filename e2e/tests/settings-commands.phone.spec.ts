@@ -53,6 +53,7 @@ test('Seti commands complete each word, pick and confirm with taps on a phone', 
   await shot(page, 'phone-confirm')
   await turnOn.tap()
   await expect.poll(async () => (await apiData<Task>(request, `/tasks/${id}`)).bypass_until).not.toBeNull()
+  await expect(reply(page)).toHaveValue('')
 
   await reply(page).tap()
   await reply(page).pressSequentially('/seti:access ')
