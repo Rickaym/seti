@@ -6,6 +6,8 @@ import {
   type PermissionRequestState,
   type PermissionRule,
   type PermissionTimeoutMinutes,
+  type RequestPr,
+  requestPrsSchema,
   timeoutAt,
   type PermissionTimeoutSettings,
 } from '@seti/shared'
@@ -22,9 +24,10 @@ export type NewPermissionRequest = Pick<
   timeout_minutes: number
 }
 
-type RequestRecord = Omit<PermissionRequest, 'suggestions' | 'edited'> & {
+type RequestRecord = Omit<PermissionRequest, 'suggestions' | 'edited' | 'prs'> & {
   suggestions: string
   edited: string
+  prs: string
   input_hash: string | null
 }
 
@@ -37,10 +40,20 @@ function readStrings(text: string): string[] {
   }
 }
 
+function readPrs(text: string): RequestPr[] {
+  try {
+    const parsed = requestPrsSchema.safeParse(JSON.parse(text))
+    return parsed.success ? parsed.data : []
+  } catch {
+    return []
+  }
+}
+
 const toRequest = ({ input_hash: _hash, ...row }: RequestRecord): PermissionRequest => ({
   ...row,
   suggestions: readStrings(row.suggestions),
   edited: readStrings(row.edited),
+  prs: readPrs(row.prs),
 })
 
 const requests = (rows: readonly RequestRecord[]) => rows.map(toRequest)
@@ -126,6 +139,12 @@ export const permissionRequests = {
   resummarize: async (id: string, summary: string): Promise<PermissionRequest | undefined> =>
     requests(
       await sql<RequestRecord[]>`UPDATE permission_request SET summary = ${summary}
+        WHERE id = ${id} AND state = 'pending' RETURNING *`,
+    ).at(0),
+  /** Sets the PRs a pending request's command names; undefined when it is not pending any more. */
+  setPrs: async (id: string, prs: readonly RequestPr[]): Promise<PermissionRequest | undefined> =>
+    requests(
+      await sql<RequestRecord[]>`UPDATE permission_request SET prs = ${JSON.stringify(prs)}
         WHERE id = ${id} AND state = 'pending' RETURNING *`,
     ).at(0),
   /** The agent's pending requests, oldest first. */
