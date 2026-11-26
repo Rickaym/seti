@@ -19,10 +19,12 @@ import {
   type EaRequestData,
 } from '@seti/shared'
 import { withMicDefaults } from './audio-prefs'
+import { QualityMeter } from './call-quality'
 import type { CallAction } from './call-state'
 import type { CallHandlers, LiveCall } from './call-store'
 import { inputKind } from './device-kind'
 import { responseError } from './ice'
+import { LinkMonitor } from './link-monitor'
 import { describeBotError } from './media'
 import { handOver, Rerouter, watchDevices } from './reroute'
 import { everySecond } from './ticker'
@@ -32,6 +34,7 @@ const OFFER_PATH = '/api/ea/offer'
 const ICE_FAILED =
   'The connection could not find a network path to the EA. Hover EA in the status bar and test the relay.'
 const BOT_ERROR_TTL_MS = 10_000
+const STATS_EVERY_TICKS = 2
 
 interface MicManager {
   updateMic: (micId: string) => Promise<void>
@@ -77,8 +80,6 @@ function installMicDefaults(defaults: () => MediaTrackConstraints): void {
 
 interface TransportInternals {
   attemptReconnection: (recreate?: boolean) => Promise<void>
-  stop: (error?: Error) => Promise<void>
-  buildTransportStartError: () => Error
   addUserMedia: () => Promise<void>
   getAudioTransceiver: () => RTCRtpTransceiver | undefined
   pc: RTCPeerConnection | null
@@ -94,15 +95,11 @@ function sendLocalAudio(transport: SmallWebRTCTransport): void {
   }
 }
 
-/**
- * A reconnect that recreates the peer connection would start a new bot session, so the call ends
- * instead. A path that is only disconnected, as in a short network stall, gets until the browser
- * declares it failed, about 30 s, rather than the transport's 5 s.
- */
+/** A dropped path is rebuilt with the same id; the EA keeps its session and the reply goes on. */
 function buildTransport(
   iceServers: RTCIceServer[],
   mediaManager: MicManager,
-  onIceFailure: () => void,
+  onRebuild: (negotiated: boolean) => void,
 ): SmallWebRTCTransport {
   const transport = new SmallWebRTCTransport({
     iceServers,
@@ -112,17 +109,10 @@ function buildTransport(
   const internals = transport as unknown as TransportInternals
   const reconnect = internals.attemptReconnection.bind(transport)
   internals.attemptReconnection = async (recreate = false) => {
-    if (!recreate) {
-      await reconnect(false)
-      return
+    if (recreate) {
+      onRebuild(internals._lastNegotiationError === null)
     }
-    if (internals.pc?.iceConnectionState === 'disconnected') {
-      return
-    }
-    if (internals._lastNegotiationError === null) {
-      onIceFailure()
-    }
-    await internals.stop(internals.buildTransportStartError())
+    await reconnect(recreate)
   }
   return transport
 }
@@ -220,13 +210,19 @@ function listen(client: PipecatClient, dispatch: (action: CallAction) => void): 
   })
 }
 
-/** The bot drops the EA's voice 3 s after its last ping, and the transport pings on page timers. */
-function keepAlive(transport: SmallWebRTCTransport): () => void {
+/** Pings the bot each second, as the transport pings on page timers, and reads the path. */
+function keepAlive(transport: SmallWebRTCTransport, link: LinkMonitor, meter: QualityMeter): () => void {
   const internals = transport as unknown as TransportInternals
+  let ticks = 0
   return everySecond(() => {
     const channel = internals.dc
     if (channel?.readyState === 'open') {
       channel.send(`ping: ${String(Date.now())}`)
+    }
+    link.observe(internals.pc?.connectionState, internals.pc?.iceConnectionState)
+    ticks += 1
+    if (ticks % STATS_EVERY_TICKS === 0) {
+      internals.pc?.getStats().then(meter.sample, () => undefined)
     }
   })
 }
@@ -283,8 +279,19 @@ export function createCall(
   const recent = () => (note !== null && Date.now() - note.at < BOT_ERROR_TTL_MS ? note : null)
   const recentReason = () => recent()?.text ?? null
   const manager = micManager()
-  const transport = buildTransport(iceServers, manager, () => {
-    note = { text: ICE_FAILED, reason: 'ice-failed', at: Date.now() }
+  const link = new LinkMonitor((reconnecting) => {
+    dispatch({ type: 'link', reconnecting, at: Date.now() })
+    if (!reconnecting && note?.reason === 'ice-failed') {
+      note = null
+    }
+  })
+  const meter = new QualityMeter()
+  const transport = buildTransport(iceServers, manager, (negotiated) => {
+    meter.rebuilt()
+    if (negotiated) {
+      note = { text: ICE_FAILED, reason: 'ice-failed', at: Date.now() }
+    }
+    link.rebuilding()
   })
   const rerouter = routeCall(manager, transport, handlers)
   let choseDevice = false
@@ -339,7 +346,7 @@ export function createCall(
   return {
     connect: async (requestData: EaRequestData) => {
       await client.initDevices()
-      stopPings = keepAlive(transport)
+      stopPings = keepAlive(transport, link, meter)
       await client.connect({ webrtcRequestParams: { endpoint: OFFER_PATH, requestData } })
       if (!stopping) {
         stopWatching = watchDevices(navigator.mediaDevices, rerouter.devicesChanged)
@@ -365,5 +372,6 @@ export function createCall(
       client.sendClientMessage(type)
     },
     failure: async (e: unknown) => recentReason() ?? connectError(e),
+    quality: meter.quality,
   }
 }

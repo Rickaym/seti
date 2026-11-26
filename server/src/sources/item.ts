@@ -16,8 +16,11 @@ export interface FoundItem {
   spans: string[]
 }
 
-/** Reads the items in a call's result text; `host` is the Slack workspace host when known. */
-export type ParseResult = (text: string, host: string | null) => FoundItem[]
+/**
+ * Reads the items in a call's result text; `workspace` is what the agent's answers from that
+ * source stated: the Slack workspace host, or the Linear workspace URL key, when known.
+ */
+export type ParseResult = (text: string, workspace: string | null) => FoundItem[]
 
 /** Reads the items in a call's result that are placed in the agent's folders, as they stand now. */
 export type FolderRead = (taskId: string, text: string) => Promise<FoundItem[]>

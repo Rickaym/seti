@@ -1,17 +1,20 @@
-import { rowEvents, type RuntimeEvent, type ToolCall, type WireRow } from '@seti/shared'
+import { rowEvents, type RuntimeEvent, type SourceKind, type ToolCall, type WireRow } from '@seti/shared'
 import { messages } from '../db.js'
 import { sourceItems } from '../store/sources.js'
 import { commitAsk, commitItems } from './commits.js'
 import { fileAsk, fileItems } from './files.js'
 import { githubRead } from './github.js'
 import type { FolderRead, FoundItem, ParseResult } from './item.js'
-import { linearRead } from './linear.js'
+import { isLinearCall, linearKeyIn, linearRead } from './linear.js'
 import { isSlackCall, slackHostIn, slackRead } from './slack.js'
 
-/** A call whose result the ledger reads: its items, ones in the agent's folders, a Slack host. */
+/** A source whose answers state the workspace its permalinks are built on. */
+type Workspace = Extract<SourceKind, 'slack' | 'linear'>
+
+/** A call whose result the ledger reads: its items, ones in the agent's folders, a workspace. */
 interface Watched {
   parse: ParseResult | null
-  slack: boolean
+  workspace: Workspace | null
   folder: FolderRead | null
 }
 
@@ -35,17 +38,31 @@ const FOLDER_ADAPTERS: readonly ((call: ToolCall) => FolderRead | null)[] = [
 
 /** Calls each task's agent started whose result the ledger will read, by call id. */
 const started = new Map<string, Map<string, Watched>>()
-/** The Slack workspace host each task's answers stated last. */
-const hosts = new Map<string, string>()
+/** The workspace each task's answers from a source stated last, by `<kind>:<task>`. */
+const workspaces = new Map<string, string>()
+
+/** How each source's answers state its workspace, and how its permalinks name it. */
+const WORKSPACES: Record<Workspace, { statedIn: (text: string) => string | null; of: (permalink: string) => string }> =
+  {
+    slack: { statedIn: slackHostIn, of: (permalink) => new URL(permalink).hostname },
+    linear: { statedIn: linearKeyIn, of: (permalink) => new URL(permalink).pathname.split('/')[1] ?? '' },
+  }
+
+const workspaceOf = (call: ToolCall): Workspace | null => {
+  if (isSlackCall(call)) {
+    return 'slack'
+  }
+  return isLinearCall(call) ? 'linear' : null
+}
 
 /** Calls a task may have open at once before the oldest are dropped. */
 const OPEN_MAX = 200
 
 function watchedOf(call: ToolCall): Watched | null {
   const parse = ADAPTERS.reduce<ParseResult | null>((first, adapter) => first ?? adapter(call), null)
-  const slack = isSlackCall(call)
+  const workspace = workspaceOf(call)
   const folder = FOLDER_ADAPTERS.reduce<FolderRead | null>((first, adapter) => first ?? adapter(call), null)
-  return parse === null && !slack && folder === null ? null : { parse, slack, folder }
+  return parse === null && workspace === null && folder === null ? null : { parse, workspace, folder }
 }
 
 function step(calls: Map<string, Watched>, event: RuntimeEvent): Ended[] {
@@ -82,12 +99,22 @@ function ended(taskId: string, events: readonly RuntimeEvent[]): Ended[] {
 const SAFE_ITEMS: FoundItem[] = []
 
 /** The items a reader finds; a reader that throws finds none, and nothing of the text is logged. */
-function itemsOf(parse: ParseResult, text: string, host: string | null): FoundItem[] {
+function itemsOf(parse: ParseResult, text: string, workspace: string | null): FoundItem[] {
   try {
-    return parse(text, host)
+    return parse(text, workspace)
   } catch {
     return SAFE_ITEMS
   }
+}
+
+/** The workspace a task's answers from a source stated, else the one its newest permalink names. */
+async function workspaceFor(taskId: string, kind: Workspace): Promise<string | null> {
+  const known = workspaces.get(`${kind}:${taskId}`)
+  if (known !== undefined) {
+    return known
+  }
+  const permalink = await sourceItems.newestPermalink(taskId, kind)
+  return permalink === null ? null : WORKSPACES[kind].of(permalink)
 }
 
 /** The items a folder read finds; one Seti cannot place finds none, and nothing is logged. */
@@ -103,18 +130,19 @@ async function keep(taskId: string, messageId: number, call: Ended, live: boolea
   if (call.folder !== null && live) {
     await sourceItems.add(taskId, messageId, call.callId, await folderItems(taskId, call.folder, call.text))
   }
-  const stated = call.slack ? slackHostIn(call.text) : null
-  if (stated !== null) {
-    hosts.set(taskId, stated)
+  const kind = call.workspace
+  const stated = kind === null ? null : WORKSPACES[kind].statedIn(call.text)
+  if (kind !== null && stated !== null) {
+    workspaces.set(`${kind}:${taskId}`, stated)
   }
   if (call.parse === null) {
     return
   }
-  const host = call.slack ? (hosts.get(taskId) ?? (await sourceItems.slackHost(taskId))) : null
-  const items = itemsOf(call.parse, call.text, host)
-  const linked = items.find((item) => item.kind === 'slack' && item.permalink !== '')
-  if (linked !== undefined && host === null) {
-    hosts.set(taskId, new URL(linked.permalink).hostname)
+  const workspace = kind === null ? null : await workspaceFor(taskId, kind)
+  const items = itemsOf(call.parse, call.text, workspace)
+  const linked = items.find((item) => item.kind === kind && item.permalink !== '')
+  if (kind !== null && linked !== undefined && workspace === null) {
+    workspaces.set(`${kind}:${taskId}`, WORKSPACES[kind].of(linked.permalink))
   }
   await sourceItems.add(taskId, messageId, call.callId, items)
 }
@@ -142,7 +170,8 @@ const PAGE = 500
 export async function rebuildSources(taskId: string): Promise<void> {
   await sourceItems.clear(taskId)
   started.delete(taskId)
-  hosts.delete(taskId)
+  workspaces.delete(`slack:${taskId}`)
+  workspaces.delete(`linear:${taskId}`)
   let after = 0
   for (;;) {
     const rows = await messages.firstAfter(taskId, after, PAGE)

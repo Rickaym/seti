@@ -1,12 +1,15 @@
 """Keeps the EA to its word: a reply that promises to pass something on gets the tool call for it.
 
 The model runs without reasoning, and now and then it ends a reply with "I'll pass that to the
-agent" and calls nothing, or asks whether to send what the user just told it to send. After every
-finished reply this module reads the turn back, with no model call: when the reply promised or
-claimed a relay, or re-asked one the user gave, and no tool that messages or starts an agent ran,
-it adds a developer note and runs the EA once more, so it acts or says plainly why it cannot.
+agent" and calls nothing, or asks whether to send what the user just told it to send, or says
+"I'll check back in twenty minutes" and schedules nothing. After every finished reply this module
+reads the turn back, with no model call: when the reply promised or claimed a relay, or re-asked
+one the user gave, and no tool that messages or starts an agent ran, or promised a later check-in
+and no follow-up or watch was set, it adds a developer note and runs the EA once more, so it acts
+or says plainly why it cannot.
 """
 
+import json
 import re
 from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass, field
@@ -21,6 +24,9 @@ from seti_ea.history import ends_with_user, is_summary
 RELAY_TOOLS = frozenset(
     {"post_team_chat", "reply_team_chat", "start_task", "hand_over_updates", "confirm_asked"}
 )
+# Each of these sets up a later check-in, so it keeps a promise to check back or report.
+FOLLOWUP_TOOLS = frozenset({"schedule_followup", "watch_task"})
+NOTIFY_ARG = "notify_when_done"
 NOTE_PREFIX = "Seti checked your last reply:"
 # Developer notes that open a turn the user did not start: an inbox report or a new call.
 INBOX_PREFIX = "Inbox:"
@@ -74,6 +80,28 @@ DIRECTIVE = re.compile(
     rf"|\b(?:have|get)\s+{_AGENT}\s+to\b",
     re.IGNORECASE,
 )
+_LATER_WILL = (
+    r"\b(?:i'll|i\s+will|i'm\s+going\s+to|i\s+am\s+going\s+to|i\s+shall)\s+(?:just\s+|also\s+|then\s+)?"
+)
+_IN_TIME = (
+    r"(?:in\s+(?:a\s+few|about\s+\w+|half\s+an|an|a|\d+|[a-z-]+)(?:\s+[a-z-]+)?\s+(?:minutes?|mins?|hours?)"
+    r"|at\s+(?:\d|noon|midnight|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\b"
+    r"|later|tomorrow|tonight|shortly|again)"
+)
+FOLLOWUP = re.compile(
+    rf"{_LATER_WILL}(?:"
+    rf"(?:check|look)\s+(?:back|in\s+on|in)\b"
+    rf"|(?:check|look)\s+(?:(?:on|at)\s+)?(?:[\w'-]+\s+){{0,4}}?{_IN_TIME}"
+    r"|(?:check|watch|track|monitor)\s+(?:its|their|his|her|the)\s+(?:progress|results?|outcome)\b"
+    r"|keep\s+(?:an\s+)?eye\s+on\b|keep\s+you\s+posted\b|watch\s+(?:it|him|her|them|over)\b"
+    r"|(?:let\s+you\s+know|tell\s+you|update\s+you)\b[^.?!]*?\b(?:when|once|as\s+soon\s+as|if)\b"
+    r"|report\s+back\b|follow\s+up\b)",
+    re.IGNORECASE,
+)
+# A sentence that only offers a check-in, which commits to nothing.
+FOLLOWUP_HEDGE = re.compile(
+    r"^(?:if|unless)\b|\b(?:would\s+you|want\s+me|shall\s+i|should\s+i|whether\s+you)\b", re.IGNORECASE
+)
 APOSTROPHES = str.maketrans({"\u2018": "'", "\u2019": "'"})
 SENTENCE_END = re.compile(r"(?<=[.!?])\s+|\n+")
 QUOTED = re.compile(r"\"[^\"]*\"|\u201c[^\u201d]*\u201d|^>.*$", re.MULTILINE)
@@ -84,7 +112,7 @@ def promise_note(sentence: str) -> str:
     return (
         f'{NOTE_PREFIX} you told the user "{sentence}" but called no tool for it, so nothing reached '
         "the agent. Do it now with the tool for it, such as post_team_chat with to for a direct "
-        "message, then say in a line what you sent to whom. If the user's words since then change "
+        "message, then say whom and the gist in a few words. If the user's words since then change "
         "it, or you cannot do it, say so in one sentence instead. Never say you did or will do "
         "something without its tool call in the same reply."
     )
@@ -95,8 +123,19 @@ def relay_note(directive: str, question: str) -> str:
     return (
         f'{NOTE_PREFIX} the user told you to pass this on ("{directive}"), and you asked again '
         f'instead: "{question}". A direct message to an agent needs no yes. Send it now with '
-        "post_team_chat and to, then say in a line what you sent to whom. Ask only when it is "
+        "post_team_chat and to, then say whom and the gist in a few words. Ask only when it is "
         "unclear which agent or what to say; a public post to every agent still needs the yes."
+    )
+
+
+def followup_note(sentence: str) -> str:
+    """What the EA hears after a reply that promised a later check-in and set none up."""
+    return (
+        f'{NOTE_PREFIX} you told the user "{sentence}" but set nothing up, so no check-in will '
+        "happen. Call schedule_followup with the time now, or watch_task to hear when an agent is "
+        "done, then add nothing unless the time differs from what you said. If one is already set "
+        "for this, say so in a few words. Never promise a later check without its tool call in the "
+        "same reply."
     )
 
 
@@ -110,21 +149,41 @@ class Turn:
     said: list[str] = field(default_factory=list)
     heard: list[str] = field(default_factory=list)
     tools: set[str] = field(default_factory=set)
+    followed: bool = False
     checked: bool = False
     whole: bool = False
     start: int = 0
 
 
-def _tool_names(message: Mapping[str, Any]) -> set[str]:
+def _functions(message: Mapping[str, Any]) -> list[Mapping[str, Any]]:
     calls = message.get("tool_calls")
     if not isinstance(calls, list):
-        return set()
-    names: set[str] = set()
+        return []
+    found: list[Mapping[str, Any]] = []
     for raw in cast(list[object], calls):
         function = cast(Mapping[str, Any], raw).get("function") if isinstance(raw, dict) else None
         if isinstance(function, dict):
-            names.add(str(cast(Mapping[str, Any], function).get("name")))
-    return names
+            found.append(cast(Mapping[str, Any], function))
+    return found
+
+
+def _tool_names(message: Mapping[str, Any]) -> set[str]:
+    return {str(function.get("name")) for function in _functions(message)}
+
+
+def _notifies(function: Mapping[str, Any]) -> bool:
+    """A start_task call that asked Seti to say when the new agent is done."""
+    if function.get("name") != "start_task":
+        return False
+    try:
+        arguments = json.loads(str(function.get("arguments") or "{}"))
+    except ValueError:
+        return False
+    return isinstance(arguments, dict) and cast(dict[str, Any], arguments).get(NOTIFY_ARG) is True
+
+
+def _sets_followup(message: Mapping[str, Any]) -> bool:
+    return any(f.get("name") in FOLLOWUP_TOOLS or _notifies(f) for f in _functions(message))
 
 
 def _opens_turn(messages: Sequence[LLMContextMessage], index: int, heard: bool) -> bool:
@@ -164,6 +223,7 @@ def last_turn(messages: Sequence[LLMContextMessage]) -> Turn:
         elif role == "assistant":
             turn.said.insert(0, text)
             turn.tools |= _tool_names(message)
+            turn.followed = turn.followed or _sets_followup(message)
     turn.whole = bool(turn.heard)
     return turn
 
@@ -192,6 +252,16 @@ def broken_promise(said: str) -> tuple[str, bool] | None:
     return None
 
 
+def broken_followup(said: str) -> str | None:
+    """The first sentence that promises a later check-in, or None; offers and questions do not."""
+    for sentence in sentences(said):
+        if sentence.endswith("?") or FOLLOWUP_HEDGE.search(sentence):
+            continue
+        if FOLLOWUP.search(sentence):
+            return sentence
+    return None
+
+
 def relay_question(said: str) -> str | None:
     """A question that asks whether to pass something to an agent, not which agent to pick."""
     for sentence in sentences(said):
@@ -203,14 +273,20 @@ def relay_question(said: str) -> str | None:
 
 
 def unkept(messages: Sequence[LLMContextMessage]) -> str | None:
-    """The note to hand the EA when its latest reply left a relay undone; None when it is kept.
+    """The note to hand the EA when its latest reply left a relay or check-in undone, else None.
 
     A turn is checked once: after the note, the EA's next reply stands, so this never loops.
     """
     turn = last_turn(messages)
-    if turn.checked or not turn.whole or turn.tools & RELAY_TOOLS:
+    if turn.checked or not turn.whole:
         return None
     said = " ".join(turn.said)
+    relay = None if turn.tools & RELAY_TOOLS else _unkept_relay(messages, turn, said)
+    return relay or _unkept_followup(messages, turn, said)
+
+
+def _unkept_relay(messages: Sequence[LLMContextMessage], turn: Turn, said: str) -> str | None:
+    """A relay the reply promised or claimed with no tool for it, or one the user gave and it re-asked."""
     promise = broken_promise(said)
     if promise is not None:
         sentence, claimed = promise
@@ -222,6 +298,14 @@ def unkept(messages: Sequence[LLMContextMessage]) -> str | None:
     if question is not None and directive is not None:
         return relay_note(directive.group(0), question)
     return None
+
+
+def _unkept_followup(messages: Sequence[LLMContextMessage], turn: Turn, said: str) -> str | None:
+    """A later check-in the reply promised with no follow-up or watch set, in this turn or the last."""
+    sentence = broken_followup(said)
+    if sentence is None or turn.followed or last_turn(messages[: turn.start]).followed:
+        return None
+    return followup_note(sentence)
 
 
 class PromiseCheck:

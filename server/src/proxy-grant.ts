@@ -30,6 +30,11 @@ async function codexGrant(task: Task, denied: ReadonlySet<string>): Promise<Prox
   }
 }
 
+/** The connections the agent's proxy swaps on this runtime, read from the store. */
+export async function grantedConnections(task: Task, runtime: RuntimeId = task.runtime): Promise<GrantConnection[]> {
+  return runtime === 'codex' ? codexConnections(task) : grantConnections(await taskConnections(task))
+}
+
 /** What the agent's egress proxy applies, read from the store, and the MCP servers it turned off. */
 export async function proxyGrant(
   task: Task,
@@ -39,7 +44,7 @@ export async function proxyGrant(
   if (runtime === 'codex') {
     return { grant: await codexGrant(task, denied), denied }
   }
-  const connections = grantConnections(await taskConnections(task))
+  const connections = await grantedConnections(task, runtime)
   const grant: ProxyGrant = {
     login: hostLoginKey(),
     anthropic: true,
