@@ -19,8 +19,10 @@ const permission = (id: string, taskId: string, minute: number, tool = 'Bash') =
     task_title: `Agent ${taskId}`,
     tool_name: tool,
     created_at: at(minute),
+    digest: `digest-${id}`,
   }) as PermissionRequest & {
     task_title: string
+    digest: string
   }
 
 const note = (id: string, minute: number, extra: Partial<KnowledgeNote> = {}) =>
