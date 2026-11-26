@@ -758,9 +758,13 @@ interrupted only for that.
 - GRD-8: The user MAY edit a held call's top-level text fields before `allow` or `deny`, only
   when the request shows the input whole and unredacted and the runtime runs a call with the input
   a decision hands back (not Codex, which runs a call as it asked). The audit, the request's
-  `edited` and the transcript's `Edited` mark record field names, never values. The agent MUST
-  learn of an edit from the control room's own record of it, never from the call's input: after an
-  edited call's result, in the same turn, it is told that the user edited the call and the text of
+  `edited` and the transcript's edit mark record field names, never values; the mark also keeps
+  the call's tool name. The mark MUST read as one plain sentence, with no tooltip needed: whom
+  (the user, since the EA never answers with an edit, PERM-17), which fields, and whether the call
+  went out ("You edited the message before it was sent. Above is the agent's draft." or "You
+  edited the message, then denied it. Nothing was sent."), naming a Slack send by what it does
+  and any other call by its server and tool. The agent MUST learn of an edit from the control
+  room's own record of it, never from the call's input: after an edited call's result, in the same turn, it is told that the user edited the call and the text of
   each changed field as it ran; an edited call the user denies is denied with the user's text for
   each changed field and their note. Each field is cut at 2000 characters and all of them at 6000,
   with a marker that says so. An answer with no edit reaches the agent exactly as before.
