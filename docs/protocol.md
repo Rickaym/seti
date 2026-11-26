@@ -867,6 +867,15 @@ interrupted only for that.
 - SEC-18: Only the user changes a set or drops all of an agent's own choices at once. A delegate
   MUST NOT move an agent to a credential whose set turns on an SSH host, cloud access or a host the
   agent lacks.
+- SEC-19: Credential redaction MUST cover session material and keep the names around it: session
+  or token-like values in `Cookie`, `Set-Cookie`, `curl -b` and `--cookie` (names, attributes and
+  short values kept); the credential of an `Authorization` header of any scheme (scheme kept);
+  JWTs; base64 JSON sessions; values under session names (`sb-*-auth-token*` with its chunks,
+  `__Secure-*`, `__Host-*`, session cookies, `access_token`, `refresh_token`, `id_token`) in
+  cookies, query strings, form bodies and JSON; storage state entries holding a session; `.netrc`
+  passwords; secret-named `curl -H` headers. Transcript rows and permission requests stored before
+  a rule existed MUST be re-scrubbed once, resuming after a restart, with a log of counts only.
+  Audit events MUST keep their sealed text.
 
 ## 9. Shared tools
 
@@ -1154,7 +1163,8 @@ Why: an agent woken by its own actions or by news nobody waited for burns turns 
 - EA-10: Off a call, watch and channel items wait for quiet (`settle`); others go at once. On a
   call nothing interrupts: items follow the user's next turn, and a needs-you item gets its own
   line after `call_silence`.
-- EA-12: If a reply promised to reach an agent and no tool did, the EA gets one more run.
+- EA-12: If a reply promised to reach an agent and no tool did, or promised a later check-in and
+  no follow-up or watch was set in that turn or the one before, the EA gets one more run.
 - EA-16: The EA, and agents at `full`, MUST be able to read every pending request of all agents or
   one, each with its id and agent, and a tool call or plan with Seti's reason, the agent's
   description, its input as stored (secrets redacted) and the PRs it names. Text an agent or a code
@@ -1168,6 +1178,13 @@ Why: an agent woken by its own actions or by news nobody waited for burns turns 
   message MUST NOT count as the yes. Agents and mods MUST NOT get these actions. The audit entry
   says the EA acted on the user's word and names the ask and the target.
   Why: the user can run Seti by voice without handing the model a standing power.
+- EA-18: A voice call survives a short network drop. While the caller's audio stops arriving, the
+  EA MUST hold its speech, up to 8 s per drop, and go on where it stopped, rather than drop it. A
+  browser that rebuilds the peer connection under the same id keeps the EA's session and its
+  conversation, and the call shows Reconnecting until the new path connects. A yes the user said
+  before the call's audio dropped, in a turn the drop cut, or in an earlier call MUST NOT count for
+  EA-4 or EA-17.
+  Why: mobile networks drop for seconds, and a cut transcript must never become the user's yes.
 
 ## 15. Resilience
 
