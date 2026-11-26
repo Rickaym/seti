@@ -5,7 +5,11 @@
       "tarball": "https://registry.npmjs.org/@openai/codex/-/codex-0.171.0-linux-x64.tgz",
       "integrity": "sha512-l66NZkQgdk2C3pbcfULDz42yEUB581MVA6I+Y43Wp4OIqEy73HCdmZ0GTjeAHY2ycuH4N00d9VsLrwT1jxshTw==",
       "binary": "package/vendor/x86_64-unknown-linux-musl/bin/codex",
-      "sha256": "b76a027d6b210f9a8da7aaf321dd235c700f0ef7a794d4a5314b9af6c134f0f0"
+      "sha256": "b76a027d6b210f9a8da7aaf321dd235c700f0ef7a794d4a5314b9af6c134f0f0",
+      "host": {
+        "member": "package/vendor/x86_64-unknown-linux-musl/bin/codex-code-mode-host",
+        "sha256": "f49bd4f0c0cc73cf1ec3a719009e07ce5b6e100520d023c760cc203fb37e5c6f"
+      }
     }
   }
 }

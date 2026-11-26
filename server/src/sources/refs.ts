@@ -57,6 +57,9 @@ export const fileRef = (repo: string, file: string, sha: string | null) => {
   return `file:${repo.toLowerCase()}:${file}${at}`
 }
 
+/** The path a file key names, without its repository and commit. */
+export const filePathOf = (ref: string) => ref.slice(ref.indexOf(':', 5) + 1).replace(/@[0-9a-f]{7,40}$/, '')
+
 /** A file's page on GitHub at a commit, with the lines it shows. */
 export function blobPermalink(repo: string, file: string, sha: string, lines: readonly [number, number] | null) {
   const page = `https://github.com/${repo}/blob/${sha}/${file.split('/').map(encodeURIComponent).join('/')}`

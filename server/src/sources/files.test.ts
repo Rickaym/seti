@@ -9,6 +9,7 @@ import { nodeLink } from '../node-link.js'
 import { quietTask } from '../threads/test-slack-kit.js'
 import { fileAsk, fileItems, githubRemote } from './files.js'
 import { itemText } from './item.js'
+import { lookupSources } from './lookup.js'
 import { matchSources } from './match.js'
 import { refOfUrl } from './refs.js'
 
@@ -43,13 +44,15 @@ beforeAll(async () => {
 })
 
 /** The agent reads a file with Claude Code's Read, and Seti ingests the call and its result. */
+let reads = 0
 async function agentReads(taskId: string, file: string, answer: string): Promise<void> {
+  const id = `toolu_file_${String(++reads)}`
   const use = { type: 'assistant', parent_tool_use_id: null, message: { content: [] as object[] } }
-  use.message.content.push({ type: 'tool_use', id: 'toolu_file', name: 'Read', input: { file_path: file } })
+  use.message.content.push({ type: 'tool_use', id, name: 'Read', input: { file_path: file } })
   const result = {
     type: 'user',
     parent_tool_use_id: null,
-    message: { content: [{ type: 'tool_result', tool_use_id: 'toolu_file', content: answer }] },
+    message: { content: [{ type: 'tool_result', tool_use_id: id, content: answer }] },
   }
   for (const payload of [use, result] as unknown as ClaudeMessage[]) {
     await nodeLink.journal(taskId, { type: 'message', runtime: 'claude', payload })
@@ -88,6 +91,17 @@ describe('file reads in a GitHub clone', () => {
     ])
     expect(hit).toMatchObject({ verified: true, unread: false, source: { kind: 'file', container: 'acme/notes' } })
     expect(miss).toMatchObject({ source: null, unread: false })
+  })
+
+  it('names a file by its path in a lookup, and a local copy as one', async () => {
+    const { dir, sha } = clone()
+    fs.copyFileSync(path.join(dir, 'docs', 'a.md'), path.join(dir, 'docs', 'b.md'))
+    const reader = await quietTask()
+    await agentReads(reader, path.join(dir, 'docs', 'b.md'), '1\tone')
+    await agentReads(reader, path.join(dir, 'docs', 'a.md'), '1\tone')
+    const { items } = await lookupSources(reader, { kind: 'file', limit: 10 })
+    expect(items.map((item) => item.place)).toEqual(['acme/notes/docs/a.md', 'acme/notes/docs/b.md (local file)'])
+    expect(items[0]?.permalink).toBe(`https://github.com/acme/notes/blob/${sha}/docs/a.md`)
   })
 
   it('links the lines a partial read showed', async () => {

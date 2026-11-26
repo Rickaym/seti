@@ -23,6 +23,7 @@ import {
   onProofRefused,
   type AccessGuardOptions,
 } from './access.js'
+import { onAccessChanged } from './agent-access.js'
 import { cancelWaitsOnArchive, deliverAgentWaits } from './agent-waits.js'
 import { remindWhenAsking } from './asking-reminder.js'
 import { briefOnReturn } from './attention-brief.js'
@@ -111,6 +112,7 @@ import { runtimeRoutes } from './routes/runtimes.js'
 import { sandboxRoutes } from './routes/sandbox.js'
 import { secretRoutes } from './routes/secrets.js'
 import { sessionRoutes } from './routes/sessions.js'
+import { setiCommandRoutes } from './routes/seti-commands.js'
 import { settingsDocRoutes } from './routes/settings-doc.js'
 import { publicShareHandler } from './routes/share-public.js'
 import { sharedToolRoutes } from './routes/shared-tools.js'
@@ -137,6 +139,7 @@ import { importedContext } from './sessions.js'
 import { setiControlPreface } from './seti-control-note.js'
 import { contextPackPrompt, workspaceContext } from './seti-guide.js'
 import { sessionSetiServers, setiToolsContext } from './seti-tools/server.js'
+import { noteSetting } from './setting-notes.js'
 import { shellPreface } from './shell-context.js'
 import { restartQuietOnAnswer } from './stall-watch.js'
 import { clearStatusLinesWhenIdle, statusLineTurnEnded } from './status-line.js'
@@ -261,6 +264,7 @@ export function createApp(access: AccessGuardOptions = defaultAccess(), eaUrl: s
   app.use('*', logServerErrors)
   app.use('*', securityHeaders(access.access))
   onProofRefused(auditRefusedProof)
+  onAccessChanged(async (taskId, line) => noteSetting(taskId, 'access', line))
   app.use('*', accessGuard({ ...access, local }))
   app.route('/hooks', hookRoutes)
   app.use('*', subdomainProxy)
@@ -321,6 +325,7 @@ export function createApp(access: AccessGuardOptions = defaultAccess(), eaUrl: s
   app.route('/api/tasks', taskComposerRoutes)
   app.route('/api/tasks', taskPermissionRoutes)
   app.route('/api/tasks', changeRequestRoutes)
+  app.route('/api/tasks', setiCommandRoutes)
   app.route('/api/commands', commandRoutes)
   app.route('/api/compact', compactRoutes)
   app.route('/api/context', contextRoutes)

@@ -14,6 +14,7 @@ import { CopyReply } from '@/components/CopyReply'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { useToolGrouping } from '@/hooks/useToolGrouping'
 import { interruptedResultIds } from '@/lib/interruptions'
+import { LedgerTaskContext } from '@/lib/references/source-matches'
 import { transcriptItems } from '@/lib/rewind'
 import { openFailure } from '@/lib/seti-notes'
 import { isAgentTool } from '@/lib/subtasks'
@@ -72,13 +73,16 @@ const NO_DELIVERIES = new Map<number, ShellDelivery>()
 const NO_MARKS: TranscriptMarks = { voice: new Set(), notes: new Map() }
 const ALL_LOADED: LoadedEdges = { hasOlder: false, hasNewer: false }
 
-export function AgentText({ text }: { text: string }) {
+/** An agent's reply; with `taskId`, its references are checked against that agent's ledger. */
+export function AgentText({ text, taskId = null }: { text: string; taskId?: string | null }) {
   const links = useFileLinks()
   return (
     <CopyReply text={text} touch={false}>
       <div data-find-text="">
         <Suspense fallback={<div className="text-sm leading-relaxed whitespace-pre-wrap">{text}</div>}>
-          <Markdown text={text} fileLink={links === null ? undefined : FileLink} />
+          <LedgerTaskContext value={taskId}>
+            <Markdown text={text} fileLink={links === null ? undefined : FileLink} />
+          </LedgerTaskContext>
         </Suspense>
       </div>
     </CopyReply>
@@ -125,7 +129,7 @@ function AssistantMessage({ props, events }: { props: RowProps; events: readonly
         if (event.type === 'message' && event.role === 'agent' && event.text.trim() !== '') {
           return (
             <Spoken key={key} voice={props.voice}>
-              <AgentText text={event.text} />
+              <AgentText text={event.text} taskId={taskId} />
             </Spoken>
           )
         }
