@@ -30,6 +30,10 @@ export interface AgentCapabilities {
   dreams: boolean
   /** A later turn can go back to an earlier prompt. */
   rewind: boolean
+  /** Bypass can run its tools without asking for a while. */
+  bypass: boolean
+  /** It takes its own slash commands from the composer, beside Seti's. */
+  slash_commands: boolean
 }
 
 /** The capabilities a mod's command or view can need, each a field of AgentCapabilities. */
@@ -41,6 +45,7 @@ export const AGENT_CAPABILITY_NAMES = [
   'side_chat',
   'dreams',
   'rewind',
+  'bypass',
 ] as const satisfies readonly Exclude<keyof AgentCapabilities, 'label'>[]
 export type AgentCapabilityName = (typeof AGENT_CAPABILITY_NAMES)[number]
 

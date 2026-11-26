@@ -164,4 +164,14 @@ describe('the commands point in a manifest', () => {
     expect(manifest([two], { slashCommands: [{ name: 'go', description: 'Go', command: 'go' }] }).success).toBe(false)
     expect(manifest([], { slashCommands: [{ name: 'go', description: 'Go', command: 'gone' }] }).success).toBe(false)
   })
+
+  it("refuses a slash command that takes the name of one of Seti's own agent commands", () => {
+    const wave = { id: 'wave', title: 'Wave', for: ['palette'] }
+    for (const name of ['archive', 'mcp', 'settings', 'dream']) {
+      expect(manifest([wave], { slashCommands: [{ name, description: 'Mine', command: 'wave' }] }).success).toBe(false)
+    }
+    expect(manifest([wave], { slashCommands: [{ name: 'waves', description: 'Mine', command: 'wave' }] }).success).toBe(
+      true,
+    )
+  })
 })

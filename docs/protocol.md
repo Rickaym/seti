@@ -192,8 +192,8 @@ between two steps; an interrupt; a hook at subagent start.
   outside the control room's own folders is removed.
 - RT-13: A runtime declares whether it loads the user's MCP servers and connectors, Seti's
   plugins and a compaction rule, and which parts of that rule it does not honour, whether it can
-  run outside the sandbox, fork a side chat, dream, rewind and run background subagents of its
-  own; `GET /api/runtimes/capabilities` serves each runtime's declaration. For an agent whose
+  run outside the sandbox, fork a side chat, dream, rewind, run background subagents of its
+  own, take Bypass and take slash commands of its own; `GET /api/runtimes/capabilities` serves each runtime's declaration. For an agent whose
   runtime lacks one, its settings show the control as not on that runtime instead of a working
   control, counts leave those items out, its `task.md` and system prompt do not offer them, and
   the server refuses the change with the reason. A control the runtime honours in part says which
@@ -1369,6 +1369,9 @@ Optional and off by default: a maintenance session per agent that consolidates i
   the control room MUST NOT offer the command or show the view there, its slash command says it is
   not on that runtime, and the server refuses the command for that agent (409) to the user, the EA
   and agents alike.
+- MOD-26: A mod's slash command MUST NOT take a name the control room's own agent commands use
+  (`/restart`, `/archive`, `/mcp`, `/sandbox`, `/bypass`, `/credential`, `/access`, `/settings`,
+  `/rename`, `/dream`); a manifest that names one is invalid.
 
 ## 18. Public surfaces
 

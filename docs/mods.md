@@ -299,8 +299,8 @@ manifest first and resolves a `task` argument to the agent's id. A result that i
 never passes for Seti or the user.
 
 A command that takes `task`, and a view in an `agentTab`, may list what the agent's runtime must
-offer in `needs`: `mcp_servers`, `plugins`, `unsandboxed`, `compaction`, `side_chat`, `dreams` or
-`rewind`, the fields of `GET /api/runtimes/capabilities`, which each runtime's adapter declares.
+offer in `needs`: `mcp_servers`, `plugins`, `unsandboxed`, `compaction`, `side_chat`, `dreams`,
+`rewind` or `bypass`, the fields of `GET /api/runtimes/capabilities`, which each runtime's adapter declares.
 On an agent whose runtime lacks one, Seti hides the command from the palette, the agent's header and
 menu and its chord, its slash command says it is not on that runtime, and the server refuses it
 with 409 for the EA and agents too; the view does not show beside that agent. A command or view
@@ -574,7 +574,8 @@ layout is narrow. `status` is what the reply box says its slash command will do,
 the slash command in the box with a reason while it cannot run, such as while an answer streams.
 `needs` hides the command on an agent whose runtime lacks a capability, as for third-party mods;
 the side chat's Ask aside needs `side_chat`. The palette and menus show a command's chord, else the
-slash command that runs it. While a bundled
+slash command that runs it. A slash command may not take a name Seti's own agent commands use,
+such as `/restart`, `/mcp` or `/settings`. While a bundled
 mod is off its slash commands and palette commands say it is off, with a Turn on button, and never
 reach Claude Code.
 
