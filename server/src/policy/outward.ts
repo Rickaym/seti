@@ -34,7 +34,7 @@ function folder(dir: string | null, given: string | undefined): string | null {
 }
 
 /** The index of the first word from `at` that is no option, skipping the values of `paired`. */
-function positional(words: readonly string[], at: number, paired: readonly string[]): number {
+export function positional(words: readonly string[], at: number, paired: readonly string[]): number {
   let next = at
   while ((words[next] ?? '').startsWith('-')) {
     next += paired.includes(words[next] ?? '') ? 2 : 1
@@ -43,7 +43,7 @@ function positional(words: readonly string[], at: number, paired: readonly strin
 }
 
 /** The value of an option given as `--name value`, `--name=value` or `-x value`, or undefined. */
-function optionValue(words: readonly string[], names: readonly string[]): string | undefined {
+export function optionValue(words: readonly string[], names: readonly string[]): string | undefined {
   for (let at = 0; at < words.length; at += 1) {
     const word = words[at] ?? ''
     const joined = names.find((name) => name.startsWith('--') && word.startsWith(`${name}=`))
@@ -142,9 +142,13 @@ function ghFork(args: readonly string[], dir: string | null): Outward[] {
   return org === undefined ? [forked] : [forked, { action: 'fork', where: { owner: org } }]
 }
 
+/** The path a `gh api` call names, without a leading slash; empty when it names none. */
+export const apiEndpoint = (api: readonly string[]): string =>
+  (api[positional(api, 0, [...API_PAIRED, ...API_PAIRED_MORE])] ?? '').replace(/^\//, '')
+
 /** An API write to `repos/<owner>/<repo>/...`; `{owner}` stands for the folder's repository. */
 function ghApi(api: readonly string[], dir: string | null): Outward[] {
-  const endpoint = (api[positional(api, 0, [...API_PAIRED, ...API_PAIRED_MORE])] ?? '').replace(/^\//, '')
+  const endpoint = apiEndpoint(api)
   const repo = /^repos\/([^/?]+)\/([^/?]+)/.exec(endpoint)
   if (!apiWrites(api)) {
     return []
@@ -191,7 +195,7 @@ function rewritesGit(words: readonly string[]): boolean {
 }
 
 /** Why the line's own words could send a push or a gh call elsewhere than Seti reads, if they do. */
-function rerouting(parts: readonly string[]): { git?: string; gh?: string } {
+export function rerouting(parts: readonly string[]): { git?: string; gh?: string } {
   const words = parts.flatMap((part) => rawWords(part).map(unquote))
   const forms = parts.flatMap((part) => denyForms(part).map((form) => rawWords(form).map(unquote)))
   const assigned = words.flatMap((word) => /^([A-Z_]\w*)=/.exec(word)?.[1] ?? [])

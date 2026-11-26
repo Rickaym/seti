@@ -75,12 +75,23 @@ export type CanUseTool = (
 
 const PERMISSION_INPUT = { command: PERMISSION_COMMAND }
 
-/** Asks Seti to run the deploy no rule allows; returns the tool result and the reply after it. */
-async function askToDeploy(
+/** Asks to run the command that follows it in the prompt, such as one that merges a PR. */
+export const COMMAND_PROMPT = 'run this once I allow it:'
+const commandInput = (prompt: string) => ({
+  command: prompt.slice(prompt.indexOf(COMMAND_PROMPT) + COMMAND_PROMPT.length).trim(),
+})
+
+/** The rule Claude Code offers: a prefix for the deploy, the exact line for any other command. */
+const ruleFor = (command: string) => (command === PERMISSION_COMMAND ? `${command}:*` : command)
+
+/** Asks Seti to run a command no rule allows; returns the tool result and the reply after it. */
+async function askToRun(
   canUseTool: CanUseTool | undefined,
   toolUseId: string,
+  input: Record<string, unknown>,
 ): Promise<{ result: string; reply: string }> {
-  const answer = await canUseTool?.('Bash', PERMISSION_INPUT, {
+  const command = String(input.command)
+  const answer = await canUseTool?.('Bash', input, {
     signal: new AbortController().signal,
     toolUseID: toolUseId,
     requestId: `req_${toolUseId}`,
@@ -90,7 +101,7 @@ async function askToDeploy(
         type: 'addRules',
         behavior: 'allow',
         destination: 'localSettings',
-        rules: [{ toolName: 'Bash', ruleContent: `${PERMISSION_COMMAND}:*` }],
+        rules: [{ toolName: 'Bash', ruleContent: ruleFor(command) }],
       },
     ],
   })
@@ -153,8 +164,9 @@ interface Ask {
   ) => Promise<{ result: string; reply: string }>
 }
 
-const DEPLOY: Ask = { prompt: PERMISSION_PROMPT, tool: 'Bash', input: () => PERMISSION_INPUT, run: askToDeploy }
+const DEPLOY: Ask = { prompt: PERMISSION_PROMPT, tool: 'Bash', input: () => PERMISSION_INPUT, run: askToRun }
 const asks: Ask[] = [
+  { prompt: COMMAND_PROMPT, tool: 'Bash', input: commandInput, run: askToRun },
   { prompt: PLAN_APPROVAL_PROMPT, tool: 'ExitPlanMode', input: () => ({ plan: PLAN_TEXT }), run: askToStart },
   { prompt: SLACK_PROMPT, tool: SLACK_SEND, input: slackInput, run: askToPost },
   { prompt: SLACK_LOOKUP_PROMPT, tool: SLACK_SEARCH, input: lookUpInput, run: searchChannels },

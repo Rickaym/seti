@@ -51,6 +51,7 @@ import { MESSAGE_SEARCH, MESSAGE_SEARCH_TALK, MESSAGE_TIME } from './schema-sear
 import {
   CLAUDE_LOGINS,
   PERMISSION_REQUEST_EDITED,
+  PERMISSION_REQUEST_PRS,
   PERMISSION_REVIEW,
   PERMISSION_TIMEOUT,
   PERMISSIONS,
@@ -262,5 +263,6 @@ export const MIGRATIONS: readonly Migration[] = [
   { version: 141, name: 'permission_request_edited', sql: PERMISSION_REQUEST_EDITED },
   { version: 142, name: 'credential_access', sql: CREDENTIAL_ACCESS },
   { version: 143, name: 'dream_tidies', sql: DREAM_TIDIES },
-  { version: 144, name: 'no_builtin_roles', sql: '', run: retireBuiltinRoles },
+  { version: 144, name: 'permission_request_prs', sql: PERMISSION_REQUEST_PRS },
+  { version: 145, name: 'no_builtin_roles', sql: '', run: retireBuiltinRoles },
 ]

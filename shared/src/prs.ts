@@ -154,7 +154,7 @@ export function setiSubdomainOf(hostname: string): string | null {
   return null
 }
 
-const CI_STATES = ['success', 'failure', 'pending', 'neutral'] as const
+export const CI_STATES = ['success', 'failure', 'pending', 'neutral'] as const
 const nullableText = (label: string) => orDefault(label, z.string().nullable(), null)
 const ciField = (label: string) => orDefault<CiState | null>(label, z.enum(CI_STATES).nullable(), null)
 
