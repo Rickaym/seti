@@ -929,6 +929,10 @@ interrupted only for that.
   thread; each stop is audited with who stopped it. An agent's settings list the threads it follows
   with Stop, and a Slack webhook's card shows both switches and, while one is on and none has
   arrived, that no message event came yet.
+- THR-8: Replies reach agents only through a webhook (THR-2); a poller never reads them. While
+  agents that are not archived follow threads and no webhook has `thread_replies` on, an agent's
+  list of followed threads and the card of a poller whose own hosts include Slack say, without
+  styling it as an error, that replies need a Slack webhook.
 
 ## 11. Pull requests
 

@@ -4,10 +4,12 @@ import { useState } from 'react'
 import { toast } from 'sonner'
 import { apiDelete, apiPost, apiPut, errorText } from '@/api'
 import { Hint } from '@/components/Hint'
+import { RepliesNeedWebhook } from '@/components/RepliesNeedWebhook'
 import { Button } from '@/components/ui/button'
 import { useConfirm } from '@/components/ui/confirm-context'
 import { Switch } from '@/components/ui/switch'
 import { DESTRUCTIVE_ON_INTENT } from '@/components/ui/table-action-buttons'
+import { useThreadReach } from '@/hooks/useThreadReach'
 import { durationLabel, relativeTime } from '@/lib/time'
 import { cn } from '@/lib/utils'
 import { SettingRow, SettingsCard } from '../layout'
@@ -40,6 +42,23 @@ function statusText(info: PollerChannelInfo): string {
   return `${last}${next}${failures}`
 }
 
+/** Whether a poller's own hosts include Slack, as a mentions poller's do. */
+const reachesSlack = (hosts: readonly string[]) =>
+  hosts.some((host) => host === 'slack.com' || host.endsWith('.slack.com'))
+
+/** The quiet line on a Slack poller while agents follow threads and no webhook reads replies. */
+function PollerReplies() {
+  const reach = useThreadReach()
+  if (reach === null || reach.following === 0) {
+    return null
+  }
+  return (
+    <SettingRow label="Replies" description="Agents follow Slack threads; this poller does not read replies.">
+      <RepliesNeedWebhook />
+    </SettingRow>
+  )
+}
+
 const count = (n: number, noun: string) => `${String(n)} ${noun}${n === 1 ? '' : 's'}`
 
 /** A poller: its status, schedule and reach, subscribers, and its runs and events folded away. */
@@ -49,10 +68,13 @@ export function PollerCard({
   onChange,
   onRemoved,
   onEdit,
+  repliesOn,
 }: {
   /** The anchor a link from the schedule scrolls to. */
   id: string
   info: PollerChannelInfo
+  /** Whether any webhook hands thread replies to agents. */
+  repliesOn: boolean
   onChange: (next: ChannelInfo) => void
   onRemoved: (id: string) => void
   onEdit: () => void
@@ -158,6 +180,7 @@ export function PollerCard({
           <span className="break-all">{reach.join('; ')}</span>
         </SettingRow>
       )}
+      {!repliesOn && reachesSlack(poller.extra_hosts) && <PollerReplies />}
       <Subscribers info={info} onChange={onChange} />
       <Activity info={info} />
     </SettingsCard>
