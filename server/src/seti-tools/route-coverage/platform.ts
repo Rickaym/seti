@@ -34,9 +34,7 @@ export const PLATFORM_ROUTES: CoverageTable = {
   'POST /api/channels/:id/subscriptions': ea('subscribe_channel'),
   'DELETE /api/channels/:id/subscriptions/:sub': ea('unsubscribe_channel'),
   'PUT /api/channels/:id/subscriptions/:sub': ea('subscribe_channel'),
-  'PUT /api/channels/:id/subscriptions/:sub/delivery': gap(
-    'When a subscriber gets events (at once or batched). Write; fits subscribe_channel',
-  ),
+  'PUT /api/channels/:id/subscriptions/:sub/delivery': ea('subscribe_channel'),
   'PUT /api/channels/:id/subscriptions/:sub/mode': ea('update_channel'),
   'POST /api/channels/:id/test': ea('test_channel'),
   'PUT /api/channels/:id/threads': user(
@@ -140,7 +138,7 @@ export const PLATFORM_ROUTES: CoverageTable = {
   ),
   'PUT /api/notifications/focus': ui('The browser says which agent is on screen. View state'),
   'PUT /api/notifications/settings': ea('set_notifications'),
-  'POST /api/notifications/test': gap('Send a test notification. Harmless write'),
+  'POST /api/notifications/test': ea('set_notifications'),
   'GET /api/ping': plumbing('Liveness. Plumbing'),
   'GET /api/prs': ea('list_prs'),
   'POST /api/prs/:owner/:repo/:number/redeploy': ea('request_preview'),

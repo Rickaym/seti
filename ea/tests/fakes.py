@@ -1519,6 +1519,8 @@ class FakeSeti:
                 return ok({"id": int(follow), "task_id": task_id, "stopped_at": "2026-01-03T00:00:00Z"})
             case ["tasks", "start"]:
                 return ok(self._planned_task(body))
+            case ["notifications", "test"]:
+                return ok({"sent": 2, "failed": 1})
             case ["ea", "usage"]:
                 self.usage_records.extend(body["records"])
                 return ok({"recorded": len(body["records"])})
