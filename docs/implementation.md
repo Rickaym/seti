@@ -434,8 +434,10 @@ English sounds only.
 The EA's manner lives in its base prompt (`ea/src/seti_ea/prompt.py`) and in the short lines Seti
 speaks while its tools run (`ea/src/seti_ea/announce.py`). It gives the answer first and stops. On a
 call it aims for fifteen words, two sentences at most unless the user asks for detail, never reads
-a list aloud and never ends with an offer. In the chat an overview is one line per item. Its tone is
-composed and precise, with dry wit now and then and none about an error, a refusal or security.
+a list aloud and never ends with an offer. In the chat an overview is one line per item. After it
+messages or starts an agent it says whom and the gist in a few words, on a call and in the chat, and
+never quotes or restates what it sent unless the user asks. Its tone is composed and precise, with
+dry wit now and then and none about an error, a refusal or security.
 
 The user's request is the EA's yes. It asks first only for tools that take `confirmed` (EA-3,
 EA-4), a public group chat post, stopping several agents at once, and work it proposes itself. It
