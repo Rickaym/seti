@@ -198,7 +198,7 @@ export function useSettingCommand(
     },
     pick: (token) => {
       const from = completeSetiLine(draft, world)?.from ?? draft.length
-      setDraft(`${draft.slice(0, from)}${token} `, true)
+      setDraft(`${draft.slice(0, from)}${token} `, typedHere(true, typed, draft))
     },
     confirm: () => {
       if (current?.kind === 'untrusted') {
