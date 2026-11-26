@@ -1475,7 +1475,7 @@ Optional and off by default: a maintenance session per agent that consolidates i
 - CMD-2: A setting command MUST run only on the user's submit in that agent's reply box of a line
   the user typed or picked there. A line that arrived another way (pasted, dropped, restored,
   handed over, taken back, or submitted by a script) MUST wait in a card with Run and run only on
-  its tap. Transcript rows, updates, group chat and Slack messages, webhooks, the EA, agents and
+  its tap, also after a command picked from the completion list replaced it. Transcript rows, updates, group chat and Slack messages, webhooks, the EA, agents and
   mods MUST NOT run one, and the control room MUST refuse a setting command sent to an agent as a
   prompt (400).
 - CMD-3: A setting command that needs a value and has none MUST offer its choices, the current one
