@@ -51,7 +51,7 @@ export async function expectRepliesNeedWebhook(
   const poller = await slackPoller(request, name)
   try {
     await page.goto('/#settings/channels')
-    const card = page.getByRole('main').getByRole('region', { name })
+    const card = page.getByRole('main').getByRole('region', { name, exact: true })
     const line = card.getByTestId('replies-need-webhook')
     await expect(line).toHaveText(LINE)
     await line.scrollIntoViewIfNeeded()
@@ -76,7 +76,7 @@ export async function expectRepliesNeedWebhook(
     try {
       await expect(await teamLine(page, agent)).toHaveCount(0)
       await page.goto('/#settings/channels')
-      await expect(page.getByRole('main').getByRole('region', { name })).toBeVisible()
+      await expect(page.getByRole('main').getByRole('region', { name, exact: true })).toBeVisible()
       await expect(card.getByTestId('replies-need-webhook')).toHaveCount(0)
     } finally {
       await request.delete(`/api/channels/${webhook.channel.id}`)
