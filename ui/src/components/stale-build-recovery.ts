@@ -1,6 +1,5 @@
-import { RotateCw } from 'lucide-react'
-import { toast } from 'sonner'
 import { isUnreachable, pingApi } from '@/api'
+import { markBehind } from '@/lib/app-update'
 import { hasUnsavedChanges } from '@/lib/leave-guard'
 import { planRecovery, type StaleRecovery } from '@/lib/stale-build'
 
@@ -30,16 +29,6 @@ async function serverAnswers(): Promise<boolean> {
   }
 }
 
-function offerNewVersion(): void {
-  toast('New version', {
-    id: 'seti-new-version',
-    duration: Infinity,
-    icon: <RotateCw className="size-4" aria-hidden />,
-    description: 'Seti was updated. Save your changes, then reload to get it.',
-    action: { label: 'Reload', onClick: reloadPage },
-  })
-}
-
 let reloading = false
 let planning: Promise<StaleRecovery> | null = null
 
@@ -55,7 +44,7 @@ async function recover(): Promise<StaleRecovery> {
     reloading = true
     reloadPage()
   } else if (recovery === 'notice') {
-    offerNewVersion()
+    markBehind()
   }
   return recovery
 }
