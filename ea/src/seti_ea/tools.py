@@ -49,7 +49,7 @@ from seti_ea.format import (
     until,
     zone_of,
 )
-from seti_ea.gate import ANSWER, GATE_CALL, GateCall, UserAnswer
+from seti_ea.gate import ANSWER, GATE_CALL, ON_WORD_TOOLS, ONE_AT_A_TIME, GateCall, UserAnswer
 from seti_ea.history_tools import HISTORY_WINDOW, activity_result, window_transcript
 from seti_ea.knowledge_tools import list_proposals, search_knowledge
 from seti_ea.location_tools import location_lines
@@ -346,8 +346,9 @@ TOOL_SPECS: list[ToolSpec] = [
         "found or was told, which the live context does not hold. With in knowledge, search the "
         "approved knowledge notes agents share instead; with in proposals, list the notes waiting "
         "for the user to approve; with in questions, list the questions agents wait on the user for; "
-        "with in requests, list everything that waits on the user: questions, access changes, tool "
-        "calls, plans and notes.",
+        "with in requests, list everything that waits on the user, of every task or the one named: "
+        "questions, access changes, and tool calls and plans with their id, Seti's reason, the "
+        "agent's description, the input or plan and the PRs they name, and notes.",
         {
             "query": {"type": "string", "description": "What to look for, in a few keywords."},
             "task": {
@@ -1041,9 +1042,9 @@ class EaTools:
         """The Seti client the tools call through."""
         return self._seti
 
-    def user_turn(self) -> None:
-        """The user spoke or typed, so a question a destructive tool asked may now be answered."""
-        self._actions.confirmations.user_turn()
+    def user_turn(self, said: str = "") -> None:
+        """The user spoke or typed `said`, so a question a destructive tool asked may now be answered."""
+        self._actions.confirmations.user_turn(said)
 
     async def call(self, name: str, args: Mapping[str, Any]) -> ToolResult:
         """Run a tool; Seti errors and bad arguments come back as a failed result, never raise."""
@@ -1072,14 +1073,17 @@ class EaTools:
             detail = f" {clip(e.detail, 300)}" if e.detail and e.detail != e.title else ""
             return ToolResult(f"The Seti call failed: {e.title}.{detail}", f"Failed: {e.title}", False)
 
-    async def answer(self, ask: AnsweredAsk) -> ToolResult:
-        """Runs the exact recorded call the user allowed, or forgets the question they denied."""
+    async def answer(self, ask: AnsweredAsk, by_word: bool = False) -> ToolResult:
+        """Runs the exact recorded call the user allowed, or forgets the question they denied.
+
+        `by_word` says the user spoke or typed the yes, rather than tapped Allow in a notification.
+        """
         if not ask.allow:
             return ToolResult(f"The user said no: {ask.summary} stays undone.", "Left undone")
         if ask.tool not in CONFIRM_TOOLS:
             result = ToolResult(f"{ask.tool} does not ask first.", "Not a question", False)
         else:
-            token = ANSWER.set(UserAnswer())
+            token = ANSWER.set(UserAnswer(ask_id=ask.id, by_word=by_word))
             try:
                 result = await self._run(ask.tool, {**ask.args, "confirmed": True})
             finally:
@@ -1096,9 +1100,15 @@ class EaTools:
         if gate.turn == 0:
             raise ToolError("The user has not answered since you asked.", "No answer yet")
         taken = parse_answered(await gate.confirm(ids=ids))
-        done = [(ask, await self.answer(ask)) for ask in taken]
+        done = [(ask, await self._answer_yes(ask, len(taken))) for ask in taken]
         missing = [i for i in ids if i not in {ask.id for ask in taken}]
         return confirm_text(done, missing)
+
+    async def _answer_yes(self, ask: AnsweredAsk, together: int) -> ToolResult:
+        """Runs a call the user's typed or spoken yes allowed; one yes allows one on-word action alone."""
+        if ask.tool in ON_WORD_TOOLS and together > 1:
+            return ToolResult(ONE_AT_A_TIME, "Needs its own yes", False)
+        return await self.answer(ask, by_word=True)
 
     async def _list(self, path: str) -> list[dict[str, Any]]:
         return dicts(await self._seti.get(path))
@@ -1274,7 +1284,9 @@ class EaTools:
         if scope == "questions":
             return await list_questions(self._seti, self._now())
         if scope == "requests":
-            return await list_requests(self._seti, self._now())
+            ref = arg_str(args, "task", required=False)
+            task = await self.resolve_task(ref) if ref else None
+            return await list_requests(self._seti, self._now(), str(task.get("id")) if task else None)
         query = arg_str(args, "query")
         if scope == "knowledge":
             return await search_knowledge(self._seti, query, self._now())
