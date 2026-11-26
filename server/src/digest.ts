@@ -205,8 +205,18 @@ function eventLines(event: RuntimeEvent, lookup: Lookup): [DigestKind, string][]
 
 type SetiPayload = Extract<MessageRow, { kind: 'seti' }>['payload']
 
-const setiNoteIsError = ({ session, seti_control, bypass, timed_out, resumed, refused_host, edited }: SetiPayload) =>
+const setiNoteIsError = ({
+  session,
+  seti_control,
+  bypass,
+  setting,
+  timed_out,
+  resumed,
+  refused_host,
+  edited,
+}: SetiPayload) =>
   refused_host === undefined &&
+  setting === undefined &&
   edited === undefined &&
   session === undefined &&
   seti_control === undefined &&

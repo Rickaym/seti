@@ -28,6 +28,7 @@ import { publish, runTurn } from './runner.js'
 import { refuseUndeclared } from './runtime-features.js'
 import { pickedRuntime } from './runtime-offers.js'
 import { runsUnsandboxed } from './runtimes/capabilities.js'
+import { noteSetting } from './setting-notes.js'
 import { contextPacks, taskContextPacks } from './store/context.js'
 import { profiles } from './store/credentials.js'
 import { taskMcpChoices } from './store/mcp.js'
@@ -253,6 +254,11 @@ export async function setTaskSandbox(task: Task, on: boolean): Promise<void> {
     summary: `Turned the sandbox ${on ? 'on' : 'off'} for task "${task.title}"`,
     detail: { title: task.title, sandbox: on },
   })
+  await noteSetting(
+    task.id,
+    'sandbox',
+    on ? 'Sandbox on from the next turn' : "Sandbox off from the next turn: the agent uses this machine's own access",
+  )
 }
 
 /** Takes the user's home folders out of an older agent's sandbox, from its next turn and for good. */
@@ -270,6 +276,7 @@ export async function dropTaskHomeAccess(task: Task): Promise<void> {
     summary: `Took your home folders out of the sandbox of task "${task.title}"`,
     detail: { title: task.title, home_access: false },
   })
+  await noteSetting(task.id, 'home', 'Home folders out of the sandbox from the next turn')
 }
 
 /**
@@ -321,6 +328,7 @@ export async function setTaskProfile(task: Task, profileId: string, actor: Audit
     summary: `Gave task "${task.title}" the credentials ${profile.name}`,
     detail: { title: task.title, profile: profile.name, profile_id: profile.id },
   })
+  await noteSetting(task.id, 'credential', `Credentials ${profile.name} from the next turn`)
   await awsWithProfile({ ...task, profile_id: profileId }, actor)
   await sshKeysChanged()
 }

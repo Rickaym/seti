@@ -8,6 +8,7 @@ export const isFailureNote = (note: SetiPayload) =>
   note.stopped !== true &&
   note.seti_control === undefined &&
   note.bypass === undefined &&
+  note.setting === undefined &&
   note.resumed !== true &&
   note.timed_out === undefined &&
   note.refused_host === undefined &&

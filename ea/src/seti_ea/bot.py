@@ -29,6 +29,7 @@ from pipecat.processors.aggregators.llm_response_universal import (
     LLMAssistantAggregatorParams,
     LLMUserAggregator,
     LLMUserAggregatorParams,
+    UserTurnStoppedMessage,
 )
 from pipecat.processors.frameworks.rtvi import (
     RTVIFunctionCallReportLevel,
@@ -136,6 +137,12 @@ def action_message(tool: str, result: ToolResult) -> dict[str, Any]:
 
 
 IDLE_END_MESSAGE: dict[str, Any] = {"type": "ea-call-end", "reason": "bot-idle"}
+
+
+def heard(args: Sequence[Any]) -> str:
+    """What the user said in the turn that just ended, from the turn-stopped event's arguments."""
+    message = next((arg for arg in args if isinstance(arg, UserTurnStoppedMessage)), None)
+    return message.content or "" if message is not None else ""
 
 
 def progress_message(text: str) -> dict[str, Any]:
@@ -488,8 +495,8 @@ async def run_bot(
             context.add_message({"role": "developer", "content": note})
 
     @user_aggregator.event_handler("on_user_turn_stopped")
-    async def on_user_turn_stopped(_aggregator: LLMUserAggregator, *_args: Any) -> None:
-        tools.user_turn()
+    async def on_user_turn_stopped(_aggregator: LLMUserAggregator, *args: Any) -> None:
+        tools.user_turn(heard(args))
         gate.expect_reply()
         await history.flush()
 

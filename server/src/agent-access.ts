@@ -240,6 +240,15 @@ export async function storeOverride(task: Task, kind: AccessKind, id: string, ov
   }
 }
 
+type AccessListener = (taskId: string, line: string) => Promise<void>
+
+let accessListener: AccessListener = async (_taskId, _line) => Promise.resolve()
+
+/** Hears each change to one agent's access with a line that says what changed, in place of any. */
+export function onAccessChanged(listener: AccessListener): void {
+  accessListener = listener
+}
+
 const itemLabel = (kind: AccessKind, name: string) => (kind === 'aws' ? AWS_NAME : `${KIND_LABEL[kind]} ${name}`)
 
 const verbOf = (enabled: boolean, override: boolean | null, credential: boolean | null) => {
@@ -283,6 +292,10 @@ export async function setTaskAccess(
     },
   })
   signalWorkspaces('task', task.id)
+  await accessListener(
+    task.id,
+    `${verbOf(now, override, item.credential)} ${itemLabel(kind, item.name)} from the next turn`,
+  )
   if (kind === 'ssh') {
     await sshKeysChanged()
   }

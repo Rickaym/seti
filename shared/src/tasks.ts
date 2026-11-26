@@ -387,9 +387,10 @@ export type MessageBody =
    * session restart or a move to another runtime (`runtime_was` names the one it left) and
    * `seti_control` one about the agent's Seti control level, which the agent reads; `memory` one
    * about the agent's memory cap, with `ended_turn` when the cap stopped Claude Code itself;
-   * `bypass` one about Bypass turning on or off; `resumed` one about a turn that a restart of Seti
-   * cut off and Seti resumed by itself; `timed_out` holds when a permission request was denied for
-   * want of an answer.
+   * `bypass` one about Bypass turning on or off; `setting` one about another setting that changes
+   * what the agent may reach (its sandbox, credentials, access or home folders); `resumed` one
+   * about a turn that a restart of Seti cut off and Seti resumed by itself; `timed_out` holds when
+   * a permission request was denied for want of an answer.
    */
   | {
       kind: 'seti'
@@ -403,6 +404,7 @@ export type MessageBody =
         /** The level before this change, so a change undone before the next turn says nothing. */
         seti_control_was?: SetiControlLevel
         bypass?: boolean
+        setting?: SettingNote
         resumed?: boolean
         timed_out?: string
         memory?: MemoryEvent
@@ -456,6 +458,10 @@ export const RESENT_NOTE =
 
 /** What a restart note says of the session; `fresh` marks one begun without the conversation. */
 export type SessionRestart = 'restarted' | 'fresh' | 'continued'
+
+/** The setting a note in the transcript is about. */
+export const SETTING_NOTES = ['sandbox', 'credential', 'access', 'home'] as const
+export type SettingNote = (typeof SETTING_NOTES)[number]
 
 export type TaskEvent =
   | { type: 'message'; row: MessageRow }

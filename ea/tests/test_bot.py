@@ -222,8 +222,8 @@ def test_the_prompt_covers_sleep_and_queued_messages() -> None:
     assert "call go_to_sleep on its own" in SYSTEM_PROMPT
     for said in ('"go to sleep"', '"that\'s all for now"', '"stand by"', '"thanks, that\'s it"'):
         assert said in SYSTEM_PROMPT
-    assert "Messaging a task needs no confirmation, even while it runs a turn" in SYSTEM_PROMPT
-    assert "Before start_task, stop_task or a public post_team_chat, say" in SYSTEM_PROMPT
+    assert "send the direct message in the same reply, even while it runs a turn" in SYSTEM_PROMPT
+    assert "A public post_team_chat, which reaches every agent: give the text, then ask." in SYSTEM_PROMPT
     assert "send_to_task" not in SYSTEM_PROMPT
     assert "Messaging an idle task" not in SYSTEM_PROMPT
 
@@ -275,7 +275,7 @@ def test_voice_rules_forbid_markdown_even_after_typed_turns() -> None:
 
 def test_the_ea_is_told_to_sound_natural_and_not_copy_terse_notes() -> None:
     assert "# How you sound" in SYSTEM_PROMPT
-    assert "Never copy their style" in SYSTEM_PROMPT
+    assert "Never copy their labels or clipped fragments" in SYSTEM_PROMPT
 
 
 def test_the_llm_turns_reasoning_off_unless_left_to_the_model() -> None:
