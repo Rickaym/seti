@@ -17,7 +17,10 @@ key off the host.
   ([7.2 Sandbox](protocol.md#72-sandbox), [7.3 Egress](protocol.md#73-egress)). An unsandboxed
   agent, or one in Bypass, is a per-agent choice of the user's.
 - An agent's folder, PR text and every webhook payload are hostile input
-  ([7.7 Hostile repositories](protocol.md#77-hostile-repositories)).
+  ([7.7 Hostile repositories](protocol.md#77-hostile-repositories)). Git that Seti runs in an
+  agent's folder, for its badges, safety checks and archives, runs in a jail with no network that
+  sees only the system folders and that repository, so a program the repository names runs with
+  no more access than the agent that wrote it (HST-2).
 - Secret values are write-only and sealed ([8 Secrets](protocol.md#8-secrets-and-connections)).
 - Only a short list of paths answers without a credential
   ([18 Public surfaces](protocol.md#18-public-surfaces)).

@@ -4,7 +4,7 @@ import type { DreamProposal, DreamProposalKind, TrashItem } from '@seti/shared'
 import { audit } from '../audit.js'
 import { TRASH_ROOT } from '../config.js'
 import { refuseAgent, refuseDelegates } from '../ea-guard.js'
-import { agentGit, mainCheckout } from '../git.js'
+import { agentGit, agentGitWrite, mainCheckout } from '../git.js'
 import { HttpError } from '../http.js'
 import { removeOwnedDir } from '../owned-dirs.js'
 import { dreamProposals, trashItems, type TrashMeta } from '../store/dream-proposals.js'
@@ -44,7 +44,7 @@ export async function applyIntoTrash(
   let trashPath = ''
   if (proposal.kind === 'delete_branch' && checked.branch !== undefined) {
     const tip = await agentGit(checked.path, 'rev-parse', `refs/heads/${checked.branch}`)
-    await agentGit(checked.path, 'branch', '-D', '--', checked.branch)
+    await agentGitWrite(checked.path, 'branch', '-D', '--', checked.branch)
     meta = { repo: checked.path, branch: checked.branch, tip }
   } else {
     const repo = proposal.kind === 'remove_worktree' ? (mainCheckout(checked.path) ?? undefined) : undefined
@@ -84,7 +84,7 @@ export async function restoreFromTrash(id: number): Promise<TrashItem> {
   }
   const { item, trashPath, meta } = found
   if (item.kind === 'delete_branch' && meta.repo !== undefined && meta.branch !== undefined && meta.tip !== undefined) {
-    await agentGit(meta.repo, 'branch', '--', meta.branch, meta.tip).catch(() => {
+    await agentGitWrite(meta.repo, 'branch', '--', meta.branch, meta.tip).catch(() => {
       throw new HttpError(409, `Branch ${meta.branch ?? ''} exists again or its commit is gone`)
     })
   } else {
@@ -94,7 +94,7 @@ export async function restoreFromTrash(id: number): Promise<TrashItem> {
     fs.renameSync(trashPath, item.original_path)
     await removeOwnedDir(path.dirname(trashPath), 'trash', [])
     if (item.kind === 'remove_worktree') {
-      await agentGit(item.original_path, 'worktree', 'repair').catch(() => '')
+      await agentGitWrite(item.original_path, 'worktree', 'repair').catch(() => '')
     }
   }
   await trashItems.restored(item.id)

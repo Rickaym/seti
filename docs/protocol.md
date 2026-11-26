@@ -798,9 +798,13 @@ interrupted only for that.
 - HST-1: Everything in an agent's folder is input the agent wrote and MUST NOT run code on the
   host. Code-host text (titles, branches, checks, comments) is rendered as text and reaches agents
   only as an update or tool result.
-- HST-2: The control room runs version control in an agent-writable folder only with hooks,
-  filters, external commands, helpers and transports disabled, ignoring system and user config. A
-  repository pointer file is followed only when the repository records that folder.
+- HST-2: The control room runs version control in an agent-writable folder only in a jail with
+  no network, no home folder and none of its own data or environment, which sees the system
+  folders and that repository's own folders, read-only unless the command writes; hooks,
+  external commands, helpers and transports are disabled too, and system and user config ignored.
+  A repository pointer file is followed only when the repository records that folder.
+  Why: a repository's config and attributes name programs, such as filter, diff and merge
+  drivers, signing programs and its submodules' own config, that no fixed setting switches off.
 - HST-4: The capability probe of a sandboxed agent's folder MUST run in its sandbox; any other
   agent-writable folder is probed with the user's settings only.
   Why: project settings start hooks and tool-server commands.
@@ -1676,6 +1680,11 @@ treat every agent as holding the user's access.
 - A custom sender definition decides how a public path authenticates, which is why only the user
   writes one (CHN-19).
 - An unsandboxed agent can read every secret on the host.
+- Where the sandbox cannot start on the host, no agent runs sandboxed and version control in an
+  agent's folder runs on the host with only the settings of HST-2.
+- Version control in a registered repository's own checkout, such as making or restoring a
+  worktree Seti made, runs on the host with the user's config; the sandbox mounts that
+  repository's config and hooks read-only.
 - Approval is review, not proof: a shared tool, knowledge note or mod the user allows unread runs
   with each agent's access. Cards therefore show the whole artefact and only the difference on
   update.
