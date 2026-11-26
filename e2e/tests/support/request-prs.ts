@@ -13,7 +13,7 @@ const rollup = (state: 'SUCCESS' | 'FAILURE') => ({
 })
 
 export const MERGE_DESCRIPTION = 'Merge tool#2136 once its checks pass'
-export const RETRY_URL = 'https://github.com/acme/tool/pull/2140'
+const RETRY_URL = 'https://github.com/acme/tool/pull/2140'
 export const RETRY_TITLE = 'Retry lease renewal on 503'
 
 /** GitHub as the fake gh answers it: the lease fix open with green CI, and the retry merged. */
