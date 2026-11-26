@@ -3,11 +3,11 @@ import path from 'node:path'
 import type { Launcher } from '../../launcher.js'
 import { FakeProcess, launcherOf } from '../conformance/process.js'
 import { RealProcess, type LineTap, type Outbound } from '../conformance/real-process.js'
+import { serveRigTools } from '../conformance/rig-tools.js'
 import type { Script, ScriptCall, Step } from '../conformance/script.js'
 import { SUITE_CWD } from '../conformance/subject.js'
 import type { Rig, SpawnRecord } from '../conformance/target.js'
 import type { ModelCall, ScriptedResponses } from './conformance-responses.js'
-import { serveRigTools } from './conformance-tools.js'
 
 /** What the sandbox hands Codex when a script names no launcher: a path and the key's placeholder. */
 const SANDBOX_ENV = { PATH: '/usr/bin:/bin', HOME: '/sandbox/home', OPENAI_API_KEY: 'egress-placeholder' }

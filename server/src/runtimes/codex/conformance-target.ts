@@ -1,10 +1,10 @@
 import { openToolRelay } from '../../tool-relay.js'
 import type { RuntimeAdapter } from '../adapter.js'
+import { rigTools } from '../conformance/rig-tools.js'
 import type { ConformanceTarget, NeutralHost } from '../conformance/target.js'
 import { codexAdapterFor } from './adapter.js'
 import type { CodexDecide } from './approvals.js'
 import { codexRig, type RigBench } from './conformance-rig.js'
-import { rigTools } from './conformance-tools.js'
 import type { CodexShapes } from './session.js'
 
 /** Seti's decision for a Codex ask, from the neutral host; a question goes to the user. */

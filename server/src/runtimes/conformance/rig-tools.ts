@@ -2,9 +2,9 @@ import { appendFileSync } from 'node:fs'
 import path from 'node:path'
 import type { Launcher } from '../../launcher.js'
 import type { RelayedServer, RelayPlace } from '../../tool-relay.js'
-import type { Script, ScriptCall, Step } from '../conformance/script.js'
+import type { Script, ScriptCall, Step } from './script.js'
 
-/** The tool servers a rig serves Codex through Seti's relay, and where their sockets go. */
+/** The tool servers a rig serves its runtime through Seti's relay, and where their sockets go. */
 interface RigTools {
   place: RelayPlace
   servers: RelayedServer[]

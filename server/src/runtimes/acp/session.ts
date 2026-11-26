@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto'
 import { promptUsage, type AcpRecord } from '@seti/shared'
 import { z } from 'zod'
 import type { Launcher } from '../../launcher.js'
+import type { StdioServer } from '../../tool-relay.js'
 import type { InputContent, RuntimeSession, SessionInput, SessionReport } from '../adapter.js'
 import { JsonRpc, RpcError, type RpcCall } from '../json-rpc.js'
 import { ReportQueue } from '../report-queue.js'
@@ -15,7 +16,7 @@ export interface AcpShapes {
   realised: AcpRealised
   decide: AcpDecide
   hooks: null
-  hostServers: Record<string, never>
+  hostServers: Record<string, StdioServer>
   policy: never
   mode: never
 }
@@ -32,8 +33,8 @@ export interface AcpRealised {
   env: Record<string, string | undefined>
   resume: string | null
   model: string
-  /** The tool servers `session/new` and `session/load` hand the agent, as ACP describes them. */
-  mcpServers: readonly unknown[]
+  /** Seti's tool servers `session/new` and `session/load` hand the agent, by name. */
+  servers: Record<string, StdioServer>
   spawn: Spawn
   decide: AcpDecide
   signal: AbortSignal
@@ -89,6 +90,7 @@ class Driver {
     this.permissions = new Permissions({
       rpc: this.rpc,
       decide: realised.decide,
+      relayed: new Set(Object.keys(realised.servers)),
       refused: (callId) => this.refused.add(callId),
     })
   }
@@ -171,7 +173,8 @@ class Driver {
     if (init.protocolVersion !== PROTOCOL) {
       throw new Error(`it speaks ACP version ${String(init.protocolVersion)}, Seti speaks ${String(PROTOCOL)}`)
     }
-    const { resume, cwd, model, mcpServers } = this.realised
+    const { resume, cwd, model } = this.realised
+    const mcpServers = Object.entries(this.realised.servers).map(([name, server]) => ({ name, ...server, env: [] }))
     if (resume === null) {
       this.session = sessionReply.parse(await this.rpc.request('session/new', { cwd, mcpServers })).sessionId
       this.reports.push(acpReport({ seti: 'started', sessionId: this.session, model, cwd }))
