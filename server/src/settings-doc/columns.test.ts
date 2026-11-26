@@ -25,6 +25,7 @@ const COLUMNS: Record<string, string | { state: string }> = {
   'ea_settings.join_on_open': 'app.ea.join_on_open',
   'ea_settings.form_of_address': 'app.ea.form_of_address',
   'ea_settings.language': 'app.ea.language',
+  'ea_settings.inbox_relays': state('a security switch only the user changes, on the EA page'),
   'archive_settings.auto_enabled': 'agents.lifecycle.auto_archive.enabled',
   'archive_settings.auto_days': 'agents.lifecycle.auto_archive.days',
   'archive_settings.delete_after_days': 'agents.lifecycle.auto_archive.delete_after_days',

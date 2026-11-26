@@ -1,4 +1,11 @@
-import { parseComposer, pasteGoesToFile, rankCommands, type ComposerCheck, type ComposerCommand } from '@seti/shared'
+import {
+  parseComposer,
+  pasteGoesToFile,
+  rankCommands,
+  type ComposerCheck,
+  type ComposerCommand,
+  type SetiCompletion,
+} from '@seti/shared'
 import { useId, useState, type ClipboardEvent, type DragEvent, type KeyboardEvent } from 'react'
 import { FindableTextarea } from '@/components/find/FindableTextarea'
 import type { FindState } from '@/components/find/useFind'
@@ -7,6 +14,7 @@ import type { CommandState } from '@/lib/command-catalog'
 import { handleWordDelete, insertText } from '@/lib/text-edit'
 import { cn } from '@/lib/utils'
 import { SuggestionList } from '@/panels/tasks/CommandSuggestions'
+import { commandRow, optionRows, type SuggestionRow } from '@/panels/tasks/suggestion-rows'
 
 const SUGGESTION_LIMIT = 8
 
@@ -39,6 +47,10 @@ interface CommandFieldProps {
   /** Find and replace in the box, opened by Ctrl+F there or a Find button; the page shows the bar. */
   find: FindState
   className?: string
+  /** The choices for the word being typed after a Seti command's name. */
+  completion?: SetiCompletion | null
+  /** Puts a choice for that word in the box. */
+  onPickWord?: ((token: string) => void) | undefined
 }
 
 export interface AttachHandlers {
@@ -119,7 +131,20 @@ function useAttachInput(attach: AttachHandlers | undefined, disabled: boolean) {
   }
 }
 
-/** A textarea that suggests slash commands while the first word is typed. */
+/** The menu: commands while the first word is typed, then a Seti command's choices for a word. */
+function menuOf(value: string, commands: CommandState, words: SetiCompletion | null) {
+  const input = parseComposer(value)
+  const typingName = input.mode === 'slash' && !/\s/.test(value.trimStart())
+  if (typingName) {
+    const rows = rankCommands(commands.commands ?? [], input.name, SUGGESTION_LIMIT).map(commandRow)
+    const listed = rows.length > 0 || commands.loading || commands.commands !== null
+    return { typingName, rows, listed, heading: undefined, updating: commands.updating }
+  }
+  const rows = words === null ? [] : optionRows(words)
+  return { typingName, rows, listed: rows.length > 0, heading: `Pick ${words?.prompt ?? 'a choice'}`, updating: false }
+}
+
+/** A textarea that suggests slash commands, then the choices for each word of a Seti command. */
 export function CommandField(props: CommandFieldProps) {
   const {
     value,
@@ -140,17 +165,23 @@ export function CommandField(props: CommandFieldProps) {
   const [active, setActive] = useState(0)
   const [dismissedAt, setDismissedAt] = useState<string | null>(null)
   const [focused, setFocused] = useState(false)
-  const input = parseComposer(value)
-  const typingName = input.mode === 'slash' && !/\s/.test(value.trimStart())
-  const items = typingName ? rankCommands(commands.commands ?? [], input.name, SUGGESTION_LIMIT) : []
-  const hasList = items.length > 0 || commands.loading || commands.commands !== null
-  const open = typingName && focused && !disabled && dismissedAt !== value && hasList
+  const words = props.completion ?? null
+  const { typingName, rows: items, listed, heading, updating } = menuOf(value, commands, words)
+  const shellMode = parseComposer(value).mode === 'shell'
+  const open = listed && focused && !disabled && dismissedAt !== value
   const current = Math.min(active, Math.max(items.length - 1, 0))
 
-  const accept = (command: ComposerCommand) => {
-    onChange(`/${command.name} `)
-    onPicked?.(`/${command.name} `)
+  const accept = (row: SuggestionRow) => {
     setActive(0)
+    if (row.unavailable !== null) {
+      return
+    }
+    if (!typingName && props.onPickWord !== undefined) {
+      props.onPickWord(row.insert)
+      return
+    }
+    onChange(`/${row.insert} `)
+    onPicked?.(`/${row.insert} `)
   }
 
   const onListKey = (e: KeyboardEvent<HTMLTextAreaElement>): boolean => {
@@ -209,7 +240,7 @@ export function CommandField(props: CommandFieldProps) {
         className={cn(
           'max-h-[40dvh] overflow-y-auto',
           props.className,
-          input.mode === 'shell' && 'border-shell font-mono focus-visible:border-shell',
+          shellMode && 'border-shell font-mono focus-visible:border-shell',
           dropClass,
         )}
         onFocus={() => {
@@ -236,10 +267,12 @@ export function CommandField(props: CommandFieldProps) {
       {open && (
         <SuggestionList
           listId={listId}
-          items={items}
+          label={typingName ? 'Command suggestions' : (words?.prompt ?? 'Choices')}
+          rows={items}
           active={current}
+          heading={heading}
           loading={commands.loading}
-          updating={commands.updating}
+          updating={updating}
           placement={placement}
           onPick={accept}
         />

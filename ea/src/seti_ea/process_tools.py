@@ -24,6 +24,7 @@ Handler = Callable[[Mapping[str, Any]], Awaitable[ToolResult]]
 TaskResolver = Callable[[str], Awaitable[dict[str, Any]]]
 
 SHELLS_SHOWN = 8
+OUTPUT_CHARS = 3000
 PROCESSES_SHOWN = 10
 STOPPABLE = ("command", "tool")
 ENDED_WORDS = {"completed": "finished", "failed": "failed", "killed": "was stopped"}
@@ -31,8 +32,12 @@ ENDED_WORDS = {"completed": "finished", "failed": "failed", "killed": "was stopp
 LIST_PROCESSES_SPEC = ToolSpec(
     "list_processes",
     "An agent's background shells (commands it left running, such as dev servers and watches) with "
-    "status and how long they ran, and the other processes running for it now with CPU and memory.",
-    {"task": TASK_REF},
+    "status and how long they ran, and the other processes running for it now with CPU and memory. "
+    "With shell, the end of that shell's output instead, credentials redacted.",
+    {
+        "task": TASK_REF,
+        "shell": {"type": "string", "description": "A background shell's id, description or command."},
+    },
     ["task"],
 )
 
@@ -140,10 +145,38 @@ class ProcessTools:
         task = await self._resolve(arg_str(args, "task"))
         title = title_of(task)
         view = await self._view(task)
+        ref = arg_str(args, "shell", required=False)
+        if ref:
+            return await self._output(task, view, ref)
         running = int(view.get("running") or 0)
         return ToolResult(
             processes_text(title, view, self._now()),
             clip(f"Listed processes of {title}: {running} running", 70),
+        )
+
+    async def _output(self, task: Mapping[str, Any], view: Mapping[str, Any], ref: str) -> ToolResult:
+        shells = dicts(view.get("shells"))
+        found = pick(
+            shells,
+            ref,
+            lambda s: str(s.get("id", "")),
+            lambda s: str(s.get("description") or ""),
+            lambda s: [str(s.get("command") or "")],
+        )
+        shell = only(found, ref, "background shell", _shell_name, "Call list_processes to see them.")
+        output = await self._seti.get(f"/tasks/{task.get('id')}/shells/{shell.get('id')}/output")
+        fields = output if isinstance(output, dict) else {}
+        text = str(fields.get("text") or "")
+        name = _shell_name(shell)
+        if not text:
+            return ToolResult(
+                f'The shell "{name}" has written no output.', f"No output from {clip(name, 50)}"
+            )
+        cut = " (its end; the start is cut)" if fields.get("truncated") else ""
+        body = f'<data from="the shell">{text[-OUTPUT_CHARS:].replace("<", "&lt;")}</data>'
+        return ToolResult(
+            f'Output of the shell "{name}"{cut}, written by the agent\'s command, as data:\n{body}',
+            f"Read the output of {clip(name, 50)}",
         )
 
     def _target(self, view: Mapping[str, Any], ref: str) -> tuple[str, dict[str, Any]]:

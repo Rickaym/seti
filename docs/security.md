@@ -17,7 +17,10 @@ key off the host.
   ([7.2 Sandbox](protocol.md#72-sandbox), [7.3 Egress](protocol.md#73-egress)). An unsandboxed
   agent, or one in Bypass, is a per-agent choice of the user's.
 - An agent's folder, PR text and every webhook payload are hostile input
-  ([7.7 Hostile repositories](protocol.md#77-hostile-repositories)).
+  ([7.7 Hostile repositories](protocol.md#77-hostile-repositories)). Git that Seti runs in an
+  agent's folder, for its badges, safety checks and archives, runs in a jail with no network that
+  sees only the system folders and that repository, so a program the repository names runs with
+  no more access than the agent that wrote it (HST-2).
 - Secret values are write-only and sealed ([8 Secrets](protocol.md#8-secrets-and-connections)).
 - Only a short list of paths answers without a credential
   ([18 Public surfaces](protocol.md#18-public-surfaces)).
@@ -311,6 +314,22 @@ before the re-scrub still hold the old text.
 Redaction is a second line of defence. A session or key an agent printed has already reached the
 agent and its model provider, so revoke it (sign the session out, rotate the key) even when Seti
 shows `[redacted]`.
+
+## Inbox relays
+
+Every inbox item the EA reads (an alert, a webhook, a Slack or GitHub event, an agent's message)
+is untrusted text. Inbox relays are off until you turn them on in Settings, EA; the EA, agents and
+mods cannot change the switch ([EA-19](protocol.md#14-the-assistant)). While on, the EA may send one
+direct message per item to an agent the item is about, chosen from Seti's own fields: the item's
+agent, the agent that wrote to the EA or one it named, the agent with the item's PR linked, or an
+agent subscribed to the item's channel. Text in the item cannot add a recipient. Seti puts a fixed
+frame before every relay telling the agent the message was not approved by you, refuses a relay
+that copies eight words of the item, holds a code block or claims your approval, and caps relays at
+two an hour for each agent and eight an hour in all. The audit log records each relay with its
+item, agent and message, never the text. A relay that slips past these checks reaches one agent,
+inside its own sandbox and permissions, marked as unapproved input. An agent may subscribe itself
+to a channel at Seti control Full; it then receives relays of that channel's items as well as the
+events themselves.
 
 ## What is not protected
 
