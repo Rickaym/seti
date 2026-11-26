@@ -108,7 +108,7 @@ export async function updateGeminiSettings(input: GeminiSettingsInput): Promise<
       summary: `Changed the Gemini runtime settings: ${changed.join(', ')}`,
       detail: { runtime: 'gemini', changed, enabled: after.enabled, evaluator_decides: after.evaluator_decides },
     })
-    followGeminiSettings(before, after)
+    await followGeminiSettings(before, after)
     if (!before.evaluator_decides && after.evaluator_decides) {
       await redecideWaitingCodexCalls('gemini')
     }

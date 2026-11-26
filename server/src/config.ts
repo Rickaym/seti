@@ -111,6 +111,8 @@ export const SDK_MODULE = DEV_MODE ? env('SETI_SDK_MODULE', '') : ''
 
 /** A pin file that replaces Codex's, so tests install from a registry on this machine. */
 export const CODEX_PIN_FILE = DEV_MODE ? env('SETI_CODEX_PIN', '') : ''
+/** A pin file that replaces Gemini CLI's, likewise. */
+export const GEMINI_PIN_FILE = DEV_MODE ? env('SETI_GEMINI_PIN', '') : ''
 
 export const CREDENTIALS = credentialSource(process.env, SETI_HOME, DEV_MODE)
 /** Agents and shells inherit the server's environment; they must not learn where its keys are. */

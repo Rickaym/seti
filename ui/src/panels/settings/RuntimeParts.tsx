@@ -7,7 +7,7 @@ import { cn } from '@/lib/utils'
 import { SettingRow } from './layout'
 
 /** What a runtime card shows of its status, the same for every runtime Seti installs. */
-export type InstallStatus = Pick<CodexStatus, 'state' | 'failure' | 'pinned' | 'keyed' | 'keyElsewhere'>
+type InstallStatus = Pick<CodexStatus, 'state' | 'failure' | 'pinned' | 'keyed' | 'keyElsewhere'>
 
 /** How a card names its runtime, the program Seti installs, and the provider whose key it needs. */
 export interface RuntimeWords {

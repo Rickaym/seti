@@ -2162,10 +2162,12 @@ class SettingsTools:
         )
         runtimes = await self._seti.get("/runtimes")
         listed = runtimes if isinstance(runtimes, dict) else {}
-        codex = runtime_words("Codex", "OpenAI", field_dict(listed, "codex"))
-        gemini = runtime_words("Gemini", "Gemini API", field_dict(listed, "gemini"))
+        runtime_lines = runtime_words("Codex", "OpenAI", field_dict(listed, "codex")) + runtime_words(
+            "Gemini", "Gemini API", field_dict(listed, "gemini")
+        )
         return ToolResult(
-            f"{sandbox}{hides} {token} {codex}{gemini}These are the user's to change, in Settings under Security: "
+            f"{sandbox}{hides} {token} {runtime_lines}These are the user's to change, in Settings under "
+            "Security: "
             "Sandbox, SSH and Credentials, in Settings, Runtimes, and per agent in its access switches. You "
             "cannot change them or see any secret.",
             "Read security settings",

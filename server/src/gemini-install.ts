@@ -1,13 +1,14 @@
+import fs from 'node:fs'
 import type { GeminiSettings, InstallFailure } from '@seti/shared'
 import { audit } from './audit.js'
 import { GEMINI_ROOT } from './config.js'
-import { entryIn, fetchGemini, holdsBundle, type GeminiPin } from './gemini-fetch.js'
+import { entryIn, fetchGemini, holdsBundle, versionDir, type GeminiPin } from './gemini-fetch.js'
 import { GEMINI_PIN } from './gemini-pin.js'
 import { removeOwnedDir } from './owned-dirs.js'
 import { InstallError } from './pinned-download.js'
 import { geminiSettings } from './store/gemini-settings.js'
 
-export interface GeminiInstallFailure {
+interface GeminiInstallFailure {
   reason: InstallFailure
   message: string
 }
@@ -93,20 +94,54 @@ export async function installGemini(actor: 'user' | 'system', pin: GeminiPin = G
   return run
 }
 
-/** After the user changed the settings: installs when they turned Gemini on. */
-export function followGeminiSettings(before: GeminiSettings, after: GeminiSettings): void {
-  if (after.enabled && !before.enabled) {
-    void installGemini('user')
+/**
+ * While Gemini is off and nothing installs, removes every folder of Seti's Gemini root; a folder
+ * a running Gemini CLI still uses stays until a later sweep finds it free.
+ */
+async function sweepGemini(): Promise<void> {
+  if (running.size > 0 || (await geminiSettings.get()).enabled) {
+    return
+  }
+  for (const name of await fs.promises.readdir(GEMINI_ROOT).catch(() => [])) {
+    if ((await removeOwnedDir(versionDir(GEMINI_ROOT, name), 'gemini', []).catch(String)) !== null) {
+      continue
+    }
+    if (!name.startsWith('.')) {
+      await audit.record({
+        actor: 'system',
+        kind: 'system.runtime_removed',
+        subject_type: 'system',
+        subject_id: 'gemini',
+        summary: `Removed Gemini CLI ${name}, which nothing uses any more`,
+        detail: { runtime: 'gemini', version: name },
+      })
+    }
   }
 }
 
-/** At start, installs the pinned version when the user has Gemini on. */
+const sweepQuietly = () =>
+  void sweepGemini().catch((e: unknown) => {
+    process.stderr.write(`gemini: the sweep failed: ${e instanceof Error ? e.message : String(e)}\n`)
+  })
+
+/** After the user changed the settings: installs when they turned Gemini on, tidies up when off. */
+export async function followGeminiSettings(before: GeminiSettings, after: GeminiSettings): Promise<void> {
+  if (after.enabled && !before.enabled) {
+    void installGemini('user')
+  } else if (!after.enabled) {
+    await sweepGemini()
+  }
+}
+
+/** At start, installs the pinned version when the user has Gemini on, and else tidies up. */
 export function startGeminiKeeper(): void {
   void geminiSettings
     .get()
     .then((settings) => {
       if (settings.enabled) {
         void installGemini('system')
+      } else {
+        sweepQuietly()
       }
     })
     .catch((e: unknown) => {

@@ -57,6 +57,7 @@ describe("what an agent's runtime declares", () => {
       dreams: true,
       bypass: true,
       slash_commands: true,
+      call_edits: true,
     })
     expect(runtimeCapabilities().claude.mcp_transports).toEqual(['stdio', 'sse', 'http', 'sdk', 'claudeai-proxy'])
     expect(runtimeCapabilities().claude.compaction_ignores).toEqual([])
@@ -73,7 +74,9 @@ describe("what an agent's runtime declares", () => {
       rewind: false,
       bypass: false,
       slash_commands: false,
+      call_edits: false,
     })
+    expect(runtimeCapabilities().gemini).toMatchObject({ label: 'Gemini', rewind: false, call_edits: false })
   })
 
   it("says in the task file of a runtime that loads none of the user's MCP servers that it loads none", async () => {

@@ -187,8 +187,8 @@ host. Treat a host with Body on as able to show the value to the agent if it ech
 
 ## What Seti downloads
 
-Seti downloads one program by itself: OpenAI's Codex, and only after you turn Codex on in
-Settings, Runtimes. It fetches the version pinned in `server/src/runtimes/codex/pin.json` from the
+Seti downloads two programs by itself, each only after you turn its runtime on in Settings,
+Runtimes: OpenAI's Codex and Google's Gemini CLI. For Codex: It fetches the version pinned in `server/src/runtimes/codex/pin.json` from the
 npm registry (`registry.npmjs.org`), when you turn Codex on, when you press Retry, and at a start
 of Seti after an upgrade moved the pin while Codex is on. It contacts no other host, follows no
 redirect, and checks the package's sha512 integrity and the program's sha256 against the pin
@@ -228,6 +228,31 @@ What a reverse proxy in front must keep: the `Content-Security-Policy`, `Permiss
 `Sec-Fetch-Dest` request header, and the original `Host`. Removing `Sec-Fetch-Dest` or rewriting
 `Host` only stops HTML pages from rendering; removing `Content-Security-Policy` would let a
 rendered page reach the network and navigate its frame away.
+
+Gemini CLI comes the same way, from the tarball pinned in `server/src/runtimes/gemini/pin.json`:
+Seti checks the tarball's sha512 and then one sha256 over every file of its `bundle` folder, and
+refuses a bundle holding a link or any other kind of entry. The bundle lives in
+`~/.seti/gemini/<version>/`, its files read-only, and turning Gemini off removes it.
+
+## Gemini agents
+
+A Gemini agent runs only in the sandbox, with the key connection's placeholder in its
+environment; the proxy puts the key on requests to `generativelanguage.googleapis.com` only. Seti
+starts Gemini CLI with its own admin policy and settings, read-only, and unsets the variables that
+would change where it sends calls or how it signs in.
+
+- Gemini CLI runs a few read-only commands, such as `cat`, `ls` and `grep` in the agent's folder,
+  without asking Seti. The Gemini card and the start page say so. The sandbox is what limits
+  them: a separate process namespace and a private home and `/tmp`, so a link in the folder that
+  points at the host's files reads nothing of the host's.
+- Gemini CLI 0.71.1 tries to send usage logs to `play.googleapis.com` even with its usage
+  statistics off, because its extension manager builds its telemetry settings without that
+  switch. The proxy refuses the request, since no connection names that host, and the transcript
+  names the refusal. Nothing is sent.
+- An agent that prints its own environment puts its key connection's placeholder into the
+  conversation. With Body off, the proxy then refuses each later model request, which carries the
+  conversation, so the session's turns end with that refusal. The key itself is never in the
+  sandbox. The same holds for a Codex agent.
 
 ## Your tool servers on Codex agents
 

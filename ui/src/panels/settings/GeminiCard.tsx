@@ -76,7 +76,7 @@ function GeminiForm({ status }: { status: GeminiStatus }) {
           label="Gemini"
           hint={
             enabled
-              ? 'Turn Gemini off: no new Gemini agents'
+              ? 'Turn Gemini off: no new Gemini agents, and Seti removes its copy'
               : `Turn Gemini on: Seti installs Gemini CLI ${status.pinned} for new agents`
           }
         />

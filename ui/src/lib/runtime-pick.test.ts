@@ -65,7 +65,7 @@ describe('the model selector', () => {
   it('says what a start on each runtime runs without asking', () => {
     expect(startHint('codex', false)).toBe('Codex: sandboxed; asks before each call.')
     expect(startHint('codex', true)).toBe('Codex: sandboxed; asks unless your rules allow.')
-    expect(startHint('gemini', true)).toContain('runs read-only commands like cat, ls and grep without asking')
+    expect(startHint('gemini', true)).toBe('Gemini: sandboxed; cat, ls, grep run unasked.')
     expect(startHint('claude', true)).toBeNull()
   })
 })

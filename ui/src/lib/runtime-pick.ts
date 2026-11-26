@@ -18,9 +18,9 @@ const START_HINTS: Record<StoredRuntime, ((rulesDecide: boolean) => string) | nu
   codex: (rulesDecide) =>
     rulesDecide ? 'Codex: sandboxed; asks unless your rules allow.' : 'Codex: sandboxed; asks before each call.',
   gemini: (rulesDecide) =>
-    `Gemini CLI: sandboxed; runs read-only commands like cat, ls and grep without asking, and ${
-      rulesDecide ? 'asks for the rest unless your rules allow' : 'asks before every other call'
-    }.`,
+    rulesDecide
+      ? 'Gemini: sandboxed; cat, ls, grep run unasked.'
+      : 'Gemini: sandboxed; cat, ls, grep unasked; rest asks.',
 }
 
 /** What a start on the runtime says under the box, or null where it says nothing. */
