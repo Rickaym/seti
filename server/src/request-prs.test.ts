@@ -122,7 +122,9 @@ describe('the PRs a request names', () => {
       { url: 'https://github.com/acme/tool/pull/2136', repo: 'acme/tool', number: 2136, title: null, ci: null },
       { url: 'https://github.com/acme/tool/pull/7', repo: 'acme/tool', number: 7, title: null, ci: null },
     ])
-    expect(lookup.calls.at(-1)).toEqual(linked.prs.map((pr) => pr.url))
+    await vi.waitFor(() => {
+      expect(lookup.calls.at(-1)).toEqual(linked.prs.map((pr) => pr.url))
+    })
 
     lookup.release()
     const filled = await pending(task.id, (request) => request.prs[0]?.title !== null)
