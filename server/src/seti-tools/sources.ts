@@ -25,11 +25,11 @@ export const SOURCE_FILTERS = {
 }
 
 interface SourceArgs {
-  query: string | undefined
-  kind: (typeof SOURCE_KINDS)[number] | undefined
-  container: string | undefined
-  since: string | undefined
-  until: string | undefined
+  query?: string | undefined
+  kind?: (typeof SOURCE_KINDS)[number] | undefined
+  container?: string | undefined
+  since?: string | undefined
+  until?: string | undefined
 }
 
 /** The caller's own ledger, searched; an agent never reads another agent's. */
