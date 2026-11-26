@@ -1578,6 +1578,15 @@ Optional and off by default: a maintenance session per agent that consolidates i
   marked, never an error. Archive, restart, Bypass on and sandbox off MUST ask the settings' own
   question inline with Confirm and Cancel first; a credential that changes access opens the dialog
   the settings open. Esc closes the card and leaves the draft.
+- CMD-4: A Seti command line starts `/seti:` and MUST be read by one grammar built from the list of
+  the agent's settings: each setting's words, each item from the agent's own state, and each
+  operation the setting allows. The control room MUST refuse a line the grammar does not define,
+  a line on more than one line, with control or invisible characters, or longer than 300
+  characters, and MUST NOT read a line that does not start with `/seti:` as a command. A line that
+  widens what the agent reaches, or cannot be undone lightly, MUST run only once the user confirmed
+  it (409 until then). Only the user runs one: the EA, agents and mods MUST be refused (403). It
+  runs through the functions the agent's settings use, so it is refused, applied and audited as
+  there, and the control room MUST refuse a `/seti:` line sent to an agent as a prompt (400).
 
 ## 20. Conformance
 

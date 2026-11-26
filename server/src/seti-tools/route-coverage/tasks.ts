@@ -78,6 +78,9 @@ export const TASKS_ROUTES: CoverageTable = {
   'DELETE /api/tasks/:id/prs': ea('unlink_pr'),
   'POST /api/tasks/:id/prs': ea('link_pr'),
   'DELETE /api/tasks/:id/queue/:message_id': ea('take_back_message'),
+  'POST /api/tasks/:id/seti-commands': ui(
+    "The user's own reply box; it runs the settings' own functions, which the EA reaches by its tools",
+  ),
   'POST /api/tasks/:id/refused-hosts': user('security', 'Allow a host the sandbox refused. Widening'),
   'POST /api/tasks/:id/retry': ea('retry_agent_turn'),
   'POST /api/tasks/:id/rewind': ea('rewind_agent'),

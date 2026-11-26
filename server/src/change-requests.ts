@@ -221,7 +221,7 @@ export async function allowRefusedHost(task: Task, input: AllowRefusedHostInput)
 }
 
 /** Adds an allowlist entry for one agent alone; its proxy lets it through from the next request. */
-async function allowTaskHost(task: Task, entry: string): Promise<void> {
+export async function allowTaskHost(task: Task, entry: string): Promise<void> {
   refuseAgent("change an agent's network allowlist")
   if (await taskHosts.add(task.id, entry)) {
     await audit.record({
