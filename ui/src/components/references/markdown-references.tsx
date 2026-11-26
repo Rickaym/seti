@@ -4,6 +4,8 @@ import { LinkIcon } from '@/components/links/LinkPill'
 import { RefMark } from '@/components/references/RefMark'
 import { SourcesList } from '@/components/references/SourcesList'
 import { INLINE_LINK, ReferencesContext, useReferenceOf } from '@/components/references/reference-context'
+import { VerifiedMark } from '@/components/references/source-marks'
+import { sourceFacts, useSourceMatch } from '@/components/references/source-match'
 import { useSourceLabel } from '@/lib/references/reference-label'
 import { isSourcesOf, SOURCES_PROPERTY, type Reference } from '@/lib/references/reference-set'
 
@@ -36,6 +38,8 @@ export function InlineReference({
 
 function QuoteSource({ reference }: { reference: Reference }) {
   const label = useSourceLabel(reference)
+  const match = useSourceMatch(reference)
+  const facts = sourceFacts(match)
   return (
     <figcaption
       className="flex min-w-0 items-center gap-1 pl-3 text-xs text-muted-foreground"
@@ -43,7 +47,12 @@ function QuoteSource({ reference }: { reference: Reference }) {
     >
       <LinkIcon info={label} className="size-3" />
       <span className="min-w-0 truncate">{label.label}</span>
-      {label.host !== null && <span className="shrink-0">{label.host}</span>}
+      {facts === null ? (
+        label.host !== null && <span className="shrink-0">{label.host}</span>
+      ) : (
+        <span className="min-w-0 truncate">{facts}</span>
+      )}
+      {match?.verified === true && <VerifiedMark />}
     </figcaption>
   )
 }
