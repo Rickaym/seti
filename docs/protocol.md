@@ -606,7 +606,8 @@ interrupted only for that.
   owners of the signed-in code-host account and its organisations, read on the control plane and
   cached for about an hour, and the owners of the repositories the agent was given. Such a CLI
   write targets the repository of each pull request or issue URL it names, else its `-R`
-  repository, else every remote of the folder it runs in, since the CLI may pick any of them. A
+  repository, else every remote of the folder it runs in, since the CLI may pick any of them (in a
+  folder outside any repository the CLI fails without writing, so it does not ask). A
   number the shell computes (a whole computed word without a slash) leaves that repository as it
   is, while a computed owner, repository or URL cannot be placed. A write to one of the user's own
   repositories never asks under this requirement; other rules still apply to it. The
