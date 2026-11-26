@@ -569,7 +569,9 @@ interrupted only for that.
   offers no `always`, since an allow rule never lifts an ask rule. A card shows the agent's
   description first, cut to two lines with the whole text in a tooltip, then the call, then the
   implementation's own reason line; the agent's reason line reads the description in place of
-  the call when there is one.
+  the call when there is one. The reason line is the implementation's own words about why it
+  asks: a call an `ask` rule holds names that rule ("Your Ask rule holds this: <rule>"); it never
+  repeats the agent's description, and with no known reason there is no reason line.
 - PERM-7: Timeout is one install-wide setting: off, 15 min, 1 h (default), 4 h or 24 h from when
   the request was raised. A new value applies to waiting requests.
 - PERM-8: At the deadline the request MUST be denied with `timed_out`. The agent is told nobody
@@ -638,11 +640,16 @@ interrupted only for that.
   the whole title in a tooltip, the CI state, and a link that opens the PR. The implementation
   reads them with the walker of PERM-15: `gh pr` `merge`, `view`, `close`, `reopen`, `ready`,
   `comment`, `review`, `checks`, `edit` or `diff` with a number, in the repository `-R` or
-  `--repo` names, else the one the folder the command runs in resolves to (the remote
-  `gh repo set-default` chose, else the only GitHub repository its remotes name); a pull request's
+  `--repo` names, else the one the folder the command runs in resolves to: the remote
+  `gh repo set-default` chose, else the only GitHub repository its remotes name, in the folder the
+  agent's shell is in as the runtime reports it for the call, past any `cd` of an earlier call; a
+  pull request's
   github.com URL as any argument; and `repos/<owner>/<repo>/pulls/<n>` in `gh api`. A part the
   shell computes, another host, or a line that sets the code host's repository or host variables
-  or changes remotes gives no pull request rather than a wrong one. The link is built from the
+  or changes remotes gives no pull request rather than a wrong one. A number whose folder names
+  no repository is looked up in the agent's own repositories and those of its linked pull requests,
+  and shown, up to three per number, only where that pull request exists open or merged; this is a
+  hint for the reader, and the outward check of PERM-15 never uses it. The link is built from the
   owner, repository and number, never taken from the text. The request MUST be shown without
   waiting on them: the pull requests follow with their links, then title and CI from the data the
   implementation tracks or one bounded, cached lookup, which reads merged and closed ones too and

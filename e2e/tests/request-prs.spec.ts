@@ -4,6 +4,11 @@ import { expect, test, unique } from './support/fixtures.js'
 import { FAKE_CLAUDE_ENV } from './support/processes.js'
 import {
   addAskRule,
+  AGENT_PRS,
+  DASH_TITLE,
+  DASH_URL,
+  LIVE_DESCRIPTION,
+  LIVE_MERGE,
   archiveStarted,
   described,
   MERGE_DESCRIPTION,
@@ -83,7 +88,7 @@ test('a command an ask rule holds offers no Always; one without a PR shows no PR
   await expect(requestCard(page).getByRole('group', { name: 'Pull requests' })).toHaveCount(0)
 })
 
-test("the agent's description reads first, then the command, Seti's reason and a merged PR", async ({
+test("the agent's description reads first, then the command and a merged PR, and never as the reason", async ({
   page,
   request,
 }) => {
@@ -96,16 +101,41 @@ test("the agent's description reads first, then the command, Seti's reason and a
   const card = requestCard(page)
   const said = card.getByText(MERGE_DESCRIPTION, { exact: true })
   const ran = card.locator('code').getByText(command, { exact: true })
-  const reason = card.getByText('No rule allows this command', { exact: true })
+  const chip = card.getByRole('group', { name: 'Pull request tool#2140' })
   const top = async (part: typeof said) => (await part.boundingBox())?.y ?? 0
   await expect(said).toBeVisible()
+  await expect(card.getByText(MERGE_DESCRIPTION), 'the description shows once, never as the reason').toHaveCount(1)
   expect(await top(said)).toBeLessThan(await top(ran))
-  expect(await top(ran)).toBeLessThan(await top(reason))
-  const chip = card.getByRole('group', { name: 'Pull request tool#2140' })
+  expect(await top(ran)).toBeLessThan(await top(chip))
   await expect(chip).toContainText(RETRY_TITLE)
   await expect(chip.getByRole('img', { name: 'Merged' })).toBeVisible()
   for (const scheme of ['light', 'dark'] as const) {
     await page.emulateMedia({ colorScheme: scheme })
     await card.screenshot({ path: test.info().outputPath(`order-desktop-${scheme}.png`) })
+  }
+})
+
+test("a merge an Ask rule holds names the rule, and finds the PR in the agent's repositories", async ({
+  page,
+  request,
+}) => {
+  const remove = await addAskRule(request, 'Bash(gh pr merge:*)')
+  try {
+    const id = await startAsking(request, described(LIVE_MERGE, LIVE_DESCRIPTION), AGENT_PRS)
+    await page.goto(`/#agents/${id}`)
+    const card = requestCard(page)
+    await expect(card.getByText(LIVE_DESCRIPTION)).toHaveCount(1)
+    await expect(card.getByText('Your Ask rule holds this: Bash(gh pr merge:*)', { exact: true })).toBeVisible()
+    const chip = card.getByRole('group', { name: 'Pull request dash#3782' })
+    await expect(chip).toContainText(DASH_TITLE)
+    await expect(chip.getByRole('link', { name: 'Open dash#3782 on GitHub' })).toHaveAttribute('href', DASH_URL)
+    await expect(card.getByRole('group', { name: /^Pull request tool#/ })).toHaveCount(0)
+    await expect(card.getByRole('button', { name: 'Always' })).toHaveCount(0)
+    for (const scheme of ['light', 'dark'] as const) {
+      await page.emulateMedia({ colorScheme: scheme })
+      await card.screenshot({ path: test.info().outputPath(`live-desktop-${scheme}.png`) })
+    }
+  } finally {
+    await remove()
   }
 })

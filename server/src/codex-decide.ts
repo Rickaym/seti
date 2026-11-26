@@ -1,4 +1,5 @@
 import type { NodeAnswer, PolicyShadowCount, Task, ToolCall } from '@seti/shared'
+import { reasonForRef } from './ask-rule-held.js'
 import { audit } from './audit.js'
 import { tasks } from './db.js'
 import { heldFolderSettings } from './folder-settings-trust.js'
@@ -65,6 +66,10 @@ const shellOf = (read: PolicyCall, call: ToolCall, task: Task) => ({
   ...(read.command === undefined ? {} : { shell: { command: read.command, cwd: cwdOf(call) ?? task.cwd } }),
   ...(call.shell?.description === undefined ? {} : { description: call.shell.description }),
 })
+
+/** Seti's reason line naming the ask rule that holds the call, or null for any other decision. */
+const ruleReason = (decision: Decision, ctx: PolicyContext) =>
+  decision.step === 'ask-rule' ? (reasonForRef(ctx.rules, decision.rule) ?? decision.reason) : null
 
 const USER_ANSWERS = 'Codex agents ask before every command, edit and tool call'
 
@@ -159,7 +164,7 @@ export async function decideCodexCall(taskId: string, call: ToolCall, signal: Ab
     return { allow: true }
   }
   const review = decision.verdict === 'review'
-  const ruled = review || decision.step === 'ask-rule' ? decision.reason : USER_ANSWERS
+  const ruled = ruleReason(decision, ctx) ?? (review ? decision.reason : USER_ANSWERS)
   const reason = pushes.length > 0 ? pushReason(pushes) : ruled
   const waits: WaitingCall = { taskId: task.id, call }
   const ids: string[] = []

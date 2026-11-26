@@ -1,5 +1,6 @@
 import { idsIn, slackSendTarget, type PermissionRequest } from '@seti/shared'
-import { announce, summarize, waitingInput } from '../permission-requests.js'
+import { announce, waitingInput } from '../permission-requests.js'
+import { summarize } from '../request-text.js'
 import { permissionRequests } from '../store/permissions.js'
 import { slackNames, type SlackName } from '../store/slack-names.js'
 import { publishToOpenStreams } from '../task-events.js'
