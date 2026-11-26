@@ -90,6 +90,9 @@ export const TASKS_ROUTES: CoverageTable = {
   'POST /api/tasks/:id/seen': ui('Mark an agent seen. View state'),
   'POST /api/tasks/:id/session/end': ea('stop_background_work'),
   'POST /api/tasks/:id/session/restart': ea('restart_agent_session'),
+  'POST /api/tasks/:id/sources': ui(
+    'Checks the links one message cites against what the agent read, for the chat view',
+  ),
   'GET /api/tasks/:id/shares': user('publishing', "An agent's shares. Route refuses the EA"),
   'POST /api/tasks/:id/shares': user('publishing', 'Share a file. Publishing'),
   'POST /api/tasks/:id/shell': user('commands', "Run a shell command in an agent's sandbox. Server refuses the EA"),
