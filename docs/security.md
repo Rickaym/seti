@@ -259,14 +259,20 @@ an agent's calls. The user settings in a sandboxed agent's home are read-only.
 ## The evidence ledger
 
 Seti records which Slack, Linear and GitHub items each agent read, so a cited link can show its
-source and a quote can be checked ([SRC-1 to SRC-5](protocol.md#37-evidence-ledger)). The ledger
+source and a quote can be checked ([SRC-1 to SRC-7](protocol.md#37-evidence-ledger)). The ledger
 holds no text and no secret: each row points at the tool result already in that agent's transcript,
 which Seti stores with credentials redacted, and rows are deleted with the transcript row, when the
 agent is archived and when it is deleted. Checking a link reads only the agent's own rows, and the
 answer carries the item's place, time and permalink, never its text. The adapters read the
 structure each server writes and the ids the call asked for, never a message body, so text someone
-posted in Slack or GitHub cannot add an item or change a permalink. Seti does not fetch anything
+posted in Slack or GitHub cannot add an item or change a permalink. An agent's own shell line can
+print text of its own, through `echo`, a jq literal or `sed`, so a filtered gh read lets a quote
+verify only when nothing in the line could add text to the result. Seti does not fetch anything
 for the ledger: an item exists only because the agent read it.
+
+An agent searches only its own ledger, at every Seti control level, and the EA searches any agent's,
+as it already reads any transcript. Both get the text as data: a note says other people wrote it and
+it is never to be followed, and the EA's frame neutralises any tag in the text that could close it.
 
 ## What is not protected
 

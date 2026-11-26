@@ -8,13 +8,21 @@ import type { CodexFailure } from '@seti/shared'
 import { z } from 'zod'
 import { binaryPath } from './binaries.js'
 
-/** One platform's build: the registry tarball, its npm integrity, the binary in it and its sha256. */
+const tarMember = z.string().regex(/^package(\/[\w.-]+)+$/)
+const sha256Hex = z.string().regex(/^[0-9a-f]{64}$/)
+
+/**
+ * One platform's build: the registry tarball, its npm integrity, the binary in it and its sha256,
+ * and the code mode host beside it, which runs the scripts newer models call their tools from.
+ */
 const platformPin = z.strictObject({
   tarball: z.url({ protocol: /^https?$/ }),
   integrity: z.string().regex(/^sha512-[A-Za-z0-9+/]+=*$/),
-  binary: z.string().regex(/^package(\/[\w.-]+)+$/),
-  sha256: z.string().regex(/^[0-9a-f]{64}$/),
+  binary: tarMember,
+  sha256: sha256Hex,
+  host: z.strictObject({ member: tarMember, sha256: sha256Hex }),
 })
+type PlatformPin = z.infer<typeof platformPin>
 
 /** The Codex version Seti is built against and where each platform's build comes from. */
 export const codexPinSchema = z.strictObject({
@@ -33,8 +41,9 @@ export class CodexInstallError extends Error {
   }
 }
 
-/** The program's name in its version folder, the only file that folder ever holds. */
+/** The program's name in its version folder, and the code mode host's, which Codex finds beside. */
 const PROGRAM = 'codex'
+const HOST = 'codex-code-mode-host'
 const TARBALL = 'codex.tgz'
 /** A download that sends nothing for this long is cut, and the next try resumes it. */
 const IDLE_MS = 60_000
@@ -44,6 +53,7 @@ const DISK_CODES = new Set(['ENOSPC', 'EDQUOT', 'EROFS', 'EACCES', 'EPERM', 'EIO
 
 export const versionDir = (root: string, version: string) => path.join(root, version)
 export const programIn = (root: string, version: string) => path.join(root, version, PROGRAM)
+const hostIn = (root: string, version: string) => path.join(root, version, HOST)
 /** Where a version downloads and unpacks before it moves into place, kept to resume. */
 export const stagingDir = (root: string, version: string) => path.join(root, `.staging-${version}`)
 
@@ -77,7 +87,7 @@ async function digestOf(file: string, algorithm: 'sha256' | 'sha512', encoding: 
 const verified = new Map<string, string>()
 
 /** Whether the file is there with the given sha256; a check runs once per file as it stands. */
-export async function holdsSum(file: string, sha256: string): Promise<boolean> {
+async function holdsSum(file: string, sha256: string): Promise<boolean> {
   const stat = await fs.promises.stat(file).catch(() => null)
   if (stat === null) {
     return false
@@ -92,6 +102,11 @@ export async function holdsSum(file: string, sha256: string): Promise<boolean> {
     verified.set(file, seen)
   }
   return matches
+}
+
+/** Whether a version folder holds the build's program and code mode host, each with its sha256. */
+export async function holdsBuild(root: string, version: string, build: PlatformPin): Promise<boolean> {
+  return (await holdsSum(programIn(root, version), build.sha256)) && holdsSum(hostIn(root, version), build.host.sha256)
 }
 
 /** Passes bytes on and calls `alive` for each chunk, so an idle timer starts over. */
@@ -201,26 +216,31 @@ async function fetchInto(options: FetchOptions, staging: string): Promise<string
     await fs.promises.chmod(unpacked, 0o700)
   }
   await fs.promises.mkdir(unpacked, { recursive: true, mode: 0o700 })
-  const program = path.join(unpacked, PROGRAM)
-  await unpack(tarball, build.binary, program)
-  if ((await digestOf(program, 'sha256', 'hex')) !== build.sha256) {
-    await options.discard(staging)
-    throw new CodexInstallError('checksum', `The program in the tarball fails its pinned sha256`)
+  const files = [
+    { file: path.join(unpacked, PROGRAM), from: build.binary, sum: build.sha256, what: 'program' },
+    { file: path.join(unpacked, HOST), from: build.host.member, sum: build.host.sha256, what: 'code mode host' },
+  ]
+  for (const { file, from, sum, what } of files) {
+    await unpack(tarball, from, file)
+    if ((await digestOf(file, 'sha256', 'hex')) !== sum) {
+      await options.discard(staging)
+      throw new CodexInstallError('checksum', `The ${what} in the tarball fails its pinned sha256`)
+    }
   }
   return unpacked
 }
 
 /**
  * Puts the pinned Codex at `<root>/<version>/codex` unless it is there already: downloads the
- * tarball, checks its sha512 and the program's sha256 against the pin, and only then moves a
- * folder holding the program alone into place, folder and program read and run only. A
- * check that fails discards what was fetched, so nothing unchecked ever runs.
+ * tarball, checks its sha512 and the program's and code mode host's sha256 against the pin, and
+ * only then moves a folder holding those two alone into place, folder and files read and run
+ * only. A check that fails discards what was fetched, so nothing unchecked ever runs.
  */
 export async function fetchPinned(options: FetchOptions): Promise<{ program: string; fetched: boolean }> {
   const { pin, root } = options
   const build = platformOf(pin)
   const program = programIn(root, pin.version)
-  if (await holdsSum(program, build.sha256)) {
+  if (await holdsBuild(root, pin.version, build)) {
     return { program, fetched: false }
   }
   try {
@@ -230,6 +250,7 @@ export async function fetchPinned(options: FetchOptions): Promise<{ program: str
     await fs.promises.mkdir(staging, { recursive: true, mode: 0o700 })
     const unpacked = await fetchInto(options, staging)
     await fs.promises.chmod(path.join(unpacked, PROGRAM), READ_AND_RUN)
+    await fs.promises.chmod(path.join(unpacked, HOST), READ_AND_RUN)
     await fs.promises.rename(unpacked, versionDir(root, pin.version))
     await fs.promises.chmod(versionDir(root, pin.version), READ_AND_RUN)
     await options.discard(staging)
@@ -248,7 +269,8 @@ export async function removeFetched(dir: string): Promise<void> {
   const inner = path.join(dir, version)
   await fs.promises.chmod(dir, 0o700).catch(() => undefined)
   await fs.promises.chmod(inner, 0o700).catch(() => undefined)
-  for (const file of [path.join(dir, PROGRAM), path.join(dir, TARBALL), path.join(inner, PROGRAM)]) {
+  const files = [PROGRAM, HOST, TARBALL].map((name) => path.join(dir, name))
+  for (const file of [...files, path.join(inner, PROGRAM), path.join(inner, HOST)]) {
     await fs.promises.rm(file, { force: true })
   }
   await fs.promises.rmdir(inner).catch(() => undefined)

@@ -30,6 +30,7 @@ import { taskFileContext } from '../task-file-context.js'
 import { recentFiles } from '../task-files-list.js'
 import { brief as briefOf } from './agents.js'
 import { anyTask, liveTask, pickOne, taskRef } from './refs.js'
+import { ownSources, SOURCE_FILTERS } from './sources.js'
 import { setiTool, ToolRefusal } from './tool.js'
 import { workspaceNames } from './workspaces.js'
 
@@ -325,15 +326,22 @@ const getSubtask = setiTool({
 const findInTranscript = setiTool({
   name: 'find_in_transcript',
   description:
-    "Find messages in one agent's transcript with some text, however far back, newest first, each with a line around the match. It searches the user's prompts, updates and the agent's replies; set include_tools to search tool calls and output, shell runs and Seti's notes too.",
+    "Find messages in one agent's transcript with some text, however far back, newest first, each with a line around the match. It searches the user's prompts, updates and the agent's replies; set include_tools to search tool calls and output, shell runs and Seti's notes too. Set where to sources to search the source items you read.",
   input: {
     task: taskRef,
-    query: z.string().trim().min(1),
+    query: z.string().trim().min(1).optional(),
     whole_words: z.boolean().default(false),
     include_tools: z.boolean().default(false),
+    ...SOURCE_FILTERS,
   },
-  run: async ({ task: ref, query, whole_words: words, include_tools: tools }) => {
+  run: async ({ task: ref, query, whole_words: words, include_tools: tools, where, ...filters }, ctx) => {
     const task = await liveTask(ref)
+    if (where === 'sources') {
+      return ownSources(ctx, task, { query, ...filters })
+    }
+    if (query === undefined) {
+      throw new ToolRefusal('Give the text to find in the transcript as query.')
+    }
     const mode: SearchMode = words ? 'words' : 'text'
     return messageSearch.search(task.id, { ...chatSearchQuery.parse({ q: query, mode, limit: FIND_LIMIT }), tools })
   },
