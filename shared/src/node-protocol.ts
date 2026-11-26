@@ -369,6 +369,11 @@ const commandSchemas = {
   },
   /** Opens the agent's egress proxy on the node unless it runs, for a control plane sandbox. */
   'proxy.open': { body: z.object({ agent, grant: proxyGrant }), answer: done },
+  /** Hands the agent's running proxy and sandbox its credential's connections as they are now. */
+  'proxy.connections': {
+    body: z.object({ agent, connections: proxyGrant.shape.connections }),
+    answer: z.object({ applied: z.boolean() }),
+  },
   /** Opens the proxy of the agent's maintenance sandbox, which reaches only the model provider. */
   'proxy.model': { body: z.object({ agent, ...modelReach.shape }), answer: done },
   /** The token the agent's processes show the node's egress proxy to fetch AWS credentials. */

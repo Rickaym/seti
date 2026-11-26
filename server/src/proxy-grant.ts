@@ -14,13 +14,8 @@ async function keyedConnections(task: Task, provider: ProviderId): Promise<Grant
   return key === null || own.some((each) => each.id === key.id) ? own : [...own, key]
 }
 
-/**
- * The grant of an agent whose provider takes a connection's key: its connections and the MCP
- * sign-ins of the servers it did not turn off, and nothing else of Claude's: no Anthropic host,
- * Claude login or claude.ai connector.
- */
-async function keyedGrant(task: Task, provider: ProviderId, denied: ReadonlySet<string>): Promise<ProxyGrant> {
-  const connections = await keyedConnections(task, provider)
+/** The grant of an agent whose provider takes a connection's key: nothing of Claude's. */
+function keyedGrant(connections: GrantConnection[], denied: ReadonlySet<string>): ProxyGrant {
   return {
     login: null,
     anthropic: false,
@@ -32,8 +27,7 @@ async function keyedGrant(task: Task, provider: ProviderId, denied: ReadonlySet<
 }
 
 /** The grant of an agent signed in with the host's Claude login: Anthropic and its connectors. */
-async function loginGrant(task: Task, denied: ReadonlySet<string>): Promise<ProxyGrant> {
-  const connections = grantConnections(await taskConnections(task))
+function loginGrant(connections: GrantConnection[], denied: ReadonlySet<string>): ProxyGrant {
   return {
     login: hostLoginKey(),
     anthropic: true,
@@ -44,14 +38,21 @@ async function loginGrant(task: Task, denied: ReadonlySet<string>): Promise<Prox
   }
 }
 
+/** The connections the agent's proxy swaps on this runtime, read from the store. */
+export async function grantedConnections(task: Task, runtime: RuntimeId = task.runtime): Promise<GrantConnection[]> {
+  const provider = providerOf(runtime)
+  return PROVIDERS[provider].key === 'login'
+    ? grantConnections(await taskConnections(task))
+    : keyedConnections(task, provider)
+}
+
 /** What the agent's egress proxy applies, read from the store, and the MCP servers it turned off. */
 export async function proxyGrant(
   task: Task,
   runtime: RuntimeId = task.runtime,
 ): Promise<{ grant: ProxyGrant; denied: Set<string> }> {
   const denied = new Set(await taskDeniedServers(task.id))
-  const provider = providerOf(runtime)
-  const grant =
-    PROVIDERS[provider].key === 'login' ? await loginGrant(task, denied) : await keyedGrant(task, provider, denied)
-  return { grant, denied }
+  const connections = await grantedConnections(task, runtime)
+  const login = PROVIDERS[providerOf(runtime)].key === 'login'
+  return { grant: login ? loginGrant(connections, denied) : keyedGrant(connections, denied), denied }
 }
