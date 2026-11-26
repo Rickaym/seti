@@ -47,6 +47,14 @@ export const eaCallQuality = z.object({
 })
 export type EaCallQuality = z.infer<typeof eaCallQuality>
 
+/** The quality as flat audit detail fields, such as `audio_lost_pct`; none when not sampled. */
+export function callQualityDetail(quality: EaCallQuality | null): Record<string, number | string | null> {
+  if (quality === null) {
+    return {}
+  }
+  return Object.fromEntries(Object.entries(quality).map(([key, value]) => [`audio_${key}`, value]))
+}
+
 /** A call's quality in one line, such as "1.2% lost, 0.4 s filled in, relay over UDP". */
 export function callQualityText(quality: EaCallQuality): string {
   const parts = [`${String(quality.lost_pct)}% lost`, `${String(quality.concealed_s)} s filled in`]
