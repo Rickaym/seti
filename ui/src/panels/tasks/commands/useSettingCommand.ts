@@ -1,5 +1,6 @@
 import { meetsNeeds, parseSettingCommand, type SettingCommandLine } from '@seti/shared'
 import { useEffect, useLayoutEffect, useRef, useState, type ReactElement } from 'react'
+import { toast } from 'sonner'
 import { errorText } from '@/api'
 import { useCapabilities } from '@/hooks/useCapabilities'
 import { useSystem } from '@/hooks/useSystem'
@@ -7,6 +8,7 @@ import { useCredentialSwitch } from '@/panels/tasks/useCredentialSwitch'
 import { COMMAND_BINDINGS } from './bindings'
 import { typedHere } from './typed-here'
 import type { Choice, CommandContext, CommandHost, CommandStep, Stepper } from './types'
+import { useCommandPalette } from './useCommandPalette'
 
 /**
  * What the composer shows for a setting command: `live` offers choices while the words are typed,
@@ -98,10 +100,6 @@ export function useSettingCommand(
   const loaded = useStepper(line, context)
   const [phase, setPhase] = useState<{ draft: string; phase: CardPhase | null }>({ draft, phase: 'live' })
   const current = phase.draft === draft ? phase.phase : 'live'
-  if (line === null) {
-    return null
-  }
-  const step = stepOf(line, context, loaded)
   const settle = (target: CommandStep | null, at: string) => {
     if (target?.kind === 'run') {
       setPhase({ draft: at, phase: null })
@@ -114,6 +112,24 @@ export function useSettingCommand(
     }
     setPhase({ draft: at, phase: 'submitted' })
   }
+  useCommandPalette(host.task, (text) => {
+    setDraft(text, true)
+    const picked = parseSettingCommand(text)
+    const bind = picked === null ? undefined : COMMAND_BINDINGS.get(picked.setting.id)
+    if (picked === null || bind === undefined) {
+      return
+    }
+    bind(context).then(
+      (stepper) => {
+        settle(stepOf(picked, context, { key: text, stepper, error: null }), text)
+      },
+      (e: unknown) => toast.error(errorText(e)),
+    )
+  })
+  if (line === null) {
+    return null
+  }
+  const step = stepOf(line, context, loaded)
   const name = line.setting.command.name
   const typingName = !/\s/.test(draft.trimStart())
   return {

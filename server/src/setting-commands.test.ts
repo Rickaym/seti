@@ -1,4 +1,6 @@
 import {
+  AGENT_SETTING_ENTRIES,
+  AGENT_SETTING_TABS,
   COMMAND_SETTINGS,
   parseSettingCommand,
   RESERVED_COMMAND_NAMES,
@@ -47,6 +49,18 @@ describe("an agent's setting commands", () => {
       'restart',
       'sandbox',
       'settings',
+    ])
+  })
+
+  it('lists every setting once, each tab of the settings with its rows', () => {
+    const ids = AGENT_SETTING_ENTRIES.map((entry) => entry.id)
+    expect(new Set(ids).size).toBe(ids.length)
+    for (const tab of AGENT_SETTING_TABS) {
+      expect(AGENT_SETTING_ENTRIES.some((entry) => entry.place === tab)).toBe(true)
+    }
+    expect(AGENT_SETTING_ENTRIES.filter((entry) => entry.place === 'dialog').map((entry) => entry.id)).toEqual([
+      'mcp',
+      'control',
     ])
   })
 

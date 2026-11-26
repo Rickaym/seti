@@ -1544,6 +1544,27 @@ Optional and off by default: a maintenance session per agent that consolidates i
   or 504; it serves hashed files from its cache first and never caches a response whose content
   type does not fit the file asked for.
 
+### 19.1 Agent commands
+
+- CMD-1: An agent's reply box MUST offer the control room's own setting commands, the same on every
+  runtime: `/restart`, `/archive`, `/mcp`, `/sandbox`, `/bypass`, `/credential`, `/access`,
+  `/settings`, `/rename` and `/dream`, each only where the runtime declares what it needs (RT-13);
+  one the runtime lacks says so by name. A setting command wins over a runtime's own command of
+  the same name and never reaches the runtime. It makes the request the agent's settings make, so
+  it is refused, applied and audited as there. The settings' rows, the palette's agent commands and
+  the reply box's commands MUST come from one list of the agent's settings, so none of them offers
+  a setting the others lack.
+- CMD-2: A setting command MUST run only on the user's submit in that agent's reply box of a line
+  the user typed or picked there. A line that arrived another way (pasted, dropped, restored,
+  handed over, taken back, or submitted by a script) MUST wait in a card with Run and run only on
+  its tap. Transcript rows, updates, group chat and Slack messages, webhooks, the EA, agents and
+  mods MUST NOT run one, and the control room MUST refuse a setting command sent to an agent as a
+  prompt (400).
+- CMD-3: A setting command that needs a value and has none MUST offer its choices, the current one
+  marked, never an error. Archive, restart, Bypass on and sandbox off MUST ask the settings' own
+  question inline with Confirm and Cancel first; a credential that changes access opens the dialog
+  the settings open. Esc closes the card and leaves the draft.
+
 ## 20. Conformance
 
 ### 20.1 Core
