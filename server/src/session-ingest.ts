@@ -30,6 +30,7 @@ import { unstored } from './session-start.js'
 import { forgetSessionTools } from './session-tools.js'
 import { countShadow } from './shadow-counts.js'
 import { learnSlackNames } from './slack/learn.js'
+import { recordSources } from './sources/record.js'
 import { addTurnCost, recordTurnCost } from './store/cost.js'
 import { hadRunningSubtask } from './subtask-cache.js'
 import { publishFolded, publishSubtasks } from './subtask-prs.js'
@@ -85,7 +86,7 @@ async function withCost(taskId: string, m: ClaudeMessage): Promise<ClaudeMessage
 async function record(taskId: string, body: MessageBody, events: readonly RuntimeEvent[]): Promise<void> {
   const outward = outwardCalls(events)
   trackToolCalls(taskId, events)
-  await appendMessage(taskId, body, outward)
+  const row = await appendMessage(taskId, body, outward)
   await audit.outwardCalls(taskId, events, outward)
   await audit.classifierDenial(taskId, events)
   if (outward.length > 0) {
@@ -94,6 +95,7 @@ async function record(taskId: string, body: MessageBody, events: readonly Runtim
   await linkCreatedPrs(taskId, events, openQuerySince(taskId))
   await followSentThreads(taskId, events)
   await learnSlackNames(taskId, events)
+  await recordSources(taskId, row)
 }
 
 /** Stores a message of the session, unless Seti does not keep it, and notes a session's start. */
