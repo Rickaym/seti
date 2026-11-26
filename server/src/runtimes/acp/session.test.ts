@@ -118,6 +118,7 @@ describe('an ACP session', () => {
   it('answers a permission request for this call only, allowed or refused, never for the session', async () => {
     const decided: ToolCall[] = []
     const verdicts = [true, false]
+    let replied = Promise.resolve()
     const agent = new FakeAgent(
       opening((prompt, fake) => {
         fake.write({
@@ -130,7 +131,7 @@ describe('an ACP session', () => {
           method: 'session/request_permission',
           params: { sessionId: 's1', options: OPTIONS, toolCall: SHELL },
         })
-        void Promise.all([
+        replied = Promise.all([
           fake.next((m) => m.id === 0 && 'result' in m),
           fake.next((m) => m.id === 1 && 'result' in m),
         ]).then(() => {
@@ -152,6 +153,7 @@ describe('an ACP session', () => {
     ])
     expect(JSON.stringify(agent.sent)).not.toContain('proceed_always')
     expect(decided[0]).toMatchObject({ kind: 'shell', shell: { command: 'make deploy', description: 'Deploy' } })
+    await replied
     session.close()
   })
 
