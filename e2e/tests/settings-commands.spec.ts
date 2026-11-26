@@ -65,6 +65,7 @@ test('a bare name offers the seti: command, and each word completes with its sta
   await reply(page).pressSequentially('/seti:pin on')
   await reply(page).press('Enter')
   await expect.poll(async () => (await apiData<Task>(request, `/tasks/${id}`)).pinned).toBe(true)
+  await expect(reply(page)).toHaveValue('')
   await reply(page).pressSequentially('/seti:pin nowhere')
   await reply(page).press('Enter')
   await expect(card(page, 'pin')).toContainText('Expected one of on, off, not nowhere')
