@@ -11,10 +11,12 @@ import { z } from 'zod'
 import { autoArchiveStatus, sweepAutoArchive, updateAutoArchive } from '../archive.js'
 import { capabilityCache } from '../capabilities.js'
 import { repos } from '../db.js'
+import { refuseOtherAgent } from '../ea-guard.js'
 import { cancelMcpSignIn, reconnectMcpServer, removeMcpServer, scopeCwd, startMcpSignIn } from '../mcp-actions.js'
 import { withoutGoneServers } from '../mcp-presence.js'
 import { withSignIn } from '../mcp-sign-in.js'
 import { changeNotificationSettings, notificationStatus } from '../notifications.js'
+import { agentPermissions, permissionPolicy } from '../permission-rules.js'
 import { pluginCatalog, removeDefaultPlugin } from '../plugins.js'
 import { sandboxStatus } from '../sandbox-status.js'
 import { sharedToolsFor } from '../shared-tools.js'
@@ -237,9 +239,19 @@ const sshHosts = setiTool({
 const getSecuritySettings = setiTool({
   name: 'get_security_settings',
   description:
-    'Read the sandbox setting, its network allowlist and hidden paths, and whether agents have a GitHub token. Only the user changes these.',
-  input: {},
-  run: async () => {
+    "Read the sandbox setting, its network allowlist and hidden paths, and whether agents have a GitHub token. With rules, the permission rules instead: the user's, those from Claude Code's settings files, Seti's built-in rules, guards and review gaps, and with task that agent's own and its project's. Only the user changes these.",
+  input: {
+    rules: z.boolean().default(false).describe('Instead, the permission rules that decide which calls run or ask.'),
+    task: taskRef.optional().describe("With rules, this agent's own rules and its project's too."),
+  },
+  run: async ({ rules, task: ref }) => {
+    if (rules) {
+      const task = ref === undefined ? undefined : await liveTask(ref)
+      if (task !== undefined) {
+        refuseOtherAgent(task.id)
+      }
+      return task === undefined ? permissionPolicy() : agentPermissions(task)
+    }
     const status = await sandboxStatus()
     return {
       policy: status.policy,

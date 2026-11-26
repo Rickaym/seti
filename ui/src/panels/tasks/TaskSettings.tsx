@@ -10,31 +10,20 @@ import { useCapabilities } from '@/hooks/useCapabilities'
 import { useNarrow } from '@/hooks/useMedia'
 import { useSandboxed } from '@/hooks/useSandboxed'
 import { WIDE_BUTTON, WIDE_LABEL } from '@/lib/wide-label'
-import { AccessSummary, TaskAccessDialog } from '@/panels/access/TaskAccess'
-import { AgentPermissions } from '@/panels/tasks/AgentPermissions'
-import { TaskBypass } from '@/panels/tasks/BypassToggle'
+import { TaskAccessDialog } from '@/panels/access/TaskAccess'
 import { ContinueOn } from '@/panels/tasks/ContinueOn'
 import { DreamActions } from '@/panels/tasks/DreamActions'
 import { LifecycleActions } from '@/panels/tasks/LifecycleActions'
-import { NewRoleDialog, RolePicker, type RoleOwner } from '@/panels/tasks/RolePicker'
-import { TaskIsolation } from '@/panels/tasks/SandboxToggle'
+import { NewRoleDialog, type RoleOwner } from '@/panels/tasks/RolePicker'
 import { SessionFields } from '@/panels/tasks/SessionFields'
 import { Fields, Row } from '@/panels/tasks/SettingsFields'
 import { HeldBack } from '@/panels/tasks/StartFacts'
-import { TaskChannels } from '@/panels/tasks/TaskChannels'
-import { TaskColor } from '@/panels/tasks/TaskColor'
-import { TaskHomeAccess } from '@/panels/tasks/TaskHomeAccess'
-import { InputModeSelect } from '@/panels/tasks/TaskInputs'
 import { TaskLocation } from '@/panels/tasks/TaskLocation'
-import { TaskNotify } from '@/panels/tasks/TaskNotify'
-import { TaskCredentials } from '@/panels/tasks/TaskProfile'
-import { TaskTeam } from '@/panels/tasks/TaskTeam'
-import { TaskThreads } from '@/panels/tasks/TaskThreads'
 import type { SettingsRequest } from '@/panels/tasks/commands/types'
+import { SettingRows, type RowContext } from '@/panels/tasks/settings-rows'
 import { useArchive } from '@/panels/tasks/useArchive'
 import { useCogState, type SectionId } from '@/panels/tasks/useCogState'
-import { useSessionRestart } from '@/panels/tasks/useSessionRestart'
-import { WorkspaceSelect } from '@/panels/tasks/workspaces/WorkspaceSelect'
+import { useRestartAction } from '@/panels/tasks/useSessionRestart'
 
 /** The tabs in reading order, the most used first. */
 const SECTIONS: readonly { id: SectionId; label: string; icon: LucideIcon }[] = [
@@ -88,7 +77,7 @@ export const TaskSettings = memo(function TaskSettingsView({
   const sandboxed = useSandboxed(task)
   const caps = useCapabilities(task)
   const archive = useArchive(task)
-  const restart = useSessionRestart(task, running, onChanged)
+  const restart = useRestartAction(task, running, onChanged)
   const [channelCount, setChannelCount] = useState(0)
   const { open, setOpen, section, setSection, accessOpen, setAccessOpen, roleFocus, workspaceFocus, onOpenChange } =
     useCogState(task, request)
@@ -101,32 +90,34 @@ export const TaskSettings = memo(function TaskSettingsView({
       e.currentTarget.focus()
     }
   }
+  const context: RowContext = {
+    task,
+    caps,
+    running,
+    sandboxed,
+    onChanged,
+    role: {
+      owner: roleOwner(task),
+      focus: roleFocus,
+      onNew: (body) => {
+        setOpen(false)
+        setNewRole(body)
+      },
+      onLeave: () => {
+        setOpen(false)
+      },
+    },
+    workspaceFocus,
+    openAccess: () => {
+      setOpen(false)
+      setAccessOpen(true)
+    },
+    channels: { count: channelCount, onCount: setChannelCount },
+  }
   const panels: Record<SectionId, ReactNode> = {
     general: (
       <Fields>
-        <Row label="Role">
-          <RolePicker
-            owner={roleOwner(task)}
-            focus={roleFocus}
-            onChanged={onChanged}
-            onNew={(body) => {
-              setOpen(false)
-              setNewRole(body)
-            }}
-            onLeave={() => {
-              setOpen(false)
-            }}
-          />
-        </Row>
-        <Row label="Workspace">
-          <WorkspaceSelect task={task} focus={workspaceFocus} onMoved={onChanged} />
-        </Row>
-        <Row label="Color">
-          <TaskColor task={task} onChanged={onChanged} />
-        </Row>
-        <Row label="Notify">
-          <TaskNotify task={task} onChanged={onChanged} />
-        </Row>
+        <SettingRows tab="general" context={context} />
         <Row label="Folder">
           <TaskLocation task={task} />
         </Row>
@@ -134,32 +125,7 @@ export const TaskSettings = memo(function TaskSettingsView({
     ),
     access: (
       <Fields>
-        <Row label="Credentials">
-          <TaskCredentials task={task} onChanged={onChanged} />
-        </Row>
-        <Row label="Services">
-          <AccessSummary
-            task={task}
-            onOpen={() => {
-              setOpen(false)
-              setAccessOpen(true)
-            }}
-          />
-        </Row>
-        <Row label="Isolation" warn={!sandboxed}>
-          <TaskIsolation task={task} running={running} onChanged={onChanged} caps={caps} />
-        </Row>
-        {task.home_access && sandboxed && (
-          <Row label="Home folders">
-            <TaskHomeAccess task={task} onChanged={onChanged} />
-          </Row>
-        )}
-        <Row label="Bypass">
-          <TaskBypass task={task} caps={caps} onChanged={onChanged} />
-        </Row>
-        <Row label="Rules">
-          <AgentPermissions task={task} />
-        </Row>
+        <SettingRows tab="access" context={context} />
         {task.setup !== null && task.setup.withheld.length > 0 && (
           <Row label="Held back">
             <HeldBack setup={task.setup} />
@@ -170,23 +136,14 @@ export const TaskSettings = memo(function TaskSettingsView({
     ),
     team: (
       <Fields>
-        <Row label="Group chat">
-          <TaskTeam taskId={task.id} />
-        </Row>
-        <Row label="Channels">
-          <TaskChannels taskId={task.id} onCount={setChannelCount} />
-        </Row>
-        <Row label="Threads">
-          <TaskThreads taskId={task.id} />
-        </Row>
-        {(task.pr_urls.length > 0 || channelCount > 0) && (
-          <Row label="Updates">
-            <InputModeSelect task={task} onChanged={onChanged} />
-          </Row>
-        )}
+        <SettingRows tab="team" context={context} />
       </Fields>
     ),
-    session: <SessionFields task={task} running={running} />,
+    session: (
+      <SessionFields task={task} running={running}>
+        <SettingRows tab="session" context={context} />
+      </SessionFields>
+    ),
   }
   const details = (
     <Tabs

@@ -13,6 +13,7 @@ import {
 } from '@seti/shared'
 import { Hono } from 'hono'
 import { setBypass } from '../bypass.js'
+import { eaAnswerOnWord } from '../ea-authority.js'
 import { eaReadOnly } from '../ea-guard.js'
 import { ok, valid, validJson } from '../http.js'
 import {
@@ -30,8 +31,11 @@ import {
 import { permissionTimeout, setPermissionTimeout } from '../permission-timeout.js'
 import { policyShadow } from '../store/policy-shadow.js'
 
-/** The EA may list rules and requests to remind the user, never change or answer them. */
-const userOnly = eaReadOnly('change permission rules or the request timeout, or answer permission requests')
+/**
+ * The EA may list rules and requests, never change rules; it answers a request only on the user's
+ * word (eaAnswerOnWord).
+ */
+const userOnly = eaReadOnly('change permission rules or the request timeout')
 
 const bypassUserOnly = eaReadOnly("turn an agent's Bypass on or off")
 
@@ -82,11 +86,13 @@ export const taskPermissionRoutes = new Hono()
   .get('/:id/permission-requests', async (c) => ok(c, await taskRequests((await taskFor(c.req.param('id'))).id)))
   .post(
     '/:id/permission-requests/:request_id',
-    userOnly,
     valid('param', permissionRequestParams),
     validJson(answerPermissionInput),
     async (c) => {
       const { id, request_id } = c.req.valid('param')
-      return ok(c, await answerPermission(await taskFor(id), request_id, c.req.valid('json')))
+      const input = c.req.valid('json')
+      const task = await taskFor(id)
+      const onWord = await eaAnswerOnWord(c, task, request_id, input)
+      return ok(c, await answerPermission(task, request_id, input, onWord))
     },
   )

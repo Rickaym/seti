@@ -5,6 +5,7 @@ import sys
 import uvicorn
 from loguru import logger
 
+from seti_ea import aiortc_jitter, aiortc_opus
 from seti_ea.config import load_settings
 from seti_ea.redact import scrubbing_sink, secrets_of
 from seti_ea.server import create_app
@@ -12,6 +13,8 @@ from seti_ea.server import create_app
 
 def main() -> None:
     settings = load_settings()
+    aiortc_opus.install()
+    aiortc_jitter.install()
     logger.remove()
     logger.add(scrubbing_sink(sys.stderr, secrets_of(settings)), level="INFO", colorize=False)
     if settings.missing:
