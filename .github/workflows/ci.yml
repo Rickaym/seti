@@ -47,11 +47,81 @@ jobs:
             echo "android=$(has '^android/|^\.github/')"
           } >> "$GITHUB_OUTPUT"
 
-  checks:
-    name: checks
+  static:
+    name: static
     needs: changes
     runs-on: ubuntu-24.04
-    timeout-minutes: 45
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+      - run: pnpm format:check
+      - run: pnpm check:text
+      - run: pnpm check:site
+      - run: pnpm typecheck
+        if: needs.changes.outputs.node == 'true'
+      - run: pnpm knip
+        if: needs.changes.outputs.node == 'true'
+      - run: pnpm audit --prod --audit-level moderate
+        if: needs.changes.outputs.node == 'true'
+      - run: pnpm audit --audit-level high
+        if: needs.changes.outputs.node == 'true'
+      - run: pnpm -r --filter '!@seti/server' run test
+        if: needs.changes.outputs.node == 'true'
+      - run: pnpm build
+        if: needs.changes.outputs.node == 'true'
+      - env:
+          GITLEAKS_VERSION: 8.24.3
+          GITLEAKS_SHA256: 9991e0b2903da4c8f6122b5c3186448b927a5da4deef1fe45271c3793f4ee29c
+          BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+          HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          curl -sSfL -o "$RUNNER_TEMP/gitleaks.tgz" "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          echo "$GITLEAKS_SHA256  $RUNNER_TEMP/gitleaks.tgz" | sha256sum -c -
+          tar -xzf "$RUNNER_TEMP/gitleaks.tgz" -C "$RUNNER_TEMP" gitleaks
+          range="$HEAD"
+          if git cat-file -e "$BASE^{commit}" 2>/dev/null; then
+            range="$BASE..$HEAD"
+          fi
+          "$RUNNER_TEMP/gitleaks" git --redact -v --exit-code 2 --log-opts="--no-merges --first-parent $range" .
+      - uses: anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c
+        continue-on-error: ${{ github.event_name == 'push' }}
+        with:
+          path: .
+          format: cyclonedx-json
+          artifact-name: seti-sbom.cdx.json
+          upload-artifact: ${{ github.event_name == 'push' }}
+          upload-artifact-retention: 1
+          syft-version: v1.52.0
+          upload-release-assets: false
+
+  lint:
+    name: lint
+    needs: changes
+    if: needs.changes.outputs.node == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+      - run: pnpm lint
+
+  server-tests:
+    name: server tests (${{ matrix.shard }}/${{ matrix.shards }})
+    needs: changes
+    if: needs.changes.outputs.node == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
+        shards: [2]
     services:
       postgres:
         image: pgvector/pgvector:pg16@sha256:ccc6e83d6e35e931dc7c5def2022729d5a6c370318d099181995567ff1fb4d6b
@@ -82,56 +152,51 @@ jobs:
           echo "SETI_TEST_DATABASE_URL=postgres://postgres:postgres@localhost:${{ job.services.postgres.ports['5432'] }}/postgres" >> "$GITHUB_ENV"
           echo "SETI_TEST_REDIS_URL=redis://localhost:${{ job.services.redis.ports['6379'] }}" >> "$GITHUB_ENV"
       - uses: ./.github/actions/setup
-      - run: pnpm format:check
-      - run: pnpm check:text
-      - run: pnpm check:site
-      - run: pnpm typecheck
-        if: needs.changes.outputs.node == 'true'
-      - run: pnpm lint
-        if: needs.changes.outputs.node == 'true'
-      - run: pnpm knip
-        if: needs.changes.outputs.node == 'true'
-      - run: pnpm audit --prod --audit-level moderate
-        if: needs.changes.outputs.node == 'true'
-      - run: pnpm audit --audit-level high
-        if: needs.changes.outputs.node == 'true'
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
-        if: needs.changes.outputs.node == 'true'
         with:
           path: ~/.cache/seti-codex
           key: codex-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('server/src/runtimes/codex/pin.json') }}
       - run: |
           bin="$(pnpm --silent --filter @seti/server run codex-binary "$HOME/.cache/seti-codex")"
           echo "SETI_CODEX_BIN=$bin" >> "$GITHUB_ENV"
-        if: needs.changes.outputs.node == 'true'
-      - run: pnpm test
-        if: needs.changes.outputs.node == 'true'
-      - run: pnpm build
-        if: needs.changes.outputs.node == 'true'
-      - env:
-          GITLEAKS_VERSION: 8.24.3
-          GITLEAKS_SHA256: 9991e0b2903da4c8f6122b5c3186448b927a5da4deef1fe45271c3793f4ee29c
-          BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
-          HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+      - working-directory: server
+        env:
+          SHARD: ${{ matrix.shard }}
+          SHARDS: ${{ matrix.shards }}
+          JOB_INDEX: ${{ strategy.job-index }}
+          JOB_TOTAL: ${{ strategy.job-total }}
         run: |
-          curl -sSfL -o "$RUNNER_TEMP/gitleaks.tgz" "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
-          echo "$GITLEAKS_SHA256  $RUNNER_TEMP/gitleaks.tgz" | sha256sum -c -
-          tar -xzf "$RUNNER_TEMP/gitleaks.tgz" -C "$RUNNER_TEMP" gitleaks
-          range="$HEAD"
-          if git cat-file -e "$BASE^{commit}" 2>/dev/null; then
-            range="$BASE..$HEAD"
+          test "$SHARDS" = "$JOB_TOTAL"
+          test "$SHARD" = "$((JOB_INDEX + 1))"
+          all="$(pnpm exec vitest list --filesOnly | sort)"
+          parts="$(for shard in $(seq 1 "$SHARDS"); do pnpm exec vitest list --filesOnly --shard="$shard/$SHARDS"; done | sort)"
+          test -n "$all"
+          test "$all" = "$parts"
+          printf '%s shards cover all %s test files\n' "$SHARDS" "$(printf '%s\n' "$all" | wc -l)"
+      - run: pnpm --filter @seti/server exec vitest run --shard=${{ matrix.shard }}/${{ matrix.shards }}
+
+  checks:
+    name: checks
+    needs: [changes, static, lint, server-tests]
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - env:
+          NODE: ${{ needs.changes.outputs.node }}
+          CHANGES: ${{ needs.changes.result }}
+          STATIC: ${{ needs.static.result }}
+          LINT: ${{ needs.lint.result }}
+          TESTS: ${{ needs.server-tests.result }}
+        run: |
+          expected=skipped
+          if [[ $NODE == true ]]; then
+            expected=success
           fi
-          "$RUNNER_TEMP/gitleaks" git --redact -v --exit-code 2 --log-opts="--no-merges --first-parent $range" .
-      - uses: anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c
-        continue-on-error: ${{ github.event_name == 'push' }}
-        with:
-          path: .
-          format: cyclonedx-json
-          artifact-name: seti-sbom.cdx.json
-          upload-artifact: ${{ github.event_name == 'push' }}
-          upload-artifact-retention: 1
-          syft-version: v1.52.0
-          upload-release-assets: false
+          test "$CHANGES" = success
+          test "$STATIC" = success
+          test "$LINT" = "$expected"
+          test "$TESTS" = "$expected"
 
   e2e-shard:
     name: e2e (${{ matrix.node == 'split' && 'split ' || '' }}${{ matrix.shard }}/${{ matrix.shards }})
@@ -142,15 +207,18 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4]
-        shards: [4]
+        shard: [1, 2, 3, 4, 5, 6]
+        shards: [6]
         node: [inline]
         include:
           - shard: 1
-            shards: 2
+            shards: 3
             node: split
           - shard: 2
-            shards: 2
+            shards: 3
+            node: split
+          - shard: 3
+            shards: 3
             node: split
     services:
       postgres:
