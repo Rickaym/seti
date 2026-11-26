@@ -193,7 +193,11 @@ they are.
 6. If the route touches security settings or secrets, refuse the EA with `notEa` or `eaReadOnly`
    and agents' Seti tools with `refuseAgent` from `server/src/ea-guard.ts`. Otherwise give the EA a
    tool for it in the same PR (below).
-7. Test it in `server/src/routes/<area>.test.ts`, and call it from the UI with `apiGet`, `apiPut`
+7. Declare it in `server/src/seti-tools/route-coverage/`: the EA tool that calls it, the route it
+   does the same as, or why the EA and agents do not get it (`user` with a principle, `ui` or
+   `plumbing`). `parity.test.ts` fails on an undeclared route, on a tool that does not exist or
+   never calls the route, and when the number of known `gap` entries differs from `GAPS_LEFT`.
+8. Test it in `server/src/routes/<area>.test.ts`, and call it from the UI with `apiGet`, `apiPut`
    and the rest of `ui/src/api.ts`.
 
 ### Add a setting
