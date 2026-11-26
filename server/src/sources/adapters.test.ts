@@ -2,7 +2,7 @@ import { claudeToolCall } from '@seti/shared'
 import { describe, expect, it } from 'vitest'
 import { githubRead } from './github.js'
 import { itemText } from './item.js'
-import { linearRead } from './linear.js'
+import { linearKeyIn, linearRead } from './linear.js'
 import { slackHostIn, slackRead } from './slack.js'
 import {
   CHANNEL,
@@ -192,8 +192,22 @@ describe('Linear adapter', () => {
       answer: linearIssues(['ENG-1', 'ENG-2']),
       want: [{ ref: 'linear:ENG-1', text: 'Title of ENG-1' }, { ref: 'linear:ENG-2' }],
     },
-  ])('$name', ({ call, answer, want }) => {
-    const found = recorded(call[0], call[1], answer)
+    {
+      name: 'a comment list on a known workspace links each comment',
+      call: [`${LINEAR}list_comments`, { issueId: 'ENG-12' }] as const,
+      answer: linearComments(['first comment']),
+      key: 'acme',
+      want: [{ permalink: 'https://linear.app/acme/issue/ENG-12#comment-00000000', text: 'first comment' }],
+    },
+    {
+      name: 'an issue list whose fields omit the URL links each issue on a known workspace',
+      call: [`${LINEAR}list_issues`, { project: 'Rollout' }] as const,
+      answer: JSON.stringify({ issues: [{ id: 'ENG-1', title: 'Title of ENG-1' }], hasNextPage: false }),
+      key: 'acme',
+      want: [{ ref: 'linear:ENG-1', permalink: 'https://linear.app/acme/issue/ENG-1' }],
+    },
+  ])('$name', ({ call, answer, want, ...rest }) => {
+    const found = recorded(call[0], call[1], answer, 'key' in rest ? rest.key : null)
     expect(found).toHaveLength(want.length)
     want.forEach((one, i) => {
       expect(found[i]).toMatchObject(one)
@@ -204,8 +218,37 @@ describe('Linear adapter', () => {
     ['another issue than the one asked for', linearIssue('ENG-13', 'x'), []],
     ['a URL on another host or issue', linearIssue('ENG-12', 'x', 'https://evil.example/issue/ENG-12'), ['']],
   ] as const)('spoof: %s', (_name, answer, permalinks) => {
-    const found = recorded(`${LINEAR}get_issue`, { id: 'ENG-12' }, answer)
+    const found = recorded(`${LINEAR}get_issue`, { id: 'ENG-12' }, answer, null)
     expect(found.map((item) => item.permalink)).toEqual(permalinks)
+  })
+
+  const issueAt = (url: string, id = 'ENG-12') => JSON.stringify({ id, title: 't', description: 'd', url })
+  it.each([
+    ['an issue', issueAt('https://linear.app/acme/issue/ENG-12/a-title'), 'acme'],
+    [
+      'an issue list',
+      JSON.stringify({ issues: [JSON.parse(issueAt('https://linear.app/acme/issue/ENG-12'))] }),
+      'acme',
+    ],
+    ['a URL that names another issue', issueAt('https://linear.app/acme/issue/ENG-13'), null],
+    ['a URL on another host', issueAt('https://linear.example/acme/issue/ENG-12'), null],
+    [
+      'a URL in a description',
+      JSON.stringify({ id: 'ENG-12', description: 'https://linear.app/evil/issue/ENG-12' }),
+      null,
+    ],
+    [
+      'two workspaces',
+      JSON.stringify({
+        issues: [
+          JSON.parse(issueAt('https://linear.app/acme/issue/ENG-1', 'ENG-1')),
+          JSON.parse(issueAt('https://linear.app/evil/issue/ENG-2', 'ENG-2')),
+        ],
+      }),
+      null,
+    ],
+  ])('the workspace key of %s is %s', (_name, answer, key) => {
+    expect(linearKeyIn(answer)).toBe(key)
   })
 })
 

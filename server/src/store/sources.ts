@@ -80,11 +80,11 @@ export const sourceItems = {
           ORDER BY id DESC LIMIT ${PER_REF}`
     return rows.map(toItem)
   },
-  /** The workspace host of the newest Slack permalink in the agent's ledger. */
-  slackHost: async (taskId: string): Promise<string | null> => {
+  /** The newest permalink of one kind in the agent's ledger, which names its workspace. */
+  newestPermalink: async (taskId: string, kind: SourceKind): Promise<string | null> => {
     const [row] = await sql<{ permalink: string }[]>`SELECT permalink FROM source_item
-      WHERE task_id = ${taskId} AND kind = 'slack' AND permalink <> '' ORDER BY id DESC LIMIT 1`
-    return row === undefined ? null : new URL(row.permalink).hostname
+      WHERE task_id = ${taskId} AND kind = ${kind} AND permalink <> '' ORDER BY id DESC LIMIT 1`
+    return row?.permalink ?? null
   },
   /** Every item of the agent, oldest first. */
   forTask: async (taskId: string): Promise<SourceItem[]> =>
