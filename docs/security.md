@@ -11,7 +11,8 @@ key off the host.
 
 - The user is the only principal with reserved powers. The EA, agents' Seti tools and mods are
   delegates, and the server refuses them those powers in the function that makes the change
-  ([7.1 Actors](protocol.md#71-actors), `server/src/ea-guard.ts`).
+  ([7.1 Actors](protocol.md#71-actors), `server/src/ea-guard.ts`). The one exception is the
+  short list below, which the EA carries out on the user's own word.
 - The sandbox, not the permission rules, is the boundary for an agent
   ([7.2 Sandbox](protocol.md#72-sandbox), [7.3 Egress](protocol.md#73-egress)). An unsandboxed
   agent, or one in Bypass, is a per-agent choice of the user's.
@@ -24,6 +25,31 @@ key off the host.
 
 [Security considerations](protocol.md#21-security-considerations) lists the limits of each of
 these. [Implementation](implementation.md#sandbox-mechanism) describes the sandbox mechanism.
+
+## What the EA does on your word
+
+The EA can carry out a few reserved actions when you tell it to, by voice or in the chat, and then
+say yes to its read-back of that one change ([EA-17](protocol.md#14-the-assistant)):
+
+| Action                                      | What the EA reads back                                        | What stays yours, in Seti                                                                      |
+| ------------------------------------------- | ------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| Allow one held tool call once               | The command word for word, Seti's reason and the PRs it names | Always allow, a rule for every agent, editing the call, and a call too long to read back whole |
+| Approve a plan                              | The plan in one sentence                                      | Editing the plan                                                                               |
+| Deny a tool call or plan, with your message | The call and your message                                     | -                                                                                              |
+
+The server, not the EA's prompt, holds the rule (`refuseUnlessOnWord` in `server/src/ea-guard.ts`):
+
+- The EA's request names the question it asked. Seti accepts it only if you said yes in your very
+  next message or spoken turn, to the same EA process, less than a minute earlier, and only once.
+- The EA's own code also requires that message to say yes in so many words, whatever the model
+  concluded, so text inside a request, a tool result or another agent's message cannot answer for
+  you.
+- Seti recomputes the request's digest and refuses the action if the request changed after the
+  read-back, or if the decision or message differs from what you heard.
+- A notification Allow, an inbox report, a webhook and a transcript never count. Agents and mods
+  get none of these actions, and a paired device reaches none of these routes.
+- The audit log records each one as the EA acting on your word, with the question and the
+  request.
 
 ## Reporting a vulnerability
 

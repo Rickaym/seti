@@ -67,12 +67,13 @@ class SetiClient:
         params: dict[str, str | int] | None = None,
         body: dict[str, Any] | None = None,
         timeout_secs: float | None = None,
+        headers: dict[str, str] | None = None,
     ) -> Any:
         """The response's data, or a SetiError that says what went wrong."""
         wait = httpx.USE_CLIENT_DEFAULT if timeout_secs is None else httpx.Timeout(timeout_secs, connect=5.0)
         try:
             response = await self._client.request(
-                method, f"/api{path}", params=params, json=body, timeout=wait
+                method, f"/api{path}", params=params, json=body, timeout=wait, headers=headers
             )
         except httpx.TimeoutException as e:
             raise SetiError("Seti did not answer in time") from e
@@ -92,10 +93,14 @@ class SetiClient:
         return await self.request("GET", path, params=params)
 
     async def post(
-        self, path: str, body: dict[str, Any] | None = None, timeout_secs: float | None = None
+        self,
+        path: str,
+        body: dict[str, Any] | None = None,
+        timeout_secs: float | None = None,
+        headers: dict[str, str] | None = None,
     ) -> Any:
         return await self.request(
-            "POST", path, body=body if body is not None else {}, timeout_secs=timeout_secs
+            "POST", path, body=body if body is not None else {}, timeout_secs=timeout_secs, headers=headers
         )
 
     async def put(self, path: str, body: dict[str, Any]) -> Any:
