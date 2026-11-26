@@ -127,7 +127,8 @@ def action_line(call: ToolCall) -> str | None:
     if call.name == "post_team_chat" and call.arguments.get("to"):
         return DIRECT_LINE
     # Without the user's yes a destructive tool only asks, so it must not sound like acting.
-    if call.name in CONFIRM_TOOLS and call.arguments.get("confirmed") is not True:
+    asks = call.name != "answer_question" or bool(call.arguments.get("request"))
+    if asks and call.name in CONFIRM_TOOLS and call.arguments.get("confirmed") is not True:
         return None
     muted = call.arguments.get("muted")
     if call.name == "set_agent_group_chat" and isinstance(muted, bool) and not call.arguments.get("handle"):

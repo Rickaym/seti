@@ -13,11 +13,13 @@ checklist.
   styled as an error.
 - Security settings, credentials and connections stay the user's, because they decide what every
   agent can reach. A credential is the bundle an agent picks; a connection is one service's access
-  it carries. The EA and agents' Seti tools never change them, never see a value and never create
-  share links; the server refuses them (`server/src/ea-guard.ts`), not just the tool list. Agents
-  may propose a change with `request_change` (a host, a connection without its value, an MCP
-  server, a script as a shared tool); only the user's own Allow applies it, and the approve route
-  refuses the EA and agents.
+  it carries. The EA and agents' Seti tools never change them on their own, never see a value and
+  never create share links; the server refuses them (`server/src/ea-guard.ts`), not just the tool
+  list. The EA may carry out the actions `docs/security.md` lists only on the user's spoken or
+  typed yes to that one action, which the server checks; agents never. Agents may propose a change
+  with `request_change` (a host, a connection without its value, an MCP server, a script as a
+  shared tool); only the user's own Allow applies it, and the approve route refuses the EA and
+  agents.
 - Every other platform action gets an EA tool in the same PR, because the EA is the hands-free way
   to run Seti. The EA has a 128-tool cap, so extend an existing tool before adding one.
 - Public surfaces stay minimal, because they face the internet without a login: exact anchored

@@ -24,6 +24,11 @@ PR_SETI = "https://github.com/Octocat/seti/pull/28"
 PR_GONE = "https://github.com/Octocat/seti/pull/7"
 
 
+def _for_task(request: dict[str, Any], params: Any) -> bool:
+    wanted = params.get("task_id")
+    return wanted is None or request.get("task_id") == wanted
+
+
 def make_task(task_id: str, title: str, status: str, **extra: Any) -> dict[str, Any]:
     task: dict[str, Any] = {
         "id": task_id,
@@ -730,6 +735,7 @@ class FakeSeti:
     questions: list[dict[str, Any]] = field(default_factory=list)
     change_requests: list[dict[str, Any]] = field(default_factory=list)
     permission_requests: list[dict[str, Any]] = field(default_factory=list)
+    answered_requests: list[dict[str, Any]] = field(default_factory=list)
     request_timeout_minutes: int = 60
     settings_doc: dict[str, Any] = field(
         default_factory=lambda: {
@@ -933,9 +939,41 @@ class FakeSeti:
         for row in self._open_asks():
             earlier = row["epoch"] != body["epoch"] or row["turn"] < body["turn"]
             if earlier and (row["id"] in ids or row["key"] == body.get("key")):
-                row.update(decision="allow", taken=True)
+                row.update(
+                    decision="allow", taken=True, confirm_epoch=body["epoch"], confirm_turn=body["turn"]
+                )
                 taken.append(row)
         return ok(taken)
+
+    def _answer_request(
+        self, task_id: str, request_id: str, body: Any, ask_header: str | None
+    ) -> httpx.Response:
+        """Seti's answer route as the EA meets it: one unused yes from the next turn, for this request."""
+        held = next(
+            (r for r in self.permission_requests if r["id"] == request_id and r["task_id"] == task_id), None
+        )
+        if held is None:
+            return err(404, "No such permission request")
+        ask = next((a for a in self.asks if ask_header is not None and str(a["id"]) == ask_header), None)
+        word = (
+            ask is not None
+            and ask.get("confirm_epoch") == ask["epoch"]
+            and ask.get("confirm_turn") == ask["turn"] + 1
+        )
+        if ask is None or not word or ask.get("used") or ask["tool"] != "answer_question":
+            return err(403, "Forbidden", "The EA does this only on the user's own yes")
+        ask["used"] = True
+        expected = {
+            "request": held["id"],
+            "digest": held["digest"],
+            "decision": body["decision"],
+            "message": body.get("message", ""),
+        }
+        if any(ask["args"].get(k) != v for k, v in expected.items()):
+            return err(403, "Forbidden", "What the user said yes to is not this request as it stands")
+        self.permission_requests.remove(held)
+        self.answered_requests.append({**body, "id": request_id, "ask": int(ask_header or 0)})
+        return ok({**held, "state": "denied" if body["decision"] == "deny" else "allowed"})
 
     def _claim_asks(self) -> httpx.Response:
         rows = [a for a in self.asks if a["decision"] is not None and not a["taken"]]
@@ -1357,8 +1395,8 @@ class FakeSeti:
                 return ok(
                     {
                         "questions": [q for q in self.questions if q["status"] == "open"],
-                        "access": self.change_requests,
-                        "permissions": self.permission_requests,
+                        "access": [r for r in self.change_requests if _for_task(r, params)],
+                        "permissions": [r for r in self.permission_requests if _for_task(r, params)],
                         "notes": [n for n in self.knowledge if n["status"] == "proposed"],
                     }
                 )
@@ -1436,6 +1474,8 @@ class FakeSeti:
     def _post(self, parts: list[str], request: httpx.Request) -> httpx.Response:
         body = json.loads(request.content or b"{}")
         match parts:
+            case ["tasks", task_id, "permission-requests", request_id]:
+                return self._answer_request(task_id, request_id, body, request.headers.get("x-seti-ea-ask"))
             case ["tasks", task_id, "threads", follow, "stop"]:
                 return ok({"id": int(follow), "task_id": task_id, "stopped_at": "2026-01-03T00:00:00Z"})
             case ["tasks", "start"]:
