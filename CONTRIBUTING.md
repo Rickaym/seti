@@ -81,11 +81,13 @@ message, and `pnpm typecheck` and `pnpm knip` before a push. Never skip them wit
 `pnpm lint` runs ESLint once per TypeScript project, each directory with a `tsconfig.json`, through
 `scripts/lint.mjs`. Typed linting keeps every project it opens in memory until the process ends, so
 one process per project keeps the peak at the largest project instead of the sum of all of them.
+Up to four projects lint at once, fewer when the machine has fewer cores or less than 4 GB of memory
+per process, and each project's output prints in one piece when it ends.
 
-CI adds `pnpm audit`, a gitleaks scan of the PR's commits, the whole e2e suite in four shards, and
-the Android build when `android/` changes. A PR merges only when all of it passes. On CI a failed
-e2e spec runs once more; one that passes on that retry is reported as flaky, so fix it rather than
-leave it.
+CI adds `pnpm audit`, a gitleaks scan of the PR's commits, the whole e2e suite in six shards and
+again in three split-mode shards, and the Android build when `android/` changes. A PR merges only
+when all of it passes. On CI a failed e2e spec runs once more; one that passes on that retry is
+reported as flaky, so fix it rather than leave it.
 
 The lint rules that surprise people most:
 
