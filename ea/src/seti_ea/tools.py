@@ -1628,7 +1628,8 @@ class EaTools:
     async def _audit_chain(self) -> ToolResult:
         status = await self._seti.get("/audit/status")
         fields = status if isinstance(status, dict) else {}
-        chain = fields.get("chain") if isinstance(fields.get("chain"), dict) else {}
+        found = fields.get("chain")
+        chain: Mapping[str, Any] = found if isinstance(found, dict) else {}
         kept = f"Events are kept {fields.get('retention_days')} days."
         if chain.get("ok") is True:
             text = f"The audit log's hash chain verifies: {chain.get('checked')} events checked. {kept}"
