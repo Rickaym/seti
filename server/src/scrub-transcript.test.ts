@@ -1,4 +1,4 @@
-import type { MessageRow } from '@seti/shared'
+import type { MessageBody, MessageRow } from '@seti/shared'
 import { beforeAll, describe, expect, it } from 'vitest'
 import { messages, sql, tasks } from './db.js'
 import { buildDigest } from './digest.js'
@@ -154,6 +154,21 @@ describe('stored transcripts', () => {
     expect(inserted.payload).toEqual({ text: 'use [redacted] to push' })
     const [stored] = await sql<{ payload: string }[]>`SELECT payload FROM task_message WHERE id = ${inserted.id}`
     expect(stored?.payload).toBe(JSON.stringify({ text: 'use [redacted] to push' }))
+  })
+
+  it('stores a tool result that prints a session cookie with the value redacted', async () => {
+    const refresh = fake('rTkn', '12345678')
+    const session = Buffer.from(JSON.stringify({ access_token: JWT, refresh_token: refresh })).toString('base64')
+    const cookie = fake('sb-', 'abcdefghijklmnopqrst', '-auth-token=base64-', session)
+    const printed = `> GET /dashboard\ncookie: ${cookie}; theme=dark\naccept: text/html`
+    const result = { type: 'tool_result', tool_use_id: 'toolu_1', content: [{ type: 'text', text: printed }] }
+    const payload = { type: 'user', parent_tool_use_id: null, message: { role: 'user', content: [result] } }
+    const inserted = await messages.insert('scrub-task', { kind: 'sdk', payload } as MessageBody, [])
+    const [stored] = await sql<{ payload: string }[]>`SELECT payload FROM task_message WHERE id = ${inserted.id}`
+    expect(stored?.payload).not.toContain(session.slice(0, 24))
+    expect(stored?.payload).not.toContain(session.slice(-24))
+    expect(stored?.payload).toContain('cookie: sb-abcdefghijklmnopqrst-auth-token=[redacted]; theme=[redacted]')
+    expect(stored?.payload).toContain('accept: text/html')
   })
 
   it('redacts rows stored before scrubbing when they go to the browser', () => {

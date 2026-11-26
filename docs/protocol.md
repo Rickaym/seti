@@ -831,6 +831,15 @@ interrupted only for that.
 - SEC-18: Only the user changes a set or drops all of an agent's own choices at once. A delegate
   MUST NOT move an agent to a credential whose set turns on an SSH host, cloud access or a host the
   agent lacks.
+- SEC-19: Credential redaction MUST cover session material and keep the names around it: the
+  values of `Cookie`, `Set-Cookie`, `curl -b` and `--cookie` (names and attributes kept); the
+  credential of an `Authorization` header of any scheme (scheme kept); JWTs; base64 JSON sessions;
+  values under session names (`sb-*-auth-token*` with its chunks, `__Secure-*`, `__Host-*`,
+  session cookies, `access_token`, `refresh_token`, `id_token`) in cookies, query strings, form
+  bodies and JSON; storage state entries holding a session; `.netrc` passwords; secret-named
+  `curl -H` headers. Transcript rows and permission requests stored before a rule existed MUST be
+  re-scrubbed once, resuming after a restart, with a log of counts only. Audit events MUST keep
+  their sealed text.
 
 ## 9. Shared tools
 

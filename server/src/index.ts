@@ -75,6 +75,7 @@ import { startStorageSchedule } from './storage-schedule.js'
 import { auditEvents } from './store/audit.js'
 import { channelStore } from './store/channels.js'
 import { fillEventColumns } from './store/event-columns.js'
+import { rescrubStoredRows } from './store/rescrub.js'
 import { backfillMessageSearch } from './store/search.js'
 import { relayTaskEvents } from './task-events.js'
 import { relayTeamEvents } from './team-events.js'
@@ -153,6 +154,19 @@ function indexOlderMessages(): void {
     })
 }
 
+/** Redacts session material older versions stored, without holding up startup; logs counts only. */
+function rescrubOlderRows(): void {
+  rescrubStoredRows()
+    .then((counts) => {
+      for (const { target, checked, changed } of counts ?? []) {
+        process.stdout.write(`scrub: re-scrubbed ${target}, ${String(changed)} of ${String(checked)} rows changed\n`)
+      }
+    })
+    .catch((e: unknown) => {
+      process.stderr.write(`scrub: re-scrubbing stored rows failed: ${e instanceof Error ? e.message : String(e)}\n`)
+    })
+}
+
 /** Fills the event columns of transcript rows stored before them, without holding up startup. */
 function fillOlderRows(): void {
   const started = performance.now()
@@ -198,6 +212,7 @@ stopOn('SIGINT')
 enforcePrivateHome(SETI_HOME, BACKUP_DIR)
 await openDatabase()
 indexOlderMessages()
+rescrubOlderRows()
 fillOlderRows()
 await sealLegacySecrets()
 relayTaskEvents()
