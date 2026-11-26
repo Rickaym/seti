@@ -19,6 +19,7 @@ import {
   type EaRequestData,
 } from '@seti/shared'
 import { withMicDefaults } from './audio-prefs'
+import { QualityMeter } from './call-quality'
 import type { CallAction } from './call-state'
 import type { CallHandlers, LiveCall } from './call-store'
 import { inputKind } from './device-kind'
@@ -33,6 +34,7 @@ const OFFER_PATH = '/api/ea/offer'
 const ICE_FAILED =
   'The connection could not find a network path to the EA. Hover EA in the status bar and test the relay.'
 const BOT_ERROR_TTL_MS = 10_000
+const STATS_EVERY_TICKS = 2
 
 interface MicManager {
   updateMic: (micId: string) => Promise<void>
@@ -209,14 +211,19 @@ function listen(client: PipecatClient, dispatch: (action: CallAction) => void): 
 }
 
 /** Pings the bot each second, as the transport pings on page timers, and reads the path. */
-function keepAlive(transport: SmallWebRTCTransport, link: LinkMonitor): () => void {
+function keepAlive(transport: SmallWebRTCTransport, link: LinkMonitor, meter: QualityMeter): () => void {
   const internals = transport as unknown as TransportInternals
+  let ticks = 0
   return everySecond(() => {
     const channel = internals.dc
     if (channel?.readyState === 'open') {
       channel.send(`ping: ${String(Date.now())}`)
     }
     link.observe(internals.pc?.connectionState, internals.pc?.iceConnectionState)
+    ticks += 1
+    if (ticks % STATS_EVERY_TICKS === 0) {
+      internals.pc?.getStats().then(meter.sample, () => undefined)
+    }
   })
 }
 
@@ -278,7 +285,9 @@ export function createCall(
       note = null
     }
   })
+  const meter = new QualityMeter()
   const transport = buildTransport(iceServers, manager, (negotiated) => {
+    meter.rebuilt()
     if (negotiated) {
       note = { text: ICE_FAILED, reason: 'ice-failed', at: Date.now() }
     }
@@ -337,7 +346,7 @@ export function createCall(
   return {
     connect: async (requestData: EaRequestData) => {
       await client.initDevices()
-      stopPings = keepAlive(transport, link)
+      stopPings = keepAlive(transport, link, meter)
       await client.connect({ webrtcRequestParams: { endpoint: OFFER_PATH, requestData } })
       if (!stopping) {
         stopWatching = watchDevices(navigator.mediaDevices, rerouter.devicesChanged)
@@ -363,5 +372,6 @@ export function createCall(
       client.sendClientMessage(type)
     },
     failure: async (e: unknown) => recentReason() ?? connectError(e),
+    quality: meter.quality,
   }
 }

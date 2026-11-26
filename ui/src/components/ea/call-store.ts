@@ -1,4 +1,4 @@
-import type { EaCallEndReason, EaRequestData } from '@seti/shared'
+import type { EaCallEndReason, EaCallQuality, EaRequestData } from '@seti/shared'
 import { callReducer, initialCallState, type CallAction, type CallState } from './call-state'
 
 /** One peer connection to the bot, from the lazily loaded engine. */
@@ -15,6 +15,8 @@ export interface LiveCall {
   send: (type: string) => void
   /** The readable reason a connect failed. */
   failure: (error: unknown) => Promise<string>
+  /** How the EA's voice has fared so far, as numbers only. */
+  quality: () => EaCallQuality | null
 }
 
 export interface CallHandlers {
@@ -79,8 +81,8 @@ export class EaCallStore {
     }
   }
 
-  private end(error: string | null, reason: EaCallEndReason): void {
-    this.dispatch({ type: 'ended', at: this.deps.now(), error, reason, hidden: this.deps.hidden() })
+  private end(error: string | null, reason: EaCallEndReason, quality: EaCallQuality | null): void {
+    this.dispatch({ type: 'ended', at: this.deps.now(), error, reason, hidden: this.deps.hidden(), quality })
   }
 
   private async release(): Promise<void> {
@@ -96,7 +98,7 @@ export class EaCallStore {
     const superseded = () => this.generation !== current
     const blocked = this.deps.preflight()
     if (blocked !== null) {
-      this.end(blocked, 'hang-up')
+      this.end(blocked, 'hang-up', null)
       return
     }
     this.unlockAudio?.()
@@ -111,7 +113,7 @@ export class EaCallStore {
         return
       }
       if (micProblem !== null) {
-        this.end(micProblem, 'hang-up')
+        this.end(micProblem, 'hang-up', null)
         return
       }
       live = engine.createCall(
@@ -124,8 +126,9 @@ export class EaCallStore {
           },
           dropped: (error, reason) => {
             if (!superseded()) {
+              const quality = this.live?.quality() ?? null
               this.live = null
-              this.end(error, reason)
+              this.end(error, reason, quality)
             }
           },
           reattach: () => {
@@ -148,7 +151,7 @@ export class EaCallStore {
       const message = live === null ? errorText(e) : await live.failure(e)
       await this.release()
       if (!superseded()) {
-        this.end(message, 'server-closed')
+        this.end(message, 'server-closed', null)
       }
     }
   }
@@ -176,7 +179,7 @@ export class EaCallStore {
   /** Ends the call; `reason` is recorded when Seti rather than the user ends it. */
   readonly hangUp = async (reason: EaCallEndReason = 'hang-up'): Promise<void> => {
     this.generation += 1
-    this.end(null, reason)
+    this.end(null, reason, this.live?.quality() ?? null)
     await this.release()
   }
 

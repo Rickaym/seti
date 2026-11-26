@@ -6,6 +6,7 @@ import { sandboxed } from './aws-access.js'
 import { tasks } from './db.js'
 import { fromEa, refuseAgent } from './ea-guard.js'
 import { HttpError } from './http.js'
+import { connectionsNow } from './live-connections.js'
 import { expireGroup } from './questions.js'
 import { redactSecrets } from './scrub.js'
 import { secretStoreProblem, storeSecret, suppliedText, writeSecretFile } from './secret-delivery.js'
@@ -136,13 +137,16 @@ export function dismissSecret(questionId: string): boolean {
   return resolve !== undefined
 }
 
-/** Puts the value where the question says, in memory only; returns the file's path for a file. */
-async function deliver(task: Task, secret: QuestionSecret, value: string): Promise<string | null> {
+/**
+ * Puts the value where the question says and returns what the agent's call gets: the file's path,
+ * or that the secret store has it and whether the agent's running sandbox took it at once.
+ */
+async function deliver(task: Task, secret: QuestionSecret, value: string): Promise<string> {
   if (secret.delivery === 'file') {
-    return writeSecretFile(task.id, secret.name, value)
+    return suppliedText(secret, writeSecretFile(task.id, secret.name, value))
   }
   await storeSecret(task, secret, value)
-  return null
+  return suppliedText(secret, null, await connectionsNow(task))
 }
 
 async function auditSupplied(question: Question, secret: QuestionSecret): Promise<void> {
@@ -198,14 +202,14 @@ export async function supplySecret(id: string, value: string): Promise<SupplySec
   if (task === undefined) {
     throw new HttpError(404, 'The agent that asked is gone')
   }
-  const file = await deliver(task, question.secret, value)
+  const text = await deliver(task, question.secret, value)
   const settled = await questions.supplied(id)
   if (settled === undefined) {
     throw new HttpError(409, 'This question was already settled')
   }
   await auditSupplied(settled, question.secret)
   waiting.delete(id)
-  resolve({ kind: 'supplied', text: suppliedText(question.secret, file) })
+  resolve({ kind: 'supplied', text })
   await refreshBlocked(task.id)
   return { task_id: task.id, task_title: task.title }
 }

@@ -37,7 +37,16 @@ describe('CallEndRecorder', () => {
     clock.now = 150_000
     recorder.ended('ice-failed')
     expect(sent).toEqual([
-      { reason: 'ice-failed', auto: true, hidden: true, duration_s: 150, hidden_s: 90, inputs: [], reroutes: 0 },
+      {
+        reason: 'ice-failed',
+        auto: true,
+        hidden: true,
+        duration_s: 150,
+        hidden_s: 90,
+        inputs: [],
+        reroutes: 0,
+        quality: null,
+      },
     ])
     expect(stored()).toBeNull()
     recorder.ended('hang-up')
