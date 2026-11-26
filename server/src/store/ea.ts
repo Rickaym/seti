@@ -29,11 +29,14 @@ async function withNotices(entries: EaHistoryEntry[]): Promise<EaHistoryEntry[]>
     severity, source FROM ea_inbox WHERE entry_id = ANY(${ids})`
   const notices = new Map(rows.map(({ entry_id, ...notice }) => [entry_id, notice]))
   const relays = await relaysByEntry(ids)
-  return entries.map((entry) =>
-    entry.kind === 'inbox'
-      ? { ...entry, notice: notices.get(entry.id) ?? null, relays: relays.get(entry.id) ?? [] }
-      : entry,
-  )
+  return entries.map((entry) => {
+    const notice = notices.get(entry.id)
+    if (entry.kind !== 'inbox' || notice === undefined) {
+      return entry.kind === 'inbox' ? { ...entry, notice: null } : entry
+    }
+    const sent = relays.get(entry.id)
+    return { ...entry, notice: sent === undefined ? notice : { ...notice, relays: sent } }
+  })
 }
 
 /** Held by every write, so batches from a call and the chat never interleave their ids. */

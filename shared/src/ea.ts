@@ -148,6 +148,8 @@ export interface EaNotice {
   severity: EaNoticeSeverity
   /** Where it came from: a task title, a channel, or the EA itself. */
   source: string
+  /** In a history page, the relays the EA sent of this item, oldest first. */
+  relays?: EaRelay[]
 }
 
 export interface EaHistoryEntry {
@@ -159,8 +161,6 @@ export interface EaHistoryEntry {
   created_at: string
   /** For an inbox entry in a history page, the item it delivered. */
   notice?: EaNotice | null
-  /** For an inbox entry, the relays the EA sent of its items, oldest first. */
-  relays?: EaRelay[]
 }
 
 export interface EaHistoryPage {

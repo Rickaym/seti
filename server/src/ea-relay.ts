@@ -54,7 +54,7 @@ const runs = (list: readonly string[], size: number): string[] =>
   Array.from({ length: Math.max(0, list.length - size + 1) }, (_, i) => list.slice(i, i + size).join(' '))
 
 /** True when `text` repeats a run of `size` consecutive words from `source`. */
-export function copiesRun(text: string, source: string, size = EA_RELAY_COPY_WORDS): boolean {
+function copiesRun(text: string, source: string, size = EA_RELAY_COPY_WORDS): boolean {
   const seen = new Set(runs(words(source), size))
   return runs(words(text), size).some((run) => seen.has(run))
 }
@@ -86,7 +86,7 @@ async function namedInMessage(item: RelayItem): Promise<string[]> {
 }
 
 /** The agents an item is about: its task, agents its message names, its PR's, its channel's. */
-export async function relayTargets(item: RelayItem): Promise<Set<string>> {
+async function relayTargets(item: RelayItem): Promise<Set<string>> {
   const pr = item.url === null ? undefined : findPrUrls(item.url).at(0)
   const subscribed = item.channel_id === null ? [] : await channelSubscriptions.forChannel(item.channel_id)
   return new Set([

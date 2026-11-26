@@ -1,5 +1,5 @@
 import fs from 'node:fs'
-import { auditQuery, type EaRelay, type EaSettings, type Task } from '@seti/shared'
+import { auditQuery, type EaHistoryPage, type EaRelay, type EaSettings, type Task } from '@seti/shared'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { asAgent } from '../access.js'
 import { createApp } from '../app.js'
@@ -247,8 +247,8 @@ describe('a relay', () => {
       VALUES ('inbox', ${JSON.stringify({ role: 'user', content: 'Inbox: alert' })}, ${now()}) RETURNING id`
     await sql`UPDATE ea_inbox SET entry_id = ${entry?.id ?? 0} WHERE id = ${id}`
     await data<EaRelay>(await relay(id, api.id, OWN_WORDS))
-    const page = await data<{ entries: { id: number; relays?: EaRelay[] }[] }>(await send(USER, 'GET', '/history'))
+    const page = await data<EaHistoryPage>(await send(USER, 'GET', '/history'))
     const shown = page.entries.find((e) => e.id === entry?.id)
-    expect(shown?.relays?.map((r) => r.title)).toEqual(['API client'])
+    expect(shown?.notice?.relays?.map((r) => r.title)).toEqual(['API client'])
   })
 })
