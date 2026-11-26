@@ -113,6 +113,7 @@ import { runtimeRoutes } from './routes/runtimes.js'
 import { sandboxRoutes } from './routes/sandbox.js'
 import { secretRoutes } from './routes/secrets.js'
 import { sessionRoutes } from './routes/sessions.js'
+import { setiCommandRoutes } from './routes/seti-commands.js'
 import { settingsDocRoutes } from './routes/settings-doc.js'
 import { publicShareHandler } from './routes/share-public.js'
 import { sharedToolRoutes } from './routes/shared-tools.js'
@@ -325,6 +326,7 @@ export function createApp(access: AccessGuardOptions = defaultAccess(), eaUrl: s
   app.route('/api/tasks', taskComposerRoutes)
   app.route('/api/tasks', taskPermissionRoutes)
   app.route('/api/tasks', changeRequestRoutes)
+  app.route('/api/tasks', setiCommandRoutes)
   app.route('/api/commands', commandRoutes)
   app.route('/api/compact', compactRoutes)
   app.route('/api/context', contextRoutes)

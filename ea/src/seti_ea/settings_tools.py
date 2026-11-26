@@ -23,6 +23,7 @@ from seti_ea.reminder_tools import (
     reminder_line,
     upcoming_runs,
 )
+from seti_ea.rules_tools import RULES_ARGS, rules_text
 from seti_ea.seti import SetiClient, SetiError
 from seti_ea.storage_tools import CLEAN_ARG, STORAGE_ARGS, StorageTools
 from seti_ea.toolkit import (
@@ -554,7 +555,11 @@ SETTINGS_SPECS: list[ToolSpec] = [
         "get_security_settings",
         "Read the sandbox setting, its network allowlist and hidden paths, whether agents have a "
         "GitHub token, and whether Codex agents can start: off, installing, failed with why, no "
-        "OpenAI key, or ready. Only the user changes these.",
+        "OpenAI key, or ready. With rules, the permission rules instead: the user's, those from "
+        "Claude Code's settings files, Seti's built-in rules and guards, and with agent that "
+        "agent's own and its project's, to explain why a call asked or was refused. Only the user "
+        "changes these.",
+        RULES_ARGS,
     ),
 ]
 
@@ -2131,6 +2136,9 @@ class SettingsTools:
         return ToolResult(f"Done. {self._settings_words(after)}", "Changed EA settings")
 
     async def get_security_settings(self, args: Mapping[str, Any]) -> ToolResult:
+        if arg_bool(args, "rules"):
+            ref = arg_str(args, "agent", required=False)
+            return await rules_text(self._seti, await self._resolve_task(ref) if ref else None)
         status = await self._seti.get("/sandbox")
         fields = status if isinstance(status, dict) else {}
         policy = field_dict(fields, "policy")

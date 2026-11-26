@@ -78,7 +78,7 @@ changed stays off.
   "capabilities": [{ "name": "net.fetch", "hosts": ["api.linear.app"] }, { "name": "storage" }],
   "activation": ["onCommand"],
   "contributes": {
-    "commands": [{ "id": "link-issue", "title": "Link issue", "for": ["palette", "view"] }]
+    "commands": [{ "id": "link-issue", "title": "Link issue", "for": ["palette", "view", "ea"] }]
   }
 }
 ```
@@ -306,6 +306,22 @@ menu and its chord, its slash command says it is not on that runtime, and the se
 with 409 for the EA and agents too; the view does not show beside that agent. A command or view
 without `needs` shows on every runtime.
 
+### Reaching the EA
+
+The EA is the hands-free way to run Seti, so whatever a person can do through a mod, the EA can do
+too, or the manifest says why not:
+
+- A command offered on a person's surface (`palette`, `agentHeader`, `agentMenu` or `view`) also
+  lists `ea` in its `for`, or carries `eaReason`, a sentence such as "It arranges the panels this
+  browser shows".
+- A route other than `GET` names the command that does the same in `command`, which must list
+  `ea`, or carries `eaReason`. A route's `command` must name one of the mod's commands, or the
+  manifest is not valid.
+
+From mod API 1.25.0, Seti writes a warning to the mod's log for each command or route that does
+neither, every time it starts the mod, and the mod still runs. From mod API 2.0.0 Seti will refuse
+such a manifest, so add `ea` or `eaReason` now. The mods Seti ships already follow the rule.
+
 ### Views and file viewers
 
 A view or viewer is one HTML page from the package. Seti serves it in a frame with no network, an
@@ -449,8 +465,10 @@ stored off; safe mode and a mod bisect leave it on, and its settings still chang
 bundled mod's do. Settings, Mods shows it with a Core badge and a lock in place of its switch. Only
 a bundled mod may be required.
 
-This Seti offers mod API 1.24.0, which adds `needs` to commands and agent views, so they show
-only on runtimes that offer what they need (see Commands and where their results go); 1.23.0 adds
+This Seti offers mod API 1.25.0, which adds `eaReason` to commands and routes and `command` to
+routes, so each says how the EA does the same or why it cannot (see Reaching the EA); 1.24.0 added
+`needs` to commands and agent views, so they show only on runtimes that offer what they need (see
+Commands and where their results go); 1.23.0 adds
 the bundled-only `tasks.dream` capability
 (`api.dreams`: a night of dreams, whether dreams have news, waiting clean-ups, and a dream started
 under Seti's caps); 1.22.0
@@ -572,6 +590,8 @@ it in the UI instead of on the server, offers it only where `when` answers true,
 state with `title`, such as Unlock while locked; both get the agent, the section and whether the
 layout is narrow. `status` is what the reply box says its slash command will do, and `waits` holds
 the slash command in the box with a reason while it cannot run, such as while an answer streams.
+A bundled command or route follows Reaching the EA too, and `server/src/mods/ea-reach.test.ts`
+fails on one that gives the EA no way and no reason.
 `needs` hides the command on an agent whose runtime lacks a capability, as for third-party mods;
 the side chat's Ask aside needs `side_chat`. The palette and menus show a command's chord, else the
 slash command that runs it. A slash command may not take a name Seti's own agent commands use,

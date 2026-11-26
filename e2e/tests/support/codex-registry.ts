@@ -8,6 +8,7 @@ import { gzipSync } from 'node:zlib'
 import { paths } from './env.js'
 
 const MEMBER = 'package/vendor/e2e/bin/codex'
+const HOST_MEMBER = 'package/vendor/e2e/bin/codex-code-mode-host'
 
 /** The Codex version this Seti needs, which the registry's stand-in and the Ready one report. */
 export const PINNED_CODEX = (
@@ -87,11 +88,13 @@ export function codexRegistry(): CodexRegistry {
   return current
 }
 
-/** Packs the stand-in program as the npm package does and returns the tarball and its checksums. */
+/** Packs the stand-in program and code mode host as the npm package does, with their checksums. */
 function standInTarball(dir: string) {
   const binary = path.join(dir, MEMBER)
   fs.mkdirSync(path.dirname(binary), { recursive: true })
   fs.writeFileSync(binary, `#!/bin/sh\necho "codex-cli ${PINNED_CODEX}"\n`, { mode: 0o700 })
+  const host = path.join(dir, HOST_MEMBER)
+  fs.writeFileSync(host, '#!/bin/sh\nexit 1\n', { mode: 0o700 })
   const tar = path.join(dir, 'codex.tar')
   execFileSync('/usr/bin/tar', ['-cf', tar, '-C', dir, 'package'])
   const tarball = gzipSync(fs.readFileSync(tar))
@@ -99,6 +102,7 @@ function standInTarball(dir: string) {
     tarball,
     integrity: `sha512-${createHash('sha512').update(tarball).digest('base64')}`,
     sha256: createHash('sha256').update(fs.readFileSync(binary)).digest('hex'),
+    hostSha256: createHash('sha256').update(fs.readFileSync(host)).digest('hex'),
   }
 }
 
@@ -109,7 +113,7 @@ function standInTarball(dir: string) {
 export async function startCodexRegistry(): Promise<NodeJS.ProcessEnv> {
   const dir = path.join(paths.root, 'codex-registry')
   fs.mkdirSync(dir, { recursive: true })
-  const { tarball, integrity, sha256 } = standInTarball(dir)
+  const { tarball, integrity, sha256, hostSha256 } = standInTarball(dir)
   current = new CodexRegistry(tarball)
   const port = await current.listen()
   const pin = {
@@ -120,6 +124,7 @@ export async function startCodexRegistry(): Promise<NodeJS.ProcessEnv> {
         integrity,
         binary: MEMBER,
         sha256,
+        host: { member: HOST_MEMBER, sha256: hostSha256 },
       },
     },
   }
