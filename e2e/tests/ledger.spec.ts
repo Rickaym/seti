@@ -1,6 +1,5 @@
 import { expect, test, unique } from './support/fixtures.js'
-import { LEDGER, ledgerReply, READ_QUOTE, seedLedgerReply } from './support/ledger.js'
-import { settled } from './support/phone-layout.js'
+import { LEDGER, ledgerReply, READ_QUOTE, seedLedgerReply, toDark } from './support/ledger.js'
 
 test('a quote the agent read shows a quiet check, and a link it never read says so', async ({ page }) => {
   const id = await seedLedgerReply(unique('Ledger marks'))
@@ -18,8 +17,7 @@ test('a quote the agent read shows a quiet check, and a link it never read says 
   await expect(sources.locator('[data-source="2"]').getByTestId('source-not-read')).toHaveText('not read by this agent')
   await expect(sources.locator('[data-source="2"]').getByTestId('quote-verified')).toHaveCount(0)
   await page.screenshot({ path: test.info().outputPath('ledger-light.png') })
-  await page.emulateMedia({ colorScheme: 'dark' })
-  await settled(page)
+  await toDark(page)
   await page.screenshot({ path: test.info().outputPath('ledger-dark.png') })
   await page.emulateMedia({ colorScheme: 'light' })
 

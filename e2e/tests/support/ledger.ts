@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import type { Page } from '@playwright/test'
+import { expect, type Page } from '@playwright/test'
 import { openSeedDb } from './db.js'
 import { paths } from './env.js'
 
@@ -91,3 +91,21 @@ export async function seedLedgerReply(title: string): Promise<string> {
 /** The agent's reply in the transcript. */
 export const ledgerReply = (page: Page) =>
   page.getByRole('region', { name: 'Transcript' }).locator('[data-find-text]').filter({ hasText: 'The release moved' })
+
+/**
+ * Switches the page to its dark theme and waits until its colours rest. A transition on this
+ * page's buttons can end without settling its promise, so this reads colours, not animations.
+ */
+export async function toDark(page: Page): Promise<void> {
+  const background = async () => page.evaluate(() => getComputedStyle(document.body).backgroundColor)
+  const light = await background()
+  await page.emulateMedia({ colorScheme: 'dark' })
+  await expect.poll(background).not.toBe(light)
+  const resting = async () =>
+    page.evaluate(async () => {
+      const before = getComputedStyle(document.body).backgroundColor
+      await new Promise((resolve) => setTimeout(resolve, 200))
+      return getComputedStyle(document.body).backgroundColor === before
+    })
+  await expect.poll(resting).toBe(true)
+}
