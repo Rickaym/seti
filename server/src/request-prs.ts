@@ -46,8 +46,41 @@ async function folderRepo(task: Task, dir: string): Promise<string | null> {
   return repos.size === 1 ? ([...repos.values()][0] ?? null) : null
 }
 
-/** The PRs the mentions name, each once, with folders read for their repository. */
-async function resolve(task: Task, mentions: readonly PrMention[]): Promise<RequestPr[]> {
+const MAX_CANDIDATE_REPOS = 10
+/** Guessed chips per number a command names without a repository, when several repos have it. */
+const MAX_GUESSES = 3
+
+const newPr = (repo: string, number: number): RequestPr => ({
+  url: prUrl(repo, number),
+  repo,
+  number,
+  title: null,
+  ci: null,
+  state: null,
+})
+
+const LINKED = /^https:\/\/github\.com\/([\w.-]+\/[\w.-]+)\/pull\/\d+$/
+
+/** The github.com repositories the agent works in: its own and those of the PRs linked to it. */
+function agentRepos(task: Task): string[] {
+  const linked = task.pr_urls.flatMap((url) => LINKED.exec(url)?.[1] ?? [])
+  const all = [...task.repos.map((repo) => repo.slug), ...linked]
+  return [...new Map(all.map((repo) => [repo.toLowerCase(), repo])).values()].slice(0, MAX_CANDIDATE_REPOS)
+}
+
+/** The PRs the mentions name and, for a number whose folder names no repository, guesses. */
+interface Resolved {
+  known: RequestPr[]
+  /** The number in each of the agent's repositories, kept only where that PR exists. */
+  guesses: RequestPr[]
+}
+
+/**
+ * The PRs the mentions name, each once, with folders read for their repository. A number whose
+ * folder gives none is guessed in the agent's own repositories: a hint for the reader only, never
+ * used to decide anything, which the outward check reads apart and more strictly.
+ */
+async function resolve(task: Task, mentions: readonly PrMention[]): Promise<Resolved> {
   const folders = new Map<string, Promise<string | null>>()
   const repoOfFolder = async (dir: string) => {
     const known = folders.get(dir) ?? folderRepo(task, dir).catch(() => null)
@@ -60,14 +93,24 @@ async function resolve(task: Task, mentions: readonly PrMention[]): Promise<Requ
       number: mention.number,
     })),
   )
-  const prs = new Map<string, RequestPr>()
+  const known = new Map<string, RequestPr>()
+  const guesses = new Map<string, RequestPr>()
   for (const { repo, number } of found) {
-    const url = repo === null ? null : prUrl(repo, number)
-    if (repo !== null && url !== null && !prs.has(url.toLowerCase())) {
-      prs.set(url.toLowerCase(), { url, repo, number, title: null, ci: null, state: null })
+    if (repo !== null) {
+      known.set(prUrl(repo, number).toLowerCase(), newPr(repo, number))
+    } else {
+      agentRepos(task).forEach((each) => guesses.set(prUrl(each, number).toLowerCase(), newPr(each, number)))
     }
   }
-  return [...prs.values()].slice(0, MAX_PRS)
+  const sure = [...known.values()].slice(0, MAX_PRS)
+  const unsure = [...guesses.values()].filter((pr) => !known.has(pr.url.toLowerCase()))
+  return { known: sure, guesses: unsure.slice(0, MAX_PRS) }
+}
+
+/** The guesses whose PR exists, open or merged, at most a few for each number. */
+function confirmed(guesses: readonly RequestPr[]): RequestPr[] {
+  const real = guesses.filter((pr) => pr.state === 'open' || pr.state === 'merged')
+  return real.filter((pr) => real.filter((other) => other.number === pr.number).indexOf(pr) < MAX_GUESSES)
 }
 
 /**
@@ -121,14 +164,18 @@ export async function addRequestPrs(
   if (task === undefined || mentions.length === 0) {
     return
   }
-  const prs = await resolve(task, mentions)
-  const named = prs.length === 0 ? undefined : await permissionRequests.setPrs(request.id, prs)
-  if (named === undefined) {
-    return
+  const { known, guesses } = await resolve(task, mentions)
+  if (known.length > 0) {
+    const named = await permissionRequests.setPrs(request.id, known)
+    if (named === undefined) {
+      return
+    }
+    await show(named)
   }
-  await show(named)
-  const detailed = await withDetails(prs)
-  if (detailed.every((pr) => pr.title === null && pr.ci === null && pr.state === null)) {
+  const looked = await withDetails([...known, ...guesses])
+  const detailed = [...looked.slice(0, known.length), ...confirmed(looked.slice(known.length))]
+  const learned = detailed.some((pr) => pr.title !== null || pr.ci !== null || pr.state !== null)
+  if (!learned) {
     return
   }
   const filled = await permissionRequests.setPrs(request.id, detailed)

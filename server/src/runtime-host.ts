@@ -40,15 +40,46 @@ const compactHook = (instructions: () => Promise<string | null>): HookCallbackMa
 
 type EditNotes = ReturnType<typeof editNoteHooks>
 
+/** Bash calls it noted at once, so a call nobody asks about is not kept for long. */
+const SHELL_DIRS_KEPT = 50
+
+/**
+ * The folder the agent's shell is in for each Bash call, as the PreToolUse hook reports it, kept
+ * until the call is asked about; the shell keeps a `cd` of an earlier call.
+ */
+function shellDirs() {
+  const dirs = new Map<string, string>()
+  const hook: HookCallback = async (input) => {
+    if (input.hook_event_name === 'PreToolUse') {
+      dirs.set(input.tool_use_id, input.cwd)
+      const [oldest] = dirs.keys()
+      if (dirs.size > SHELL_DIRS_KEPT && oldest !== undefined) {
+        dirs.delete(oldest)
+      }
+    }
+    return Promise.resolve({})
+  }
+  const take = (id: string) => {
+    const dir = dirs.get(id)
+    dirs.delete(id)
+    return dir
+  }
+  return { matcher: { matcher: 'Bash', hooks: [hook] } satisfies HookCallbackMatcher, take }
+}
+
+type ShellDirs = ReturnType<typeof shellDirs>
+
 /**
  * Decides each tool call the runtime would ask about by asking the control plane, and keeps its
  * note of the user's edits for the agent once the call has run.
  */
 const decideByAsking =
-  (taskId: string, session: AbortSignal, edits: EditNotes): CanUseTool =>
+  (taskId: string, session: AbortSignal, edits: EditNotes, dirs: ShellDirs): CanUseTool =>
   async (tool, input, { signal, ...options }) => {
     const both = AbortSignal.any([signal, session])
-    const { result, context } = await nodeLink.ask(taskId, 'permission.ask', { tool, input, options }, both)
+    const cwd = dirs.take(options.toolUseID)
+    const asked = { tool, input, options, ...(cwd === undefined ? {} : { cwd }) }
+    const { result, context } = await nodeLink.ask(taskId, 'permission.ask', asked, both)
     edits.keep(options.toolUseID, context)
     // The control plane answered with what canUseToolFor decided.
     return result as PermissionResult
@@ -173,10 +204,12 @@ export async function sessionHost(task: Task, sandboxed: boolean, session: Abort
   const { servers } = await nodeLink.ask(task.id, 'tools.list', {})
   const shadow = shadowHooks(task, sandboxed, session)
   const edits = editNoteHooks()
+  const dirs = shellDirs()
   const notes = { PostToolUse: edits.PostToolUse, PostToolUseFailure: edits.PostToolUseFailure }
+  const own = withHooks(sessionHooks(task, sandboxed, session), { PreToolUse: [dirs.matcher] })
   return {
-    decide: shadow.observe(decideByAsking(task.id, session, edits)),
-    hooks: withHooks(withHooks(sessionHooks(task, sandboxed, session), notes), shadow.hooks),
+    decide: shadow.observe(decideByAsking(task.id, session, edits, dirs)),
+    hooks: withHooks(withHooks(own, notes), shadow.hooks),
     toolServers: Object.fromEntries(servers.map((server) => [server.name, hostedServer(task.id, server)])),
   }
 }
