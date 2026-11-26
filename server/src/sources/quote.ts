@@ -1,5 +1,5 @@
 /** Quotes shorter than this, once normalised, are too short to say anything and never verify. */
-export const QUOTE_MIN = 12
+const QUOTE_MIN = 12
 
 const ENTITIES: Record<string, string> = { '&amp;': '&', '&lt;': '<', '&gt;': '>', '&quot;': '"', '&#39;': "'" }
 

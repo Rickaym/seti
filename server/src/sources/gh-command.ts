@@ -28,7 +28,7 @@ const UNQUOTED = /[|&;<>()$`\\*?{}[\]!#\n\r]/
 const QUOTED = /[$`\\\n\r]/
 
 /** A command's words, or null when it uses any shell feature beyond plain words and quotes. */
-export function plainWords(command: string): string[] | null {
+function plainWords(command: string): string[] | null {
   const words: string[] = []
   const at: { word: string | null; quote: string | null } = { word: null, quote: null }
   const quoted = (ch: string): boolean => {

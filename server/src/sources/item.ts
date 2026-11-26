@@ -74,7 +74,7 @@ function follow(value: unknown, pointer: string): unknown {
 const RANGE = /@(\d+):(\d+)$/
 
 /** The text one locator names in a result text; null when it names nothing there any more. */
-export function locate(text: string, locator: string): string | null {
+function locate(text: string, locator: string): string | null {
   const range = RANGE.exec(locator)
   const pointer = range === null ? locator : locator.slice(0, range.index)
   const value = pointer === '' ? text : follow(parseJson(text), pointer)

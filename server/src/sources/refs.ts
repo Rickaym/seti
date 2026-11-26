@@ -38,7 +38,7 @@ export const isSlackTs = (ts: unknown): ts is string => typeof ts === 'string' &
 /** The time a Slack `ts` stands for. */
 export const slackTime = (ts: string): string => new Date(Number(ts.split('.')[0]) * 1000).toISOString()
 
-export const githubRef = (repo: string, number: number | string) => `github:${repo.toLowerCase()}#${String(number)}`
+const githubRef = (repo: string, number: number | string) => `github:${repo.toLowerCase()}#${String(number)}`
 
 /** `owner/repo` when both parts are names GitHub allows. */
 export function githubRepo(owner: string, repo: string): string | null {
