@@ -139,7 +139,7 @@ export const eaSecurityAccessRefusal = (c: Context, kinds: readonly AccessKind[]
 export const eaSshReadOnly = eaReadOnly('change ssh hosts, keys or trusted host keys')
 
 /** The refusal of an EA action that needs the user's own yes and has none to use. */
-export const NO_WORD =
+const NO_WORD =
   "The EA does this only on the user's own yes, spoken or typed in the turn right after it read the " +
   'change back; ask the user again'
 
