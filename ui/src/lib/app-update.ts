@@ -25,6 +25,8 @@ let pending: Pending | null = null
 let offered = false
 let applying = false
 let reloadOnTakeover = false
+/** Whether a signed-in page polls the server's build; before sign-in the API refuses. */
+let watching = false
 let settle: ReturnType<typeof setInterval> | undefined
 const listeners = new Set<() => void>()
 
@@ -235,15 +237,26 @@ export function adoptWorker(next: ServiceWorkerRegistration): void {
 
 const checkServer = () => {
   registration?.update().catch(() => undefined)
-  systemResource.refresh()
+  if (watching) {
+    systemResource.refresh()
+  }
 }
 
-/** Compares this page's build with the server's on every poll and on return to the foreground. */
-export function startUpdates(): void {
-  watchTyping()
-  systemResource.subscribe(() => {
+/** Compares this page's build with the server's on every poll, once the user is signed in. */
+export function watchServerBuild(): () => void {
+  const stop = systemResource.subscribe(() => {
     noteServerBuild(systemResource.getSnapshot().data?.build)
   })
+  watching = true
+  return () => {
+    watching = false
+    stop()
+  }
+}
+
+/** Watches for a new worker and for the page going to the background and back. */
+export function startUpdates(): void {
+  watchTyping()
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.addEventListener('controllerchange', () => {
       if (reloadOnTakeover) {
