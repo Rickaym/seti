@@ -1440,6 +1440,11 @@ Optional and off by default: a maintenance session per agent that consolidates i
 - MOD-26: A mod's slash command MUST NOT take a name the control room's own agent commands use
   (`/restart`, `/archive`, `/mcp`, `/sandbox`, `/bypass`, `/credential`, `/access`, `/settings`,
   `/rename`, `/dream`); a manifest that names one is invalid.
+- MOD-27: A mod's command offered on the palette, an agent's header or menu, or a view SHOULD also
+  be offered to the EA or carry `eaReason`, and a mod's route other than `GET` SHOULD name a
+  command offered to the EA or carry `eaReason`. A route's `command` MUST name one of the mod's
+  commands. The control room writes a warning to the mod's log for each one that does neither when
+  it starts the mod; mod API 2.0.0 makes these MUST and refuses such a manifest.
 
 ## 18. Public surfaces
 

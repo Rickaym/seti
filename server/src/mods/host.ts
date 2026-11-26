@@ -5,6 +5,7 @@ import {
   grantScopes,
   manifestProblem,
   modAuditKind,
+  modEaReachWarnings,
   modManifest,
   modScoped,
   type Disposer,
@@ -14,6 +15,7 @@ import {
   type ModTier,
 } from '@seti/shared'
 import { pollerTemplates, webhookSources } from '../channels/sources.js'
+import { modLogs } from '../store/mod-logic.js'
 import { modHostSettings, modStates } from '../store/mods.js'
 import { serverApi } from './api.js'
 import { registerModContext } from './ops/context.js'
@@ -122,6 +124,13 @@ function registerDeclared(manifest: ModManifest, track: (dispose: Disposer) => D
     track(modAuditKinds.register({ kind: modAuditKind(id, kind), mod: id }))
   }
   claimFileViewers(manifest, track)
+}
+
+/** Logs what a person can do through the mod but the EA cannot, with no reason given. */
+async function logEaReach(manifest: ModManifest): Promise<void> {
+  for (const warning of modEaReachWarnings(manifest.contributes)) {
+    await modLogs.system(manifest.id, warning, 'warn')
+  }
 }
 
 /** A channel source the manifest declares whose code the server half did not register. */
@@ -322,6 +331,7 @@ export class ModHost {
       if (command !== undefined) {
         throw new Error(`It declares the command ${command}, which its server half does not answer`)
       }
+      await logEaReach(manifest)
       mod.disposers = disposers
       runningMods.add(id)
     } catch (e) {
