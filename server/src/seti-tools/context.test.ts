@@ -46,8 +46,7 @@ describe('context pack tools', () => {
 
     const read = (await call('get_context_pack', { pack: id, query: 'tag' })).json()
     expect(read.matches).toEqual(['Then tag it.'])
-    expect(read.used_by).toMatchObject({ ea: false })
-    expect(Array.isArray(read.used_by.agents)).toBe(true)
+    expect(read.used_by).toEqual({ agents: [], ea: false })
     expect((await revisions.unseen()).some((change) => change.object_id === id)).toBe(true)
     const changes = await call('list_changes', { pack: 'Deploy notes' })
     expect(changes.json()).toHaveLength(2)
