@@ -52,7 +52,7 @@ test('hovering a mark previews its source, and a click opens it without leaving 
 
   await page.mouse.move(0, 0)
   await markOf(page, 4).click()
-  await expect(page.getByTestId('reference-preview')).toContainText(SOURCES.note)
+  await expect(page.getByTestId('reference-preview').filter({ hasText: SOURCES.note })).toBeVisible()
   expect(page.url()).toBe(at)
   await expect(page.getByRole('region', { name: 'Transcript' })).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Footnotes' })).toHaveCount(0)
