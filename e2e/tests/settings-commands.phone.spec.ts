@@ -15,31 +15,37 @@ async function seedAgent(title: string): Promise<string> {
 }
 
 const reply = (page: Page) => page.getByRole('combobox', { name: 'Reply' })
-const card = (page: Page, name: string) => page.getByRole('group', { name: `Command /${name}` })
+const card = (page: Page, name: string) => page.getByRole('group', { name: `Command /seti:${name}` })
 
 async function shot(page: Page, name: string): Promise<void> {
   await test.info().attach(name, { body: await page.screenshot(), contentType: 'image/png' })
 }
 
-test('setting commands complete, pick and confirm with taps on a phone', async ({ page, request }) => {
+test('Seti commands complete each word, pick and confirm with taps on a phone', async ({ page, request }) => {
   const id = await seedAgent('Phone commands')
   await page.goto(`/#agents/${id}`)
   await reply(page).tap()
   await reply(page).pressSequentially('/by')
   const list = page.getByRole('listbox', { name: 'Command suggestions' })
-  await expect(list.getByRole('option', { name: /\/bypass/ })).toBeVisible()
+  const name = list.getByRole('option', { name: /\/seti:bypass/ })
+  await expect(name).toBeVisible()
+  await expectTouchTarget(name)
   await expectFitsPhone(page, 'the command list')
   await shot(page, 'phone-completion')
-  await list.getByRole('option', { name: /\/bypass/ }).tap()
-  await expect(reply(page)).toHaveValue('/bypass ')
+  await name.tap()
+  await expect(reply(page)).toHaveValue('/seti:bypass ')
 
-  const bypass = card(page, 'bypass')
-  const eight = bypass.getByRole('button', { name: '8 h' })
+  const hours = page.getByRole('listbox', { name: 'one of 2, 8, 24, off' })
+  const eight = hours.getByRole('option', { name: /8 h/ })
   await expect(eight).toBeVisible()
   await expectTouchTarget(eight)
-  await expectFitsPhone(page, 'the Bypass picker')
-  await shot(page, 'phone-picker')
+  await expect(hours.getByRole('option', { name: /Off/ })).toContainText('Already off')
+  await expectFitsPhone(page, 'the Bypass choices')
+  await shot(page, 'phone-values')
   await eight.tap()
+  await expect(reply(page)).toHaveValue('/seti:bypass 8 ')
+  await page.getByRole('button', { name: 'Run command' }).tap()
+  const bypass = card(page, 'bypass')
   const turnOn = bypass.getByRole('button', { name: 'Turn on' })
   await expect(turnOn).toBeVisible()
   await expectTouchTarget(turnOn)
@@ -47,18 +53,25 @@ test('setting commands complete, pick and confirm with taps on a phone', async (
   await shot(page, 'phone-confirm')
   await turnOn.tap()
   await expect.poll(async () => (await apiData<Task>(request, `/tasks/${id}`)).bypass_until).not.toBeNull()
+
+  await reply(page).tap()
+  await reply(page).pressSequentially('/seti:access ')
+  const kinds = page.getByRole('listbox', { name: 'a kind of access' })
+  await expect(kinds.getByRole('option', { name: /MCP server/ })).toBeVisible()
+  await expectFitsPhone(page, 'the access kinds')
+  await shot(page, 'phone-access-kinds')
 })
 
-test('a restored /archive waits for Run on a phone', async ({ page, request }) => {
+test('a restored /seti:archive waits for Run on a phone', async ({ page, request }) => {
   const id = await seedAgent('Phone restored')
   await page.addInitScript(
     ([key, value]) => {
       localStorage.setItem(key, value)
     },
-    [`seti.draft.task.${id}`, '/archive'] as const,
+    [`seti.draft.task.${id}`, '/seti:archive'] as const,
   )
   await page.goto(`/#agents/${id}`)
-  await expect(reply(page)).toHaveValue('/archive')
+  await expect(reply(page)).toHaveValue('/seti:archive')
   await page.getByRole('button', { name: 'Run command' }).tap()
   const archive = card(page, 'archive')
   const run = archive.getByRole('button', { name: 'Run' })

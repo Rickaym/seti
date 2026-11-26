@@ -147,5 +147,11 @@ export * from './runtimes/settings.js'
 export * from './runtimes/stored.js'
 export { setiCommandInput, type SetiCommandInput, type SetiCommandResult } from './seti-commands/input.js'
 export { isSetiLine, SETI_NAMES, setiComposerCommands, sourcesOf } from './seti-commands/names.js'
-export { completeSetiLine, parseSetiLine, SETI_LINE_MAX, type SetiCommand } from './seti-commands/parse.js'
+export {
+  completeSetiLine,
+  parseSetiLine,
+  SETI_LINE_MAX,
+  type SetiCommand,
+  type SetiCompletion,
+} from './seti-commands/parse.js'
 export type { CommandAuthor, CommandSource, CommandWorld } from './seti-commands/world.js'

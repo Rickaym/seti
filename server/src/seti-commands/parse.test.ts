@@ -65,8 +65,8 @@ function world(author: CommandAuthor = 'user', runtime: 'claude' | 'codex' = 'cl
       github: { state: 'none' },
     },
     credentials: [
-      { id: 'default', name: 'Default' },
-      { id: 'p2', name: 'Deploy' },
+      { id: 'default', name: 'Default', builtin: true, agents: 1, access_items: 0 },
+      { id: 'p2', name: 'Deploy', builtin: false, agents: 0, access_items: 2 },
     ],
     workspaces: [
       { id: 'w1', name: 'Main' },
