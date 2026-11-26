@@ -2,7 +2,6 @@ import os from 'node:os'
 import { withSetiCommands, type CommandCatalog, type CommandInfo, type ComposerCommand } from '@seti/shared'
 import type { CapabilityLookup } from './capabilities.js'
 import { mainCheckout } from './git.js'
-import { setiCommands } from './mods/points.js'
 
 const TERMINAL_ONLY = 'it only changes the terminal display'
 const TERMINAL_UI = 'Claude Code marks it as terminal only'
@@ -45,11 +44,11 @@ const toComposer = (command: CommandInfo, builtin: boolean): ComposerCommand => 
 
 /**
  * Every slash command a task directory offers, builtins first where names repeat. An agent's
- * catalog adds Seti's own commands, which win over any of the same name.
+ * catalog adds Seti's own commands (`seti`), which win over any of the same name.
  */
 export function commandCatalog(
   { snapshot, exact, fresh }: CapabilityLookup,
-  { agent = false }: { agent?: boolean } = {},
+  seti?: readonly ComposerCommand[],
 ): CommandCatalog {
   const builtin = snapshot.builtin_commands.map((command) => toComposer(command, true))
   const taken = new Set(builtin.map((command) => command.name))
@@ -63,9 +62,8 @@ export function commandCatalog(
     probed_at: snapshot.probed_at,
     fresh,
     approximate: !exact,
-    commands: agent
-      ? withSetiCommands(commands, setiCommands())
-      : commands.toSorted((a, b) => a.name.localeCompare(b.name)),
+    commands:
+      seti === undefined ? commands.toSorted((a, b) => a.name.localeCompare(b.name)) : withSetiCommands(commands, seti),
   }
 }
 

@@ -30,6 +30,7 @@ import { endSession, isRunning, publish, sessionState } from './runner.js'
 import { DIRECT, type SettingsWrite } from './settings-write.js'
 import { shellTurnGuard } from './shell-context.js'
 import { closeAgentChats } from './side-chat/chats.js'
+import { rebuildSources } from './sources/record.js'
 import { archiveSettings, taskArchives, type ArchiveRecord } from './store/archive.js'
 import { taskInputs } from './store/inputs.js'
 import { prWatch } from './store/pr-watch.js'
@@ -262,6 +263,7 @@ export async function unarchiveTask(taskId: string, actor: ArchiveActor = 'user'
   })
   forgetSubtasks(task.id)
   forgetChunks(task.id)
+  await rebuildSources(task.id)
   capabilityCache.prewarm(task.cwd)
   publish(task.id, { type: 'archived', archived: false })
   const again = worktrees.filter((worktree) => worktree.recreated).map((worktree) => worktree.dir)

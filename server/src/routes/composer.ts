@@ -1,6 +1,16 @@
 import fs from 'node:fs'
 import path from 'node:path'
-import { commandScopeQuery, shellInput, taskParams, type AuditKind, type CommandCatalog, type Task } from '@seti/shared'
+import {
+  commandScopeQuery,
+  settingCommands,
+  shellInput,
+  taskParams,
+  withSetiCommands,
+  type AuditKind,
+  type CommandCatalog,
+  type ComposerCommand,
+  type Task,
+} from '@seti/shared'
 import { Hono } from 'hono'
 import { compress } from 'hono/compress'
 import { audit } from '../audit.js'
@@ -8,23 +18,27 @@ import { capabilityCache } from '../capabilities.js'
 import { commandCatalog, nearbyDirs } from '../commands.js'
 import { notEa } from '../ea-guard.js'
 import { HttpError, ok, valid, validJson } from '../http.js'
+import { setiCommands } from '../mods/points.js'
 import { agentCapabilities } from '../runtimes/capabilities.js'
 import { runShell, stopShell } from '../shell.js'
 import { inLane } from '../task-lane.js'
 import { requireTask } from '../tasks.js'
 import { scopeCwd } from './capabilities.js'
 
-const catalogFor = async (cwd: string, agent = false) =>
-  commandCatalog(await capabilityCache.lookup(cwd, nearbyDirs(cwd)), { agent })
+const catalogFor = async (cwd: string, seti?: readonly ComposerCommand[]) =>
+  commandCatalog(await capabilityCache.lookup(cwd, nearbyDirs(cwd)), seti)
 
-/** An agent whose runtime takes no slash commands of its own lists none. */
-const noCommands = (cwd: string): CommandCatalog => ({
+/** An agent whose runtime takes no slash commands of its own lists only Seti's. */
+const setiOnly = (cwd: string, seti: readonly ComposerCommand[]): CommandCatalog => ({
   cwd,
   probed_at: new Date().toISOString(),
   fresh: true,
   approximate: false,
-  commands: [],
+  commands: withSetiCommands([], seti),
 })
+
+/** The commands Seti answers for an agent: its setting commands the runtime can take, and mods'. */
+const agentSetiCommands = (task: Task) => [...settingCommands(agentCapabilities(task.runtime)), ...setiCommands()]
 
 async function auditShell(kind: Extract<AuditKind, `task.shell_${string}`>, task: Task, command: string) {
   const verb = kind === 'task.shell_run' ? 'Ran' : 'Stopped'
@@ -44,9 +58,10 @@ const validTask = valid('param', taskParams)
 export const taskComposerRoutes = new Hono()
   .get('/:id/commands', compress(), validTask, async (c) => {
     const task = await requireTask(c.req.valid('param').id)
+    const seti = agentSetiCommands(task)
     return ok(
       c,
-      agentCapabilities(task.runtime).slash_commands ? await catalogFor(task.cwd, true) : noCommands(task.cwd),
+      agentCapabilities(task.runtime).slash_commands ? await catalogFor(task.cwd, seti) : setiOnly(task.cwd, seti),
     )
   })
   .post('/:id/shell', notEa('run shell commands'), validTask, validJson(shellInput), async (c) => {

@@ -46,6 +46,7 @@ import { TodoStrip } from '@/panels/tasks/TodoStrip'
 import { HeaderUnseenDot } from '@/panels/tasks/UnseenDot'
 import type { ActionHandlers } from '@/panels/tasks/agent-actions'
 import { useAgentFrame, type AgentFrame } from '@/panels/tasks/agent-frame'
+import type { CommandHost, SettingsRequest } from '@/panels/tasks/commands/types'
 import { useCompactingResync } from '@/panels/tasks/useCompactingResync'
 import { useMarkSeen } from '@/panels/tasks/useMarkSeen'
 import { usePin } from '@/panels/tasks/usePin'
@@ -189,6 +190,22 @@ export function TaskDetail({ task, onChanged, onSubtasks }: TaskDetailProps) {
   })
 
   const background = stream.session.background
+  const [settingsRequest, setSettingsRequest] = useState<SettingsRequest | null>(null)
+  const host = useMemo<CommandHost>(
+    () => ({
+      task,
+      running: status === 'running',
+      busy: busy || background > 0,
+      onChanged,
+      openSettings: (target) => {
+        setSettingsRequest({ target, at: Date.now() })
+      },
+      startRename: () => {
+        setTitleDraft(task.title)
+      },
+    }),
+    [task, status, busy, background, onChanged],
+  )
   const endSession = async () => {
     const work = background === 1 ? 'the background subagent or command' : `${String(background)} background jobs`
     if (!(await confirm({ message: `Stop ${work} of "${task.title}"?`, variant: 'destructive' }))) {
@@ -229,6 +246,7 @@ export function TaskDetail({ task, onChanged, onSubtasks }: TaskDetailProps) {
         busy={busy || background > 0}
         running={status === 'running'}
         compact={compact}
+        request={settingsRequest}
       />
     </ErrorBoundary>
   )
@@ -296,7 +314,7 @@ export function TaskDetail({ task, onChanged, onSubtasks }: TaskDetailProps) {
             compacting={compacting}
             draft={draft}
             onDraftChange={setDraft}
-            onChanged={onChanged}
+            host={host}
           />
         </AgentDockArea>
         {rewinding && (
