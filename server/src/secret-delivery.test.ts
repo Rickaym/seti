@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import type { QuestionSecret } from '@seti/shared'
 import { describe, expect, it } from 'vitest'
 import { gitCheckoutAbove } from './private-file.js'
 import { suppliedText, writeSecretFile } from './secret-delivery.js'
@@ -59,7 +60,7 @@ describe('secret files', () => {
     const file = suppliedText({ name: 'API_TOKEN', hosts: [], delivery: 'file' }, '/w/secrets/API_TOKEN')
     expect(file).toMatch(/^The value of API_TOKEN is in \/w\/secrets\/API_TOKEN\. Read it from there/)
     expect(file).toContain('never open it with the Read tool, print it, log it or commit it')
-    const secret = { name: 'API_TOKEN', hosts: ['api.example.com'], delivery: 'secret_store' } as const
+    const secret: QuestionSecret = { name: 'API_TOKEN', hosts: ['api.example.com'], delivery: 'secret_store' }
     const later = suppliedText(secret, null)
     expect(later).toContain(
       "in Seti's secret store for api.example.com. From your next turn your session has $API_TOKEN",

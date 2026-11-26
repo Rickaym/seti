@@ -90,6 +90,7 @@ describe('control link', () => {
       'mode.set': () => ({ applied: 'next_turn' }),
       'policy.set': () => ({}),
       'proxy.model': () => ({}),
+      'proxy.connections': () => ({ applied: true }),
       'queued.retract': ({ promptId }) => ({ outcome: 'removed', promptId }),
       'quiet.restart': () => ({}),
       'sessions.view': () => ({
