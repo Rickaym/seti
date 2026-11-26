@@ -674,8 +674,9 @@ pnpm --filter @seti/server backup keygen /absolute/path/seti-backup.key
 
 After a restart Seti writes `~/.seti/backups/seti-<time>.pgdump.enc` every
 `SETI_BACKUP_INTERVAL_HOURS` and keeps the newest `SETI_BACKUP_KEEP`. `backup now --env-file
-~/.seti/seti.env` takes one on demand. A restore goes into a new database and verifies its audit
-chain; point `SETI_DATABASE_URL` at it, or rename it over `seti` while Seti is stopped:
+~/.seti/seti.env` takes one on demand. A restore goes into a new database in one transaction, so a
+failed one leaves that database empty, then verifies its audit chain; point `SETI_DATABASE_URL` at
+it, or rename it over `seti` while Seti is stopped:
 
 ```sh
 pnpm --filter @seti/server backup restore /abs/backup.pgdump.enc seti_restored --key /abs/seti-backup.key
