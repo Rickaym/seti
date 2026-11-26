@@ -79,7 +79,7 @@ function BuiltinPack({ pack, onChanged }: { pack: ContextPack; onChanged: (pack:
     >
       <PackLinks pack={pack} />
       <div className="min-h-0 flex-1 overflow-y-auto border border-border p-3">
-        <Markdown text={pack.body} />
+        <Markdown text={pack.body} references={false} />
       </div>
     </EditorFrame>
   )
