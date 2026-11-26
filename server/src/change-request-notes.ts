@@ -44,6 +44,11 @@ function allowedText(request: ChangeRequest, keySet: boolean): { title: string; 
       }
     case 'mcp_server':
       return { title: `The user turned on the MCP server ${change.server} for you`, body: serverText(change.server) }
+    case 'command':
+      return {
+        title: `The user allowed ${change.line}`,
+        body: `${change.description}. It applies from your next turn.`,
+      }
     case 'shared_tool':
       return {
         title: `The user published your shared tool ${change.name}`,
@@ -101,6 +106,7 @@ async function auditOutcome(request: ChangeRequest, outcome: Outcome, title: str
       request_id: request.id,
       change: what,
       kind: request.change.kind,
+      ...(request.change.kind === 'command' ? { command: request.change.line } : {}),
       ...(request.scope === null ? {} : { scope: request.scope }),
     },
   })

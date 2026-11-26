@@ -154,4 +154,5 @@ export {
   type SetiCommand,
   type SetiCompletion,
 } from './seti-commands/parse.js'
+export { OWN_TOOLS } from './seti-commands/rules.js'
 export type { CommandAuthor, CommandSource, CommandWorld } from './seti-commands/world.js'

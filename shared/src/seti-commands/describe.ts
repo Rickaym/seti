@@ -43,7 +43,25 @@ function describeTarget(first: AccessTarget, key: string, op: string, world: Com
 const describeItem = (what: string, op: string) =>
   op === 'reset' ? `Set ${what} back to its credential or the default` : `Turn ${what} ${op} for this agent`
 
-function describeAmount(name: string, key: string): string {
+/** The cap the agent has now, in the words its proposal shows beside the new one. */
+function amountNow(name: string, world: CommandWorld): string | null {
+  if (name === 'memory') {
+    return world.memory === null ? null : mbLabel(world.memory.effective.max_mb)
+  }
+  const percent = world.cpu?.cap.effective.quota_percent
+  if (percent === undefined) {
+    return null
+  }
+  return percent === null ? 'no cap' : coresLabel(percent)
+}
+
+function describeAmount(name: string, key: string, world: CommandWorld): string {
+  const now = amountNow(name, world)
+  const from = now === null ? '' : `, from ${now}`
+  return `${amountChange(name, key)}${from}`
+}
+
+function amountChange(name: string, key: string): string {
   const what = name === 'memory' ? 'memory cap' : 'CPU cap'
   if (key === 'default') {
     return `Set this agent's ${what} back to the default`
@@ -72,7 +90,7 @@ function describeValue(found: SetiName, value: string, world: CommandWorld): str
         ? `Turn ${entry.label} ${value}`
         : `${entry.label}: ${grammar.values.find((choice) => choice.value === value)?.label ?? value}`
     case 'amount':
-      return describeAmount(found.name, value)
+      return describeAmount(found.name, value, world)
     case 'access':
     case 'alias':
     case 'run':
