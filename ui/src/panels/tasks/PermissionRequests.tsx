@@ -77,11 +77,13 @@ function CallLines({ request }: { request: PermissionRequest }) {
   )
 }
 
-/** Why the agent asks, then the pull requests its command names. */
+/** Why Seti asks, never a repeat of the agent's description, then the PRs its command names. */
 function Reason({ request }: { request: PermissionRequest }) {
   return (
     <>
-      {request.reason !== null && <p className="text-muted-foreground">{request.reason}</p>}
+      {request.reason !== null && request.reason !== request.description && (
+        <p className="text-muted-foreground">{request.reason}</p>
+      )}
       <RequestPrs prs={request.prs} />
     </>
   )

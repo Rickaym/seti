@@ -8,6 +8,6 @@ export function ModMarkdown({ text, empty }: { text: string | null; empty: strin
   return text === null || text.trim() === '' ? (
     <p className="text-muted-foreground">{empty}</p>
   ) : (
-    <Markdown text={text} plugins={PLUGINS} className="max-w-[72ch] text-sm" />
+    <Markdown text={text} plugins={PLUGINS} references={false} className="max-w-[72ch] text-sm" />
   )
 }

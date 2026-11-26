@@ -1,7 +1,6 @@
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import type { CanUseTool } from '@anthropic-ai/claude-agent-sdk'
 import type { PermissionRequest, Task } from '@seti/shared'
 import { afterAll, describe, expect, it, vi } from 'vitest'
 import { createApp } from './app.js'
@@ -12,27 +11,43 @@ import type { DetailAnswer } from './pr-details.js'
 import { endSession, runTurn } from './runner.js'
 import { USER_AUTH } from './test-auth.js'
 
-/** Asks to run the command its prompt names, as Claude Code does for a call no rule allows. */
+/**
+ * Asks to run the command its prompt names, as Claude Code does for a call no rule allows:
+ * `<command> ## <description> @@ <folder the shell is in>`. With a description it hands that on
+ * as the call's description and gives no reason of its own, as Claude Code did live.
+ */
 const sdk = await vi.hoisted(async () => {
   const { FakeSdk, fakeAssistant, fakeResult } = await import('./fake-sdk.js')
   const fake = new FakeSdk(async function* (turn) {
-    const canUseTool: CanUseTool | undefined = turn.session.options.canUseTool
+    const { canUseTool, hooks } = turn.session.options
+    const [said = '', cwd] = turn.text.split(' @@ ')
+    const [command = '', description] = said.split(' ## ')
+    const input = description === undefined ? { command } : { command, description }
+    const event = {
+      session_id: 's',
+      transcript_path: '',
+      cwd: cwd ?? '/tmp',
+      hook_event_name: 'PreToolUse' as const,
+      tool_name: 'Bash',
+      tool_input: input,
+      tool_use_id: 'toolu_pr',
+    }
+    const bash = (hooks?.PreToolUse ?? []).filter((m) => m.matcher === undefined || m.matcher === 'Bash')
+    if (cwd !== undefined) {
+      for (const hook of bash.flatMap((m) => m.hooks)) {
+        await hook(event, 'toolu_pr', { signal: turn.signal })
+      }
+    }
+    const rule = { toolName: 'Bash', ruleContent: command }
     const options = {
       signal: turn.signal,
       toolUseID: 'toolu_pr',
       requestId: 'req_pr',
-      decisionReason: 'Merge the fix',
+      ...(description === undefined ? { decisionReason: 'Merge the fix' } : { description }),
       suggestions: [
-        {
-          type: 'addRules' as const,
-          behavior: 'allow' as const,
-          destination: 'localSettings' as const,
-          rules: [{ toolName: 'Bash', ruleContent: turn.text.split(' ## ')[0] ?? '' }],
-        },
+        { type: 'addRules' as const, behavior: 'allow' as const, destination: 'localSettings' as const, rules: [rule] },
       ],
     }
-    const [command = '', description] = turn.text.split(' ## ')
-    const input = description === undefined ? { command } : { command, description }
     const result = await canUseTool?.('Bash', input, options)
     yield fakeAssistant(JSON.stringify(result ?? null))
     yield fakeResult()
@@ -71,7 +86,10 @@ vi.mock('./pr-details.js', async (importOriginal) => ({
     lookup.calls.push([...urls])
     await lookup.held()
     const pr = { title: 'Fix lease renewal after TTL', ci: 'success' }
-    return { details: new Map(urls.map((url) => [url, url.endsWith('/2136') ? pr : null])), pending: [] } as never
+    const dash = { title: 'Add the lease renewal test', ci: 'pending' }
+    const known: Record<string, unknown> = { 'acme/tool/pull/2136': pr, 'acme/dash/pull/3782': dash }
+    const detail = (url: string) => known[url.replace('https://github.com/', '')] ?? null
+    return { details: new Map(urls.map((url) => [url, detail(url)])), pending: [] } as never
   },
 }))
 
@@ -90,9 +108,9 @@ const app = createApp()
 const headers = { host: 'localhost', ...USER_AUTH, 'content-type': 'application/json' }
 const created: string[] = []
 
-async function newTask(cwd = '/tmp'): Promise<Task> {
+async function newTask(cwd = '/tmp', prUrls: string[] = []): Promise<Task> {
   const id = `request-prs-task-${String(created.length + 1)}`
-  await tasks.insert({ id, title: id, repo_id: null, cwd, worktree: false, pr_urls: [] })
+  await tasks.insert({ id, title: id, repo_id: null, cwd, worktree: false, pr_urls: prUrls })
   created.push(id)
   const task = await tasks.get(id)
   if (task === undefined) {
@@ -204,5 +222,61 @@ describe('the PRs a request names', () => {
     const plain = await newTask()
     await runTurn(plain.id, 'gh pr view 6 -R acme/tool')
     expect((await pending(plain.id)).description).toBeNull()
+  })
+
+  it('names the ask rule that holds a live merge, never the description, and finds the PR where the shell cd-ed', async () => {
+    const clone = fs.mkdtempSync(path.join(os.tmpdir(), 'request-prs-clone-'))
+    await git(clone, 'init', '-q')
+    await git(clone, 'remote', 'add', 'origin', 'https://github.com/acme/dash.git')
+    try {
+      const task = await newTask()
+      await addPermissionRule(task, { behavior: 'ask', rule: 'Bash(gh pr merge:*)' })
+      await addPermissionRule(task, { behavior: 'allow', rule: 'PushTo(acme)' })
+      const merge = `gh pr merge 3782 --squash && sleep 4 && gh pr view 3782 --json state,mergeCommit --jq '"#3782 \\(.state)"' | tee -a /abs/ops.log`
+      const command = `git diff origin/staging...abc123 -- path/file.test.ts | grep -E '^\\+.*(it|describe)\\(' ; ${merge}`
+      await runTurn(task.id, `${command} ## Confirm new test added, merge PR 3782 @@ ${clone}`)
+      const request = await pending(task.id, (one) => one.prs[0]?.title !== null && one.prs.length > 0)
+      expect(request.description).toBe('Confirm new test added, merge PR 3782')
+      expect(request.reason).toBe('Your Ask rule holds this: Bash(gh pr merge:*)')
+      expect(request.suggestions).toEqual([])
+      expect(request.prs).toEqual([
+        {
+          url: 'https://github.com/acme/dash/pull/3782',
+          repo: 'acme/dash',
+          number: 3782,
+          title: 'Add the lease renewal test',
+          ci: 'pending',
+          state: 'open',
+        },
+      ])
+    } finally {
+      fs.rmSync(clone, { recursive: true, force: true })
+    }
+  })
+
+  it('shows no reason line rather than the description when nothing says why', async () => {
+    const task = await newTask()
+    await runTurn(task.id, 'make deploy ## Ship the build')
+    const request = await pending(task.id)
+    expect(request.description).toBe('Ship the build')
+    expect(request.reason).toBeNull()
+  })
+
+  it("guesses a bare number in the agent's own repositories when the folder names none", async () => {
+    const linked = ['https://github.com/acme/dash/pull/3700', 'https://github.com/acme/tool/pull/9']
+    const one = await newTask('/tmp', linked)
+    await runTurn(one.id, 'gh pr merge 3782 --squash')
+    const found = await pending(one.id, (request) => request.prs.length > 0)
+    expect(found.prs.map((pr) => pr.url)).toEqual(['https://github.com/acme/dash/pull/3782'])
+
+    const both = await newTask('/tmp', linked)
+    await runTurn(both.id, 'gh pr view 7')
+    const guessed = await pending(both.id, (request) => request.prs.length > 1)
+    expect(guessed.prs.map((pr) => pr.repo)).toEqual(['acme/dash', 'acme/tool'])
+
+    const none = await newTask('/tmp', linked)
+    await runTurn(none.id, 'gh pr view 8')
+    await new Promise((resolve) => setTimeout(resolve, 300))
+    expect((await pending(none.id)).prs).toEqual([])
   })
 })
