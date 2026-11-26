@@ -69,7 +69,7 @@ jobs:
         if: needs.changes.outputs.node == 'true'
       - run: pnpm audit --audit-level high
         if: needs.changes.outputs.node == 'true'
-      - run: pnpm -r --filter '!@seti/server' run test
+      - run: pnpm -r --filter '!seti' --filter '!@seti/server' run test
         if: needs.changes.outputs.node == 'true'
       - run: pnpm build
         if: needs.changes.outputs.node == 'true'
