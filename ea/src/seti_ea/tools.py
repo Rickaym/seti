@@ -62,6 +62,7 @@ from seti_ea.role_tools import role_lines
 from seti_ea.seti import SetiClient, SetiError
 from seti_ea.settings_json import settings_text
 from seti_ea.settings_tools import SETTINGS_SPECS, SettingsTools
+from seti_ea.source_tools import SOURCE_CONTAINER, SOURCE_KIND, SOURCE_SINCE, SOURCE_UNTIL, find_sources
 from seti_ea.task_extras import FILES_ARG, opinion_lines, recent_files
 from seti_ea.thread_lines import thread_lines
 from seti_ea.toolkit import (
@@ -119,13 +120,14 @@ FIND_WHOLE_WORDS = {
 }
 FIND_WHERE = {
     "type": "string",
-    "enum": ["transcript", "file_names", "file_text", "file"],
+    "enum": ["transcript", "file_names", "file_text", "file", "sources"],
     "description": "Where to look: transcript (the default); file_names, the paths of the task's files "
     "and folders matched loosely as an editor's quick open does; file_text, the text inside its "
-    "files; or file, to read one file whole, with query its path as the agent or a file search "
-    "names it, such as a file an agent sent you. Files cover the task's working directory, repos, "
-    "folders and workspace as its Files view shows them, never hidden paths or secrets. "
-    "whole_words applies to the transcript only.",
+    "files; file, to read one file whole, with query its path as the agent or a file search names "
+    "it, such as a file an agent sent you; or sources, the Slack, Linear and GitHub items the task "
+    "read, with their exact text and permalink, by query, kind, container and time. Files cover the "
+    "task's working directory, repos, folders and workspace as its Files view shows them, never "
+    "hidden paths or secrets. whole_words applies to the transcript only.",
 }
 FIND_TOOLS = {
     "type": "boolean",
@@ -646,8 +648,12 @@ TOOL_SPECS: list[ToolSpec] = [
             "whole_words": FIND_WHOLE_WORDS,
             "include_tools": FIND_TOOLS,
             "where": FIND_WHERE,
+            "kind": SOURCE_KIND,
+            "container": SOURCE_CONTAINER,
+            "since": SOURCE_SINCE,
+            "until": SOURCE_UNTIL,
         },
-        ["task", "query"],
+        ["task"],
     ),
     ToolSpec(
         "post_team_chat",
@@ -2287,10 +2293,12 @@ class EaTools:
         where = arg_str(args, "where", required=False) or "transcript"
         if where == "file":
             return await read_agent_file(self._seti, task, arg_str(args, "query"))
+        if where == "sources":
+            return await find_sources(self._seti, task, args)
         if where in FILE_SEARCH_MODES:
             return await self._find_in_files(task, FILE_SEARCH_MODES[where], arg_str(args, "query"))
         if where != "transcript":
-            raise ToolError("Set where to transcript, file_names, file_text or file.", "Bad where")
+            raise ToolError("Set where to transcript, file_names, file_text, file or sources.", "Bad where")
         tools = {"tools": "true"} if arg_bool(args, "include_tools") else {}
         query, hits, more = await self._find(f"/tasks/{task.get('id')}/search", args, tools)
         text = self._found(query, f"the transcript of {title_of(task)}", hits, more, FIND_KINDS)
