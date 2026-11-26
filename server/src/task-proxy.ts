@@ -1,9 +1,15 @@
 import fs from 'node:fs'
 import path from 'node:path'
-import type { ModelReach, NodeAsk, ProxyGrant } from '@seti/shared'
+import type { GrantConnection, ModelReach, NodeAsk, ProxyGrant } from '@seti/shared'
 import { askInTime } from './ask-in-time.js'
 import { SETI_HOME } from './config.js'
-import { connectionPlaceholders, connectionRules, mcpLoginRules, type ConnectionValue } from './egress-connections.js'
+import {
+  connectionEnv,
+  connectionPlaceholders,
+  connectionRules,
+  mcpLoginRules,
+  type ConnectionValue,
+} from './egress-connections.js'
 import { modelOnly } from './egress-hosts.js'
 import type { EgressPlaceholder } from './egress-placeholders.js'
 import { startEgressProxy, type EgressProxy, type Upstream } from './egress-proxy.js'
@@ -14,6 +20,7 @@ import { sandboxDirOf } from './owned-dirs.js'
 import { proxyCa } from './proxy-owner.js'
 import { awsToken, forgetAwsToken } from './sandbox-aws-token.js'
 import { loadSandboxCa, sandboxCaFiles, type SandboxCa } from './sandbox-ca.js'
+import { writeSandboxEnv } from './sandbox-env-file.js'
 import { sshAgentSocket, stopSshAgent } from './ssh-agent.js'
 
 const CA_DIR = path.join(SETI_HOME, 'sandbox-ca')
@@ -61,6 +68,8 @@ interface SessionAccess {
 }
 
 const access = new Map<string, SessionAccess>()
+/** The grant each running proxy applies, which a change of connections updates in place. */
+const grants = new Map<string, ProxyGrant>()
 const NO_ACCESS: SessionAccess = {
   rules: [],
   placeholders: [],
@@ -138,6 +147,7 @@ async function taskProxy(taskId: string, authority: SandboxCa): Promise<EgressPr
 function applyGrant(taskId: string, grant: ProxyGrant): void {
   const value = connectionValueAsk(taskId)
   const mcp = async (url: URL) => mint(taskId, { kind: 'mcp', url: url.href })
+  grants.set(taskId, grant)
   access.set(taskId, {
     rules: [...connectionRules(grant.connections, value), ...mcpLoginRules(grant.mcp, mcp)],
     placeholders: connectionPlaceholders(grant.connections, value),
@@ -153,6 +163,22 @@ export async function startProxy(taskId: string, grant: ProxyGrant): Promise<voi
   const authority = await sandboxCa()
   await authority.cover(grant.caHosts)
   await taskProxy(taskId, authority)
+}
+
+/**
+ * Gives the agent's running proxy its credential's connections as they are now, keeping the rest
+ * of its grant, and writes their placeholders to the env file its sandbox's shells read. False
+ * when no proxy runs for the agent, so its next sandbox takes them when it starts.
+ */
+export async function regrantConnections(taskId: string, connections: readonly GrantConnection[]): Promise<boolean> {
+  const current = grants.get(taskId)
+  if (current === undefined || !proxies.has(taskId)) {
+    return false
+  }
+  const caHosts = [...new Set([...current.caHosts, ...ruleCaHosts(connections)])]
+  await (await sandboxCa()).cover(caHosts)
+  applyGrant(taskId, { ...current, connections: [...connections], caHosts })
+  return writeSandboxEnv(path.join(sandboxDirOf(taskId), 'run'), connectionEnv(connections))
 }
 
 /** Opens the task's proxy for a sandbox another process builds; a running one stays as it is. */
@@ -212,6 +238,7 @@ export async function closeTaskProxy(taskId: string): Promise<void> {
   modelReaches.delete(taskId)
   forgetAwsToken(taskId)
   access.delete(taskId)
+  grants.delete(taskId)
   for (const proxy of running) {
     await proxy?.then(async (open) => open.close()).catch(() => undefined)
   }

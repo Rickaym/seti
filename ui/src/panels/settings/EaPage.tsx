@@ -1,4 +1,4 @@
-import { EA_CLIENT_MESSAGES, type EaHealth } from '@seti/shared'
+import { EA_CLIENT_MESSAGES, callQualityText, type EaHealth } from '@seti/shared'
 import { VolumeX } from 'lucide-react'
 import { useCallback } from 'react'
 import { ToggleButton } from '@/components/ToggleButton'
@@ -38,6 +38,7 @@ const latencyText = (latency: Latency | null) =>
 export function EaPage() {
   const store = useEaCallStore()
   const call = useEaCall()
+  const callAudio = call.lastEnd?.quality ?? null
   const { state, refresh } = useEaHealth()
   const need = setupNeed(state)
   const health = state.status === 'up' ? state.health : null
@@ -151,6 +152,11 @@ export function EaPage() {
           <SettingRow label="Last end" description="How the last call in this browser ended.">
             <span data-testid="ea-last-end">{lastEndText(call.lastEnd)}</span>
           </SettingRow>
+          {callAudio !== null && (
+            <SettingRow label="Call audio" stack description="How the EA's voice reached you on the last call.">
+              <span data-testid="ea-call-audio">{callQualityText(callAudio)}</span>
+            </SettingRow>
+          )}
           <SettingRow label="Relay test" stack description="Checks that this browser can reach the relay.">
             <RelayCheck />
           </SettingRow>

@@ -2,16 +2,28 @@ import { describeChange, hostEntry, sharedToolCallName, type ChangeRequest, type
 import { audit } from './audit.js'
 import { tasks } from './db.js'
 import { deliverInputs, wakeTask } from './inputs.js'
+import { connectionsNow } from './live-connections.js'
 import { mcpToolPrefix, probedTools } from './mcp-off-context.js'
+import { liveVariableText } from './sandbox-env-file.js'
 import { auditTool } from './shared-tools.js'
 import { refreshBlocked } from './task-blocked.js'
 
 type Outcome = SetiInput['kind']
 
+/** How an allowed connection reached the agent: whether a key is set and its sandbox has it now. */
+interface KeyState {
+  keySet: boolean
+  live: boolean
+}
+
 /** What the agent learns of a pasted key: that it is in place, never the key or its length. */
-const keyText = (env: string, keySet: boolean) =>
-  `From your next turn your session has $${env}, holding a placeholder that Seti's proxy swaps for the ` +
-  `key on its hosts${keySet ? '' : ' once the user pastes it'}. You never see the value; never print or ask for it.`
+function keyText(env: string, { keySet, live }: KeyState): string {
+  const swapped = `a placeholder that Seti's proxy swaps for the key on its hosts${keySet ? '' : ' once the user pastes it'}`
+  if (live) {
+    return `${liveVariableText(env)} It holds ${swapped}; you never see the value, so never print or ask for it.`
+  }
+  return `From your next turn your session has $${env}, holding ${swapped}. You never see the value; never print or ask for it.`
+}
 
 const NAMED_TOOLS = 5
 
@@ -27,7 +39,7 @@ function serverText(server: string): string {
   )
 }
 
-function allowedText(request: ChangeRequest, keySet: boolean): { title: string; body: string } {
+function allowedText(request: ChangeRequest, key: KeyState): { title: string; body: string } {
   const { change } = request
   switch (change.kind) {
     case 'allow_host': {
@@ -39,8 +51,8 @@ function allowedText(request: ChangeRequest, keySet: boolean): { title: string; 
     }
     case 'api_key':
       return {
-        title: `The user added the connection ${change.env}${keySet ? ' with its key' : ''}`,
-        body: keyText(change.env, keySet),
+        title: `The user added the connection ${change.env}${key.keySet ? ' with its key' : ''}`,
+        body: keyText(change.env, key),
       }
     case 'mcp_server':
       return { title: `The user turned on the MCP server ${change.server} for you`, body: serverText(change.server) }
@@ -59,11 +71,11 @@ function allowedText(request: ChangeRequest, keySet: boolean): { title: string; 
   }
 }
 
-function textOf(request: ChangeRequest, outcome: Outcome, keySet: boolean): { title: string; body: string } {
+function textOf(request: ChangeRequest, outcome: Outcome, key: KeyState): { title: string; body: string } {
   const what = describeChange(request.change)
   switch (outcome) {
     case 'allowed':
-      return allowedText(request, keySet)
+      return allowedText(request, key)
     case 'denied':
       return {
         title: `The user denied your request for ${what}`,
@@ -115,14 +127,17 @@ async function auditOutcome(request: ChangeRequest, outcome: Outcome, title: str
 /**
  * Records how a request ended, tells the agent as an update, and takes it off the agent's reason
  * line. An expiry is Seti's; an answer is the user's, so the agent gets it without the wait that
- * groups updates. keySet means the user pasted the key on Allow.
+ * groups updates. keySet means the user pasted the key on Allow. An allowed connection reaches
+ * the agent's running sandbox before the update does.
  */
 export async function closeRequest(request: ChangeRequest, outcome: Outcome, keySet = false): Promise<void> {
   const task = await tasks.get(request.task_id)
   const title = task?.title ?? request.task_id
   const what = describeChange(request.change)
   await auditOutcome(request, outcome, title)
-  const text = textOf(request, outcome, keySet)
+  const live =
+    outcome === 'allowed' && request.change.kind === 'api_key' && task !== undefined && (await connectionsNow(task))
+  const text = textOf(request, outcome, { keySet, live })
   const input: SetiInput = {
     source: 'seti',
     kind: outcome,

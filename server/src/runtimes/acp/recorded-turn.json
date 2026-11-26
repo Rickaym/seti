@@ -1,0 +1,286 @@
+{
+  "agent": "gemini-cli 0.71.1",
+  "cwd": "/work",
+  "messages": [
+    {
+      "update": {
+        "sessionUpdate": "agent_thought_chunk",
+        "content": {
+          "type": "text",
+          "text": "****\nLet me look first."
+        }
+      }
+    },
+    {
+      "update": {
+        "sessionUpdate": "agent_message_chunk",
+        "content": {
+          "type": "text",
+          "text": "I will check the files."
+        }
+      }
+    },
+    {
+      "update": {
+        "sessionUpdate": "tool_call",
+        "toolCallId": "read_file__read_file_1795715130605_0",
+        "status": "in_progress",
+        "title": "hello.txt",
+        "content": [],
+        "locations": [
+          {
+            "path": "/work/hello.txt"
+          }
+        ],
+        "kind": "read"
+      }
+    },
+    {
+      "update": {
+        "sessionUpdate": "tool_call_update",
+        "toolCallId": "read_file__read_file_1795715130605_0",
+        "status": "completed",
+        "title": "hello.txt",
+        "content": [],
+        "locations": [
+          {
+            "path": "/work/hello.txt"
+          }
+        ],
+        "kind": "read"
+      }
+    },
+    {
+      "update": {
+        "sessionUpdate": "tool_call",
+        "toolCallId": "run_shell_command__run_shell_command_1795715130704_0",
+        "status": "pending",
+        "title": "echo hi > /work/marker",
+        "content": [
+          {
+            "type": "content",
+            "content": {
+              "type": "text",
+              "text": "[current working directory /work] (Write a marker)"
+            }
+          }
+        ],
+        "locations": [],
+        "kind": "execute"
+      }
+    },
+    {
+      "ask": {
+        "id": 0,
+        "options": ["proceed_always", "proceed_once", "cancel"],
+        "toolCallId": "run_shell_command__run_shell_command_1795715130704_0"
+      }
+    },
+    {
+      "update": {
+        "sessionUpdate": "tool_call_update",
+        "toolCallId": "run_shell_command__run_shell_command_1795715130704_0",
+        "status": "completed",
+        "title": "echo hi > /work/marker",
+        "content": [],
+        "locations": [],
+        "kind": "execute"
+      }
+    },
+    {
+      "update": {
+        "sessionUpdate": "tool_call",
+        "toolCallId": "write_file__write_file_1795715130774_0",
+        "status": "pending",
+        "title": "Writing to notes.md",
+        "content": [
+          {
+            "type": "diff",
+            "path": "/work/notes.md",
+            "oldText": "",
+            "newText": "one\ntwo\n",
+            "_meta": {
+              "kind": "add"
+            }
+          }
+        ],
+        "locations": [
+          {
+            "path": "/work/notes.md"
+          }
+        ],
+        "kind": "edit"
+      }
+    },
+    {
+      "ask": {
+        "id": 1,
+        "options": ["proceed_always", "proceed_once", "cancel"],
+        "toolCallId": "write_file__write_file_1795715130774_0"
+      }
+    },
+    {
+      "update": {
+        "sessionUpdate": "tool_call_update",
+        "toolCallId": "write_file__write_file_1795715130774_0",
+        "status": "completed",
+        "title": "Writing to notes.md",
+        "content": [
+          {
+            "type": "diff",
+            "path": "/work/notes.md",
+            "oldText": "",
+            "newText": "one\ntwo\n",
+            "_meta": {
+              "kind": "add"
+            }
+          }
+        ],
+        "locations": [
+          {
+            "path": "/work/notes.md"
+          }
+        ],
+        "kind": "edit"
+      }
+    },
+    {
+      "update": {
+        "sessionUpdate": "tool_call",
+        "toolCallId": "replace__replace_1795715131615_0",
+        "status": "pending",
+        "title": "notes.md: two => three",
+        "content": [
+          {
+            "type": "diff",
+            "path": "/work/notes.md",
+            "oldText": "one\ntwo\n",
+            "newText": "one\nthree\n",
+            "_meta": {
+              "kind": "modify"
+            }
+          }
+        ],
+        "locations": [
+          {
+            "path": "/work/notes.md"
+          }
+        ],
+        "kind": "edit"
+      }
+    },
+    {
+      "ask": {
+        "id": 2,
+        "options": ["proceed_always", "proceed_once", "cancel"],
+        "toolCallId": "replace__replace_1795715131615_0"
+      }
+    },
+    {
+      "update": {
+        "sessionUpdate": "tool_call_update",
+        "toolCallId": "replace__replace_1795715131615_0",
+        "status": "completed",
+        "title": "notes.md: two => three",
+        "content": [
+          {
+            "type": "diff",
+            "path": "/work/notes.md",
+            "oldText": "one\ntwo\n",
+            "newText": "one\nthree\n",
+            "_meta": {
+              "kind": "modify"
+            }
+          }
+        ],
+        "locations": [
+          {
+            "path": "/work/notes.md"
+          }
+        ],
+        "kind": "edit"
+      }
+    },
+    {
+      "update": {
+        "sessionUpdate": "tool_call",
+        "toolCallId": "run_shell_command__run_shell_command_1795715131693_0",
+        "status": "pending",
+        "title": "rm -rf /tmp/nothing-here",
+        "content": [
+          {
+            "type": "content",
+            "content": {
+              "type": "text",
+              "text": "[current working directory /work] (Remove)"
+            }
+          }
+        ],
+        "locations": [],
+        "kind": "execute"
+      }
+    },
+    {
+      "ask": {
+        "id": 3,
+        "options": ["proceed_always", "proceed_once", "cancel"],
+        "toolCallId": "run_shell_command__run_shell_command_1795715131693_0"
+      }
+    },
+    {
+      "update": {
+        "sessionUpdate": "tool_call_update",
+        "toolCallId": "run_shell_command__run_shell_command_1795715131693_0",
+        "status": "completed",
+        "title": "rm -rf /tmp/nothing-here",
+        "content": [],
+        "locations": [],
+        "kind": "execute"
+      }
+    },
+    {
+      "update": {
+        "sessionUpdate": "agent_message_chunk",
+        "content": {
+          "type": "text",
+          "text": "All done."
+        }
+      }
+    },
+    {
+      "result": {
+        "stopReason": "end_turn",
+        "usage": {
+          "inputTokens": 700,
+          "outputTokens": 49,
+          "cachedReadTokens": 140,
+          "totalTokens": 749
+        },
+        "_meta": {
+          "quota": {
+            "token_count": {
+              "input_tokens": 700,
+              "output_tokens": 49
+            },
+            "model_usage": [
+              {
+                "model": "gemini-3.8-flash",
+                "token_count": {
+                  "input_tokens": 100,
+                  "output_tokens": 7
+                }
+              },
+              {
+                "model": "auto",
+                "token_count": {
+                  "input_tokens": 600,
+                  "output_tokens": 42
+                }
+              }
+            ]
+          }
+        }
+      }
+    }
+  ]
+}

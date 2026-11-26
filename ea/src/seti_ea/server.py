@@ -170,6 +170,7 @@ class Sessions:
         await self._handler.handle_patch_request(request)
 
     async def _start(self, connection: SmallWebRTCConnection, call: CallRequest) -> None:
+        self._tools.audio_lost()
         task = asyncio.create_task(self._run(connection, call))
         self.current = Session(connection, task)
         joined = ", joined on open" if call.auto else ""

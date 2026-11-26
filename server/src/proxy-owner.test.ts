@@ -4,6 +4,7 @@ import {
   proxiesRunBy,
   proxyAwsToken,
   proxyCa,
+  proxyConnections,
   proxyGone,
   modelProxyHere,
   proxyHere,
@@ -23,6 +24,7 @@ describe('the owner of an agent egress proxy', () => {
     expect(start).toHaveBeenCalledTimes(1)
     expect(stop).toHaveBeenCalledTimes(1)
     expect(await proxyAwsToken(task.id, () => 'here')).toBe('here')
+    expect(await proxyConnections(task.id, [], async () => Promise.resolve(true))).toBe(true)
     expect(
       await proxyCa(
         async () => Promise.resolve('loaded'),
@@ -34,6 +36,7 @@ describe('the owner of an agent egress proxy', () => {
       open: vi.fn(async () => Promise.resolve()),
       openModel: vi.fn(async () => Promise.resolve()),
       close: vi.fn(async () => Promise.resolve()),
+      connections: vi.fn(async () => Promise.resolve(false)),
       awsToken: vi.fn(async () => Promise.resolve('node')),
       sshOpen: vi.fn(async () => Promise.resolve()),
       sshReload: vi.fn(async () => Promise.resolve()),
@@ -48,6 +51,8 @@ describe('the owner of an agent egress proxy', () => {
     expect(owner.openModel).toHaveBeenCalledWith('agent', { login: 'login', key: null })
     expect(owner.close).toHaveBeenCalledWith('agent')
     expect(await proxyAwsToken(task.id, () => 'here')).toBe('node')
+    expect(await proxyConnections(task.id, [], async () => Promise.resolve(true))).toBe(false)
+    expect(owner.connections).toHaveBeenCalledWith('agent', [])
     await sshAgentHere(task.id, start)
     await sshKeysChanged()
     expect(start).toHaveBeenCalledTimes(1)
