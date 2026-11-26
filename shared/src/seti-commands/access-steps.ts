@@ -1,5 +1,5 @@
 import { accessBase, type AccessItem, type AccessKind } from '../access.js'
-import { refusedHost } from '../change-requests.js'
+import { HTTPS_PORT, refusedHost } from '../change-requests.js'
 import { meetsNeeds } from '../runtimes/capabilities.js'
 import {
   ACCESS_OPS,
@@ -12,6 +12,13 @@ import {
   type OpRule,
 } from './rules.js'
 import { itemSource, option, type CommandOption, type CommandWorld, type FreeWord, type GrammarStep } from './world.js'
+
+const ITEM_PROMPTS: Partial<Readonly<Record<AccessTarget, string>>> = {
+  ssh: 'an SSH host',
+  mcp: 'an MCP server',
+  plugin: 'a plugin',
+  pack: 'a context pack',
+}
 
 const LIST_KINDS: Partial<Readonly<Record<AccessTarget, AccessKind>>> = {
   ssh: 'ssh',
@@ -121,7 +128,8 @@ function itemState(target: AccessTarget, key: string, world: CommandWorld): Item
     return { item: null, enabled: world.task.home_access }
   }
   if (target === 'host') {
-    return { item: null, enabled: (world.access?.hosts ?? []).includes(key) }
+    const hosts = world.access?.hosts ?? []
+    return { item: null, enabled: hosts.includes(key) || hosts.includes(`${key}:${String(HTTPS_PORT)}`) }
   }
   const item = itemsOf(target, world).find((entry) => entry.id === key) ?? null
   return { item, enabled: item?.enabled ?? false }
@@ -187,7 +195,7 @@ function opStep(name: AccessTarget, key: string, world: CommandWorld): GrammarSt
       unavailable: opRefusal(rule, op, label, world) ?? stateRefusal(op, state),
     }),
   )
-  return choose(ops.map(({ op }) => op).join(', '), options)
+  return choose(`one of ${ops.map(({ op }) => op).join(', ')}`, options)
 }
 
 function lastStep(name: AccessTarget, key: string, op: string, world: CommandWorld): GrammarStep | null {
@@ -212,7 +220,7 @@ function credentialStep(world: CommandWorld): GrammarStep {
 export function accessStep(words: readonly string[], world: CommandWorld): GrammarStep | null {
   const [first, second, third, ...more] = words
   if (first === undefined) {
-    return choose('what to change', targetOptions(world))
+    return choose('a kind of access', targetOptions(world))
   }
   if (first === 'reset' || first === 'save') {
     return second === undefined ? { kind: 'end', rule: ACCESS_WHOLE[first].rule } : null
@@ -254,7 +262,7 @@ function targetStep(name: AccessTarget, second: string | undefined, third: strin
   if (second === undefined) {
     return name === 'host'
       ? choose('a host', hostOptions(world), hostFree)
-      : choose(`a ${rule.label.toLowerCase()}`, itemOptions(name, world))
+      : choose(ITEM_PROMPTS[name] ?? 'an item', itemOptions(name, world))
   }
   return third === undefined ? opStep(name, second, world) : lastStep(name, second, third, world)
 }

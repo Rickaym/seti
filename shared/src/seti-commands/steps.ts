@@ -73,7 +73,7 @@ function valuesStep(found: SetiName, grammar: ValuesGrammar, rest: readonly stri
         unavailable: refusal ?? (entry.value === current ? `Already ${entry.label.toLowerCase()}` : null),
       }),
     )
-    return choose(grammar.values.map((entry) => entry.value).join(', '), options)
+    return choose(`one of ${grammar.values.map((entry) => entry.value).join(', ')}`, options)
   }
   const entry = grammar.values.find((value) => value.value === picked)
   return entry === undefined || more.length > 0

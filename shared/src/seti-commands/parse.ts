@@ -63,7 +63,7 @@ function match(step: Choose, word: string): Got<CommandOption> {
     return got(picked)
   }
   if (step.free === null) {
-    return refused(`No ${step.prompt} ${word}`)
+    return refused(`Expected ${step.prompt}, not ${word}`)
   }
   const free = step.free(word)
   return 'option' in free ? got(free.option) : refused(free.refusal)
