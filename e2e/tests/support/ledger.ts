@@ -19,6 +19,7 @@ export const READ_QUOTE = 'We ship on Friday, not Thursday.'
 const REPLY = [
   `The release moved to Friday; Dana said so in [the release thread](${LEDGER.read}):`,
   `> ${READ_QUOTE}`,
+  'That settles the date.',
   `The freeze was confirmed in [a later message](${LEDGER.unread}).`,
 ].join('\n\n')
 
