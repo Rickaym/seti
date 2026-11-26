@@ -153,10 +153,7 @@ export function EaPage() {
             <span data-testid="ea-last-end">{lastEndText(call.lastEnd)}</span>
           </SettingRow>
           {callAudio !== null && (
-            <SettingRow
-              label="Call audio"
-              description="How the EA's voice fared on the last call: packets lost, speech filled in, the path."
-            >
+            <SettingRow label="Call audio" stack description="How the EA's voice reached you on the last call.">
               <span data-testid="ea-call-audio">{callQualityText(callAudio)}</span>
             </SettingRow>
           )}
