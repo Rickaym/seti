@@ -21,11 +21,12 @@ function SourceRow({ reference }: { reference: Reference }) {
       {reference.href !== null && reference.note !== null && (
         <span className="min-w-0 truncate text-muted-foreground">{reference.note}</span>
       )}
-      {match?.unread === true ? (
-        <NotRead />
-      ) : (
-        label.host !== null && <span className="shrink-0 text-muted-foreground">{label.host}</span>
+      {label.host !== null && (
+        <span className={cn('shrink-0 text-muted-foreground', match?.unread === true && 'max-sm:hidden')}>
+          {label.host}
+        </span>
       )}
+      {match?.unread === true && <NotRead />}
       {match?.verified === true && <VerifiedMark />}
     </>
   )
