@@ -74,6 +74,17 @@ const envs = () => ({
   codexKeyless: portable(
     sandboxEnv(HOST_ENV, '/home/agent', { github: false, connectors: false, codex: { modelKey: null } }),
   ),
+  gemini: portable(
+    sandboxEnv(HOST_ENV, '/home/agent', {
+      github: true,
+      connectors: true,
+      connections: { ...placeholders, GEMINI_API: 'seti-placeholder-gemini' },
+      gemini: { modelKey: 'GEMINI_API' },
+    }),
+  ),
+  geminiKeyless: portable(
+    sandboxEnv(HOST_ENV, '/home/agent', { github: false, connectors: false, gemini: { modelKey: null } }),
+  ),
 })
 
 /** What each runtime's adapter declares, with functions named rather than shown. */
