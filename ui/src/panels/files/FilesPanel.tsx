@@ -126,7 +126,6 @@ export function FilesPanel({ taskId, request, readOnly, onClose }: FilesPanelPro
   const [setiFiles, setSetiFiles] = useState(storedShowSetiFiles)
   const [naming, setNaming] = useState(false)
   const [refreshes, setRefreshes] = useState(0)
-  const tree = place.root === FILES_TREE_ROOT
   const listing = useListing({ taskId, place, sort, dotfiles, setiFiles, showing: open === null })
   const search = useFileSearch(taskId, { dotfiles, setiFiles })
   const [resultsShown, setResultsShown] = useState(false)
@@ -230,13 +229,13 @@ export function FilesPanel({ taskId, request, readOnly, onClose }: FilesPanelPro
           onClose={closeSearch}
         />
       )}
-      <div className="flex shrink-0 items-center gap-1.5 border-b border-border px-3 py-2">
+      <div className="flex shrink-0 flex-wrap items-center gap-1.5 border-b border-border px-3 py-2">
         <NativeSelect
           size="sm"
           aria-label="Root"
           value={place.root}
           onChange={(e) => void go({ root: e.target.value, dir: '' }, null)}
-          className="max-w-48 min-w-0"
+          className="max-w-48 min-w-28 max-md:max-w-none max-md:basis-full"
         >
           <NativeSelectOption value={RECENT}>Recent</NativeSelectOption>
           {roots.map((entry) => (
@@ -334,9 +333,18 @@ export function FilesPanel({ taskId, request, readOnly, onClose }: FilesPanelPro
           </Button>
         </Hint>
       </div>
-      <div className="shrink-0 border-b border-border px-3 py-1.5 text-xs">
-        <Breadcrumb root={root} tree={tree} dir={place.dir} onGo={(dir) => void go({ root: place.root, dir }, null)} />
-      </div>
+      <Breadcrumb
+        root={root}
+        dir={place.dir}
+        onGo={(dir) => {
+          void go({ root: place.root, dir }, null).then(() => {
+            if (dir === '') {
+              // The folder row leaves at the top, so keep focus in the panel rather than on body.
+              section.current?.focus()
+            }
+          })
+        }}
+      />
       {naming && (
         <NewFileForm
           onCancel={() => {
