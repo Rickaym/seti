@@ -163,7 +163,13 @@ const askSchemas = {
    * `context` is Seti's note of the user's edits, for the agent once an edited call has run.
    */
   'permission.ask': {
-    ask: z.object({ tool: z.string(), input: z.record(z.string(), z.unknown()), options: z.unknown() }),
+    ask: z.object({
+      tool: z.string(),
+      input: z.record(z.string(), z.unknown()),
+      options: z.unknown(),
+      /** The folder the agent's shell is in for a Bash call, as the runtime's hook reported it. */
+      cwd: z.string().optional(),
+    }),
     answer: z.object({ result: z.unknown(), context: z.string().optional() }),
   },
   /** Holds an MCP call a review rule names until the user answers; the hook's output. */

@@ -13,6 +13,18 @@ const rollup = (state: 'SUCCESS' | 'FAILURE') => ({
 })
 
 export const MERGE_DESCRIPTION = 'Merge tool#2136 once its checks pass'
+export const DASH_URL = 'https://github.com/acme/dash/pull/3782'
+export const DASH_TITLE = 'Add the lease renewal test'
+/** PRs linked to the agent, which name the repositories it works in. */
+export const AGENT_PRS = ['https://github.com/acme/dash/pull/3700', 'https://github.com/acme/tool/pull/9']
+export const LIVE_DESCRIPTION = 'Confirm new test added, merge PR 3782'
+/** A live merge: an unrelated diff piped through a regex first, no -R, no cd on the line. */
+export const LIVE_MERGE = [
+  "git diff origin/staging...abc123 -- path/file.test.ts | grep -E '^\\+.*(it|describe)\\(' ;",
+  'gh pr merge 3782 --squash && sleep 4 &&',
+  `gh pr view 3782 --json state,mergeCommit --jq '"#3782 \\(.state) \\(.mergeCommit.oid[0:8])"' | tee -a /tmp/ops.log`,
+].join(' ')
+
 const RETRY_URL = 'https://github.com/acme/tool/pull/2140'
 export const RETRY_TITLE = 'Retry lease renewal on 503'
 
@@ -21,6 +33,7 @@ export function seedLeasePr(): void {
   setFakeGh('e2e', {
     [LEASE_URL]: { ...prNode(LEASE_URL, 'OPEN'), title: LEASE_TITLE, commits: rollup('SUCCESS') },
     [RETRY_URL]: { ...prNode(RETRY_URL, 'MERGED'), title: RETRY_TITLE, commits: rollup('SUCCESS') },
+    [DASH_URL]: { ...prNode(DASH_URL, 'OPEN'), title: DASH_TITLE, commits: rollup('SUCCESS') },
   })
 }
 
@@ -28,9 +41,14 @@ export function seedLeasePr(): void {
 export const described = (command: string, description: string) => `${command}${DESCRIPTION_MARK}${description}`
 
 /** Starts an agent that asks to run the command, and waits until it is blocked on the request. */
-export async function startAsking(request: APIRequestContext, command: string): Promise<string> {
+export async function startAsking(
+  request: APIRequestContext,
+  command: string,
+  prUrls: readonly string[] = [],
+): Promise<string> {
+  const prompt = `Please ${COMMAND_PROMPT} ${command}`
   const response = await request.post('/api/tasks', {
-    data: { title: unique('PR merger'), prompt: `Please ${COMMAND_PROMPT} ${command}`, sandbox: false },
+    data: { title: unique('PR merger'), prompt, sandbox: false, ...(prUrls.length > 0 ? { pr_urls: prUrls } : {}) },
   })
   expect(response.ok(), 'POST /api/tasks').toBe(true)
   const { id } = ((await response.json()) as Envelope<Task>).data

@@ -1,6 +1,13 @@
 import fs from 'node:fs'
 import path from 'node:path'
-import { type CommandCatalog, type MessagePage, type MessageRow, type ShellResult, type TaskEvent } from '@seti/shared'
+import {
+  settingCommands,
+  type CommandCatalog,
+  type MessagePage,
+  type MessageRow,
+  type ShellResult,
+  type TaskEvent,
+} from '@seti/shared'
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createApp } from './app.js'
 import { messages, tasks } from './db.js'
@@ -318,14 +325,23 @@ describe('GET /api/tasks/:id/commands', () => {
     expect(res.status).toBe(200)
     const catalog = ((await res.json()) as { data: CommandCatalog }).data
     expect(catalog).toMatchObject({ cwd: scratch, fresh: true, approximate: false })
-    expect(catalog.commands.map((c) => [c.name, c.builtin, c.unsupported !== null])).toEqual([
+    const own = new Set(settingCommands(null).map((c) => c.name))
+    expect(
+      catalog.commands.filter((c) => !own.has(c.name)).map((c) => [c.name, c.builtin, c.unsupported !== null]),
+    ).toEqual([
       ['btw', true, false],
       ['color', true, true],
       ['compact', true, false],
       ['slack:standup', false, false],
     ])
-    expect(catalog.commands[0]).toMatchObject({ name: 'btw', argument_hint: '[question]', builtin: true })
-    expect(catalog.commands[0]?.description).toBe('Ask a side question; the agent is not interrupted')
+    expect(catalog.commands.map((c) => c.name)).toEqual(
+      expect.arrayContaining(['archive', 'mcp', 'restart', 'settings']),
+    )
+    expect(catalog.commands[0]).toMatchObject({ name: 'access', builtin: true })
+    expect(catalog.commands.find((c) => c.name === 'btw')).toMatchObject({ argument_hint: '[question]', builtin: true })
+    expect(catalog.commands.find((c) => c.name === 'btw')?.description).toBe(
+      'Ask a side question; the agent is not interrupted',
+    )
   })
 
   it('serves directory lists for the New task dialog and rejects missing directories', async () => {

@@ -4,6 +4,10 @@ import { expectFitsPhone } from './support/phone-layout.js'
 import { FAKE_CLAUDE_ENV } from './support/processes.js'
 import {
   addAskRule,
+  AGENT_PRS,
+  DASH_TITLE,
+  LIVE_DESCRIPTION,
+  LIVE_MERGE,
   archiveStarted,
   described,
   LEASE_TITLE,
@@ -76,11 +80,33 @@ test("on a phone the agent's description reads above the command and the PR line
   const code = await card.locator('code').first().boundingBox()
   expect(box?.y ?? 0).toBeLessThan(code?.y ?? 0)
   expect(box?.height ?? 0, 'two lines at most').toBeLessThanOrEqual(48)
-  await expect(card.getByText('No rule allows this command', { exact: true })).toBeVisible()
+  await expect(card.getByText(long, { exact: true }), 'the description shows once, never as the reason').toHaveCount(1)
   await expect(card.getByRole('group', { name: 'Pull request tool#2136' })).toContainText(LEASE_TITLE)
   await expectFitsPhone(page, 'request with a description')
   for (const scheme of ['light', 'dark'] as const) {
     await page.emulateMedia({ colorScheme: scheme })
     await card.screenshot({ path: test.info().outputPath(`order-phone-${scheme}.png`) })
+  }
+})
+
+test('on a phone a merge an Ask rule holds names the rule and shows the PR found in the agent repos', async ({
+  page,
+  request,
+}) => {
+  const remove = await addAskRule(request, 'Bash(gh pr merge:*)')
+  try {
+    const id = await startAsking(request, described(LIVE_MERGE, LIVE_DESCRIPTION), AGENT_PRS)
+    await page.goto(`/#agents/${id}`)
+    const card = requestCard(page)
+    await expect(card.getByText('Your Ask rule holds this: Bash(gh pr merge:*)', { exact: true })).toBeVisible()
+    await expect(card.getByRole('group', { name: 'Pull request dash#3782' })).toContainText(DASH_TITLE)
+    await expect(card.getByRole('button', { name: 'Always' })).toHaveCount(0)
+    await expectFitsPhone(page, 'request an Ask rule holds')
+    for (const scheme of ['light', 'dark'] as const) {
+      await page.emulateMedia({ colorScheme: scheme })
+      await card.screenshot({ path: test.info().outputPath(`live-phone-${scheme}.png`) })
+    }
+  } finally {
+    await remove()
   }
 })

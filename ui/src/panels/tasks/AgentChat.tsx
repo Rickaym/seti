@@ -13,6 +13,7 @@ import { QuickReplies } from '@/panels/tasks/QuickReplies'
 import { ShellLive } from '@/panels/tasks/ShellEntry'
 import { QueuedInputs } from '@/panels/tasks/TaskInputs'
 import { TranscriptPane } from '@/panels/tasks/TranscriptPane'
+import type { CommandHost } from '@/panels/tasks/commands/types'
 
 type TranscriptProps = ComponentProps<typeof TranscriptPane>
 
@@ -43,7 +44,8 @@ interface AgentChatProps {
   compacting: string | null
   draft: string
   onDraftChange: (draft: string) => void
-  onChanged: () => void
+  /** The agent and what its view lends the composer's setting commands. */
+  host: CommandHost
 }
 
 /** The agent's transcript, the updates it has not read and the composer below. */
@@ -57,7 +59,7 @@ export function AgentChat({
   compacting,
   draft,
   onDraftChange,
-  onChanged,
+  host,
 }: AgentChatProps) {
   const running = status === 'running'
   const { store, unsent } = usePendingRows(task.id, transcript.stream.messages)
@@ -78,7 +80,7 @@ export function AgentChat({
           <QuickReplies key={task.updated_at} taskId={task.id} messages={messages} />
         )}
         {(status === 'error' || status === 'interrupted') && (
-          <TaskFailure task={task} status={status} onChanged={onChanged} />
+          <TaskFailure task={task} status={status} onChanged={host.onChanged} />
         )}
         {compacting !== null && <CompactingNote since={compacting} />}
         {shell !== null && (
@@ -89,12 +91,10 @@ export function AgentChat({
       </TranscriptPane>
       <QueuedInputs task={task} messages={messages} running={running} />
       <Composer
-        taskId={task.id}
-        cwd={task.cwd}
+        host={host}
         agentRunning={running}
         compacting={compacting !== null}
         shellRunning={shell !== null}
-        codex={task.runtime === 'codex'}
         draft={draft}
         onDraftChange={onDraftChange}
         sends={store}
