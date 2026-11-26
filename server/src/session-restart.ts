@@ -25,6 +25,7 @@ const ENDED =
 const PREFACE: Record<StoredRuntime, string> = {
   claude: `The user restarted your Claude Code session from Seti, so your tools, MCP servers and plugins were loaded again. ${ENDED}`,
   codex: `The user restarted your Codex session from Seti, so your tools and Seti's tools were loaded again. ${ENDED}`,
+  gemini: `The user restarted your Gemini CLI session from Seti, so Seti's tools were loaded again. ${ENDED}`,
 }
 
 /** The latest restart since the agent last read a message, so it knows what ended with it. */
