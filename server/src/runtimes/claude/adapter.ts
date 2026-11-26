@@ -24,6 +24,8 @@ export const claudeAdapter: RuntimeAdapter<ClaudeShapes, 'claude'> = {
     sandbox: { optional: true },
     compaction: { off: true, windowAlone: true },
     subagents: true,
+    bypass: true,
+    slashCommands: true,
     dream: {
       memory: claudeMemory,
       open: async (spec, launcher, host, abortController) => {
