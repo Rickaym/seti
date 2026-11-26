@@ -9,7 +9,7 @@ import { refOfUrl, type UrlRef } from './refs.js'
 /** The agent's newest items under the URL's key, else under the nearest key that holds it. */
 async function itemsFor(taskId: string, url: UrlRef): Promise<SourceItem[]> {
   for (const ref of [url.ref, ...url.parents]) {
-    const prefix = ref.startsWith('linear:') && ref.includes('#')
+    const prefix = (ref.startsWith('linear:') && ref.includes('#')) || (ref === url.ref && url.prefix === true)
     const items = await sourceItems.find(taskId, ref, prefix)
     if (items.length > 0) {
       return items

@@ -15,6 +15,6 @@ export async function noteEdit(task: Task, request: PermissionRequest): Promise<
   const error = denied
     ? `Edited ${fields} of ${request.tool_name}, then denied it`
     : `Edited ${fields} of ${request.tool_name} before it ran`
-  const payload = { error, edited: { fields: [...request.edited], denied } }
+  const payload = { error, edited: { fields: [...request.edited], denied, tool: request.tool_name } }
   await inLane(task.id, async () => appendMessage(task.id, { kind: 'seti', payload }))
 }
