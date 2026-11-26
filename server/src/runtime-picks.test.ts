@@ -58,11 +58,12 @@ describe('the runtime a model picks', () => {
       expect(pickRefusal(picks, OFFERS)).toBeNull()
     }
     expect(pickRefusal({ runtime: 'codex', model: 'gpt-5.5', effort: 'xhigh' }, OFFERS)).toBeNull()
+    expect(pickRefusal({ model: 'gpt-6.2-sol', effort: 'max' }, OFFERS)).toBeNull()
   })
 
   it('refuses an unknown model naming the offered ones, a runtime that disagrees and an effort not taken', () => {
     expect(pickRefusal({ model: 'gpt-4' }, OFFERS)).toBe(
-      'No runtime offers gpt-4; a new agent may name opus, haiku, gpt-5.5',
+      'No runtime offers gpt-4; a new agent may name opus, haiku, gpt-5.5, gpt-6.2-sol, gpt-6.2-astra, gpt-6.1-terra, gpt-6-luna',
     )
     expect(pickRefusal({ runtime: 'claude', model: 'gpt-5.5' }, OFFERS)).toBe(
       'gpt-5.5 runs on Codex, not on Claude Code',
