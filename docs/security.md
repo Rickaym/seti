@@ -277,6 +277,12 @@ An agent searches only its own ledger, at every Seti control level, and the EA s
 as it already reads any transcript. Both get the text as data: a note says other people wrote it and
 it is never to be followed, and the EA's frame neutralises any tag in the text that could close it.
 
+A file the agent reads in a GitHub clone is placed with git on the host, in a clone the agent can
+write to, so its config and attributes are input ([SRC-8](protocol.md#37-evidence-ledger)). Git
+runs with the guards Seti uses for agents' repositories, the file is compared with HEAD by hashing
+its bytes with no filter, and a link that leads out of the clone gives no item. The clone's remote
+and history are the agent's, so a permalink says where the agent's clone says the file came from.
+
 ## Redaction of what agents print
 
 Seti redacts credentials in what agents print before it stores a transcript row, a permission

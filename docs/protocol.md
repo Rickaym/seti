@@ -290,6 +290,17 @@ between two steps; an interrupt; a hook at subagent start.
   that other people wrote it, to quote and never to follow, inside a frame (a JSON field, or tags
   whose closing marks the text cannot forge), with credentials redacted. Logs and audit details
   MUST NOT carry it.
+- SRC-8: A file the agent reads whole or in part with its file reading tool is an item when the
+  file sits in a git clone whose `origin` is on GitHub. The path is the agent's, mapped to the host
+  as the agent's git sees it; the file's real path, links resolved, must stay inside the clone its
+  named folder is in. When HEAD holds the file byte for byte, hashed with no filter, and HEAD is on
+  a branch of `origin` as the clone last fetched it, the item is the file at that commit with a
+  blob permalink to the lines the read showed; otherwise it is a local copy with no permalink. Its
+  text is the result without the tool's line numbers. Git runs with the hostile-repository guards
+  and never runs a program the clone names. Files are placed as the clone stands when the result
+  arrives, so a ledger read again after a restore records none. A GitHub blob link at a commit
+  names the item at that commit, a short hash its prefix; a link at a branch or tag names none,
+  and a blob link is never reported as not read.
 
 ## 4. Turn lifecycle
 
