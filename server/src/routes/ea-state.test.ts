@@ -189,6 +189,7 @@ describe('EA settings', () => {
       join_on_open: true,
       form_of_address: '',
       language: 'en',
+      inbox_relays: false,
       updated_at: null,
     })
 

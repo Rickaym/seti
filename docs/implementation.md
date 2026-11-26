@@ -463,6 +463,17 @@ reads `getStats` every two seconds (`call-quality.ts`) and reports the call's lo
 speech, jitter, round trip, path type and reconnects with its call end, as numbers only; the EA
 logs one line per call with the user's audio loss, drops and the seconds of speech it held.
 
+### Inbox relays
+
+`server/src/ea-relay.ts` implements EA-19 behind `POST /api/ea/relays`, which only the EA's bot
+token reaches. It checks the switch (`ea_settings.inbox_relays`, changed only through
+`PUT /api/ea/settings/inbox-relays` by the user), then the recipient against `relayTargets`, then
+the text, then the hourly limits, and claims the item in `ea_relay` before it posts the framed
+direct message through `postTeamMessage`. A channel alert records its `channel_id` on `ea_inbox`
+so the subscribed agents come from Seti's tables, not the payload. History pages attach each
+inbox entry's relays, and `POST /api/ea/relays/:id/take-back` dismisses the relay's update while
+it still waits for the agent.
+
 ## Reference values
 
 Seti uses every value in [Appendix A](protocol.md#appendix-a-reference-constants) of the

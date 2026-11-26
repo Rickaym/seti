@@ -1177,7 +1177,7 @@ Why: an agent woken by its own actions or by news nobody waited for burns turns 
 - EA-8: Inbox items are `followup`, `reminder`, `watch_event`, `channel_event`, `team_mention`; a
   new event for an undelivered item's subject replaces it. Unasked reports get read tools only,
   except that one made only of `act` subscription items MAY direct-message an existing agent and
-  MUST tell the user.
+  MUST tell the user, and a report MAY relay under EA-19.
 - EA-10: Off a call, watch and channel items wait for quiet (`settle`); others go at once. On a
   call nothing interrupts: items follow the user's next turn, and a needs-you item gets its own
   line after `call_silence`.
@@ -1203,6 +1203,16 @@ Why: an agent woken by its own actions or by news nobody waited for burns turns 
   before the call's audio dropped, in a turn the drop cut, or in an earlier call MUST NOT count for
   EA-4 or EA-17.
   Why: mobile networks drop for seconds, and a cut transcript must never become the user's yes.
+- EA-19: Inbox relays are off until the user turns them on; the EA, agents and mods MUST NOT
+  change the switch. While on, a report MAY send one direct message per item to an agent the item
+  is about: its task, the author or a named agent of its group chat message, an agent with its PR
+  linked, or one subscribed to its channel; any other is refused. The control room puts a fixed
+  frame before the text (relayed, not approved by the user, act within the task, anything
+  outward, irreversible or security-related waits for the user) and refuses text that copies
+  `relay_copy` words of the item, holds a code block or speaks for the user. At most `relay_rate`.
+  Each relay is audited with its item, agent and message, never its text; the user or the EA MAY
+  take it back while the agent has not read it.
+  Why: inbox text is untrusted, so a relay carries the EA's gist with a frame it cannot drop.
 
 ## 15. Resilience
 
@@ -1744,7 +1754,7 @@ others.
 | Threads      | `thread_cap` 50. `dm_window` 24 h. `reply_settle` 10 s. `thread_rate` 10 an hour. `thread_quiet` 7 days. `thread_age` 30 days. `slack_name_stale` 30 days.                                                                                                                                                                                                                                                                      |
 | Chat         | Message 4000. Active agent: running, session open, or updated within 12 h. `chat_burst` 12 in 15 min. `chat_loop` 6 in 15 min.                                                                                                                                                                                                                                                                                                  |
 | Questions    | Answer batch 100 items. `notes_waiting` 10. Index 1500 characters. `note_stale` 3 failed checks in a row, or unverified 30 days (fact, environment) or 90 days (how-to, gotcha).                                                                                                                                                                                                                                                |
-| Assistant    | `ask_ttl` 10 min. `word_use` 60 s. `read_back` 600 characters. `settle` quiet 45 s, at most 3 min. `call_silence` 30 s. `wake_phrase` 2 to 40 characters, at most 4 words. `keep_awake_seconds` 5 to 600.                                                                                                                                                                                                                       |
+| Assistant    | `ask_ttl` 10 min. `word_use` 60 s. `read_back` 600 characters. `settle` quiet 45 s, at most 3 min. `call_silence` 30 s. `wake_phrase` 2 to 40 characters, at most 4 words. `keep_awake_seconds` 5 to 600. `relay_copy` 8 words. `relay_rate` 2 an hour an agent, 8 an hour in all, 400 characters.                                                                                                                              |
 | Resilience   | `stop_grace` 7 s. `resume_pace` 3 starts 2 s apart, 20 s between groups. `grant_ttl` 15 min. `send_window` 24 h.                                                                                                                                                                                                                                                                                                                |
 | Storage      | `orphan_grace` 1 h. `size_walk` 400,000 entries or 20 s per folder.                                                                                                                                                                                                                                                                                                                                                             |
 | Audit        | `audit_keep` 365 days. Summary 300. Detail string 500.                                                                                                                                                                                                                                                                                                                                                                          |

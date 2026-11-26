@@ -1,5 +1,6 @@
 import { eaLanguageName, type EaSettings, type EaSettingsInput } from '@seti/shared'
 import { audit } from './audit.js'
+import { refuseDelegates } from './ea-guard.js'
 import { DIRECT, type SettingsWrite } from './settings-write.js'
 import { eaSettings } from './store/ea.js'
 
@@ -47,5 +48,22 @@ export async function saveEaSettings(input: EaSettingsInput, write: SettingsWrit
       },
     }),
   )
+  return saved
+}
+
+/** Turns inbox relays on or off; the EA, agents and mods are refused, so only the user does. */
+export async function setInboxRelays(on: boolean): Promise<EaSettings> {
+  refuseDelegates('turn inbox relays on or off')
+  const before = await eaSettings.get()
+  const saved = await eaSettings.setInboxRelays(on)
+  if (before.inbox_relays !== on) {
+    await audit.record({
+      actor: 'user',
+      kind: 'ea.inbox_relays',
+      subject_type: 'ea',
+      summary: `Inbox relays ${on ? 'on' : 'off'}`,
+      detail: { on },
+    })
+  }
   return saved
 }
