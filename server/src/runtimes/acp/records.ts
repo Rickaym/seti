@@ -79,3 +79,24 @@ export class UpdateJoiner {
     return text
   }
 }
+
+/**
+ * A tool server call's update with the server and tool named as Gemini CLI names them on its
+ * permission request, which its call updates leave out: the call id starts with
+ * `mcp_<server>_<tool>__`, read against the servers Seti handed the agent, the longest first.
+ */
+export function namingServer(update: unknown, servers: readonly string[]): unknown {
+  if (typeof update !== 'object' || update === null || '_meta' in update || !('toolCallId' in update)) {
+    return update
+  }
+  const id = update.toolCallId
+  const name = typeof id === 'string' ? id.slice(0, Math.max(id.indexOf('__'), 0)) : ''
+  const server = servers
+    .toSorted((a, b) => b.length - a.length)
+    .find((each) => name.startsWith(`mcp_${each}_`) && name.length > each.length + 5)
+  if (server === undefined) {
+    return update
+  }
+  const mcp = { server_name: server, tool_name: name.slice(server.length + 5) }
+  return { ...update, _meta: { 'gemini-cli': { mcp } } }
+}

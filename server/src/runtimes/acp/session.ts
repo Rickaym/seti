@@ -8,7 +8,7 @@ import type { InputContent, RuntimeSession, SessionInput, SessionReport } from '
 import { JsonRpc, RpcError, type RpcCall } from '../json-rpc.js'
 import { ReportQueue } from '../report-queue.js'
 import { Permissions, type AcpDecide } from './permissions.js'
-import { acpReport, UpdateJoiner } from './records.js'
+import { acpReport, namingServer, UpdateJoiner } from './records.js'
 
 /** An ACP runtime's shapes: a neutral decision, a JSON-RPC process, no hooks, rules or modes. */
 export interface AcpShapes {
@@ -248,11 +248,12 @@ class Driver {
     if (!note.success || note.data.sessionId !== this.session) {
       return
     }
-    if (this.wasCut(note.data.update)) {
+    const update = namingServer(note.data.update, Object.keys(this.realised.servers))
+    if (this.wasCut(update)) {
       return
     }
-    const denied = this.track(note.data.update)
-    this.store(this.joiner.take(note.data.update, denied))
+    const denied = this.track(update)
+    this.store(this.joiner.take(update, denied))
     this.hush()
   }
 
