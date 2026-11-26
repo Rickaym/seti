@@ -262,8 +262,9 @@ between two steps; an interrupt; a hook at subagent start.
   and pipe filters that only cut, order or count; otherwise the item has no text, so no quote
   verifies against it. A permalink is the one the answer states, else one built from
   parts the call and answers stated (Slack: the workspace host the agent's Slack answers stated, the
-  channel and the `ts`; GitHub: the repository and number); one that cannot be built so stays
-  empty and is never guessed.
+  channel and the `ts`; Linear: the workspace URL key that issues' own `url` fields in the agent's
+  Linear answers stated, the identifier and a comment's id; GitHub: the repository and number);
+  one that cannot be built so stays empty and is never guessed.
 - SRC-3: An agent's ledger follows its transcript: archiving removes it, restoring reads it again
   from the restored transcript, and deleting the agent or a transcript row deletes its items.
 - SRC-4: A client MAY ask which ledger item each link of an agent's message names; the answer
@@ -564,7 +565,13 @@ interrupted only for that.
   swaps it for the value in the URL path and headers (Basic auth too), on the connection's hosts
   and port 443 only. A readable request that carries a placeholder elsewhere MUST be refused (403)
   and audited. A connection with no value answers 502. The agent is told where the value is
-  swapped, and in which connections' bodies (EGR-15).
+  swapped, and in which connections' bodies (EGR-15). Each sandbox start writes the placeholders
+  of the agent's connections, never a value, to `/run/seti/env.sh` (0600, read-only inside, never
+  in a git checkout), which `BASH_ENV` names. When the user places a connection in the agent's
+  credential, Seti hands its running proxy the credential's connections at once, read and checked
+  as at a start, keeping the rest of its grant (login, MCP sign-ins, denied connectors), and
+  rewrites that file, so the next bash command has the variable; another shell, or a process
+  started before then such as an MCP server, sources the file.
 - EGR-14: On its connections' hosts the proxy reads the body of a JSON, form, multipart or plain
   text request without a content encoding, holding at most 1 MiB, before anything goes upstream;
   every other body streams on unread. A held body carrying a placeholder toward a host its
@@ -773,7 +780,8 @@ interrupted only for that.
   for the agent; the connection into the asking agent's credential on those hosts, joining an
   existing one with that variable only on the same hosts and only filling an empty value, and
   turning on its Body (EGR-15) when the request asked for `body`. The
-  agent gets one `seti` update with the outcome and whether a value is set.
+  agent gets one `seti` update with the outcome and whether a value is set; an allowed connection
+  reaches the agent's running proxy and shells first (EGR-5).
 - CHG-7: The pasted value MUST travel only in the user's Allow and MUST NOT enter the request, the
   update, the transcript, events, errors or the audit.
 - CHG-10: An agent at `self` or `full` is told: when a task needs access it lacks, file
@@ -842,7 +850,9 @@ interrupted only for that.
 - SEC-11: Any agent MAY call `ask_secret {name, purpose, hosts}`. Only the user sends the value,
   alone, on its own route. Sandboxed, it is sealed as a connection for those hosts in the agent's
   credential; unsandboxed, it is a 0600 file in the agent's workspace that no view, handoff, share
-  or archive serves. The call returns where it went, never the value. The question expires when
+  or archive serves. The call returns where it went, never the value. A sandboxed agent's running
+  proxy and shells take the connection before the call returns (EGR-5), and the call tells it to
+  go on in the same turn; with none running, its next turn takes it. The question expires when
   its call is cancelled, its session closes or the control room restarts; later values are kept
   nowhere.
 - SEC-14: Webhook secrets and tokens are sealed. Only the user pastes one an app issued, or reveals
@@ -860,6 +870,15 @@ interrupted only for that.
 - SEC-18: Only the user changes a set or drops all of an agent's own choices at once. A delegate
   MUST NOT move an agent to a credential whose set turns on an SSH host, cloud access or a host the
   agent lacks.
+- SEC-19: Credential redaction MUST cover session material and keep the names around it: session
+  or token-like values in `Cookie`, `Set-Cookie`, `curl -b` and `--cookie` (names, attributes and
+  short values kept); the credential of an `Authorization` header of any scheme (scheme kept);
+  JWTs; base64 JSON sessions; values under session names (`sb-*-auth-token*` with its chunks,
+  `__Secure-*`, `__Host-*`, session cookies, `access_token`, `refresh_token`, `id_token`) in
+  cookies, query strings, form bodies and JSON; storage state entries holding a session; `.netrc`
+  passwords; secret-named `curl -H` headers. Transcript rows and permission requests stored before
+  a rule existed MUST be re-scrubbed once, resuming after a restart, with a log of counts only.
+  Audit events MUST keep their sealed text.
 
 ## 9. Shared tools
 
@@ -1244,8 +1263,8 @@ store, the audit chain and every record.
 - NODE-8: Only the node runs agents' egress proxies. A sandbox the control plane builds, for a
   terminal or a `!` command, has the node open the agent's proxy and uses it, and removing an
   agent stops its proxy on the node. The proxy applies a grant the control plane hands it with no
-  value in it (the agent's connections, MCP sign-ins, denied connectors, login and CA hosts), and
-  asks the control plane for the allowed hosts, ssh first hops and AWS switch when it checks them.
+  value in it (the agent's connections, MCP sign-ins, denied connectors, login and CA hosts), takes
+  a changed list of connections from it while it runs (EGR-5), and asks the control plane for the allowed hosts, ssh first hops and AWS switch when it checks them.
 - NODE-9: A command the node's guard refused, and a request its egress proxy blocked for
   carrying a connection's placeholder toward a host the connection does not allow, reach the
   control plane as journal entries, which it audits once.

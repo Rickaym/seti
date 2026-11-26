@@ -1,26 +1,11 @@
-import { randomUUID } from 'node:crypto'
 import fs from 'node:fs'
-import path from 'node:path'
 import type { QuestionSecret, Task } from '@seti/shared'
 import { HttpError } from './http.js'
 import { hasKey, placeKeyRequest } from './key-requests.js'
+import { gitCheckoutAbove, writePrivateFile } from './private-file.js'
+import { liveVariableText } from './sandbox-env-file.js'
 import { connectionRows } from './store/connections.js'
 import { secretsDir, workspaceDir } from './workspace/dir.js'
-
-/** The git checkout a folder sits in, or null when no folder from it up to the root has `.git`. */
-export function gitCheckoutAbove(dir: string): string | null {
-  let current = path.resolve(dir)
-  for (;;) {
-    if (fs.existsSync(path.join(current, '.git'))) {
-      return current
-    }
-    const parent = path.dirname(current)
-    if (parent === current) {
-      return null
-    }
-    current = parent
-  }
-}
 
 /** Makes the secrets folder mode 700, refusing a symlink or a file in its place. */
 function ensureSecretsDir(taskId: string): string {
@@ -46,22 +31,7 @@ export function writeSecretFile(taskId: string, name: string, value: string): st
   if (checkout !== null) {
     throw new HttpError(409, `The agent's workspace is inside the git checkout ${checkout}; Seti wrote no secret there`)
   }
-  const dir = ensureSecretsDir(taskId)
-  const file = path.join(dir, name)
-  const temp = path.join(dir, `.${name}.${randomUUID()}.tmp`)
-  const fd = fs.openSync(temp, fs.constants.O_WRONLY | fs.constants.O_CREAT | fs.constants.O_EXCL, 0o600)
-  try {
-    fs.fchmodSync(fd, 0o600)
-    fs.writeFileSync(fd, value)
-    fs.fsyncSync(fd)
-  } catch (e) {
-    fs.closeSync(fd)
-    fs.unlinkSync(temp)
-    throw e
-  }
-  fs.closeSync(fd)
-  fs.renameSync(temp, file)
-  return file
+  return writePrivateFile(ensureSecretsDir(taskId), name, value)
 }
 
 /** Why the secret store cannot take the secret for these hosts, or null when it can. */
@@ -93,8 +63,11 @@ export async function storeSecret(task: Task, secret: QuestionSecret, value: str
   await placeKeyRequest(task, { kind: 'api_key', env: secret.name, hosts: secret.hosts }, value)
 }
 
-/** What the agent's ask_secret call returns once the user supplied the secret; never the value. */
-export function suppliedText(secret: QuestionSecret, file: string | null): string {
+/**
+ * What the agent's ask_secret call returns once the user supplied the secret, never the value;
+ * `live` means its running sandbox already took the connection.
+ */
+export function suppliedText(secret: QuestionSecret, file: string | null, live = false): string {
   if (file !== null) {
     return (
       `The value of ${secret.name} is in ${file}. Read it from there when you need it, in the command or ` +
@@ -102,9 +75,13 @@ export function suppliedText(secret: QuestionSecret, file: string | null): strin
       'those puts it in your transcript.'
     )
   }
+  const stored = `The user stored ${secret.name} in Seti's secret store for ${secret.hosts.join(', ')}.`
+  const swapped = "a placeholder that Seti's proxy swaps for the value on those hosts"
+  if (live) {
+    return `${stored} ${liveVariableText(secret.name)} It holds ${swapped}; you never see the value, so never print it or ask for it.`
+  }
   return (
-    `The user stored ${secret.name} in Seti's secret store for ${secret.hosts.join(', ')}. From your next turn ` +
-    `your session has $${secret.name}, holding a placeholder that Seti's proxy swaps for the value on those ` +
-    'hosts. You never see the value; never print it or ask for it.'
+    `${stored} From your next turn your session has $${secret.name}, holding ${swapped}. You never see the ` +
+    'value; never print it or ask for it.'
   )
 }
