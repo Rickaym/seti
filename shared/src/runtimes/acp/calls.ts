@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import type { ToolCall, ToolKind, ToolResult } from '../../events.js'
-import type { AcpToolCall } from './shapes.js'
+import { sessionUpdate, type AcpToolCall } from './shapes.js'
 
 type Content = NonNullable<AcpToolCall['content']>[number]
 
@@ -97,6 +97,13 @@ export function callOf(call: AcpToolCall): ToolCall {
     ...DETAILS[kind]?.(call),
     ...(mcp === null ? {} : { mcp }),
   }
+}
+
+/** The call an agent's permission request names, or null where Seti cannot read it. */
+export function askedCall(toolCall: unknown): ToolCall | null {
+  const fields = typeof toolCall === 'object' && toolCall !== null ? toolCall : {}
+  const parsed = sessionUpdate.safeParse({ ...fields, sessionUpdate: 'tool_call' })
+  return parsed.success && parsed.data.sessionUpdate === 'tool_call' ? callOf(parsed.data) : null
 }
 
 /** What an ended call returned: its text parts, and the images it carried by count. */
