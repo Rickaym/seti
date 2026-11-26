@@ -65,6 +65,18 @@ const KEY_SERVICES: KeyService[] = [
     key: ['API key', 'An API key of the project or the account.'],
   },
   {
+    id: 'gemini',
+    title: 'Gemini API',
+    description: 'Gemini models, the key Gemini agents run on.',
+    category: 'ai',
+    icon: 'google',
+    docs: 'https://ai.google.dev/gemini-api/docs/api-key',
+    env: 'GEMINI_API_KEY',
+    hosts: ['generativelanguage.googleapis.com'],
+    header: ['x-goog-api-key', '{{value}}'],
+    key: ['API key', 'A Google AI Studio key from a billed Google Cloud project.'],
+  },
+  {
     id: 'huggingface',
     title: 'Hugging Face Inference',
     description: 'Models served through Inference Providers.',
