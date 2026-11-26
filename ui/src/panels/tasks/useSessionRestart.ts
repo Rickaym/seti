@@ -28,7 +28,7 @@ export function restartQuestion(task: Task, running: boolean, caps: AgentCapabil
 }
 
 /** Restarts the agent's session, stopping its turn first when `running`; false when it failed. */
-export async function restartTask(task: Task, running: boolean, onChanged: () => void): Promise<boolean> {
+async function restartTask(task: Task, running: boolean, onChanged: () => void): Promise<boolean> {
   try {
     const body: RestartSessionInput = { interrupt: running }
     await apiPost(`/tasks/${task.id}/session/restart`, body)
