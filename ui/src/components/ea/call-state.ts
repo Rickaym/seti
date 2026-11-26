@@ -63,6 +63,8 @@ export interface CallState {
   replies: { count: number; totalMs: number }
   lastEnd: CallEnd | null
   route: CallRoute
+  /** The network path dropped and the call is rebuilding it, keeping the conversation. */
+  reconnecting: boolean
 }
 
 export type CallAction =
@@ -80,6 +82,7 @@ export type CallAction =
   | { type: 'captions-cleared' }
   | { type: 'audio-blocked'; blocked: boolean }
   | { type: 'route'; event: RouteEvent }
+  | { type: 'link'; reconnecting: boolean; at: number }
 
 const QUIET: CallSignals = { userSpeaking: false, botSpeaking: false, micHeld: false, latency: null }
 const NO_TRACKS: CallTracks = { local: null, bot: null }
@@ -100,6 +103,7 @@ export const initialCallState: CallState = {
   replies: { count: 0, totalMs: 0 },
   lastEnd: null,
   route: { inputs: [], reroutes: 0 },
+  reconnecting: false,
 }
 
 /** A kind joins the list when it differs from the last one, up to the cap. */
@@ -187,6 +191,7 @@ export function callReducer(state: CallState, action: CallAction): CallState {
         userStoppedAt: null,
         replies: initialCallState.replies,
         route: initialCallState.route,
+        reconnecting: false,
       }
     case 'connected':
       return withCaption({ ...state, phase: 'connected' }, { type: 'marker', text: 'Call started', at: action.at })
@@ -210,7 +215,17 @@ export function callReducer(state: CallState, action: CallAction): CallState {
       return { ...state, wake: action.wake }
     case 'captions-cleared':
       return { ...state, captions: initialCaptions }
+    case 'link':
+      return linkChanged(state, action)
   }
+}
+
+function linkChanged(state: CallState, action: Extract<CallAction, { type: 'link' }>): CallState {
+  if (action.reconnecting === state.reconnecting || state.phase !== 'connected') {
+    return state
+  }
+  const text = action.reconnecting ? 'Reconnecting' : 'Reconnected'
+  return withCaption({ ...state, reconnecting: action.reconnecting }, { type: 'marker', text, at: action.at })
 }
 
 export const callActive = (phase: CallPhase) => phase === 'connecting' || phase === 'connected'
