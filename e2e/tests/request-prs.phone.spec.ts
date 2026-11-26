@@ -80,7 +80,7 @@ test("on a phone the agent's description reads above the command and the PR line
   const code = await card.locator('code').first().boundingBox()
   expect(box?.y ?? 0).toBeLessThan(code?.y ?? 0)
   expect(box?.height ?? 0, 'two lines at most').toBeLessThanOrEqual(48)
-  await expect(card.getByText(long), 'the description shows once, never as the reason').toHaveCount(1)
+  await expect(card.getByText(long, { exact: true }), 'the description shows once, never as the reason').toHaveCount(1)
   await expect(card.getByRole('group', { name: 'Pull request tool#2136' })).toContainText(LEASE_TITLE)
   await expectFitsPhone(page, 'request with a description')
   for (const scheme of ['light', 'dark'] as const) {

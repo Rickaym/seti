@@ -104,7 +104,10 @@ test("the agent's description reads first, then the command and a merged PR, and
   const chip = card.getByRole('group', { name: 'Pull request tool#2140' })
   const top = async (part: typeof said) => (await part.boundingBox())?.y ?? 0
   await expect(said).toBeVisible()
-  await expect(card.getByText(MERGE_DESCRIPTION), 'the description shows once, never as the reason').toHaveCount(1)
+  await expect(
+    card.getByText(MERGE_DESCRIPTION, { exact: true }),
+    'the description shows once, never as the reason',
+  ).toHaveCount(1)
   expect(await top(said)).toBeLessThan(await top(ran))
   expect(await top(ran)).toBeLessThan(await top(chip))
   await expect(chip).toContainText(RETRY_TITLE)
@@ -124,7 +127,7 @@ test("a merge an Ask rule holds names the rule, and finds the PR in the agent's 
     const id = await startAsking(request, described(LIVE_MERGE, LIVE_DESCRIPTION), AGENT_PRS)
     await page.goto(`/#agents/${id}`)
     const card = requestCard(page)
-    await expect(card.getByText(LIVE_DESCRIPTION)).toHaveCount(1)
+    await expect(card.getByText(LIVE_DESCRIPTION, { exact: true })).toHaveCount(1)
     await expect(card.getByText('Your Ask rule holds this: Bash(gh pr merge:*)', { exact: true })).toBeVisible()
     const chip = card.getByRole('group', { name: 'Pull request dash#3782' })
     await expect(chip).toContainText(DASH_TITLE)
