@@ -13,7 +13,7 @@ const MARK = cn(
   'relative -top-[0.45em] mx-px inline-flex cursor-pointer items-center px-px align-baseline',
   'text-[max(0.75em,11px)] leading-none font-medium text-primary tabular-nums no-underline',
   'hover:underline focus-visible:outline-2 focus-visible:outline-ring',
-  'pointer-coarse:-my-4 pointer-coarse:min-h-11 pointer-coarse:px-1',
+  'pointer-coarse:-my-4 pointer-coarse:min-h-11 pointer-coarse:px-0.5',
 )
 
 interface MarkProps {
@@ -83,17 +83,19 @@ function PhoneMark({ reference, label }: MarkProps) {
       />
       {open && (
         <Sheet open onOpenChange={setOpen}>
-          <SheetContent side="bottom" aria-describedby={undefined} className="gap-3 p-4" data-testid="reference-sheet">
-            <SheetTitle>Source {reference.n}</SheetTitle>
-            <ReferencePreview reference={reference} label={label} />
-            {reference.href !== null && (
-              <Button asChild className="min-h-11">
-                <a href={reference.href} target="_blank" rel="noreferrer">
-                  <ExternalLink />
-                  Open
-                </a>
-              </Button>
-            )}
+          <SheetContent side="bottom" aria-describedby={undefined} className="p-0" data-testid="reference-sheet">
+            <div className="flex flex-col gap-3 p-4">
+              <SheetTitle>Source {reference.n}</SheetTitle>
+              <ReferencePreview reference={reference} label={label} />
+              {reference.href !== null && (
+                <Button asChild className="min-h-11">
+                  <a href={reference.href} target="_blank" rel="noreferrer">
+                    <ExternalLink />
+                    Open
+                  </a>
+                </Button>
+              )}
+            </div>
           </SheetContent>
         </Sheet>
       )}
