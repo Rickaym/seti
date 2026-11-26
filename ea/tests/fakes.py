@@ -737,6 +737,8 @@ class FakeSeti:
     permission_requests: list[dict[str, Any]] = field(default_factory=list)
     answered_requests: list[dict[str, Any]] = field(default_factory=list)
     request_timeout_minutes: int = 60
+    permission_policy: dict[str, Any] = field(default_factory=dict)
+    agent_permissions: dict[str, dict[str, Any]] = field(default_factory=dict)
     settings_doc: dict[str, Any] = field(
         default_factory=lambda: {
             "version": 1,
@@ -751,6 +753,7 @@ class FakeSeti:
     )
     team: list[dict[str, Any]] = field(default_factory=list)
     chat_hits: list[dict[str, Any]] = field(default_factory=list)
+    sources: dict[str, Any] = field(default_factory=lambda: {"note": "", "items": [], "more": False})
     chat_more: bool = False
     file_search: dict[str, Any] = field(
         default_factory=lambda: {"mode": "name", "hits": [], "truncated": False, "partial": False}
@@ -1259,6 +1262,8 @@ class FakeSeti:
                 return ok({"hits": self.chat_hits, "has_more": self.chat_more, "total": len(self.chat_hits)})
             case ["tasks", _, "files", "search"]:
                 return ok(self.file_search)
+            case ["tasks", _, "sources"]:
+                return ok(self.sources)
             case ["tasks", _, "files", "roots"]:
                 return ok([{"id": "cwd", "label": "login-app"}, {"id": "workspace", "label": "Workspace"}])
             case ["tasks", _, "files", "resolve"]:
@@ -1386,6 +1391,11 @@ class FakeSeti:
                 return ok(self.policy_shadow)
             case ["settings-doc"]:
                 return ok(self.settings_doc)
+            case ["permissions"]:
+                return ok(self.permission_policy)
+            case ["tasks", task_id, "permissions"]:
+                found = self.agent_permissions.get(task_id)
+                return ok(found) if found is not None else err(404, "Task not found")
             case ["permissions", "timeout"]:
                 return ok({"request_timeout_minutes": self.request_timeout_minutes, "updated_at": None})
             case ["requests"]:

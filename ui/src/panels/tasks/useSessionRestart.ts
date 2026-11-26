@@ -2,7 +2,6 @@ import type { AgentCapabilities, RestartSessionInput, Task } from '@seti/shared'
 import { RotateCw } from 'lucide-react'
 import { toast } from 'sonner'
 import { apiPost, errorText } from '@/api'
-import { useCommands } from '@/components/palette/useCommands'
 import { useConfirm, type ConfirmOptions } from '@/components/ui/confirm-context'
 import { useCapabilities } from '@/hooks/useCapabilities'
 
@@ -51,22 +50,4 @@ export function useRestartAction(task: Task, running: boolean, onChanged: () => 
       await restartTask(task, running, onChanged)
     }
   }
-}
-
-/** Restarting the agent's session, which keeps the conversation; it is in the palette too. */
-export function useSessionRestart(task: Task, running: boolean, onChanged: () => void) {
-  const restart = useRestartAction(task, running, onChanged)
-  useCommands([
-    {
-      id: 'agent.restart-session',
-      title: 'Restart session',
-      detail: task.title,
-      icon: RotateCw,
-      group: 'Current agent',
-      keywords: 'reload reconnect mcp servers plugins tools runtime process',
-      when: (context) => context.agent?.id === task.id,
-      run: () => void restart(),
-    },
-  ])
-  return restart
 }

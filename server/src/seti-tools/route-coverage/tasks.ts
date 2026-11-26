@@ -64,17 +64,23 @@ export const TASKS_ROUTES: CoverageTable = {
     "Allow a held tool call once, approve a plan, or deny either with a message (owner's C table, " +
       "section 1). Always allow, a rule for every agent and edited fields stay the user's",
   ),
-  'GET /api/tasks/:id/permissions': gap("One agent's permission rules. Read"),
+  'GET /api/tasks/:id/permissions': ea('get_security_settings'),
   'PUT /api/tasks/:id/permissions/bypass': user('security', 'Bypass on or off. Security setting'),
   'POST /api/tasks/:id/permissions/rules': user('security', 'Add an agent rule. Permission rules'),
   'DELETE /api/tasks/:id/permissions/rules/:rule_id': user('security', 'Remove an agent rule. Permission rules'),
   'POST /api/tasks/:id/permissions/rules/batch': user('security', 'Add agent rules. Permission rules'),
-  'GET /api/tasks/:id/permissions/rules/coverage': gap("An agent's review coverage. Read"),
+  'GET /api/tasks/:id/permissions/rules/coverage': user(
+    'security',
+    'Checks a review rule while the user writes it, which is part of editing permission rules',
+  ),
   'GET /api/tasks/:id/processes': ea('list_processes'),
   'POST /api/tasks/:id/processes/stop': ea('stop_process'),
   'DELETE /api/tasks/:id/prs': ea('unlink_pr'),
   'POST /api/tasks/:id/prs': ea('link_pr'),
   'DELETE /api/tasks/:id/queue/:message_id': ea('take_back_message'),
+  'POST /api/tasks/:id/seti-commands': ui(
+    "The user's own reply box; it runs the settings' own functions, which the EA reaches by its tools",
+  ),
   'POST /api/tasks/:id/refused-hosts': user('security', 'Allow a host the sandbox refused. Widening'),
   'POST /api/tasks/:id/retry': ea('retry_agent_turn'),
   'POST /api/tasks/:id/rewind': ea('rewind_agent'),
@@ -87,6 +93,7 @@ export const TASKS_ROUTES: CoverageTable = {
   'POST /api/tasks/:id/seen': ui('Mark an agent seen. View state'),
   'POST /api/tasks/:id/session/end': ea('stop_background_work'),
   'POST /api/tasks/:id/session/restart': ea('restart_agent_session'),
+  'GET /api/tasks/:id/sources': ea('find_in_transcript'),
   'POST /api/tasks/:id/sources': ui(
     'Checks the links one message cites against what the agent read, for the chat view',
   ),

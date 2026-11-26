@@ -1,7 +1,9 @@
 import { z } from 'zod'
 import { RESERVED_COMMAND_NAMES } from './agent-settings.js'
+import { eaReason } from './mod-ea-reach.js'
 import { localName, title } from './mod-names.js'
 import { AGENT_VIEW_PLACES, agentPlaceIssues } from './mod-places.js'
+import { modPublicPath as publicPath, modRoute as route } from './mod-routes.js'
 import { fenceRenderer, fileViewer } from './mod-viewers.js'
 import { capabilityNeeds as needs } from './runtimes/capabilities.js'
 
@@ -82,6 +84,7 @@ const command = z
     timeoutSeconds: z.number().int().min(1).max(600).default(30),
     /** Hidden on an agent whose runtime lacks one of these, and refused there. */
     needs,
+    eaReason,
   })
   .superRefine((entry, ctx) => {
     const task = entry.args[MOD_TASK_ARG]
@@ -233,26 +236,6 @@ const schedule = z.strictObject({
 /** Task events a mod's onTaskEvent handler may hear; it needs tasks.read. */
 export const MOD_TASK_EVENTS = ['turn_finished', 'needs_you', 'status_changed', 'pr_linked', 'pr_merged'] as const
 export type ModTaskEvent = (typeof MOD_TASK_EVENTS)[number]
-
-/** A route under /api/mods/<id>/; only routes marked demo answer in the public demo. */
-const route = z.strictObject({
-  method: z.enum(['GET', 'POST', 'PUT', 'PATCH', 'DELETE']),
-  path: z
-    .string()
-    .max(120)
-    .regex(/^(?:\/(?:[a-z0-9-]+|:[a-z][a-z0-9_]*))+$/, 'A route path is /segments of lowercase words or :params')
-    .refine((path) => !/^\/actions(?:\/|$)/.test(path), 'Seti runs commands under /actions'),
-  demo: z.boolean().default(false),
-  /** It answers with server-sent events, written as the handler goes. */
-  stream: z.boolean().default(false),
-})
-
-const publicPath = z.strictObject({
-  path: z
-    .string()
-    .max(120)
-    .regex(/^\/[a-z0-9-]+(?:\/[a-z0-9-]+)*$/, 'A public path is exact, with no parameters'),
-})
 
 /** An entry that names what a mod adds and nothing more, such as an input hook. */
 const named = z.strictObject({ id: localName, title })
