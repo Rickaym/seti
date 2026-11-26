@@ -285,7 +285,7 @@ class TextChat:
 
         Only read-only tools and a reply to the agent that asked are open to it, and for alerts
         from a channel the user set to act, a direct message to an existing agent. With inbox
-        relays on, it may relay one item to the agent it is about (EA-18).
+        relays on, it may relay one item to the agent it is about (EA-19).
         """
         items = delivered.for_model
         if not items:

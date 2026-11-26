@@ -1,4 +1,4 @@
-"""Inbox relays (EA-18): in a chat report the EA may pass one item to the agent it is about."""
+"""Inbox relays (EA-19): in a chat report the EA may pass one item to the agent it is about."""
 
 from collections.abc import Mapping, Sequence
 from typing import TYPE_CHECKING, Any
