@@ -22,10 +22,13 @@ from pipecat.transports.smallwebrtc.transport import (
     SmallWebRTCTransport,
 )
 
+from seti_ea.call_audio import CallAudio
+
 HEARD_WINDOW_SECS = 0.5
 # Under pipecat's 10 s audio write timeout, which would end the call.
 HOLD_SECS = 8.0
 POLL_SECS = 0.05
+SAMPLE_SECS = 5.0
 
 
 class LinkWatch:
@@ -39,6 +42,7 @@ class LinkWatch:
         self._pinged = connection.is_connected
         self._heard = -math.inf
         self._down_since: float | None = None
+        self.audio = CallAudio()
         connection.is_connected = self.up  # type: ignore[method-assign]
 
     def heard(self) -> None:
@@ -59,19 +63,30 @@ class LinkWatch:
             await asyncio.sleep(POLL_SECS)
             silent = self._heard != -math.inf and self._clock() - self._heard >= HEARD_WINDOW_SECS
             if silent and not reported:
+                self.audio.drops += 1
                 lost()
             reported = silent
 
+    async def sample(self) -> None:
+        """Samples the user's audio packets every SAMPLE_SECS, for the call's log line."""
+        while True:
+            await asyncio.sleep(SAMPLE_SECS)
+            await self.audio.sample(self._connection.pc)
+
     async def wait(self) -> bool:
         """Waits for the link while this outage is under HOLD_SECS old; True once it is up."""
-        while not self.up():
-            now = self._clock()
-            self._down_since = self._down_since if self._down_since is not None else now
-            if now - self._down_since >= HOLD_SECS:
-                return False
-            await asyncio.sleep(POLL_SECS)
-        self._down_since = None
-        return True
+        start = self._clock()
+        try:
+            while not self.up():
+                now = self._clock()
+                self._down_since = self._down_since if self._down_since is not None else now
+                if now - self._down_since >= HOLD_SECS:
+                    return False
+                await asyncio.sleep(POLL_SECS)
+            self._down_since = None
+            return True
+        finally:
+            self.audio.held_secs += self._clock() - start
 
 
 class HeardInput(SmallWebRTCInputTransport):

@@ -18,6 +18,7 @@ import { awsToken } from './sandbox-aws-token.js'
 import { bwrapArgs } from './sandbox-bwrap.js'
 import { sandboxClaudeJson } from './sandbox-claude-json.js'
 import { CODEX_DIR, codexMountPoints, EMPTY_DIR, EMPTY_FILE, MODEL_KEY_ENV, SKILLS_HOME } from './sandbox-codex.js'
+import { SANDBOX_ENV_FILE, writeSandboxEnv } from './sandbox-env-file.js'
 import { prepareGemini } from './sandbox-gemini.js'
 import { gitEnv } from './sandbox-git.js'
 import { forgetSandboxSignIns, hostClaudeJson, mcpTokens, proxiedServers, signedInServers } from './sandbox-mcp.js'
@@ -173,6 +174,7 @@ export function sandboxEnv(
     SHELL: '/bin/bash',
     TMPDIR: '/tmp',
     SETI_SANDBOX: '1',
+    BASH_ENV: SANDBOX_ENV_FILE,
     ...runtimeEnv(home, options),
     HTTPS_PROXY: PROXY_URL,
     HTTP_PROXY: PROXY_URL,
@@ -420,6 +422,7 @@ export async function taskSandbox(task: Task, request: SandboxRequest): Promise<
   const { publicDir: caDir, systemBundle } = authority
   const browserDb = sandboxBrowserDb(authority.browserDb, dir)
   const ready = { ...layout, caDir, systemBundle, browserDb, ssh: reach.ssh }
+  writeSandboxEnv(path.join(dir, 'run'), reach.options.connections ?? {})
   const env = sandboxEnv(process.env, ctx.home, reach.options)
   const command = (program: string, args: readonly string[], options: SandboxCommandOptions = {}) => {
     const extra = path.isAbsolute(program) ? [program] : []
