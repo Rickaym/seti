@@ -15,6 +15,7 @@ import type { PermissionRequest } from './permissions.js'
 import { disabledPluginIds } from './plugins.js'
 import { prUrl } from './pr-url.js'
 import type { RepoRef } from './repos.js'
+import type { AcpRecord } from './runtimes/acp/shapes.js'
 import type { ClaudeMessage } from './runtimes/claude/message.js'
 import type { CodexMessage } from './runtimes/codex/project.js'
 import { runtimeFields } from './runtimes/picks.js'
@@ -382,6 +383,7 @@ export type MessageBody =
   /** A runtime's message as it sent it; `runtime` names any runtime but Claude Code. */
   | { kind: 'sdk'; payload: ClaudeMessage; runtime?: undefined }
   | { kind: 'sdk'; payload: CodexMessage; runtime: 'codex' }
+  | { kind: 'sdk'; payload: AcpRecord; runtime: 'gemini' }
   /**
    * A note from Seti; `stopped` marks one about a process the user stopped, `session` one about a
    * session restart or a move to another runtime (`runtime_was` names the one it left) and

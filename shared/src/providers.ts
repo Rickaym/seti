@@ -86,8 +86,45 @@ const OPENAI = {
   },
 } satisfies Provider
 
+/** Google's rates for a model at short context, rising to `later` from the day named. */
+const google = (short: TokenRate, later?: { from: string; short: TokenRate }): readonly PriceRow[] => [
+  { from: null, short, long: null },
+  ...(later === undefined ? [] : [{ from: later.from, short: later.short, long: null }]),
+]
+
+/**
+ * Gemini CLI's provider, with the Gemini API's paid-tier text rates. Cache storage, which Google
+ * bills by the hour, is not in the estimate.
+ */
+const GOOGLE = {
+  label: 'Google',
+  baseUrl: 'https://generativelanguage.googleapis.com',
+  hosts: ['generativelanguage.googleapis.com'],
+  key: 'connection',
+  prices: {
+    asOf: '2026-11-26',
+    source: 'https://aistudio.google.com/docs/pricing',
+    models: {
+      'gemini-3.8-flash': google(rate(0.75, 0.075, 3.75), { from: '2027-01-01', short: rate(1.5, 0.15, 7.5) }),
+      'gemini-3.6-flash': google(rate(0.75, 0.075, 3.75), { from: '2027-01-01', short: rate(1.5, 0.15, 7.5) }),
+      'gemini-3.5-flash-lite': google(rate(0.3, 0.03, 2.5)),
+      'gemini-3.1-flash-lite': google(rate(0.25, 0.025, 1.5)),
+      'gemini-3.1-pro-preview': [
+        { from: null, short: rate(2, 0.2, 12), long: { above: 200_000, rate: rate(4, 0.4, 18) } },
+      ],
+      'gemini-4-carbon': google(rate(2, 0.1, 10), { from: '2026-12-01', short: rate(4, 0.2, 20) }),
+      'gemini-4-argon': google(rate(2, 0.1, 10), { from: '2026-12-01', short: rate(4, 0.2, 20) }),
+      'gemini-4-neon': google(rate(3, 0.15, 15)),
+      'gemini-4-hydrogen': google(rate(1.5, 0.075, 7.5)),
+    },
+  },
+} satisfies Provider
+
 /** The providers Seti knows, built in; no user-defined provider exists. */
-export const PROVIDERS = { anthropic: ANTHROPIC, openai: OPENAI } as const satisfies Record<string, Provider>
+export const PROVIDERS = { anthropic: ANTHROPIC, openai: OPENAI, google: GOOGLE } as const satisfies Record<
+  string,
+  Provider
+>
 
 export type ProviderId = keyof typeof PROVIDERS
 
@@ -96,7 +133,7 @@ export const reachesProvider = (provider: ProviderId, patterns: readonly string[
   patterns.some((pattern) => PROVIDERS[provider].hosts.some((host) => hostMatches(pattern, host)))
 
 /** The provider each runtime's agents reach, which signs their model calls. */
-const RUNTIME_PROVIDERS: Record<StoredRuntime, ProviderId> = { claude: 'anthropic', codex: 'openai' }
+const RUNTIME_PROVIDERS: Record<StoredRuntime, ProviderId> = { claude: 'anthropic', codex: 'openai', gemini: 'google' }
 
 /** The provider an agent on the runtime sends its model calls to. */
 export const providerOf = (runtime: StoredRuntime): ProviderId => RUNTIME_PROVIDERS[runtime]

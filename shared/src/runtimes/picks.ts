@@ -3,7 +3,11 @@ import { CODEX_EFFORTS, CODEX_MODELS, codexModelLabel } from './settings.js'
 import { STORED_RUNTIMES, type StoredRuntime } from './stored.js'
 
 /** Each runtime as people call it. */
-export const RUNTIME_NAMES: Record<StoredRuntime, string> = { claude: 'Claude Code', codex: 'Codex' }
+export const RUNTIME_NAMES: Record<StoredRuntime, string> = {
+  claude: 'Claude Code',
+  codex: 'Codex',
+  gemini: 'Gemini CLI',
+}
 
 /** The runtime a new agent runs on when its start names neither a runtime nor a model. */
 export const DEFAULT_RUNTIME: StoredRuntime = 'claude'
