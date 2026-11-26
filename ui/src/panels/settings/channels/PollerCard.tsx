@@ -53,7 +53,7 @@ function PollerReplies() {
     return null
   }
   return (
-    <SettingRow label="Replies" description="Agents follow Slack threads; this poller does not read replies.">
+    <SettingRow label="Replies" stack description="Agents follow Slack threads; this poller does not read replies.">
       <RepliesNeedWebhook />
     </SettingRow>
   )
