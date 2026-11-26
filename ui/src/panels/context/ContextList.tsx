@@ -92,17 +92,17 @@ function PackItems({
   ))
 }
 
-/** No roles is the normal start: one line on what a role is, and the way to add one. */
+/** No roles is the normal start: one line, and the way to add one. */
 function NoRoles({ onAdd }: { onAdd: () => void }) {
   return (
     <div data-testid="no-roles" className="flex items-center gap-2 px-3 py-2">
-      <p className="min-w-0 flex-1 text-xs text-muted-foreground">
-        No roles yet. A role is a standing brief for an agent.
-      </p>
-      <Button size="sm" variant="outline" onClick={onAdd}>
-        <Plus />
-        Add
-      </Button>
+      <p className="min-w-0 flex-1 truncate text-xs text-muted-foreground">No roles yet.</p>
+      <Hint text="Add a role: a standing brief an agent works under">
+        <Button size="sm" variant="outline" onClick={onAdd}>
+          <Plus />
+          Add
+        </Button>
+      </Hint>
     </div>
   )
 }
