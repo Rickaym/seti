@@ -15,6 +15,7 @@ const REQUEST: PermissionRequest = {
   tool_name: 'Bash',
   kind: 'tool',
   summary: COMMAND,
+  description: null,
   input: JSON.stringify({ command: COMMAND, description: 'Merge the lease fix' }, null, 2),
   reason: 'Merge the lease fix',
   suggestions: [`Bash(${COMMAND})`],
@@ -29,12 +30,18 @@ const REQUEST: PermissionRequest = {
   timed_out: false,
 }
 
-const pr = (number: number, title: string | null, ci: RequestPr['ci']): RequestPr => ({
+const pr = (
+  number: number,
+  title: string | null,
+  ci: RequestPr['ci'],
+  state: RequestPr['state'] = null,
+): RequestPr => ({
   url: `https://github.com/acme/tool/pull/${String(number)}`,
   repo: 'acme/tool',
   number,
   title,
   ci,
+  state,
 })
 
 const card = (request: PermissionRequest) =>
@@ -68,5 +75,22 @@ describe('the permission card', () => {
     const html = card({ ...REQUEST, suggestions: [] })
     expect(html).not.toContain('Always')
     expect(card(REQUEST)).toContain('Always adds')
+  })
+
+  it("puts the agent's description first, then the command, then Seti's reason and the PRs", async () => {
+    const described = {
+      ...REQUEST,
+      description: 'Merge tool#2136',
+      prs: [pr(2136, 'Fix lease renewal after TTL', 'success', 'merged')],
+    }
+    const html = card(described)
+    const at = (text: string) => html.indexOf(text)
+    expect(at('Merge tool#2136')).toBeGreaterThan(at('Allow Bash?'))
+    expect(at('<code')).toBeGreaterThan(at('Merge tool#2136'))
+    expect(at('Merge the lease fix')).toBeGreaterThan(at('<code'))
+    expect(at('aria-label="Merged"')).toBeGreaterThan(at('Merge the lease fix'))
+    await expect(`${JSON.stringify({ card: html }, null, 2)}\n`).toMatchFileSnapshot(
+      './permission-card-description.golden.json',
+    )
   })
 })

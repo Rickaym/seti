@@ -139,3 +139,7 @@ ALTER TABLE permission_request ADD COLUMN edited TEXT NOT NULL DEFAULT '[]';
 export const PERMISSION_REQUEST_PRS = `
 ALTER TABLE permission_request ADD COLUMN prs TEXT NOT NULL DEFAULT '[]';
 `
+
+export const PERMISSION_REQUEST_DESCRIPTION = `
+ALTER TABLE permission_request ADD COLUMN description TEXT;
+`

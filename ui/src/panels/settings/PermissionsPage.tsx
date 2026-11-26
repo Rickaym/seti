@@ -38,7 +38,7 @@ function Waiting({ requests }: { requests: readonly PermissionRequest[] }) {
               <Hand className="size-3.5 shrink-0 text-warning-text" aria-hidden />
               <span className="shrink-0 font-medium">{titles.get(request.task_id) ?? 'Agent'}</span>
               <span className="min-w-0 truncate text-muted-foreground">
-                {toolLabel(request.tool_name)}: {request.summary}
+                {toolLabel(request.tool_name)}: {request.description ?? request.summary}
               </span>
             </button>
           </li>

@@ -2,6 +2,8 @@ import type { RequestPr } from '@seti/shared'
 import { ExternalLink, GitPullRequest } from 'lucide-react'
 import { Hint } from '@/components/Hint'
 import { TOUCH_TARGET } from '@/lib/touch'
+import { cn } from '@/lib/utils'
+import { PR_GROUPS } from '@/panels/tasks/linked-prs'
 import { CiBadge } from '@/panels/tasks/pr-badges'
 
 /** Chips a request card shows before the rest fold into "+N". */
@@ -10,11 +12,20 @@ const SHOWN = 3
 /** The short name the agent header's chips use, such as tool#2136. */
 const labelOf = (pr: RequestPr) => `${pr.repo.split('/').at(-1) ?? pr.repo}#${String(pr.number)}`
 
+/** The PR icon the agent header shows, or the linked-PR list's icon for a merged or closed one. */
+function StateIcon({ pr }: { pr: RequestPr }) {
+  if (pr.state !== 'merged' && pr.state !== 'closed') {
+    return <GitPullRequest className="size-3 shrink-0" />
+  }
+  const { icon: Icon, className, title } = PR_GROUPS[pr.state]
+  return <Icon className={cn('size-3 shrink-0', className)} role="img" aria-label={title} />
+}
+
 function RequestPrChip({ pr }: { pr: RequestPr }) {
   const label = labelOf(pr)
   return (
     <span className="flex min-w-0 items-center gap-1.5" role="group" aria-label={`Pull request ${label}`}>
-      <GitPullRequest className="size-3 shrink-0" />
+      <StateIcon pr={pr} />
       <span className="shrink-0 text-primary">{label}</span>
       {pr.title !== null && (
         <Hint text={pr.title}>

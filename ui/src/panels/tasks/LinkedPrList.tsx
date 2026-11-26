@@ -1,4 +1,4 @@
-import { CircleX, GitMerge, GitPullRequest, GitPullRequestClosed, List, Plus, X, type LucideIcon } from 'lucide-react'
+import { List, Plus, X } from 'lucide-react'
 import { useMemo, useState, type ReactNode } from 'react'
 import { Hint } from '@/components/Hint'
 import { ScrollOnHover } from '@/components/ScrollOnHover'
@@ -17,25 +17,12 @@ import { PrChips } from '@/panels/tasks/PrChips'
 import { FailingChecks } from '@/panels/tasks/PrCiFailure'
 import { PrReview } from '@/panels/tasks/PrReview'
 import type { PrAgent } from '@/panels/tasks/fix-ci'
-import {
-  failingPrs,
-  filterLinkedPrs,
-  LINKED_PR_GROUPS,
-  type LinkedPr,
-  type LinkedPrGroup,
-} from '@/panels/tasks/linked-prs'
+import { failingPrs, filterLinkedPrs, LINKED_PR_GROUPS, PR_GROUPS, type LinkedPr } from '@/panels/tasks/linked-prs'
 import { CiBadge, Tag, ThreadsBadge } from '@/panels/tasks/pr-badges'
 import { keepForToasts, unlinkWithUndo } from '@/panels/tasks/pr-links'
 
 /** Rows mounted at first; scrolling to the end mounts the next batch, so 500 links open fast. */
 const BATCH = 60
-
-const GROUP: Record<LinkedPrGroup, { title: string; icon: LucideIcon; className: string }> = {
-  fix: { title: 'Needs a fix', icon: CircleX, className: 'text-destructive' },
-  open: { title: 'Open', icon: GitPullRequest, className: 'text-success' },
-  merged: { title: 'Merged', icon: GitMerge, className: 'text-primary' },
-  closed: { title: 'Closed', icon: GitPullRequestClosed, className: 'text-muted-foreground' },
-}
 
 interface RowProps {
   item: LinkedPr
@@ -72,7 +59,7 @@ const noStatus = (item: LinkedPr, title: string) => {
 
 function LinkedPrRow({ item, path, owner, agent, onChanged, onSent }: RowProps) {
   const { pr } = item
-  const { icon: Icon, className, title } = GROUP[item.group]
+  const { icon: Icon, className, title } = PR_GROUPS[item.group]
   const draft = pr?.draft === true
   return (
     <li className="border-b border-border last:border-b-0" aria-label={`Pull request ${item.label}`}>
@@ -131,9 +118,9 @@ function GroupedRows({ matches, ...shared }: RowsProps) {
   return (
     <>
       {groups.map(({ group, count, rows }) => (
-        <section key={group} aria-label={GROUP[group].title}>
+        <section key={group} aria-label={PR_GROUPS[group].title}>
           <h3 className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-popover px-3 py-1 text-2xs font-semibold text-muted-foreground uppercase">
-            {GROUP[group].title}
+            {PR_GROUPS[group].title}
             <span className="tabular-nums">{count}</span>
           </h3>
           <ul className="text-xs">
