@@ -1,17 +1,18 @@
 import { rowEvents, type RuntimeEvent, type ToolCall, type WireRow } from '@seti/shared'
 import { messages } from '../db.js'
 import { sourceItems } from '../store/sources.js'
-import { fileAsk, fileItems, type FileAsk } from './files.js'
+import { commitAsk, commitItems } from './commits.js'
+import { fileAsk, fileItems } from './files.js'
 import { githubRead } from './github.js'
-import type { FoundItem, ParseResult } from './item.js'
+import type { FolderRead, FoundItem, ParseResult } from './item.js'
 import { linearRead } from './linear.js'
 import { isSlackCall, slackHostIn, slackRead } from './slack.js'
 
-/** A call whose result the ledger reads: its items, a file, or only the Slack host it states. */
+/** A call whose result the ledger reads: its items, ones in the agent's folders, a Slack host. */
 interface Watched {
   parse: ParseResult | null
   slack: boolean
-  file: FileAsk | null
+  folder: FolderRead | null
 }
 
 interface Ended extends Watched {
@@ -20,6 +21,17 @@ interface Ended extends Watched {
 }
 
 const ADAPTERS: readonly ((call: ToolCall) => ParseResult | null)[] = [slackRead, linearRead, githubRead]
+
+const FOLDER_ADAPTERS: readonly ((call: ToolCall) => FolderRead | null)[] = [
+  (call) => {
+    const ask = fileAsk(call)
+    return ask === null ? null : async (taskId, text) => fileItems(taskId, ask, text)
+  },
+  (call) => {
+    const ask = commitAsk(call)
+    return ask === null ? null : async (taskId, text) => commitItems(taskId, ask, text)
+  },
+]
 
 /** Calls each task's agent started whose result the ledger will read, by call id. */
 const started = new Map<string, Map<string, Watched>>()
@@ -32,8 +44,8 @@ const OPEN_MAX = 200
 function watchedOf(call: ToolCall): Watched | null {
   const parse = ADAPTERS.reduce<ParseResult | null>((first, adapter) => first ?? adapter(call), null)
   const slack = isSlackCall(call)
-  const file = fileAsk(call)
-  return parse === null && !slack && file === null ? null : { parse, slack, file }
+  const folder = FOLDER_ADAPTERS.reduce<FolderRead | null>((first, adapter) => first ?? adapter(call), null)
+  return parse === null && !slack && folder === null ? null : { parse, slack, folder }
 }
 
 function step(calls: Map<string, Watched>, event: RuntimeEvent): Ended[] {
@@ -78,19 +90,18 @@ function itemsOf(parse: ParseResult, text: string, host: string | null): FoundIt
   }
 }
 
-/** The item a file read is; a file Seti cannot place finds none, and nothing is logged. */
-async function fileItemsOf(taskId: string, file: FileAsk, text: string): Promise<FoundItem[]> {
+/** The items a folder read finds; one Seti cannot place finds none, and nothing is logged. */
+async function folderItems(taskId: string, read: FolderRead, text: string): Promise<FoundItem[]> {
   try {
-    return await fileItems(taskId, file, text)
+    return await read(taskId, text)
   } catch {
     return SAFE_ITEMS
   }
 }
 
 async function keep(taskId: string, messageId: number, call: Ended, live: boolean): Promise<void> {
-  if (call.file !== null) {
-    await sourceItems.add(taskId, messageId, call.callId, live ? await fileItemsOf(taskId, call.file, call.text) : [])
-    return
+  if (call.folder !== null && live) {
+    await sourceItems.add(taskId, messageId, call.callId, await folderItems(taskId, call.folder, call.text))
   }
   const stated = call.slack ? slackHostIn(call.text) : null
   if (stated !== null) {

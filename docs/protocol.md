@@ -290,6 +290,15 @@ between two steps; an interrupt; a hook at subagent start.
   arrives, so a ledger read again after a restore records none. A GitHub blob link at a commit
   names the item at that commit, a short hash its prefix; a link at a branch or tag names none,
   and a blob link is never reported as not read.
+- SRC-9: A shell line that runs one `git show` or `git log` alone, or through filters that only
+  cut, order or count, records one item per `commit <hash>` header it printed, at most 50, when
+  the clone it ran in has its `origin` on GitHub and holds that commit. The folder is the agent's
+  starting folder followed past `cd` and `-C`; a header the clone does not hold gives no item. A
+  format option, git settings or environment on the line, output sent to a file, or another
+  command that prints gives no item. The item's text is the result from its header to the next,
+  its time the author date, and its permalink the commit page when a branch of `origin` holds the
+  commit; otherwise it has none. A GitHub commit link names the item by its full hash, or by a
+  short one as a prefix, and is never reported as not read.
 
 ## 4. Turn lifecycle
 
