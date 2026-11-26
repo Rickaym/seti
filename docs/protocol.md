@@ -1569,8 +1569,8 @@ Optional and off by default: a maintenance session per agent that consolidates i
 - CMD-2: A Seti command MUST run only on the user's submit in that agent's reply box of a line
   the user typed or picked there. A line that arrived another way (pasted, dropped, restored,
   handed over, taken back, or submitted by a script) MUST wait in a card with Run and run only on
-  its tap. Transcript rows, updates, group chat and Slack messages, webhooks, the EA, agents and
-  mods MUST NOT run one.
+  its tap, also after a choice picked from the completion list replaced it. Transcript rows,
+  updates, group chat and Slack messages, webhooks, the EA, agents and mods MUST NOT run one.
 - CMD-3: Each word of a Seti command MUST complete from a list: the setting's values, or the
   agent's own items with their state and where it comes from (Custom, Credential, Inherited), then
   each operation the item allows, each with one line. A choice that cannot be taken MUST show
