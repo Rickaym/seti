@@ -211,7 +211,7 @@ describe('review rules', () => {
     expect(event?.detail).toMatchObject({ review: true, edited: ['text'] })
     expect(JSON.stringify(event?.detail)).not.toContain('Deploy is done')
     expect(await setiNotes(task)).toEqual([
-      { error: `Edited text of ${SEND} before it ran`, edited: { fields: ['text'], denied: false } },
+      { error: `Edited text of ${SEND} before it ran`, edited: { fields: ['text'], denied: false, tool: SEND } },
     ])
   })
 
@@ -247,7 +247,7 @@ describe('review rules', () => {
     expect(event?.detail).toMatchObject({ review: true, edited: ['text'] })
     expect(JSON.stringify(event?.detail)).not.toContain('Deploy is done')
     expect(await setiNotes(task)).toEqual([
-      { error: `Edited text of ${SEND}, then denied it`, edited: { fields: ['text'], denied: true } },
+      { error: `Edited text of ${SEND}, then denied it`, edited: { fields: ['text'], denied: true, tool: SEND } },
     ])
   })
 

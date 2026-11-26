@@ -3,8 +3,8 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { mcpEnabled, type Task } from '@seti/shared'
+import { canonicalRoot } from './git-dirs.js'
 import { hostClaudeJson } from './sandbox-mcp.js'
-import { canonicalRoot } from './sandbox-mounts.js'
 import { mcpDefaults, taskMcpChoices } from './store/mcp.js'
 
 type Json = Record<string, unknown>

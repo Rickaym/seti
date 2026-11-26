@@ -175,6 +175,28 @@ async def test_search_seti_lists_every_request_and_says_which_only_the_user_answ
     assert result.summary == "4 requests waiting"
 
 
+async def test_search_seti_reads_a_proposed_seti_command_by_its_line_and_seti_s_words(
+    tools: EaTools, fake_seti: FakeSeti
+) -> None:
+    fake_seti.change_requests = [
+        {
+            "task_title": "Builder",
+            "change": {
+                "kind": "command",
+                "line": "/seti:memory 12g",
+                "description": "Set this agent's memory cap to 12 GB, from 8 GB",
+            },
+            "reason": "The build runs out of memory.",
+        }
+    ]
+    lines = (await tools.call("search_seti", {"in": "requests"})).text.splitlines()
+    assert (
+        "- [] Builder asks for the Seti command /seti:memory 12g (Set this agent's memory cap to 12 GB, "
+        "from 8 GB)" in lines
+    )
+    assert '  Its reason: <data from="the agent">The build runs out of memory.</data>' in lines
+
+
 async def test_search_seti_says_when_a_request_times_out_and_what_the_timeout_is(
     tools: EaTools, fake_seti: FakeSeti
 ) -> None:

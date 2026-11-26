@@ -1,167 +1,216 @@
-import { meetsNeeds, parseSettingCommand, type SettingCommandLine } from '@seti/shared'
-import { useEffect, useLayoutEffect, useRef, useState, type ReactElement } from 'react'
+import {
+  AGENT_SETTING_TABS,
+  completeSetiLine,
+  isSetiLine,
+  parseSetiLine,
+  SETI_NAMES,
+  sourcesOf,
+  type AgentSettingTab,
+  type CommandWorld,
+  type SetiCommand,
+  type SetiCommandInput,
+  type SetiCommandResult,
+  type SetiCompletion,
+} from '@seti/shared'
+import { useState, type ReactElement } from 'react'
 import { toast } from 'sonner'
-import { errorText } from '@/api'
-import { useCapabilities } from '@/hooks/useCapabilities'
-import { useSystem } from '@/hooks/useSystem'
+import { apiPost, errorText } from '@/api'
+import type { ConfirmOptions } from '@/components/ui/confirm-context'
+import { noteAccessChange } from '@/panels/access/access'
 import { useCredentialSwitch } from '@/panels/tasks/useCredentialSwitch'
-import { COMMAND_BINDINGS } from './bindings'
+import { questionFor } from './consequences'
 import { typedHere } from './typed-here'
-import type { Choice, CommandContext, CommandHost, CommandStep, Stepper } from './types'
+import type { CommandHost, SettingsTarget } from './types'
 import { useCommandPalette } from './useCommandPalette'
+import { useCommandWorld } from './useCommandWorld'
 
-/**
- * What the composer shows for a setting command: `live` offers choices while the words are typed,
- * `submitted` the step after Enter, `untrusted` asks before running a line that was not typed.
- */
-type CardPhase = 'live' | 'submitted' | 'untrusted'
+/** What the card above the reply box shows after Enter: why not, the settings' question, or Run. */
+export type CommandCard =
+  | { kind: 'refuse'; reason: string }
+  | { kind: 'confirm'; question: ConfirmOptions; command: SetiCommand }
+  | { kind: 'untrusted' }
 
 export interface SettingCommand {
-  line: SettingCommandLine
-  step: CommandStep | null
-  /** The card to show now, or null. */
-  phase: CardPhase | null
-  error: string | null
-  /** Takes the composer's Enter or Send; false when the draft is not a setting command. */
+  line: string
+  /** The choices for the word being typed; null while the name is typed or nothing fits. */
+  completion: SetiCompletion | null
+  card: CommandCard | null
+  /** Takes the composer's Enter or Send; true, since the draft is a Seti command. */
   submit: (trusted: boolean) => boolean
-  choose: (choice: Choice) => void
+  /** Puts a choice in place of the word being typed. */
+  pick: (token: string) => void
   confirm: () => void
   /** Closes the card and leaves the draft as it is. */
   dismiss: () => boolean
-  dialog: ReactElement | null
 }
 
-interface Loaded {
-  key: string
-  stepper: Stepper | null
-  error: string | null
-}
-
-const keyOf = (line: SettingCommandLine | null, taskId: string, version: string) =>
-  line === null ? null : `${taskId}:${line.setting.id}:${version}`
-
-/** Loads what the typed command reads, once per command and agent state, not per keystroke. */
-function useStepper(line: SettingCommandLine | null, context: CommandContext): Loaded | null {
-  const key = keyOf(line, context.task.id, context.task.updated_at)
-  const [loaded, setLoaded] = useState<Loaded | null>(null)
-  const latest = useRef({ context, line })
-  useLayoutEffect(() => {
-    latest.current = { context, line }
-  })
-  useEffect(() => {
-    const { line: now, context: at } = latest.current
-    const bind = now === null ? undefined : COMMAND_BINDINGS.get(now.setting.id)
-    if (key === null || bind === undefined) {
-      return undefined
-    }
-    let stale = false
-    bind(at).then(
-      (stepper) => {
-        if (!stale) {
-          setLoaded({ key, stepper, error: null })
-        }
-      },
-      (e: unknown) => {
-        if (!stale) {
-          setLoaded({ key, stepper: null, error: errorText(e) })
-        }
-      },
-    )
-    return () => {
-      stale = true
-    }
-  }, [key])
-  return loaded !== null && loaded.key === key ? loaded : null
-}
-
-/** The step the words lead to, or a refusal when the agent's runtime lacks what the command needs. */
-function stepOf(line: SettingCommandLine, context: CommandContext, loaded: Loaded | null): CommandStep | null {
-  if (!meetsNeeds(context.caps, line.setting.needs)) {
-    return { kind: 'refuse', reason: `/${line.setting.command.name} is not on ${context.caps?.label ?? ''} agents` }
+/** The completion to show: none when the word typed is already the only choice, so Enter runs. */
+function shownCompletion(draft: string, world: CommandWorld): SetiCompletion | null {
+  if (!/\s/.test(draft.trimStart())) {
+    return null
   }
-  return loaded?.stepper?.(line.args) ?? null
+  const completion = completeSetiLine(draft, world)
+  const typed = draft.slice(completion?.from ?? draft.length).toLowerCase()
+  const options = completion?.options ?? []
+  const done = options.length === 1 && options[0]?.token.toLowerCase() === typed
+  return completion === null || options.length === 0 || done ? null : completion
 }
+
+const isTab = (value: string | null | undefined): value is AgentSettingTab =>
+  (AGENT_SETTING_TABS as readonly (string | null | undefined)[]).includes(value)
+
+/** The tab or dialog a command that opens something opens. */
+function openTarget(command: SetiCommand): SettingsTarget {
+  const [name = '', word = ''] = command.keys
+  if (name === 'settings') {
+    return isTab(word) ? word : 'general'
+  }
+  const place = SETI_NAMES.find((entry) => entry.name === name)?.entry.place
+  return name !== 'access' && isTab(place) ? place : 'access'
+}
+
+const opens = (command: SetiCommand) => {
+  const found = SETI_NAMES.find((entry) => entry.name === command.keys[0])
+  const access = command.keys[0] === 'access' && (command.keys[1] === undefined || command.keys[1] === 'save')
+  return found?.grammar.kind === 'open' || access
+}
+
+const loading = (draft: string, world: CommandWorld) => sourcesOf(draft).some((source) => world[source] === null)
+
+interface Run {
+  draft: string
+  world: CommandWorld
+  host: CommandHost
+  show: (card: CommandCard) => void
+  done: () => void
+  choose: ReturnType<typeof useCredentialSwitch>['choose']
+}
+
+async function post({ host, done }: Run, command: SetiCommand, confirmed: boolean) {
+  try {
+    const body: SetiCommandInput = { line: command.line, confirmed }
+    const result = await apiPost<SetiCommandResult>(`/tasks/${host.task.id}/seti-commands`, body)
+    toast.success(result.description)
+    done()
+    if (command.keys[0] === 'access' || command.keys[0] === 'mcp') {
+      noteAccessChange(host.task.id)
+    }
+    host.onChanged()
+  } catch (e) {
+    toast.error(errorText(e))
+  }
+}
+
+/** Reads the line and runs it, opens what it opens, or asks the settings' question first. */
+function execute(run: Run, quiet = false) {
+  const { draft, world, host, show, done } = run
+  const parsed = parseSetiLine(draft, world)
+  if (!parsed.ok && !quiet) {
+    const reason = loading(draft, world) ? "Loading the agent's settings; press Enter again" : parsed.reason
+    show({ kind: 'refuse', reason })
+  }
+  if (!parsed.ok) {
+    return
+  }
+  const { command } = parsed
+  if (opens(command)) {
+    host.openSettings(openTarget(command))
+    done()
+  } else if (command.keys[0] === 'access' && command.keys[1] === 'credential') {
+    const id = command.keys[2] ?? ''
+    run.choose(
+      id,
+      world.credentials?.find((profile) => profile.id === id),
+    )
+    done()
+  } else if (command.rule.confirm) {
+    show({ kind: 'confirm', question: questionFor(command, host.task, host.running, world.caps), command })
+  } else {
+    void post(run, command, false)
+  }
+}
+
+/** What running a line needs from the hook, for the line in the box or one the palette puts there. */
+interface RunParts {
+  host: CommandHost
+  world: CommandWorld
+  choose: Run['choose']
+  setCard: (card: { draft: string; card: CommandCard } | null) => void
+  setDraft: (draft: string, typed: boolean) => void
+}
+
+const makeRun = (draft: string, { host, world, choose, setCard, setDraft }: RunParts): Run => ({
+  draft,
+  world,
+  host,
+  choose,
+  show: (shown) => {
+    setCard({ draft, card: shown })
+  },
+  done: () => {
+    setCard(null)
+    setDraft('', true)
+  },
+})
 
 /**
- * Runs the setting command in the composer's draft through the cog's own actions. Only a line the
- * user typed here runs at Enter; any other asks first, so text from elsewhere never acts.
+ * Runs the Seti command in the composer's draft: completes each word from the agent's state, and
+ * on Enter sends the line to Seti, which reads it again and runs it through the settings' own
+ * functions. Only a line the user typed here runs at Enter; any other asks first. The credential
+ * dialog it may open is returned beside it, since it outlives the draft.
  */
 export function useSettingCommand(
   host: CommandHost,
   draft: string,
   typed: string | null,
   setDraft: (draft: string, typed: boolean) => void,
-): SettingCommand | null {
-  const caps = useCapabilities(host.task)
-  const sandboxOn = useSystem().data?.sandbox.enabled ?? false
+): [SettingCommand | null, ReactElement | null] {
+  const active = isSetiLine(draft)
+  const world = useCommandWorld(host.task, draft, active)
   const credential = useCredentialSwitch(host.task, host.onChanged)
-  const context: CommandContext = { ...host, caps, sandboxOn, switchCredential: credential.choose }
-  const line = parseSettingCommand(draft)
-  const loaded = useStepper(line, context)
-  const [phase, setPhase] = useState<{ draft: string; phase: CardPhase | null }>({ draft, phase: 'live' })
-  const current = phase.draft === draft ? phase.phase : 'live'
-  const settle = (target: CommandStep | null, at: string) => {
-    if (target?.kind === 'run') {
-      setPhase({ draft: at, phase: null })
-      void target.run().then((ok) => {
-        if (ok) {
-          setDraft('', true)
-        }
-      })
+  const [card, setCard] = useState<{ draft: string; card: CommandCard } | null>(null)
+  const parts: RunParts = { host, world, choose: credential.choose, setCard, setDraft }
+  useCommandPalette(host.task, (name) => {
+    if (name === 'rename') {
+      host.startRename()
       return
     }
-    setPhase({ draft: at, phase: 'submitted' })
-  }
-  useCommandPalette(host.task, (text) => {
+    const text = `/seti:${name} `
     setDraft(text, true)
-    const picked = parseSettingCommand(text)
-    const bind = picked === null ? undefined : COMMAND_BINDINGS.get(picked.setting.id)
-    if (picked === null || bind === undefined) {
-      return
-    }
-    bind(context).then(
-      (stepper) => {
-        settle(stepOf(picked, context, { key: text, stepper, error: null }), text)
-      },
-      (e: unknown) => toast.error(errorText(e)),
-    )
+    execute(makeRun(text, parts), true)
   })
-  if (line === null) {
-    return null
+  if (!active) {
+    return [null, credential.dialog]
   }
-  const step = stepOf(line, context, loaded)
-  const name = line.setting.command.name
-  const typingName = !/\s/.test(draft.trimStart())
-  return {
-    line,
-    step,
-    phase: current === 'live' && typingName ? null : current,
-    error: loaded?.error ?? null,
+  const run = makeRun(draft, parts)
+  const current = card?.draft === draft ? card.card : null
+  const command: SettingCommand = {
+    line: draft,
+    completion: shownCompletion(draft, world),
+    card: current,
     submit: (trusted) => {
       if (typedHere(trusted, typed, draft)) {
-        settle(step, draft)
+        execute(run)
       } else {
-        setPhase({ draft, phase: 'untrusted' })
+        run.show({ kind: 'untrusted' })
       }
       return true
     },
-    choose: (picked) => {
-      const text = `/${name} ${picked.args}`
-      setDraft(text, true)
-      settle(loaded?.stepper?.(picked.args) ?? null, text)
+    pick: (token) => {
+      const from = completeSetiLine(draft, world)?.from ?? draft.length
+      setDraft(`${draft.slice(0, from)}${token} `, typedHere(true, typed, draft))
     },
     confirm: () => {
-      if (current === 'untrusted') {
-        settle(step, draft)
-      } else if (step?.kind === 'confirm') {
-        settle({ kind: 'run', run: step.run }, draft)
+      if (current?.kind === 'untrusted') {
+        execute(run)
+      } else if (current?.kind === 'confirm') {
+        void post(run, current.command, true)
       }
     },
     dismiss: () => {
-      const open = current === 'submitted' || current === 'untrusted'
-      setPhase({ draft, phase: null })
-      return open
+      setCard(null)
+      return current !== null
     },
-    dialog: credential.dialog,
   }
+  return [command, credential.dialog]
 }

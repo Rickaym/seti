@@ -2,11 +2,11 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
+import { canonicalRoot } from './git-dirs.js'
 import { bwrapArgs } from './sandbox-bwrap.js'
 import { sandboxClaudeJson, sandboxServers } from './sandbox-claude-json.js'
 import { codexLocks } from './sandbox-codex.js'
 import {
-  canonicalRoot,
   mountProblem,
   projectSlug,
   SANDBOX_CA,

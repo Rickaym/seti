@@ -25,14 +25,20 @@ const requestChange = setiTool({
     'structure), and fails with a non-zero exit and a message on stderr; it starts by its #! line, else ' +
     'by its extension, and is stopped after timeout_seconds, 120 unless you set it. Seti reads the file ' +
     'as it is now, the user reviews that code, and once allowed every agent whose credential has those ' +
-    'variables gets the tool; the same name again proposes an update). Never ask for a key or ' +
+    'variables gets the tool; the same name again proposes an update), command (a Seti command for ' +
+    'yourself, written as the user types it in your reply box, such as /seti:access mcp docs off, ' +
+    '/seti:access plugin lint-kit on, /seti:access ssh prod off or /seti:memory 12g; Seti reads it ' +
+    'with the same grammar, refuses what it does not define, and the user allows or denies it; you ' +
+    'may propose MCP servers, plugins, context packs and hosts on or off, SSH or AWS off, and your ' +
+    'own memory or CPU cap). Never ask for a key or ' +
     'token in chat, and never ask for the sandbox off, Bypass, permission rules, secret values or other ' +
     `agents. Carry on with other work or end your turn while it waits; it expires after ${HOURS} hours, and ` +
     `at most ${String(PENDING_MAX)} wait at once.`,
   input: {
     change: fileChangeInput.shape.change.describe(
       'The change: {kind: "allow_host", host, port?}, {kind: "api_key", env, hosts, body?}, {kind: "mcp_server", server} ' +
-        'or {kind: "shared_tool", name, description, path, input, writes, timeout_seconds?, needs?: [{env, hosts}]}.',
+        'or {kind: "shared_tool", name, description, path, input, writes, timeout_seconds?, needs?: [{env, hosts}]} ' +
+        'or {kind: "command", line}.',
     ),
     reason: z
       .string()

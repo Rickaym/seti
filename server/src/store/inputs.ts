@@ -28,6 +28,11 @@ const lastHeldRead = (taskId: string) => sql`COALESCE((
     AND (COALESCE(payload::json ->> 'auto', 'false') = 'false' OR (payload::json ->> 'held') = 'true')
 ), 0)`
 
+/** A group chat update that carries one team message. */
+// eslint-disable-next-line @typescript-eslint/promise-function-async -- a fragment, never awaited
+const TEAM_MESSAGE = (messageId: number) =>
+  sql`(payload::json ->> 'source') = 'team' AND (payload::json ->> 'message_id') = ${String(messageId)}`
+
 /** An undismissed update after the prompt that read its kind; a held one outlasts automatic turns. */
 // eslint-disable-next-line @typescript-eslint/promise-function-async -- a fragment, never awaited
 const unread = (taskId: string) => sql`task_id = ${taskId} AND kind = 'input' AND ${NOT_DISMISSED}
@@ -89,6 +94,23 @@ export const taskInputs = {
     )
       .map((row) => row.id)
       .sort((a, b) => a - b),
+  /** Marks dismissed the waiting update that carries team message `messageId`; returns its ids. */
+  dismissTeamMessage: async (taskId: string, messageId: number, at: string): Promise<number[]> =>
+    (
+      await sql<{ id: number }[]>`UPDATE task_message
+        SET payload = (payload::jsonb || jsonb_build_object('dismissed_at', ${at}::text))::text
+        WHERE ${waiting(taskId)} AND ${TEAM_MESSAGE(messageId)}
+        RETURNING id`
+    ).map((row) => row.id),
+  /** The team messages among `messageIds` whose updates still wait for the agent. */
+  waitingTeamMessages: async (taskId: string, messageIds: readonly number[]): Promise<Set<number>> =>
+    new Set(
+      (
+        await sql<{ message_id: string }[]>`SELECT payload::json ->> 'message_id' AS message_id FROM task_message
+          WHERE ${waiting(taskId)} AND (payload::json ->> 'source') = 'team'
+            AND (payload::json ->> 'message_id') IN ${sql(messageIds.map(String))}`
+      ).map((row) => Number(row.message_id)),
+    ),
   /** Start times of the newest automatic turns since `since` and since the user last wrote. */
   autoTurnsSince: async (taskId: string, since: string, limit: number): Promise<string[]> =>
     (

@@ -28,6 +28,7 @@ import { htmlPreviewHeaders, previewBody, wantsHtmlPreview } from '../html-previ
 import { HttpError, ok, valid, validJson } from '../http.js'
 import { sandboxContext } from '../session-options.js'
 import { sandboxPolicy } from '../store/sandbox.js'
+import { taskFileContext } from '../task-file-context.js'
 import { listDir, recentFiles, resolveLinked, resolvePath, workspaceOwner } from '../task-files-list.js'
 import { FileConflictError, saveText } from '../task-files-save.js'
 import { searchFiles, searchOptions } from '../task-files-search.js'
@@ -42,17 +43,10 @@ import {
   taskRoots,
   type FileContext,
 } from '../task-files.js'
-import { requireTask } from '../tasks.js'
 
 const KEEPALIVE_MS = 15_000
 const WATCH_DEBOUNCE_MS = 200
 const DAY_MS = 86_400_000
-
-async function fileContext(id: string): Promise<FileContext> {
-  const task = await requireTask(id)
-  const rules = fileRules(task.id, await sandboxPolicy.get(), sandboxContext())
-  return { task, rules, roots: taskRoots(task, rules) }
-}
 
 /**
  * Where a mentioned path lives: in the viewing task's roots, else in any task's workspace,
@@ -195,7 +189,7 @@ function watchFile(c: Context, files: FileContext, query: FileQuery) {
 }
 
 async function save(c: Context, id: string, input: z.output<typeof saveFileInput>) {
-  const files = await fileContext(id)
+  const files = await taskFileContext(id)
   const at = locate(files, input.root, input.path, { dotfiles: input.dotfiles, missing: true })
   let saved: { created: boolean; bytes: number }
   try {
@@ -222,44 +216,44 @@ async function save(c: Context, id: string, input: z.output<typeof saveFileInput
 export const taskFileRoutes = new Hono()
   .use('/:id/files/*', eaReadOnly("edit an agent's files"))
   .get('/:id/files/roots', async (c) => {
-    const files = await fileContext(c.req.param('id'))
+    const files = await taskFileContext(c.req.param('id'))
     return ok(c, files.roots.map(publicRoot))
   })
   .get('/:id/files/list', valid('query', fileListQuery), async (c) => {
     const query = c.req.valid('query')
-    const files = await fileContext(c.req.param('id'))
+    const files = await taskFileContext(c.req.param('id'))
     const at = locate(files, query.root, query.path, { dotfiles: query.dotfiles })
     return ok(c, listDir(at, files, query))
   })
   .get('/:id/files/tree', valid('query', treeQuery), async (c) => {
     const query = c.req.valid('query')
-    const files = await fileContext(c.req.param('id'))
+    const files = await taskFileContext(c.req.param('id'))
     const at = locate(files, query.root, query.path, { dotfiles: query.dotfiles })
     return ok(c, await listTree(at, files, { dotfiles: query.dotfiles, setiFiles: query.seti_files }))
   })
   .get('/:id/files/recent', valid('query', recentFilesQuery), async (c) => {
     const query = c.req.valid('query')
-    const files = await fileContext(c.req.param('id'))
+    const files = await taskFileContext(c.req.param('id'))
     const since =
       query.days === undefined ? new Date(files.task.created_at) : new Date(Date.now() - query.days * DAY_MS)
     return ok(c, recentFiles(files, { since, limit: query.limit, setiFiles: query.seti_files }))
   })
   .get('/:id/files/search', valid('query', fileSearchQuery), async (c) => {
-    const files = await fileContext(c.req.param('id'))
+    const files = await taskFileContext(c.req.param('id'))
     return ok(c, searchForReader(await searchFiles(files, c.req.valid('query'), searchOptions(c.req.raw.signal))))
   })
   .get('/:id/files/resolve', valid('query', resolvePathsQuery), async (c) => {
-    const files = await fileContext(c.req.param('id'))
+    const files = await taskFileContext(c.req.param('id'))
     return ok(c, await Promise.all(c.req.valid('query').p.map(async (raw) => resolveAnywhere(files, raw))))
   })
   .get('/:id/files/stat', valid('query', fileQuery), async (c) => {
     const query = c.req.valid('query')
-    const files = await fileContext(c.req.param('id'))
+    const files = await taskFileContext(c.req.param('id'))
     return ok(c, readFile(locate(files, query.root, query.path, query), false).meta)
   })
   .get('/:id/files/text', valid('query', fileQuery), async (c) => {
     const query = c.req.valid('query')
-    const files = await fileContext(c.req.param('id'))
+    const files = await taskFileContext(c.req.param('id'))
     const at = locate(files, query.root, query.path, query)
     refuseDelegateSecretFile(at)
     const { meta, text } = readFile(at, true)
@@ -269,10 +263,10 @@ export const taskFileRoutes = new Hono()
     return ok(c, { ...meta, text: textForReader(text) })
   })
   .get('/:id/files/raw', valid('query', fileRawQuery), async (c) =>
-    serveRaw(c, await fileContext(c.req.param('id')), c.req.valid('query')),
+    serveRaw(c, await taskFileContext(c.req.param('id')), c.req.valid('query')),
   )
   .get('/:id/files/watch', valid('query', fileQuery), async (c) =>
-    watchFile(c, await fileContext(c.req.param('id')), c.req.valid('query')),
+    watchFile(c, await taskFileContext(c.req.param('id')), c.req.valid('query')),
   )
   .put('/:id/files/text', validJson(saveFileInput), async (c) => save(c, c.req.param('id'), c.req.valid('json')))
 

@@ -21,11 +21,13 @@ import { refuseAgent } from './ea-guard.js'
 import { HttpError } from './http.js'
 import { hasKey, placeKeyRequest } from './key-requests.js'
 import { allowForEveryAgent } from './sandbox-policy.js'
+import { applyCommand, proposedChange } from './seti-commands/propose.js'
 import { publishedAlready, snapshotProposal } from './shared-tool-proposals.js'
 import { auditTool, publishSharedTool } from './shared-tools.js'
-import { allowedFor, changeRequests, taskHosts } from './store/change-requests.js'
+import { allowedFor, changeRequests } from './store/change-requests.js'
 import { refusedHostLines } from './store/refused-hosts.js'
 import { refreshBlocked } from './task-blocked.js'
+import { allowTaskHost } from './task-hosts.js'
 
 /** How long a request waits for the user before it expires. */
 export const REQUEST_TTL_MS = 24 * 60 * 60_000
@@ -53,7 +55,7 @@ async function mcpItem(task: Task, server: string) {
 }
 
 /** Why the agent need not ask, or null when the change is new to it; refuses what cannot apply. */
-async function alreadyHas(task: Task, change: RequestedChange): Promise<string | null> {
+async function alreadyHas(task: Task, change: Exclude<RequestedChange, { kind: 'command' }>): Promise<string | null> {
   if ((change.kind === 'allow_host' || change.kind === 'api_key') && !(await sandboxed(task))) {
     throw new HttpError(409, SANDBOX_ONLY)
   }
@@ -88,6 +90,10 @@ async function storedChange(task: Task, asked: FileChangeRequest['change']): Pro
   if (asked.kind === 'shared_tool') {
     return snapshotProposal(task, asked)
   }
+  if (asked.kind === 'command') {
+    const proposed = await proposedChange(task, asked.line)
+    return proposed.kind === 'mcp_server' ? storedChange(task, proposed) : proposed
+  }
   return asked.kind === 'mcp_server' ? { ...asked, server: (await mcpItem(task, asked.server)).name } : asked
 }
 
@@ -95,7 +101,7 @@ async function storedChange(task: Task, asked: FileChangeRequest['change']): Pro
 export async function fileChangeRequest(task: Task, input: FileChangeRequest): Promise<Filed> {
   refuseArchived(task)
   const change = await storedChange(task, input.change)
-  const already = await alreadyHas(task, change)
+  const already = change.kind === 'command' ? null : await alreadyHas(task, change)
   if (already !== null) {
     return { outcome: 'already', text: already }
   }
@@ -139,6 +145,7 @@ async function auditFiled(task: Task, request: ChangeRequest): Promise<void> {
       request_id: request.id,
       kind: request.change.kind,
       change: describeChange(request.change),
+      ...(request.change.kind === 'command' ? { command: request.change.line } : {}),
       reason: request.reason,
     },
   })
@@ -165,6 +172,9 @@ async function apply(task: Task, request: ChangeRequest, answer: Extract<AnswerC
       return
     case 'shared_tool':
       await publishSharedTool(task, request, change)
+      return
+    case 'command':
+      await applyCommand(task, change.line)
       return
   }
 }
@@ -218,38 +228,6 @@ export async function allowRefusedHost(task: Task, input: AllowRefusedHostInput)
     throw new HttpError(409, filed.text.replace(/^You can/, 'The agent can'))
   }
   return answerChangeRequest(task, filed.request.id, { decision: 'allow', scope: input.scope ?? 'agent' })
-}
-
-/** Adds an allowlist entry for one agent alone; its proxy lets it through from the next request. */
-export async function allowTaskHost(task: Task, entry: string): Promise<void> {
-  refuseAgent("change an agent's network allowlist")
-  if (await taskHosts.add(task.id, entry)) {
-    await audit.record({
-      actor: 'user',
-      kind: 'task.host_allowed',
-      subject_type: 'task',
-      subject_id: task.id,
-      summary: `Let task "${task.title}" reach ${entry}`,
-      detail: { title: task.title, entry },
-    })
-  }
-}
-
-/** Takes an entry off one agent's own allowlist. */
-export async function removeTaskHost(task: Task, entry: string): Promise<string[]> {
-  refuseAgent("change an agent's network allowlist")
-  if (!(await taskHosts.remove(task.id, entry))) {
-    throw new HttpError(404, `${task.title} has no host ${entry} of its own`)
-  }
-  await audit.record({
-    actor: 'user',
-    kind: 'task.host_removed',
-    subject_type: 'task',
-    subject_id: task.id,
-    summary: `Stopped task "${task.title}" reaching ${entry}`,
-    detail: { title: task.title, entry },
-  })
-  return taskHosts.list(task.id)
 }
 
 /** Expires every request that waited past its time, telling each agent. */
