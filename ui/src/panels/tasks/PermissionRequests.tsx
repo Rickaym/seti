@@ -58,6 +58,25 @@ function Details({ request }: { request: PermissionRequest }) {
   )
 }
 
+/** What the agent says the call is for, then the call itself; a plan shows neither. */
+function CallLines({ request }: { request: PermissionRequest }) {
+  if (isPlan(request)) {
+    return null
+  }
+  return (
+    <>
+      {request.description !== null && (
+        <Hint text={request.description}>
+          <p className="line-clamp-2 break-words text-foreground">{request.description}</p>
+        </Hint>
+      )}
+      {request.summary !== '' && (
+        <code className="bg-muted px-1.5 py-1 font-mono text-2xs break-all whitespace-pre-wrap">{request.summary}</code>
+      )}
+    </>
+  )
+}
+
 /** Why the agent asks, then the pull requests its command names. */
 function Reason({ request }: { request: PermissionRequest }) {
   return (
@@ -165,11 +184,7 @@ export function PermissionCard({ request, onAnswered, className }: CardProps) {
             <p className="font-medium text-foreground">{titleOf(request)}</p>
             <PermissionCountdown request={request} />
           </div>
-          {!plan && request.summary !== '' && (
-            <code className="bg-muted px-1.5 py-1 font-mono text-2xs break-all whitespace-pre-wrap">
-              {request.summary}
-            </code>
-          )}
+          <CallLines request={request} />
           <Reason request={request} />
           <CallFields tool={request.tool_name} fields={fields} editing={editing} />
           <Details request={request} />

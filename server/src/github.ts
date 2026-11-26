@@ -351,7 +351,7 @@ export const parseWatchResponse = (urls: readonly string[], stdout: string) =>
   parseResources(urls, stdout, parseWatched)
 
 /** Looks the URLs up in batches; a failed batch rejects the whole call. */
-async function fetchResources<T>(
+export async function fetchResources<T>(
   urls: readonly string[],
   prFields: string,
   parse: (node: unknown) => T,

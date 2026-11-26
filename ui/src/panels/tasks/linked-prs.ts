@@ -1,4 +1,5 @@
 import type { LinkedPrState, PullRequest } from '@seti/shared'
+import { CircleX, GitMerge, GitPullRequest, GitPullRequestClosed, type LucideIcon } from 'lucide-react'
 import { prShortLabel } from '@/lib/pr-number'
 import { needsFix } from '@/panels/tasks/pr-ci'
 
@@ -6,6 +7,14 @@ import { needsFix } from '@/panels/tasks/pr-ci'
 export type LinkedPrGroup = 'fix' | 'open' | 'merged' | 'closed'
 
 export const LINKED_PR_GROUPS: readonly LinkedPrGroup[] = ['fix', 'open', 'merged', 'closed']
+
+/** How each group of linked PRs reads: its title, and its icon in that colour. */
+export const PR_GROUPS: Record<LinkedPrGroup, { title: string; icon: LucideIcon; className: string }> = {
+  fix: { title: 'Needs a fix', icon: CircleX, className: 'text-destructive' },
+  open: { title: 'Open', icon: GitPullRequest, className: 'text-success' },
+  merged: { title: 'Merged', icon: GitMerge, className: 'text-primary' },
+  closed: { title: 'Closed', icon: GitPullRequestClosed, className: 'text-muted-foreground' },
+}
 
 export interface LinkedPr {
   url: string

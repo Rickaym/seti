@@ -25,7 +25,8 @@ function permissionLine(pending: readonly PermissionRequest[]): string | null {
     return null
   }
   const what = first.tool_name === 'ExitPlanMode' ? 'Asks to approve its plan' : `Asks to use ${first.tool_name}`
-  const asked = first.summary === '' || first.tool_name === 'ExitPlanMode' ? what : `${what}: ${first.summary}`
+  const said = first.description ?? first.summary
+  const asked = said === '' || first.tool_name === 'ExitPlanMode' ? what : `${what}: ${said}`
   const line = first.kind === 'repeat' ? (first.reason ?? asked) : asked
   const more = pending.length > 1 ? ` (+${String(pending.length - 1)} more)` : ''
   const soon = timesOutSoon(first) ? ', times out soon' : ''
