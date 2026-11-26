@@ -268,8 +268,9 @@ between two steps; an interrupt; a hook at subagent start.
   verifies. A client shows a verified quote with a quiet mark and any other with none, never as an
   error.
 - SRC-5: A Slack message permalink, or a GitHub pull request, issue or comment link, that names no
-  item and whose id appears in no row of the agent's transcript is reported as not read by the
-  agent; a client says so in muted text. An agent with no transcript rows gets no such report.
+  item and whose id appears in no tool result, prompt or update of the agent's transcript (its own
+  replies and calls do not count) is reported as not read by the agent; a client says so in muted
+  text. An agent with no transcript rows gets no such report.
 
 ## 4. Turn lifecycle
 

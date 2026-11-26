@@ -1,5 +1,5 @@
 import { SOURCE_KINDS, type SourceKind } from '@seti/shared'
-import { sql } from '../db.js'
+import { rowFilter, sql } from '../db.js'
 import type { FoundItem } from '../sources/item.js'
 
 /** A ledger row: where the item came from and the transcript row and call whose result holds it. */
@@ -101,13 +101,17 @@ export const transcriptText = {
     const [row] = await sql<{ id: string }[]>`SELECT id FROM task_message WHERE task_id = ${taskId} LIMIT 1`
     return row !== undefined
   },
-  /** Whether any row of the agent's transcript holds one of these texts, compared in lower case. */
+  /**
+   * Whether a row the agent did not write holds one of these texts, compared in lower case: a tool
+   * result, a prompt or an update, never its own replies, calls or turn ends.
+   */
   mentions: async (taskId: string, needles: readonly string[]): Promise<boolean> => {
     if (needles.length === 0) {
       return false
     }
     const lowered = needles.map((needle) => needle.toLowerCase())
-    const [row] = await sql<{ id: string }[]>`SELECT id FROM task_message WHERE task_id = ${taskId}
+    const read = sql`(kind <> 'sdk' OR ${rowFilter.resultRow} OR NOT (${rowFilter.agentRow} OR ${rowFilter.turnEnd}))`
+    const [row] = await sql<{ id: string }[]>`SELECT id FROM task_message WHERE task_id = ${taskId} AND ${read}
       AND EXISTS (SELECT 1 FROM unnest(${lowered}::text[]) AS needle WHERE strpos(lower(payload), needle) > 0)
       LIMIT 1`
     return row !== undefined
