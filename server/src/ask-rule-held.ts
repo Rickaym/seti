@@ -18,7 +18,7 @@ const RULE_CHARS = 80
 const shorten = (rule: string) => (rule.length > RULE_CHARS ? `${rule.slice(0, RULE_CHARS - 3)}...` : rule)
 
 /** Seti's reason line for a call an ask rule holds, naming the rule; Seti's own rules say so. */
-export const askRuleReason = (rule: string, builtIn = false): string =>
+const askRuleReason = (rule: string, builtIn = false): string =>
   `${builtIn ? "Seti's" : 'Your'} Ask rule holds this: ${shorten(rule)}`
 
 /** The reason line for the rule a decision names by its ref, or null when it names none. */
