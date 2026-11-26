@@ -92,8 +92,14 @@ describe('the Codex runtime in Settings', () => {
     await openaiKey()
     expect(await status()).toMatchObject({ state: 'ready', keyed: [DEFAULT_PROFILE_ID] })
     expect(await offered()).toEqual(['claude', 'codex'])
+    const efforts = ['low', 'medium', 'high', 'xhigh', 'max']
     expect((await runtimes()).offers[1]?.models).toEqual([
-      { id: 'gpt-5.5', label: 'gpt-5.5', efforts: ['low', 'medium', 'high', 'xhigh', 'max'] },
+      { id: 'gpt-5.5', label: 'gpt-5.5', efforts },
+      ...['gpt-6.2-sol', 'gpt-6.2-astra', 'gpt-6.1-terra', 'gpt-6-luna'].map((id) => ({
+        id,
+        label: `${id} (unproven)`,
+        efforts,
+      })),
     ])
     const recorded = await auditEvents.latest('system.runtime_changed')
     expect(recorded?.detail).toMatchObject({ runtime: 'codex', changed: ['program'] })
