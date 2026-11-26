@@ -813,8 +813,10 @@ members, or writes a draft. A topic, purpose, title or message is never read for
 label inside a message, such as `<#C0123|deploys>`, may show where that message is shown but is
 never learned. An id Seti has not seen named reads "name not known" until an agent's call states
 it, and the request and transcript update at once when it does. On such a request, Look up denies
-the send and asks the agent to read that channel or person first and send again. A permission
-request says when a name was last seen if that was over 30 days ago. Seti holds no Slack token for
+the send and asks the agent to read that channel or person first and send again. When you edit a
+Slack send before allowing it, each channel or person id shows its name under the field and
+follows your edit, and the message field lists whom it mentions. A permission request says when a
+name was last seen if that was over 30 days ago. Seti holds no Slack token for
 this.
 
 To fill the names in one go, ask any agent with the Slack MCP server: "Run slack_list_user_channels

@@ -208,14 +208,15 @@ export function CallStatus({ block, startedAt, result, running, background }: St
   )
 }
 
-/** The tool's icon and name, and one line saying what the call does. */
+/** The tool's icon and name, and what the call does; a phone shows only where a Slack send goes. */
 function CallName({ block }: { block: ToolUseBlock }) {
   const name = toolName(block.name)
-  const summary = useSlackSummary(block) ?? toolSummary(block)
+  const slack = useSlackSummary(block)
+  const summary = slack ?? toolSummary(block)
   return (
     <>
       <ToolKindIcon kind={toolKind(block)} className="size-3 text-muted-foreground" />
-      <span className="min-w-0 truncate font-semibold" title={block.name}>
+      <span className={cn('min-w-0 truncate font-semibold', slack !== null && 'max-sm:hidden')} title={block.name}>
         {name.server !== null && <span className="font-normal text-muted-foreground">{name.server}.</span>}
         {name.name}
       </span>
