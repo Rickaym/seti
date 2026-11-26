@@ -36,7 +36,7 @@ async def report(
     script = Script([steps, ["Told Login: rename fetchAll."]])
     tools = EaTools(seti_of(fake), now=lambda: NOW)
     turns: list[int] = []
-    tools.user_turn = lambda: turns.append(1)  # type: ignore[method-assign]
+    tools.user_turn = lambda *_heard: turns.append(1)  # type: ignore[method-assign]
     chat = TextChat(
         settings(openai_api_key="op"), tools, Conversation(), llm=factory(script), now=lambda: NOW
     )
@@ -156,6 +156,7 @@ def test_relay_mode_opens_no_gated_tool_and_no_answer_to_a_request() -> None:
     assert open_tools.isdisjoint(gated)
     assert open_tools.isdisjoint(CONFIRM_TOOLS)
     assert "confirm_asked" not in open_tools
+    assert "answer_question" not in open_tools
 
 
 async def test_take_back_message_takes_back_a_relay_by_its_id(fake_seti: FakeSeti) -> None:

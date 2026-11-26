@@ -2095,8 +2095,8 @@ class SettingsTools:
         settings = await self._ea_settings()
         relays = "on" if settings.get("inbox_relays") is True else "off"
         return ToolResult(
-            f"{self._settings_words(settings)} Inbox relays are {relays}; only the user turns them on or off, "
-            "in Settings, EA. Your voice and models are set in your configuration, not here.",
+            f"{self._settings_words(settings)} Inbox relays are {relays}; only the user turns them on or "
+            "off, in Settings, EA. Your voice and models are set in your configuration, not here.",
             "Read EA settings",
         )
 
