@@ -790,6 +790,7 @@ class FakeSeti:
     ssh_sets: dict[str, list[str]] = field(default_factory=dict)
     access_defaults: dict[str, bool] = field(default_factory=dict)
     processes: dict[str, dict[str, Any]] = field(default_factory=dict)
+    access_catalog: list[dict[str, Any]] = field(default_factory=list)
     second_opinions: dict[str, dict[str, Any]] = field(default_factory=dict)
     recent_files: dict[str, dict[str, Any]] = field(default_factory=dict)
     shell_output: dict[str, dict[str, Any]] = field(default_factory=dict)
@@ -1049,6 +1050,12 @@ class FakeSeti:
                 return ok(self.task_mcp_servers(task_id))
             case ["tasks", task_id, "access"]:
                 return self._set_access(task_id, body)
+            case ["access", "defaults"]:
+                item = next(
+                    i for i in self.access_catalog if (i["kind"], i["id"]) == (body["kind"], body["id"])
+                )
+                item["default_enabled"] = body["enabled"]
+                return ok(item)
             case ["mcp", "defaults", name]:
                 if body["enabled"] == (name not in self.mcp_local):
                     self.mcp_defaults.pop(name, None)
@@ -1246,6 +1253,8 @@ class FakeSeti:
         match parts:
             case ["tasks"]:
                 return ok([{**listed_subtasks(self.subtasks.get(t["id"], [])), **t} for t in self.tasks])
+            case ["access"]:
+                return ok(self.access_catalog)
             case ["tasks", "archived"]:
                 return ok(self.archived)
             case ["notifications"]:

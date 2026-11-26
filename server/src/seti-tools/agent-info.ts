@@ -13,7 +13,7 @@ import {
   type TaskCpuCap,
 } from '@seti/shared'
 import { z } from 'zod'
-import { effectiveAccess } from '../agent-access.js'
+import { accessCatalog, effectiveAccess } from '../agent-access.js'
 import { agentProcesses } from '../agent-processes.js'
 import { cpuCapSettings, taskCpuCap } from '../cpu-cap.js'
 import { tasks } from '../db.js'
@@ -150,9 +150,12 @@ const getMemoryCap = setiTool({
 const agentAccess = setiTool({
   name: 'agent_access',
   description:
-    'Say what one agent may reach: its SSH hosts, AWS (the role it gets, or why none), MCP servers, context packs, Seti plugins and credentials, each marked as the default for every agent, its own choice, or from its credential.',
-  input: { task: taskRef },
+    'Say what one agent may reach: its SSH hosts, AWS (the role it gets, or why none), MCP servers, context packs, Seti plugins and credentials, each marked as the default for every agent, its own choice, or from its credential. Without task, what every agent gets by default.',
+  input: { task: taskRef.optional() },
   run: async ({ task: ref }) => {
+    if (ref === undefined) {
+      return accessCatalog()
+    }
     const view = await effectiveAccess(await anyTask(ref))
     return {
       ...view,

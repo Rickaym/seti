@@ -10,12 +10,8 @@ export const PLATFORM_ROUTES: CoverageTable = {
     "Claude Code hook callbacks from agents' sessions. Called by agents' runtimes, not by a person",
   ),
   'POST /share-target': ui('Android share-sheet target. Redirects into the app'),
-  'GET /api/access': gap(
-    "Default access: what every new agent gets (MCP servers, roles, plugins, SSH hosts, AWS). Read side; the EA sees one agent's access with agent_access but not the defaults",
-  ),
-  'PUT /api/access/defaults': gap(
-    'Turn a default on or off for every new agent. Server allows the EA for MCP, roles and plugins and refuses SSH and AWS; no EA tool beyond set_mcp_default',
-  ),
+  'GET /api/access': ea('agent_access'),
+  'PUT /api/access/defaults': ea('set_agent_access'),
   'GET /api/archive/settings': ea('get_archive_settings'),
   'PUT /api/archive/settings': ea('set_auto_archive'),
   'POST /api/archive/sweep': ea('run_archive_sweep'),

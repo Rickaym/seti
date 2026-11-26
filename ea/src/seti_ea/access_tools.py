@@ -65,9 +65,9 @@ AGENT_ACCESS_SPEC = ToolSpec(
     "agent_access",
     "Say what one agent may reach: its SSH hosts, AWS and its role, MCP servers, context packs, Seti "
     "plugins and credentials, each marked as the default for every agent, the agent's own choice "
-    "or from its credential, and whether it has Seti control.",
+    "or from its credential, and whether it has Seti control. Without task, what every agent "
+    "gets by default instead.",
     {"task": TASK_REF},
-    ["task"],
 )
 
 ACCESS_SPECS: list[ToolSpec] = [
@@ -85,8 +85,9 @@ ACCESS_SPECS: list[ToolSpec] = [
     ToolSpec(
         "set_agent_access",
         "Turn MCP servers, context packs or Seti plugins on or off for one agent, or back to their "
-        "default, from its next turn. SSH hosts and AWS are the user's alone. Call agent_access first "
-        "to see what the agent has. Needs the user's yes.",
+        "default, from its next turn, or with every_agent their default for every agent. SSH hosts "
+        "and AWS are the user's alone. Call agent_access first to see what the agent has. Needs the "
+        "user's yes.",
         {
             "task": TASK_REF,
             "kind": {
@@ -97,9 +98,14 @@ ACCESS_SPECS: list[ToolSpec] = [
             "enable": {**ITEM_LIST, "description": "Items to turn on for this agent."},
             "disable": {**ITEM_LIST, "description": "Items to turn off for this agent."},
             "reset": {**ITEM_LIST, "description": "Items to put back on their default for this agent."},
+            "every_agent": {
+                "type": "boolean",
+                "description": "Instead of one agent, turn items on or off by default for every agent "
+                "without its own choice; leave out task.",
+            },
             "confirmed": CONFIRMED,
         },
-        ["task", "kind"],
+        ["kind"],
     ),
     ToolSpec(
         "set_agent_profile",
@@ -197,6 +203,21 @@ def ssh_hosts_text(status: Mapping[str, Any]) -> str:
     return f"{plural(len(hosts), 'SSH host')}: {'. '.join(lines)}. {SSH_USER_ONLY}"
 
 
+def defaults_text(items: list[dict[str, Any]]) -> str:
+    """What every agent gets without its own choice, by kind."""
+    parts = []
+    for kind, words in KIND_WORDS.items():
+        rows = [i for i in items if i.get("kind") == kind]
+        if not rows:
+            continue
+        on = [name_of(i) for i in rows if i.get("default_enabled") is True]
+        off = [name_of(i) for i in rows if i.get("default_enabled") is not True]
+        parts.append(f"{words} on: {and_list(on) or 'none'}; off: {and_list(off) or 'none'}")
+    if not parts:
+        return "Seti offers agents nothing to choose by default yet."
+    return "By default every agent without its own choice gets: " + ". ".join(parts) + "."
+
+
 def access_text(title: str, view: Mapping[str, Any]) -> str:
     """One agent's access as a spoken summary, each item marked when it is the agent's own choice."""
     items = dicts(view.get("items"))
@@ -266,6 +287,8 @@ class AccessTools:
         )
 
     async def agent_access(self, args: Mapping[str, Any]) -> ToolResult:
+        if not args.get("task"):
+            return ToolResult(defaults_text(await self._defaults()), "Read access defaults")
         task = await self._resolve(arg_str(args, "task"))
         view = await self._seti.get(f"/tasks/{task.get('id')}/access")
         title = title_of(task)
@@ -284,6 +307,8 @@ class AccessTools:
             raise ToolError(USER_ONLY, "Only the user changes SSH or AWS")
         if kind not in KIND_WORDS:
             raise ToolError("kind must be mcp, pack or plugin.", "Unknown kind")
+        if arg_bool(args, "every_agent"):
+            return await self._set_defaults(kind, args)
         task = await self._resolve(arg_str(args, "task"))
         title = title_of(task)
         path = f"/tasks/{task.get('id')}/access"
@@ -321,6 +346,38 @@ class AccessTools:
         return ToolResult(
             f"Turned {and_list(words)} for {title} from its next turn. {access_text(title, view)}",
             clip(f"Changed the {KIND_WORDS[kind]} of {title}", 70),
+        )
+
+    async def _defaults(self) -> list[dict[str, Any]]:
+        return dicts(await self._seti.get("/access"))
+
+    async def _set_defaults(self, kind: str, args: Mapping[str, Any]) -> ToolResult:
+        if arg_list(args, "reset"):
+            raise ToolError("A default has nothing to go back to; say on or off.", "Nothing to reset")
+        items = [i for i in await self._defaults() if i.get("kind") == kind]
+        wanted = {
+            _item_id(_pick_item(items, ref, kind)): on
+            for key, on in (("enable", True), ("disable", False))
+            for ref in arg_list(args, key)
+        }
+        by_id = {_item_id(i): i for i in items}
+        changes = {i: on for i, on in wanted.items() if by_id[i].get("default_enabled") is not on}
+        if not changes:
+            return ToolResult(f"No change. {defaults_text(await self._defaults())}", "Already so")
+        words = and_list(
+            [f"{name_of(by_id[i])} {'on' if on else 'off'}" for i, on in sorted(changes.items())]
+        )
+        if not await self._cleared(args, gate_key("set_agent_access", "defaults", kind, changes)):
+            effect = (
+                f"This turns {words} by default for every agent without its own choice, from its next turn."
+            )
+            return ask("set_agent_access", args, effect, f"change the default {KIND_WORDS[kind]}")
+        for item_id, on in changes.items():
+            body = {"kind": kind, "id": item_id, "enabled": on}
+            await self._call("change it", lambda body=body: self._seti.put("/access/defaults", body))
+        return ToolResult(
+            f"Turned {words} by default. {defaults_text(await self._defaults())}",
+            clip(f"Changed the default {KIND_WORDS[kind]}", 70),
         )
 
     async def set_agent_profile(self, args: Mapping[str, Any]) -> ToolResult:
