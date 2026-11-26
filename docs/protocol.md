@@ -626,7 +626,9 @@ interrupted only for that.
   offers no `always`, since an allow rule never lifts an ask rule. A card shows the agent's
   description first, cut to two lines with the whole text in a tooltip, then the call, then the
   implementation's own reason line; the agent's reason line reads the description in place of
-  the call when there is one.
+  the call when there is one. The reason line is the implementation's own words about why it
+  asks: a call an `ask` rule holds names that rule ("Your Ask rule holds this: <rule>"); it never
+  repeats the agent's description, and with no known reason there is no reason line.
 - PERM-7: Timeout is one install-wide setting: off, 15 min, 1 h (default), 4 h or 24 h from when
   the request was raised. A new value applies to waiting requests.
 - PERM-8: At the deadline the request MUST be denied with `timed_out`. The agent is told nobody
@@ -695,11 +697,16 @@ interrupted only for that.
   the whole title in a tooltip, the CI state, and a link that opens the PR. The implementation
   reads them with the walker of PERM-15: `gh pr` `merge`, `view`, `close`, `reopen`, `ready`,
   `comment`, `review`, `checks`, `edit` or `diff` with a number, in the repository `-R` or
-  `--repo` names, else the one the folder the command runs in resolves to (the remote
-  `gh repo set-default` chose, else the only GitHub repository its remotes name); a pull request's
+  `--repo` names, else the one the folder the command runs in resolves to: the remote
+  `gh repo set-default` chose, else the only GitHub repository its remotes name, in the folder the
+  agent's shell is in as the runtime reports it for the call, past any `cd` of an earlier call; a
+  pull request's
   github.com URL as any argument; and `repos/<owner>/<repo>/pulls/<n>` in `gh api`. A part the
   shell computes, another host, or a line that sets the code host's repository or host variables
-  or changes remotes gives no pull request rather than a wrong one. The link is built from the
+  or changes remotes gives no pull request rather than a wrong one. A number whose folder names
+  no repository is looked up in the agent's own repositories and those of its linked pull requests,
+  and shown, up to three per number, only where that pull request exists open or merged; this is a
+  hint for the reader, and the outward check of PERM-15 never uses it. The link is built from the
   owner, repository and number, never taken from the text. The request MUST be shown without
   waiting on them: the pull requests follow with their links, then title and CI from the data the
   implementation tracks or one bounded, cached lookup, which reads merged and closed ones too and
@@ -853,6 +860,15 @@ interrupted only for that.
 - SEC-18: Only the user changes a set or drops all of an agent's own choices at once. A delegate
   MUST NOT move an agent to a credential whose set turns on an SSH host, cloud access or a host the
   agent lacks.
+- SEC-19: Credential redaction MUST cover session material and keep the names around it: session
+  or token-like values in `Cookie`, `Set-Cookie`, `curl -b` and `--cookie` (names, attributes and
+  short values kept); the credential of an `Authorization` header of any scheme (scheme kept);
+  JWTs; base64 JSON sessions; values under session names (`sb-*-auth-token*` with its chunks,
+  `__Secure-*`, `__Host-*`, session cookies, `access_token`, `refresh_token`, `id_token`) in
+  cookies, query strings, form bodies and JSON; storage state entries holding a session; `.netrc`
+  passwords; secret-named `curl -H` headers. Transcript rows and permission requests stored before
+  a rule existed MUST be re-scrubbed once, resuming after a restart, with a log of counts only.
+  Audit events MUST keep their sealed text.
 
 ## 9. Shared tools
 
@@ -1140,7 +1156,8 @@ Why: an agent woken by its own actions or by news nobody waited for burns turns 
 - EA-10: Off a call, watch and channel items wait for quiet (`settle`); others go at once. On a
   call nothing interrupts: items follow the user's next turn, and a needs-you item gets its own
   line after `call_silence`.
-- EA-12: If a reply promised to reach an agent and no tool did, the EA gets one more run.
+- EA-12: If a reply promised to reach an agent and no tool did, or promised a later check-in and
+  no follow-up or watch was set in that turn or the one before, the EA gets one more run.
 - EA-16: The EA, and agents at `full`, MUST be able to read every pending request of all agents or
   one, each with its id and agent, and a tool call or plan with Seti's reason, the agent's
   description, its input as stored (secrets redacted) and the PRs it names. Text an agent or a code
@@ -1154,6 +1171,13 @@ Why: an agent woken by its own actions or by news nobody waited for burns turns 
   message MUST NOT count as the yes. Agents and mods MUST NOT get these actions. The audit entry
   says the EA acted on the user's word and names the ask and the target.
   Why: the user can run Seti by voice without handing the model a standing power.
+- EA-18: A voice call survives a short network drop. While the caller's audio stops arriving, the
+  EA MUST hold its speech, up to 8 s per drop, and go on where it stopped, rather than drop it. A
+  browser that rebuilds the peer connection under the same id keeps the EA's session and its
+  conversation, and the call shows Reconnecting until the new path connects. A yes the user said
+  before the call's audio dropped, in a turn the drop cut, or in an earlier call MUST NOT count for
+  EA-4 or EA-17.
+  Why: mobile networks drop for seconds, and a cut transcript must never become the user's yes.
 
 ## 15. Resilience
 
