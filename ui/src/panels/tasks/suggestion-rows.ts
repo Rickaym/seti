@@ -26,7 +26,7 @@ export const optionRows = (completion: SetiCompletion): SuggestionRow[] =>
     key: option.key,
     insert: option.token,
     title: option.label,
-    hint: option.current ? 'current' : '',
+    hint: option.current && option.unavailable === null ? 'current' : '',
     detail: option.detail ?? '',
     unavailable: option.unavailable,
   }))
