@@ -197,6 +197,7 @@ function setiText(payload: Extract<MessageRow, { kind: 'seti' }>['payload'], tas
     payload.session !== undefined ||
     payload.seti_control !== undefined ||
     payload.bypass !== undefined ||
+    payload.setting !== undefined ||
     payload.resumed === true ||
     payload.timed_out !== undefined ||
     payload.refused_host !== undefined ||

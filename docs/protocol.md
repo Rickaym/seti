@@ -444,6 +444,10 @@ interrupted only for that.
 - ACT-5: A delegate reaches another agent only through the group chat, which marks the author.
 - ACT-6: Agents propose reserved changes with `request_change` (7.6); only the user's own Allow
   applies one.
+- ACT-7: A change to what one agent may reach (its sandbox, credentials, an access item, home
+  folders, Seti control or Bypass) MUST leave one line in that agent's transcript that says what
+  changed and when it applies, whoever made it and from whichever surface; a change that changes
+  nothing leaves none.
 
 ### 7.2 Sandbox
 
