@@ -18,6 +18,8 @@ export const codexAdapterFor = (binary?: string, provider?: CodexProvider): Runt
     sandbox: { optional: false },
     compaction: { off: false, windowAlone: false },
     subagents: false,
+    bypass: false,
+    slashCommands: false,
     dream: null,
     oneShot: codexOneShotFor(binary, provider),
   },
