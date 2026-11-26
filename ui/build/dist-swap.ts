@@ -11,7 +11,7 @@ export interface BuildRecord {
 export const BUILDS_FILE = 'builds.json'
 
 /** Older builds whose hashed files stay served, so a page opened on one can load until it updates. */
-export const KEPT_BUILDS = 2
+const KEPT_BUILDS = 2
 
 const ASSETS = 'assets'
 

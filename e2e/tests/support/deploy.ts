@@ -98,7 +98,7 @@ export async function deployBuildB(
 }
 
 /** The build of the worker that controls the page, as it answers. */
-export const controllerBuild = async (page: Page) =>
+const controllerBuild = async (page: Page) =>
   page.evaluate(
     async () =>
       new Promise<string | null>((resolve) => {
