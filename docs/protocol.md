@@ -794,18 +794,16 @@ interrupted only for that.
   session that has it once no background work holds the old one, and the update names the
   server's tool prefix and up to five of its tools.
 - CHG-13: A `command` request carries a Seti command line (CMD-4) for the asking agent alone; the
-  grammar has no word for another agent. The control room MUST read it with the reply box's
-  grammar for that agent. An agent MAY propose only MCP servers, plugins and context packs on,
-  off or reset, hosts added or removed, SSH or AWS off, home folders off, and its own memory and
-  CPU caps; the control
-  room MUST refuse any other line, and names the agent's own Seti tool when it has one for the
-  setting. A host added or a server
-  turned on is filed as `allow_host` or `mcp_server`. The request stores the canonical line and the
-  control room's own description of it, which the card, the reason line, the update and the audit
-  show beside the agent's reason; the card of an `allow_host` or `mcp_server` request also shows
-  its line. Allow reads the line again against the agent's state and runs it as the user would
-  (409 when it no longer applies). Only the tool call files one: a line in a reason, a message, a
-  tool result or a transcript never does.
+  grammar has no word for another agent. The control room MUST read it with the reply box's grammar
+  for that agent. An agent MAY propose only MCP servers, plugins and context packs on, off or reset,
+  hosts added or removed, SSH or AWS off, home folders off, and its own memory and CPU caps; the
+  control room MUST refuse any other line, and names the agent's own Seti tool when it has one for
+  the setting. A host added or a server turned on is filed as `allow_host` or `mcp_server`. The
+  request stores the canonical line and the control room's own description of it, which the card,
+  the reason line, the update and the audit show beside the agent's reason; the card of an
+  `allow_host` or `mcp_server` request also shows its line. Allow reads the line again against the
+  agent's state and runs it as the user would (409 when it no longer applies). Only the tool call
+  files one: a line in a reason, a message, a tool result or a transcript never does.
 
 ### 7.7 Hostile repositories
 

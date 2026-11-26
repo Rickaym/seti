@@ -189,11 +189,12 @@ async def test_search_seti_reads_a_proposed_seti_command_by_its_line_and_seti_s_
             "reason": "The build runs out of memory.",
         }
     ]
-    result = await tools.call("search_seti", {"in": "requests"})
+    lines = (await tools.call("search_seti", {"in": "requests"})).text.splitlines()
     assert (
-        "- Builder asks for the Seti command /seti:memory 12g (Set this agent's memory cap to 12 GB, "
-        "from 8 GB): The build runs out of memory." in result.text.splitlines()
+        "- [] Builder asks for the Seti command /seti:memory 12g (Set this agent's memory cap to 12 GB, "
+        "from 8 GB)" in lines
     )
+    assert '  Its reason: <data from="the agent">The build runs out of memory.</data>' in lines
 
 
 async def test_search_seti_says_when_a_request_times_out_and_what_the_timeout_is(
