@@ -9,7 +9,7 @@ import { memoryCapInput } from './memory.js'
 import { pollerSettingsInput } from './pollers.js'
 import { reminderSettingsInput } from './reminders.js'
 import { repoInput } from './repos.js'
-import { codexSettingsInput } from './runtimes/settings.js'
+import { codexSettingsInput, geminiSettingsInput } from './runtimes/settings.js'
 import { documented, held, keyedBy, settingsSection } from './settings-doc.js'
 import { storageScheduleInput } from './storage.js'
 import { themeChoice, userSettingsInput } from './user.js'
@@ -21,6 +21,7 @@ const compact = compactRuleInput.shape
 const dream = dreamSettingsInput.shape
 const memory = memoryCapInput.shape
 const codex = codexSettingsInput.shape
+const gemini = geminiSettingsInput.shape
 const storage = storageScheduleInput.shape
 const poller = pollerSettingsInput.shape
 const reminder = reminderSettingsInput.shape
@@ -210,10 +211,22 @@ const runtimes = settingsSection({
           default_effort: "Its reasoning effort; null is Codex's own",
         },
       ),
+      gemini: documented(
+        {
+          enabled: held(gemini.enabled),
+          evaluator_decides: held(gemini.evaluator_decides),
+          default_model: held(gemini.default_model),
+        },
+        {
+          enabled: 'Gemini CLI is offered as a runtime for new agents',
+          evaluator_decides: 'Rules decide: an allow rule or the read-only list answers a call without you',
+          default_model: "The model a new Gemini agent starts with; null is Seti's default",
+        },
+      ),
     },
-    { codex: 'OpenAI Codex' },
+    { codex: 'OpenAI Codex', gemini: 'Google Gemini CLI' },
   ),
-  security: ['codex'],
+  security: ['codex', 'gemini'],
 })
 
 const storageSection = settingsSection({

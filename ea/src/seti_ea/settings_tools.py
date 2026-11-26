@@ -568,18 +568,18 @@ SETTINGS_WRITES = frozenset(spec.name for spec in SETTINGS_SPECS if "confirmed" 
 Handler = Callable[[Mapping[str, Any]], Awaitable[ToolResult]]
 
 
-def codex_words(codex: Mapping[str, Any]) -> str:
-    """Where Codex stands, as one sentence and a space, from the runtimes route; empty if unknown."""
-    state = codex.get("state")
-    failure = field_dict(codex, "failure")
+def runtime_words(name: str, key: str, status: Mapping[str, Any]) -> str:
+    """Where a runtime stands, as one sentence and a space, from the runtimes route; empty if unknown."""
+    state = status.get("state")
+    failure = field_dict(status, "failure")
     words = {
-        "off": "Codex is off, so agents run on Claude Code only.",
-        "installing": f"Codex {codex.get('pinned', '')} is installing.",
-        "failed": f"Codex cannot start: {failure.get('message', 'its install failed')}; the user "
+        "off": f"{name} is off.",
+        "installing": f"{name} {status.get('pinned', '')} is installing.",
+        "failed": f"{name} cannot start: {failure.get('message', 'its install failed')}; the user "
         "retries in Settings, Runtimes.",
-        "no_key": "Codex is on, but the default credential holds no OpenAI key, so new Codex agents "
+        "no_key": f"{name} is on, but the default credential holds no {key} key, so new {name} agents "
         "are refused.",
-        "ready": "Codex is ready for new agents.",
+        "ready": f"{name} is ready for new agents.",
     }
     return f"{words[state]} " if isinstance(state, str) and state in words else ""
 
@@ -2161,9 +2161,11 @@ class SettingsTools:
             else "No GitHub token is set for agents."
         )
         runtimes = await self._seti.get("/runtimes")
-        codex = codex_words(field_dict(runtimes if isinstance(runtimes, dict) else {}, "codex"))
+        listed = runtimes if isinstance(runtimes, dict) else {}
+        codex = runtime_words("Codex", "OpenAI", field_dict(listed, "codex"))
+        gemini = runtime_words("Gemini", "Gemini API", field_dict(listed, "gemini"))
         return ToolResult(
-            f"{sandbox}{hides} {token} {codex}These are the user's to change, in Settings under Security: "
+            f"{sandbox}{hides} {token} {codex}{gemini}These are the user's to change, in Settings under Security: "
             "Sandbox, SSH and Credentials, in Settings, Runtimes, and per agent in its access switches. You "
             "cannot change them or see any secret.",
             "Read security settings",

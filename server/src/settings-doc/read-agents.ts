@@ -1,6 +1,7 @@
 import {
   CODEX_EFFORTS,
   CODEX_MODELS,
+  GEMINI_MODELS,
   type ChannelInfo,
   type SettingsSectionPath,
   type SettingsSectionValue,
@@ -14,6 +15,7 @@ import { codexSettings } from '../store/codex-settings.js'
 import { compactSettings } from '../store/compact.js'
 import { dreamSettings } from '../store/dream-nights.js'
 import { eaSettings } from '../store/ea.js'
+import { geminiSettings } from '../store/gemini-settings.js'
 import { notificationSettings } from '../store/notifications.js'
 import { storageSettings } from '../store/storage.js'
 import { currentSettings } from '../user-settings.js'
@@ -85,7 +87,15 @@ export const APP_AGENT_READERS: SectionReaders<Extract<SettingsSectionPath, `app
     const { enabled, program, evaluator_decides, default_model, default_effort } = await codexSettings.get()
     const model = CODEX_MODELS.find((known) => known === default_model) ?? null
     const effort = CODEX_EFFORTS.find((known) => known === default_effort) ?? null
-    return { codex: { enabled, program, evaluator_decides, default_model: model, default_effort: effort } }
+    const gemini = await geminiSettings.get()
+    return {
+      codex: { enabled, program, evaluator_decides, default_model: model, default_effort: effort },
+      gemini: {
+        enabled: gemini.enabled,
+        evaluator_decides: gemini.evaluator_decides,
+        default_model: GEMINI_MODELS.find((known) => known === gemini.default_model) ?? null,
+      },
+    }
   },
   'agents.storage': async () => {
     const { enabled, idle_days } = await storageSettings.get()

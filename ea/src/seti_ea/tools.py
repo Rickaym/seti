@@ -473,10 +473,10 @@ TOOL_SPECS: list[ToolSpec] = [
             },
             "runtime": {
                 "type": "string",
-                "enum": ["claude", "codex"],
-                "description": "Only when the user asks for Codex: the agent runs on OpenAI's Codex "
-                "instead of Claude Code. Left out, the role's or the model's. Seti refuses Codex while the "
-                "user has it off.",
+                "enum": ["claude", "codex", "gemini"],
+                "description": "Only when the user asks for Codex or Gemini: the agent runs on OpenAI's "
+                "Codex or Google's Gemini CLI instead of Claude Code. Left out, the role's or the model's. "
+                "Seti refuses a runtime the user has off.",
             },
             "model": {
                 "type": "string",

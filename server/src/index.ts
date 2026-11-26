@@ -39,6 +39,7 @@ import { followLiveContext } from './ea-context.js'
 import { startInboxSweeper } from './ea-deliver.js'
 import { startEaIndex } from './ea-index.js'
 import { watchInterrupted } from './ea-turn-watch.js'
+import { startGeminiKeeper } from './gemini-install.js'
 import { importAgentTokenFile } from './github-token.js'
 import { wakeWaiting } from './inputs.js'
 import { startKnowledgeSweep } from './knowledge.js'
@@ -244,6 +245,7 @@ startStorageSchedule()
 startDreamTicker()
 startTrashSweep()
 startCodexKeeper()
+startGeminiKeeper()
 startMcpLoginKeeper()
 startLoginKeeper()
 resourceSampler.start()

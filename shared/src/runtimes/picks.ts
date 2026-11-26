@@ -1,12 +1,12 @@
 import { z } from 'zod'
-import { CODEX_EFFORTS, CODEX_MODELS, codexModelLabel } from './settings.js'
+import { CODEX_EFFORTS, CODEX_MODELS, codexModelLabel, GEMINI_MODELS, geminiModelLabel } from './settings.js'
 import { STORED_RUNTIMES, type StoredRuntime } from './stored.js'
 
 /** Each runtime as people call it. */
 export const RUNTIME_NAMES: Record<StoredRuntime, string> = {
   claude: 'Claude Code',
   codex: 'Codex',
-  gemini: 'Gemini CLI',
+  gemini: 'Gemini',
 }
 
 /** The runtime a new agent runs on when its start names neither a runtime nor a model. */
@@ -71,6 +71,13 @@ export const codexOffer = (): RuntimeOffer => ({
   runtime: 'codex',
   models: CODEX_MODELS.map((id) => ({ id, label: codexModelLabel(id), efforts: [...CODEX_EFFORTS] })),
   default_efforts: [...CODEX_EFFORTS],
+})
+
+/** Gemini CLI's offer: its models by explicit id; Seti sets no effort on them. */
+export const geminiOffer = (): RuntimeOffer => ({
+  runtime: 'gemini',
+  models: GEMINI_MODELS.map((id) => ({ id, label: geminiModelLabel(id), efforts: [] })),
+  default_efforts: [],
 })
 
 /** The runtimes that offer a model, in the order they are offered. */

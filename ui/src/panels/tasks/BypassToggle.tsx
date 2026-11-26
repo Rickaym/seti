@@ -11,7 +11,7 @@ import { useEffect, useState } from 'react'
 import { InfoTip } from '@/components/InfoTip'
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 import { Switch } from '@/components/ui/switch'
-import { NotOnRuntime } from '@/panels/tasks/NotOnCodex'
+import { NotOnRuntime } from '@/panels/tasks/NotOnRuntime'
 import { BYPASS_DETAIL, saveBypass } from '@/panels/tasks/setting-actions'
 
 const MAX_TIMER_MS = 2 ** 31 - 1

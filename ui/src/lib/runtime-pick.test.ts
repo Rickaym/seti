@@ -1,7 +1,7 @@
 import type { RuntimeOffer } from '@seti/shared'
 import { describe, expect, it } from 'vitest'
 import {
-  codexHint,
+  startHint,
   DEFAULT_PICK,
   effortsOf,
   modelGroups,
@@ -62,8 +62,10 @@ describe('the model selector', () => {
     expect(pickFields(CODEX_PICK)).toEqual({ runtime: 'codex', model: 'gpt-5.5' })
   })
 
-  it('says a Codex start asks only when the rules do not decide', () => {
-    expect(codexHint(false)).toBe('Codex: sandboxed; asks before each call.')
-    expect(codexHint(true)).toBe('Codex: sandboxed; asks unless your rules allow.')
+  it('says what a start on each runtime runs without asking', () => {
+    expect(startHint('codex', false)).toBe('Codex: sandboxed; asks before each call.')
+    expect(startHint('codex', true)).toBe('Codex: sandboxed; asks unless your rules allow.')
+    expect(startHint('gemini', true)).toContain('runs read-only commands like cat, ls and grep without asking')
+    expect(startHint('claude', true)).toBeNull()
   })
 })

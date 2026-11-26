@@ -1,4 +1,5 @@
 import {
+  DEFAULT_RUNTIME,
   permissionRequestsSchema,
   type AnswerPermissionInput,
   type PermissionDecision,
@@ -12,6 +13,7 @@ import { Hint } from '@/components/Hint'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
+import { useCapabilities } from '@/hooks/useCapabilities'
 import { refreshRequests } from '@/hooks/useRequests'
 import { refreshTasks, useTasks } from '@/hooks/useTasks'
 import { toolLabel } from '@/lib/tool-label'
@@ -110,26 +112,38 @@ function DenyNote({ note, onChange }: { note: string; onChange: (note: string) =
   )
 }
 
-const CODEX_DENY = 'Codex tells its agent only that you refused; it cannot pass on a note'
+/** The name of a runtime that passes on only a refusal, not a note; null when a note goes too. */
+type Plain = string | null
 
-function DenyButton({ codex, busy, onDeny }: { codex: boolean; busy: boolean; onDeny: () => void }) {
+function DenyButton({ plain, busy, onDeny }: { plain: Plain; busy: boolean; onDeny: () => void }) {
   const button = (
     <Button size="sm" variant="ghost" className={ACTION} disabled={busy} onClick={onDeny}>
       <X />
       Deny
     </Button>
   )
-  return codex ? <Hint text={CODEX_DENY}>{button}</Hint> : button
+  return plain === null ? (
+    button
+  ) : (
+    <Hint text={`${plain} tells its agent only that you refused; it cannot pass on a note`}>{button}</Hint>
+  )
 }
 
-/** The note a deny passes on; Codex tells its agent only that the user refused. */
-const denial = (decision: PermissionDecision, codex: boolean, message: string) =>
-  decision === 'deny' && !codex && message !== '' ? { message } : {}
+/** The note a deny passes on, where the runtime can pass one on. */
+const denial = (decision: PermissionDecision, plain: Plain, message: string) =>
+  decision === 'deny' && plain === null && message !== '' ? { message } : {}
 
 interface CardProps {
   request: PermissionRequest
   onAnswered: () => void
   className?: string
+}
+
+/** The runtime's name when its agent's answers are yes or no only, else null. */
+function usePlainAnswers(taskId: string): Plain {
+  const runtime = useTasks().tasks.find((task) => task.id === taskId)?.runtime ?? DEFAULT_RUNTIME
+  const caps = useCapabilities({ runtime })
+  return caps === null || caps.call_edits ? null : caps.label
 }
 
 /** One tool call the agent waits on, with Allow, Always and Deny. */
@@ -138,7 +152,7 @@ export function PermissionCard({ request, onAnswered, className }: CardProps) {
   const [everyAgent, setEveryAgent] = useState(false)
   const [note, setNote] = useState('')
   const sending = useRef(false)
-  const codex = useTasks().tasks.find((task) => task.id === request.task_id)?.runtime === 'codex'
+  const plain = usePlainAnswers(request.task_id)
   const scopeId = useId()
   const fields = useCallFields(request)
   const [editing, setEditing] = useState(request.editable && request.kind === 'review')
@@ -158,7 +172,7 @@ export function PermissionCard({ request, onAnswered, className }: CardProps) {
     const body: AnswerPermissionInput = {
       decision,
       scope: everyAgent ? 'global' : 'agent',
-      ...denial(decision, codex, lookUp ?? note.trim()),
+      ...denial(decision, plain, lookUp ?? note.trim()),
       ...(edited.length > 0 ? { fields: fields.changed } : {}),
     }
     try {
@@ -190,7 +204,7 @@ export function PermissionCard({ request, onAnswered, className }: CardProps) {
           <Reason request={request} />
           <CallFields tool={request.tool_name} fields={fields} editing={editing} />
           <Details request={request} />
-          {!codex && <DenyNote note={note} onChange={setNote} />}
+          {plain === null && <DenyNote note={note} onChange={setNote} />}
           <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
             <Button size="sm" className={ACTION} disabled={busy} onClick={() => void answer('allow')}>
               <Check />
@@ -209,11 +223,11 @@ export function PermissionCard({ request, onAnswered, className }: CardProps) {
                 Always
               </Button>
             )}
-            <DenyButton codex={codex} busy={busy} onDeny={() => void answer('deny')} />
+            <DenyButton plain={plain} busy={busy} onDeny={() => void answer('deny')} />
             <SlackLookUp
               request={request}
               busy={busy}
-              noted={!codex}
+              noted={plain === null}
               className={ACTION}
               onLookUp={(lookUp) => void answer('deny', lookUp)}
             />

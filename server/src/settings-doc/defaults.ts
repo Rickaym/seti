@@ -2,6 +2,7 @@ import {
   AUTO_ARCHIVE_DEFAULTS,
   AWS_SETTINGS_DEFAULT,
   CODEX_SETTINGS_DEFAULTS,
+  GEMINI_SETTINGS_DEFAULTS,
   COMPACT_DEFAULTS,
   DEFAULT_PERMISSION_TIMEOUT_MINUTES,
   DEFAULT_PROFILE_ID,
@@ -68,6 +69,11 @@ export const SECTION_DEFAULTS: SectionDefaults = {
       evaluator_decides: codex.evaluator_decides,
       default_model: null,
       default_effort: null,
+    },
+    gemini: {
+      enabled: GEMINI_SETTINGS_DEFAULTS.enabled,
+      evaluator_decides: GEMINI_SETTINGS_DEFAULTS.evaluator_decides,
+      default_model: null,
     },
   }),
   'agents.storage': () => ({

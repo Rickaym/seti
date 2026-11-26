@@ -22,7 +22,7 @@ import { useCoarsePointer } from '@/hooks/useMedia'
 import { navigate } from '@/lib/route'
 import { cn } from '@/lib/utils'
 import { SourceMark } from '@/panels/access/SourceMark'
-import { NotOnRuntime } from '@/panels/tasks/NotOnCodex'
+import { NotOnRuntime } from '@/panels/tasks/NotOnRuntime'
 import { McpSessionNote } from './McpSessionNote'
 
 interface Group {

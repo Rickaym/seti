@@ -1,4 +1,4 @@
-import type { Task } from '@seti/shared'
+import { DEFAULT_RUNTIME, RUNTIME_NAMES, type Task } from '@seti/shared'
 import { TerminalSquare } from 'lucide-react'
 import { Hint } from '@/components/Hint'
 import { useTasks } from '@/hooks/useTasks'
@@ -9,13 +9,14 @@ function useMixedRuntimes(): boolean {
   return tasks.some((task) => task.runtime !== tasks[0]?.runtime)
 }
 
-/** A quiet mark on a Codex agent while agents run on more than one runtime. */
+/** A quiet mark on an agent off the default runtime while agents run on more than one runtime. */
 export function RuntimeBadge({ task }: { task: Pick<Task, 'runtime' | 'requested_model'> }) {
   const mixed = useMixedRuntimes()
-  if (task.runtime !== 'codex' || !mixed) {
+  if (task.runtime === DEFAULT_RUNTIME || !mixed) {
     return null
   }
-  const name = task.requested_model === null ? 'Codex' : `Codex, ${task.requested_model}`
+  const runtime = RUNTIME_NAMES[task.runtime]
+  const name = task.requested_model === null ? runtime : `${runtime}, ${task.requested_model}`
   return (
     <Hint text={name}>
       <span role="img" aria-label={name} className="flex shrink-0 items-center text-muted-foreground">

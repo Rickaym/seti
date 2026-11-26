@@ -250,7 +250,7 @@ ACTION_SPECS: list[ToolSpec] = [
             "task": TASK_REF,
             "runtime": {
                 "type": "string",
-                "enum": ["claude", "codex"],
+                "enum": ["claude", "codex", "gemini"],
                 "description": "Only when the user asks for it: the runtime to continue the agent on. "
                 "Seti refuses one the user has off.",
             },
@@ -413,7 +413,7 @@ ACTION_SPECS: list[ToolSpec] = [
             },
             "runtime": {
                 "type": "string",
-                "enum": ["claude", "codex", "default"],
+                "enum": ["claude", "codex", "gemini", "default"],
                 "description": "Roles only: the runtime an agent started in this role runs on unless "
                 "its start names one; default leaves it to the start.",
             },
@@ -476,7 +476,7 @@ CONFIRM_TOOLS = frozenset(
 CHANGE_TOOLS = frozenset(spec.name for spec in ACTION_SPECS) | SETTINGS_WRITES
 
 
-RUNTIME_NAMES = {"claude": "Claude Code", "codex": "Codex"}
+RUNTIME_NAMES = {"claude": "Claude Code", "codex": "Codex", "gemini": "Gemini"}
 
 
 def _restart_question(title: str, running: bool, runtime: str | None, model: str | None) -> tuple[str, str]:

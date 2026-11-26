@@ -11,6 +11,7 @@ import { useFind } from '@/components/find/useFind'
 import { Button } from '@/components/ui/button'
 import { useConfirm } from '@/components/ui/confirm-context'
 import { useAttachments } from '@/hooks/useAttachments'
+import { useCapabilities } from '@/hooks/useCapabilities'
 import { RETRYING_LABEL, useClientSend } from '@/hooks/useClientSend'
 import { useCommandCatalog } from '@/hooks/useCommandCatalog'
 import { useDraft } from '@/hooks/useDraft'
@@ -104,7 +105,7 @@ export function StartPage() {
   const [starting, setStarting] = useState(false)
   const [sandboxed, setSandboxed] = useState(true)
   const { pick, setPick, runtimeHint } = useStartPick()
-  const codex = pick.runtime === 'codex'
+  const canUnsandbox = useCapabilities(pick)?.unsandboxed !== false
   const clientSend = useClientSend()
   const commands = useCommandCatalog('/commands', prompt.trimStart().startsWith('/'))
   const check = checkComposer(prompt, commands.commands)
@@ -126,7 +127,7 @@ export function StartPage() {
     try {
       const body = {
         ...inWorkspace(attachments.message(prompt), currentId),
-        ...(sandboxed || codex ? {} : { sandbox: false }),
+        ...(sandboxed || !canUnsandbox ? {} : { sandbox: false }),
         ...pickFields(pick),
       }
       const task = await clientSend.run(JSON.stringify(body), async (clientId, options) =>
@@ -179,7 +180,7 @@ export function StartPage() {
             <div className="flex items-end gap-1 px-2 pb-2">
               <ModelPicker pick={pick} onChange={setPick} disabled={starting} />
               <div className="ml-auto flex shrink-0 items-center gap-1">
-                {!codex && <SandboxToggle on={sandboxed} onChange={setSandboxed} disabled={starting} />}
+                {canUnsandbox && <SandboxToggle on={sandboxed} onChange={setSandboxed} disabled={starting} />}
                 {touch && <FindButton find={find} />}
                 <AttachButton
                   disabled={starting}

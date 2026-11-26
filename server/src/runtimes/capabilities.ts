@@ -124,6 +124,7 @@ export const agentCapabilities = (runtime: StoredRuntime): AgentCapabilities => 
   rewind: rewinds(runtime),
   bypass: declared(runtime).bypass,
   slash_commands: declared(runtime).slashCommands,
+  call_edits: declared(runtime).gate.rewriteInput,
 })
 
 /** Every stored runtime's capabilities. */

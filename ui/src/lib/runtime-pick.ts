@@ -12,9 +12,20 @@ export interface RuntimePick {
 /** Today's default: Claude Code on the user's default model. */
 export const DEFAULT_PICK: RuntimePick = { runtime: DEFAULT_RUNTIME, model: null, effort: null }
 
-/** What a Codex start says under the box: always sandboxed, and asks unless the rules decide. */
-export const codexHint = (rulesDecide: boolean): string =>
-  rulesDecide ? 'Codex: sandboxed; asks unless your rules allow.' : 'Codex: sandboxed; asks before each call.'
+/** What a start on each runtime says under the box, by whether the rules decide; null for none. */
+const START_HINTS: Record<StoredRuntime, ((rulesDecide: boolean) => string) | null> = {
+  claude: null,
+  codex: (rulesDecide) =>
+    rulesDecide ? 'Codex: sandboxed; asks unless your rules allow.' : 'Codex: sandboxed; asks before each call.',
+  gemini: (rulesDecide) =>
+    `Gemini CLI: sandboxed; runs read-only commands like cat, ls and grep without asking, and ${
+      rulesDecide ? 'asks for the rest unless your rules allow' : 'asks before every other call'
+    }.`,
+}
+
+/** What a start on the runtime says under the box, or null where it says nothing. */
+export const startHint = (runtime: StoredRuntime, rulesDecide: boolean): string | null =>
+  START_HINTS[runtime]?.(rulesDecide) ?? null
 
 /** One option of the model selector, grouped under its runtime. */
 export interface ModelOption {
