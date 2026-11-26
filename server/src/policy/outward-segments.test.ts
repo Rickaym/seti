@@ -36,8 +36,7 @@ describe('a repository path with values Seti cannot read after the repository', 
 
   it.each([
     'gh api graphql -f query=\'mutation{resolveReviewThread(input:{threadId:"x"}){thread{id}}}\'',
-    'gh pr comment 12 -R other/tool --body x',
-    'gh pr review 12 -R other/tool --approve',
+    'gh api graphql -f query=\'mutation{addComment(input:{subjectId:"x",body:"y"}){clientMutationId}}\'',
   ])('leaves out what PERM-15 does not read: %s', (command) => {
     expect(read(command)).toEqual([])
   })

@@ -10,7 +10,7 @@ import { permissionRules } from './store/permissions.js'
 
 const GIT_TIMEOUT_MS = 5000
 
-/** A push, fork or write the user is asked about first, as the request reads on a phone. */
+/** A push, fork or other write the user is asked about first, as the request reads on a phone. */
 export interface OutsidePush {
   action: OutwardAction
   /** `owner/repo`, an owner, or null where Seti could not tell. */
@@ -24,6 +24,34 @@ const VERBS: Record<OutwardAction, string> = {
   fork: 'Fork',
   pr: 'Open a pull request on',
   api: 'Write to',
+  'pr comment': 'Comment on',
+  'pr review': 'Review',
+  'pr merge': 'Merge into',
+  'pr close': 'Close a pull request on',
+  'pr reopen': 'Reopen a pull request on',
+  'pr ready': 'Mark a pull request ready on',
+  'pr edit': 'Edit a pull request on',
+  'pr lock': 'Lock a pull request on',
+  'pr unlock': 'Unlock a pull request on',
+  'pr update-branch': 'Update a pull request on',
+  'pr revert': 'Revert a pull request on',
+  'issue create': 'Open an issue on',
+  'issue comment': 'Comment on',
+  'issue close': 'Close an issue on',
+  'issue reopen': 'Reopen an issue on',
+  'issue edit': 'Edit an issue on',
+  'issue delete': 'Delete an issue on',
+  'issue lock': 'Lock an issue on',
+  'issue unlock': 'Unlock an issue on',
+  'issue pin': 'Pin an issue on',
+  'issue unpin': 'Unpin an issue on',
+  'issue transfer': 'Move an issue on',
+  'issue develop': 'Link a branch on',
+  'release create': 'Publish a release on',
+  'release edit': 'Edit a release on',
+  'release delete': 'Delete a release on',
+  'release upload': 'Upload to a release on',
+  'release delete-asset': 'Delete a release asset on',
 }
 
 /** The request's line: "Push to acme/tool, outside your organisations", or why Seti asks. */
@@ -125,7 +153,14 @@ async function remoteUrls(git: Git, repoOnly: Git, remote: string | null): Promi
   return [...new Set(urls.flatMap((out) => out.split('\n')).filter((line) => line.trim() !== ''))]
 }
 
-/** The places a push from a folder reaches, or [null] where git cannot say or it reaches more. */
+/** Whether git failed because the folder is in no repository, where gh cannot pick one either. */
+const noRepository = (error: unknown) =>
+  error instanceof Error && 'stderr' in error && /not a git repository/i.test(String(error.stderr))
+
+/**
+ * The places a push from a folder reaches, or [null] where git cannot say or it reaches more. A
+ * gh call in a folder outside any repository reaches none, since gh fails there without writing.
+ */
 async function pushedFrom(view: AgentGitView, dir: string, where: { remote?: string | null; url?: string }) {
   const at = view.folder(dir)
   const git: Git = async (...args) => agentGitReading(GIT_TIMEOUT_MS, at, view.globals, ...args)
@@ -139,8 +174,8 @@ async function pushedFrom(view: AgentGitView, dir: string, where: { remote?: str
         ? await remoteUrls(git, repoOnly, where.remote ?? null)
         : [rewriteUrl(where.url, await git('config', '--get-regexp', '^url\\.').catch(() => ''))]
     return urls.length === 0 ? [null] : urls
-  } catch {
-    return [null]
+  } catch (error) {
+    return where.remote === '*' && noRepository(error) ? [] : [null]
   }
 }
 
@@ -184,9 +219,10 @@ function outside(action: OutwardAction, given: string | null, own: Set<string>):
 }
 
 /**
- * The pushes, forks, pull requests and API writes of a shell line that reach a repository outside
- * the user's own organisations, or that Seti cannot place; the user's `PushTo` rules let a GitHub
- * owner through. Read on the host with git's hostile-repository guards, never in the sandbox.
+ * The pushes, forks, pull requests and other writes of a shell line that reach a repository
+ * outside the user's own organisations, or that Seti cannot place; the user's `PushTo` rules
+ * let a GitHub owner through. Read on the host with git's hostile-repository guards, never in
+ * the sandbox.
  */
 export async function outsidePushes(task: Task, command: string, cwd: string | null): Promise<OutsidePush[]> {
   const calls = outwardCalls(command, cwd, os.homedir())

@@ -14,7 +14,6 @@ import { refuseAtSelf, refuseOtherAgent } from './ea-guard.js'
 import { HttpError } from './http.js'
 import { byUser, recordRevision, sourceDetail, type ChangeSource, type Saved } from './revisions.js'
 import { pickedRuntime } from './runtime-offers.js'
-import { packForDisplay } from './seti-guide.js'
 import { contextPacks, eaContextPacks, taskContextPacks } from './store/context.js'
 import { signalWorkspaces } from './workspace/dir.js'
 
@@ -28,7 +27,7 @@ export async function requirePack(id: string): Promise<ContextPack> {
   return pack
 }
 
-/** Seti renders the built-in pack itself, so nobody edits or deletes it. */
+/** Seti renders the built-in guide itself, so nobody edits or deletes it. */
 function refuseBuiltin(pack: ContextPack, verb: 'changed' | 'deleted'): void {
   if (pack.builtin) {
     throw new HttpError(403, `${pack.name} is built into Seti and cannot be ${verb}; unlink it instead`)
@@ -58,7 +57,7 @@ export async function setPackLinkedByDefault(id: string, on: boolean): Promise<C
   return pack
 }
 
-/** Sets the runtime and model an agent started in this role takes; built-in roles take them too. */
+/** Sets the runtime and model an agent started in this role takes. */
 export async function setRoleRuntime(id: string, input: RoleRuntimeInput): Promise<ContextPack> {
   const before = await requirePack(id)
   if (before.kind !== 'role') {
@@ -159,16 +158,6 @@ export async function deletePack(id: string): Promise<void> {
     await auditPack('context.pack_deleted', pack)
     signalWorkspaces('packs')
   }
-}
-
-/** An editable copy of a pack, built-in roles included, as the agents read it; not the guide. */
-export async function duplicatePack(id: string): Promise<Saved<ContextPack>> {
-  const pack = packForDisplay(await requirePack(id))
-  if (pack.builtin && pack.kind === 'reference') {
-    throw new HttpError(400, `${pack.name} is written by Seti for each agent and cannot be copied`)
-  }
-  const name = await contextPacks.copyName(pack.name)
-  return createPack({ name, description: pack.description, body: pack.body }, pack.kind)
 }
 
 const fileState = (file: ContextFileContent): RevisionState | null => (file.exists ? { content: file.content } : null)

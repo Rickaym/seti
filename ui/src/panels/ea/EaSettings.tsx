@@ -11,7 +11,7 @@ import { takeEaSettingsRequest, useEaSettingsRequested } from '@/panels/ea/ea-se
 import { SubscribedChannels } from '@/panels/settings/channels/SubscribedChannels'
 import { NewRoleDialog, RolePicker, type RoleOwner } from '@/panels/tasks/RolePicker'
 
-const EA_ROLE: RoleOwner = { packsPath: '/ea/context-packs', rolePath: '/ea/role', name: 'EA', pinned: false }
+const EA_ROLE: RoleOwner = { packsPath: '/ea/context-packs', rolePath: '/ea/role', name: 'EA' }
 
 function Row({ label, children }: { label: string; children: ReactNode }) {
   return (

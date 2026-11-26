@@ -36,6 +36,14 @@ async function roleRuntime(
   }
 }
 
+/** Why a start's role is refused, naming the roles there are so the caller can pick one. */
+async function unknownRole(name: string): Promise<string> {
+  const roles = (await contextPacks.list()).filter((pack) => pack.kind === 'role').map((pack) => pack.name)
+  return roles.length === 0
+    ? `No role is named ${name}, and there are no roles yet; start without one, or add one under Context`
+    : `No role is named ${name}; the roles are ${roles.join(', ')}`
+}
+
 /**
  * The role a start names, and the runtime and model it runs on: the start's own picks first, then
  * the role's, then the install's default when the role's runtime cannot start an agent now.
@@ -46,7 +54,7 @@ export async function roleStart(input: StartAgentRequest, profileId: string): Pr
   }
   const role = await contextPacks.roleNamed(input.role)
   if (role === undefined) {
-    throw new HttpError(404, `No role is named ${input.role}`)
+    throw new HttpError(404, await unknownRole(input.role))
   }
   if (input.runtime !== undefined || input.model !== undefined || (role.runtime === null && role.model === null)) {
     return ownPicks(input, role)

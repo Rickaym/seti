@@ -46,7 +46,7 @@ import { PR_LIST_CACHE } from './schema-prs.js'
 import { QUESTION_SECRETS, QUESTIONS } from './schema-questions.js'
 import { DROP_ROUTINES, REMINDER_CHANNELS, REMINDER_CRON } from './schema-reminders.js'
 import { RESTART_CUTS } from './schema-restart.js'
-import { PACK_KIND, ROLE_RUNTIME, rolesToPacks } from './schema-roles.js'
+import { PACK_KIND, retireBuiltinRoles, ROLE_RUNTIME, rolesToPacks } from './schema-roles.js'
 import { MESSAGE_SEARCH, MESSAGE_SEARCH_TALK, MESSAGE_TIME } from './schema-search.js'
 import {
   CLAUDE_LOGINS,
@@ -264,4 +264,5 @@ export const MIGRATIONS: readonly Migration[] = [
   { version: 142, name: 'credential_access', sql: CREDENTIAL_ACCESS },
   { version: 143, name: 'dream_tidies', sql: DREAM_TIDIES },
   { version: 144, name: 'permission_request_prs', sql: PERMISSION_REQUEST_PRS },
+  { version: 145, name: 'no_builtin_roles', sql: '', run: retireBuiltinRoles },
 ]

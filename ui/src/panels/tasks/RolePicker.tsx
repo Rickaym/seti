@@ -1,12 +1,11 @@
 import {
-  BUILTIN_ROLES,
   roleLabel,
   type ContextPack,
   type ContextPackSummary,
   type NewContextPackInput,
   type TaskRoleInput,
 } from '@seti/shared'
-import { Copy, Pencil, Users } from 'lucide-react'
+import { Pencil } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState, type Ref } from 'react'
 import { toast } from 'sonner'
 import { apiGet, apiPost, apiPut, errorText } from '@/api'
@@ -21,7 +20,6 @@ import { packSelection } from '@/panels/context/selection'
 
 const NONE = ''
 const NEW = 'new'
-const LEAD_ID = BUILTIN_ROLES.find((role) => role.name === 'Lead')?.id ?? ''
 
 /** Who takes a role pack: an agent or the EA, by the routes that list and link its packs. */
 export interface RoleOwner {
@@ -31,19 +29,16 @@ export interface RoleOwner {
   rolePath: string
   /** Names a new role "<name> role" and titles its editor. */
   name: string
-  /** Offers the built-in Lead with one click while it has no role. */
-  pinned: boolean
 }
 
-/** Every role pack, Seti's first, and the one the owner links; null while loading. */
+/** Every role pack and the one the owner links; null while loading. */
 function useRoles(packsPath: string) {
   const [roles, setRoles] = useState<ContextPack[] | null>(null)
   const [current, setCurrent] = useState<string | null>(null)
   const load = useCallback(() => {
     Promise.all([apiGet<ContextPack[]>('/context/packs'), apiGet<ContextPackSummary[]>(packsPath)])
       .then(([packs, linked]) => {
-        const all = packs.filter((pack) => pack.kind === 'role')
-        setRoles([...all.filter((pack) => pack.builtin), ...all.filter((pack) => !pack.builtin)])
+        setRoles(packs.filter((pack) => pack.kind === 'role'))
         setCurrent(linked.find((pack) => pack.kind === 'role')?.id ?? null)
       })
       .catch((e: unknown) => {
@@ -69,21 +64,6 @@ interface RolePickerProps {
   onNew: (body: string) => void
   /** Closes the settings before leaving for the Context page. */
   onLeave: () => void
-}
-
-function RoleGroup({ label, roles }: { label: string; roles: readonly ContextPack[] }) {
-  if (roles.length === 0) {
-    return null
-  }
-  return (
-    <optgroup label={label}>
-      {roles.map((role) => (
-        <NativeSelectOption key={role.id} value={role.id}>
-          {role.name}
-        </NativeSelectOption>
-      ))}
-    </optgroup>
-  )
 }
 
 function RoleSelect({
@@ -112,14 +92,17 @@ function RoleSelect({
       }}
     >
       <NativeSelectOption value={NONE}>None</NativeSelectOption>
-      <RoleGroup label="Built in" roles={roles.filter((role) => role.builtin)} />
-      <RoleGroup label="Yours" roles={roles.filter((role) => !role.builtin)} />
+      {roles.map((role) => (
+        <NativeSelectOption key={role.id} value={role.id}>
+          {role.name}
+        </NativeSelectOption>
+      ))}
       <NativeSelectOption value={NEW}>New role...</NativeSelectOption>
     </NativeSelect>
   )
 }
 
-/** The owner's role pack: pick one, start a new one, edit or duplicate it, or go without. */
+/** The owner's role pack: pick one, start a new one, edit it, or go without. */
 export function RolePicker({ owner, focus, onChanged, onNew, onLeave }: RolePickerProps) {
   const { roles, current, load } = useRoles(owner.packsPath)
   const select = useRef<HTMLSelectElement>(null)
@@ -155,20 +138,13 @@ export function RolePicker({ owner, focus, onChanged, onNew, onLeave }: RolePick
       onChanged()
     })
 
-  const edit = async () =>
-    run(async () => {
-      if (pack === null) {
-        return
-      }
-      const target = pack.builtin ? await apiPost<ContextPack>(`/context/packs/${pack.id}/duplicate`) : pack
-      if (pack.builtin) {
-        await linkRole(owner, target.id)
-        toast.success(`${target.name} is the role of ${owner.name} now; edit it here`)
-        onChanged()
-      }
-      onLeave()
-      navigate('context', packSelection(target.id))
-    })
+  const edit = () => {
+    if (pack === null) {
+      return
+    }
+    onLeave()
+    navigate('context', packSelection(pack.id))
+  }
 
   return (
     <div className="flex min-w-0 flex-col gap-1">
@@ -181,15 +157,9 @@ export function RolePicker({ owner, focus, onChanged, onNew, onLeave }: RolePick
           onPick={(value) => void pick(value)}
         />
         {pack !== null && (
-          <Hint text={pack.builtin ? 'Duplicate it into a role of your own and edit that' : 'Edit this role'}>
-            <Button
-              size="icon-xs"
-              variant="ghost"
-              aria-label={pack.builtin ? 'Duplicate role to edit' : 'Edit role'}
-              disabled={busy}
-              onClick={() => void edit()}
-            >
-              {pack.builtin ? <Copy /> : <Pencil />}
+          <Hint text="Edit this role">
+            <Button size="icon-xs" variant="ghost" aria-label="Edit role" disabled={busy} onClick={edit}>
+              <Pencil />
             </Button>
           </Hint>
         )}
@@ -199,22 +169,11 @@ export function RolePicker({ owner, focus, onChanged, onNew, onLeave }: RolePick
           {roleLabel(pack.name, pack.body)}
         </span>
       )}
-      {owner.pinned && roles !== null && current === null && (
-        <div className="flex flex-wrap items-center gap-1.5 text-2xs text-muted-foreground">
-          <span>Pinned agents work best with a role</span>
-          <Hint text="The built-in Lead role: delegate instead of implementing">
-            <Button size="xs" variant="outline" disabled={busy} onClick={() => void pick(LEAD_ID)}>
-              <Users />
-              Lead
-            </Button>
-          </Hint>
-        </div>
-      )}
     </div>
   )
 }
 
-/** A new role pack for the owner, linked to it once saved; built-in roles are starting points. */
+/** A new role pack for the owner, linked to it once saved. */
 export function NewRoleDialog({
   owner,
   initial,
@@ -262,24 +221,6 @@ export function NewRoleDialog({
             setName(e.target.value)
           }}
         />
-      </Field>
-      <Field label="Start from" full>
-        <div className="flex flex-wrap gap-1.5">
-          {BUILTIN_ROLES.map((role) => (
-            <Hint key={role.id} text={role.description}>
-              <Button
-                type="button"
-                size="xs"
-                variant="outline"
-                onClick={() => {
-                  setBody(role.text)
-                }}
-              >
-                {role.name}
-              </Button>
-            </Hint>
-          ))}
-        </div>
       </Field>
       <Field label="Role" full>
         <FindableTextarea

@@ -5,7 +5,7 @@ import type {
   NewContextPackInput,
   PackKind,
 } from '@seti/shared'
-import { Copy, Trash2 } from 'lucide-react'
+import { Trash2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { apiDelete, apiGet, apiPost, apiPut, errorText } from '@/api'
@@ -60,48 +60,11 @@ function DefaultToggle({ pack, onChanged }: { pack: ContextPack; onChanged: (pac
   )
 }
 
-/** Makes an editable copy of a pack, such as a built-in role, and opens it. */
-function DuplicateButton({ pack, onCopied }: { pack: ContextPack; onCopied: (copy: ContextPack) => void }) {
-  const [busy, setBusy] = useState(false)
-  const duplicate = async () => {
-    setBusy(true)
-    try {
-      const copy = await apiPost<ContextPack>(`/context/packs/${pack.id}/duplicate`)
-      toast.success(`Created ${copy.name}`)
-      onCopied(copy)
-    } catch (e) {
-      toast.error(errorText(e))
-    } finally {
-      setBusy(false)
-    }
-  }
-  return (
-    <Hint text="Make an editable copy">
-      <Button size="sm" variant="outline" disabled={busy} onClick={() => void duplicate()}>
-        <Copy />
-        Duplicate to edit
-      </Button>
-    </Hint>
-  )
-}
-
-const BUILTIN_ROLE_NOTE =
-  "Built into Seti and read-only. An agent with this role reads it right after the Seti guide. Pick it in an agent's settings under Role, or duplicate it to make your own version."
-
 const GUIDE_NOTE =
   "Built into Seti and read-only. Seti writes it for each agent, naming only the tools this machine has and following the agent's update mode; shown here for an agent that wakes on PR updates. Unlink it from an agent in its details, or turn off Default so new agents leave it out."
 
-/** Seti's own pack: shown as agents read it, never edited or deleted; a role can be duplicated. */
-function BuiltinPack({
-  pack,
-  onChanged,
-  onCopied,
-}: {
-  pack: ContextPack
-  onChanged: (pack: ContextPack) => void
-  onCopied: (copy: ContextPack) => void
-}) {
-  const role = pack.kind === 'role'
+/** Seti's own guide: shown as agents read it, never edited or deleted. */
+function BuiltinPack({ pack, onChanged }: { pack: ContextPack; onChanged: (pack: ContextPack) => void }) {
   return (
     <EditorFrame
       title={pack.name}
@@ -111,17 +74,8 @@ function BuiltinPack({
       saving={false}
       readOnly
       onSave={() => undefined}
-      actions={
-        role ? (
-          <>
-            <RoleRuntime pack={pack} onChanged={onChanged} />
-            <DuplicateButton pack={pack} onCopied={onCopied} />
-          </>
-        ) : (
-          <DefaultToggle pack={pack} onChanged={onChanged} />
-        )
-      }
-      banner={<Banner tone="info">{role ? BUILTIN_ROLE_NOTE : GUIDE_NOTE}</Banner>}
+      actions={<DefaultToggle pack={pack} onChanged={onChanged} />}
+      banner={<Banner tone="info">{GUIDE_NOTE}</Banner>}
     >
       <PackLinks pack={pack} />
       <div className="min-h-0 flex-1 overflow-y-auto border border-border p-3">
@@ -260,7 +214,7 @@ export function PackEditor({
   }
 
   if (pack?.builtin === true) {
-    return <BuiltinPack pack={pack} onChanged={changed} onCopied={onSaved} />
+    return <BuiltinPack pack={pack} onChanged={changed} />
   }
   const copy = COPY[pack?.kind ?? newKind]
 

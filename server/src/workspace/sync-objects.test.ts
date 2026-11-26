@@ -50,6 +50,7 @@ await tasks.insert({
 })
 await ensureMember({ id: TASK, title: 'Morning report' })
 const pack = (await createPack({ name: 'Deploy notes', description: 'How we ship', body: 'Run make deploy.' })).value
+await createPack({ name: 'Lead', description: 'Delegates the work', body: 'Lead: delegate the work.' }, 'role')
 await openWorkspace(TASK)
 
 afterAll(async () => {
@@ -245,7 +246,7 @@ describe('channels in task.md', () => {
 describe('role pack files', () => {
   const role = async () => (await taskContextPacks.list(TASK)).filter((p) => p.kind === 'role').map((p) => p.name)
 
-  it('renders the built-in roles with kind: role and links one from its linked line', async () => {
+  it('renders role packs with kind: role and links one from its linked line', async () => {
     expect(read('packs/lead.md')).toMatch(/^---\nname: Lead\ndescription: .*\nkind: role\nlinked: false\n---\n\nLead: /)
     expect(read('packs/deploy-notes.md')).not.toContain('kind:')
     edit('packs/lead.md', (text) => text.replace('linked: false', 'linked: true'))

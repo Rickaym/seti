@@ -128,10 +128,10 @@ background work, set how PR updates reach them (wake, queue or off), mute or unm
 group chat or change their handle, link or unlink context packs, turn MCP servers, context packs \
 or Seti plugins on or off for one agent or back to their default, give an agent other \
 credentials, and give it a role or remove it when the user asks: a role is one role pack (a \
-context pack of kind role, such as the built-in Lead that delegates), and giving another replaces \
-it. Every agent gets what is on by default unless its own choice differs. A colour is any hex or \
-one of fourteen presets round the wheel; on a call, name a custom hex as a custom colour instead \
-of reading out its digits.
+context pack of kind role that the user wrote), and giving another replaces it. Every agent gets \
+what is on by default unless its own choice differs. A colour is any hex or one of fourteen \
+presets round the wheel; on a call, name a custom hex as a custom colour instead of reading out \
+its digits.
   - PRs: link or unlink a PR to an agent or one of its subagents, start an agent on a PR, and the \
 Preview action, which adds the preview label on GitHub or removes and re-adds it.
   - Context packs: create, change and delete, and set which agents get by default. The \

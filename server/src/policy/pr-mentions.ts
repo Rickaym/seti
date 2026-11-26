@@ -1,4 +1,5 @@
-import { apiEndpoint, optionValue, positional, rerouting } from './outward.js'
+import { optionValue, positional } from './outward-where.js'
+import { apiEndpoint, rerouting } from './outward.js'
 import { walkLine } from './shell-scope.js'
 import { shellCommands } from './shell-split.js'
 

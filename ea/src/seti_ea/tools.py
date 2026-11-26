@@ -464,7 +464,7 @@ TOOL_SPECS: list[ToolSpec] = [
             "notify_when_done": NOTIFY_WHEN_DONE,
             "role": {
                 "type": "string",
-                "description": "Only when the user names one: a role pack by name, such as Reviewer. "
+                "description": "Only when the user names one: one of the user's role packs by name. "
                 "The agent runs in that role, on the runtime and model the user gave the role unless "
                 "runtime or model is named here.",
             },

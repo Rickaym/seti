@@ -84,7 +84,6 @@ const roleOwner = (task: Task): RoleOwner => ({
   packsPath: `/tasks/${task.id}/context-packs`,
   rolePath: `/tasks/${task.id}/role`,
   name: task.title,
-  pinned: task.pinned,
 })
 
 /** What is not needed at a glance, behind a cog: a popover, or a bottom sheet on phones. */
