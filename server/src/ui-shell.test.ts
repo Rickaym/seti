@@ -77,6 +77,7 @@ describe('the UI shell', () => {
       const res = await get(pathname)
       expect(res.status, pathname).toBe(404)
       expect(res.headers.get('content-type'), pathname).not.toMatch(/html/)
+      expect(res.headers.get('cache-control'), pathname).toBe('no-store')
     }
     expect((await get('/agents')).status).toBe(200)
   })

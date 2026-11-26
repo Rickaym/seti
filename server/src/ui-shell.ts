@@ -15,6 +15,9 @@ const BUILD_META = /<meta name="seti-build" content="([\w-]+)"/
 
 const NOT_BUILT = 'UI not built. Run: pnpm build'
 
+/** A missing file may appear a moment later, as while a build swaps in, so no cache keeps it. */
+const UNCACHED = { 'cache-control': 'no-store' }
+
 /** Paths that name a file; a missing one is a 404, never the app shell in its place. */
 const FILE_PATH = /^\/assets\/|\.\w+$/
 
@@ -60,13 +63,13 @@ export function shellFallback(shell: UiShell): Handler {
     if (c.req.path === '/sw.js') {
       const worker = shell.read('sw.js')
       return worker === null
-        ? c.text(NOT_BUILT, 503)
+        ? c.text(NOT_BUILT, 503, UNCACHED)
         : c.body(worker, 200, { 'content-type': 'text/javascript; charset=utf-8' })
     }
     if (c.req.path !== '/index.html' && FILE_PATH.test(c.req.path)) {
-      return c.text('Not found', 404)
+      return c.text('Not found', 404, UNCACHED)
     }
     const index = shell.read('index.html')
-    return index === null ? c.text(NOT_BUILT, 503) : c.html(index)
+    return index === null ? c.text(NOT_BUILT, 503, UNCACHED) : c.html(index)
   }
 }
