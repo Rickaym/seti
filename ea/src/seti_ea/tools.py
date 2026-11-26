@@ -49,7 +49,7 @@ from seti_ea.format import (
     until,
     zone_of,
 )
-from seti_ea.gate import ANSWER, GATE_CALL, GateCall, UserAnswer
+from seti_ea.gate import ANSWER, GATE_CALL, ON_WORD_TOOLS, ONE_AT_A_TIME, GateCall, UserAnswer
 from seti_ea.history_tools import HISTORY_WINDOW, activity_result, window_transcript
 from seti_ea.knowledge_tools import list_proposals, search_knowledge
 from seti_ea.location_tools import location_lines
@@ -62,6 +62,7 @@ from seti_ea.role_tools import role_lines
 from seti_ea.seti import SetiClient, SetiError
 from seti_ea.settings_json import settings_text
 from seti_ea.settings_tools import SETTINGS_SPECS, SettingsTools
+from seti_ea.source_tools import SOURCE_CONTAINER, SOURCE_KIND, SOURCE_SINCE, SOURCE_UNTIL, find_sources
 from seti_ea.thread_lines import thread_lines
 from seti_ea.toolkit import (
     TASK_REF,
@@ -118,13 +119,14 @@ FIND_WHOLE_WORDS = {
 }
 FIND_WHERE = {
     "type": "string",
-    "enum": ["transcript", "file_names", "file_text", "file"],
+    "enum": ["transcript", "file_names", "file_text", "file", "sources"],
     "description": "Where to look: transcript (the default); file_names, the paths of the task's files "
     "and folders matched loosely as an editor's quick open does; file_text, the text inside its "
-    "files; or file, to read one file whole, with query its path as the agent or a file search "
-    "names it, such as a file an agent sent you. Files cover the task's working directory, repos, "
-    "folders and workspace as its Files view shows them, never hidden paths or secrets. "
-    "whole_words applies to the transcript only.",
+    "files; file, to read one file whole, with query its path as the agent or a file search names "
+    "it, such as a file an agent sent you; or sources, the Slack, Linear and GitHub items the task "
+    "read, with their exact text and permalink, by query, kind, container and time. Files cover the "
+    "task's working directory, repos, folders and workspace as its Files view shows them, never "
+    "hidden paths or secrets. whole_words applies to the transcript only.",
 }
 FIND_TOOLS = {
     "type": "boolean",
@@ -346,8 +348,9 @@ TOOL_SPECS: list[ToolSpec] = [
         "found or was told, which the live context does not hold. With in knowledge, search the "
         "approved knowledge notes agents share instead; with in proposals, list the notes waiting "
         "for the user to approve; with in questions, list the questions agents wait on the user for; "
-        "with in requests, list everything that waits on the user: questions, access changes, tool "
-        "calls, plans and notes.",
+        "with in requests, list everything that waits on the user, of every task or the one named: "
+        "questions, access changes, and tool calls and plans with their id, Seti's reason, the "
+        "agent's description, the input or plan and the PRs they name, and notes.",
         {
             "query": {"type": "string", "description": "What to look for, in a few keywords."},
             "task": {
@@ -432,7 +435,7 @@ TOOL_SPECS: list[ToolSpec] = [
     ),
     ToolSpec(
         "stop_task",
-        "Stop a running task's current turn. Confirm with the user first.",
+        "Stop a running task's current turn. Ask first unless the user named this one agent to stop.",
         {"task": TASK_REF},
         ["task"],
     ),
@@ -450,7 +453,7 @@ TOOL_SPECS: list[ToolSpec] = [
         "of its own and clones the repos it needs, so name them in the prompt. Seti's planner titles "
         "it and picks context packs and MCP servers from the prompt. Unclear permissions are not "
         "given: it runs sandboxed with SSH hosts and AWS only as their defaults say; only the user "
-        "grants more. Confirm the prompt with the user first.",
+        "grants more. When the user asked for it and named the work, start it without asking first.",
         {
             "prompt": {"type": "string", "description": "The full instructions for the agent."},
             "title": {
@@ -642,8 +645,12 @@ TOOL_SPECS: list[ToolSpec] = [
             "whole_words": FIND_WHOLE_WORDS,
             "include_tools": FIND_TOOLS,
             "where": FIND_WHERE,
+            "kind": SOURCE_KIND,
+            "container": SOURCE_CONTAINER,
+            "since": SOURCE_SINCE,
+            "until": SOURCE_UNTIL,
         },
-        ["task", "query"],
+        ["task"],
     ),
     ToolSpec(
         "post_team_chat",
@@ -1041,9 +1048,9 @@ class EaTools:
         """The Seti client the tools call through."""
         return self._seti
 
-    def user_turn(self) -> None:
-        """The user spoke or typed, so a question a destructive tool asked may now be answered."""
-        self._actions.confirmations.user_turn()
+    def user_turn(self, said: str = "") -> None:
+        """The user spoke or typed `said`, so a question a destructive tool asked may now be answered."""
+        self._actions.confirmations.user_turn(said)
 
     async def call(self, name: str, args: Mapping[str, Any]) -> ToolResult:
         """Run a tool; Seti errors and bad arguments come back as a failed result, never raise."""
@@ -1072,14 +1079,17 @@ class EaTools:
             detail = f" {clip(e.detail, 300)}" if e.detail and e.detail != e.title else ""
             return ToolResult(f"The Seti call failed: {e.title}.{detail}", f"Failed: {e.title}", False)
 
-    async def answer(self, ask: AnsweredAsk) -> ToolResult:
-        """Runs the exact recorded call the user allowed, or forgets the question they denied."""
+    async def answer(self, ask: AnsweredAsk, by_word: bool = False) -> ToolResult:
+        """Runs the exact recorded call the user allowed, or forgets the question they denied.
+
+        `by_word` says the user spoke or typed the yes, rather than tapped Allow in a notification.
+        """
         if not ask.allow:
             return ToolResult(f"The user said no: {ask.summary} stays undone.", "Left undone")
         if ask.tool not in CONFIRM_TOOLS:
             result = ToolResult(f"{ask.tool} does not ask first.", "Not a question", False)
         else:
-            token = ANSWER.set(UserAnswer())
+            token = ANSWER.set(UserAnswer(ask_id=ask.id, by_word=by_word))
             try:
                 result = await self._run(ask.tool, {**ask.args, "confirmed": True})
             finally:
@@ -1096,9 +1106,15 @@ class EaTools:
         if gate.turn == 0:
             raise ToolError("The user has not answered since you asked.", "No answer yet")
         taken = parse_answered(await gate.confirm(ids=ids))
-        done = [(ask, await self.answer(ask)) for ask in taken]
+        done = [(ask, await self._answer_yes(ask, len(taken))) for ask in taken]
         missing = [i for i in ids if i not in {ask.id for ask in taken}]
         return confirm_text(done, missing)
+
+    async def _answer_yes(self, ask: AnsweredAsk, together: int) -> ToolResult:
+        """Runs a call the user's typed or spoken yes allowed; one yes allows one on-word action alone."""
+        if ask.tool in ON_WORD_TOOLS and together > 1:
+            return ToolResult(ONE_AT_A_TIME, "Needs its own yes", False)
+        return await self.answer(ask, by_word=True)
 
     async def _list(self, path: str) -> list[dict[str, Any]]:
         return dicts(await self._seti.get(path))
@@ -1274,7 +1290,9 @@ class EaTools:
         if scope == "questions":
             return await list_questions(self._seti, self._now())
         if scope == "requests":
-            return await list_requests(self._seti, self._now())
+            ref = arg_str(args, "task", required=False)
+            task = await self.resolve_task(ref) if ref else None
+            return await list_requests(self._seti, self._now(), str(task.get("id")) if task else None)
         query = arg_str(args, "query")
         if scope == "knowledge":
             return await search_knowledge(self._seti, query, self._now())
@@ -2269,10 +2287,12 @@ class EaTools:
         where = arg_str(args, "where", required=False) or "transcript"
         if where == "file":
             return await read_agent_file(self._seti, task, arg_str(args, "query"))
+        if where == "sources":
+            return await find_sources(self._seti, task, args)
         if where in FILE_SEARCH_MODES:
             return await self._find_in_files(task, FILE_SEARCH_MODES[where], arg_str(args, "query"))
         if where != "transcript":
-            raise ToolError("Set where to transcript, file_names, file_text or file.", "Bad where")
+            raise ToolError("Set where to transcript, file_names, file_text, file or sources.", "Bad where")
         tools = {"tools": "true"} if arg_bool(args, "include_tools") else {}
         query, hits, more = await self._find(f"/tasks/{task.get('id')}/search", args, tools)
         text = self._found(query, f"the transcript of {title_of(task)}", hits, more, FIND_KINDS)

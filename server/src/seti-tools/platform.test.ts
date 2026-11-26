@@ -9,6 +9,7 @@ import { addMcpServer } from '../mcp-actions.js'
 import { setMcpDefault } from '../mcp-selection.js'
 import { addDefaultPlugin, setDefaultPluginEnabled } from '../plugins.js'
 import { auditEvents } from '../store/audit.js'
+import { permissionRules } from '../store/permissions.js'
 import { setiPlugins } from '../store/plugins.js'
 import { SETI_TOOLS } from './catalog.js'
 import { callSetiTool } from './server.js'
@@ -105,5 +106,24 @@ describe('what widens agent reach stays the user', () => {
       'Agents cannot turn default plugins on',
     )
     expect(await setiPlugins.get(off.id)).toMatchObject({ enabled: false })
+  })
+
+  it("reads the permission rules, every agent's or one agent's, and at Self only its own", async () => {
+    const other = { id: randomUUID(), title: 'Rule holder', seti_control: 'self' as const }
+    await tasks.insert({ ...other, repo_id: null, cwd: '/tmp', worktree: false, pr_urls: [] })
+    await permissionRules.add(null, 'ask', 'Bash(git push:*)')
+    await permissionRules.add(other.id, 'allow', 'WebFetch')
+    const every = (await call('get_security_settings', { rules: true })).json()
+    expect(every.rules).toEqual(expect.arrayContaining([expect.objectContaining({ rule: 'Bash(git push:*)' })]))
+    const one = (await call('get_security_settings', { rules: true, task: other.id })).json()
+    expect(one.own).toEqual([expect.objectContaining({ rule: 'WebFetch', behavior: 'allow' })])
+    const self = SETI_TOOLS.find((tool) => tool.name === 'get_security_settings')
+    if (self === undefined) {
+      throw new Error('No get_security_settings')
+    }
+    const own = await callSetiTool(self, other.id, { rules: true, task: other.id })
+    expect(own.isError).toBeUndefined()
+    const reach = await callSetiTool(self, other.id, { rules: true, task: caller.id })
+    expect(reach.isError).toBe(true)
   })
 })

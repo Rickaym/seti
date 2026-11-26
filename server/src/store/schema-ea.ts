@@ -201,3 +201,13 @@ ALTER TABLE ea_settings ADD COLUMN form_of_address TEXT NOT NULL DEFAULT '';
 export const EA_LANGUAGE = `
 ALTER TABLE ea_settings ADD COLUMN language TEXT NOT NULL DEFAULT 'en';
 `
+
+/**
+ * Where the user's yes to an EA question came from: the EA process and user turn of a spoken or
+ * typed yes, empty for a notification Allow; and when an action on the user's word used it.
+ */
+export const EA_ASK_WORD = `
+ALTER TABLE ea_ask ADD COLUMN confirm_epoch TEXT;
+ALTER TABLE ea_ask ADD COLUMN confirm_turn INTEGER;
+ALTER TABLE ea_ask ADD COLUMN used_at TEXT;
+`

@@ -1,6 +1,6 @@
 import path from 'node:path'
 import { reachesProvider } from '@seti/shared'
-import { holdsSum, platformOf, programIn } from './codex-fetch.js'
+import { holdsBuild, platformOf, programIn } from './codex-fetch.js'
 import { CODEX_PIN } from './codex-pin.js'
 import { CODEX_ROOT, DATABASE_URL } from './config.js'
 import { runQuiet, within, type Check } from './doctor.js'
@@ -23,14 +23,14 @@ async function programCheck(program: string | null): Promise<Check> {
     return { section: SECTION, state: 'warn', label, fix: `${RUNTIMES}: clear Own program to use Seti's copy` }
   }
   const copy = programIn(CODEX_ROOT, pinned)
-  const sha256 = (() => {
+  const build = (() => {
     try {
-      return platformOf(CODEX_PIN).sha256
+      return platformOf(CODEX_PIN)
     } catch {
       return null
     }
   })()
-  if (sha256 !== null && (await holdsSum(copy, sha256))) {
+  if (build !== null && (await holdsBuild(CODEX_ROOT, pinned, build))) {
     const label = `Codex ${pinned} installed in ${path.dirname(copy)}, checksum verified`
     return { section: SECTION, state: 'ok', label }
   }
