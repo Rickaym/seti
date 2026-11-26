@@ -1,4 +1,4 @@
-import type { EaAsk, EaAskDecision, EaAskState } from '@seti/shared'
+import { isOnWordTool, type EaAsk, type EaAskDecision, type EaAskState } from '@seti/shared'
 import { audit } from './audit.js'
 import { now } from './db.js'
 import { fromEa, refuseAgent } from './ea-guard.js'
@@ -24,6 +24,10 @@ export async function decideAsk(id: number, decision: EaAskDecision): Promise<Ea
   }
   refuseAgent("answer the EA's questions")
   const at = now()
+  const asked = await eaAsks.get(id, at)
+  if (decision === 'allow' && asked !== undefined && isOnWordTool(asked.tool)) {
+    throw new HttpError(403, 'This needs your own yes to the EA, spoken or typed; an Allow here does not cover it')
+  }
   const result = await eaAsks.decide(id, decision, at)
   if (!result.ok) {
     if (result.state === null) {

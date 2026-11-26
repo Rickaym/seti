@@ -4,7 +4,7 @@ import { modelFallbackMessage } from './model-fallback.js'
 import { stored as codexPayload } from './runtimes/codex/shapes.js'
 import { STORED_RUNTIMES, type StoredRuntime } from './runtimes/stored.js'
 import { setiControlLevel } from './seti-control.js'
-import type { MessageBody } from './tasks.js'
+import { SETTING_NOTES, type MessageBody } from './tasks.js'
 
 type Schemas = ReadonlyMap<string, z.ZodType>
 
@@ -104,6 +104,7 @@ const setiPayload = z.looseObject({
   seti_control: z.union([z.boolean(), setiControlLevel]).optional(),
   seti_control_was: setiControlLevel.optional(),
   bypass: z.boolean().optional(),
+  setting: z.enum(SETTING_NOTES).optional(),
   resumed: z.boolean().optional(),
   timed_out: text.optional(),
   /** A host the agent's sandbox refused, and how many times so far. */
