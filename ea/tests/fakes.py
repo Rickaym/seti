@@ -753,6 +753,7 @@ class FakeSeti:
     )
     team: list[dict[str, Any]] = field(default_factory=list)
     chat_hits: list[dict[str, Any]] = field(default_factory=list)
+    sources: dict[str, Any] = field(default_factory=lambda: {"note": "", "items": [], "more": False})
     chat_more: bool = False
     file_search: dict[str, Any] = field(
         default_factory=lambda: {"mode": "name", "hits": [], "truncated": False, "partial": False}
@@ -1276,6 +1277,8 @@ class FakeSeti:
                 return ok({"hits": self.chat_hits, "has_more": self.chat_more, "total": len(self.chat_hits)})
             case ["tasks", _, "files", "search"]:
                 return ok(self.file_search)
+            case ["tasks", _, "sources"]:
+                return ok(self.sources)
             case ["tasks", _, "files", "roots"]:
                 return ok([{"id": "cwd", "label": "login-app"}, {"id": "workspace", "label": "Workspace"}])
             case ["tasks", _, "files", "resolve"]:

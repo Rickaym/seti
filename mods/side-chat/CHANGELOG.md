@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.2.1
+
+Its routes name the commands the EA runs for the same thing: Ask aside for a question and Clear
+asides for deleting them. Needs mod API 1.25.
+
 ## 1.2.0
 
 Ask aside, /btw and the side chat dock show only on agents whose runtime can fork its conversation
