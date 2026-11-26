@@ -1451,7 +1451,9 @@ Optional and off by default: a maintenance session per agent that consolidates i
   `/settings`, `/rename` and `/dream`, each only where the runtime declares what it needs (RT-13);
   one the runtime lacks says so by name. A setting command wins over a runtime's own command of
   the same name and never reaches the runtime. It makes the request the agent's settings make, so
-  it is refused, applied and audited as there.
+  it is refused, applied and audited as there. The settings' rows, the palette's agent commands and
+  the reply box's commands MUST come from one list of the agent's settings, so none of them offers
+  a setting the others lack.
 - CMD-2: A setting command MUST run only on the user's submit in that agent's reply box of a line
   the user typed or picked there. A line that arrived another way (pasted, dropped, restored,
   handed over, taken back, or submitted by a script) MUST wait in a card with Run and run only on

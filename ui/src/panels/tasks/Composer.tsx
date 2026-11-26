@@ -24,6 +24,7 @@ import { AttachButton, DraftAttachments } from '@/panels/tasks/AttachmentChips'
 import { CommandField, ComposerStatus } from '@/panels/tasks/CommandField'
 import { SettingCommandCard } from '@/panels/tasks/commands/SettingCommandCard'
 import type { CommandHost } from '@/panels/tasks/commands/types'
+import { useCommandPalette } from '@/panels/tasks/commands/useCommandPalette'
 import { useSettingCommand } from '@/panels/tasks/commands/useSettingCommand'
 import { HINTS, hintKey, ROOMY_PX, useWiderThan } from '@/panels/tasks/composer-hints'
 
@@ -183,6 +184,13 @@ export const Composer = memo(function ComposerView({
   const setting = useSettingCommand(host, draft, typedText, (text, byUser) => {
     setDraft(text)
     setTypedText(byUser ? text : null)
+  })
+  useCommandPalette(host.task, (text) => {
+    setDraft(text)
+    setTypedText(text)
+    requestAnimationFrame(() => {
+      box.current?.querySelector('textarea')?.focus()
+    })
   })
   const files = attachments.items.length
   const shell = check.kind === 'shell'
