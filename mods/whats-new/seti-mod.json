@@ -1,8 +1,8 @@
 {
   "id": "whats-new",
   "name": "What's new",
-  "version": "1.0.0",
-  "seti": "^1.17",
+  "version": "1.0.1",
+  "seti": "^1.25",
   "description": "Shows the Seti you run, whether a newer one waits, and what each deploy brought.",
   "author": "Seti",
   "icon": "sparkles",
@@ -15,7 +15,12 @@
       { "method": "GET", "path": "/changelog", "demo": true },
       { "method": "GET", "path": "/status", "demo": true },
       { "method": "GET", "path": "/update" },
-      { "method": "POST", "path": "/seen", "demo": true }
+      {
+        "method": "POST",
+        "path": "/seen",
+        "demo": true,
+        "eaReason": "It marks the notes read once the user has seen them"
+      }
     ]
   }
 }

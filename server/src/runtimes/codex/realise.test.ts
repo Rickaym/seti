@@ -38,6 +38,7 @@ describe('realising a Codex session', () => {
         'model_providers.seti-openai.env_key="SETI_MODEL_KEY"',
         'features.multi_agent=false',
         'features.multi_agent_v2=false',
+        'agents.enabled=false',
       ]),
     )
   })

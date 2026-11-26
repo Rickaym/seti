@@ -267,6 +267,9 @@ export const Composer = memo(function ComposerView({
           value={draft}
           onChange={setDraft}
           onTyped={setTypedText}
+          onPicked={(text) => {
+            setTypedText(typedText === draft ? text : null)
+          }}
           onEscape={() => setting?.dismiss() === true}
           commands={commands}
           label="Reply"
