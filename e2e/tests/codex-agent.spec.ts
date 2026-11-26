@@ -22,7 +22,10 @@ test("a Codex agent's request offers Allow and Deny only, and its settings say w
 
   const reply = main.locator('textarea[placeholder*="! to run a shell command"]')
   await expect(reply).toBeVisible()
-  await expect(reply, 'a Codex agent takes no slash commands').not.toHaveAttribute('placeholder', /\//)
+  await expect(reply, "a Codex agent takes Seti's setting commands").toHaveAttribute(
+    'placeholder',
+    /Start with \/ for a command/,
+  )
   await expect(main.locator('textarea[placeholder*="Esc Esc"]'), 'a Codex agent cannot rewind').toHaveCount(0)
 
   const dialog = await openAgentSettings(page, 'Access')

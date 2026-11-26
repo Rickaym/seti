@@ -19,12 +19,13 @@ export const LINKS = {
   labelled: 'https://example.com/changelog',
 } as const
 
-/** The agent's reply, as the agent wrote it. */
+/** The agent's reply, as the agent wrote it, with each pill's link alone on its line. */
 const REPLY = [
-  `I read the thread at ${LINKS.slack.url} and opened ${LINKS.pr.url}.`,
-  `Setup steps are in ${LINKS.plain.url}. The fix also closes ${LINKS.issue.url}.`,
+  `I read the thread and opened the fix:\n${LINKS.slack.url}\n${LINKS.pr.url}`,
+  `Setup steps are in:\n${LINKS.plain.url}`,
+  `- ${LINKS.issue.url}`,
   `See [the changelog](${LINKS.labelled}) for the release note, and \`${LINKS.code}\` for the endpoint.`,
-  `The full report: ${LINKS.long.url}`,
+  `The full report:\n${LINKS.long.url}`,
   `\`\`\`\ncurl ${LINKS.code}\n\`\`\``,
 ].join('\n\n')
 
@@ -39,22 +40,22 @@ const assistant = (content: unknown[]) => ({
   uuid: randomUUID(),
 })
 
-/** An idle agent whose prompt and reply hold Slack, GitHub, Linear, plain and very long links. */
-export async function seedLinkPills(title: string): Promise<string> {
+/** An idle agent whose prompt and reply are the ones given. */
+export async function seedReply(title: string, reply: string, prompt = PROMPT): Promise<string> {
   const db = openSeedDb()
   const id = randomUUID()
   const start = Date.now() - 5 * 60_000
   await db.idleTask(id, title, paths.checkout, new Date(start).toISOString())
   const rows = [
-    { kind: 'prompt', payload: { text: PROMPT } },
-    { kind: 'sdk', payload: assistant([{ type: 'text', text: REPLY }]) },
+    { kind: 'prompt', payload: { text: prompt } },
+    { kind: 'sdk', payload: assistant([{ type: 'text', text: reply }]) },
     {
       kind: 'sdk',
       payload: {
         type: 'result',
         subtype: 'success',
         is_error: false,
-        result: REPLY,
+        result: reply,
         duration_ms: 4000,
         num_turns: 1,
         total_cost_usd: 0,
@@ -71,3 +72,6 @@ export async function seedLinkPills(title: string): Promise<string> {
   await db.close()
   return id
 }
+
+/** An idle agent whose prompt and reply hold Slack, GitHub, Linear, plain and very long links. */
+export const seedLinkPills = async (title: string): Promise<string> => seedReply(title, REPLY)

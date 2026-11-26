@@ -16,7 +16,8 @@ function reloaded(caps: AgentCapabilities | null): string {
   return `${named.join(', ')} and settings`
 }
 
-function question(task: Task, running: boolean, caps: AgentCapabilities | null): ConfirmOptions {
+/** The question before a restart, with what it ends and loads anew. */
+export function restartQuestion(task: Task, running: boolean, caps: AgentCapabilities | null): ConfirmOptions {
   const effect = `${caps?.label ?? 'The runtime'} for "${task.title}" starts again with its ${reloaded(caps)} loaded anew.`
   return {
     title: 'Restart session',
@@ -27,21 +28,27 @@ function question(task: Task, running: boolean, caps: AgentCapabilities | null):
   }
 }
 
+/** Restarts the agent's session, stopping its turn first when `running`; false when it failed. */
+export async function restartTask(task: Task, running: boolean, onChanged: () => void): Promise<boolean> {
+  try {
+    const body: RestartSessionInput = { interrupt: running }
+    await apiPost(`/tasks/${task.id}/session/restart`, body)
+    toast.success('Session restarted')
+    onChanged()
+    return true
+  } catch (e) {
+    toast.error(errorText(e))
+    return false
+  }
+}
+
 /** Restarts the agent's session after a confirmation; `running` offers to stop the turn first. */
 export function useRestartAction(task: Task, running: boolean, onChanged: () => void) {
   const confirm = useConfirm()
   const caps = useCapabilities(task)
   return async () => {
-    if (!(await confirm(question(task, running, caps)))) {
-      return
-    }
-    try {
-      const body: RestartSessionInput = { interrupt: running }
-      await apiPost(`/tasks/${task.id}/session/restart`, body)
-      toast.success('Session restarted')
-      onChanged()
-    } catch (e) {
-      toast.error(errorText(e))
+    if (await confirm(restartQuestion(task, running, caps))) {
+      await restartTask(task, running, onChanged)
     }
   }
 }

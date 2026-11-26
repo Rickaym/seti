@@ -11,54 +11,13 @@ import { callHash, takeGrant } from './permission-grants.js'
 import { alwaysRules } from './permission-policy.js'
 import { ASK_TOOL, askQuestions } from './questions.js'
 import { addRequestPrs, shellCommand, type PrSource } from './request-prs.js'
+import { describe, reasonOf, summarize } from './request-text.js'
 import { stoppingForRestart } from './restart-state.js'
 import { adapterFor, DEFAULT_RUNTIME } from './runtimes/registry.js'
-import { redactSecrets, scrubValue } from './scrub.js'
-import { slackSendSummary } from './slack/destination.js'
+import { scrubValue } from './scrub.js'
 import { permissionRequests, timeoutSettings } from './store/permissions.js'
 import { setStall, refreshBlocked } from './task-blocked.js'
 import { publish } from './task-events.js'
-
-const SUMMARY_CHARS = 300
-
-const clip = (text: string, max: number) => (text.length > max ? `${text.slice(0, max - 3)}...` : text)
-
-const firstText = (input: Record<string, unknown>, keys: readonly string[]) =>
-  keys.map((key) => input[key]).find((value): value is string => typeof value === 'string' && value.trim() !== '')
-
-const SUMMARY_KEYS = ['command', 'file_path', 'notebook_path', 'url', 'query', 'path', 'pattern', 'description']
-const MESSAGE_KEYS = ['text', 'message', 'body', 'content', 'subject']
-
-/**
- * One line of what the call does, such as its command, file or URL, else its first text field. A
- * Slack send names where it goes, by name when Seti knows it, else saying the name is not known.
- */
-export async function summarize(tool: string, input: Record<string, unknown>): Promise<string> {
-  if (tool === 'ExitPlanMode') {
-    return 'Approve the plan and start on it'
-  }
-  const text = firstText(input, [...SUMMARY_KEYS, ...MESSAGE_KEYS, ...Object.keys(input)]) ?? ''
-  const shown = (await slackSendSummary(tool, input)) ?? text
-  return clip(redactSecrets(shown.replace(/\s+/g, ' ').trim()), SUMMARY_CHARS)
-}
-
-const DESCRIPTION_CHARS = 200
-
-/**
- * What the agent says a shell call is for, as one line of plain text: a Bash call's description,
- * or the one its runtime gave; null when it says nothing.
- */
-function describe(ask: Pick<Ask, 'tool' | 'input' | 'description'>): string | null {
-  const given = ask.tool === 'Bash' ? ask.input.description : undefined
-  const text = ask.description ?? (typeof given === 'string' ? given : '')
-  const line = redactSecrets(
-    text
-      .replace(/[\p{Cc}\p{Cf}]/gu, ' ')
-      .replace(/\s+/g, ' ')
-      .trim(),
-  )
-  return line === '' ? null : clip(line, DESCRIPTION_CHARS)
-}
 
 /** Sets the task's reason line from its pending requests and tells its views about the request. */
 export async function announce(request: PermissionRequest): Promise<void> {
@@ -86,18 +45,11 @@ export async function resolveRequest(request: PermissionRequest, result: Permiss
   return resolve !== undefined
 }
 
+const clip = (text: string, max: number) => (text.length > max ? `${text.slice(0, max - 3)}...` : text)
+
 /** The call's input as a request shows it: secrets redacted, cut to a size the page can show. */
 export function inputText(input: Record<string, unknown>): string {
   return clip(JSON.stringify(scrubValue(input), null, 2), INPUT_CHARS)
-}
-
-type AskOptions = Parameters<CanUseTool>[2]
-
-function reasonOf(options: AskOptions): string | null {
-  const reason = options.decisionReason ?? options.description ?? options.title ?? null
-  const blocked = options.blockedPath === undefined ? '' : `Path: ${options.blockedPath}`
-  const text = [reason ?? '', blocked].filter((part) => part !== '').join('. ')
-  return text === '' ? null : redactSecrets(text)
 }
 
 const DROPPED: Answer = { result: { behavior: 'deny', message: 'The request was dropped.', interrupt: true } }
@@ -298,7 +250,7 @@ const signInMessage = (server: string) =>
 /** Decides each tool call Claude Code would ask about: the user answers a request or a question. */
 export const canUseToolFor =
   (taskId: string, session: AbortSignal) =>
-  async (...[tool, input, options]: Parameters<CanUseTool>): Promise<Answer> => {
+  async (...[tool, input, options, cwd]: [...Parameters<CanUseTool>, cwd?: string]): Promise<Answer> => {
     if (tool === ASK_TOOL) {
       return { result: await askQuestions(taskId, input, options, session) }
     }
@@ -307,13 +259,15 @@ export const canUseToolFor =
       await setStall(taskId, 'mcp', `Sign in to the ${server} MCP server in Seti`)
       return { result: { behavior: 'deny', message: signInMessage(server) } }
     }
-    const held = await askRuleHolds(taskId, tool, input, options).catch(() => false)
+    const held = await askRuleHolds(taskId, tool, input, options).catch(() => null)
+    const command = shellCommand(tool, input)
     const ask: Ask = {
       tool,
       input,
       kind: 'tool',
-      reason: reasonOf(options),
-      suggestions: held ? [] : alwaysRules(tool, input, options),
+      reason: held ?? reasonOf(options, input),
+      suggestions: held === null ? alwaysRules(tool, input, options) : [],
+      ...(command === undefined || cwd === undefined ? {} : { shell: { command, cwd } }),
     }
     return askUser(taskId, ask, [options.signal, session])
   }
@@ -330,7 +284,7 @@ export const askAboutRepeat = async (
 /** Asks the user about a command that pushes outside their organisations; Always adds `PushTo`. */
 export const askAboutPush = async (
   taskId: string,
-  call: { tool: string; input: Record<string, unknown>; reason: string; owners: readonly string[] },
+  call: Pick<Ask, 'tool' | 'input' | 'shell'> & { reason: string; owners: readonly string[] },
   signals: readonly AbortSignal[],
 ): Promise<PermissionResult> => {
   const owners = [...new Set(call.owners)].map((owner) => `PushTo(${owner})`)

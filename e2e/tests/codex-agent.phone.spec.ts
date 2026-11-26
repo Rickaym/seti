@@ -14,5 +14,8 @@ test("a phone shows a Codex agent's request with Allow and Deny only", async ({ 
   await expect(card.getByRole('button', { name: 'Deny' })).toBeInViewport()
   const reply = page.getByRole('main').locator('textarea[placeholder*="shell"]')
   await expect(reply).toBeVisible()
-  await expect(reply, 'a Codex agent takes no slash commands').not.toHaveAttribute('placeholder', /\//)
+  await expect(reply, "a Codex agent takes Seti's setting commands").toHaveAttribute(
+    'placeholder',
+    /\/ (for a )?command/,
+  )
 })

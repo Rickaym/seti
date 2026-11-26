@@ -33,7 +33,13 @@ export async function pushCall(
   if (pushes.length === 0) {
     return {}
   }
-  const asked = { tool: call.tool, input: call.input, reason: pushReason(pushes), owners: ownersOf(pushes) }
+  const asked = {
+    tool: call.tool,
+    input: call.input,
+    reason: pushReason(pushes),
+    owners: ownersOf(pushes),
+    shell: { command, cwd: call.cwd },
+  }
   const answer = await askAboutPush(task.id, asked, [signal])
   if (answer.behavior !== 'deny') {
     return {}
