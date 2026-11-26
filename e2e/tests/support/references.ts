@@ -18,7 +18,7 @@ export const SOURCES = {
 export const QUOTE = 'We ship on Friday, not Thursday.'
 
 /** A reply that cites in every form: links and bare URLs in sentences, a quote, footnotes, `[n]`. */
-export const REPLY = [
+const REPLY = [
   `The deploy moved to Friday after [the release review](${SOURCES.pr.url}), and the thread ${SOURCES.slack.url} agrees.`,
   `> ${QUOTE}`,
   `Dana said so in [the release thread](${SOURCES.slack.url}).`,
