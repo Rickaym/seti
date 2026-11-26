@@ -8,6 +8,9 @@ import { answerChangeRequest } from './change-requests.js'
 import { tasks } from './db.js'
 import { approveKnowledge } from './knowledge-review.js'
 import { answerPermission } from './permission-rules.js'
+import { SETI_TOOLS } from './seti-tools/catalog.js'
+import { toolsFor } from './seti-tools/levels.js'
+import { callSetiTool } from './seti-tools/server.js'
 import { auditEvents } from './store/audit.js'
 import { changeRequests } from './store/change-requests.js'
 import { knowledge } from './store/knowledge.js'
@@ -175,5 +178,36 @@ describe('answering what the Requests panel lists stays the user', () => {
     ).toBe(200)
     const [event] = (await auditEvents.page(auditQuery.parse({ kind: 'task.change_allowed', limit: 1 }))).events
     expect(event).toMatchObject({ actor: 'user', subject_id: task.id, detail: { request_id: access.id } })
+  })
+})
+
+describe("agents' search_seti with requests", () => {
+  const searchSeti = SETI_TOOLS.find((tool) => tool.name === 'search_seti')
+  const asAgentLists = async (callerId: string, args: object) => {
+    if (searchSeti === undefined) {
+      throw new Error('there is no search_seti seti tool')
+    }
+    const result = await callSetiTool(searchSeti, callerId, args)
+    expect(result.isError).toBeUndefined()
+    return JSON.parse(result.content[0]?.text ?? '') as PendingRequests
+  }
+
+  it('lists what waits on the user with each call, for every agent or the one named, at Full', async () => {
+    const caller = await newTask('full')
+    const task = await newTask()
+    const other = await newTask()
+    const seeded = await seed(task)
+    await seed(other)
+    const all = await asAgentLists(caller.id, { requests: true })
+    expect(all.permissions.find((r) => r.id === seeded.plan.id)).toMatchObject({
+      task_title: task.title,
+      input: JSON.stringify({ plan: 'Fix the bug' }),
+      prs: [],
+    })
+    expect(all.access.find((r) => r.id === seeded.access.id)?.reason).toBe('The tests download fixtures from there.')
+    const mine = await asAgentLists(caller.id, { requests: true, task: task.id })
+    expect(mine.permissions.map((r) => r.id)).toEqual([seeded.plan.id])
+    expect(mine.questions.map((q) => q.id)).toEqual([seeded.question.id])
+    expect(toolsFor('self').map((tool) => tool.name)).not.toContain('search_seti')
   })
 })
