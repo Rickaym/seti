@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import type { APIRequestContext, BrowserContext, Page } from '@playwright/test'
+import type { APIRequestContext, BrowserContext, Page, Route } from '@playwright/test'
 import { openSeedDb } from './db.js'
 import { paths } from './env.js'
 import { expect } from './fixtures.js'
@@ -10,11 +10,14 @@ interface Precache {
   lazy: string[]
 }
 
-/** The id of the build a test deploys over the one the server was built with. */
-export const BUILD_B = 'e2e-build-b'
+/** The id of the build a test opens Seti on; deploying brings in the server's own build. */
+export const OLD_BUILD = 'e2e-build-old'
 
-/** A file only build B has; it marks the page that runs it. */
-const CHANGED = '/assets/e2e-changed-B0b1c2d3.js'
+/** A file only the old build has. */
+const OLD_FILE = '/assets/e2e-old-A0b1c2d3.js'
+
+/** A file the new build's page loads; it marks the page that runs the new build. */
+const NEW_FILE = '/assets/e2e-new-B0b1c2d3.js'
 
 /** The build bakes the manifest into sw.js as a JSON string literal passed to JSON.parse. */
 const MANIFEST_LITERAL = /JSON\.parse\(("\{\\"version(?:[^"\\]|\\.)*")\)/
@@ -33,19 +36,43 @@ export async function openControlled(page: Page, hash = ''): Promise<string> {
   return (await pageBuild(page).getAttribute('content')) ?? ''
 }
 
-async function buildB(request: APIRequestContext): Promise<{ page: string; worker: string }> {
-  const html = await (await request.get('/')).text()
-  const served = BUILD_TAG.exec(html)?.[1] ?? ''
-  expect(served, 'build id in index.html').not.toBe('')
-  const page = html
-    .replace(`content="${served}"`, `content="${BUILD_B}"`)
-    .replace('</head>', `<script type="module" src="${CHANGED}"></script></head>`)
-  const script = await (await request.get('/sw.js')).text()
-  const literal = MANIFEST_LITERAL.exec(script)?.[1] ?? ''
-  expect(literal, 'precache manifest in sw.js').not.toBe('')
-  const current = JSON.parse(JSON.parse(literal) as string) as Precache
-  const next: Precache = { version: BUILD_B, urls: [...current.urls, CHANGED], lazy: current.lazy }
-  return { page, worker: script.replace(literal, JSON.stringify(JSON.stringify(next))) }
+type Handler = (route: Route) => Promise<void>
+type Served = [match: (url: URL) => boolean, handler: Handler][]
+
+const NO_CACHE = { 'cache-control': 'no-cache' }
+
+const isPage = (url: URL) => url.pathname === '/' || url.pathname === '/index.html'
+const isWorker = (url: URL) => url.pathname === '/sw.js'
+
+const servePage =
+  (body: string): Handler =>
+  async (route) =>
+    route.fulfill({ body, contentType: 'text/html; charset=utf-8', headers: NO_CACHE })
+
+const serveScript =
+  (body: string): Handler =>
+  async (route) =>
+    route.fulfill({ body, contentType: 'text/javascript', headers: NO_CACHE })
+
+const marker = (name: string) => serveScript(`document.documentElement.dataset.e2eBuild = "${name}"`)
+
+const loading = (html: string, file: string) =>
+  html.replace('</head>', `<script type="module" src="${file}"></script></head>`)
+
+/** Answers /api/system from the server with `build` in place of the server's build. */
+const reporting =
+  (build: string): Handler =>
+  async (route) => {
+    const headers = Object.entries(route.request().headers()).filter(([name]) => name !== 'if-none-match')
+    const response = await route.fetch({ headers: Object.fromEntries(headers) })
+    const body = (await response.json()) as { data: Record<string, unknown> }
+    await route.fulfill({ json: { ...body, data: { ...body.data, build } } })
+  }
+
+async function serve(context: BrowserContext, served: Served): Promise<void> {
+  for (const [match, handler] of served) {
+    await context.route(match, handler)
+  }
 }
 
 interface DeployOptions {
@@ -53,48 +80,61 @@ interface DeployOptions {
   workerOutages?: number
 }
 
-/** Serves build B in place of the built one: its page, worker, a changed file and its build id. */
-export async function deployBuildB(
-  context: BrowserContext,
-  request: APIRequestContext,
-  { workerOutages = 0 }: DeployOptions = {},
-): Promise<{ workerAnswers: number[] }> {
-  const workerAnswers: number[] = []
-  const b = await buildB(request)
-  let outages = workerOutages
-  const noCache = { 'cache-control': 'no-cache' }
-  await context.route(
-    (url) => url.pathname === '/' || url.pathname === '/index.html',
-    async (route) => route.fulfill({ body: b.page, contentType: 'text/html; charset=utf-8', headers: noCache }),
-  )
-  await context.route(
-    (url) => url.pathname === '/sw.js',
-    async (route) => {
-      if (outages > 0) {
-        outages -= 1
-        workerAnswers.push(503)
-        await route.fulfill({ status: 503, body: 'Seti is restarting', headers: noCache })
-        return
-      }
-      workerAnswers.push(200)
-      await route.fulfill({ body: b.worker, contentType: 'text/javascript', headers: noCache })
-    },
-  )
-  await context.route(
-    (url) => url.pathname === CHANGED,
-    async (route) =>
-      route.fulfill({ body: 'document.documentElement.dataset.e2eBuild = "B"', contentType: 'text/javascript' }),
-  )
-  await context.route(
-    (url) => url.pathname === '/api/system',
-    async (route) => {
-      const headers = Object.entries(route.request().headers()).filter(([name]) => name !== 'if-none-match')
-      const response = await route.fetch({ headers: Object.fromEntries(headers) })
-      const body = (await response.json()) as { data: Record<string, unknown> }
-      await route.fulfill({ json: { ...body, data: { ...body.data, build: BUILD_B } } })
-    },
-  )
-  return { workerAnswers }
+export interface Deploy {
+  /** The server's own build, which the deploy brings in. */
+  build: string
+  /** Replaces the old build with the server's own; resolves with each answer to sw.js after it. */
+  run: (options?: DeployOptions) => Promise<{ workerAnswers: number[] }>
+}
+
+/**
+ * Serves an old build in place of the server's own until `run`. The new build is the real one, so
+ * the browser's own update checks of sw.js, which pass by the routes, fetch the new build too.
+ */
+export async function serveOldBuild(context: BrowserContext, request: APIRequestContext): Promise<Deploy> {
+  const html = await (await request.get('/')).text()
+  const build = BUILD_TAG.exec(html)?.[1] ?? ''
+  expect(build, 'build id in index.html').not.toBe('')
+  const worker = await (await request.get('/sw.js')).text()
+  const literal = MANIFEST_LITERAL.exec(worker)?.[1] ?? ''
+  expect(literal, 'precache manifest in sw.js').not.toBe('')
+  const current = JSON.parse(JSON.parse(literal) as string) as Precache
+  const old: Precache = { version: OLD_BUILD, urls: [...current.urls, OLD_FILE], lazy: current.lazy }
+  const before: Served = [
+    [isPage, servePage(loading(html.replace(`content="${build}"`, `content="${OLD_BUILD}"`), OLD_FILE))],
+    [isWorker, serveScript(worker.replace(literal, JSON.stringify(JSON.stringify(old))))],
+    [(url) => url.pathname === OLD_FILE, marker('old')],
+    [(url) => url.pathname === '/api/system', reporting(OLD_BUILD)],
+  ]
+  await serve(context, before)
+
+  const run = async ({ workerOutages = 0 }: DeployOptions = {}) => {
+    for (const [match, handler] of before) {
+      await context.unroute(match, handler)
+    }
+    const workerAnswers: number[] = []
+    let outages = workerOutages
+    await serve(context, [
+      [isPage, servePage(loading(html, NEW_FILE))],
+      [(url) => url.pathname === NEW_FILE, marker('new')],
+      [
+        isWorker,
+        async (route) => {
+          if (outages > 0) {
+            outages -= 1
+            workerAnswers.push(503)
+            await route.fulfill({ status: 503, body: 'Seti is restarting', headers: NO_CACHE })
+            return
+          }
+          const response = await route.fetch()
+          workerAnswers.push(response.status())
+          await route.fulfill({ response })
+        },
+      ],
+    ])
+    return { workerAnswers }
+  }
+  return { build, run }
 }
 
 /** The build of the worker that controls the page, as it answers. */
@@ -115,19 +155,16 @@ const controllerBuild = async (page: Page) =>
       }),
   )
 
-/** Expects the page to run build B, its changed file included. */
-export async function expectPageOnBuildB(page: Page): Promise<void> {
-  await expect(pageBuild(page)).toHaveAttribute('content', BUILD_B, { timeout: 45_000 })
-  await expect(page.locator('html')).toHaveAttribute('data-e2e-build', 'B')
+/** Expects the page to run the deployed build, its own file included. */
+export async function expectPageOnNewBuild(page: Page, deploy: Deploy): Promise<void> {
+  await expect(pageBuild(page)).toHaveAttribute('content', deploy.build, { timeout: 45_000 })
+  await expect(page.locator('html')).toHaveAttribute('data-e2e-build', 'new')
 }
 
-/**
- * Expects the page to run build B under build B's worker. Old caches are not checked: the
- * browser's own update checks of sw.js pass by the routes and fetch the built worker again.
- */
-export async function expectOnBuildB(page: Page): Promise<void> {
-  await expectPageOnBuildB(page)
-  await expect.poll(async () => controllerBuild(page)).toBe(BUILD_B)
+/** Expects the page to run the deployed build under that build's worker. */
+export async function expectOnNewBuild(page: Page, deploy: Deploy): Promise<void> {
+  await expectPageOnNewBuild(page, deploy)
+  await expect.poll(async () => controllerBuild(page)).toBe(deploy.build)
 }
 
 /** Counts the page's loads from now on. */
