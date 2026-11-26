@@ -2,10 +2,11 @@ import { Pencil } from 'lucide-react'
 import { useId } from 'react'
 import { FindableTextarea } from '@/components/find/FindableTextarea'
 import { Button } from '@/components/ui/button'
+import { SlackFieldNote } from '@/panels/tasks/SlackFieldNote'
 import type { CallFieldValues } from '@/panels/tasks/use-call-fields'
 
-/** A box for each text field of the call, labelled with the field's name, while editing. */
-export function CallFields({ fields, editing }: { fields: CallFieldValues; editing: boolean }) {
+/** While editing, a box for each text field of the call, labelled with its name, and Slack names. */
+export function CallFields({ tool, fields, editing }: { tool: string; fields: CallFieldValues; editing: boolean }) {
   const id = useId()
   if (!editing) {
     return null
@@ -26,6 +27,7 @@ export function CallFields({ fields, editing }: { fields: CallFieldValues; editi
               fields.set(key, event.target.value)
             }}
           />
+          <SlackFieldNote tool={tool} field={key} value={value} />
         </div>
       ))}
     </div>

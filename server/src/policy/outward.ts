@@ -93,9 +93,13 @@ function ghFork(args: readonly string[], dir: string | null): Outward[] {
   return org === undefined ? [forked] : [forked, { action: 'fork', where: { owner: org } }]
 }
 
+/** The path a `gh api` call names, without a leading slash; empty when it names none. */
+export const apiEndpoint = (api: readonly string[]): string =>
+  (api[positional(api, 0, [...API_PAIRED, ...API_PAIRED_MORE])] ?? '').replace(/^\//, '')
+
 /** An API write to `repos/<owner>/<repo>/...`; `{owner}` stands for the folder's repository. */
 function ghApi(api: readonly string[], dir: string | null): Outward[] {
-  const endpoint = (api[positional(api, 0, [...API_PAIRED, ...API_PAIRED_MORE])] ?? '').replace(/^\//, '')
+  const endpoint = apiEndpoint(api)
   const repo = /^repos\/([^/?]+)\/([^/?]+)/.exec(endpoint)
   if (!apiWrites(api)) {
     return []
@@ -142,7 +146,7 @@ function rewritesGit(words: readonly string[]): boolean {
 }
 
 /** Why the line's own words could send a push or a gh call elsewhere than Seti reads, if they do. */
-function rerouting(parts: readonly string[]): { git?: string; gh?: string } {
+export function rerouting(parts: readonly string[]): { git?: string; gh?: string } {
   const words = parts.flatMap((part) => rawWords(part).map(unquote))
   const forms = parts.flatMap((part) => denyForms(part).map((form) => rawWords(form).map(unquote)))
   const assigned = words.flatMap((word) => /^([A-Z_]\w*)=/.exec(word)?.[1] ?? [])

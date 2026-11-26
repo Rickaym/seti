@@ -135,3 +135,7 @@ ALTER TABLE permission_request ADD COLUMN editable BOOLEAN NOT NULL DEFAULT fals
 export const PERMISSION_REQUEST_EDITED = `
 ALTER TABLE permission_request ADD COLUMN edited TEXT NOT NULL DEFAULT '[]';
 `
+
+export const PERMISSION_REQUEST_PRS = `
+ALTER TABLE permission_request ADD COLUMN prs TEXT NOT NULL DEFAULT '[]';
+`

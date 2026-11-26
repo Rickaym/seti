@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import type { CanUseTool, PermissionMode, PermissionResult, PermissionUpdate } from '@anthropic-ai/claude-agent-sdk'
 import type { PermissionRequest, PermissionRequestKind } from '@seti/shared'
+import { askRuleHolds } from './ask-rule-held.js'
 import { permissionModeOf } from './bypass-mode.js'
 import { tasks } from './db.js'
 import { editedDenial, type EditedValues } from './edit-notes.js'
@@ -9,6 +10,7 @@ import { INPUT_CHARS, isEditable } from './permission-edits.js'
 import { callHash, takeGrant } from './permission-grants.js'
 import { alwaysRules } from './permission-policy.js'
 import { ASK_TOOL, askQuestions } from './questions.js'
+import { addRequestPrs, shellCommand, type PrSource } from './request-prs.js'
 import { stoppingForRestart } from './restart-state.js'
 import { adapterFor, DEFAULT_RUNTIME } from './runtimes/registry.js'
 import { redactSecrets, scrubValue } from './scrub.js'
@@ -171,6 +173,8 @@ interface Ask {
   suggestions: string[]
   /** Whether the agent's runtime would run the call with input the user edited. */
   rewrites?: boolean
+  /** The shell command whose PRs the request shows, and where it runs; else read from a Bash call. */
+  shell?: PrSource
   /** Told the request's id once it waits for the user. */
   opened?: (id: string) => void
 }
@@ -232,6 +236,7 @@ async function askUser(taskId: string, ask: Ask, signals: readonly AbortSignal[]
     if (waiting.has(id)) {
       ask.opened?.(id)
       await announce(request)
+      showPrs(request, ask)
     } else if (!stoppingForRestart()) {
       await dropRequest(id)
     }
@@ -239,6 +244,17 @@ async function askUser(taskId: string, ask: Ask, signals: readonly AbortSignal[]
   } finally {
     inputs.delete(id)
     waiting.delete(id)
+  }
+}
+
+/** Adds the PRs the call's command names once the request shows, never holding it up. */
+function showPrs(request: PermissionRequest, ask: Ask): void {
+  const command = shellCommand(ask.tool, ask.input)
+  const source = ask.shell ?? (command === undefined ? undefined : { command })
+  if (source !== undefined) {
+    addRequestPrs(request, source, announce).catch((e: unknown) => {
+      process.stderr.write(`permissions: no PRs for request ${request.id}: ${e instanceof Error ? e.name : 'error'}\n`)
+    })
   }
 }
 
@@ -270,12 +286,13 @@ export const canUseToolFor =
       await setStall(taskId, 'mcp', `Sign in to the ${server} MCP server in Seti`)
       return { result: { behavior: 'deny', message: signInMessage(server) } }
     }
+    const held = await askRuleHolds(taskId, tool, input, options).catch(() => false)
     const ask: Ask = {
       tool,
       input,
       kind: 'tool',
       reason: reasonOf(options),
-      suggestions: alwaysRules(tool, input, options),
+      suggestions: held ? [] : alwaysRules(tool, input, options),
     }
     return askUser(taskId, ask, [options.signal, session])
   }
@@ -317,7 +334,7 @@ export type UserAnswer = { allow: true } | { allow: false; message: string; drop
  */
 export async function askCodexUser(
   taskId: string,
-  call: Pick<Ask, 'tool' | 'input' | 'reason' | 'opened'> & { review: boolean },
+  call: Pick<Ask, 'tool' | 'input' | 'reason' | 'opened' | 'shell'> & { review: boolean },
   signals: readonly AbortSignal[],
 ): Promise<UserAnswer> {
   const kind = call.review ? 'review' : 'tool'

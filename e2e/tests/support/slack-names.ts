@@ -106,6 +106,37 @@ export async function expectNameArrivesLive(page: Page, request: APIRequestConte
   await expect(main.getByText(SLACK_POSTED, { exact: true })).toBeVisible()
 }
 
+/**
+ * With the call's fields open, the channel field names its id, follows an edit to another id,
+ * says when a value is not an id, and the message field lists who it mentions by name.
+ */
+export async function expectFieldNames(page: Page, request: APIRequestContext): Promise<void> {
+  await seedSlackNames({ U0E2EDANA01: 'Dana' })
+  const channel = freshChannel()
+  const poster = await startSlackPoster(request, false, `${channel} cc U0E2EDANA01`)
+  await page.goto(`/#agents/${poster}`)
+  const card = page.getByRole('main').getByRole('region', { name: /^Permission request for/ })
+  await expect(card).toContainText(`Send to channel ${channel}, name not known: Deploy done, cc @Dana`)
+  await card.getByRole('button', { name: 'Edit' }).click()
+  const fields = card.getByRole('group', { name: 'Call fields' })
+  const id = fields.getByRole('textbox', { name: 'channel_id' })
+  const notes = fields.getByTestId('slack-field-note')
+  await expect(notes).toHaveText(['Name not known', 'Mentions Dana'])
+  await expect(card.getByRole('button', { name: 'Look up' })).toBeVisible()
+  await card.scrollIntoViewIfNeeded()
+  await shot(page, 'slack-fields-unnamed')
+  await id.fill(SLACK_CHANNEL)
+  await expect(notes.first()).toHaveText('#deploys')
+  await shot(page, 'slack-fields-named')
+  await id.fill('U0E2EDANA01')
+  await expect(notes.first()).toHaveText('DM to Dana')
+  await shot(page, 'slack-fields-dm')
+  await id.fill('deploys')
+  await expect(notes.first()).toHaveText('Not a Slack id')
+  await card.getByRole('button', { name: 'Deny', exact: true }).click()
+  await expect(card).toHaveCount(0)
+}
+
 /** A signed Slack app_mention to a new webhook that reports to the EA; the webhook's id. */
 export async function mentionReachesEa(request: APIRequestContext, baseURL: string): Promise<string> {
   await seedSlackNames({ U0E2ERICKY: 'Ricky', C0E2EOPS01: 'ops' })

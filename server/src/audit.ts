@@ -1,5 +1,7 @@
 import {
   modActor,
+  idsIn,
+  readableSlack,
   slackPlace,
   slackSendTarget,
   type AuditActor,
@@ -136,10 +138,16 @@ function startRetention(): void {
   setInterval(() => void daily(), DAY_MS).unref()
 }
 
-/** A Slack send's summary with the channel or person by name; the detail keeps the id. */
+/** A Slack send's summary with the channel, person and mentions by name; the detail keeps ids. */
 async function withSlackName(call: ToolCall, summary: string): Promise<string> {
   const target = slackSendTarget(call.name, call.input)
-  return target === null ? summary : summary.replace(target, slackPlace(target, await slackNames.of([target])))
+  if (target === null) {
+    return summary
+  }
+  const names = await slackNames.of([target, ...idsIn(summary)])
+  const place = slackPlace(target, names)
+  const where = /^[UW]/.test(target) || (target.startsWith('D') && names.has(target)) ? `DM to ${place}` : place
+  return readableSlack(summary.replace(target, where), names, false)
 }
 
 /** Records the tool calls among a message's events that the runner flagged as outward. */

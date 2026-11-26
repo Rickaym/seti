@@ -130,6 +130,13 @@ describe('Slack names', () => {
     expect(await slackSendSummary(SEND, { channel_id: 'C0UNKNOWN9', message: 'Hi' })).toBe(
       'Send to channel C0UNKNOWN9, name not known: Hi',
     )
+    expect(
+      await slackSendSummary(SEND, { channel_id: 'C0DEPLOY02', message: 'cc <@U0DANA0009> <@U0NOPE0009|Eve>' }),
+    ).toBe('Send to #deploys: cc <@U0DANA0009> <@U0NOPE0009|Eve>')
+    await slackNames.learn([{ id: 'U0DANA0009', kind: 'user', name: 'Dana' }], 'test', now())
+    expect(await slackSendSummary(SEND, { channel_id: 'U0DANA0009', message: 'cc <@U0DANA0009>' })).toBe(
+      'DM to Dana: cc @Dana',
+    )
     expect(await slackSendSummary('Bash', { command: 'ls' })).toBeNull()
   })
 
@@ -150,5 +157,13 @@ describe('Slack names', () => {
     )
     expect(event?.summary).toContain('#audit-room')
     expect(event?.detail.target).toBe('C0AUDIT001')
+    await slackNames.learn([{ id: 'U0AUDIT001', kind: 'user', name: 'Dana' }], 'test', now())
+    const dm = projectClaude(use('a2', SEND, { channel_id: 'U0AUDIT001', message: 'Hi <@U0AUDIT001>' }))
+    await audit.outwardCalls(task, dm, ['a2'])
+    const sent = (await auditEvents.page({ kind: 'agent.outward', limit: 20 })).events.filter(
+      (e) => e.subject_id === task && e.detail.target === 'U0AUDIT001',
+    )
+    expect(sent[0]?.summary).toContain('DM to Dana')
+    expect(sent[0]?.summary).toContain('Hi @Dana')
   })
 })

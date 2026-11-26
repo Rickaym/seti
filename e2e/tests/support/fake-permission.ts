@@ -11,13 +11,17 @@ export const SLACK_PROMPT = 'post the deploy note to Slack once I allow it'
 export const SLACK_CHANNEL = 'C0E2EDEPLOY'
 export const SLACK_POSTED = 'Posted the deploy note.'
 const SLACK_SEND = 'mcp__plugin_slack_slack__slack_send_message'
-/** A Slack channel Seti has never seen named; a prompt that names a channel posts there instead. */
+/** A channel Seti never saw named; a prompt naming a channel posts there, `cc U0...` mentions one. */
 export const SLACK_UNNAMED_CHANNEL = 'C0E2EUNNAMED'
 const CHANNEL_ID = /\bC0[A-Z0-9]{8,}\b/
-const slackInput = (prompt: string) => ({
-  channel_id: CHANNEL_ID.exec(prompt)?.[0] ?? SLACK_CHANNEL,
-  message: 'Deploy done',
-})
+const PERSON_ID = /\bcc (U0[A-Z0-9]{8,})\b/
+const slackInput = (prompt: string) => {
+  const cc = PERSON_ID.exec(prompt)?.[1]
+  return {
+    channel_id: CHANNEL_ID.exec(prompt)?.[0] ?? SLACK_CHANNEL,
+    message: cc === undefined ? 'Deploy done' : `Deploy done, cc <@${cc}>`,
+  }
+}
 /** Asks for a channel search whose answer names the channel id in the prompt `as #name`. */
 export const SLACK_LOOKUP_PROMPT = 'look up the Slack channel'
 const SLACK_SEARCH = 'mcp__plugin_slack_slack__slack_search_channels'
@@ -71,12 +75,23 @@ export type CanUseTool = (
 
 const PERMISSION_INPUT = { command: PERMISSION_COMMAND }
 
-/** Asks Seti to run the deploy no rule allows; returns the tool result and the reply after it. */
-async function askToDeploy(
+/** Asks to run the command that follows it in the prompt, such as one that merges a PR. */
+export const COMMAND_PROMPT = 'run this once I allow it:'
+const commandInput = (prompt: string) => ({
+  command: prompt.slice(prompt.indexOf(COMMAND_PROMPT) + COMMAND_PROMPT.length).trim(),
+})
+
+/** The rule Claude Code offers: a prefix for the deploy, the exact line for any other command. */
+const ruleFor = (command: string) => (command === PERMISSION_COMMAND ? `${command}:*` : command)
+
+/** Asks Seti to run a command no rule allows; returns the tool result and the reply after it. */
+async function askToRun(
   canUseTool: CanUseTool | undefined,
   toolUseId: string,
+  input: Record<string, unknown>,
 ): Promise<{ result: string; reply: string }> {
-  const answer = await canUseTool?.('Bash', PERMISSION_INPUT, {
+  const command = String(input.command)
+  const answer = await canUseTool?.('Bash', input, {
     signal: new AbortController().signal,
     toolUseID: toolUseId,
     requestId: `req_${toolUseId}`,
@@ -86,7 +101,7 @@ async function askToDeploy(
         type: 'addRules',
         behavior: 'allow',
         destination: 'localSettings',
-        rules: [{ toolName: 'Bash', ruleContent: `${PERMISSION_COMMAND}:*` }],
+        rules: [{ toolName: 'Bash', ruleContent: ruleFor(command) }],
       },
     ],
   })
@@ -149,8 +164,9 @@ interface Ask {
   ) => Promise<{ result: string; reply: string }>
 }
 
-const DEPLOY: Ask = { prompt: PERMISSION_PROMPT, tool: 'Bash', input: () => PERMISSION_INPUT, run: askToDeploy }
+const DEPLOY: Ask = { prompt: PERMISSION_PROMPT, tool: 'Bash', input: () => PERMISSION_INPUT, run: askToRun }
 const asks: Ask[] = [
+  { prompt: COMMAND_PROMPT, tool: 'Bash', input: commandInput, run: askToRun },
   { prompt: PLAN_APPROVAL_PROMPT, tool: 'ExitPlanMode', input: () => ({ plan: PLAN_TEXT }), run: askToStart },
   { prompt: SLACK_PROMPT, tool: SLACK_SEND, input: slackInput, run: askToPost },
   { prompt: SLACK_LOOKUP_PROMPT, tool: SLACK_SEARCH, input: lookUpInput, run: searchChannels },

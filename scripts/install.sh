@@ -137,7 +137,7 @@ detect_platform() {
 }
 
 APT_REQUIRED=(git curl ca-certificates build-essential python3 bubblewrap socat openssl util-linux openssh-client)
-APT_OPTIONAL=(gh jq ripgrep fd-find)
+APT_OPTIONAL=(gh jq ripgrep fd-find libnss3-tools)
 APT_PREVIEW=(poppler-utils ffmpeg resvg librsvg2-bin libreoffice-writer-nogui libreoffice-calc-nogui
   libreoffice-impress-nogui)
 

@@ -18,6 +18,7 @@ import { toolLabel } from '@/lib/tool-label'
 import { cn } from '@/lib/utils'
 import { CallFields, EditButton, EditedNote } from '@/panels/tasks/CallFields'
 import { PermissionCountdown } from '@/panels/tasks/PermissionCountdown'
+import { RequestPrs } from '@/panels/tasks/RequestPrs'
 import { SlackLookUp } from '@/panels/tasks/SlackLookUp'
 import { useCallFields } from '@/panels/tasks/use-call-fields'
 
@@ -54,6 +55,16 @@ function Details({ request }: { request: PermissionRequest }) {
         {plan ?? request.input}
       </pre>
     </details>
+  )
+}
+
+/** Why the agent asks, then the pull requests its command names. */
+function Reason({ request }: { request: PermissionRequest }) {
+  return (
+    <>
+      {request.reason !== null && <p className="text-muted-foreground">{request.reason}</p>}
+      <RequestPrs prs={request.prs} />
+    </>
   )
 }
 
@@ -159,8 +170,8 @@ export function PermissionCard({ request, onAnswered, className }: CardProps) {
               {request.summary}
             </code>
           )}
-          {request.reason !== null && <p className="text-muted-foreground">{request.reason}</p>}
-          <CallFields fields={fields} editing={editing} />
+          <Reason request={request} />
+          <CallFields tool={request.tool_name} fields={fields} editing={editing} />
           <Details request={request} />
           {!codex && <DenyNote note={note} onChange={setNote} />}
           <div className="flex flex-wrap items-center gap-1.5 pt-0.5">

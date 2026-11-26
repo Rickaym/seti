@@ -29,6 +29,7 @@ import {
   type Maintenance,
   type SandboxLayout,
 } from './sandbox-mounts.js'
+import { sandboxBrowserDb } from './sandbox-nssdb.js'
 import { prepareSandboxSsh } from './sandbox-ssh-files.js'
 import { homeExcluded, type SandboxContext, sandboxHiddenPaths } from './sandbox.js'
 import { SSH_AGENT_SOCKET, stopSshAgent } from './ssh-agent.js'
@@ -381,6 +382,7 @@ export async function taskSandbox(task: Task, request: SandboxRequest): Promise<
     readOnly: plan.readOnly,
     caDir: '',
     systemBundle: null,
+    browserDb: null,
     hidden: sandboxHiddenPaths(policy, ctx),
     excluded: homeExcluded(ctx),
     pathEnv: process.env.PATH ?? '',
@@ -400,7 +402,9 @@ export async function taskSandbox(task: Task, request: SandboxRequest): Promise<
       ? await grantedReach(task, request, { dir, home: ctx.home, socat })
       : await modelReach(task, request)
   const authority = await sandboxCaPublic()
-  const ready = { ...layout, caDir: authority.publicDir, systemBundle: authority.systemBundle, ssh: reach.ssh }
+  const { publicDir: caDir, systemBundle } = authority
+  const browserDb = sandboxBrowserDb(authority.browserDb, dir)
+  const ready = { ...layout, caDir, systemBundle, browserDb, ssh: reach.ssh }
   const env = sandboxEnv(process.env, ctx.home, reach.options)
   const command = (program: string, args: readonly string[], options: SandboxCommandOptions = {}) => {
     const extra = path.isAbsolute(program) ? [program] : []

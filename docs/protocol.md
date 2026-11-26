@@ -499,6 +499,9 @@ interrupted only for that.
   refuse a name that resolves to a loopback or link-local address.
 - EGR-4: The proxy terminates TLS only for hosts where it adds a credential, with a local CA
   name-constrained to them whose key stays outside the sandbox. Other hosts are tunnelled unread.
+  A sandbox trusts those CAs through the system bundle and the usual CA variables and, when the
+  host has certutil, through its own copy of an NSS database at `~/.pki/nssdb` that holds their
+  certificates only, trusted for TLS servers, so browsers inside trust the proxy too.
 - EGR-5: A placeholder is `seti-secret-<name>-<32 hex>`, in the connection's variable. The proxy
   swaps it for the value in the URL path and headers (Basic auth too), on the connection's hosts
   and port 443 only. A readable request that carries a placeholder elsewhere MUST be refused (403)
@@ -557,10 +560,11 @@ interrupted only for that.
 - PERM-4: Built-in: reads, search and platform tools are allowed; shell and edits inside the
   agent's folders are allowed in the sandbox only; killing by name is denied.
 - PERM-5: Request fields: `id`, `task_id`, `tool_name`, `kind`, `summary`, `input`, `reason`,
-  `suggestions`, `editable`, `state`, `edited` (field names, GRD-8), `created_at`, `timeout_at`,
-  `timed_out`. Decisions:
+  `suggestions`, `editable`, `prs` (PERM-16), `state`, `edited` (field names, GRD-8),
+  `created_at`, `timeout_at`, `timed_out`. Decisions:
   `allow` (this call), `always` (adds the suggested allow rules, scope `agent` or `global`),
-  `deny` (optional message to the agent).
+  `deny` (optional message to the agent). A call an `ask` rule holds has no suggestions and
+  offers no `always`, since an allow rule never lifts an ask rule.
 - PERM-7: Timeout is one install-wide setting: off, 15 min, 1 h (default), 4 h or 24 h from when
   the request was raised. A new value applies to waiting requests.
 - PERM-8: At the deadline the request MUST be denied with `timed_out`. The agent is told nobody
@@ -623,6 +627,21 @@ interrupted only for that.
   viewing, listing or checking a pull request, and GraphQL calls, are not read), and a push to a
   local path does not ask. An allow rule `PushTo(<owner>)`, which only the user adds, lets
   that code-host owner through for every one of these writes; it is never handed to a runtime.
+- PERM-16: A request whose shell command names GitHub pull requests lists each once in `prs`
+  (`url`, `repo`, `number`, `title`, `ci`), and its card shows up to three, then "+N", between the
+  reason and the full input: the repository's short name and number, the title on one line with
+  the whole title in a tooltip, the CI state, and a link that opens the PR. The implementation
+  reads them with the walker of PERM-15: `gh pr` `merge`, `view`, `close`, `reopen`, `ready`,
+  `comment`, `review`, `checks`, `edit` or `diff` with a number, in the repository `-R` or
+  `--repo` names, else the one the folder the command runs in resolves to (the remote
+  `gh repo set-default` chose, else the only GitHub repository its remotes name); a pull request's
+  github.com URL as any argument; and `repos/<owner>/<repo>/pulls/<n>` in `gh api`. A part the
+  shell computes, another host, or a line that sets the code host's repository or host variables
+  or changes remotes gives no pull request rather than a wrong one. The link is built from the
+  owner, repository and number, never taken from the text. The request MUST be shown without
+  waiting on them: the pull requests follow with their links, then title and CI from the data the
+  implementation tracks or one bounded, cached lookup; a failed lookup leaves the link. A request
+  whose command names none is shown as before, on every runtime whose command is known.
 
 ### 7.5 Guards
 
@@ -854,7 +873,11 @@ interrupted only for that.
   that message is shown. A newer sighting replaces the name and when it was last seen. Where Seti
   shows a Slack id (a Slack event's title and text, a thread reply, a Slack send's request summary,
   transcript row and audit summary) it shows the name it knows, else the id and "name not known";
-  it never guesses. A newly learned name replaces "name not known" at once in the summary of each
+  it never guesses. A send to a person reads "DM to <name>", and mentions inside the message read
+  by name where Seti knows it. While a Slack call's fields are open for editing, a field holding a
+  channel or person id shows its name under it, follows an edit to another id, and says when the
+  value is not a Slack id; the message field lists whom it mentions. The editable text stays the
+  literal text the call sends. A newly learned name replaces "name not known" at once in the summary of each
   pending request and in every open transcript. A name shown on a permission request never comes
   from text a message author controls, and says when it was last seen if that was over
   `slack_name_stale` ago. A request for a Slack send to an id with no known name offers Look up,
