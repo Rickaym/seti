@@ -423,6 +423,19 @@ EA-10. The EA posts usage records (numbers and model names, never text) to `ea_u
 days. The language setting reaches Deepgram, ElevenLabs and the prompt; the wake word model knows
 English sounds only.
 
+### How the EA speaks
+
+The EA's manner lives in its base prompt (`ea/src/seti_ea/prompt.py`) and in the short lines Seti
+speaks while its tools run (`ea/src/seti_ea/announce.py`). It gives the answer first and stops. On a
+call it aims for fifteen words, two sentences at most unless the user asks for detail, never reads
+a list aloud and never ends with an offer. In the chat an overview is one line per item. Its tone is
+composed and precise, with dry wit now and then and none about an error, a refusal or security.
+
+The user's request is the EA's yes. It asks first only for tools that take `confirmed` (EA-3,
+EA-4), a public group chat post, stopping several agents at once, and work it proposes itself. It
+refuses a security change rather than asking. An ask is one sentence of effect and a short
+question; in the chat it ends with exactly "Shall I go ahead?", which shows the Yes and No buttons.
+
 ## Reference values
 
 Seti uses every value in [Appendix A](protocol.md#appendix-a-reference-constants) of the
