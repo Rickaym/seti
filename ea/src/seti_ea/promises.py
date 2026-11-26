@@ -84,7 +84,7 @@ def promise_note(sentence: str) -> str:
     return (
         f'{NOTE_PREFIX} you told the user "{sentence}" but called no tool for it, so nothing reached '
         "the agent. Do it now with the tool for it, such as post_team_chat with to for a direct "
-        "message, then say in a line what you sent to whom. If the user's words since then change "
+        "message, then say whom and the gist in a few words. If the user's words since then change "
         "it, or you cannot do it, say so in one sentence instead. Never say you did or will do "
         "something without its tool call in the same reply."
     )
@@ -95,7 +95,7 @@ def relay_note(directive: str, question: str) -> str:
     return (
         f'{NOTE_PREFIX} the user told you to pass this on ("{directive}"), and you asked again '
         f'instead: "{question}". A direct message to an agent needs no yes. Send it now with '
-        "post_team_chat and to, then say in a line what you sent to whom. Ask only when it is "
+        "post_team_chat and to, then say whom and the gist in a few words. Ask only when it is "
         "unclear which agent or what to say; a public post to every agent still needs the yes."
     )
 
