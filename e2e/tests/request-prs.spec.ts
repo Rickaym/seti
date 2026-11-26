@@ -4,6 +4,9 @@ import { expect, test, unique } from './support/fixtures.js'
 import { FAKE_CLAUDE_ENV } from './support/processes.js'
 import {
   addAskRule,
+  described,
+  MERGE_DESCRIPTION,
+  RETRY_TITLE,
   LEASE_TITLE,
   LEASE_URL,
   MERGE,
@@ -71,4 +74,31 @@ test('a command an ask rule holds offers no Always; one without a PR shows no PR
   await page.goto(`/#agents/${data.id}`)
   await expect(requestCard(page).getByRole('button', { name: 'Always' })).toBeVisible()
   await expect(requestCard(page).getByRole('group', { name: 'Pull requests' })).toHaveCount(0)
+})
+
+test("the agent's description reads first, then the command, Seti's reason and a merged PR", async ({
+  page,
+  request,
+}) => {
+  const command = 'gh pr view 2140 -R acme/tool --json state'
+  const id = await startAsking(request, described(command, MERGE_DESCRIPTION))
+  await page.goto('/#agents')
+  const row = page.getByRole('main').getByRole('region', { name: 'Needs you' }).locator(`[data-task-id="${id}"]`)
+  await expect(row).toContainText(`Asks to use Bash: ${MERGE_DESCRIPTION}`)
+  await page.goto(`/#agents/${id}`)
+  const card = requestCard(page)
+  const said = card.getByText(MERGE_DESCRIPTION, { exact: true })
+  const ran = card.locator('code').getByText(command, { exact: true })
+  const reason = card.getByText('No rule allows this command', { exact: true })
+  const top = async (part: typeof said) => (await part.boundingBox())?.y ?? 0
+  await expect(said).toBeVisible()
+  expect(await top(said)).toBeLessThan(await top(ran))
+  expect(await top(ran)).toBeLessThan(await top(reason))
+  const chip = card.getByRole('group', { name: 'Pull request tool#2140' })
+  await expect(chip).toContainText(RETRY_TITLE)
+  await expect(chip.getByRole('img', { name: 'Merged' })).toBeVisible()
+  for (const scheme of ['light', 'dark'] as const) {
+    await page.emulateMedia({ colorScheme: scheme })
+    await card.screenshot({ path: test.info().outputPath(`order-desktop-${scheme}.png`) })
+  }
 })

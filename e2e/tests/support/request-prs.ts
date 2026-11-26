@@ -1,7 +1,7 @@
 import type { APIRequestContext, Page } from '@playwright/test'
 import type { Envelope, Task } from '@seti/shared'
 import { prNode, setFakeGh } from './fake-gh-env.js'
-import { COMMAND_PROMPT } from './fake-permission.js'
+import { COMMAND_PROMPT, DESCRIPTION_MARK } from './fake-permission.js'
 import { apiData, expect, unique } from './fixtures.js'
 
 export const LEASE_TITLE = 'Fix lease renewal after TTL'
@@ -12,10 +12,20 @@ const rollup = (state: 'SUCCESS' | 'FAILURE') => ({
   nodes: [{ commit: { oid: 'abc1234def', statusCheckRollup: { state, contexts: { nodes: [] } } } }],
 })
 
-/** GitHub as the fake gh answers it: the lease fix open with green CI. */
+export const MERGE_DESCRIPTION = 'Merge tool#2136 once its checks pass'
+export const RETRY_URL = 'https://github.com/acme/tool/pull/2140'
+export const RETRY_TITLE = 'Retry lease renewal on 503'
+
+/** GitHub as the fake gh answers it: the lease fix open with green CI, and the retry merged. */
 export function seedLeasePr(): void {
-  setFakeGh('e2e', { [LEASE_URL]: { ...prNode(LEASE_URL, 'OPEN'), title: LEASE_TITLE, commits: rollup('SUCCESS') } })
+  setFakeGh('e2e', {
+    [LEASE_URL]: { ...prNode(LEASE_URL, 'OPEN'), title: LEASE_TITLE, commits: rollup('SUCCESS') },
+    [RETRY_URL]: { ...prNode(RETRY_URL, 'MERGED'), title: RETRY_TITLE, commits: rollup('SUCCESS') },
+  })
 }
+
+/** The command with the description the agent gives it. */
+export const described = (command: string, description: string) => `${command}${DESCRIPTION_MARK}${description}`
 
 /** Starts an agent that asks to run the command, and waits until it is blocked on the request. */
 export async function startAsking(request: APIRequestContext, command: string): Promise<string> {

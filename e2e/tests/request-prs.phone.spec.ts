@@ -4,9 +4,11 @@ import { expectFitsPhone } from './support/phone-layout.js'
 import { FAKE_CLAUDE_ENV } from './support/processes.js'
 import {
   addAskRule,
+  described,
   LEASE_TITLE,
   LEASE_URL,
   MERGE,
+  MERGE_DESCRIPTION,
   requestCard,
   seedLeasePr,
   startAsking,
@@ -52,5 +54,28 @@ test('on a phone five PRs show as three and +2, and an ask rule leaves no Always
     await page.screenshot({ path: test.info().outputPath('request-pr-ask-rule-phone.png') })
   } finally {
     await remove()
+  }
+})
+
+test("on a phone the agent's description reads above the command and the PR line still fits", async ({
+  page,
+  request,
+}) => {
+  const long = `${MERGE_DESCRIPTION}, then tell the release channel and close the tracking issue for the lease work`
+  const id = await startAsking(request, described(MERGE, long))
+  await page.goto(`/#agents/${id}`)
+  const card = requestCard(page)
+  const said = card.getByText(long, { exact: true })
+  await expect(said).toBeVisible()
+  const box = await said.boundingBox()
+  const code = await card.locator('code').first().boundingBox()
+  expect(box?.y ?? 0).toBeLessThan(code?.y ?? 0)
+  expect(box?.height ?? 0, 'two lines at most').toBeLessThanOrEqual(48)
+  await expect(card.getByText('No rule allows this command', { exact: true })).toBeVisible()
+  await expect(card.getByRole('group', { name: 'Pull request tool#2136' })).toContainText(LEASE_TITLE)
+  await expectFitsPhone(page, 'request with a description')
+  for (const scheme of ['light', 'dark'] as const) {
+    await page.emulateMedia({ colorScheme: scheme })
+    await card.screenshot({ path: test.info().outputPath(`order-phone-${scheme}.png`) })
   }
 })
