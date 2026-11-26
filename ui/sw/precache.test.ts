@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { passesThrough, planPrecache, type Precache } from './precache'
+import { fitsKind, passesThrough, planPrecache, type Precache } from './precache'
 
 const PRECACHE: Precache = {
   version: 'next',
@@ -94,5 +94,22 @@ describe('passesThrough', () => {
     for (const pathname of ['/', '/index.html', '/shared', '/apis', '/assets/share-1.js', '/#share']) {
       expect(passesThrough(pathname), pathname).toBe(false)
     }
+  })
+})
+
+describe('fitsKind', () => {
+  it('takes a file in the content type of its kind', () => {
+    expect(fitsKind('/assets/index-NEW00001.js', 'text/javascript; charset=utf-8')).toBe(true)
+    expect(fitsKind('/assets/index-NEW00001.css', 'text/css; charset=utf-8')).toBe(true)
+    expect(fitsKind('/icon-192.png', 'image/png')).toBe(true)
+    expect(fitsKind('/manifest.webmanifest', 'application/manifest+json')).toBe(true)
+    expect(fitsKind('/index.html', 'text/html; charset=utf-8')).toBe(true)
+  })
+
+  it('refuses the app shell in place of a script, a stylesheet or an unknown file', () => {
+    expect(fitsKind('/assets/index-OLD00001.js', 'text/html; charset=UTF-8')).toBe(false)
+    expect(fitsKind('/assets/index-OLD00001.css', 'text/html')).toBe(false)
+    expect(fitsKind('/assets/data-OLD00001.bin', 'text/html')).toBe(false)
+    expect(fitsKind('/assets/index-OLD00001.js', null)).toBe(false)
   })
 })

@@ -46,7 +46,7 @@ function account(windows: [key: string, label: string, used: number][]): Account
 test('sandbox off is a warning icon and auto permission mode is a plain one, each says its state on hover', async ({
   page,
 }) => {
-  const system: SystemInfo = { permission_mode: 'auto', sandbox: { enabled: false, token_mode: 'none' } }
+  const system: SystemInfo = { permission_mode: 'auto', sandbox: { enabled: false, token_mode: 'none' }, build: null }
   await serve(page, '/system', system)
   await page.goto('/#agents')
 
@@ -206,7 +206,7 @@ test('warnings colour their item on the bar, only a critical one fills it, and i
   await page.route('**/api/resources/summary', async (route) =>
     route.fulfill({ json: { data: summary(severity), meta: {} } }),
   )
-  const system: SystemInfo = { permission_mode: 'auto', sandbox: { enabled: true, token_mode: 'agent' } }
+  const system: SystemInfo = { permission_mode: 'auto', sandbox: { enabled: true, token_mode: 'agent' }, build: null }
   await serve(page, '/system', system)
   await page.goto('/#agents')
 

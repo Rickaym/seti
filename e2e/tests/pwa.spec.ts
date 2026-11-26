@@ -2,7 +2,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { chromium, type Page } from '@playwright/test'
-import { expect, loadAssetsThroughNode, test, toasts } from './support/fixtures.js'
+import { expect, loadAssetsThroughNode, test } from './support/fixtures.js'
 
 test.use({ serviceWorkers: 'allow' })
 
@@ -125,7 +125,7 @@ test('Chromium parses the manifest and finds the app installable', async ({ seti
 })
 
 test('the service worker controls the page and never answers for the API', async ({ page }) => {
-  expect(await controlledPage(page)).toMatch(/\/sw\.js$/)
+  expect(await controlledPage(page)).toMatch(/\/sw\.js\?build=\w+$/)
   const api: boolean[] = []
   const assets: boolean[] = []
   page.on('response', (response) => {
@@ -191,15 +191,17 @@ test('share links pass the worker by, so they never get the cached shell', async
   }
 })
 
-test('a waiting worker offers a reload that switches to it', async ({ page }) => {
+test('a waiting worker of the build the page runs takes over without a reload', async ({ page }) => {
   await controlledPage(page)
+  let loads = 0
+  page.on('load', () => {
+    loads += 1
+  })
   await page.evaluate(async () => {
     await navigator.serviceWorker.register('/sw.js?next')
   })
-  const toast = toasts(page).filter({ hasText: 'Seti updated' })
-  await expect(toast).toBeVisible()
-  await Promise.all([page.waitForEvent('load'), toast.getByRole('button', { name: 'Reload' }).click()])
   await expect
     .poll(async () => page.evaluate(() => navigator.serviceWorker.controller?.scriptURL ?? ''))
     .toMatch(/\/sw\.js\?next$/)
+  expect(loads).toBe(0)
 })
