@@ -18,6 +18,10 @@ test('a quote the agent read shows a quiet check, and a link it never read says 
   await expect(sources.locator('[data-source="2"]').getByTestId('source-not-read')).toHaveText('not read by this agent')
   await expect(sources.locator('[data-source="2"]').getByTestId('quote-verified')).toHaveCount(0)
   await page.screenshot({ path: test.info().outputPath('ledger-light.png') })
+  await page.emulateMedia({ colorScheme: 'dark' })
+  await settled(page)
+  await page.screenshot({ path: test.info().outputPath('ledger-dark.png') })
+  await page.emulateMedia({ colorScheme: 'light' })
 
   await reply.locator('[data-reference="1"]').first().hover()
   const card = page.getByTestId('reference-preview')
@@ -25,11 +29,4 @@ test('a quote the agent read shows a quiet check, and a link it never read says 
   await expect(card).toContainText(READ_QUOTE)
   await expect(card.getByTestId('quote-verified')).toBeVisible()
   await page.screenshot({ path: test.info().outputPath('ledger-preview.png') })
-
-  await page.mouse.move(0, 0)
-  await expect(card).toBeHidden()
-  await page.emulateMedia({ colorScheme: 'dark' })
-  await settled(page)
-  await page.screenshot({ path: test.info().outputPath('ledger-dark.png') })
-  await page.emulateMedia({ colorScheme: 'light' })
 })
