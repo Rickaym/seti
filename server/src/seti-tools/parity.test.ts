@@ -2,12 +2,19 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { AGENT_COLOR_ALIASES, AGENT_COLOR_PRESETS, modManifest, modToolName } from '@seti/shared'
 import { describe, expect, it } from 'vitest'
+import { createApp } from '../app.js'
 import { BUNDLED_MODS, modHost, TEST_MODS } from '../mods/bundled.js'
 import { modCommands } from '../mods/points.js'
 import { SETI_TOOLS } from './catalog.js'
 import { KNOWLEDGE_TOOLS } from './knowledge.js'
+import { toolsFor } from './levels.js'
 import { modActionTools } from './mod-actions.js'
 import { REQUEST_TOOLS, SECRET_TOOLS } from './requests.js'
+import { EA_ROUTES } from './route-coverage/ea.js'
+import { PRINCIPLES, type Coverage } from './route-coverage/kinds.js'
+import { PLATFORM_ROUTES } from './route-coverage/platform.js'
+import { SECURITY_ROUTES } from './route-coverage/security.js'
+import { TASKS_ROUTES } from './route-coverage/tasks.js'
 import { OPINION_TOOLS } from './second-opinion.js'
 import { HANDOFF_TOOLS } from './team.js'
 
@@ -76,12 +83,18 @@ const USER_ONLY: Record<string, RegExp> = {
   "Publishing data outside Seti is the user's call.": /share|publish/,
 }
 
-/** Every tool name the EA declares, reading ToolSpec("name", ...) and ToolSpec(CONSTANT, ...). */
-function eaToolNames(): string[] {
-  const sources = fs
+/** Known gaps in the route registry; a PR that closes one lowers it, one that adds one raises it. */
+const GAPS_LEFT = 27
+
+const eaSources = () =>
+  fs
     .readdirSync(EA_SOURCES)
     .filter((file) => file.endsWith('.py'))
     .map((file) => fs.readFileSync(path.join(EA_SOURCES, file), 'utf8'))
+
+/** Every tool name the EA declares, reading ToolSpec("name", ...) and ToolSpec(CONSTANT, ...). */
+function eaToolNames(): string[] {
+  const sources = eaSources()
   const constants = new Map(
     sources.flatMap((source) => [...source.matchAll(/^([A-Z_]+) = "(\w+)"$/gm)].map((m) => [m[1], m[2]] as const)),
   )
@@ -159,5 +172,116 @@ describe('seti tools', () => {
     const names = SETI_TOOLS.map((tool) => tool.name)
     expect(new Set(names).size).toBe(names.length)
     expect(SETI_TOOLS.filter((tool) => tool.description.trim().length < 20).map((tool) => tool.name)).toEqual([])
+  })
+})
+
+const ROUTE_TABLES = [EA_ROUTES, TASKS_ROUTES, SECURITY_ROUTES, PLATFORM_ROUTES]
+const ROUTES: Readonly<Record<string, Coverage>> = Object.fromEntries(ROUTE_TABLES.flatMap(Object.entries))
+
+/** The method and path of every route the app serves, middleware left out. */
+function mountedRoutes(): string[] {
+  const keys = createApp()
+    .routes.filter((route) => route.method !== 'ALL')
+    .map((route) => `${route.method} ${route.path}`)
+  return [...new Set(keys)]
+}
+
+/** A path the EA's sources call, with the method when the call names one. */
+interface EaPath {
+  method: string | null
+  pattern: RegExp
+}
+
+const CALL = /\.(get|post|put|patch|delete)\(\s{0,40}f?"([^"\n]{0,300})"/g
+const LITERAL = /f?"([^"\n]*)"/g
+const PLACEHOLDER = /\{[^{}]*\}/g
+
+/** A path such as /tasks/{id}/stop or {base}/roots: slashes, words and placeholders only. */
+function pathShaped(text: string): boolean {
+  const shape = text.replace(PLACEHOLDER, '{}')
+  return /^[/{][\w/{}-]*$/.test(shape) && /\/[a-z]/.test(shape) && !/\}[^/]/.test(shape)
+}
+
+const escaped = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
+/** A Python f-string path as a pattern, each {placeholder} standing for one or more path parts. */
+const pathPattern = (text: string) => new RegExp(`^${text.split(PLACEHOLDER).map(escaped).join('.+')}$`)
+
+function eaPaths(): EaPath[] {
+  return eaSources().flatMap((source) => {
+    const calls = [...source.matchAll(CALL)].map((m) => ({ method: (m[1] ?? '').toUpperCase(), text: m[2] ?? '' }))
+    const others = [...source.replace(CALL, '').matchAll(LITERAL)].map((m) => ({ method: null, text: m[1] ?? '' }))
+    return [...calls, ...others]
+      .filter(({ text }) => pathShaped(text))
+      .map(({ method, text }) => ({ method, pattern: pathPattern(text) }))
+  })
+}
+
+/** True when the EA calls the route: its path, with its method where the call names one. */
+function eaCalls(paths: readonly EaPath[], route: string): boolean {
+  const [method, full = ''] = route.split(' ')
+  const sample = full.replace(/^\/api/, '').replace(/:\w+/g, 'x')
+  return paths.some((known) => (known.method === null || known.method === method) && known.pattern.test(sample))
+}
+
+/** The tool a route ends at, following same routes; null when the chain ends anywhere else. */
+function toolOf(route: string, seen: readonly string[] = []): Coverage | null {
+  const coverage = ROUTES[route]
+  if (coverage === undefined || seen.includes(route)) {
+    return null
+  }
+  return coverage.kind === 'same' ? toolOf(coverage.route, [...seen, route]) : coverage
+}
+
+const entriesOf = (kind: Coverage['kind']) => Object.entries(ROUTES).filter(([, coverage]) => coverage.kind === kind)
+
+describe('the route registry', () => {
+  it('declares every route the app serves once, and no route it does not serve', () => {
+    const routes = mountedRoutes()
+    expect(routes.length).toBeGreaterThan(400)
+    expect(ROUTE_TABLES.reduce((sum, table) => sum + Object.keys(table).length, 0)).toBe(Object.keys(ROUTES).length)
+    expect(
+      routes.filter((route) => !(route in ROUTES)),
+      'Declare each new route in seti-tools/route-coverage: an EA tool, a seti tool or why not',
+    ).toEqual([])
+    expect(Object.keys(ROUTES).filter((route) => !routes.includes(route))).toEqual([])
+  })
+
+  it('names EA tools that exist and whose sources call the route', () => {
+    const tools = new Set(eaToolNames())
+    const paths = eaPaths()
+    const wrong = entriesOf('ea').filter(
+      ([route, coverage]) => coverage.kind === 'ea' && !(tools.has(coverage.tool) && eaCalls(paths, route)),
+    )
+    expect(wrong.map(([route]) => route)).toEqual([])
+  })
+
+  it('names seti tools at a level that has them', () => {
+    const wrong = entriesOf('agent').filter(
+      ([, coverage]) =>
+        coverage.kind === 'agent' && !toolsFor(coverage.level).some((tool) => tool.name === coverage.tool),
+    )
+    expect(wrong.map(([route]) => route)).toEqual([])
+  })
+
+  it('leads every route declared the same as another to a tool', () => {
+    const wrong = entriesOf('same').filter(([route]) => {
+      const end = toolOf(route)
+      return end?.kind !== 'ea' && end?.kind !== 'agent'
+    })
+    expect(wrong.map(([route]) => route)).toEqual([])
+  })
+
+  it('gives every route kept from the EA and agents a principle and a reason', () => {
+    const reasons = Object.entries(ROUTES).flatMap(([route, coverage]) =>
+      'why' in coverage ? [[route, coverage.why] as const] : [],
+    )
+    expect(reasons.filter(([, why]) => why.trim().length < 12).map(([route]) => route)).toEqual([])
+    const principles = entriesOf('user').filter(([, c]) => c.kind === 'user' && !(c.principle in PRINCIPLES))
+    expect(principles.map(([route]) => route)).toEqual([])
+  })
+
+  it('holds the known gaps at GAPS_LEFT', () => {
+    expect(entriesOf('gap')).toHaveLength(GAPS_LEFT)
   })
 })
