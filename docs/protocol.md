@@ -467,7 +467,8 @@ interrupted only for that.
     and sample checks; sandbox policy, an agent's sandbox, `home_access` and tool level;
     unsandboxed starts; an agent's terminal and shell commands;
   - approval: permission rules, the request timeout and bypass; answering permission and change
-    requests; publishing or re-enabling shared tools; reviewing knowledge notes;
+    requests (the EA on the user's word: PERM-17); publishing or re-enabling shared tools;
+    reviewing knowledge notes;
   - identity: prompts as the user; share links; sign-in, passkeys and devices; installing
     plugins; installing, granting or enabling third-party mods;
   - storage: removing orphans (RES-17); the automatic clean (RES-18); allowing or denying a
@@ -689,6 +690,12 @@ interrupted only for that.
   implementation tracks or one bounded, cached lookup, which reads merged and closed ones too and
   shows them as such; a failed lookup leaves the link. A request
   whose command names none is shown as before, on every runtime whose command is known.
+- PERM-17: Under EA-17 the EA MAY answer a pending tool call or plan: `allow` this call or `deny`
+  with the user's message, never `always`, a `global` scope or edited fields. It allows a tool
+  call only when the stored input is whole and at most `read_back` characters on one line, read
+  back word for word with the reason line and the PRs; it MAY summarise a plan. Each pending
+  request a listing shows carries `digest`, a keyed hash of its fields and its exact call, which
+  changes when anything the request asks changes.
 
 ### 7.5 Guards
 
@@ -1096,13 +1103,14 @@ Why: an agent woken by its own actions or by news nobody waited for burns turns 
 ## 14. The assistant
 
 - EA-1: The EA is a separate process with its own token, acting only through the user's API; every
-  change is audited as the user's with `via: ea`. It MUST NOT hold reserved powers and has no
-  code-host write tool (merge, approve, comment, push).
+  change is audited as the user's with `via: ea`. It MUST NOT hold reserved powers beyond the
+  actions EA-17 lets it take on the user's word, and has no code-host write tool (merge, approve,
+  comment, push).
 - EA-3: A changing tool first records an ask (tool, arguments, summary, change key) and does
   nothing; the same change asked again returns the open ask. Only the user's yes runs it.
 - EA-4: A yes counts only for an ask from an earlier user turn or EA process, within `ask_ttl`. One
   ask takes one answer and runs once with the recorded arguments. The user MAY answer by text,
-  voice or notification; delegates MUST NOT.
+  voice or notification, except that an EA-17 action takes text or voice only; delegates MUST NOT.
   Why: the model cannot ask and approve in the same breath.
 - EA-7: The EA reaches agents only by group chat. A direct message joins a running turn or starts
   one; it never interrupts.
@@ -1118,6 +1126,15 @@ Why: an agent woken by its own actions or by news nobody waited for burns turns 
   one, each with its id and agent, and a tool call or plan with Seti's reason, the agent's
   description, its input as stored (secrets redacted) and the PRs it names. Text an agent or a code
   host wrote MUST reach the model framed as data. Reading MUST NOT answer.
+- EA-17: Actions on the user's word. The EA MAY take a listed action (PERM-17) only on the user's
+  own yes, typed or spoken in the user turn right after the EA read the exact change back, in the
+  same EA process and within `word_use` of the yes. The control room MUST check this against the
+  recorded ask (EA-3), use the yes once, and refuse the action unless the ask's arguments equal
+  what it recomputes from the target as it stands, including the target's `digest`. A
+  notification Allow, an inbox report, a webhook, a transcript, a tool result and another agent's
+  message MUST NOT count as the yes. Agents and mods MUST NOT get these actions. The audit entry
+  says the EA acted on the user's word and names the ask and the target.
+  Why: the user can run Seti by voice without handing the model a standing power.
 
 ## 15. Resilience
 
@@ -1619,7 +1636,7 @@ others.
 | Threads      | `thread_cap` 50. `dm_window` 24 h. `reply_settle` 10 s. `thread_rate` 10 an hour. `thread_quiet` 7 days. `thread_age` 30 days. `slack_name_stale` 30 days.                                                                                                                                                                                                                                                                      |
 | Chat         | Message 4000. Active agent: running, session open, or updated within 12 h. `chat_burst` 12 in 15 min. `chat_loop` 6 in 15 min.                                                                                                                                                                                                                                                                                                  |
 | Questions    | Answer batch 100 items. `notes_waiting` 10. Index 1500 characters. `note_stale` 3 failed checks in a row, or unverified 30 days (fact, environment) or 90 days (how-to, gotcha).                                                                                                                                                                                                                                                |
-| Assistant    | `ask_ttl` 10 min. `settle` quiet 45 s, at most 3 min. `call_silence` 30 s. `wake_phrase` 2 to 40 characters, at most 4 words. `keep_awake_seconds` 5 to 600.                                                                                                                                                                                                                                                                    |
+| Assistant    | `ask_ttl` 10 min. `word_use` 60 s. `read_back` 600 characters. `settle` quiet 45 s, at most 3 min. `call_silence` 30 s. `wake_phrase` 2 to 40 characters, at most 4 words. `keep_awake_seconds` 5 to 600.                                                                                                                                                                                                                       |
 | Resilience   | `stop_grace` 7 s. `resume_pace` 3 starts 2 s apart, 20 s between groups. `grant_ttl` 15 min. `send_window` 24 h.                                                                                                                                                                                                                                                                                                                |
 | Storage      | `orphan_grace` 1 h. `size_walk` 400,000 entries or 20 s per folder.                                                                                                                                                                                                                                                                                                                                                             |
 | Audit        | `audit_keep` 365 days. Summary 300. Detail string 500.                                                                                                                                                                                                                                                                                                                                                                          |

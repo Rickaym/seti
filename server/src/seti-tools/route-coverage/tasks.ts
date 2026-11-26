@@ -1,4 +1,4 @@
-import { ea, gap, same, ui, user, type CoverageTable } from './kinds.js'
+import { ea, eaOnWord, gap, same, ui, user, type CoverageTable } from './kinds.js'
 
 /** Routes under /api/tasks: one agent and what it holds. */
 export const TASKS_ROUTES: CoverageTable = {
@@ -59,9 +59,10 @@ export const TASKS_ROUTES: CoverageTable = {
   'POST /api/tasks/:id/model/switch-back': ea('retry_agent_turn'),
   'GET /api/tasks/:id/own-message': ui("The user's queued message for editing. The user's own prompt box"),
   'GET /api/tasks/:id/permission-requests': same('GET /api/requests'),
-  'POST /api/tasks/:id/permission-requests/:request_id': user(
-    'security',
-    'Allow, always allow or deny a tool call or plan. Answering is an access decision',
+  'POST /api/tasks/:id/permission-requests/:request_id': eaOnWord(
+    'answer_question',
+    "Allow a held tool call once, approve a plan, or deny either with a message (owner's C table, " +
+      "section 1). Always allow, a rule for every agent and edited fields stay the user's",
   ),
   'GET /api/tasks/:id/permissions': gap("One agent's permission rules. Read"),
   'PUT /api/tasks/:id/permissions/bypass': user('security', 'Bypass on or off. Security setting'),
