@@ -48,8 +48,9 @@ describe("Seti's own copy of Codex", () => {
     const program = path.join(dirOf('1.0.1'), 'codex')
     expect(await copyState(pin)).toEqual({ state: 'ready', program })
     expect(registry.ranges, 'two asks at once fetch once').toEqual([null])
-    expect(fs.readdirSync(dirOf('1.0.1'))).toEqual(['codex'])
+    expect(new Set(fs.readdirSync(dirOf('1.0.1')))).toEqual(new Set(['codex', 'codex-code-mode-host']))
     expect(fs.statSync(program).mode & 0o777).toBe(0o500)
+    expect(fs.statSync(path.join(dirOf('1.0.1'), 'codex-code-mode-host')).mode & 0o777).toBe(0o500)
     expect(fs.statSync(dirOf('1.0.1')).mode & 0o777).toBe(0o500)
     expect(() => {
       fs.writeFileSync(path.join(dirOf('1.0.1'), 'codex-path'), '')
@@ -94,6 +95,29 @@ describe("Seti's own copy of Codex", () => {
     expect(fs.existsSync(dirOf('1.0.3'))).toBe(false)
     expect(fs.existsSync(stagingOf('1.0.3'))).toBe(false)
     expect(fs.existsSync(marker)).toBe(false)
+  })
+
+  it('refuses a code mode host that fails its sha256, and installs nothing', async () => {
+    const pin = registry.pin(fakeBuild(scratch, '1.0.11', '/bin/sleep'), { hostSha256: 'f'.repeat(64) })
+    await installCodex('system', pin)
+    expect(await copyState(pin)).toMatchObject({
+      state: 'failed',
+      failure: { reason: 'checksum', message: expect.stringContaining('code mode host') as string },
+    })
+    expect(fs.existsSync(dirOf('1.0.11'))).toBe(false)
+    expect(fs.existsSync(stagingOf('1.0.11'))).toBe(false)
+  })
+
+  it('fetches again a copy installed before Codex needed its code mode host', async () => {
+    const pin = registry.pin(fakeBuild(scratch, '1.0.12', '/bin/sleep'))
+    await installCodex('user', pin)
+    const host = path.join(dirOf('1.0.12'), 'codex-code-mode-host')
+    fs.chmodSync(dirOf('1.0.12'), 0o700)
+    fs.rmSync(host)
+    expect(await copyState(pin)).toMatchObject({ state: 'failed' })
+    await installCodex('system', pin)
+    expect(await copyState(pin)).toMatchObject({ state: 'ready' })
+    expect(fs.existsSync(host)).toBe(true)
   })
 
   it('fails a cut download as a network failure, and the next try finishes it', async () => {
