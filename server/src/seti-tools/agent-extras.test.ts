@@ -49,3 +49,14 @@ describe("agents' agent_access without an agent", () => {
     expect(items.every((entry) => typeof entry.default_enabled === 'boolean')).toBe(true)
   })
 })
+
+describe("agents' search_audit with chain", () => {
+  it('says whether the hash chain verifies', async () => {
+    const result = JSON.parse((await call('search_audit', { chain: true })).text) as {
+      retention_days: number
+      chain: { ok: boolean }
+    }
+    expect(result.chain.ok).toBe(true)
+    expect(result.retention_days).toBeGreaterThan(0)
+  })
+})

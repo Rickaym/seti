@@ -407,3 +407,19 @@ async def test_tool_specs_are_valid_json_schema(tools: EaTools) -> None:
         for prop in spec.properties.values():
             assert prop["type"] in {"string", "boolean", "array", "integer"}
             assert prop["description"]
+
+
+async def test_search_audit_says_whether_the_hash_chain_verifies(tools: EaTools, fake_seti: FakeSeti) -> None:
+    intact = await tools.call("search_audit", {"chain": True})
+    assert intact.text == "The audit log's hash chain verifies: 42 events checked. Events are kept 90 days."
+    fake_seti.audit_chain = {
+        "ok": False,
+        "checked": 9,
+        "broken_at": 7,
+        "problem": "the hash of event 7 differs",
+    }
+    broken = await tools.call("search_audit", {"chain": True})
+    assert not broken.ok
+    assert broken.text.startswith(
+        "The audit log's hash chain is broken at event 7: the hash of event 7 differs."
+    )

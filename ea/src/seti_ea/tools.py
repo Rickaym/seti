@@ -432,6 +432,10 @@ TOOL_SPECS: list[ToolSpec] = [
                 "description": "The user's timezone from the time note, for today, yesterday and this week.",
             },
             "limit": {"type": "integer", "description": "How many events to list, 1 to 25. Default 10."},
+            "chain": {
+                "type": "boolean",
+                "description": "Instead, whether the log's hash chain verifies and how long events are kept.",
+            },
         },
     ),
     ToolSpec(
@@ -1621,6 +1625,21 @@ class EaTools:
                 lines.append(f"And {len(related) - 5} more not listed.")
         return ToolResult("\n".join(lines), f"Read {label}")
 
+    async def _audit_chain(self) -> ToolResult:
+        status = await self._seti.get("/audit/status")
+        fields = status if isinstance(status, dict) else {}
+        chain = fields.get("chain") if isinstance(fields.get("chain"), dict) else {}
+        kept = f"Events are kept {fields.get('retention_days')} days."
+        if chain.get("ok") is True:
+            text = f"The audit log's hash chain verifies: {chain.get('checked')} events checked. {kept}"
+            return ToolResult(text, "Audit chain intact")
+        problem = chain.get("problem") or "a link does not match"
+        text = (
+            f"The audit log's hash chain is broken at event {chain.get('broken_at')}: {problem}. "
+            f"Tell the user; Settings, Audit shows it. {kept}"
+        )
+        return ToolResult(text, "Audit chain broken", ok=False)
+
     async def _audit_scan(
         self,
         params: dict[str, str | int],
@@ -1664,6 +1683,8 @@ class EaTools:
         return f"- {ago(event.get('at'), now)}, {who}: {text}"
 
     async def search_audit(self, args: Mapping[str, Any]) -> ToolResult:
+        if arg_bool(args, "chain"):
+            return await self._audit_chain()
         area = audit_kind(arg_str(args, "area", required=False))
         actor = normalize(arg_str(args, "actor", required=False))
         actor = ACTOR_ALIASES.get(actor, actor)
