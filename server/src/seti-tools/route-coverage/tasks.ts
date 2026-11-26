@@ -90,6 +90,7 @@ export const TASKS_ROUTES: CoverageTable = {
   'POST /api/tasks/:id/seen': ui('Mark an agent seen. View state'),
   'POST /api/tasks/:id/session/end': ea('stop_background_work'),
   'POST /api/tasks/:id/session/restart': ea('restart_agent_session'),
+  'GET /api/tasks/:id/sources': ea('find_in_transcript'),
   'POST /api/tasks/:id/sources': ui(
     'Checks the links one message cites against what the agent read, for the chat view',
   ),

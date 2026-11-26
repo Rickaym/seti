@@ -9,6 +9,7 @@ import { findBinary } from './binaries.js'
 import type { CodexPin } from './codex-fetch.js'
 
 const MEMBER = 'package/vendor/test/bin/codex'
+const HOST_MEMBER = 'package/vendor/test/bin/codex-code-mode-host'
 const PLATFORM = `${process.platform}-${process.arch}`
 
 /** A Codex build a test registry serves: the tarball's bytes and the checksums a pin names. */
@@ -17,18 +18,25 @@ export interface FakeBuild {
   tarball: Buffer
   integrity: string
   sha256: string
+  hostSha256: string
 }
 
 /**
- * Packs `program` (a file's path) as the binary of a registry tarball for `version`, the way the
- * npm package lays it out.
+ * Packs `program` (a file's path) as the binary of a registry tarball for `version`, beside the
+ * code mode host at `host` or a stand-in, the way the npm package lays them out.
  */
-export function fakeBuild(scratch: string, version: string, program: string): FakeBuild {
+export function fakeBuild(scratch: string, version: string, program: string, host?: string): FakeBuild {
   const dir = fs.mkdtempSync(path.join(scratch, 'build-'))
   const binary = path.join(dir, MEMBER)
   fs.mkdirSync(path.dirname(binary), { recursive: true })
   fs.copyFileSync(program, binary)
   fs.chmodSync(binary, 0o700)
+  const packedHost = path.join(dir, HOST_MEMBER)
+  if (host === undefined) {
+    fs.writeFileSync(packedHost, `#!/bin/sh\n# code mode host ${version}\n`, { mode: 0o700 })
+  } else {
+    fs.copyFileSync(host, packedHost)
+  }
   const tar = path.join(dir, 'codex.tar')
   execFileSync(findBinary('tar'), ['-cf', tar, '-C', dir, 'package'])
   const tarball = gzipSync(fs.readFileSync(tar), { level: 1 })
@@ -38,6 +46,7 @@ export function fakeBuild(scratch: string, version: string, program: string): Fa
     tarball,
     integrity: `sha512-${createHash('sha512').update(tarball).digest('base64')}`,
     sha256: createHash('sha256').update(fs.readFileSync(binary)).digest('hex'),
+    hostSha256: createHash('sha256').update(fs.readFileSync(packedHost)).digest('hex'),
   }
 }
 
@@ -74,7 +83,7 @@ export class FakeRegistry {
   }
 
   /** The pin a Seti under test installs `build` from, with its checksums changed when asked. */
-  pin(build: FakeBuild, change: { integrity?: string; sha256?: string } = {}): CodexPin {
+  pin(build: FakeBuild, change: { integrity?: string; sha256?: string; hostSha256?: string } = {}): CodexPin {
     this.builds.set(build.version, build)
     return {
       version: build.version,
@@ -84,6 +93,7 @@ export class FakeRegistry {
           integrity: change.integrity ?? build.integrity,
           binary: MEMBER,
           sha256: change.sha256 ?? build.sha256,
+          host: { member: HOST_MEMBER, sha256: change.hostSha256 ?? build.hostSha256 },
         },
       },
     }

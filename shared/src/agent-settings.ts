@@ -1,8 +1,11 @@
 import { parseComposer, type ComposerCommand } from './commands.js'
 import { meetsNeeds, type AgentCapabilities, type AgentCapabilityName } from './runtimes/capabilities.js'
 
-/** Where a setting sits in the agent's settings; null for a command that is not a row there. */
-export type AgentSettingPlace = 'general' | 'access' | 'team' | 'session' | 'footer' | 'menu'
+/**
+ * Where a setting sits: a tab of the agent's settings, their footer, the access dialog or the
+ * agent's menu; null for a command that is no row anywhere.
+ */
+export type AgentSettingPlace = AgentSettingTab | 'footer' | 'dialog' | 'menu'
 
 /** The tabs of the agent's settings, which `/settings` opens. */
 export const AGENT_SETTING_TABS = ['general', 'access', 'team', 'session'] as const
@@ -39,21 +42,26 @@ const command = (name: string, description: string, argumentHint = ''): AgentSet
   argumentHint,
 })
 
-const setting = (id: string, label: string, place: AgentSettingPlace | null, kind: AgentSettingKind): AgentSetting => ({
+const setting = <const I extends string, const P extends AgentSettingPlace | null>(
+  id: I,
+  label: string,
+  place: P,
+  kind: AgentSettingKind,
+) => ({
   id,
   label,
   place,
   kind,
   security: false,
-  applies: 'now',
-  needs: [],
-  command: null,
+  applies: 'now' as AgentSetting['applies'],
+  needs: [] as readonly AgentCapabilityName[],
+  command: null as AgentSettingCommand | null,
 })
 
 const NEXT = 'next_turn'
 
 /** Every setting of an agent, in the order the settings show them. */
-const AGENT_SETTING_ENTRIES: readonly AgentSetting[] = [
+export const AGENT_SETTING_ENTRIES = [
   { ...setting('role', 'Role', 'general', 'choice'), applies: NEXT },
   setting('workspace', 'Workspace', 'general', 'choice'),
   setting('color', 'Color', 'general', 'choice'),
@@ -70,12 +78,12 @@ const AGENT_SETTING_ENTRIES: readonly AgentSetting[] = [
     command: command('access', 'Open what this agent may reach: SSH, AWS, MCP servers, packs'),
   },
   {
-    ...setting('mcp', 'MCP servers', 'access', 'choice'),
+    ...setting('mcp', 'MCP servers', 'dialog', 'choice'),
     applies: NEXT,
     needs: ['mcp_servers'],
     command: command('mcp', 'List MCP servers, or turn one on or off for this agent', '[server] [on|off|default]'),
   },
-  { ...setting('control', 'Seti control', 'access', 'choice'), security: true, applies: NEXT },
+  { ...setting('control', 'Seti control', 'dialog', 'choice'), security: true, applies: NEXT },
   {
     ...setting('sandbox', 'Isolation', 'access', 'toggle'),
     security: true,
@@ -119,13 +127,19 @@ const AGENT_SETTING_ENTRIES: readonly AgentSetting[] = [
     ...setting('settings', 'Settings', null, 'dialog'),
     command: command('settings', "Open this agent's settings", '[general|access|team|session]'),
   },
-]
+] as const satisfies readonly AgentSetting[]
+
+export type AgentSettingEntry = (typeof AGENT_SETTING_ENTRIES)[number]
+
+/** The id of a row in one tab of the agent's settings. */
+export type TabSettingId<T extends AgentSettingTab> = Extract<AgentSettingEntry, { place: T }>['id']
+
+type CommandEntry = Extract<AgentSettingEntry, { command: AgentSettingCommand }>
 
 /** The settings that have a slash command, with it. */
-export const COMMAND_SETTINGS = AGENT_SETTING_ENTRIES.flatMap((entry) =>
-  entry.command === null ? [] : [{ ...entry, command: entry.command }],
-)
+export const COMMAND_SETTINGS = AGENT_SETTING_ENTRIES.filter((entry): entry is CommandEntry => entry.command !== null)
 export type CommandSetting = (typeof COMMAND_SETTINGS)[number]
+export type CommandSettingId = CommandSetting['id']
 
 /** Names only Seti's own commands take: no mod may add a slash command of one of them. */
 export const RESERVED_COMMAND_NAMES: ReadonlySet<string> = new Set(COMMAND_SETTINGS.map((entry) => entry.command.name))
