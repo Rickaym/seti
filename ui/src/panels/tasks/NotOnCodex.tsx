@@ -8,10 +8,3 @@ export function NotOnRuntime({ label, reason }: { label: string; reason: string 
     </Hint>
   )
 }
-
-/** A feature a Codex agent does not have. */
-export function NotOnCodex({ reason }: { reason: string }) {
-  return <NotOnRuntime label="Codex" reason={reason} />
-}
-
-export const NO_BYPASS = 'Codex agents ask before every command and edit; Bypass is not offered.'

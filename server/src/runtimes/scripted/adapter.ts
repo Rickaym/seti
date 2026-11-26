@@ -39,6 +39,8 @@ export const scriptedAdapter: RuntimeAdapter<ScriptedShapes, 'scripted'> = {
     sandbox: { optional: true },
     compaction: null,
     subagents: true,
+    bypass: true,
+    slashCommands: false,
     dream: null,
     oneShot: {
       open: async (request, launcher, abortController) => {

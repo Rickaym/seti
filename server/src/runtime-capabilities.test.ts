@@ -44,7 +44,13 @@ describe("what an agent's runtime declares", () => {
       data: unknown
     }
     expect(served.data).toEqual(runtimeCapabilities())
-    expect(runtimeCapabilities().claude).toMatchObject({ mcp_servers: true, plugins: true, dreams: true })
+    expect(runtimeCapabilities().claude).toMatchObject({
+      mcp_servers: true,
+      plugins: true,
+      dreams: true,
+      bypass: true,
+      slash_commands: true,
+    })
     expect(runtimeCapabilities().claude.mcp_transports).toEqual(['stdio', 'sse', 'http', 'sdk', 'claudeai-proxy'])
     expect(runtimeCapabilities().claude.compaction_ignores).toEqual([])
     expect(runtimeCapabilities().codex).toEqual({
@@ -58,6 +64,8 @@ describe("what an agent's runtime declares", () => {
       side_chat: false,
       dreams: false,
       rewind: false,
+      bypass: false,
+      slash_commands: false,
     })
   })
 

@@ -7,7 +7,8 @@ import { tasks } from './db.js'
 import { refuseAgent } from './ea-guard.js'
 import { controlLink } from './node-link.js'
 import { appendMessage } from './runner.js'
-import { refuseOnCodex } from './runtime-features.js'
+import { refuseUndeclared } from './runtime-features.js'
+import { agentCapabilities } from './runtimes/capabilities.js'
 import { bypass } from './store/permissions.js'
 import { inLane } from './task-lane.js'
 
@@ -68,7 +69,7 @@ function schedule(taskId: string, until: string | null): void {
 export async function setBypass(task: Task, hours: BypassHours | null): Promise<BypassState> {
   refuseAgent('turn Bypass on or off')
   if (hours !== null) {
-    refuseOnCodex(task, 'Bypass')
+    refuseUndeclared(task, agentCapabilities(task.runtime).bypass, 'Bypass')
   }
   const until = hours === null ? null : new Date(Date.now() + hours * HOUR_MS).toISOString()
   if (until === null && !bypassOn(task.bypass_until)) {
