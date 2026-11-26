@@ -62,6 +62,7 @@ const PERMISSION: PermissionRequest = {
   reason: 'No rule allows terraform apply',
   suggestions: ['Bash(terraform apply:*)'],
   editable: false,
+  prs: [],
   state: 'pending',
   message: null,
   edited: [],

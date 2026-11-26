@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { lenientArray, orDefault, type ResponseSchema } from './lenient.js'
+import { CI_STATES, type CiState } from './prs.js'
 import { reviewGapSchema, type ReviewGap } from './review-tools.js'
 
 /**
@@ -32,7 +33,8 @@ const PUSH_HINT = 'PushTo takes one owner and only allows, such as PushTo(acme)'
 const pushRuleFits = (behavior: string, rule: string) =>
   !rule.startsWith('PushTo') || (behavior === 'allow' && pushRuleOwner(rule) !== null)
 
-const REVIEW_HINT = 'Review takes an MCP tool or server, such as mcp__slack__send_message or mcp__slack'
+const REVIEW_HINT =
+  'Review takes an MCP tool or server, such as mcp__slack__send_message or mcp__slack; use Ask for other tools such as Bash'
 
 export const permissionRuleText = z
   .string()
@@ -135,6 +137,17 @@ export type PermissionRequestState = (typeof PERMISSION_REQUEST_STATES)[number]
 export const PERMISSION_REQUEST_KINDS = ['tool', 'repeat', 'review'] as const
 export type PermissionRequestKind = (typeof PERMISSION_REQUEST_KINDS)[number]
 
+/** A GitHub pull request a request's command names, with its title and CI once Seti knows them. */
+export interface RequestPr {
+  /** Built by Seti from the repository and number, never taken from the command's text. */
+  url: string
+  /** `owner/repo`. */
+  repo: string
+  number: number
+  title: string | null
+  ci: CiState | null
+}
+
 /** A tool call the agent waits on the user to allow or deny. */
 export interface PermissionRequest {
   id: string
@@ -151,6 +164,8 @@ export interface PermissionRequest {
   suggestions: string[]
   /** Whether the user may edit the call's text fields before allowing it: unredacted MCP calls. */
   editable: boolean
+  /** The pull requests the call's command names; empty for any other call. */
+  prs: RequestPr[]
   state: PermissionRequestState
   /** What the user told the agent with a deny. */
   message: string | null
@@ -195,6 +210,17 @@ export const permissionRequestParams = z.object({ id: z.string().trim().min(1).m
 
 const maybeText = (label: string) => orDefault(label, z.string().nullable(), null)
 
+const requestPrSchema = z.object({
+  url: z.string(),
+  repo: z.string(),
+  number: z.number(),
+  title: maybeText('title'),
+  ci: orDefault<CiState | null>('ci', z.enum(CI_STATES).nullable(), null),
+}) satisfies ResponseSchema<RequestPr>
+
+/** The PRs a request names, as stored and sent. */
+export const requestPrsSchema = z.array(requestPrSchema)
+
 export const permissionRequestSchema = z.object({
   id: z.string(),
   task_id: z.string(),
@@ -205,6 +231,7 @@ export const permissionRequestSchema = z.object({
   reason: maybeText('reason'),
   suggestions: orDefault('suggestions', z.array(z.string()), []),
   editable: orDefault('editable', z.boolean(), false),
+  prs: orDefault('prs', requestPrsSchema, []),
   state: orDefault<PermissionRequestState>('state', z.enum(PERMISSION_REQUEST_STATES), 'cancelled'),
   message: maybeText('message'),
   edited: orDefault('edited', z.array(z.string()), []),

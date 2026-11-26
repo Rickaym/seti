@@ -10,6 +10,7 @@ import { asksForServers, loadedServers, type FakeSettings } from './fake-mcp-ser
 import { InProcessClient, type SdkServer } from './fake-mcp.js'
 import {
   actPermission,
+  COMMAND_PROMPT,
   PERMISSION_PROMPT,
   PLAN_APPROVAL_PROMPT,
   SLACK_LOOKUP_PROMPT,
@@ -335,7 +336,7 @@ class FakeClaude {
         this.outbox.fail(new Error(`Claude Code process exited with code 1: ${reason}`))
         return
       }
-      await ([PERMISSION_PROMPT, PLAN_APPROVAL_PROMPT, SLACK_PROMPT, SLACK_LOOKUP_PROMPT].some((ask) =>
+      await ([PERMISSION_PROMPT, PLAN_APPROVAL_PROMPT, SLACK_PROMPT, SLACK_LOOKUP_PROMPT, COMMAND_PROMPT].some((ask) =>
         text(m).includes(ask),
       )
         ? actPermission(this.options.canUseTool, this.actor(), text(m))

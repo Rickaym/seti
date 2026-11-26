@@ -17,7 +17,7 @@ test('a review rule holds an MCP call until the user edits and allows it', async
   await rules(page).getByRole('combobox', { name: 'Rule action' }).selectOption('review')
   await rules(page).getByRole('textbox', { name: 'New rule' }).fill('Bash')
   await rules(page).getByRole('button', { name: 'Add' }).click()
-  await expect(page.getByText('Review takes an MCP tool or server', { exact: false })).toBeVisible()
+  await expect(page.getByText('use Ask for other tools such as Bash', { exact: false })).toBeVisible()
   await rules(page).getByRole('textbox', { name: 'New rule' }).fill(rule)
   await rules(page).getByRole('button', { name: 'Add' }).click()
   await expect(rules(page).getByRole('group', { name: 'Rules' }).getByRole('region', { name: 'Review' })).toContainText(
