@@ -73,7 +73,7 @@ function agentFolder(scratch: string, outside: string, holderPid: number): strin
 }
 
 /** Every read the proof tries, as shell commands; the first is the control inside the folder. */
-export function proofCommands(holderPid: number): string[] {
+function proofCommands(holderPid: number): string[] {
   return [
     'cat inside.txt',
     'cat link.txt',
