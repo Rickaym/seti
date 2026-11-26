@@ -20,12 +20,16 @@ interface CommandFieldProps {
   disabled?: boolean
   /** Where the suggestion list opens relative to the box. */
   placement: 'above' | 'below'
-  /** Plain Enter with `enterSends`, otherwise Ctrl+Enter or Cmd+Enter. */
-  onSubmit?: () => void
+  /** Plain Enter with `enterSends`, otherwise Ctrl+Enter or Cmd+Enter; false for a scripted key. */
+  onSubmit?: (trusted: boolean) => void
+  /** The text after the user typed in the box or picked a command, never after a paste or drop. */
+  onTyped?: (value: string) => void
+  /** Esc that the box does not take itself; true when it closed something. */
+  onEscape?: () => boolean
   /** Enter submits and Ctrl+Enter or Shift+Enter starts a new line, as in Claude Code. */
   enterSends?: boolean
   /** Alt+Enter, the second way to send when there is one. */
-  onAltSubmit?: (() => void) | undefined
+  onAltSubmit?: ((trusted: boolean) => void) | undefined
   /** Takes big pastes and pasted or dropped files as attachments; each returns the tokens to insert. */
   attach?: AttachHandlers | undefined
   /** The page's main input, which takes focus after keyboard navigation to the page. */
@@ -76,6 +80,9 @@ function pastedTokens(e: ClipboardEvent<HTMLTextAreaElement>, attach: AttachHand
   return pasteGoesToFile(text) ? attach.text(text) : null
 }
 
+/** Input the user typed, an IME's included, as opposed to a paste, a drop or a script. */
+const typedInput = (e: Event) => e.isTrusted && e instanceof InputEvent && !e.inputType.startsWith('insertFrom')
+
 const carriesFiles = (e: DragEvent) => e.dataTransfer.types.includes('Files')
 
 /** Paste and drop handlers that turn big pastes and files into attachment tokens at the caret. */
@@ -112,7 +119,7 @@ function useAttachInput(attach: AttachHandlers | undefined, disabled: boolean) {
 
 /** A textarea that suggests slash commands while the first word is typed. */
 export function CommandField(props: CommandFieldProps) {
-  const { value, onChange, commands, placement, onSubmit, onAltSubmit, attach, find, disabled = false } = props
+  const { value, onChange, onTyped, commands, placement, onSubmit, onAltSubmit, attach, find, disabled = false } = props
   const { dropClass, ...attachInput } = useAttachInput(attach, disabled)
   const { ref: editorRef, ...editor } = useEditorText(value, onChange)
   const listId = useId()
@@ -128,6 +135,7 @@ export function CommandField(props: CommandFieldProps) {
 
   const accept = (command: ComposerCommand) => {
     onChange(`/${command.name} `)
+    onTyped?.(`/${command.name} `)
     setActive(0)
   }
 
@@ -151,16 +159,20 @@ export function CommandField(props: CommandFieldProps) {
     if ((open && onListKey(e)) || handleWordDelete(e)) {
       return
     }
+    if (e.key === 'Escape' && props.onEscape?.() === true) {
+      e.preventDefault()
+      return
+    }
     const action = enterAction(e, props.enterSends === true)
     if (action === 'newline') {
       e.preventDefault()
       insertText(e.currentTarget, '\n')
     } else if (action === 'submit') {
       e.preventDefault()
-      onSubmit?.()
+      onSubmit?.(e.nativeEvent.isTrusted)
     } else if (action === 'alt' && onAltSubmit !== undefined) {
       e.preventDefault()
-      onAltSubmit()
+      onAltSubmit(e.nativeEvent.isTrusted)
     }
   }
 
@@ -196,6 +208,11 @@ export function CommandField(props: CommandFieldProps) {
         onChange={(e) => {
           editor.onChange(e)
           setActive(0)
+        }}
+        onInput={(e) => {
+          if (typedInput(e.nativeEvent)) {
+            onTyped?.(e.currentTarget.value)
+          }
         }}
         onCompositionStart={editor.onCompositionStart}
         onCompositionEnd={editor.onCompositionEnd}
