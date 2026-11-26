@@ -116,6 +116,7 @@ import { settingsDocRoutes } from './routes/settings-doc.js'
 import { publicShareHandler } from './routes/share-public.js'
 import { sharedToolRoutes } from './routes/shared-tools.js'
 import { shareRoutes, taskShareRoutes } from './routes/shares.js'
+import { taskSourceRoutes } from './routes/sources.js'
 import { sshRoutes } from './routes/ssh.js'
 import { stepUpRoutes } from './routes/step-up.js'
 import { storageRoutes } from './routes/storage.js'
@@ -303,6 +304,7 @@ export function createApp(access: AccessGuardOptions = defaultAccess(), eaUrl: s
   app.route('/api/tasks', taskProcessRoutes)
   app.route('/api/tasks', taskCompactRoutes)
   app.route('/api/tasks', taskDreamRoutes)
+  app.route('/api/tasks', taskSourceRoutes)
   app.route('/api/dreams', dreamRoutes)
   app.route('/api/runtimes', runtimeRoutes)
   app.route('/api/trash', trashRoutes)

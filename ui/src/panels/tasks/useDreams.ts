@@ -5,6 +5,9 @@ import { apiGet, apiPost, apiPut, errorText } from '@/api'
 
 const WHILE_DREAMING_MS = 3000
 
+/** Starts a dream on the agent now, as Dream now does. */
+export const startDream = async (taskId: string) => apiPost<DreamRun>(`/tasks/${taskId}/dream`, {})
+
 /** The memory changes a dream recorded: Seti's revisions of the agent's memory while it ran. */
 const changesOf = (run: DreamRun, revisions: readonly Revision[]) =>
   revisions.filter(
@@ -49,7 +52,7 @@ export function useDreams(taskId: string, open: boolean) {
   }, [taskId, open, reload, latest?.state])
 
   const dreamNow = useCallback(() => {
-    apiPost<DreamRun>(`/tasks/${taskId}/dream`, {})
+    startDream(taskId)
       .then(setLatest)
       .catch((e: unknown) => toast.error(errorText(e)))
   }, [taskId])
