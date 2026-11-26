@@ -1,9 +1,8 @@
 import path from 'node:path'
-import type { CpuCap, MemoryCap, ProxyGrant, SandboxPolicy, Task } from '@seti/shared'
+import { providerOf, type CpuCap, type MemoryCap, type ProxyGrant, type SandboxPolicy, type Task } from '@seti/shared'
 import { taskSsh } from './agent-access.js'
 import { profileAws, taskAws } from './aws-access.js'
 import { connectorCredential } from './claude-credential.js'
-import { codexKeyConnection } from './codex-key.js'
 import { codexProgram } from './codex-status.js'
 import { effectiveCpuCap } from './cpu-cap.js'
 import { agentTokenStamp } from './github-token.js'
@@ -12,6 +11,7 @@ import { taskBorrowedServers } from './mcp-borrowed.js'
 import { effectiveCap } from './memory-cap.js'
 import type { ScopeKind } from './memory-scope.js'
 import { taskPluginConfigs } from './plugins.js'
+import { providerKeyConnection } from './provider-key.js'
 import { proxyGrant } from './proxy-grant.js'
 import type { RuntimeId } from './runtimes/adapter.js'
 import { sharedToolFolders, TOOL_SERVER } from './shared-tools.js'
@@ -80,7 +80,11 @@ async function codexFolders(): Promise<string[]> {
 
 /** A Codex agent's part of its plan, which leaves out Claude's plugins, servers and connectors. */
 async function codexPart(task: Task) {
-  return { codex: { modelKey: (await codexKeyConnection(task))?.env ?? null }, connectors: false, borrowed: [] }
+  return {
+    codex: { modelKey: (await providerKeyConnection(task, providerOf('codex')))?.env ?? null },
+    connectors: false,
+    borrowed: [],
+  }
 }
 
 /** What the agent's sandbox is made of under this policy. */
