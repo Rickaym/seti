@@ -64,12 +64,15 @@ export const TASKS_ROUTES: CoverageTable = {
     "Allow a held tool call once, approve a plan, or deny either with a message (owner's C table, " +
       "section 1). Always allow, a rule for every agent and edited fields stay the user's",
   ),
-  'GET /api/tasks/:id/permissions': gap("One agent's permission rules. Read"),
+  'GET /api/tasks/:id/permissions': ea('get_security_settings'),
   'PUT /api/tasks/:id/permissions/bypass': user('security', 'Bypass on or off. Security setting'),
   'POST /api/tasks/:id/permissions/rules': user('security', 'Add an agent rule. Permission rules'),
   'DELETE /api/tasks/:id/permissions/rules/:rule_id': user('security', 'Remove an agent rule. Permission rules'),
   'POST /api/tasks/:id/permissions/rules/batch': user('security', 'Add agent rules. Permission rules'),
-  'GET /api/tasks/:id/permissions/rules/coverage': gap("An agent's review coverage. Read"),
+  'GET /api/tasks/:id/permissions/rules/coverage': user(
+    'security',
+    'Checks a review rule while the user writes it, which is part of editing permission rules',
+  ),
   'GET /api/tasks/:id/processes': ea('list_processes'),
   'POST /api/tasks/:id/processes/stop': ea('stop_process'),
   'DELETE /api/tasks/:id/prs': ea('unlink_pr'),
