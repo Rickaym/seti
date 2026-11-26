@@ -1,8 +1,9 @@
-import { slackSendTarget, type PermissionRequest } from '@seti/shared'
+import { idsIn, slackSendTarget, type PermissionRequest } from '@seti/shared'
 import { announce, summarize, waitingInput } from '../permission-requests.js'
 import { permissionRequests } from '../store/permissions.js'
 import { slackNames, type SlackName } from '../store/slack-names.js'
 import { publishToOpenStreams } from '../task-events.js'
+import { messageOf } from './destination.js'
 
 /** The names a batch states once each; an id the batch names two ways is left out. */
 function agreed(names: readonly SlackName[]): SlackName[] {
@@ -28,12 +29,12 @@ function inputOf(request: PermissionRequest): Record<string, unknown> {
   }
 }
 
-/** Rewrites the summary of each pending Slack send to one of these ids and tells its views. */
+/** Rewrites the summary of each pending Slack send to or mentioning these ids; tells its views. */
 async function renamePendingSends(ids: ReadonlySet<string>): Promise<void> {
   for (const request of await permissionRequests.allPending()) {
     const input = inputOf(request)
     const target = slackSendTarget(request.tool_name, input)
-    if (target === null || !ids.has(target)) {
+    if (target === null || ![target, ...idsIn(messageOf(input))].some((id) => ids.has(id))) {
       continue
     }
     const renamed = await permissionRequests.resummarize(request.id, await summarize(request.tool_name, input))

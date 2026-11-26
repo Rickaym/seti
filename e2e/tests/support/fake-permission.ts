@@ -11,13 +11,17 @@ export const SLACK_PROMPT = 'post the deploy note to Slack once I allow it'
 export const SLACK_CHANNEL = 'C0E2EDEPLOY'
 export const SLACK_POSTED = 'Posted the deploy note.'
 const SLACK_SEND = 'mcp__plugin_slack_slack__slack_send_message'
-/** A Slack channel Seti has never seen named; a prompt that names a channel posts there instead. */
+/** A channel Seti never saw named; a prompt naming a channel posts there, `cc U0...` mentions one. */
 export const SLACK_UNNAMED_CHANNEL = 'C0E2EUNNAMED'
 const CHANNEL_ID = /\bC0[A-Z0-9]{8,}\b/
-const slackInput = (prompt: string) => ({
-  channel_id: CHANNEL_ID.exec(prompt)?.[0] ?? SLACK_CHANNEL,
-  message: 'Deploy done',
-})
+const PERSON_ID = /\bcc (U0[A-Z0-9]{8,})\b/
+const slackInput = (prompt: string) => {
+  const cc = PERSON_ID.exec(prompt)?.[1]
+  return {
+    channel_id: CHANNEL_ID.exec(prompt)?.[0] ?? SLACK_CHANNEL,
+    message: cc === undefined ? 'Deploy done' : `Deploy done, cc <@${cc}>`,
+  }
+}
 /** Asks for a channel search whose answer names the channel id in the prompt `as #name`. */
 export const SLACK_LOOKUP_PROMPT = 'look up the Slack channel'
 const SLACK_SEARCH = 'mcp__plugin_slack_slack__slack_search_channels'
