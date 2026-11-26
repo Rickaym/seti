@@ -28,3 +28,27 @@ export const drafts = {
     }
   },
 }
+
+interface Typed {
+  text: string
+  /** Whether a reload brings the text back from storage. */
+  kept: boolean
+}
+
+const typed = new Map<symbol, Typed>()
+
+/** The text every open composer holds now, so an update can wait for it. */
+export const openDrafts = {
+  set: (id: symbol, text: string, kept: boolean): void => {
+    if (text.trim() === '') {
+      typed.delete(id)
+    } else {
+      typed.set(id, { text, kept })
+    }
+  },
+  drop: (id: symbol): void => {
+    typed.delete(id)
+  },
+  anyText: (): boolean => typed.size > 0,
+  anyUnkept: (): boolean => [...typed.values()].some((draft) => !draft.kept),
+}

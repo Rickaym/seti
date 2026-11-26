@@ -1,4 +1,4 @@
-import { expect, test, toasts } from './support/fixtures.js'
+import { expect, test } from './support/fixtures.js'
 import {
   CAUGHT_CRASH,
   contextHeading,
@@ -41,7 +41,7 @@ test('a panel that still fails after the reload offers Reload instead of the raw
   await expect(page).toHaveURL(/#context$/)
 })
 
-test('unsaved changes keep the page and get a New version notice with Reload', async ({ page }) => {
+test('unsaved changes keep the page and Update shows in the status bar', async ({ page }) => {
   let loads = 0
   page.on('load', () => {
     loads += 1
@@ -51,9 +51,7 @@ test('unsaved changes keep the page and get a New version notice with Reload', a
   await name.fill('Unsaved name')
   await reportPreloadError(page)
 
-  const notice = toasts(page).filter({ hasText: 'New version' })
-  await expect(notice).toContainText('Save your changes, then reload')
-  await expect(notice.getByRole('button', { name: 'Reload' })).toBeVisible()
+  await expect(page.getByRole('contentinfo').getByRole('button', { name: 'Update', exact: true })).toBeVisible()
   await expect(name).toHaveValue('Unsaved name')
   expect(loads).toBe(1)
 })
