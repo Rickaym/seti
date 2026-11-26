@@ -166,7 +166,8 @@ function addUserServer(task: Task): string {
 async function installFrom(scratch: string, binary: string): Promise<string> {
   const registry = await new FakeRegistry().start()
   try {
-    await installCodex('user', registry.pin(fakeBuild(scratch, CODEX_PIN.version, binary)))
+    const host = path.join(path.dirname(binary), 'codex-code-mode-host')
+    await installCodex('user', registry.pin(fakeBuild(scratch, CODEX_PIN.version, binary, host)))
   } finally {
     await registry.close()
   }
