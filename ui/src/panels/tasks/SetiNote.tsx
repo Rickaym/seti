@@ -1,13 +1,19 @@
+import type { SettingNote } from '@seti/shared'
 import {
   ArrowRightLeft,
   CircleStop,
   Eraser,
   FastForward,
+  FolderX,
+  KeyRound,
   MemoryStick,
+  Plug,
   RotateCw,
+  Shield,
   ShieldCheck,
   ShieldOff,
   TimerOff,
+  type LucideIcon,
 } from 'lucide-react'
 import { isFailureNote, type SetiPayload } from '@/lib/seti-notes'
 import { EditedLine } from '@/panels/tasks/EditedLine'
@@ -17,7 +23,14 @@ import { Line } from '@/panels/tasks/TranscriptLines'
 
 const SESSION_ICONS = { fresh: Eraser, restarted: RotateCw, continued: ArrowRightLeft }
 
-/** A note from Seti: memory, restart, Seti control, timeout, refused host, edit or failure. */
+const SETTING_ICONS: Record<SettingNote, LucideIcon> = {
+  sandbox: Shield,
+  credential: KeyRound,
+  access: Plug,
+  home: FolderX,
+}
+
+/** A note from Seti: memory, restart, a setting, timeout, refused host, edit or failure. */
 export function SetiNote({ taskId, payload }: { taskId: string; payload: SetiPayload }) {
   if (payload.edited !== undefined) {
     return <EditedLine fields={payload.edited.fields} denied={payload.edited.denied} />
@@ -44,6 +57,9 @@ export function SetiNote({ taskId, payload }: { taskId: string; payload: SetiPay
   }
   if (payload.bypass !== undefined) {
     return <Line icon={FastForward}>{payload.error}</Line>
+  }
+  if (payload.setting !== undefined) {
+    return <Line icon={SETTING_ICONS[payload.setting]}>{payload.error}</Line>
   }
   if (payload.timed_out !== undefined) {
     const at = new Date(payload.timed_out)

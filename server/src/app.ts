@@ -23,6 +23,7 @@ import {
   onProofRefused,
   type AccessGuardOptions,
 } from './access.js'
+import { onAccessChanged } from './agent-access.js'
 import { cancelWaitsOnArchive, deliverAgentWaits } from './agent-waits.js'
 import { remindWhenAsking } from './asking-reminder.js'
 import { briefOnReturn } from './attention-brief.js'
@@ -137,6 +138,7 @@ import { importedContext } from './sessions.js'
 import { setiControlPreface } from './seti-control-note.js'
 import { contextPackPrompt, workspaceContext } from './seti-guide.js'
 import { sessionSetiServers, setiToolsContext } from './seti-tools/server.js'
+import { noteSetting } from './setting-notes.js'
 import { shellPreface } from './shell-context.js'
 import { restartQuietOnAnswer } from './stall-watch.js'
 import { clearStatusLinesWhenIdle, statusLineTurnEnded } from './status-line.js'
@@ -261,6 +263,7 @@ export function createApp(access: AccessGuardOptions = defaultAccess(), eaUrl: s
   app.use('*', logServerErrors)
   app.use('*', securityHeaders(access.access))
   onProofRefused(auditRefusedProof)
+  onAccessChanged(async (taskId, line) => noteSetting(taskId, 'access', line))
   app.use('*', accessGuard({ ...access, local }))
   app.route('/hooks', hookRoutes)
   app.use('*', subdomainProxy)
