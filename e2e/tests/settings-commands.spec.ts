@@ -95,7 +95,7 @@ test('a handed-over or pasted /archive waits for Run, then asks as Archive does'
   await page.evaluate(async () => navigator.clipboard.writeText('/archive'))
   await reply(page).press('ControlOrMeta+V')
   await expect(reply(page)).toHaveValue('/archive')
-  await closeList(page)
+  await expect(page.getByRole('listbox', { name: 'Command suggestions' })).toBeHidden()
   await reply(page).press('Enter')
   await expect(archive).toContainText('This line was not typed here')
   await archive.getByRole('button', { name: 'Run' }).click()

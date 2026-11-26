@@ -82,6 +82,7 @@ function askOf(command: SettingCommand): Ask | null {
   }
   if (step?.kind === 'run') {
     return {
+      icon: Play,
       title: name,
       message: command.line.setting.command.description,
       detail: null,
