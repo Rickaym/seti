@@ -39,7 +39,7 @@ const HOME_SKILLS = '.agents'
 const INSTRUCTIONS = 'GEMINI.md'
 
 /** The files and folders of a private home the sandbox covers; bwrap mounts only on what exists. */
-export const geminiMountPoints = (home: string): { files: string[]; dirs: string[] } => ({
+const geminiMountPoints = (home: string): { files: string[]; dirs: string[] } => ({
   files: [
     ...[...LOCKED_JSON, ...LOCKED_TEXT].map((name) => path.join(home, GEMINI_DIR, name)),
     ...[HOME_ENV, ...SHELL_STARTUP].map((name) => path.join(home, name)),
@@ -48,7 +48,7 @@ export const geminiMountPoints = (home: string): { files: string[]; dirs: string
 })
 
 /** The working folders' own Gemini CLI folders, whose settings run programs at start. */
-export const workFolderPoints = (layout: Pick<SandboxLayout, 'cwd' | 'dirs'>): string[] =>
+const workFolderPoints = (layout: Pick<SandboxLayout, 'cwd' | 'dirs'>): string[] =>
   [layout.cwd, ...layout.dirs].map((dir) => path.join(dir, GEMINI_DIR))
 
 /** What covers a file in the home: Seti's empty object, an empty file, or the user's rules. */
