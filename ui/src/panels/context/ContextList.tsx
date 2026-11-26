@@ -92,6 +92,21 @@ function PackItems({
   ))
 }
 
+/** No roles is the normal start: one line on what a role is, and the way to add one. */
+function NoRoles({ onAdd }: { onAdd: () => void }) {
+  return (
+    <div data-testid="no-roles" className="flex items-center gap-2 px-3 py-2">
+      <p className="min-w-0 flex-1 text-xs text-muted-foreground">
+        No roles yet. A role is a standing brief for an agent.
+      </p>
+      <Button size="sm" variant="outline" onClick={onAdd}>
+        <Plus />
+        Add
+      </Button>
+    </div>
+  )
+}
+
 const sizeText = (file: ContextFile) =>
   file.exists && file.size !== null ? `${file.size.toLocaleString()} bytes` : 'not created'
 
@@ -204,6 +219,13 @@ export function ContextList({
             />
           }
         />
+        {roles.length === 0 && (
+          <NoRoles
+            onAdd={() => {
+              onSelect(NEW_ROLE)
+            }}
+          />
+        )}
         <PackItems packs={roles} selected={selected} onSelect={onSelect} agentChanged={agentChanged} />
       </section>
     </div>

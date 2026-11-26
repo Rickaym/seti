@@ -1,12 +1,4 @@
-import {
-  BUILTIN_ROLES,
-  EA_PACK_CHARS_MAX,
-  LEAD_HELPER_LINE,
-  LEAD_SUBAGENT_LINE,
-  type ContextPack,
-  type EaPackPrompt,
-  type InputMode,
-} from '@seti/shared'
+import { EA_PACK_CHARS_MAX, type ContextPack, type EaPackPrompt, type InputMode } from '@seti/shared'
 import { binaryPath } from './binaries.js'
 import { tasks } from './db.js'
 import { eaModActions } from './mods/ea-actions.js'
@@ -105,34 +97,21 @@ export function renderGuide(input: GuideInput): string {
   return `${sections.map((lines) => lines.join('\n')).join('\n\n')}\n`
 }
 
-/** A built-in role pack with its text from Seti's code, for a runtime with subagents or without. */
-function builtinRole(pack: ContextPack, subagents = true): ContextPack | null {
-  const role = pack.builtin && pack.kind === 'role' ? BUILTIN_ROLES.find((entry) => entry.id === pack.id) : undefined
-  if (role === undefined) {
-    return null
-  }
-  return { ...pack, body: subagents ? role.text : role.text.replace(LEAD_SUBAGENT_LINE, LEAD_HELPER_LINE) }
-}
-
-/** The pack as an agent of the task reads it: built-in packs rendered for its mode and runtime. */
+/** The pack as an agent of the task reads it: the guide rendered for its mode and runtime. */
 export async function packForTask(pack: ContextPack, taskId: string): Promise<ContextPack> {
   if (!pack.builtin) {
     return pack
   }
   const task = await tasks.get(taskId)
   const subagents = task === undefined || hasSubagents(task.runtime)
-  const role = builtinRole(pack, subagents)
-  if (role !== null) {
-    return role
-  }
   const sandboxed = task?.sandbox === true && (await sandboxPolicy.get()).enabled
   const setiTools = task?.seti_control === 'full'
   return { ...pack, body: renderGuide({ mode: task?.input_mode ?? null, setiTools, sandboxed, subagents }) }
 }
 
-/** The pack as the Context page shows it: built-in packs rendered, the guide for a waking agent. */
+/** The pack as the Context page shows it: the built-in guide rendered for a waking agent. */
 export const packForDisplay = (pack: ContextPack): ContextPack =>
-  pack.builtin ? (builtinRole(pack) ?? { ...pack, body: renderGuide({ mode: 'wake' }) }) : pack
+  pack.builtin ? { ...pack, body: renderGuide({ mode: 'wake' }) } : pack
 
 /** The line every agent gets, linked to the guide or not, so it can still use the group chat. */
 export const workspaceLine = (dir: string) =>

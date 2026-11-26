@@ -99,10 +99,11 @@ between two steps; an interrupt; a hook at subagent start.
 - ENT-17: Workspace: `id`, `name` (at most 60, unique ignoring case), `position`, `created_at`. An
   agent started without one joins the first by position. The last workspace, and one holding any
   agent (archived included), MUST NOT be deleted.
-- ENT-23: A role is a context text, at most one per agent; peers see its first line. A role MAY
-  name a runtime and a model, built-in roles included; only the user sets them. A start MAY name
-  a role, which links it; its runtime and model apply where the start names neither, and while
-  that runtime cannot start an agent the start runs on the default and its setup says why.
+- ENT-23: A role is a context text the user writes, at most one per agent; peers see its first
+  line. Seti ships no roles of its own. A role MAY name a runtime and a model; only the user sets
+  them. A start MAY name a role, which links it; a name no role has MUST be refused with the names
+  of the roles there are. The role's runtime and model apply where the start names neither, and
+  while that runtime cannot start an agent the start runs on the default and its setup says why.
 
 ### 3.3 Requests
 
@@ -197,7 +198,7 @@ between two steps; an interrupt; a hook at subagent start.
   control, counts leave those items out, its `task.md` and system prompt do not offer them, and
   the server refuses the change with the reason. A control the runtime honours in part says which
   part it does not. An agent whose runtime has no subagents is pointed to helper agents instead,
-  in the Seti guide and the Lead role.
+  in the Seti guide.
 - RT-14: A runtime whose model can summarise its reasoning MUST ask for the summary, so its agents
   show their thinking as the default runtime's do. Reasoning the model seals for its own next call
   MUST NOT be stored, served or shown by the control room.
