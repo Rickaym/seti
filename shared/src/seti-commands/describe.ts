@@ -68,7 +68,9 @@ function describeValue(found: SetiName, value: string, world: CommandWorld): str
     case 'open':
       return value === '' ? `Open ${entry.label}` : `Open ${entry.label}: ${value}`
     case 'values':
-      return `${entry.label}: ${grammar.values.find((choice) => choice.value === value)?.label ?? value}`
+      return value === 'on' || value === 'off'
+        ? `Turn ${entry.label} ${value}`
+        : `${entry.label}: ${grammar.values.find((choice) => choice.value === value)?.label ?? value}`
     case 'amount':
       return describeAmount(found.name, value)
     case 'access':
