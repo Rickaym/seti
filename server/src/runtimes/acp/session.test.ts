@@ -7,7 +7,7 @@ import { Channel } from '../conformance/run.js'
 import type { AcpDecide } from './permissions.js'
 import { acpSession, type AcpRealised } from './session.js'
 
-type Message = Record<string, unknown> & { id?: number; method?: string; params?: Record<string, unknown> }
+type Message = Record<string, unknown> & { id?: number | undefined; method?: string; params?: Record<string, unknown> }
 
 /** A scripted ACP agent on a fake process: it answers Seti's requests with the handler's replies. */
 class FakeAgent {
