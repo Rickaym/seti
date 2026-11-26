@@ -29,9 +29,6 @@ const callFields = {
   rawOutput: z.unknown().optional(),
 }
 
-export const toolCall = z.looseObject(callFields)
-export type AcpToolCall = z.infer<typeof toolCall>
-
 const planEntry = z.looseObject({
   content: z.string(),
   status: z.enum(['pending', 'in_progress', 'completed']),
@@ -48,13 +45,13 @@ export const sessionUpdate = z.discriminatedUnion('sessionUpdate', [
 ])
 
 /** The tokens a prompt's reply reports for its whole turn. */
-export const promptUsage = z.looseObject({
-  inputTokens: z.number(),
-  outputTokens: z.number(),
-  cachedReadTokens: z.number().nullable().optional(),
-  cachedWriteTokens: z.number().nullable().optional(),
-  thoughtTokens: z.number().nullable().optional(),
-})
+interface PromptUsage {
+  inputTokens: number
+  outputTokens: number
+  cachedReadTokens?: number | null
+  cachedWriteTokens?: number | null
+  thoughtTokens?: number | null
+}
 
 /**
  * An ACP agent's message as Seti stores it: the session it started, a prompt's turn starting,
@@ -70,10 +67,13 @@ export type AcpRecord =
       turnId: string
       stopReason: string
       result: string
-      usage: z.infer<typeof promptUsage> | null
+      usage: PromptUsage | null
       /** Seti's estimate of the turn's cost from the provider's dated prices, where it has one. */
       usd?: number
       error?: string
       /** The calls the turn left without an end, as a cancel cuts them. */
       unfinished?: readonly string[]
     }
+
+/** A tool call or an update of one, with the fields both carry. */
+export type AcpToolCall = Extract<z.infer<typeof sessionUpdate>, { toolCallId: string }>
