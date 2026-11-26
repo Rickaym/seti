@@ -14,11 +14,16 @@ export function useSourceMatch(reference: Reference): SourceMatch | null {
 const sourceDay = (at: string) =>
   new Date(at).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })
 
-/** Where and when the source was written, as the ledger states it: `#release, 24 Nov 2025`. */
-export function sourceFacts(match: SourceMatch | null): string | null {
+/**
+ * Where and when the source was written, as the ledger states it: `#release, 24 Nov 2025`, or
+ * only the day when the label already names the place.
+ */
+export function sourceFacts(match: SourceMatch | null, label: string): string | null {
   const source = match?.source
   if (source === undefined || source === null) {
     return null
   }
-  return source.at === null ? source.place : `${source.place}, ${sourceDay(source.at)}`
+  const parts = [label.includes(source.place) ? null : source.place, source.at === null ? null : sourceDay(source.at)]
+  const shown = parts.filter((part) => part !== null)
+  return shown.length === 0 ? null : shown.join(', ')
 }

@@ -7,7 +7,7 @@ import type { Reference } from '@/lib/references/reference-set'
 /** What a reference's card and sheet show: its label, host, footnote words and quote, as text. */
 export function ReferencePreview({ reference, label }: { reference: Reference; label: SourceLabel }) {
   const match = useSourceMatch(reference)
-  const facts = sourceFacts(match)
+  const facts = sourceFacts(match, label.label)
   return (
     <div className="flex min-w-0 flex-col gap-1" data-testid="reference-preview">
       <p className="flex min-w-0 items-center gap-1.5 font-medium text-foreground">

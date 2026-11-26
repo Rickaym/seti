@@ -39,7 +39,7 @@ export function InlineReference({
 function QuoteSource({ reference }: { reference: Reference }) {
   const label = useSourceLabel(reference)
   const match = useSourceMatch(reference)
-  const facts = sourceFacts(match)
+  const facts = sourceFacts(match, label.label)
   return (
     <figcaption
       className="flex min-w-0 items-center gap-1 pl-3 text-xs text-muted-foreground"

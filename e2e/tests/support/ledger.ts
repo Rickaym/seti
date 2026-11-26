@@ -12,6 +12,8 @@ export const LEDGER = {
   read: `https://acme.slack.com/archives/${CHANNEL}/p1731000000123456`,
   unread: `https://acme.slack.com/archives/${CHANNEL}/p1731000999000001`,
   place: '#release',
+  /** The thread's day as the reader's locale shows it; the e2e browsers read en-US. */
+  day: 'Nov 7, 2024',
 } as const
 
 export const READ_QUOTE = 'We ship on Friday, not Thursday.'
