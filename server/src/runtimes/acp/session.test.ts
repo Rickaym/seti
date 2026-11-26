@@ -289,6 +289,37 @@ describe('an ACP session', () => {
     session.close()
   })
 
+  it('answers an ask that arrives after the cancel as cancelled, without deciding it', async () => {
+    const agent = new FakeAgent(
+      opening((prompt, fake) => {
+        fake.update({ sessionUpdate: 'tool_call', ...SHELL })
+        void fake
+          .next((m) => m.method === 'session/cancel')
+          .then(async () => {
+            fake.write({
+              id: 8,
+              method: 'session/request_permission',
+              params: { sessionId: 's1', options: OPTIONS, toolCall: SHELL },
+            })
+            await fake.next((m) => m.id === 8)
+            fake.write({ id: prompt.id, result: { stopReason: 'cancelled' } })
+          })
+      }),
+    )
+    const decided: string[] = []
+    const { send, session, reports } = open(agent, async (call) => {
+      decided.push(call.callId)
+      return new Promise(() => undefined)
+    })
+    send('go')
+    await expect.poll(() => records(reports).some((r) => r.seti === 'update')).toBe(true)
+    await session.interrupt()
+    await expect.poll(() => records(reports).some((r) => r.seti === 'ended')).toBe(true)
+    expect(agent.sent.find((m) => m.id === 8)?.result).toEqual({ outcome: { outcome: 'cancelled' } })
+    expect(decided).toEqual([])
+    session.close()
+  })
+
   it('drops the history a loaded session replays, and stores its start only with its first turn', async () => {
     const agent = new FakeAgent((message, fake) => {
       if (message.method === 'initialize') {
