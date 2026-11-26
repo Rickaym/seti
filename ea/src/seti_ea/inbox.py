@@ -2,7 +2,7 @@
 
 import asyncio
 import time
-from collections.abc import Awaitable, Callable, Mapping, Sequence
+from collections.abc import Awaitable, Callable, Collection, Mapping, Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Literal, cast
 
@@ -187,6 +187,8 @@ class SilenceGate:
         self._replying = False
         self._tools: set[str] = set()
         self._awaiting_until: float | None = None
+        self.spoke = 0
+        self.cuts = 0
 
     def _touch(self) -> None:
         self._last = self._clock()
@@ -201,11 +203,14 @@ class SilenceGate:
         self._touch()
 
     def bot_speaking(self, speaking: bool) -> None:
+        if self._bot and not speaking:
+            self.spoke += 1
         self._bot = speaking
         self._touch()
 
     def interrupted(self) -> None:
         """The EA's reply was cut short, so no reply is in flight any more."""
+        self.cuts += 1
         self._replying = False
         self._bot = False
         self._touch()
@@ -326,6 +331,13 @@ class CallInbox:
     @property
     def needs_you_waiting(self) -> bool:
         return any(item.needs_you for item in self._pending.values())
+
+    def take_needs_you(self, task_ids: Collection[str]) -> list[InboxItem]:
+        """The needs-you items about these agents, which an announcement of their request covers."""
+        picked = [item for item in self._pending.values() if item.needs_you and item.task_id in task_ids]
+        for item in picked:
+            del self._pending[item.id]
+        return picked
 
     def take(self, *, needs_you_only: bool = False) -> list[InboxItem]:
         """Everything that waits, oldest first; with needs_you_only, only the needs-you items."""

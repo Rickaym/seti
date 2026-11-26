@@ -55,6 +55,14 @@ from pydantic import BaseModel
 from seti_ea.announce import ToolAnnouncer, ToolCall
 from seti_ea.brief import brief_note, fetch_brief, greeting
 from seti_ea.call import CallRequest
+from seti_ea.call_requests import (
+    QUESTION_GAP_SECS,
+    CallRequests,
+    CallVoice,
+    ended_with_question,
+    heard_through,
+    say_in_language,
+)
 from seti_ea.clock import CURRENT_CLOCK, TimeNotes
 from seti_ea.config import Settings
 from seti_ea.conversation import Conversation
@@ -69,7 +77,9 @@ from seti_ea.inbox import (
     SilenceObserver,
     VoiceDelivery,
     deliver,
+    take_items,
 )
+from seti_ea.language import DEFAULT as ENGLISH
 from seti_ea.language import stt_endpointing, stt_language, tts_language
 from seti_ea.live_context import LiveContext, LiveContextInjector
 from seti_ea.local_wake import PausableDeepgramSTT, SleepControl
@@ -79,6 +89,7 @@ from seti_ea.promises import PromiseCheck
 from seti_ea.prompt import (
     SYSTEM_PROMPT,
     VOICE_NOTE,
+    clean_address,
     voice_urgent_note,
     with_act,
 )
@@ -462,6 +473,7 @@ async def run_bot(
             await worker.queue_frames([LLMRunFrame()])
         await announce_wake()
         delivering.append(asyncio.create_task(delivery.run()))
+        delivering.append(asyncio.create_task(requests.run()))
 
     @rtvi.event_handler("on_client_message")
     async def on_client_message(_rtvi: RTVIProcessor, message: ClientMessage) -> None:
@@ -496,7 +508,9 @@ async def run_bot(
 
     @user_aggregator.event_handler("on_user_turn_stopped")
     async def on_user_turn_stopped(_aggregator: LLMUserAggregator, *args: Any) -> None:
-        tools.user_turn(heard(args))
+        said = heard(args)
+        tools.user_turn(said)
+        requests.user_turn(said)
         gate.expect_reply()
         await history.flush()
 
@@ -540,6 +554,44 @@ async def run_bot(
         take=take,
         report=report_inbox,
         wake=wake_for_inbox,
+    )
+    direct = [True]
+
+    async def speak_line(line: str) -> bool:
+        spoke, cuts = gate.spoke, gate.cuts
+        direct[0] = speaking.now == ENGLISH
+        if direct[0]:
+            await tts.queue_frame(filler_frame(line))
+        else:
+            history.add_unstored(say_in_language(line))
+            await worker.queue_frames([LLMRunFrame()])
+        return await heard_through(gate, spoke, cuts)
+
+    async def tell_context(line: str | None, note: str) -> None:
+        if line is not None and direct[0]:
+            context.add_message({"role": "assistant", "content": line})
+        history.add_unstored(note)
+        await history.flush()
+
+    async def cover_needs_you(task_ids: Collection[str]) -> None:
+        delivered = await take_items(call_inbox, call_inbox.take_needs_you(task_ids), take)
+        if delivered is not None:
+            await history.merge(delivered.entries)
+
+    requests = CallRequests(
+        seti,
+        tools.confirmations,
+        CallVoice(
+            floor_free=lambda secs: gate.silent(
+                max(secs, QUESTION_GAP_SECS) if ended_with_question(context.messages) else secs
+            ),
+            speak=speak_line,
+            told=tell_context,
+            covered=cover_needs_you,
+            address=lambda: clean_address(packs.address),
+            asleep=lambda: wake.settings.enabled and not wake.awake,
+            wake=wake_for_inbox,
+        ),
     )
     delivering: list[asyncio.Task[None]] = []
 

@@ -94,14 +94,62 @@ def _words(text: str) -> list[str]:
     return re.findall(r"[^\W_]+(?:'[^\W_]+)?", folded)
 
 
-def said_yes(text: str, agrees: Iterable[str] = ()) -> bool:
+def said_yes(text: str, agrees: Iterable[str] = (), *, only_agrees: bool = False) -> bool:
     """True when the message holds a yes and no word of refusal.
 
     `agrees` adds the words that repeat the read-back's own side, such as allow for an Allow.
+    With `only_agrees`, a bare yes is not enough: the question offered more than one way on.
     """
     words = _words(text)
-    if any(word in NO_WORDS for word in words):
+    if any(word in NO_WORDS for word in words) or said_later(text):
         return False
+    if only_agrees:
+        return any(word in frozenset(agrees) for word in words)
     joined = f" {' '.join(words)} "
     yes = YES_WORDS | frozenset(agrees)
     return any(word in yes for word in words) or any(f" {phrase} " in joined for phrase in YES_PHRASES)
+
+
+LATER_PHRASES = (
+    "not now",
+    "not yet",
+    "later",
+    "hold on",
+    "hold off",
+    "hold",
+    "wait",
+    "in a minute",
+    "in a moment",
+    "in a bit",
+    "one moment",
+    "one sec",
+    "one second",
+    "leave it",
+    "after this",
+    "busy",
+)
+DENY_WORDS = frozenset({"deny", "refuse", "reject", "decline"})
+
+
+def said_later(text: str) -> bool:
+    """True when the message puts the matter off rather than answering it, such as "not now"."""
+    joined = f" {' '.join(_words(text))} "
+    return any(f" {phrase} " in joined for phrase in LATER_PHRASES)
+
+
+def said_no(text: str) -> bool:
+    """True when the message refuses, such as "no" or "deny it", and neither says yes nor puts it off."""
+    words = _words(text)
+    if said_later(text) or any(word in YES_WORDS for word in words):
+        return False
+    return any(word in NO_WORDS or word in DENY_WORDS for word in words)
+
+
+def own_words(text: str) -> str:
+    """What the user said with a refusal, for the agent; empty when it was only the refusal."""
+    words = _words(text)
+    if all(
+        word in NO_WORDS or word in DENY_WORDS or word in ("it", "thanks", "thank", "you") for word in words
+    ):
+        return ""
+    return " ".join(text.split())
