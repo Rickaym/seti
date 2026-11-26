@@ -12,22 +12,22 @@ const reply = z.looseObject({
 })
 const notification = z.looseObject({ method: z.string(), params: z.unknown().optional() })
 
-/** A notification or request as Codex sent it. */
-export interface CodexCall {
+/** A notification or request as the runtime sent it. */
+export interface RpcCall {
   method: string
   params?: unknown
 }
 
 /** What a driver hands its session as lines arrive. */
 export interface RpcHandlers {
-  notified: (message: CodexCall) => void
-  /** Codex asks Seti and waits; the answer is the result, or an Error for a JSON-RPC error. */
-  asked: (message: CodexCall & { id: number | string }) => void
+  notified: (message: RpcCall) => void
+  /** The runtime asks Seti and waits for the answer: a result, or a JSON-RPC error. */
+  asked: (message: RpcCall & { id: number | string }) => void
   /** A line that is not a JSON-RPC message at all. */
   garbled: (line: string) => void
 }
 
-/** An error Codex answered a request with. */
+/** An error the runtime answered a request with. */
 export class RpcError extends Error {
   readonly code: number | undefined
 
@@ -40,25 +40,28 @@ export class RpcError extends Error {
 const STDERR_TAIL = 2000
 
 /**
- * JSON-RPC over a Codex app-server's stdio, one JSON object per line, without the `jsonrpc`
- * field. It never times out a request: a reply may wait as long as the user takes.
+ * JSON-RPC over a runtime's stdio, one JSON object per line; `stamped` writes the `jsonrpc`
+ * field, which Codex leaves out and ACP needs. It never times out a request: a reply may wait as
+ * long as the user takes.
  */
-export class CodexRpc {
+export class JsonRpc {
   private next = 1
   private over: Error | null = null
   private stderr = ''
   private lines: Interface | null = null
   private readonly pending = new Map<number, { resolve: (value: unknown) => void; reject: (e: Error) => void }>()
   private readonly child: ChildProcess
+  private readonly stamp: { jsonrpc: '2.0' } | Record<string, never>
 
-  constructor(child: ChildProcess) {
+  constructor(child: ChildProcess, options: { stamped: boolean } = { stamped: false }) {
     this.child = child
+    this.stamp = options.stamped ? { jsonrpc: '2.0' } : {}
     child.stderr?.on('data', (chunk: Buffer | string) => {
       this.stderr = `${this.stderr}${chunk.toString()}`.slice(-STDERR_TAIL)
     })
   }
 
-  /** The last lines Codex wrote to stderr, for an error that names why it stopped. */
+  /** The last lines the runtime wrote to stderr, for an error that names why it stopped. */
   get stderrTail(): string {
     return this.stderr.trim()
   }
@@ -109,9 +112,9 @@ export class CodexRpc {
     this.lines?.close()
   }
 
-  private write(message: unknown): void {
+  private write(message: Record<string, unknown>): void {
     if (this.over === null && this.child.stdin?.writable === true) {
-      this.child.stdin.write(`${JSON.stringify(message)}\n`)
+      this.child.stdin.write(`${JSON.stringify({ ...this.stamp, ...message })}\n`)
     }
   }
 

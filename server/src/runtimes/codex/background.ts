@@ -1,6 +1,6 @@
 import type { CodexJob } from '@seti/shared'
 import { z } from 'zod'
-import type { CodexCall, CodexRpc } from './rpc.js'
+import type { RpcCall, JsonRpc } from '../json-rpc.js'
 
 const commandNote = z.looseObject({
   threadId: z.string().optional(),
@@ -19,16 +19,16 @@ export class Background {
   private readonly running = new Set<string>()
   private readonly jobs = new Map<string, CodexJob>()
   private readonly abandoned = new Set<string>()
-  private readonly rpc: CodexRpc
+  private readonly rpc: JsonRpc
   private readonly root: () => string
 
-  constructor(rpc: CodexRpc, root: () => string) {
+  constructor(rpc: JsonRpc, root: () => string) {
     this.rpc = rpc
     this.root = root
   }
 
   /** Follows the agent's commands; returns the job whose end this message reports, if any. */
-  note(message: CodexCall): CodexJob | undefined {
+  note(message: RpcCall): CodexJob | undefined {
     const note = commandNote.safeParse(message.params).data
     if (note === undefined || (note.threadId !== undefined && note.threadId !== this.root())) {
       return undefined
@@ -71,7 +71,7 @@ export class Background {
   }
 
   /** At a turn's end: the list request and Codex's reply naming the commands still running. */
-  async listed(): Promise<{ message: CodexCall; reply: unknown } | null> {
+  async listed(): Promise<{ message: RpcCall; reply: unknown } | null> {
     const fresh = [...this.running].filter((id) => !this.jobs.has(id) && !this.abandoned.has(id))
     if (fresh.length === 0) {
       return null

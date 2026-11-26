@@ -1,4 +1,4 @@
-import type { CodexCall } from './rpc.js'
+import type { RpcCall } from '../json-rpc.js'
 
 /**
  * Notifications Seti asks Codex not to send. `remoteControl/status/changed` carries the host's
@@ -51,6 +51,6 @@ export function kept(body: unknown): unknown {
 }
 
 /** The message as Seti stores it. */
-export function keptMessage(message: CodexCall): CodexCall {
+export function keptMessage(message: RpcCall): RpcCall {
   return message.params === undefined ? message : { ...message, params: kept(message.params) }
 }
