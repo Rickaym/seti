@@ -1,6 +1,6 @@
 import { guessLanguage, languageOfClasses } from '@seti/shared'
 import { defaultSchema, type Schema } from 'hast-util-sanitize'
-import { Suspense, useContext, useMemo, type ComponentProps, type ComponentType, type ReactNode } from 'react'
+import { Suspense, useContext, useMemo, useState, type ComponentProps, type ComponentType, type ReactNode } from 'react'
 import MarkdownRoot, { type Components, type ExtraProps, type Options } from 'react-markdown'
 import rehypeRaw from 'rehype-raw'
 import rehypeSanitize from 'rehype-sanitize'
@@ -10,10 +10,14 @@ import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { HighlightedCode } from '@/components/highlight/HighlightedCode'
 import { LinkPill } from '@/components/links/LinkPill'
 import { MarkdownImagesContext } from '@/components/markdown-images'
+import { InlineReference, ReferenceQuote, ReferenceSup, SourcesSlot } from '@/components/references/markdown-references'
+import { INLINE_LINK, ReferencesContext, useReferenceOf } from '@/components/references/reference-context'
 import { useFenceRenderer } from '@/lib/fence-renderers'
 import { pathOfHref, remarkFilePaths } from '@/lib/file-paths'
 import { textIsUrl } from '@/lib/links/bare-urls'
 import { pillOf } from '@/lib/links/link-label'
+import { newToken, REF_PROPERTY, SOURCES_PROPERTY, type ReferenceSet } from '@/lib/references/reference-set'
+import { remarkReferences } from '@/lib/references/remark-references'
 import { cn } from '@/lib/utils'
 import { useViewTheme } from '@/lib/view-theme'
 
@@ -29,24 +33,31 @@ function plainText(node: ExtraProps['node']): string | null {
   return children.length > 0 && texts.length === children.length ? texts.join('') : null
 }
 
-/** In-page links stay in the page; a bare URL shows as a pill; the rest open in a new tab. */
+/**
+ * In-page links stay in the page; a link inside a sentence is a reference; a bare URL shows as a
+ * pill; the rest open in a new tab.
+ */
 function Anchor({ node, children, ...props }: ComponentProps<'a'> & ExtraProps) {
   const { href } = props
+  const reference = useReferenceOf(node)
   if (href?.startsWith('#') === true) {
     return <a {...props}>{children}</a>
   }
   const text = plainText(node)
-  const pill = href !== undefined && text !== null && textIsUrl(text, href) ? pillOf(href) : null
+  const bare = href !== undefined && text !== null && textIsUrl(text, href)
+  if (reference !== null && href !== undefined && reference.href === href) {
+    return (
+      <InlineReference reference={reference} bare={bare}>
+        {children}
+      </InlineReference>
+    )
+  }
+  const pill = bare ? pillOf(href) : null
   if (pill !== null && href !== undefined) {
     return <LinkPill href={href} info={pill} />
   }
   return (
-    <a
-      {...props}
-      target="_blank"
-      rel="noreferrer"
-      className="text-primary underline decoration-primary/40 underline-offset-2 hover:decoration-primary"
-    >
+    <a {...props} target="_blank" rel="noreferrer" className={INLINE_LINK}>
       {children}
     </a>
   )
@@ -129,37 +140,24 @@ function Pre({ node, ...props }: ComponentProps<'pre'> & ExtraProps) {
   )
 }
 
+type HeadingTag = 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6'
+
+/** A heading in its style; a class the source gives, such as sr-only, stays. */
+const heading = (Tag: HeadingTag, style: string) =>
+  function Heading({ node: _node, className, ...props }: ComponentProps<HeadingTag> & ExtraProps) {
+    return <Tag {...props} className={cn(className, style)} />
+  }
+
 const components: Components = {
-  h1: ({ node: _node, children, ...props }) => (
-    <h1 {...props} className={`${HEADING} border-b border-border pb-1 text-lg text-foreground`}>
-      {children}
-    </h1>
-  ),
-  h2: ({ node: _node, children, ...props }) => (
-    <h2 {...props} className={`${HEADING} text-base text-foreground`}>
-      {children}
-    </h2>
-  ),
-  h3: ({ node: _node, children, ...props }) => (
-    <h3 {...props} className={`${HEADING} text-sm text-foreground/85`}>
-      {children}
-    </h3>
-  ),
-  h4: ({ node: _node, children, ...props }) => (
-    <h4 {...props} className={MINOR_HEADING}>
-      {children}
-    </h4>
-  ),
-  h5: ({ node: _node, children, ...props }) => (
-    <h5 {...props} className={MINOR_HEADING}>
-      {children}
-    </h5>
-  ),
-  h6: ({ node: _node, children, ...props }) => (
-    <h6 {...props} className={MINOR_HEADING}>
-      {children}
-    </h6>
-  ),
+  blockquote: ReferenceQuote,
+  sup: ReferenceSup,
+  section: SourcesSlot,
+  h1: heading('h1', `${HEADING} border-b border-border pb-1 text-lg text-foreground`),
+  h2: heading('h2', `${HEADING} text-base text-foreground`),
+  h3: heading('h3', `${HEADING} text-sm text-foreground/85`),
+  h4: heading('h4', MINOR_HEADING),
+  h5: heading('h5', MINOR_HEADING),
+  h6: heading('h6', MINOR_HEADING),
   ul: ({ node: _node, ...props }) => (
     <ul {...props} className="list-disc space-y-0.5 pl-5 marker:text-muted-foreground" />
   ),
@@ -172,9 +170,6 @@ const components: Components = {
   input: ({ node: _node, ...props }) => <input {...props} className="mr-2 -ml-5 align-middle accent-primary" />,
   a: Anchor,
   strong: ({ node: _node, ...props }) => <strong {...props} className="font-semibold text-foreground" />,
-  blockquote: ({ node: _node, ...props }) => (
-    <blockquote {...props} className="space-y-2 border-l-2 border-border pl-3 text-muted-foreground" />
-  ),
   hr: ({ node: _node, ...props }) => <hr {...props} className="border-border" />,
   code: ({ node: _node, ...props }) => (
     <code {...props} className={cn('border border-border bg-code px-1 py-px font-mono text-[0.85em]', NO_LIGATURES)} />
@@ -200,8 +195,23 @@ const components: Components = {
   },
 }
 
-/** GitHub's own allowlist; the prefix keeps ids from comments out of the page's id space. */
-const githubSchema: Schema = { ...defaultSchema, clobberPrefix: 'gh-' }
+const allowed = (tag: string, ...names: string[]) => [...(defaultSchema.attributes?.[tag] ?? []), ...names]
+
+/**
+ * GitHub's own allowlist; the prefix keeps ids from comments out of the page's id space. The
+ * reference properties pass, and only the ones this view's token signs count.
+ */
+const githubSchema: Schema = {
+  ...defaultSchema,
+  clobberPrefix: 'gh-',
+  attributes: {
+    ...defaultSchema.attributes,
+    a: allowed('a', REF_PROPERTY),
+    blockquote: allowed('blockquote', REF_PROPERTY),
+    sup: allowed('sup', REF_PROPERTY),
+    section: allowed('section', SOURCES_PROPERTY),
+  },
+}
 
 const githubHtml: NonNullable<Options['rehypePlugins']> = [rehypeRaw, [rehypeSanitize, githubSchema]]
 
@@ -250,12 +260,17 @@ function withFileLinks(FileLink: FileLinkRenderer): Components {
   }
 }
 
-/** GitHub-flavoured Markdown; raw HTML is escaped unless `html`, which renders it sanitized. */
+/**
+ * GitHub-flavoured Markdown; raw HTML is escaped unless `html`, which renders it sanitized. Links
+ * inside sentences and footnotes become numbered references with a Sources list unless
+ * `references` is false, as for documents.
+ */
 export function Markdown({
   text,
   html = false,
   plugins = [],
   fileLink,
+  references = true,
   className,
 }: {
   text: string
@@ -263,15 +278,24 @@ export function Markdown({
   plugins?: NonNullable<Options['remarkPlugins']>
   /** Renders the file paths and Files links in the text, such as chips that open the Files view. */
   fileLink?: FileLinkRenderer | undefined
+  references?: boolean
   className?: string
 }) {
+  const [set] = useState<ReferenceSet>(() => ({ token: newToken(), refs: [] }))
   const rendered = useMemo(() => (fileLink === undefined ? components : withFileLinks(fileLink)), [fileLink])
-  const remark = fileLink === undefined ? [remarkGfm, ...plugins] : [remarkGfm, ...plugins, remarkFilePaths]
+  const remark = [
+    remarkGfm,
+    ...plugins,
+    ...(fileLink === undefined ? [] : [remarkFilePaths]),
+    ...(references ? [remarkReferences(set)] : []),
+  ]
   return (
     <div className={cn(PROSE, className)}>
-      <MarkdownRoot remarkPlugins={remark} rehypePlugins={html ? githubHtml : []} components={rendered}>
-        {text}
-      </MarkdownRoot>
+      <ReferencesContext value={references ? set : null}>
+        <MarkdownRoot remarkPlugins={remark} rehypePlugins={html ? githubHtml : []} components={rendered}>
+          {text}
+        </MarkdownRoot>
+      </ReferencesContext>
     </div>
   )
 }

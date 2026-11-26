@@ -11,7 +11,11 @@ function useMediaQuery(query: string): boolean {
     },
     [query],
   )
-  return useSyncExternalStore(subscribe, () => window.matchMedia(query).matches)
+  return useSyncExternalStore(
+    subscribe,
+    () => window.matchMedia(query).matches,
+    () => false,
+  )
 }
 
 /** True on touch screens, where hover and keyboard shortcut hints do not apply. */
