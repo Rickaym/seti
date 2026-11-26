@@ -10,7 +10,7 @@ import { acpSession, type AcpRealised, type AcpShapes } from './session.js'
  * arguments for a model, the environment Seti presets over the sandbox's, and the variable that
  * must hold the model key's placeholder.
  */
-interface AcpLaunch {
+export interface AcpLaunch {
   label: string
   command: string
   args: (model: string) => string[]

@@ -10,6 +10,7 @@
     "backup": "tsx src/backup-cli.ts",
     "build-id": "tsx src/node/build-id-cli.ts",
     "codex-binary": "tsx src/codex-binary-cli.ts",
+    "gemini-bundle": "tsx src/gemini-bundle-cli.ts",
     "doctor": "tsx src/doctor-cli.ts",
     "ea-index": "tsx src/ea-index-cli.ts",
     "secrets": "tsx src/secrets-cli.ts",

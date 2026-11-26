@@ -29,7 +29,13 @@ async function benchFor(binary: string): Promise<GeminiBench | null> {
 
 const bench = await benchFor(process.env.SETI_GEMINI_BIN ?? '')
 
-describe.skipIf(bench === null)('Gemini CLI over the program SETI_GEMINI_BIN names', () => {
+describe.runIf(process.env.CI === 'true')('the Gemini CLI conformance run in CI', () => {
+  it('has the pinned bundle, so the cases below run instead of skipping', () => {
+    expect(bench, 'CI must set SETI_GEMINI_BIN (the gemini-bundle script)').not.toBeNull()
+  })
+})
+
+describe.skipIf(bench === null)('Gemini CLI over the bundle SETI_GEMINI_BIN names', () => {
   if (bench !== null) {
     describeAdapter(geminiTarget(bench))
   }
