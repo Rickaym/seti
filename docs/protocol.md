@@ -297,7 +297,8 @@ between two steps; an interrupt; a hook at subagent start.
   format option, git settings or environment on the line, output sent to a file, or another
   command that prints gives no item. The item's text is the result from its header to the next,
   its time the author date, and its permalink the commit page when a branch of `origin` holds the
-  commit; otherwise it has none. A GitHub commit link names the item by its full hash, or by a
+  commit; otherwise it has none. As with files, commits are placed only as the result arrives. A
+  GitHub commit link names the item by its full hash, or by a
   short one as a prefix, and is never reported as not read.
 
 ## 4. Turn lifecycle
