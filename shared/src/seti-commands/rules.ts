@@ -150,7 +150,7 @@ const onOff = (on: OpRule = USER, off: OpRule = USER) => values([value('on', 'On
 type SettingId = AgentSettingEntry['id']
 
 /** Where a setting's kind alone does not say what it takes; every other setting follows its kind. */
-export const DECLARED_GRAMMAR: Partial<Readonly<Record<SettingId, SetiGrammar>>> = {
+const DECLARED_GRAMMAR: Partial<Readonly<Record<SettingId, SetiGrammar>>> = {
   access: { kind: 'access' },
   mcp: { kind: 'alias', target: 'mcp' },
   credential: { kind: 'within', target: 'credential' },
