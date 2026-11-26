@@ -101,6 +101,19 @@ describe('evidence ledger', () => {
     ])
   })
 
+  it('counts a permalink the agent only wrote itself as not read', async () => {
+    const task = await readerTask()
+    const assembled = `https://${HOST}/archives/${CHANNEL}/p1764000777000100`
+    const reply = {
+      type: 'assistant',
+      parent_tool_use_id: null,
+      message: { content: [{ type: 'text', text: assembled }] },
+    }
+    await nodeLink.journal(task, { type: 'message', runtime: 'claude', payload: reply as unknown as ClaudeMessage })
+    const [own] = await match(task, [{ href: assembled, quote: null }])
+    expect(own?.unread).toBe(true)
+  })
+
   it("keeps each agent's ledger its own", async () => {
     const reader = await readerTask()
     const other = await quietTask()
