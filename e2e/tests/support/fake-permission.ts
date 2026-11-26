@@ -75,11 +75,16 @@ export type CanUseTool = (
 
 const PERMISSION_INPUT = { command: PERMISSION_COMMAND }
 
-/** Asks to run the command that follows it in the prompt, such as one that merges a PR. */
+/** Asks to run the command that follows it in the prompt, with the description after it. */
 export const COMMAND_PROMPT = 'run this once I allow it:'
-const commandInput = (prompt: string) => ({
-  command: prompt.slice(prompt.indexOf(COMMAND_PROMPT) + COMMAND_PROMPT.length).trim(),
-})
+/** Splits the command from the description the agent gives it, written after ` ## `. */
+export const DESCRIPTION_MARK = ' ## '
+const commandInput = (prompt: string) => {
+  const [command = '', description] = prompt
+    .slice(prompt.indexOf(COMMAND_PROMPT) + COMMAND_PROMPT.length)
+    .split(DESCRIPTION_MARK)
+  return description === undefined ? { command: command.trim() } : { command: command.trim(), description }
+}
 
 /** The rule Claude Code offers: a prefix for the deploy, the exact line for any other command. */
 const ruleFor = (command: string) => (command === PERMISSION_COMMAND ? `${command}:*` : command)
