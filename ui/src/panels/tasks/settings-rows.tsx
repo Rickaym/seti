@@ -107,7 +107,7 @@ export function SettingRows({ tab, context }: { tab: AgentSettingTab; context: R
   return AGENT_SETTING_ENTRIES.filter((entry): entry is TabEntry => entry.place === tab).map((entry) => {
     const row = ROWS[entry.id](context)
     return row === null ? null : (
-      <Row key={entry.id} label={entry.label} warn={row.warn}>
+      <Row key={entry.id} label={entry.label} warn={row.warn ?? false}>
         {row.body}
       </Row>
     )
