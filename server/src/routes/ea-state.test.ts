@@ -304,6 +304,30 @@ describe('EA call ends', () => {
     expect((await auditEvents.latest('ea.call_ended'))?.detail).not.toHaveProperty('transcript')
   })
 
+  it('audits how the call audio fared as numbers, never an address', async () => {
+    const quality = {
+      lost_pct: 1.2,
+      concealed_s: 0.4,
+      jitter_ms: 18,
+      rtt_ms: 84,
+      path: 'relay',
+      protocol: 'udp',
+      reconnects: 1,
+    }
+    const sent = { ...end, quality: { ...quality, address: 'phone.local' } }
+    expect((await send('PUT', '/call-end', LOCAL, sent)).status).toBe(200)
+    expect((await auditEvents.latest('ea.call_ended'))?.detail).toMatchObject({
+      audio_lost_pct: 1.2,
+      audio_concealed_s: 0.4,
+      audio_rtt_ms: 84,
+      audio_path: 'relay',
+      audio_protocol: 'udp',
+      audio_reconnects: 1,
+    })
+    expect(JSON.stringify((await auditEvents.latest('ea.call_ended'))?.detail)).not.toContain('phone.local')
+    expect((await send('PUT', '/call-end', LOCAL, { ...end, quality: { ...quality, lost_pct: 150 } })).status).toBe(400)
+  })
+
   it('audits the kinds of microphone a call used and its reroutes, never a device name', async () => {
     const routed = { ...end, inputs: ['default', 'bluetooth'], reroutes: 2 }
     expect((await send('PUT', '/call-end', LOCAL, routed)).status).toBe(200)
