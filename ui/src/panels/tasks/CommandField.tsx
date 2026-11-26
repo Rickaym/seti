@@ -22,8 +22,10 @@ interface CommandFieldProps {
   placement: 'above' | 'below'
   /** Plain Enter with `enterSends`, otherwise Ctrl+Enter or Cmd+Enter; false for a scripted key. */
   onSubmit?: (trusted: boolean) => void
-  /** The text after the user typed in the box or picked a command, never after a paste or drop. */
+  /** The text after the user typed in the box, never after a paste or drop. */
   onTyped?: (value: string) => void
+  /** A command picked from the list replaced the text, which was typed or not as before. */
+  onPicked?: (value: string) => void
   /** Esc that the box does not take itself; true when it closed something. */
   onEscape?: () => boolean
   /** Enter submits and Ctrl+Enter or Shift+Enter starts a new line, as in Claude Code. */
@@ -119,7 +121,19 @@ function useAttachInput(attach: AttachHandlers | undefined, disabled: boolean) {
 
 /** A textarea that suggests slash commands while the first word is typed. */
 export function CommandField(props: CommandFieldProps) {
-  const { value, onChange, onTyped, commands, placement, onSubmit, onAltSubmit, attach, find, disabled = false } = props
+  const {
+    value,
+    onChange,
+    onTyped,
+    onPicked,
+    commands,
+    placement,
+    onSubmit,
+    onAltSubmit,
+    attach,
+    find,
+    disabled = false,
+  } = props
   const { dropClass, ...attachInput } = useAttachInput(attach, disabled)
   const { ref: editorRef, ...editor } = useEditorText(value, onChange)
   const listId = useId()
@@ -135,7 +149,7 @@ export function CommandField(props: CommandFieldProps) {
 
   const accept = (command: ComposerCommand) => {
     onChange(`/${command.name} `)
-    onTyped?.(`/${command.name} `)
+    onPicked?.(`/${command.name} `)
     setActive(0)
   }
 

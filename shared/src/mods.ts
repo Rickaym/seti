@@ -10,12 +10,13 @@ import {
   type ModPoint,
   type ModSettingField,
 } from './mod-contributions.js'
+import { unknownRouteCommand } from './mod-ea-reach.js'
 import { modListingFields, type ModDocs, type ModIcon } from './mod-listing.js'
 import { modAgentEntry, modGlob } from './mod-scopes.js'
 import { thirdPartyProblem } from './mod-third-party.js'
 
 /** The version of the mod API this Seti offers; a manifest's `seti` range must match it. */
-export const MOD_API_VERSION = '1.24.0'
+export const MOD_API_VERSION = '1.25.0'
 
 /** A mod's id: lowercase words joined by -, so `<mod>.<name>` never reads two ways. */
 export const MOD_ID = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/
@@ -137,6 +138,10 @@ export const modManifest = z
     if (long !== undefined) {
       const message = `The agent tool ${modToolName(manifest.id, long.id)} is longer than ${String(MOD_TOOL_NAME_MAX)}`
       ctx.addIssue({ code: 'custom', path: ['contributes', 'commands'], message })
+    }
+    const unknown = unknownRouteCommand(manifest.contributes)
+    if (unknown !== undefined) {
+      ctx.addIssue({ code: 'custom', path: ['contributes', 'routes'], message: unknown })
     }
   })
 export type ModManifest = z.output<typeof modManifest>
