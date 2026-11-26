@@ -177,10 +177,11 @@ between two steps; an interrupt; a hook at subagent start.
 - RT-11: Turning a runtime on installs the version the control room pins, in the background;
   pressing Retry and the control room's start while the runtime is on are the only other
   triggers, and the EA and agents can trigger none of them. The install contacts only the host
-  the pin names, MUST check the downloaded package's sha512 integrity and then the program's
-  sha256, both from the pin, and MUST discard what it fetched and never run it when either
-  differs. The program lands alone in a folder of the control room's own data, one folder per
-  version, read and run only, which a sandbox mounts read-only. The install resumes a cut
+  the pin names, MUST check the downloaded package's sha512 integrity and then the sha256 of the
+  program and of each helper program the pin names (Codex's code mode host), all from the pin,
+  and MUST discard what it fetched and never run it when any differs. The program and its
+  helpers land alone in a folder of the control room's own data, one folder per version, read
+  and run only, which a sandbox mounts read-only; a folder missing a helper is fetched again. The install resumes a cut
   download, fetches once however often it is asked, and records each install and failure in the
   audit log with the version and checksum. A user MAY name a program of their own instead, for a
   machine without network access; it MUST report the pinned version, and nothing is fetched for
@@ -243,15 +244,23 @@ between two steps; an interrupt; a hook at subagent start.
 - SRC-1: The control room keeps an evidence ledger per agent. When a tool call ends well and an
   adapter recognises it as a read from a source system (a Slack tool server's channel, thread and
   message search reads; a Linear tool server's issue, issue list and comment reads; `gh pr view`,
-  `gh issue view` and `gh api` GETs of pull requests, issues, comments and reviews), it records one
+  `gh issue view`, `gh pr diff` and `gh api` GETs of pull requests, issues, comments and reviews),
+  it records one
   row per item read: the source kind, its container (channel, repository or team), the key a cited
   link is matched by, its permalink, its time and a pointer to the tool result in the stored
   transcript. The ledger MUST NOT copy the item's text: it reads the result as the transcript
   stores it, so credential redaction applies, and it reads both runtimes from neutral events.
 - SRC-2: An adapter reads only the structure the source's server writes: fields at their fixed
   places, the counts the answer states, and the ids the call asked for. An answer that does not
-  fit gives no item, and so does a shell command that uses anything beyond plain words and quotes,
-  or filters or pipes the output. A permalink is the one the answer states, else one built from
+  fit gives no item. A shell line is read as the outward check reads it, past `cd`, wrappers and
+  variables given one literal value; a gh read whose repository or number the shell computes
+  gives no item, nor does any gh write, a line that sets `GH_REPO` or `GH_HOST`, or a read whose
+  output goes to a file. A read whose output is filtered (`--jq`, a pipe) or shares the result
+  with other commands is recorded under the repository and number its own words name, and only
+  when the result is not empty and holds no gh error. Its text is the whole result when the line
+  prints that one read alone, through a jq program with no literal, variable, environment or input
+  and pipe filters that only cut, order or count; otherwise the item has no text, so no quote
+  verifies against it. A permalink is the one the answer states, else one built from
   parts the call and answers stated (Slack: the workspace host the agent's Slack answers stated, the
   channel and the `ts`; GitHub: the repository and number); one that cannot be built so stays
   empty and is never guessed.
@@ -1439,6 +1448,11 @@ Optional and off by default: a maintenance session per agent that consolidates i
   and agents alike.
 - MOD-26: A mod's slash command MUST NOT take the name of one of an agent's settings, such as
   `restart`, `mcp` or `settings`, nor any name with `seti:`; a manifest that names one is invalid.
+- MOD-27: A mod's command offered on the palette, an agent's header or menu, or a view SHOULD also
+  be offered to the EA or carry `eaReason`, and a mod's route other than `GET` SHOULD name a
+  command offered to the EA or carry `eaReason`. A route's `command` MUST name one of the mod's
+  commands. The control room writes a warning to the mod's log for each one that does neither when
+  it starts the mod; mod API 2.0.0 makes these MUST and refuses such a manifest.
 
 ## 18. Public surfaces
 

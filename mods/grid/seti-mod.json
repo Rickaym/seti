@@ -1,8 +1,8 @@
 {
   "id": "grid",
   "name": "Grid",
-  "version": "1.2.1",
-  "seti": "^1.14",
+  "version": "1.2.2",
+  "seti": "^1.25",
   "description": "Shows agents and terminals side by side in panels you drag, resize and tidy, one layout per workspace.",
   "author": "Seti",
   "icon": "layout-grid",
@@ -18,6 +18,7 @@
         "icon": "layout-grid",
         "description": "grid tile split several multiple agents side by side layout",
         "for": ["palette"],
+        "eaReason": "It arranges the panels this browser shows",
         "chord": "Alt+G",
         "changes": false
       },
@@ -28,6 +29,7 @@
         "description": "Show this agent beside others",
         "args": { "task": { "type": "string" } },
         "for": ["palette", "agentHeader"],
+        "eaReason": "It arranges the panels this browser shows",
         "changes": false
       },
       {
@@ -36,6 +38,7 @@
         "icon": "rows-3",
         "description": "Lay the panels out evenly to fit the window",
         "for": ["palette"],
+        "eaReason": "It arranges the panels this browser shows",
         "changes": false
       },
       {
@@ -44,6 +47,7 @@
         "icon": "lock",
         "description": "grid layout freeze pin panels drag resize",
         "for": ["palette"],
+        "eaReason": "It arranges the panels this browser shows",
         "changes": false
       },
       {
@@ -52,6 +56,7 @@
         "icon": "eraser",
         "description": "Take every panel out; agents keep running",
         "for": ["palette"],
+        "eaReason": "It arranges the panels this browser shows",
         "changes": false
       },
       {
@@ -60,6 +65,7 @@
         "icon": "move",
         "description": "Move and resize the focused panel with arrow keys",
         "for": ["palette"],
+        "eaReason": "It arranges the panels this browser shows",
         "changes": false
       }
     ],
@@ -67,7 +73,12 @@
     "styles": [{ "id": "panels", "file": "panels.css" }],
     "routes": [
       { "method": "GET", "path": "/layouts", "demo": true },
-      { "method": "PUT", "path": "/layouts/:workspace_id", "demo": true }
+      {
+        "method": "PUT",
+        "path": "/layouts/:workspace_id",
+        "demo": true,
+        "eaReason": "It saves the grid the user arranged by hand"
+      }
     ]
   }
 }

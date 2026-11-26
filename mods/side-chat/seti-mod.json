@@ -1,8 +1,8 @@
 {
   "id": "side-chat",
   "name": "Side chat",
-  "version": "1.2.0",
-  "seti": "^1.24",
+  "version": "1.2.1",
+  "seti": "^1.25",
   "description": "Ask an agent about its work with /btw, without interrupting it; each answer stays in its transcript as an aside.",
   "author": "Seti",
   "icon": "message-circle-question-mark",
@@ -93,7 +93,8 @@
       {
         "method": "POST",
         "path": "/tasks/:task",
-        "stream": true
+        "stream": true,
+        "command": "ask"
       },
       {
         "method": "GET",
@@ -102,11 +103,13 @@
       },
       {
         "method": "DELETE",
-        "path": "/tasks/:task/asides"
+        "path": "/tasks/:task/asides",
+        "command": "clear"
       },
       {
         "method": "DELETE",
-        "path": "/tasks/:task/asides/:aside"
+        "path": "/tasks/:task/asides/:aside",
+        "command": "clear"
       }
     ],
     "transcriptBlocks": [

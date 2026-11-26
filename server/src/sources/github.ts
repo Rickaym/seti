@@ -1,5 +1,6 @@
 import type { ToolCall } from '@seti/shared'
-import { ghRead, type GhApi, type GhView } from './gh-command.js'
+import type { GhApi, GhRead, GhView } from './gh-command.js'
+import { ghLine } from './gh-line.js'
 import { at, isoTime, isRecord, parseJson, stringAt, type FoundItem, type ParseResult } from './item.js'
 import { refOfUrl } from './refs.js'
 
@@ -135,15 +136,61 @@ function restAnswer(read: GhApi): ParseResult {
   }
 }
 
-/** The reader of a gh read's output, or null for any other call. */
-export function githubRead(call: ToolCall): ParseResult | null {
-  const command = call.shell?.action === 'run' ? call.shell.command : undefined
-  const read = command === undefined ? null : ghRead(command)
-  if (read === null) {
+/** The page of the item a read names by its own words, or null when its words do not say. */
+function pageOf(read: GhRead): string | null {
+  if (read.form === 'api') {
+    const page = read.pull ? 'pull' : 'issues'
+    return read.number === null ? null : `https://github.com/${read.repo}/${page}/${read.number}`
+  }
+  if (read.item === null || numberOf(read) !== null) {
+    return builtUrl(read, numberOf(read))
+  }
+  const item = named(read.item)
+  return item !== null && (read.repo === null || sameRepo(item.repo, read.repo)) ? item.url : null
+}
+
+/** The item a read names, under the given spans; a diff links to the changed files. */
+function identity(read: GhRead, spans: string[]): FoundItem[] {
+  const item = named(pageOf(read))
+  if (item === null) {
+    return []
+  }
+  const permalink = read.form === 'diff' ? `${item.url}/files` : item.url
+  return [{ kind: 'github', container: item.repo, ref: item.ref, permalink, at: null, spans }]
+}
+
+/** An error gh prints in place of an answer, so the item was not read. */
+const FAILED =
+  /^(?:GraphQL: |HTTP \d{3}|gh: |no (?:pull requests?|issues?) found|could not |error|failed |unknown (?:flag|command))/im
+
+/** The reader of a whole, unfiltered answer, which takes items and comments from the JSON. */
+function wholeReader(read: GhRead): ParseResult | null {
+  if (read.form === 'api') {
+    return read.filter === 'none' ? restAnswer(read) : null
+  }
+  if (read.form === 'diff' || read.filter !== 'none') {
     return null
   }
-  if (read.form === 'api') {
-    return restAnswer(read)
-  }
   return read.json ? (text) => viewJson(read, text) : (text) => viewText(read, text)
+}
+
+/**
+ * The reader of the GitHub reads a shell line makes with gh, or null for any other call. A whole
+ * answer is read as gh prints it; filtered output is recorded under the item the call's words
+ * name, its text quotable only when nothing else and nothing that adds text printed into it.
+ */
+export function githubRead(call: ToolCall): ParseResult | null {
+  const command = call.shell?.action === 'run' ? call.shell.command : undefined
+  const line = command === undefined ? null : ghLine(command)
+  const [only, ...more] = line?.reads ?? []
+  if (line === null || only === undefined) {
+    return null
+  }
+  const whole = line.output === 'whole' ? wholeReader(only) : null
+  if (whole !== null) {
+    return whole
+  }
+  const quotable = more.length === 0 && line.output !== 'mixed' && only.filter !== 'any'
+  const spans = quotable ? [at([])] : []
+  return (text) => (text.trim() === '' || FAILED.test(text) ? [] : line.reads.flatMap((read) => identity(read, spans)))
 }

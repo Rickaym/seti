@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.2.2
+
+Each grid command and the layout route say why the EA does not run them: they arrange the panels
+one browser shows. Needs mod API 1.25.
+
 ## 1.2.1
 
 Calm is gone: every panel shows its agent's transcript and reply box again, and the Calm toggle leaves the toolbar. List still hides the agents list beside the grid.
