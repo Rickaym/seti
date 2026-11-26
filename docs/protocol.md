@@ -177,10 +177,11 @@ between two steps; an interrupt; a hook at subagent start.
 - RT-11: Turning a runtime on installs the version the control room pins, in the background;
   pressing Retry and the control room's start while the runtime is on are the only other
   triggers, and the EA and agents can trigger none of them. The install contacts only the host
-  the pin names, MUST check the downloaded package's sha512 integrity and then the program's
-  sha256, both from the pin, and MUST discard what it fetched and never run it when either
-  differs. The program lands alone in a folder of the control room's own data, one folder per
-  version, read and run only, which a sandbox mounts read-only. The install resumes a cut
+  the pin names, MUST check the downloaded package's sha512 integrity and then the sha256 of the
+  program and of each helper program the pin names (Codex's code mode host), all from the pin,
+  and MUST discard what it fetched and never run it when any differs. The program and its
+  helpers land alone in a folder of the control room's own data, one folder per version, read
+  and run only, which a sandbox mounts read-only; a folder missing a helper is fetched again. The install resumes a cut
   download, fetches once however often it is asked, and records each install and failure in the
   audit log with the version and checksum. A user MAY name a program of their own instead, for a
   machine without network access; it MUST report the pinned version, and nothing is fetched for

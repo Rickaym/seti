@@ -573,9 +573,10 @@ old one once no agent runs it. With a separate node (`SETI_NODE=split`), `seti.s
 it; the node starts the program at the path the server hands it with each agent's spec, from the
 same `~/.seti`, and mounts its folder read-only into the sandbox as a single process does.
 
-On a machine without network access, put a `codex` program of the pinned version somewhere and
-name it under Advanced, Own program, in the Codex card; the status says when it is missing or
-another version. `pnpm seti:doctor` shows a Codex line while Codex is on.
+On a machine without network access, put a `codex` program of the pinned version somewhere, with
+the `codex-code-mode-host` program from the same package beside it, and name `codex` under
+Advanced, Own program, in the Codex card; the status says when it is missing or another version.
+Without the host, models newer than gpt-5.5 get no working tools and run nothing. `pnpm seti:doctor` shows a Codex line while Codex is on.
 
 A Codex agent runs only in the sandbox. Seti's rules answer its calls: a guard or deny rule
 refuses at once, an allow rule or Seti's read-only list runs the call, and every other command,

@@ -4,7 +4,7 @@ import { audit } from './audit.js'
 import {
   CodexInstallError,
   fetchPinned,
-  holdsSum,
+  holdsBuild,
   platformOf,
   programIn,
   stagingDir,
@@ -46,14 +46,14 @@ export async function copyState(pin: CodexPin = CODEX_PIN): Promise<CopyState> {
   if (failed !== undefined) {
     return { state: 'failed', failure: failed }
   }
-  let sha256: string
+  let build: ReturnType<typeof platformOf>
   try {
-    sha256 = platformOf(pin).sha256
+    build = platformOf(pin)
   } catch (e) {
     return { state: 'failed', failure: failureOf(e) }
   }
   const program = programIn(CODEX_ROOT, pin.version)
-  if (await holdsSum(program, sha256)) {
+  if (await holdsBuild(CODEX_ROOT, pin.version, build)) {
     return { state: 'ready', program }
   }
   const failure: CodexInstallFailure = fs.existsSync(program)
