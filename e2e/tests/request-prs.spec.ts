@@ -4,6 +4,7 @@ import { expect, test, unique } from './support/fixtures.js'
 import { FAKE_CLAUDE_ENV } from './support/processes.js'
 import {
   addAskRule,
+  archiveStarted,
   described,
   MERGE_DESCRIPTION,
   RETRY_TITLE,
@@ -13,12 +14,17 @@ import {
   requestCard,
   seedLeasePr,
   startAsking,
+  track,
 } from './support/request-prs.js'
 
 test.use({ serverEnv: { ...FAKE_CLAUDE_ENV, ...fakeGhEnv() } })
 
 test.beforeEach(() => {
   seedLeasePr()
+})
+
+test.afterEach(async ({ request }) => {
+  await archiveStarted(request)
 })
 
 test('a request whose command merges a PR shows the PR with its title, CI and a GitHub link', async ({
@@ -71,6 +77,7 @@ test('a command an ask rule holds offers no Always; one without a PR shows no PR
     data: { title: unique('Deployer'), prompt: `Please ${PERMISSION_PROMPT}`, sandbox: false },
   })
   const { data } = (await response.json()) as { data: { id: string } }
+  track(data.id)
   await page.goto(`/#agents/${data.id}`)
   await expect(requestCard(page).getByRole('button', { name: 'Always' })).toBeVisible()
   await expect(requestCard(page).getByRole('group', { name: 'Pull requests' })).toHaveCount(0)

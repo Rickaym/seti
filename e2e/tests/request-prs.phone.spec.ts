@@ -4,6 +4,7 @@ import { expectFitsPhone } from './support/phone-layout.js'
 import { FAKE_CLAUDE_ENV } from './support/processes.js'
 import {
   addAskRule,
+  archiveStarted,
   described,
   LEASE_TITLE,
   LEASE_URL,
@@ -18,6 +19,10 @@ test.use({ serverEnv: { ...FAKE_CLAUDE_ENV, ...fakeGhEnv() } })
 
 test.beforeEach(() => {
   seedLeasePr()
+})
+
+test.afterEach(async ({ request }) => {
+  await archiveStarted(request)
 })
 
 test('on a phone the PR line stays on one line with its title cut, and fits the screen', async ({ page, request }) => {

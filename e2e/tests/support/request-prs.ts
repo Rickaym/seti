@@ -34,8 +34,26 @@ export async function startAsking(request: APIRequestContext, command: string): 
   })
   expect(response.ok(), 'POST /api/tasks').toBe(true)
   const { id } = ((await response.json()) as Envelope<Task>).data
+  started.push(id)
   await expect.poll(async () => (await apiData<Task>(request, `/tasks/${id}`)).blocked).not.toBeNull()
   return id
+}
+
+/** Agents the test started, archived after it so none is left waiting on the user. */
+const started: string[] = []
+
+/** Notes an agent the test started another way, to archive it with the rest. */
+export function track(id: string): void {
+  started.push(id)
+}
+
+/** Archives the agents the test started, so other specs on this server find nobody waiting. */
+export async function archiveStarted(request: APIRequestContext): Promise<void> {
+  const ids = started.splice(0)
+  if (ids.length > 0) {
+    const response = await request.post('/api/tasks/archive', { data: { task_ids: ids, remove_worktree: false } })
+    expect(response.ok(), 'POST /api/tasks/archive').toBe(true)
+  }
 }
 
 export const requestCard = (page: Page) =>
