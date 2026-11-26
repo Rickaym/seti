@@ -1143,7 +1143,8 @@ Why: an agent woken by its own actions or by news nobody waited for burns turns 
 - EA-10: Off a call, watch and channel items wait for quiet (`settle`); others go at once. On a
   call nothing interrupts: items follow the user's next turn, and a needs-you item gets its own
   line after `call_silence`.
-- EA-12: If a reply promised to reach an agent and no tool did, the EA gets one more run.
+- EA-12: If a reply promised to reach an agent and no tool did, or promised a later check-in and
+  no follow-up or watch was set in that turn or the one before, the EA gets one more run.
 - EA-16: The EA, and agents at `full`, MUST be able to read every pending request of all agents or
   one, each with its id and agent, and a tool call or plan with Seti's reason, the agent's
   description, its input as stored (secrets redacted) and the PRs it names. Text an agent or a code
