@@ -19,6 +19,21 @@ describe('callReducer', () => {
     ])
   })
 
+  it('marks a dropped path and its rebuild once each, and only on a live call', () => {
+    const state = run(
+      [
+        { type: 'link', reconnecting: true, at: 2 },
+        { type: 'link', reconnecting: true, at: 3 },
+        { type: 'link', reconnecting: false, at: 4 },
+      ],
+      connected,
+    )
+    const markers = state.captions.items.map((item) => (item.kind === 'marker' ? item.text : item.kind))
+    expect(markers).toEqual(['Call started', 'Reconnecting', 'Reconnected'])
+    expect(state.reconnecting).toBe(false)
+    expect(run([{ type: 'link', reconnecting: true, at: 2 }])).toBe(initialCallState)
+  })
+
   it('does not mark a call that never connected, and keeps the error', () => {
     const state = run([
       { type: 'connecting', auto: false },
@@ -60,7 +75,7 @@ describe('callReducer', () => {
 
   it('keeps how the last connected call ended, but not a connect that failed', () => {
     const dropped = run([{ type: 'ended', at: 9, error: 'Lost', reason: 'ice-failed', hidden: true }], connected)
-    expect(dropped.lastEnd).toEqual({ reason: 'ice-failed', at: 9, hidden: true })
+    expect(dropped.lastEnd).toEqual({ reason: 'ice-failed', at: 9, hidden: true, quality: null })
     const retried = run(
       [
         { type: 'connecting', auto: true },

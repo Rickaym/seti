@@ -33,7 +33,7 @@ function useCallEnds(connected: boolean, auto: boolean, lastEnd: CallEnd | null,
   }, [recorder, route, connected])
   useEffect(() => {
     if (lastEnd !== null) {
-      recorder.ended(lastEnd.reason)
+      recorder.ended(lastEnd.reason, lastEnd.quality)
     }
   }, [recorder, lastEnd])
 }

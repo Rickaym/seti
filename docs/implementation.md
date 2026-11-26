@@ -434,13 +434,31 @@ English sounds only.
 The EA's manner lives in its base prompt (`ea/src/seti_ea/prompt.py`) and in the short lines Seti
 speaks while its tools run (`ea/src/seti_ea/announce.py`). It gives the answer first and stops. On a
 call it aims for fifteen words, two sentences at most unless the user asks for detail, never reads
-a list aloud and never ends with an offer. In the chat an overview is one line per item. Its tone is
-composed and precise, with dry wit now and then and none about an error, a refusal or security.
+a list aloud and never ends with an offer. In the chat an overview is one line per item. After it
+messages or starts an agent it says whom and the gist in a few words, on a call and in the chat, and
+never quotes or restates what it sent unless the user asks. Its tone is composed and precise, with
+dry wit now and then and none about an error, a refusal or security.
 
 The user's request is the EA's yes. It asks first only for tools that take `confirmed` (EA-3,
 EA-4), a public group chat post, stopping several agents at once, and work it proposes itself. It
 refuses a security change rather than asking. An ask is one sentence of effect and a short
 question; in the chat it ends with exactly "Shall I go ahead?", which shows the Yes and No buttons.
+
+### Call audio
+
+A call is WebRTC through pipecat's SmallWebRTC transport, which runs on aiortc. aiortc has no
+settings for speech on a lossy network, so two small modules replace what it creates, and their
+tests fail when the pinned aiortc version or the code they replace changes. `aiortc_opus.py`
+encodes the EA's voice as 48 kbps mono Opus with in-band FEC and a 10% loss hint, so the browser
+rebuilds a single lost packet instead of concealing it. `aiortc_jitter.py` buffers the user's audio
+three packets deep and skips a packet the network lost, where aiortc's own buffer also drops
+packets that arrived after it.
+
+`link.py` watches the caller's microphone audio: while it is missing, the EA's speech waits up to
+8 s and goes on where it stopped, and the gate forgets the user's last words (EA-18). The browser
+reads `getStats` every two seconds (`call-quality.ts`) and reports the call's loss, filled-in
+speech, jitter, round trip, path type and reconnects with its call end, as numbers only; the EA
+logs one line per call with the user's audio loss, drops and the seconds of speech it held.
 
 ## Reference values
 

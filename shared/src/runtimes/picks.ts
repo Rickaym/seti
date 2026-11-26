@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { CODEX_EFFORTS, CODEX_MODELS } from './settings.js'
+import { CODEX_EFFORTS, CODEX_MODELS, codexModelLabel } from './settings.js'
 import { STORED_RUNTIMES, type StoredRuntime } from './stored.js'
 
 /** Each runtime as people call it. */
@@ -65,7 +65,7 @@ export function claudeOffer(reported: readonly ReportedModel[] | null): RuntimeO
 /** Codex's offer: the models Seti proves it with, each with every effort. */
 export const codexOffer = (): RuntimeOffer => ({
   runtime: 'codex',
-  models: CODEX_MODELS.map((id) => ({ id, label: id, efforts: [...CODEX_EFFORTS] })),
+  models: CODEX_MODELS.map((id) => ({ id, label: codexModelLabel(id), efforts: [...CODEX_EFFORTS] })),
   default_efforts: [...CODEX_EFFORTS],
 })
 

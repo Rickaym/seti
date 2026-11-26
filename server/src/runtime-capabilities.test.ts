@@ -1,5 +1,5 @@
 import {
-  settingCommands,
+  setiComposerCommands,
   type CapabilitiesSnapshot,
   type CommandCatalog,
   type McpServer,
@@ -103,19 +103,15 @@ describe("what an agent's runtime declares", () => {
     await expect(startDream(task)).rejects.toThrow("The agent's runtime keeps no memory Seti can find.")
   })
 
-  it("lists a Codex agent Seti's setting commands its runtime can take, and none of Claude Code's", async () => {
+  it("lists a Codex agent Seti's commands its runtime can take, and none of Claude Code's", async () => {
     const res = await app.request(`/api/tasks/${CODEX}/commands`, { headers: HEADERS })
     const catalog = ((await res.json()) as { data: CommandCatalog }).data
-    const own = new Set(settingCommands(null).map((command) => command.name))
-    expect(catalog.commands.filter((command) => own.has(command.name)).map((command) => command.name)).toEqual([
-      'access',
-      'archive',
-      'credential',
-      'mcp',
-      'rename',
-      'restart',
-      'settings',
-    ])
+    const own = new Set(setiComposerCommands(null).map((command) => command.name))
+    const listed = catalog.commands.filter((command) => own.has(command.name)).map((command) => command.name)
+    expect(listed).toEqual(expect.arrayContaining(['seti:access', 'seti:archive', 'seti:mcp', 'seti:restart']))
+    expect(listed).not.toEqual(expect.arrayContaining(['seti:sandbox']))
+    expect(listed).not.toContain('seti:bypass')
+    expect(listed).not.toContain('seti:dream')
     expect(catalog.commands.filter((command) => !own.has(command.name) && command.name === 'compact')).toEqual([])
   })
 

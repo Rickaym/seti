@@ -61,7 +61,7 @@ export const archiveQuestion = (task: Task) => ({
 })
 
 /** Archives the agent and says what it stored and freed. */
-export async function archiveTask(task: Task): Promise<boolean> {
+async function archiveTask(task: Task): Promise<boolean> {
   try {
     const report = await sendArchive(task)
     const disk = report.disk_bytes > 0 ? `, ${bytesLabel(report.disk_bytes)} of disk freed` : ''

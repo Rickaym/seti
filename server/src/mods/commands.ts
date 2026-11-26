@@ -4,7 +4,7 @@ import {
   MOD_TASK_ARG,
   modCommandArgs,
   parseComposer,
-  settingCommandRefusal,
+  isSetiLine,
   type ModActionResult,
   type ModCommand,
   type ModManifest,
@@ -166,7 +166,10 @@ const offBundled = (): ModManifest[] =>
  * that is off, which never goes to Claude Code either; null when it can.
  */
 export function slashRefusal(prompt: string): string | null {
-  const own = settingCommandRefusal(prompt) ?? setiCommandRefusal(prompt)
+  if (isSetiLine(prompt)) {
+    return "A /seti: command is Seti's: it runs from the agent's reply box and never goes to the agent"
+  }
+  const own = setiCommandRefusal(prompt)
   const input = parseComposer(prompt)
   if (own !== null || input.mode !== 'slash') {
     return own

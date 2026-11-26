@@ -24,7 +24,7 @@ import { AttachButton, DraftAttachments } from '@/panels/tasks/AttachmentChips'
 import { CommandField, ComposerStatus } from '@/panels/tasks/CommandField'
 import { SettingCommandCard } from '@/panels/tasks/commands/SettingCommandCard'
 import type { CommandHost } from '@/panels/tasks/commands/types'
-import { useSettingCommand } from '@/panels/tasks/commands/useSettingCommand'
+import { useSettingCommand, type SettingCommand } from '@/panels/tasks/commands/useSettingCommand'
 import { HINTS, hintKey, ROOMY_PX, useWiderThan } from '@/panels/tasks/composer-hints'
 
 const CONFIRM_TITLES: Partial<Record<ComposerCheck['kind'], string>> = {
@@ -88,6 +88,12 @@ function draftRefusal(
   }
   return refusal(...rest)
 }
+
+/** The choices for the word of a Seti command being typed, and how one is picked. */
+const wordChoices = (setting: SettingCommand | null) => ({
+  completion: setting?.completion ?? null,
+  onPickWord: setting?.pick,
+})
 
 /** What the send button does with the draft. */
 type SendMode = 'shell' | 'action' | 'queue' | 'send'
@@ -180,7 +186,7 @@ export const Composer = memo(function ComposerView({
   const check = checkComposer(draft, commands.commands)
   const { slash: modSlash, ui: slashUi } = useModSlash(draft, taskId)
   const [typedText, setTypedText] = useState<string | null>(null)
-  const setting = useSettingCommand(host, draft, typedText, (text, byUser) => {
+  const [setting, settingDialog] = useSettingCommand(host, draft, typedText, (text, byUser) => {
     setDraft(text)
     setTypedText(byUser ? text : null)
   })
@@ -247,7 +253,7 @@ export const Composer = memo(function ComposerView({
       ref={box}
       className="agent-focus @container/composer shrink-0 space-y-1 border-t border-border p-3 max-md:px-2 max-md:py-1 in-data-agent-frame:p-2"
     >
-      <SettingCommandCard command={setting} />
+      <SettingCommandCard command={setting} dialog={settingDialog} />
       <DraftAttachments attachments={attachments} />
       {modSlash?.kind === 'off' ? (
         <ModOffNotice mod={modSlash.mod} />
@@ -267,7 +273,11 @@ export const Composer = memo(function ComposerView({
           value={draft}
           onChange={setDraft}
           onTyped={setTypedText}
+          onPicked={(text) => {
+            setTypedText(typedText === draft ? text : null)
+          }}
           onEscape={() => setting?.dismiss() === true}
+          {...wordChoices(setting)}
           commands={commands}
           label="Reply"
           placeholder={HINTS[hintKey({ agentRunning, compacting, shellRunning, rewind }, touch)][roomy ? 0 : 1]}
