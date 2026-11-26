@@ -12,7 +12,7 @@ import type { Choice, CommandContext, CommandHost, CommandStep, Stepper } from '
  * What the composer shows for a setting command: `live` offers choices while the words are typed,
  * `submitted` the step after Enter, `untrusted` asks before running a line that was not typed.
  */
-export type CardPhase = 'live' | 'submitted' | 'untrusted'
+type CardPhase = 'live' | 'submitted' | 'untrusted'
 
 export interface SettingCommand {
   line: SettingCommandLine

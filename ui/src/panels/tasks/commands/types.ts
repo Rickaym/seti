@@ -2,7 +2,7 @@ import type { AgentCapabilities, AgentSettingTab, ProfileSummary, Task } from '@
 import type { ConfirmOptions } from '@/components/ui/confirm-context'
 
 /** Where `/settings` and `/access` take the user: a tab of the agent's settings, or its access. */
-export type SettingsTarget = AgentSettingTab | 'access'
+type SettingsTarget = AgentSettingTab | 'access'
 
 /** A request to open the agent's settings, new each time so the same tab can open twice. */
 export interface SettingsRequest {

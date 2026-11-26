@@ -1,4 +1,4 @@
-import { Check, Play, X } from 'lucide-react'
+import { Check, Play, X, type LucideIcon } from 'lucide-react'
 import { useEffect, useRef, type KeyboardEvent, type ReactElement } from 'react'
 import { Button } from '@/components/ui/button'
 import { keepFocus } from '@/lib/keep-focus'
@@ -20,30 +20,34 @@ function Choices({ command }: { command: SettingCommand }) {
     return null
   }
   return (
-    <div className="flex flex-wrap gap-1.5" role="group" aria-label={step.prompt}>
-      {step.choices.map((item) => (
-        <Button
-          key={item.args}
-          variant={item.current ? 'secondary' : 'outline'}
-          size="sm"
-          className={TOUCH}
-          aria-pressed={item.current}
-          onMouseDown={keepFocus}
-          onKeyDown={closeOnEscape(command)}
-          onClick={() => {
-            command.choose(item)
-          }}
-        >
-          {item.current && <Check aria-hidden />}
-          {item.label}
-          {item.detail !== null && <span className="text-muted-foreground">{item.detail}</span>}
-        </Button>
-      ))}
+    <div className="grid gap-1.5">
+      <p className="text-muted-foreground">{step.prompt}</p>
+      <div className="flex flex-wrap gap-1.5" role="group" aria-label={step.prompt}>
+        {step.choices.map((item) => (
+          <Button
+            key={item.args}
+            variant={item.current ? 'secondary' : 'outline'}
+            size="sm"
+            className={TOUCH}
+            aria-pressed={item.current}
+            onMouseDown={keepFocus}
+            onKeyDown={closeOnEscape(command)}
+            onClick={() => {
+              command.choose(item)
+            }}
+          >
+            {item.current && <Check aria-hidden />}
+            {item.label}
+            {item.detail !== null && <span className="text-muted-foreground">{item.detail}</span>}
+          </Button>
+        ))}
+      </div>
     </div>
   )
 }
 
 interface Ask {
+  icon: LucideIcon
   title: string
   message: string
   detail: string | null
@@ -57,6 +61,7 @@ function askOf(command: SettingCommand): Ask | null {
   const { step, phase } = command
   if (phase === 'untrusted') {
     return {
+      icon: Play,
       title: `Run ${name}?`,
       message: 'This line was not typed here, so it waits for you.',
       detail: command.line.setting.command.description,
@@ -67,6 +72,7 @@ function askOf(command: SettingCommand): Ask | null {
   if (step?.kind === 'confirm') {
     const q = step.question
     return {
+      icon: q.icon ?? Play,
       title: q.title ?? name,
       message: q.message,
       detail: q.detail ?? null,
@@ -117,7 +123,7 @@ function AskBody({ ask, command }: { ask: Ask; command: SettingCommand }) {
           onKeyDown={closeOnEscape(command)}
           onClick={command.confirm}
         >
-          <Play />
+          <ask.icon />
           {ask.label}
         </Button>
       </div>
