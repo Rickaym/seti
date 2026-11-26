@@ -71,7 +71,8 @@ function openTarget(command: SetiCommand): SettingsTarget {
 
 const opens = (command: SetiCommand) => {
   const found = SETI_NAMES.find((entry) => entry.name === command.keys[0])
-  return found?.grammar.kind === 'open' || (command.keys[0] === 'access' && command.keys[1] === 'save')
+  const access = command.keys[0] === 'access' && (command.keys[1] === undefined || command.keys[1] === 'save')
+  return found?.grammar.kind === 'open' || access
 }
 
 const loading = (draft: string, world: CommandWorld) => sourcesOf(draft).some((source) => world[source] === null)
@@ -101,15 +102,14 @@ async function post({ host, done }: Run, command: SetiCommand, confirmed: boolea
 }
 
 /** Reads the line and runs it, opens what it opens, or asks the settings' question first. */
-function execute(run: Run) {
+function execute(run: Run, quiet = false) {
   const { draft, world, host, show, done } = run
-  if (loading(draft, world)) {
-    show({ kind: 'refuse', reason: "Loading the agent's settings; press Enter again" })
-    return
-  }
   const parsed = parseSetiLine(draft, world)
+  if (!parsed.ok && !quiet) {
+    const reason = loading(draft, world) ? "Loading the agent's settings; press Enter again" : parsed.reason
+    show({ kind: 'refuse', reason })
+  }
   if (!parsed.ok) {
-    show({ kind: 'refuse', reason: parsed.reason })
     return
   }
   const { command } = parsed
@@ -130,6 +130,29 @@ function execute(run: Run) {
   }
 }
 
+/** What running a line needs from the hook, for the line in the box or one the palette puts there. */
+interface RunParts {
+  host: CommandHost
+  world: CommandWorld
+  choose: Run['choose']
+  setCard: (card: { draft: string; card: CommandCard } | null) => void
+  setDraft: (draft: string, typed: boolean) => void
+}
+
+const makeRun = (draft: string, { host, world, choose, setCard, setDraft }: RunParts): Run => ({
+  draft,
+  world,
+  host,
+  choose,
+  show: (shown) => {
+    setCard({ draft, card: shown })
+  },
+  done: () => {
+    setCard(null)
+    setDraft('', true)
+  },
+})
+
 /**
  * Runs the Seti command in the composer's draft: completes each word from the agent's state, and
  * on Enter sends the line to Seti, which reads it again and runs it through the settings' own
@@ -146,25 +169,20 @@ export function useSettingCommand(
   const world = useCommandWorld(host.task, draft, active)
   const credential = useCredentialSwitch(host.task, host.onChanged)
   const [card, setCard] = useState<{ draft: string; card: CommandCard } | null>(null)
-  useCommandPalette(host.task, (text) => {
+  const parts: RunParts = { host, world, choose: credential.choose, setCard, setDraft }
+  useCommandPalette(host.task, (name) => {
+    if (name === 'rename') {
+      host.startRename()
+      return
+    }
+    const text = `/seti:${name} `
     setDraft(text, true)
+    execute(makeRun(text, parts), true)
   })
   if (!active) {
     return [null, credential.dialog]
   }
-  const run: Run = {
-    draft,
-    world,
-    host,
-    choose: credential.choose,
-    show: (shown) => {
-      setCard({ draft, card: shown })
-    },
-    done: () => {
-      setCard(null)
-      setDraft('', true)
-    },
-  }
+  const run = makeRun(draft, parts)
   const current = card?.draft === draft ? card.card : null
   const command: SettingCommand = {
     line: draft,

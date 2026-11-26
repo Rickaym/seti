@@ -199,6 +199,9 @@ export function TaskDetail({ task, onChanged, onSubtasks }: TaskDetailProps) {
       openSettings: (target) => {
         setSettingsRequest({ target, at: Date.now() })
       },
+      startRename: () => {
+        setTitleDraft(task.title)
+      },
     }),
     [task, status, onChanged],
   )

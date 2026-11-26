@@ -28,9 +28,9 @@ const ICONS: Readonly<Record<string, LucideIcon>> = {
 
 /**
  * Offers the agent's Seti commands in the palette, from the same grammar as its reply box: a pick
- * puts the command in the box, where its choices complete each word.
+ * runs a command that needs no more words, or puts it in the box, where its choices complete it.
  */
-export function useCommandPalette(task: Task, fill: (text: string) => void): void {
+export function useCommandPalette(task: Task, pick: (name: string) => void): void {
   const caps = useCapabilities(task)
   useCommands(
     SETI_NAMES.filter((entry) => meetsNeeds(caps, entry.entry.needs)).map((entry) => ({
@@ -42,7 +42,7 @@ export function useCommandPalette(task: Task, fill: (text: string) => void): voi
       keywords: entry.entry.label,
       when: (context) => context.agent?.id === task.id,
       run: () => {
-        fill(`/seti:${entry.name} `)
+        pick(entry.name)
       },
     })),
   )

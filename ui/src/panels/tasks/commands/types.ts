@@ -16,4 +16,6 @@ export interface CommandHost {
   running: boolean
   onChanged: () => void
   openSettings: (target: SettingsTarget) => void
+  /** Opens the agent's name for editing, as Rename in its menu does. */
+  startRename: () => void
 }
