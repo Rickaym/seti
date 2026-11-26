@@ -1,5 +1,4 @@
-import { shownSlackName, slackPlace } from '@seti/shared'
-import { idsIn, readableSlack } from '../slack/names.js'
+import { shownSlackName, slackPlace, idsIn, readableSlack } from '@seti/shared'
 import { slackNames, type SlackName } from '../store/slack-names.js'
 
 /** A message a webhook delivered from a conversation agents may have posted in. */

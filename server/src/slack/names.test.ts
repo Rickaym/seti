@@ -1,6 +1,13 @@
-import { slackDestination, slackLookUpNote, slackPlace } from '@seti/shared'
+import {
+  idsIn,
+  readableSlack,
+  slackDestination,
+  slackFieldNote,
+  slackLookUpNote,
+  slackMentions,
+  slackPlace,
+} from '@seti/shared'
 import { describe, expect, it } from 'vitest'
-import { idsIn, readableSlack } from './names.js'
 
 describe('readableSlack', () => {
   const names = new Map([
@@ -51,5 +58,25 @@ describe('readableSlack', () => {
     expect(slackLookUpNote('C0NOPE0001')).toContain('slack_read_channel with channel_id C0NOPE0001')
     expect(slackLookUpNote('U0NOPE0001')).toContain('slack_read_user_profile with user_id U0NOPE0001')
     expect(slackLookUpNote('D0NOPE0001')).toContain('slack_list_user_channels')
+  })
+
+  it('names the id in a Slack call field, with DM wording for a send to a person', () => {
+    const send = 'mcp__plugin_slack_slack__slack_send_message'
+    const read = 'mcp__plugin_slack_slack__slack_read_user_profile'
+    const note = (tool: string, key: string, value: string) => slackFieldNote(tool, key, value, names)
+    expect(note(send, 'channel_id', 'C0DEPLOY01')).toEqual({ text: '#deploys', tone: 'name' })
+    expect(note(send, 'channel_id', 'U0DANA0001')).toEqual({ text: 'DM to Dana', tone: 'name' })
+    expect(note(read, 'user_id', 'U0DANA0001')).toEqual({ text: 'Dana', tone: 'name' })
+    expect(note(send, 'channel_id', 'C0NOPE0001')).toEqual({ text: 'Name not known', tone: 'unknown' })
+    expect(note(send, 'channel_id', '#deploys')).toEqual({ text: 'Not a Slack id', tone: 'invalid' })
+    expect(note(send, 'channel_id', ' ')).toBeNull()
+    expect(note(send, 'message', 'C0DEPLOY01')).toBeNull()
+    expect(note('mcp__linear__save_comment', 'channel_id', 'C0DEPLOY01')).toBeNull()
+  })
+
+  it('lists mentions by name, and keeps a label Seti cannot vouch for out when asked', () => {
+    const text = 'cc <@U0DANA0001> in <#C0OTHER001|eng-private>'
+    expect(slackMentions(text, names)).toEqual(['Dana', 'C0OTHER001'])
+    expect(readableSlack(text, names, false)).toBe('cc @Dana in <#C0OTHER001|eng-private>')
   })
 })
