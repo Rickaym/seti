@@ -68,11 +68,27 @@ class Confirmations:
     epoch: str = field(default_factory=lambda: secrets.token_hex(8))
     turn: int = 0
     said: str = ""
+    speaking: bool = False
+    cut: bool = False
+
+    def user_turn_started(self) -> None:
+        """The user began a turn; if the call's audio drops before it ends, it is no yes."""
+        self.speaking = True
 
     def user_turn(self, said: str = "") -> None:
-        """The user said or typed `said`; questions asked before now may be answered."""
+        """The user said or typed `said`; questions asked before now may be answered.
+
+        A turn the call's audio dropped out of still counts as a turn, but never as a yes.
+        """
         self.turn += 1
-        self.said = said
+        self.said = "" if self.cut else said
+        self.cut = False
+        self.speaking = False
+
+    def audio_lost(self) -> None:
+        """The call's audio broke off, or a new call began: nothing heard before now is a yes."""
+        self.said = ""
+        self.cut = self.speaking
 
     @property
     def asked_in(self) -> dict[str, Any]:

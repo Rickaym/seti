@@ -43,7 +43,6 @@ from pipecat.services.llm_service import FunctionCallParams
 from pipecat.services.openai.llm import OpenAILLMService
 from pipecat.transports.base_transport import TransportParams
 from pipecat.transports.smallwebrtc.connection import SmallWebRTCConnection
-from pipecat.transports.smallwebrtc.transport import SmallWebRTCTransport
 from pipecat.turns.user_start.base_user_turn_start_strategy import BaseUserTurnStartStrategy
 from pipecat.turns.user_stop import BaseUserTurnStopStrategy, TurnAnalyzerUserTurnStopStrategy
 from pipecat.turns.user_turn_strategies import UserTurnStrategies
@@ -81,6 +80,7 @@ from seti_ea.inbox import (
 )
 from seti_ea.language import DEFAULT as ENGLISH
 from seti_ea.language import stt_endpointing, stt_language, tts_language
+from seti_ea.link import CallTransport
 from seti_ea.live_context import LiveContext, LiveContextInjector
 from seti_ea.local_wake import PausableDeepgramSTT, SleepControl
 from seti_ea.packs import VOICE_TIMEOUT_SECS, PackPrompt, SystemPromptUpdates
@@ -319,10 +319,7 @@ async def run_bot(
     speaking = CallLanguage(language, Phrasebook(responses_translate(settings, seti)))
     if call.auto:
         wake.sleep()
-    transport = SmallWebRTCTransport(
-        webrtc_connection=connection,
-        params=TransportParams(audio_in_enabled=True, audio_out_enabled=True),
-    )
+    transport = CallTransport(connection, TransportParams(audio_in_enabled=True, audio_out_enabled=True))
     # The default model is Nova-3, which takes keyterm; keywords is for older models.
     stt = PausableDeepgramSTT(
         paused=wake.settings.enabled and LOCAL_SPOTTER.get() is not None,
@@ -472,8 +469,8 @@ async def run_bot(
             history.add_unstored(greeting(returning, brief))
             await worker.queue_frames([LLMRunFrame()])
         await announce_wake()
-        delivering.append(asyncio.create_task(delivery.run()))
-        delivering.append(asyncio.create_task(requests.run()))
+        background.append(asyncio.create_task(delivery.run()))
+        background.append(asyncio.create_task(requests.run()))
 
     @rtvi.event_handler("on_client_message")
     async def on_client_message(_rtvi: RTVIProcessor, message: ClientMessage) -> None:
@@ -500,6 +497,7 @@ async def run_bot(
         _aggregator: LLMUserAggregator, _strategy: BaseUserTurnStartStrategy
     ) -> None:
         guard.active = False
+        tools.user_turn_started()
         if await history.merge(inbox.take()):
             context.add_message({"role": "developer", "content": VOICE_NOTE})
         note = notes.refresh(datetime.now(UTC))
@@ -531,7 +529,7 @@ async def run_bot(
         await history.summary_applied()
 
     @transport.event_handler("on_client_disconnected")
-    async def on_client_disconnected(_transport: SmallWebRTCTransport, _client: Any) -> None:
+    async def on_client_disconnected(_transport: CallTransport, _client: Any) -> None:
         logger.info("EA client disconnected")
         await worker.cancel()
 
@@ -593,14 +591,14 @@ async def run_bot(
             wake=wake_for_inbox,
         ),
     )
-    delivering: list[asyncio.Task[None]] = []
+    background: list[asyncio.Task[None]] = [asyncio.create_task(transport.link.watch(tools.audio_lost))]
 
     runner = WorkerRunner(handle_sigint=False)
     await runner.add_workers(worker)
     try:
         await runner.run()
     finally:
-        for task in delivering:
+        for task in background:
             task.cancel()
         await progress.stop()
         await think.settle()
