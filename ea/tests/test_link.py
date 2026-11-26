@@ -85,6 +85,7 @@ async def test_speech_waits_no_longer_than_the_hold_per_drop(monkeypatch: pytest
     assert clock.now - start == pytest.approx(HOLD_SECS, abs=0.1)
     assert not await watch.wait()
     assert clock.now - start == pytest.approx(HOLD_SECS, abs=0.1)
+    assert watch.audio.held_secs == pytest.approx(HOLD_SECS, abs=0.1)
 
 
 async def test_each_silence_reports_one_loss() -> None:
