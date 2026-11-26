@@ -1,4 +1,3 @@
-import fs from 'node:fs'
 import path from 'node:path'
 import { serveStatic } from '@hono/node-server/serve-static'
 import {
@@ -146,6 +145,7 @@ import { subdomainProxy } from './subdomain-proxy.js'
 import { clearStallsOnTurnStart } from './task-blocked.js'
 import { onAnyTaskEvent } from './task-events.js'
 import { taskFolderContext } from './task-location.js'
+import { createUiShell, shellFallback } from './ui-shell.js'
 import { openWorkspace, startWorkspaceSync, workspaceTurnEnded } from './workspace/engine.js'
 
 /** Large enough for a full context file or prompt, small enough to refuse memory floods. */
@@ -253,6 +253,7 @@ const defaultAccess = (): AccessGuardOptions => ({
 export function createApp(access: AccessGuardOptions = defaultAccess(), eaUrl: string = EA_URL): Hono {
   const local = access.local ?? defaultLocalAuth()
   const app = new Hono()
+  const shell = createUiShell(UI_DIST)
   app.onError((e, c) =>
     e instanceof HttpError ? fail(c, e.status, e.message) : fail(c, 500, 'Server error', e.message),
   )
@@ -273,7 +274,7 @@ export function createApp(access: AccessGuardOptions = defaultAccess(), eaUrl: s
   app.get('/api/ping', (c) => c.body(null, 204))
   app.get('/api/system', async (c) => {
     const sandbox = { enabled: (await sandboxPolicy.get()).enabled, token_mode: await githubTokenMode() }
-    return ok(c, { permission_mode: PERMISSION_MODE, sandbox } satisfies SystemInfo)
+    return ok(c, { permission_mode: PERMISSION_MODE, sandbox, build: shell.build() } satisfies SystemInfo)
   })
   app.use('/api/tasks/:id', archivedGuard)
   app.use('/api/tasks/:id/*', archivedGuard)
@@ -411,12 +412,6 @@ export function createApp(access: AccessGuardOptions = defaultAccess(), eaUrl: s
   app.get('/agent/:id', (c) => c.redirect(`/#agents/${encodeURIComponent(c.req.param('id'))}`))
   app.use('/*', cacheHeaders)
   app.use('/*', serveStatic({ root: path.relative(process.cwd(), UI_DIST) }))
-  app.get('/*', (c) => {
-    const index = path.join(UI_DIST, 'index.html')
-    if (!fs.existsSync(index)) {
-      return c.text('UI not built. Run: pnpm build', 503)
-    }
-    return c.html(fs.readFileSync(index, 'utf8'))
-  })
+  app.get('/*', shellFallback(shell))
   return app
 }
