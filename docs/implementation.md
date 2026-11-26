@@ -454,7 +454,7 @@ packets that arrived after it.
 
 ### Inbox relays
 
-`server/src/ea-relay.ts` implements EA-18 behind `POST /api/ea/relays`, which only the EA's bot
+`server/src/ea-relay.ts` implements EA-19 behind `POST /api/ea/relays`, which only the EA's bot
 token reaches. It checks the switch (`ea_settings.inbox_relays`, changed only through
 `PUT /api/ea/settings/inbox-relays` by the user), then the recipient against `relayTargets`, then
 the text, then the hourly limits, and claims the item in `ea_relay` before it posts the framed

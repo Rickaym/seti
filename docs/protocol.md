@@ -1139,11 +1139,12 @@ Why: an agent woken by its own actions or by news nobody waited for burns turns 
 - EA-8: Inbox items are `followup`, `reminder`, `watch_event`, `channel_event`, `team_mention`; a
   new event for an undelivered item's subject replaces it. Unasked reports get read tools only,
   except that one made only of `act` subscription items MAY direct-message an existing agent and
-  MUST tell the user, and a report MAY relay under EA-18.
+  MUST tell the user, and a report MAY relay under EA-19.
 - EA-10: Off a call, watch and channel items wait for quiet (`settle`); others go at once. On a
   call nothing interrupts: items follow the user's next turn, and a needs-you item gets its own
   line after `call_silence`.
-- EA-12: If a reply promised to reach an agent and no tool did, the EA gets one more run.
+- EA-12: If a reply promised to reach an agent and no tool did, or promised a later check-in and
+  no follow-up or watch was set in that turn or the one before, the EA gets one more run.
 - EA-16: The EA, and agents at `full`, MUST be able to read every pending request of all agents or
   one, each with its id and agent, and a tool call or plan with Seti's reason, the agent's
   description, its input as stored (secrets redacted) and the PRs it names. Text an agent or a code
@@ -1157,7 +1158,14 @@ Why: an agent woken by its own actions or by news nobody waited for burns turns 
   message MUST NOT count as the yes. Agents and mods MUST NOT get these actions. The audit entry
   says the EA acted on the user's word and names the ask and the target.
   Why: the user can run Seti by voice without handing the model a standing power.
-- EA-18: Inbox relays are off until the user turns them on; the EA, agents and mods MUST NOT
+- EA-18: A voice call survives a short network drop. While the caller's audio stops arriving, the
+  EA MUST hold its speech, up to 8 s per drop, and go on where it stopped, rather than drop it. A
+  browser that rebuilds the peer connection under the same id keeps the EA's session and its
+  conversation, and the call shows Reconnecting until the new path connects. A yes the user said
+  before the call's audio dropped, in a turn the drop cut, or in an earlier call MUST NOT count for
+  EA-4 or EA-17.
+  Why: mobile networks drop for seconds, and a cut transcript must never become the user's yes.
+- EA-19: Inbox relays are off until the user turns them on; the EA, agents and mods MUST NOT
   change the switch. While on, a report MAY send one direct message per item to an agent the item
   is about: its task, the author or a named agent of its group chat message, an agent with its PR
   linked, or one subscribed to its channel; any other is refused. The control room puts a fixed

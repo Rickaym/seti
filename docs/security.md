@@ -278,7 +278,7 @@ it is never to be followed, and the EA's frame neutralises any tag in the text t
 
 Every inbox item the EA reads (an alert, a webhook, a Slack or GitHub event, an agent's message)
 is untrusted text. Inbox relays are off until you turn them on in Settings, EA; the EA, agents and
-mods cannot change the switch ([EA-18](protocol.md#14-the-assistant)). While on, the EA may send one
+mods cannot change the switch ([EA-19](protocol.md#14-the-assistant)). While on, the EA may send one
 direct message per item to an agent the item is about, chosen from Seti's own fields: the item's
 agent, the agent that wrote to the EA or one it named, the agent with the item's PR linked, or an
 agent subscribed to the item's channel. Text in the item cannot add a recipient. Seti puts a fixed

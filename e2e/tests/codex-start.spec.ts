@@ -52,7 +52,13 @@ test('the start page lists Codex models only while Codex is ready with a key', a
     await expect(model).toHaveValue('claude:')
     expect(await groupsOf(page)).toEqual(['Claude Code', 'Codex'])
     await expect(model.locator('optgroup').first().locator('option').first()).toHaveText('Default')
-    await expect(model.locator('optgroup').last().locator('option')).toHaveText(['gpt-5.5'])
+    await expect(model.locator('optgroup').last().locator('option')).toHaveText([
+      'gpt-5.5',
+      'gpt-6.2-sol (unproven)',
+      'gpt-6.2-astra (unproven)',
+      'gpt-6.1-terra (unproven)',
+      'gpt-6-luna (unproven)',
+    ])
     await expect(main.getByRole('combobox', { name: 'Effort' })).toHaveCount(0)
   } finally {
     await codexOff(request)

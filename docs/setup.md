@@ -566,7 +566,8 @@ and only you change that.
    The agent holds a placeholder; the egress proxy puts the key on requests to OpenAI's API only.
 3. On the start page, pick a Codex model in the Model selector beside the message box, and an
    effort if you want one, then start the agent. The selector lists Codex models only while the
-   status reads Ready.
+   status reads Ready. A model marked unproven has passed Seti's tests against a scripted model
+   but no run against OpenAI's own API yet.
 
 When an upgrade moves the pinned version, Seti installs the new one at its start and removes the
 old one once no agent runs it. With a separate node (`SETI_NODE=split`), `seti.service` installs
