@@ -2,13 +2,13 @@ import path from 'node:path'
 import type { AcpLaunch } from '../acp/adapter.js'
 
 /** Where Gemini CLI sends its model calls; the proxy adds the key on this host only. */
-export const GEMINI_API = 'https://generativelanguage.googleapis.com'
+const GEMINI_API = 'https://generativelanguage.googleapis.com'
 
 /** The model a Gemini session runs when its agent names none. */
-export const GEMINI_DEFAULT_MODEL = 'gemini-3.8-flash'
+const GEMINI_DEFAULT_MODEL = 'gemini-3.8-flash'
 
 /** The variable Gemini CLI reads its API key from: the key connection's placeholder. */
-export const GEMINI_KEY_ENV = 'GEMINI_API_KEY'
+const GEMINI_KEY_ENV = 'GEMINI_API_KEY'
 
 /** Seti's settings and policy files, by name in the folder `geminiLaunch` is given. */
 const SETTINGS = 'settings.json'
@@ -113,7 +113,7 @@ const CLEARED = [
 ]
 
 /** The environment Seti presets over the sandbox's for Gemini CLI, with its files in `config`. */
-export function geminiEnv(config: string, apiUrl: string): Record<string, string> {
+function geminiEnv(config: string, apiUrl: string): Record<string, string> {
   return {
     ...Object.fromEntries(CLEARED.map((name) => [name, ''])),
     GOOGLE_GEMINI_BASE_URL: apiUrl,
