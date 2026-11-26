@@ -75,6 +75,7 @@ What Seti needs, and what the installer does about each:
 | systemd user manager                                   | Runs Seti as a service and caps agents' memory           | Units in `~/.config/systemd/user`, lingering    |
 | Claude Code                                            | Signing in; Seti runs the Agent SDK's own binary         | Installs the CLI into `~/.local/bin`            |
 | gh, jq, ripgrep, fd-find (optional)                    | PR watching; faster agents                               | apt packages when available                     |
+| libnss3-tools (optional)                               | Browsers in the sandbox trust the egress proxy           | apt package when available                      |
 | poppler-utils, ffmpeg, resvg, LibreOffice (optional)   | Share link previews of PDFs, media, SVG and Office files | apt packages, after asking                      |
 | uv (optional)                                          | The Executive Assistant and `pnpm check`                 | With `--with-ea`                                |
 | Redis (optional)                                       | Shared cache; Seti works without it                      | With `--with-redis`                             |
@@ -1027,6 +1028,15 @@ sudo apparmor_parser -r /etc/apparmor.d/bwrap
 bwrap --unshare-user --unshare-pid --unshare-net --ro-bind / / --dev /dev --proc /proc true && echo sandbox ok
 ```
 
+Tools in the sandbox trust the egress proxy's CA through `SSL_CERT_FILE`, `NODE_EXTRA_CA_CERTS`
+and the system bundle. Chromium and Chrome, Playwright's and the Playwright MCP server's included,
+read an NSS database instead: with `certutil` on the host (`sudo apt-get install libnss3-tools`,
+then restart Seti), each sandbox gets one at `~/.pki/nssdb` at its next start, and pages on hosts
+where the proxy adds a credential load with no certificate error and no `ignoreHTTPSErrors`.
+Without it those pages fail with `ERR_CERT_AUTHORITY_INVALID`; `pnpm seti:doctor` says when
+certutil is missing. [Security](security.md#the-egress-ca-inside-a-sandbox) has what the sandbox
+sees.
+
 An agent fails to start when the sandbox does not work; it never falls back to running
 unsandboxed. An older agent with home folders may keep worktrees in its private home that the host
 cannot see, so run `git worktree prune` in a main checkout only when no such agent works on it.
@@ -1046,7 +1056,7 @@ The installer automates these steps; do them by hand on a machine it does not co
 
 ```sh
 sudo apt-get install postgresql bubblewrap socat openssl util-linux openssh-client git gh curl \
-  build-essential python3 jq ripgrep fd-find
+  build-essential python3 jq ripgrep fd-find libnss3-tools
 sudo apt-get install --no-install-recommends poppler-utils ffmpeg librsvg2-bin \
   libreoffice-writer-nogui libreoffice-calc-nogui libreoffice-impress-nogui   # optional: share previews
 sudo -u postgres createuser --createdb "$USER"

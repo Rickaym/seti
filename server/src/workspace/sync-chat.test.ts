@@ -262,6 +262,7 @@ describe('sessions', () => {
       readOnly: [],
       caDir: path.join(scratch, 'ca'),
       systemBundle: null,
+      browserDb: null,
       hidden: [],
       pathEnv: '',
       sessionId: null,
