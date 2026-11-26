@@ -1113,7 +1113,8 @@ Why: an agent woken by its own actions or by news nobody waited for burns turns 
 - EA-10: Off a call, watch and channel items wait for quiet (`settle`); others go at once. On a
   call nothing interrupts: items follow the user's next turn, and a needs-you item gets its own
   line after `call_silence`.
-- EA-12: If a reply promised to reach an agent and no tool did, the EA gets one more run.
+- EA-12: If a reply promised to reach an agent and no tool did, or promised a later check-in and
+  no follow-up or watch was set in that turn or the one before, the EA gets one more run.
 
 ## 15. Resilience
 

@@ -25,8 +25,8 @@ def developer(text: str) -> Message:
     return {"role": "developer", "content": text}
 
 
-def called(name: str, call_id: str = "call-1") -> list[Message]:
-    call = {"id": call_id, "type": "function", "function": {"name": name, "arguments": "{}"}}
+def called(name: str, call_id: str = "call-1", arguments: str = "{}") -> list[Message]:
+    call = {"id": call_id, "type": "function", "function": {"name": name, "arguments": arguments}}
     return [
         {"role": "assistant", "tool_calls": [call]},
         {"role": "tool", "tool_call_id": call_id, "content": "Done."},
@@ -98,7 +98,6 @@ def test_a_claim_with_no_tool_call_is_caught_but_an_earlier_one_is_not() -> None
 
 def test_offers_questions_and_words_for_the_user_are_not_promises() -> None:
     assert check(user("Fix it."), said("I'll start an agent to fix it. Shall I go ahead?")) is None
-    assert check(user("How long?"), said("I'll let you know when it finishes.")) is None
     assert check(user("Ideas?"), said("If you like, I'll tell the docs agent.")) is None
     assert check(user("What did it say?"), said('It said: "I\'ll tell the docs agent."')) is None
     assert check(user("Status?"), said("He'll ask the reviewer next.")) is None
@@ -113,6 +112,37 @@ def test_nouns_that_double_as_verbs_and_restated_sends_are_not_promises() -> Non
         check(*sent, user("Go for it."), *called("schedule_followup", "call-2"), said("I've sent it."))
         is None
     )
+
+
+def test_a_check_in_promised_with_nothing_scheduled_is_caught() -> None:
+    start = [user("Start an agent on the login test."), *called("start_task")]
+    note = check(*start, said("Started. I'll check its progress in thirty minutes."))
+    assert note is not None
+    assert "I'll check its progress in thirty minutes" in note
+    assert "schedule_followup" in note
+    assert check(*start, said("Started. I'll tell you when it's done.")) is not None
+    assert check(user("How long?"), said("I'll let you know when it finishes.")) is not None
+    sent = [user("Tell him to rebase."), *called("post_team_chat")]
+    assert check(*sent, said("Sent. I'll check back in twenty minutes.")) is not None
+
+
+def test_a_check_in_with_its_follow_up_watch_or_notify_is_kept() -> None:
+    start = [user("Start an agent on the login test."), *called("start_task")]
+    scheduled = [*start, *called("schedule_followup", "call-2")]
+    assert check(*scheduled, said("Started. I'll check its progress in thirty minutes.")) is None
+    assert check(*start, *called("watch_task", "call-2"), said("I'll tell you when it's done.")) is None
+    notify = called("start_task", arguments='{"prompt": "Fix it.", "notify_when_done": true}')
+    assert check(user("Start one."), *notify, said("Started. I'll tell you when it's done.")) is None
+    earlier = [user("Check back at two."), *scheduled, said("Done.")]
+    assert check(*earlier, user("When?"), said("I'll check back at two.")) is None
+
+
+def test_lookups_offers_and_questions_are_not_check_in_promises() -> None:
+    assert check(user("Is it ready?"), said("I'll check the brief before asking you to approve it.")) is None
+    assert check(user("Status?"), said("Let me check on it.")) is None
+    assert check(user("Later?"), said("If you like, I'll check back at two.")) is None
+    assert check(user("Later?"), said("Shall I check back in twenty minutes?")) is None
+    assert check(user("What did it find?"), said("I'll tell you what it found: two bugs.")) is None
 
 
 def test_asking_the_user_to_repeat_unclear_words_is_left_alone() -> None:
