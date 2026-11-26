@@ -127,7 +127,7 @@ const usedRoles = async (tx: Db, ids: readonly string[]) =>
         WHERE lower(a) = 'role:' || lower(p.name)))
     ORDER BY p.name`
 
-/** Keeps each built-in role in use as the user's own, with the text it had; deletes the rest. */
+/** Keeps used built-in roles as the user's own, deletes the rest; a new install records nothing. */
 export async function retireBuiltinRoles(tx: Db): Promise<void> {
   const at = new Date().toISOString()
   const ids = RETIRED_ROLES.map((role) => role.id)
@@ -138,7 +138,8 @@ export async function retireBuiltinRoles(tx: Db): Promise<void> {
   }
   const removed = await tx<{ name: string }[]>`DELETE FROM context_pack WHERE id = ANY(${ids}) AND builtin
     RETURNING name`
-  if (kept.length === 0 && removed.length === 0) {
+  const [history] = await tx<{ any: boolean }[]>`SELECT EXISTS (SELECT 1 FROM audit_event) AS any`
+  if (kept.length + removed.length === 0 || (kept.length === 0 && history?.any !== true)) {
     return
   }
   const names = (rows: readonly { name: string }[]) =>

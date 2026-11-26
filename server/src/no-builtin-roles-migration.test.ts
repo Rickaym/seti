@@ -85,10 +85,16 @@ describe('the no built-in roles migration', () => {
     const result = await migrate(task('idle'))
     expect(roleNames(result)).toEqual([])
     expect(result.packs.find((pack) => pack.id === GUIDE)).toMatchObject({ name: 'Seti guide', builtin: true })
-    expect(result.audit).toHaveLength(1)
-    expect(result.audit[0]?.summary).toBe(
+    expect(result.audit).toEqual([])
+  })
+
+  it('records what it removed on an install with history', async () => {
+    const result = await migrate(`INSERT INTO audit_event (at, actor, kind, subject_type, summary, detail)
+      VALUES ('x', 'user', 'task.created', 'task', 'Created a task', '{}');`)
+    expect(roleNames(result)).toEqual([])
+    expect(result.audit.map((event) => event.summary)).toEqual([
       'Seti ships no built-in roles: kept none as your own, removed Lead, Reviewer, Watcher',
-    )
+    ])
   })
 
   it.each(REFERENCES)('keeps a role %s refers to as the user own, and deletes the others', async (_, name, seed) => {
