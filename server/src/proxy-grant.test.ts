@@ -1,9 +1,9 @@
 import { NODE_COMMANDS, type Task } from '@seti/shared'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { codexKeyConnection } from './codex-key.js'
 import type * as ConnectionEgress from './connection-egress.js'
 import { taskConnections } from './connection-egress.js'
 import type * as McpSelection from './mcp-selection.js'
+import { providerKeyConnection } from './provider-key.js'
 import { proxyGrant } from './proxy-grant.js'
 import type { ConnectionRow } from './store/connections.js'
 
@@ -33,7 +33,7 @@ const row = (id: string, env: string, hosts: string[], { header = true, body = f
   updated_at: '2026-11-23',
 })
 
-const task = { id: 't1', profile_id: 'p1' } as Task
+const task = { id: 't1', profile_id: 'p1', runtime: 'claude' } as Task
 
 describe("a Codex agent's grant", () => {
   beforeEach(() => {
@@ -45,7 +45,7 @@ describe("a Codex agent's grant", () => {
   })
 
   it("takes the OpenAI key from the agent's connection that sets a header on OpenAI's API", async () => {
-    expect((await codexKeyConnection(task))?.env).toBe('OPENAI_API_KEY')
+    expect((await providerKeyConnection(task, 'openai'))?.env).toBe('OPENAI_API_KEY')
   })
 
   it('reaches no Anthropic host and carries no Claude login, connector or host sign-in, only its connections', async () => {
@@ -56,7 +56,7 @@ describe("a Codex agent's grant", () => {
 
   it("has no key when no connection sets a header on OpenAI's API", async () => {
     vi.mocked(taskConnections).mockResolvedValue([row('bare', 'OPENAI_BARE', ['api.openai.com'], { header: false })])
-    expect(await codexKeyConnection(task)).toBeNull()
+    expect(await providerKeyConnection(task, 'openai')).toBeNull()
   })
 
   it("leaves a Claude agent's grant reaching Anthropic", async () => {

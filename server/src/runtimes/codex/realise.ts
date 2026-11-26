@@ -1,4 +1,4 @@
-import { SHARED_TOOL_SERVER, type CompactRule } from '@seti/shared'
+import { PROVIDERS, SHARED_TOOL_SERVER, type CompactRule } from '@seti/shared'
 import type { CodexToolServer } from '../../codex-tool-servers.js'
 import type { Launcher } from '../../launcher.js'
 import { MODEL_KEY_ENV } from '../../sandbox-codex.js'
@@ -19,7 +19,7 @@ export interface CodexProvider {
 const PROVIDER = 'seti-openai'
 
 /** OpenAI's API, with the key the egress proxy puts in place of the sandbox's placeholder. */
-const OPENAI: CodexProvider = { baseUrl: 'https://api.openai.com/v1', envKey: MODEL_KEY_ENV }
+const OPENAI: CodexProvider = { baseUrl: PROVIDERS.openai.baseUrl, envKey: MODEL_KEY_ENV }
 
 /** The model a Codex agent uses until it picks one; without a model Codex offers no tools. */
 const DEFAULT_MODEL = 'gpt-5.5'

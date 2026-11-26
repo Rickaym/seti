@@ -1,12 +1,12 @@
 import dns from 'node:dns/promises'
 import type { IncomingHttpHeaders, OutgoingHttpHeaders } from 'node:http'
 import net from 'node:net'
-import { isGitHubOwner, urlAllowed } from '@seti/shared'
+import { isGitHubOwner, PROVIDERS, urlAllowed } from '@seti/shared'
 import { noValue, type Target, unlessLate } from './egress-answers.js'
 import { isAwsHost } from './egress-aws.js'
 
 /** Claude Code talks to this host; the proxy always lets it through with the real credential. */
-export const ANTHROPIC_HOST = 'api.anthropic.com'
+export const ANTHROPIC_HOST = new URL(PROVIDERS.anthropic.baseUrl).hostname
 
 /** Anthropic's MCP proxy, which serves claude.ai connectors to the account's OAuth token. */
 export const MCP_PROXY_HOST = 'mcp-proxy.anthropic.com'

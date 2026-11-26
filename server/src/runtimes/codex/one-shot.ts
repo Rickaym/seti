@@ -1,5 +1,5 @@
 import { oneInput, type OneShot } from '../one-shot.js'
-import { callCost } from './prices.js'
+import { callCost } from '../prices.js'
 import { realiseOneShot, type CodexProvider } from './realise.js'
 import { codexSession } from './session.js'
 
@@ -23,5 +23,5 @@ export const codexOneShotFor = (binary?: string, provider?: CodexProvider): OneS
     })
     return Promise.resolve(codexSession(realised, oneInput(request.prompt)))
   },
-  price: callCost,
+  price: (model, usage) => callCost('openai', model, usage),
 })
