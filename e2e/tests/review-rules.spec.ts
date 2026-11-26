@@ -1,8 +1,10 @@
 import type { Page } from '@playwright/test'
 import type { Envelope, PermissionPolicy, PermissionRequest, Task } from '@seti/shared'
+import { SLACK_POSTED } from './support/fake-permission.js'
 import { REVIEW_DRAFT, REVIEW_PROMPT, reviewSent } from './support/fake-review.js'
 import { apiData, expect, test, unique } from './support/fixtures.js'
 import { FAKE_CLAUDE_ENV } from './support/processes.js'
+import { startSlackPoster } from './support/slack-names.js'
 
 test.use({ serverEnv: FAKE_CLAUDE_ENV })
 
@@ -47,11 +49,9 @@ test('a review rule holds an MCP call until the user edits and allows it', async
     await card.getByRole('button', { name: 'Allow', exact: true }).click()
 
     await expect(page.getByRole('main').getByText(reviewSent('Deploy is done'), { exact: true })).toBeVisible()
-    const edited = page.getByRole('main').getByRole('img', { name: /^Edited: / })
-    await expect(edited).toHaveText('Edited')
-    await expect(edited).toHaveAccessibleName('Edited: You edited text before the call ran; the agent was told')
-    await edited.hover()
-    await expect(page.getByRole('tooltip')).toContainText('You edited text before the call ran')
+    await expect(page.getByRole('main').getByTestId('edited-mark')).toHaveText(
+      `You edited the text before ${rule.slice(5)}.send_message ran. Above is the agent's draft.`,
+    )
     await expect.poll(async () => (await apiData<Task>(request, `/tasks/${id}`)).status).toBe('idle')
   } finally {
     const policy = await apiData<PermissionPolicy>(request, '/permissions')
@@ -61,7 +61,10 @@ test('a review rule holds an MCP call until the user edits and allows it', async
   }
 })
 
-test('a held call the user edits and then denies is marked Edited and tells the agent', async ({ page, request }) => {
+test('a held call the user edits and then denies says so in plain words and tells the agent', async ({
+  page,
+  request,
+}) => {
   const rule = server()
   const added = await request.post('/api/permissions/rules', { data: { behavior: 'review', rule } })
   expect(added.ok(), 'POST /api/permissions/rules').toBe(true)
@@ -79,8 +82,9 @@ test('a held call the user edits and then denies is marked Edited and tells the 
     await card.getByRole('button', { name: 'Deny' }).click()
 
     await expect(page.getByRole('main').getByText('Not sent.', { exact: true })).toBeVisible()
-    const edited = page.getByRole('main').getByRole('img', { name: /^Edited: / })
-    await expect(edited).toHaveAccessibleName('Edited: You edited text, then denied the call; the agent got your text')
+    await expect(page.getByRole('main').getByTestId('edited-mark')).toHaveText(
+      `You edited the text, then denied ${rule.slice(5)}.send_message. Nothing ran.`,
+    )
     const [held] = await apiData<PermissionRequest[]>(request, `/tasks/${id}/permission-requests`)
     expect(held).toMatchObject({ state: 'denied', edited: ['text'], message: 'Wait for QA' })
   } finally {
@@ -89,4 +93,23 @@ test('a held call the user edits and then denies is marked Edited and tells the 
       await request.delete(`/api/permissions/rules/${String(own.id)}`)
     }
   }
+})
+
+test('an edited Slack send says, under its row, that the message was sent', async ({ page, request }) => {
+  const id = await startSlackPoster(request, true)
+  await page.goto(`/#agents/${id}`)
+  const main = page.getByRole('main')
+  const card = main.getByRole('region', { name: /^Permission request for/ })
+  await card.getByRole('button', { name: 'Edit' }).click()
+  await card
+    .getByRole('group', { name: 'Call fields' })
+    .getByRole('textbox', { name: 'message' })
+    .fill('Deploy is green')
+  await card.getByRole('button', { name: 'Allow', exact: true }).click()
+  await expect(main.getByText(SLACK_POSTED, { exact: true })).toBeVisible()
+  const mark = main.getByTestId('edited-mark')
+  await expect(mark).toHaveText("You edited the message before it was sent. Above is the agent's draft.")
+  const row = main.getByTestId('tool-summary').filter({ hasText: 'Send to #deploys' })
+  const [rowBox, markBox] = await Promise.all([row.boundingBox(), mark.boundingBox()])
+  expect(markBox?.y ?? 0).toBeGreaterThan(rowBox?.y ?? Infinity)
 })
