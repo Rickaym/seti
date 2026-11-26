@@ -1,6 +1,8 @@
 import { ChevronDown, Library } from 'lucide-react'
 import { useState, type ReactNode } from 'react'
 import { LinkIcon } from '@/components/links/LinkPill'
+import { NotRead, VerifiedMark } from '@/components/references/source-marks'
+import { useSourceMatch } from '@/components/references/source-match'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { useNarrow } from '@/hooks/useMedia'
 import { useSourceLabel } from '@/lib/references/reference-label'
@@ -11,6 +13,7 @@ const ENTRY = 'flex min-w-0 flex-1 items-center gap-1.5 pointer-coarse:min-h-11'
 
 function SourceRow({ reference }: { reference: Reference }) {
   const label = useSourceLabel(reference)
+  const match = useSourceMatch(reference)
   const content = (
     <>
       <LinkIcon info={label} className="size-3.5" />
@@ -18,7 +21,13 @@ function SourceRow({ reference }: { reference: Reference }) {
       {reference.href !== null && reference.note !== null && (
         <span className="min-w-0 truncate text-muted-foreground">{reference.note}</span>
       )}
-      {label.host !== null && <span className="shrink-0 text-muted-foreground">{label.host}</span>}
+      {label.host !== null && (
+        <span className={cn('shrink-0 text-muted-foreground', match?.unread === true && 'max-sm:hidden')}>
+          {label.host}
+        </span>
+      )}
+      {match?.unread === true && <NotRead />}
+      {match?.verified === true && <VerifiedMark />}
     </>
   )
   return (
