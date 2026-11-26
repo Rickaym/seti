@@ -53,6 +53,14 @@ function plain(cwd: string, ...args: string[]): string {
   return execFileSync('git', [...identity, '-C', cwd, ...args], { encoding: 'utf8', stdio: 'pipe' }).trim()
 }
 
+const attempt = (run: () => unknown) => {
+  try {
+    run()
+  } catch {
+    // the outcome does not matter, only what ran
+  }
+}
+
 const HOOKS = ['post-index-change', 'pre-commit', 'post-checkout', 'reference-transaction', 'post-commit']
 
 /** A commit carrying a signature, which `log.showSignature` hands to the signing program. */
@@ -212,7 +220,8 @@ describe('git in a repository an agent controls', () => {
     fs.appendFileSync(path.join(repo, '.gitattributes'), '*.bin filter=proc\n')
     plain(repo, 'config', 'filter.proc.process', trap(repo, 'filter-process'))
     touchAll(repo)
-    expect(() => plain(repo, 'status', '--porcelain')).toThrow()
+    // git fails or carries on after a filter process that never answers, by version
+    attempt(() => plain(repo, 'status', '--porcelain'))
     expect(sprung()).toContain('filter-process')
     reset()
     for (const args of READS) {
