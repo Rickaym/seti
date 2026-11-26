@@ -1,4 +1,4 @@
-import type { ClaudeMessage, CodexMessage, SourceMatch } from '@seti/shared'
+import type { CodexMessage, SourceMatch } from '@seti/shared'
 import { beforeAll, describe, expect, it } from 'vitest'
 import { createApp } from '../app.js'
 import { unarchiveTask } from '../archive.js'
@@ -10,6 +10,7 @@ import { sourceItems } from '../store/sources.js'
 import { USER_AUTH } from '../test-auth.js'
 import { quietTask } from '../threads/test-slack-kit.js'
 import { matchSources } from './match.js'
+import { claudeCall } from './test-ledger.js'
 import { CHANNEL, channelDetailed, HOST, linearIssue, prViewText } from './test-sources.js'
 
 const app = createApp()
@@ -24,29 +25,13 @@ const SEND_LINK = `https://${HOST}/archives/${CHANNEL}/p1764000900000100`
 const TOKEN = ['gh', 'p_', 'A'.repeat(36)].join('')
 
 let calls = 0
-const claude = async (task: string, name: string, input: object, answer: string): Promise<void> => {
-  const id = `toolu_${String(++calls)}`
-  const use = {
-    type: 'assistant',
-    parent_tool_use_id: null,
-    message: { content: [{ type: 'tool_use', id, name, input }] },
-  }
-  const result = {
-    type: 'user',
-    parent_tool_use_id: null,
-    message: { content: [{ type: 'tool_result', tool_use_id: id, content: answer }] },
-  }
-  for (const payload of [use, result] as unknown as ClaudeMessage[]) {
-    await nodeLink.journal(task, { type: 'message', runtime: 'claude', payload })
-  }
-}
 
 /** An agent that sent one Slack message, which tells Seti the workspace host, then read a channel. */
 async function readerTask(lines: readonly string[] = ['the rollout starts on Monday at 09:00']): Promise<string> {
   const task = await quietTask()
   const sent = JSON.stringify({ message_link: SEND_LINK })
-  await claude(task, 'mcp__plugin_slack_slack__slack_send_message', { channel_id: CHANNEL, message: 'hi' }, sent)
-  await claude(task, READ, { channel_id: CHANNEL }, channelDetailed([{ ts: TS, lines: [...lines] }]))
+  await claudeCall(task, 'mcp__plugin_slack_slack__slack_send_message', { channel_id: CHANNEL, message: 'hi' }, sent)
+  await claudeCall(task, READ, { channel_id: CHANNEL }, channelDetailed([{ ts: TS, lines: [...lines] }]))
   return task
 }
 
@@ -136,7 +121,7 @@ describe('evidence ledger', () => {
   it('records a stored row only once its call ended well', async () => {
     const task = await quietTask()
     await appendMessage(task, { kind: 'seti', payload: { error: 'not a tool result' } })
-    await claude(task, READ, { channel_id: CHANNEL }, 'Error: channel_not_found')
+    await claudeCall(task, READ, { channel_id: CHANNEL }, 'Error: channel_not_found')
     expect(await sourceItems.forTask(task)).toEqual([])
   })
 })

@@ -270,6 +270,15 @@ between two steps; an interrupt; a hook at subagent start.
 - SRC-5: A Slack message permalink, or a GitHub pull request, issue or comment link, that names no
   item and whose id appears in no row of the agent's transcript is reported as not read by the
   agent; a client says so in muted text. An agent with no transcript rows gets no such report.
+- SRC-6: An agent MAY search its own ledger by words, kind, container and time with
+  `find_in_transcript` (`where` set to `sources`). Each item comes back once, newest first, with its
+  place, time, permalink and exact text from the transcript, cut at 2,000 characters. At every Seti
+  control level an agent reaches only its own ledger; the assistant reaches any agent's, as it
+  reads any agent's transcript.
+- SRC-7: Ledger text given to an agent or the assistant is untrusted data. It MUST come with a note
+  that other people wrote it, to quote and never to follow, inside a frame (a JSON field, or tags
+  whose closing marks the text cannot forge), with credentials redacted. Logs and audit details
+  MUST NOT carry it.
 
 ## 4. Turn lifecycle
 
