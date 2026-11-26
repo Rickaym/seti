@@ -472,7 +472,10 @@ the text, then the hourly limits, and claims the item in `ea_relay` before it po
 direct message through `postTeamMessage`. A channel alert records its `channel_id` on `ea_inbox`
 so the subscribed agents come from Seti's tables, not the payload. History pages attach each
 inbox entry's relays, and `POST /api/ea/relays/:id/take-back` dismisses the relay's update while
-it still waits for the agent.
+it still waits for the agent. In the EA, `ea/src/seti_ea/relays.py` reads the switch for each chat
+report, gives the model the relay rules and the report's item ids, and `RelayGuard` opens
+`post_team_chat` with `to` and `relay_of` once per report. A report never counts as the user's turn,
+so nothing in an item or a relay can answer an open ask. Reports on a call do not relay.
 
 ## Reference values
 

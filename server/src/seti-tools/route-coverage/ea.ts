@@ -1,4 +1,4 @@
-import { ea, plumbing, same, ui, user, type CoverageTable } from './kinds.js'
+import { ea, plumbing, ui, user, type CoverageTable } from './kinds.js'
 
 /** Routes under /api/ea: the EA's own tools and the plumbing its voice bot calls. */
 export const EA_ROUTES: CoverageTable = {
@@ -44,8 +44,8 @@ export const EA_ROUTES: CoverageTable = {
     'security',
     'Whether untrusted inbox items may reach agents through the EA is a security setting',
   ),
-  'POST /api/ea/relays': plumbing('The EA relays an inbox item to its agent. EA plumbing'),
-  'POST /api/ea/relays/:id/take-back': same('DELETE /api/tasks/:id/queue/:message_id'),
+  'POST /api/ea/relays': ea('post_team_chat'),
+  'POST /api/ea/relays/:id/take-back': ea('take_back_message'),
   'POST /api/ea/thoughts': plumbing('The EA logs a thought. EA plumbing'),
   'GET /api/ea/usage': ea('seti_overview'),
   'POST /api/ea/usage': plumbing('The EA records usage. EA plumbing'),
