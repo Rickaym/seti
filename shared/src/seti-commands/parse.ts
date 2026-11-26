@@ -1,11 +1,11 @@
 import { describeSetiCommand } from './describe.js'
+import { SETI_LINE_MAX } from './limits.js'
 import { isSetiLine } from './names.js'
 import { SETI_PREFIX, type OpRule } from './rules.js'
 import { stepAt } from './steps.js'
 import type { CommandOption, CommandWorld, GrammarStep } from './world.js'
 
-/** The longest line Seti reads as a command. */
-export const SETI_LINE_MAX = 300
+export { SETI_LINE_MAX } from './limits.js'
 
 /** A line Seti understood: what it changes, who may run it, and the words to show for it. */
 export interface SetiCommand {
