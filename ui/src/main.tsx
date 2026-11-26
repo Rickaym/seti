@@ -9,6 +9,7 @@ import { TeamChatProvider } from '@/components/team/TeamChatProvider'
 import { ThemeProvider } from '@/components/theme/theme-provider'
 import { ConfirmProvider } from '@/components/ui/confirm-dialog'
 import { TooltipProvider } from '@/components/ui/tooltip'
+import { startUpdates } from '@/lib/app-update'
 import { installLinkPillCopy } from '@/lib/links/pill-copy'
 import { registerServiceWorker } from '@/lib/service-worker'
 import { installThemeTokens } from '@/mods/themes'
@@ -47,5 +48,6 @@ createRoot(rootEl, { onCaughtError: () => undefined }).render(
 )
 
 if (import.meta.env.PROD) {
+  startUpdates()
   registerServiceWorker()
 }

@@ -1475,7 +1475,7 @@ Optional and off by default: a maintenance session per agent that consolidates i
   that need the user with reason lines, a few agents with status, counts and today's cost.
 - API-15: A client that cannot reach the server keeps its data and shows no error until it
   answers. After a deploy, a view that fails to load reloads once per build if the server answers
-  and no form is unsaved, else offers a reload. A failure toast stays until dismissed.
+  and no form is unsaved, else offers Update (API-20). A failure toast stays until dismissed.
 - API-17: Every flow, full configuration included, MUST work on a phone-sized client.
 - API-18: A file for a message uploads as one request before the message goes out, at most
   `upload_file`; the client MUST refuse a larger file without sending it and name the limit. While
@@ -1497,6 +1497,25 @@ Optional and off by default: a maintenance session per agent that consolidates i
   new tab; on a phone a tap opens a sheet with an Open button. Previews show only text derived
   from the URL and the message, bounded in length, and raw HTML in a message cannot produce a mark
   or a Sources list.
+- API-20: Each UI build carries an id, which index.html names and `GET /api/system` reports as
+  `build`. A client compares its own id with the server's on every poll, when it returns to the
+  foreground and when it comes back online. When they differ it installs the new worker and reloads
+  into the new build at a safe moment: at once while hidden or idle, never while the user types,
+  a composer holds text, a dialog is open, a file uploads or a form is unsaved; until then it
+  shows one Update control in the status bar that reloads on demand. A hidden page waits only for
+  uploads, unsaved forms and text no draft keeps. Composer drafts survive the reload. A failed
+  worker install is tried again after 5 s, doubling to 5 minutes; after two failures the page
+  reloads without it. A client reloads by itself at most once per build. A client already on the
+  server's build lets a waiting worker take over at once.
+  Why: an installed app resumes its old page and has no pull to refresh, so without this a phone
+  runs an old build for hours.
+- API-21: A UI build is made beside the served folder and swapped in whole, keeping the hashed
+  files of the two builds before it. While the files swap, the server answers `sw.js` and
+  `index.html` from the last complete build; it answers 503 only when no build was ever there. A
+  missing file, such as an old hashed asset, answers 404, never the app shell. The worker loads
+  pages from the network first and falls back to its cached shell only offline or on a 502, 503
+  or 504; it serves hashed files from its cache first and never caches a response whose content
+  type does not fit the file asked for.
 
 ### 19.1 Agent commands
 
