@@ -791,6 +791,9 @@ class FakeSeti:
     ssh_sets: dict[str, list[str]] = field(default_factory=dict)
     access_defaults: dict[str, bool] = field(default_factory=dict)
     processes: dict[str, dict[str, Any]] = field(default_factory=dict)
+    second_opinions: dict[str, dict[str, Any]] = field(default_factory=dict)
+    recent_files: dict[str, dict[str, Any]] = field(default_factory=dict)
+    shell_output: dict[str, dict[str, Any]] = field(default_factory=dict)
     task_access: dict[str, dict[str, bool]] = field(default_factory=dict)
     aws_outcomes: dict[str, dict[str, Any]] = field(default_factory=dict)
     profiles: list[dict[str, Any]] = field(
@@ -1277,6 +1280,12 @@ class FakeSeti:
                 if self.digest is None:
                     return err(404, "Not Found")
                 return ok({"lines": self.digest})
+            case ["tasks", task_id, "second-opinions"]:
+                return ok(self.second_opinions.get(task_id, {"spend": [], "reviews": []}))
+            case ["tasks", task_id, "files", "recent"]:
+                return ok(self.recent_files.get(task_id, {"files": [], "since": "", "truncated": False}))
+            case ["tasks", _, "shells", shell_id, "output"]:
+                return ok(self.shell_output.get(shell_id, {"id": shell_id, "text": "", "truncated": False}))
             case ["tasks", task_id, "processes"]:
                 view = self.processes.get(task_id)
                 return ok(view) if view is not None else err(404, "Task not found")

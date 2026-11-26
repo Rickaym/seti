@@ -2,8 +2,10 @@ import { randomUUID } from 'node:crypto'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import type { QuestionSecret } from '@seti/shared'
 import { describe, expect, it } from 'vitest'
-import { gitCheckoutAbove, suppliedText, writeSecretFile } from './secret-delivery.js'
+import { gitCheckoutAbove } from './private-file.js'
+import { suppliedText, writeSecretFile } from './secret-delivery.js'
 import { sandboxContext } from './session-options.js'
 import { sandboxPolicy } from './store/sandbox.js'
 import { fileRules, pathProblem } from './task-files.js'
@@ -58,8 +60,15 @@ describe('secret files', () => {
     const file = suppliedText({ name: 'API_TOKEN', hosts: [], delivery: 'file' }, '/w/secrets/API_TOKEN')
     expect(file).toMatch(/^The value of API_TOKEN is in \/w\/secrets\/API_TOKEN\. Read it from there/)
     expect(file).toContain('never open it with the Read tool, print it, log it or commit it')
-    const stored = suppliedText({ name: 'API_TOKEN', hosts: ['api.example.com'], delivery: 'secret_store' }, null)
-    expect(stored).toContain("in Seti's secret store for api.example.com")
+    const secret: QuestionSecret = { name: 'API_TOKEN', hosts: ['api.example.com'], delivery: 'secret_store' }
+    const later = suppliedText(secret, null)
+    expect(later).toContain(
+      "in Seti's secret store for api.example.com. From your next turn your session has $API_TOKEN",
+    )
+    const now = suppliedText(secret, null, true)
+    expect(now).toContain("in Seti's secret store for api.example.com. Your bash commands have $API_TOKEN from now on")
+    expect(now).toContain("It holds a placeholder that Seti's proxy swaps for the value on those hosts")
+    expect(now).not.toContain('next turn')
   })
 
   it('never serves the secrets folder in the Files view', async () => {

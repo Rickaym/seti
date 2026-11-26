@@ -7,8 +7,8 @@ from test_chat import Script, events_of, make_chat, stored, texts
 from seti_ea.clock import CALL_NOTE_PREFIX
 from seti_ea.conversation import Conversation
 from seti_ea.history import SUMMARY_PREFIX
-from seti_ea.promises import NOTE_PREFIX, PromiseCheck, unkept
-from seti_ea.prompt import SYSTEM_PROMPT, VOICE_HELD_NOTE
+from seti_ea.promises import NOTE_PREFIX, PromiseCheck, promise_note, relay_note, unkept
+from seti_ea.prompt import ACT_NOTE, SYSTEM_PROMPT, VOICE_HELD_NOTE
 
 Message = dict[str, Any]
 
@@ -279,3 +279,14 @@ def test_the_prompt_forbids_empty_promises_and_re_asking_relays() -> None:
     )
     assert "send the direct message in the same reply, even while it runs a turn" in SYSTEM_PROMPT
     assert "show them in a quote block before sending" not in SYSTEM_PROMPT
+
+
+def test_after_a_relay_the_ea_says_whom_and_the_gist_and_never_reads_the_message_back() -> None:
+    prompt = " ".join(SYSTEM_PROMPT.split())
+    assert "say whom and the gist in a few words" in prompt
+    assert "never quote, read back or restate it, whole or step by step" in prompt
+    assert "Give it only when the user asks what you sent." in prompt
+    assert "quote what you sent" not in prompt
+    for text in (prompt, ACT_NOTE, promise_note("I told it."), relay_note("tell it", "Shall I send it?")):
+        assert "what you sent to whom" not in text
+        assert "the gist in a few words" in text

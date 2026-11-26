@@ -13,6 +13,8 @@ import { expect, test } from './support/fixtures.js'
 
 test.use({ permissions: ['microphone'] })
 
+const CALL_AUDIO = /^\d+(\.\d)?% lost, \d+(\.\d)? s filled in, direct over UDP$/
+
 const READY: EaHealth = { ok: true, configured: true, missing: [], model: 'gpt-4.1-mini', turn: true }
 
 const eaItem = (page: Page) => page.getByRole('contentinfo').getByRole('group', { name: 'EA', exact: true })
@@ -49,5 +51,6 @@ test('a phone call stays live after switching apps, and the media controls hang 
   await toBackground(page, false)
   await page.goto('/#settings/ea')
   await expect(page.getByTestId('ea-last-end')).toHaveText('Hung up, in the background')
+  await expect(page.getByTestId('ea-call-audio')).toHaveText(CALL_AUDIO)
   await expect(eaItem(page).getByTestId('ea-bar')).toHaveCount(0)
 })

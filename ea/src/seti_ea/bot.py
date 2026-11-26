@@ -591,7 +591,10 @@ async def run_bot(
             wake=wake_for_inbox,
         ),
     )
-    background: list[asyncio.Task[None]] = [asyncio.create_task(transport.link.watch(tools.audio_lost))]
+    background: list[asyncio.Task[None]] = [
+        asyncio.create_task(transport.link.watch(tools.audio_lost)),
+        asyncio.create_task(transport.link.sample()),
+    ]
 
     runner = WorkerRunner(handle_sigint=False)
     await runner.add_workers(worker)
@@ -607,3 +610,4 @@ async def run_bot(
         conversation.detach(inbox)
         await history.flush(final=True)
         await usage.flush()
+        logger.info(transport.link.audio.line())

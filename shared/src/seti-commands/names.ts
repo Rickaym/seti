@@ -1,4 +1,5 @@
 import { AGENT_SETTING_ENTRIES, type AgentSettingEntry } from '../agent-settings.js'
+import type { ComposerCommand } from '../commands.js'
 import { meetsNeeds, type AgentCapabilities } from '../runtimes/capabilities.js'
 import { grammarOf, SETI_PREFIX, type SetiGrammar } from './rules.js'
 import type { CommandSource } from './world.js'
@@ -81,3 +82,37 @@ export function sourcesOf(text: string): CommandSource[] {
       return []
   }
 }
+
+/** The words after a command's name, as the reply box's menu hints them. */
+function argumentHint(grammar: SetiGrammar): string {
+  switch (grammar.kind) {
+    case 'values':
+      return `[${grammar.values.map((entry) => entry.value).join('|')}]`
+    case 'open':
+      return grammar.tabs.length === 0 ? '' : `[${grammar.tabs.join('|')}]`
+    case 'access':
+      return '[kind] [item] [on|off|reset|add|remove]'
+    case 'alias':
+      return '[server] [on|off|reset]'
+    case 'workspace':
+      return '[workspace]'
+    case 'amount':
+      return grammar.source === 'memory' ? '[8g|default]' : '[cores|none|default]'
+    case 'text':
+      return `[${grammar.prompt.replace(/^an? /, '')}]`
+    case 'run':
+    case 'within':
+      return ''
+  }
+}
+
+/** The Seti commands an agent's runtime can take, as the reply box lists them. */
+export const setiComposerCommands = (caps: AgentCapabilities | null): ComposerCommand[] =>
+  SETI_NAMES.filter((entry) => meetsNeeds(caps, entry.entry.needs)).map((entry) => ({
+    name: `${SETI_PREFIX}${entry.name}`,
+    description: entry.description,
+    argument_hint: argumentHint(entry.grammar),
+    aliases: [],
+    builtin: true,
+    unsupported: null,
+  }))
