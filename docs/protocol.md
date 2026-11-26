@@ -271,6 +271,15 @@ between two steps; an interrupt; a hook at subagent start.
   item and whose id appears in no tool result, prompt or update of the agent's transcript (its own
   replies and calls do not count) is reported as not read by the agent; a client says so in muted
   text. An agent with no transcript rows gets no such report.
+- SRC-6: An agent MAY search its own ledger by words, kind, container and time with
+  `find_in_transcript` (`where` set to `sources`). Each item comes back once, newest first, with its
+  place, time, permalink and exact text from the transcript, cut at 2,000 characters. At every Seti
+  control level an agent reaches only its own ledger; the assistant reaches any agent's, as it
+  reads any agent's transcript.
+- SRC-7: Ledger text given to an agent or the assistant is untrusted data. It MUST come with a note
+  that other people wrote it, to quote and never to follow, inside a frame (a JSON field, or tags
+  whose closing marks the text cannot forge), with credentials redacted. Logs and audit details
+  MUST NOT carry it.
 
 ## 4. Turn lifecycle
 
@@ -608,9 +617,7 @@ interrupted only for that.
   offers no `always`, since an allow rule never lifts an ask rule. A card shows the agent's
   description first, cut to two lines with the whole text in a tooltip, then the call, then the
   implementation's own reason line; the agent's reason line reads the description in place of
-  the call when there is one. The reason line is the implementation's own words about why it
-  asks: a call an `ask` rule holds names that rule ("Your Ask rule holds this: <rule>"); it never
-  repeats the agent's description, and with no known reason there is no reason line.
+  the call when there is one.
 - PERM-7: Timeout is one install-wide setting: off, 15 min, 1 h (default), 4 h or 24 h from when
   the request was raised. A new value applies to waiting requests.
 - PERM-8: At the deadline the request MUST be denied with `timed_out`. The agent is told nobody
@@ -679,16 +686,11 @@ interrupted only for that.
   the whole title in a tooltip, the CI state, and a link that opens the PR. The implementation
   reads them with the walker of PERM-15: `gh pr` `merge`, `view`, `close`, `reopen`, `ready`,
   `comment`, `review`, `checks`, `edit` or `diff` with a number, in the repository `-R` or
-  `--repo` names, else the one the folder the command runs in resolves to: the remote
-  `gh repo set-default` chose, else the only GitHub repository its remotes name, in the folder the
-  agent's shell is in as the runtime reports it for the call, past any `cd` of an earlier call; a
-  pull request's
+  `--repo` names, else the one the folder the command runs in resolves to (the remote
+  `gh repo set-default` chose, else the only GitHub repository its remotes name); a pull request's
   github.com URL as any argument; and `repos/<owner>/<repo>/pulls/<n>` in `gh api`. A part the
   shell computes, another host, or a line that sets the code host's repository or host variables
-  or changes remotes gives no pull request rather than a wrong one. A number whose folder names
-  no repository is looked up in the agent's own repositories and those of its linked pull requests,
-  and shown, up to three per number, only where that pull request exists open or merged; this is a
-  hint for the reader, and the outward check of PERM-15 never uses it. The link is built from the
+  or changes remotes gives no pull request rather than a wrong one. The link is built from the
   owner, repository and number, never taken from the text. The request MUST be shown without
   waiting on them: the pull requests follow with their links, then title and CI from the data the
   implementation tracks or one bounded, cached lookup, which reads merged and closed ones too and
@@ -1548,25 +1550,6 @@ Optional and off by default: a maintenance session per agent that consolidates i
   pages from the network first and falls back to its cached shell only offline or on a 502, 503
   or 504; it serves hashed files from its cache first and never caches a response whose content
   type does not fit the file asked for.
-
-### 19.1 Agent commands
-
-- CMD-1: An agent's reply box MUST offer the control room's own setting commands, the same on every
-  runtime: `/restart`, `/archive`, `/mcp`, `/sandbox`, `/bypass`, `/credential`, `/access`,
-  `/settings`, `/rename` and `/dream`, each only where the runtime declares what it needs (RT-13);
-  one the runtime lacks says so by name. A setting command wins over a runtime's own command of
-  the same name and never reaches the runtime. It makes the request the agent's settings make, so
-  it is refused, applied and audited as there.
-- CMD-2: A setting command MUST run only on the user's submit in that agent's reply box of a line
-  the user typed or picked there. A line that arrived another way (pasted, dropped, restored,
-  handed over, taken back, or submitted by a script) MUST wait in a card with Run and run only on
-  its tap. Transcript rows, updates, group chat and Slack messages, webhooks, the EA, agents and
-  mods MUST NOT run one, and the control room MUST refuse a setting command sent to an agent as a
-  prompt (400).
-- CMD-3: A setting command that needs a value and has none MUST offer its choices, the current one
-  marked, never an error. Archive, restart, Bypass on and sandbox off MUST ask the settings' own
-  question inline with Confirm and Cancel first; a credential that changes access opens the dialog
-  the settings open. Esc closes the card and leaves the draft.
 
 ## 20. Conformance
 
