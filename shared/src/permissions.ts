@@ -20,7 +20,7 @@ const RULE_MAX = 500
 /** An MCP server, which covers all its tools, or one tool, as in mcp__slack or mcp__slack__send. */
 const MCP_RULE = /^mcp__[\w-]+$/
 
-/** An allow rule for pushes to one owner outside the user's organisations, as in PushTo(acme). */
+/** An allow rule for pushes and other writes to one owner outside the user's organisations. */
 const PUSH_RULE = /^PushTo\(([\w.-]+)\)$/
 
 /** The owner a `PushTo` rule names, or null for any other rule. */
