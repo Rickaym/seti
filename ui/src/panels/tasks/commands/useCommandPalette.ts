@@ -30,7 +30,7 @@ const ICONS: Readonly<Record<CommandSettingId, LucideIcon>> = {
 
 /**
  * Offers the agent's setting commands in the palette, from the same registry as its reply box: a
- * pick puts the command in the box as if typed there, where its choices or question show.
+ * pick runs the command as if typed in the box, where its choices or question show.
  */
 export function useCommandPalette(task: Task, fill: (text: string) => void): void {
   const caps = useCapabilities(task)
