@@ -1,4 +1,4 @@
-import { slackDestination, slackSendTarget, type SlackNames } from '@seti/shared'
+import { idsIn, readableSlack, slackDestination, slackSendTarget, type SlackNames } from '@seti/shared'
 import { useEffect, useSyncExternalStore } from 'react'
 import { apiGet } from '@/api'
 
@@ -45,8 +45,8 @@ const subscribe = (listener: () => void) => {
   }
 }
 
-/** The names Seti knows of these Slack ids; an id stays out of the map until its name is known. */
-export function useSlackNames(ids: readonly string[]): ReadonlyMap<string, string> {
+/** The names Seti knows of these Slack ids, and whether it is still asking about any of them. */
+export function useSlackLookup(ids: readonly string[]): { names: ReadonlyMap<string, string>; asking: boolean } {
   const key = ids.join(',')
   useEffect(() => {
     const missing = key.split(',').filter((id) => id !== '' && !known.has(id))
@@ -56,23 +56,28 @@ export function useSlackNames(ids: readonly string[]): ReadonlyMap<string, strin
     }
   }, [key])
   useSyncExternalStore(subscribe, () => version)
-  return new Map(
+  const names = new Map(
     ids.flatMap((id) => {
       const name = known.get(id)
       return name === undefined || name === null ? [] : [[id, name] as const]
     }),
   )
+  return { names, asking: ids.some((id) => !known.has(id)) }
 }
+
+/** The names Seti knows of these Slack ids; an id stays out of the map until its name is known. */
+export const useSlackNames = (ids: readonly string[]): ReadonlyMap<string, string> => useSlackLookup(ids).names
 
 const messageOf = (input: unknown): string => {
   const value = typeof input === 'object' && input !== null ? (input as { message?: unknown }).message : undefined
   return typeof value === 'string' ? value.replace(/\s+/g, ' ').trim() : ''
 }
 
-/** A Slack send's row line, `Send to #deploys: Deploy done`; null for any other call. */
+/** A Slack send's row line, `Send to #deploys: Deploy done` with mentions by name; null otherwise. */
 export function useSlackSummary(call: { name: string; input: unknown }): string | null {
   const target = slackSendTarget(call.name, call.input)
-  const names = useSlackNames(target === null ? [] : [target])
+  const text = target === null ? '' : messageOf(call.input)
+  const names = useSlackNames(target === null ? [] : [target, ...idsIn(text)])
   const where = slackDestination(call.name, call.input, names)
-  return where === null ? null : `${where}: ${messageOf(call.input)}`
+  return where === null ? null : `${where}: ${readableSlack(text, names, false)}`
 }

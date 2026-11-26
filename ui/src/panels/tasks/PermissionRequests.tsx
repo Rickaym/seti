@@ -171,7 +171,7 @@ export function PermissionCard({ request, onAnswered, className }: CardProps) {
             </code>
           )}
           <Reason request={request} />
-          <CallFields fields={fields} editing={editing} />
+          <CallFields tool={request.tool_name} fields={fields} editing={editing} />
           <Details request={request} />
           {!codex && <DenyNote note={note} onChange={setNote} />}
           <div className="flex flex-wrap items-center gap-1.5 pt-0.5">

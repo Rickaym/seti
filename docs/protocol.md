@@ -858,7 +858,11 @@ interrupted only for that.
   that message is shown. A newer sighting replaces the name and when it was last seen. Where Seti
   shows a Slack id (a Slack event's title and text, a thread reply, a Slack send's request summary,
   transcript row and audit summary) it shows the name it knows, else the id and "name not known";
-  it never guesses. A newly learned name replaces "name not known" at once in the summary of each
+  it never guesses. A send to a person reads "DM to <name>", and mentions inside the message read
+  by name where Seti knows it. While a Slack call's fields are open for editing, a field holding a
+  channel or person id shows its name under it, follows an edit to another id, and says when the
+  value is not a Slack id; the message field lists whom it mentions. The editable text stays the
+  literal text the call sends. A newly learned name replaces "name not known" at once in the summary of each
   pending request and in every open transcript. A name shown on a permission request never comes
   from text a message author controls, and says when it was last seen if that was over
   `slack_name_stale` ago. A request for a Slack send to an id with no known name offers Look up,
