@@ -53,7 +53,7 @@ const texts = (content: readonly Content[] | undefined): string[] =>
 /** A shell call's description, which Gemini CLI puts after the working folder in brackets. */
 const SHELL_NOTE = /^\[current working directory [^\]]*\](?: \((?<description>[\s\S]*)\))?$/
 
-function shellOf(call: AcpToolCall): ToolCall['shell'] {
+function shellOf(call: AcpToolCall): NonNullable<ToolCall['shell']> {
   const description = texts(call.content)
     .map((each) => SHELL_NOTE.exec(each)?.groups?.description)
     .find((each) => each !== undefined)
