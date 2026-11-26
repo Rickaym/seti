@@ -11,7 +11,6 @@ import { Hono } from 'hono'
 import {
   createPack,
   deletePack,
-  duplicatePack,
   requirePack,
   saveContextFile,
   setEaPacks,
@@ -40,7 +39,6 @@ export const contextRoutes = new Hono()
     const { kind, ...fields } = c.req.valid('json')
     return ok(c, (await createPack(fields, kind)).value)
   })
-  .post('/packs/:id/duplicate', async (c) => ok(c, (await duplicatePack(c.req.param('id'))).value))
   .get('/packs/:id', async (c) => ok(c, packForDisplay(await requirePack(c.req.param('id')))))
   .get('/packs/:id/links', async (c) => ok(c, await packLinks(await requirePack(c.req.param('id')))))
   .put('/packs/:id', validJson(contextPackInput), async (c) =>

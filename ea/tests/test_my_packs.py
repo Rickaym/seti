@@ -18,7 +18,7 @@ from seti_ea.tools import EaTools
 
 CHECKLIST = "3785dbaf-4f57-4752-ba91-9b95f4c6fc19"
 STAFF = "4b2e8f6a-1c3d-4e5f-8a9b-0c1d2e3f4a5b"
-OTHER_ROLE = "5e710000-0000-4000-8000-000000000002"
+OTHER_ROLE = "7a1c9e2b-3d4f-4a5b-9c6d-1e2f3a4b5c6d"
 
 
 @pytest.fixture(autouse=True)

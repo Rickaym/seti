@@ -7,7 +7,7 @@ from seti_ea.toolkit import ToolResult
 from seti_ea.tools import EaTools
 
 LOGOUT = f"/api/tasks/{TASK_LOGOUT}"
-LEAD = "5e710000-0000-4000-8000-000000000002"
+LEAD = "7a1c9e2b-3d4f-4a5b-9c6d-1e2f3a4b5c6d"
 OWN = "4b2e8f6a-1c3d-4e5f-8a9b-0c1d2e3f4a5b"
 TEXT = "Lead: you delegate the logout work.\n- Hand implementation to background subagents."
 
@@ -22,7 +22,6 @@ def role_packs(fake_seti: FakeSeti) -> None:
                 "description": "",
                 "body": "Lead: delegate.",
                 "kind": "role",
-                "builtin": True,
             },
             {"id": OWN, "name": "Release owner", "description": "", "body": "Own it.", "kind": "role"},
         ]
@@ -113,7 +112,7 @@ async def test_role_packs_are_given_by_set_agent_role_only(tools: EaTools, fake_
     default = await tools.call("update_context_pack", {"pack": "Release owner", "linked_by_default": True})
     assert not default.ok
     listed = (await tools.call("list_context_packs", {})).text
-    assert "- Lead (about 2 words; a role, given per agent with set_agent_role, built into Seti" in listed
+    assert "- Lead (about 2 words; a role, given per agent with set_agent_role)" in listed
     assert fake_seti.writes() == []
 
 

@@ -29,10 +29,10 @@ ROLE_SPECS: list[ToolSpec] = [
     ToolSpec(
         "set_agent_role",
         "Give an agent a role, replacing the one it has, or remove it. A role is a context pack of "
-        "kind role, in its system prompt right after the Seti guide from its next turn: the built-in "
-        "Lead, Reviewer and Watcher, or the user's own. Pass role to pick one by name, or text to "
-        "create a new role pack and give it to the agent. get_task shows the current role. Only "
-        "when the user asks. Needs the user's yes.",
+        "kind role the user wrote, in its system prompt right after the Seti guide from its next "
+        "turn; list_context_packs lists them. Pass role to pick one by name, or text to create a new "
+        "role pack and give it to the agent. get_task shows the current role. Only when the user "
+        "asks. Needs the user's yes.",
         {
             "task": TASK_REF,
             "role": {"type": "string", "description": "The role pack's name as the user said it."},

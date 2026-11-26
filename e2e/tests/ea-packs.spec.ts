@@ -1,9 +1,10 @@
 import { randomUUID } from 'node:crypto'
 import type { APIRequestContext, Page } from '@playwright/test'
-import { BUILTIN_ROLES, type AuditPage, type ContextPack, type EaHealth, type EaPackPrompt } from '@seti/shared'
+import type { AuditPage, ContextPack, EaHealth, EaPackPrompt } from '@seti/shared'
 import { EA_HEADERS } from './support/env.js'
 import { fakeEaChat, type FakeChat } from './support/fake-ea.js'
 import { apiData, expect, test, waitForToastsToClear } from './support/fixtures.js'
+import { newRole, removePacks } from './support/roles.js'
 
 const READY: EaHealth = {
   ok: true,
@@ -14,7 +15,6 @@ const READY: EaHealth = {
   chat_missing: [],
   turn: true,
 }
-const WATCHER = BUILTIN_ROLES.find((role) => role.name === 'Watcher')
 
 const main = (page: Page) => page.getByRole('main')
 const panel = (page: Page) => page.locator('dl[aria-label="EA settings"]')
@@ -65,6 +65,7 @@ test("a role and a pack linked from the EA cog reach the EA's next typed turn", 
   test.setTimeout(60_000)
   const tag = randomUUID().slice(0, 8)
   const pack = await newPack(request, `E2E EA pack ${tag}`, `Release trains leave on Tuesdays (${tag}).`)
+  const watcher = await newRole(request, 'Watcher', 'you monitor channels.')
   try {
     await page.route('**/api/ea/health', async (route) => route.fulfill({ json: READY }))
     chat = await fakeEaChat(page)
@@ -72,8 +73,8 @@ test("a role and a pack linked from the EA cog reach the EA's next typed turn", 
     await openSettings(page)
     await expect(panel(page).getByRole('list', { name: 'EA context packs' })).toBeHidden()
     await expect(panel(page)).toContainText('None')
-    await panel(page).getByRole('combobox', { name: 'Role' }).selectOption({ label: 'Watcher' })
-    await expect(panel(page).getByTestId('task-role')).toContainText('Watcher: you monitor channels')
+    await panel(page).getByRole('combobox', { name: 'Role' }).selectOption({ label: watcher.name })
+    await expect(panel(page).getByTestId('task-role')).toContainText(`${watcher.name}: you monitor channels`)
     await linkInDialog(page, pack.name)
 
     await openSettings(page)
@@ -87,7 +88,7 @@ test("a role and a pack linked from the EA cog reach the EA's next typed turn", 
     expect(turn.text).toBe('When do release trains leave?')
     const { text } = await eaPrompt(request)
     expect(text.indexOf('## Your role')).toBe(0)
-    expect(text).toContain(WATCHER?.text ?? 'missing')
+    expect(text).toContain(watcher.body)
     expect(text.indexOf(`## Context pack: ${pack.name}`)).toBeGreaterThan(text.indexOf('## Your role'))
     expect(text).toContain(`Release trains leave on Tuesdays (${tag}).`)
     turn.send({ type: 'text', delta: 'On Tuesdays.' })
@@ -96,7 +97,7 @@ test("a role and a pack linked from the EA cog reach the EA's next typed turn", 
 
     const audit = await apiData<AuditPage>(request, '/audit?kind=ea.context_packs_changed')
     expect(audit.events.map((event) => event.summary)).toEqual(
-      expect.arrayContaining(['Role of the EA: Watcher', `Context packs of the EA: ${pack.name}`]),
+      expect.arrayContaining([`Role of the EA: ${watcher.name}`, `Context packs of the EA: ${pack.name}`]),
     )
 
     await page.goto(`/#context/pack:${pack.id}`)
@@ -104,7 +105,7 @@ test("a role and a pack linked from the EA cog reach the EA's next typed turn", 
   } finally {
     await request.put('/api/ea/role', { data: { pack_id: null } })
     await unlinkAll(request)
-    await request.delete(`/api/context/packs/${pack.id}`)
+    await removePacks(request, [pack, watcher])
   }
 })
 

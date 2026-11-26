@@ -1,22 +1,24 @@
 import type { Page } from '@playwright/test'
-import {
-  BUILTIN_ROLES,
-  type ContextPack,
-  type ContextPackSummary,
-  isClaudeRow,
-  type MessagePage,
-  type Task,
-} from '@seti/shared'
+import { type ContextPack, type ContextPackSummary, isClaudeRow, type MessagePage, type Task } from '@seti/shared'
 import { settingsDialog, showSection } from './support/agent-settings.js'
 import { SYSTEM_PROMPT_PROMPT } from './support/fake-claude.js'
 import { apiData, expect, test, toasts, unique, waitForToastsToClear } from './support/fixtures.js'
 import { FAKE_CLAUDE_ENV } from './support/processes.js'
+import { newRole, removePacks } from './support/roles.js'
 
 test.use({ serverEnv: FAKE_CLAUDE_ENV })
 
-const role = (name: string) => BUILTIN_ROLES.find((entry) => entry.name === name) ?? { id: '', text: '' }
-const LEAD = role('Lead')
-const REVIEWER = role('Reviewer')
+const made: { id: string }[] = []
+
+test.afterEach(async ({ request }) => {
+  await removePacks(request, made.splice(0))
+})
+
+async function ownRole(page: Page, prefix: string, line: string): Promise<ContextPack> {
+  const role = await newRole(page.request, prefix, line)
+  made.push(role)
+  return role
+}
 
 async function startAgent(page: Page, pinned: boolean): Promise<Task> {
   const created = await page.request.post('/api/tasks', {
@@ -58,50 +60,53 @@ async function promptReply(page: Page, taskId: string): Promise<string> {
   return reply
 }
 
-test('a pinned agent gets the built-in Lead role in one click and its next turn reads it', async ({ page }) => {
+test("a pinned agent takes one of the user's roles, switches to another, and its next turn reads it", async ({
+  page,
+}) => {
+  const lead = await ownRole(page, 'Lead', 'you delegate the work.')
+  const reviewer = await ownRole(page, 'Reviewer', 'you review PRs.')
   const task = await startAgent(page, true)
   await page.goto(`/#agents/${task.id}`)
   const details = await settings(page)
   const picker = details.getByRole('combobox', { name: 'Role' })
-  await expect(details).toContainText('Pinned agents work best with a role')
   await expect(picker).toHaveValue('')
-  await details.getByRole('button', { name: 'Lead', exact: true }).click()
+  await expect(picker.locator('optgroup')).toHaveCount(0)
+  await picker.selectOption({ label: lead.name })
   await expect(toasts(page).filter({ hasText: 'Applies from the next turn' })).toBeVisible()
-  await expect(picker).toHaveValue(LEAD.id)
-  await expect(details.getByTestId('task-role')).toHaveText(LEAD.text.split('\n')[0] ?? '')
-  await expect(details).not.toContainText('Pinned agents work best with a role')
-  await expect(details.getByRole('button', { name: 'Duplicate role to edit' })).toBeVisible()
-  expect((await roleOf(page, task.id))?.name).toBe('Lead')
+  await expect(picker).toHaveValue(lead.id)
+  await expect(details.getByTestId('task-role')).toHaveText(lead.body.split('\n')[0] ?? '')
+  await expect(details.getByRole('button', { name: 'Edit role' })).toBeVisible()
+  expect((await roleOf(page, task.id))?.name).toBe(lead.name)
 
-  await picker.selectOption({ label: 'Reviewer' })
-  await expect.poll(async () => (await roleOf(page, task.id))?.name).toBe('Reviewer')
+  await picker.selectOption({ label: reviewer.name })
+  await expect.poll(async () => (await roleOf(page, task.id))?.name).toBe(reviewer.name)
   await page.keyboard.press('Escape')
 
   const reply = await promptReply(page, task.id)
   const at = (text: string) => reply.indexOf(text)
   expect(at('## Your role\n')).toBeGreaterThan(at('# Seti guide'))
-  expect(reply).toContain(REVIEWER.text)
-  expect(reply).not.toContain(LEAD.text)
+  expect(reply).toContain(reviewer.body)
+  expect(reply).not.toContain(lead.body)
 })
 
 test('a new role from the picker is a role pack linked to the agent, edited on the Context page', async ({ page }) => {
   const task = await startAgent(page, false)
   await page.goto(`/#agents/${task.id}`)
   const details = await settings(page)
-  await expect(details).not.toContainText('Pinned agents work best with a role')
   await details.getByRole('combobox', { name: 'Role' }).selectOption({ label: 'New role...' })
 
   const dialog = page.getByRole('dialog', { name: `New role for ${task.title}` })
   await expect(dialog.getByRole('textbox', { name: 'Name' })).toHaveValue(`${task.title} role`)
   const field = dialog.getByRole('textbox', { name: 'Role content' })
-  await dialog.getByRole('button', { name: 'Reviewer' }).click()
-  await expect(field).toHaveValue(REVIEWER.text)
+  await expect(field).toHaveValue('')
+  await expect(dialog).not.toContainText('Start from')
   await field.fill('Release owner: you own the release train.\n- Cut the tag on Fridays.')
   await dialog.getByRole('button', { name: 'Save' }).click()
   await expect(toasts(page).filter({ hasText: 'Applies from the next turn' })).toBeVisible()
   await expect(dialog).toBeHidden()
   const linked = await roleOf(page, task.id)
   expect(linked?.name).toBe(`${task.title} role`)
+  made.push({ id: linked?.id ?? '' })
 
   const again = await settings(page)
   await expect(again.getByTestId('task-role')).toHaveText(
@@ -118,31 +123,25 @@ test('a new role from the picker is a role pack linked to the agent, edited on t
   expect(await promptReply(page, task.id)).toContain('- Cut the tag on Mondays.')
 })
 
-test('duplicating a built-in role links the copy, None removes the role', async ({ page }) => {
+test('None removes the role and leaves the role pack for others', async ({ page }) => {
+  const lead = await ownRole(page, 'Lead', 'you delegate the work.')
   const task = await startAgent(page, false)
-  await page.request.put(`/api/tasks/${task.id}/role`, { data: { pack_id: LEAD.id } })
-  await page.goto(`/#agents/${task.id}`)
-  const details = await settings(page)
-  await details.getByRole('button', { name: 'Duplicate role to edit' }).click()
-  await expect(page).toHaveURL(/#context\/pack:[0-9a-f-]{36}$/)
-  const copy = await roleOf(page, task.id)
-  expect(copy?.name).toMatch(/^Lead \(copy( \d+)?\)$/)
-  await expect(page.getByRole('main').getByLabel('Role content')).toHaveValue(LEAD.text)
-
+  await page.request.put(`/api/tasks/${task.id}/role`, { data: { pack_id: lead.id } })
   await page.goto(`/#agents/${task.id}`)
   const picker = (await settings(page)).getByRole('combobox', { name: 'Role' })
-  await expect(picker).toHaveValue(copy?.id ?? '')
+  await expect(picker).toHaveValue(lead.id)
   await waitForToastsToClear(page)
   await picker.selectOption({ label: 'None' })
   await expect(toasts(page).filter({ hasText: 'Applies from the next turn' })).toBeVisible()
   await expect.poll(async () => roleOf(page, task.id)).toBeNull()
   const packs = await apiData<ContextPack[]>(page.request, '/context/packs')
-  expect(packs.some((pack) => pack.id === copy?.id)).toBe(true)
+  expect(packs.some((pack) => pack.id === lead.id)).toBe(true)
   await page.keyboard.press('Escape')
   expect(await promptReply(page, task.id)).not.toContain('## Your role')
 })
 
 test('the palette opens the role picker, and the access dialog leaves roles out', async ({ page }) => {
+  const watcher = await ownRole(page, 'Watcher', 'you watch CI.')
   const task = await startAgent(page, false)
   await page.goto(`/#agents/${task.id}`)
   await expect(page.getByRole('main').getByRole('heading', { name: task.title, level: 2 })).toBeVisible()
@@ -154,13 +153,13 @@ test('the palette opens the role picker, and the access dialog leaves roles out'
   await page.keyboard.press('Enter')
   const picker = page.getByRole('dialog').getByLabel('Agent details').getByRole('combobox', { name: 'Role' })
   await expect(picker).toBeFocused()
-  await picker.selectOption({ label: 'Watcher' })
-  await expect.poll(async () => (await roleOf(page, task.id))?.name).toBe('Watcher')
+  await picker.selectOption({ label: watcher.name })
+  await expect.poll(async () => (await roleOf(page, task.id))?.name).toBe(watcher.name)
 
   await showSection(settingsDialog(page), 'Access')
   await page.getByRole('button', { name: 'Edit access' }).click()
   const access = page.getByRole('dialog', { name: /^Access of / })
   const packs = access.getByRole('region', { name: 'Context packs' })
   await expect(packs.getByRole('switch', { name: 'Seti guide' })).toBeVisible()
-  await expect(packs).not.toContainText('Watcher')
+  await expect(packs).not.toContainText(watcher.name)
 })

@@ -1,6 +1,5 @@
-import { BUILTIN_ROLES } from '@seti/shared'
 import { describe, expect, it } from 'vitest'
-import { rolePackName } from './store/schema-roles.js'
+import { RETIRED_ROLES, rolePackName } from './store/schema-roles.js'
 import { migrateWith } from './test-migration.js'
 
 interface Pack {
@@ -68,7 +67,7 @@ describe('the roles as packs migration', () => {
       { task_id: 'long', name: `${'A'.repeat(75)} role`, linked: true },
     ])
 
-    for (const role of BUILTIN_ROLES) {
+    for (const role of RETIRED_ROLES) {
       expect(result.packs.find((pack) => pack.id === role.id)).toMatchObject({
         name: role.name,
         kind: 'role',

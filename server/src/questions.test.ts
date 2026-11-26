@@ -1,5 +1,5 @@
 import type { CanUseTool, PermissionResult } from '@anthropic-ai/claude-agent-sdk'
-import { BUILTIN_ROLES, type AnswerQuestionsResult, type Question, type Task } from '@seti/shared'
+import type { AnswerQuestionsResult, Question, Task } from '@seti/shared'
 import { afterAll, describe, expect, it, vi } from 'vitest'
 import { asAgent } from './access.js'
 import { createApp } from './app.js'
@@ -346,11 +346,5 @@ describe('leftover questions', () => {
     }
     expect(text).not.toContain('if you have a next step to offer, ask it')
     expect(text.length).toBeLessThan(1900)
-  })
-
-  it('keeps the asking rules out of the built-in roles, so no agent pays for them twice', () => {
-    for (const role of BUILTIN_ROLES) {
-      expect(role.text).not.toMatch(/AskUserQuestion|go-ahead/)
-    }
   })
 })

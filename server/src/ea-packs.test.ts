@@ -1,6 +1,5 @@
 import fs from 'node:fs'
 import {
-  BUILTIN_ROLES,
   EA_PACK_CHARS_MAX,
   type ContextPack,
   type ContextPackLinks,
@@ -24,7 +23,6 @@ const scratch = await vi.hoisted(async () => {
 })
 
 const app = createApp()
-const LEAD = BUILTIN_ROLES.find((role) => role.name === 'Lead')
 const GUIDE_ID = '5e710000-0000-4000-8000-000000000001'
 
 afterAll(() => {
@@ -106,11 +104,6 @@ describe('EA context packs', () => {
     expect((await prompt()).text).not.toContain('First draft.')
     expect((await send('DELETE', `/context/packs/${pack.id}`)).status).toBe(204)
     expect(await linked()).toEqual([])
-  })
-
-  it('renders a built-in role from Seti code', async () => {
-    expect((await setRole(LEAD?.id ?? '')).status).toBe(200)
-    expect((await prompt()).text).toContain(LEAD?.text ?? 'missing')
   })
 
   it('cuts the text at the cap and still reports the full length', async () => {
