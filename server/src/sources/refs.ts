@@ -5,6 +5,8 @@ export interface UrlRef {
   parents: string[]
   /** Set for a message or item permalink, whose absence from a transcript means it was assembled. */
   needles: string[] | null
+  /** Whether items whose key starts with `ref` match, as for a commit named by a short hash. */
+  prefix?: true
 }
 
 const SLACK_HOST = /^(?:[a-z0-9-]+\.)+slack\.com$/
@@ -46,6 +48,18 @@ export function githubRepo(owner: string, repo: string): string | null {
   return ok ? `${owner}/${repo}` : null
 }
 
+/** A file of a GitHub repository at a commit, or as a local copy when `sha` is null. */
+export const fileRef = (repo: string, file: string, sha: string | null) => {
+  const at = sha === null ? '' : `@${sha}`
+  return `file:${repo.toLowerCase()}:${file}${at}`
+}
+
+/** A file's page on GitHub at a commit, with the lines it shows. */
+export function blobPermalink(repo: string, file: string, sha: string, lines: readonly [number, number] | null) {
+  const page = `https://github.com/${repo}/blob/${sha}/${file.split('/').map(encodeURIComponent).join('/')}`
+  return lines === null ? page : `${page}#L${String(lines[0])}-L${String(lines[1])}`
+}
+
 export const linearRef = (id: string) => `linear:${id}`
 export const linearCommentRef = (id: string, comment: string) => `linear:${id}#${comment.toLowerCase()}`
 export const isLinearId = (id: unknown): id is string => typeof id === 'string' && LINEAR_ID.test(id)
@@ -71,9 +85,33 @@ function slackUrl(url: URL): UrlRef | null {
 
 const COMMENT_ANCHOR = /^(issuecomment-|discussion_r|pullrequestreview-)(\d{1,20})$/
 
+const SHA = /^[0-9a-f]{7,40}$/
+
+/** A file at a commit; a URL naming a branch or tag names no version the ledger can hold. */
+function blobUrl(repo: string, rest: readonly string[]): UrlRef | null {
+  const [sha = '', ...parts] = rest
+  let file: string
+  try {
+    file = parts.map(decodeURIComponent).join('/')
+  } catch {
+    return null
+  }
+  if (!SHA.test(sha) || file === '' || parts.includes('')) {
+    return null
+  }
+  const ref = fileRef(repo, file, sha)
+  return sha.length === 40 ? { ref, parents: [], needles: null } : { ref, parents: [], needles: null, prefix: true }
+}
+
 function githubUrl(url: URL): UrlRef | null {
-  const [, owner = '', name = '', type, number = '', extra] = url.pathname.split('/')
+  const [, owner = '', name = '', type, ...rest] = url.pathname.split('/')
   const repo = githubRepo(owner, name)
+  return repo !== null && type === 'blob' ? blobUrl(repo, rest) : itemUrl(url, repo, type, rest)
+}
+
+/** A pull request, an issue, or a comment on one. */
+function itemUrl(url: URL, repo: string | null, type: string | undefined, rest: readonly string[]): UrlRef | null {
+  const [number = '', extra] = rest
   if (repo === null || (type !== 'pull' && type !== 'issues') || !/^\d{1,9}$/.test(number)) {
     return null
   }

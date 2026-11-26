@@ -242,6 +242,12 @@ structure each server writes and the ids the call asked for, never a message bod
 posted in Slack or GitHub cannot add an item or change a permalink. Seti does not fetch anything
 for the ledger: an item exists only because the agent read it.
 
+A file the agent reads in a GitHub clone is placed with git on the host, in a clone the agent can
+write to, so its config and attributes are input ([SRC-8](protocol.md#37-evidence-ledger)). Git
+runs with the guards Seti uses for agents' repositories, the file is compared with HEAD by hashing
+its bytes with no filter, and a link that leads out of the clone gives no item. The clone's remote
+and history are the agent's, so a permalink says where the agent's clone says the file came from.
+
 ## What is not protected
 
 - systemd 255's user manager cannot decrypt credentials, so the key files are plain files the Seti
