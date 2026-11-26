@@ -199,6 +199,7 @@ export function ChannelsPage({ detail }: { detail: string | null }) {
     setCreating(null)
     setEditingReminder(null)
   }
+  const repliesOn = (channels ?? []).some((info) => info.source === 'webhook' && info.threads?.replies === true)
   const card = (info: ChannelInfo) => {
     if (info.source === 'poller') {
       return (
@@ -211,6 +212,7 @@ export function ChannelsPage({ detail }: { detail: string | null }) {
           onEdit={() => {
             setEditing(info)
           }}
+          repliesOn={repliesOn}
         />
       )
     }
