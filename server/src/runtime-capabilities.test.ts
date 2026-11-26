@@ -1,4 +1,11 @@
-import type { CapabilitiesSnapshot, McpServer, McpTransport, Task } from '@seti/shared'
+import {
+  settingCommands,
+  type CapabilitiesSnapshot,
+  type CommandCatalog,
+  type McpServer,
+  type McpTransport,
+  type Task,
+} from '@seti/shared'
 import { describe, expect, it, vi } from 'vitest'
 import { createApp } from './app.js'
 import { sql, tasks } from './db.js'
@@ -44,7 +51,13 @@ describe("what an agent's runtime declares", () => {
       data: unknown
     }
     expect(served.data).toEqual(runtimeCapabilities())
-    expect(runtimeCapabilities().claude).toMatchObject({ mcp_servers: true, plugins: true, dreams: true })
+    expect(runtimeCapabilities().claude).toMatchObject({
+      mcp_servers: true,
+      plugins: true,
+      dreams: true,
+      bypass: true,
+      slash_commands: true,
+    })
     expect(runtimeCapabilities().claude.mcp_transports).toEqual(['stdio', 'sse', 'http', 'sdk', 'claudeai-proxy'])
     expect(runtimeCapabilities().claude.compaction_ignores).toEqual([])
     expect(runtimeCapabilities().codex).toEqual({
@@ -58,6 +71,8 @@ describe("what an agent's runtime declares", () => {
       side_chat: false,
       dreams: false,
       rewind: false,
+      bypass: false,
+      slash_commands: false,
     })
   })
 
@@ -86,6 +101,22 @@ describe("what an agent's runtime declares", () => {
     })
     expect(compact.status).toBe(200)
     await expect(startDream(task)).rejects.toThrow("The agent's runtime keeps no memory Seti can find.")
+  })
+
+  it("lists a Codex agent Seti's setting commands its runtime can take, and none of Claude Code's", async () => {
+    const res = await app.request(`/api/tasks/${CODEX}/commands`, { headers: HEADERS })
+    const catalog = ((await res.json()) as { data: CommandCatalog }).data
+    const own = new Set(settingCommands(null).map((command) => command.name))
+    expect(catalog.commands.filter((command) => own.has(command.name)).map((command) => command.name)).toEqual([
+      'access',
+      'archive',
+      'credential',
+      'mcp',
+      'rename',
+      'restart',
+      'settings',
+    ])
+    expect(catalog.commands.filter((command) => !own.has(command.name) && command.name === 'compact')).toEqual([])
   })
 
   it("says which runtimes can use each MCP server: those that take its transport and name, and a plugin's only where plugins load", () => {

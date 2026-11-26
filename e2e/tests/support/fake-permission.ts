@@ -69,6 +69,7 @@ export type CanUseTool = (
     toolUseID: string
     requestId: string
     decisionReason?: string
+    description?: string
     suggestions?: unknown[]
   },
 ) => Promise<PermissionAnswer | null>
@@ -96,11 +97,12 @@ async function askToRun(
   input: Record<string, unknown>,
 ): Promise<{ result: string; reply: string }> {
   const command = String(input.command)
+  const described = typeof input.description === 'string' ? input.description : undefined
   const answer = await canUseTool?.('Bash', input, {
     signal: new AbortController().signal,
     toolUseID: toolUseId,
     requestId: `req_${toolUseId}`,
-    decisionReason: 'No rule allows this command',
+    ...(described === undefined ? { decisionReason: 'No rule allows this command' } : { description: described }),
     suggestions: [
       {
         type: 'addRules',

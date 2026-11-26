@@ -52,29 +52,37 @@ export async function archiveWithUndo(task: Named): Promise<void> {
   }
 }
 
+/** The question before archiving, with what archiving does to the agent. */
+export const archiveQuestion = (task: Task) => ({
+  title: 'Archive agent',
+  message: `"${task.title}" leaves the agent list, PR updates and the group chat until you restore it.`,
+  detail: archiveDetail(task),
+  confirmLabel: 'Archive',
+})
+
+/** Archives the agent and says what it stored and freed. */
+export async function archiveTask(task: Task): Promise<boolean> {
+  try {
+    const report = await sendArchive(task)
+    const disk = report.disk_bytes > 0 ? `, ${bytesLabel(report.disk_bytes)} of disk freed` : ''
+    const kept = keptWorktrees(report)
+    const keptText = kept === '' ? '' : `. Worktree kept: ${kept}`
+    toast.success(
+      `Archived "${task.title}": ${bytesLabel(report.table_bytes)} of transcript stored as ${bytesLabel(report.stored_bytes)}${disk}${keptText}`,
+    )
+    refreshTaskLists()
+    return true
+  } catch (e) {
+    toast.error(errorText(e))
+    return false
+  }
+}
+
 export function useArchive(task: Task): () => Promise<void> {
   const confirm = useConfirm()
   return async () => {
-    const question = {
-      title: 'Archive agent',
-      message: `"${task.title}" leaves the agent list, PR updates and the group chat until you restore it.`,
-      detail: archiveDetail(task),
-      confirmLabel: 'Archive',
-    }
-    if (!(await confirm(question))) {
-      return
-    }
-    try {
-      const report = await sendArchive(task)
-      const disk = report.disk_bytes > 0 ? `, ${bytesLabel(report.disk_bytes)} of disk freed` : ''
-      const kept = keptWorktrees(report)
-      const keptText = kept === '' ? '' : `. Worktree kept: ${kept}`
-      toast.success(
-        `Archived "${task.title}": ${bytesLabel(report.table_bytes)} of transcript stored as ${bytesLabel(report.stored_bytes)}${disk}${keptText}`,
-      )
-      refreshTaskLists()
-    } catch (e) {
-      toast.error(errorText(e))
+    if (await confirm(archiveQuestion(task))) {
+      await archiveTask(task)
     }
   }
 }

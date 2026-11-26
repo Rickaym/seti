@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { RESERVED_COMMAND_NAMES } from './agent-settings.js'
 import { localName, title } from './mod-names.js'
 import { AGENT_VIEW_PLACES, agentPlaceIssues } from './mod-places.js'
 import { fenceRenderer, fileViewer } from './mod-viewers.js'
@@ -112,7 +113,8 @@ const slashCommand = z.strictObject({
   name: z
     .string()
     .max(32)
-    .regex(/^[a-z][a-z0-9-]*$/, 'A slash command name is lowercase letters, digits and -'),
+    .regex(/^[a-z][a-z0-9-]*$/, 'A slash command name is lowercase letters, digits and -')
+    .refine((name) => !RESERVED_COMMAND_NAMES.has(name), 'Seti keeps this name for its own agent command'),
   description,
   argumentHint: z.string().max(60).default(''),
   /** The mod command it runs, by its local id. */

@@ -9,6 +9,7 @@ import { NeedsYouItem } from '@/components/status-bar/NeedsYouItem'
 import { PermissionModeItem } from '@/components/status-bar/PermissionModeItem'
 import { ResourcesItem } from '@/components/status-bar/ResourcesItem'
 import { SandboxItem } from '@/components/status-bar/SandboxItem'
+import { UpdateItem } from '@/components/status-bar/UpdateItem'
 
 /** Work that needs a look on the left; plan usage, then health past a hairline on the right. */
 type StatusSlot = 'work' | 'account' | 'health'
@@ -25,6 +26,7 @@ interface StatusItem {
 export const statusBarItems = new Registry<StatusItem>('status bar item', (item) => item.key)
 
 for (const item of [
+  { key: 'update', name: 'Update', slot: 'work', view: UpdateItem },
   { key: 'ea', name: 'EA', slot: 'work', view: EaItem },
   { key: 'needs-you', name: 'Agents that need you', slot: 'work', view: NeedsYouItem },
   { key: 'account', name: 'Account', slot: 'account', view: AccountItem },

@@ -192,8 +192,8 @@ between two steps; an interrupt; a hook at subagent start.
   outside the control room's own folders is removed.
 - RT-13: A runtime declares whether it loads the user's MCP servers and connectors, Seti's
   plugins and a compaction rule, and which parts of that rule it does not honour, whether it can
-  run outside the sandbox, fork a side chat, dream, rewind and run background subagents of its
-  own; `GET /api/runtimes/capabilities` serves each runtime's declaration. For an agent whose
+  run outside the sandbox, fork a side chat, dream, rewind, run background subagents of its
+  own, take Bypass and take slash commands of its own; `GET /api/runtimes/capabilities` serves each runtime's declaration. For an agent whose
   runtime lacks one, its settings show the control as not on that runtime instead of a working
   control, counts leave those items out, its `task.md` and system prompt do not offer them, and
   the server refuses the change with the reason. A control the runtime honours in part says which
@@ -237,6 +237,40 @@ between two steps; an interrupt; a hook at subagent start.
   its server or tool from the control room, the user's settings, or a folder settings file the
   agent could not have written (SBX-14). A server definition the agent writes MUST NOT load. A server the
   agent's runtime cannot use MUST show in the agent's access with the reason, and never count as on.
+
+### 3.7 Evidence ledger
+
+- SRC-1: The control room keeps an evidence ledger per agent. When a tool call ends well and an
+  adapter recognises it as a read from a source system (a Slack tool server's channel, thread and
+  message search reads; a Linear tool server's issue, issue list and comment reads; `gh pr view`,
+  `gh issue view` and `gh api` GETs of pull requests, issues, comments and reviews), it records one
+  row per item read: the source kind, its container (channel, repository or team), the key a cited
+  link is matched by, its permalink, its time and a pointer to the tool result in the stored
+  transcript. The ledger MUST NOT copy the item's text: it reads the result as the transcript
+  stores it, so credential redaction applies, and it reads both runtimes from neutral events.
+- SRC-2: An adapter reads only the structure the source's server writes: fields at their fixed
+  places, the counts the answer states, and the ids the call asked for. An answer that does not
+  fit gives no item, and so does a shell command that uses anything beyond plain words and quotes,
+  or filters or pipes the output. A permalink is the one the answer states, else one built from
+  parts the call and answers stated (Slack: the workspace host the agent's Slack answers stated, the
+  channel and the `ts`; GitHub: the repository and number); one that cannot be built so stays
+  empty and is never guessed.
+- SRC-3: An agent's ledger follows its transcript: archiving removes it, restoring reads it again
+  from the restored transcript, and deleting the agent or a transcript row deletes its items.
+- SRC-4: A client MAY ask which ledger item each link of an agent's message names; the answer
+  comes from that agent's ledger only and carries the item's kind, container and its name when
+  known, time and permalink, never its text. A link names an item by its key, else the thread or
+  channel that holds it, else the pull request or issue that holds a comment. A quote tied to the
+  link is verified when, normalised, it stands in the item's text: Slack and Markdown markup cut to
+  their text, HTML entities decoded, quote marks, bullets and heading marks at a line's start,
+  emphasis marks, backslashes, `@` and quotation marks dropped, white space collapsed. Parts a
+  quote separates with an ellipsis must appear in order, and a quote under 12 characters never
+  verifies. A client shows a verified quote with a quiet mark and any other with none, never as an
+  error.
+- SRC-5: A Slack message permalink, or a GitHub pull request, issue or comment link, that names no
+  item and whose id appears in no tool result, prompt or update of the agent's transcript (its own
+  replies and calls do not count) is reported as not read by the agent; a client says so in muted
+  text. An agent with no transcript rows gets no such report.
 
 ## 4. Turn lifecycle
 
@@ -573,7 +607,9 @@ interrupted only for that.
   offers no `always`, since an allow rule never lifts an ask rule. A card shows the agent's
   description first, cut to two lines with the whole text in a tooltip, then the call, then the
   implementation's own reason line; the agent's reason line reads the description in place of
-  the call when there is one.
+  the call when there is one. The reason line is the implementation's own words about why it
+  asks: a call an `ask` rule holds names that rule ("Your Ask rule holds this: <rule>"); it never
+  repeats the agent's description, and with no known reason there is no reason line.
 - PERM-7: Timeout is one install-wide setting: off, 15 min, 1 h (default), 4 h or 24 h from when
   the request was raised. A new value applies to waiting requests.
 - PERM-8: At the deadline the request MUST be denied with `timed_out`. The agent is told nobody
@@ -642,11 +678,16 @@ interrupted only for that.
   the whole title in a tooltip, the CI state, and a link that opens the PR. The implementation
   reads them with the walker of PERM-15: `gh pr` `merge`, `view`, `close`, `reopen`, `ready`,
   `comment`, `review`, `checks`, `edit` or `diff` with a number, in the repository `-R` or
-  `--repo` names, else the one the folder the command runs in resolves to (the remote
-  `gh repo set-default` chose, else the only GitHub repository its remotes name); a pull request's
+  `--repo` names, else the one the folder the command runs in resolves to: the remote
+  `gh repo set-default` chose, else the only GitHub repository its remotes name, in the folder the
+  agent's shell is in as the runtime reports it for the call, past any `cd` of an earlier call; a
+  pull request's
   github.com URL as any argument; and `repos/<owner>/<repo>/pulls/<n>` in `gh api`. A part the
   shell computes, another host, or a line that sets the code host's repository or host variables
-  or changes remotes gives no pull request rather than a wrong one. The link is built from the
+  or changes remotes gives no pull request rather than a wrong one. A number whose folder names
+  no repository is looked up in the agent's own repositories and those of its linked pull requests,
+  and shown, up to three per number, only where that pull request exists open or merged; this is a
+  hint for the reader, and the outward check of PERM-15 never uses it. The link is built from the
   owner, repository and number, never taken from the text. The request MUST be shown without
   waiting on them: the pull requests follow with their links, then title and CI from the data the
   implementation tracks or one bounded, cached lookup, which reads merged and closed ones too and
@@ -1373,6 +1414,9 @@ Optional and off by default: a maintenance session per agent that consolidates i
   the control room MUST NOT offer the command or show the view there, its slash command says it is
   not on that runtime, and the server refuses the command for that agent (409) to the user, the EA
   and agents alike.
+- MOD-26: A mod's slash command MUST NOT take a name the control room's own agent commands use
+  (`/restart`, `/archive`, `/mcp`, `/sandbox`, `/bypass`, `/credential`, `/access`, `/settings`,
+  `/rename`, `/dream`); a manifest that names one is invalid.
 
 ## 18. Public surfaces
 
@@ -1435,7 +1479,7 @@ Optional and off by default: a maintenance session per agent that consolidates i
   that need the user with reason lines, a few agents with status, counts and today's cost.
 - API-15: A client that cannot reach the server keeps its data and shows no error until it
   answers. After a deploy, a view that fails to load reloads once per build if the server answers
-  and no form is unsaved, else offers a reload. A failure toast stays until dismissed.
+  and no form is unsaved, else offers Update (API-20). A failure toast stays until dismissed.
 - API-17: Every flow, full configuration included, MUST work on a phone-sized client.
 - API-18: A file for a message uploads as one request before the message goes out, at most
   `upload_file`; the client MUST refuse a larger file without sending it and name the limit. While
@@ -1444,6 +1488,57 @@ Optional and off by default: a maintenance session per agent that consolidates i
   `stalled`, with retry and removal. A failed upload shows its reason (too large, connection lost,
   or the server's refusal) with the file and in a failure toast. The server gives an upload up
   after `upload_idle` without a byte or `upload_time` in all, and keeps nothing of it.
+- API-19: A message in an agent's chat, a group chat or the assistant renders its sources as
+  references. An http or https link inside a sentence keeps its text (a bare URL shows its service
+  label, with the Slack channel's name when known) and gains a superscript `[n]` mark; `[^n]`
+  footnotes and `[n]` with a `[n]: url` definition become the same marks. Numbers count from 1
+  per message in order of first appearance, and a repeated URL reuses its number. A link alone on
+  its line, list item or table cell stays a chip, and code is untouched. A message with a
+  reference ends with a Sources list (number, service icon, label, host), folded to one line on a
+  phone. A quote with a reference inside it, a single reference in the paragraph after it, or one
+  ending the paragraph before it, shows that source under it. A mark MUST NOT navigate within the
+  client or create ids: on desktop hover or focus previews the source and a click opens it in a
+  new tab; on a phone a tap opens a sheet with an Open button. Previews show only text derived
+  from the URL and the message, bounded in length, and raw HTML in a message cannot produce a mark
+  or a Sources list.
+- API-20: Each UI build carries an id, which index.html names and `GET /api/system` reports as
+  `build`. A client compares its own id with the server's on every poll, when it returns to the
+  foreground and when it comes back online. When they differ it installs the new worker and reloads
+  into the new build at a safe moment: at once while hidden or idle, never while the user types,
+  a composer holds text, a dialog is open, a file uploads or a form is unsaved; until then it
+  shows one Update control in the status bar that reloads on demand. A hidden page waits only for
+  uploads, unsaved forms and text no draft keeps. Composer drafts survive the reload. A failed
+  worker install is tried again after 5 s, doubling to 5 minutes; after two failures the page
+  reloads without it. A client reloads by itself at most once per build. A client already on the
+  server's build lets a waiting worker take over at once.
+  Why: an installed app resumes its old page and has no pull to refresh, so without this a phone
+  runs an old build for hours.
+- API-21: A UI build is made beside the served folder and swapped in whole, keeping the hashed
+  files of the two builds before it. While the files swap, the server answers `sw.js` and
+  `index.html` from the last complete build; it answers 503 only when no build was ever there. A
+  missing file, such as an old hashed asset, answers 404, never the app shell. The worker loads
+  pages from the network first and falls back to its cached shell only offline or on a 502, 503
+  or 504; it serves hashed files from its cache first and never caches a response whose content
+  type does not fit the file asked for.
+
+### 19.1 Agent commands
+
+- CMD-1: An agent's reply box MUST offer the control room's own setting commands, the same on every
+  runtime: `/restart`, `/archive`, `/mcp`, `/sandbox`, `/bypass`, `/credential`, `/access`,
+  `/settings`, `/rename` and `/dream`, each only where the runtime declares what it needs (RT-13);
+  one the runtime lacks says so by name. A setting command wins over a runtime's own command of
+  the same name and never reaches the runtime. It makes the request the agent's settings make, so
+  it is refused, applied and audited as there.
+- CMD-2: A setting command MUST run only on the user's submit in that agent's reply box of a line
+  the user typed or picked there. A line that arrived another way (pasted, dropped, restored,
+  handed over, taken back, or submitted by a script) MUST wait in a card with Run and run only on
+  its tap. Transcript rows, updates, group chat and Slack messages, webhooks, the EA, agents and
+  mods MUST NOT run one, and the control room MUST refuse a setting command sent to an agent as a
+  prompt (400).
+- CMD-3: A setting command that needs a value and has none MUST offer its choices, the current one
+  marked, never an error. Archive, restart, Bypass on and sandbox off MUST ask the settings' own
+  question inline with Confirm and Cancel first; a credential that changes access opens the dialog
+  the settings open. Esc closes the card and leaves the draft.
 
 ## 20. Conformance
 

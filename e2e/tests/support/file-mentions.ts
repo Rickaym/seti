@@ -36,7 +36,7 @@ export async function seedMentions(title: string): Promise<{ id: string; dir: st
   const reply = [
     'I wrote the plan to notes/plan.md and left out/missing.pdf for later.',
     `The greeting lives here:\n\n${downloadUrl(id, 'src/greet.ts')}`,
-    `Background reading: ${OTHER_LINK}`,
+    `Background reading:\n${OTHER_LINK}`,
   ].join('\n\n')
   const db = openSeedDb()
   const started = new Date(Date.now() - 60_000).toISOString()

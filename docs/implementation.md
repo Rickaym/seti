@@ -59,6 +59,7 @@ with another top-level folder.
 | Section        | Main files                                                                                                                                                                                                                                                                                                                                                        |
 | -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 3 Entities     | `shared/src/tasks.ts`, `shared/src/inputs.ts`, `shared/src/requests.ts`, `shared/src/events.ts`, `shared/src/runtimes/`, `events/`, `db.ts`, `pending-requests.ts`, `codex-status.ts`, `codex-install.ts`, `codex-fetch.ts`, `codex-pin.ts`                                                                                                                       |
+| 3.7 Ledger     | `sources/` (one adapter per source, `refs.ts` for cited URLs, `quote.ts`, `match.ts`), `store/sources.ts`, `routes/sources.ts`, `shared/src/sources.ts`                                                                                                                                                                                                           |
 | 4 Turns        | `runner.ts`, `session-host.ts`, `session-ingest.ts`, `codex-spend.ts`, `codex-host.ts`, `codex-decide.ts`, `session-spec.ts`, `session-realise.ts`, `runtime-host.ts`, `runtimes/`, `agent-session.ts`, `rewind.ts`, `turn-asking.ts`, `closing-line.ts`, `task-location.ts`                                                                                      |
 | 4 Restarts     | `session-restart.ts`, `input-queue.ts`                                                                                                                                                                                                                                                                                                                            |
 | 4 Node link    | `node-link.ts`, `node-commands.ts`, `session-control.ts`, `session-mirror.ts`, `session-setup.ts`, `session-tools.ts`, `turn-asks.ts`, `shared/src/node-protocol.ts`                                                                                                                                                                                              |
@@ -84,7 +85,7 @@ with another top-level folder.
 | 16 Audit       | `audit.ts`, `store/audit.ts`                                                                                                                                                                                                                                                                                                                                      |
 | 17 Mods        | `mods/`, `shared/src/mods.ts`, `packages/mod-api/`; [Mods](mods.md) is the authoring guide                                                                                                                                                                                                                                                                        |
 | 18 Public      | `access.ts`, `routes/share-public.ts`, `share-preview/`, `converter.ts`, `rate-limit.ts`, `security-headers.ts`                                                                                                                                                                                                                                                   |
-| 19 Client      | `http.ts`, `etag.ts`, `devices.ts`, `shared/src/lenient.ts`, `ui/src/lib/poll-loop.ts`, `ui/src/lib/stale-build.ts`, `ui/src/lib/uploader.ts`                                                                                                                                                                                                                     |
+| 19 Client      | `http.ts`, `etag.ts`, `devices.ts`, `shared/src/lenient.ts`, `ui/src/lib/poll-loop.ts`, `ui/src/lib/stale-build.ts`, `ui/src/lib/app-update.ts`, `server/src/ui-shell.ts`, `ui/build/dist-swap.ts`, `ui/src/lib/uploader.ts`                                                                                                                                      |
 
 ## Storage
 
@@ -111,6 +112,11 @@ with another top-level folder.
   row by its event columns instead (`callText`, `callOrResultText` in `event-filters.ts`), and
   search indexes it from its neutral events (`server/src/events/search-text.ts`) where the search
   trigger indexes Claude Code's rows from their JSON.
+- The evidence ledger (`source_item`) keeps one row per item an agent read: kind, container,
+  match key, permalink, time and the `spans` that locate the text in a tool result, as JSON
+  pointers into the result with an optional character range. The row names its transcript row and
+  call, and a foreign key on the row deletes it with the row. A restore reads the ledger again from
+  the restored rows (`rebuildSources` in `server/src/sources/record.ts`).
 - Redis holds only what can be rebuilt: GitHub PR lists and the GraphQL budget, capability and
   account probes, the EA's live context, and pub/sub for agent events and group chat across
   processes. It keeps nothing on disk and never holds a token. `SETI_REDIS_URL=off` costs cache
