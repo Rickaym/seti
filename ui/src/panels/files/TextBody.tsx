@@ -56,7 +56,7 @@ function View({ text, viewer, file, markdown, language }: ViewProps) {
     <div className="min-h-0 flex-1 overflow-auto px-4 py-3">
       {markdown ? (
         <Suspense fallback={<pre className={cn(MONO, 'whitespace-pre-wrap')}>{text}</pre>}>
-          <Markdown text={text} />
+          <Markdown text={text} references={false} />
         </Suspense>
       ) : (
         <PlainText text={text} line={line} />

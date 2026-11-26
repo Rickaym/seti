@@ -192,8 +192,8 @@ between two steps; an interrupt; a hook at subagent start.
   outside the control room's own folders is removed.
 - RT-13: A runtime declares whether it loads the user's MCP servers and connectors, Seti's
   plugins and a compaction rule, and which parts of that rule it does not honour, whether it can
-  run outside the sandbox, fork a side chat, dream, rewind and run background subagents of its
-  own; `GET /api/runtimes/capabilities` serves each runtime's declaration. For an agent whose
+  run outside the sandbox, fork a side chat, dream, rewind, run background subagents of its
+  own, take Bypass and take slash commands of its own; `GET /api/runtimes/capabilities` serves each runtime's declaration. For an agent whose
   runtime lacks one, its settings show the control as not on that runtime instead of a working
   control, counts leave those items out, its `task.md` and system prompt do not offer them, and
   the server refuses the change with the reason. A control the runtime honours in part says which
@@ -569,7 +569,9 @@ interrupted only for that.
   offers no `always`, since an allow rule never lifts an ask rule. A card shows the agent's
   description first, cut to two lines with the whole text in a tooltip, then the call, then the
   implementation's own reason line; the agent's reason line reads the description in place of
-  the call when there is one.
+  the call when there is one. The reason line is the implementation's own words about why it
+  asks: a call an `ask` rule holds names that rule ("Your Ask rule holds this: <rule>"); it never
+  repeats the agent's description, and with no known reason there is no reason line.
 - PERM-7: Timeout is one install-wide setting: off, 15 min, 1 h (default), 4 h or 24 h from when
   the request was raised. A new value applies to waiting requests.
 - PERM-8: At the deadline the request MUST be denied with `timed_out`. The agent is told nobody
@@ -638,11 +640,16 @@ interrupted only for that.
   the whole title in a tooltip, the CI state, and a link that opens the PR. The implementation
   reads them with the walker of PERM-15: `gh pr` `merge`, `view`, `close`, `reopen`, `ready`,
   `comment`, `review`, `checks`, `edit` or `diff` with a number, in the repository `-R` or
-  `--repo` names, else the one the folder the command runs in resolves to (the remote
-  `gh repo set-default` chose, else the only GitHub repository its remotes name); a pull request's
+  `--repo` names, else the one the folder the command runs in resolves to: the remote
+  `gh repo set-default` chose, else the only GitHub repository its remotes name, in the folder the
+  agent's shell is in as the runtime reports it for the call, past any `cd` of an earlier call; a
+  pull request's
   github.com URL as any argument; and `repos/<owner>/<repo>/pulls/<n>` in `gh api`. A part the
   shell computes, another host, or a line that sets the code host's repository or host variables
-  or changes remotes gives no pull request rather than a wrong one. The link is built from the
+  or changes remotes gives no pull request rather than a wrong one. A number whose folder names
+  no repository is looked up in the agent's own repositories and those of its linked pull requests,
+  and shown, up to three per number, only where that pull request exists open or merged; this is a
+  hint for the reader, and the outward check of PERM-15 never uses it. The link is built from the
   owner, repository and number, never taken from the text. The request MUST be shown without
   waiting on them: the pull requests follow with their links, then title and CI from the data the
   implementation tracks or one bounded, cached lookup, which reads merged and closed ones too and
@@ -1369,6 +1376,9 @@ Optional and off by default: a maintenance session per agent that consolidates i
   the control room MUST NOT offer the command or show the view there, its slash command says it is
   not on that runtime, and the server refuses the command for that agent (409) to the user, the EA
   and agents alike.
+- MOD-26: A mod's slash command MUST NOT take a name the control room's own agent commands use
+  (`/restart`, `/archive`, `/mcp`, `/sandbox`, `/bypass`, `/credential`, `/access`, `/settings`,
+  `/rename`, `/dream`); a manifest that names one is invalid.
 
 ## 18. Public surfaces
 
@@ -1440,6 +1450,19 @@ Optional and off by default: a maintenance session per agent that consolidates i
   `stalled`, with retry and removal. A failed upload shows its reason (too large, connection lost,
   or the server's refusal) with the file and in a failure toast. The server gives an upload up
   after `upload_idle` without a byte or `upload_time` in all, and keeps nothing of it.
+- API-19: A message in an agent's chat, a group chat or the assistant renders its sources as
+  references. An http or https link inside a sentence keeps its text (a bare URL shows its service
+  label, with the Slack channel's name when known) and gains a superscript `[n]` mark; `[^n]`
+  footnotes and `[n]` with a `[n]: url` definition become the same marks. Numbers count from 1
+  per message in order of first appearance, and a repeated URL reuses its number. A link alone on
+  its line, list item or table cell stays a chip, and code is untouched. A message with a
+  reference ends with a Sources list (number, service icon, label, host), folded to one line on a
+  phone. A quote with a reference inside it, a single reference in the paragraph after it, or one
+  ending the paragraph before it, shows that source under it. A mark MUST NOT navigate within the
+  client or create ids: on desktop hover or focus previews the source and a click opens it in a
+  new tab; on a phone a tap opens a sheet with an Open button. Previews show only text derived
+  from the URL and the message, bounded in length, and raw HTML in a message cannot produce a mark
+  or a Sources list.
 
 ## 20. Conformance
 

@@ -182,6 +182,7 @@ describe('sessionOptions', () => {
       'mcp__.*',
       'Bash',
       undefined,
+      'Bash',
       undefined,
     ])
     expect(denies(opts)).toContain('Edit(//**/.claude/settings.json)')
@@ -222,6 +223,7 @@ describe('sessionOptions', () => {
       'mcp__.*',
       'Bash',
       undefined,
+      'Bash',
       undefined,
     ])
     expect(opts.env?.CLAUDE_CODE_OAUTH_TOKEN).toBeUndefined()
