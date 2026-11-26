@@ -156,12 +156,22 @@ async function keepRules(task: Task, request: PermissionRequest, scope: Permissi
   }
 }
 
+/** How an answer's audit entry starts, naming the EA question the user said yes to, if any. */
+const answeredBy = (allow: boolean, onWord: number | null, requestId: string) =>
+  onWord === null
+    ? { verb: allow ? 'Allowed' : 'Denied', detail: {} }
+    : {
+        verb: `On the user's word, the EA ${allow ? 'allowed' : 'denied'}`,
+        detail: { on_users_word: onWord, request: requestId },
+      }
+
 async function auditAnswer(
   task: Task,
   request: PermissionRequest,
   input: AnswerPermissionInput,
-  edited: readonly string[],
+  how: { edited: readonly string[]; onWord: number | null },
 ): Promise<void> {
+  const { edited, onWord } = how
   const allow = input.decision !== 'deny'
   const kept =
     request.kind === 'repeat'
@@ -169,13 +179,15 @@ async function auditAnswer(
       : ` and always allowed ${request.suggestions.join(', ')}`
   const always = input.decision === 'always' ? kept : ''
   const changed = edited.length > 0 ? ` with ${edited.join(', ')} edited` : ''
+  const by = answeredBy(allow, onWord, request.id)
   await audit.record({
     actor: 'user',
     kind: allow ? 'task.permission_allowed' : 'task.permission_denied',
     subject_type: 'task',
     subject_id: task.id,
-    summary: `${allow ? 'Allowed' : 'Denied'} ${request.tool_name} for task "${task.title}"${changed}${always}`,
+    summary: `${by.verb} ${request.tool_name} for task "${task.title}"${changed}${always}`,
     detail: {
+      ...by.detail,
       title: task.title,
       tool: request.tool_name,
       call: request.summary,
@@ -244,12 +256,14 @@ function refuseOnCodex(task: Task, input: AnswerPermissionInput): void {
 
 /**
  * The user's answer to a request the agent waits on; Always allow also keeps its rules, if any.
- * The answer to a request a restart cut off resumes the agent with it instead.
+ * The answer to a request a restart cut off resumes the agent with it instead. `onWord` is the EA
+ * question whose spoken or typed yes the EA answers on.
  */
 export async function answerPermission(
   task: Task,
   requestId: string,
   input: AnswerPermissionInput,
+  onWord: number | null = null,
 ): Promise<PermissionRequest> {
   refuseAgent('answer permission requests')
   refuseOnCodex(task, input)
@@ -269,7 +283,7 @@ export async function answerPermission(
   if (input.decision === 'always') {
     await keepRules(task, settled, input.scope ?? 'agent')
   }
-  await auditAnswer(task, settled, input, names)
+  await auditAnswer(task, settled, input, { edited: names, onWord })
   const result = deny
     ? denied(message, edited)
     : allowed(settled, call, await permissionModeOf(task), input.decision === 'always')

@@ -1,4 +1,4 @@
-import { ea, gap, same, ui, user, type CoverageTable } from './kinds.js'
+import { ea, eaOnWord, gap, same, ui, user, type CoverageTable } from './kinds.js'
 
 /** Routes under /api/tasks: one agent and what it holds. */
 export const TASKS_ROUTES: CoverageTable = {
@@ -14,9 +14,7 @@ export const TASKS_ROUTES: CoverageTable = {
     "Reset an agent's access to the defaults. Server refuses delegates",
   ),
   'POST /api/tasks/:id/archive': ea('archive_agent'),
-  'GET /api/tasks/:id/change-requests': gap(
-    "An agent's pending change requests. Read; /api/requests carries them without the agent filter",
-  ),
+  'GET /api/tasks/:id/change-requests': same('GET /api/requests'),
   'POST /api/tasks/:id/change-requests/:request_id': user(
     'security',
     'Allow or deny a change request. Approving access',
@@ -60,12 +58,11 @@ export const TASKS_ROUTES: CoverageTable = {
   'GET /api/tasks/:id/messages/:message_id': same('GET /api/tasks/:id/messages'),
   'POST /api/tasks/:id/model/switch-back': ea('retry_agent_turn'),
   'GET /api/tasks/:id/own-message': ui("The user's queued message for editing. The user's own prompt box"),
-  'GET /api/tasks/:id/permission-requests': gap(
-    "One agent's pending tool calls and plans. Read; fits search_seti in requests",
-  ),
-  'POST /api/tasks/:id/permission-requests/:request_id': user(
-    'security',
-    'Allow, always allow or deny a tool call or plan. Answering is an access decision',
+  'GET /api/tasks/:id/permission-requests': same('GET /api/requests'),
+  'POST /api/tasks/:id/permission-requests/:request_id': eaOnWord(
+    'answer_question',
+    "Allow a held tool call once, approve a plan, or deny either with a message (owner's C table, " +
+      "section 1). Always allow, a rule for every agent and edited fields stay the user's",
   ),
   'GET /api/tasks/:id/permissions': gap("One agent's permission rules. Read"),
   'PUT /api/tasks/:id/permissions/bypass': user('security', 'Bypass on or off. Security setting'),
@@ -93,6 +90,7 @@ export const TASKS_ROUTES: CoverageTable = {
   'POST /api/tasks/:id/seen': ui('Mark an agent seen. View state'),
   'POST /api/tasks/:id/session/end': ea('stop_background_work'),
   'POST /api/tasks/:id/session/restart': ea('restart_agent_session'),
+  'GET /api/tasks/:id/sources': ea('find_in_transcript'),
   'POST /api/tasks/:id/sources': ui(
     'Checks the links one message cites against what the agent read, for the chat view',
   ),
