@@ -25,6 +25,7 @@ import {
   EA_LANGUAGE,
   EA_INBOX,
   EA_INBOX_COALESCE,
+  EA_INBOX_RELAYS,
   EA_INBOX_URGENT,
   EA_INDEX,
   EA_JOIN_ON_OPEN,
@@ -269,4 +270,5 @@ export const MIGRATIONS: readonly Migration[] = [
   { version: 145, name: 'no_builtin_roles', sql: '', run: retireBuiltinRoles },
   { version: 146, name: 'permission_request_description', sql: PERMISSION_REQUEST_DESCRIPTION },
   { version: 147, name: 'source_items', sql: SOURCE_ITEMS },
+  { version: 148, name: 'ea_inbox_relays', sql: EA_INBOX_RELAYS },
 ]

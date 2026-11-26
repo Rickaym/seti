@@ -13,7 +13,12 @@ import { sql, transaction } from '../db.js'
 import { eaReplies } from './ea-replies.js'
 import { insertEntry, lockHistory, toEntry, type HistoryRecord } from './ea.js'
 
-type ItemRecord = EaInboxItem & { depth: number; entry_id: number | null; coalesce_key: string | null }
+type ItemRecord = EaInboxItem & {
+  depth: number
+  entry_id: number | null
+  coalesce_key: string | null
+  channel_id: string | null
+}
 
 export interface NewInboxItem extends EaNotice {
   task_id: string | null
@@ -24,23 +29,31 @@ export interface NewInboxItem extends EaNotice {
   urgent?: boolean
   act?: boolean
   message_id?: number | null
+  /** The channel an alert came through, which names the agents subscribed to it. */
+  channel_id?: string | null
   /** An undelivered item with the same key takes this one's place instead of a new row. */
   coalesce_key?: string | null
 }
 
 const FOLLOWUP_KINDS: readonly EaInboxKind[] = ['followup', 'reminder']
 
-const toItem = ({ depth: _depth, entry_id: _entry, coalesce_key: _key, ...item }: ItemRecord): EaInboxItem => item
+const toItem = ({
+  depth: _depth,
+  entry_id: _entry,
+  coalesce_key: _key,
+  channel_id: _channel,
+  ...item
+}: ItemRecord): EaInboxItem => item
 
 /** Items waiting for the EA, the follow-ups it scheduled, and what the user has seen. */
 export const eaInbox = {
   /** Adds the item, or updates in place the undelivered one with its coalesce key. */
   add: async (item: NewInboxItem): Promise<EaInboxItem> => {
     const [row] = await sql<ItemRecord[]>`INSERT INTO ea_inbox (kind, event, title, body, url, severity, source,
-        task_id, timezone, depth, urgent, act, message_id, coalesce_key, due_at, created_at)
+        task_id, timezone, depth, urgent, act, message_id, channel_id, coalesce_key, due_at, created_at)
       VALUES (${item.kind}, ${item.event}, ${item.title}, ${item.body}, ${item.url}, ${item.severity},
         ${item.source}, ${item.task_id}, ${item.timezone ?? null}, ${item.depth ?? 0}, ${item.urgent ?? false},
-        ${item.act ?? false}, ${item.message_id ?? null}, ${item.coalesce_key ?? null}, ${item.due_at},
+        ${item.act ?? false}, ${item.message_id ?? null}, ${item.channel_id ?? null}, ${item.coalesce_key ?? null}, ${item.due_at},
         ${item.created_at})
       ON CONFLICT (coalesce_key) WHERE delivered_at IS NULL AND cancelled_at IS NULL
       DO UPDATE SET event = excluded.event, title = excluded.title, body = excluded.body, url = excluded.url,

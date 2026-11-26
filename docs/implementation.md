@@ -442,6 +442,17 @@ EA-4), a public group chat post, stopping several agents at once, and work it pr
 refuses a security change rather than asking. An ask is one sentence of effect and a short
 question; in the chat it ends with exactly "Shall I go ahead?", which shows the Yes and No buttons.
 
+### Inbox relays
+
+`server/src/ea-relay.ts` implements EA-18 behind `POST /api/ea/relays`, which only the EA's bot
+token reaches. It checks the switch (`ea_settings.inbox_relays`, changed only through
+`PUT /api/ea/settings/inbox-relays` by the user), then the recipient against `relayTargets`, then
+the text, then the hourly limits, and claims the item in `ea_relay` before it posts the framed
+direct message through `postTeamMessage`. A channel alert records its `channel_id` on `ea_inbox`
+so the subscribed agents come from Seti's tables, not the payload. History pages attach each
+inbox entry's relays, and `POST /api/ea/relays/:id/take-back` dismisses the relay's update while
+it still waits for the agent.
+
 ## Reference values
 
 Seti uses every value in [Appendix A](protocol.md#appendix-a-reference-constants) of the
