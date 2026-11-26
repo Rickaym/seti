@@ -75,7 +75,7 @@ describe('callReducer', () => {
 
   it('keeps how the last connected call ended, but not a connect that failed', () => {
     const dropped = run([{ type: 'ended', at: 9, error: 'Lost', reason: 'ice-failed', hidden: true }], connected)
-    expect(dropped.lastEnd).toEqual({ reason: 'ice-failed', at: 9, hidden: true })
+    expect(dropped.lastEnd).toEqual({ reason: 'ice-failed', at: 9, hidden: true, quality: null })
     const retried = run(
       [
         { type: 'connecting', auto: true },

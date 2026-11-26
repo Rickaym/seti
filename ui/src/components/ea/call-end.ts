@@ -1,4 +1,10 @@
-import { EA_CALL_END_TEXT, eaCallEndInput, type EaCallEndInput, type EaCallEndReason } from '@seti/shared'
+import {
+  EA_CALL_END_TEXT,
+  eaCallEndInput,
+  type EaCallEndInput,
+  type EaCallEndReason,
+  type EaCallQuality,
+} from '@seti/shared'
 import type { CallRoute } from './call-state'
 
 const OPEN_KEY = 'seti-ea-call-open'
@@ -102,7 +108,7 @@ export class CallEndRecorder {
     this.save()
   }
 
-  readonly ended = (reason: EaCallEndReason): void => {
+  readonly ended = (reason: EaCallEndReason, quality: EaCallQuality | null = null): void => {
     const open = this.open
     if (open === null) {
       return
@@ -118,6 +124,7 @@ export class CallEndRecorder {
       hidden_s: open.hiddenAt === null ? null : seconds(now - open.hiddenAt),
       inputs: open.inputs,
       reroutes: open.reroutes,
+      quality,
     })
   }
 }

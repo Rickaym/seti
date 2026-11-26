@@ -454,6 +454,12 @@ rebuilds a single lost packet instead of concealing it. `aiortc_jitter.py` buffe
 three packets deep and skips a packet the network lost, where aiortc's own buffer also drops
 packets that arrived after it.
 
+`link.py` watches the caller's microphone audio: while it is missing, the EA's speech waits up to
+8 s and goes on where it stopped, and the gate forgets the user's last words (EA-18). The browser
+reads `getStats` every two seconds (`call-quality.ts`) and reports the call's loss, filled-in
+speech, jitter, round trip, path type and reconnects with its call end, as numbers only; the EA
+logs one line per call with the user's audio loss, drops and the seconds of speech it held.
+
 ## Reference values
 
 Seti uses every value in [Appendix A](protocol.md#appendix-a-reference-constants) of the
