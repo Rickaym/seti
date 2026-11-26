@@ -22,6 +22,7 @@ import {
   ATTENTION_TIERS,
   EA_CONTEXT_PACKS,
   EA_FORM_OF_ADDRESS,
+  EA_ASK_WORD,
   EA_LANGUAGE,
   EA_INBOX,
   EA_INBOX_COALESCE,
@@ -65,6 +66,7 @@ import { CLIENT_SENDS } from './schema-sends.js'
 import { SHARED_TOOLS } from './schema-shared-tools.js'
 import { SHARE_LIVE, SHARE_PREVIEWS, SHARE_RENDER, SHARES } from './schema-shares.js'
 import { SLACK_NAMES } from './schema-slack-names.js'
+import { SOURCE_ITEMS } from './schema-sources.js'
 import { loginsToHosts, SSH_HOST_KEYS } from './schema-ssh-keys.js'
 import { importSshHosts, SSH_HOSTS } from './schema-ssh.js'
 import { STORAGE_SETTINGS } from './schema-storage.js'
@@ -267,4 +269,6 @@ export const MIGRATIONS: readonly Migration[] = [
   { version: 144, name: 'permission_request_prs', sql: PERMISSION_REQUEST_PRS },
   { version: 145, name: 'no_builtin_roles', sql: '', run: retireBuiltinRoles },
   { version: 146, name: 'permission_request_description', sql: PERMISSION_REQUEST_DESCRIPTION },
+  { version: 147, name: 'source_items', sql: SOURCE_ITEMS },
+  { version: 148, name: 'ea_ask_word', sql: EA_ASK_WORD },
 ]
