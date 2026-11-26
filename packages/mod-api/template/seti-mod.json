@@ -11,6 +11,6 @@
   "activation": ["onCommand"],
   "contributes": {
     "settings": { "greeting": { "type": "string", "title": "Greeting", "default": "Hello" } },
-    "commands": [{ "id": "hello", "title": "Say hello", "for": ["palette", "view"] }]
+    "commands": [{ "id": "hello", "title": "Say hello", "for": ["palette", "view", "ea"] }]
   }
 }
