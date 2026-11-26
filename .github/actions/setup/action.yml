@@ -15,7 +15,7 @@ runs:
         PLAYWRIGHT_DEPS: ${{ inputs.playwright-deps }}
       run: |
         source <(sed -n '/^APT_PREVIEW=(/,/)$/p' scripts/install.sh)
-        packages="bubblewrap socat openssh-server ripgrep ${APT_PREVIEW[*]}"
+        packages="bubblewrap socat openssh-server ripgrep libnss3-tools ${APT_PREVIEW[*]}"
         archives="$RUNNER_TEMP/apt-archives"
         scope=base
         if [[ $PLAYWRIGHT_DEPS == true ]]; then

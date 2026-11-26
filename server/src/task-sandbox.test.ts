@@ -17,7 +17,7 @@ import {
 import { spawn as spawnPty } from 'node-pty'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { readProcesses, stoppable, subtreeOf, terminate } from './agent-processes.js'
-import { findBinary } from './binaries.js'
+import { binaryPath, findBinary } from './binaries.js'
 import { CLAUDE_HOME, SCRATCH_ROOT, SETI_HOME } from './config.js'
 import { tasks } from './db.js'
 import { heldFolderSettings, watchFolderSettings } from './folder-settings-trust.js'
@@ -70,6 +70,18 @@ const available = (() => {
 })()
 
 const scopes = available ? await detectScopeHost(true) : null
+
+const certutil = binaryPath('certutil')
+
+/** Playwright's Chromium headless shell when this host has one; tests never download it. */
+const headlessShell = (() => {
+  const cache = process.env.PLAYWRIGHT_BROWSERS_PATH ?? path.join(os.userInfo().homedir, '.cache', 'ms-playwright')
+  const dirs = fs.existsSync(cache) ? fs.readdirSync(cache).filter((name) => name.startsWith('chromium_headless')) : []
+  const found = dirs
+    .map((name) => path.join(cache, name, 'chrome-headless-shell-linux64', 'chrome-headless-shell'))
+    .filter((file) => fs.existsSync(file))
+  return found.at(-1) ?? null
+})()
 
 describe('sandboxEnv', () => {
   it('passes only harmless variables and replaces credentials with placeholders', () => {
@@ -162,14 +174,15 @@ describe.skipIf(!available)('a real task sandbox', () => {
     script: string,
     scope: ScopePlan | null = null,
     as: Partial<Task> = {},
-    session: { maintenance?: Maintenance; runtime?: RuntimeId } = {},
+    session: { maintenance?: Maintenance; runtime?: RuntimeId; readOnly?: readonly string[] } = {},
   ): Promise<{ code: number | null; out: string }> {
-    const { maintenance, runtime = 'claude' } = session
+    const { maintenance, runtime = 'claude', readOnly = [] } = session
     const ctx = { ...sandboxContext(), home }
     const sandboxed = { ...task, ...as }
+    const plan = await sandboxPlanFor(sandboxed, await sandboxPolicy.get(), runtime)
     const sandbox = await taskSandbox(sandboxed, {
       ctx,
-      plan: await sandboxPlanFor(sandboxed, await sandboxPolicy.get(), runtime),
+      plan: { ...plan, readOnly: [...plan.readOnly, ...readOnly] },
       ...(maintenance === undefined ? {} : { maintenance }),
     })
     const child = sandbox.spawn('/bin/bash', ['-c', script], { stdin: 'ignore', scope })
@@ -464,6 +477,60 @@ describe.skipIf(!available)('a real task sandbox', () => {
       fs.writeFileSync(path.join(CLAUDE_HOME, '.credentials.json'), '{"claudeAiOauth":{"accessToken":"x"}}')
     }
   })
+
+  it.skipIf(certutil === null || headlessShell === null)(
+    'lets Chromium load a page signed by the Seti CA through the proxy, with no certificate error',
+    async () => {
+      const authority = await loadSandboxCa(path.join(SETI_HOME, 'sandbox-ca'))
+      await authority.cover(['localhost'])
+      const page = https.createServer(
+        {
+          SNICallback: (name, done) => {
+            authority.contextFor(name).then(
+              (context) => {
+                done(null, context)
+              },
+              (e: unknown) => {
+                done(e instanceof Error ? e : new Error(String(e)))
+              },
+            )
+          },
+        },
+        (_req, res) => res.end('<p>seti-ca-trusted</p>'),
+      )
+      await new Promise<void>((resolve) => page.listen(0, '127.0.0.1', resolve))
+      const pagePort = (page.address() as AddressInfo).port
+      const policy = await sandboxPolicy.get()
+      await sandboxPolicy.save({
+        ...policy,
+        allowed_domains: [...policy.allowed_domains, `localhost:${String(pagePort)}`],
+      })
+      const browser = headlessShell ?? ''
+      const load = (homeDir: string) =>
+        `HOME=${homeDir} "${browser}" --headless --no-sandbox --proxy-server="$HTTPS_PROXY" ` +
+        `--proxy-bypass-list='<-loopback>' --dump-dom https://localhost:${String(pagePort)}/ 2>&1 | ` +
+        `grep -o 'seti-ca-trusted\\|ERR_CERT_[A-Z_]*' | head -1`
+      try {
+        const script = [
+          load('"$HOME"'),
+          load('"$HOME/elsewhere"'),
+          'touch /run/seti-ca/nssdb/cert9.db 2>/dev/null && echo source-writable || echo source-read-only',
+          'echo "ca=$(ls /run/seti-ca | tr "\\n" " ") keys=$(grep -rl "PRIVATE KEY" /run/seti-ca ~/.pki/nssdb | wc -l)"',
+        ].join('; ')
+        const { out } = await inSandbox(script, null, {}, { readOnly: [path.dirname(browser)] })
+        expect(out.trim().split('\n')).toEqual([
+          'seti-ca-trusted',
+          'ERR_CERT_AUTHORITY_INVALID',
+          'source-read-only',
+          'ca=bundle.pem ca.pem nssdb  keys=0',
+        ])
+      } finally {
+        page.close()
+        await sandboxPolicy.save(policy)
+      }
+    },
+    60_000,
+  )
 
   it('gets a local server of another directory only once it is on for the agent', async () => {
     const config = path.join(SETI_HOME, 'sandbox', task.id, 'home', '.claude.json')
