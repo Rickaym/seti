@@ -2,22 +2,19 @@ import {
   BYPASS_HOURS,
   bypassOn,
   DEFAULT_BYPASS_HOURS,
+  type AgentCapabilities,
   type BypassHours,
-  type BypassState,
   type Task,
 } from '@seti/shared'
 import { FastForward } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { toast } from 'sonner'
-import { apiPut, errorText } from '@/api'
 import { InfoTip } from '@/components/InfoTip'
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 import { Switch } from '@/components/ui/switch'
+import { NotOnRuntime } from '@/panels/tasks/NotOnCodex'
+import { BYPASS_DETAIL, saveBypass } from '@/panels/tasks/setting-actions'
 
 const MAX_TIMER_MS = 2 ** 31 - 1
-
-const BYPASS_DETAIL =
-  "Runs every tool without asking for the hours you pick, then turns off by itself. Ask rules still ask; deny rules, Seti's guards and the sandbox still apply."
 
 const clock = (iso: string) => new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 
@@ -43,23 +40,14 @@ function useBypassOn(until: string | null): boolean {
 }
 
 /** The agent's Bypass switch with how long it lasts, and until when while it is on. */
-export function BypassToggle({ task, onChanged }: { task: Task; onChanged: () => void }) {
+function BypassToggle({ task, onChanged }: { task: Task; onChanged: () => void }) {
   const on = useBypassOn(task.bypass_until)
   const [hours, setHours] = useState<BypassHours>(DEFAULT_BYPASS_HOURS)
   const [busy, setBusy] = useState(false)
   const save = async (next: BypassHours | null) => {
     setBusy(true)
-    try {
-      const state = await apiPut<BypassState>(`/tasks/${task.id}/permissions/bypass`, { hours: next })
-      if (state.applied === 'next_turn') {
-        toast.success('Applies from the next turn')
-      }
-      onChanged()
-    } catch (e) {
-      toast.error(errorText(e))
-    } finally {
-      setBusy(false)
-    }
+    await saveBypass(task, next, onChanged)
+    setBusy(false)
   }
   return (
     <div className="flex flex-col gap-0.5" data-testid="bypass">
@@ -95,6 +83,27 @@ export function BypassToggle({ task, onChanged }: { task: Task; onChanged: () =>
       <p className="text-muted-foreground">Runs tools without asking, except ask rules.</p>
     </div>
   )
+}
+
+/** Bypass for the agent, or why its runtime does not offer it. */
+export function TaskBypass({
+  task,
+  caps,
+  onChanged,
+}: {
+  task: Task
+  caps: AgentCapabilities | null
+  onChanged: () => void
+}) {
+  if (caps?.bypass === false) {
+    return (
+      <NotOnRuntime
+        label={caps.label}
+        reason={`${caps.label} agents ask before every command and edit; Bypass is not offered.`}
+      />
+    )
+  }
+  return <BypassToggle task={task} onChanged={onChanged} />
 }
 
 /** A small mark in the agent's header while its Bypass lasts; only its icon on narrow phones. */
