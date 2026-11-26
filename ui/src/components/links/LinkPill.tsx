@@ -26,6 +26,11 @@ const PILL = [
   'hover:border-primary/60 hover:bg-primary/10 focus-visible:outline-2 focus-visible:outline-ring',
 ].join(' ')
 
+/** The brand mark of a link's service, or the lucide icon of its kind. */
+export function LinkIcon({ info, className }: { info: Pick<LinkLabel, 'icon' | 'glyph'>; className: string }) {
+  return <ServiceIcon icon={info.icon} fallback={GLYPHS[info.glyph]} className={className} />
+}
+
 function Pill({ href, info, children }: { href: string; info: LinkLabel; children: ReactNode }) {
   return (
     <Hint text={<span className="break-all">{clip(href, TOOLTIP_LIMIT)}</span>}>
@@ -37,7 +42,7 @@ function Pill({ href, info, children }: { href: string; info: LinkLabel; childre
         data-link-pill={info.service}
         data-link-url={href}
       >
-        <ServiceIcon icon={info.icon} fallback={GLYPHS[info.glyph]} className="size-[1.1em]" />
+        <LinkIcon info={info} className="size-[1.1em]" />
         <span className="min-w-0 truncate">{children}</span>
       </a>
     </Hint>

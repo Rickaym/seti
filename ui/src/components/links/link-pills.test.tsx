@@ -17,8 +17,8 @@ const markdown = (text: string, html = false) =>
 const pills = (markup: string) => [...markup.matchAll(/data-link-pill="([^"]+)"/g)].map((match) => match[1])
 
 describe('link pills in Markdown', () => {
-  it('shows a bare URL as a pill that opens it in a new tab and copies as the URL', () => {
-    const html = markdown(`The thread: ${SLACK}.`)
+  it('shows a bare URL alone on its line as a pill that opens it in a new tab and copies as the URL', () => {
+    const html = markdown(`The thread:\n${SLACK}.`)
     expect(pills(html)).toEqual(['slack'])
     expect(html).toContain(`href="${SLACK}"`)
     expect(html).toContain(`data-link-url="${SLACK}"`)
@@ -28,7 +28,7 @@ describe('link pills in Markdown', () => {
   })
 
   it('shows a Markdown link whose text is its URL as a pill', () => {
-    expect(pills(markdown(`[${PR}](${PR}) and <${PR}>`))).toEqual(['github', 'github'])
+    expect(pills(markdown(`[${PR}](${PR})\n<${PR}>`))).toEqual(['github', 'github'])
     expect(markdown(`[${PR}](${PR})`)).toContain('>acme/widgets#123</span>')
   })
 
@@ -46,10 +46,11 @@ describe('link pills in Markdown', () => {
     expect(html).toContain(`>${PR}</code></a>`)
   })
 
-  it('refuses a javascript link and pills a bare URL in sanitized HTML', () => {
+  it('refuses a javascript link and labels a bare URL in sanitized HTML', () => {
     const html = markdown(`[javascript:alert(1)](javascript:alert(1)) <a href="${PR}">${PR}</a>`, true)
     expect(html).not.toContain('javascript:alert(1)"')
-    expect(pills(html)).toEqual(['github'])
+    expect(html).toContain(`href="${PR}"`)
+    expect(html).toContain('>acme/widgets#123</a>')
   })
 })
 

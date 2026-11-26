@@ -171,6 +171,10 @@ export interface Capabilities {
   compaction: { off: boolean; windowAlone: boolean } | null
   /** The agent can hand work to subagents of its own that run in the background. */
   subagents: boolean
+  /** Bypass can let its tool calls run without asking for a while. */
+  bypass: boolean
+  /** It takes its own slash commands as prompts, listed in the composer. */
+  slashCommands: boolean
 }
 
 /**

@@ -192,8 +192,8 @@ between two steps; an interrupt; a hook at subagent start.
   outside the control room's own folders is removed.
 - RT-13: A runtime declares whether it loads the user's MCP servers and connectors, Seti's
   plugins and a compaction rule, and which parts of that rule it does not honour, whether it can
-  run outside the sandbox, fork a side chat, dream, rewind and run background subagents of its
-  own; `GET /api/runtimes/capabilities` serves each runtime's declaration. For an agent whose
+  run outside the sandbox, fork a side chat, dream, rewind, run background subagents of its
+  own, take Bypass and take slash commands of its own; `GET /api/runtimes/capabilities` serves each runtime's declaration. For an agent whose
   runtime lacks one, its settings show the control as not on that runtime instead of a working
   control, counts leave those items out, its `task.md` and system prompt do not offer them, and
   the server refuses the change with the reason. A control the runtime honours in part says which
@@ -1411,6 +1411,9 @@ Optional and off by default: a maintenance session per agent that consolidates i
   the control room MUST NOT offer the command or show the view there, its slash command says it is
   not on that runtime, and the server refuses the command for that agent (409) to the user, the EA
   and agents alike.
+- MOD-26: A mod's slash command MUST NOT take a name the control room's own agent commands use
+  (`/restart`, `/archive`, `/mcp`, `/sandbox`, `/bypass`, `/credential`, `/access`, `/settings`,
+  `/rename`, `/dream`); a manifest that names one is invalid.
 
 ## 18. Public surfaces
 
@@ -1482,6 +1485,19 @@ Optional and off by default: a maintenance session per agent that consolidates i
   `stalled`, with retry and removal. A failed upload shows its reason (too large, connection lost,
   or the server's refusal) with the file and in a failure toast. The server gives an upload up
   after `upload_idle` without a byte or `upload_time` in all, and keeps nothing of it.
+- API-19: A message in an agent's chat, a group chat or the assistant renders its sources as
+  references. An http or https link inside a sentence keeps its text (a bare URL shows its service
+  label, with the Slack channel's name when known) and gains a superscript `[n]` mark; `[^n]`
+  footnotes and `[n]` with a `[n]: url` definition become the same marks. Numbers count from 1
+  per message in order of first appearance, and a repeated URL reuses its number. A link alone on
+  its line, list item or table cell stays a chip, and code is untouched. A message with a
+  reference ends with a Sources list (number, service icon, label, host), folded to one line on a
+  phone. A quote with a reference inside it, a single reference in the paragraph after it, or one
+  ending the paragraph before it, shows that source under it. A mark MUST NOT navigate within the
+  client or create ids: on desktop hover or focus previews the source and a click opens it in a
+  new tab; on a phone a tap opens a sheet with an Open button. Previews show only text derived
+  from the URL and the message, bounded in length, and raw HTML in a message cannot produce a mark
+  or a Sources list.
 
 ## 20. Conformance
 
