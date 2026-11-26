@@ -7,7 +7,7 @@ from seti_ea.format import clip, plural
 from seti_ea.gate import CONFIRMED, Confirmations, ask, gate_key
 from seti_ea.seti import SetiClient, SetiError
 from seti_ea.toolkit import ToolError, ToolResult, ToolSpec, arg_bool, arg_str, dicts, title_of
-from seti_ea.workspace_tools import resolve_workspace, workspace_list
+from seti_ea.workspace_tools import resolve_workspace, workspace_list, workspace_names
 
 SHOWN = 3
 
@@ -133,6 +133,20 @@ def _trash_line(trash: list[dict[str, Any]]) -> str:
     return f"The trash holds {plural(len(trash), 'item')}: {items}."
 
 
+def _off_line(off: Any, tasks: list[dict[str, Any]], workspaces: dict[str, str]) -> str:
+    fields = off if isinstance(off, dict) else {}
+    titles = {str(t.get("id")): title_of(t) for t in tasks}
+    agents = [titles.get(str(i), str(i)) for i in fields.get("tasks") or []]
+    places = [workspaces.get(str(i), str(i)) for i in fields.get("workspaces") or []]
+    if not agents and not places:
+        return "No agent or workspace is switched out of Dreaming."
+    parts = [
+        f"agents {', '.join(agents)}" if agents else "",
+        f"workspaces {', '.join(places)}" if places else "",
+    ]
+    return f"Switched out of Dreaming: {'; '.join(p for p in parts if p)}."
+
+
 def _tidy_line(tidy: Mapping[str, Any]) -> str:
     state = "undone" if tidy.get("state") == "undone" else f"undo id {tidy.get('id')}"
     reason = clip(str(tidy.get("reason") or ""), 120)
@@ -204,7 +218,12 @@ class DreamTools:
             night = await self._seti.get("/dreams")
             trash = dicts(await self._seti.get("/trash"))
             night_line = _night_line(night if isinstance(night, dict) else None)
-            text = f"{_settings_line(settings)} {night_line} {_trash_line(trash)}"
+            off = _off_line(
+                await self._seti.get("/dreams/off"),
+                dicts(await self._seti.get("/tasks")),
+                await workspace_names(self._seti),
+            )
+            text = f"{_settings_line(settings)} {night_line} {off} {_trash_line(trash)}"
             return ToolResult(text, "Read Dreaming")
         if not await self._gate.cleared(gate_key("dreams", "settings", change), arg_bool(args, "confirmed")):
             effect = f"This changes nightly Dreaming: {_change_words(change)}."

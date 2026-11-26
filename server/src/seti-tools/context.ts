@@ -19,7 +19,7 @@ import { listContextFiles, readContextFile } from '../context-files.js'
 import { revertRevision } from '../revert.js'
 import { byAgent } from '../revisions.js'
 import { packForDisplay } from '../seti-guide.js'
-import { contextPacks } from '../store/context.js'
+import { contextPacks, packLinks } from '../store/context.js'
 import { revisions } from '../store/revisions.js'
 import { pickOne } from './refs.js'
 import { done, setiTool, ToolRefusal, type ToolContext } from './tool.js'
@@ -97,7 +97,7 @@ const listContextPacks = setiTool({
 const getContextPack = setiTool({
   name: 'get_context_pack',
   description:
-    'One context pack: its description, size, headings and opening, or the lines matching a query. Pass full for the whole text.',
+    'One context pack: its description, size, the agents that use it, headings and opening, or the lines matching a query. Pass full for the whole text.',
   input: {
     pack: packRef,
     query: z.string().trim().min(1).optional(),
@@ -106,7 +106,8 @@ const getContextPack = setiTool({
   run: async ({ pack: ref, query, full }) => {
     const pack = await findPack(ref)
     const { body, ...fields } = pack
-    return { ...fields, chars: body.length, ...(full ? { body } : summarise(body, query)) }
+    const used_by = await packLinks(pack)
+    return { ...fields, chars: body.length, used_by, ...(full ? { body } : summarise(body, query)) }
   },
 })
 

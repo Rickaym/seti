@@ -500,17 +500,22 @@ async def test_context_packs(tools: EaTools, fake_seti: FakeSeti) -> None:
     assert pack.text.splitlines() == [
         "Context pack Triage sources. Where the morning triage looks for problems. About 22 words, "
         "updated 3 hours ago.",
+        "No agent uses it.",
         "Sections: Triage sources; Output.",
         "Opening: - Slack: the #problems channel (read only). - PostHog: error tracking for production. "
         "Group findings by severity.",
     ]
     found = await tools.call("get_context_pack", {"pack": "Triage sources", "query": "posthog"})
-    assert found.text.splitlines()[1:] == [
+    assert found.text.splitlines()[2:] == [
         'Lines mentioning "posthog":',
         "- PostHog: error tracking for production.",
     ]
     missing = await tools.call("get_context_pack", {"pack": "security"})
     assert not missing.ok
+    pack_id = str(fake_seti.packs[0]["id"])
+    fake_seti.pack_links[pack_id] = {"agents": [{"id": "t1", "title": "Morning triage"}], "ea": True}
+    used = await tools.call("get_context_pack", {"pack": "triage"})
+    assert used.text.splitlines()[1] == "Used by Morning triage, you."
     fake_seti.packs = []
     assert (await tools.call("list_context_packs", {})).text == "There are no context packs."
 
@@ -795,6 +800,19 @@ async def test_overview_reads_plain_settings_as_json(tools: EaTools, fake_seti: 
     assert "revision" not in whole.text
     assert gets(fake_seti, "/api/settings-doc") == [{}, {}]
     assert not fake_seti.posts()
+
+
+async def test_overview_reads_the_defaults_a_workspaces_or_an_agents_settings(
+    tools: EaTools, fake_seti: FakeSeti
+) -> None:
+    fake_seti.workspaces = [{"id": "w-client", "name": "Client", "position": 0}]
+    path = "agents.lifecycle"
+    defaults = await tools.call("seti_overview", {"settings": path, "settings_of": "defaults"})
+    assert '"days": "settings-doc/defaults"' in defaults.text
+    workspace = await tools.call("seti_overview", {"settings": path, "settings_of": "client"})
+    assert '"days": "settings-doc/workspaces/w-client"' in workspace.text
+    agent = await tools.call("seti_overview", {"settings": path, "settings_of": "login"})
+    assert f'"days": "settings-doc/agents/{TASK_LOGIN}"' in agent.text
 
 
 async def test_overview_names_the_parts_of_settings_it_lacks(tools: EaTools) -> None:

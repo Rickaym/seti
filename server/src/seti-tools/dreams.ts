@@ -13,18 +13,18 @@ const SHOWN = 5
 
 /** Dreaming's settings and how the last night went; changing them is the user's. */
 async function overview() {
-  const settings = await dreamSettings.get()
-  const night = await dreamNights.latest()
+  const [settings, night, off] = await Promise.all([dreamSettings.get(), dreamNights.latest(), dreamOptOuts.get()])
   return {
     settings,
     last_night: night === undefined ? null : { night: night.night, line: nightLine(await nightRuns.of(night.night)) },
+    switched_out: { tasks: [...off.tasks], workspaces: [...off.workspaces] },
   }
 }
 
 const dreams = setiTool({
   name: 'dreams',
   description:
-    "Dreams: sandboxed sessions that tidy an agent's memory folder and decide on its unused channel subscriptions, each change undoable. Without task, Dreaming's settings and last night. With task, that agent's recent dreams, reports and configuration changes; with start, run one dream of another agent now; with dreaming, switch another agent in or out of nightly Dreaming.",
+    "Dreams: sandboxed sessions that tidy an agent's memory folder and decide on its unused channel subscriptions, each change undoable. Without task, Dreaming's settings, last night, and the agents and workspaces switched out. With task, that agent's recent dreams, reports and configuration changes; with start, run one dream of another agent now; with dreaming, switch another agent in or out of nightly Dreaming.",
   input: {
     task: taskRef.optional(),
     start: z.boolean().optional().describe('true to start a dream of the agent now'),

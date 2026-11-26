@@ -21,6 +21,7 @@ import { memoryCapSettings, taskMemoryCap } from '../memory-cap.js'
 import { readShellOutput, stopProcess, stopShell } from '../process-stop.js'
 import { openQuerySince } from '../runner.js'
 import { taskInputs } from '../store/inputs.js'
+import { rewinds } from '../store/rewinds.js'
 import { messageSearch } from '../store/search.js'
 import { secondOpinions } from '../store/second-opinions.js'
 import { threadFollows } from '../store/threads.js'
@@ -38,6 +39,7 @@ const QUEUE_SCAN = 200
 const FIND_LIMIT = 20
 const DIGEST_LINES = 40
 const THREADS_SHOWN = 10
+const REWINDS_SHOWN = 5
 /** get_task's transcript stays under this, so the whole answer fits one tool result. */
 const DIGEST_CHARS = 12_000
 /** Process kinds an agent may stop: commands and tools, never Claude Code or Seti's helpers. */
@@ -245,7 +247,7 @@ function digestText(lines: readonly DigestLine[]): string[] {
 const getTask = setiTool({
   name: 'get_task',
   description:
-    'One agent in detail: status, a condensed recent transcript, its todo list, updates waiting for it, running subagents and counts of the rest, where it works, its setup, cost at API prices, what its second opinions cost and the latest reviews of its PRs, the Slack threads it posted in and follows for replies, and linked PRs. For an earlier day use read_transcript.',
+    'One agent in detail: status, a condensed recent transcript, its todo list, updates waiting for it, running subagents and counts of the rest, where it works, its setup, cost at API prices, what its second opinions cost and the latest reviews of its PRs, its latest rewinds, the Slack threads it posted in and follows for replies, and linked PRs. For an earlier day use read_transcript.',
   input: {
     task: taskRef,
     files: z.boolean().default(false).describe('Instead, the files it changed since it started, newest first.'),
@@ -259,7 +261,7 @@ const getTask = setiTool({
         setiFiles: false,
       })
     }
-    const [subtasks, names, digest, todos, waiting, threads, spend, reviews] = await Promise.all([
+    const [subtasks, names, digest, todos, waiting, threads, spend, reviews, rewound] = await Promise.all([
       subtaskBriefs(task.id, openQuerySince(task.id)),
       workspaceNames(),
       taskDigest(task.id, DIGEST_LINES),
@@ -268,6 +270,7 @@ const getTask = setiTool({
       threadFollows.forTask(task.id),
       secondOpinions.spend(task.id),
       secondOpinions.reviews(task.id),
+      rewinds.list(task.id),
     ])
     const running = subtasks.filter((s) => s.status === 'running')
     const { id, title, status, ...rest } = briefOf(task)
@@ -289,6 +292,7 @@ const getTask = setiTool({
       input_mode: task.input_mode,
       cost_usd: task.cost_usd,
       second_opinions: { spend, reviews },
+      rewinds: rewound.slice(-REWINDS_SHOWN),
       setup: task.setup,
       followed_threads: threads
         .filter((thread) => thread.stopped_at === null)

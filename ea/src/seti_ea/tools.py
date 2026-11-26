@@ -62,7 +62,7 @@ from seti_ea.role_tools import role_lines
 from seti_ea.seti import SetiClient, SetiError
 from seti_ea.settings_json import settings_text
 from seti_ea.settings_tools import SETTINGS_SPECS, SettingsTools
-from seti_ea.task_extras import FILES_ARG, opinion_lines, recent_files
+from seti_ea.task_extras import FILES_ARG, opinion_lines, recent_files, rewind_lines
 from seti_ea.thread_lines import thread_lines
 from seti_ea.toolkit import (
     TASK_REF,
@@ -321,13 +321,19 @@ TOOL_SPECS: list[ToolSpec] = [
                 "one part by its path, such as agents.lifecycle or app.ea. Security settings are not "
                 "in it; you change settings with their own tools, and the user changes the rest in Seti.",
             },
+            "settings_of": {
+                "type": "string",
+                "description": "With settings: defaults for Seti's defaults, or a workspace's or an "
+                "agent's name for its own settings. Leave it out for Seti's settings.",
+            },
         },
     ),
     ToolSpec(
         "get_task",
         "Details of one task: status, repos, cost, its todo list, linked PRs with CI and review, "
         "updates waiting for the agent, Slack threads it posted in and follows for replies, what its "
-        "second opinions cost and the latest reviews of its PRs, and a condensed recent transcript, "
+        "second opinions cost and the latest reviews of its PRs, its latest rewinds, and a condensed "
+        "recent transcript, "
         "or with files the files it changed, or with window what it "
         "did then, such as yesterday. To ask an agent why it did something, use the side chat mod's "
         "ask action through run_mod_action while that mod is on.",
@@ -518,7 +524,8 @@ TOOL_SPECS: list[ToolSpec] = [
     ),
     ToolSpec(
         "get_context_pack",
-        "Summarise one context pack: description, size, outline, opening, or lines matching a query.",
+        "Summarise one context pack: description, size, the agents that use it, outline, opening, or "
+        "lines matching a query.",
         {
             "pack": {"type": "string", "description": "The pack's name as the user said it."},
             "query": QUERY,
@@ -1273,6 +1280,7 @@ class EaTools:
         lines.extend(await self._task_prs(task))
         lines.extend(await thread_lines(self._seti, task_id, now))
         lines.extend(await opinion_lines(self._seti, task_id, now))
+        lines.extend(await rewind_lines(self._seti, task_id, now))
         waiting = await self._waiting(task_id)
         if waiting:
             about = "; ".join(clip(str(u.get("title", "update")), 80) for u in waiting[:5])
@@ -1902,8 +1910,17 @@ class EaTools:
             f"Context pack {name_of(pack)}.{description} About {plural(len(body.split()), 'word')}, "
             f"updated {ago(pack.get('updated_at'), self._now())}."
         ]
+        lines.append(await self._pack_users(str(pack.get("id"))))
         lines.extend(self._summarise_text(body, arg_str(args, "query", required=False)))
         return ToolResult("\n".join(lines), f"Read context pack {clip(name_of(pack), 50)}")
+
+    async def _pack_users(self, pack_id: str) -> str:
+        links = await self._seti.get(f"/context/packs/{pack_id}/links")
+        fields = links if isinstance(links, dict) else {}
+        names = [title_of(a) for a in dicts(fields.get("agents"))]
+        if fields.get("ea") is True:
+            names.append("you")
+        return f"Used by {', '.join(names)}." if names else "No agent uses it."
 
     async def list_context_files(self, args: Mapping[str, Any]) -> ToolResult:
         files = await self._list("/context/files")
@@ -2463,6 +2480,17 @@ class EaTools:
         lines = changelog_lines(log, update, self._now(), zone_label(CURRENT_CLOCK.get()))
         return ToolResult("\n".join(lines), "Read the Seti changelog")
 
+    async def _settings_path(self, args: Mapping[str, Any]) -> str:
+        scope = arg_str(args, "settings_of", required=False)
+        if not scope:
+            return "/settings-doc"
+        if normalize(scope) == "defaults":
+            return "/settings-doc/defaults"
+        workspaces = await workspace_list(self._seti)
+        if any(normalize(str(w.get("name"))) == normalize(scope) for w in workspaces):
+            return f"/settings-doc/workspaces/{resolve_workspace(workspaces, scope).get('id')}"
+        return f"/settings-doc/agents/{(await self.resolve_task(scope)).get('id')}"
+
     async def seti_overview(self, args: Mapping[str, Any]) -> ToolResult:
         if arg_bool(args, "changelog"):
             return await self._changelog()
@@ -2473,7 +2501,7 @@ class EaTools:
             return ToolResult("\n".join(shadow_lines(summary)), "Read how Seti's permission shadow compares")
         settings = arg_str(args, "settings", required=False)
         if settings:
-            return settings_text(await self._seti.get("/settings-doc"), settings)
+            return settings_text(await self._seti.get(await self._settings_path(args)), settings)
         if arg_bool(args, "mods"):
             listing, user = await asyncio.gather(self._seti.get("/mods"), _attempt(self._seti.get("/user")))
             text = mods_text(listing)
