@@ -8,6 +8,7 @@ import { capabilityCache } from '../capabilities.js'
 import { commandCatalog, nearbyDirs } from '../commands.js'
 import { notEa } from '../ea-guard.js'
 import { HttpError, ok, valid, validJson } from '../http.js'
+import { agentCapabilities } from '../runtimes/capabilities.js'
 import { runShell, stopShell } from '../shell.js'
 import { inLane } from '../task-lane.js'
 import { requireTask } from '../tasks.js'
@@ -16,7 +17,7 @@ import { scopeCwd } from './capabilities.js'
 const catalogFor = async (cwd: string, agent = false) =>
   commandCatalog(await capabilityCache.lookup(cwd, nearbyDirs(cwd)), { agent })
 
-/** A Codex agent takes no slash commands: Claude Code's and Seti's both act on Claude's session. */
+/** An agent whose runtime takes no slash commands of its own lists none. */
 const noCommands = (cwd: string): CommandCatalog => ({
   cwd,
   probed_at: new Date().toISOString(),
@@ -43,7 +44,10 @@ const validTask = valid('param', taskParams)
 export const taskComposerRoutes = new Hono()
   .get('/:id/commands', compress(), validTask, async (c) => {
     const task = await requireTask(c.req.valid('param').id)
-    return ok(c, task.runtime === 'codex' ? noCommands(task.cwd) : await catalogFor(task.cwd, true))
+    return ok(
+      c,
+      agentCapabilities(task.runtime).slash_commands ? await catalogFor(task.cwd, true) : noCommands(task.cwd),
+    )
   })
   .post('/:id/shell', notEa('run shell commands'), validTask, validJson(shellInput), async (c) => {
     const task = await requireTask(c.req.valid('param').id)

@@ -122,6 +122,8 @@ export const agentCapabilities = (runtime: StoredRuntime): AgentCapabilities => 
   side_chat: forksSideChat(runtime),
   dreams: dreamsOf(runtime) !== null,
   rewind: rewinds(runtime),
+  bypass: declared(runtime).bypass,
+  slash_commands: declared(runtime).slashCommands,
 })
 
 /** Every stored runtime's capabilities. */

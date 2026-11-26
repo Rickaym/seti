@@ -27,7 +27,7 @@ import { BypassToggle } from '@/panels/tasks/BypassToggle'
 import { ContinueOn } from '@/panels/tasks/ContinueOn'
 import { DreamActions } from '@/panels/tasks/DreamActions'
 import { LifecycleActions } from '@/panels/tasks/LifecycleActions'
-import { NO_BYPASS, NotOnCodex } from '@/panels/tasks/NotOnCodex'
+import { NotOnRuntime } from '@/panels/tasks/NotOnCodex'
 import { NewRoleDialog, RolePicker, type RoleOwner } from '@/panels/tasks/RolePicker'
 import { TaskIsolation } from '@/panels/tasks/SandboxToggle'
 import { SessionFields } from '@/panels/tasks/SessionFields'
@@ -214,8 +214,11 @@ export const TaskSettings = memo(function TaskSettingsView({
           </Row>
         )}
         <Row label="Bypass">
-          {task.runtime === 'codex' ? (
-            <NotOnCodex reason={NO_BYPASS} />
+          {caps?.bypass === false ? (
+            <NotOnRuntime
+              label={caps.label}
+              reason={`${caps.label} agents ask before every command and edit; Bypass is not offered.`}
+            />
           ) : (
             <BypassToggle task={task} onChanged={onChanged} />
           )}
