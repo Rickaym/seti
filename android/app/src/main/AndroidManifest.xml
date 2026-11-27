@@ -2,6 +2,10 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
 
     <application
         android:name=".SetiApplication"
@@ -72,6 +76,27 @@
             android:name="com.google.androidbrowserhelper.trusted.ManageDataLauncherActivity"
             android:exported="false"
             android:targetActivity=".SiteSettingsActivity" />
+
+        <activity
+            android:name="com.google.androidbrowserhelper.trusted.NotificationPermissionRequestActivity"
+            android:exported="false" />
+
+        <service
+            android:name=".call.SetiDelegationService"
+            android:exported="true">
+            <meta-data
+                android:name="android.support.customtabs.trusted.SMALL_ICON"
+                android:resource="@drawable/ic_seti" />
+            <intent-filter>
+                <action android:name="android.support.customtabs.trusted.TRUSTED_WEB_ACTIVITY_SERVICE" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </service>
+
+        <service
+            android:name=".call.CallService"
+            android:exported="false"
+            android:foregroundServiceType="microphone" />
 
         <receiver
             android:name=".widget.NeedsYouWidgetReceiver"

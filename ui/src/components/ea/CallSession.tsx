@@ -1,8 +1,12 @@
 import type { EaCallEndInput } from '@seti/shared'
 import { useEffect, useState } from 'react'
+import { toast } from 'sonner'
 import { apiBeacon } from '@/api'
+import { setCallLive } from '@/lib/live-call'
+import { AwayWatch } from './away'
 import { useEaCall } from './call-context'
 import { CallEndRecorder, pageHidden, sessionTabStorage } from './call-end'
+import { useCallNotice } from './call-notice'
 import type { CallEnd, CallRoute } from './call-state'
 import type { EaCallStore } from './call-store'
 import { useCallMediaSession } from './media-session'
@@ -38,11 +42,41 @@ function useCallEnds(connected: boolean, auto: boolean, lastEnd: CallEnd | null,
   }, [recorder, lastEnd])
 }
 
+/** Reopens a microphone the system dropped while away, and says when the EA heard nothing. */
+function useAwayWatch(store: EaCallStore, connected: boolean): void {
+  const [watch] = useState(
+    () =>
+      new AwayWatch({
+        hearing: store.hearing,
+        micOn: () => store.getSnapshot().micOn,
+        reopen: store.reroute,
+        note: (text) => toast(text),
+        now: Date.now,
+      }),
+  )
+  useEffect(() => {
+    if (!connected) {
+      return undefined
+    }
+    const changed = () => void (pageHidden() ? watch.hidden() : watch.shown())
+    document.addEventListener('visibilitychange', changed)
+    return () => {
+      document.removeEventListener('visibilitychange', changed)
+      watch.reset()
+    }
+  }, [watch, connected])
+}
+
 /** Keeps a live call going as media the phone shows, and records how each call ends. */
 export function CallSession({ store }: { store: EaCallStore }) {
   const { phase, micOn, auto, lastEnd, route } = useEaCall()
   const connected = phase === 'connected'
+  useEffect(() => {
+    setCallLive(phase === 'connecting' || connected)
+  }, [phase, connected])
   useCallMediaSession(store, connected, micOn)
+  useCallNotice(store, connected, micOn)
   useCallEnds(connected, auto, lastEnd, route)
+  useAwayWatch(store, connected)
   return null
 }

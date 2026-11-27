@@ -1,7 +1,8 @@
-import { Check, LoaderCircle, Wrench, X } from 'lucide-react'
+import { Check, EarOff, LoaderCircle, Wrench, X } from 'lucide-react'
 import { useEffect, useMemo, useRef } from 'react'
 import { CallControls } from '@/components/ea/CallControls'
 import { MeterBars } from '@/components/ea/MeterBars'
+import { BACKGROUND_LINE, backgroundSilences } from '@/components/ea/away'
 import { useEaHistory, useEaHistoryStore } from '@/components/ea/call-context'
 import { asleep, type CallState } from '@/components/ea/call-state'
 import { LIGHT, listeningLocally, LOCAL_HINT, meterTrack, statusOf } from '@/components/ea/call-status'
@@ -9,6 +10,8 @@ import type { ActionItem, SpeechItem } from '@/components/ea/captions'
 import { useNarrow } from '@/hooks/useMedia'
 import { cn } from '@/lib/utils'
 import { inFlight, settledCount, type FeedItem } from './call-feed'
+
+const SILENCED = backgroundSilences(navigator.userAgent, navigator.maxTouchPoints)
 
 /** Time for the bot to store a finished line before the conversation is fetched again. */
 const LAND_MS = 800
@@ -136,6 +139,12 @@ export function CallCard({ call, touch }: { call: CallState; touch: boolean }) {
         )}
         {!narrow && <CallControls call={call} canStart touch={touch} className="ml-auto p-0" />}
       </div>
+      {SILENCED && call.phase === 'connected' && (
+        <p className="flex items-start gap-1.5 border-t border-border px-3 py-1.5 text-muted-foreground">
+          <EarOff className="mt-px size-3.5 shrink-0" aria-hidden="true" />
+          {BACKGROUND_LINE}
+        </p>
+      )}
       {feed.length > 0 && <Feed items={feed} />}
       {narrow && <CallControls call={call} canStart touch={touch} className="border-t border-border pt-2" />}
     </section>

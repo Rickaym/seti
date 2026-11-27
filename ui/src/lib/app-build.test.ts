@@ -9,6 +9,7 @@ const IDLE: PageActivity = {
   dialog: false,
   uploading: false,
   unsaved: false,
+  call: false,
 }
 
 describe('isBehind', () => {
@@ -40,8 +41,8 @@ describe('updateMoment', () => {
     expect(updateMoment({ ...IDLE, hidden: true, draft: true, dialog: true, typing: true })).toBe('now')
   })
 
-  it('never reloads over an upload, unsaved changes or text a reload would lose', () => {
-    for (const busy of [{ uploading: true }, { unsaved: true }, { unkeptText: true }]) {
+  it('never reloads over an upload, unsaved changes, text a reload would lose or a live call', () => {
+    for (const busy of [{ uploading: true }, { unsaved: true }, { unkeptText: true }, { call: true }]) {
       expect(updateMoment({ ...IDLE, hidden: true, ...busy })).toBe('wait')
       expect(updateMoment({ ...IDLE, ...busy })).toBe('wait')
     }

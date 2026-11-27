@@ -1341,6 +1341,18 @@ Why: an agent woken by its own actions or by news nobody waited for burns turns 
   Showing it MUST NOT build a live context or call a model; every part passes the EA's secret
   redaction. The view is read only. When the EA is not running the page says so.
   Why: the user can read exactly what the EA is told, which changes only through code.
+- EA-22: Leaving Seti MUST NOT end a voice call: nothing in Seti hangs up, reloads or navigates
+  the page while a call connects or is live, and opening Seti again from its icon, a shortcut or a
+  widget routes inside the running page. The call stays media with Mute and Hang up on the lock
+  screen. On devices that silence a backgrounded browser's microphone (Android, iOS) the call
+  shows "The EA cannot hear you while Seti is in the background on this device". On return the
+  page reopens a microphone the system muted or ended, and when the EA heard nothing for 5 s or
+  more it says "You were away for <time>; the EA could not hear you". On Android, with
+  notifications allowed, a live call shows the notification "Call with the EA" with Mute and Hang
+  up for exactly as long as it is live; the Android app holds that notification as a microphone
+  foreground service, which runs only then.
+  Why: a call must survive a glance at another app, and a silenced microphone must never pass for
+  a live one.
 
 ## 15. Resilience
 
@@ -1737,9 +1749,9 @@ Optional and off by default: a maintenance session per agent that consolidates i
   `build`. A client compares its own id with the server's on every poll, when it returns to the
   foreground and when it comes back online. When they differ it installs the new worker and reloads
   into the new build at a safe moment: at once while hidden or idle, never while the user types,
-  a composer holds text, a dialog is open, a file uploads or a form is unsaved; until then it
-  shows one Update control in the status bar that reloads on demand. A hidden page waits only for
-  uploads, unsaved forms and text no draft keeps. Composer drafts survive the reload. A failed
+  a composer holds text, a dialog is open, a file uploads, a form is unsaved or an EA call is live;
+  until then it shows one Update control in the status bar that reloads on demand. A hidden page
+  waits only for uploads, unsaved forms, text no draft keeps and a live EA call. Composer drafts survive the reload. A failed
   worker install is tried again after 5 s, doubling to 5 minutes; after two failures the page
   reloads without it. A client reloads by itself at most once per build. A client already on the
   server's build lets a waiting worker take over at once.

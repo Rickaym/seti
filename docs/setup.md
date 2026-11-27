@@ -388,7 +388,16 @@ systemctl --user restart seti.service seti-ea.service
 
 A call keeps going while Seti is in the background, as when you switch apps on a phone, and ends
 only once the browser declares the network path failed, after about 30 seconds. Each call end is
-audited as `ea.call_ended` with its reason and length, never audio or words.
+audited as `ea.call_ended` with its reason and length, never audio or words. On desktop browsers
+the EA keeps hearing you from a hidden tab. Android and iOS silence the microphone of a browser in
+the background, so there the call stays connected and the EA's voice keeps playing, but the EA
+hears nothing until you return; the call says so, and on return Seti reopens the microphone and
+tells you how long the EA could not hear you. Opening the Android app again from its icon or a
+widget returns to the running call instead of reloading it, once the app is updated.
+
+The Android app asks once for its own microphone permission. It never opens the microphone itself:
+during a call it holds the call's notification as a microphone foreground service, so the call can
+keep hearing you in the background, and it shows Seti's notifications as its own.
 
 On Android, Chrome sends call audio to a Bluetooth headset only when Chrome may use Nearby devices
 (Android settings, Apps, Chrome, Permissions). A headset that connects mid-call takes over once the

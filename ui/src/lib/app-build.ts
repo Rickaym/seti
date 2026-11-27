@@ -23,11 +23,13 @@ export interface PageActivity {
   uploading: boolean
   /** A form holds changes that leaving would discard. */
   unsaved: boolean
+  /** An EA call is live; a reload would hang it up. */
+  call: boolean
 }
 
 /** now: reload into the new build. wait: offer Update and look again when the page settles. */
 export function updateMoment(page: PageActivity): 'now' | 'wait' {
-  if (page.uploading || page.unsaved || page.unkeptText) {
+  if (page.uploading || page.unsaved || page.unkeptText || page.call) {
     return 'wait'
   }
   if (page.hidden) {
