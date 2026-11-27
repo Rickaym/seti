@@ -7,6 +7,7 @@ import { openAgentSettings } from './support/agent-settings.js'
 import { openSeedDb } from './support/db.js'
 import { paths } from './support/env.js'
 import { addScratchRepos, apiData, expect, removeRepos, test } from './support/fixtures.js'
+import { addHost, addKey } from './support/ssh.js'
 
 const main = (page: Page) => page.getByRole('main')
 const message = (page: Page) => page.getByLabel('Message')
@@ -174,25 +175,27 @@ test('Enter starts a planned agent in a fresh folder of its own, without a setup
   await remove(page, id)
 })
 
-test('access the message does not clearly ask for is not given, and the agent settings say so', async ({
-  page,
-  request,
-}) => {
-  await page.goto('/#agents/new')
-  const id = await start(page, 'Look at why the cloud server is slow')
-  await expect(main(page).getByRole('heading', { name: 'Planned: Look at why the cloud server is slow' })).toBeVisible()
-  await expect(main(page).getByLabel('Setup', { exact: true })).toHaveCount(0)
-  await expect(main(page)).not.toContainText('Not given')
-  expect(await apiData<Task>(request, `/tasks/${id}`)).toMatchObject({ sandbox: true })
-  expect(await grantedAccess(request, id)).toEqual([])
+test('a message that names a host and AWS turns on no access, and nothing is held back', async ({ page, request }) => {
+  const key = await addKey(request, 'start-page')
+  await addHost(request, 'server', '203.0.113.40', { key_id: key.id })
+  try {
+    await page.goto('/#agents/new')
+    const id = await start(page, 'ssh to the server and read the AWS logs in S3')
+    const title = 'Planned: ssh to the server and read the AWS logs in S3'
+    await expect(main(page).getByRole('heading', { name: title })).toBeVisible()
+    await expect(main(page).getByLabel('Setup', { exact: true })).toHaveCount(0)
+    expect(await apiData<Task>(request, `/tasks/${id}`)).toMatchObject({ sandbox: true, setup: { withheld: [] } })
+    expect(await grantedAccess(request, id)).toEqual([])
 
-  const details = await openAgentSettings(page, 'Access')
-  const held = details.getByRole('list', { name: 'Held back' })
-  await expect(held.getByRole('listitem').filter({ hasText: /^SSH server: / })).toHaveCount(1)
-  await expect(held.getByRole('listitem').filter({ hasText: /^AWS: / })).toHaveCount(1)
-  await page.keyboard.press('Escape')
-  await expect(details).toBeHidden()
-  await remove(page, id)
+    const details = await openAgentSettings(page, 'Access')
+    await expect(details.getByRole('list', { name: 'Held back' })).toHaveCount(0)
+    await page.keyboard.press('Escape')
+    await expect(details).toBeHidden()
+    await remove(page, id)
+  } finally {
+    await request.delete('/api/ssh/hosts/server')
+    await request.delete(`/api/ssh/keys/${key.id}`)
+  }
 })
 
 test('a planner that fails still starts the agent with defaults and a title from the message', async ({ page }) => {

@@ -112,7 +112,7 @@ const handOverUpdates = setiTool({
 const startTaskTool = setiTool({
   name: 'start_task',
   description:
-    "Start a new agent on a prompt. It works in a fresh folder of its own and clones the repos it needs, so name them in the prompt. Seti's planner titles it and picks context packs and MCP servers. It runs sandboxed with at most your own access: never SSH, AWS, MCP servers, plugins or credentials you lack, and Seti control Self, never Full. The user sees it listed under you. It cannot start agents itself, and at most 4 you started run at once. With notify_when_done, Seti sends you its final message as an update once its first turn ends.",
+    "Start a new agent on a prompt. It works in a fresh folder of its own and clones the repos it needs, so name them in the prompt. Seti's planner titles it and picks its context packs; it turns no access on. It runs sandboxed with at most your own access: never SSH, AWS, MCP servers, plugins or credentials you lack, and Seti control Self, never Full. The user sees it listed under you. It cannot start agents itself, and at most 4 you started run at once. With notify_when_done, Seti sends you its final message as an update once its first turn ends.",
   input: {
     prompt: startAgentInput.shape.prompt,
     title: startAgentInput.shape.title,

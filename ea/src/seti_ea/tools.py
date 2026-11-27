@@ -756,18 +756,13 @@ def connector_line(connector: Mapping[str, Any]) -> str:
 
 
 def setup_note(setup: Mapping[str, Any]) -> str:
-    """What the planner chose beyond the defaults, and the access it held back."""
+    """What the planner chose beyond the defaults; it turns no access on."""
     choices = [
         (setup.get("packs_linked"), "linked the context packs"),
-        (setup.get("mcp_enabled"), "turned on the MCP servers"),
         (setup.get("mcp_disabled"), "turned off the MCP servers"),
     ]
     done = [f"{verb} {and_list([str(n) for n in names])}" for names, verb in choices if names]
-    held = [str(w).split(":")[0] for w in setup.get("withheld") or [] if str(w).startswith(("SSH ", "AWS:"))]
     note = f" Seti {and_list(done)}." if done else ""
-    if held:
-        verb, pronoun = ("stays", "it") if len(held) == 1 else ("stay", "them")
-        note += f" {and_list(held)} {verb} off; the user turns {pronoun} on in the agent's details."
     if setup.get("planner") == "fallback":
         note += " The planner did not answer, so it has the defaults."
     return note

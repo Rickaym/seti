@@ -4,7 +4,7 @@ import { checkPlan } from './planner-rules.js'
 import { titleFor, titleProblem } from './planner-title.js'
 import { planTitle, setPlannerModel } from './planner.js'
 
-const NO_CHOICES = { packs: [], mcp: [], ssh_hosts: [], aws: { available: false, default_enabled: false } }
+const NO_CHOICES = { packs: [], mcp: [] }
 
 const plan = (message: string, fields: Partial<PlannerOutput>) =>
   checkPlan({ raw: plannerOutput.parse(fields), message, reason: null, ms: 4300 }, NO_CHOICES)

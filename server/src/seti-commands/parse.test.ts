@@ -202,8 +202,9 @@ describe('Seti command lines', () => {
     expect(parsed('/seti:memory 12g', agent).rule.propose).toBe(true)
     expect(parsed('/seti:cpu 4', agent).rule.propose).toBe(true)
     expect(parsed('/seti:access ssh prod off', agent).rule.propose).toBe(true)
-    expect(refusal('/seti:access ssh staging on', agent)).toBe('Only the user turns this SSH host on')
-    expect(refusal('/seti:access aws on', agent)).toBe('Only the user turns AWS on')
+    expect(parsed('/seti:access ssh staging on', agent).rule).toEqual({ user: true, propose: true, confirm: true })
+    expect(parsed('/seti:access aws on', agent).rule.propose).toBe(true)
+    expect(refusal('/seti:access ssh staging reset', agent)).toBe('Only the user resets this SSH host')
     expect(refusal('/seti:access credential Deploy', agent)).toBe('Only the user changes the credential')
     expect(refusal('/seti:access reset', agent)).toBe('Only the user does this')
     for (const line of [

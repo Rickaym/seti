@@ -24,6 +24,10 @@ key off the host.
   the agent that wrote it (HST-2). Every file git reads as config or hooks in a git folder an
   agent can write stays read-only to it, even one that does not exist yet (SBX-16), so your own
   git there runs only what you configured.
+- Starting an agent turns on no access from the wording of its first message. The planner that
+  names the agent only picks among what is on by default and narrows it (TURN-21); an SSH host,
+  AWS or an MCP server that is off comes on only when you turn it on or allow the agent's own
+  request for it (CHG-13).
 - Secret values are write-only and sealed ([8 Secrets](protocol.md#8-secrets-and-connections)).
 - Only a short list of paths answers without a credential
   ([18 Public surfaces](protocol.md#18-public-surfaces)).

@@ -11,7 +11,6 @@ import { sendKey, sendOnce } from './client-sends.js'
 import { withinDelegateLimits } from './crew/delegate-limits.js'
 import { withBrief } from './crew/handover.js'
 import { roleStart, withRole } from './crew/role-start.js'
-import { fromEa } from './ea-guard.js'
 import { planAgent, planTitle } from './planner.js'
 import type { AgentWait } from './store/agent-waits.js'
 import { approvalCeilings } from './store/approval-ceilings.js'
@@ -44,8 +43,9 @@ async function beforeFirstTurn(notify: boolean, cap: AccessCap | undefined, hold
 
 /**
  * Plans what the caller did not pin, then starts the agent on the default profile, sandboxed
- * unless the user turned that off. An agent starting another passes its cap: the new one is
- * sandboxed, gets nothing its starter lacks, grants nothing and settles no call more loosely.
+ * unless the user turned that off. The plan turns no access on. An agent starting another passes
+ * its cap: the new one is sandboxed, gets nothing its starter lacks and settles no call more
+ * loosely.
  */
 export async function startAgent(
   input: StartAgentRequest,
@@ -86,26 +86,22 @@ async function startPlanned(
   refuseCommandAttachments(input.prompt, input.attachments)
   checkStaged(input.attachments)
   const onCreated = await beforeFirstTurn(input.notify_when_done, cap, hold)
-  const plan = await planAgent(input.prompt, {
-    title: input.title,
-    fromEa: fromEa(),
-    fromAgent: cap !== undefined,
-  })
+  const plan = await planAgent(input.prompt, { title: input.title })
   const capped = cap === undefined ? null : await capStart(cap)
   const mcpOff = new Set([...plan.mcp_disabled, ...(capped?.mcp_disabled ?? [])])
   const profileId = cap?.profile_id ?? DEFAULT_PROFILE_ID
   const roled = await roleStart(input, profileId)
-  const held = [...plan.setup.withheld, ...(capped?.held ?? []), ...roled.held]
+  const held = [...(capped?.held ?? []), ...roled.held]
   return startTask(
     {
       title: plan.title,
       prompt: await firstPrompt(input),
       context_pack_ids: await withRole(plan.context_pack_ids, roled.role),
       disabled_plugin_ids: capped?.disabled_plugin_ids ?? [],
-      mcp_enabled: plan.mcp_enabled.filter((name) => cap === undefined || cap.mcp.has(name)),
+      mcp_enabled: [],
       mcp_disabled: [...mcpOff],
       sandbox: input.sandbox,
-      access: [...plan.access, ...(capped?.access ?? [])],
+      access: capped?.access ?? [],
       profile_id: profileId,
       seti_control: DEFAULT_SETI_CONTROL,
       setup: { ...plan.setup, withheld: held },

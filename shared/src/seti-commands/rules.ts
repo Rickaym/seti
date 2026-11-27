@@ -25,6 +25,8 @@ export const USER = rule(true, false)
 const BOTH = rule(true, true)
 /** The user's, confirmed first. */
 const WIDEN = rule(true, false, true)
+/** The user's, confirmed first; an agent may ask for it, and only the user's Allow applies it. */
+const GRANT = rule(true, true, true)
 
 /** What `/seti:access` reaches: the access dialog's kinds, the agent's hosts and its credential. */
 export const ACCESS_TARGETS = ['ssh', 'aws', 'mcp', 'plugin', 'pack', 'host', 'home', 'credential'] as const
@@ -58,14 +60,14 @@ export const ACCESS_RULES: Readonly<Record<AccessTarget, AccessTargetRule>> = {
     label: 'SSH host',
     description: "Hosts from Seti's ssh config",
     item: 'list',
-    ops: { on: WIDEN, off: BOTH, reset: WIDEN },
+    ops: { on: GRANT, off: BOTH, reset: WIDEN },
     sandboxOnly: true,
   }),
   aws: target({
     label: 'AWS',
     description: "The credential's AWS role",
     item: 'single',
-    ops: { on: WIDEN, off: BOTH, reset: WIDEN },
+    ops: { on: GRANT, off: BOTH, reset: WIDEN },
     sandboxOnly: true,
   }),
   mcp: target({

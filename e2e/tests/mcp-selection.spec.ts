@@ -47,7 +47,10 @@ async function seedSessionStart(taskId: string, servers: { name: string; status:
   await db.close()
 }
 
-test('an MCP server off by default, turned on by the planner and in agent details', async ({ page, request }) => {
+test('an MCP server off by default stays off when the first message names it, and agent details turn it on', async ({
+  page,
+  request,
+}) => {
   test.setTimeout(PROBE_TIMEOUT_MS * 4)
   const added = await request.post('/api/mcp/servers', {
     data: { name: SERVER, scope: 'user', transport: 'http', url: 'http://127.0.0.1:9/mcp' },
@@ -74,11 +77,10 @@ test('an MCP server off by default, turned on by the planner and in agent detail
     const planned = new URL(page.url()).hash.split('/')[1] ?? ''
     const mcpChip = page.getByRole('list', { name: 'Access' }).getByRole('listitem').filter({ hasText: 'MCP' })
     await openAgentSettings(page, 'Access')
-    await expect(mcpChip).toHaveText('1 MCP')
+    await expect(mcpChip).toHaveText('MCP')
     await page.keyboard.press('Escape')
-    await expect(main).not.toContainText('Not given')
     const chosen = await apiData<TaskMcpServer[]>(request, `/tasks/${planned}/mcp`)
-    expect(chosen.find((s) => s.name === SERVER)).toMatchObject({ enabled: true, choice: true })
+    expect(chosen.find((s) => s.name === SERVER)).toMatchObject({ enabled: false, choice: null })
     await page.goto('/#agents')
     expect((await request.delete(`/api/tasks/${planned}`)).ok()).toBe(true)
 

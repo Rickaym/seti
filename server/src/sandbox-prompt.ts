@@ -1,8 +1,9 @@
-import type { Task } from '@seti/shared'
+import type { SetiControlLevel, Task } from '@seti/shared'
 import { taskSsh } from './agent-access.js'
 import { sharedMemoryLines } from './agent-memory.js'
 import { taskAws } from './aws-access.js'
 import { tasks } from './db.js'
+import type { SshReach } from './ssh-config.js'
 import { connectionRows } from './store/connections.js'
 import { profiles } from './store/credentials.js'
 import { sandboxPolicy } from './store/sandbox.js'
@@ -43,8 +44,31 @@ function sshLine(aliases: readonly string[]): string {
   return (
     `SSH reaches only these hosts: ${aliases.join(', ')} (ssh <alias>), and the jump hosts on their way. ` +
     "Users and keys are set per host; keys stay in Seti's ssh-agent and host keys are pinned; other hosts " +
-    'are refused. GitHub remotes stay on https. Only the user gives you more hosts.'
+    'are refused. GitHub remotes stay on https.'
   )
+}
+
+const OFF_LIST_MAX = 8
+
+/** How the agent gets access that is off: its own request, or the user when it has none. */
+const askFor = (level: SetiControlLevel) =>
+  level === 'off'
+    ? 'The user can turn it on in your access.'
+    : 'If your task needs it, ask with request_change kind command, such as /seti:access ssh <alias> on ' +
+      'or /seti:access aws on; it applies once the user allows it.'
+
+/** SSH hosts with a login and the AWS role that are off for the agent, and how it asks for them. */
+async function offLines(task: Task, ssh: SshReach, aws: boolean): Promise<string[]> {
+  const hosts = [...ssh.missing].flatMap(([alias, gaps]) =>
+    gaps.length === 0 && !ssh.enabled.includes(alias) ? [alias] : [],
+  )
+  const role = !aws && ((await profiles.get(task.profile_id))?.aws.role_arn ?? null) !== null
+  const more = hosts.length > OFF_LIST_MAX ? [`${String(hosts.length - OFF_LIST_MAX)} more`] : []
+  const off = [
+    ...(hosts.length === 0 ? [] : [`SSH hosts ${[...hosts.slice(0, OFF_LIST_MAX), ...more].join(', ')}`]),
+    ...(role ? ['AWS'] : []),
+  ]
+  return off.length === 0 ? [] : [`Off for you: ${off.join('; ')}. ${askFor(task.seti_control)}`]
 }
 
 /** Names the hosts Seti adds a connection's header on, so the agent calls them without a token. */
@@ -63,11 +87,13 @@ export async function sandboxPrompt(taskId: string): Promise<string | null> {
   if (task?.sandbox !== true || !(await sandboxPolicy.get()).enabled) {
     return null
   }
-  const ssh = (await taskSsh(task.id)).usable
+  const ssh = await taskSsh(task.id)
+  const aws = await taskAws(task.id)
   const extra = [
     ...(await headersLine(task)),
-    ...((await taskAws(task.id)) ? [await awsLine(task)] : []),
-    ...(ssh.length === 0 ? [] : [sshLine(ssh)]),
+    ...(aws ? [await awsLine(task)] : []),
+    ...(ssh.usable.length === 0 ? [] : [sshLine(ssh.usable)]),
+    ...(await offLines(task, ssh, aws)),
   ]
   return [...homeLines(task), ...SANDBOX_LINES, ...extra, ...sharedMemoryLines(task)].join('\n')
 }
