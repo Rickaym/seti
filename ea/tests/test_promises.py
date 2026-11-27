@@ -281,6 +281,13 @@ def test_the_prompt_forbids_empty_promises_and_re_asking_relays() -> None:
     assert "show them in a quote block before sending" not in SYSTEM_PROMPT
 
 
+def test_a_relay_passes_on_the_users_request_without_adding_limits() -> None:
+    prompt = " ".join(SYSTEM_PROMPT.split())
+    assert "pass on their request in their meaning and about their length" in prompt
+    assert "add no steps, limits or conditions the user did not give" in prompt
+    assert "clear, self-contained instruction" not in prompt
+
+
 def test_after_a_relay_the_ea_says_whom_and_the_gist_and_never_reads_the_message_back() -> None:
     prompt = " ".join(SYSTEM_PROMPT.split())
     assert "say whom and the gist in a few words" in prompt
