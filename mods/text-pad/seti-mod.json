@@ -42,7 +42,8 @@
     "routes": [
       {
         "method": "GET",
-        "path": "/text"
+        "path": "/text",
+        "demo": true
       },
       {
         "method": "PUT",
