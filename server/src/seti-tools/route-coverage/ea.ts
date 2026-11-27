@@ -34,6 +34,9 @@ export const EA_ROUTES: CoverageTable = {
   'GET /api/ea/index': plumbing("The EA's doc index. EA plumbing"),
   'PATCH /api/ea/offer': plumbing('Call signalling. Plumbing'),
   'POST /api/ea/offer': plumbing('Call signalling. Plumbing'),
+  'GET /api/ea/prompt': ui(
+    "The EA's whole prompt in its settings, for the user to read. Refused to the EA and agents: no use",
+  ),
   'GET /api/ea/replies': ui('EA replies for the app. View'),
   'POST /api/ea/replies/seen': ui('Mark EA replies seen. View state'),
   'PUT /api/ea/role': ea('change_my_context_packs'),

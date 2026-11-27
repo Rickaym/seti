@@ -1329,7 +1329,14 @@ Why: an agent woken by its own actions or by news nobody waited for burns turns 
   user's request, asks first (EA-3) or acts only on the user's word (EA-17). The list is read only
   and holds no arguments or values. When the EA is not running the page says so.
   Why: the user decides what to ask the EA for, so they see what it can do and what waits for them.
-- EA-21: Leaving Seti MUST NOT end a voice call: nothing in Seti hangs up, reloads or navigates
+- EA-21: The EA's settings MUST show the whole prompt the running EA gives its model, read from
+  the EA itself and only by the user: the system prompt as built for the current settings and
+  linked packs, the note each channel (call, chat, inbox) adds to a turn, and the live context the
+  last turn was given with its age, each with its character count, and the commit the EA runs.
+  Showing it MUST NOT build a live context or call a model; every part passes the EA's secret
+  redaction. The view is read only. When the EA is not running the page says so.
+  Why: the user can read exactly what the EA is told, which changes only through code.
+- EA-22: Leaving Seti MUST NOT end a voice call: nothing in Seti hangs up, reloads or navigates
   the page while a call connects or is live, and opening Seti again from its icon, a shortcut or a
   widget routes inside the running page. The call stays media with Mute and Hang up on the lock
   screen. On devices that silence a backgrounded browser's microphone (Android, iOS) the call
@@ -1643,10 +1650,9 @@ Optional and off by default: a maintenance session per agent that consolidates i
   it starts the mod; mod API 2.0.0 makes these MUST and refuses such a manifest.
 - MOD-28: A bundled mod MAY place a view at the bottom of the navigation (`navBottom`). In the menu
   drawer of a narrow screen the view takes the height the sections leave and keeps a minimum, the
-  sections scrolling first. In the icon rail of a wide screen it MAY open a panel beside the rail at
-  the rail's full height, which narrows the page rather than covering it, stays open on that device
-  until the view or Esc closes it, and is one at a time. A third-party mod MUST NOT place a view
-  there.
+  sections scrolling first. In the icon rail of a wide screen it has the rail's width and MAY float
+  a window over the page, above the page's own docks and panels and under the control room's
+  dialogs, menus and toasts. A third-party mod MUST NOT place a view there.
 
 ## 18. Public surfaces
 

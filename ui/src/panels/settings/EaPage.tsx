@@ -14,6 +14,7 @@ import {
 import { InboxRelaysSetting } from '@/components/ea/InboxRelaysSetting'
 import { LanguageSetting } from '@/components/ea/LanguageSetting'
 import { LiveContextCard } from '@/components/ea/LiveContextCard'
+import { PromptCard } from '@/components/ea/PromptCard'
 import { RelayCheck } from '@/components/ea/RelayCheck'
 import { SetupCard } from '@/components/ea/SetupCard'
 import { ToolsCard } from '@/components/ea/ToolsCard'
@@ -175,6 +176,7 @@ export function EaPage() {
         <UsageCard />
         <LiveContextCard />
         <ToolsCard />
+        <PromptCard />
       </div>
     </SettingsBody>
   )

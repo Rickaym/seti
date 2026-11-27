@@ -6,6 +6,7 @@ from collections.abc import Sequence
 from seti_ea.clock import UNKNOWN_CLOCK, UserClock
 from seti_ea.history import Entry
 from seti_ea.inbox import CallInbox
+from seti_ea.live_context import SentNote
 
 
 class Inbox:
@@ -28,7 +29,8 @@ class Conversation:
     Every HistorySync of this process holds `lock` while it appends, so a voice turn and a typed
     reply never interleave their entries. A live call listens for what the chat stored and folds
     it into its context at the start of the user's next spoken turn. `call` holds the live call's
-    inbox items until a pause, and `last_clock` is the user's clock as last seen.
+    inbox items until a pause, `last_clock` is the user's clock as last seen, and `live_note` the
+    live context the last turn of either channel was given.
     """
 
     def __init__(self) -> None:
@@ -36,6 +38,7 @@ class Conversation:
         self._inboxes: list[Inbox] = []
         self.call: CallInbox | None = None
         self.last_clock: UserClock = UNKNOWN_CLOCK
+        self.live_note = SentNote()
 
     def attach(self) -> Inbox:
         """An inbox for a call that starts listening; detach it when the call ends."""

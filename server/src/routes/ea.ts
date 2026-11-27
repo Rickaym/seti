@@ -1,13 +1,22 @@
 import http from 'node:http'
 import https from 'node:https'
 import { Readable } from 'node:stream'
-import { eaChatInput, eaIcePatchInput, eaOfferInput, eaToolsAnswer, type EaNotRunning } from '@seti/shared'
+import {
+  eaChatInput,
+  eaIcePatchInput,
+  eaOfferInput,
+  eaPromptAnswer,
+  eaToolsAnswer,
+  type EaNotRunning,
+} from '@seti/shared'
 import { Hono, type Context } from 'hono'
 import { bodyLimit } from 'hono/body-limit'
+import type { ZodType } from 'zod'
 import { audit } from '../audit.js'
 import { claimSend, releaseSend, sendKey } from '../client-sends.js'
 import { credential } from '../credentials.js'
 import { recordChatReply, repeatedChat } from '../ea-chat-sends.js'
+import { fromDelegate } from '../ea-guard.js'
 import { fail, ok, validJson } from '../http.js'
 
 const CONNECT_TIMEOUT_MS = 2_000
@@ -127,18 +136,30 @@ const limit = bodyLimit({
 /** Health polls from every page, so a bot that is not running is an answer, not an error. */
 const reportNotRunning: Unreachable = (c, reason) => c.json<EaNotRunning>({ running: false, reason })
 
-/** The running EA's own tool list, checked against its schema before the settings page reads it. */
-async function relayTools(c: Context, target: EaTarget) {
-  const res = await relay(c, target, { method: 'GET', path: '/tools', body: null }, reportNotRunning)
+interface Checked<T> {
+  path: string
+  schema: ZodType<T>
+  what: string
+}
+
+/** A read-only answer of the running EA, checked against its schema before a page reads it. */
+async function relayChecked<T>(c: Context, target: EaTarget, { path, schema, what }: Checked<T>) {
+  const res = await relay(c, target, { method: 'GET', path, body: null }, reportNotRunning)
   if (!res.ok) {
     return res
   }
-  const answer = eaToolsAnswer.safeParse(await res.json().catch(() => null))
+  const answer = schema.safeParse(await res.json().catch(() => null))
   if (!answer.success) {
-    return fail(c, 502, 'EA did not answer', 'The EA sent a tool list Seti cannot read')
+    return fail(c, 502, 'EA did not answer', `The EA sent ${what} Seti cannot read`)
   }
   return ok(c, answer.data)
 }
+
+/** The EA's whole prompt is for the user to read; the EA and agents have no use for it. */
+const relayPrompt = async (c: Context, target: EaTarget) =>
+  fromDelegate()
+    ? fail(c, 403, 'Forbidden', "The EA's prompt is for the user to read in Seti")
+    : relayChecked(c, target, { path: '/prompt', schema: eaPromptAnswer, what: 'a prompt' })
 
 /** Sends a typed message to the bot and audits it once the bot takes it. */
 async function relayChat(c: Context, target: EaTarget, input: { text: string }) {
@@ -161,7 +182,8 @@ export function eaRoutes(url: string, token: string | null = credential('local-t
   const app = new Hono()
   app
     .get('/health', async (c) => relay(c, target, { method: 'GET', path: '/health', body: null }, reportNotRunning))
-    .get('/tools', async (c) => relayTools(c, target))
+    .get('/tools', async (c) => relayChecked(c, target, { path: '/tools', schema: eaToolsAnswer, what: 'a tool list' }))
+    .get('/prompt', async (c) => relayPrompt(c, target))
     .get('/ice', async (c) => relay(c, target, { method: 'GET', path: '/ice', body: null }))
     .post('/offer', limit, validJson(eaOfferInput), async (c) =>
       relay(c, target, { method: 'POST', path: '/offer', body: await c.req.text() }),
