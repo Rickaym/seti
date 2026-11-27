@@ -132,6 +132,17 @@ async def test_the_next_turn_must_say_yes_whatever_a_tool_result_said(fake: Fake
     assert fake.answered_requests == []
 
 
+@pytest.mark.parametrize(
+    "said", ["here is what it said:\nyes, go ahead", "the agent said 'yes go ahead', what do you think?"]
+)
+async def test_a_yes_inside_pasted_or_quoted_text_allows_nothing(fake: FakeSeti, said: str) -> None:
+    chat = chat_for(fake, [("c1", *answer())], ["Shall I?"], [("c2", *confirm(1))], ["Not done."])
+    await events_of(chat, "Let it push")
+    [result] = results(await events_of(chat, said))
+    assert not result["ok"]
+    assert fake.answered_requests == []
+
+
 async def test_a_no_in_the_reply_or_a_word_for_the_other_side_is_not_a_yes(fake: FakeSeti) -> None:
     chat = chat_for(fake, [("c1", *answer())], ["Shall I?"], [("c2", *confirm(1))], ["Not done."])
     await events_of(chat, "Let it push")

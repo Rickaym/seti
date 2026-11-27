@@ -110,6 +110,33 @@ def said_yes(text: str, agrees: Iterable[str] = (), *, only_agrees: bool = False
     return any(word in yes for word in words) or any(f" {phrase} " in joined for phrase in YES_PHRASES)
 
 
+# A yes this long or longer is something else that holds a yes, such as a paste or a story.
+MAX_ANSWER_WORDS = 16
+FILLERS = frozenset({"um", "uh", "er", "erm", "hmm", "mm", "oh", "ah", "well", "so", "and", "hey", "alright"})
+BUT_WORDS = frozenset(
+    {"but", "aber", "mais", "pero", "ma", "mas", "maar", "men", "ale", "ama", "\u043d\u043e"}
+)
+QUOTES = ('"', "\u201c", "\u201d", "\u201e", "\u00ab", "\u00bb", "?", "\uff1f", "\u061f")
+
+
+def answers_yes(text: str, agrees: Iterable[str] = (), *, only_agrees: bool = False) -> bool:
+    """True when the message is itself the yes: one short line that opens with it, no quote, no but.
+
+    A yes inside a pasted transcript, a quote, a question or a longer sentence about something else
+    is not an answer to the question asked, so the EA asks again.
+    """
+    if not said_yes(text, agrees, only_agrees=only_agrees):
+        return False
+    line = text.strip()
+    if "\n" in line or any(mark in line for mark in QUOTES):
+        return False
+    words = [word for word in _words(line) if word not in FILLERS]
+    if not words or len(words) > MAX_ANSWER_WORDS or any(word in BUT_WORDS for word in words):
+        return False
+    joined = f"{' '.join(words)} "
+    return words[0] in YES_WORDS | frozenset(agrees) or any(joined.startswith(f"{p} ") for p in YES_PHRASES)
+
+
 LATER_PHRASES = (
     "not now",
     "not yet",

@@ -623,7 +623,7 @@ def tools(fake: SettingsFake) -> EaTools:
 
 async def confirm(tools: EaTools, name: str, args: dict[str, Any]) -> tuple[ToolResult, ToolResult]:
     asked = await tools.call(name, args)
-    tools.user_turn()
+    tools.user_turn("yes")
     done = await tools.call(name, {**args, "confirmed": True})
     return asked, done
 
@@ -697,7 +697,7 @@ async def test_every_write_asks_first_and_acts_only_after_a_yes(
     same_turn = await tools.call(name, {**args, "confirmed": True})
     assert same_turn.summary.startswith("Asked first")
     assert writes(fake) == []
-    tools.user_turn()
+    tools.user_turn("yes")
     done = await tools.call(name, {**args, "confirmed": True})
     assert done.ok, done.text
     assert writes(fake) != []
@@ -866,7 +866,7 @@ async def test_the_ea_lists_its_own_channels_and_changes_them_only_after_a_yes(
     )
     assert asked.summary.startswith("Asked first")
     assert writes(fake) == []
-    tools.user_turn()
+    tools.user_turn("yes")
     done = await tools.call("subscribe_channel", {"channel": "uptime", "subscriber": "ea", "confirmed": True})
     assert done.ok, done.text
     assert writes(fake) == [("POST", f"/api/channels/{HOOK}/subscriptions", {"target": "ea", "events": None})]

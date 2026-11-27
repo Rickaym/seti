@@ -26,7 +26,7 @@ async def test_defaults_are_read_without_an_agent_and_changed_only_after_a_yes(
     asked = await tools.call("set_agent_access", args)
     assert asked.summary.startswith("Asked first")
     assert fake_seti.writes() == []
-    tools.user_turn()
+    tools.user_turn("yes")
     done = await tools.call("set_agent_access", {**args, "confirmed": True})
     assert done.ok, done.text
     assert [(m, p, b) for m, p, _q, b in fake_seti.writes()] == [

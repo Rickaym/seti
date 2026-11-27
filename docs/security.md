@@ -49,7 +49,9 @@ The server, not the EA's prompt, holds the rule (`refuseUnlessOnWord` in `server
   next message or spoken turn, to the same EA process, less than a minute earlier, and only once.
 - The EA's own code also requires that message to say yes in so many words, whatever the model
   concluded, so text inside a request, a tool result or another agent's message cannot answer for
-  you.
+  you. The message must be the yes itself, one short line that opens with it, so a yes inside a
+  transcript you paste, a quote or a longer sentence does not count either. The same holds for
+  every change the EA asks about first, such as deleting or archiving an agent.
 - Seti recomputes the request's digest and refuses the action if the request changed after the
   read-back, or if the decision or message differs from what you heard.
 - On a call the EA announces a new request in one sentence it builds from Seti's own fields, never

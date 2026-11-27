@@ -14,7 +14,7 @@ from typing import Any, Literal
 
 from loguru import logger
 
-from seti_ea.consent import said_no, said_yes
+from seti_ea.consent import answers_yes, said_no
 from seti_ea.format import clip
 from seti_ea.seti import SetiClient, SetiError
 from seti_ea.toolkit import ToolError, ToolResult, arg_bool
@@ -53,7 +53,7 @@ def heard_it(said: str, agrees: Iterable[str], heard: Heard) -> bool:
     """Whether the user's message gives the answer the question takes."""
     if heard == "no":
         return said_no(said)
-    return said_yes(said, agrees, only_agrees=heard == "word")
+    return answers_yes(said, agrees, only_agrees=heard == "word")
 
 
 ANSWER: ContextVar[UserAnswer | None] = ContextVar("ea_user_answer", default=None)
@@ -102,7 +102,7 @@ class Confirmations:
             answer.used = True
             return True
         call = GATE_CALL.get()
-        if confirmed and self.turn > 0:
+        if confirmed and self.turn > 0 and answers_yes(self.said):
             taken = await self.confirm(key=key)
             if taken:
                 if call is not None:
@@ -132,7 +132,7 @@ class Confirmations:
                 raise ToolError(NO_YES, "No yes from the user")
             return answer.ask_id
         call = GATE_CALL.get()
-        if confirmed and self.turn > 0 and said_yes(self.said, agrees):
+        if confirmed and self.turn > 0 and answers_yes(self.said, agrees):
             taken = await self.confirm(key=key)
             if taken:
                 ask_id = int(taken[0]["id"])
@@ -142,6 +142,25 @@ class Confirmations:
         if call is not None:
             call.asked_key = key
         return None
+
+    async def may_answer(self, ids: list[int]) -> bool:
+        """Whether the user's latest message may answer every one of these questions.
+
+        A plain yes may answer any. Anything else may answer only questions on the user's word,
+        which check that message themselves: their allow needs a yes, their deny a no.
+        """
+        if answers_yes(self.said):
+            return True
+        try:
+            data = await self.seti.get("/ea/asks/open")
+        except SetiError as e:
+            logger.warning(f"EA could not list its open questions: {e}")
+            return False
+        rows: list[Any] = data if isinstance(data, list) else []
+        on_word = {
+            row.get("id") for row in rows if isinstance(row, dict) and row.get("tool") in ON_WORD_TOOLS
+        }
+        return all(i in on_word for i in ids)
 
     async def confirm(self, *, key: str | None = None, ids: list[int] | None = None) -> list[dict[str, Any]]:
         """Takes the user's yes for the open questions named; those Seti handed back, with their calls."""

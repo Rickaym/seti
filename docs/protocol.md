@@ -1263,7 +1263,12 @@ Why: an agent woken by its own actions or by news nobody waited for burns turns 
 - EA-4: A yes counts only for an ask from an earlier user turn or EA process, within `ask_ttl`. One
   ask takes one answer and runs once with the recorded arguments. The user MAY answer by text,
   voice or notification, except that an EA-17 action takes text or voice only; delegates MUST NOT.
-  Why: the model cannot ask and approve in the same breath.
+  A typed or spoken yes counts only when the user's turn is itself the yes: one line of at most 16
+  words that opens with an affirmation and holds no refusal, "but", quotation mark or question
+  mark. The EA's code checks this before it takes any ask; a yes inside pasted text, a quote or a
+  longer sentence takes nothing, and the EA asks again.
+  Why: the model cannot ask and approve in the same breath, and words the user did not mean as an
+  answer cannot approve for them.
 - EA-7: The EA reaches agents only by group chat. A direct message joins a running turn or starts
   one; it never interrupts.
 - EA-8: Inbox items are `followup`, `reminder`, `watch_event`, `channel_event`, `team_mention`; a

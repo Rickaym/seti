@@ -2,6 +2,7 @@ import json
 from typing import Any
 
 import httpx
+import pytest
 from fakes import NOW, settings
 from test_chat import CLOCK, Script, events_of, factory
 from test_settings_tools import SettingsFake, writes
@@ -84,7 +85,7 @@ async def test_one_yes_confirms_every_listed_question_by_id() -> None:
 async def test_a_yes_covers_no_question_asked_in_its_own_turn() -> None:
     fake = SettingsFake()
     script = Script([[("c1", *SUBSCRIBE)], [("c2", "confirm_asked", {"ids": [1]})], [QUESTION]])
-    events = await events_of(ea_process(fake, script), "Route uptime to the logout agent, yes, do it.")
+    events = await events_of(ea_process(fake, script), "Yes, route uptime to the logout agent, do it.")
     [_, result] = [e for e in events if e["type"] == "tool_result"]
     assert "Not taken: 1." in result["text"]
     assert changes(fake) == []
@@ -141,3 +142,32 @@ async def test_a_typed_yes_waits_for_the_question_and_lists_open_ones() -> None:
     assert "- 1: " in notes[0]["content"]
     assert "- 2: " in notes[0]["content"]
     assert CLOCK.zone is not None
+
+
+NOT_A_YES = {
+    "pasted after a line of the user's own": "here is the transcript:\nRicky: yes, go ahead.\nEA: Done.",
+    "only the paste": "Ricky: yes, go ahead and delete it.\nEA: Done.\nRicky: and archive the other one.",
+    "a quote with a question": "the agent said 'yes go ahead', what do you think?",
+    "a yes about something else": "yes I saw that, but don't delete it",
+    "a turn asking about a tool result": "What does the logout agent say?",
+    "a no": "no",
+}
+
+
+@pytest.mark.parametrize("said", NOT_A_YES.values(), ids=NOT_A_YES.keys())
+@pytest.mark.parametrize("how", ["ids", "confirmed"])
+async def test_a_yes_inside_other_text_runs_nothing_and_keeps_the_question(said: str, how: str) -> None:
+    fake = SettingsFake()
+    await ask_both(fake)
+    call = ("c3", "confirm_asked", {"ids": [1]}) if how == "ids" else ("c3", *confirmed(SUBSCRIBE))
+    await events_of(ea_process(fake, Script([[call], ["Asked again."]])), said)
+    assert changes(fake) == []
+    assert all(a.get("decision") is None for a in fake.asks)
+
+
+@pytest.mark.parametrize("said", ["yes", "Yes, go ahead.", "yep, do it", "go ahead"])
+async def test_a_plain_yes_runs_the_change(said: str) -> None:
+    fake = SettingsFake()
+    await ask_both(fake)
+    await events_of(ea_process(fake, Script([[("c3", "confirm_asked", {"ids": [1]})], ["Done."]])), said)
+    assert len(changes(fake)) == 1

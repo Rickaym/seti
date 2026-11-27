@@ -10,7 +10,7 @@ LOGOUT_ACCESS = f"/api/tasks/{TASK_LOGOUT}/access"
 
 async def confirm(tools: EaTools, name: str, args: dict[str, Any]) -> tuple[ToolResult, ToolResult]:
     asked = await tools.call(name, args)
-    tools.user_turn()
+    tools.user_turn("yes")
     done = await tools.call(name, {**args, "confirmed": True})
     return asked, done
 

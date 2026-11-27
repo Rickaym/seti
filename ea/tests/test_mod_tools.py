@@ -101,7 +101,7 @@ async def test_turning_a_mod_on_asks_first_and_then_patches_it(tools: EaTools, f
     assert "needs the user's explicit yes" in asked.text
     assert "Once on it may: Keeps its own data in Seti." in asked.text
     assert not [r for r in fake.requests if r.method == "PATCH"]
-    tools.user_turn()
+    tools.user_turn("yes")
     done = await tools.call("set_mod_enabled", {"mod": "Sample", "enabled": True, "confirmed": True})
     assert done.text == "Turned the Sample mod on."
     patch = [r for r in fake.requests if r.method == "PATCH"][-1]
@@ -142,7 +142,7 @@ async def test_one_previews_format_turns_off_after_the_users_yes(tools: EaTools,
     asked = await tools.call("set_mod_enabled", args)
     assert "This sets PDF to false in the Previews mod for everyone using Seti, at once." in asked.text
     assert not [r for r in fake.requests if r.method == "PATCH"]
-    tools.user_turn()
+    tools.user_turn("yes")
     done = await tools.call("set_mod_enabled", {**args, "confirmed": True})
     assert done.text == "Set PDF to false in the Previews mod."
     patch = [r for r in fake.requests if r.method == "PATCH"][-1]
@@ -181,7 +181,7 @@ async def test_required_mods_stay_on_while_their_settings_change(tools: EaTools,
     assert not [r for r in fake.requests if r.method == "PATCH"]
     args = {"mod": "previews", "settings": {"sheets": False}}
     await tools.call("set_mod_enabled", args)
-    tools.user_turn()
+    tools.user_turn("yes")
     done = await tools.call("set_mod_enabled", {**args, "confirmed": True})
     assert done.text == "Set Spreadsheets and CSV to false in the Previews mod."
 
@@ -300,7 +300,7 @@ async def test_an_action_that_changes_something_asks_first(tools: EaTools, fake:
     assert "needs the user's explicit yes" in asked.text
     assert "This runs Count of the Sample mod." in asked.text
     assert not [r for r in fake.requests if r.method == "POST" and "/actions/" in r.url.path]
-    tools.user_turn()
+    tools.user_turn("yes")
     done = await tools.call("run_mod_action", {"mod": "sample", "action": "count", "confirmed": True})
     assert done.text == '<mod_output mod="sample">\nRan count {}\n</mod_output>'
 
