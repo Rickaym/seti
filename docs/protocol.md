@@ -1288,6 +1288,11 @@ Why: an agent woken by its own actions or by news nobody waited for burns turns 
   Each relay is audited with its item, agent and message, never its text; the user or the EA MAY
   take it back while the agent has not read it.
   Why: inbox text is untrusted, so a relay carries the EA's gist with a frame it cannot drop.
+- EA-20: The EA's settings MUST list the tools the running EA gives its model, read from the EA
+  itself: each tool's name, area, the first sentence of its description, and whether it runs on the
+  user's request, asks first (EA-3) or acts only on the user's word (EA-17). The list is read only
+  and holds no arguments or values. When the EA is not running the page says so.
+  Why: the user decides what to ask the EA for, so they see what it can do and what waits for them.
 
 ## 15. Resilience
 

@@ -120,6 +120,20 @@ describe('EA proxy with the bot up', () => {
     expect(seen[0]?.headers.cookie).toBeUndefined()
   })
 
+  it("relays the EA's tool list and refuses one it cannot read", async () => {
+    const tools = [{ name: 'stop_task', area: 'Agents', summary: 'Stop a task.', gate: 'asks' }]
+    replies.set('GET /tools', { status: 200, body: JSON.stringify({ tools, args: { secret: 1 } }) })
+    const res = await send(app, 'GET', '/tools')
+    expect(res.status).toBe(200)
+    expect(res.headers.get('cache-control')).toBe('no-store')
+    expect(await res.json()).toEqual({ data: { tools }, meta: {} })
+
+    replies.set('GET /tools', { status: 200, body: '{"tools":[{"name":"stop_task","gate":"sometimes"}]}' })
+    const bad = await send(app, 'GET', '/tools')
+    expect(bad.status).toBe(502)
+    expect(((await bad.json()) as { error: { detail: string } }).error.detail).toMatch(/cannot read/)
+  })
+
   it('forwards the offer body byte for byte and returns the answer', async () => {
     const answer = '{"sdp":"v=0\\r\\n","type":"answer","pc_id":"pc-1"}'
     replies.set('POST /offer', { status: 200, body: answer })
@@ -275,6 +289,14 @@ describe('EA proxy with the bot down', () => {
     const payload = (await res.json()) as { running: boolean; reason: string }
     expect(payload.running).toBe(false)
     expect(payload.reason).toMatch(/^Nothing answers at http:\/\/127\.0\.0\.1:\d+ \(ECONNREFUSED\)$/)
+  })
+
+  it('says the EA is not running when its tool list is asked for', async () => {
+    const res = await send(downApp, 'GET', '/tools')
+    expect(res.status).toBe(200)
+    const { data } = (await res.json()) as { data: { running: boolean; reason: string } }
+    expect(data.running).toBe(false)
+    expect(data.reason).toMatch(/ECONNREFUSED/)
   })
 
   it('answers 503 with a readable reason for the call endpoints', async () => {

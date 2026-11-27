@@ -46,6 +46,7 @@ export const EA_ROUTES: CoverageTable = {
   ),
   'POST /api/ea/relays': ea('post_team_chat'),
   'POST /api/ea/relays/:id/take-back': ea('take_back_message'),
+  'GET /api/ea/tools': ui("The EA's tool list in its settings. View; the EA is given its tools"),
   'POST /api/ea/thoughts': plumbing('The EA logs a thought. EA plumbing'),
   'GET /api/ea/usage': ea('seti_overview'),
   'POST /api/ea/usage': plumbing('The EA records usage. EA plumbing'),
