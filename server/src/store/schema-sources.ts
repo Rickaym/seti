@@ -18,3 +18,6 @@ CREATE TABLE source_item (
 CREATE INDEX source_item_ref ON source_item(task_id, ref text_pattern_ops);
 CREATE INDEX source_item_message ON source_item(message_id);
 `
+
+/** The branches of `origin` whose tip was a file's or commit's commit when the agent read it. */
+export const SOURCE_ITEM_BRANCHES = `ALTER TABLE source_item ADD COLUMN branches TEXT[] NOT NULL DEFAULT '{}';`

@@ -191,7 +191,7 @@ describe('GitHub remotes and blob links', () => {
   it.each([
     [`https://github.com/Acme/Notes/blob/${sha}/docs/a%20b.md#L2-L3`, `file:acme/notes:docs/a b.md@${sha}`, undefined],
     ['https://github.com/acme/notes/blob/abc1234/docs/a.md', 'file:acme/notes:docs/a.md@abc1234', true],
-    ['https://github.com/acme/notes/blob/main/docs/a.md', null, undefined],
+    ['https://github.com/acme/notes/blob/main/docs/a.md', 'file:acme/notes:docs/a.md@', undefined],
     [`https://github.com/acme/notes/blob/${sha}/docs/../a.md`, `file:acme/notes:a.md@${sha}`, undefined],
     [`https://github.com/acme/notes/blob/${sha}/docs/`, null, undefined],
     [`https://github.com/acme/notes/blob/${sha}`, null, undefined],
@@ -199,5 +199,53 @@ describe('GitHub remotes and blob links', () => {
     const found = refOfUrl(url)
     expect(found?.ref ?? null).toBe(ref)
     expect(found?.prefix).toBe(prefix)
+  })
+})
+
+describe('links at a branch name', () => {
+  it('reads every split of a branch link into a branch and a file', () => {
+    expect(refOfUrl('https://github.com/acme/notes/tree/feat/x/docs/a.md')?.branches).toEqual([
+      { branch: 'feat', prefix: 'file:acme/notes:x/docs/a.md@' },
+      { branch: 'feat/x', prefix: 'file:acme/notes:docs/a.md@' },
+      { branch: 'feat/x/docs', prefix: 'file:acme/notes:a.md@' },
+    ])
+    expect(refOfUrl('https://github.com/acme/notes/blob/a..b/docs/a.md')).toBeNull()
+  })
+
+  it('matches the file read when the branch was at its commit, saying which commit', async () => {
+    const { dir, sha } = clone()
+    git(dir, 'update-ref', 'refs/remotes/origin/feat/x', 'HEAD')
+    const reader = await quietTask()
+    await agentReads(reader, path.join(dir, 'docs', 'a.md'), '1\tthe rollout starts\n2\ton Monday at nine')
+    const page = (at: string) => `https://github.com/acme/notes/${at}/docs/a.md`
+    const [main, feature, tree, other] = await matchSources(reader, [
+      { href: `${page('blob/main')}#L1-L2`, quote: 'the rollout starts on Monday' },
+      { href: page('blob/feat/x'), quote: null },
+      { href: page('tree/main'), quote: null },
+      { href: page('blob/dev'), quote: null },
+    ])
+    const asRead = { as_read_at: sha.slice(0, 7), source: { kind: 'file', container: 'acme/notes' } }
+    expect(main).toMatchObject({ ...asRead, verified: true })
+    expect(feature).toMatchObject(asRead)
+    expect(tree).toMatchObject(asRead)
+    expect(other).toMatchObject({ source: null, unread: false })
+    expect(other?.as_read_at).toBeUndefined()
+  })
+
+  it('matches no branch whose tip was not the commit read', async () => {
+    const { dir, sha } = clone()
+    fs.writeFileSync(path.join(dir, 'docs', 'a.md'), 'later\n')
+    git(dir, 'commit', '-qam', 'later')
+    git(dir, 'update-ref', 'refs/remotes/origin/main', 'HEAD')
+    git(dir, 'checkout', '-q', sha)
+    const reader = await quietTask()
+    await agentReads(reader, path.join(dir, 'docs', 'a.md'), '1\tone')
+    const [branch, commit] = await matchSources(reader, [
+      { href: 'https://github.com/acme/notes/blob/main/docs/a.md', quote: null },
+      { href: `https://github.com/acme/notes/blob/${sha}/docs/a.md`, quote: null },
+    ])
+    expect(branch).toMatchObject({ source: null, unread: false })
+    expect(commit?.source).not.toBeNull()
+    expect(commit?.as_read_at).toBeUndefined()
   })
 })

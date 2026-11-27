@@ -14,6 +14,7 @@ export interface SourceItem {
   permalink: string
   at: string | null
   spans: string[]
+  branches: string[]
 }
 
 interface Row {
@@ -27,6 +28,7 @@ interface Row {
   permalink: string
   item_at: string | null
   spans: string
+  branches: string[]
 }
 
 const kindOf = (kind: string): SourceKind => SOURCE_KINDS.find((known) => known === kind) ?? 'file'
@@ -42,6 +44,7 @@ const toItem = (row: Row): SourceItem => ({
   permalink: row.permalink,
   at: row.item_at,
   spans: JSON.parse(row.spans) as string[],
+  branches: row.branches,
 })
 
 /** Most rows one lookup of a key returns, newest first: the same item read again adds a row. */
@@ -68,9 +71,16 @@ export const sourceItems = {
       permalink: item.permalink,
       item_at: item.at,
       spans: JSON.stringify(item.spans),
+      branches: [...(item.branches ?? [])],
     }))
     await sql`INSERT INTO source_item ${sql(rows)}`
   },
+  /** The agent's items under keys `prefix` starts, read when `branch` of origin was at them. */
+  onBranch: async (taskId: string, prefix: string, branch: string): Promise<SourceItem[]> =>
+    (
+      await sql<Row[]>`SELECT * FROM source_item WHERE task_id = ${taskId} AND ref LIKE ${likePrefix(prefix)}
+        AND ${branch} = ANY(branches) ORDER BY id DESC LIMIT ${PER_REF}`
+    ).map(toItem),
   /** The agent's items under a key, or under keys it starts, newest first. */
   find: async (taskId: string, ref: string, prefix = false): Promise<SourceItem[]> => {
     const rows = prefix

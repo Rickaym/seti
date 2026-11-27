@@ -8,6 +8,15 @@ import { refOfUrl, type UrlRef } from './refs.js'
 
 /** The agent's newest items under the URL's key, else under the nearest key that holds it. */
 async function itemsFor(taskId: string, url: UrlRef): Promise<SourceItem[]> {
+  if (url.branches !== undefined) {
+    for (const { branch, prefix } of url.branches) {
+      const items = await sourceItems.onBranch(taskId, prefix, branch)
+      if (items.length > 0) {
+        return items
+      }
+    }
+    return []
+  }
   for (const ref of [url.ref, ...url.parents]) {
     const prefix = (ref.startsWith('linear:') && ref.includes('#')) || (ref === url.ref && url.prefix === true)
     const items = await sourceItems.find(taskId, ref, prefix)
@@ -45,13 +54,17 @@ async function preview(item: SourceItem): Promise<SourcePreview> {
   return { kind: item.kind, container: item.container, place, at: item.at, permalink: item.permalink }
 }
 
+/** The short hash of the commit an item's key names after its `@`. */
+const shortHash = (ref: string) => ref.slice(ref.lastIndexOf('@') + 1).slice(0, 7)
+
 /** One cited link checked against the agent's ledger. */
 async function matchOne(taskId: string, href: string, quote: string | null, kept: boolean): Promise<SourceMatch> {
   const url = refOfUrl(href)
   const items = url === null ? [] : await itemsFor(taskId, url)
   const first = items[0]
   if (first !== undefined) {
-    return { href, source: await preview(first), verified: await verified(items, quote), unread: false }
+    const found = { href, source: await preview(first), verified: await verified(items, quote), unread: false }
+    return url?.branches === undefined ? found : { ...found, as_read_at: shortHash(first.ref) }
   }
   const needles = url?.needles ?? null
   const unread = kept && needles !== null && !(await transcriptText.mentions(taskId, needles))

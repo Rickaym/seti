@@ -29,7 +29,19 @@ export function fileAsk(call: ToolCall): FileAsk | null {
   return { path: path.normalize(named), part }
 }
 
-type Git = (...args: string[]) => Promise<string>
+export type Git = (...args: string[]) => Promise<string>
+
+const ORIGIN = 'refs/remotes/origin/'
+const BRANCH = /^[\w./-]{1,200}$/
+
+/** The branches of `origin` whose tip, as the clone last fetched it, is the commit. */
+export async function branchesAt(git: Git, sha: string): Promise<string[]> {
+  const refs = await git('for-each-ref', '--points-at', sha, '--format=%(refname)', ORIGIN).catch(() => '')
+  return refs.split('\n').flatMap((ref) => {
+    const name = ref.startsWith(ORIGIN) ? ref.slice(ORIGIN.length) : ''
+    return name !== 'HEAD' && BRANCH.test(name) && !name.includes('..') ? [name] : []
+  })
+}
 
 /** `owner/repo` of a GitHub remote URL, or null for any other host or form. */
 export function githubRemote(url: string): string | null {
@@ -69,6 +81,8 @@ export interface PlacedFile {
   repo: string
   file: string
   sha: string | null
+  /** Branches of `origin` whose tip is `sha`. */
+  branches: string[]
 }
 
 /**
@@ -93,14 +107,15 @@ export async function placeFile(taskId: string, agentPath: string): Promise<Plac
     return null
   }
   const file = path.relative(top, real).split(path.sep).join('/')
-  return { repo, file, sha: await pushedAt(git, file, real) }
+  const sha = await pushedAt(git, file, real)
+  return { repo, file, sha, branches: sha === null ? [] : await branchesAt(git, sha) }
 }
 
 /** A placed file's item: linked to the lines it showed at its commit, or a local copy with none. */
 export function fileItem(placed: PlacedFile, lines: readonly [number, number] | null, spans: string[]): FoundItem {
-  const { repo, file, sha } = placed
+  const { repo, file, sha, branches } = placed
   const permalink = sha === null ? '' : blobPermalink(repo, file, sha, lines)
-  return { kind: 'file', container: repo, ref: fileRef(repo, file, sha), permalink, at: null, spans }
+  return { kind: 'file', container: repo, ref: fileRef(repo, file, sha), permalink, at: null, spans, branches }
 }
 
 /** The item a file read is, when the file sits in a git clone whose origin is on GitHub. */

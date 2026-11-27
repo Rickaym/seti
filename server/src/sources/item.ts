@@ -14,6 +14,8 @@ export interface FoundItem {
   permalink: string
   at: string | null
   spans: string[]
+  /** Branches of `origin` whose tip was the item's commit when it was read. */
+  branches?: readonly string[]
 }
 
 /**

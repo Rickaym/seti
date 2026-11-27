@@ -4,6 +4,9 @@ import { ReferencesContext } from '@/components/references/reference-context'
 import type { Reference } from '@/lib/references/reference-set'
 import { useSourceMatches } from '@/lib/references/source-matches'
 
+/** What a link at a branch name matched: the commit that branch was at when the agent read it. */
+export const asReadAt = (commit: string) => `as read at ${commit}`
+
 /** What the agent's ledger says of one reference of the message being rendered; null when silent. */
 export function useSourceMatch(reference: Reference): SourceMatch | null {
   const set = useContext(ReferencesContext)
@@ -23,7 +26,11 @@ export function sourceFacts(match: SourceMatch | null, label: string): string | 
   if (source === undefined || source === null) {
     return null
   }
-  const parts = [label.includes(source.place) ? null : source.place, source.at === null ? null : sourceDay(source.at)]
+  const parts = [
+    label.includes(source.place) ? null : source.place,
+    source.at === null ? null : sourceDay(source.at),
+    match?.as_read_at === undefined ? null : asReadAt(match.as_read_at),
+  ]
   const shown = parts.filter((part) => part !== null)
   return shown.length === 0 ? null : shown.join(', ')
 }

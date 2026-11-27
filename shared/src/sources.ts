@@ -42,6 +42,11 @@ export interface SourceMatch {
   source: SourcePreview | null
   verified: boolean
   unread: boolean
+  /**
+   * For a link at a branch name: the short hash of the commit that branch was at when the agent
+   * read what it names. The branch may have moved since.
+   */
+  as_read_at?: string
 }
 
 /** Most items one lookup returns. */

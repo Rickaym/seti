@@ -173,6 +173,10 @@ describe('files an agent prints with the shell in a GitHub clone', () => {
     expect(inside).toMatchObject({ verified: true, source: { kind: 'file', container: 'acme/notes' } })
     expect(outside).toMatchObject({ verified: false, source: { kind: 'file' } })
     expect(other).toMatchObject({ verified: true })
+    const [branch] = await matchSources(task, [
+      { href: 'https://github.com/acme/notes/blob/main/docs/plan.md#L4-L6', quote: 'step 5 of the rollout plan' },
+    ])
+    expect(branch).toMatchObject({ verified: true, as_read_at: sha.slice(0, 7) })
   })
 
   it('names the lines of a local copy in a lookup', async () => {

@@ -305,8 +305,8 @@ between two steps; an interrupt; a hook at subagent start.
   text is the result without the tool's line numbers. Git runs with the hostile-repository guards
   and never runs a program the clone names. Files are placed as the clone stands when the result
   arrives, so a ledger read again after a restore records none. A GitHub blob link at a commit
-  names the item at that commit, a short hash its prefix; a link at a branch or tag names none,
-  and a blob link is never reported as not read.
+  names the item at that commit, a short hash its prefix; a link at a branch names an item only
+  as SRC-11 says, and a blob link is never reported as not read.
 - SRC-9: A shell line that runs one `git show` or `git log` alone, or through filters that only
   cut, order or count, records one item per `commit <hash>` header it printed, at most 50, when
   the clone it ran in has its `origin` on GitHub and holds that commit. The folder is the agent's
@@ -331,6 +331,16 @@ between two steps; an interrupt; a hook at subagent start.
   verifies against it, and a read whose last line is not named gives none. The blob permalink
   links those lines, and a lookup names them. The control room never reads the file for this: the
   result in the transcript is what was read.
+- SRC-11: A file or commit item placed in a clone also records the branches of `origin` whose
+  tip, as the clone last fetched it, was the item's commit when the result arrived. A GitHub blob
+  or tree link at a branch name names the agent's item for that path read when that branch was at
+  its commit, each split of the link into a branch and a path tried in turn, since a branch name
+  may hold slashes; a commit link at a branch name names the commit read when that branch was at
+  it. Matching uses only what the ledger recorded and never asks the network. A branch may have
+  moved since the read, so the match never says the branch holds that content now: it carries the
+  short hash of the commit read, and a client shows `as read at <hash>` beside the link in muted
+  text. A branch the ledger did not record names nothing, and such a link is never reported as
+  not read.
 
 ## 4. Turn lifecycle
 

@@ -6,11 +6,15 @@ import { paths } from './env.js'
 const SESSION = 'ledger-session'
 const CHANNEL = 'C0LEDGER001'
 const THREAD_TS = '1731000000.123456'
+const PLAN_SHA = 'c0ffee1'.padEnd(40, '0')
 
 /** The links the reply cites: a thread the agent read, and a message it never saw. */
 export const LEDGER = {
   read: `https://acme.slack.com/archives/${CHANNEL}/p1731000000123456`,
   unread: `https://acme.slack.com/archives/${CHANNEL}/p1731000999000001`,
+  /** A file at a branch name, read when that branch was at `PLAN_SHA`. */
+  branch: 'https://github.com/acme/notes/blob/main/docs/plan.md',
+  asRead: 'as read at c0ffee1',
   place: '#release',
   /** The thread's day as the reader's locale shows it; the e2e browsers read en-US. */
   day: 'Nov 7, 2024',
@@ -23,6 +27,7 @@ const REPLY = [
   `> ${READ_QUOTE}`,
   'That settles the date.',
   `The freeze was confirmed in [a later message](${LEDGER.unread}).`,
+  `The steps are in [the plan](${LEDGER.branch}).`,
 ].join('\n\n')
 
 const message = (type: 'assistant' | 'user', content: unknown[]) => ({
@@ -47,6 +52,8 @@ export async function seedLedgerReply(title: string): Promise<string> {
   const db = openSeedDb()
   const id = randomUUID()
   const callId = 'toolu_ledger_read'
+  const fileCall = 'toolu_ledger_file'
+  const file = `${paths.checkout}/docs/plan.md`
   const start = Date.now() - 5 * 60_000
   await db.idleTask(id, title, paths.checkout, new Date(start).toISOString())
   const input = { channel_id: CHANNEL, message_ts: THREAD_TS, response_format: 'concise' }
@@ -59,6 +66,14 @@ export async function seedLedgerReply(title: string): Promise<string> {
       ]),
     },
     { kind: 'sdk', payload: message('user', [{ type: 'tool_result', tool_use_id: callId, content: THREAD }]) },
+    {
+      kind: 'sdk',
+      payload: message('assistant', [{ type: 'tool_use', id: fileCall, name: 'Read', input: { file_path: file } }]),
+    },
+    {
+      kind: 'sdk',
+      payload: message('user', [{ type: 'tool_result', tool_use_id: fileCall, content: '1\tFreeze, then ship.' }]),
+    },
     { kind: 'sdk', payload: message('assistant', [{ type: 'text', text: REPLY }]) },
   ]
   let at = start
@@ -69,7 +84,7 @@ export async function seedLedgerReply(title: string): Promise<string> {
   await db.run(
     `INSERT INTO source_item (task_id, message_id, call_id, kind, container, ref, permalink, item_at, spans)
       SELECT ?, id, ?, 'slack', ?, ?, ?, ?, '["/messages"]' FROM task_message
-      WHERE task_id = ? AND payload LIKE '%"tool_result"%'`,
+      WHERE task_id = ? AND payload LIKE ?`,
     id,
     callId,
     CHANNEL,
@@ -77,6 +92,18 @@ export async function seedLedgerReply(title: string): Promise<string> {
     LEDGER.read,
     new Date(Number(THREAD_TS.split('.')[0]) * 1000).toISOString(),
     id,
+    `%"tool_use_id":"${callId}"%`,
+  )
+  await db.run(
+    `INSERT INTO source_item (task_id, message_id, call_id, kind, container, ref, permalink, spans, branches)
+      SELECT ?, id, ?, 'file', 'acme/notes', ?, ?, '["~numbered"]', ARRAY['main'] FROM task_message
+      WHERE task_id = ? AND payload LIKE ?`,
+    id,
+    fileCall,
+    `file:acme/notes:docs/plan.md@${PLAN_SHA}`,
+    `https://github.com/acme/notes/blob/${PLAN_SHA}/docs/plan.md`,
+    id,
+    `%"tool_use_id":"${fileCall}"%`,
   )
   await db.run(
     `INSERT INTO slack_name (id, kind, name, source, learned_at) VALUES (?, 'channel', 'release', 'test', ?)
