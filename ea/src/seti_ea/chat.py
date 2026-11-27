@@ -237,7 +237,7 @@ class TextChat:
         self._now = now or (lambda: datetime.now(UTC))
         self._turn = asyncio.Lock()
         self._noted: datetime | None = None
-        self._live = LiveContext(tools.seti, now=self._now)
+        self._live = LiveContext(tools.seti, now=self._now, sent=conversation.live_note)
         self._packs = PackPrompt(tools.seti, timeout_secs=CHAT_TIMEOUT_SECS)
 
     def _note(self, context: LLMContext, clock: UserClock) -> None:
