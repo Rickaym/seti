@@ -269,7 +269,7 @@ async def test_voice_transforms_drop_tables_and_marks_split_across_sentences() -
 
 
 def test_voice_rules_forbid_markdown_even_after_typed_turns() -> None:
-    assert "even when earlier turns were typed in the chat" in SYSTEM_PROMPT
+    assert "even when earlier turns used the other" in " ".join(SYSTEM_PROMPT.split())
     assert "Never use markdown" in SYSTEM_PROMPT
 
 
