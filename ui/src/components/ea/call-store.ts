@@ -1,4 +1,5 @@
 import type { EaCallEndReason, EaCallQuality, EaRequestData } from '@seti/shared'
+import type { Hearing } from './away'
 import { callReducer, initialCallState, type CallAction, type CallState } from './call-state'
 
 /** One peer connection to the bot, from the lazily loaded engine. */
@@ -17,6 +18,8 @@ export interface LiveCall {
   failure: (error: unknown) => Promise<string>
   /** How the EA's voice has fared so far, as numbers only. */
   quality: () => EaCallQuality | null
+  /** What the microphone gives the EA right now. */
+  hearing: () => Promise<Hearing>
 }
 
 export interface CallHandlers {
@@ -202,6 +205,12 @@ export class EaCallStore {
       return false
     }
     return live.reroute()
+  }
+
+  /** What a connected call's microphone gives the EA; null between calls. */
+  readonly hearing = async (): Promise<Hearing | null> => {
+    const live = this.live
+    return this.state.phase === 'connected' && live !== null ? live.hearing() : null
   }
 
   readonly setOutputMuted = (muted: boolean): void => {
