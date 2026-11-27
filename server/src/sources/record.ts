@@ -1,18 +1,21 @@
 import { rowEvents, type RuntimeEvent, type SourceKind, type ToolCall, type WireRow } from '@seti/shared'
 import { messages } from '../db.js'
 import { sourceItems } from '../store/sources.js'
+import { commitAsk, commitItems } from './commits.js'
+import { fileAsk, fileItems } from './files.js'
 import { githubRead } from './github.js'
-import type { FoundItem, ParseResult } from './item.js'
+import type { FolderRead, FoundItem, ParseResult } from './item.js'
 import { isLinearCall, linearKeyIn, linearRead } from './linear.js'
 import { isSlackCall, slackHostIn, slackRead } from './slack.js'
 
 /** A source whose answers state the workspace its permalinks are built on. */
 type Workspace = Extract<SourceKind, 'slack' | 'linear'>
 
-/** A call whose result the ledger reads: its items, or only the workspace its answer states. */
+/** A call whose result the ledger reads: its items, ones in the agent's folders, a workspace. */
 interface Watched {
   parse: ParseResult | null
   workspace: Workspace | null
+  folder: FolderRead | null
 }
 
 interface Ended extends Watched {
@@ -21,6 +24,17 @@ interface Ended extends Watched {
 }
 
 const ADAPTERS: readonly ((call: ToolCall) => ParseResult | null)[] = [slackRead, linearRead, githubRead]
+
+const FOLDER_ADAPTERS: readonly ((call: ToolCall) => FolderRead | null)[] = [
+  (call) => {
+    const ask = fileAsk(call)
+    return ask === null ? null : async (taskId, text) => fileItems(taskId, ask, text)
+  },
+  (call) => {
+    const ask = commitAsk(call)
+    return ask === null ? null : async (taskId, text) => commitItems(taskId, ask, text)
+  },
+]
 
 /** Calls each task's agent started whose result the ledger will read, by call id. */
 const started = new Map<string, Map<string, Watched>>()
@@ -47,7 +61,8 @@ const OPEN_MAX = 200
 function watchedOf(call: ToolCall): Watched | null {
   const parse = ADAPTERS.reduce<ParseResult | null>((first, adapter) => first ?? adapter(call), null)
   const workspace = workspaceOf(call)
-  return parse === null && workspace === null ? null : { parse, workspace }
+  const folder = FOLDER_ADAPTERS.reduce<FolderRead | null>((first, adapter) => first ?? adapter(call), null)
+  return parse === null && workspace === null && folder === null ? null : { parse, workspace, folder }
 }
 
 function step(calls: Map<string, Watched>, event: RuntimeEvent): Ended[] {
@@ -102,7 +117,19 @@ async function workspaceFor(taskId: string, kind: Workspace): Promise<string | n
   return permalink === null ? null : WORKSPACES[kind].of(permalink)
 }
 
-async function keep(taskId: string, messageId: number, call: Ended): Promise<void> {
+/** The items a folder read finds; one Seti cannot place finds none, and nothing is logged. */
+async function folderItems(taskId: string, read: FolderRead, text: string): Promise<FoundItem[]> {
+  try {
+    return await read(taskId, text)
+  } catch {
+    return SAFE_ITEMS
+  }
+}
+
+async function keep(taskId: string, messageId: number, call: Ended, live: boolean): Promise<void> {
+  if (call.folder !== null && live) {
+    await sourceItems.add(taskId, messageId, call.callId, await folderItems(taskId, call.folder, call.text))
+  }
   const kind = call.workspace
   const stated = kind === null ? null : WORKSPACES[kind].statedIn(call.text)
   if (kind !== null && stated !== null) {
@@ -122,12 +149,13 @@ async function keep(taskId: string, messageId: number, call: Ended): Promise<voi
 
 /**
  * Records the source items in the tool results of one stored transcript row, read from the row as
- * stored, so the ledger sees the same redacted text as the transcript.
+ * stored, so the ledger sees the same redacted text as the transcript. A file is placed as its
+ * clone stands now, so only a row read as it arrives (`live`) records files.
  */
-export async function recordSources(taskId: string, row: WireRow): Promise<void> {
+export async function recordSources(taskId: string, row: WireRow, live = true): Promise<void> {
   try {
     for (const call of ended(taskId, rowEvents(row))) {
-      await keep(taskId, row.id, call)
+      await keep(taskId, row.id, call, live)
     }
   } catch (e) {
     const reason = e instanceof Error ? e.name : 'unknown'
@@ -148,7 +176,7 @@ export async function rebuildSources(taskId: string): Promise<void> {
   for (;;) {
     const rows = await messages.firstAfter(taskId, after, PAGE)
     for (const row of rows) {
-      await recordSources(taskId, row)
+      await recordSources(taskId, row, false)
     }
     const last = rows.at(-1)
     if (last === undefined) {

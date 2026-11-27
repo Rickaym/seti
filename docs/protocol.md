@@ -107,13 +107,13 @@ between two steps; an interrupt; a hook at subagent start.
 
 ### 3.3 Requests
 
-| Entity                                                                | States                                                      | Holds agent | Settled by                    |
-| --------------------------------------------------------------------- | ----------------------------------------------------------- | ----------- | ----------------------------- |
-| Permission request (`tool`, `repeat`, `review`)                       | `pending`, `allowed`, `denied`, `cancelled`                 | yes         | user                          |
-| Question (`choice`, `yes_no`, `secret`)                               | `open`, `answered`, `dismissed`, `expired`                  | yes         | user; EA relays, not `secret` |
-| Change request (`allow_host`, `api_key`, `mcp_server`, `shared_tool`) | `pending`, `allowed`, `denied`, `expired`                   | yes         | user                          |
-| Knowledge note                                                        | `proposed`, `approved`, `rejected`, `stale`                 | no          | user                          |
-| Delegate ask (EA or mod)                                              | `pending`, `allowed`, `denied`, `expired`, `done`, `failed` | no          | user                          |
+| Entity                                                                           | States                                                      | Holds agent | Settled by                    |
+| -------------------------------------------------------------------------------- | ----------------------------------------------------------- | ----------- | ----------------------------- |
+| Permission request (`tool`, `repeat`, `review`)                                  | `pending`, `allowed`, `denied`, `cancelled`                 | yes         | user                          |
+| Question (`choice`, `yes_no`, `secret`)                                          | `open`, `answered`, `dismissed`, `expired`                  | yes         | user; EA relays, not `secret` |
+| Change request (`allow_host`, `api_key`, `mcp_server`, `shared_tool`, `command`) | `pending`, `allowed`, `denied`, `expired`                   | yes         | user                          |
+| Knowledge note                                                                   | `proposed`, `approved`, `rejected`, `stale`                 | no          | user                          |
+| Delegate ask (EA or mod)                                                         | `pending`, `allowed`, `denied`, `expired`, `done`, `failed` | no          | user                          |
 
 - ENT-20: One read MUST list every pending request by kind (`questions`, `access`, `plans`,
   `tools`, `notes`) and MUST offer no way to answer; each kind is answered on its own route.
@@ -290,6 +290,27 @@ between two steps; an interrupt; a hook at subagent start.
   that other people wrote it, to quote and never to follow, inside a frame (a JSON field, or tags
   whose closing marks the text cannot forge), with credentials redacted. Logs and audit details
   MUST NOT carry it.
+- SRC-8: A file the agent reads whole or in part with its file reading tool is an item when the
+  file sits in a git clone whose `origin` is on GitHub. The path is the agent's, mapped to the host
+  as the agent's git sees it; the file's real path, links resolved, must stay inside the clone its
+  named folder is in. When HEAD holds the file byte for byte, hashed with no filter, and HEAD is on
+  a branch of `origin` as the clone last fetched it, the item is the file at that commit with a
+  blob permalink to the lines the read showed; otherwise it is a local copy with no permalink. Its
+  text is the result without the tool's line numbers. Git runs with the hostile-repository guards
+  and never runs a program the clone names. Files are placed as the clone stands when the result
+  arrives, so a ledger read again after a restore records none. A GitHub blob link at a commit
+  names the item at that commit, a short hash its prefix; a link at a branch or tag names none,
+  and a blob link is never reported as not read.
+- SRC-9: A shell line that runs one `git show` or `git log` alone, or through filters that only
+  cut, order or count, records one item per `commit <hash>` header it printed, at most 50, when
+  the clone it ran in has its `origin` on GitHub and holds that commit. The folder is the agent's
+  starting folder followed past `cd` and `-C`; a header the clone does not hold gives no item. A
+  format option, git settings or environment on the line, output sent to a file, or another
+  command that prints gives no item. The item's text is the result from its header to the next,
+  its time the author date, and its permalink the commit page when a branch of `origin` holds the
+  commit; otherwise it has none. As with files, commits are placed only as the result arrives. A
+  GitHub commit link names the item by its full hash, or by a
+  short one as a prefix, and is never reported as not read.
 
 ## 4. Turn lifecycle
 
@@ -515,6 +536,11 @@ interrupted only for that.
   control room's data MUST NOT be visible.
 - SBX-7: `home_access` adds the user's top-level non-dot home folders read-write, with their
   repository config and hooks read-only.
+- SBX-16: Where a sandbox mounts a repository's git folder writable, every file there that git
+  reads as config or code MUST be read-only to the agent whether or not it exists when the
+  sandbox starts: the config and the main checkout's `config.worktree`, the hooks folder and, for
+  a worktree, its own `config.worktree` and the submodules' git folders (`modules`).
+  Why: the user's own git reads them, and a new worktree copies `config.worktree`.
 - SBX-9: Every command the user runs for an agent (shell, terminal, side question, rewind helper)
   MUST run in its sandbox. An unsandboxed agent has the user's access to the host; credentials and
   the allowlist do not apply to it.
@@ -747,9 +773,13 @@ interrupted only for that.
 - GRD-8: The user MAY edit a held call's top-level text fields before `allow` or `deny`, only
   when the request shows the input whole and unredacted and the runtime runs a call with the input
   a decision hands back (not Codex, which runs a call as it asked). The audit, the request's
-  `edited` and the transcript's `Edited` mark record field names, never values. The agent MUST
-  learn of an edit from the control room's own record of it, never from the call's input: after an
-  edited call's result, in the same turn, it is told that the user edited the call and the text of
+  `edited` and the transcript's edit mark record field names, never values; the mark also keeps
+  the call's tool name. The mark MUST read as one plain sentence, with no tooltip needed: whom
+  (the user, since the EA never answers with an edit, PERM-17), which fields, and whether the call
+  went out ("You edited the message before it was sent. Above is the agent's draft." or "You
+  edited the message, then denied it. Nothing was sent."), naming a Slack send by what it does
+  and any other call by its server and tool. The agent MUST learn of an edit from the control
+  room's own record of it, never from the call's input: after an edited call's result, in the same turn, it is told that the user edited the call and the text of
   each changed field as it ran; an edited call the user denies is denied with the user's text for
   each changed field and their note. Each field is cut at 2000 characters and all of them at 6000,
   with a marker that says so. An answer with no edit reaches the agent exactly as before.
@@ -764,7 +794,8 @@ interrupted only for that.
 ### 7.6 Change requests
 
 - CHG-1: Kinds: `allow_host {host, port}`, `api_key {env, hosts[1..5], body?}`,
-  `mcp_server {server}`, `shared_tool` (section 9), each with a `reason` (10 to 500). The answer is
+  `mcp_server {server}`, `shared_tool` (section 9), `command {line}` (CHG-13), each with a `reason`
+  (10 to 500). The answer is
   `{decision: allow, scope: agent | all, value?}` (`value` for `api_key` only) or
   `{decision: deny}`.
 - CHG-2: MUST be refused: hosts on the machine or its networks; wildcards over a public suffix;
@@ -792,15 +823,33 @@ interrupted only for that.
   (UPD-5); a running turn still ends first. The turn that brings an allowed server starts a new
   session that has it once no background work holds the old one, and the update names the
   server's tool prefix and up to five of its tools.
+- CHG-13: A `command` request carries a Seti command line (CMD-4) for the asking agent alone; the
+  grammar has no word for another agent. The control room MUST read it with the reply box's grammar
+  for that agent. An agent MAY propose only MCP servers, plugins and context packs on, off or reset,
+  hosts added or removed, SSH or AWS off, home folders off, and its own memory and CPU caps; the
+  control room MUST refuse any other line, and names the agent's own Seti tool when it has one for
+  the setting. A host added or a server turned on is filed as `allow_host` or `mcp_server`. The
+  request stores the canonical line and the control room's own description of it, which the card,
+  the reason line, the update and the audit show beside the agent's reason; the card of an
+  `allow_host` or `mcp_server` request also shows its line. Allow reads the line again against the
+  agent's state and runs it as the user would (409 when it no longer applies). Only the tool call
+  files one: a line in a reason, a message, a tool result or a transcript never does.
 
 ### 7.7 Hostile repositories
 
 - HST-1: Everything in an agent's folder is input the agent wrote and MUST NOT run code on the
   host. Code-host text (titles, branches, checks, comments) is rendered as text and reaches agents
   only as an update or tool result.
-- HST-2: The control room runs version control in an agent-writable folder only with hooks,
-  filters, external commands, helpers and transports disabled, ignoring system and user config. A
-  repository pointer file is followed only when the repository records that folder.
+- HST-2: The control room runs version control in an agent-writable folder, and in a registered
+  repository's own checkout whose git folder a sandbox can write (making, listing, removing and
+  restoring worktrees, warming caches), only in a jail with no network, no home folder and none
+  of its own data or environment, which sees the system folders and that repository's own
+  folders: its files read-only, and its git folder writable only when the command writes; hooks,
+  external commands, helpers and transports are disabled too, and system and user config ignored.
+  A repository pointer file is followed only when the repository records that folder. Making a
+  worktree fetches nothing; it checks out the base branch as the repository last fetched it.
+  Why: a repository's config and attributes name programs, such as filter, diff and merge
+  drivers, signing programs and its submodules' own config, that no fixed setting switches off.
 - HST-4: The capability probe of a sandboxed agent's folder MUST run in its sandbox; any other
   agent-writable folder is probed with the user's settings only.
   Why: project settings start hooks and tool-server commands.
@@ -1162,7 +1211,7 @@ Why: an agent woken by its own actions or by news nobody waited for burns turns 
 - EA-8: Inbox items are `followup`, `reminder`, `watch_event`, `channel_event`, `team_mention`; a
   new event for an undelivered item's subject replaces it. Unasked reports get read tools only,
   except that one made only of `act` subscription items MAY direct-message an existing agent and
-  MUST tell the user.
+  MUST tell the user, and a report MAY relay under EA-19.
 - EA-10: Off a call, watch and channel items wait for quiet (`settle`); others go at once. On a
   call nothing interrupts: items follow the user's next turn, and a needs-you item gets its own
   line after `call_silence`.
@@ -1188,6 +1237,16 @@ Why: an agent woken by its own actions or by news nobody waited for burns turns 
   before the call's audio dropped, in a turn the drop cut, or in an earlier call MUST NOT count for
   EA-4 or EA-17.
   Why: mobile networks drop for seconds, and a cut transcript must never become the user's yes.
+- EA-19: Inbox relays are off until the user turns them on; the EA, agents and mods MUST NOT
+  change the switch. While on, a report MAY send one direct message per item to an agent the item
+  is about: its task, the author or a named agent of its group chat message, an agent with its PR
+  linked, or one subscribed to its channel; any other is refused. The control room puts a fixed
+  frame before the text (relayed, not approved by the user, act within the task, anything
+  outward, irreversible or security-related waits for the user) and refuses text that copies
+  `relay_copy` words of the item, holds a code block or speaks for the user. At most `relay_rate`.
+  Each relay is audited with its item, agent and message, never its text; the user or the EA MAY
+  take it back while the agent has not read it.
+  Why: inbox text is untrusted, so a relay carries the EA's gist with a frame it cannot drop.
 
 ## 15. Resilience
 
@@ -1676,6 +1735,14 @@ treat every agent as holding the user's access.
 - A custom sender definition decides how a public path authenticates, which is why only the user
   writes one (CHN-19).
 - An unsandboxed agent can read every secret on the host.
+- Where the sandbox cannot start on the host, no agent runs sandboxed and version control in an
+  agent's folder runs on the host with only the settings of HST-2.
+- Version control in a registered repository's own checkout runs in the jail of HST-2 too, so a
+  worktree Seti makes runs none of the repository's hooks and only the filters its own config
+  names, in the jail; files tracked through a filter the user's global config defines, such as
+  Git LFS, are checked out as stored. The user's own git there reads only config an agent cannot
+  write (SBX-16), unless the user's config points `include.path` or `core.hooksPath` into the git
+  folder.
 - Approval is review, not proof: a shared tool, knowledge note or mod the user allows unread runs
   with each agent's access. Cards therefore show the whole artefact and only the difference on
   update.
@@ -1724,7 +1791,7 @@ others.
 | Threads      | `thread_cap` 50. `dm_window` 24 h. `reply_settle` 10 s. `thread_rate` 10 an hour. `thread_quiet` 7 days. `thread_age` 30 days. `slack_name_stale` 30 days.                                                                                                                                                                                                                                                                      |
 | Chat         | Message 4000. Active agent: running, session open, or updated within 12 h. `chat_burst` 12 in 15 min. `chat_loop` 6 in 15 min.                                                                                                                                                                                                                                                                                                  |
 | Questions    | Answer batch 100 items. `notes_waiting` 10. Index 1500 characters. `note_stale` 3 failed checks in a row, or unverified 30 days (fact, environment) or 90 days (how-to, gotcha).                                                                                                                                                                                                                                                |
-| Assistant    | `ask_ttl` 10 min. `word_use` 60 s. `read_back` 600 characters. `settle` quiet 45 s, at most 3 min. `call_silence` 30 s. `wake_phrase` 2 to 40 characters, at most 4 words. `keep_awake_seconds` 5 to 600.                                                                                                                                                                                                                       |
+| Assistant    | `ask_ttl` 10 min. `word_use` 60 s. `read_back` 600 characters. `settle` quiet 45 s, at most 3 min. `call_silence` 30 s. `wake_phrase` 2 to 40 characters, at most 4 words. `keep_awake_seconds` 5 to 600. `relay_copy` 8 words. `relay_rate` 2 an hour an agent, 8 an hour in all, 400 characters.                                                                                                                              |
 | Resilience   | `stop_grace` 7 s. `resume_pace` 3 starts 2 s apart, 20 s between groups. `grant_ttl` 15 min. `send_window` 24 h.                                                                                                                                                                                                                                                                                                                |
 | Storage      | `orphan_grace` 1 h. `size_walk` 400,000 entries or 20 s per folder.                                                                                                                                                                                                                                                                                                                                                             |
 | Audit        | `audit_keep` 365 days. Summary 300. Detail string 500.                                                                                                                                                                                                                                                                                                                                                                          |

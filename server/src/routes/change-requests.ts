@@ -1,8 +1,9 @@
 import { allowRefusedHostInput, answerChangeInput, changeRequestParams, taskHostParams } from '@seti/shared'
 import { Hono } from 'hono'
-import { allowRefusedHost, answerChangeRequest, pendingChanges, removeTaskHost } from '../change-requests.js'
+import { allowRefusedHost, answerChangeRequest, pendingChanges } from '../change-requests.js'
 import { eaReadOnly } from '../ea-guard.js'
 import { ok, valid, validJson } from '../http.js'
+import { removeTaskHost } from '../task-hosts.js'
 import { requireTask } from '../tasks.js'
 
 /** The EA may list an agent's requests to remind the user, never answer them. */

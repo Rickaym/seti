@@ -5,6 +5,7 @@ import { slackNames } from '../store/slack-names.js'
 import { sourceItems, type SourceItem } from '../store/sources.js'
 import { itemText } from './item.js'
 import { normalise } from './quote.js'
+import { filePathOf } from './refs.js'
 
 /** How a lookup's items present themselves to the agent that reads them. */
 export const SOURCE_NOTE =
@@ -49,6 +50,12 @@ async function texts(taskId: string, candidates: readonly Candidate[]): Promise<
   )
 }
 
+/** A file as its repository and path, a local copy said so, since it has no permalink. */
+function filePlace(item: Candidate): string {
+  const named = `${item.container}/${filePathOf(item.ref)}`
+  return item.permalink === '' ? `${named} (local file)` : named
+}
+
 function shown(item: Candidate, place: string, text: string): SourceLookupItem {
   const clean = redactCredentials(text)
   const cut = clean.length > TEXT_CHARS
@@ -71,7 +78,12 @@ function shown(item: Candidate, place: string, text: string): SourceLookupItem {
 export async function lookupSources(taskId: string, query: SourceLookupQuery): Promise<SourceLookup> {
   const candidates = await sourceItems.recent(taskId, query.kind ?? null, CANDIDATES)
   const names = await slackNames.of(candidates.filter((item) => item.kind === 'slack').map((item) => item.container))
-  const placeOf = (item: Candidate) => (item.kind === 'slack' ? slackPlace(item.container, names) : item.container)
+  const placeOf = (item: Candidate) => {
+    if (item.kind === 'slack') {
+      return slackPlace(item.container, names)
+    }
+    return item.kind === 'file' ? filePlace(item) : item.container
+  }
   const [since, until] = [bound(query.since, false), bound(query.until, true)]
   const wanted = query.container === undefined ? null : plainPlace(query.container)
   const kept = candidates.filter((item) => {

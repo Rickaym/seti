@@ -1256,6 +1256,7 @@ async def test_refreshes_resources_ea_settings_schedule_and_security(
     assert "npm test" not in usage.text
     settings = await tools.call("get_ea_settings", {})
     assert settings.text.startswith('Your wake word is off; its phrase is "Hey Seti"')
+    assert "Inbox relays are off; only the user turns them on or off" in settings.text
     bad = await confirm(tools, "update_ea_settings", {"wake_phrase": "one two three four five"})
     assert not bad[1].ok
     _, on = await confirm(tools, "update_ea_settings", {"wake_enabled": True, "keep_awake_seconds": 60})

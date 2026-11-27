@@ -45,35 +45,38 @@ export const sessionUpdate = z.discriminatedUnion('sessionUpdate', [
 ])
 
 /** The tokens a prompt's reply reports for its whole turn. */
-interface PromptUsage {
-  inputTokens: number
-  outputTokens: number
-  cachedReadTokens?: number | null
-  cachedWriteTokens?: number | null
-  thoughtTokens?: number | null
-}
+export const promptUsage = z.looseObject({
+  inputTokens: z.number(),
+  outputTokens: z.number(),
+  cachedReadTokens: z.number().nullish(),
+  cachedWriteTokens: z.number().nullish(),
+  thoughtTokens: z.number().nullish(),
+})
 
 /**
  * An ACP agent's message as Seti stores it: the session it started, a prompt's turn starting,
  * one update (a message or a thought with its chunks joined, under the id Seti gave it; `denied`
  * when Seti refused the call it ends), or the end of the turn with its reply's text and tokens.
+ * `usd` is Seti's estimate from the provider's dated prices; `unfinished` names the calls the
+ * turn left without an end, as a cancel cuts them.
  */
-export type AcpRecord =
-  | { seti: 'started'; sessionId: string; model: string; cwd: string }
-  | { seti: 'turn'; turnId: string }
-  | { seti: 'update'; id: string; update: unknown; denied?: true }
-  | {
-      seti: 'ended'
-      turnId: string
-      stopReason: string
-      result: string
-      usage: PromptUsage | null
-      /** Seti's estimate of the turn's cost from the provider's dated prices, where it has one. */
-      usd?: number
-      error?: string
-      /** The calls the turn left without an end, as a cancel cuts them. */
-      unfinished?: readonly string[]
-    }
+export const acpRecord = z.discriminatedUnion('seti', [
+  z.object({ seti: z.literal('started'), sessionId: z.string(), model: z.string(), cwd: z.string() }),
+  z.object({ seti: z.literal('turn'), turnId: z.string() }),
+  z.object({ seti: z.literal('update'), id: z.string(), update: z.unknown(), denied: z.literal(true).optional() }),
+  z.object({
+    seti: z.literal('ended'),
+    turnId: z.string(),
+    stopReason: z.string(),
+    result: z.string(),
+    usage: promptUsage.nullable(),
+    usd: z.number().optional(),
+    error: z.string().optional(),
+    unfinished: z.array(z.string()).optional(),
+  }),
+])
+
+export type AcpRecord = z.infer<typeof acpRecord>
 
 /** A tool call or an update of one, with the fields both carry. */
 export type AcpToolCall = Extract<z.infer<typeof sessionUpdate>, { toolCallId: string }>

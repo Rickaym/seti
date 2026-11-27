@@ -214,12 +214,17 @@ ACTION_SPECS: list[ToolSpec] = [
     ),
     ToolSpec(
         "take_back_message",
-        "Take back a message queued for a running agent before the agent reads it.",
+        "Take back a message queued for a running agent before the agent reads it, or with relay, "
+        "an inbox relay the agent has not read yet.",
         {
             "task": TASK_REF,
             "message": {
                 "type": "string",
                 "description": "Words from the queued message, when several are queued.",
+            },
+            "relay": {
+                "type": "integer",
+                "description": "The relay id a post_team_chat relay reported, to take that relay back.",
             },
         },
         ["task"],
@@ -868,6 +873,13 @@ class AgentActions:
 
     async def take_back_message(self, args: Mapping[str, Any]) -> ToolResult:
         task, title = await self._task_ref(args)
+        relay = args.get("relay")
+        if isinstance(relay, int) and not isinstance(relay, bool) and relay > 0:
+            await self._seti.post(f"/ea/relays/{relay}/take-back", {})
+            return ToolResult(
+                f"Took back the relay to {title} before it read it.",
+                clip(f"Took back the relay to {title}", 70),
+            )
         page = await self._seti.get(f"/tasks/{task.get('id')}/messages", {"limit": 200})
         rows = dicts(page.get("messages")) if isinstance(page, dict) else []
         queued = [

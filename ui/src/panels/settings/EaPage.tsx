@@ -11,6 +11,7 @@ import {
   SpeakerPicker,
   TestSpeaker,
 } from '@/components/ea/AudioDevices'
+import { InboxRelaysSetting } from '@/components/ea/InboxRelaysSetting'
 import { LanguageSetting } from '@/components/ea/LanguageSetting'
 import { LiveContextCard } from '@/components/ea/LiveContextCard'
 import { RelayCheck } from '@/components/ea/RelayCheck'
@@ -131,6 +132,15 @@ export function EaPage() {
             description="What the EA listens, speaks and writes in; a change applies to a live call at once. The wake phrase stays in English words."
           >
             <LanguageSetting state={settings} />
+          </SettingRow>
+        </SettingsCard>
+        <SettingsCard title="Inbox">
+          <SettingRow
+            label="Inbox relays"
+            stack
+            description="The EA may tell the agent an alert or message is about, in its own words, marked as not approved by you, and reports it in a line. Off, it asks you first."
+          >
+            <InboxRelaysSetting state={settings} />
           </SettingRow>
         </SettingsCard>
         <SettingsCard title="Connection">

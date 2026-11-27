@@ -1,9 +1,9 @@
 import { AWS_ACCESS_ID, HTTPS_PORT, updateTaskInput, type AccessKind, type Task } from '@seti/shared'
 import { resetTaskAccess } from '../access-reset.js'
 import { setTaskAccess } from '../agent-access.js'
-import { allowTaskHost, removeTaskHost } from '../change-requests.js'
 import { HttpError } from '../http.js'
 import { updateTask } from '../task-actions.js'
+import { allowTaskHost, removeTaskHost } from '../task-hosts.js'
 
 const STATES: Readonly<Record<string, boolean | null>> = { on: true, off: false, reset: null }
 
