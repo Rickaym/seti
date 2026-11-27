@@ -604,15 +604,19 @@ interrupted only for that.
   as at a start, keeping the rest of its grant (login, MCP sign-ins, denied connectors), and
   rewrites that file, so the next bash command has the variable; another shell, or a process
   started before then such as an MCP server, sources the file.
-- EGR-14: On its connections' hosts the proxy reads the body of a JSON, form, multipart or plain
-  text request without a content encoding, holding at most 1 MiB, before anything goes upstream;
-  every other body streams on unread. A held body carrying a placeholder toward a host its
-  connection does not allow, or of a connection with Body off, MUST be refused (403) and audited
-  as in EGR-5, naming the connection and never its value, and nothing is sent upstream. A body
+- EGR-14: On its connections' hosts, except the agent's model hosts (EGR-17), the proxy reads the
+  body of a JSON, form, multipart or plain text request without a content encoding, holding at
+  most 1 MiB, before anything goes upstream; every other body streams on unread. A held body
+  carrying a placeholder toward a host its connection does not allow, or of a connection with Body
+  off, MUST be refused (403) and audited as in EGR-5, naming the connection and never its value,
+  and nothing is sent upstream. The refusal says nothing was sent and what to do: send the value
+  in a header or the URL, or ask the user for Body, which it never suggests for a connection on a
+  model provider's hosts, and it never suggests turning the sandbox off. A body
   over 1 MiB streams on while the proxy watches the rest; a placeholder in it cuts the request off
   and answers 413. A held body goes upstream with its exact length.
 - EGR-15: A connection's Body setting is off by default and only the user changes it. With it on,
-  the proxy swaps the value into a held body (EGR-14) on the connection's hosts: string-escaped
+  the proxy swaps the value into a held body (EGR-14) on the connection's hosts, never on the
+  agent's model hosts (EGR-17): string-escaped
   in JSON, URL-encoded in a form, raw in plain text and in a multipart text field (no file name,
   no type or `text/plain`), never into another body type. A value with a line break in a
   multipart field, or a placeholder in a file part or a part header, is refused (422) rather than
@@ -630,6 +634,8 @@ interrupted only for that.
 - EGR-12: Tool servers an agent leaves out MUST be denied to its runtime and get no proxy sign-in.
 - EGR-13: A maintenance session's proxy allows the model provider alone, with the agent's model
   login: no connection, allowlist, claude.ai connector, cloud or SSH, and no placeholder is issued.
+  It carries the agent's model hosts (EGR-17), and audits each request it refuses for a
+  placeholder as the agent's own proxy does (EGR-5).
 - EGR-16: A host the proxy refuses as off the allowlist answers 403 with a body that tells the
   agent retrying will not help and to ask with `request_change` (`allow_host`) or tell the user.
   The first refusal of each host for an agent MUST add one quiet transcript line naming it,
@@ -639,6 +645,14 @@ interrupted only for that.
   the host is recorded. The line's Allow host files the host request and answers it with the
   user's own Allow (for the agent, or every agent), refused to the EA and agents (403) and to a
   host the agent was not refused (404). A refusal alone never puts the agent in Needs you.
+- EGR-17: An agent's model hosts are the hosts of the provider its runtime calls, as the provider
+  registry lists them, carried in its value-free grant (NODE-8) and fixed by the runtime the user
+  chose: nothing in the sandbox, a request or a connection adds one, and a grant naming a host no
+  provider serves is invalid. On a model host the proxy never reads a request body and never swaps
+  a value into one, for any connection and with Body on or off, so a placeholder printed into the
+  conversation travels to the model as plain text and later model calls keep working. The URL
+  path and header swap (EGR-5) applies there as on any connection host, and a placeholder in a
+  header or URL toward a host its connection does not name is still refused.
 
 ### 7.4 Permission rules and requests
 
