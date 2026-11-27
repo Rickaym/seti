@@ -1629,10 +1629,9 @@ Optional and off by default: a maintenance session per agent that consolidates i
   it starts the mod; mod API 2.0.0 makes these MUST and refuses such a manifest.
 - MOD-28: A bundled mod MAY place a view at the bottom of the navigation (`navBottom`). In the menu
   drawer of a narrow screen the view takes the height the sections leave and keeps a minimum, the
-  sections scrolling first. In the icon rail of a wide screen it MAY open a panel beside the rail at
-  the rail's full height, which narrows the page rather than covering it, stays open on that device
-  until the view or Esc closes it, and is one at a time. A third-party mod MUST NOT place a view
-  there.
+  sections scrolling first. In the icon rail of a wide screen it has the rail's width and MAY float
+  a window over the page, above the page's own docks and panels and under the control room's
+  dialogs, menus and toasts. A third-party mod MUST NOT place a view there.
 
 ## 18. Public surfaces
 
