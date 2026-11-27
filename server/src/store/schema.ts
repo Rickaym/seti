@@ -26,6 +26,7 @@ import {
   EA_LANGUAGE,
   EA_INBOX,
   EA_INBOX_COALESCE,
+  EA_INBOX_RELAYS,
   EA_INBOX_URGENT,
   EA_INDEX,
   EA_JOIN_ON_OPEN,
@@ -274,5 +275,6 @@ export const MIGRATIONS: readonly Migration[] = [
   { version: 147, name: 'source_items', sql: SOURCE_ITEMS },
   { version: 148, name: 'ea_ask_word', sql: EA_ASK_WORD },
   { version: 149, name: 'session_rescrub', sql: SESSION_RESCRUB },
-  { version: 150, name: 'gemini_settings', sql: GEMINI_SETTINGS },
+  { version: 150, name: 'ea_inbox_relays', sql: EA_INBOX_RELAYS },
+  { version: 151, name: 'gemini_settings', sql: GEMINI_SETTINGS },
 ]

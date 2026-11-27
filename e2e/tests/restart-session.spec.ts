@@ -82,7 +82,7 @@ test('a sandbox switch during a turn offers to restart now so it applies at once
     .toEqual(['stopped', true])
 })
 
-test('restarts the open agent from the palette through its /restart command', async ({ page, request }) => {
+test('restarts the open agent from the palette through its /seti:restart command', async ({ page, request }) => {
   const { id, session } = await startSessionAgent(request)
   await page.goto(`/#agents/${id}`)
   await expect(transcript(page)).toContainText(`Session ${session}, resumed none`)
@@ -90,9 +90,9 @@ test('restarts the open agent from the palette through its /restart command', as
   await page.keyboard.press('Control+k')
   await page.keyboard.type('>restart session')
   await page.keyboard.press('Enter')
-  await expect(page.getByRole('combobox', { name: 'Reply' })).toHaveValue('/restart ')
-  const card = page.getByRole('group', { name: 'Command /restart' })
+  await expect(page.getByRole('combobox', { name: 'Reply' })).toHaveValue('/seti:restart ')
+  const card = page.getByRole('group', { name: 'Command /seti:restart' })
   await card.getByRole('button', { name: 'Restart', exact: true }).click()
-  await expect(toasts(page).filter({ hasText: 'Session restarted' })).toBeVisible()
+  await expect(toasts(page).filter({ hasText: 'Restart session' })).toBeVisible()
   expect((await apiData<Task>(request, `/tasks/${id}`)).session_id).toBe(session)
 })

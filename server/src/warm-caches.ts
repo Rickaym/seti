@@ -6,7 +6,7 @@ import { performance } from 'node:perf_hooks'
 import { promisify } from 'node:util'
 import type { Repo, WarmCacheSeed, WarmCacheSettings } from '@seti/shared'
 import { WORKTREE_ROOT } from './config.js'
-import { listWorktrees } from './git.js'
+import { agentGitRaw, listWorktrees } from './git.js'
 
 const exec = promisify(execFile)
 
@@ -65,19 +65,11 @@ function checkDeadline(deadline: number): void {
   }
 }
 
-async function git(cwd: string, args: string[], input?: string): Promise<string> {
-  const child = exec('git', ['-C', cwd, ...args], { maxBuffer: 64 * MB })
-  if (input !== undefined) {
-    child.child.stdin?.end(input)
-  }
-  return (await child).stdout
-}
-
 const splitZ = (out: string) => out.split('\0').filter((entry) => entry !== '')
 
 /** Gitignored, untracked files and directories of a checkout; a directory stands for all inside. */
 async function ignoredEntries(root: string): Promise<string[]> {
-  const out = await git(root, ['ls-files', '-z', '--others', '--ignored', '--exclude-standard', '--directory'])
+  const out = await agentGitRaw(root, ['ls-files', '-z', '--others', '--ignored', '--exclude-standard', '--directory'])
   return splitZ(out).map((entry) => entry.replace(/\/$/, ''))
 }
 
@@ -150,9 +142,9 @@ async function confirmIgnored(root: string, found: CachePath[]): Promise<CachePa
     return []
   }
   const rels = found.map((entry) => entry.rel)
-  const listed = await git(root, ['check-ignore', '-z', '--stdin'], `${rels.join('\0')}\0`).catch(() => '')
+  const listed = await agentGitRaw(root, ['check-ignore', '-z', '--stdin'], `${rels.join('\0')}\0`).catch(() => '')
   const ignored = new Set(splitZ(listed))
-  const tracked = splitZ(await git(root, ['ls-files', '-z', '--', ...rels.map((rel) => `:(literal)${rel}`)]))
+  const tracked = splitZ(await agentGitRaw(root, ['ls-files', '-z', '--', ...rels.map((rel) => `:(literal)${rel}`)]))
   const hasTracked = (rel: string) => tracked.some((file) => file === rel || file.startsWith(`${rel}/`))
   const sorted = found.filter((entry) => ignored.has(entry.rel) && !hasTracked(entry.rel))
   sorted.sort((a, b) => a.rel.localeCompare(b.rel))
@@ -366,7 +358,7 @@ const TSCONFIGS_READ = 50
 /** Why a repo's typecheck cannot be warmed, or null when it can or the repo has no tsconfig. */
 export async function typecheckHint(repoPath: string): Promise<string | null> {
   try {
-    const configs = splitZ(await git(repoPath, ['ls-files', '-z', '--', ':(glob)**/tsconfig*.json']))
+    const configs = splitZ(await agentGitRaw(repoPath, ['ls-files', '-z', '--', ':(glob)**/tsconfig*.json']))
     if (configs.length === 0) {
       return null
     }

@@ -1,8 +1,8 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { REBUILDABLE_DIRS, type GitBadge } from '@seti/shared'
+import { isRepoRoot } from './git-dirs.js'
 import { agentGitWithin } from './git.js'
-import { isRepoRoot } from './sandbox-mounts.js'
 
 const BADGE_TIMEOUT_MS = 3000
 const BADGE_TTL_MS = 30_000
