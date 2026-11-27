@@ -65,5 +65,7 @@ export interface EaRelay {
   taken_back: boolean
   /** The EA started this agent for the item rather than messaging one. */
   started: boolean
+  /** The agent is in a turn now, so Stop has something to stop. */
+  running: boolean
   created_at: string
 }

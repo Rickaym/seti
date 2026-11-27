@@ -44,7 +44,7 @@ function RelayLine({ relay }: { relay: EaRelay }) {
     <div className="flex min-h-8 items-center gap-2 border-t border-border px-2 py-1" data-testid="ea-relay">
       <UserRoundCheck className="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
       <span className="min-w-0 flex-1 break-words text-foreground">{lineText(shown, told, stopped)}</span>
-      {shown.started && shown.task_id !== null && !stopped && (
+      {shown.started && shown.running && shown.task_id !== null && !stopped && (
         <Hint text={`Stop ${told}'s turn; it keeps its transcript`}>
           <Button
             variant="outline"
@@ -58,7 +58,7 @@ function RelayLine({ relay }: { relay: EaRelay }) {
           </Button>
         </Hint>
       )}
-      {shown.pending && !shown.taken_back && (
+      {shown.pending && !shown.started && !shown.taken_back && (
         <Hint text={`Take the message back before ${told} reads it`}>
           <Button
             variant="outline"

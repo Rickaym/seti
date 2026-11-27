@@ -58,6 +58,7 @@ test('a started agent shows Started with Stop, and a skipped agent is removed fr
   await startedItem(request)
   await skipAgent(request, 'Humbaba')
   await page.route('**/api/ea/health', async (route) => route.fulfill({ json: READY }))
+  await page.route('**/api/tasks/*/stop', async (route) => route.fulfill({ json: { data: {} } }))
   await page.goto('/#ea')
   const transcript = page.getByRole('main').getByRole('region', { name: 'Transcript' })
   const line = transcript.getByTestId('ea-relay')

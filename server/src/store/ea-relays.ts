@@ -14,11 +14,13 @@ export interface RelayRow {
   created_at: string
   taken_back_at: string | null
   started: boolean
+  running: boolean
 }
 
 const SELECT = sql`SELECT r.id, r.item_id, i.entry_id, r.task_id, COALESCE(t.title, '') AS title, r.message_id,
     COALESCE((SELECT d.mode FROM team_delivery d WHERE d.message_id = r.message_id AND d.task_id = r.task_id
-      ORDER BY d.id DESC LIMIT 1), 'held') AS mode, r.created_at, r.taken_back_at, r.started
+      ORDER BY d.id DESC LIMIT 1), 'held') AS mode, r.created_at, r.taken_back_at, r.started,
+      COALESCE(t.status = 'running', false) AS running
   FROM ea_relay r
   LEFT JOIN ea_inbox i ON i.id = r.item_id
   LEFT JOIN task t ON t.id = r.task_id`
@@ -130,6 +132,7 @@ export async function relayView(row: RelayRow): Promise<EaRelay> {
     pending: waiting,
     taken_back: row.taken_back_at !== null,
     started: row.started,
+    running: row.running,
     created_at: row.created_at,
   }
 }

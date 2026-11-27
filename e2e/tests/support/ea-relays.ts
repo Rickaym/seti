@@ -67,7 +67,8 @@ export async function relayedItem(request: APIRequestContext, title = 'Release n
 export async function startedItem(request: APIRequestContext, title = 'BES latency'): Promise<EaRelay> {
   const relay = await relayedItem(request, title)
   const db = openSeedDb()
-  await db.run('UPDATE ea_relay SET started = true WHERE id = ?', relay.id)
+  await db.run('UPDATE ea_relay SET started = true, message_id = NULL WHERE id = ?', relay.id)
+  await db.run("UPDATE task SET status = 'running' WHERE id = ?", relay.task_id)
   await db.close()
   return relay
 }

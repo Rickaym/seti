@@ -45,6 +45,7 @@ test('a started line and a skipped agent fit a phone with 44 px buttons', async 
   await startedItem(request)
   await skipAgent(request, 'Humbaba')
   await page.route('**/api/ea/health', async (route) => route.fulfill({ json: READY }))
+  await page.route('**/api/tasks/*/stop', async (route) => route.fulfill({ json: { data: {} } }))
   await page.goto('/#ea')
   const line = page.getByRole('main').getByRole('region', { name: 'Transcript' }).getByTestId('ea-relay')
   await expect(line).toContainText('Started BES latency')
