@@ -10,6 +10,7 @@ from pipecat.processors.aggregators.llm_context import LLMContext
 from pipecat.services.deepgram.stt import DeepgramSTTService
 from pipecat.services.elevenlabs.tts import ElevenLabsTTSService
 from pipecat.services.llm_service import FunctionCallParams
+from pipecat.services.openai.llm import OpenAILLMService
 from pipecat.transcriptions.language import Language
 from pipecat.turns.user_stop import TurnAnalyzerUserTurnStopStrategy
 
@@ -280,11 +281,14 @@ def test_the_ea_is_told_to_sound_natural_and_not_copy_terse_notes() -> None:
 
 def test_the_llm_turns_reasoning_off_unless_left_to_the_model() -> None:
     invocation = cast(OpenAILLMInvocationParams, {"messages": []})
-    params = model_llm(settings(openai_api_key="op"), "gpt-6-luna").build_chat_completion_params(invocation)
+    llm = model_llm(settings(openai_api_key="op"), "gpt-6-luna")
+    assert isinstance(llm, OpenAILLMService)
+    params = llm.build_chat_completion_params(invocation)
     assert params["model"] == "gpt-6-luna"
     assert params["reasoning_effort"] == "none"
-    legacy = settings(openai_api_key="op", reasoning_effort="default")
-    assert "reasoning_effort" not in model_llm(legacy, "gpt-4.1").build_chat_completion_params(invocation)
+    legacy = model_llm(settings(openai_api_key="op", reasoning_effort="default"), "gpt-4.1")
+    assert isinstance(legacy, OpenAILLMService)
+    assert "reasoning_effort" not in legacy.build_chat_completion_params(invocation)
 
 
 def test_smart_turn_ends_the_users_turn_and_waits_longer_on_an_unfinished_one() -> None:
