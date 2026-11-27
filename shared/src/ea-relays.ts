@@ -13,7 +13,7 @@ export const EA_RELAY_LIMITS = { perAgent: 2, all: 8, windowMs: 60 * 60_000 } as
 /** Assignments in all and new agents started from act items, per day. */
 export const EA_ASSIGN_DAILY = { all: 20, starts: 3, windowMs: 24 * 60 * 60_000 } as const
 
-/** The user's switch for inbox relays; only the user turns it on or off. */
+/** The user's switch for Assign; only the user turns it on or off. */
 export const eaRelaySwitchInput = z.object({ on: z.boolean() })
 
 /**

@@ -471,19 +471,21 @@ reads `getStats` every two seconds (`call-quality.ts`) and reports the call's lo
 speech, jitter, round trip, path type and reconnects with its call end, as numbers only; the EA
 logs one line per call with the user's audio loss, drops and the seconds of speech it held.
 
-### Inbox relays
+### Assign
 
 `server/src/ea-relay.ts` implements EA-19 behind `POST /api/ea/relays`, which only the EA's bot
-token reaches. It checks the switch (`ea_settings.inbox_relays`, changed only through
-`PUT /api/ea/settings/inbox-relays` by the user), then the recipient against `relayTargets`, then
-the text, then the hourly limits, and claims the item in `ea_relay` before it posts the framed
-direct message through `postTeamMessage`. A channel alert records its `channel_id` on `ea_inbox`
-so the subscribed agents come from Seti's tables, not the payload. History pages attach each
-inbox entry's relays, and `POST /api/ea/relays/:id/take-back` dismisses the relay's update while
-it still waits for the agent. In the EA, `ea/src/seti_ea/relays.py` reads the switch for each chat
-report, gives the model the relay rules and the report's item ids, and `RelayGuard` opens
-`post_team_chat` with `to` and `relay_of` once per report. A report never counts as the user's turn,
-so nothing in an item or a relay can answer an open ask. Reports on a call do not relay.
+token reaches. It checks the item (`ea_inbox.act`, or the switch `ea_settings.inbox_relays`,
+changed only through `PUT /api/ea/settings/inbox-relays` by the user), screens the item and the
+text (`ea-assign-screen.ts`), checks the recipient (any agent for an act item, else
+`relayTargets`), the skips (`ea_assign_skip`, `ea-assign-skips.ts`) and the limits, and claims the
+item in `ea_relay` before it posts the framed direct message through `postTeamMessage` or, with
+`start`, creates the agent through `createTask` without the planner's access. History pages attach
+each inbox entry's assignments, and `POST /api/ea/relays/:id/take-back` dismisses a message while
+it still waits for the agent. In the EA, `ea/src/seti_ea/relays.py` gives the model the act or
+relay rules and the report's item ids, and `RelayGuard` opens `post_team_chat` with `to`, or
+`start_task` for act items with Assign on, once per item, each with `relay_of`. Held act notes on a
+call carry the same rules. The pack prompt's `assign` flag adds `ASSIGN_RULE` to the system
+prompt. A report never counts as the user's turn, so nothing in an item can answer an open ask.
 
 ## Reference values
 

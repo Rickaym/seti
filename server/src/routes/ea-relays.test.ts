@@ -113,7 +113,7 @@ beforeEach(async () => {
   await teamMembers.setMuted(api.id, false)
 })
 
-describe('the inbox relays switch', () => {
+describe('the Assign switch', () => {
   it('starts off, and only the user turns it on or off', async () => {
     await sql`UPDATE ea_settings SET inbox_relays = false WHERE id = 1`
     expect((await data<EaSettings>(await send(USER, 'GET', '/settings'))).inbox_relays).toBe(false)

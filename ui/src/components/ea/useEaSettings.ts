@@ -53,7 +53,7 @@ export function useEaSettings(onSaved: () => void) {
     [onSaved],
   )
 
-  /** Turns inbox relays on or off; only the user's own Seti may, so it has a route of its own. */
+  /** Turns Assign on or off; only the user's own Seti may, so it has a route of its own. */
   const setRelays = useCallback(async (on: boolean) => {
     try {
       setSettings(await apiPut<EaSettings>(`${SETTINGS_PATH}/inbox-relays`, { on }))

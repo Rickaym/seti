@@ -251,7 +251,7 @@ describe('urgency', () => {
       'chat',
     )
     expect(entries.map((entry) => entry.message.content)).toEqual([
-      'Inbox: Uptime alert (info) (act: hand its work to an existing agent without asking): dana asks about SSO.',
+      'Inbox: Uptime alert (info) (from a channel set to act): dana asks about SSO.',
       'Inbox: Uptime alert (info): deploy done.',
     ])
   })

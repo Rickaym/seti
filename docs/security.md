@@ -350,21 +350,27 @@ Redaction is a second line of defence. A session or key an agent printed has alr
 agent and its model provider, so revoke it (sign the session out, rotate the key) even when Seti
 shows `[redacted]`.
 
-## Inbox relays
+## Assign
 
 Every inbox item the EA reads (an alert, a webhook, a Slack or GitHub event, an agent's message)
-is untrusted text. Inbox relays are off until you turn them on in Settings, EA; the EA, agents and
-mods cannot change the switch ([EA-19](protocol.md#14-the-assistant)). While on, the EA may send one
-direct message per item to an agent the item is about, chosen from Seti's own fields: the item's
-agent, the agent that wrote to the EA or one it named, the agent with the item's PR linked, or an
-agent subscribed to the item's channel. Text in the item cannot add a recipient. Seti puts a fixed
-frame before every relay telling the agent the message was not approved by you, refuses a relay
-that copies eight words of the item, holds a code block or claims your approval, and caps relays at
-two an hour for each agent and eight an hour in all. The audit log records each relay with its
-item, agent and message, never the text. A relay that slips past these checks reaches one agent,
-inside its own sandbox and permissions, marked as unapproved input. An agent may subscribe itself
-to a channel at Seti control Full; it then receives relays of that channel's items as well as the
-events themselves.
+is untrusted text ([EA-19](protocol.md#14-the-assistant)). An item from a channel you set to act
+may go to any existing agent the EA judges right; Assign, which starts off and which the EA, agents
+and mods cannot change, adds a new agent for such an item when none fits, a message to the agent
+any other item is about (chosen from Seti's own fields, never the item's text), and work the EA
+recommends in conversation sent without your yes. A started agent runs sandboxed on your start
+defaults, with no access the planner would infer from the item.
+
+Seti, not the EA, enforces the limits. It puts a fixed frame before every assignment telling the
+agent it was not approved by you, and refuses text that copies eight words of the item, holds a
+code block, claims your approval or names sensitive work (a push to a default branch, a merge, a
+production deploy, a publish, deleting a repository, branch or data, access, credentials, secrets,
+keys, permission rules or money). It refuses any item from people or agents that claims approval or
+gives the assistant instructions, any agent or channel you told the EA to skip, and anything past
+one per item, two an hour for each agent, eight an hour and twenty a day in all, and three new
+agents a day. The audit log records each assignment and skip with its item, agent and message,
+never the text. An assignment that slips past these checks reaches one agent, inside its own
+sandbox and permissions, marked as unapproved input. An agent may subscribe itself to a channel at
+Seti control Full; it then receives assignments of that channel's items as well as the events.
 
 ## What is not protected
 
