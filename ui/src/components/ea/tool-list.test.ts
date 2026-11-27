@@ -1,6 +1,6 @@
 import type { EaTool } from '@seti/shared'
 import { describe, expect, it } from 'vitest'
-import { countText, groupTools, matchTools } from './tool-list'
+import { areaOpen, countText, groupTools, matchTools } from './tool-list'
 
 const TOOLS: EaTool[] = [
   { name: 'list_tasks', area: 'Agents', summary: 'List Seti tasks.', gate: 'runs' },
@@ -33,5 +33,14 @@ describe('groupTools', () => {
       ['PRs and repos', ['list_prs']],
       ['Messaging', ['answer_question']],
     ])
+  })
+})
+
+describe('areaOpen', () => {
+  it('keeps areas closed until opened, and opens every area while a search runs', () => {
+    expect(areaOpen('Agents', '', new Set())).toBe(false)
+    expect(areaOpen('Agents', '  ', new Set())).toBe(false)
+    expect(areaOpen('Agents', '', new Set(['Agents']))).toBe(true)
+    expect(areaOpen('Channels', 'stop', new Set())).toBe(true)
   })
 })

@@ -1,11 +1,12 @@
 import { eaToolsAnswer, type EaTool, type EaToolGate } from '@seti/shared'
-import { CircleHelp, Hand, Search, type LucideIcon } from 'lucide-react'
+import { ChevronRight, CircleHelp, Hand, Search, type LucideIcon } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { apiGetValid, errorText } from '@/api'
 import { Hint } from '@/components/Hint'
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { Input } from '@/components/ui/input'
 import { SettingsCard } from '@/panels/settings/layout'
-import { GATE_LABEL, countText, groupTools, matchTools } from './tool-list'
+import { GATE_LABEL, areaOpen, countText, groupTools, matchTools, type ToolGroup } from './tool-list'
 
 type Loaded =
   { status: 'loading' } | { status: 'error'; message: string } | { status: 'down' } | { status: 'ok'; tools: EaTool[] }
@@ -33,30 +34,68 @@ function GateBadge({ gate }: { gate: EaToolGate }) {
   )
 }
 
-function ToolRows({ tools }: { tools: EaTool[] }) {
-  const groups = groupTools(tools)
+function ToolRow({ tool }: { tool: EaTool }) {
+  return (
+    <li className="border-t border-border px-3 py-2">
+      <div className="flex items-start justify-between gap-2">
+        <span className="min-w-0 font-mono wrap-anywhere">{tool.name}</span>
+        <GateBadge gate={tool.gate} />
+      </div>
+      <p className="mt-0.5 text-muted-foreground">{tool.summary}</p>
+    </li>
+  )
+}
+
+function AreaGroup({ group, open, onOpenChange }: { group: ToolGroup; open: boolean; onOpenChange: () => void }) {
+  return (
+    <Collapsible open={open} onOpenChange={onOpenChange} asChild>
+      <section aria-label={group.area} className="border-t border-border">
+        <CollapsibleTrigger className="group flex min-h-11 w-full items-center gap-2 px-3 text-left font-medium hover:bg-muted/40">
+          <ChevronRight
+            className="size-3.5 shrink-0 transition-transform group-data-[state=open]:rotate-90"
+            aria-hidden
+          />
+          <span className="min-w-0 flex-1">{group.area}</span>
+          <span className="text-muted-foreground">{String(group.tools.length)}</span>
+        </CollapsibleTrigger>
+        <CollapsibleContent asChild>
+          <ul>
+            {group.tools.map((tool) => (
+              <ToolRow key={tool.name} tool={tool} />
+            ))}
+          </ul>
+        </CollapsibleContent>
+      </section>
+    </Collapsible>
+  )
+}
+
+function ToolRows({ tools, query }: { tools: EaTool[]; query: string }) {
+  const [opened, setOpened] = useState<ReadonlySet<string>>(new Set())
+  const groups = groupTools(matchTools(tools, query))
   if (groups.length === 0) {
-    return <p className="px-3 py-2 text-muted-foreground">No tool matches.</p>
+    return <p className="border-t border-border px-3 py-2 text-muted-foreground">No tool matches.</p>
+  }
+  const toggle = (area: string) => {
+    setOpened((now) => {
+      const next = new Set(now)
+      if (!next.delete(area)) {
+        next.add(area)
+      }
+      return next
+    })
   }
   return (
     <>
       {groups.map((group) => (
-        <section key={group.area} aria-label={group.area} className="border-t border-border">
-          <h4 className="bg-muted/40 px-3 py-1.5 font-medium">
-            {group.area} <span className="text-muted-foreground">{String(group.tools.length)}</span>
-          </h4>
-          <ul>
-            {group.tools.map((tool) => (
-              <li key={tool.name} className="border-t border-border px-3 py-2">
-                <div className="flex items-start justify-between gap-2">
-                  <span className="min-w-0 font-mono wrap-anywhere">{tool.name}</span>
-                  <GateBadge gate={tool.gate} />
-                </div>
-                <p className="mt-0.5 text-muted-foreground">{tool.summary}</p>
-              </li>
-            ))}
-          </ul>
-        </section>
+        <AreaGroup
+          key={group.area}
+          group={group}
+          open={areaOpen(group.area, query, opened)}
+          onOpenChange={() => {
+            toggle(group.area)
+          }}
+        />
       ))}
     </>
   )
@@ -101,23 +140,26 @@ export function ToolsCard() {
       {loaded.status === 'error' && <p className="px-3 py-2 text-destructive">{loaded.message}</p>}
       {loaded.status === 'ok' && (
         <>
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-2 px-3 py-2">
-            <div className="relative min-w-0 flex-1 basis-48">
-              <Search className="pointer-events-none absolute top-1/2 left-2 size-3.5 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                type="search"
-                aria-label="Search tools"
-                placeholder="Search tools"
-                className="pl-7"
-                value={query}
-                onChange={(e) => {
-                  setQuery(e.target.value)
-                }}
-              />
-            </div>
-            <span data-testid="ea-tools-count">{countText(loaded.tools)}</span>
+          <div className="space-y-0.5 px-3 pt-2">
+            <p data-testid="ea-tools-count">{countText(loaded.tools)}</p>
+            <p className="text-muted-foreground">
+              Each line opens the instructions the EA itself reads, so there &quot;you&quot; means the EA.
+            </p>
           </div>
-          <ToolRows tools={matchTools(loaded.tools, query)} />
+          <div className="relative px-3 py-2">
+            <Search className="pointer-events-none absolute top-1/2 left-5 size-3.5 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              type="search"
+              aria-label="Search tools"
+              placeholder="Search tools"
+              className="pl-7"
+              value={query}
+              onChange={(e) => {
+                setQuery(e.target.value)
+              }}
+            />
+          </div>
+          <ToolRows tools={loaded.tools} query={query} />
         </>
       )}
     </SettingsCard>

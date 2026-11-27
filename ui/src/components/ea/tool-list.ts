@@ -48,3 +48,7 @@ export function groupTools(tools: readonly EaTool[]): ToolGroup[] {
   }
   return [...groups].map(([area, list]) => ({ area, tools: list }))
 }
+
+/** Areas start closed; while a search runs, every area left holds a match and stays open. */
+export const areaOpen = (area: string, query: string, opened: ReadonlySet<string>) =>
+  query.trim() !== '' || opened.has(area)
