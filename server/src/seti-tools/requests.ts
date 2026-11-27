@@ -29,7 +29,7 @@ const requestChange = setiTool({
     'yourself, written as the user types it in your reply box, such as /seti:access mcp docs off, ' +
     '/seti:access plugin lint-kit on, /seti:access ssh prod off or /seti:memory 12g; Seti reads it ' +
     'with the same grammar, refuses what it does not define, and the user allows or denies it; you ' +
-    'may propose MCP servers, plugins, context packs, hosts, SSH hosts and AWS on or off, and your ' +
+    'may propose MCP servers, plugins, context packs and hosts on or off, SSH or AWS off, and your ' +
     'own memory or CPU cap). Never ask for a key or ' +
     'token in chat, and never ask for the sandbox off, Bypass, permission rules, secret values or other ' +
     `agents. Carry on with other work or end your turn while it waits; it expires after ${HOURS} hours, and ` +

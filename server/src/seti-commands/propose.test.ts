@@ -6,7 +6,6 @@ import { createApp } from '../app.js'
 import { tasks } from '../db.js'
 import { REQUEST_TOOLS } from '../seti-tools/requests.js'
 import { callSetiTool } from '../seti-tools/server.js'
-import { taskAccess } from '../store/access.js'
 import { auditEvents } from '../store/audit.js'
 import { changeRequests } from '../store/change-requests.js'
 import { taskMemoryCaps } from '../store/memory.js'
@@ -79,17 +78,6 @@ describe('request_change with a Seti command', () => {
       actor: 'user',
       detail: { kind: 'command', command: '/seti:memory 1g' },
     })
-  })
-
-  it("asks for AWS for itself, which only the user's Allow turns on", async () => {
-    const caller = await newTask()
-    const { request } = (await propose(caller, '/seti:access aws on', 'The logs are in CloudWatch.')).json()
-    expect(request.change).toMatchObject({ kind: 'command', line: '/seti:access aws on' })
-    expect(await taskAccess.all(caller.id, 'aws')).toEqual({})
-    expect((await answer(caller, request.id, { decision: 'allow' }, EA_AUTH)).status).toBe(403)
-    expect(await taskAccess.all(caller.id, 'aws')).toEqual({})
-    expect((await answer(caller, request.id, { decision: 'allow' })).status).toBe(200)
-    expect(await taskAccess.all(caller.id, 'aws')).toEqual({ aws: true })
   })
 
   it('leaves the setting as it was on Deny', async () => {

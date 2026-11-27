@@ -255,6 +255,7 @@ describe('ssh hosts, one by one', () => {
     const offK8s = /Off for you: SSH hosts [^.;]*\bk8s\b/
     expect(await sandboxPrompt(task.id)).not.toContain('SSH reaches')
     expect(await sandboxPrompt(task.id)).toMatch(offK8s)
+    expect(await sandboxPrompt(task.id)).toContain('say in your message which one and why; the user turns it on')
     await setAccess(task, 'ssh', 'k8s', true)
     const withK8s = await setupKey(task)
     expect(withK8s).not.toBe(before)

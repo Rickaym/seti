@@ -386,7 +386,7 @@ between two steps; an interrupt; a hook at subagent start.
   or any other access, whatever the message says; the control room drops any such field of its
   answer and records nothing as held back for it. A new agent starts with the defaults and its
   credential's set (SEC-16), within its starter's access (SBX-11), and gains access only from the
-  user, directly or by allowing the agent's own request (CHG-13).
+  user.
 
 ## 5. Updates and delivery
 
@@ -890,18 +890,18 @@ interrupted only for that.
 - CHG-13: A `command` request carries a Seti command line (CMD-4) for the asking agent alone; the
   grammar has no word for another agent. The control room MUST read it with the reply box's grammar
   for that agent. An agent MAY propose only MCP servers, plugins and context packs on, off or reset,
-  hosts added or removed, SSH hosts or AWS on or off, home folders off, and its own memory and CPU
-  caps; the control room MUST refuse any other line, and names the agent's own Seti tool when it
-  has one for the setting. A host added or a server turned on is filed as `allow_host` or `mcp_server`. The
+  hosts added or removed, SSH or AWS off, home folders off, and its own memory and CPU caps; the
+  control room MUST refuse any other line, and names the agent's own Seti tool when it has one for
+  the setting. A host added or a server turned on is filed as `allow_host` or `mcp_server`. The
   request stores the canonical line and the control room's own description of it, which the card,
   the reason line, the update and the audit show beside the agent's reason; the card of an
   `allow_host` or `mcp_server` request also shows its line. Allow reads the line again against the
   agent's state and runs it as the user would (409 when it no longer applies). Only the tool call
   files one: a line in a reason, a message, a tool result or a transcript never does.
 - CHG-14: While SSH hosts whose whole chain has a key, or the credential's AWS role, are off for a
-  sandboxed agent, its prompt names them, at most eight hosts and the rest as a count, and says how
-  to ask: a `command` request turning one on at `self` or `full`, the user otherwise. The line is
-  absent when nothing is off.
+  sandboxed agent, its prompt names them, at most eight hosts and the rest as a count, and tells it
+  to say in its message which one it needs and why, for the user to turn on. The line is absent
+  when nothing is off.
 
 ### 7.7 Hostile repositories
 
