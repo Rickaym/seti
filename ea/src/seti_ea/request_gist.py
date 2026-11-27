@@ -15,7 +15,6 @@ Asks = Literal["yes", "word", "none"]
 
 # Seti's EA_READ_BACK_CHARS: a longer call is allowed in Seti only.
 READ_BACK_CHARS = 600
-PLAIN_COMMAND_CHARS = 80
 NAME_CHARS = 40
 TITLE_CHARS = 60
 PROMPT_WORDS = 20
@@ -125,17 +124,24 @@ def _segments(command: str) -> list[list[str]]:
     return [[t for t in seg if not re.match(r"^\w+=", t)] for seg in segments if seg]
 
 
-def _push(args: list[str], request: Mapping[str, Any]) -> str:
-    force = any(a in ("-f", "--force") or a.startswith("--force-with-lease") for a in args)
+def _push(args: list[str], request: Mapping[str, Any]) -> tuple[str, bool]:
+    """A push in words, and whether those words state its whole effect: repo and branch, no force."""
+    force = any(a in ("-f", "--force") or a.startswith(("--force-with-lease", "+")) for a in args)
+    delete = any(a in ("-d", "--delete") for a in args)
     places = [a for a in args if not a.startswith("-")]
-    branch = places[1].split(":")[-1].removeprefix("refs/heads/") if len(places) > 1 else ""
+    ref = places[1] if len(places) > 1 else ""
+    delete = delete or ref.startswith(":")
+    force = force or ref.startswith("+")
+    branch = spoken(ref.split(":")[-1].removeprefix("+").removeprefix("refs/heads/"))
     reason = str(request.get("reason") or "")
     pushed = re.search(r"Push to ([\w.-]+/[\w.-]+)", reason)
     prs = dicts(request.get("prs"))
     repo = _repo(pushed[1]) if pushed else _repo(str(prs[0].get("repo", ""))) if prs else ""
+    what = f"the {branch} branch" if branch else "its branch"
+    if delete:
+        return f"delete {what}{f' on {repo}' if repo else ''}", False
     verb = "force-push" if force else "push"
-    what = f"the {spoken(branch)} branch" if spoken(branch) else "its branch"
-    return f"{verb} {what}{f' to {repo}' if repo else ''}"
+    return f"{verb} {what}{f' to {repo}' if repo else ''}", not force and bool(branch and repo)
 
 
 def _gh(args: list[str], request: Mapping[str, Any]) -> tuple[str, bool]:
@@ -151,21 +157,27 @@ def _gh(args: list[str], request: Mapping[str, Any]) -> tuple[str, bool]:
     return f"run gh {spoken(' '.join(args[:2]))}".strip(), False
 
 
-def _shell(command: str, request: Mapping[str, Any]) -> tuple[str, bool]:
-    """What a shell command does in words, and whether it sends text outward."""
+def _shell(command: str, request: Mapping[str, Any]) -> tuple[str, bool, bool]:
+    """What a shell command does in words, whether it sends text outward, and whether it is plain.
+
+    Only a lone push whose words name its repo and branch is plain; any other command is read first.
+    """
     segments = _segments(command)
     for seg in segments:
         program = seg[0].rsplit("/", 1)[-1]
         if program == "git" and len(seg) > 1 and seg[1] == "push":
-            return _push(seg[2:], request), False
+            gist, plain = _push(seg[2:], request)
+            alone = len(segments) == 1 and not SHELL_OPERATORS.search(command)
+            return gist, False, plain and alone
         if program == "gh":
-            return _gh(seg[1:], request)
+            gist, outward = _gh(seg[1:], request)
+            return gist, outward, False
     seg = segments[0] if segments else [""]
     program = spoken(seg[0].rsplit("/", 1)[-1], 20)
     sub = seg[1] if len(seg) > 1 and re.fullmatch(r"[a-z][a-z-]{1,14}", seg[1]) else ""
     if program == "rm":
-        return "delete files", False
-    return f"run {program} {spoken(sub)}".strip() if program else "run a command", False
+        return "delete files", False, False
+    return (f"run {program} {spoken(sub)}".strip() if program else "run a command"), False, False
 
 
 def _mcp(tool: str) -> tuple[str, bool]:
@@ -184,29 +196,37 @@ def _file(tool: str, inputs: Mapping[str, Any]) -> str:
     return f"{'write' if tool == 'Write' else 'edit'} {name}"
 
 
+READS = ("Read", "Glob", "Grep", "LS")
+EDITS = ("Edit", "Write", "MultiEdit", "NotebookEdit")
+
+
 def call_gist(request: Mapping[str, Any]) -> tuple[str, bool, bool]:
-    """What a held call does in a few words, whether it sends text outward, and whether it is plain."""
+    """What a held call does in a few words, whether it sends text outward, and whether it is plain.
+
+    Plain means the words state the whole effect, so a bare yes may allow it: a push naming its repo
+    and branch, an edit naming its file, or a read. Anything else is read to the user first.
+    """
     tool = str(request.get("tool_name") or "")
     inputs = _input(request)
     slack = _slack(str(request.get("summary") or ""))
     if slack is not None:
         return slack, True, False
     if tool == "Bash":
-        command = str(inputs.get("command") or request.get("summary") or "")
-        gist, outward = _shell(command, request)
-        plain = len(command) <= PLAIN_COMMAND_CHARS and not SHELL_OPERATORS.search(command)
-        return gist, outward, plain and not outward
+        return _shell(str(inputs.get("command") or request.get("summary") or ""), request)
     if tool.startswith("mcp__"):
         gist, outward = _mcp(tool)
-        return gist, outward, not outward
-    if tool in ("Edit", "Write", "MultiEdit", "NotebookEdit", "Read", "Glob", "Grep", "LS"):
+        return gist, outward, False
+    if tool in READS:
         return _file(tool, inputs), False, True
+    if tool in EDITS:
+        gist = _file(tool, inputs)
+        return gist, False, not gist.endswith("a file")
     if tool == "WebFetch":
         host = re.sub(r"^https?://([^/]+).*$", r"\1", str(inputs.get("url") or ""))
-        return f"fetch a page from {host or 'the web'}", False, True
+        return f"fetch a page from {host or 'the web'}", False, False
     if tool == "WebSearch":
         return "search the web", False, True
-    return f"use {spoken(tool) or 'a tool'}", False, True
+    return f"use {spoken(tool) or 'a tool'}", False, False
 
 
 def whole(request: Mapping[str, Any]) -> bool:

@@ -734,8 +734,8 @@ interrupted only for that.
   with the user's message, never `always`, a `global` scope or edited fields. It allows a tool
   call only when the stored input is whole and at most `read_back` characters on one line, read
   back word for word with the reason line and the PRs, or, for a message going outward, as where
-  Seti says it goes and its text word for word; it MAY summarise a plan. On a call the EA-10
-  announcement MAY stand in for the read-back. Each pending
+  Seti says it goes and its text word for word; it MAY summarise a plan. On a call an EA-10
+  announcement MAY stand in for the read-back only where it states the whole effect. Each pending
   request a listing shows carries `digest`, a keyed hash of its fields and its exact call, which
   changes when anything the request asks changes.
 
@@ -1193,9 +1193,12 @@ Why: an agent woken by its own actions or by news nobody waited for burns turns 
   of its own: a courtesy with the form of address, the count when several wait, then the most
   urgent (soonest timeout, then oldest) as the agent's title and what it asks in words Seti builds
   from its own fields, never the agent's description, ids, hashes or URLs. It never speaks over
-  the user, and a reply under way finishes first. A tool call asks "Shall I allow it?"; a message
-  going outward, a long or compound command or a plan offers to read or summarise it first; a
-  question is read as asked; a secret question and an access change are left to Seti and the EA
+  the user, and a reply under way finishes first. A bare yes answers only a line that states the
+  whole effect from Seti's own fields: a lone push naming its repository and branch (never a force
+  push or a branch delete), an edit or write naming its file, or a read. Any other call, a plan and
+  a message going outward offer to read or summarise it first, and then only "allow" or "approve" in
+  so many words binds; a question is read as asked; a secret question and an access change are left
+  to Seti and the EA
   never takes a secret. Each request is said at most once per call, dropped when it was answered
   before the EA spoke, and the next follows only after the user's next turn. At most one
   unprompted announcement per spacing; "not now" or "later" holds them for the snooze unless the

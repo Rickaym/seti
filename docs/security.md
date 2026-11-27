@@ -52,8 +52,10 @@ The server, not the EA's prompt, holds the rule (`refuseUnlessOnWord` in `server
 - On a call the EA announces a new request in one sentence it builds from Seti's own fields, never
   the agent's words ([EA-10](protocol.md#14-the-assistant)). That sentence is the read-back: your
   yes right after it allows that one request as it stood, and your no denies it, passing on your
-  own words from that turn as transcribed. A message going outward or a plan takes "allow" or
-  "approve" in so many words, since the EA offers to read or summarise it first.
+  own words from that turn as transcribed. A bare yes counts only when that sentence states the
+  whole effect: a plain push naming its repository and branch, an edit naming its file, or a read.
+  Anything else, such as another shell command, a tool of an MCP server, a plan or a message going
+  outward, the EA offers to read or summarise first, and then only "allow" or "approve" counts.
 - A notification Allow, an inbox report, a webhook and a transcript never count. Agents and mods
   get none of these actions, and a paired device reaches none of these routes.
 - The audit log records each one as the EA acting on your word, with the question and the

@@ -37,7 +37,13 @@ def test_a_push_names_the_branch_and_repo_in_words_and_asks_a_plain_yes() -> Non
         "Humbaba wants to push the feat login fix branch to the dashboard repo. Shall I allow it?"
     ]
     force = call("Bash", {"command": "git push -f origin HEAD:main"})
-    assert said(force) == ["Humbaba wants to force-push the main branch. Shall I allow it?"]
+    assert said(force) == ["Humbaba wants to force-push the main branch. Shall I read it, or allow it?"]
+    gone = call("Bash", {"command": "git push origin :old"}, reason="Push to acme/dashboard, outside x")
+    assert said(gone) == [
+        "Humbaba wants to delete the old branch on the dashboard repo. Shall I read it, or allow it?"
+    ]
+    unnamed = call("Bash", {"command": "git push origin feat/x"})
+    assert said(unnamed)[0].endswith("Shall I read it, or allow it?")
 
 
 def test_a_slack_send_names_the_place_and_offers_to_read_it_first() -> None:
