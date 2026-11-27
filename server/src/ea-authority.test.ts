@@ -199,6 +199,34 @@ describe('the EA answers a held call only on the user word', () => {
     expect(await state(request)).toBe('pending')
   })
 
+  it('denies on the no to a call announcement with the words the EA heard, and allows nothing with it', async () => {
+    const { task, request } = await waiting('permit git push origin feature')
+    const heard = async (decision: 'allow' | 'deny') => {
+      const args = { request: request.id, digest: request.digest, decision, message: '', heard: 'no' }
+      const asked = await data<EaAsk>(
+        await send('POST', '/ea/asks', EA_AUTH, {
+          tool: 'answer_question',
+          args,
+          summary: 'deny on the no',
+          key: `heard:${randomUUID()}`,
+          epoch: 'e1',
+          turn: 4,
+        }),
+      )
+      await data(await send('POST', '/ea/asks/confirm', EA_AUTH, { ids: [asked.id], epoch: 'e1', turn: 5 }))
+      return asked.id
+    }
+    await refused(await answer(task, request, await heard('deny'), { decision: 'allow' }), '(decision)')
+    const told = { decision: 'deny', message: 'No, push to staging first.' }
+    await refused(await answer(task, request, await heard('allow'), told), '(decision)')
+    const res = await answer(task, request, await heard('deny'), told)
+    expect((await data<PermissionRequest>(res)).message).toBe('No, push to staging first.')
+    await auditEvents.settled()
+    const entry = await auditEvents.latest('task.permission_denied')
+    expect(entry?.summary).toMatch(/^On the user's word, the EA denied Bash/)
+    expect(entry?.detail).toMatchObject({ request: request.id, via: 'ea' })
+  })
+
   it('never always allows, keeps a rule for every agent, edits a call or allows one too long to read back', async () => {
     const { task, request } = await waiting('permit git status')
     for (const body of [

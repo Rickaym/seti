@@ -8,8 +8,10 @@ import json
 from collections.abc import Mapping
 from typing import Any
 
-from seti_ea.gate import Confirmations, ask_word, gate_key
+from seti_ea.consent import own_words
+from seti_ea.gate import ANSWER, Confirmations, Heard, ask_word, gate_key
 from seti_ea.question_tools import ID_CHARS, INPUT_CHARS, PROMPT_CHARS, data, pr_line
+from seti_ea.request_gist import body_of, call_gist
 from seti_ea.seti import SetiClient, SetiError
 from seti_ea.toolkit import ToolError, ToolResult, arg_bool, arg_str, dicts
 
@@ -17,10 +19,15 @@ TOOL = "answer_question"
 ASK_HEADER = "x-seti-ea-ask"
 # Seti's EA_READ_BACK_CHARS: a longer call is allowed in Seti, where the user reads all of it.
 READ_BACK_CHARS = 600
-AGREES = {"allow": ("allow", "approve"), "deny": ("deny",)}
+AGREES = {"allow": ("allow", "approve", "send"), "deny": ("deny",)}
+HEARD: tuple[Heard, ...] = ("yes", "word", "no")
 USER_ONLY = (
     "Only allow once or deny. Always allow, a rule for every agent and edited fields stay the "
     "user's, in Seti, Requests."
+)
+NOT_ANNOUNCED = (
+    "Not done: heard and announced belong to the questions Seti records when it announces a request on "
+    "a call. Leave them out."
 )
 CHANGED = (
     "Not done: the request changed since you read it back. Read it to the user again and ask for a new yes."
@@ -67,7 +74,14 @@ def _allow_text(request: Mapping[str, Any]) -> str:
             "You may still deny it if the user says so.",
             "Too long to read back",
         )
-    lines = [f"That allows {title} to run {request.get('tool_name')}: {data(flat, limit=READ_BACK_CHARS)}."]
+    gist, outward, _ = call_gist(request)
+    body = body_of(request) if outward else None
+    if body is not None:
+        lines = [f"That allows {title} to {gist}. The text: {data(body, limit=READ_BACK_CHARS)}."]
+    else:
+        lines = [
+            f"That allows {title} to run {request.get('tool_name')}: {data(flat, limit=READ_BACK_CHARS)}."
+        ]
     if request.get("reason"):
         lines.append(f"Seti asked because: {data(request.get('reason'), 'Seti', PROMPT_CHARS)}.")
     prs = dicts(request.get("prs"))
@@ -84,6 +98,16 @@ def _deny_text(request: Mapping[str, Any], message: str) -> str:
         target = f"{title}'s {request.get('tool_name')} call: {data(request.get('summary'))}"
     told = f", and tells it: {data(message, 'the user')}" if message else ""
     return f"That denies {target}{told}. Shall I?"
+
+
+def _heard(args: Mapping[str, Any]) -> Heard | None:
+    """The answer an announced question takes; only Seti's own recorded question carries one."""
+    heard = args.get("heard")
+    if heard is None and "announced" not in args:
+        return None
+    if ANSWER.get() is None or heard not in HEARD:
+        raise ToolError(NOT_ANNOUNCED, "Not an announced question")
+    return next(kind for kind in HEARD if kind == heard)
 
 
 class RequestAnswers:
@@ -114,7 +138,10 @@ class RequestAnswers:
         decision = arg_str(args, "decision")
         if decision not in AGREES:
             raise ToolError(USER_ONLY, "Allow once or deny")
-        message = arg_str(args, "message", required=False)
+        heard = _heard(args)
+        message = own_words(self._gate.said) if heard == "no" else arg_str(args, "message", required=False)
+        if heard == "no" and decision != "deny":
+            raise ToolError(NOT_ANNOUNCED, "Not an announced question")
         if message and decision != "deny":
             raise ToolError("A message goes only with a deny.", "Message with a deny")
         request = await self._find(arg_str(args, "request"))
@@ -124,7 +151,7 @@ class RequestAnswers:
             raise ToolError(CHANGED, "Request changed")
         read_back = _allow_text(request) if decision == "allow" else _deny_text(request, message)
         key = gate_key(TOOL, request.get("id"), decision, message, digest)
-        ask_id = await self._gate.on_word(key, arg_bool(args, "confirmed"), AGREES[decision])
+        ask_id = await self._gate.on_word(key, arg_bool(args, "confirmed"), AGREES[decision], heard or "yes")
         if ask_id is None:
             bound = {"request": request.get("id"), "decision": decision, "message": message, "digest": digest}
             before = _plan_first(request) if _is_plan(request) and decision == "allow" else ""

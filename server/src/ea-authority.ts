@@ -34,14 +34,31 @@ export async function requestDigest(request: PermissionRequest): Promise<string>
   return createHmac('sha256', DIGEST_KEY).update(JSON.stringify(parts)).digest('hex')
 }
 
+type Asked = Readonly<Record<string, unknown>>
+
 /**
  * Uses the user's spoken or typed yes to the question the EA request names, once, and returns
  * the question's id; refuses unless ea-guard.ts's rule holds for `expected`.
  */
-async function onUsersWord(c: Context, tool: EaOnWordTool, expected: Readonly<Record<string, unknown>>) {
+async function onUsersWord(c: Context, tool: EaOnWordTool, expected: (args: Asked) => Asked) {
   const id = askNamed(c)
-  refuseUnlessOnWord(id === null ? null : await eaAsks.useOnWord(id, tool, now()), expected)
+  const args = id === null ? null : await eaAsks.useOnWord(id, tool, now())
+  refuseUnlessOnWord(args, args === null ? {} : expected(args))
   return id ?? 0
+}
+
+/**
+ * What the EA's answer must match. A deny the EA recorded for the user's no to its announcement
+ * on a call (EA-10) carries the user's own words from that turn, so its message is not compared.
+ */
+function answerExpected(request: PermissionRequest, digest: string, input: AnswerPermissionInput) {
+  return (args: Asked): Asked => {
+    const base = { request: request.id, digest, decision: input.decision }
+    if (input.decision === 'deny' && args.heard === 'no') {
+      return { ...base, heard: 'no' }
+    }
+    return { ...base, message: input.message ?? '' }
+  }
 }
 
 /**
@@ -72,11 +89,5 @@ export async function eaAnswerOnWord(
   if (input.decision === 'allow' && !isPlanRequest(request) && !readsBackWhole(request.input)) {
     throw new HttpError(403, 'This call is too long for the EA to read back whole; the user allows it in Seti')
   }
-  const expected = {
-    request: request.id,
-    digest: await requestDigest(request),
-    decision: input.decision,
-    message: input.message ?? '',
-  }
-  return onUsersWord(c, 'answer_question', expected)
+  return onUsersWord(c, 'answer_question', answerExpected(request, await requestDigest(request), input))
 }
