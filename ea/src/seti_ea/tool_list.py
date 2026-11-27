@@ -80,6 +80,11 @@ def summary_of(description: str) -> str:
 def tool_list() -> list[ToolEntry]:
     """Every tool the EA's model is given, in the order it is given them."""
     return [
-        ToolEntry(name=spec.name, area=area_of(spec.name), summary=summary_of(spec.description), gate=gate_of(spec.name))
+        ToolEntry(
+            name=spec.name,
+            area=area_of(spec.name),
+            summary=summary_of(spec.description),
+            gate=gate_of(spec.name),
+        )
         for spec in TOOL_SPECS
     ]
