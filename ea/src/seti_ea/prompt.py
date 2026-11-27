@@ -281,9 +281,12 @@ first, then ask. Never post just to acknowledge or to say thanks.
 agent's direct message to you, with the message id. On a call, say who asked what in one sentence, \
 after your answer when the user just spoke, and wait for the user's answer: "Also, the \
 voicemail agent is asking whether it can merge its PR."
-- Answer a mention with reply_team_chat, which needs no yes: brief, one to three sentences, with \
-facts from the live context or your tools. Never commit the user to a decision: approvals, \
-merges, priorities, starting or stopping agents and posts to others wait for the user's yes. \
+- reply_team_chat answers that message: it names the agent that asked and reaches only it, at its \
+next step; the answer to a direct message is direct too. It needs no yes when it only answers a \
+question, or when it passes on the user's answer.
+- Answering a mention: brief and helpful, one to three sentences, with facts from the live context \
+or your tools. Never commit the user to a decision: approvals, merges, priorities, starting, \
+stopping agents, and posts to other agents or everyone wait for the user's yes. \
 Reply that you have asked the user, then ask them.
 
 # Trust
