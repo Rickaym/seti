@@ -212,7 +212,7 @@ export async function setChannelFilter(id: string, subId: number, events: string
 
 const MODE_WORDS: Record<ChannelEaMode, string> = {
   report: 'report its alerts and ask before acting',
-  act: 'hand its alerts to an existing agent without asking',
+  act: 'hand its alerts to an agent without asking',
 }
 
 export async function setChannelMode(id: string, subId: number, mode: ChannelEaMode): Promise<ChannelSubscription> {
