@@ -88,6 +88,12 @@ const capabilitiesOf = (launch: AcpLaunch): Capabilities => ({
   oneShot: acpOneShot(launch),
 })
 
+/** The model the spec's vendor names, else the profile's default. */
+function modelOf(vendor: unknown, launch: AcpLaunch): string {
+  const named = typeof vendor === 'object' && vendor !== null && 'model' in vendor ? vendor.model : null
+  return typeof named === 'string' ? named : launch.model
+}
+
 /** An ACP agent run as one process per session, in Seti's sandbox only. */
 export const acpAdapterFor = <Id extends string>(id: Id, launch: AcpLaunch): RuntimeAdapter<AcpShapes, Id> => ({
   id,
@@ -99,7 +105,7 @@ export const acpAdapterFor = <Id extends string>(id: Id, launch: AcpLaunch): Run
         servers: host.toolServers,
         cwd: spec.cwd,
         resume: spec.resume,
-        model: launch.model,
+        model: modelOf(spec.vendor, launch),
         decide: host.decide,
         signal: abortController.signal,
       }),

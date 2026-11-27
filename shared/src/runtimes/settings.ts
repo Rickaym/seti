@@ -27,6 +27,19 @@ export const CODEX_SETTINGS_DEFAULTS: CodexSettings = {
 }
 
 /**
+ * Gemini CLI as Seti runs it, which only the user changes: off until they turn it on, whether
+ * Seti's permission rules answer a Gemini agent's calls without them, and the model a new Gemini
+ * agent starts with unless it picks its own.
+ */
+export interface GeminiSettings {
+  enabled: boolean
+  evaluator_decides: boolean
+  default_model: string | null
+}
+
+export const GEMINI_SETTINGS_DEFAULTS: GeminiSettings = { enabled: false, evaluator_decides: true, default_model: null }
+
+/**
  * The models a Codex agent may pick. gpt-5.5 calls its tools directly; the newer ones call them
  * from scripts Codex's code mode host runs, and CI proves both shapes against a scripted model.
  */

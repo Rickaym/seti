@@ -1,14 +1,15 @@
-import type {
-  AddPermissionRuleInput,
-  AddPermissionRulesInput,
-  AgentPermissions,
-  AnswerPermissionInput,
-  PermissionPolicy,
-  PermissionRequest,
-  PermissionRule,
-  PermissionScope,
-  ReviewCoverage,
-  Task,
+import {
+  type AddPermissionRuleInput,
+  type AddPermissionRulesInput,
+  type AgentPermissions,
+  type AnswerPermissionInput,
+  type PermissionPolicy,
+  type PermissionRequest,
+  type PermissionRule,
+  type PermissionScope,
+  type ReviewCoverage,
+  type Task,
+  RUNTIME_NAMES,
 } from '@seti/shared'
 import { claudeRules } from './approval-ceiling.js'
 import { audit } from './audit.js'
@@ -241,16 +242,17 @@ async function answerable(task: Task, requestId: string, input: AnswerPermission
   return request
 }
 
-/** Refuses what a Codex agent cannot take: Always, whose rule would not answer for it, or a note. */
-function refuseOnCodex(task: Task, input: AnswerPermissionInput): void {
-  if (task.runtime !== 'codex') {
+/** Refuses what a Codex or Gemini agent cannot take: Always, which no rule answers, or a note. */
+function refuseOffClaude(task: Task, input: AnswerPermissionInput): void {
+  if (task.runtime === 'claude') {
     return
   }
+  const name = RUNTIME_NAMES[task.runtime]
   if (input.decision === 'always') {
-    throw new HttpError(400, "A Codex agent's request takes Allow or Deny; a rule would not answer for it")
+    throw new HttpError(400, `A ${name} agent's request takes Allow or Deny; a rule would not answer for it`)
   }
   if (input.decision === 'deny' && (input.message ?? '') !== '') {
-    throw new HttpError(400, 'Codex tells its agent only that you refused; it cannot pass on a note')
+    throw new HttpError(400, `${name} tells its agent only that you refused; it cannot pass on a note`)
   }
 }
 
@@ -266,7 +268,7 @@ export async function answerPermission(
   onWord: number | null = null,
 ): Promise<PermissionRequest> {
   refuseAgent('answer permission requests')
-  refuseOnCodex(task, input)
+  refuseOffClaude(task, input)
   const request = await answerable(task, requestId, input)
   const late = isLateRequest(request.id)
   const deny = input.decision === 'deny'

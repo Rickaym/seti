@@ -12,7 +12,8 @@ import { acpReport, namingServer, UpdateJoiner } from './records.js'
 
 /** An ACP runtime's shapes: a neutral decision, a JSON-RPC process, no hooks, rules or modes. */
 export interface AcpShapes {
-  vendor: null
+  /** The model the agent runs, or null for the profile's default. */
+  vendor: { model: string | null }
   realised: AcpRealised
   decide: AcpDecide
   hooks: null

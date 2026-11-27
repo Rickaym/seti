@@ -8,7 +8,7 @@ const GEMINI_API = 'https://generativelanguage.googleapis.com'
 const GEMINI_DEFAULT_MODEL = 'gemini-3.8-flash'
 
 /** The variable Gemini CLI reads its API key from: the key connection's placeholder. */
-const GEMINI_KEY_ENV = 'GEMINI_API_KEY'
+export const GEMINI_KEY_ENV = 'GEMINI_API_KEY'
 
 /** Seti's settings and policy files, by name in the folder `geminiLaunch` is given. */
 const SETTINGS = 'settings.json'

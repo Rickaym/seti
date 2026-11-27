@@ -1,14 +1,14 @@
-import type { Task } from '@seti/shared'
+import { RUNTIME_NAMES, type Task } from '@seti/shared'
 import { HttpError } from './http.js'
 import { agentCapabilities } from './runtimes/capabilities.js'
 
 /**
- * Refuses a Claude Code feature for an agent whose runtime has none, saying so plainly: a Codex
- * agent has no side chat, rewind or Bypass.
+ * Refuses a Claude Code feature for an agent on another runtime, saying so plainly: a Codex or
+ * Gemini agent has no side chat, rewind or Bypass.
  */
-export function refuseOnCodex(task: Pick<Task, 'runtime'>, feature: string): void {
-  if (task.runtime === 'codex') {
-    throw new HttpError(409, `Codex agents have no ${feature}`)
+export function refuseOffClaude(task: Pick<Task, 'runtime'>, feature: string): void {
+  if (task.runtime !== 'claude') {
+    throw new HttpError(409, `${RUNTIME_NAMES[task.runtime]} agents have no ${feature}`)
   }
 }
 

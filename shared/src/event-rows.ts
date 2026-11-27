@@ -1,7 +1,5 @@
 import type { RuntimeEvent } from './events.js'
 import type { TurnBlock } from './prose-question.js'
-import { projectClaude } from './runtimes/claude/project.js'
-import { projectCodex } from './runtimes/codex/project.js'
 import { projectRuntime, storedRuntime } from './runtimes/stored.js'
 import type { MessageBase, MessagePage, MessageRow } from './tasks.js'
 
@@ -51,7 +49,7 @@ export function rowEvents(row: WireRow): readonly RuntimeEvent[] {
   if (cached !== undefined) {
     return cached
   }
-  const events = row.runtime === 'codex' ? projectCodex(row.payload) : projectClaude(row.payload)
+  const events = projectRuntime(row.runtime ?? 'claude', row.payload)
   cache.set(row.payload, events)
   return events
 }

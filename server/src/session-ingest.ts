@@ -1,12 +1,15 @@
 import {
+  projectAcp,
   projectClaude,
   projectCodex,
+  type AcpRecord,
   type ClaudeMessage,
   type CodexMessage,
   type JournalEntry,
   type MessageBody,
   type MessageRow,
   type RuntimeEvent,
+  type StoredRuntime,
   type TaskStatus,
 } from '@seti/shared'
 import { audit } from './audit.js'
@@ -15,6 +18,7 @@ import { withSpend } from './codex-spend.js'
 import { auditBlockedKey } from './connection-egress.js'
 import { linkCreatedPrs } from './created-prs.js'
 import { messages, tasks } from './db.js'
+import { withGeminiCost } from './gemini-spend.js'
 import { reportMemoryEvent } from './memory-scope.js'
 import { serveNode } from './node-link.js'
 import { outwardCalls } from './outward.js'
@@ -117,6 +121,27 @@ async function storeCodexMessage(taskId: string, raw: CodexMessage): Promise<voi
   await recordStart(taskId, events)
 }
 
+/** Stores a message of a Gemini session, with the estimated cost of a turn it ends. */
+async function storeGeminiMessage(taskId: string, raw: AcpRecord): Promise<void> {
+  const m = await withGeminiCost(taskId, raw)
+  const events = projectAcp(m)
+  await addTurnCost(taskId, m.seti === 'ended' ? (m.usd ?? 0) : 0)
+  await record(taskId, { kind: 'sdk', runtime: 'gemini', payload: m }, events)
+  await recordStart(taskId, events)
+}
+
+/** Stores a runtime's message as its adapter wrote it. */
+async function storeRuntimeMessage(taskId: string, runtime: StoredRuntime, payload: unknown): Promise<void> {
+  switch (runtime) {
+    case 'codex':
+      return storeCodexMessage(taskId, payload as CodexMessage)
+    case 'gemini':
+      return storeGeminiMessage(taskId, payload as AcpRecord)
+    case 'claude':
+      return storeMessage(taskId, payload as ClaudeMessage)
+  }
+}
+
 async function reportEnd(taskId: string, status: TaskStatus, lastError: string | null): Promise<void> {
   await tasks.endTurn(taskId, {
     status,
@@ -146,10 +171,7 @@ type Ingest = { [T in JournalEntry['type']]: (taskId: string, entry: EntryOf<T>)
 /** What the control plane does with each entry a node reports. */
 const ingest: Ingest = {
   // The runtime adapter of the session wrote the payload.
-  message: async (taskId, { runtime, payload }) =>
-    runtime === 'codex'
-      ? storeCodexMessage(taskId, payload as CodexMessage)
-      : storeMessage(taskId, payload as ClaudeMessage),
+  message: async (taskId, { runtime, payload }) => storeRuntimeMessage(taskId, runtime, payload),
   'turn.started': async (taskId) => setStatus(taskId, 'running'),
   'turn.ended': async (taskId, { status, error }) => reportEnd(taskId, status, error),
   note: async (taskId, { error }) => appendMessage(taskId, { kind: 'seti', payload: { error } }),

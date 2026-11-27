@@ -1,3 +1,4 @@
+import type { StoredRuntime } from '@seti/shared'
 import { sql } from '../db.js'
 
 /** A Codex agent's own messages of one kind of event, by the event columns its ingest filled. */
@@ -13,10 +14,11 @@ export const codexTurns = {
             WHERE task_id = ${taskId} AND ${OWN_CODEX} AND event = 'turn.started'), 0)
         ORDER BY id`
     ).map((row) => row.payload),
-  /** The agent's latest session start, which names the model its turns run on. */
-  sessionStart: async (taskId: string): Promise<string | null> =>
+  /** The agent's latest session start on the runtime, which names the model its turns run on. */
+  sessionStart: async (taskId: string, runtime: StoredRuntime): Promise<string | null> =>
     (
       await sql<{ payload: string }[]>`SELECT payload FROM task_message
-        WHERE task_id = ${taskId} AND ${OWN_CODEX} AND event = 'session.started' ORDER BY id DESC LIMIT 1`
+        WHERE task_id = ${taskId} AND kind = 'sdk' AND runtime = ${runtime} AND thread = ''
+          AND event = 'session.started' ORDER BY id DESC LIMIT 1`
     ).at(0)?.payload ?? null,
 }

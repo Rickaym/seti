@@ -210,10 +210,22 @@ const runtimes = settingsSection({
           default_effort: "Its reasoning effort; null is Codex's own",
         },
       ),
+      gemini: documented(
+        {
+          enabled: z.boolean(),
+          evaluator_decides: z.boolean(),
+          default_model: z.string().nullable(),
+        },
+        {
+          enabled: 'Gemini CLI is offered as a runtime for new agents',
+          evaluator_decides: 'Rules decide: an allow rule or the read-only list answers a call without you',
+          default_model: "The model a new Gemini agent starts with; null is Gemini CLI's own",
+        },
+      ),
     },
-    { codex: 'OpenAI Codex' },
+    { codex: 'OpenAI Codex', gemini: 'Gemini CLI' },
   ),
-  security: ['codex'],
+  security: ['codex', 'gemini'],
 })
 
 const storageSection = settingsSection({

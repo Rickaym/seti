@@ -18,20 +18,36 @@ function proofCall(call: ScriptCall): ModelCall {
   return { name: 'apply_patch', input: `*** Begin Patch\n*** Add File: ${file}\n+${line}\n*** End Patch\n` }
 }
 
+/** A scripted model API on a loopback port, as the Responses and Gemini fakes are. */
+interface ScriptedApi {
+  readonly bodies: string[]
+  start(): Promise<string>
+  play(turns: Step[][]): void
+  close(): void
+}
+
 /**
- * OpenAI's API as a Codex agent's egress proxy reaches it in a test: HTTPS for `api.openai.com`
- * signed by a CA of the test's own, in front of the scripted Responses fake. It records every
- * host the proxy dials or refuses and the Authorization header of every model call.
+ * A model API as an agent's egress proxy reaches it in a test: HTTPS for the model host signed
+ * by a CA of the test's own, in front of a scripted fake. It records every host the proxy dials
+ * or refuses and the key header of every model call.
  */
-export class TestModelHost {
+export class TestModelHost<Api extends ScriptedApi> {
   readonly dialled: string[] = []
   readonly refused: string[] = []
   readonly authorizations: string[] = []
-  readonly fake = new ScriptedResponses(proofCall)
+  readonly fake: Api
+  private readonly host: string
+  private readonly keyHeader: string
   private front: https.Server | null = null
   /** The front's port and the file of the CA that signs it, once started. */
   port = 0
   caFile = ''
+
+  constructor(fake: Api, host = MODEL_HOST, keyHeader = 'authorization') {
+    this.fake = fake
+    this.host = host
+    this.keyHeader = keyHeader
+  }
 
   /** Notes what a proxy did with a host, as a proxy in this process or a split node reports it. */
   readonly note: EgressNote = (kind, host) => {
@@ -42,8 +58,8 @@ export class TestModelHost {
   async start(dir: string): Promise<ReturnType<typeof modelUpstream>> {
     const base = new URL(await this.fake.start())
     const ca = await loadSandboxCa(path.join(dir, 'model-ca'))
-    await ca.cover([MODEL_HOST])
-    const context = await ca.contextFor(MODEL_HOST)
+    await ca.cover([this.host])
+    const context = await ca.contextFor(this.host)
     const front = https.createServer(
       {
         SNICallback: (_name, done) => {
@@ -51,7 +67,8 @@ export class TestModelHost {
         },
       },
       (req, res) => {
-        this.authorizations.push(req.headers.authorization ?? '')
+        const key = req.headers[this.keyHeader]
+        this.authorizations.push(typeof key === 'string' ? key : '')
         const out = http.request(
           { host: base.hostname, port: base.port, path: req.url, method: req.method, headers: req.headers },
           (answer) => {
@@ -66,14 +83,14 @@ export class TestModelHost {
     this.front = front
     this.port = (front.address() as AddressInfo).port
     this.caFile = path.join(ca.publicDir, 'ca.pem')
-    return modelUpstream(this.port, fs.readFileSync(this.caFile, 'utf8'), this.note)
+    return modelUpstream(this.port, fs.readFileSync(this.caFile, 'utf8'), this.note, this.host)
   }
 
   play(turns: Step[][]): void {
     this.fake.play(turns)
   }
 
-  /** Every model call's body as the fake received it, joined, to find what Codex told the model. */
+  /** Every model call's body as the fake received it, joined, to find what the agent told it. */
   told(): string {
     return this.fake.bodies.join('\n')
   }
@@ -84,3 +101,8 @@ export class TestModelHost {
     this.fake.close()
   }
 }
+
+/** OpenAI's API in front of the scripted Responses fake, as a Codex agent's proxy reaches it. */
+export const codexModelHost = () => new TestModelHost(new ScriptedResponses(proofCall))
+
+export type CodexModelHost = ReturnType<typeof codexModelHost>

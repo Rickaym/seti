@@ -5,7 +5,7 @@ import type { SessionSpec } from '../session-spec.js'
 import type { OneShot } from './one-shot.js'
 
 /** Names an agent runtime; Claude Code is the only one so far. */
-export type RuntimeId = 'claude' | 'codex'
+export type RuntimeId = 'claude' | 'codex' | 'gemini'
 
 /** When an input sent during a turn reaches the agent: now, at the turn's next step, or after it. */
 export type InputPriority = 'now' | 'next' | 'later'

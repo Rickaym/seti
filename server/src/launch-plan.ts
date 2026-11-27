@@ -4,7 +4,11 @@ import { taskSsh } from './agent-access.js'
 import { profileAws, taskAws } from './aws-access.js'
 import { connectorCredential } from './claude-credential.js'
 import { codexProgram } from './codex-status.js'
+import { GEMINI_ROOT } from './config.js'
 import { effectiveCpuCap } from './cpu-cap.js'
+import { versionDir } from './gemini-fetch.js'
+import { GEMINI_PIN } from './gemini-pin.js'
+import { geminiEntry } from './gemini-status.js'
 import { agentTokenStamp } from './github-token.js'
 import { launcherFrom, sandboxFrom } from './launcher.js'
 import { taskBorrowedServers } from './mcp-borrowed.js'
@@ -46,6 +50,8 @@ export interface SandboxPlan {
    * connection that carries its OpenAI key, or null when it has none.
    */
   codex?: { modelKey: string | null }
+  /** Present for a Gemini agent, likewise: the variable of the connection with its Gemini API key. */
+  gemini?: { modelKey: string | null }
 }
 
 /**
@@ -87,6 +93,45 @@ async function codexPart(task: Task) {
   }
 }
 
+/** The pinned Gemini CLI's version folder, which a Gemini agent's sandbox mounts read-only. */
+async function geminiFolders(): Promise<string[]> {
+  const entry = await geminiEntry()
+  return entry === null ? [] : [versionDir(GEMINI_ROOT, GEMINI_PIN.version)]
+}
+
+/** A Gemini agent's part of its plan, which leaves out Claude's plugins, servers and connectors. */
+async function geminiPart(task: Task) {
+  return {
+    gemini: { modelKey: (await providerKeyConnection(task, providerOf('gemini')))?.env ?? null },
+    connectors: false,
+    borrowed: [],
+  }
+}
+
+/** The read-only folders of the agent's own runtime: its program, or Claude Code's plugins. */
+async function ownFolders(task: Task, runtime: RuntimeId): Promise<string[]> {
+  switch (runtime) {
+    case 'codex':
+      return codexFolders()
+    case 'gemini':
+      return geminiFolders()
+    case 'claude':
+      return (await taskPluginConfigs(task.id)).map((plugin) => plugin.path)
+  }
+}
+
+/** The runtime's own part of the plan, which replaces Claude Code's defaults for another runtime. */
+async function runtimePart(task: Task, runtime: RuntimeId) {
+  switch (runtime) {
+    case 'codex':
+      return codexPart(task)
+    case 'gemini':
+      return geminiPart(task)
+    case 'claude':
+      return {}
+  }
+}
+
 /** What the agent's sandbox is made of under this policy. */
 export async function sandboxPlanFor(
   task: Task,
@@ -94,8 +139,7 @@ export async function sandboxPlanFor(
   runtime: RuntimeId = task.runtime,
 ): Promise<SandboxPlan> {
   const { grant, denied } = await proxyGrant(task, runtime)
-  const own =
-    runtime === 'codex' ? await codexFolders() : (await taskPluginConfigs(task.id)).map((plugin) => plugin.path)
+  const own = await ownFolders(task, runtime)
   const tools = await sharedToolFolders(task)
   return {
     policy,
@@ -107,7 +151,7 @@ export async function sandboxPlanFor(
     github: (await agentTokenStamp(task.profile_id)) !== null,
     connectors: connectorCredential() !== null,
     aws: (await taskAws(task.id)) ? { region: (await profileAws(task.profile_id)).region } : null,
-    ...(runtime === 'codex' ? await codexPart(task) : {}),
+    ...(await runtimePart(task, runtime)),
   }
 }
 

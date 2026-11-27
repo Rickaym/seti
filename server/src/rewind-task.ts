@@ -5,7 +5,7 @@ import { HttpError } from './http.js'
 import { taskLauncher } from './launch-plan.js'
 import { rewindPoints, type RewindPoint } from './rewind.js'
 import { closeIdleSession, isRunning } from './runner.js'
-import { refuseOnCodex } from './runtime-features.js'
+import { refuseOffClaude } from './runtime-features.js'
 import {
   matchChain,
   rewindFiles,
@@ -93,7 +93,7 @@ async function plannedFiles(task: Task, match: ChainMatch): Promise<FilesRewind>
 /** What restoring code to just before a prompt would change; nothing is written. */
 export async function previewRewindFiles(taskId: string, messageId: number): Promise<RewindFilesPreview> {
   const task = await requireTask(taskId)
-  refuseOnCodex(task, 'rewind')
+  refuseOffClaude(task, 'rewind')
   const match = await locate(task, await requirePoint(task, messageId))
   const result = await plannedFiles(task, match)
   return {
@@ -123,7 +123,7 @@ export async function rewindTask(taskId: string, messageId: number, restore: Rew
   refuseOnSelf(taskId, 'rewind')
   refuseUnsupported(restore)
   const task = await requireTask(taskId)
-  refuseOnCodex(task, 'rewind')
+  refuseOffClaude(task, 'rewind')
   assertIdle(task.id)
   const point = await requirePoint(task, messageId)
   const match = await locate(task, point)

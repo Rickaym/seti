@@ -10,12 +10,12 @@ export type EgressNote = (kind: 'dialled' | 'refused', host: string) => void
  * Where a test's proxies send their traffic: the model host to the local HTTPS front on `port`,
  * trusted by `caPem`, and nothing else; each host they dial or refuse is noted.
  */
-export function modelUpstream(port: number, caPem: string, note: EgressNote) {
+export function modelUpstream(port: number, caPem: string, note: EgressNote, modelHost = MODEL_HOST) {
   const upstream: Upstream = {
     address: async (host) => {
       note('dialled', host)
-      if (host !== MODEL_HOST) {
-        throw new Error(`The test reaches only ${MODEL_HOST}`)
+      if (host !== modelHost) {
+        throw new Error(`The test reaches only ${modelHost}`)
       }
       return Promise.resolve({ host: '127.0.0.1', port })
     },

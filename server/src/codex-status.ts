@@ -12,6 +12,7 @@ import { redecideWaitingCodexCalls } from './codex-decide.js'
 import { copyState, followSettings, installCodex, type CodexInstallFailure } from './codex-install.js'
 import { CODEX_PIN } from './codex-pin.js'
 import { refuseAgent } from './ea-guard.js'
+import { geminiEntry, requireGemini } from './gemini-status.js'
 import { HttpError } from './http.js'
 import { forgetVersions, programVersion } from './program-version.js'
 import { credentialHasKey, keyedCredentials, keyOutsideDefault } from './provider-key.js'
@@ -106,11 +107,22 @@ export async function requireCodexProgram(settings: CodexSettings): Promise<stri
 }
 
 /** The program a new process of the runtime starts where Seti installs it, else null. */
-export const runtimeProgram = async (runtime: StoredRuntime): Promise<string | null> =>
-  runtime === 'codex' ? codexProgram() : Promise.resolve(null)
+export async function runtimeProgram(runtime: StoredRuntime): Promise<string | null> {
+  switch (runtime) {
+    case 'codex':
+      return codexProgram()
+    case 'gemini':
+      return geminiEntry()
+    case 'claude':
+      return null
+  }
+}
 
 /** Refuses a new agent on a runtime that cannot start one now, or on a credential without its key. */
 export async function requireRuntime(runtime: StoredRuntime, profileId: string): Promise<void> {
+  if (runtime === 'gemini') {
+    return requireGemini(profileId)
+  }
   if (runtime !== 'codex') {
     return
   }

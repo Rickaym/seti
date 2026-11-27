@@ -19,7 +19,7 @@ import { codexSettings } from './store/codex-settings.js'
 import { permissionRequests, permissionRules } from './store/permissions.js'
 import { questions } from './store/questions.js'
 import { routeEgressForTests } from './task-proxy.js'
-import { TestModelHost } from './test-codex-model.js'
+import { codexModelHost, type CodexModelHost } from './test-codex-model.js'
 import { fakeBuild, FakeRegistry } from './test-codex-registry.js'
 import { MODEL_HOST } from './test-codex-upstream.js'
 import { keyConnection } from './test-connections.js'
@@ -82,7 +82,7 @@ async function answerWaits(task: Task): Promise<void> {
   }
 }
 
-const where = async (task: Task, model: TestModelHost) => {
+const where = async (task: Task, model: CodexModelHost) => {
   const rows = await sql<{ kind: string; payload: string }[]>`SELECT kind, payload::text AS payload FROM task_message
     WHERE task_id = ${task.id} ORDER BY id DESC LIMIT 6`
   const asks = (await permissionRequests.pending(task.id)).map((r) => `${r.tool_name}:${r.summary}`)
@@ -91,7 +91,7 @@ const where = async (task: Task, model: TestModelHost) => {
 }
 
 /** Answers the agent's waits until its turn ends. */
-async function untilIdle(task: Task, model?: TestModelHost): Promise<void> {
+async function untilIdle(task: Task, model?: CodexModelHost): Promise<void> {
   const deadline = Date.now() + TURN_MS
   await pause(POLL_MS)
   while (isRunning(task.id)) {
@@ -104,7 +104,7 @@ async function untilIdle(task: Task, model?: TestModelHost): Promise<void> {
 }
 
 /** A split node in a process of its own whose proxies reach the model host, once it listens. */
-async function startNode(model: TestModelHost, notes: string): Promise<ChildProcess> {
+async function startNode(model: CodexModelHost, notes: string): Promise<ChildProcess> {
   const entry = path.join(import.meta.dirname, 'test-codex-node.ts')
   const args = ['--import', 'tsx', entry, String(model.port), model.caFile, notes]
   const child = spawn(process.execPath, args, {
@@ -184,7 +184,7 @@ async function installFrom(scratch: string, binary: string): Promise<string> {
  * runs them.
  */
 export async function proofRun(scratch: string, binary: string, split: boolean) {
-  const model = new TestModelHost()
+  const model = codexModelHost()
   const local = await model.start(scratch)
   const notes = path.join(scratch, 'egress-notes')
   const node = split ? await startNode(model, notes) : null
