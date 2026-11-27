@@ -149,7 +149,15 @@ export { projectAcp } from './runtimes/acp/project.js'
 export { promptUsage, type AcpRecord } from './runtimes/acp/shapes.js'
 export type { TurnSpend } from './runtimes/codex/shapes.js'
 export * from './runtimes/picks.js'
-export { costEstimated, PROVIDERS, providerOf, reachesProvider, type PriceRow, type ProviderId } from './providers.js'
+export {
+  costEstimated,
+  PROVIDERS,
+  providerOf,
+  reachesModelHost,
+  reachesProvider,
+  type PriceRow,
+  type ProviderId,
+} from './providers.js'
 export * from './runtimes/capabilities.js'
 export * from './runtimes/settings.js'
 export * from './runtimes/stored.js'

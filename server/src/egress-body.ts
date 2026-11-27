@@ -1,6 +1,6 @@
 import type { IncomingHttpHeaders, OutgoingHttpHeaders } from 'node:http'
 import { Transform, type Readable, type TransformCallback } from 'node:stream'
-import { hostMatches } from '@seti/shared'
+import { hostMatches, reachesModelHost } from '@seti/shared'
 import type { Target } from './egress-answers.js'
 import { swapBody } from './egress-body-swap.js'
 import { blockedText, placeholderAllowed, type EgressPlaceholder, type Refusal } from './egress-placeholders.js'
@@ -70,9 +70,14 @@ async function readUpTo(body: Readable, limit: number): Promise<{ head: Buffer; 
 
 const offText = (host: string, names: readonly string[]) =>
   `Seti sandbox proxy: refused a request to ${host} carrying the placeholder of ${names.join(', ')} in its ` +
-  "body, and sent nothing. Seti swaps a connection's value into a request body only when the user turns " +
-  'on Body for that connection in Settings, Connections; ask them, or propose it with request_change ' +
-  '(kind api_key, body true).'
+  'body, and sent nothing; retrying the same body will not help. Send the value in a header or the URL. ' +
+  'If this site takes it only in the body, ask the user to turn on Body for that connection in Settings, ' +
+  'Connections, or propose it with request_change (kind api_key, body true).'
+
+const keyText = (host: string, names: readonly string[]) =>
+  `Seti sandbox proxy: refused a request to ${host} carrying the placeholder of ${names.join(', ')} in its ` +
+  "body, and sent nothing; retrying the same body will not help. That connection holds a model provider's " +
+  'key, which goes in a header: send it there and leave it out of request bodies.'
 
 const encodedText = (host: string) =>
   `Seti sandbox proxy: ${host} takes connection values in request bodies, which Seti cannot search ` +
@@ -122,7 +127,7 @@ async function checkWhole(
   }
   const off = found.filter((entry) => !entry.body)
   if (off.length > 0) {
-    return refused(offText, target.host, off)
+    return refused(off.some((entry) => reachesModelHost(entry.hosts)) ? keyText : offText, target.host, off)
   }
   const contentType = headers['content-type'] ?? ''
   const type = bodyTypeOf(contentType) ?? 'text'

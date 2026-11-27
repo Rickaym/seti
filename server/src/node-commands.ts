@@ -104,8 +104,8 @@ serveControl({
   'proxy.connections': async ({ agent, connections }) => ({
     applied: await regrantConnections(agent, connections),
   }),
-  'proxy.model': async ({ agent, login, key }) => {
-    await openModelProxy(agent, { login, key })
+  'proxy.model': async ({ agent, ...reach }) => {
+    await openModelProxy(agent, reach)
     return {}
   },
   'aws.token': ({ agent }) => ({ token: awsToken(agent) }),

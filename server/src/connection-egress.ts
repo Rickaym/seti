@@ -1,4 +1,4 @@
-import type { GrantConnection, Task } from '@seti/shared'
+import { PROVIDERS, providerOf, type GrantConnection, type Task } from '@seti/shared'
 import { audit } from './audit.js'
 import { tasks } from './db.js'
 import { connectionRows, type ConnectionRow } from './store/connections.js'
@@ -46,9 +46,10 @@ const NOT_IN_BODIES =
   'such a request unsent'
 
 /** Where the proxy puts a value, so an agent never posts a placeholder the proxy will not swap. */
-const swapText = (bodies: boolean) =>
+const swapText = (bodies: boolean, model: readonly string[]) =>
   `Seti's proxy swaps in the real value on those hosts only, in the URL and headers (Basic auth too)` +
-  `${bodies ? IN_BODIES : NOT_IN_BODIES}; the user can turn on Body for a connection in Settings, Connections`
+  `${bodies ? IN_BODIES : NOT_IN_BODIES}, except your model calls to ${model.join(', ')}, whose bodies it ` +
+  'passes on unread and unswapped; the user can turn on Body for a connection in Settings, Connections'
 
 /** Names the variables that hold placeholders and their hosts, so the agent uses them as is. */
 export async function connectionContext(taskId: string): Promise<string | null> {
@@ -62,6 +63,7 @@ export async function connectionContext(taskId: string): Promise<string | null> 
   }
   const list = rows.map((row) => `${row.env} (${row.hosts.join(', ')}${row.body ? '; bodies too' : ''})`).join(', ')
   const sandboxed = task.sandbox && (await sandboxPolicy.get()).enabled
-  const swap = sandboxed ? swapText(rows.some((row) => row.body)) : OUTSIDE
+  const bodies = rows.some((row) => row.body)
+  const swap = sandboxed ? swapText(bodies, PROVIDERS[providerOf(task.runtime)].hosts) : OUTSIDE
   return `Connections: ${list} hold Seti placeholders: ${swap}. Never print env values or ask for the keys.`
 }

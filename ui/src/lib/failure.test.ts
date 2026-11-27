@@ -45,6 +45,27 @@ describe('classifyFailure', () => {
     })
     expect(long.title).toHaveLength(120)
   })
+
+  it.each([
+    'unexpected status 403 Forbidden: Seti sandbox proxy: refused a request to api.vendor.test carrying the ' +
+      'placeholder of vendor in its body, and sent nothing; retrying the same body will not help. Send the ' +
+      'value in a header or the URL. If this site takes it only in the body, ask the user to turn on Body for ' +
+      'that connection in Settings, Connections, or propose it with request_change (kind api_key, body true).',
+    'Seti sandbox proxy: refused a request to api.github.com carrying the placeholder of openai_key, and sent ' +
+      'nothing. Seti sends a connection only to the hosts the user allowed for it: send it to those hosts, or ' +
+      'ask the user to add this one to the connection.',
+    'Seti sandbox proxy: refused a request body over 1 MiB carrying a connection placeholder.',
+    'Seti sandbox proxy: app.login.test takes connection values in request bodies, which Seti cannot search ' +
+      'once compressed. Send the body without a Content-Encoding.',
+  ])('reads a placeholder refusal as what it is, never as a reason to turn the sandbox off: %s', (raw) => {
+    const failure = classifyFailure(raw)
+    expect(failure).toEqual({
+      kind: 'placeholder',
+      title: 'Seti held back a connection placeholder.',
+      hint: 'Seti sent nothing. Retry once the agent sends the connection only to its own hosts.',
+    })
+    expect(`${failure.title} ${failure.hint ?? ''}`).not.toMatch(/sandbox off|Body/)
+  })
 })
 
 const NOW = Date.parse('2026-10-02T15:00:00Z')

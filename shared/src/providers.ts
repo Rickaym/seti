@@ -132,6 +132,14 @@ export type ProviderId = keyof typeof PROVIDERS
 export const reachesProvider = (provider: ProviderId, patterns: readonly string[]): boolean =>
   patterns.some((pattern) => PROVIDERS[provider].hosts.some((host) => hostMatches(pattern, host)))
 
+/** Whether a built-in provider serves its models on the host; only these are model hosts. */
+export const isModelHost = (host: string): boolean =>
+  Object.values(PROVIDERS).some((provider) => provider.hosts.includes(host))
+
+/** Whether a connection on these host patterns reaches any provider's model calls. */
+export const reachesModelHost = (patterns: readonly string[]): boolean =>
+  Object.values(PROVIDERS).some((provider) => patterns.some((p) => provider.hosts.some((h) => hostMatches(p, h))))
+
 /** The provider each runtime's agents reach, which signs their model calls. */
 const RUNTIME_PROVIDERS: Record<StoredRuntime, ProviderId> = { claude: 'anthropic', codex: 'openai', gemini: 'google' }
 
