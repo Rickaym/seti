@@ -11,13 +11,14 @@ from collections.abc import Awaitable, Callable, Mapping, Sequence
 from typing import Any, cast
 
 from loguru import logger
-from openai import AsyncOpenAI, OpenAIError
+from openai import OpenAIError
 from pipecat.frames.frames import TranscriptionFrame
 from pipecat.observers.base_observer import BaseObserver, FramePushed
 
 from seti_ea.announce import ACTION_LINES, DIRECT_LINE, GROUP_CHAT_LINES, PHRASES, SLEEP_LINE, THINK_LINES
 from seti_ea.config import Settings
 from seti_ea.language import DEFAULT, LANGUAGES, MULTI, heard_language
+from seti_ea.llm import openai_client
 from seti_ea.seti import SetiClient
 from seti_ea.think_speech import OTHER_STEP, STARTED_LINE, STEP_LINES, STILL_LINES
 from seti_ea.usage import UsageRecorder, response_record
@@ -89,7 +90,7 @@ def parse_lines(text: str, count: int) -> list[str]:
 
 def responses_translate(settings: Settings, seti: SetiClient) -> Translate:
     """Translates with the think model on the Responses API, storing nothing."""
-    client = AsyncOpenAI(api_key=settings.openai_api_key)
+    client = openai_client(settings)
 
     async def translate(language: str, lines: Sequence[str]) -> list[str]:
         numbered = [{"id": number, "text": line} for number, line in enumerate(lines)]

@@ -19,7 +19,6 @@ from seti_ea.bot import (
     filler_frame,
     keyterms,
     language_frames,
-    openai_llm,
     put_to_sleep,
     sleep_schema,
     smart_turn,
@@ -28,6 +27,7 @@ from seti_ea.bot import (
     voice_text_transforms,
 )
 from seti_ea.clock import TimeNotes, parse_user_clock
+from seti_ea.llm import model_llm
 from seti_ea.prompt import GREETING, SYSTEM_PROMPT
 from seti_ea.toolkit import ToolResult
 from seti_ea.tools import TOOL_SPECS, EaTools
@@ -280,11 +280,11 @@ def test_the_ea_is_told_to_sound_natural_and_not_copy_terse_notes() -> None:
 
 def test_the_llm_turns_reasoning_off_unless_left_to_the_model() -> None:
     invocation = cast(OpenAILLMInvocationParams, {"messages": []})
-    params = openai_llm(settings(openai_api_key="op"), "gpt-6-luna").build_chat_completion_params(invocation)
+    params = model_llm(settings(openai_api_key="op"), "gpt-6-luna").build_chat_completion_params(invocation)
     assert params["model"] == "gpt-6-luna"
     assert params["reasoning_effort"] == "none"
     legacy = settings(openai_api_key="op", reasoning_effort="default")
-    assert "reasoning_effort" not in openai_llm(legacy, "gpt-4.1").build_chat_completion_params(invocation)
+    assert "reasoning_effort" not in model_llm(legacy, "gpt-4.1").build_chat_completion_params(invocation)
 
 
 def test_smart_turn_ends_the_users_turn_and_waits_longer_on_an_unfinished_one() -> None:
