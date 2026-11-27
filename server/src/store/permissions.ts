@@ -18,6 +18,8 @@ export type NewPermissionRequest = Pick<
   PermissionRequest,
   'id' | 'task_id' | 'tool_name' | 'kind' | 'summary' | 'input' | 'reason' | 'suggestions' | 'editable'
 > & {
+  /** The runtime's id of the call; none by default. */
+  call_id?: string | null
   /** What the agent says the call is for; none by default. */
   description?: string | null
   /** A hash of the exact call, which an answer given after a restart allows once. */
@@ -97,9 +99,9 @@ export const permissionRequests = {
   open: async (request: NewPermissionRequest): Promise<PermissionRequest> => {
     const at = now()
     const [row] = await sql<RequestRecord[]>`INSERT INTO permission_request
-      (id, task_id, tool_name, kind, summary, description, input, reason, suggestions, editable, state,
+      (id, task_id, tool_name, call_id, kind, summary, description, input, reason, suggestions, editable, state,
         created_at, timeout_at, input_hash)
-      VALUES (${request.id}, ${request.task_id}, ${request.tool_name}, ${request.kind}, ${request.summary},
+      VALUES (${request.id}, ${request.task_id}, ${request.tool_name}, ${request.call_id ?? null}, ${request.kind}, ${request.summary},
         ${request.description ?? null}, ${request.input}, ${request.reason}, ${JSON.stringify(request.suggestions)}, ${request.editable},
         'pending', ${at}, ${timeoutAt(at, request.timeout_minutes)}, ${request.input_hash ?? null}) RETURNING *`
     if (row === undefined) {

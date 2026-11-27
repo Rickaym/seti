@@ -82,6 +82,17 @@ const RANGE = /@(\d+):(\d+)$/
 /** The locator of a whole result shown as numbered lines, read without the numbers. */
 export const NUMBERED = '~numbered'
 
+/** The locator of a whole result that shows lines `from` to `to` of a file, as printed. */
+export const linesLocator = (lines: readonly [number, number]) => `~lines:${String(lines[0])}-${String(lines[1])}`
+
+const LINES_LOCATOR = /^~lines:(\d{1,9})-(\d{1,9})$/
+
+/** The lines of a file an item's spans say its result shows, or null when they say none. */
+export function linesOfSpans(spans: readonly string[]): [number, number] | null {
+  const found = spans.length === 1 ? LINES_LOCATOR.exec(spans[0] ?? '') : null
+  return found === null ? null : [Number(found[1]), Number(found[2])]
+}
+
 const LINE_NUMBER = /^\s*\d{1,9}[\t\u2192]/
 
 /** Numbered lines without their numbers; null when no line is numbered. */
@@ -107,6 +118,9 @@ export function shownLines(text: string): [number, number] | null {
 function locate(text: string, locator: string): string | null {
   if (locator === NUMBERED) {
     return unnumbered(text)
+  }
+  if (LINES_LOCATOR.test(locator)) {
+    return text
   }
   const range = RANGE.exec(locator)
   const pointer = range === null ? locator : locator.slice(0, range.index)

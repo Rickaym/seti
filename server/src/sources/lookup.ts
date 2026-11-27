@@ -3,7 +3,7 @@ import { messages } from '../db.js'
 import { redactCredentials } from '../scrub.js'
 import { slackNames } from '../store/slack-names.js'
 import { sourceItems, type SourceItem } from '../store/sources.js'
-import { itemText } from './item.js'
+import { itemText, linesOfSpans } from './item.js'
 import { normalise } from './quote.js'
 import { filePathOf } from './refs.js'
 
@@ -52,7 +52,9 @@ async function texts(taskId: string, candidates: readonly Candidate[]): Promise<
 
 /** A file as its repository and path, a local copy said so, since it has no permalink. */
 function filePlace(item: Candidate): string {
-  const named = `${item.container}/${filePathOf(item.ref)}`
+  const lines = linesOfSpans(item.spans)
+  const range = lines === null ? '' : ` lines ${String(lines[0])}-${String(lines[1])}`
+  const named = `${item.container}/${filePathOf(item.ref)}${range}`
   return item.permalink === '' ? `${named} (local file)` : named
 }
 

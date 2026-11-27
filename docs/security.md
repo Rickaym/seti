@@ -316,7 +316,9 @@ A file the agent reads in a GitHub clone is placed with git on the host, in a cl
 write to, so its config and attributes are input ([SRC-8](protocol.md#37-evidence-ledger)). Git
 runs with the guards Seti uses for agents' repositories, the file is compared with HEAD by hashing
 its bytes with no filter, and a link that leads out of the clone gives no item. The clone's remote
-and history are the agent's, so a permalink says where the agent's clone says the file came from.
+and history are the agent's, so a permalink says where the agent's clone says the file came from. A file printed with a plain shell read
+is placed the same way, and its text is the result the agent saw, never the file read again
+([SRC-10](protocol.md#37-evidence-ledger)).
 
 ## Redaction of what agents print
 

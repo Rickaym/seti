@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { githubRead } from './github.js'
 import { itemText } from './item.js'
 import { linearKeyIn, linearRead } from './linear.js'
+import { shellReadAsk } from './shell-reads.js'
 import { slackHostIn, slackRead } from './slack.js'
 import {
   CHANNEL,
@@ -429,5 +430,20 @@ describe('GitHub adapter', () => {
     ['a read sent to a file', 'gh pr view 12 -R acme/api > /tmp/pr.txt; cat /tmp/pr.txt', prViewText(repo, 12, 'x')],
   ])('spoof or unread form: %s gives nothing', (_name, command, answer) => {
     expect(recorded('Bash', { command }, answer)).toEqual([])
+  })
+})
+
+describe('Shell read adapter', () => {
+  it.each(['cat docs/a.md', 'cd docs && sed -n 1,5p a.md', 'nl a.md', 'head -n 3 a.md; tail -n +4 a.md'])(
+    'takes `%s` to place in the clone',
+    (command) => {
+      expect(shellReadAsk(claudeToolCall('call-1', ...bash(command)))).toEqual({ command })
+    },
+  )
+
+  it('leaves a line that prints no file and a file reading tool to others', () => {
+    expect(shellReadAsk(claudeToolCall('call-1', ...bash('git status')))).toBeNull()
+    expect(shellReadAsk(claudeToolCall('call-1', ...bash('concat a.md')))).toBeNull()
+    expect(shellReadAsk(claudeToolCall('call-1', 'Read', { file_path: '/x/a.md' }))).toBeNull()
   })
 })

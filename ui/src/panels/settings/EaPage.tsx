@@ -16,6 +16,7 @@ import { LanguageSetting } from '@/components/ea/LanguageSetting'
 import { LiveContextCard } from '@/components/ea/LiveContextCard'
 import { RelayCheck } from '@/components/ea/RelayCheck'
 import { SetupCard } from '@/components/ea/SetupCard'
+import { ToolsCard } from '@/components/ea/ToolsCard'
 import { UsageCard } from '@/components/ea/UsageCard'
 import { WakeSetting } from '@/components/ea/WakeSetting'
 import { useEaCall, useEaCallStore } from '@/components/ea/call-context'
@@ -173,6 +174,7 @@ export function EaPage() {
         </SettingsCard>
         <UsageCard />
         <LiveContextCard />
+        <ToolsCard />
       </div>
     </SettingsBody>
   )

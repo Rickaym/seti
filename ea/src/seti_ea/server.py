@@ -1,4 +1,4 @@
-"""HTTP endpoints of the EA: health, ICE servers and SmallWebRTC signalling."""
+"""HTTP endpoints of the EA: health, its tool list, ICE servers and SmallWebRTC signalling."""
 
 import asyncio
 import contextlib
@@ -29,6 +29,7 @@ from seti_ea.ice import IceProvider, IceServerDict, peer_servers
 from seti_ea.inbox import InboxPump
 from seti_ea.seti import SetiClient
 from seti_ea.spotter import LOCAL_SPOTTER
+from seti_ea.tool_list import tool_list
 from seti_ea.tools import EaTools
 
 if TYPE_CHECKING:
@@ -339,6 +340,10 @@ def create_app(
             "chat_missing": settings.chat_missing,
             "turn": settings.turn,
         }
+
+    @app.get("/tools")
+    async def tools_list() -> dict[str, Any]:
+        return {"tools": tool_list()}
 
     @app.get("/ice")
     async def ice_servers() -> dict[str, Any]:

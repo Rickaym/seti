@@ -435,7 +435,9 @@ only the read tools in `THINK_TOOLS` and `store=False` at OpenAI; the conversati
 works. `promises.py` implements EA-12 without a model call. `settle.py` and `held.py` implement
 EA-10. The EA posts usage records (numbers and model names, never text) to `ea_usage`, kept 30
 days. The language setting reaches Deepgram, ElevenLabs and the prompt; the wake word model knows
-English sounds only.
+English sounds only. `tool_list.py` serves the EA's tools at `/tools`, with an area read from
+each name and the gate from `CONFIRM_TOOLS` and `ON_WORD_TOOLS`; the EA settings page lists them
+(EA-20).
 
 ### How the EA speaks
 

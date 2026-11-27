@@ -75,7 +75,13 @@ describe("Seti's answer to a Codex agent's call", () => {
   it('asks the user about a call the rules would allow, with Allow and Deny only, and counts beside', async () => {
     const decided = decideCodexCall(TASK, shell('ls'), new AbortController().signal)
     const request = await pending()
-    expect(request).toMatchObject({ tool_name: 'Bash', kind: 'tool', suggestions: [], editable: false })
+    expect(request).toMatchObject({
+      tool_name: 'Bash',
+      call_id: 'call-ls',
+      kind: 'tool',
+      suggestions: [],
+      editable: false,
+    })
     await expect(answerPermission(task, request.id, { decision: 'always' })).rejects.toThrow(/Allow or Deny/)
     await answerPermission(task, request.id, { decision: 'allow' })
     expect(await decided).toEqual({ allow: true })

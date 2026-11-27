@@ -43,3 +43,14 @@ describe('editMarkText', () => {
     )
   })
 })
+
+describe('editMarkText under a row that shows what was sent', () => {
+  it('drops the draft clause for a Slack send and for any other call', () => {
+    expect(editMarkText({ fields: ['message'], denied: false, tool: SLACK }, true)).toBe(
+      'You edited the message before it was sent.',
+    )
+    expect(editMarkText({ fields: ['title'], denied: false, tool: 'mcp__github__create_issue' }, true)).toBe(
+      'You edited the title before github.create_issue ran.',
+    )
+  })
+})

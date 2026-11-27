@@ -69,8 +69,9 @@ beforeEach(async () => {
 describe('a push outside the user organisations', () => {
   it("asks for a Claude agent through its hook, offering the owner's PushTo rule", async () => {
     expect(await pushCall(claude, bash('git push origin main'), signal)).toEqual({})
-    const held = pushCall(claude, bash('git push theirs main'), signal)
+    const held = pushCall(claude, { ...bash('git push theirs main'), id: 'toolu_push' }, signal)
     const request = await pending(claude.id)
+    expect(request.call_id).toBe('toolu_push')
     expect(request.reason).toBe('Push to other/tool, outside your organisations')
     expect(request.suggestions).toEqual(['PushTo(other)'])
     await answerPermission(claude, request.id, { decision: 'deny' })

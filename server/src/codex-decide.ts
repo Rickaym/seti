@@ -173,7 +173,15 @@ export async function decideCodexCall(taskId: string, call: ToolCall, signal: Ab
     ids.push(id)
     waitingCalls.set(id, waits)
   }
-  const ask = { tool: read.name, input: shownInput(call), review, reason, opened, ...shellOf(read, call, task) }
+  const ask = {
+    tool: read.name,
+    callId: call.callId,
+    input: shownInput(call),
+    review,
+    reason,
+    opened,
+    ...shellOf(read, call, task),
+  }
   try {
     const result = await askCodexUser(task.id, ask, [signal])
     if (!answeredByRules.has(waits)) {

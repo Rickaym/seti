@@ -13,6 +13,7 @@ const REQUEST: PermissionRequest = {
   id: 'request-1',
   task_id: 'task-1',
   tool_name: 'Bash',
+  call_id: null,
   kind: 'tool',
   summary: COMMAND,
   description: null,

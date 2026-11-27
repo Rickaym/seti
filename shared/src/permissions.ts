@@ -158,6 +158,8 @@ export interface PermissionRequest {
   id: string
   task_id: string
   tool_name: string
+  /** The runtime's id of the held call, which links it to the call's row; null where none is given. */
+  call_id: string | null
   kind: PermissionRequestKind
   /** One line of what the call does, such as its command or file. */
   summary: string
@@ -233,6 +235,7 @@ export const permissionRequestSchema = z.object({
   id: z.string(),
   task_id: z.string(),
   tool_name: orDefault('tool_name', z.string(), 'tool'),
+  call_id: maybeText('call_id'),
   kind: orDefault<PermissionRequestKind>('kind', z.enum(PERMISSION_REQUEST_KINDS), 'tool'),
   summary: orDefault('summary', z.string(), ''),
   description: maybeText('description'),

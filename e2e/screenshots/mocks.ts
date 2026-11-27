@@ -56,6 +56,7 @@ const PERMISSION: PermissionRequest = {
   id: 'perm-infra-1',
   task_id: AGENTS.infra,
   tool_name: 'Bash',
+  call_id: null,
   kind: 'tool',
   summary: INFRA_COMMAND,
   description: null,

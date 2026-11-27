@@ -28,14 +28,14 @@ const decide = (
  */
 export async function reviewCall(
   task: Task,
-  call: { tool: string; input: Record<string, unknown> },
+  call: { tool: string; id?: string | undefined; input: Record<string, unknown> },
   signal: AbortSignal,
 ): Promise<HookJSONOutput> {
   const { tool, input } = call
   if (!(await reviewed(task.id, tool)) || (await permissionSettings(task)).deny.some((rule) => namesTool(rule, tool))) {
     return {}
   }
-  const { result, note } = await askForReview(task.id, call, [signal])
+  const { result, note } = await askForReview(task.id, { tool, callId: call.id, input }, [signal])
   if (result.behavior === 'deny') {
     return decide('deny', { permissionDecisionReason: result.message })
   }
