@@ -17,8 +17,16 @@ import { audit } from './audit.js'
 import { binaryPath } from './binaries.js'
 import { ARCHIVE_ROOT } from './config.js'
 import { now, tasks } from './db.js'
-import { directoryBytes, removeWorktree } from './git.js'
-import { busyReason, OWNED_ROOTS, removalRefusal, removeOwnedDir, scratchDirOf, type OwnedRoot } from './owned-dirs.js'
+import { directoryBytes } from './git.js'
+import {
+  busyReason,
+  OWNED_ROOTS,
+  removalRefusal,
+  removeOwnedDir,
+  removeWorktree,
+  scratchDirOf,
+  type OwnedRoot,
+} from './owned-dirs.js'
 import { stopTaskProbes } from './runtimes/claude/probe-launch.js'
 import { taskArchives } from './store/archive.js'
 import { taskLocation } from './store/task-location.js'

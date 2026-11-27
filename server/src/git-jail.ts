@@ -36,20 +36,25 @@ function heldProblem(folder: string): string | null {
   return held === undefined ? null : `${folder} holds ${held}`
 }
 
-/** The repository's top and git folders around `cwd`; an empty folder stands in outside one. */
+/**
+ * The repository's top read-only and its shared git folder, writable for a write, around `cwd`;
+ * an empty folder stands in outside one. A write changes git's records, never checked-out files.
+ */
 function repoMounts(cwd: string, write: boolean): Mount[] {
   const found = repoTop(cwd)
   if (found === null) {
     return [{ kind: 'tmpfs', dest: cwd }]
   }
-  const folders = [found.top, ...(found.git.linked ? [found.git.common] : [])]
-  return folders.map((folder) => {
+  const { top, git } = found
+  const shared = write || git.linked ? [git.common] : []
+  for (const folder of [top, ...shared]) {
     const problem = heldProblem(folder)
     if (problem !== null) {
       throw new Error(`git does not run in ${cwd}: its repository ${problem}`)
     }
-    return { kind: write ? 'bind' : 'ro-bind', src: folder, dest: folder }
-  })
+  }
+  const kind = write ? 'bind' : 'ro-bind'
+  return [{ kind: 'ro-bind', src: top, dest: top }, ...shared.map((dir): Mount => ({ kind, src: dir, dest: dir }))]
 }
 
 /** The mounts of the jail for one command, the git program's own folder included. */

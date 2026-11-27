@@ -526,6 +526,11 @@ interrupted only for that.
   control room's data MUST NOT be visible.
 - SBX-7: `home_access` adds the user's top-level non-dot home folders read-write, with their
   repository config and hooks read-only.
+- SBX-16: Where a sandbox mounts a repository's git folder writable, every file there that git
+  reads as config or code MUST be read-only to the agent whether or not it exists when the
+  sandbox starts: the config and the main checkout's `config.worktree`, the hooks folder and, for
+  a worktree, its own `config.worktree` and the submodules' git folders (`modules`).
+  Why: the user's own git reads them, and a new worktree copies `config.worktree`.
 - SBX-9: Every command the user runs for an agent (shell, terminal, side question, rewind helper)
   MUST run in its sandbox. An unsandboxed agent has the user's access to the host; credentials and
   the allowlist do not apply to it.
@@ -825,11 +830,14 @@ interrupted only for that.
 - HST-1: Everything in an agent's folder is input the agent wrote and MUST NOT run code on the
   host. Code-host text (titles, branches, checks, comments) is rendered as text and reaches agents
   only as an update or tool result.
-- HST-2: The control room runs version control in an agent-writable folder only in a jail with
-  no network, no home folder and none of its own data or environment, which sees the system
-  folders and that repository's own folders, read-only unless the command writes; hooks,
+- HST-2: The control room runs version control in an agent-writable folder, and in a registered
+  repository's own checkout whose git folder a sandbox can write (making, listing, removing and
+  restoring worktrees, warming caches), only in a jail with no network, no home folder and none
+  of its own data or environment, which sees the system folders and that repository's own
+  folders: its files read-only, and its git folder writable only when the command writes; hooks,
   external commands, helpers and transports are disabled too, and system and user config ignored.
-  A repository pointer file is followed only when the repository records that folder.
+  A repository pointer file is followed only when the repository records that folder. Making a
+  worktree fetches nothing; it checks out the base branch as the repository last fetched it.
   Why: a repository's config and attributes name programs, such as filter, diff and merge
   drivers, signing programs and its submodules' own config, that no fixed setting switches off.
 - HST-4: The capability probe of a sandboxed agent's folder MUST run in its sandbox; any other
@@ -1719,9 +1727,12 @@ treat every agent as holding the user's access.
 - An unsandboxed agent can read every secret on the host.
 - Where the sandbox cannot start on the host, no agent runs sandboxed and version control in an
   agent's folder runs on the host with only the settings of HST-2.
-- Version control in a registered repository's own checkout, such as making or restoring a
-  worktree Seti made, runs on the host with the user's config; the sandbox mounts that
-  repository's config and hooks read-only.
+- Version control in a registered repository's own checkout runs in the jail of HST-2 too, so a
+  worktree Seti makes runs none of the repository's hooks and only the filters its own config
+  names, in the jail; files tracked through a filter the user's global config defines, such as
+  Git LFS, are checked out as stored. The user's own git there reads only config an agent cannot
+  write (SBX-16), unless the user's config points `include.path` or `core.hooksPath` into the git
+  folder.
 - Approval is review, not proof: a shared tool, knowledge note or mod the user allows unread runs
   with each agent's access. Cards therefore show the whole artefact and only the difference on
   update.

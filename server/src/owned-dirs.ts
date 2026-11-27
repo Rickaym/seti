@@ -209,6 +209,17 @@ export async function removeOwnedDir(dir: string, root: OwnedRoot, others: reado
   return null
 }
 
+/** Removes a worktree Seti made and drops its record from the repository at `repoPath`. */
+export async function removeWorktree(repoPath: string, dir: string): Promise<void> {
+  if (fs.existsSync(dir)) {
+    const refusal = await removeOwnedDir(dir, 'worktrees', [])
+    if (refusal !== null) {
+      throw new Error(refusal)
+    }
+  }
+  await forgetWorktree(repoPath, dir)
+}
+
 const REBUILDABLE_NAMES = new Set<string>([...REBUILDABLE_DIRS, ...REBUILDABLE_IF_IGNORED])
 
 /** Where a rebuildable folder lies: an agent's own folder, one level below an owned root. */
