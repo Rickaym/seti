@@ -3,8 +3,11 @@ import type { PermissionResult } from '@anthropic-ai/claude-agent-sdk'
 import { describe, expect, it } from 'vitest'
 import { tasks } from './db.js'
 import { nodeLink } from './node-link.js'
+import { waitsFor } from './permission-requests.js'
 import { answerPermission } from './permission-rules.js'
 import { answerQuestions } from './question-answers.js'
+import { waiterOf } from './questions.js'
+import { stopForRestart } from './restart-state.js'
 import { isLateGroup, isLateRequest, keepLeftoverRequests } from './restart-waits.js'
 import './runner.js'
 import { permissionRequests } from './store/permissions.js'
@@ -33,7 +36,7 @@ const options = { toolUseID: 'toolu_1', requestId: 'req_1' }
 /** The node asks once; the control plane that answered stops before the user does. */
 async function askedBeforeRestart(taskId: string, ask: string, tool: string, input: Record<string, unknown>) {
   const first = new AbortController()
-  void nodeLink
+  const ended = nodeLink
     .answer(
       { type: 'ask', id: ask, agent: taskId, ask: 'permission.ask', body: { tool, input, options } },
       first.signal,
@@ -42,6 +45,9 @@ async function askedBeforeRestart(taskId: string, ask: string, tool: string, inp
   await expect
     .poll(async () => (await permissionRequests.pending(taskId)).length + (await questions.openList(taskId)).length)
     .toBe(1)
+  stopForRestart()
+  first.abort()
+  await ended
 }
 
 const resultOf = (answer: unknown) => (answer as { result: PermissionResult }).result
@@ -64,7 +70,8 @@ describe('an ask a node sends again after the control plane restarted', () => {
       },
       new AbortController().signal,
     )
-    await expect.poll(async () => (await permissionRequests.pending(id)).map((request) => request.id)).toEqual([ask])
+    await expect.poll(() => waitsFor(ask)).toBe(true)
+    expect((await permissionRequests.pending(id)).map((request) => request.id)).toEqual([ask])
     expect(await answerPermission(await taskOf(id), ask, { decision: 'allow' })).toBeTruthy()
     expect(resultOf(await again)).toMatchObject({ behavior: 'allow' })
     expect(await permissionRequests.pending(id)).toEqual([])
@@ -88,6 +95,7 @@ describe('an ask a node sends again after the control plane restarted', () => {
       { type: 'ask', id: ask, agent: id, ask: 'permission.ask', body: { tool: 'AskUserQuestion', input, options } },
       new AbortController().signal,
     )
+    await expect.poll(() => waiterOf(ask) !== undefined).toBe(true)
     const [question] = await questions.group(ask)
     expect(await questions.openList(id)).toHaveLength(1)
     await answerQuestions({ items: [{ id: question?.id ?? '', action: 'answer', selected: ['Yes'], other: null }] })
