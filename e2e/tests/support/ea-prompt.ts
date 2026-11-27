@@ -17,7 +17,7 @@ const part = (fields: Omit<EaPromptPart, 'chars' | 'per_turn' | 'built_at'>, at?
 })
 
 /** The parts a running EA answers, with a base prompt about as long as the real one. */
-export const PROMPT_PARTS = (sentAt: string): EaPromptPart[] => [
+const promptParts = (sentAt: string): EaPromptPart[] => [
   part({ key: 'base', label: 'Base prompt', about: 'The system prompt of every call and chat.', text: BASE }),
   part({
     key: 'call',
@@ -52,6 +52,6 @@ export const PROMPT_PARTS = (sentAt: string): EaPromptPart[] => [
 export async function fakeEaPrompt(page: Page): Promise<void> {
   const sentAt = new Date(Date.now() - 120_000).toISOString()
   await page.route('**/api/ea/prompt', async (route) =>
-    route.fulfill({ json: { data: { commit: '0123456789abcdef', parts: PROMPT_PARTS(sentAt) } } }),
+    route.fulfill({ json: { data: { commit: '0123456789abcdef', parts: promptParts(sentAt) } } }),
   )
 }
