@@ -218,7 +218,7 @@ async def test_the_check_reruns_a_finished_reply_and_holds_the_note_for_a_cut_of
     assert await kept.reply_ended() is False
 
 
-async def test_a_typed_promise_is_carried_out_in_the_same_reply(fake_seti: FakeSeti) -> None:
+async def test_a_typed_promise_is_carried_out_in_the_same_reply(fake_seti: FakeSeti, llm_api: str) -> None:
     script = Script(
         [
             ["I'm here. I'll pass your decisions to the logout agent so it keeps moving."],
@@ -226,7 +226,7 @@ async def test_a_typed_promise_is_carried_out_in_the_same_reply(fake_seti: FakeS
             ["Sent: no flag is needed."],
         ]
     )
-    chat = make_chat(fake_seti, script, Conversation())
+    chat = make_chat(fake_seti, script, Conversation(), llm_api=llm_api)
 
     events = await events_of(chat, "No need for explicit flags. Okay, I can hear you now.")
 
@@ -239,7 +239,9 @@ async def test_a_typed_promise_is_carried_out_in_the_same_reply(fake_seti: FakeS
     assert not any(NOTE_PREFIX in str(message.get("content")) for _, message in stored(fake_seti))
 
 
-async def test_keep_it_going_sends_the_direct_message_without_a_yes(fake_seti: FakeSeti) -> None:
+async def test_keep_it_going_sends_the_direct_message_without_a_yes(
+    fake_seti: FakeSeti, llm_api: str
+) -> None:
     script = Script(
         [
             [
@@ -250,7 +252,7 @@ async def test_keep_it_going_sends_the_direct_message_without_a_yes(fake_seti: F
             ["Sent."],
         ]
     )
-    chat = make_chat(fake_seti, script, Conversation())
+    chat = make_chat(fake_seti, script, Conversation(), llm_api=llm_api)
 
     await events_of(chat, "I finished the issue myself keep the logout button going")
 
@@ -259,14 +261,14 @@ async def test_keep_it_going_sends_the_direct_message_without_a_yes(fake_seti: F
     assert len(script.seen) == 3
 
 
-async def test_a_reply_that_keeps_its_word_runs_once(fake_seti: FakeSeti) -> None:
+async def test_a_reply_that_keeps_its_word_runs_once(fake_seti: FakeSeti, llm_api: str) -> None:
     script = Script(
         [
             [("call-1", "post_team_chat", {"to": "logout button", "text": "Rebase please."})],
             ["I've told the logout agent to rebase."],
         ]
     )
-    chat = make_chat(fake_seti, script, Conversation())
+    chat = make_chat(fake_seti, script, Conversation(), llm_api=llm_api)
 
     await events_of(chat, "Tell the logout agent to rebase.")
 

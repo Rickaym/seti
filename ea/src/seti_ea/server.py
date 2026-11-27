@@ -339,6 +339,8 @@ def create_app(
             "missing": settings.missing,
             "model": settings.model,
             "text_model": settings.chat_model,
+            "llm_api": settings.llm_api,
+            "llm_host": settings.llm_host,
             "chat_missing": settings.chat_missing,
             "turn": settings.turn,
         }

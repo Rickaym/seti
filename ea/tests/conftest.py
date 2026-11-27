@@ -25,3 +25,8 @@ def make_tools(fake_seti: FakeSeti) -> Callable[[], EaTools]:
 @pytest.fixture
 def tools(make_tools: Callable[[], EaTools]) -> EaTools:
     return make_tools()
+
+
+@pytest.fixture(params=["chat", "responses"])
+def llm_api(request: pytest.FixtureRequest) -> str:
+    return str(request.param)
