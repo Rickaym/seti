@@ -6,6 +6,7 @@ import { setCallLive } from '@/lib/live-call'
 import { AwayWatch } from './away'
 import { useEaCall } from './call-context'
 import { CallEndRecorder, pageHidden, sessionTabStorage } from './call-end'
+import { useCallNotice } from './call-notice'
 import type { CallEnd, CallRoute } from './call-state'
 import type { EaCallStore } from './call-store'
 import { useCallMediaSession } from './media-session'
@@ -74,6 +75,7 @@ export function CallSession({ store }: { store: EaCallStore }) {
     setCallLive(phase === 'connecting' || connected)
   }, [phase, connected])
   useCallMediaSession(store, connected, micOn)
+  useCallNotice(store, connected, micOn)
   useCallEnds(connected, auto, lastEnd, route)
   useAwayWatch(store, connected)
   return null

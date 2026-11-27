@@ -1,4 +1,5 @@
 import { SHARE_TARGET_PATH } from '@seti/shared/attachment-limits'
+import { EA_CALL_NOTICE_TAG, eaCallActionMessage } from '@seti/shared/ea-call-notice'
 import { fitsKind, isHashed, passesThrough, planPrecache, type Precache } from './precache'
 import { receiveShare } from './share-inbox'
 
@@ -193,7 +194,24 @@ async function openSeti(url: string): Promise<void> {
   }
 }
 
+/** Hands a press on the live call's notification to every open Seti; the call stays shown. */
+async function pressCall(tag: string, action: string): Promise<void> {
+  const message = eaCallActionMessage(tag, action)
+  if (message === null) {
+    await openSeti('/#ea')
+    return
+  }
+  const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true })
+  for (const client of windows) {
+    client.postMessage(message)
+  }
+}
+
 self.addEventListener('notificationclick', (event) => {
+  if (event.notification.tag === EA_CALL_NOTICE_TAG) {
+    event.waitUntil(pressCall(event.notification.tag, event.action))
+    return
+  }
   event.notification.close()
   const data: unknown = event.notification.data
   const url = typeof data === 'object' && data !== null && 'url' in data ? text(data.url, '/') : '/'

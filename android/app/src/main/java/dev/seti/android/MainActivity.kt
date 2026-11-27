@@ -2,6 +2,7 @@ package dev.seti.android
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.getValue
@@ -11,6 +12,7 @@ import androidx.lifecycle.lifecycleScope
 import com.google.androidbrowserhelper.trusted.SharingUtils
 import dev.seti.android.api.ApiException
 import dev.seti.android.api.UnauthorizedException
+import dev.seti.android.call.MicAsk
 import dev.seti.android.data.SetiStore
 import dev.seti.android.pairing.Pairer
 import dev.seti.android.pairing.QrScanner
@@ -31,6 +33,10 @@ import java.security.GeneralSecurityException
 class MainActivity : ComponentActivity() {
     private val crashLog by lazy { CrashLog(this) }
     private var crash by mutableStateOf<String?>(null)
+    private var afterMicAsk: HttpUrl? = null
+    private val askMic = registerForActivityResult(ActivityResultContracts.RequestPermission()) {
+        afterMicAsk?.let(::open)
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -39,7 +45,7 @@ class MainActivity : ComponentActivity() {
             val state = SetiStore(this@MainActivity).current()
             val data = intent.data?.toString()?.toHttpUrlOrNull()
             when (val launch = LaunchRouter.decide(intent.action, data, state)) {
-                is Launch.Open -> crash?.let { showCrash(it, launch.url) } ?: open(launch.url)
+                is Launch.Open -> crash?.let { showCrash(it, launch.url) } ?: openAfterAsking(launch.url)
                 is Launch.Pair -> showPairing(launch, state.pairing?.baseUrl)
             }
         }
@@ -60,6 +66,17 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    /** Asks once for the microphone, so an EA call can hold it in the background, then opens Seti. */
+    private fun openAfterAsking(url: HttpUrl) {
+        if (!MicAsk.due(this)) {
+            open(url)
+            return
+        }
+        MicAsk.mark(this)
+        afterMicAsk = url
+        askMic.launch(MicAsk.PERMISSION)
     }
 
     private fun open(url: HttpUrl) {

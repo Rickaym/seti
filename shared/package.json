@@ -6,6 +6,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./attachment-limits": "./src/attachment-limits.ts",
+    "./ea-call-notice": "./src/ea-call-notice.ts",
     "./highlight": "./src/highlight.ts",
     "./markdown-fences": "./src/markdown-fences.ts"
   },

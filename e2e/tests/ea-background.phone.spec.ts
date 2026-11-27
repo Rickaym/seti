@@ -85,3 +85,39 @@ test('a phone call says the EA cannot hear it in the background, and reopens a d
   await expect(card.getByTestId('ea-call-status')).toHaveText('Listening')
   await page.screenshot({ path: test.info().outputPath('away-note.png') })
 })
+
+test.describe('with notifications allowed', () => {
+  test.use({ permissions: ['microphone', 'notifications'] })
+
+  test('an Android call shows a notification whose Hang up ends the call', async ({ page }) => {
+    test.skip(!(await page.evaluate(() => navigator.userAgent.includes('Android'))), 'Android shows it')
+    await page.route('**/api/ea/health', async (route) => route.fulfill({ json: READY }))
+    await page.route('**/api/ea/ice', async (route) => route.fulfill({ json: { iceServers: [] } }))
+    await fakeEa(page)
+    await page.goto('/#ea')
+    await page.evaluate(async () => navigator.serviceWorker.ready)
+    const notices = async () =>
+      page.evaluate(async () => {
+        const registration = await navigator.serviceWorker.ready
+        const shown = await registration.getNotifications({ tag: 'seti-ea-call' })
+        return shown.map((notice) => `${notice.title}: ${notice.body}`)
+      })
+    const main = page.getByRole('main')
+    await main.getByRole('button', { name: 'Call', exact: true }).tap()
+    const card = main.getByRole('region', { name: 'Live call' })
+    await expect(card.getByTestId('ea-call-status')).toHaveText('Listening')
+    await expect.poll(notices).toEqual(['Call with the EA: Microphone on'])
+
+    await page.evaluate(() => {
+      const data = { type: 'seti:ea-call', action: 'ea-mute' }
+      navigator.serviceWorker.dispatchEvent(new MessageEvent('message', { data }))
+    })
+    await expect.poll(notices).toEqual(['Call with the EA: Muted'])
+    await page.evaluate(() => {
+      const data = { type: 'seti:ea-call', action: 'ea-hang-up' }
+      navigator.serviceWorker.dispatchEvent(new MessageEvent('message', { data }))
+    })
+    await expect(card).toHaveCount(0)
+    await expect.poll(notices).toEqual([])
+  })
+})
