@@ -48,6 +48,9 @@ export function githubRepo(owner: string, repo: string): string | null {
   return ok ? `${owner}/${repo}` : null
 }
 
+/** A commit of a GitHub repository. */
+export const commitRef = (repo: string, sha: string) => `github:${repo.toLowerCase()}@${sha}`
+
 /** A file of a GitHub repository at a commit, or as a local copy when `sha` is null. */
 export const fileRef = (repo: string, file: string, sha: string | null) => {
   const at = sha === null ? '' : `@${sha}`
@@ -109,7 +112,20 @@ function blobUrl(repo: string, rest: readonly string[]): UrlRef | null {
 function githubUrl(url: URL): UrlRef | null {
   const [, owner = '', name = '', type, ...rest] = url.pathname.split('/')
   const repo = githubRepo(owner, name)
+  if (repo !== null && type === 'commit') {
+    return commitUrl(repo, rest)
+  }
   return repo !== null && type === 'blob' ? blobUrl(repo, rest) : itemUrl(url, repo, type, rest)
+}
+
+/** A commit by its full hash, or by a short one as a prefix. */
+function commitUrl(repo: string, rest: readonly string[]): UrlRef | null {
+  const [sha = '', ...more] = rest
+  if (!SHA.test(sha) || more.some((part) => part !== '')) {
+    return null
+  }
+  const ref = commitRef(repo, sha)
+  return sha.length === 40 ? { ref, parents: [], needles: null } : { ref, parents: [], needles: null, prefix: true }
 }
 
 /** A pull request, an issue, or a comment on one. */

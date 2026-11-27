@@ -793,6 +793,7 @@ class FakeSeti:
     ssh_sets: dict[str, list[str]] = field(default_factory=dict)
     access_defaults: dict[str, bool] = field(default_factory=dict)
     processes: dict[str, dict[str, Any]] = field(default_factory=dict)
+    access_catalog: list[dict[str, Any]] = field(default_factory=list)
     second_opinions: dict[str, dict[str, Any]] = field(default_factory=dict)
     recent_files: dict[str, dict[str, Any]] = field(default_factory=dict)
     shell_output: dict[str, dict[str, Any]] = field(default_factory=dict)
@@ -970,12 +971,15 @@ class FakeSeti:
         if ask is None or not word or ask.get("used") or ask["tool"] != "answer_question":
             return err(403, "Forbidden", "The EA does this only on the user's own yes")
         ask["used"] = True
-        expected = {
+        expected: dict[str, Any] = {
             "request": held["id"],
             "digest": held["digest"],
             "decision": body["decision"],
-            "message": body.get("message", ""),
         }
+        if body["decision"] == "deny" and ask["args"].get("heard") == "no":
+            expected["heard"] = "no"
+        else:
+            expected["message"] = body.get("message", "")
         if any(ask["args"].get(k) != v for k, v in expected.items()):
             return err(403, "Forbidden", "What the user said yes to is not this request as it stands")
         self.permission_requests.remove(held)
@@ -1052,6 +1056,12 @@ class FakeSeti:
                 return ok(self.task_mcp_servers(task_id))
             case ["tasks", task_id, "access"]:
                 return self._set_access(task_id, body)
+            case ["access", "defaults"]:
+                item = next(
+                    i for i in self.access_catalog if (i["kind"], i["id"]) == (body["kind"], body["id"])
+                )
+                item["default_enabled"] = body["enabled"]
+                return ok(item)
             case ["mcp", "defaults", name]:
                 if body["enabled"] == (name not in self.mcp_local):
                     self.mcp_defaults.pop(name, None)
@@ -1249,6 +1259,8 @@ class FakeSeti:
         match parts:
             case ["tasks"]:
                 return ok([{**listed_subtasks(self.subtasks.get(t["id"], [])), **t} for t in self.tasks])
+            case ["access"]:
+                return ok(self.access_catalog)
             case ["tasks", "archived"]:
                 return ok(self.archived)
             case ["notifications"]:

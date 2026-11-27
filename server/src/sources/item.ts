@@ -22,6 +22,9 @@ export interface FoundItem {
  */
 export type ParseResult = (text: string, workspace: string | null) => FoundItem[]
 
+/** Reads the items in a call's result that are placed in the agent's folders, as they stand now. */
+export type FolderRead = (taskId: string, text: string) => Promise<FoundItem[]>
+
 export function parseJson(text: string): unknown {
   try {
     return JSON.parse(text) as unknown

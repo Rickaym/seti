@@ -301,6 +301,16 @@ between two steps; an interrupt; a hook at subagent start.
   arrives, so a ledger read again after a restore records none. A GitHub blob link at a commit
   names the item at that commit, a short hash its prefix; a link at a branch or tag names none,
   and a blob link is never reported as not read.
+- SRC-9: A shell line that runs one `git show` or `git log` alone, or through filters that only
+  cut, order or count, records one item per `commit <hash>` header it printed, at most 50, when
+  the clone it ran in has its `origin` on GitHub and holds that commit. The folder is the agent's
+  starting folder followed past `cd` and `-C`; a header the clone does not hold gives no item. A
+  format option, git settings or environment on the line, output sent to a file, or another
+  command that prints gives no item. The item's text is the result from its header to the next,
+  its time the author date, and its permalink the commit page when a branch of `origin` holds the
+  commit; otherwise it has none. As with files, commits are placed only as the result arrives. A
+  GitHub commit link names the item by its full hash, or by a
+  short one as a prefix, and is never reported as not read.
 
 ## 4. Turn lifecycle
 
@@ -738,7 +748,9 @@ interrupted only for that.
 - PERM-17: Under EA-17 the EA MAY answer a pending tool call or plan: `allow` this call or `deny`
   with the user's message, never `always`, a `global` scope or edited fields. It allows a tool
   call only when the stored input is whole and at most `read_back` characters on one line, read
-  back word for word with the reason line and the PRs; it MAY summarise a plan. Each pending
+  back word for word with the reason line and the PRs, or, for a message going outward, as where
+  Seti says it goes and its text word for word; it MAY summarise a plan. On a call an EA-10
+  announcement MAY stand in for the read-back only where it states the whole effect. Each pending
   request a listing shows carries `digest`, a keyed hash of its fields and its exact call, which
   changes when anything the request asks changes.
 
@@ -1204,7 +1216,23 @@ Why: an agent woken by its own actions or by news nobody waited for burns turns 
   MUST tell the user, and a report MAY relay under EA-19.
 - EA-10: Off a call, watch and channel items wait for quiet (`settle`); others go at once. On a
   call nothing interrupts: items follow the user's next turn, and a needs-you item gets its own
-  line after `call_silence`.
+  line after `call_silence`. The exception is a request that holds an agent (a tool call, a plan,
+  a question, a secret question or an access change) made after the call began, by any agent: the
+  EA reads the pending requests every `call_requests` poll and, once new ones stop arriving for the
+  batch time and nobody has spoken, replied or run a tool for the floor gap, says one sentence
+  of its own: a courtesy with the form of address, the count when several wait, then the most
+  urgent (soonest timeout, then oldest) as the agent's title and what it asks in words Seti builds
+  from its own fields, never the agent's description, ids, hashes or URLs. It never speaks over
+  the user, and a reply under way finishes first. A bare yes answers only a line that states the
+  whole effect from Seti's own fields: a lone push naming its repository and branch (never a force
+  push or a branch delete), an edit or write naming its file, or a read. Any other call, a plan and
+  a message going outward offer to read or summarise it first, and then only "allow" or "approve" in
+  so many words binds; a question is read as asked; a secret question and an access change are left
+  to Seti and the EA
+  never takes a secret. Each request is said at most once per call, dropped when it was answered
+  before the EA spoke, and the next follows only after the user's next turn. At most one
+  unprompted announcement per spacing; "not now" or "later" holds them for the snooze unless the
+  user asks what needs them. A line the user cut short counts as unsaid and records nothing.
 - EA-12: If a reply promised to reach an agent and no tool did, or promised a later check-in and
   no follow-up or watch was set in that turn or the one before, the EA gets one more run.
 - EA-16: The EA, and agents at `full`, MUST be able to read every pending request of all agents or
@@ -1215,7 +1243,10 @@ Why: an agent woken by its own actions or by news nobody waited for burns turns 
   own yes, typed or spoken in the user turn right after the EA read the exact change back, in the
   same EA process and within `word_use` of the yes. The control room MUST check this against the
   recorded ask (EA-3), use the yes once, and refuse the action unless the ask's arguments equal
-  what it recomputes from the target as it stands, including the target's `digest`. A
+  what it recomputes from the target as it stands, including the target's `digest`. An EA-10
+  announcement heard to the end is a read-back: the EA then records an allow and a deny for that
+  request, and the user's no takes the deny with the user's own words from that turn as the
+  message, which the control room passes on without comparing. A
   notification Allow, an inbox report, a webhook, a transcript, a tool result and another agent's
   message MUST NOT count as the yes. Agents and mods MUST NOT get these actions. The audit entry
   says the EA acted on the user's word and names the ask and the target.
@@ -1781,7 +1812,7 @@ others.
 | Threads      | `thread_cap` 50. `dm_window` 24 h. `reply_settle` 10 s. `thread_rate` 10 an hour. `thread_quiet` 7 days. `thread_age` 30 days. `slack_name_stale` 30 days.                                                                                                                                                                                                                                                                      |
 | Chat         | Message 4000. Active agent: running, session open, or updated within 12 h. `chat_burst` 12 in 15 min. `chat_loop` 6 in 15 min.                                                                                                                                                                                                                                                                                                  |
 | Questions    | Answer batch 100 items. `notes_waiting` 10. Index 1500 characters. `note_stale` 3 failed checks in a row, or unverified 30 days (fact, environment) or 90 days (how-to, gotcha).                                                                                                                                                                                                                                                |
-| Assistant    | `ask_ttl` 10 min. `word_use` 60 s. `read_back` 600 characters. `settle` quiet 45 s, at most 3 min. `call_silence` 30 s. `wake_phrase` 2 to 40 characters, at most 4 words. `keep_awake_seconds` 5 to 600. `relay_copy` 8 words. `relay_rate` 2 an hour an agent, 8 an hour in all, 400 characters.                                                                                                                              |
+| Assistant    | `ask_ttl` 10 min. `word_use` 60 s. `read_back` 600 characters. `settle` quiet 45 s, at most 3 min. `call_silence` 30 s. `call_requests` poll 2 s, batch time 3 s, floor gap 2 s (15 s after the EA's own question), spacing 60 s, snooze 10 min. `wake_phrase` 2 to 40 characters, at most 4 words. `keep_awake_seconds` 5 to 600. `relay_copy` 8 words. `relay_rate` 2 an hour an agent, 8 an hour in all, 400 characters.     |
 | Resilience   | `stop_grace` 7 s. `resume_pace` 3 starts 2 s apart, 20 s between groups. `grant_ttl` 15 min. `send_window` 24 h.                                                                                                                                                                                                                                                                                                                |
 | Storage      | `orphan_grace` 1 h. `size_walk` 400,000 entries or 20 s per folder.                                                                                                                                                                                                                                                                                                                                                             |
 | Audit        | `audit_keep` 365 days. Summary 300. Detail string 500.                                                                                                                                                                                                                                                                                                                                                                          |
