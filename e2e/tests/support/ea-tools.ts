@@ -16,5 +16,5 @@ const TOOLS: EaTool[] = [
 
 /** Answers the EA tool list as a running EA would. */
 export async function fakeEaTools(page: Page): Promise<void> {
-  await page.route('**/api/ea/tools', async (route) => route.fulfill({ json: { tools: TOOLS } }))
+  await page.route('**/api/ea/tools', async (route) => route.fulfill({ json: { data: { tools: TOOLS } } }))
 }

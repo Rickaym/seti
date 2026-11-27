@@ -8,7 +8,7 @@ import { audit } from '../audit.js'
 import { claimSend, releaseSend, sendKey } from '../client-sends.js'
 import { credential } from '../credentials.js'
 import { recordChatReply, repeatedChat } from '../ea-chat-sends.js'
-import { fail, validJson } from '../http.js'
+import { fail, ok, validJson } from '../http.js'
 
 const CONNECT_TIMEOUT_MS = 2_000
 const ANSWER_TIMEOUT_MS = 30_000
@@ -137,7 +137,7 @@ async function relayTools(c: Context, target: EaTarget) {
   if (!answer.success) {
     return fail(c, 502, 'EA did not answer', 'The EA sent a tool list Seti cannot read')
   }
-  return c.json(answer.data)
+  return ok(c, answer.data)
 }
 
 /** Sends a typed message to the bot and audits it once the bot takes it. */
