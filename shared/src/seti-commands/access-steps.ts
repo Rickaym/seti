@@ -10,6 +10,7 @@ import {
   type AccessTarget,
   type AccessTargetRule,
   type OpRule,
+  USER,
 } from './rules.js'
 import { itemSource, option, type CommandOption, type CommandWorld, type FreeWord, type GrammarStep } from './world.js'
 
@@ -220,7 +221,7 @@ function credentialStep(world: CommandWorld): GrammarStep {
 export function accessStep(words: readonly string[], world: CommandWorld): GrammarStep | null {
   const [first, second, third, ...more] = words
   if (first === undefined) {
-    return choose('a kind of access', targetOptions(world))
+    return { ...choose('a kind of access', targetOptions(world)), endRule: USER }
   }
   if (first === 'reset' || first === 'save') {
     return second === undefined ? { kind: 'end', rule: ACCESS_WHOLE[first].rule } : null

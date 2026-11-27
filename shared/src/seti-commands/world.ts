@@ -30,7 +30,7 @@ export interface CommandWorld {
   /** The sandbox is on in Settings, so the agent's own switch means something. */
   sandboxOn: boolean
   access: TaskAccessView | null
-  credentials: readonly Pick<ProfileSummary, 'id' | 'name'>[] | null
+  credentials: readonly ProfileSummary[] | null
   workspaces: readonly { id: string; name: string }[] | null
   memory: Pick<TaskMemoryCap, 'override' | 'effective'> | null
   cpu: { cap: Pick<TaskCpuCap, 'override' | 'effective'>; max_percent: number } | null

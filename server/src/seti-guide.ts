@@ -69,9 +69,13 @@ function toolLines(has: Has): string[] {
   return uses.length === 0 ? [] : [`- Use ${uses.join('; ')}.`]
 }
 
-const tools = (mode: InputMode | null, has: Has) => [
+/** How an agent with request_change asks for a setting of its own, in the reply box's words. */
+const PROPOSE = '- Propose a change to your own settings with request_change kind command, such as /seti:memory 12g.'
+
+const tools = (mode: InputMode | null, has: Has, requests: boolean) => [
   '## Tools',
   '- In a long wait, show what for on your row with seti set_status, such as "waiting on CI".',
+  ...(requests ? [PROPOSE] : []),
   ...(mode === 'wake' ? ['- After a push, end the turn: Seti wakes you on CI results, reviews and comments.'] : []),
   ...toolLines(has),
   '- Batch independent reads and searches in one message.',
@@ -88,12 +92,20 @@ export interface GuideInput {
   sandboxed?: boolean
   /** Its runtime runs background subagents of its own. */
   subagents?: boolean
+  /** It may propose changes with request_change: its Seti control is Self or Full. */
+  requests?: boolean
 }
 
 /** The body of the built-in Seti guide pack, as Markdown. */
 export function renderGuide(input: GuideInput): string {
-  const { mode, setiTools = false, has = hasOnPath, sandboxed = true, subagents = true } = input
-  const sections = [head(subagents), workspace(setiTools), userFiles(sandboxed), chat(setiTools), tools(mode, has)]
+  const { mode, setiTools = false, has = hasOnPath, sandboxed = true, subagents = true, requests = true } = input
+  const sections = [
+    head(subagents),
+    workspace(setiTools),
+    userFiles(sandboxed),
+    chat(setiTools),
+    tools(mode, has, requests),
+  ]
   return `${sections.map((lines) => lines.join('\n')).join('\n\n')}\n`
 }
 
@@ -106,7 +118,11 @@ export async function packForTask(pack: ContextPack, taskId: string): Promise<Co
   const subagents = task === undefined || hasSubagents(task.runtime)
   const sandboxed = task?.sandbox === true && (await sandboxPolicy.get()).enabled
   const setiTools = task?.seti_control === 'full'
-  return { ...pack, body: renderGuide({ mode: task?.input_mode ?? null, setiTools, sandboxed, subagents }) }
+  const requests = task?.seti_control !== 'off'
+  return {
+    ...pack,
+    body: renderGuide({ mode: task?.input_mode ?? null, setiTools, sandboxed, subagents, requests }),
+  }
 }
 
 /** The pack as the Context page shows it: the built-in guide rendered for a waking agent. */

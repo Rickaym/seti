@@ -594,8 +594,8 @@ A bundled command or route follows Reaching the EA too, and `server/src/mods/ea-
 fails on one that gives the EA no way and no reason.
 `needs` hides the command on an agent whose runtime lacks a capability, as for third-party mods;
 the side chat's Ask aside needs `side_chat`. The palette and menus show a command's chord, else the
-slash command that runs it. A slash command may not take a name Seti's own agent commands use,
-such as `/restart`, `/mcp` or `/settings`. While a bundled
+slash command that runs it. A slash command may not take the name of one of an agent's settings,
+such as `restart`, `mcp` or `settings`, and no mod name holds `seti:`. While a bundled
 mod is off its slash commands and palette commands say it is off, with a Turn on button, and never
 reach Claude Code.
 

@@ -1,4 +1,4 @@
-import { EA_MAX_INPUTS, type EaCallEndReason, type EaInputKind, type EaWake } from '@seti/shared'
+import { EA_MAX_INPUTS, type EaCallEndReason, type EaCallQuality, type EaInputKind, type EaWake } from '@seti/shared'
 import { captionsReducer, initialCaptions, type CaptionEvent, type CaptionState, type SpeechItem } from './captions'
 
 export type CallPhase = 'idle' | 'connecting' | 'connected' | 'error'
@@ -33,6 +33,8 @@ export interface CallEnd {
   reason: EaCallEndReason
   at: number
   hidden: boolean
+  /** How the EA's voice fared on the call, when the call sampled it. */
+  quality: EaCallQuality | null
 }
 
 /** The kinds of microphone a call used, in order, and how often it rerouted; for its audit record. */
@@ -70,7 +72,14 @@ export interface CallState {
 export type CallAction =
   | { type: 'connecting'; auto: boolean }
   | { type: 'connected'; at: number }
-  | { type: 'ended'; at: number; error: string | null; reason: EaCallEndReason; hidden: boolean }
+  | {
+      type: 'ended'
+      at: number
+      error: string | null
+      reason: EaCallEndReason
+      hidden: boolean
+      quality?: EaCallQuality | null
+    }
   | { type: 'caption'; event: CaptionEvent }
   | { type: 'user-speaking'; speaking: boolean; at: number }
   | { type: 'bot-speaking'; speaking: boolean; at: number }
@@ -124,7 +133,7 @@ const withCaption = (state: CallState, event: CaptionEvent): CallState => ({
 })
 
 function ended(state: CallState, action: Extract<CallAction, { type: 'ended' }>): CallState {
-  const { at, error, reason, hidden } = action
+  const { at, error, reason, hidden, quality = null } = action
   if (state.phase === 'idle' && error === null) {
     return state
   }
@@ -133,7 +142,7 @@ function ended(state: CallState, action: Extract<CallAction, { type: 'ended' }>)
   const signals = { ...QUIET, latency: state.signals.latency }
   const failure = error === null ? null : { at, dropped: live, auto: state.auto }
   const phase = error === null ? 'idle' : 'error'
-  const lastEnd = live ? { reason, at, hidden } : state.lastEnd
+  const lastEnd = live ? { reason, at, hidden, quality } : state.lastEnd
   return { ...marked, phase, error, failure, signals, tracks: NO_TRACKS, wake: null, lastEnd }
 }
 

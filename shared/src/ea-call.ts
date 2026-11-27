@@ -24,6 +24,50 @@ export const EA_MAX_INPUTS = 8
 const DAY_SECONDS = 24 * 60 * 60
 const seconds = z.number().int().min(0).max(DAY_SECONDS).nullable()
 
+const CANDIDATE_TYPES = ['host', 'srflx', 'prflx', 'relay'] as const
+const PATH_PROTOCOLS = ['udp', 'tcp', 'tls'] as const
+const MS = z.number().min(0).max(600_000)
+
+/** How the EA's voice fared on the call, as numbers only: never audio, words or addresses. */
+export const eaCallQuality = z.object({
+  /** Share of the EA's voice packets the network lost, in percent. */
+  lost_pct: z.number().min(0).max(100),
+  /** Seconds of the EA's speech the phone had to fill in for audio that never came. */
+  concealed_s: z.number().min(0).max(DAY_SECONDS),
+  /** The jitter of the EA's voice packets on arrival. */
+  jitter_ms: MS,
+  /** The round trip on the network path at the end; null when the browser did not say. */
+  rtt_ms: MS.nullable(),
+  /** How the path ran: straight between the two ends (host, srflx, prflx) or through a relay. */
+  path: z.enum(CANDIDATE_TYPES).nullable(),
+  /** The protocol to the relay, or of the direct path. */
+  protocol: z.enum(PATH_PROTOCOLS).nullable(),
+  /** How often the call rebuilt its network path. */
+  reconnects: z.number().int().min(0).max(1000),
+})
+export type EaCallQuality = z.infer<typeof eaCallQuality>
+
+/** The quality as flat audit detail fields, such as `audio_lost_pct`; none when not sampled. */
+export function callQualityDetail(quality: EaCallQuality | null): Record<string, number | string | null> {
+  if (quality === null) {
+    return {}
+  }
+  return Object.fromEntries(Object.entries(quality).map(([key, value]) => [`audio_${key}`, value]))
+}
+
+/** A call's quality in one line, such as "1.2% lost, 0.4 s filled in, relay over UDP". */
+export function callQualityText(quality: EaCallQuality): string {
+  const parts = [`${String(quality.lost_pct)}% lost`, `${String(quality.concealed_s)} s filled in`]
+  if (quality.path !== null) {
+    const route = quality.path === 'relay' ? 'relay' : 'direct'
+    parts.push(quality.protocol === null ? route : `${route} over ${quality.protocol.toUpperCase()}`)
+  }
+  if (quality.reconnects > 0) {
+    parts.push(`${String(quality.reconnects)} ${quality.reconnects === 1 ? 'reconnect' : 'reconnects'}`)
+  }
+  return parts.join(', ')
+}
+
 /** A call end the browser reports for the audit log; it carries no audio and no words. */
 export const eaCallEndInput = z.object({
   reason: z.enum(EA_CALL_END_REASONS),
@@ -39,6 +83,8 @@ export const eaCallEndInput = z.object({
   inputs: z.array(z.enum(EA_INPUT_KINDS)).max(EA_MAX_INPUTS).default([]),
   /** How often the call reopened the microphone for a headset; null when the page did not say. */
   reroutes: z.number().int().min(0).max(10_000).nullable().default(null),
+  /** How the EA's voice fared; null when the call never sampled it or the page predates it. */
+  quality: eaCallQuality.nullable().default(null),
 })
 export type EaCallEndInput = z.input<typeof eaCallEndInput>
 

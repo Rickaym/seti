@@ -1,4 +1,4 @@
-import { EA_CLIENT_MESSAGES, type EaHealth } from '@seti/shared'
+import { EA_CLIENT_MESSAGES, callQualityText, type EaHealth } from '@seti/shared'
 import { VolumeX } from 'lucide-react'
 import { useCallback } from 'react'
 import { ToggleButton } from '@/components/ToggleButton'
@@ -11,6 +11,7 @@ import {
   SpeakerPicker,
   TestSpeaker,
 } from '@/components/ea/AudioDevices'
+import { InboxRelaysSetting } from '@/components/ea/InboxRelaysSetting'
 import { LanguageSetting } from '@/components/ea/LanguageSetting'
 import { LiveContextCard } from '@/components/ea/LiveContextCard'
 import { RelayCheck } from '@/components/ea/RelayCheck'
@@ -38,6 +39,7 @@ const latencyText = (latency: Latency | null) =>
 export function EaPage() {
   const store = useEaCallStore()
   const call = useEaCall()
+  const callAudio = call.lastEnd?.quality ?? null
   const { state, refresh } = useEaHealth()
   const need = setupNeed(state)
   const health = state.status === 'up' ? state.health : null
@@ -132,6 +134,15 @@ export function EaPage() {
             <LanguageSetting state={settings} />
           </SettingRow>
         </SettingsCard>
+        <SettingsCard title="Inbox">
+          <SettingRow
+            label="Inbox relays"
+            stack
+            description="The EA may tell the agent an alert or message is about, in its own words, marked as not approved by you, and reports it in a line. Off, it asks you first."
+          >
+            <InboxRelaysSetting state={settings} />
+          </SettingRow>
+        </SettingsCard>
         <SettingsCard title="Connection">
           <SettingRow label="Voice model" description="The language model behind the voice.">
             <span>{health?.model ?? '-'}</span>
@@ -151,6 +162,11 @@ export function EaPage() {
           <SettingRow label="Last end" description="How the last call in this browser ended.">
             <span data-testid="ea-last-end">{lastEndText(call.lastEnd)}</span>
           </SettingRow>
+          {callAudio !== null && (
+            <SettingRow label="Call audio" stack description="How the EA's voice reached you on the last call.">
+              <span data-testid="ea-call-audio">{callQualityText(callAudio)}</span>
+            </SettingRow>
+          )}
           <SettingRow label="Relay test" stack description="Checks that this browser can reach the relay.">
             <RelayCheck />
           </SettingRow>

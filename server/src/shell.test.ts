@@ -1,7 +1,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import {
-  settingCommands,
+  setiComposerCommands,
   type CommandCatalog,
   type MessagePage,
   type MessageRow,
@@ -325,7 +325,7 @@ describe('GET /api/tasks/:id/commands', () => {
     expect(res.status).toBe(200)
     const catalog = ((await res.json()) as { data: CommandCatalog }).data
     expect(catalog).toMatchObject({ cwd: scratch, fresh: true, approximate: false })
-    const own = new Set(settingCommands(null).map((c) => c.name))
+    const own = new Set(setiComposerCommands(null).map((c) => c.name))
     expect(
       catalog.commands.filter((c) => !own.has(c.name)).map((c) => [c.name, c.builtin, c.unsupported !== null]),
     ).toEqual([
@@ -335,9 +335,9 @@ describe('GET /api/tasks/:id/commands', () => {
       ['slack:standup', false, false],
     ])
     expect(catalog.commands.map((c) => c.name)).toEqual(
-      expect.arrayContaining(['archive', 'mcp', 'restart', 'settings']),
+      expect.arrayContaining(['seti:archive', 'seti:mcp', 'seti:restart', 'seti:settings']),
     )
-    expect(catalog.commands[0]).toMatchObject({ name: 'access', builtin: true })
+    expect(catalog.commands.find((c) => c.name === 'seti:access')).toMatchObject({ builtin: true })
     expect(catalog.commands.find((c) => c.name === 'btw')).toMatchObject({ argument_hint: '[question]', builtin: true })
     expect(catalog.commands.find((c) => c.name === 'btw')?.description).toBe(
       'Ask a side question; the agent is not interrupted',

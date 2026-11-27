@@ -2,13 +2,14 @@ import { getDomain } from 'tldts'
 import { z } from 'zod'
 import { connectionEnv, connectionHost, connectionValue } from './connections.js'
 import { isRecord, lenientArray, orDefault, type ResponseSchema } from './lenient.js'
+import { SETI_LINE_MAX } from './seti-commands/limits.js'
 import { sharedToolProposal, type SharedToolChange } from './shared-tools.js'
 
 /**
  * Changes an agent may ask the user for. Nothing else is requestable: the sandbox, Bypass,
  * permission modes and rules, security settings, secret values and other agents stay the user's.
  */
-export const CHANGE_KINDS = ['allow_host', 'api_key', 'mcp_server', 'shared_tool'] as const
+export const CHANGE_KINDS = ['allow_host', 'api_key', 'mcp_server', 'shared_tool', 'command'] as const
 export type ChangeKind = (typeof CHANGE_KINDS)[number]
 
 /** Who an allowed host reaches: the agent that asked, or every sandboxed agent. */
@@ -97,11 +98,23 @@ export const requestedChange = z.discriminatedUnion('kind', [
   }),
   z.object({ kind: z.literal('mcp_server'), server: z.string().trim().min(1).max(255) }),
   sharedToolProposal,
+  /** A Seti command for the agent itself, which Seti reads with the reply box's grammar. */
+  z.object({ kind: z.literal('command'), line: z.string().trim().min(1).max(SETI_LINE_MAX) }),
 ])
 /** A change as the agent asks for it; a shared tool is still a path Seti has not read. */
 export type AskedChange = z.output<typeof requestedChange>
-/** A change as Seti stores it: a shared tool carries the script Seti read when the agent asked. */
-export type RequestedChange = Exclude<AskedChange, { kind: 'shared_tool' }> | SharedToolChange
+/** A Seti command as Seti stores it: the canonical line and Seti's own words for it. */
+export interface CommandChange {
+  kind: 'command'
+  line: string
+  description: string
+}
+/**
+ * A change as Seti stores it: a shared tool carries the script Seti read when the agent asked, a
+ * command the line Seti read and its description.
+ */
+export type RequestedChange =
+  Exclude<AskedChange, { kind: 'shared_tool' | 'command' }> | SharedToolChange | CommandChange
 
 export const REQUEST_REASON_MAX = 500
 
@@ -127,6 +140,23 @@ export function describeChange(change: RequestedChange): string {
       return `the MCP server ${change.server}`
     case 'shared_tool':
       return `the shared tool ${change.name}`
+    case 'command':
+      return `this change: ${change.description}`
+  }
+}
+
+/** The Seti command a change is, as the request card shows it; null for one no command makes. */
+export function commandLineOf(change: RequestedChange): string | null {
+  switch (change.kind) {
+    case 'allow_host':
+      return change.port === HTTPS_PORT ? `/seti:access host ${change.host} add` : null
+    case 'mcp_server':
+      return `/seti:mcp ${change.server} on`
+    case 'command':
+      return change.line
+    case 'api_key':
+    case 'shared_tool':
+      return null
   }
 }
 

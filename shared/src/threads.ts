@@ -33,6 +33,14 @@ export interface ListedThread extends FollowedThread {
   channel_name: string | null
 }
 
+/** Whether replies in followed threads have a way in, so a screen can say when none does. */
+export interface ThreadReach {
+  /** Threads agents that are not archived follow now. */
+  following: number
+  /** Webhooks with thread replies on: the only way a reply reaches an agent. */
+  reading: number
+}
+
 /** A webhook's thread switches, for a sender Seti reads replies from; both start off. */
 export interface WebhookThreads {
   /** Replies in threads agents posted in reach those agents. */

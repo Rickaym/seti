@@ -16,8 +16,11 @@ export interface FoundItem {
   spans: string[]
 }
 
-/** Reads the items in a call's result text; `host` is the Slack workspace host when known. */
-export type ParseResult = (text: string, host: string | null) => FoundItem[]
+/**
+ * Reads the items in a call's result text; `workspace` is what the agent's answers from that
+ * source stated: the Slack workspace host, or the Linear workspace URL key, when known.
+ */
+export type ParseResult = (text: string, workspace: string | null) => FoundItem[]
 
 export function parseJson(text: string): unknown {
   try {
@@ -73,8 +76,35 @@ function follow(value: unknown, pointer: string): unknown {
 
 const RANGE = /@(\d+):(\d+)$/
 
+/** The locator of a whole result shown as numbered lines, read without the numbers. */
+export const NUMBERED = '~numbered'
+
+const LINE_NUMBER = /^\s*\d{1,9}[\t\u2192]/
+
+/** Numbered lines without their numbers; null when no line is numbered. */
+function unnumbered(text: string): string | null {
+  const lines = text.split('\n')
+  return lines.some((line) => LINE_NUMBER.test(line))
+    ? lines.map((line) => line.replace(LINE_NUMBER, '')).join('\n')
+    : null
+}
+
+/** The first and last line numbers a numbered result shows, or null when it shows none. */
+export function shownLines(text: string): [number, number] | null {
+  const numbers = text.split('\n').flatMap((line) => {
+    const found = /^\s*(\d{1,9})[\t\u2192]/.exec(line)?.[1]
+    return found === undefined ? [] : [Number(found)]
+  })
+  const [first] = numbers
+  const last = numbers.at(-1)
+  return first === undefined || last === undefined || last < first ? null : [first, last]
+}
+
 /** The text one locator names in a result text; null when it names nothing there any more. */
 function locate(text: string, locator: string): string | null {
+  if (locator === NUMBERED) {
+    return unnumbered(text)
+  }
   const range = RANGE.exec(locator)
   const pointer = range === null ? locator : locator.slice(0, range.index)
   const value = pointer === '' ? text : follow(parseJson(text), pointer)

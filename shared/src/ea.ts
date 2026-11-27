@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { clientSendId } from './client-send.js'
 import { EA_LANGUAGE_DEFAULT, eaLanguage, type EaLanguage } from './ea-language.js'
+import type { EaRelay } from './ea-relays.js'
 
 /** Where the EA's keys live, one file per key, passed to it as systemd credentials. */
 export const EA_CREDENTIALS_DIR = '~/.seti/credentials'
@@ -147,6 +148,8 @@ export interface EaNotice {
   severity: EaNoticeSeverity
   /** Where it came from: a task title, a channel, or the EA itself. */
   source: string
+  /** In a history page, the relays the EA sent of this item, oldest first. */
+  relays?: EaRelay[]
 }
 
 export interface EaHistoryEntry {
@@ -265,6 +268,8 @@ export type EaSettingsInput = z.output<typeof eaSettingsInput>
 export interface EaSettings extends Omit<EaSettingsInput, 'form_of_address' | 'language'> {
   form_of_address: string
   language: EaLanguage
+  /** The EA may pass inbox items to the agent they are about; only the user changes it. */
+  inbox_relays: boolean
   updated_at: string | null
 }
 
@@ -275,6 +280,7 @@ export const EA_SETTINGS_DEFAULT: EaSettings = {
   join_on_open: true,
   form_of_address: '',
   language: EA_LANGUAGE_DEFAULT,
+  inbox_relays: false,
   updated_at: null,
 }
 

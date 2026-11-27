@@ -151,6 +151,7 @@ export async function routeChannelEvent(event: ChannelEvent, act = false): Promi
     severity: event.severity,
     source: event.source,
     task_id: null,
+    channel_id: event.channel,
     urgent: channelUrgent(event),
     act,
     due_at: at,
