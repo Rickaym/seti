@@ -19,6 +19,7 @@ import {
 import { z } from 'zod'
 import { accountStatus } from '../account.js'
 import { capOf, defaultsBeyond } from '../agent-cap.js'
+import { AUDIT_RETENTION_DAYS } from '../config.js'
 import { now, repos } from '../db.js'
 import { liveContext } from '../ea-context.js'
 import { searchIndex } from '../ea-index.js'
@@ -126,9 +127,15 @@ const searchAudit = setiTool({
     query: auditQuery.shape.q,
     limit: auditQuery.shape.limit,
     before: auditQuery.shape.before,
+    chain: z
+      .boolean()
+      .default(false)
+      .describe("Instead, whether the log's hash chain verifies and how long events are kept."),
   },
-  run: async ({ area, actor, query, limit, before }) =>
-    auditEvents.page(auditQuery.parse({ kind: area, actor, q: query, limit, before })),
+  run: async ({ area, actor, query, limit, before, chain }) =>
+    chain
+      ? { retention_days: AUDIT_RETENTION_DAYS, chain: await auditEvents.verify() }
+      : auditEvents.page(auditQuery.parse({ kind: area, actor, q: query, limit, before })),
 })
 
 const searchSeti = setiTool({

@@ -1,4 +1,4 @@
-import { ea, eaOnWord, gap, same, ui, user, type CoverageTable } from './kinds.js'
+import { ea, eaOnWord, same, ui, user, type CoverageTable } from './kinds.js'
 
 /** Routes under /api/tasks: one agent and what it holds. */
 export const TASKS_ROUTES: CoverageTable = {
@@ -86,7 +86,7 @@ export const TASKS_ROUTES: CoverageTable = {
   'POST /api/tasks/:id/rewind': ea('rewind_agent'),
   'GET /api/tasks/:id/rewind/files': ea('rewind_agent'),
   'GET /api/tasks/:id/rewind/targets': ea('rewind_agent'),
-  'GET /api/tasks/:id/rewinds': gap('Past rewinds of an agent. Read'),
+  'GET /api/tasks/:id/rewinds': ea('get_task'),
   'PUT /api/tasks/:id/role': ea('set_agent_role'),
   'GET /api/tasks/:id/search': ea('find_in_transcript'),
   'GET /api/tasks/:id/second-opinions': ea('get_task'),

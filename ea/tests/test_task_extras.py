@@ -26,6 +26,37 @@ async def test_get_task_says_what_second_opinions_cost_and_frames_the_latest_rev
     assert DATA_NOTE in lines
 
 
+async def test_get_task_lists_the_latest_rewinds_newest_first_with_the_prompt_as_data(
+    tools: EaTools, fake_seti: FakeSeti
+) -> None:
+    plain = (await tools.call("get_task", {"task": "login"})).text
+    assert "rewound" not in plain
+    fake_seti.rewinds[TASK_LOGIN] = [
+        {
+            "prompt_text": "Try the old way",
+            "restore": "conversation",
+            "state": "applied",
+            "reason": None,
+            "created_at": "2026-09-27T09:00:00.000Z",
+        },
+        {
+            "prompt_text": "Use <b>staging</b>",
+            "restore": "both",
+            "state": "refused",
+            "reason": "no checkpoint",
+            "created_at": "2026-09-27T11:00:00.000Z",
+        },
+    ]
+    lines = (await tools.call("get_task", {"task": "login"})).text.splitlines()
+    start = lines.index("It was rewound 2 times; the latest:")
+    assert lines[start + 1].endswith(
+        'both, refused (no checkpoint), to before <data from="the prompt">Use &lt;b>staging&lt;/b></data>'
+    )
+    assert lines[start + 2].endswith(
+        'conversation, applied, to before <data from="the prompt">Try the old way</data>'
+    )
+
+
 async def test_get_task_with_files_lists_what_the_agent_changed(tools: EaTools, fake_seti: FakeSeti) -> None:
     empty = await tools.call("get_task", {"task": "login", "files": True})
     assert empty.text.endswith("has changed no files since it started.")

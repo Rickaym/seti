@@ -793,8 +793,13 @@ class FakeSeti:
     ssh_sets: dict[str, list[str]] = field(default_factory=dict)
     access_defaults: dict[str, bool] = field(default_factory=dict)
     processes: dict[str, dict[str, Any]] = field(default_factory=dict)
+    audit_chain: dict[str, Any] = field(
+        default_factory=lambda: {"ok": True, "checked": 42, "broken_at": None}
+    )
     access_catalog: list[dict[str, Any]] = field(default_factory=list)
     second_opinions: dict[str, dict[str, Any]] = field(default_factory=dict)
+    rewinds: dict[str, list[dict[str, Any]]] = field(default_factory=dict)
+    pack_links: dict[str, dict[str, Any]] = field(default_factory=dict)
     recent_files: dict[str, dict[str, Any]] = field(default_factory=dict)
     shell_output: dict[str, dict[str, Any]] = field(default_factory=dict)
     task_access: dict[str, dict[str, bool]] = field(default_factory=dict)
@@ -1291,6 +1296,8 @@ class FakeSeti:
                 if self.digest is None:
                     return err(404, "Not Found")
                 return ok({"lines": self.digest})
+            case ["tasks", task_id, "rewinds"]:
+                return ok(self.rewinds.get(task_id, []))
             case ["tasks", task_id, "second-opinions"]:
                 return ok(self.second_opinions.get(task_id, {"spend": [], "reviews": []}))
             case ["tasks", task_id, "files", "recent"]:
@@ -1347,6 +1354,8 @@ class FakeSeti:
                 return ok(self.repos)
             case ["workspaces"]:
                 return ok(self.workspaces)
+            case ["audit", "status"]:
+                return ok({"retention_days": 90, "chain": self.audit_chain})
             case ["audit"]:
                 return audit_page(self.audit, params)
             case ["ea", "context-packs"]:
@@ -1355,6 +1364,8 @@ class FakeSeti:
                 return ok(self.ea_pack_prompt())
             case ["context", "packs"]:
                 return ok(self.packs)
+            case ["context", "packs", pack_id, "links"]:
+                return ok(self.pack_links.get(pack_id, {"agents": [], "ea": False}))
             case ["context", "files"]:
                 return ok(self.files)
             case ["context", "files", key]:
@@ -1414,6 +1425,12 @@ class FakeSeti:
                 return ok(self.policy_shadow)
             case ["settings-doc"]:
                 return ok(self.settings_doc)
+            case (
+                ["settings-doc", "defaults"]
+                | ["settings-doc", "agents", _]
+                | ["settings-doc", "workspaces", _]
+            ):
+                return ok({"agents": {"lifecycle": {"days": "/".join(parts)}}})
             case ["permissions"]:
                 return ok(self.permission_policy)
             case ["tasks", task_id, "permissions"]:
@@ -1510,6 +1527,8 @@ class FakeSeti:
                 return ok({"id": int(follow), "task_id": task_id, "stopped_at": "2026-01-03T00:00:00Z"})
             case ["tasks", "start"]:
                 return ok(self._planned_task(body))
+            case ["notifications", "test"]:
+                return ok({"sent": 2, "failed": 1})
             case ["ea", "usage"]:
                 self.usage_records.extend(body["records"])
                 return ok({"recorded": len(body["records"])})

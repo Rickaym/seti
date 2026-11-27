@@ -121,6 +121,7 @@ class SettingsFake(FakeSeti):
         self.proposals: list[dict[str, Any]] = []
         self.tidies: list[dict[str, Any]] = []
         self.trash: list[dict[str, Any]] = []
+        self.dreams_off: dict[str, list[str]] = {"tasks": [], "workspaces": []}
         self.dream_settings: dict[str, Any] = {
             "enabled": False,
             "window_start": "01:00",
@@ -384,6 +385,8 @@ class SettingsFake(FakeSeti):
                 return ok(self.dream_settings)
             case "GET", ["dreams"]:
                 return ok(None)
+            case "GET", ["dreams", "off"]:
+                return ok(self.dreams_off)
             case "GET", ["dreams", "proposals"]:
                 return ok(self.proposals)
             case "GET", ["dreams", "tidies"]:
@@ -1108,12 +1111,23 @@ async def test_dreams_are_read_and_one_started_after_a_yes(tools: EaTools, fake:
     assert writes(fake)[-1][0:2] == ("POST", f"/api/tasks/{TASK_LOGOUT}/dream")
 
 
+async def test_dreaming_names_the_agents_and_workspaces_switched_out(
+    tools: EaTools, fake: SettingsFake
+) -> None:
+    fake.dreams_off = {"tasks": [TASK_LOGOUT], "workspaces": ["w-client"]}
+    read = await tools.call("dreams", {})
+    assert "Switched out of Dreaming: agents Fix the logout button; workspaces Client." in read.text
+
+
 async def test_dreaming_is_read_changed_and_switched_per_agent_and_workspace_after_a_yes(
     tools: EaTools, fake: SettingsFake
 ) -> None:
     read = await tools.call("dreams", {})
     assert read.text.startswith("Nightly Dreaming is off: window 01:00 to 05:00 (no zone chosen yet)")
-    assert read.text.endswith("No night has been planned yet. The trash is empty.")
+    assert read.text.endswith(
+        "No night has been planned yet. No agent or workspace is switched out of Dreaming. "
+        "The trash is empty."
+    )
     change = {"enabled": True, "zone": "Europe/Istanbul", "window_start": "00:30"}
     asked, changed = await confirm(tools, "dreams", change)
     assert "turns it on, sets window start to 00:30, sets zone to Europe/Istanbul." in asked.text

@@ -88,12 +88,20 @@ export const SECURITY_ROUTES: CoverageTable = {
   'PUT /api/mod-admin/dev-mode': user('installs', 'Developer mode. Runs unreviewed code'),
   'POST /api/mod-admin/install': user('installs', "Install a mod. Runs code; needs the user's consent"),
   'PATCH /api/mod-admin/mods/:id': user('installs', "A mod's grants. Consent"),
-  'GET /api/mod-admin/mods/:id/log': gap("A mod's log. Read"),
+  'GET /api/mod-admin/mods/:id/log': gap(
+    "A mod's log. Mod admin asks the user's consent (requireUserConsent); the EA's mod list has its newest error",
+  ),
   'POST /api/mod-admin/mods/:id/rollback': user('installs', 'Roll a mod back. Code change'),
   'POST /api/mod-admin/mods/:id/uninstall': user('installs', 'Uninstall a mod. Consent route'),
   'POST /api/mod-admin/mods/:id/update/apply': user('installs', 'Update a mod. Code change'),
-  'POST /api/mod-admin/mods/:id/update/check': gap('Check a mod for updates. Read'),
-  'POST /api/mod-admin/mods/:id/update/skip': gap('Skip a mod update. Harmless write'),
+  'POST /api/mod-admin/mods/:id/update/check': user(
+    'installs',
+    "Part of updating a mod, which needs the user's own consent",
+  ),
+  'POST /api/mod-admin/mods/:id/update/skip': user(
+    'installs',
+    "Part of updating a mod, which needs the user's own consent",
+  ),
   'POST /api/mod-admin/preview': user('installs', 'Preview a mod package before install. Install flow'),
   'GET /api/mod-asks': user('installs', 'Mods asking for consent. Consent'),
   'POST /api/mod-asks/:id': user('installs', "Answer a mod's consent ask. Consent"),
