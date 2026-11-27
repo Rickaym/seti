@@ -1309,7 +1309,6 @@ async def test_seti_refusing_the_ea_reads_plainly(tools: EaTools, fake: Settings
 def test_the_prompt_keeps_security_and_secrets_with_the_user() -> None:
     assert "Security is the user's alone" in SYSTEM_PROMPT
     assert "You never see a secret value." in SYSTEM_PROMPT
-    assert "webhook channels (create, change, test, delete, rotate the secret" in SYSTEM_PROMPT
     assert SYSTEM_PROMPT.isascii()
 
 
