@@ -22,7 +22,7 @@ const ownersOf = (pushes: readonly OutsidePush[]) => pushes.flatMap((push) => (p
  */
 export async function pushCall(
   task: Task,
-  call: { tool: string; input: Record<string, unknown>; cwd: string },
+  call: { tool: string; id?: string | undefined; input: Record<string, unknown>; cwd: string },
   signal: AbortSignal,
 ): Promise<PushOutput> {
   const command = call.input.command
@@ -35,6 +35,7 @@ export async function pushCall(
   }
   const asked = {
     tool: call.tool,
+    callId: call.id,
     input: call.input,
     reason: pushReason(pushes),
     owners: ownersOf(pushes),

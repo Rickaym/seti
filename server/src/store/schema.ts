@@ -53,6 +53,7 @@ import { PACK_KIND, retireBuiltinRoles, ROLE_RUNTIME, rolesToPacks } from './sch
 import { MESSAGE_SEARCH, MESSAGE_SEARCH_TALK, MESSAGE_TIME } from './schema-search.js'
 import {
   CLAUDE_LOGINS,
+  PERMISSION_REQUEST_CALL,
   PERMISSION_REQUEST_DESCRIPTION,
   PERMISSION_REQUEST_EDITED,
   PERMISSION_REQUEST_PRS,
@@ -277,4 +278,5 @@ export const MIGRATIONS: readonly Migration[] = [
   { version: 149, name: 'session_rescrub', sql: SESSION_RESCRUB },
   { version: 150, name: 'ea_inbox_relays', sql: EA_INBOX_RELAYS },
   { version: 151, name: 'gemini_settings', sql: GEMINI_SETTINGS },
+  { version: 152, name: 'permission_request_call', sql: PERMISSION_REQUEST_CALL },
 ]

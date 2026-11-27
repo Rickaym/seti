@@ -42,8 +42,9 @@ import {
 } from '@/lib/transcript'
 import { cn } from '@/lib/utils'
 import { ToolFileButton } from '@/panels/files/FileLink'
-import { CallInput } from '@/panels/tasks/ToolInput'
+import { EditedTag, RanInput } from '@/panels/tasks/SentCall'
 import { TrimmedText } from '@/panels/tasks/TrimmedText'
+import { useSentCall } from '@/panels/tasks/sent-calls'
 
 /** The file a call that edits one changes, whose card links to it in Files. */
 const touchedFile = (block: ToolUseBlock) => {
@@ -245,7 +246,10 @@ export interface ToolCallProps {
   background: BackgroundStatus | undefined
 }
 
-/** One call on one line; opening it shows the full input and the result. */
+/**
+ * One call on one line; opening it shows the full input and the result. A call the user edited
+ * before it ran shows its input as it ran, with the agent's draft under it once opened.
+ */
 export function ToolCall({
   taskId,
   rowId,
@@ -259,6 +263,8 @@ export function ToolCall({
 }: ToolCallProps) {
   const failed = result?.failed === true
   const inputSource = inputTrimmed ? { taskId, rowId, toolUseId: block.callId, pick: fullInputText } : null
+  const sent = useSentCall(block.callId)
+  const shown = sent === undefined ? block : { ...block, input: sent.input }
   const output = result ? resultText(result) : ''
   const refused = refusals(output)
   const touched = touchedFile(block)
@@ -268,8 +274,9 @@ export function ToolCall({
       resultRow={result?.rowId}
       summary={
         <>
-          <CallName block={block} />
+          <CallName block={shown} />
           {touched !== undefined && <ToolFileButton path={touched} />}
+          {sent !== undefined && <EditedTag />}
           {outward && <OutwardMark />}
           {refused.length > 0 && (
             <span
@@ -284,7 +291,7 @@ export function ToolCall({
         </>
       }
     >
-      <CallInput block={block} source={inputSource} taskId={taskId} />
+      <RanInput block={block} sent={sent} source={inputSource} taskId={taskId} />
       {result ? (
         <div className="space-y-2 border-t border-border pt-2">
           <ToolOutput taskId={taskId} result={result} />
