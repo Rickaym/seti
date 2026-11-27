@@ -656,7 +656,8 @@ interrupted only for that.
   Beside each answer the user gives, the implementation counts its own verdict (PERM-12).
 - PERM-4: Built-in: reads, search and platform tools are allowed; shell and edits inside the
   agent's folders are allowed in the sandbox only; killing by name is denied.
-- PERM-5: Request fields: `id`, `task_id`, `tool_name`, `kind`, `summary`, `description` (what
+- PERM-5: Request fields: `id`, `task_id`, `tool_name`, `call_id` (the runtime's id of the held
+  call, or null where the runtime gives none; GRD-8), `kind`, `summary`, `description` (what
   the agent says the call is for, as one line of plain text of at most 200 characters, or null),
   `input`, `reason`, `suggestions`, `editable`, `prs` (PERM-16), `state`, `edited` (field names,
   GRD-8), `created_at`, `timeout_at`, `timed_out`. Decisions:
@@ -782,11 +783,17 @@ interrupted only for that.
   when the request shows the input whole and unredacted and the runtime runs a call with the input
   a decision hands back (not Codex, which runs a call as it asked). The audit, the request's
   `edited` and the transcript's edit mark record field names, never values; the mark also keeps
-  the call's tool name. The mark MUST read as one plain sentence, with no tooltip needed: whom
+  the call's tool name and, where the runtime gives one, the call's id, which the request keeps
+  too. The mark MUST read as one plain sentence, with no tooltip needed: whom
   (the user, since the EA never answers with an edit, PERM-17), which fields, and whether the call
-  went out ("You edited the message before it was sent. Above is the agent's draft." or "You
-  edited the message, then denied it. Nothing was sent."), naming a Slack send by what it does
-  and any other call by its server and tool. The agent MUST learn of an edit from the control
+  went out ("You edited the message before it was sent." or "You edited the message, then denied
+  it. Nothing was sent."), naming a Slack send by what it does and any other call by its server
+  and tool. The row of an edited call that went out MUST show the call as it ran, read from its
+  request's stored input (secrets redacted), with a quiet "edited" mark and the agent's draft
+  under it once the row is opened. A row whose request has no call id, is no longer among the
+  agent's latest requests, or stored an input cut short shows the agent's draft, and its mark
+  ends "Above is the agent's draft.". A denied call's row shows the agent's draft, since nothing
+  went out. The agent MUST learn of an edit from the control
   room's own record of it, never from the call's input: after an edited call's result, in the same turn, it is told that the user edited the call and the text of
   each changed field as it ran; an edited call the user denies is denied with the user's text for
   each changed field and their note. Each field is cut at 2000 characters and all of them at 6000,

@@ -11,7 +11,7 @@ export function EditedTag() {
     <Hint text="You edited this call before it ran. This row shows what ran; open it for the agent's draft.">
       <span data-testid="tool-edited" className="flex shrink-0 items-center gap-0.5 text-muted-foreground">
         <Pencil aria-hidden className="size-3" />
-        edited
+        <span className="max-sm:sr-only">edited</span>
       </span>
     </Hint>
   )
