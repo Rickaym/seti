@@ -1,4 +1,5 @@
 import { hostMatches } from './connections.js'
+import type { StoredRuntime } from './runtimes/stored.js'
 
 /** US dollars per million tokens. */
 interface TokenRate {
@@ -32,6 +33,8 @@ interface Provider {
   baseUrl: string
   /** The hosts its model calls go to, the only ones where its key is added. */
   hosts: readonly string[]
+  /** What signs its calls: the host's Claude login, or a connection with a header on its hosts. */
+  key: 'login' | 'connection'
   /** Null where the runtime reports dollars itself. */
   prices: PriceTable | null
 }
@@ -43,6 +46,7 @@ const ANTHROPIC = {
   label: 'Anthropic',
   baseUrl: 'https://api.anthropic.com',
   hosts: ['api.anthropic.com'],
+  key: 'login',
   prices: null,
 } satisfies Provider
 
@@ -51,6 +55,7 @@ const OPENAI = {
   label: 'OpenAI',
   baseUrl: 'https://api.openai.com/v1',
   hosts: ['api.openai.com'],
+  key: 'connection',
   prices: {
     asOf: '2026-11-24',
     source: 'https://developers.openai.com/api/docs/pricing',
@@ -79,3 +84,9 @@ export type ProviderId = keyof typeof PROVIDERS
 /** Whether a connection on these host patterns reaches the provider's model calls. */
 export const reachesProvider = (provider: ProviderId, patterns: readonly string[]): boolean =>
   patterns.some((pattern) => PROVIDERS[provider].hosts.some((host) => hostMatches(pattern, host)))
+
+/** The provider each runtime's agents reach, which signs their model calls. */
+const RUNTIME_PROVIDERS: Record<StoredRuntime, ProviderId> = { claude: 'anthropic', codex: 'openai' }
+
+/** The provider an agent on the runtime sends its model calls to. */
+export const providerOf = (runtime: StoredRuntime): ProviderId => RUNTIME_PROVIDERS[runtime]
