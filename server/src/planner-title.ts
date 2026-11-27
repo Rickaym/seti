@@ -44,7 +44,7 @@ const REPLY_STEMS = ['sorry', 'unable', 'cannot', 'cant', 'wont', 'apolog', 'sus
 /** A title names the work, so it never speaks as the planner does. */
 const FIRST_PERSON = new Set(['i', 'im', 'ive', 'me', 'my'])
 
-const words = (text: string) =>
+const words = (text: string): string[] =>
   text
     .toLowerCase()
     .replace(/['\u2019]/g, '')
@@ -58,8 +58,8 @@ export function titleProblem(title: string, message: string): string | null {
   const said = words(message)
   const has = (stem: string) => said.some((word) => word.startsWith(stem))
   const own = words(title)
-  const reply = own.find((word) => REPLY_STEMS.some((stem) => word.startsWith(stem) && !has(stem)))
-  if (reply !== undefined || own.some((word) => FIRST_PERSON.has(word) && !said.includes(word))) {
+  const replies = own.some((word) => REPLY_STEMS.some((stem) => word.startsWith(stem) && !has(stem)))
+  if (replies || own.some((word) => FIRST_PERSON.has(word) && !said.includes(word))) {
     return 'The planner answered the message instead of titling it'
   }
   return null
