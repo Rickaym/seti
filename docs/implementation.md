@@ -70,7 +70,7 @@ with another top-level folder.
 | 7.2, 7.3       | `sandbox.ts`, `sandbox-mounts.ts`, `sandbox-bwrap.ts`, `sandbox-codex.ts`, `sandbox-read-only.ts`, `egress-*.ts`, `sandbox-ca.ts`, `sandbox-aws-token.ts`, `task-proxy.ts`, `launch-plan.ts`, `proxy-grant.ts`, `provider-key.ts`, `egress-connections.ts`, `proxy-owner.ts`, `secret-asks.ts`, `ask-in-time.ts`, `ssh-agent.ts`, `agent-access.ts`, `tool-relay.ts` |
 | 7.4, 7.5       | `permission-policy.ts`, `policy/`, `permission-requests.ts`, `permission-timeout.ts`, `permission-guard.ts`, `repeat-hooks.ts`, `review-hooks.ts`, `shadow-hooks.ts`, `outward.ts`, `outward-push.ts` and `push-asks.ts` (PERM-15: `policy/outward.ts` reads the command, the Claude agent's `Bash` hook in `runtime-host.ts` and `codex-decide.ts` ask)             |
 | 7.6 Changes    | `change-requests.ts`, `change-request-notes.ts`, `mcp-off-context.ts`, `shared/src/change-requests.ts`                                                                                                                                                                                                                                                               |
-| 7.7 Hostile    | `git.ts`, `runtimes/claude/probe-launch.ts`, `task-files.ts`, `html-preview.ts`, `uploads.ts`                                                                                                                                                                                                                                                                        |
+| 7.7 Hostile    | `git.ts`, `git-jail.ts`, `runtimes/claude/probe-launch.ts`, `task-files.ts`, `html-preview.ts`, `uploads.ts`                                                                                                                                                                                                                                                         |
 | 7.8 Caps       | `launcher.ts`, `memory-scope.ts`, `scope-cpu.ts`, `scope-limits.ts`, `scope-control.ts`, `oom-guard.ts`                                                                                                                                                                                                                                                              |
 | 8 Secrets      | `secret-box.ts`, `connections.ts`, `scrub.ts`, `secret-questions.ts`, `secret-delivery.ts`                                                                                                                                                                                                                                                                           |
 | 9 Shared tools | `shared/src/shared-tools.ts`, `shared-tool-proposals.ts`, `shared-tool-files.ts`, `shared-tool-server.ts`                                                                                                                                                                                                                                                            |
@@ -163,8 +163,9 @@ with another top-level folder.
   `git ls-files` and one `git check-ignore` per batch. `server/src/storage-clean.ts` refuses with
   409 while the agent runs, re-plans on confirm, removes only what both the plan and the request
   name, and records one `task.storage_cleaned` event (RES-16).
-- **Removal.** Every removal goes through `server/src/owned-dirs.ts`. A linked worktree goes
-  through its main checkout's `git worktree remove`; anything else is `fs.rm` on the checked path.
+- **Removal.** Every removal goes through `server/src/owned-dirs.ts`: `fs.rm` on the checked path,
+  then for a linked worktree its main checkout's record is dropped with a jailed
+  `git worktree remove` of the missing folder.
   `removeNestedDir` removes one rebuildable folder inside an agent folder that passes the same
   checks, and only when its real path is the agent folder's real path joined with the target's
   relative path, so no symlink on the way leads elsewhere.
@@ -291,9 +292,15 @@ the AppArmor profile for `bwrap` that the installer adds ([Setup](setup.md#sandb
   input, prlimit caps (512 MB to 1.5 GB of memory, CPU time, file size, open files), a wall-clock
   timeout on the process group, capped output, and at most two at once at low priority.
   LibreOffice starts from a fresh profile with macros disabled and Java off.
-- **Agent-writable folders.** Seti runs git there only through `agentGit` in `server/src/git.ts`
-  (HST-2), probes capabilities through `server/src/runtimes/claude/probe-launch.ts` (HST-4), and
-  serves HTML previews under the policy in `server/src/html-preview.ts` (HST-5).
+- **Agent-writable folders.** Seti runs git there only through `agentGit` in `server/src/git.ts`,
+  which starts it in the jail of `server/src/git-jail.ts`: bwrap with its own user, process and
+  network namespaces, `/usr`, `/etc` and the repository's top (read-only) and git folders
+  mounted, nothing else of the home or Seti's data, and an environment of git variables only
+  (HST-2). Worktrees of a registered repository are made, listed and removed the same way, and
+  `server/src/warm-caches.ts` lists ignored files through `agentGitRaw`. `gitMounts` in
+  `server/src/sandbox-mounts.ts` makes the read-only covers of SBX-16, empty where missing. Seti
+  probes capabilities through `server/src/runtimes/claude/probe-launch.ts` (HST-4), and serves
+  HTML previews under the policy in `server/src/html-preview.ts` (HST-5).
 
 ## Writing a runtime adapter
 
@@ -460,6 +467,20 @@ packets that arrived after it.
 reads `getStats` every two seconds (`call-quality.ts`) and reports the call's loss, filled-in
 speech, jitter, round trip, path type and reconnects with its call end, as numbers only; the EA
 logs one line per call with the user's audio loss, drops and the seconds of speech it held.
+
+### Inbox relays
+
+`server/src/ea-relay.ts` implements EA-19 behind `POST /api/ea/relays`, which only the EA's bot
+token reaches. It checks the switch (`ea_settings.inbox_relays`, changed only through
+`PUT /api/ea/settings/inbox-relays` by the user), then the recipient against `relayTargets`, then
+the text, then the hourly limits, and claims the item in `ea_relay` before it posts the framed
+direct message through `postTeamMessage`. A channel alert records its `channel_id` on `ea_inbox`
+so the subscribed agents come from Seti's tables, not the payload. History pages attach each
+inbox entry's relays, and `POST /api/ea/relays/:id/take-back` dismisses the relay's update while
+it still waits for the agent. In the EA, `ea/src/seti_ea/relays.py` reads the switch for each chat
+report, gives the model the relay rules and the report's item ids, and `RelayGuard` opens
+`post_team_chat` with `to` and `relay_of` once per report. A report never counts as the user's turn,
+so nothing in an item or a relay can answer an open ask. Reports on a call do not relay.
 
 ## Reference values
 

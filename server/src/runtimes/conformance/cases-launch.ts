@@ -10,6 +10,7 @@ const LAUNCHER_ENV = {
   HTTPS_PROXY: 'https://egress.invalid:3128',
   ANTHROPIC_API_KEY: 'egress-placeholder',
   OPENAI_API_KEY: 'egress-placeholder',
+  GEMINI_API_KEY: 'egress-placeholder',
 }
 
 /** Secrets in Seti's own environment, which no process of an agent may see. */

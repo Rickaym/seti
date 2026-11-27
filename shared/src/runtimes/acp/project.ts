@@ -1,6 +1,6 @@
 import type { RuntimeEvent } from '../../events.js'
 import { callOf, resultOf } from './calls.js'
-import { sessionUpdate, type AcpRecord } from './shapes.js'
+import { acpRecord, sessionUpdate, type AcpRecord } from './shapes.js'
 
 type Event = RuntimeEvent
 
@@ -131,25 +131,30 @@ function turnEnded(record: Extract<AcpRecord, { seti: 'ended' }>): Event[] {
 }
 
 /** The neutral events of one ACP record as Seti stored it; anything it cannot read is `vendor`. */
-export function projectAcp(raw: AcpRecord): Event[] {
-  switch (raw.seti) {
+export function projectAcp(raw: unknown): Event[] {
+  const parsed = acpRecord.safeParse(raw)
+  if (!parsed.success) {
+    return [vendor('acp', true)]
+  }
+  const record = parsed.data
+  switch (record.seti) {
     case 'started':
       return [
         {
           ...AGENT,
           type: 'session.started',
-          sessionId: raw.sessionId,
-          model: raw.model,
+          sessionId: record.sessionId,
+          model: record.model,
           mode: null,
           servers: [],
-          cwd: raw.cwd,
+          cwd: record.cwd,
         },
       ]
     case 'turn':
-      return [{ ...AGENT, type: 'turn.started', turnId: raw.turnId, cause: 'input' }]
+      return [{ ...AGENT, type: 'turn.started', turnId: record.turnId, cause: 'input' }]
     case 'update':
-      return fromUpdate(raw)
+      return fromUpdate(record)
     case 'ended':
-      return turnEnded(raw)
+      return turnEnded(record)
   }
 }

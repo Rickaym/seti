@@ -25,32 +25,36 @@ async function leaveDraft(page: Page, taskId: string, text: string): Promise<voi
 }
 
 const reply = (page: Page) => page.getByRole('combobox', { name: 'Reply' })
-const card = (page: Page, name: string) => page.getByRole('group', { name: `Command /${name}` })
+const card = (page: Page, name: string) => page.getByRole('group', { name: `Command /seti:${name}` })
+const commandList = (page: Page) => page.getByRole('listbox', { name: 'Command suggestions' })
 
 async function shot(page: Page, name: string): Promise<void> {
   await test.info().attach(name, { body: await page.screenshot(), contentType: 'image/png' })
 }
 
-test("the composer completes Seti's setting commands and runs Bypass through its own confirmation", async ({
-  page,
-  request,
-}) => {
+test('a bare name offers the seti: command, and each word completes with its state', async ({ page, request }) => {
   const id = await seedAgent('Commands')
   await page.goto(`/#agents/${id}`)
-  await reply(page).pressSequentially('/re')
-  const list = page.getByRole('listbox', { name: 'Command suggestions' })
-  await expect(list.getByRole('option', { name: /\/restart/ })).toBeVisible()
-  await expect(list.getByRole('option', { name: /\/rename/ })).toBeVisible()
+  await reply(page).pressSequentially('/acc')
+  await expect(commandList(page).getByRole('option', { name: /\/seti:access/ })).toBeVisible()
   await shot(page, 'completion')
+  await reply(page).press('Enter')
+  await expect(reply(page)).toHaveValue('/seti:access ')
+  const kinds = page.getByRole('listbox', { name: 'a kind of access' })
+  await expect(kinds.getByRole('option', { name: /MCP server/ })).toBeVisible()
+  await expect(kinds.getByRole('option', { name: /Home folders/ })).toHaveAttribute('aria-disabled', 'true')
+  await shot(page, 'access-kinds')
 
   await reply(page).fill('')
-  await reply(page).pressSequentially('/bypass ')
+  await reply(page).pressSequentially('/seti:bypass ')
+  const hours = page.getByRole('listbox', { name: 'one of 2, 8, 24, off' })
+  await expect(hours.getByRole('option', { name: /Off/ })).toHaveAttribute('aria-disabled', 'true')
+  await expect(hours.getByRole('option', { name: /Off/ })).toContainText('Already off')
+  await shot(page, 'values')
+  await hours.getByRole('option', { name: /8 h/ }).click()
+  await expect(reply(page)).toHaveValue('/seti:bypass 8 ')
+  await reply(page).press('Enter')
   const bypass = card(page, 'bypass')
-  await expect(bypass.getByRole('button', { name: '8 h' })).toBeVisible()
-  await expect(bypass.getByRole('button', { name: 'Off' })).toHaveAttribute('aria-pressed', 'true')
-  await shot(page, 'picker')
-
-  await bypass.getByRole('button', { name: '8 h' }).click()
   await expect(bypass).toContainText('Turn Bypass on')
   await expect(bypass).toContainText('runs every tool without asking for 8 hours')
   await shot(page, 'confirm')
@@ -58,24 +62,28 @@ test("the composer completes Seti's setting commands and runs Bypass through its
   await expect.poll(async () => (await apiData<Task>(request, `/tasks/${id}`)).bypass_until).not.toBeNull()
   await expect(reply(page)).toHaveValue('')
 
-  await reply(page).pressSequentially('/bypass off')
+  await reply(page).pressSequentially('/seti:pin on')
   await reply(page).press('Enter')
-  await expect.poll(async () => (await apiData<Task>(request, `/tasks/${id}`)).bypass_until).toBeNull()
+  await expect.poll(async () => (await apiData<Task>(request, `/tasks/${id}`)).pinned).toBe(true)
+  await expect(reply(page)).toHaveValue('')
+  await reply(page).pressSequentially('/seti:pin nowhere')
+  await reply(page).press('Enter')
+  await expect(card(page, 'pin')).toContainText('Expected one of on, off, not nowhere')
 })
 
-test('a handed-over or pasted /archive waits for Run, then asks as Archive does', async ({
+test('a handed-over or pasted /seti:archive waits for Run, then asks as Archive does', async ({
   page,
   context,
   request,
 }) => {
   const id = await seedAgent('Handed over')
-  await leaveDraft(page, id, '/archive')
+  await leaveDraft(page, id, '/seti:archive')
   await page.goto(`/#agents/${id}`)
-  await expect(reply(page)).toHaveValue('/archive')
+  await expect(reply(page)).toHaveValue('/seti:archive')
   await reply(page).click()
   await expect(page.getByRole('listbox', { name: 'Command suggestions' })).toBeVisible()
   await reply(page).press('Enter')
-  await expect(reply(page), 'Enter picks the command from the list').toHaveValue('/archive ')
+  await expect(reply(page), 'Enter picks the command from the list').toHaveValue('/seti:archive ')
   await reply(page).press('Enter')
   const archive = card(page, 'archive')
   await expect(archive).toContainText('This line was not typed here')
@@ -86,11 +94,11 @@ test('a handed-over or pasted /archive waits for Run, then asks as Archive does'
 
   await context.grantPermissions(['clipboard-read', 'clipboard-write'])
   await reply(page).fill('')
-  await page.evaluate(async () => navigator.clipboard.writeText('/archive'))
+  await page.evaluate(async () => navigator.clipboard.writeText('/seti:archive'))
   await reply(page).press('ControlOrMeta+V')
-  await expect(reply(page)).toHaveValue('/archive')
+  await expect(reply(page)).toHaveValue('/seti:archive')
   await reply(page).press('Enter')
-  await expect(reply(page), 'Enter picks the pasted command from the list').toHaveValue('/archive ')
+  await expect(reply(page), 'Enter picks the pasted command from the list').toHaveValue('/seti:archive ')
   await reply(page).press('Enter')
   await expect(archive).toContainText('This line was not typed here')
   await archive.getByRole('button', { name: 'Run' }).click()
@@ -99,13 +107,10 @@ test('a handed-over or pasted /archive waits for Run, then asks as Archive does'
   await expect.poll(async () => (await apiData<Task>(request, `/tasks/${id}`)).archived_at).not.toBeNull()
 })
 
-test('a typed /settings opens the agent settings on the tab it names, and /rename renames', async ({
-  page,
-  request,
-}) => {
+test('/seti:settings opens the tab it names, and /seti:rename renames', async ({ page, request }) => {
   const id = await seedAgent('Opens')
   await page.goto(`/#agents/${id}`)
-  await reply(page).pressSequentially('/settings team')
+  await reply(page).pressSequentially('/seti:settings team')
   await reply(page).press('Enter')
   const settings = page.getByRole('dialog').filter({ has: page.getByRole('tablist', { name: 'Sections' }) })
   await expect(settings.getByRole('tab', { name: 'Team', exact: true })).toHaveAttribute('aria-selected', 'true')
@@ -113,18 +118,18 @@ test('a typed /settings opens the agent settings on the tab it names, and /renam
   await expect(settings).toBeHidden()
 
   const title = unique('Renamed')
-  await reply(page).pressSequentially(`/rename ${title}`)
+  await reply(page).pressSequentially(`/seti:rename ${title}`)
   await reply(page).press('Enter')
   await expect.poll(async () => (await apiData<Task>(request, `/tasks/${id}`)).title).toBe(title)
 })
 
-test('a Codex agent lists the setting commands its runtime takes and refuses the rest by name', async ({ page }) => {
+test('a Codex agent lists the seti: commands its runtime takes and refuses the rest by name', async ({ page }) => {
   const id = await seedCodexAgent(unique('Codex commands'))
   await page.goto(`/#agents/${id}`)
-  await reply(page).pressSequentially('/')
-  const list = page.getByRole('listbox', { name: 'Command suggestions' })
-  await expect(list.getByRole('option', { name: /\/mcp/ })).toBeVisible()
-  await expect(list.getByRole('option', { name: /\/bypass/ })).toHaveCount(0)
-  await reply(page).pressSequentially('bypass ')
-  await expect(card(page, 'bypass')).toContainText('/bypass is not on Codex agents')
+  await reply(page).pressSequentially('/seti:')
+  await expect(commandList(page).getByRole('option', { name: /\/seti:mcp/ })).toBeVisible()
+  await expect(commandList(page).getByRole('option', { name: /\/seti:bypass/ })).toHaveCount(0)
+  await reply(page).pressSequentially('bypass 8')
+  await reply(page).press('Enter')
+  await expect(card(page, 'bypass')).toContainText('Not on Codex')
 })

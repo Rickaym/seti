@@ -2,7 +2,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import {
   commandScopeQuery,
-  settingCommands,
+  setiComposerCommands,
   shellInput,
   taskParams,
   withSetiCommands,
@@ -38,7 +38,7 @@ const setiOnly = (cwd: string, seti: readonly ComposerCommand[]): CommandCatalog
 })
 
 /** The commands Seti answers for an agent: its setting commands the runtime can take, and mods'. */
-const agentSetiCommands = (task: Task) => [...settingCommands(agentCapabilities(task.runtime)), ...setiCommands()]
+const agentSetiCommands = (task: Task) => [...setiComposerCommands(agentCapabilities(task.runtime)), ...setiCommands()]
 
 async function auditShell(kind: Extract<AuditKind, `task.shell_${string}`>, task: Task, command: string) {
   const verb = kind === 'task.shell_run' ? 'Ran' : 'Stopped'

@@ -1,9 +1,10 @@
 import type { ToolCall } from '@seti/shared'
+import type { RpcCall, JsonRpc } from '../json-rpc.js'
+import type { ReportQueue } from '../report-queue.js'
 import { askedOf, type CodexDecide } from './approvals.js'
-import { codexReport, type ReportQueue } from './reports.js'
-import type { CodexCall, CodexRpc } from './rpc.js'
+import { codexReport } from './reports.js'
 
-type Request = CodexCall & { id: number | string }
+type Request = RpcCall & { id: number | string }
 
 /** An ask Seti still owes Codex an answer to. */
 interface Waiting {
@@ -14,7 +15,7 @@ interface Waiting {
 
 /** What answering Codex's asks needs from the session it belongs to. */
 export interface AskContext {
-  rpc: CodexRpc
+  rpc: JsonRpc
   reports: ReportQueue
   decide: CodexDecide
   /** The agent's own thread, once Codex named it. */

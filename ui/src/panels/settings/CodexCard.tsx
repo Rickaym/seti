@@ -1,6 +1,6 @@
 import {
   DEFAULT_PROFILE_ID,
-  type CodexFailure,
+  type InstallFailure,
   type CodexSettingsInput,
   type CodexState,
   type CodexStatus,
@@ -72,7 +72,7 @@ function StateWord({ status }: { status: CodexStatus }) {
   )
 }
 
-const FAILURE_WORDS: Record<CodexFailure, string> = {
+const FAILURE_WORDS: Record<InstallFailure, string> = {
   network: 'Download failed',
   checksum: 'Checksum mismatch',
   platform: 'Unsupported machine',

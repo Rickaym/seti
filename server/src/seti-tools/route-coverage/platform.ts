@@ -69,6 +69,9 @@ export const PLATFORM_ROUTES: CoverageTable = {
   'GET /api/channels/slack-names': gap('Names of Slack users and channels Seti learned. Read; fits get_channel'),
   'GET /api/channels/sources': ea('create_channel'),
   'GET /api/channels/summary': same('GET /api/channels'),
+  'GET /api/channels/thread-reach': ui(
+    'Whether a screen says replies need a Slack webhook; the EA reads threads with get_task, webhooks with get_channel',
+  ),
   'GET /api/commands': ui("Slash commands for the composer. The user's own prompt box"),
   'GET /api/compact': ea('get_memory_cap'),
   'PUT /api/compact': ea('set_memory_cap'),

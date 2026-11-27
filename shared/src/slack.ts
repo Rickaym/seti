@@ -2,11 +2,12 @@ import { z } from 'zod'
 
 /** Slack send tools of an MCP server, such as slack_send_message; drafts and schedules count. */
 const SEND_TOOL = /(?:^|_)(send_message|send_message_draft|schedule_message)$/
-const VERBS: Record<string, string> = {
-  send_message: 'Send',
-  send_message_draft: 'Draft',
-  schedule_message: 'Schedule',
-}
+const KINDS = { send_message: 'send', send_message_draft: 'draft', schedule_message: 'schedule' } as const
+
+/** What a Slack send call does: post now, save a draft or schedule the message. */
+export type SlackSendKind = (typeof KINDS)[keyof typeof KINDS]
+
+const VERBS: Record<SlackSendKind, string> = { send: 'Send', draft: 'Draft', schedule: 'Schedule' }
 
 const isChannel = (id: string) => /^[CG]/.test(id)
 const isPerson = (id: string) => /^[UW]/.test(id)
@@ -39,11 +40,13 @@ const fieldOf = (input: unknown, key: string): string | null => {
 
 /** The Slack channel, DM or person a send call addresses; null for any other call. */
 export function slackSendTarget(tool: string, input: unknown): string | null {
-  const name = tool.split('__').at(-1) ?? tool
-  if (!/slack/i.test(tool) || !SEND_TOOL.test(name)) {
-    return null
-  }
-  return fieldOf(input, 'channel_id') ?? fieldOf(input, 'channel')
+  return slackSendKind(tool) === null ? null : (fieldOf(input, 'channel_id') ?? fieldOf(input, 'channel'))
+}
+
+/** Whether a tool is a Slack send, by its name alone, and which kind; null for any other tool. */
+export function slackSendKind(tool: string): SlackSendKind | null {
+  const found = SEND_TOOL.exec(tool.split('__').at(-1) ?? tool)?.[1]
+  return /slack/i.test(tool) && found !== undefined ? KINDS[found as keyof typeof KINDS] : null
 }
 
 /** Where a Slack send call goes, such as `Send to #deploys` or `DM to Dana`; null for other calls. */
@@ -52,8 +55,7 @@ export function slackDestination(tool: string, input: unknown, names: ReadonlyMa
   if (target === null) {
     return null
   }
-  const name = tool.split('__').at(-1) ?? tool
-  const verb = VERBS[SEND_TOOL.exec(name)?.[1] ?? ''] ?? 'Send'
+  const verb = VERBS[slackSendKind(tool) ?? 'send']
   const thread = fieldOf(input, 'thread_ts') === null ? '' : ', in a thread'
   const dm = isPerson(target) || (target.startsWith('D') && names.has(target))
   const where = dm ? `DM to ${slackPlace(target, names)}` : `${verb} to ${slackPlace(target, names)}`

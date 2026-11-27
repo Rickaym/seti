@@ -1,23 +1,15 @@
 import fs from 'node:fs'
-import type { CodexFailure, CodexSettings } from '@seti/shared'
+import type { CodexSettings, InstallFailure } from '@seti/shared'
 import { audit } from './audit.js'
-import {
-  CodexInstallError,
-  fetchPinned,
-  holdsBuild,
-  platformOf,
-  programIn,
-  stagingDir,
-  versionDir,
-  type CodexPin,
-} from './codex-fetch.js'
+import { fetchPinned, holdsBuild, platformOf, programIn, stagingDir, versionDir, type CodexPin } from './codex-fetch.js'
 import { CODEX_PIN } from './codex-pin.js'
 import { CODEX_ROOT } from './config.js'
 import { removeOwnedDir } from './owned-dirs.js'
+import { InstallError } from './pinned-download.js'
 import { codexSettings } from './store/codex-settings.js'
 
 export interface CodexInstallFailure {
-  reason: CodexFailure
+  reason: InstallFailure
   message: string
 }
 
@@ -30,7 +22,7 @@ const failures = new Map<string, CodexInstallFailure>()
 const SWEEP_MS = 60 * 60_000
 
 const failureOf = (e: unknown): CodexInstallFailure =>
-  e instanceof CodexInstallError
+  e instanceof InstallError
     ? { reason: e.reason, message: e.message }
     : { reason: 'disk', message: e instanceof Error ? e.message : String(e) }
 
@@ -66,7 +58,7 @@ export async function copyState(pin: CodexPin = CODEX_PIN): Promise<CopyState> {
 async function discard(dir: string): Promise<void> {
   const refusal = await removeOwnedDir(dir, 'codex', [])
   if (refusal !== null) {
-    throw new CodexInstallError('disk', `Could not remove ${dir}: ${refusal}`)
+    throw new InstallError('disk', `Could not remove ${dir}: ${refusal}`)
   }
 }
 

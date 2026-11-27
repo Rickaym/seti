@@ -81,6 +81,7 @@ import { credentialRoutes, profileSummaryRoutes } from './routes/credentials.js'
 import { auditRefusedProof, deviceRoutes } from './routes/devices.js'
 import { dreamRoutes, taskDreamRoutes, trashRoutes, workspaceDreamRoutes } from './routes/dreams.js'
 import { eaContextRoutes } from './routes/ea-context.js'
+import { eaRelayRoutes } from './routes/ea-relays.js'
 import { eaReplyRoutes } from './routes/ea-replies.js'
 import { eaStateRoutes } from './routes/ea-state.js'
 import { eaUsageRoutes } from './routes/ea-usage.js'
@@ -339,6 +340,7 @@ export function createApp(access: AccessGuardOptions = defaultAccess(), eaUrl: s
   app.route('/api/ea', eaContextRoutes)
   app.route('/api/ea', eaInboxRoutes)
   app.route('/api/ea', eaReplyRoutes)
+  app.route('/api/ea', eaRelayRoutes)
   app.route('/api/ea', eaRoutes(eaUrl))
   app.route('/api/local-session', localSessionRoutes(local))
   app.route('/api/auth/step-up', stepUpRoutes)
