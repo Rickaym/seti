@@ -9,9 +9,10 @@ test('on a phone the checked quote and the unread link show in the reply and its
   await expect(reply.getByTestId('quote-source').getByTestId('quote-verified')).toBeVisible()
 
   const sources = reply.getByRole('region', { name: 'Sources' })
-  await sources.getByRole('button', { name: '2 sources' }).tap()
+  await sources.getByRole('button', { name: '3 sources' }).tap()
   await expect(sources.locator('[data-source="2"]').getByTestId('source-not-read')).toBeVisible()
-  await expectFitsPhone(page, 'a reply with a checked quote and an unread link')
+  await expect(sources.locator('[data-source="3"]').getByTestId('source-as-read')).toHaveText(LEDGER.asRead)
+  await expectFitsPhone(page, 'a reply with a checked quote, an unread link and a branch link')
   await sources.scrollIntoViewIfNeeded()
   await page.screenshot({ path: test.info().outputPath('ledger-phone-light.png') })
 

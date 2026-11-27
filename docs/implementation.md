@@ -114,7 +114,8 @@ with another top-level folder.
   trigger indexes Claude Code's rows from their JSON.
 - The evidence ledger (`source_item`) keeps one row per item an agent read: kind, container,
   match key, permalink, time and the `spans` that locate the text in a tool result, as JSON
-  pointers into the result with an optional character range. The row names its transcript row and
+  pointers into the result with an optional character range, and for a file or commit the
+  `branches` of `origin` that were at its commit when it was read. The row names its transcript row and
   call, and a foreign key on the row deletes it with the row. A restore reads the ledger again from
   the restored rows (`rebuildSources` in `server/src/sources/record.ts`).
 - Redis holds only what can be rebuilt: GitHub PR lists and the GraphQL budget, capability and

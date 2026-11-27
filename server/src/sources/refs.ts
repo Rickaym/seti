@@ -7,6 +7,11 @@ export interface UrlRef {
   needles: string[] | null
   /** Whether items whose key starts with `ref` match, as for a commit named by a short hash. */
   prefix?: true
+  /**
+   * For a link at a branch name: each way to read it as a branch and the key prefix of what it
+   * names, matched by items read when that branch of origin was at them.
+   */
+  branches?: { branch: string; prefix: string }[]
 }
 
 const SLACK_HOST = /^(?:[a-z0-9-]+\.)+slack\.com$/
@@ -93,19 +98,43 @@ const COMMENT_ANCHOR = /^(issuecomment-|discussion_r|pullrequestreview-)(\d{1,20
 
 const SHA = /^[0-9a-f]{7,40}$/
 
-/** A file at a commit; a URL naming a branch or tag names no version the ledger can hold. */
-function blobUrl(repo: string, rest: readonly string[]): UrlRef | null {
-  const [sha = '', ...parts] = rest
-  let file: string
+const decoded = (parts: readonly string[]): string[] | null => {
   try {
-    file = parts.map(decodeURIComponent).join('/')
+    return parts.map(decodeURIComponent)
   } catch {
     return null
   }
-  if (!SHA.test(sha) || file === '' || parts.includes('')) {
+}
+
+/** A branch name a link may hold: no empty or dot part, no `..`, no characters git refuses. */
+const isBranch = (name: string) =>
+  /^[\w./-]{1,200}$/.test(name) && !name.includes('..') && !name.split('/').some((part) => /^\.*$/.test(part))
+
+/**
+ * A file at a branch: every split of the path into a branch and a file, since a branch name may
+ * hold slashes. Each is matched only by an item read when that branch was at its commit.
+ */
+function branchFile(repo: string, parts: readonly string[]): UrlRef | null {
+  const branches = parts.slice(1).flatMap((_, i) => {
+    const branch = parts.slice(0, i + 1).join('/')
+    const file = parts.slice(i + 1).join('/')
+    return isBranch(branch) ? [{ branch, prefix: `${fileRef(repo, file, null)}@` }] : []
+  })
+  const [first] = branches
+  return first === undefined ? null : { ref: first.prefix, parents: [], needles: null, branches }
+}
+
+/** A file at a commit, or at a branch as read when that branch was at a commit. */
+function blobUrl(repo: string, rest: readonly string[]): UrlRef | null {
+  const all = decoded(rest)
+  if (all === null || all.includes('') || all.length < 2) {
     return null
   }
-  const ref = fileRef(repo, file, sha)
+  const [sha = '', ...parts] = all
+  if (!SHA.test(sha)) {
+    return branchFile(repo, all)
+  }
+  const ref = fileRef(repo, parts.join('/'), sha)
   return sha.length === 40 ? { ref, parents: [], needles: null } : { ref, parents: [], needles: null, prefix: true }
 }
 
@@ -115,12 +144,18 @@ function githubUrl(url: URL): UrlRef | null {
   if (repo !== null && type === 'commit') {
     return commitUrl(repo, rest)
   }
-  return repo !== null && type === 'blob' ? blobUrl(repo, rest) : itemUrl(url, repo, type, rest)
+  const file = type === 'blob' || type === 'tree'
+  return repo !== null && file ? blobUrl(repo, rest) : itemUrl(url, repo, type, rest)
 }
 
-/** A commit by its full hash, or by a short one as a prefix. */
+/** A commit by its full hash, a short one as a prefix, or a branch as read at its tip. */
 function commitUrl(repo: string, rest: readonly string[]): UrlRef | null {
   const [sha = '', ...more] = rest
+  const branch = decoded(rest.filter((part) => part !== ''))?.join('/') ?? ''
+  if (!SHA.test(sha) && isBranch(branch)) {
+    const prefix = commitRef(repo, '')
+    return { ref: prefix, parents: [], needles: null, branches: [{ branch, prefix }] }
+  }
   if (!SHA.test(sha) || more.some((part) => part !== '')) {
     return null
   }
