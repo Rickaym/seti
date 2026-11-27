@@ -3,6 +3,7 @@ import { VolumeX } from 'lucide-react'
 import { useCallback } from 'react'
 import { ToggleButton } from '@/components/ToggleButton'
 import { AddressSetting } from '@/components/ea/AddressSetting'
+import { AssignSetting } from '@/components/ea/AssignSetting'
 import {
   DeviceNotes,
   MicPicker,
@@ -11,7 +12,6 @@ import {
   SpeakerPicker,
   TestSpeaker,
 } from '@/components/ea/AudioDevices'
-import { InboxRelaysSetting } from '@/components/ea/InboxRelaysSetting'
 import { LanguageSetting } from '@/components/ea/LanguageSetting'
 import { LiveContextCard } from '@/components/ea/LiveContextCard'
 import { RelayCheck } from '@/components/ea/RelayCheck'
@@ -136,11 +136,11 @@ export function EaPage() {
         </SettingsCard>
         <SettingsCard title="Inbox">
           <SettingRow
-            label="Inbox relays"
+            label="Assign work"
             stack
-            description="The EA may tell the agent an alert or message is about, in its own words, marked as not approved by you, and reports it in a line. Off, it asks you first."
+            description="On, the EA sends work it recommends to the right agent without your yes, starts one for an alert from a channel set to act when none fits, and tells the agent another alert is about. Sensitive work still asks, and each is marked not approved by you."
           >
-            <InboxRelaysSetting state={settings} />
+            <AssignSetting state={settings} />
           </SettingRow>
         </SettingsCard>
         <SettingsCard title="Connection">

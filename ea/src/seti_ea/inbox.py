@@ -25,6 +25,7 @@ from pipecat.observers.base_observer import BaseObserver, FramePushed
 from seti_ea.actions import CHANGE_TOOLS
 from seti_ea.asks import AnsweredAsk, parse_answered
 from seti_ea.history import Entry, parse_entries
+from seti_ea.relays import relay_id
 from seti_ea.seti import SetiClient, SetiError
 from seti_ea.settle import Settle
 from seti_ea.toolkit import ToolResult
@@ -47,8 +48,8 @@ ACTION_TOOLS = (
     frozenset({"start_task", "stop_task", "hand_over_updates", "post_team_chat", "confirm_asked"})
     | CHANGE_TOOLS
 )
-# An alert from a channel the user set to act may go to an existing agent as a direct message;
-# a public post and starting an agent still ask.
+# An alert from a channel the user set to act may be assigned to an existing agent by a direct
+# message that names it with relay_of; a public post still asks.
 ACT_TOOLS = frozenset({"post_team_chat"})
 REPLY_TOOL = "reply_team_chat"
 # On a call the user hears a mention first and answers it; the EA does not reply on its own.
@@ -303,7 +304,7 @@ class InboxGuard:
     def check(self, tool: str, arguments: Mapping[str, Any] | None = None) -> ToolResult | None:
         if not self.active or tool not in self._held:
             return None
-        if self.acting and tool in ACT_TOOLS and is_direct(arguments):
+        if self.acting and tool in ACT_TOOLS and is_direct(arguments) and relay_id(arguments) is not None:
             return None
         return ToolResult(
             "The user has not asked for this; you are reporting from your inbox. Tell the user what "

@@ -46,7 +46,7 @@ from seti_ea.live_context import LiveContext
 from seti_ea.packs import CHAT_TIMEOUT_SECS, PackPrompt
 from seti_ea.promises import PromiseCheck
 from seti_ea.prompt import CHAT_NOTE_PREFIX, VOICE_NOTE, chat_inbox_note, chat_note
-from seti_ea.relays import RelayGuard, relay_note, relays_on
+from seti_ea.relays import START_TOOL, RelayGuard, act_note, relay_note, relays_on
 from seti_ea.seti import SetiError
 from seti_ea.think import Ask, Thinker, responses_ask
 from seti_ea.think_speech import ShownProgress
@@ -283,9 +283,9 @@ class TextChat:
     async def follow_up(self, delivered: Delivered) -> None:
         """Checks due follow-ups, triages channel alerts and answers mentions, then reports in the chat.
 
-        Only read-only tools and a reply to the agent that asked are open to it, and for alerts
-        from a channel the user set to act, a direct message to an existing agent. With inbox
-        relays on, it may relay one item to the agent it is about (EA-19).
+        Only read-only tools and a reply to the agent that asked are open to it. Items from a channel
+        the user set to act may be assigned to any agent, and with Assign on, start one; with Assign
+        on, other items may go to the agent they are about (EA-19). Seti checks each assignment.
         """
         items = delivered.for_model
         if not items:
@@ -300,9 +300,7 @@ class TextChat:
         async def report(_tool: str, _result: ToolResult, _call_id: str) -> None:
             return None
 
-        relaying = not delivered.act and await relays_on(self._tools.seti)
-        guard = RelayGuard([item.id for item in items]) if relaying else None
-        open_tools = INBOX_TOOLS | ACT_TOOLS if delivered.act or relaying else INBOX_TOOLS
+        rules, guard, open_tools = await self._assigning(delivered)
         schemas = tool_schemas(
             self._tools, report, only=open_tools, guard=guard.check if guard is not None else None
         )
@@ -314,10 +312,7 @@ class TextChat:
             direct_token = DIRECT_ONLY.set(True)
             try:
                 await history.load()
-                relay = relay_note(items) if relaying else None
-                history.add_unstored(
-                    chat_inbox_note(time_note(clock, self._now()), group_chat, act=delivered.act, relay=relay)
-                )
+                history.add_unstored(chat_inbox_note(time_note(clock, self._now()), group_chat, rules))
                 await self._live.refresh(context)
                 system = await self._packs.system_prompt()
                 error = await self._run(context, history, system, lambda _event: None, "inbox")
@@ -330,6 +325,17 @@ class TextChat:
                 DIRECT_ONLY.reset(direct_token)
                 INBOX_ORIGIN.reset(origin_token)
                 CURRENT_CLOCK.reset(clock_token)
+
+    async def _assigning(self, delivered: Delivered) -> tuple[str | None, RelayGuard | None, frozenset[str]]:
+        """The assign rules, their guard and the tools a report on these items may use."""
+        items = delivered.for_model
+        on = await relays_on(self._tools.seti)
+        if not delivered.act and not on:
+            return None, None, INBOX_TOOLS
+        starts = delivered.act and on
+        rules = act_note(items, starts=starts) if delivered.act else relay_note(items)
+        guard = RelayGuard([item.id for item in items], starts=starts)
+        return rules, guard, INBOX_TOOLS | ACT_TOOLS | ({START_TOOL} if starts else frozenset())
 
     async def _run(
         self, context: LLMContext, history: HistorySync, system: str, emit: Emit, channel: Channel

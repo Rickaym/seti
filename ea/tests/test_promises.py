@@ -8,7 +8,8 @@ from seti_ea.clock import CALL_NOTE_PREFIX
 from seti_ea.conversation import Conversation
 from seti_ea.history import SUMMARY_PREFIX
 from seti_ea.promises import NOTE_PREFIX, PromiseCheck, promise_note, relay_note, unkept
-from seti_ea.prompt import ACT_NOTE, SYSTEM_PROMPT, VOICE_HELD_NOTE
+from seti_ea.prompt import ASSIGN_RULE, SYSTEM_PROMPT, VOICE_HELD_NOTE
+from seti_ea.relays import act_note
 
 Message = dict[str, Any]
 
@@ -294,6 +295,8 @@ def test_after_a_relay_the_ea_says_whom_and_the_gist_and_never_reads_the_message
     assert "never quote, read back or restate it, whole or step by step" in prompt
     assert "Give it only when the user asks what you sent." in prompt
     assert "quote what you sent" not in prompt
-    for text in (prompt, ACT_NOTE, promise_note("I told it."), relay_note("tell it", "Shall I send it?")):
+    for text in (prompt, promise_note("I told it."), relay_note("tell it", "Shall I send it?")):
         assert "what you sent to whom" not in text
         assert "the gist in a few words" in text
+    for text in (act_note([], starts=True), act_note([], starts=False, voice=True), ASSIGN_RULE):
+        assert "never the message itself" in text

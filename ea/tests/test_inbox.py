@@ -46,7 +46,7 @@ from seti_ea.inbox import (
     parse_items,
     split_act,
 )
-from seti_ea.prompt import ACT_NOTE
+from seti_ea.relays import ACT_RULES
 from seti_ea.seti import SetiClient, SetiError
 from seti_ea.settle import Settle
 from seti_ea.toolkit import ToolResult
@@ -454,15 +454,16 @@ def alert(item_id: int, *, act: bool) -> InboxItem:
     return item(item_id, "channel_event", "Slack mentions alert (info): dana in #northwind", act=act)
 
 
-def test_only_a_report_on_act_items_alone_may_send_a_direct_message() -> None:
+def test_only_a_report_on_act_items_alone_may_assign_by_direct_message() -> None:
     guard = InboxGuard()
-    direct = {"to": "login", "text": "Please draft a reply"}
+    direct = {"to": "login", "text": "Please draft a reply", "relay_of": 2}
     guard.report(Delivered([alert(1, act=False)], []))
     assert guard.check("post_team_chat", direct) is not None
     guard.report(Delivered([alert(1, act=False), alert(2, act=True)], []))
     assert guard.check("post_team_chat", direct) is not None
     guard.report(Delivered([alert(2, act=True), item(3)], []))
     assert guard.check("post_team_chat", direct) is None
+    assert guard.check("post_team_chat", {"to": "login", "text": "Please draft a reply"}) is not None
     assert guard.check("post_team_chat", {"text": "@all heads up"}) is not None
     assert guard.check("post_team_chat", {"to": " ", "text": "x"}) is not None
     for held in ("start_task", "stop_task"):
@@ -497,7 +498,7 @@ async def test_without_a_call_a_mixed_batch_reports_act_alerts_apart(fake_seti: 
     assert [(d.act, [i.id for i in d.for_model]) for d in followed] == [(False, [1]), (True, [2])]
 
 
-SEND = {"to": "login", "text": "Draft a reply to Dana on the SSO groups; do not send it."}
+SEND = {"to": "login", "text": "Draft a reply to Dana on the SSO groups; do not send it.", "relay_of": 1}
 
 
 async def report_alert(fake_seti: FakeSeti, steps: list[Step], *, act: bool) -> Script:
@@ -513,10 +514,22 @@ def sent_to_agents(fake_seti: FakeSeti) -> list[object]:
     return [body for path, body in fake_seti.posts() if path.startswith(("/api/tasks", "/api/team"))]
 
 
-async def test_an_act_alert_goes_to_an_existing_agent_as_a_direct_message(fake_seti: FakeSeti) -> None:
+def relays_sent(fake_seti: FakeSeti) -> list[object]:
+    return [body for path, body in fake_seti.posts() if path == "/api/ea/relays"]
+
+
+async def test_an_act_alert_is_assigned_to_an_existing_agent_through_seti(fake_seti: FakeSeti) -> None:
     script = await report_alert(fake_seti, [("call-1", "post_team_chat", SEND)], act=True)
-    assert ACT_NOTE in script.seen[0][1]["content"]
-    assert sent_to_agents(fake_seti) == [{"text": SEND["text"], "to": "bug"}]
+    assert script.seen[0][1]["content"].startswith(ACT_RULES)
+    assert relays_sent(fake_seti) == [{"item_id": 1, "to": "bug", "text": SEND["text"]}]
+    assert sent_to_agents(fake_seti) == []
+
+
+async def test_an_act_alert_needs_relay_of_to_reach_an_agent(fake_seti: FakeSeti) -> None:
+    plain = {"to": "login", "text": SEND["text"]}
+    await report_alert(fake_seti, [("call-1", "post_team_chat", plain)], act=True)
+    assert relays_sent(fake_seti) == []
+    assert sent_to_agents(fake_seti) == []
 
 
 async def test_an_act_alert_never_posts_to_everyone(fake_seti: FakeSeti) -> None:
@@ -527,11 +540,13 @@ async def test_an_act_alert_never_posts_to_everyone(fake_seti: FakeSeti) -> None
 
 async def test_a_report_alert_never_reaches_an_agent(fake_seti: FakeSeti) -> None:
     script = await report_alert(fake_seti, [("call-1", "post_team_chat", SEND)], act=False)
-    assert ACT_NOTE not in script.seen[0][1]["content"]
+    assert ACT_RULES not in script.seen[0][1]["content"]
     assert sent_to_agents(fake_seti) == []
+    assert relays_sent(fake_seti) == []
 
 
-async def test_an_act_alert_still_cannot_start_a_task(fake_seti: FakeSeti) -> None:
-    start = {"title": "Northwind SSO", "prompt": "Answer Dana"}
+async def test_an_act_alert_cannot_start_a_task_while_assign_is_off(fake_seti: FakeSeti) -> None:
+    start = {"title": "Northwind SSO", "prompt": "Answer Dana", "relay_of": 1}
     await report_alert(fake_seti, [("call-1", "start_task", start)], act=True)
     assert sent_to_agents(fake_seti) == []
+    assert relays_sent(fake_seti) == []

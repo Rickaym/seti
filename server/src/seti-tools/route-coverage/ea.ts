@@ -42,8 +42,11 @@ export const EA_ROUTES: CoverageTable = {
   'PUT /api/ea/settings': ea('update_ea_settings'),
   'PUT /api/ea/settings/inbox-relays': user(
     'security',
-    'Whether untrusted inbox items may reach agents through the EA is a security setting',
+    'Whether the EA assigns untrusted inbox items to agents and starts agents for them is a security setting',
   ),
+  'GET /api/ea/assign-skips': ea('get_ea_settings'),
+  'POST /api/ea/assign-skips': ea('update_ea_settings'),
+  'POST /api/ea/assign-skips/remove': ea('update_ea_settings'),
   'POST /api/ea/relays': ea('post_team_chat'),
   'POST /api/ea/relays/:id/take-back': ea('take_back_message'),
   'POST /api/ea/thoughts': plumbing('The EA logs a thought. EA plumbing'),

@@ -8,7 +8,7 @@ from loguru import logger
 
 from seti_ea.language import DEFAULT as DEFAULT_LANGUAGE
 from seti_ea.language import language_of
-from seti_ea.prompt import base_prompt
+from seti_ea.prompt import ASSIGN_RULE, base_prompt
 from seti_ea.seti import SetiClient, SetiError
 
 VOICE_TIMEOUT_SECS = 0.3
@@ -16,11 +16,17 @@ CHAT_TIMEOUT_SECS = 2.0
 
 
 def system_prompt(
-    packs: str, actions: str = "", form_of_address: str = "", language: str = DEFAULT_LANGUAGE
+    packs: str,
+    actions: str = "",
+    form_of_address: str = "",
+    language: str = DEFAULT_LANGUAGE,
+    *,
+    assign: bool = False,
 ) -> str:
-    """The base prompt, the role and reference packs as Seti rendered them, then mod actions."""
+    """The base prompt, the assign rule while it is on, the packs as Seti rendered them, then mod actions."""
     base = base_prompt(form_of_address, language)
-    return "\n\n".join(part for part in (base, packs.strip(), actions.strip()) if part)
+    rule = ASSIGN_RULE if assign else ""
+    return "\n\n".join(part for part in (base, rule, packs.strip(), actions.strip()) if part)
 
 
 class PackPrompt:
@@ -33,6 +39,7 @@ class PackPrompt:
         self._actions = ""
         self._address = ""
         self._language = DEFAULT_LANGUAGE
+        self._assign = False
 
     @property
     def address(self) -> str:
@@ -51,10 +58,11 @@ class PackPrompt:
             self._actions = str(prompt.get("mod_actions") or "")
             self._address = str(prompt.get("form_of_address") or "")
             self._language = language_of(prompt)
+            self._assign = prompt.get("assign") is True
         return self._prompt()
 
     def _prompt(self) -> str:
-        return system_prompt(self._text, self._actions, self._address, self._language)
+        return system_prompt(self._text, self._actions, self._address, self._language, assign=self._assign)
 
 
 class SystemPromptUpdates:

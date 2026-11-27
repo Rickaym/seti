@@ -51,9 +51,9 @@ export async function saveEaSettings(input: EaSettingsInput, write: SettingsWrit
   return saved
 }
 
-/** Turns inbox relays on or off; the EA, agents and mods are refused, so only the user does. */
+/** Turns Assign (EA-19) on or off; the EA, agents and mods are refused, so only the user does. */
 export async function setInboxRelays(on: boolean): Promise<EaSettings> {
-  refuseDelegates('turn inbox relays on or off')
+  refuseDelegates('turn Assign on or off')
   const before = await eaSettings.get()
   const saved = await eaSettings.setInboxRelays(on)
   if (before.inbox_relays !== on) {
@@ -61,7 +61,7 @@ export async function setInboxRelays(on: boolean): Promise<EaSettings> {
       actor: 'user',
       kind: 'ea.inbox_relays',
       subject_type: 'ea',
-      summary: `Inbox relays ${on ? 'on' : 'off'}`,
+      summary: `Assign ${on ? 'on' : 'off'}`,
       detail: { on },
     })
   }

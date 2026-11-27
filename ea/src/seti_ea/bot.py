@@ -91,9 +91,9 @@ from seti_ea.prompt import (
     VOICE_NOTE,
     clean_address,
     voice_urgent_note,
-    with_act,
 )
 from seti_ea.redact import scrub_value, secrets_of
+from seti_ea.relays import act_note, relays_on
 from seti_ea.spotter import LOCAL_SPOTTER
 from seti_ea.think import THINK_TOOL, Thinker, responses_ask
 from seti_ea.think_speech import QUIET_SECS, SpokenProgress
@@ -411,7 +411,7 @@ async def run_bot(
             control.local,
             stt,
             user_aggregator,
-            HeldUpdates(call_inbox, take, history),
+            HeldUpdates(call_inbox, take, history, lambda: relays_on(seti)),
             LiveContextInjector(LiveContext(seti), SystemPromptUpdates(packs, system)),
             llm,
             tts,
@@ -538,7 +538,9 @@ async def run_bot(
         note = notes.refresh(datetime.now(UTC))
         if note is not None:
             context.add_message({"role": "developer", "content": note})
-        history.add_unstored(with_act(voice_urgent_note(woke=woke), act=delivered.act))
+        rules = act_note(delivered.for_model, starts=False, voice=True) if delivered.act else None
+        urgent = voice_urgent_note(woke=woke)
+        history.add_unstored(urgent if rules is None else f"{urgent}\n{rules}")
         guard.report(delivered)
         await worker.queue_frames([LLMRunFrame()])
 

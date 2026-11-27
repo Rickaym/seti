@@ -168,6 +168,7 @@ export async function eaPackPrompt(): Promise<EaPackPrompt> {
     mod_actions: eaModActions(),
     form_of_address: settings.form_of_address,
     language: settings.language,
+    assign: settings.inbox_relays,
   }
 }
 

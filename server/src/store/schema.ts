@@ -23,6 +23,7 @@ import {
   EA_CONTEXT_PACKS,
   EA_FORM_OF_ADDRESS,
   EA_ASK_WORD,
+  EA_ASSIGN,
   EA_LANGUAGE,
   EA_INBOX,
   EA_INBOX_COALESCE,
@@ -277,4 +278,5 @@ export const MIGRATIONS: readonly Migration[] = [
   { version: 149, name: 'session_rescrub', sql: SESSION_RESCRUB },
   { version: 150, name: 'ea_inbox_relays', sql: EA_INBOX_RELAYS },
   { version: 151, name: 'gemini_settings', sql: GEMINI_SETTINGS },
+  { version: 152, name: 'ea_assign', sql: EA_ASSIGN },
 ]

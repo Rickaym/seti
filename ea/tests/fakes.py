@@ -762,6 +762,7 @@ class FakeSeti:
     team_deliveries: list[dict[str, Any]] = field(default_factory=list)
     relays: list[dict[str, Any]] = field(default_factory=list)
     relay_refusal: tuple[int, str] | None = None
+    assign_skips: list[dict[str, Any]] = field(default_factory=list)
     fix_ci: dict[str, Any] = field(
         default_factory=lambda: {"nudges": [], "skipped": [], "unlinked": 0, "error": None}
     )
@@ -1401,6 +1402,8 @@ class FakeSeti:
                 scope = request.url.params.get("scope", "all")
                 entries = self.ea_context() if scope == "context" else self.ea_history
                 return ok({"entries": entries, "has_older": False})
+            case ["ea", "assign-skips"]:
+                return ok(self.assign_skips)
             case ["ea", "settings"]:
                 if self.ea_settings is None:
                     return err(404, "Not Found")
@@ -1657,10 +1660,22 @@ class FakeSeti:
             case ["ea", "relays"]:
                 if self.relay_refusal is not None:
                     return err(self.relay_refusal[0], "Refused", self.relay_refusal[1])
+                if "start" in body:
+                    relay = {"id": len(self.relays) + 1, **body, "title": "Northwind SSO"}
+                    self.relays.append(relay)
+                    return ok(
+                        {**relay, "mode": "held", "pending": False, "taken_back": False, "started": True}
+                    )
                 task = next((t for t in self.tasks if self.handle_of(t["id"]) == body["to"]), None)
                 relay = {"id": len(self.relays) + 1, **body, "title": task["title"] if task else body["to"]}
                 self.relays.append(relay)
-                return ok({**relay, "mode": "held", "pending": True, "taken_back": False})
+                return ok({**relay, "mode": "held", "pending": True, "taken_back": False, "started": False})
+            case ["ea", "assign-skips"]:
+                self.assign_skips.append({**body, "name": body["ref"], "created_at": NOW.isoformat()})
+                return ok(self.assign_skips)
+            case ["ea", "assign-skips", "remove"]:
+                self.assign_skips = [s for s in self.assign_skips if s["ref"] != body["ref"]]
+                return ok(self.assign_skips)
             case ["ea", "relays", relay_id, "take-back"]:
                 return ok({"id": int(relay_id), "pending": False, "taken_back": True})
             case ["team", "messages"]:

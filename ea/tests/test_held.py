@@ -10,7 +10,7 @@ from pipecat.frames.frames import (
     VADUserStoppedSpeakingFrame,
 )
 from pipecat.processors.aggregators.llm_context import LLMContext, LLMContextMessage
-from test_inbox import Clock, push_to
+from test_inbox import Clock, item, push_to
 
 from seti_ea.conversation import Conversation
 from seti_ea.held import HeldUpdates
@@ -24,7 +24,8 @@ from seti_ea.inbox import (
     VoiceDelivery,
     deliver,
 )
-from seti_ea.prompt import ACT_NOTE, SYSTEM_PROMPT, VOICE_HELD_NOTE
+from seti_ea.prompt import SYSTEM_PROMPT, VOICE_HELD_NOTE
+from seti_ea.relays import ACT_NO_START, ACT_RULES, act_note
 from seti_ea.seti import SetiClient
 
 REQUEST = (
@@ -143,7 +144,11 @@ async def test_held_act_alerts_keep_what_act_opens(fake_seti: FakeSeti) -> None:
     assert await call.poll() == 1
     call.context.add_message(message("user", "Anything new?"))
     assert await call.held.add(LLMContextFrame(context=call.context))
-    assert call.context.messages[-1] == message("developer", f"{VOICE_HELD_NOTE} {ACT_NOTE}")
+    held = item(1, "channel_event", "Slack mentions alert: dana in #northwind", act=True)
+    rules = act_note([held], starts=False, voice=True)
+    assert call.context.messages[-1] == message("developer", f"{VOICE_HELD_NOTE}\nThe one exception: {rules}")
+    assert rules.startswith(ACT_RULES + ACT_NO_START)
+    assert '- 1: alert "Slack mentions alert: dana in #northwind"' in rules
 
 
 def test_a_summary_is_not_the_users_words() -> None:

@@ -97,6 +97,8 @@ export interface EaPackPrompt {
   form_of_address: string
   /** The language the EA speaks and writes in, from its settings. */
   language: EaLanguage
+  /** Whether the user turned Assign on, so the EA sends work it recommends instead of asking. */
+  assign: boolean
 }
 
 /** Who reads a pack: the agents it is linked to, archived ones aside, and the EA. */

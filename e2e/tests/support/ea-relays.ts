@@ -15,7 +15,7 @@ export const READY: EaHealth = {
   turn: true,
 }
 
-export const TOLD = 'Told Release notes: the QA lead wants to know if 4.2 is ready; it drafts an answer for you.'
+export const TOLD = 'Assigned Release notes: the QA lead wants to know if 4.2 is ready; it drafts an answer for you.'
 
 async function asBot<T>(request: APIRequestContext, url: string, data: unknown): Promise<T> {
   const response = await request.post(url, { headers: EA_HEADERS, data })
@@ -23,8 +23,12 @@ async function asBot<T>(request: APIRequestContext, url: string, data: unknown):
   return ((await response.json()) as { data: T }).data
 }
 
+/** Sets the Assign switch and clears what the EA was told to skip, so each test starts the same. */
 export async function setRelays(request: APIRequestContext, on: boolean): Promise<void> {
   expect((await request.put('/api/ea/settings/inbox-relays', { data: { on } })).ok()).toBe(true)
+  const db = openSeedDb()
+  await db.run('DELETE FROM ea_assign_skip')
+  await db.close()
 }
 
 /** A muted agent's follow-up, delivered and relayed; the relay waits, so Take back stays open. */
@@ -57,4 +61,22 @@ export async function relayedItem(request: APIRequestContext, title = 'Release n
     entries: [{ kind: 'chat', message: { role: 'assistant', content: TOLD } }],
   })
   return relay
+}
+
+/** A relay shown as the EA starting its agent, as it does for an item from a channel set to act. */
+export async function startedItem(request: APIRequestContext, title = 'BES latency'): Promise<EaRelay> {
+  const relay = await relayedItem(request, title)
+  const db = openSeedDb()
+  await db.run('UPDATE ea_relay SET started = true WHERE id = ?', relay.id)
+  await db.close()
+  return relay
+}
+
+/** Tells the EA to stop assigning to an agent, as the EA does when the user says so. */
+export async function skipAgent(request: APIRequestContext, title: string): Promise<void> {
+  const db = openSeedDb()
+  const taskId = randomUUID()
+  await db.idleTask(taskId, title, paths.root, new Date().toISOString())
+  await db.close()
+  await asBot(request, '/api/ea/assign-skips', { kind: 'agent', ref: taskId })
 }

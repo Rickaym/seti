@@ -1,5 +1,5 @@
 import type { EaSettings } from '@seti/shared'
-import { READY, TOLD, relayedItem, setRelays } from './support/ea-relays.js'
+import { READY, TOLD, relayedItem, setRelays, skipAgent, startedItem } from './support/ea-relays.js'
 import { apiData, expect, test } from './support/fixtures.js'
 import { expectFitsPhone } from './support/phone-layout.js'
 
@@ -12,26 +12,26 @@ test.afterEach(async ({ request }) => {
   await setRelays(request, false)
 })
 
-test('the inbox relays switch fits a phone and turns on with a tap', async ({ page, request }) => {
+test('the Assign switch fits a phone and turns on with a tap', async ({ page, request }) => {
   await page.goto('/#settings/ea')
   const card = page.getByRole('main').getByRole('region', { name: 'Inbox' })
-  const toggle = card.getByRole('button', { name: 'Relays' })
+  const toggle = card.getByRole('button', { name: 'Assign' })
   await toggle.scrollIntoViewIfNeeded()
   await expect(toggle).toHaveAttribute('aria-pressed', 'false')
-  await expectFitsPhone(page, 'EA page with inbox relays off')
+  await expectFitsPhone(page, 'EA page with Assign off')
   await page.screenshot({ path: test.info().outputPath('phone-relays-off.png') })
   await toggle.tap()
   await expect.poll(async () => (await apiData<EaSettings>(request, '/ea/settings')).inbox_relays).toBe(true)
   await expect(toggle).toHaveAttribute('aria-pressed', 'true')
 })
 
-test('a relay line with Take back fits a phone and takes a tap', async ({ page, request }) => {
+test('an assigned line with Take back fits a phone and takes a tap', async ({ page, request }) => {
   await relayedItem(request, 'Release notes')
   await page.route('**/api/ea/health', async (route) => route.fulfill({ json: READY }))
   await page.goto('/#ea')
   const transcript = page.getByRole('main').getByRole('region', { name: 'Transcript' })
   const relay = transcript.getByTestId('ea-relay')
-  await expect(relay).toContainText('Told Release notes')
+  await expect(relay).toContainText('Assigned Release notes')
   await expect(transcript).toContainText(TOLD)
   const takeBack = relay.getByRole('button', { name: 'Take back' })
   expect((await takeBack.boundingBox())?.height).toBeGreaterThanOrEqual(44)
@@ -39,4 +39,25 @@ test('a relay line with Take back fits a phone and takes a tap', async ({ page, 
   await page.screenshot({ path: test.info().outputPath('phone-relay-told.png') })
   await takeBack.tap()
   await expect(relay).toContainText('Took back from Release notes')
+})
+
+test('a started line and a skipped agent fit a phone with 44 px buttons', async ({ page, request }) => {
+  await startedItem(request)
+  await skipAgent(request, 'Humbaba')
+  await page.route('**/api/ea/health', async (route) => route.fulfill({ json: READY }))
+  await page.goto('/#ea')
+  const line = page.getByRole('main').getByRole('region', { name: 'Transcript' }).getByTestId('ea-relay')
+  await expect(line).toContainText('Started BES latency')
+  expect((await line.getByRole('button', { name: 'Stop' }).boundingBox())?.height).toBeGreaterThanOrEqual(44)
+  await expectFitsPhone(page, 'EA chat with a started line')
+  await page.screenshot({ path: test.info().outputPath('phone-assign-started.png') })
+
+  await page.goto('/#settings/ea')
+  const skip = page.getByRole('main').getByRole('button', { name: 'Remove: Not to Humbaba' })
+  await skip.scrollIntoViewIfNeeded()
+  expect((await skip.boundingBox())?.height).toBeGreaterThanOrEqual(44)
+  await expectFitsPhone(page, 'EA page with a skipped agent')
+  await page.screenshot({ path: test.info().outputPath('phone-assign-skips.png') })
+  await skip.tap()
+  await expect(page.getByTestId('ea-assign-skip')).toHaveCount(0)
 })

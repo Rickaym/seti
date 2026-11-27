@@ -261,6 +261,12 @@ NOTIFY_WHEN_DONE = {
 NOTIFY_NOTE = " You will hear in your inbox when that turn ends."
 
 
+RELAY_OF = {
+    "type": "integer",
+    "description": "Only in an inbox report whose rules allow it: the id of the item this assigns, in "
+    "your own words. Seti checks and frames it.",
+}
+
 TOOL_SPECS: list[ToolSpec] = [
     ToolSpec(
         "list_tasks",
@@ -479,6 +485,7 @@ TOOL_SPECS: list[ToolSpec] = [
                 "description": "Only when the user names one: the workspace it joins. Left out, the first.",
             },
             "notify_when_done": NOTIFY_WHEN_DONE,
+            "relay_of": RELAY_OF,
             "role": {
                 "type": "string",
                 "description": "Only when the user names one: one of the user's role packs by name. "
@@ -695,11 +702,7 @@ TOOL_SPECS: list[ToolSpec] = [
                 "type": "boolean",
                 "description": "True to send the short Fix CI message instead of text.",
             },
-            "relay_of": {
-                "type": "integer",
-                "description": "Only in an inbox report with relays on: the id of the item this direct "
-                "message passes on, in your own words. Needs to.",
-            },
+            "relay_of": RELAY_OF,
         },
     ),
     ToolSpec(
@@ -1811,6 +1814,9 @@ class EaTools:
     async def start_task(self, args: Mapping[str, Any]) -> ToolResult:
         prompt = arg_str(args, "prompt")
         title = arg_str(args, "title", required=False)
+        relay = relay_id(args)
+        if relay is not None:
+            return await self._relay(relay, {"start": {"title": title} if title else {}}, prompt)
         body: dict[str, Any] = {"prompt": prompt}
         workspace_ref = arg_str(args, "workspace", required=False)
         if workspace_ref:
@@ -2439,7 +2445,7 @@ class EaTools:
         if relay is not None:
             if not to:
                 raise ToolError("A relay goes to one agent: set to.", "Relay needs to")
-            return await self._relay(relay, to, text)
+            return await self._relay(relay, {"to": await self._handle_of(to)}, text)
         if not to and DIRECT_ONLY.get():
             raise ToolError(
                 "Here you may only send a direct message to one agent, with to; a public post waits "
@@ -2461,27 +2467,30 @@ class EaTools:
             f"Posted to the group chat, {plural(reached, 'agent')}",
         )
 
-    async def _relay(self, item_id: int, to: str, text: str) -> ToolResult:
-        """Passes an inbox item to its agent through Seti, which frames it and may refuse it."""
-        handle = await self._handle_of(to)
+    async def _relay(self, item_id: int, target: Mapping[str, Any], text: str) -> ToolResult:
+        """Assigns an inbox item through Seti, which frames it and may refuse it."""
         try:
-            sent = await self._seti.post("/ea/relays", {"item_id": item_id, "to": handle, "text": text})
+            sent = await self._seti.post("/ea/relays", {"item_id": item_id, **target, "text": text})
         except SetiError as e:
             if e.status is None or e.status >= 500:
                 raise
+            why = (e.detail or e.title).rstrip(".")
             raise ToolError(
-                f"Seti refused the relay: {e.detail or e.title} Do not try again; report the item instead.",
-                "Relay refused",
+                f"Seti refused the assignment: {why}. Do not try again; report the item instead, and "
+                "ask the user when it needs work.",
+                "Assignment refused",
             ) from e
         fields = sent if isinstance(sent, dict) else {}
-        title = str(fields.get("title") or f"@{handle}")
+        title = str(fields.get("title") or target.get("to") or "the new agent")
         relay = fields.get("id")
+        if fields.get("started") is True:
+            return ToolResult(f"Started {title} (relay {relay}).", clip(f"Started {title}", 70))
         waits = (
             f" It waits for {title}; take_back_message with relay {relay} takes it back."
             if fields.get("pending") is True
             else ""
         )
-        return ToolResult(f"Told {title} (relay {relay}).{waits}", clip(f"Told {title}", 70))
+        return ToolResult(f"Assigned {title} (relay {relay}).{waits}", clip(f"Assigned {title}", 70))
 
     async def _post_direct(self, text: str, handle: str) -> ToolResult:
         posted = await self._seti.post("/team/messages", {"text": text, "to": handle})

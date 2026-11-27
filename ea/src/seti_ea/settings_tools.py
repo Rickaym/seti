@@ -12,6 +12,7 @@ from seti_ea.memory_tools import MEMORY_SPECS, MemoryTools
 from seti_ea.mod_tools import MOD_SPECS, ModTools
 from seti_ea.poller_tools import POLLER_SPECS, PollerTools, poller_line
 from seti_ea.prompt import FORM_OF_ADDRESS_MAX
+from seti_ea.relays import change_skip
 from seti_ea.reminder_tools import (
     REMINDER_CRON,
     REMINDER_INTERVAL,
@@ -177,6 +178,12 @@ OBJECT_ARGS = {
         "description": "An agent, for the changes Seti's dreams made to the notes in its Claude Code "
         "memory folder.",
     },
+}
+
+
+ASSIGN_SKIP = {
+    "type": "string",
+    "description": "An agent's name or id, or with channel a channel's name or id.",
 }
 
 SETTINGS_SPECS: list[ToolSpec] = [
@@ -532,8 +539,15 @@ SETTINGS_SPECS: list[ToolSpec] = [
         "update_ea_settings",
         "Change your own settings: turn the wake word on or off, its phrase, how long you stay awake "
         "after the last words, how you address the user, or the language you listen, speak and write "
-        "in. Needs the user's yes.",
+        "in. Needs the user's yes. With stop_assigning or resume_assigning instead, stop or resume "
+        "assigning work to an agent or from a channel when the user says so; that needs no yes.",
         {
+            "stop_assigning": ASSIGN_SKIP,
+            "resume_assigning": ASSIGN_SKIP,
+            "channel": {
+                "type": "boolean",
+                "description": "True when stop_assigning or resume_assigning names a channel.",
+            },
             "wake_enabled": {"type": "boolean", "description": "true to turn the wake word on."},
             "wake_phrase": {"type": "string", "description": "Two to four words, such as Hey Seti."},
             "keep_awake_seconds": {"type": "integer", "description": "5 to 600 seconds."},
@@ -2093,14 +2107,24 @@ class SettingsTools:
 
     async def get_ea_settings(self, args: Mapping[str, Any]) -> ToolResult:
         settings = await self._ea_settings()
-        relays = "on" if settings.get("inbox_relays") is True else "off"
+        assign = "on" if settings.get("inbox_relays") is True else "off"
+        skips = await self._seti.get("/ea/assign-skips")
+        names = [
+            f"{'to' if skip.get('kind') == 'agent' else 'from'} {skip.get('name')}" for skip in dicts(skips)
+        ]
+        skipped = f" You do not assign {', '.join(names)}." if names else ""
         return ToolResult(
-            f"{self._settings_words(settings)} Inbox relays are {relays}; only the user turns them on or "
-            "off, in Settings, EA. Your voice and models are set in your configuration, not here.",
+            f"{self._settings_words(settings)} Assign is {assign}; only the user turns it on or off, in "
+            f"Settings, EA.{skipped} Your voice and models are set in your configuration, not here.",
             "Read EA settings",
         )
 
     async def update_ea_settings(self, args: Mapping[str, Any]) -> ToolResult:
+        for key, stop in (("stop_assigning", True), ("resume_assigning", False)):
+            ref = arg_str(args, key, required=False)
+            if ref:
+                kind = "channel" if arg_bool(args, "channel") else "agent"
+                return await change_skip(self._seti, kind, ref, stop=stop)
         current = await self._ea_settings()
         body = {
             "wake_enabled": current.get("wake_enabled") is True,

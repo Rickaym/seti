@@ -227,3 +227,13 @@ CREATE TABLE ea_relay (
 CREATE INDEX ea_relay_created ON ea_relay(created_at);
 CREATE INDEX ea_relay_task ON ea_relay(task_id, created_at);
 `
+
+export const EA_ASSIGN = `
+ALTER TABLE ea_relay ADD COLUMN started BOOLEAN NOT NULL DEFAULT false;
+CREATE TABLE ea_assign_skip (
+  kind TEXT NOT NULL CHECK (kind IN ('agent', 'channel')),
+  ref TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  PRIMARY KEY (kind, ref)
+);
+`

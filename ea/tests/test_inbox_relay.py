@@ -11,7 +11,7 @@ from seti_ea.chat import INBOX_TOOLS, TextChat
 from seti_ea.conversation import Conversation
 from seti_ea.inbox import deliver
 from seti_ea.prompt import CHAT_INBOX_NOTE
-from seti_ea.relays import RELAY_NOTE, RelayGuard, relay_id
+from seti_ea.relays import ACT_RULES, ACT_START, RELAY_NOTE, RelayGuard, relay_id
 from seti_ea.seti import SetiClient
 from seti_ea.tools import TOOL_SPECS, EaTools
 
@@ -70,7 +70,7 @@ async def test_with_relays_on_the_report_relays_one_item_through_seti(fake_seti:
     assert relays_sent(fake_seti) == [{"item_id": 1, "to": "bug", "text": RELAY["text"]}]
     assert to_agents(fake_seti) == []
     result = next(m for m in script.seen[1] if m["role"] == "tool")
-    assert "Told " in result["content"]
+    assert "Assigned " in result["content"]
 
 
 async def test_a_refusal_from_seti_is_reported_and_never_retried(fake_seti: FakeSeti) -> None:
@@ -81,8 +81,8 @@ async def test_a_refusal_from_seti_is_reported_and_never_retried(fake_seti: Fake
         fake_seti, [("call-1", "post_team_chat", RELAY), ("call-2", "post_team_chat", again)]
     )
     results = [m["content"] for m in script.seen[1] if m["role"] == "tool"]
-    assert "Seti refused the relay: This item is not about Billing export" in results[0]
-    assert "Here you may only relay" in results[1]
+    assert "Seti refused the assignment: This item is not about Billing export" in results[0]
+    assert "Here you may only assign" in results[1]
     assert len(relays_sent(fake_seti)) == 1
 
 
@@ -119,7 +119,7 @@ async def test_hostile_items_open_nothing_but_the_one_guarded_relay(fake_seti: F
     ]
     script, _tools, _turns = await report(fake_seti, steps, title=hostile)
     results = [m["content"] for m in script.seen[1] if m["role"] == "tool"]
-    assert "Here you may only relay" in results[0]
+    assert "Here you may only assign" in results[0]
     assert relays_sent(fake_seti) == []
     assert to_agents(fake_seti) == []
     assert fake_seti.inbox[0].get("act") is None
@@ -164,3 +164,47 @@ async def test_take_back_message_takes_back_a_relay_by_its_id(fake_seti: FakeSet
     result = await tools.call("take_back_message", {"task": "login", "relay": 3})
     assert result.ok
     assert ("/api/ea/relays/3/take-back", {}) in fake_seti.posts()
+
+
+async def test_an_act_item_may_start_an_agent_through_seti_while_assign_is_on(fake_seti: FakeSeti) -> None:
+    fake_seti.ea_settings = ON
+    fake_seti.inbox_item("channel_event", "Sentry alert: error spike in acme/billing", act=True)
+    start = {"prompt": "Billing errors spiked; find the cause in acme/billing.", "relay_of": 1}
+    script = Script([[("call-1", "start_task", start)], ["Started Billing errors."]])
+    tools = EaTools(seti_of(fake_seti), now=lambda: NOW)
+    chat = TextChat(
+        settings(openai_api_key="op"), tools, Conversation(), llm=factory(script), now=lambda: NOW
+    )
+    await chat.follow_up(await deliver(seti_of(fake_seti), [1], "chat"))
+    await settle(chat)
+    note = script.seen[0][1]["content"]
+    assert note.startswith(ACT_RULES + ACT_START)
+    assert relays_sent(fake_seti) == [{"item_id": 1, "start": {}, "text": start["prompt"]}]
+    assert [path for path, _body in fake_seti.posts() if path == "/api/tasks/start"] == []
+    result = next(m for m in script.seen[1] if m["role"] == "tool")
+    assert "Started Northwind SSO" in result["content"]
+
+
+def test_the_guard_opens_one_assignment_per_item_and_starts_only_when_allowed() -> None:
+    guard = RelayGuard([1, 2], starts=True)
+    start = {"prompt": "Look into it", "relay_of": 1}
+    assert guard.check("start_task", start) is None
+    assert guard.check("start_task", start) is not None
+    assert guard.check("post_team_chat", {"to": "login", "text": "x", "relay_of": 2}) is None
+    assert guard.check("post_team_chat", {"to": "login", "text": "x", "relay_of": 2}) is not None
+    assert RelayGuard([1]).check("start_task", start) is not None
+    assert RelayGuard([1]).check("start_task", {"prompt": "x"}) is not None
+
+
+async def test_the_user_can_stop_and_resume_assigning_in_words_without_a_yes(fake_seti: FakeSeti) -> None:
+    tools = EaTools(seti_of(fake_seti), now=lambda: NOW)
+    stopped = await tools.call("update_ea_settings", {"stop_assigning": "Humbaba"})
+    assert stopped.ok
+    assert stopped.text == "I no longer assign work to Humbaba."
+    assert fake_seti.assign_skips[0]["kind"] == "agent"
+    channel = await tools.call("update_ea_settings", {"stop_assigning": "alerts", "channel": True})
+    assert channel.text == "I no longer assign work from alerts."
+    resumed = await tools.call("update_ea_settings", {"resume_assigning": "Humbaba"})
+    assert resumed.text == "I may assign work to Humbaba again."
+    assert [skip["ref"] for skip in fake_seti.assign_skips] == ["alerts"]
+    assert not [path for path, _body in fake_seti.posts() if path == "/api/ea/asks"]
