@@ -1,6 +1,7 @@
 import type { PageActivity } from '@/lib/app-build'
 import { openDrafts } from '@/lib/drafts'
 import { hasUnsavedChanges } from '@/lib/leave-guard'
+import { callLive } from '@/lib/live-call'
 import { uploadsInFlight } from '@/lib/uploader'
 
 /** A pause in keys and edits this long ends typing. */
@@ -34,5 +35,6 @@ export function readActivity(): PageActivity {
     dialog: dialogOpen(),
     uploading: uploadsInFlight(),
     unsaved: hasUnsavedChanges(),
+    call: callLive(),
   }
 }

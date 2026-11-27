@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import androidx.browser.customtabs.CustomTabsCallback
+import androidx.browser.trusted.LaunchHandlerClientMode
 import androidx.browser.trusted.TrustedWebActivityIntentBuilder
 import androidx.browser.trusted.sharing.ShareData
 import androidx.browser.trusted.sharing.ShareTarget
@@ -65,6 +66,10 @@ private class ShareLauncher(
         fallback: TwaLauncher.FallbackStrategy,
     ) {
         post?.let { (target, data) -> builder.setShareParams(target, data) }
+        // Reopening routes inside the running page, so a live EA call survives; a share must load.
+        builder.setLaunchHandlerClientMode(
+            if (post == null) LaunchHandlerClientMode.FOCUS_EXISTING else LaunchHandlerClientMode.AUTO,
+        )
         super.launch(builder, callback, splash, onLaunched, fallback)
     }
 }

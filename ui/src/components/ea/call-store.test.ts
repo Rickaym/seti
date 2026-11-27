@@ -47,6 +47,7 @@ function setup(overrides: Partial<CallDeps> = {}) {
         await Promise.resolve()
       },
       quality: () => null,
+      hearing: async () => Promise.resolve({ mic: 'live', energy: null }),
       enableMic: (on) => {
         call.mic.push(on)
       },

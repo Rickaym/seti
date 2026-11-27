@@ -1,4 +1,5 @@
 import { isNarrow } from '@/hooks/useMedia'
+import { isNeedsYouShortcut, NEEDS_YOU_PARAM } from '@/lib/launch-move'
 import { navigate, parseHash } from '@/lib/route'
 
 const listeners = new Set<() => void>()
@@ -27,16 +28,13 @@ export function revealNeedsYou(): void {
   navigate('agents')
 }
 
-/** The query the manifest's Needs you shortcut opens Seti with. */
-const SHORTCUT = { key: 'view', value: 'needs-you' }
-
 /** Shows the Needs you group when Seti opens from the app icon's shortcut, then drops the query. */
 export function openNeedsYouShortcut(): void {
   const url = new URL(window.location.href)
-  if (url.searchParams.get(SHORTCUT.key) !== SHORTCUT.value) {
+  if (!isNeedsYouShortcut(url)) {
     return
   }
-  url.searchParams.delete(SHORTCUT.key)
+  url.searchParams.delete(NEEDS_YOU_PARAM)
   window.history.replaceState(window.history.state, '', url)
   revealNeedsYou()
 }

@@ -3,8 +3,11 @@ import type { EaHealth } from '@seti/shared'
 import {
   backgroundable,
   callEnds,
+  dropMic,
   longestGap,
   mediaSession,
+  micTracks,
+  phoneHooks,
   pressMediaAction,
   toBackground,
 } from './support/background.js'
@@ -53,4 +56,32 @@ test('a phone call stays live after switching apps, and the media controls hang 
   await expect(page.getByTestId('ea-last-end')).toHaveText('Hung up, in the background')
   await expect(page.getByTestId('ea-call-audio')).toHaveText(CALL_AUDIO)
   await expect(eaItem(page).getByTestId('ea-bar')).toHaveCount(0)
+})
+
+test('a phone call says the EA cannot hear it in the background, and reopens a dropped microphone', async ({
+  page,
+}) => {
+  await backgroundable(page)
+  await phoneHooks(page)
+  await page.route('**/api/ea/health', async (route) => route.fulfill({ json: READY }))
+  await page.route('**/api/ea/ice', async (route) => route.fulfill({ json: { iceServers: [] } }))
+  await fakeEa(page)
+  await page.goto('/#ea')
+  const main = page.getByRole('main')
+  await main.getByRole('button', { name: 'Call', exact: true }).tap()
+  const card = main.getByRole('region', { name: 'Live call' })
+  await expect(card.getByTestId('ea-call-status')).toHaveText('Listening')
+  await expect(card).toContainText('The EA cannot hear you while Seti is in the background on this device')
+  await page.screenshot({ path: test.info().outputPath('background-line.png') })
+
+  const from = await page.evaluate(() => Date.now())
+  await toBackground(page)
+  const opened = await dropMic(page)
+  await expect.poll(async () => page.evaluate(() => Date.now())).toBeGreaterThan(from + 5500)
+  await toBackground(page, false)
+  await expect(page.getByText(/^You were away for \d+ s; the EA could not hear you$/)).toBeVisible()
+  await expect.poll(async () => (await micTracks(page)).live).toBe(true)
+  expect((await micTracks(page)).count).toBeGreaterThan(opened)
+  await expect(card.getByTestId('ea-call-status')).toHaveText('Listening')
+  await page.screenshot({ path: test.info().outputPath('away-note.png') })
 })
