@@ -465,7 +465,8 @@ stored off; safe mode and a mod bisect leave it on, and its settings still chang
 bundled mod's do. Settings, Mods shows it with a Core badge and a lock in place of its switch. Only
 a bundled mod may be required.
 
-This Seti offers mod API 1.25.0, which adds `eaReason` to commands and routes and `command` to
+This Seti offers mod API 1.26.0, which adds the `navBottom` view place under the sidebar's sections
+(see The UI half); 1.25.0 added `eaReason` to commands and routes and `command` to
 routes, so each says how the EA does the same or why it cannot (see Reaching the EA); 1.24.0 added
 `needs` to commands and agent views, so they show only on runtimes that offer what they need (see
 Commands and where their results go); 1.23.0 adds
@@ -702,7 +703,11 @@ export const weatherUi = defineMod({
 
 `registerSection`, `registerView`, `registerDock`, `registerStatusBarItem` and `registerFileViewer`
 take the id of an entry the manifest declares, and `registerFenceRenderer` a fence language it declares. `registerView` places a view the manifest puts in `header`, the
-band across the app header, or in `about`, a part of Settings, About; `registerNews` puts a dot on
+band across the app header, in `about`, a part of Settings, About, or in `navBottom`, under the
+sidebar's sections. A `navBottom` view gets `layout`: `drawer` in the menu drawer of a narrow
+screen, where the views share the height the sections leave and keep at least 10rem while the
+sections scroll, or `rail` in the 48 px icon rail of a wide screen, where a view fits an icon
+button. `mods/text-pad/` is the example. `registerNews` puts a dot on
 the way to an `about` view while its signal is on. `registerDock` draws a view the manifest places
 in `agentDock` over an agent's chat: a panel on a wide screen and in a layout's panel, a bottom
 sheet on a phone. Seti draws its frame, with the view's icon, title, `description` and a close

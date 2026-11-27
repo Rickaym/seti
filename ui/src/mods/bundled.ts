@@ -12,6 +12,7 @@ export const UI_MODS: Readonly<Record<string, () => Promise<ModDefinition>>> = {
   previews: async () => import('@seti/mod-previews/ui').then((m) => m.previewsUi),
   sample: async () => import('@seti/mod-sample/ui').then((m) => m.sampleUi),
   'side-chat': async () => import('@seti/mod-side-chat/ui').then((m) => m.sideChatUi),
+  'text-pad': async () => import('@seti/mod-text-pad/ui').then((m) => m.textPadUi),
   vim: async () => import('@seti/mod-vim/ui').then((m) => m.vimUi),
   weather: async () => import('@seti/mod-weather/ui').then((m) => m.weatherUi),
   'whats-new': async () => import('@seti/mod-whats-new/ui').then((m) => m.whatsNewUi),

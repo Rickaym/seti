@@ -1,4 +1,5 @@
 import { useId } from 'react'
+import { NavBottomViews } from '@/components/NavBottomViews'
 import { NewsDot } from '@/components/NewsDot'
 import { SectionCount } from '@/components/SectionCount'
 import { ShortcutGuidePopover } from '@/components/shortcuts/ShortcutGuide'
@@ -83,6 +84,7 @@ export function Sidebar({ active, onSelect }: { active: SectionKey; onSelect: (k
           </div>
         ))}
       </nav>
+      <NavBottomViews layout="rail" />
       <div className="flex shrink-0 flex-col items-center gap-1 border-t border-border py-2">
         <TerminalNavButton side="right" className="size-9 text-foreground/70" />
         <TeamChatToggle side="right" className="size-9 text-foreground/70" />

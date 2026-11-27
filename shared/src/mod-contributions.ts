@@ -175,9 +175,10 @@ const view = z
     /**
      * header is the band across the app header; about is a part of Settings, About; agentsLayout
      * shows several agents at once in the Agents section; agentDock is a panel over one agent's
-     * chat, a bottom sheet on a phone.
+     * chat, a bottom sheet on a phone; navBottom sits under the sidebar's sections, in the rail of a
+     * wide screen and the menu drawer of a narrow one.
      */
-    where: z.enum(['agentTab', 'agentDock', 'sidePanel', 'section', 'agentsLayout', 'header', 'about']),
+    where: z.enum(['agentTab', 'agentDock', 'sidePanel', 'section', 'agentsLayout', 'header', 'about', 'navBottom']),
     phone: z.boolean(),
     entry: z.string().max(200).optional(),
     /** Hidden on an agent whose runtime lacks one of these; only views placed on one agent. */
@@ -432,6 +433,7 @@ export const AVAILABLE_VIEW_PLACES: ReadonlySet<string> = new Set([
   'section',
   'header',
   'about',
+  'navBottom',
   'agentsLayout',
   'agentDock',
 ])
