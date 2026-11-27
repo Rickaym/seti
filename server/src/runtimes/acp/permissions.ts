@@ -1,4 +1,4 @@
-import { askedCall, type ToolCall } from '@seti/shared'
+import { askedCall, type ToolCall, type ToolKind } from '@seti/shared'
 import { z } from 'zod'
 import type { JsonRpc } from '../json-rpc.js'
 
@@ -34,8 +34,29 @@ function replyOf(options: Options, allow: boolean): unknown {
 interface PermissionContext {
   rpc: JsonRpc
   decide: AcpDecide
+  /** Seti's own tool servers, whose calls Seti decides in its relay on the arguments they run with. */
+  relayed: ReadonlySet<string>
   /** Seti refused this call: the update that ends it is stored as denied. */
   refused: (callId: string) => void
+}
+
+/**
+ * Kinds whose request shows what will run: a command as it runs, an edit's path and text, the
+ * paths a read or search covers. A fetch shows a title cut short, and other kinds only a title.
+ */
+const READABLE: ReadonlySet<ToolKind> = new Set(['shell', 'edit', 'read', 'search'])
+
+/**
+ * How a request is answered without Seti's decision, or null when Seti decides it. A call to one
+ * of Seti's own tool servers goes on, because the relay decides it on the arguments it receives
+ * before it runs; any other server's call, and a call of a kind whose request does not show what
+ * will run, is refused, so Seti never allows what it could not read.
+ */
+function undecided(call: ToolCall, relayed: ReadonlySet<string>): boolean | null {
+  if (call.kind === 'mcp') {
+    return call.mcp !== undefined && relayed.has(call.mcp.server)
+  }
+  return READABLE.has(call.kind) ? null : false
 }
 
 /**
@@ -59,6 +80,14 @@ export class Permissions {
     const call = parsed.success ? askedCall(parsed.data.toolCall) : null
     if (!parsed.success || call === null || this.cancelled) {
       rpc.answer(id, CANCELLED)
+      return
+    }
+    const fixed = undecided(call, this.context.relayed)
+    if (fixed !== null) {
+      if (!fixed) {
+        this.context.refused(call.callId)
+      }
+      rpc.answer(id, replyOf(parsed.data.options, fixed))
       return
     }
     const control = new AbortController()

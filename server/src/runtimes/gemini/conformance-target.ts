@@ -1,8 +1,12 @@
 import { mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { gatedServers } from '../../relay-gate.js'
+import { openToolRelay } from '../../tool-relay.js'
 import { acpAdapterFor } from '../acp/adapter.js'
 import type { AcpDecide } from '../acp/permissions.js'
 import type { AcpShapes } from '../acp/session.js'
+import type { RuntimeAdapter } from '../adapter.js'
+import { rigTools } from '../conformance/rig-tools.js'
 import type { ConformanceTarget, NeutralHost } from '../conformance/target.js'
 import { geminiRig, type RigBench } from './conformance-rig.js'
 import { GEMINI_CONFIG_FILES, geminiLaunch } from './launch.js'
@@ -14,7 +18,7 @@ const decideWith =
     neutral.decide(call, signal)
 
 /** Cases the ACP adapter over Gemini CLI is known to fail, with the reason. */
-const NO_SERVERS = 'the adapter hands Gemini CLI no tool server yet, so no tool server call is made'
+const NO_QUESTIONS = "Gemini CLI offers no question tool over ACP; an agent asks through Seti's own tools"
 
 export const GEMINI_GAPS: Partial<Record<string, string>> = {
   'LC-2': 'ACP marks no boundary between messages: two text parts in a row arrive as chunks of one message',
@@ -25,13 +29,11 @@ export const GEMINI_GAPS: Partial<Record<string, string>> = {
     'ACP sends no call input: a read names the paths Gemini CLI resolved in the working folder, ' +
     'not the paths the model wrote',
   'TL-2': 'Gemini CLI ends a command that exits non-zero as completed; the exit code is only in the text',
-  'TL-3': NO_SERVERS,
-  'PM-2': `an edit names its path resolved in the working folder, and ${NO_SERVERS}`,
+  'PM-2': 'an edit names its path resolved in the working folder, not the path the model wrote',
   'PM-3': "ACP's permission reply carries no message: the model reads Gemini CLI's own refusal",
-  'Q-1': `Gemini CLI offers no question tool over ACP; questions come through Seti's tools, and ${NO_SERVERS}`,
-  'Q-2': `Gemini CLI offers no question tool over ACP; questions come through Seti's tools, and ${NO_SERVERS}`,
-  'DG-1': NO_SERVERS,
-  'DG-2': NO_SERVERS,
+  'Q-1': NO_QUESTIONS,
+  'Q-2': NO_QUESTIONS,
+  'DG-2': 'Gemini CLI ends a cancelled turn without cancelling its tool server call, so the call runs on',
 }
 
 /**
@@ -61,9 +63,25 @@ function launchOf(bench: GeminiBench) {
   })
 }
 
+/**
+ * The adapter given the rig's tool servers through Seti's relay, each call decided in the relay
+ * on its arguments, as a Gemini agent's session host gives its own.
+ */
+function onBench(adapter: RuntimeAdapter<AcpShapes, 'gemini'>): RuntimeAdapter<AcpShapes, 'gemini'> {
+  return {
+    ...adapter,
+    realise: async (spec, launcher, host, abortController) => {
+      const tools = rigTools(launcher)
+      const servers = tools === undefined ? [] : gatedServers(tools.servers, host.decide)
+      const toolServers = tools === undefined ? {} : await openToolRelay(tools.place, servers, abortController.signal)
+      return adapter.realise(spec, launcher, { ...host, toolServers }, abortController)
+    },
+  }
+}
+
 /** The ACP adapter as the suite drives it, over the real Gemini CLI and a scripted API. */
 export const geminiTarget = (bench: GeminiBench): ConformanceTarget<AcpShapes, 'gemini'> => ({
-  adapter: acpAdapterFor('gemini', launchOf(bench)),
+  adapter: onBench(acpAdapterFor('gemini', launchOf(bench))),
   // A real Node program on a busy machine takes seconds to start where a fake takes milliseconds.
   boundMs: 15000,
   profile: {
