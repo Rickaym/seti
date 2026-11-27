@@ -3,6 +3,7 @@ import path from 'node:path'
 import { canonicalRoot, gitDirs } from './git-dirs.js'
 import { codexLocks } from './sandbox-codex.js'
 import { folderSettingsGuards } from './sandbox-folder-settings.js'
+import { geminiLocks } from './sandbox-gemini.js'
 import { readOnlyWork } from './sandbox-read-only.js'
 
 export type Mount =
@@ -53,6 +54,8 @@ export interface SandboxLayout {
   maintenance?: Maintenance
   /** A Codex agent: no Claude Code configuration, and Codex's own settings files read-only. */
   codex?: boolean
+  /** A Gemini CLI agent: no Claude Code configuration, and Gemini CLI's settings files covered. */
+  gemini?: boolean
 }
 
 /**
@@ -399,10 +402,13 @@ function masks(layout: SandboxLayout, mounted: readonly string[]): Mount[] {
     })
 }
 
-/** Codex's locked settings files, or Claude Code's state unless the session is bare. */
+/** Codex's or Gemini CLI's locked settings, or Claude Code's state unless the session is bare. */
 function runtimeMounts(layout: SandboxLayout): Mount[] {
   if (layout.codex === true) {
     return codexLocks(layout)
+  }
+  if (layout.gemini === true) {
+    return geminiLocks(layout)
   }
   return layout.maintenance?.bare === true ? [] : claudeMounts(layout)
 }

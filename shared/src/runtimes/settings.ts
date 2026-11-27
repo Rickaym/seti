@@ -68,18 +68,18 @@ export const CODEX_STATES = ['off', 'installing', 'failed', 'no_key', 'ready'] a
 export type CodexState = (typeof CODEX_STATES)[number]
 
 /**
- * Why Codex cannot run: the download failed, a checksum did not match, the pin has no build for
- * this machine, the disk refused the write, Seti's copy is not there, or the program the user
- * named is missing or another version.
+ * Why a runtime's program cannot run: the download failed, a checksum did not match, the pin has
+ * no build for this machine, the disk refused the write, Seti's copy is not there, or the program
+ * the user named is missing or another version.
  */
-export const CODEX_FAILURES = ['network', 'checksum', 'platform', 'disk', 'missing', 'program'] as const
-export type CodexFailure = (typeof CODEX_FAILURES)[number]
+export const INSTALL_FAILURES = ['network', 'checksum', 'platform', 'disk', 'missing', 'program'] as const
+export type InstallFailure = (typeof INSTALL_FAILURES)[number]
 
 /** The Codex runtime as Settings shows it; the key's state is counts and names, never a value. */
 export interface CodexStatus {
   state: CodexState
   /** Why Codex cannot run, present only in the failed state. */
-  failure: { reason: CodexFailure; message: string } | null
+  failure: { reason: InstallFailure; message: string } | null
   /** The version the program agents start reports or was verified as, when there is one. */
   version: string | null
   /** The version this Seti is built and tested against, which it installs itself. */

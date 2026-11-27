@@ -1,10 +1,11 @@
-import { writeFileSync } from 'node:fs'
+import { mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { acpAdapterFor } from '../acp/adapter.js'
 import type { AcpDecide } from '../acp/permissions.js'
 import type { AcpShapes } from '../acp/session.js'
 import type { ConformanceTarget, NeutralHost } from '../conformance/target.js'
 import { geminiRig, type RigBench } from './conformance-rig.js'
+import { GEMINI_CONFIG_FILES, geminiLaunch } from './launch.js'
 
 /** Seti's decision for a Gemini CLI ask, from the neutral host. */
 const decideWith =
@@ -33,56 +34,31 @@ export const GEMINI_GAPS: Partial<Record<string, string>> = {
   'DG-2': NO_SERVERS,
 }
 
-/** Every tool call asks first, reads included, as Seti's admin policy will make it. */
-const ADMIN_POLICY = [
-  '[[rule]]',
-  'toolName = "*"',
-  'decision = "ask_user"',
-  'priority = 999',
-  '[[rule]]',
-  'mcpName = "*"',
-  'toolName = "*"',
-  'decision = "ask_user"',
-  'priority = 999',
-  '',
-].join('\n')
-
-const SYSTEM_SETTINGS = {
-  privacy: { usageStatisticsEnabled: false },
-  telemetry: { enabled: false },
-  security: { auth: { selectedType: 'gemini-api-key' }, disableYoloMode: true },
-}
-
 /**
  * Where the suite runs Gemini CLI: its program, the model the agents pick, the scripted API that
  * answers for it, and a folder for the rigs' homes and Seti's policy files.
  */
 export interface GeminiBench extends RigBench {
+  /** The pinned bundle's `gemini.js`, which Node runs. */
   binary: string
   baseUrl: string
   agentModel: string
 }
 
-/** The settings a bench launches with; the profile that ships them comes with the install. */
+/** Seti's own launch, with its files in the bench's folder and model calls to the scripted API. */
 function launchOf(bench: GeminiBench) {
-  const policy = path.join(bench.folder, 'admin-policy.toml')
-  const settings = path.join(bench.folder, 'system-settings.json')
-  writeFileSync(policy, ADMIN_POLICY)
-  writeFileSync(settings, JSON.stringify(SYSTEM_SETTINGS))
-  return {
-    label: 'Gemini CLI',
-    command: bench.binary,
-    args: (model: string) => ['--acp', '--admin-policy', policy, '-m', model],
-    env: {
-      GOOGLE_GEMINI_BASE_URL: bench.baseUrl,
-      GEMINI_CLI_NO_RELAUNCH: 'true',
-      GEMINI_CLI_SYSTEM_SETTINGS_PATH: settings,
-      GEMINI_CLI_TRUST_WORKSPACE: 'true',
-      GEMINI_SYSTEM_MD: '0',
-    },
-    keyVariable: 'GEMINI_API_KEY',
-    model: bench.agentModel,
+  const config = path.join(bench.folder, 'config')
+  mkdirSync(config, { recursive: true })
+  for (const [name, text] of Object.entries(GEMINI_CONFIG_FILES)) {
+    writeFileSync(path.join(config, name), text)
   }
+  return geminiLaunch({
+    node: process.execPath,
+    entry: bench.binary,
+    config,
+    apiUrl: bench.baseUrl,
+    model: bench.agentModel,
+  })
 }
 
 /** The ACP adapter as the suite drives it, over the real Gemini CLI and a scripted API. */

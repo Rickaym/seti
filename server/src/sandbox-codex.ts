@@ -34,7 +34,7 @@ const LOCKED_FILES = ['config.toml', '.env', 'auth.json', 'environments.toml', C
 const LOCKED_DIRS = ['rules', 'agents']
 
 /** What a shell started in the private home reads before every command Codex runs. */
-const SHELL_STARTUP = [
+export const SHELL_STARTUP = [
   ...['.zshenv', '.zprofile', '.zlogin', '.zlogout', '.zshrc'].flatMap((name) => [name, `${name}.zwc`]),
   '.bash_profile',
   '.bash_login',
@@ -89,7 +89,7 @@ function skillMounts(layout: SandboxLayout): Mount[] {
  * The user's own CLAUDE.md when it is a file, which a Codex agent reads as its global AGENTS.md;
  * none for a bare session, which gets none of the user's files.
  */
-function userInstructions(layout: SandboxLayout): string | null {
+export function userInstructions(layout: SandboxLayout): string | null {
   if (layout.maintenance?.bare === true) {
     return null
   }
