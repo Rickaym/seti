@@ -1,6 +1,6 @@
 import { defineMod, type ModViewProps, type UiModApi } from '@seti/mod-api'
 import { NotepadText } from 'lucide-react'
-import { useEffect, useState, useSyncExternalStore } from 'react'
+import { useEffect, useSyncExternalStore } from 'react'
 import { PadStore } from './pad-store.js'
 import { PAD_MAX } from './pad-text.js'
 import manifest from './seti-mod.json' with { type: 'json' }
@@ -37,10 +37,10 @@ interface PadParts {
 /** The text area itself: saves as typing pauses and on blur, and says so only when a save fails. */
 function PadField({ store, api, className }: PadParts & { className?: string }) {
   const state = useSyncExternalStore(store.subscribe, store.get)
-  const { Textarea, cn } = api.kit
+  const { PlainTextarea, cn } = api.kit
   return (
     <>
-      <Textarea
+      <PlainTextarea
         aria-label="Pad"
         placeholder="Notes"
         value={state.text}
@@ -48,7 +48,6 @@ function PadField({ store, api, className }: PadParts & { className?: string }) 
         maxLength={PAD_MAX}
         spellCheck
         aria-invalid={state.failure !== null}
-        boxClassName="min-h-0 flex-1"
         className={cn('field-sizing-fixed min-h-0 flex-1 resize-none', className)}
         onChange={(event) => {
           store.edit(event.target.value)
@@ -66,43 +65,39 @@ function PadField({ store, api, className }: PadParts & { className?: string }) 
   )
 }
 
-/** On the rail, which is too narrow for text, the pad is an icon that opens it in a dialog. */
-function RailPad({ store, api }: PadParts) {
-  const [open, setOpen] = useState(false)
+/** On the rail, which is too narrow for text, the pad is an icon that opens its panel beside it. */
+function RailPad({ store, api, panel }: PadParts & { panel: NonNullable<ModViewProps['panel']> }) {
   const failed = useSyncExternalStore(store.subscribe, () => store.get().failure !== null)
-  const { Button, Dialog, Hint } = api.kit
+  const { Button, Hint } = api.kit
   return (
-    <>
-      <Hint text="Pad">
-        <Button
-          variant="ghost"
-          aria-label="Pad"
-          className="relative size-9 p-0 text-foreground/70"
-          onClick={() => {
-            setOpen(true)
-            void store.refresh()
-          }}
-        >
-          <NotepadText className="size-[18px]" />
-          {failed && <span aria-hidden className="absolute top-1 right-1 size-2 rounded-full bg-destructive" />}
-        </Button>
-      </Hint>
-      <Dialog open={open} onOpenChange={setOpen} title="Pad" className="sm:max-w-xl">
-        <div className="flex h-[60vh] min-h-40 flex-col">
-          <PadField store={store} api={api} className="text-sm md:text-sm" />
-        </div>
-      </Dialog>
-    </>
+    <Hint text="Pad">
+      <Button
+        variant="ghost"
+        aria-label="Pad"
+        aria-pressed={panel.open}
+        className={api.kit.cn(
+          'relative size-9 p-0',
+          panel.open ? 'bg-primary text-primary-foreground hover:bg-primary/90' : 'text-foreground/70',
+        )}
+        onClick={() => {
+          panel.toggle()
+          void store.refresh()
+        }}
+      >
+        <NotepadText className="size-[18px]" />
+        {failed && <span aria-hidden className="absolute top-1 right-1 size-2 rounded-full bg-destructive" />}
+      </Button>
+    </Hint>
   )
 }
 
 const padView = (api: UiModApi, store: PadStore) =>
-  function Pad({ layout }: ModViewProps) {
+  function Pad({ layout, panel }: ModViewProps) {
     useEffect(() => {
       void store.refresh()
     }, [])
-    if (layout === 'rail') {
-      return <RailPad store={store} api={api} />
+    if (layout === 'rail' && panel !== null) {
+      return <RailPad store={store} api={api} panel={panel} />
     }
     return (
       <PadField

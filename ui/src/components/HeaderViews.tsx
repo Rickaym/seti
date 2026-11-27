@@ -9,7 +9,7 @@ export function HeaderViews() {
       {views.length === 0 && <div aria-hidden data-slot="header-gap" className="min-w-0 flex-1 self-stretch" />}
       {views.map(({ key, name, view: View }) => (
         <ErrorBoundary key={key} name={name} kind="item">
-          <View layout={null} />
+          <View layout={null} panel={null} />
         </ErrorBoundary>
       ))}
     </>

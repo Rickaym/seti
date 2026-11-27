@@ -33,8 +33,11 @@ test('the pad fills the drawer under the sections, saves itself and is there aft
   expect(Math.abs((terminal?.y ?? 0) - fieldBottom), 'the pad reaches down to the tools').toBeLessThan(12)
   expect(fieldBox?.height ?? 0, 'the pad keeps a usable height').toBeGreaterThanOrEqual(150)
   await expectFitsPhone(page, 'menu drawer with the pad')
-
   await field.tap()
+  const slot = drawer.locator('[data-slot="nav-bottom"]')
+  await expect(slot.getByRole('textbox')).toHaveCount(1)
+  await expect(slot.getByRole('button'), 'the pad holds nothing but its text area').toHaveCount(0)
+
   await field.fill('pick up keys')
   await expectSaved(request, 'pick up keys')
   await page.reload()

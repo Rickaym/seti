@@ -1,4 +1,4 @@
-import type { Page } from '@playwright/test'
+import type { Locator, Page } from '@playwright/test'
 import { expect, test } from './support/fixtures.js'
 import { clearPad, expectSaved, pad } from './support/text-pad.js'
 
@@ -6,31 +6,54 @@ test.afterEach(async ({ request }) => {
   await clearPad(request)
 })
 
-const openPad = async (page: Page) => {
-  await page.getByRole('complementary', { name: 'Sidebar' }).getByRole('button', { name: 'Pad' }).click()
-  return page.getByRole('dialog', { name: 'Pad' })
+const rail = (page: Page) => page.getByRole('complementary', { name: 'Sidebar' })
+const panel = (page: Page) => page.getByRole('region', { name: 'Pad' })
+
+const boxOf = async (locator: Locator) => {
+  const box = await locator.boundingBox()
+  expect(box).not.toBeNull()
+  return box ?? { x: 0, y: 0, width: 0, height: 0 }
 }
 
-test('the pad sits at the bottom of the rail, saves as you type and is there after a reload', async ({
-  page,
-  request,
-}) => {
-  await page.goto('/')
-  const rail = page.getByRole('complementary', { name: 'Sidebar' })
-  const button = rail.getByRole('button', { name: 'Pad' })
-  const shortcuts = rail.getByRole('button', { name: 'Shortcuts' })
-  const [padBox, toolsBox] = [await button.boundingBox(), await shortcuts.boundingBox()]
-  expect(padBox?.y ?? 0, 'the pad sits under the sections, above the tools').toBeLessThan(toolsBox?.y ?? 0)
+const openPad = async (page: Page) => {
+  await rail(page).getByRole('button', { name: 'Pad' }).click()
+  return panel(page)
+}
 
-  const dialog = await openPad(page)
-  const field = pad(dialog)
+test('the pad sits at the bottom of the rail, opens beside it and saves as you type', async ({ page, request }) => {
+  await page.goto('/')
+  const button = rail(page).getByRole('button', { name: 'Pad' })
+  const shortcuts = rail(page).getByRole('button', { name: 'Shortcuts' })
+  const [padBox, toolsBox] = [await boxOf(button), await boxOf(shortcuts)]
+  expect(padBox.y, 'the pad sits under the sections, above the tools').toBeLessThan(toolsBox.y)
+  const mainBefore = await boxOf(page.getByRole('main'))
+
+  const open = await openPad(page)
+  await expect(button).toHaveAttribute('aria-pressed', 'true')
+  await expect(open.getByRole('textbox')).toHaveCount(1)
+  await expect(open.getByRole('button'), 'the pad holds nothing but its text area').toHaveCount(0)
+  const field = pad(open)
   await expect(field).toBeEditable()
-  expect((await field.boundingBox())?.height ?? 0, 'the dialog gives the pad its height').toBeGreaterThan(300)
+  const [railBox, fieldBox, mainBox] = [
+    await boxOf(rail(page)),
+    await boxOf(field),
+    await boxOf(page.getByRole('main')),
+  ]
+  expect(fieldBox.height, 'the pad is as tall as the rail').toBeGreaterThan(railBox.height - 4)
+  expect(mainBox.x, 'the page moves over rather than being covered').toBeGreaterThanOrEqual(fieldBox.x + fieldBox.width)
+  expect(mainBox.width).toBeLessThan(mainBefore.width)
   await field.fill('milk\neggs')
   await expectSaved(request, 'milk\neggs')
 
   await page.reload()
-  await expect(pad(await openPad(page))).toHaveValue('milk\neggs')
+  await expect(pad(panel(page)), 'the panel stays open on this device').toHaveValue('milk\neggs')
+  await pad(panel(page)).press('Escape')
+  await expect(panel(page)).toHaveCount(0)
+  await expect(button).toHaveAttribute('aria-pressed', 'false')
+  await button.click()
+  await expect(pad(panel(page))).toHaveValue('milk\neggs')
+  await button.click()
+  await expect(panel(page)).toHaveCount(0)
 })
 
 test.describe('while the server fails', () => {

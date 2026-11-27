@@ -706,8 +706,11 @@ take the id of an entry the manifest declares, and `registerFenceRenderer` a fen
 band across the app header, in `about`, a part of Settings, About, or in `navBottom`, under the
 sidebar's sections. A `navBottom` view gets `layout`: `drawer` in the menu drawer of a narrow
 screen, where the views share the height the sections leave and keep at least 10rem while the
-sections scroll, or `rail` in the 48 px icon rail of a wide screen, where a view fits an icon
-button. `mods/text-pad/` is the example. `registerNews` puts a dot on
+sections scroll; `rail` in the 48 px icon rail of a wide screen, where a view fits an icon button
+and gets `panel`, whose `toggle` opens or closes its panel; and `panel` in that panel, which
+stands beside the rail at its full height and narrows the page rather than covering it. One panel
+is open at a time, each device remembers it, and Esc inside it closes it. `mods/text-pad/` is the
+example. `registerNews` puts a dot on
 the way to an `about` view while its signal is on. `registerDock` draws a view the manifest places
 in `agentDock` over an agent's chat: a panel on a wide screen and in a layout's panel, a bottom
 sheet on a phone. Seti draws its frame, with the view's icon, title, `description` and a close

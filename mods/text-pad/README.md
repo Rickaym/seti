@@ -7,7 +7,8 @@ the same pad shows on every device and survives restarts.
 
 - On a phone the pad sits in the menu drawer, under the sections, and takes the height they leave.
   On a wide screen the sidebar is a rail of icons, so the pad is the Pad icon above the sidebar's
-  tools, which opens it in a dialog.
+  tools. It opens the pad as a panel beside the rail, as tall as the rail, and the page narrows to
+  make room. The panel stays open, on that device, until the icon or Esc closes it.
 - It saves a moment after you stop typing, when it loses focus and when the page hides. There is no
   Save button.
 - When a save fails, the pad says so and tries again until it works. Until then this browser keeps
