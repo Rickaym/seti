@@ -39,13 +39,15 @@ const call = async (method: string, route: string, body: object = {}, auth: obje
 /** Seti's copy is on disk once a fetch has passed, as `holdsBundle` would find it. */
 let held = false
 
+const fetchPasses = async () => {
+  held = true
+  return Promise.resolve({ entry: '/nowhere/gemini.js', fetched: true })
+}
+
 beforeEach(async () => {
   held = false
   vi.mocked(holdsBundle).mockImplementation(async () => Promise.resolve(held))
-  vi.mocked(fetchGemini).mockImplementation(async () => {
-    held = true
-    return Promise.resolve({ entry: '/nowhere/gemini.js', fetched: true })
-  })
+  vi.mocked(fetchGemini).mockImplementation(fetchPasses)
   await geminiSettings.set(GEMINI_SETTINGS_DEFAULTS)
   await clearConnections()
 })
@@ -81,10 +83,12 @@ describe('the Gemini runtime in Settings', () => {
   })
 
   it('shows a failed install with its reason until Retry installs it', async () => {
-    vi.mocked(fetchGemini).mockRejectedValueOnce(new InstallError('network', 'The registry did not answer'))
+    // every fetch fails, whether this call joins the install the PUT started or runs its own
+    vi.mocked(fetchGemini).mockRejectedValue(new InstallError('network', 'The registry did not answer'))
     await call('PUT', '', { enabled: true })
     await installGemini('user')
     expect(await status()).toMatchObject({ state: 'failed', failure: { reason: 'network' } })
+    vi.mocked(fetchGemini).mockImplementation(fetchPasses)
     expect((await call('POST', '/retry')).status).toBe(200)
     await installGemini('user')
     expect((await status()).state).toBe('no_key')
