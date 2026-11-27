@@ -1,6 +1,16 @@
 import { expect, test, unique } from './support/fixtures.js'
 import { settled } from './support/phone-layout.js'
-import { markOf, QUOTE, referencedReply, seedReferences, serveSources, SOURCES } from './support/references.js'
+import {
+  bareReply,
+  markOf,
+  QUOTE,
+  referencedReply,
+  seedBareLinks,
+  seedReferences,
+  serveSources,
+  SLACK_FILE,
+  SOURCES,
+} from './support/references.js'
 
 test('links in sentences show their text with numbered marks and a Sources list', async ({ page }) => {
   const id = await seedReferences(unique('References'))
@@ -77,4 +87,26 @@ test('finding text in the chat still finds a link by its words', async ({ page }
   await page.getByTestId('chat-find-input').fill('release review')
   await expect(page.getByTestId('chat-find-count')).toHaveText('1 of 1')
   await expect(page.locator('[data-find-current]')).toContainText('the release review')
+})
+
+test('a bare URL in a sentence reads as a short name with its mark, not a clipped URL', async ({ page }) => {
+  const id = await seedBareLinks(unique('Bare links'))
+  await page.goto(`/#agents/${id}`)
+  const reply = bareReply(page)
+  await expect(reply.locator('[data-reference]').first()).toBeVisible()
+  await page.screenshot({ path: test.info().outputPath('bare-links-desktop.png') })
+
+  await expect(reply.getByRole('link', { name: SLACK_FILE.label, exact: true })).toHaveAttribute('href', SLACK_FILE.url)
+  await expect(reply.getByRole('link', { name: SOURCES.pr.label, exact: true })).toHaveAttribute('href', SOURCES.pr.url)
+  await expect(reply.getByRole('link', { name: SOURCES.issue.label, exact: true })).toBeVisible()
+  await expect(reply.getByRole('link', { name: 'release review', exact: true })).toBeVisible()
+  await expect(reply.getByRole('link', { name: 'example.com', exact: true })).toHaveAttribute(
+    'href',
+    SOURCES.runbook.url,
+  )
+  await expect(reply.locator('[data-reference]')).toHaveText(['[1]', '[2]', '[3]', '[2]', '[4]'])
+  await expect(reply.locator('code')).toHaveText(SOURCES.runbook.url)
+  await expect(reply.getByRole('region', { name: 'Sources' }).locator('[data-source="1"]')).toContainText(
+    SLACK_FILE.label,
+  )
 })

@@ -1,6 +1,15 @@
 import { expect, test, unique } from './support/fixtures.js'
 import { expectFitsPhone, expectTouchTarget, settled } from './support/phone-layout.js'
-import { markOf, QUOTE, referencedReply, seedReferences, SOURCES } from './support/references.js'
+import {
+  bareReply,
+  markOf,
+  QUOTE,
+  referencedReply,
+  seedBareLinks,
+  seedReferences,
+  SLACK_FILE,
+  SOURCES,
+} from './support/references.js'
 
 test('on a phone the Sources list folds to one line and opens on a tap', async ({ page }) => {
   const id = await seedReferences(unique('Phone references'))
@@ -49,4 +58,20 @@ test('tapping a mark opens a sheet with the source and an Open button, and stays
   await expect(page.getByTestId('reference-sheet')).toContainText(SOURCES.note)
   await expect(page.getByTestId('reference-sheet').getByRole('link', { name: 'Open' })).toHaveCount(0)
   expect(page.url()).toBe(at)
+})
+
+test('on a phone a bare URL reads as a short name with its mark and fits the screen', async ({ page }) => {
+  const id = await seedBareLinks(unique('Phone bare links'))
+  await page.goto(`/#agents/${id}`)
+  const reply = bareReply(page)
+  await expect(reply.locator('[data-reference]').first()).toBeVisible()
+  await settled(page)
+  await page.screenshot({ path: test.info().outputPath('bare-links-phone.png') })
+
+  await expect(reply.getByRole('link', { name: SLACK_FILE.label, exact: true })).toHaveAttribute('href', SLACK_FILE.url)
+  await expect(reply.getByRole('link', { name: 'example.com', exact: true })).toBeVisible()
+  await expectFitsPhone(page, 'a reply with bare URLs')
+  await reply.getByRole('button', { name: '4 sources' }).tap()
+  await expect(reply.locator('[data-source="1"]')).toContainText(SLACK_FILE.label)
+  await expect(reply.locator('[data-source="1"] a')).toHaveAttribute('href', SLACK_FILE.url)
 })

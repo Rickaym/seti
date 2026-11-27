@@ -1732,9 +1732,12 @@ Optional and off by default: a maintenance session per agent that consolidates i
 - API-19: A message in an agent's chat, a group chat or the assistant renders its sources as
   references. An http or https link inside a sentence keeps its text (a bare URL shows its service
   label, with the Slack channel's name when known) and gains a superscript `[n]` mark; `[^n]`
-  footnotes and `[n]` with a `[n]: url` definition become the same marks. Numbers count from 1
-  per message in order of first appearance, and a repeated URL reuses its number. A link alone on
-  its line, list item or table cell stays a chip, and code is untouched. A message with a
+  footnotes and `[n]` with a `[n]: url` definition become the same marks. A bare URL never shows
+  itself, whole or clipped, inside a sentence: a Slack file shows its file name and a page of no
+  known service shows only its host, while the link and its Sources row keep the full URL.
+  Numbers count from 1 per message in order of first appearance, and a repeated URL reuses its
+  number. A link alone on its line, list item or table cell stays a chip, and code is untouched.
+  A message with a
   reference ends with a Sources list (number, service icon, label, host), folded to one line on a
   phone. A quote with a reference inside it, a single reference in the paragraph after it, or one
   ending the paragraph before it, shows that source under it. A mark MUST NOT navigate within the
