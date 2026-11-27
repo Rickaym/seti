@@ -112,7 +112,21 @@ async function allowAll(task: Task, asked: string[]): Promise<void> {
 /** Installs the pinned bundle the test names into Seti's own folder, as turning Gemini on does. */
 function installFrom(entry: string): void {
   const version = path.dirname(path.dirname(entry))
-  fs.cpSync(version, versionDir(GEMINI_ROOT, GEMINI_PIN.version), { recursive: true })
+  const dir = versionDir(GEMINI_ROOT, GEMINI_PIN.version)
+  fs.cpSync(version, dir, { recursive: true })
+  // read and run only, as fetchGemini leaves it, whatever mode cpSync keeps
+  fs.chmodSync(dir, 0o500)
+}
+
+/** Gives the installed copy's folders back their write bit, so the test root can be removed. */
+function uninstall(): void {
+  const dir = versionDir(GEMINI_ROOT, GEMINI_PIN.version)
+  fs.chmodSync(dir, 0o700)
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true, recursive: true })) {
+    if (entry.isDirectory()) {
+      fs.chmodSync(path.join(entry.parentPath, entry.name), 0o700)
+    }
+  }
 }
 
 /** One proof run: the Gemini API host, Gemini on with the pinned bundle, and a key the proxy adds. */
@@ -167,6 +181,7 @@ export async function geminiProofRun(scratch: string, entry: string) {
       routeEgressForTests(null)
       model.close()
       holder.kill()
+      uninstall()
     },
   }
 }
