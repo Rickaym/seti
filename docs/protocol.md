@@ -1342,7 +1342,10 @@ Why: an agent woken by its own actions or by news nobody waited for burns turns 
   screen. On devices that silence a backgrounded browser's microphone (Android, iOS) the call
   shows "The EA cannot hear you while Seti is in the background on this device". On return the
   page reopens a microphone the system muted or ended, and when the EA heard nothing for 5 s or
-  more it says "You were away for <time>; the EA could not hear you".
+  more it says "You were away for <time>; the EA could not hear you". On Android, with
+  notifications allowed, a live call shows the notification "Call with the EA" with Mute and Hang
+  up for exactly as long as it is live; the Android app holds that notification as a microphone
+  foreground service, which runs only then.
   Why: a call must survive a glance at another app, and a silenced microphone must never pass for
   a live one.
 

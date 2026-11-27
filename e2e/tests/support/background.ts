@@ -121,3 +121,43 @@ export function longestGap(pings: readonly number[], from: number, to: number): 
   const times = [from, ...pings.filter((at) => at > from && at <= to), to]
   return Math.max(...times.slice(1).map((at, i) => at - (times[i] ?? at)))
 }
+
+type NoticeWindow = Window & { notices?: Map<string, { title: string; body: string }> }
+
+/** Stands in for notifications, which headless Chromium always refuses. */
+function installNotices(): void {
+  const notices = new Map<string, { title: string; body: string }>()
+  ;(window as NoticeWindow).notices = notices
+  Object.defineProperty(Notification, 'permission', { configurable: true, get: () => 'granted' })
+  const registration = {
+    showNotification: async (title: string, options: NotificationOptions = {}) => {
+      notices.set(options.tag ?? '', { title, body: options.body ?? '' })
+      return Promise.resolve()
+    },
+    getNotifications: async ({ tag = '' }: GetNotificationOptions = {}) =>
+      Promise.resolve(
+        [...notices.entries()].filter(([key]) => key === tag).map(([key]) => ({ close: () => notices.delete(key) })),
+      ),
+  }
+  navigator.serviceWorker.getRegistration = async () =>
+    Promise.resolve(registration as unknown as ServiceWorkerRegistration)
+}
+
+/** Lets the page show notifications, kept in a list the test reads. */
+export async function notifications(page: Page): Promise<void> {
+  await page.addInitScript(installNotices)
+}
+
+export async function shownNotices(page: Page): Promise<string[]> {
+  return page.evaluate(() =>
+    [...((window as NoticeWindow).notices?.values() ?? [])].map((notice) => `${notice.title}: ${notice.body}`),
+  )
+}
+
+/** Presses a button on the call's notification, as the service worker reports it to the page. */
+export async function pressNotice(page: Page, action: string): Promise<void> {
+  await page.evaluate((name) => {
+    const data = { type: 'seti:ea-call', action: name }
+    navigator.serviceWorker.dispatchEvent(new MessageEvent('message', { data }))
+  }, action)
+}

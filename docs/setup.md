@@ -395,6 +395,10 @@ hears nothing until you return; the call says so, and on return Seti reopens the
 tells you how long the EA could not hear you. Opening the Android app again from its icon or a
 widget returns to the running call instead of reloading it, once the app is updated.
 
+The Android app asks once for its own microphone permission. It never opens the microphone itself:
+during a call it holds the call's notification as a microphone foreground service, so the call can
+keep hearing you in the background, and it shows Seti's notifications as its own.
+
 On Android, Chrome sends call audio to a Bluetooth headset only when Chrome may use Nearby devices
 (Android settings, Apps, Chrome, Permissions). A headset that connects mid-call takes over once the
 device list settles, and the Audio button in the call does the same on demand.

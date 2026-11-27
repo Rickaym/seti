@@ -5,7 +5,7 @@ import type { EaCallStore } from './call-store'
 /** Chrome takes notification buttons, which the DOM types no longer list. */
 type CallNoticeOptions = NotificationOptions & { actions: { action: EaCallAction; title: string }[] }
 
-export const CALL_NOTICE_TITLE = 'Call with the EA'
+const CALL_NOTICE_TITLE = 'Call with the EA'
 
 /** The notification a live call shows, so a live microphone is never out of sight. */
 export function callNotice(micOn: boolean): CallNoticeOptions {
