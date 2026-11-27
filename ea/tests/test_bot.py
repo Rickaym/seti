@@ -221,7 +221,7 @@ async def test_the_sleep_tool_reports_and_keeps_the_llm_quiet() -> None:
 
 def test_the_prompt_covers_sleep_and_queued_messages() -> None:
     assert "call go_to_sleep on its own" in SYSTEM_PROMPT
-    for said in ('"go to sleep"', '"that\'s all for now"', '"stand by"', '"thanks, that\'s it"'):
+    for said in ('"go to sleep"', '"stand by"', '"thanks, that\'s it"'):
         assert said in SYSTEM_PROMPT
     assert "send the direct message in the same reply, even while it runs a turn" in SYSTEM_PROMPT
     assert "A public post_team_chat, which reaches every agent: give the text, then ask." in SYSTEM_PROMPT

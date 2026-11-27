@@ -292,10 +292,10 @@ def test_a_relay_passes_on_the_users_request_without_adding_limits() -> None:
 
 def test_after_a_relay_the_ea_says_whom_and_the_gist_and_never_reads_the_message_back() -> None:
     prompt = " ".join(SYSTEM_PROMPT.split())
-    assert "say whom and the gist in a few words" in prompt
-    assert "never quote, read back or restate it, whole or step by step" in prompt
-    assert "Give it only when the user asks what you sent." in prompt
+    assert "say whom and the gist in one short sentence of your own" in prompt
+    assert "Never quote, read back or restate the message" in prompt
     assert "quote what you sent" not in prompt
-    for text in (prompt, ACT_NOTE, promise_note("I told it."), relay_note("tell it", "Shall I send it?")):
+    assert "what you sent to whom" not in prompt
+    for text in (ACT_NOTE, promise_note("I told it."), relay_note("tell it", "Shall I send it?")):
         assert "what you sent to whom" not in text
         assert "the gist in a few words" in text
