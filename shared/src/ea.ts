@@ -62,6 +62,10 @@ export interface EaHealth {
   model: string | null
   /** The model behind the typed chat; absent from bots older than the chat. */
   text_model?: string | null
+  /** The model API the EA uses; absent from bots older than the choice. */
+  llm_api?: 'chat' | 'responses'
+  /** The host every model request goes to, never the full URL. */
+  llm_host?: string
   /** Names the typed chat still needs from the EA env file. */
   chat_missing?: string[]
   /** Whether the bot has TURN keys, so its ICE servers include a relay. */

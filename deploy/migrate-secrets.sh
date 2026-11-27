@@ -13,6 +13,7 @@ UNITS=(seti.service seti-ea.service cloudflared.service)
 MOVES=(
   "ea.env:DEEPGRAM_API_KEY:deepgram-api-key"
   "ea.env:OPENAI_API_KEY:openai-api-key"
+  "ea.env:EA_LLM_API_KEY:ea-llm-api-key"
   "ea.env:ELEVENLABS_API_KEY:elevenlabs-api-key"
   "ea.env:CLOUDFLARE_TURN_KEY_ID:cloudflare-turn-key-id"
   "ea.env:CLOUDFLARE_TURN_API_TOKEN:cloudflare-turn-api-token"
@@ -20,7 +21,7 @@ MOVES=(
   "cloudflared.env:TUNNEL_TOKEN:tunnel-token"
 )
 GENERATED=(secret-key local-token-user local-token-ea)
-OPTIONAL=(openai-api-key deepgram-api-key elevenlabs-api-key cloudflare-turn-key-id cloudflare-turn-api-token)
+OPTIONAL=(openai-api-key ea-llm-api-key deepgram-api-key elevenlabs-api-key cloudflare-turn-key-id cloudflare-turn-api-token)
 
 usage() {
   cat <<'USAGE'
