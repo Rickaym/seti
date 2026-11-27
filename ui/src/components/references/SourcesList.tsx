@@ -1,7 +1,7 @@
 import { ChevronDown, Library } from 'lucide-react'
 import { useState, type ReactNode } from 'react'
 import { LinkIcon } from '@/components/links/LinkPill'
-import { NotRead, VerifiedMark } from '@/components/references/source-marks'
+import { AsReadAt, NotRead, VerifiedMark } from '@/components/references/source-marks'
 import { useSourceMatch } from '@/components/references/source-match'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { useNarrow } from '@/hooks/useMedia'
@@ -27,6 +27,7 @@ function SourceRow({ reference }: { reference: Reference }) {
         </span>
       )}
       {match?.unread === true && <NotRead />}
+      {match?.as_read_at !== undefined && <AsReadAt commit={match.as_read_at} />}
       {match?.verified === true && <VerifiedMark />}
     </>
   )

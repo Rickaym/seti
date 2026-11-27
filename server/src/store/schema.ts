@@ -68,7 +68,7 @@ import { CLIENT_SENDS } from './schema-sends.js'
 import { SHARED_TOOLS } from './schema-shared-tools.js'
 import { SHARE_LIVE, SHARE_PREVIEWS, SHARE_RENDER, SHARES } from './schema-shares.js'
 import { SLACK_NAMES } from './schema-slack-names.js'
-import { SOURCE_ITEMS } from './schema-sources.js'
+import { SOURCE_ITEM_BRANCHES, SOURCE_ITEMS } from './schema-sources.js'
 import { loginsToHosts, SSH_HOST_KEYS } from './schema-ssh-keys.js'
 import { importSshHosts, SSH_HOSTS } from './schema-ssh.js'
 import { STORAGE_SETTINGS } from './schema-storage.js'
@@ -277,4 +277,5 @@ export const MIGRATIONS: readonly Migration[] = [
   { version: 149, name: 'session_rescrub', sql: SESSION_RESCRUB },
   { version: 150, name: 'ea_inbox_relays', sql: EA_INBOX_RELAYS },
   { version: 151, name: 'gemini_settings', sql: GEMINI_SETTINGS },
+  { version: 152, name: 'source_item_branches', sql: SOURCE_ITEM_BRANCHES },
 ]

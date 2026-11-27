@@ -317,6 +317,9 @@ write to, so its config and attributes are input ([SRC-8](protocol.md#37-evidenc
 runs with the guards Seti uses for agents' repositories, the file is compared with HEAD by hashing
 its bytes with no filter, and a link that leads out of the clone gives no item. The clone's remote
 and history are the agent's, so a permalink says where the agent's clone says the file came from.
+The same holds for the branches recorded with an item ([SRC-11](protocol.md#37-evidence-ledger)):
+they are the clone's remote-tracking refs as the agent last fetched them, so a link at a branch
+matches only with the commit it was read at beside it.
 
 ## Redaction of what agents print
 

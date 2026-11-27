@@ -16,6 +16,8 @@ test('a quote the agent read shows a quiet check, and a link it never read says 
   await expect(sources.locator('[data-source="1"]').getByTestId('source-not-read')).toHaveCount(0)
   await expect(sources.locator('[data-source="2"]').getByTestId('source-not-read')).toHaveText('not read by this agent')
   await expect(sources.locator('[data-source="2"]').getByTestId('quote-verified')).toHaveCount(0)
+  await expect(sources.locator('[data-source="3"]').getByTestId('source-as-read')).toHaveText(LEDGER.asRead)
+  await expect(sources.locator('[data-source="3"]').getByTestId('source-not-read')).toHaveCount(0)
   await page.screenshot({ path: test.info().outputPath('ledger-light.png') })
   await toDark(page)
   await page.screenshot({ path: test.info().outputPath('ledger-dark.png') })

@@ -68,7 +68,6 @@ describe('cited URLs', () => {
     ['another host', 'https://example.com/archives/C0SOURCE01/p1764000060000200'],
     ['a look-alike Slack host', 'https://acme.slack.com.example.com/archives/C0SOURCE01'],
     ['a repository page', 'https://github.com/acme/api'],
-    ['a file at a branch', 'https://github.com/acme/api/blob/main/README.md'],
     ['not a URL', 'see the plan'],
   ])('ignores %s', (_name, href) => {
     expect(refOfUrl(href)).toBeNull()

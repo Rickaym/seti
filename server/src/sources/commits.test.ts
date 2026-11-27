@@ -115,14 +115,21 @@ describe('commits an agent shows with git', () => {
       await nodeLink.journal(task, { type: 'message', runtime: 'claude', payload })
     }
     const href = `https://github.com/acme/notes/commit/${pushed.slice(0, 8)}`
-    const [hit] = await matchSources(task, [{ href, quote: 'the rollout moves to Monday' }])
+    const [hit, tip, other] = await matchSources(task, [
+      { href, quote: 'the rollout moves to Monday' },
+      { href: 'https://github.com/acme/notes/commit/main', quote: 'the rollout moves to Monday' },
+      { href: 'https://github.com/acme/notes/commit/dev', quote: null },
+    ])
     expect(hit).toMatchObject({ verified: true, source: { kind: 'github', container: 'acme/notes' } })
+    expect(hit?.as_read_at).toBeUndefined()
+    expect(tip).toMatchObject({ verified: true, as_read_at: pushed.slice(0, 7) })
+    expect(other).toMatchObject({ source: null, unread: false })
   })
 
   it.each([
     [`https://github.com/acme/notes/commit/${'a'.repeat(40)}`, `github:acme/notes@${'a'.repeat(40)}`, undefined],
     ['https://github.com/Acme/Notes/commit/abc1234', 'github:acme/notes@abc1234', true],
-    ['https://github.com/acme/notes/commit/main', null, undefined],
+    ['https://github.com/acme/notes/commit/main', 'github:acme/notes@', undefined],
     ['https://github.com/acme/notes/commit/abc1234/extra', null, undefined],
   ])('%s names %s', (url, ref, prefix) => {
     const found = refOfUrl(url)

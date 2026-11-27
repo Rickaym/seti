@@ -29,7 +29,19 @@ export function fileAsk(call: ToolCall): FileAsk | null {
   return { path: path.normalize(named), part }
 }
 
-type Git = (...args: string[]) => Promise<string>
+export type Git = (...args: string[]) => Promise<string>
+
+const ORIGIN = 'refs/remotes/origin/'
+const BRANCH = /^[\w./-]{1,200}$/
+
+/** The branches of `origin` whose tip, as the clone last fetched it, is the commit. */
+export async function branchesAt(git: Git, sha: string): Promise<string[]> {
+  const refs = await git('for-each-ref', '--points-at', sha, '--format=%(refname)', ORIGIN).catch(() => '')
+  return refs.split('\n').flatMap((ref) => {
+    const name = ref.startsWith(ORIGIN) ? ref.slice(ORIGIN.length) : ''
+    return name !== 'HEAD' && BRANCH.test(name) && !name.includes('..') ? [name] : []
+  })
+}
 
 /** `owner/repo` of a GitHub remote URL, or null for any other host or form. */
 export function githubRemote(url: string): string | null {
@@ -91,5 +103,12 @@ export async function fileItems(taskId: string, ask: FileAsk, text: string): Pro
   const base = { kind: 'file' as const, container: repo, at: null, spans: [NUMBERED] }
   return sha === null
     ? [{ ...base, ref: fileRef(repo, file, null), permalink: '' }]
-    : [{ ...base, ref: fileRef(repo, file, sha), permalink: blobPermalink(repo, file, sha, linesOf(ask, text)) }]
+    : [
+        {
+          ...base,
+          ref: fileRef(repo, file, sha),
+          permalink: blobPermalink(repo, file, sha, linesOf(ask, text)),
+          branches: await branchesAt(git, sha),
+        },
+      ]
 }

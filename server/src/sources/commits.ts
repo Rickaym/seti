@@ -7,7 +7,7 @@ import { agentGitView } from '../outward-folder.js'
 import { rerouting } from '../policy/outward.js'
 import { walkLine } from '../policy/shell-scope.js'
 import { shellCommands } from '../policy/shell-split.js'
-import { githubRemote } from './files.js'
+import { branchesAt, githubRemote } from './files.js'
 import { at, isoTime, type FoundItem } from './item.js'
 import { lineOutput, printsToFile } from './line-output.js'
 import { commitRef } from './refs.js'
@@ -107,7 +107,16 @@ export async function commitItems(taskId: string, ask: CommitAsk, text: string):
       const pushed = (await git(...on).catch(() => '')) !== ''
       const permalink = pushed ? `https://github.com/${repo}/commit/${sha}` : ''
       const ref = commitRef(repo, sha)
-      return { kind: 'github' as const, container: repo, ref, permalink, at: isoTime(times.get(sha)), spans: [span] }
+      const branches = pushed ? await branchesAt(git, sha) : []
+      return {
+        kind: 'github' as const,
+        container: repo,
+        ref,
+        permalink,
+        at: isoTime(times.get(sha)),
+        spans: [span],
+        branches,
+      }
     }),
   )
 }
