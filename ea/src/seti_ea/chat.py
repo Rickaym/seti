@@ -46,7 +46,7 @@ from seti_ea.live_context import LiveContext
 from seti_ea.packs import CHAT_TIMEOUT_SECS, PackPrompt
 from seti_ea.promises import PromiseCheck
 from seti_ea.prompt import CHAT_NOTE_PREFIX, VOICE_NOTE, chat_inbox_note, chat_note
-from seti_ea.relays import RelayGuard, relay_note, relays_on
+from seti_ea.relays import RELAY_TOOL, RelayGuard, relay_note, relays_on
 from seti_ea.seti import SetiError
 from seti_ea.think import Ask, Thinker, responses_ask
 from seti_ea.think_speech import ShownProgress
@@ -284,7 +284,7 @@ class TextChat:
         """Checks due follow-ups, triages channel alerts and answers mentions, then reports in the chat.
 
         Only read-only tools and a reply to the agent that asked are open to it, and for alerts
-        from a channel the user set to act, a direct message to an existing agent. With inbox
+        from a channel the user set to act, a direct message to an agent or a new agent. With inbox
         relays on, it may relay one item to the agent it is about (EA-19).
         """
         items = delivered.for_model
@@ -302,7 +302,9 @@ class TextChat:
 
         relaying = not delivered.act and await relays_on(self._tools.seti)
         guard = RelayGuard([item.id for item in items]) if relaying else None
-        open_tools = INBOX_TOOLS | ACT_TOOLS if delivered.act or relaying else INBOX_TOOLS
+        open_tools = INBOX_TOOLS | ACT_TOOLS if delivered.act else INBOX_TOOLS
+        if relaying:
+            open_tools = INBOX_TOOLS | {RELAY_TOOL}
         schemas = tool_schemas(
             self._tools, report, only=open_tools, guard=guard.check if guard is not None else None
         )

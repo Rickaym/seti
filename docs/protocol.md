@@ -1263,8 +1263,8 @@ Why: an agent woken by its own actions or by news nobody waited for burns turns 
   one; it never interrupts.
 - EA-8: Inbox items are `followup`, `reminder`, `watch_event`, `channel_event`, `team_mention`; a
   new event for an undelivered item's subject replaces it. Unasked reports get read tools only,
-  except that one made only of `act` subscription items MAY direct-message an existing agent and
-  MUST tell the user, and a report MAY relay under EA-19.
+  except that one made only of `act` subscription items MAY direct-message an agent or start one
+  and MUST tell the user, and a report MAY relay under EA-19.
 - EA-10: Off a call, watch and channel items wait for quiet (`settle`); others go at once. On a
   call nothing interrupts: items follow the user's next turn, and a needs-you item gets its own
   line after `call_silence`. The exception is a request that holds an agent (a tool call, a plan,

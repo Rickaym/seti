@@ -881,13 +881,8 @@ async def test_your_inbox_reports_or_acts_on_a_channel_and_agents_have_no_mode(
     asked, done = await confirm(
         tools, "subscribe_channel", {"channel": "uptime", "subscriber": "ea", "mode": "Act"}
     )
-    assert (
-        "For alerts from the webhook Uptime, this lets you send their work to an existing agent" in asked.text
-    )
-    assert (
-        done.text
-        == "Alerts from the webhook Uptime: you now send their work to an existing agent without asking."
-    )
+    assert "For alerts from the webhook Uptime, this lets you send their work to an agent" in asked.text
+    assert done.text == "Alerts from the webhook Uptime: you now send their work to an agent without asking."
     assert writes(fake) == [("PUT", f"/api/channels/{HOOK}/subscriptions/1/mode", {"mode": "act"})]
     mine = await tools.call("list_my_channels", {})
     assert "- Uptime (webhook): disk; you act on its alerts" in mine.text
@@ -920,7 +915,7 @@ async def test_your_inbox_reports_or_acts_on_a_channel_and_agents_have_no_mode(
     _, added = await confirm(
         tools, "subscribe_channel", {"channel": "uptime", "subscriber": "ea", "mode": "act"}
     )
-    assert added.text.endswith("you now send their work to an existing agent without asking.")
+    assert added.text.endswith("you now send their work to an agent without asking.")
     assert writes(fake)[-1] == (
         "POST",
         f"/api/channels/{HOOK}/subscriptions",

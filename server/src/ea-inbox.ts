@@ -34,7 +34,7 @@ export function noticeText(item: EaInboxItem): string {
     case 'watch_event':
       return `Inbox: from the watched task "${item.source}": ${item.title}.${body}${url}`
     case 'channel_event': {
-      const act = item.act ? ' (act: hand its work to an existing agent without asking)' : ''
+      const act = item.act ? ' (act: hand its work to an agent without asking)' : ''
       return `Inbox: ${item.source} alert (${item.severity})${act}: ${item.title}.${body}${url}`
     }
     case 'team_mention': {

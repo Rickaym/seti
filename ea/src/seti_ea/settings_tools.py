@@ -130,7 +130,7 @@ EA_MODE = {
     "type": "string",
     "enum": list(EA_MODES),
     "description": "Your inbox only: report (the default) reports its alerts and asks before acting; act "
-    "lets you send an alert's work to an existing agent without asking. Leave out to keep it.",
+    "lets you send an alert's work to an agent without asking. Leave out to keep it.",
 }
 DELIVERIES = ("now", "after_turn", "with_message", "agent")
 DELIVERY = {
@@ -155,11 +155,11 @@ DELIVERY_RESULTS = {
 }
 MODE_EFFECTS = {
     "report": "has you report them and ask before acting",
-    "act": "lets you send their work to an existing agent without asking",
+    "act": "lets you send their work to an agent without asking",
 }
 MODE_RESULTS = {
     "report": "report them and ask before acting",
-    "act": "send their work to an existing agent without asking",
+    "act": "send their work to an agent without asking",
 }
 SUBSCRIBE_EA = {
     "type": "boolean",

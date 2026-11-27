@@ -181,7 +181,7 @@ export function Subscribers({ info, onChange }: { info: ChannelInfo; onChange: (
                 size="xs"
                 icon={Zap}
                 label="Auto act"
-                hint="On: the EA sends an alert's work to an existing agent without asking. Off: it reports and asks first."
+                hint="On: the EA sends an alert's work to an agent without asking. Off: it reports and asks first."
                 pressed={ea.mode === 'act'}
                 disabled={busy}
                 onPressedChange={(on) => {

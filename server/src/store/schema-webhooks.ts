@@ -70,7 +70,7 @@ ALTER TABLE channel_event ADD COLUMN kind TEXT NOT NULL DEFAULT '';
 ALTER TABLE channel_delivery ADD COLUMN routes TEXT NOT NULL DEFAULT '[]';
 `
 
-/** The EA hands an act subscription's alerts to an existing agent unasked; tasks always report. */
+/** The EA hands an act subscription's alerts to an agent unasked; tasks always report. */
 export const EA_CHANNEL_MODE = `
 ALTER TABLE channel_subscription ADD COLUMN mode TEXT NOT NULL DEFAULT 'report'
   CHECK (mode IN ('report', 'act'));
