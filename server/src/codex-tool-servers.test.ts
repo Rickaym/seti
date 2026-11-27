@@ -23,6 +23,7 @@ const grant = (hosts: string[] = []): ProxyGrant => ({
   mcp: [],
   deniedConnectors: [],
   caHosts: [],
+  modelHosts: [],
 })
 
 const scope = (patch: Partial<Parameters<typeof codexServersOf>[1]> = {}) => ({

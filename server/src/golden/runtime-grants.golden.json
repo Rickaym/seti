@@ -245,6 +245,9 @@
       "grant": {
         "login": "host-login",
         "anthropic": true,
+        "modelHosts": [
+          "api.anthropic.com"
+        ],
         "connections": [
           {
             "id": "stripe",
@@ -309,6 +312,9 @@
       "grant": {
         "login": null,
         "anthropic": false,
+        "modelHosts": [
+          "api.openai.com"
+        ],
         "connections": [
           {
             "id": "stripe",
@@ -373,6 +379,9 @@
       "grant": {
         "login": null,
         "anthropic": false,
+        "modelHosts": [
+          "generativelanguage.googleapis.com"
+        ],
         "connections": [
           {
             "id": "stripe",

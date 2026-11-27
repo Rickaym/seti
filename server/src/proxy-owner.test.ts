@@ -13,7 +13,15 @@ import {
 } from './proxy-owner.js'
 
 const task = { id: 'agent' } as Task
-const grant: ProxyGrant = { login: null, anthropic: true, connections: [], mcp: [], deniedConnectors: [], caHosts: [] }
+const grant: ProxyGrant = {
+  login: null,
+  anthropic: true,
+  modelHosts: ['api.anthropic.com'],
+  connections: [],
+  mcp: [],
+  deniedConnectors: [],
+  caHosts: [],
+}
 
 describe('the owner of an agent egress proxy', () => {
   it('runs the proxy here until another process runs them, then has that process open and close it', async () => {
@@ -47,8 +55,9 @@ describe('the owner of an agent egress proxy', () => {
     expect(start).toHaveBeenCalledTimes(1)
     expect(stop).toHaveBeenCalledTimes(1)
     expect(owner.open).toHaveBeenCalledWith('agent', grant)
-    await modelProxyHere(task.id, { login: 'login', key: null }, start)
-    expect(owner.openModel).toHaveBeenCalledWith('agent', { login: 'login', key: null })
+    const reach = { login: 'login', key: null, modelHosts: ['api.anthropic.com'] }
+    await modelProxyHere(task.id, reach, start)
+    expect(owner.openModel).toHaveBeenCalledWith('agent', reach)
     expect(owner.close).toHaveBeenCalledWith('agent')
     expect(await proxyAwsToken(task.id, () => 'here')).toBe('node')
     expect(await proxyConnections(task.id, [], async () => Promise.resolve(true))).toBe(false)

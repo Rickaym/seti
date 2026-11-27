@@ -67,6 +67,8 @@ export interface EgressOptions {
   rules?: () => readonly EgressRule[]
   /** The task's connections as placeholders: their hosts are allowed and intercepted like rules'. */
   placeholders?: () => readonly EgressPlaceholder[]
+  /** The runtime's model hosts, fixed by its grant: bodies to them stream unread and unswapped. */
+  modelHosts?: () => readonly string[]
   /** A request carried placeholders toward a host their keys do not allow, and was refused. */
   onBlocked?: (host: string, names: readonly string[]) => void
   /** Whether the task may use a claude.ai connector, by its id; every one when left out. */
@@ -166,6 +168,11 @@ class Egress {
     }
   }
 
+  /** The connections the proxy looks for in a body to the target: none on a model host. */
+  private bodyEntries(target: Target): readonly EgressPlaceholder[] {
+    return (this.options.modelHosts?.() ?? []).includes(target.host) ? [] : this.placeholders()
+  }
+
   private async withKeys(target: Target, path: string, headers: IncomingHttpHeaders): Promise<Keyed | Refusal> {
     return keyRequest({ target, path, headers }, this.placeholders(), this.options.onBlocked)
   }
@@ -217,7 +224,7 @@ class Egress {
       req.resume()
       return
     }
-    const plan = await bodyOf({ target, req, res }, this.placeholders(), this.options.onBlocked)
+    const plan = await bodyOf({ target, req, res }, this.bodyEntries(target), this.options.onBlocked)
     const address = plan === null ? null : await this.reach(target)
     if (address instanceof Error) {
       answer(res, 502, address.message)
@@ -319,7 +326,7 @@ class Egress {
       req.resume()
       return
     }
-    const plan = await bodyOf({ target, req, res }, this.placeholders(), this.options.onBlocked)
+    const plan = await bodyOf({ target, req, res }, this.bodyEntries(target), this.options.onBlocked)
     if (plan === null) {
       return
     }

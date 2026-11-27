@@ -65,7 +65,7 @@ describe('planBody', () => {
     )
     expect(result).toMatchObject({ status: 403, names: ['site_login'] })
     expect(JSON.stringify(result)).toContain('site_login')
-    expect(JSON.stringify(result)).toContain('turns on Body for that connection')
+    expect(JSON.stringify(result)).toContain('ask the user to turn on Body for that connection')
     expect(JSON.stringify(result)).not.toContain(VALUE)
   })
 
