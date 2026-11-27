@@ -4,7 +4,7 @@ import type { AddressInfo } from 'node:net'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { createApp } from '../app.js'
 import { auditEvents } from '../store/audit.js'
-import { USER_AUTH } from '../test-auth.js'
+import { EA_AUTH, USER_AUTH } from '../test-auth.js'
 
 interface Seen {
   method: string
@@ -132,6 +132,25 @@ describe('EA proxy with the bot up', () => {
     const bad = await send(app, 'GET', '/tools')
     expect(bad.status).toBe(502)
     expect(((await bad.json()) as { error: { detail: string } }).error.detail).toMatch(/cannot read/)
+  })
+
+  it("relays the EA's prompt to the user only and refuses one it cannot read", async () => {
+    const part = { key: 'base', label: 'Base prompt', about: 'Every turn', text: 'You are the EA.', chars: 15 }
+    const prompt = { commit: 'abc123', parts: [{ ...part, per_turn: false, built_at: null }] }
+    replies.set('GET /prompt', { status: 200, body: JSON.stringify({ ...prompt, token: 'x' }) })
+    const res = await send(app, 'GET', '/prompt')
+    expect(res.status).toBe(200)
+    expect(res.headers.get('cache-control')).toBe('no-store')
+    expect(await res.json()).toEqual({ data: prompt, meta: {} })
+
+    const asEa = await app.request('/api/ea/prompt', { headers: { ...LOCAL, ...EA_AUTH } })
+    expect(asEa.status).toBe(403)
+    expect(seen).toHaveLength(1)
+
+    replies.set('GET /prompt', { status: 200, body: '{"commit":null,"parts":[{"key":"secret"}]}' })
+    const bad = await send(app, 'GET', '/prompt')
+    expect(bad.status).toBe(502)
+    expect(((await bad.json()) as { error: { detail: string } }).error.detail).toMatch(/a prompt Seti cannot read/)
   })
 
   it('forwards the offer body byte for byte and returns the answer', async () => {
@@ -289,6 +308,12 @@ describe('EA proxy with the bot down', () => {
     const payload = (await res.json()) as { running: boolean; reason: string }
     expect(payload.running).toBe(false)
     expect(payload.reason).toMatch(/^Nothing answers at http:\/\/127\.0\.0\.1:\d+ \(ECONNREFUSED\)$/)
+  })
+
+  it('says the EA is not running when its prompt is asked for', async () => {
+    const res = await send(downApp, 'GET', '/prompt')
+    expect(res.status).toBe(200)
+    expect(((await res.json()) as { data: { running: boolean } }).data.running).toBe(false)
   })
 
   it('says the EA is not running when its tool list is asked for', async () => {
