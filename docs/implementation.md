@@ -438,7 +438,8 @@ EA-10. The EA posts usage records (numbers and model names, never text) to `ea_u
 days. The language setting reaches Deepgram, ElevenLabs and the prompt; the wake word model knows
 English sounds only. `tool_list.py` serves the EA's tools at `/tools`, with an area read from
 each name and the gate from `CONFIRM_TOOLS` and `ON_WORD_TOOLS`; the EA settings page lists them
-(EA-20).
+(EA-20). `prompt_view.py` serves the EA's prompt parts at `/prompt` from the code each channel
+uses, with the live context the last turn was given (`Conversation.live_note`) (EA-21).
 
 ### How the EA speaks
 

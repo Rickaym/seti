@@ -1324,6 +1324,13 @@ Why: an agent woken by its own actions or by news nobody waited for burns turns 
   user's request, asks first (EA-3) or acts only on the user's word (EA-17). The list is read only
   and holds no arguments or values. When the EA is not running the page says so.
   Why: the user decides what to ask the EA for, so they see what it can do and what waits for them.
+- EA-21: The EA's settings MUST show the whole prompt the running EA gives its model, read from
+  the EA itself and only by the user: the system prompt as built for the current settings and
+  linked packs, the note each channel (call, chat, inbox) adds to a turn, and the live context the
+  last turn was given with its age, each with its character count, and the commit the EA runs.
+  Showing it MUST NOT build a live context or call a model; every part passes the EA's secret
+  redaction. The view is read only. When the EA is not running the page says so.
+  Why: the user can read exactly what the EA is told, which changes only through code.
 
 ## 15. Resilience
 

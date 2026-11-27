@@ -14,6 +14,7 @@ from seti_ea.history import HistorySync
 from seti_ea.live_context import (
     LiveContext,
     LiveContextInjector,
+    SentNote,
     TaskRef,
     is_live_note,
     matched_task,
@@ -118,6 +119,17 @@ async def test_a_detail_question_brings_excerpts_from_the_named_task(fake_seti: 
     assert search.url.params["mode"] == "text"
     assert "min_match" not in search.url.params
     assert live.last_excerpts == 1
+
+
+async def test_the_note_given_to_a_turn_is_kept_for_the_settings(fake_seti: FakeSeti) -> None:
+    fake_seti.live_context = live_context("Tasks: 3 in all; 1 running.")
+    sent = SentNote()
+    live = LiveContext(client(fake_seti), now=lambda: NOW, sent=sent)
+    context = LLMContext(messages=messages(("user", "What's running?")))
+    await live.refresh(context)
+    assert sent.at == NOW
+    assert sent.text == cast(dict[str, str], context.messages[0])["content"]
+    assert "1 running" in sent.text
 
 
 async def test_excerpts_outside_a_named_task_must_match_enough_words(fake_seti: FakeSeti) -> None:
