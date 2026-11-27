@@ -37,10 +37,14 @@ test('a review fits the phone, and its message is edited and sent with taps', as
     await text.fill('Deploy is done')
     await card.getByRole('button', { name: 'Allow', exact: true }).tap()
     await expect(page.getByRole('main').getByText(reviewSent('Deploy is done'), { exact: true })).toBeVisible()
-    await expect(page.getByRole('main').getByTestId('edited-mark')).toHaveText(
-      `You edited the text before ${rule.slice(5)}.send_message ran. Above is the agent's draft.`,
+    const main = page.getByRole('main')
+    await expect(main.getByTestId('edited-mark')).toHaveText(
+      `You edited the text before ${rule.slice(5)}.send_message ran.`,
     )
     await expectFitsPhone(page, 'edited mark')
+    await main.getByTestId('tool-edited').tap()
+    await expect(main.getByRole('region', { name: "Agent's draft" })).toContainText(REVIEW_DRAFT)
+    await expectFitsPhone(page, 'agent draft')
   } finally {
     const policy = await apiData<PermissionPolicy>(request, '/permissions')
     for (const own of policy.rules.filter((r: PermissionRule) => r.rule === rule)) {
@@ -62,5 +66,6 @@ test('an edited Slack send the user denies says on the phone that nothing was se
   await card.getByRole('button', { name: 'Deny', exact: true }).tap()
   await expect(main.getByText(/^Did not post/)).toBeVisible()
   await expect(main.getByTestId('edited-mark')).toHaveText('You edited the message, then denied it. Nothing was sent.')
+  await expect(main.getByTestId('tool-edited')).toHaveCount(0)
   await expectFitsPhone(page, 'denied edit mark')
 })

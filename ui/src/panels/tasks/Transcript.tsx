@@ -59,6 +59,7 @@ import { ToolGroup } from '@/panels/tasks/ToolGroup'
 import { TranscriptBlocks } from '@/panels/tasks/TranscriptBlocks'
 import { RuntimeLine } from '@/panels/tasks/TranscriptLines'
 import { NoteLine, Spoken, type TranscriptMarks } from '@/panels/tasks/TranscriptMarks'
+import { SentCallsContext, useSentCalls } from '@/panels/tasks/sent-calls'
 
 const Markdown = lazy(async () => import('@/components/Markdown').then((m) => ({ default: m.Markdown })))
 
@@ -308,6 +309,7 @@ export const Transcript = memo(function TranscriptList({
   const interrupted = useMemo(() => interruptedResultIds(messages, running), [messages, running])
   const replies = useMemo(() => turnReplies(messages), [messages])
   const failure = useMemo(() => (subagentRows ? null : openFailure(messages)), [messages, subagentRows])
+  const sent = useSentCalls(taskId, messages)
   const views = useMemo(() => {
     const context: RoleContext = { ...index, subagentRows, notes: marks.notes }
     return transcriptViews(items, grouping ? (row) => rowRole(row, context) : null)
@@ -396,20 +398,22 @@ export const Transcript = memo(function TranscriptList({
   }
 
   return (
-    <div className="space-y-3">
-      {views.map((view) => {
-        const first = viewStart(view)?.id
-        const before = first === undefined ? undefined : placed.before.get(first)
-        return before === undefined ? (
-          renderView(view)
-        ) : (
-          <Fragment key={`blocks-${String(first)}`}>
-            <TranscriptBlocks agent={taskId} blocks={before} />
-            {renderView(view)}
-          </Fragment>
-        )
-      })}
-      <TranscriptBlocks agent={taskId} blocks={placed.after} />
-    </div>
+    <SentCallsContext value={sent}>
+      <div className="space-y-3">
+        {views.map((view) => {
+          const first = viewStart(view)?.id
+          const before = first === undefined ? undefined : placed.before.get(first)
+          return before === undefined ? (
+            renderView(view)
+          ) : (
+            <Fragment key={`blocks-${String(first)}`}>
+              <TranscriptBlocks agent={taskId} blocks={before} />
+              {renderView(view)}
+            </Fragment>
+          )
+        })}
+        <TranscriptBlocks agent={taskId} blocks={placed.after} />
+      </div>
+    </SentCallsContext>
   )
 })

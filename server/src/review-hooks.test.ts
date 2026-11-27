@@ -204,14 +204,17 @@ describe('review rules', () => {
       },
     ])
     const settled = await call<PermissionRequest[]>('GET', `/tasks/${task.id}/permission-requests`)
-    expect(settled.at(-1)).toMatchObject({ state: 'allowed', edited: ['text'] })
+    expect(settled.at(-1)).toMatchObject({ state: 'allowed', edited: ['text'], call_id: 'toolu_0' })
     expect(settled.at(-1)?.input).toContain('Deploy is done')
     await auditEvents.settled()
     const event = await auditEvents.latest('task.permission_allowed')
     expect(event?.detail).toMatchObject({ review: true, edited: ['text'] })
     expect(JSON.stringify(event?.detail)).not.toContain('Deploy is done')
     expect(await setiNotes(task)).toEqual([
-      { error: `Edited text of ${SEND} before it ran`, edited: { fields: ['text'], denied: false, tool: SEND } },
+      {
+        error: `Edited text of ${SEND} before it ran`,
+        edited: { fields: ['text'], denied: false, tool: SEND, call: 'toolu_0' },
+      },
     ])
   })
 
@@ -247,7 +250,10 @@ describe('review rules', () => {
     expect(event?.detail).toMatchObject({ review: true, edited: ['text'] })
     expect(JSON.stringify(event?.detail)).not.toContain('Deploy is done')
     expect(await setiNotes(task)).toEqual([
-      { error: `Edited text of ${SEND}, then denied it`, edited: { fields: ['text'], denied: true, tool: SEND } },
+      {
+        error: `Edited text of ${SEND}, then denied it`,
+        edited: { fields: ['text'], denied: true, tool: SEND, call: 'toolu_0' },
+      },
     ])
   })
 

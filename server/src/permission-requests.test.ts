@@ -189,7 +189,12 @@ describe('permission requests', () => {
     const task = await newTask()
     await runTurn(task.id, 'permit make deploy')
     const request = await pending(task.id)
-    expect(request).toMatchObject({ tool_name: 'Bash', summary: 'make deploy', reason: 'Not allowed' })
+    expect(request).toMatchObject({
+      tool_name: 'Bash',
+      call_id: 'toolu_1',
+      summary: 'make deploy',
+      reason: 'Not allowed',
+    })
     expect(request.suggestions).toEqual(['Bash(make deploy:*)'])
 
     const options = sdk.fake.last?.options
@@ -247,7 +252,7 @@ describe('permission requests', () => {
     const task = await newTask()
     await runTurn(task.id, 'send Deploy is dnoe')
     const request = await pending(task.id)
-    expect(request).toMatchObject({ tool_name: 'mcp__chat__send_message', editable: true })
+    expect(request).toMatchObject({ tool_name: 'mcp__chat__send_message', call_id: 'toolu_send', editable: true })
     await call('POST', `/tasks/${task.id}/permission-requests/${request.id}`, {
       decision: 'allow',
       fields: { text: 'Deploy is done' },
