@@ -247,6 +247,14 @@ def _excerpt(hit: Mapping[str, Any], now: datetime) -> str:
     return f'- From {where}, {kind}, {ago(hit.get("at"), now)}: "{snippet}"'
 
 
+@dataclass
+class SentNote:
+    """The live context note last put before a user's turn, kept for the EA's settings to show."""
+
+    text: str = ""
+    at: datetime | None = None
+
+
 def is_live_note(message: object) -> bool:
     """A live context note, which is never stored and never outlives the next one."""
     if isinstance(message, LLMSpecificMessage) or not isinstance(message, dict):
@@ -278,8 +286,10 @@ class LiveContext:
         *,
         now: Callable[[], datetime] | None = None,
         timeout_secs: float = FETCH_TIMEOUT_SECS,
+        sent: SentNote | None = None,
     ) -> None:
         self._seti = seti
+        self._sent = sent
         self._now = now or (lambda: datetime.now(UTC))
         self._timeout = timeout_secs
         self._last: Snapshot | None = None
@@ -361,6 +371,8 @@ class LiveContext:
         kept = [m for m in context.messages if not is_live_note(m)]
         at = len(kept) - 1 if last_user_text(kept) is not None else len(kept)
         context.set_messages([*kept[:at], message, *kept[at:]])
+        if self._sent is not None:
+            self._sent.text, self._sent.at = note, self._now()
         self.last_ms = (time.perf_counter() - started) * 1000
         logger.debug(f"EA live context ready in {self.last_ms:.0f} ms, {self.last_excerpts} excerpts")
 

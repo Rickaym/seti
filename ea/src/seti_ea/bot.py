@@ -412,7 +412,9 @@ async def run_bot(
             stt,
             user_aggregator,
             HeldUpdates(call_inbox, take, history),
-            LiveContextInjector(LiveContext(seti), SystemPromptUpdates(packs, system)),
+            LiveContextInjector(
+                LiveContext(seti, sent=conversation.live_note), SystemPromptUpdates(packs, system)
+            ),
             llm,
             tts,
             transport.output(),
