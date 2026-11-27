@@ -82,6 +82,9 @@ describe('files an agent prints with the shell in a GitHub clone', () => {
     ['tail -n +11 docs/plan.md', lines(11, 12), '#L11-L12'],
     ['tail -n 20 docs/plan.md', lines(1, 12), ''],
     ['cat -- docs/plan.md', lines(1, 12), ''],
+    ['cat docs/plan.md | head -n 5', lines(1, 5), '#L1-L5'],
+    ['sed -n 3,9p docs/plan.md | head -2', lines(3, 4), '#L3-L4'],
+    ['tail -n +4 docs/plan.md | head', lines(4, 12), '#L4-L12'],
   ])('records `%s` with the lines it printed', async (command, text, anchor) => {
     const { dir, sha } = clone()
     const found = await recorded(await taskIn(dir), command, `${text}\n`)
@@ -118,7 +121,9 @@ describe('files an agent prints with the shell in a GitHub clone', () => {
 
   it.each([
     ['a pipe into a filter', 'cat docs/plan.md | cut -c1-5'],
-    ['a pipe into head', 'cat docs/plan.md | head -n 2'],
+    ['a pipe into head that names a file', 'cat docs/plan.md | head -n 2 git/show.md'],
+    ['a pipe after head', 'cat docs/plan.md | head -n 2 | cut -c1-3'],
+    ['the last lines piped into head', 'tail -n 4 docs/plan.md | head -n 2'],
     ['a redirect of errors', 'cat docs/plan.md 2>/dev/null'],
     ['output sent to a file', 'cat docs/plan.md > copy.md'],
     ['a glob', 'cat docs/*.md'],

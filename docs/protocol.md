@@ -318,9 +318,9 @@ between two steps; an interrupt; a hook at subagent start.
   GitHub commit link names the item by its full hash, or by a
   short one as a prefix, and is never reported as not read.
 - SRC-10: A shell line whose every command is a plain read of one named file (`cat`, `nl`,
-  `head` or `tail` with at most a line count, `sed -n` with one `A,Bp` or `Ap` script) or a `cd`
-  to a named folder, joined only by `;` or `&&`, records each file as SRC-8 places a file read.
-  A pipe, a redirect, a glob, a variable, a substitution, an assignment, an option that changes
+  `head` or `tail` with at most a line count, `sed -n` with one `A,Bp` or `Ap` script), such a
+  read piped into `head` with at most a line count, or a `cd` to a named folder, joined only by
+  `;` or `&&`, records each file as SRC-8 places a file read. Any other pipe, a redirect, a glob, a variable, a substitution, an assignment, an option that changes
   what is printed, a script that does more, a loop, a fallback, a background run or any other
   command gives no item, and so do `less` and `bat`, whose settings can change what they print.
   A line that prints one file gives an item whose text is the result and whose lines are the ones

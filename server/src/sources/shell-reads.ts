@@ -102,12 +102,15 @@ const READERS: ReadonlyMap<string, (args: readonly string[]) => Parsed> = new Ma
   ['sed', sed],
 ])
 
-/** Whether a step prints one named file, or changes folder without printing, and nothing else. */
+/** Whether a step prints one named file, keeps the first lines of one, or changes folder. */
 function plainStep(step: ShellStep): boolean {
   const [program = '', ...args] = rawWords(step.text)
-  const shape = step.nested.length === 0 && !step.guarded && JOINS.has(step.before) && JOINS.has(step.after)
-  const folder = program === 'cd' && args.length === 1 && args[0] !== '-'
-  return shape && (folder || READERS.has(program)) && args.every((word) => !SHELL_WORD.test(word))
+  const piped = step.before === '|'
+  const shape = step.nested.length === 0 && !step.guarded && (piped || JOINS.has(step.before))
+  const ends = JOINS.has(step.after) || (step.after === '|' && program !== 'cd')
+  const known = piped ? program === 'head' : program === 'cd' || READERS.has(program)
+  const folder = program !== 'cd' || (args.length === 1 && args[0] !== '-')
+  return shape && ends && known && folder && args.every((word) => !SHELL_WORD.test(word))
 }
 
 function readOf(words: readonly string[], dir: string | null): ShellRead | null {
@@ -122,16 +125,34 @@ function readOf(words: readonly string[], dir: string | null): ShellRead | null 
   return dir === null ? null : { file: path.resolve(dir, parsed.name), printed: parsed.printed }
 }
 
-/** The files a line prints, in order, when every command in it is a plain read or a `cd`. */
+/** A read cut to its first `count` lines by a `head` it pipes into; null when that cannot be said. */
+function firstLines(read: ShellRead | null, words: readonly string[]): ShellRead | null {
+  const { value, rest } = countOption(words.slice(1).map(unquote))
+  const count = value === '' ? 10 : Number(value)
+  if (read === null || rest.length > 0 || (value !== '' && !COUNT.test(value)) || 'last' in read.printed) {
+    return null
+  }
+  const { from, to } = 'whole' in read.printed ? { from: 1, to: null } : read.printed
+  const last = from + count - 1
+  return { file: read.file, printed: { from, to: to === null ? last : Math.min(to, last) } }
+}
+
+/**
+ * The files a line prints, in order, when every command in it is a plain read, a `head` a read
+ * pipes into, or a `cd`. The walk visits the line's steps in order, so each visit is its step.
+ */
 function readsOf(command: string, cwd: string | null): ShellRead[] {
   const steps = shellSteps(command)
   if (steps.length === 0 || !steps.every(plainStep)) {
     return []
   }
   const reads: (ShellRead | null)[] = []
+  let at = 0
   walkLine(command, { cwd, home: null }, (forms, dir) => {
     const words = forms.at(-1) ?? []
-    if (READERS.has(unquote(words[0] ?? ''))) {
+    if (steps[at++]?.before === '|') {
+      reads.push(firstLines(reads.pop() ?? null, words))
+    } else if (READERS.has(unquote(words[0] ?? ''))) {
       reads.push(readOf(words, dir))
     }
   })
