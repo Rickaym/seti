@@ -58,11 +58,13 @@ from seti_ea.mod_tools import mods_text, themes_text
 from seti_ea.my_pack_tools import LIST_MY_PACKS_SPEC
 from seti_ea.process_tools import LIST_PROCESSES_SPEC
 from seti_ea.question_tools import list_questions, list_requests
+from seti_ea.relays import relay_id
 from seti_ea.role_tools import role_lines
 from seti_ea.seti import SetiClient, SetiError
 from seti_ea.settings_json import settings_text
 from seti_ea.settings_tools import SETTINGS_SPECS, SettingsTools
 from seti_ea.source_tools import SOURCE_CONTAINER, SOURCE_KIND, SOURCE_SINCE, SOURCE_UNTIL, find_sources
+from seti_ea.task_extras import FILES_ARG, opinion_lines, recent_files
 from seti_ea.thread_lines import thread_lines
 from seti_ea.toolkit import (
     TASK_REF,
@@ -327,8 +329,9 @@ TOOL_SPECS: list[ToolSpec] = [
     ToolSpec(
         "get_task",
         "Details of one task: status, repos, cost, its todo list, linked PRs with CI and review, "
-        "updates waiting for the agent, Slack threads it posted in and follows for replies, and a "
-        "condensed recent transcript, or with window what it "
+        "updates waiting for the agent, Slack threads it posted in and follows for replies, what its "
+        "second opinions cost and the latest reviews of its PRs, and a condensed recent transcript, "
+        "or with files the files it changed, or with window what it "
         "did then, such as yesterday. To ask an agent why it did something, use the side chat mod's "
         "ask action through run_mod_action while that mod is on.",
         {
@@ -338,6 +341,7 @@ TOOL_SPECS: list[ToolSpec] = [
                 "description": "Read its prompts and replies in this window instead of the recent "
                 "transcript. " + str(HISTORY_WINDOW["description"]),
             },
+            "files": FILES_ARG,
         },
         ["task"],
     ),
@@ -679,6 +683,11 @@ TOOL_SPECS: list[ToolSpec] = [
             "fix_ci": {
                 "type": "boolean",
                 "description": "True to send the short Fix CI message instead of text.",
+            },
+            "relay_of": {
+                "type": "integer",
+                "description": "Only in an inbox report with relays on: the id of the item this direct "
+                "message passes on, in your own words. Needs to.",
             },
         },
     ),
@@ -1245,6 +1254,8 @@ class EaTools:
 
     async def get_task(self, args: Mapping[str, Any]) -> ToolResult:
         task = await self.resolve_task(arg_str(args, "task"))
+        if arg_bool(args, "files"):
+            return await recent_files(self._seti, task, self._now())
         task_id = str(task.get("id"))
         now = self._now()
         worktree = " in a worktree" if task.get("worktree") is True else ""
@@ -1277,6 +1288,7 @@ class EaTools:
             lines.append(f"It made {plural(outward, 'call')} that reach outside the machine.")
         lines.extend(await self._task_prs(task))
         lines.extend(await thread_lines(self._seti, task_id, now))
+        lines.extend(await opinion_lines(self._seti, task_id, now))
         waiting = await self._waiting(task_id)
         if waiting:
             about = "; ".join(clip(str(u.get("title", "update")), 80) for u in waiting[:5])
@@ -2379,6 +2391,11 @@ class EaTools:
         to = arg_str(args, "to", required=False)
         fix_ci = args.get("fix_ci") is True
         text = "" if fix_ci else arg_str(args, "text")
+        relay = relay_id(args)
+        if relay is not None:
+            if not to:
+                raise ToolError("A relay goes to one agent: set to.", "Relay needs to")
+            return await self._relay(relay, to, text)
         if not to and DIRECT_ONLY.get():
             raise ToolError(
                 "Here you may only send a direct message to one agent, with to; a public post waits "
@@ -2399,6 +2416,28 @@ class EaTools:
             team_outcome(deliveries, unknown, archived),
             f"Posted to the group chat, {plural(reached, 'agent')}",
         )
+
+    async def _relay(self, item_id: int, to: str, text: str) -> ToolResult:
+        """Passes an inbox item to its agent through Seti, which frames it and may refuse it."""
+        handle = await self._handle_of(to)
+        try:
+            sent = await self._seti.post("/ea/relays", {"item_id": item_id, "to": handle, "text": text})
+        except SetiError as e:
+            if e.status is None or e.status >= 500:
+                raise
+            raise ToolError(
+                f"Seti refused the relay: {e.detail or e.title} Do not try again; report the item instead.",
+                "Relay refused",
+            ) from e
+        fields = sent if isinstance(sent, dict) else {}
+        title = str(fields.get("title") or f"@{handle}")
+        relay = fields.get("id")
+        waits = (
+            f" It waits for {title}; take_back_message with relay {relay} takes it back."
+            if fields.get("pending") is True
+            else ""
+        )
+        return ToolResult(f"Told {title} (relay {relay}).{waits}", clip(f"Told {title}", 70))
 
     async def _post_direct(self, text: str, handle: str) -> ToolResult:
         posted = await self._seti.post("/team/messages", {"text": text, "to": handle})

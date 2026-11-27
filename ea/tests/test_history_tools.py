@@ -96,5 +96,5 @@ async def test_get_task_window_refuses_a_date_that_does_not_exist(tools: EaTools
 
 def test_get_task_takes_no_side_question() -> None:
     spec = next(spec for spec in TOOL_SPECS if spec.name == "get_task")
-    assert set(spec.properties) == {"task", "window"}
+    assert set(spec.properties) == {"task", "window", "files"}
     assert "run_mod_action" in spec.description

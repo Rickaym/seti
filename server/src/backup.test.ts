@@ -75,6 +75,29 @@ describe('encrypted backups', () => {
     }
   }, 30_000)
 
+  it('leaves the new database empty when a restore fails part way', async () => {
+    const { file: keyFile, publicKey } = keyPair('owner')
+    const { file } = await backupDatabase(live, { dir: backups(), recipient: publicKey, keep: 3 })
+    const dump = path.join(root, 'restored.pgdump')
+    await decryptFile(file, dump, readBackupPrivateKey(keyFile))
+    fs.truncateSync(dump, fs.statSync(dump).size - 1024)
+    const restoredUrl = withDatabase(live, `${databaseOf(live)}_t`)
+    try {
+      await ensureDatabase(restoredUrl)
+      await expect(restoreDump(dump, restoredUrl)).rejects.toThrow(/pg_restore exited/)
+      const restored = connect(restoredUrl, 1)
+      try {
+        const [tables] = await restored<{ count: number }[]>`
+          SELECT COUNT(*)::int AS count FROM pg_tables WHERE schemaname = 'public'`
+        expect(tables?.count).toBe(0)
+      } finally {
+        await restored.end()
+      }
+    } finally {
+      await dropDatabase(restoredUrl)
+    }
+  }, 30_000)
+
   it('refuses another key and a changed file without leaving output behind', async () => {
     const { publicKey } = keyPair('owner')
     const stranger = keyPair('stranger')

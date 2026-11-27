@@ -531,13 +531,16 @@ CHAT_MENTION_NOTE = (
 )
 
 
-def chat_inbox_note(time: str, group_chat: str | None = None, *, act: bool = False) -> str:
+def chat_inbox_note(
+    time: str, group_chat: str | None = None, *, act: bool = False, relay: str | None = None
+) -> str:
     """The note that opens a report the EA writes to the chat on its own, with the user's time.
 
     With `group_chat`, the excerpt around a mention, it also asks the EA to answer the mention.
-    With `act`, the items came from a channel the user set to act.
+    With `act`, the items came from a channel the user set to act. With `relay`, the relay rules
+    take the place of the plain report rules.
     """
-    note = f"{with_act(CHAT_INBOX_NOTE, act=act)} {time}"
+    note = f"{relay} {time}" if relay is not None else f"{with_act(CHAT_INBOX_NOTE, act=act)} {time}"
     if group_chat is None:
         return note
     return f"{note}\n\n{CHAT_MENTION_NOTE}\n{group_chat}"

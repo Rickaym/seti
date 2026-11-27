@@ -220,8 +220,15 @@ async function dumpDatabase(url: string, target: string, recipient: KeyObject): 
   }
 }
 
+/** Restores in one transaction: it commits once, and a failed restore leaves nothing behind. */
 export async function restoreDump(file: string, url: string): Promise<void> {
-  const restore = runTool('pg_restore', ['--no-owner', '--no-privileges', '--exit-on-error', `--dbname=${url}`, file])
+  const restore = runTool('pg_restore', [
+    '--no-owner',
+    '--no-privileges',
+    '--single-transaction',
+    `--dbname=${url}`,
+    file,
+  ])
   restore.stdout.resume()
   await restore.done
 }

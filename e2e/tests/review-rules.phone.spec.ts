@@ -3,6 +3,7 @@ import { REVIEW_DRAFT, REVIEW_PROMPT, reviewSent } from './support/fake-review.j
 import { apiData, expect, test, unique } from './support/fixtures.js'
 import { expectFitsPhone } from './support/phone-layout.js'
 import { FAKE_CLAUDE_ENV } from './support/processes.js'
+import { startSlackPoster } from './support/slack-names.js'
 
 test.use({ serverEnv: FAKE_CLAUDE_ENV })
 
@@ -36,9 +37,9 @@ test('a review fits the phone, and its message is edited and sent with taps', as
     await text.fill('Deploy is done')
     await card.getByRole('button', { name: 'Allow', exact: true }).tap()
     await expect(page.getByRole('main').getByText(reviewSent('Deploy is done'), { exact: true })).toBeVisible()
-    const edited = page.getByRole('main').getByRole('img', { name: /^Edited: / })
-    await expect(edited).toHaveText('Edited')
-    await expect(edited).toHaveAccessibleName('Edited: You edited text before the call ran; the agent was told')
+    await expect(page.getByRole('main').getByTestId('edited-mark')).toHaveText(
+      `You edited the text before ${rule.slice(5)}.send_message ran. Above is the agent's draft.`,
+    )
     await expectFitsPhone(page, 'edited mark')
   } finally {
     const policy = await apiData<PermissionPolicy>(request, '/permissions')
@@ -46,4 +47,20 @@ test('a review fits the phone, and its message is edited and sent with taps', as
       await request.delete(`/api/permissions/rules/${String(own.id)}`)
     }
   }
+})
+
+test('an edited Slack send the user denies says on the phone that nothing was sent', async ({ page, request }) => {
+  const id = await startSlackPoster(request, true)
+  await page.goto(`/#agents/${id}`)
+  const main = page.getByRole('main')
+  const card = main.getByRole('region', { name: /^Permission request for/ })
+  await card.getByRole('button', { name: 'Edit' }).tap()
+  await card
+    .getByRole('group', { name: 'Call fields' })
+    .getByRole('textbox', { name: 'message' })
+    .fill('Deploy is green')
+  await card.getByRole('button', { name: 'Deny', exact: true }).tap()
+  await expect(main.getByText(/^Did not post/)).toBeVisible()
+  await expect(main.getByTestId('edited-mark')).toHaveText('You edited the message, then denied it. Nothing was sent.')
+  await expectFitsPhone(page, 'denied edit mark')
 })

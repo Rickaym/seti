@@ -175,6 +175,17 @@ const DECLARED_GRAMMAR: Partial<Readonly<Record<SettingId, SetiGrammar>>> = {
   settings: { kind: 'open', tabs: ['general', 'access', 'team', 'session'] },
 }
 
+/** The Seti tool an agent changes the setting on itself with, so it never needs a request. */
+export const OWN_TOOLS: Partial<Readonly<Record<SettingId, string>>> = {
+  rename: 'rename_agent',
+  pin: 'pin_agent',
+  color: 'set_agent_color',
+  updates: 'set_update_mode',
+  role: 'set_agent_role',
+  chat: 'set_agent_group_chat',
+  channels: 'subscribe_channel',
+}
+
 /** What a setting takes: its declared grammar, else what its kind implies. */
 export function grammarOf(entry: Pick<AgentSettingEntry, 'id' | 'kind'>): SetiGrammar {
   const declared = DECLARED_GRAMMAR[entry.id]

@@ -414,8 +414,8 @@ export type MessageBody =
         /** A host the agent's sandbox refused, and how many times so far. */
         refused_host?: string
         refused_count?: number
-        /** The fields the user edited in a held call, by name, and whether they then denied it. */
-        edited?: { fields: string[]; denied: boolean }
+        /** The fields the user edited in a held call, by name, whether they denied it, and its tool. */
+        edited?: { fields: string[]; denied: boolean; tool?: string }
       }
     }
   | { kind: 'shell'; payload: ShellResult }
