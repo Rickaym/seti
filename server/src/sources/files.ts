@@ -64,18 +64,24 @@ function linesOf(ask: FileAsk, text: string): [number, number] | null {
   return whole ? null : lines
 }
 
+/** A file as its repository places it: at a pushed commit, or a local copy when `sha` is null. */
+export interface PlacedFile {
+  repo: string
+  file: string
+  sha: string | null
+}
+
 /**
- * The item a file read is, when the file sits in a git clone whose origin is on GitHub: at its
- * commit with a permalink when it is tracked, unchanged and pushed, else as a local copy with
- * none. The path is the agent's, mapped to the host as its git sees it; the file's real path must
- * stay inside the clone its named folder is in. Git runs with the hostile-repository guards.
+ * Where a file the agent named sits, when it is in a git clone whose origin is on GitHub. The
+ * path is the agent's, mapped to the host as its git sees it; the file's real path must stay
+ * inside the clone its named folder is in. Git runs with the hostile-repository guards.
  */
-export async function fileItems(taskId: string, ask: FileAsk, text: string): Promise<FoundItem[]> {
+export async function placeFile(taskId: string, agentPath: string): Promise<PlacedFile | null> {
   const task = await tasks.get(taskId)
   if (task === undefined) {
-    return []
+    return null
   }
-  const named = (await agentGitView(task)).folder(ask.path)
+  const named = (await agentGitView(task)).folder(agentPath)
   const git: Git = async (...args) => agentGitReading(GIT_TIMEOUT_MS, path.dirname(named), [], ...args)
   const [top, real, origin] = await Promise.all([
     git('rev-parse', '--show-toplevel').then(async (found) => fs.realpath(found)),
@@ -84,12 +90,21 @@ export async function fileItems(taskId: string, ask: FileAsk, text: string): Pro
   ])
   const repo = githubRemote(origin)
   if (repo === null || !within(real, top) || !(await fs.stat(real)).isFile()) {
-    return []
+    return null
   }
   const file = path.relative(top, real).split(path.sep).join('/')
-  const sha = await pushedAt(git, file, real)
-  const base = { kind: 'file' as const, container: repo, at: null, spans: [NUMBERED] }
-  return sha === null
-    ? [{ ...base, ref: fileRef(repo, file, null), permalink: '' }]
-    : [{ ...base, ref: fileRef(repo, file, sha), permalink: blobPermalink(repo, file, sha, linesOf(ask, text)) }]
+  return { repo, file, sha: await pushedAt(git, file, real) }
+}
+
+/** A placed file's item: linked to the lines it showed at its commit, or a local copy with none. */
+export function fileItem(placed: PlacedFile, lines: readonly [number, number] | null, spans: string[]): FoundItem {
+  const { repo, file, sha } = placed
+  const permalink = sha === null ? '' : blobPermalink(repo, file, sha, lines)
+  return { kind: 'file', container: repo, ref: fileRef(repo, file, sha), permalink, at: null, spans }
+}
+
+/** The item a file read is, when the file sits in a git clone whose origin is on GitHub. */
+export async function fileItems(taskId: string, ask: FileAsk, text: string): Promise<FoundItem[]> {
+  const placed = await placeFile(taskId, ask.path)
+  return placed === null ? [] : [fileItem(placed, linesOf(ask, text), [NUMBERED])]
 }

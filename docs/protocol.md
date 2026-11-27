@@ -317,6 +317,20 @@ between two steps; an interrupt; a hook at subagent start.
   commit; otherwise it has none. As with files, commits are placed only as the result arrives. A
   GitHub commit link names the item by its full hash, or by a
   short one as a prefix, and is never reported as not read.
+- SRC-10: A shell line whose every command is a plain read of one named file (`cat`, `nl`,
+  `head` or `tail` with at most a line count, `sed -n` with one `A,Bp` or `Ap` script) or a `cd`
+  to a named folder, joined only by `;` or `&&`, records each file as SRC-8 places a file read.
+  A pipe, a redirect, a glob, a variable, a substitution, an assignment, an option that changes
+  what is printed, a script that does more, a loop, a fallback, a background run or any other
+  command gives no item, and so do `less` and `bat`, whose settings can change what they print.
+  A line that prints one file gives an item whose text is the result and whose lines are the ones
+  the result shows: from the first line the read starts at, as many as the result holds, and no
+  more than it asks for (a result with more lines gives no item). `tail` for the last lines gives
+  an item only when the result shows fewer lines than it asks for, so it showed the whole file. A
+  line of several reads gives each an item with the lines it names and no text, so no quote
+  verifies against it, and a read whose last line is not named gives none. The blob permalink
+  links those lines, and a lookup names them. The control room never reads the file for this: the
+  result in the transcript is what was read.
 
 ## 4. Turn lifecycle
 

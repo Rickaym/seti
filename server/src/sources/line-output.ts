@@ -14,7 +14,7 @@ const ASSIGNMENT = /^[A-Za-z_]\w*=[^$`]*$/
 /** A redirection of standard output, so what the command prints is not in the result. */
 const STDOUT = /^(?:1?>>?|&>>?|>\|)/
 
-const unquote = (word: string) => word.replace(/\\(.)/g, '$1').replace(/["']/g, '')
+export const unquote = (word: string) => word.replace(/\\(.)/g, '$1').replace(/["']/g, '')
 
 /** A step's words without redirections and leading literal assignments, unquoted. */
 function programWords(step: ShellStep): string[] {
