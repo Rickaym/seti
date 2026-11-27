@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import type { APIRequestContext, BrowserContext, Page, Route } from '@playwright/test'
+import type { APIRequestContext, BrowserContext, CDPSession, Page, Route } from '@playwright/test'
 import { openSeedDb } from './db.js'
 import { paths } from './env.js'
 import { expect } from './fixtures.js'
@@ -37,6 +37,12 @@ export async function openControlled(page: Page, hash = ''): Promise<string> {
 }
 
 type Handler = (route: Route) => Promise<void>
+/** What CDP reports of a worker version. */
+interface Version {
+  versionId: string
+  status: string
+  runningStatus: string
+}
 type Served = [match: (url: URL) => boolean, handler: Handler][]
 
 const NO_CACHE = { 'cache-control': 'no-cache' }
@@ -161,10 +167,42 @@ export async function expectPageOnNewBuild(page: Page, deploy: Deploy): Promise<
   await expect(page.locator('html')).toHaveAttribute('data-e2e-build', 'new')
 }
 
+/**
+ * Stops the active worker while one waits. Chromium activates a worker told to skip waiting once
+ * the active one stops; a request landing mid-stop restarts it and defers that by five minutes.
+ */
+async function stopActiveForWaiting(session: CDPSession, versions: Map<string, Version>): Promise<void> {
+  const all = [...versions.values()]
+  const active = all.find((version) => version.status === 'activated' && version.runningStatus !== 'stopped')
+  if (active !== undefined && all.some((version) => version.status === 'installed')) {
+    await session.send('ServiceWorker.stopWorker', { versionId: active.versionId })
+  }
+}
+
 /** Expects the page to run the deployed build under that build's worker. */
 export async function expectOnNewBuild(page: Page, deploy: Deploy): Promise<void> {
   await expectPageOnNewBuild(page, deploy)
-  await expect.poll(async () => controllerBuild(page)).toBe(deploy.build)
+  const session = await page.context().newCDPSession(page)
+  const versions = new Map<string, Version>()
+  session.on('ServiceWorker.workerVersionUpdated', ({ versions: updated }) => {
+    for (const version of updated) {
+      versions.set(version.versionId, version)
+    }
+  })
+  await session.send('ServiceWorker.enable')
+  try {
+    await expect
+      .poll(async () => {
+        const build = await controllerBuild(page)
+        if (build !== deploy.build) {
+          await stopActiveForWaiting(session, versions)
+        }
+        return build
+      })
+      .toBe(deploy.build)
+  } finally {
+    await session.detach()
+  }
 }
 
 /** Counts the page's loads from now on. */
