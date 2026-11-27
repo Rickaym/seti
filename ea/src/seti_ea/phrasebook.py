@@ -162,9 +162,14 @@ class CallLanguage(BaseObserver):
         self._phrasebook.prepare(code)
         return True
 
+    @property
+    def now(self) -> str:
+        """The language the call speaks now."""
+        return self._heard if self.code == MULTI else self.code
+
     def line(self, text: str) -> str | None:
         """A fixed line in the language the call speaks now; None while it has no translation."""
-        return self._phrasebook.line(text, self._heard if self.code == MULTI else self.code)
+        return self._phrasebook.line(text, self.now)
 
     async def on_push_frame(self, data: FramePushed) -> None:
         frame = data.frame

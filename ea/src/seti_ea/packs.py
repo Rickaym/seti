@@ -34,6 +34,11 @@ class PackPrompt:
         self._address = ""
         self._language = DEFAULT_LANGUAGE
 
+    @property
+    def address(self) -> str:
+        """The form of address the user chose in the EA's settings, empty for none."""
+        return self._address
+
     async def system_prompt(self) -> str:
         try:
             data = await asyncio.wait_for(self._seti.get("/ea/context-packs/prompt"), self._timeout)
