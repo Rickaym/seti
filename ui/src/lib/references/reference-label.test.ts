@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { slackChannelOf, sourceLabel } from './reference-label'
+import { inlineLabel, slackChannelOf, sourceLabel } from './reference-label'
 import type { Reference } from './reference-set'
 
 const ref = (href: string | null, note: string | null = null): Reference => ({ n: 3, href, note, quote: null })
@@ -37,6 +37,24 @@ describe('sourceLabel', () => {
     expect(sourceLabel(ref(null, 'Standup notes'), NONE)).toMatchObject({ label: 'Standup notes', host: null })
     expect(sourceLabel(ref(null), NONE).label).toBe('Source 3')
     expect(sourceLabel(ref(null, 'x'.repeat(500)), NONE).label).toHaveLength(60)
+  })
+})
+
+describe('inlineLabel', () => {
+  const inline = (href: string, names = NONE) => inlineLabel(sourceLabel(ref(href), names))
+
+  it('names a bare URL by its service, and a plain web page by its host alone', () => {
+    const file = 'https://acme.slack.com/files/U08ABCDEF12/F08ABCDEF12/q3-release-evaluation.pdf'
+    expect(inline(file)).toBe('Slack file q3 release evaluation')
+    expect(inline('https://acme.slack.com/archives/C08ABCDEF12/p1731000000123456', NAMES)).toBe(
+      'Slack message in #deploys',
+    )
+    expect(inline('https://github.com/acme/widgets/pull/12')).toBe('acme/widgets#12')
+    expect(inline('https://linear.app/acme/issue/ENG-42/fix')).toBe('ENG-42')
+    expect(inline('https://www.example.com/runbooks/release?step=2')).toBe('example.com')
+    expect(sourceLabel(ref('https://www.example.com/runbooks/release'), NONE).label).toBe(
+      'example.com/runbooks/release',
+    )
   })
 })
 

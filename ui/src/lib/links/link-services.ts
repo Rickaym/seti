@@ -41,7 +41,20 @@ const unslug = (slug: string) => slug.replace(/[-_+]+/g, ' ').trim()
 const ISSUE_KEY = /^[A-Za-z][A-Za-z0-9]*-\d+$/
 const DIGITS = /^\d+$/
 
-function slackLabel(url: URL, [section, channel, message]: readonly string[]): string | null {
+/** A Slack file page, `/files/<user>/<file>/<name>`, named by its file name without extension. */
+function slackFileLabel([, user = '', file = '', name = '']: readonly string[]): string | null {
+  if (!/^[UW][A-Z0-9]{2,}$/.test(user) || !/^F[A-Z0-9]{2,}$/.test(file)) {
+    return null
+  }
+  const title = unslug(name.replace(/\.[a-z0-9]{1,8}$/i, ''))
+  return title === '' ? 'Slack file' : `Slack file ${clip(title)}`
+}
+
+function slackLabel(url: URL, parts: readonly string[]): string | null {
+  const [section, channel, message] = parts
+  if (section === 'files') {
+    return slackFileLabel(parts)
+  }
   if (section !== 'archives' || channel === undefined || !/^[CDG][A-Z0-9]{2,}$/.test(channel)) {
     return null
   }

@@ -5,6 +5,7 @@ import { TooltipProvider } from '@/components/ui/tooltip'
 
 const PR = 'https://github.com/acme/widgets/pull/12'
 const SLACK = 'https://acme.slack.com/archives/C08ABCDEF12/p1731000000123456'
+const LINEAR = 'https://linear.app/acme/issue/ENG-42/fix-login'
 
 const render = (text: string, options: { html?: boolean; references?: boolean } = {}) =>
   renderToStaticMarkup(
@@ -22,6 +23,26 @@ describe('references in Markdown', () => {
     expect(html).toContain('aria-label="Source 1: acme/widgets#12"')
     expect(html).toContain('>[2]</a>')
     expect(html).not.toContain('data-seti-ref')
+  })
+
+  it('shows a bare URL in a sentence as a short name with its mark, never the clipped URL', () => {
+    const file = 'https://acme.slack.com/files/U08ABCDEF12/F08ABCDEF12/q3-release-evaluation.pdf'
+    const page = 'https://example.com/runbooks/release'
+    const html = render(
+      `Open it here: ${file} and the fix is ${PR}, tracked in ${LINEAR}. The [review](${PR}) and ` +
+        `[${page}](${page}) agree, see ${page}. Do not run \`${page}\` by hand.`,
+    )
+    expect(html).toContain('>Slack file q3 release evaluation</a>')
+    expect(html).toContain(`<a href="${file}"`)
+    expect(html).toContain('>acme/widgets#12</a>')
+    expect(html).toContain('>ENG-42</a>')
+    expect(html).toContain('>review</a>')
+    expect(html.match(/>example\.com<\/a>/g)).toHaveLength(2)
+    expect(html).toContain('>[4]</a>.')
+    expect([...html.matchAll(/>\[(\d)\]<\/a>/g)].map((match) => match[1])).toEqual(['1', '2', '3', '2', '4', '4'])
+    expect(html).toContain(`>${page}</code>`)
+    expect(html).not.toContain(`>${file.slice('https://'.length)}`)
+    expect(html).not.toContain(String.fromCodePoint(0x2026))
   })
 
   it('ends with a Sources list holding each source once, as links that copy as their URL', () => {

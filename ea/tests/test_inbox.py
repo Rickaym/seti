@@ -454,7 +454,7 @@ def alert(item_id: int, *, act: bool) -> InboxItem:
     return item(item_id, "channel_event", "Slack mentions alert (info): dana in #northwind", act=act)
 
 
-def test_only_a_report_on_act_items_alone_may_send_a_direct_message() -> None:
+def test_only_a_report_on_act_items_alone_may_message_or_start_an_agent() -> None:
     guard = InboxGuard()
     direct = {"to": "login", "text": "Please draft a reply"}
     guard.report(Delivered([alert(1, act=False)], []))
@@ -465,11 +465,11 @@ def test_only_a_report_on_act_items_alone_may_send_a_direct_message() -> None:
     assert guard.check("post_team_chat", direct) is None
     assert guard.check("post_team_chat", {"text": "@all heads up"}) is not None
     assert guard.check("post_team_chat", {"to": " ", "text": "x"}) is not None
-    for held in ("start_task", "stop_task"):
-        assert guard.check(held) is not None
-    guard.active = False
     assert guard.check("start_task") is None
-    assert {"post_team_chat"} == ACT_TOOLS
+    assert guard.check("stop_task") is not None
+    guard.report(Delivered([alert(1, act=False)], []))
+    assert guard.check("start_task") is not None
+    assert {"post_team_chat", "start_task"} == ACT_TOOLS
 
 
 def test_act_items_split_from_the_rest_and_parse_from_seti() -> None:
@@ -513,7 +513,7 @@ def sent_to_agents(fake_seti: FakeSeti) -> list[object]:
     return [body for path, body in fake_seti.posts() if path.startswith(("/api/tasks", "/api/team"))]
 
 
-async def test_an_act_alert_goes_to_an_existing_agent_as_a_direct_message(fake_seti: FakeSeti) -> None:
+async def test_an_act_alert_goes_to_an_agent_as_a_direct_message(fake_seti: FakeSeti) -> None:
     script = await report_alert(fake_seti, [("call-1", "post_team_chat", SEND)], act=True)
     assert ACT_NOTE in script.seen[0][1]["content"]
     assert sent_to_agents(fake_seti) == [{"text": SEND["text"], "to": "bug"}]
@@ -531,7 +531,14 @@ async def test_a_report_alert_never_reaches_an_agent(fake_seti: FakeSeti) -> Non
     assert sent_to_agents(fake_seti) == []
 
 
-async def test_an_act_alert_still_cannot_start_a_task(fake_seti: FakeSeti) -> None:
-    start = {"title": "Northwind SSO", "prompt": "Answer Dana"}
-    await report_alert(fake_seti, [("call-1", "start_task", start)], act=True)
+START = {"title": "Northwind SSO", "prompt": "Draft a reply to Dana on the SSO groups."}
+
+
+async def test_an_act_alert_may_start_a_task(fake_seti: FakeSeti) -> None:
+    await report_alert(fake_seti, [("call-1", "start_task", START)], act=True)
+    assert sent_to_agents(fake_seti) != []
+
+
+async def test_a_report_alert_cannot_start_a_task(fake_seti: FakeSeti) -> None:
+    await report_alert(fake_seti, [("call-1", "start_task", START)], act=False)
     assert sent_to_agents(fake_seti) == []

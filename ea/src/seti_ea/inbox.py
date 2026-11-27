@@ -47,9 +47,9 @@ ACTION_TOOLS = (
     frozenset({"start_task", "stop_task", "hand_over_updates", "post_team_chat", "confirm_asked"})
     | CHANGE_TOOLS
 )
-# An alert from a channel the user set to act may go to an existing agent as a direct message;
-# a public post and starting an agent still ask.
-ACT_TOOLS = frozenset({"post_team_chat"})
+# An alert from a channel the user set to act may go to an agent as a direct message or a new
+# agent; a public post still asks.
+ACT_TOOLS = frozenset({"post_team_chat", "start_task"})
 REPLY_TOOL = "reply_team_chat"
 # On a call the user hears a mention first and answers it; the EA does not reply on its own.
 VOICE_HELD_TOOLS = ACTION_TOOLS | {REPLY_TOOL}
@@ -303,7 +303,7 @@ class InboxGuard:
     def check(self, tool: str, arguments: Mapping[str, Any] | None = None) -> ToolResult | None:
         if not self.active or tool not in self._held:
             return None
-        if self.acting and tool in ACT_TOOLS and is_direct(arguments):
+        if self.acting and tool in ACT_TOOLS and (tool == "start_task" or is_direct(arguments)):
             return None
         return ToolResult(
             "The user has not asked for this; you are reporting from your inbox. Tell the user what "
