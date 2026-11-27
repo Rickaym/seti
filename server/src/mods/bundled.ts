@@ -12,6 +12,7 @@ import previews from '@seti/mod-previews/seti-mod.json' with { type: 'json' }
 import { sampleServer } from '@seti/mod-sample/server'
 import { sentryWebhooksServer } from '@seti/mod-sentry-webhooks/server'
 import { sideChatServer } from '@seti/mod-side-chat/server'
+import { textPadServer } from '@seti/mod-text-pad/server'
 import twemoji from '@seti/mod-twemoji/seti-mod.json' with { type: 'json' }
 import vim from '@seti/mod-vim/seti-mod.json' with { type: 'json' }
 import { weatherServer } from '@seti/mod-weather/server'
@@ -34,6 +35,7 @@ export const BUNDLED_MODS: readonly ModDefinition[] = [
   { manifest: previews },
   sentryWebhooksServer,
   sideChatServer,
+  textPadServer,
   { manifest: twemoji },
   { manifest: vim },
   weatherServer,

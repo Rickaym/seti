@@ -108,6 +108,7 @@ function registerView(manifest: ModManifest, view: View, track: (dispose: Dispos
     case 'agentsLayout':
     case 'header':
     case 'about':
+    case 'navBottom':
       throw new Error(`A third-party view cannot sit in ${view.where}`)
   }
 }

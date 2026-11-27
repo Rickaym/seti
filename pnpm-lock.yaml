@@ -315,6 +315,28 @@ importers:
         specifier: ^5.1.1
         version: 5.1.1(@types/node@24.19.2)(jsdom@28.1.0)(vite@8.3.8(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
 
+  mods/text-pad:
+    dependencies:
+      '@seti/mod-api':
+        specifier: workspace:*
+        version: link:../../packages/mod-api
+      lucide-react:
+        specifier: ^1.75.0
+        version: 1.75.0(@types/react@19.3.0)(react@19.3.1)
+      react:
+        specifier: ^19.3.1
+        version: 19.3.1
+    devDependencies:
+      '@types/react':
+        specifier: ^19.3.0
+        version: 19.3.0
+      typescript:
+        specifier: ~6.0.3
+        version: 6.0.3
+      vitest:
+        specifier: ^5.1.1
+        version: 5.1.1(@types/node@24.19.2)(jsdom@28.1.0)(vite@8.3.8(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
+
   mods/twemoji: {}
 
   mods/vim:
@@ -458,6 +480,9 @@ importers:
       '@seti/mod-side-chat':
         specifier: workspace:*
         version: link:../mods/side-chat
+      '@seti/mod-text-pad':
+        specifier: workspace:*
+        version: link:../mods/text-pad
       '@seti/mod-twemoji':
         specifier: workspace:*
         version: link:../mods/twemoji
@@ -670,6 +695,9 @@ importers:
       '@seti/mod-side-chat':
         specifier: workspace:*
         version: link:../mods/side-chat
+      '@seti/mod-text-pad':
+        specifier: workspace:*
+        version: link:../mods/text-pad
       '@seti/mod-twemoji':
         specifier: workspace:*
         version: link:../mods/twemoji

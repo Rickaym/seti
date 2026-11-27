@@ -1,4 +1,4 @@
-import type { ModSignal } from '@seti/mod-api'
+import type { ModSignal, ModViewProps } from '@seti/mod-api'
 import { Registry } from '@seti/shared'
 import { useSyncExternalStore, type ComponentType } from 'react'
 
@@ -6,7 +6,7 @@ interface PlacedView {
   key: string
   /** What its error boundary calls it when it crashes. */
   name: string
-  view: ComponentType
+  view: ComponentType<ModViewProps>
 }
 
 /** The bands across the app header that enabled mods add; without one the header keeps its gap. */
@@ -15,8 +15,54 @@ export const headerViews = new Registry<PlacedView>('header view', (view) => vie
 /** The parts of Settings, About that enabled mods add; About is listed only while one does. */
 export const aboutParts = new Registry<PlacedView>('about part', (view) => view.key)
 
+/** The views enabled mods add under the sidebar's sections, in the rail and the menu drawer. */
+export const navBottomViews = new Registry<PlacedView>('navigation view', (view) => view.key)
+
 export const usePlacedViews = (registry: Registry<PlacedView>): readonly PlacedView[] =>
   useSyncExternalStore(registry.subscribe, registry.list)
+
+/** Whether an enabled mod places a view under the sidebar's sections, so the sections give way. */
+export const useNavBottomViews = () => usePlacedViews(navBottomViews).length > 0
+
+const NAV_PANEL_KEY = 'seti.nav-panel'
+const panelListeners = new Set<() => void>()
+
+function storedPanel(): string | null {
+  try {
+    return localStorage.getItem(NAV_PANEL_KEY)
+  } catch {
+    return null
+  }
+}
+
+let openPanel = storedPanel()
+
+/** Opens a `navBottom` view's panel beside the rail, or closes it with null; this device keeps it. */
+export function setNavPanel(key: string | null): void {
+  openPanel = key
+  try {
+    if (key === null) {
+      localStorage.removeItem(NAV_PANEL_KEY)
+    } else {
+      localStorage.setItem(NAV_PANEL_KEY, key)
+    }
+  } catch {
+    // Without storage the panel stays open for this page only.
+  }
+  for (const listener of panelListeners) {
+    listener()
+  }
+}
+
+const subscribePanel = (listener: () => void) => {
+  panelListeners.add(listener)
+  return () => {
+    panelListeners.delete(listener)
+  }
+}
+
+/** The key of the `navBottom` view whose panel is open beside the rail, or null. */
+export const useNavPanel = (): string | null => useSyncExternalStore(subscribePanel, () => openPanel)
 
 interface NewsEntry {
   key: string

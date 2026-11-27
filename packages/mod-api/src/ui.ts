@@ -22,6 +22,17 @@ export interface ModViewTheme {
   dark: boolean
 }
 
+/** What a view placed by `registerView` gets; `layout` says how `navBottom` shows, else null. */
+export interface ModViewProps {
+  /**
+   * For a `navBottom` view: `rail` in the icon rail of a wide screen, `panel` in its panel beside
+   * the rail, `drawer` in the menu drawer of a narrow screen.
+   */
+  layout: 'rail' | 'panel' | 'drawer' | null
+  /** In the rail: whether the view's panel beside the rail is open, and how to open or close it. */
+  panel: { open: boolean; toggle: () => void } | null
+}
+
 /** What a file viewer gets: the file, where to load it from, and the theme. */
 export interface ModFileViewProps {
   name: string
@@ -139,6 +150,8 @@ export interface ModKit {
   Input: ComponentType<InputHTMLAttributes<HTMLInputElement>>
   /** Seti's text field, where Ctrl+F finds and replaces in its text as in every other field. */
   Textarea: ComponentType<ComponentProps<'textarea'>>
+  /** The bare text area, without find, for plain text such as notes. */
+  PlainTextarea: ComponentType<ComponentProps<'textarea'>>
   /** A tooltip on its one child, which says more than the child's one-or-two-word label. */
   Hint: ComponentType<{ text: ReactNode; children: ReactElement }>
   /** A binary mode as one pressed or unpressed button with an icon and a one-or-two-word label. */
@@ -429,8 +442,11 @@ export interface UiModApi {
   registerSection: (section: { id: string; icon: ModIcon; view: ComponentType<ModSectionProps> }) => Disposer
   /** A dock over an agent's chat, for a view the manifest places in `agentDock`. */
   registerDock: (dock: ModDock) => Disposer
-  /** A view the manifest places in `header` (the app header's band) or `about` (Settings, About). */
-  registerView: (view: { id: string; view: ComponentType }) => Disposer
+  /**
+   * A view the manifest places in `header` (the app header's band), `about` (Settings, About) or
+   * `navBottom` (under the sidebar's sections, in the rail and the menu drawer).
+   */
+  registerView: (view: { id: string; view: ComponentType<ModViewProps> }) => Disposer
   /** A dot on the way to one of its `about` views, in the sidebar and Settings, while `news` is on. */
   registerNews: (news: { view: string; news: ModSignal }) => Disposer
   /** The mod's page in Settings, in place of the form Seti draws from its settings. */

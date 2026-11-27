@@ -10,7 +10,7 @@ import { toggleGroupChat } from '@/components/team/team-context'
 import { mediaSignal, NARROW_QUERY } from '@/hooks/useMedia'
 import { fenceRenderers } from '@/lib/fence-renderers'
 import { inputHooks } from '@/lib/input-hooks'
-import { aboutParts, headerViews, newsEntries } from '@/lib/mod-views'
+import { aboutParts, headerViews, navBottomViews, newsEntries } from '@/lib/mod-views'
 import {
   composerOf,
   isPassthrough,
@@ -102,6 +102,13 @@ function agentsOf(id: string, manifest: ModManifest): UiModApi['agents'] {
   }
 }
 
+/** The registry each place `registerView` takes draws from. */
+const PLACED_VIEWS: Readonly<Record<string, typeof aboutParts>> = {
+  header: headerViews,
+  about: aboutParts,
+  navBottom: navBottomViews,
+}
+
 function declared<T extends { id: string }>(entries: readonly T[], id: string, manifest: ModManifest): T {
   const entry = entries.find((candidate) => candidate.id === id)
   if (entry === undefined) {
@@ -148,8 +155,12 @@ export function uiApi(manifest: ModManifest, { track, ownPage, switches }: UiApi
       return track(agentDocks.register(entry))
     },
     registerView: ({ id: view, view: View }) => {
-      const { title, where } = declared([...placed('header'), ...placed('about')], view, manifest)
-      const registry = where === 'header' ? headerViews : aboutParts
+      const { title, where } = declared(
+        [...placed('header'), ...placed('about'), ...placed('navBottom')],
+        view,
+        manifest,
+      )
+      const registry = PLACED_VIEWS[where] ?? aboutParts
       return track(registry.register({ key: modScoped(id, view), name: title, view: View }))
     },
     registerNews: ({ view, news }) => {

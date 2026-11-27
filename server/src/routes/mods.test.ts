@@ -57,6 +57,7 @@ describe('Settings, Mods', () => {
       'previews',
       'sentry-webhooks',
       'side-chat',
+      'text-pad',
       'twemoji',
       'vim',
       'weather',

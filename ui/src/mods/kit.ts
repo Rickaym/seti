@@ -6,7 +6,7 @@ import { Hint } from '@/components/Hint'
 import { Markdown } from '@/components/Markdown'
 import { NewsDot } from '@/components/NewsDot'
 import { ToggleButton } from '@/components/ToggleButton'
-import { FindableTextarea } from '@/components/find/FindableTextarea'
+import { FindableTextarea, PlainTextarea } from '@/components/find/FindableTextarea'
 import { ItemHint, StatusBarItem } from '@/components/status-bar/StatusBarItem'
 import { Button } from '@/components/ui/button'
 import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from '@/components/ui/command'
@@ -33,6 +33,7 @@ export const MOD_KIT: ModKit = {
   Button,
   Input,
   Textarea: FindableTextarea,
+  PlainTextarea,
   Hint,
   ToggleButton,
   CopyButton,

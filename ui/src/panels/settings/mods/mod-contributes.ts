@@ -28,6 +28,7 @@ const VIEW_PLACES: Readonly<Record<string, string>> = {
   agentTab: "A tab in an agent's page",
   sidePanel: 'The side panel',
   agentsLayout: 'A layout of several agents',
+  navBottom: 'The bottom of the navigation',
 }
 
 const titled = (entries: readonly { title: string; description?: string | undefined }[]) =>

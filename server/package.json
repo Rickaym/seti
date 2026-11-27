@@ -42,6 +42,7 @@
     "@seti/mod-sample": "workspace:*",
     "@seti/mod-sentry-webhooks": "workspace:*",
     "@seti/mod-side-chat": "workspace:*",
+    "@seti/mod-text-pad": "workspace:*",
     "@seti/mod-twemoji": "workspace:*",
     "@seti/mod-vim": "workspace:*",
     "@seti/mod-weather": "workspace:*",

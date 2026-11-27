@@ -1,5 +1,6 @@
 import { Menu, X } from 'lucide-react'
 import { useId } from 'react'
+import { NavBottomViews } from '@/components/NavBottomViews'
 import { NewsDot } from '@/components/NewsDot'
 import { SectionCount } from '@/components/SectionCount'
 import { ShortcutGuideOpener } from '@/components/shortcuts/ShortcutGuide'
@@ -7,7 +8,7 @@ import { ModeToggle } from '@/components/theme/mode-toggle'
 import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from '@/components/ui/sheet'
 import { describedBy } from '@/lib/described-by'
-import { useNewsPages } from '@/lib/mod-views'
+import { useNavBottomViews, useNewsPages } from '@/lib/mod-views'
 import { useSectionBadge, useSectionGroups, type SectionKey, type SidebarItem } from '@/lib/sections'
 import { cn } from '@/lib/utils'
 import { TerminalDrawerItem } from '@/panels/terminal/TerminalNavButton'
@@ -56,6 +57,7 @@ export function NavDrawer({ active, onSelect, open, onOpenChange: setOpen }: Nav
   const news = useNewsPages().length > 0
   const newsId = useId()
   const groups = useSectionGroups()
+  const bottom = useNavBottomViews()
   return (
     <>
       <Button
@@ -73,7 +75,11 @@ export function NavDrawer({ active, onSelect, open, onOpenChange: setOpen }: Nav
         {news && <NewsDot id={newsId} className="absolute top-2 right-2" />}
       </Button>
       <Sheet open={open} onOpenChange={setOpen}>
-        <SheetContent side="left" showCloseButton={false} className="w-64 gap-0">
+        <SheetContent
+          side="left"
+          showCloseButton={false}
+          className="w-64 gap-0 data-[side=left]:h-[var(--app-height,100dvh)]"
+        >
           <div className="flex h-12 shrink-0 items-center justify-between border-b border-border pr-2 pl-4">
             <SheetTitle className="text-sm font-semibold tracking-[0.3em]">SETI</SheetTitle>
             <SheetDescription className="sr-only">Sections</SheetDescription>
@@ -88,7 +94,7 @@ export function NavDrawer({ active, onSelect, open, onOpenChange: setOpen }: Nav
               <X />
             </Button>
           </div>
-          <nav className="min-h-0 flex-1 overflow-y-auto py-2" aria-label="Sections">
+          <nav className={cn('min-h-0 overflow-y-auto py-2', !bottom && 'flex-1')} aria-label="Sections">
             {groups.map((group, index) => (
               <div
                 key={group.group}
@@ -111,6 +117,7 @@ export function NavDrawer({ active, onSelect, open, onOpenChange: setOpen }: Nav
               </div>
             ))}
           </nav>
+          <NavBottomViews layout="drawer" />
           <div className="shrink-0 border-t border-border py-2">
             <TerminalDrawerItem
               onOpen={() => {

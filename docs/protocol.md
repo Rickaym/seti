@@ -1627,6 +1627,12 @@ Optional and off by default: a maintenance session per agent that consolidates i
   command offered to the EA or carry `eaReason`. A route's `command` MUST name one of the mod's
   commands. The control room writes a warning to the mod's log for each one that does neither when
   it starts the mod; mod API 2.0.0 makes these MUST and refuses such a manifest.
+- MOD-28: A bundled mod MAY place a view at the bottom of the navigation (`navBottom`). In the menu
+  drawer of a narrow screen the view takes the height the sections leave and keeps a minimum, the
+  sections scrolling first. In the icon rail of a wide screen it MAY open a panel beside the rail at
+  the rail's full height, which narrows the page rather than covering it, stays open on that device
+  until the view or Esc closes it, and is one at a time. A third-party mod MUST NOT place a view
+  there.
 
 ## 18. Public surfaces
 
