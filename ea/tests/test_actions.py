@@ -36,7 +36,7 @@ LOGIN = f"/api/tasks/{TASK_LOGIN}"
 async def confirm(tools: EaTools, name: str, args: dict[str, Any]) -> tuple[ToolResult, ToolResult]:
     """Asks, lets the user answer, then calls again with confirmed; both results."""
     asked = await tools.call(name, args)
-    tools.user_turn()
+    tools.user_turn("yes")
     done = await tools.call(name, {**args, "confirmed": True})
     return asked, done
 
@@ -100,7 +100,7 @@ async def test_delete_asks_first_and_acts_only_after_the_users_next_turn(
     assert same_turn.summary.startswith("Asked first")
     assert fake_seti.writes() == []
 
-    tools.user_turn()
+    tools.user_turn("yes")
     done = await tools.call("delete_agent", {"task": "logout button", "confirmed": True})
     assert done.ok
     assert done.text == 'Deleted the agent "Fix the logout button" and its transcript.'
@@ -109,7 +109,7 @@ async def test_delete_asks_first_and_acts_only_after_the_users_next_turn(
 
 
 async def test_confirmed_without_asking_first_only_asks(tools: EaTools, fake_seti: FakeSeti) -> None:
-    tools.user_turn()
+    tools.user_turn("yes")
     result = await tools.call("delete_agent", {"task": "deploy docs", "confirmed": True})
     assert result.text.startswith("You had not put this to the user yet.")
     assert fake_seti.writes() == []
@@ -117,7 +117,7 @@ async def test_confirmed_without_asking_first_only_asks(tools: EaTools, fake_set
 
 async def test_a_yes_covers_only_the_target_it_was_asked_about(tools: EaTools, fake_seti: FakeSeti) -> None:
     await tools.call("delete_agent", {"task": "logout"})
-    tools.user_turn()
+    tools.user_turn("yes")
     other = await tools.call("delete_agent", {"task": "deploy docs", "confirmed": True})
     assert other.summary.startswith("Asked first")
     assert fake_seti.writes() == []
@@ -126,10 +126,10 @@ async def test_a_yes_covers_only_the_target_it_was_asked_about(tools: EaTools, f
 async def test_a_question_goes_stale_after_a_while(tools: EaTools, fake_seti: FakeSeti) -> None:
     await tools.call("delete_agent", {"task": "logout"})
     fake_seti.expire_asks()
-    tools.user_turn()
+    tools.user_turn("yes")
     stale = await tools.call("delete_agent", {"task": "logout", "confirmed": True})
     assert stale.summary.startswith("Asked first")
-    tools.user_turn()
+    tools.user_turn("yes")
     done = await tools.call("delete_agent", {"task": "logout", "confirmed": True})
     assert done.summary == "Deleted agent Fix the logout button"
     again = await tools.call("delete_agent", {"task": "logout", "confirmed": True})
@@ -290,7 +290,7 @@ async def test_dismiss_updates_asks_again_when_another_update_arrived(
     rows = [{"id": 2, "kind": "input", "payload": {"source": "pr", "kind": "review", "title": "Review"}}]
     fake_seti.task_messages[TASK_LOGOUT] = rows
     await tools.call("dismiss_updates", {"task": "logout"})
-    tools.user_turn()
+    tools.user_turn("yes")
     rows.append({"id": 3, "kind": "input", "payload": {"source": "channel", "kind": "", "title": "Alert"}})
     again = await tools.call("dismiss_updates", {"task": "logout", "confirmed": True})
     assert again.summary.startswith("Asked first")

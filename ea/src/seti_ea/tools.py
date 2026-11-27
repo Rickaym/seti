@@ -49,7 +49,16 @@ from seti_ea.format import (
     until,
     zone_of,
 )
-from seti_ea.gate import ANSWER, GATE_CALL, ON_WORD_TOOLS, ONE_AT_A_TIME, Confirmations, GateCall, UserAnswer
+from seti_ea.gate import (
+    ANSWER,
+    GATE_CALL,
+    NO_YES,
+    ON_WORD_TOOLS,
+    ONE_AT_A_TIME,
+    Confirmations,
+    GateCall,
+    UserAnswer,
+)
 from seti_ea.history_tools import HISTORY_WINDOW, activity_result, window_transcript
 from seti_ea.knowledge_tools import list_proposals, search_knowledge
 from seti_ea.location_tools import location_lines
@@ -1138,6 +1147,8 @@ class EaTools:
         gate = self._actions.confirmations
         if gate.turn == 0:
             raise ToolError("The user has not answered since you asked.", "No answer yet")
+        if not await gate.may_answer(ids):
+            raise ToolError(NO_YES, "No yes from the user")
         taken = parse_answered(await gate.confirm(ids=ids))
         done = [(ask, await self._answer_yes(ask, len(taken))) for ask in taken]
         missing = [i for i in ids if i not in {ask.id for ask in taken}]
