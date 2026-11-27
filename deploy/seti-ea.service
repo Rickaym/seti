@@ -9,6 +9,7 @@ EnvironmentFile=-%h/.seti/ea.env
 LoadCredential=seti-api-token:%h/.seti/credentials/local-token-ea
 LoadCredential=deepgram-api-key:%h/.seti/credentials/deepgram-api-key
 LoadCredential=openai-api-key:%h/.seti/credentials/openai-api-key
+LoadCredential=ea-llm-api-key:%h/.seti/credentials/ea-llm-api-key
 LoadCredential=elevenlabs-api-key:%h/.seti/credentials/elevenlabs-api-key
 LoadCredential=cloudflare-turn-key-id:%h/.seti/credentials/cloudflare-turn-key-id
 LoadCredential=cloudflare-turn-api-token:%h/.seti/credentials/cloudflare-turn-api-token

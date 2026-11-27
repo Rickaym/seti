@@ -35,6 +35,16 @@ function relayText(health: EaHealth | null): string {
   return health.turn ? 'TURN' : 'STUN only'
 }
 
+const API_NAMES = { chat: 'Chat Completions', responses: 'Responses' } as const
+
+function modelText(health: EaHealth | null): string {
+  const model = health?.model ?? '-'
+  if (health?.llm_api === undefined || health.llm_host === undefined) {
+    return model
+  }
+  return `${model}, ${API_NAMES[health.llm_api]} at ${health.llm_host}`
+}
+
 const latencyText = (latency: Latency | null) =>
   latency === null ? '-' : `${String(Math.round(latency.last))} ms, avg ${String(Math.round(latency.average))} ms`
 
@@ -146,8 +156,14 @@ export function EaPage() {
           </SettingRow>
         </SettingsCard>
         <SettingsCard title="Connection">
-          <SettingRow label="Voice model" description="The language model behind the voice.">
-            <span>{health?.model ?? '-'}</span>
+          <SettingRow
+            label="Voice model"
+            stack
+            description="The language model behind the voice, and the API and host both models use."
+          >
+            <span data-testid="ea-voice-model" className="break-all">
+              {modelText(health)}
+            </span>
           </SettingRow>
           <SettingRow label="Chat model" description="The language model behind the typed chat, EA_TEXT_MODEL.">
             <span>{health?.text_model ?? health?.model ?? '-'}</span>

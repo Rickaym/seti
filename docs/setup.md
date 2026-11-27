@@ -321,6 +321,7 @@ values an install can change.
 | `local-token-user`                                    | Seti, browsers | The installer                |
 | `local-token-ea`                                      | Seti, the EA   | The installer                |
 | `openai-api-key`                                      | Seti, the EA   | You (optional)               |
+| `ea-llm-api-key`                                      | The EA         | You (optional, endpoint)     |
 | `deepgram-api-key`, `elevenlabs-api-key`              | The EA         | You (optional, voice)        |
 | `cloudflare-turn-key-id`, `cloudflare-turn-api-token` | The EA         | You (optional, remote calls) |
 | `tunnel-token`                                        | `cloudflared`  | You (optional)               |
@@ -345,6 +346,9 @@ The EA reads its key files first, then its environment, then `SETI_EA_ENV`
 | `EA_MODEL`, `EA_TEXT_MODEL`                           | `gpt-6-sol`, same         | Voice model, and the chat model when different             |
 | `EA_REASONING_EFFORT`                                 | `none`                    | `default` for a model without reasoning, such as `gpt-4.1` |
 | `EA_THINK_MODEL`, `EA_THINK_EFFORT`                   | `gpt-6-sol`, `medium`     | The reasoning model the think tool hands hard questions to |
+| `EA_LLM_API`                                          | `chat`                    | `chat` for Chat Completions, `responses` for Responses     |
+| `EA_LLM_BASE_URL`                                     | unset (OpenAI)            | Another OpenAI-compatible endpoint for every model request |
+| `EA_LLM_API_KEY`                                      | unset                     | That endpoint's key; credential `ea-llm-api-key`           |
 | `ELEVENLABS_VOICE_ID`, `ELEVENLABS_MODEL`             | a set voice, flash v2.5   | The voice; another model must speak the EA's language      |
 | `EA_HISTORY_MAX_TOKENS`                               | `8000`                    | Conversation kept per call, at least 200                   |
 | `EA_INBOX_POLL_SECS`                                  | `5`                       | How often the EA checks its inbox                          |
@@ -385,6 +389,40 @@ To add a key later, write it to its file and restart both services:
 (umask 077; printf '%s\n' 'sk-...' > ~/.seti/credentials/openai-api-key)
 systemctl --user restart seti.service seti-ea.service
 ```
+
+#### Another model endpoint
+
+The EA sends every model request (calls, the chat, the think tool, translations and summaries) to
+OpenAI unless `EA_LLM_BASE_URL` names another OpenAI-compatible endpoint, such as an Azure AI
+Foundry resource. That endpoint takes its own key, `EA_LLM_API_KEY`, so the OpenAI key is never
+sent anywhere else. `EA_LLM_API=responses` moves calls and the chat from Chat Completions to the
+Responses API, which reasoning models need to call tools at a reasoning effort above `none`. The
+think tool and translations always use the Responses API.
+
+1. Write the endpoint's key to its file:
+
+   ```sh
+   (umask 077; printf '%s\n' '<endpoint-key>' > ~/.seti/credentials/ea-llm-api-key)
+   ```
+
+2. Add the settings to `~/.seti/ea.env`. On Azure the model names are your deployment names:
+
+   ```sh
+   EA_LLM_API=responses
+   EA_LLM_BASE_URL=https://<resource>.cognitiveservices.azure.com/openai/v1/
+   EA_MODEL=<deployment>
+   EA_THINK_MODEL=<deployment>
+   EA_REASONING_EFFORT=low
+   ```
+
+3. Restart the EA with `systemctl --user restart seti-ea.service`. A unit installed before this
+   setting existed needs `LoadCredential=ea-llm-api-key:%h/.seti/credentials/ea-llm-api-key`
+   (see `deploy/seti-ea.service`) and `systemctl --user daemon-reload` first.
+
+On the Responses API the EA asks the endpoint once per model and effort when it starts, and stops
+with a message naming the setting to change when one is refused; many reasoning models accept
+`low` at the least. Settings, EA shows the API and host on the Voice model line. To go back,
+remove or comment out those lines and restart the EA; the key file can stay.
 
 A call keeps going while Seti is in the background, as when you switch apps on a phone, and ends
 only once the browser declares the network path failed, after about 30 seconds. Each call end is

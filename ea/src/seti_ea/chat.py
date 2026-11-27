@@ -24,12 +24,11 @@ from pipecat.processors.aggregators.llm_response_universal import (
     LLMAssistantAggregator,
 )
 from pipecat.processors.frame_processor import FrameDirection, FrameProcessor
-from pipecat.services.openai.llm import OpenAILLMService
 from pipecat.utils.context.llm_context_summarization import LLMContextSummarizationUtil
 from pipecat.workers.runner import WorkerRunner
 
 from seti_ea.asks import ASKED, AnsweredAsk, open_asks_note
-from seti_ea.bot import openai_llm, tool_schemas
+from seti_ea.bot import tool_schemas
 from seti_ea.clock import (
     CALL_NOTE_PREFIX,
     CURRENT_CLOCK,
@@ -43,6 +42,7 @@ from seti_ea.conversation import Conversation
 from seti_ea.history import HistorySync, summarization_config
 from seti_ea.inbox import ACT_TOOLS, ACTION_TOOLS, Delivered, InboxItem
 from seti_ea.live_context import LiveContext
+from seti_ea.llm import ModelLLM, model_llm
 from seti_ea.packs import CHAT_TIMEOUT_SECS, PackPrompt
 from seti_ea.promises import PromiseCheck
 from seti_ea.prompt import CHAT_NOTE_PREFIX, VOICE_NOTE, chat_inbox_note, chat_note
@@ -78,13 +78,13 @@ async def _ignore(_tool: str, _result: ToolResult, _call_id: str) -> None:
     return None
 
 
-LlmFactory = Callable[[Settings, str], OpenAILLMService]
+LlmFactory = Callable[[Settings, str], ModelLLM]
 AskFactory = Callable[[Settings], Ask]
 
 
-def chat_llm(settings: Settings, system: str) -> OpenAILLMService:
+def chat_llm(settings: Settings, system: str) -> ModelLLM:
     """The voice EA's LLM service with the chat model and this turn's system prompt."""
-    return openai_llm(settings, settings.chat_model, system)
+    return model_llm(settings, settings.chat_model, system)
 
 
 def channel_of(messages: list[LLMContextMessage]) -> str | None:
@@ -119,7 +119,7 @@ class TextTap(FrameProcessor):
 
 async def run_reply(
     context: LLMContext,
-    llm: OpenAILLMService,
+    llm: ModelLLM,
     emit: Emit,
     usage: UsageObserver,
     add_note: Callable[[str], None],
@@ -155,7 +155,7 @@ async def run_reply(
         finished.set()
 
     @llm.event_handler("on_function_calls_started")
-    async def on_function_calls_started(_llm: OpenAILLMService, calls: list[FunctionCallFromLLM]) -> None:
+    async def on_function_calls_started(_llm: ModelLLM, calls: list[FunctionCallFromLLM]) -> None:
         for call in calls:
             arguments = call.arguments if isinstance(call.arguments, dict) else {}
             emit(
@@ -184,7 +184,7 @@ async def run_reply(
     return failures[0] if failures else None
 
 
-async def compact(context: LLMContext, history: HistorySync, llm: OpenAILLMService, max_tokens: int) -> None:
+async def compact(context: LLMContext, history: HistorySync, llm: ModelLLM, max_tokens: int) -> None:
     """Past `max_tokens`, folds the older turns into one summary the way a call does."""
     if LLMContextSummarizationUtil.estimate_context_tokens(context) < max_tokens:
         return

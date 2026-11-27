@@ -4,6 +4,7 @@ import os
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
+from urllib.parse import urlparse
 
 DEFAULT_ENV_FILE = "~/.seti/ea.env"
 DEFAULT_PORT = 3007
@@ -14,6 +15,8 @@ MODEL_DEFAULT_EFFORT = "default"
 # The think tool's reasoning model runs on the Responses API, where tools work at any effort.
 DEFAULT_THINK_EFFORT = "medium"
 DEFAULT_SETI_API = "http://127.0.0.1:3006"
+LLM_APIS = ("chat", "responses")
+OPENAI_HOST = "api.openai.com"
 # ElevenLabs voice the user chose for the EA.
 DEFAULT_VOICE_ID = "Fahco4VZzobUeiPqni1S"
 DEFAULT_TTS_MODEL = "eleven_flash_v2_5"
@@ -32,6 +35,7 @@ CREDENTIAL_FILES = {
     "CLOUDFLARE_TURN_KEY_ID": "cloudflare-turn-key-id",
     "CLOUDFLARE_TURN_API_TOKEN": "cloudflare-turn-api-token",
     "SETI_API_TOKEN": "seti-api-token",
+    "EA_LLM_API_KEY": "ea-llm-api-key",
 }
 
 
@@ -58,6 +62,9 @@ class Settings:
     reasoning_effort: str = DEFAULT_REASONING_EFFORT
     think_model: str = DEFAULT_MODEL
     think_effort: str = DEFAULT_THINK_EFFORT
+    llm_api: str = "chat"
+    llm_base_url: str = ""
+    llm_api_key: str = ""
 
     @property
     def keys_hint(self) -> str:
@@ -72,6 +79,32 @@ class Settings:
         return self.text_model or self.model
 
     @property
+    def model_key_name(self) -> str:
+        """The key the model endpoint takes: OpenAI's, or EA_LLM_API_KEY for another endpoint."""
+        return "EA_LLM_API_KEY" if self.llm_base_url else "OPENAI_API_KEY"
+
+    @property
+    def model_api_key(self) -> str:
+        """The value of `model_key_name`, never sent to any other host."""
+        return self.llm_api_key if self.llm_base_url else self.openai_api_key
+
+    @property
+    def llm_host(self) -> str:
+        """The host every model request goes to, without path or credentials."""
+        if not self.llm_base_url:
+            return OPENAI_HOST
+        return urlparse(self.llm_base_url).hostname or self.llm_base_url
+
+    @property
+    def config_error(self) -> str | None:
+        """Why the settings cannot run at all, for the start; None when they can."""
+        if self.llm_api not in LLM_APIS:
+            return f"EA_LLM_API is {self.llm_api!r}; use chat or responses"
+        if self.llm_base_url and urlparse(self.llm_base_url).scheme not in ("http", "https"):
+            return "EA_LLM_BASE_URL must start with https://"
+        return None
+
+    @property
     def llm_params(self) -> dict[str, str]:
         """Extra Chat Completions parameters: the reasoning effort, unless left to the model."""
         if self.reasoning_effort == MODEL_DEFAULT_EFFORT:
@@ -81,17 +114,21 @@ class Settings:
     @property
     def chat_missing(self) -> list[str]:
         """Names of keys the typed chat needs that are not set."""
-        return ["OPENAI_API_KEY"] if self.openai_api_key == "" else []
+        return [self.model_key_name] if self.model_api_key == "" else []
 
     @property
     def missing(self) -> list[str]:
         """Names of required keys that are not set."""
         values = {
             "DEEPGRAM_API_KEY": self.deepgram_api_key,
-            "OPENAI_API_KEY": self.openai_api_key,
+            "OPENAI_API_KEY": self.model_api_key,
             "ELEVENLABS_API_KEY": self.elevenlabs_api_key,
         }
-        return [name for name in REQUIRED_KEYS if values[name] == ""]
+        return [
+            self.model_key_name if name == "OPENAI_API_KEY" else name
+            for name in REQUIRED_KEYS
+            if values[name] == ""
+        ]
 
     @property
     def configured(self) -> bool:
@@ -107,7 +144,8 @@ class Settings:
         return (
             f"Settings(model={self.model!r}, chat_model={self.chat_model!r}, "
             f"reasoning_effort={self.reasoning_effort!r}, think_model={self.think_model!r}, "
-            f"think_effort={self.think_effort!r}, seti_api={self.seti_api!r}, "
+            f"think_effort={self.think_effort!r}, llm_api={self.llm_api!r}, llm_host={self.llm_host!r}, "
+            f"seti_api={self.seti_api!r}, "
             f"port={self.port}, missing={self.missing!r}, turn={self.turn})"
         )
 
@@ -188,6 +226,9 @@ def load_settings(environ: Mapping[str, str] | None = None) -> Settings:
         reasoning_effort=get("EA_REASONING_EFFORT", DEFAULT_REASONING_EFFORT),
         think_model=get("EA_THINK_MODEL", DEFAULT_MODEL),
         think_effort=get("EA_THINK_EFFORT", DEFAULT_THINK_EFFORT),
+        llm_api=get("EA_LLM_API", "chat").lower(),
+        llm_base_url=get("EA_LLM_BASE_URL"),
+        llm_api_key=get("EA_LLM_API_KEY"),
         turn_key_id=get("CLOUDFLARE_TURN_KEY_ID"),
         turn_api_token=get("CLOUDFLARE_TURN_API_TOKEN"),
         seti_api=get("SETI_API", DEFAULT_SETI_API).rstrip("/"),

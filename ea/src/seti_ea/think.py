@@ -12,11 +12,11 @@ from dataclasses import dataclass, field
 from typing import Any, cast
 
 from loguru import logger
-from openai import AsyncOpenAI
 from openai.types.responses import FunctionToolParam, Response, ResponseFunctionToolCall
 from openai.types.responses.response_input_param import ResponseInputParam
 
 from seti_ea.config import Settings
+from seti_ea.llm import openai_client
 from seti_ea.toolkit import ToolSpec
 from seti_ea.tools import TOOL_SPECS, EaTools
 from seti_ea.usage import UsageRecorder, response_record
@@ -155,8 +155,8 @@ def function_tool(spec: ToolSpec) -> FunctionToolParam:
 
 
 def responses_ask(settings: Settings) -> Ask:
-    """Calls the think model on the Responses API with the EA's own OpenAI key, storing nothing."""
-    client = AsyncOpenAI(api_key=settings.openai_api_key)
+    """Calls the think model on the Responses API at the EA's endpoint, storing nothing."""
+    client = openai_client(settings)
     tools = [function_tool(spec) for spec in THINK_SPECS]
 
     async def ask(request: Round) -> Response:
