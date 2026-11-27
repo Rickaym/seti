@@ -376,6 +376,11 @@ between two steps; an interrupt; a hook at subagent start.
   quotes or headings, self-addressed questions and closing courtesies MUST NOT count.
 - TURN-19: An agent that asked (`notify_when_done`, await) MUST get one `agent` update when the
   other agent's turn ends.
+- TURN-20: A start without a title takes the planner's name for the work its message describes,
+  given the message as framed data (UPD-13). A title that is empty, speaks in the first person
+  where the message does not, or states a refusal, apology or status the message does not
+  mention MUST NOT be used: the title is the message's opening words and `fallback_reason` says
+  why, judged without a model call.
 
 ## 5. Updates and delivery
 
