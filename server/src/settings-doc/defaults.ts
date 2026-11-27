@@ -8,6 +8,7 @@ import {
   DEFAULT_TIERS,
   DREAM_SETTINGS_DEFAULTS,
   EA_SETTINGS_DEFAULT,
+  GEMINI_SETTINGS_DEFAULTS,
   SANDBOX_POLICY_DEFAULT,
   STORAGE_SCHEDULE_DEFAULTS,
   type SettingsSectionPath,
@@ -68,6 +69,11 @@ export const SECTION_DEFAULTS: SectionDefaults = {
       evaluator_decides: codex.evaluator_decides,
       default_model: null,
       default_effort: null,
+    },
+    gemini: {
+      enabled: GEMINI_SETTINGS_DEFAULTS.enabled,
+      evaluator_decides: GEMINI_SETTINGS_DEFAULTS.evaluator_decides,
+      default_model: GEMINI_SETTINGS_DEFAULTS.default_model,
     },
   }),
   'agents.storage': () => ({
