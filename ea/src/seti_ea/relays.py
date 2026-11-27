@@ -63,7 +63,8 @@ ACT_RULES = (
     "These notes come from a channel the user set to act, so you assign their work by your own "
     "judgement, as if the user had said yes: for each note that needs work, pick the existing agent "
     "whose work fits best, any agent, and send it the work with post_team_chat, to and relay_of set "
-    "to the note's item id below, without asking. "
+    "to the note's item id below, without asking. A question someone asks about an agent's work is "
+    "work for that agent: have it find the answer and draft the reply for the user. "
 )
 
 ACT_START = (
