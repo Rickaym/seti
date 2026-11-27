@@ -16,7 +16,7 @@ export function AboutPage() {
     >
       {parts.map(({ key, name, view: View }) => (
         <ErrorBoundary key={key} name={name} kind="row">
-          <View layout={null} panel={null} />
+          <View layout={null} />
         </ErrorBoundary>
       ))}
     </SettingsBody>

@@ -7,7 +7,7 @@ test.afterEach(async ({ request }) => {
 })
 
 const rail = (page: Page) => page.getByRole('complementary', { name: 'Sidebar' })
-const panel = (page: Page) => page.getByRole('region', { name: 'Pad' })
+const padWindow = (page: Page) => page.getByRole('region', { name: 'Pad', exact: true })
 
 const boxOf = async (locator: Locator) => {
   const box = await locator.boundingBox()
@@ -16,44 +16,97 @@ const boxOf = async (locator: Locator) => {
 }
 
 const openPad = async (page: Page) => {
-  await rail(page).getByRole('button', { name: 'Pad' }).click()
-  return panel(page)
+  await rail(page).getByRole('button', { name: 'Pad', exact: true }).click()
+  return padWindow(page)
 }
 
-test('the pad sits at the bottom of the rail, opens beside it and saves as you type', async ({ page, request }) => {
+/** Drags with the mouse from the middle of `from` by dx and dy. */
+async function dragBy(page: Page, from: Locator, dx: number, dy: number) {
+  const box = await boxOf(from)
+  const [x, y] = [box.x + box.width / 2, box.y + box.height / 2]
+  await page.mouse.move(x, y)
+  await page.mouse.down()
+  await page.mouse.move(x + dx / 2, y + dy / 2)
+  await page.mouse.move(x + dx, y + dy)
+  await page.mouse.up()
+}
+
+test('the Pad icon opens a window over the page that saves as you type', async ({ page, request }) => {
   await page.goto('/')
-  const button = rail(page).getByRole('button', { name: 'Pad' })
+  const button = rail(page).getByRole('button', { name: 'Pad', exact: true })
   const shortcuts = rail(page).getByRole('button', { name: 'Shortcuts' })
   const [padBox, toolsBox] = [await boxOf(button), await boxOf(shortcuts)]
-  expect(padBox.y, 'the pad sits under the sections, above the tools').toBeLessThan(toolsBox.y)
+  expect(padBox.y, 'the icon sits under the sections, above the tools').toBeLessThan(toolsBox.y)
   const mainBefore = await boxOf(page.getByRole('main'))
 
   const open = await openPad(page)
   await expect(button).toHaveAttribute('aria-pressed', 'true')
+  await expect(pad(open)).toBeFocused()
   await expect(open.getByRole('textbox')).toHaveCount(1)
-  await expect(open.getByRole('button'), 'the pad holds nothing but its text area').toHaveCount(0)
-  const field = pad(open)
-  await expect(field).toBeEditable()
-  const [railBox, fieldBox, mainBox] = [
-    await boxOf(rail(page)),
-    await boxOf(field),
-    await boxOf(page.getByRole('main')),
-  ]
-  expect(fieldBox.height, 'the pad is as tall as the rail').toBeGreaterThan(railBox.height - 4)
-  expect(mainBox.x, 'the page moves over rather than being covered').toBeGreaterThanOrEqual(fieldBox.x + fieldBox.width)
-  expect(mainBox.width).toBeLessThan(mainBefore.width)
-  await field.fill('milk\neggs')
+  const controls = await open.getByRole('button').evaluateAll((all) => all.map((b) => b.ariaLabel))
+  expect(controls, 'the window holds its text area, a move handle and a close button').toEqual([
+    'Move pad',
+    'Close pad',
+  ])
+  expect(await boxOf(page.getByRole('main')), 'the page keeps its full width').toEqual(mainBefore)
+  const windowBox = await boxOf(open)
+  expect(windowBox.x, 'it opens beside the rail').toBeGreaterThanOrEqual(padBox.x + padBox.width)
+  await pad(open).fill('milk\neggs')
   await expectSaved(request, 'milk\neggs')
 
-  await page.reload()
-  await expect(pad(panel(page)), 'the panel stays open on this device').toHaveValue('milk\neggs')
-  await pad(panel(page)).press('Escape')
-  await expect(panel(page)).toHaveCount(0)
+  await open.getByRole('button', { name: 'Close pad' }).click()
+  await expect(padWindow(page)).toHaveCount(0)
+  await expect(button).toBeFocused()
+  await button.click()
+  await pad(padWindow(page)).press('Escape')
+  await expect(padWindow(page)).toHaveCount(0)
   await expect(button).toHaveAttribute('aria-pressed', 'false')
-  await button.click()
-  await expect(pad(panel(page))).toHaveValue('milk\neggs')
-  await button.click()
-  await expect(panel(page)).toHaveCount(0)
+})
+
+test('the window moves and resizes, and a reload brings it back where it was', async ({ page }) => {
+  await page.goto('/')
+  const open = await openPad(page)
+  await pad(open).fill('stays put')
+  const start = await boxOf(open)
+  await dragBy(page, open.getByRole('button', { name: 'Move pad' }), 200, -150)
+  const dragged = await boxOf(open)
+  expect([dragged.x - start.x, dragged.y - start.y]).toEqual([200, -150])
+  await dragBy(page, open.locator('[data-resize="se"]'), 80, 60)
+  const sized = await boxOf(open)
+  expect([sized.width - dragged.width, sized.height - dragged.height]).toEqual([80, 60])
+  expect([sized.x, sized.y]).toEqual([dragged.x, dragged.y])
+
+  await page.reload()
+  const back = padWindow(page)
+  await expect(pad(back)).toHaveValue('stays put')
+  expect(await boxOf(back)).toEqual(sized)
+  await expect(pad(back), 'opening on load leaves focus alone').not.toBeFocused()
+
+  await page.setViewportSize({ width: 900, height: 420 })
+  await expect
+    .poll(async () => {
+      const box = await boxOf(back)
+      return box.x >= 0 && box.y >= 0 && box.x + box.width <= 900 && box.y + box.height <= 420
+    }, 'a smaller viewport pulls the window into view')
+    .toBe(true)
+})
+
+test('the arrow keys move the window and Shift with them resizes it', async ({ page }) => {
+  await page.goto('/')
+  const open = await openPad(page)
+  const handle = open.getByRole('button', { name: 'Move pad' })
+  await handle.focus()
+  const start = await boxOf(open)
+  await page.keyboard.press('ArrowUp')
+  await page.keyboard.press('ArrowRight')
+  const stepped = await boxOf(open)
+  expect([stepped.x - start.x, stepped.y - start.y]).toEqual([16, -16])
+  await page.keyboard.press('Shift+ArrowRight')
+  await page.keyboard.press('Shift+ArrowDown')
+  const grown = await boxOf(open)
+  expect([grown.width - stepped.width, grown.height - stepped.height]).toEqual([16, 16])
+  await page.keyboard.press('Escape')
+  await expect(padWindow(page)).toHaveCount(0)
 })
 
 test.describe('while the server fails', () => {
@@ -93,7 +146,7 @@ test('the server refuses a pad past its limit with a reason', async ({ request }
 
 test('turning the Pad mod off takes the pad out of the rail', async ({ page, request }) => {
   await page.goto('/')
-  const button = page.getByRole('complementary', { name: 'Sidebar' }).getByRole('button', { name: 'Pad' })
+  const button = page.getByRole('complementary', { name: 'Sidebar' }).getByRole('button', { name: 'Pad', exact: true })
   await expect(button).toBeVisible()
   await request.patch('/api/mods/text-pad', { data: { enabled: false } })
   await page.reload()

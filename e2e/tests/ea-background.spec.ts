@@ -3,8 +3,10 @@ import type { EaHealth } from '@seti/shared'
 import {
   backgroundable,
   callEnds,
+  launch,
   longestGap,
   mediaSession,
+  phoneHooks,
   pressMediaAction,
   toBackground,
 } from './support/background.js'
@@ -87,4 +89,26 @@ test('a page that closes during a call reports it', async ({ page, request }) =>
   await page.reload()
   await expect(eaItem(page)).toBeVisible()
   await expect.poll(closed).toBe(before + 1)
+})
+
+test('opening Seti again from a link routes inside the page and keeps the call', async ({ page }) => {
+  await backgroundable(page)
+  await phoneHooks(page)
+  await mockEa(page)
+  const ends = callEnds(page)
+  await startCall(page)
+  await page.goto('/#ea')
+  const card = page.getByRole('main').getByRole('region', { name: 'Live call' })
+  await expect(card.getByTestId('ea-call-status')).toHaveText('Listening')
+  await expect(card.getByText('in the background on this device')).toHaveCount(0)
+
+  await toBackground(page)
+  await launch(page, new URL('/#settings/ea', page.url()).href)
+  await toBackground(page, false)
+  await expect(page).toHaveURL(/#settings\/ea$/)
+  await expect(status(page)).toHaveText('Listening')
+  await launch(page, new URL('/', page.url()).href)
+  await expect(page).toHaveURL(/#settings\/ea$/)
+  await expect(status(page)).toHaveText('Listening')
+  expect(ends).toEqual([])
 })

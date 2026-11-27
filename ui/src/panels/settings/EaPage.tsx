@@ -14,6 +14,7 @@ import {
 import { InboxRelaysSetting } from '@/components/ea/InboxRelaysSetting'
 import { LanguageSetting } from '@/components/ea/LanguageSetting'
 import { LiveContextCard } from '@/components/ea/LiveContextCard'
+import { PromptCard } from '@/components/ea/PromptCard'
 import { RelayCheck } from '@/components/ea/RelayCheck'
 import { SetupCard } from '@/components/ea/SetupCard'
 import { ToolsCard } from '@/components/ea/ToolsCard'
@@ -32,6 +33,16 @@ function relayText(health: EaHealth | null): string {
     return '-'
   }
   return health.turn ? 'TURN' : 'STUN only'
+}
+
+const API_NAMES = { chat: 'Chat Completions', responses: 'Responses' } as const
+
+function modelText(health: EaHealth | null): string {
+  const model = health?.model ?? '-'
+  if (health?.llm_api === undefined || health.llm_host === undefined) {
+    return model
+  }
+  return `${model}, ${API_NAMES[health.llm_api]} at ${health.llm_host}`
 }
 
 const latencyText = (latency: Latency | null) =>
@@ -145,8 +156,14 @@ export function EaPage() {
           </SettingRow>
         </SettingsCard>
         <SettingsCard title="Connection">
-          <SettingRow label="Voice model" description="The language model behind the voice.">
-            <span>{health?.model ?? '-'}</span>
+          <SettingRow
+            label="Voice model"
+            stack
+            description="The language model behind the voice, and the API and host both models use."
+          >
+            <span data-testid="ea-voice-model" className="break-all">
+              {modelText(health)}
+            </span>
           </SettingRow>
           <SettingRow label="Chat model" description="The language model behind the typed chat, EA_TEXT_MODEL.">
             <span>{health?.text_model ?? health?.model ?? '-'}</span>
@@ -175,6 +192,7 @@ export function EaPage() {
         <UsageCard />
         <LiveContextCard />
         <ToolsCard />
+        <PromptCard />
       </div>
     </SettingsBody>
   )

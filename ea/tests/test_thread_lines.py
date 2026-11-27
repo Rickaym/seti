@@ -46,7 +46,7 @@ async def test_unlink_pr_stops_following_a_thread_after_a_yes(tools: EaTools, fa
     asked = await tools.call("unlink_pr", {"task": "logout", "thread": 2})
     assert "stops Fix the logout button following that Slack thread" in asked.text
     assert fake_seti.writes() == []
-    tools.user_turn()
+    tools.user_turn("yes")
     done = await tools.call("unlink_pr", {"task": "logout", "thread": 2, "confirmed": True})
     assert done.text == "Fix the logout button no longer follows that thread."
     assert fake_seti.writes() == [("POST", f"/api/tasks/{TASK_LOGOUT}/threads/2/stop", {}, {})]

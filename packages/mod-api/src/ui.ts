@@ -24,13 +24,8 @@ export interface ModViewTheme {
 
 /** What a view placed by `registerView` gets; `layout` says how `navBottom` shows, else null. */
 export interface ModViewProps {
-  /**
-   * For a `navBottom` view: `rail` in the icon rail of a wide screen, `panel` in its panel beside
-   * the rail, `drawer` in the menu drawer of a narrow screen.
-   */
-  layout: 'rail' | 'panel' | 'drawer' | null
-  /** In the rail: whether the view's panel beside the rail is open, and how to open or close it. */
-  panel: { open: boolean; toggle: () => void } | null
+  /** The icon rail of a wide screen, or the menu drawer of a narrow one, for a `navBottom` view. */
+  layout: 'rail' | 'drawer' | null
 }
 
 /** What a file viewer gets: the file, where to load it from, and the theme. */

@@ -1,5 +1,5 @@
 import { useId } from 'react'
-import { NavBottomPanel, NavBottomViews } from '@/components/NavBottomViews'
+import { NavBottomViews } from '@/components/NavBottomViews'
 import { NewsDot } from '@/components/NewsDot'
 import { SectionCount } from '@/components/SectionCount'
 import { ShortcutGuidePopover } from '@/components/shortcuts/ShortcutGuide'
@@ -63,37 +63,34 @@ export function Sidebar({ active, onSelect }: { active: SectionKey; onSelect: (k
   const news = useNewsPages().length > 0
   const groups = useSectionGroups()
   return (
-    <>
-      <aside aria-label="Sidebar" className="flex min-h-0 w-12 shrink-0 flex-col border-r border-border bg-card">
-        <nav className="flex flex-1 flex-col items-center gap-1 overflow-y-auto py-2" aria-label="Sections">
-          {groups.map((group, index) => (
-            <div
-              key={group.group}
-              role="group"
-              aria-label={group.group}
-              className={cn('flex flex-col items-center gap-1', index > 0 && 'mt-1 border-t border-border pt-2')}
-            >
-              {group.items.map((item) => (
-                <SectionButton
-                  key={item.key}
-                  item={item}
-                  current={active === item.key}
-                  dot={news && item.key === 'settings'}
-                  onSelect={onSelect}
-                />
-              ))}
-            </div>
-          ))}
-        </nav>
-        <NavBottomViews layout="rail" />
-        <div className="flex shrink-0 flex-col items-center gap-1 border-t border-border py-2">
-          <TerminalNavButton side="right" className="size-9 text-foreground/70" />
-          <TeamChatToggle side="right" className="size-9 text-foreground/70" />
-          <ModeToggle side="right" className="size-9 text-foreground/70" />
-          <ShortcutGuidePopover className="size-9 text-foreground/70" />
-        </div>
-      </aside>
-      <NavBottomPanel />
-    </>
+    <aside aria-label="Sidebar" className="flex min-h-0 w-12 shrink-0 flex-col border-r border-border bg-card">
+      <nav className="flex flex-1 flex-col items-center gap-1 overflow-y-auto py-2" aria-label="Sections">
+        {groups.map((group, index) => (
+          <div
+            key={group.group}
+            role="group"
+            aria-label={group.group}
+            className={cn('flex flex-col items-center gap-1', index > 0 && 'mt-1 border-t border-border pt-2')}
+          >
+            {group.items.map((item) => (
+              <SectionButton
+                key={item.key}
+                item={item}
+                current={active === item.key}
+                dot={news && item.key === 'settings'}
+                onSelect={onSelect}
+              />
+            ))}
+          </div>
+        ))}
+      </nav>
+      <NavBottomViews layout="rail" />
+      <div className="flex shrink-0 flex-col items-center gap-1 border-t border-border py-2">
+        <TerminalNavButton side="right" className="size-9 text-foreground/70" />
+        <TeamChatToggle side="right" className="size-9 text-foreground/70" />
+        <ModeToggle side="right" className="size-9 text-foreground/70" />
+        <ShortcutGuidePopover className="size-9 text-foreground/70" />
+      </div>
+    </aside>
   )
 }

@@ -4,6 +4,8 @@ import type { EaCallEndInput } from '@seti/shared'
 type HeldWindow = Window & {
   timersHeld?: boolean
   mediaActions?: Record<string, MediaSessionActionHandler | null>
+  micTracks?: MediaStreamTrack[]
+  launchConsumer?: (params: { targetURL?: string }) => void
 }
 
 /** Lets a test hold the page's interval timers, as Chrome throttles them in a background page. */
@@ -22,6 +24,56 @@ function installHold(): void {
     actions[action] = handler
     set.call(this, action, handler)
   }
+}
+
+/** Keeps each microphone track the page opens, and takes the Launch Handler consumer it sets. */
+function installPhoneHooks(): void {
+  const held = window as HeldWindow
+  held.micTracks = []
+  const media = navigator.mediaDevices
+  const open = media.getUserMedia.bind(media)
+  media.getUserMedia = async (request) => {
+    const stream = await open(request)
+    held.micTracks?.push(...stream.getAudioTracks())
+    return stream
+  }
+  Object.defineProperty(window, 'launchQueue', {
+    configurable: true,
+    value: {
+      setConsumer: (consumer: (params: { targetURL?: string }) => void) => {
+        held.launchConsumer = consumer
+      },
+    },
+  })
+}
+
+/** Lets a test open Seti again from a link and drop the microphone, as a phone can. */
+export async function phoneHooks(page: Page): Promise<void> {
+  await page.addInitScript(installPhoneHooks)
+}
+
+/** Opens Seti at `url` while it runs, as the app icon or a widget does with a running app. */
+export async function launch(page: Page, url: string): Promise<void> {
+  await page.evaluate((targetURL) => {
+    ;(window as HeldWindow).launchConsumer?.({ targetURL })
+  }, url)
+}
+
+/** Ends the newest microphone track, as iOS does to a page in the background. */
+export async function dropMic(page: Page): Promise<number> {
+  return page.evaluate(() => {
+    const tracks = (window as HeldWindow).micTracks ?? []
+    tracks.at(-1)?.stop()
+    return tracks.length
+  })
+}
+
+/** How many microphone tracks the page has opened, and whether the newest is live. */
+export async function micTracks(page: Page): Promise<{ count: number; live: boolean }> {
+  return page.evaluate(() => {
+    const tracks = (window as HeldWindow).micTracks ?? []
+    return { count: tracks.length, live: tracks.at(-1)?.readyState === 'live' }
+  })
 }
 
 /** Records the media controls the page sets and lets the test hold its interval timers. */

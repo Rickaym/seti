@@ -30,7 +30,7 @@ def role_packs(fake_seti: FakeSeti) -> None:
 
 async def confirm(tools: EaTools, name: str, args: dict[str, Any]) -> tuple[ToolResult, ToolResult]:
     asked = await tools.call(name, args)
-    tools.user_turn()
+    tools.user_turn("yes")
     done = await tools.call(name, {**args, "confirmed": True})
     return asked, done
 
@@ -55,7 +55,7 @@ async def test_another_role_replaces_the_current_one(tools: EaTools, fake_seti: 
 
 
 async def test_set_role_with_confirmed_but_unasked_only_asks(tools: EaTools, fake_seti: FakeSeti) -> None:
-    tools.user_turn()
+    tools.user_turn("yes")
     result = await tools.call("set_agent_role", {"task": "logout", "role": "Lead", "confirmed": True})
     assert result.text.startswith("You had not put this to the user yet.")
     assert fake_seti.writes() == []

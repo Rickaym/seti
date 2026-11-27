@@ -1,8 +1,8 @@
 {
   "id": "text-pad",
   "name": "Pad",
-  "version": "1.0.0",
-  "seti": "^1.26",
+  "version": "1.1.0",
+  "seti": "^1.27",
   "description": "A text pad at the bottom of the navigation that saves itself. It is plain text that anyone signed in can read, so keep secrets out of it.",
   "author": "Seti",
   "icon": "notepad-text",

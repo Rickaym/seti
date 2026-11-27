@@ -401,8 +401,8 @@ build() {
 }
 
 CREDENTIALS_GENERATED=(secret-key local-token-user local-token-ea)
-CREDENTIALS_OPTIONAL=(openai-api-key deepgram-api-key elevenlabs-api-key cloudflare-turn-key-id
-  cloudflare-turn-api-token tunnel-token)
+CREDENTIALS_OPTIONAL=(openai-api-key ea-llm-api-key deepgram-api-key elevenlabs-api-key
+  cloudflare-turn-key-id cloudflare-turn-api-token tunnel-token)
 
 random_value() {
   node -e "process.stdout.write(require('node:crypto').randomBytes(32).toString(process.argv[1]))" "$1"

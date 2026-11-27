@@ -40,7 +40,6 @@ from pipecat.processors.frameworks.rtvi.models import ClientMessage
 from pipecat.services.deepgram.stt import DeepgramSTTService
 from pipecat.services.elevenlabs.tts import ElevenLabsTTSService
 from pipecat.services.llm_service import FunctionCallParams
-from pipecat.services.openai.llm import OpenAILLMService
 from pipecat.transports.base_transport import TransportParams
 from pipecat.transports.smallwebrtc.connection import SmallWebRTCConnection
 from pipecat.turns.user_start.base_user_turn_start_strategy import BaseUserTurnStartStrategy
@@ -82,12 +81,12 @@ from seti_ea.language import DEFAULT as ENGLISH
 from seti_ea.language import stt_endpointing, stt_language, tts_language
 from seti_ea.link import CallTransport
 from seti_ea.live_context import LiveContext, LiveContextInjector
+from seti_ea.llm import ModelLLM, model_llm
 from seti_ea.local_wake import PausableDeepgramSTT, SleepControl
 from seti_ea.packs import VOICE_TIMEOUT_SECS, PackPrompt, SystemPromptUpdates
 from seti_ea.phrasebook import CallLanguage, Phrasebook, responses_translate
 from seti_ea.promises import PromiseCheck
 from seti_ea.prompt import (
-    SYSTEM_PROMPT,
     VOICE_NOTE,
     clean_address,
     voice_urgent_note,
@@ -215,14 +214,6 @@ def tool_schemas(
     ]
 
 
-def openai_llm(settings: Settings, model: str, system: str = SYSTEM_PROMPT) -> OpenAILLMService:
-    """The EA's OpenAI service for `model`, with the system prompt and reasoning effort."""
-    return OpenAILLMService(
-        api_key=settings.openai_api_key,
-        settings=OpenAILLMService.Settings(model=model, system_instruction=system, extra=settings.llm_params),
-    )
-
-
 _TABLE_ROW = re.compile(r"^[ \t]*\|.*\|[ \t]*$\n?", re.MULTILINE)
 _STRAY_MARKS = re.compile(r"\*{2,}|_{2,}|`+")
 
@@ -342,7 +333,7 @@ async def run_bot(
     )
     packs = PackPrompt(seti, timeout_secs=VOICE_TIMEOUT_SECS)
     system = await packs.system_prompt()
-    llm = openai_llm(settings, settings.model, system)
+    llm = model_llm(settings, settings.model, system)
 
     rtvi = RedactingRTVIProcessor(secrets_of(settings))
 
@@ -412,7 +403,9 @@ async def run_bot(
             stt,
             user_aggregator,
             HeldUpdates(call_inbox, take, history),
-            LiveContextInjector(LiveContext(seti), SystemPromptUpdates(packs, system)),
+            LiveContextInjector(
+                LiveContext(seti, sent=conversation.live_note), SystemPromptUpdates(packs, system)
+            ),
             llm,
             tts,
             transport.output(),
@@ -452,7 +445,7 @@ async def run_bot(
             await fall_asleep()
 
     @llm.event_handler("on_function_calls_started")
-    async def on_function_calls_started(_llm: OpenAILLMService, calls: list[Any]) -> None:
+    async def on_function_calls_started(_llm: ModelLLM, calls: list[Any]) -> None:
         if guard.active:
             return
         text = announcer.phrase([ToolCall(c.function_name, c.arguments or {}) for c in calls])

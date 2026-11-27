@@ -1,4 +1,4 @@
-"""HTTP endpoints of the EA: health, its tool list, ICE servers and SmallWebRTC signalling."""
+"""HTTP endpoints of the EA: health, its tools and prompt, ICE servers and SmallWebRTC signalling."""
 
 import asyncio
 import contextlib
@@ -27,6 +27,7 @@ from seti_ea.config import Settings
 from seti_ea.conversation import Conversation
 from seti_ea.ice import IceProvider, IceServerDict, peer_servers
 from seti_ea.inbox import InboxPump
+from seti_ea.prompt_view import PromptAnswer, PromptView
 from seti_ea.seti import SetiClient
 from seti_ea.spotter import LOCAL_SPOTTER
 from seti_ea.tool_list import tool_list
@@ -301,6 +302,7 @@ def create_app(
     chat = TextChat(settings, tools, conversation, llm=chat_llm or default_chat_llm)
     follow_up = None if settings.chat_missing else chat.follow_up
     pump = InboxPump(seti, conversation, follow_up, settings.inbox_poll_secs, answer=chat.answer)
+    prompt = PromptView(settings, seti, conversation)
 
     @contextlib.asynccontextmanager
     async def lifespan(_app: FastAPI) -> AsyncGenerator[None]:
@@ -337,6 +339,8 @@ def create_app(
             "missing": settings.missing,
             "model": settings.model,
             "text_model": settings.chat_model,
+            "llm_api": settings.llm_api,
+            "llm_host": settings.llm_host,
             "chat_missing": settings.chat_missing,
             "turn": settings.turn,
         }
@@ -344,6 +348,10 @@ def create_app(
     @app.get("/tools")
     async def tools_list() -> dict[str, Any]:
         return {"tools": tool_list()}
+
+    @app.get("/prompt")
+    async def prompt_parts() -> PromptAnswer:
+        return await prompt.answer()
 
     @app.get("/ice")
     async def ice_servers() -> dict[str, Any]:

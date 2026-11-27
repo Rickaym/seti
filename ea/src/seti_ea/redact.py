@@ -21,6 +21,7 @@ def secrets_of(settings: Settings) -> list[str]:
     values = [
         settings.deepgram_api_key,
         settings.openai_api_key,
+        settings.llm_api_key,
         settings.elevenlabs_api_key,
         settings.turn_api_token,
     ]

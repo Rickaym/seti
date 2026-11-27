@@ -1,8 +1,10 @@
 import { defineMod, type ModViewProps, type UiModApi } from '@seti/mod-api'
 import { NotepadText } from 'lucide-react'
-import { useEffect, useSyncExternalStore } from 'react'
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type Ref } from 'react'
+import { PadWindow } from './PadWindow.js'
 import { PadStore } from './pad-store.js'
 import { PAD_MAX } from './pad-text.js'
+import { PadWindowState } from './pad-window.js'
 import manifest from './seti-mod.json' with { type: 'json' }
 
 const BACKUP_KEY = 'seti.text-pad.unsaved'
@@ -35,12 +37,18 @@ interface PadParts {
 }
 
 /** The text area itself: saves as typing pauses and on blur, and says so only when a save fails. */
-function PadField({ store, api, className }: PadParts & { className?: string }) {
+function PadField({
+  store,
+  api,
+  className,
+  fieldRef,
+}: PadParts & { className?: string; fieldRef?: Ref<HTMLTextAreaElement> }) {
   const state = useSyncExternalStore(store.subscribe, store.get)
   const { PlainTextarea, cn } = api.kit
   return (
     <>
       <PlainTextarea
+        ref={fieldRef}
         aria-label="Pad"
         placeholder="Notes"
         value={state.text}
@@ -65,47 +73,64 @@ function PadField({ store, api, className }: PadParts & { className?: string }) 
   )
 }
 
-/** On the rail, which is too narrow for text, the pad is an icon that opens its panel beside it. */
-function RailPad({ store, api, panel }: PadParts & { panel: NonNullable<ModViewProps['panel']> }) {
+const FIELD_CLASS = 'border-0 px-4 py-2 text-base focus-visible:ring-inset md:text-sm dark:bg-transparent'
+
+/** On the rail, which is too narrow for text, the pad is an icon that opens it as a window. */
+function RailPad({ store, api, place }: PadParts & { place: PadWindowState }) {
+  const open = useSyncExternalStore(place.subscribe, place.isOpen)
   const failed = useSyncExternalStore(store.subscribe, () => store.get().failure !== null)
-  const { Button, Hint } = api.kit
+  const [clicked, setClicked] = useState(false)
+  const field = useRef<HTMLTextAreaElement>(null)
+  useEffect(() => {
+    if (open && clicked) {
+      field.current?.focus()
+    }
+  }, [open, clicked])
+  const close = useCallback(() => {
+    place.setOpen(false)
+    document.querySelector<HTMLElement>('[data-pad-toggle]')?.focus()
+  }, [place])
+  const { Button, Hint, cn } = api.kit
   return (
-    <Hint text="Pad">
-      <Button
-        variant="ghost"
-        aria-label="Pad"
-        aria-pressed={panel.open}
-        className={api.kit.cn(
-          'relative size-9 p-0',
-          panel.open ? 'bg-primary text-primary-foreground hover:bg-primary/90' : 'text-foreground/70',
-        )}
-        onClick={() => {
-          panel.toggle()
-          void store.refresh()
-        }}
-      >
-        <NotepadText className="size-[18px]" />
-        {failed && <span aria-hidden className="absolute top-1 right-1 size-2 rounded-full bg-destructive" />}
-      </Button>
-    </Hint>
+    <>
+      <Hint text="Pad">
+        <Button
+          variant="ghost"
+          aria-label="Pad"
+          aria-pressed={open}
+          data-pad-toggle=""
+          className={cn(
+            'relative size-9 p-0',
+            open ? 'bg-primary text-primary-foreground hover:bg-primary/90' : 'text-foreground/70',
+          )}
+          onClick={() => {
+            setClicked(!open)
+            place.setOpen(!open)
+            void store.refresh()
+          }}
+        >
+          <NotepadText className="size-[18px]" />
+          {failed && <span aria-hidden className="absolute top-1 right-1 size-2 rounded-full bg-destructive" />}
+        </Button>
+      </Hint>
+      {open && (
+        <PadWindow api={api} place={place} onClose={close}>
+          <PadField store={store} api={api} fieldRef={field} className={FIELD_CLASS} />
+        </PadWindow>
+      )}
+    </>
   )
 }
 
-const padView = (api: UiModApi, store: PadStore) =>
-  function Pad({ layout, panel }: ModViewProps) {
+const padView = (api: UiModApi, store: PadStore, place: PadWindowState) =>
+  function Pad({ layout }: ModViewProps) {
     useEffect(() => {
       void store.refresh()
     }, [])
-    if (layout === 'rail' && panel !== null) {
-      return <RailPad store={store} api={api} panel={panel} />
+    if (layout === 'rail') {
+      return <RailPad store={store} api={api} place={place} />
     }
-    return (
-      <PadField
-        store={store}
-        api={api}
-        className="border-0 px-4 py-2 text-base focus-visible:ring-inset md:text-sm dark:bg-transparent"
-      />
-    )
+    return <PadField store={store} api={api} className={FIELD_CLASS} />
   }
 
 /** A text pad at the bottom of the navigation, kept on the server and saved as the user types. */
@@ -133,7 +158,7 @@ export const textPadUi = defineMod({
     window.addEventListener('focus', refresh)
     document.addEventListener('visibilitychange', refresh)
     window.addEventListener('pagehide', flush)
-    api.registerView({ id: 'pad', view: padView(api, store) })
+    api.registerView({ id: 'pad', view: padView(api, store, new PadWindowState()) })
     api.onDispose(() => {
       window.removeEventListener('focus', refresh)
       document.removeEventListener('visibilitychange', refresh)

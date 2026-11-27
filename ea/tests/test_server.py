@@ -76,6 +76,8 @@ async def test_health_reports_missing_keys() -> None:
         "missing": ["DEEPGRAM_API_KEY", "OPENAI_API_KEY", "ELEVENLABS_API_KEY"],
         "model": "gpt-6-sol",
         "text_model": "gpt-6-sol",
+        "llm_api": "chat",
+        "llm_host": "api.openai.com",
         "chat_missing": ["OPENAI_API_KEY"],
         "turn": False,
     }
@@ -91,6 +93,8 @@ async def test_health_when_configured() -> None:
         "missing": [],
         "model": "gpt-6-sol",
         "text_model": "gpt-6-sol",
+        "llm_api": "chat",
+        "llm_host": "api.openai.com",
         "chat_missing": [],
         "turn": True,
     }

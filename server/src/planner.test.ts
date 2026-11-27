@@ -1,6 +1,7 @@
 import { plannerOutput, type PlannerOutput } from '@seti/shared'
 import { afterEach, describe, expect, it } from 'vitest'
-import { asksForAws, asksForHost, checkPlan, fallbackTitle, type PlannerCatalog } from './planner-rules.js'
+import { asksForAws, asksForHost, checkPlan, type PlannerCatalog } from './planner-rules.js'
+import { fallbackTitle } from './planner-title.js'
 import { extractJson, planAgent, plannerRequest, planTitle, setPlannerModel, type PlannerModel } from './planner.js'
 
 const CATALOG: PlannerCatalog = {
@@ -65,7 +66,7 @@ describe('the prompt', () => {
     expect(request.prompt).toContain('- clickup [off by default]')
     expect(request.prompt).toContain('SSH hosts:\n- k8s [off by default]\n- voip [off by default]')
     expect(request.prompt).toContain('AWS: a role, off by default')
-    expect(request.prompt.endsWith('<message>\nDeploy to k8s\n</message>')).toBe(true)
+    expect(request.prompt).toContain('<message>\nDeploy to k8s\n</message>\nPlan from the message above')
   })
 
   it('asks for a title alone without the lists', () => {

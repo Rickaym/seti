@@ -1,6 +1,7 @@
 import { isUnreachable, pingApi } from '@/api'
 import { markBehind } from '@/lib/app-update'
 import { hasUnsavedChanges } from '@/lib/leave-guard'
+import { callLive } from '@/lib/live-call'
 import { planRecovery, type StaleRecovery } from '@/lib/stale-build'
 
 const PING_TIMEOUT_MS = 5000
@@ -37,7 +38,7 @@ async function recover(): Promise<StaleRecovery> {
     storage: sessionStore(),
     build: runningBuild(),
     now: Date.now(),
-    unsaved: hasUnsavedChanges(),
+    unsaved: hasUnsavedChanges() || callLive(),
     reachable: serverAnswers,
   })
   if (recovery === 'reload') {

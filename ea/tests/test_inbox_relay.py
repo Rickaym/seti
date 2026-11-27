@@ -29,7 +29,7 @@ def seti_of(fake: FakeSeti) -> SetiClient:
 
 
 async def report(
-    fake: FakeSeti, steps: list[Step], *, title: str = REVIEW
+    fake: FakeSeti, steps: list[Step], *, title: str = REVIEW, llm_api: str = "chat"
 ) -> tuple[Script, EaTools, list[int]]:
     """Delivers one channel alert and lets the scripted EA report on it; returns what it saw."""
     fake.inbox_item("channel_event", title)
@@ -38,7 +38,11 @@ async def report(
     turns: list[int] = []
     tools.user_turn = lambda *_heard: turns.append(1)  # type: ignore[method-assign]
     chat = TextChat(
-        settings(openai_api_key="op"), tools, Conversation(), llm=factory(script), now=lambda: NOW
+        settings(openai_api_key="op", llm_api=llm_api),
+        tools,
+        Conversation(),
+        llm=factory(script),
+        now=lambda: NOW,
     )
     await chat.follow_up(await deliver(seti_of(fake), [1], "chat"))
     await settle(chat)
@@ -61,9 +65,11 @@ async def test_with_relays_off_the_report_keeps_the_plain_rules(fake_seti: FakeS
     assert relays_sent(fake_seti) == []
 
 
-async def test_with_relays_on_the_report_relays_one_item_through_seti(fake_seti: FakeSeti) -> None:
+async def test_with_relays_on_the_report_relays_one_item_through_seti(
+    fake_seti: FakeSeti, llm_api: str
+) -> None:
     fake_seti.ea_settings = ON
-    script, _tools, _turns = await report(fake_seti, [("call-1", "post_team_chat", RELAY)])
+    script, _tools, _turns = await report(fake_seti, [("call-1", "post_team_chat", RELAY)], llm_api=llm_api)
     note = script.seen[0][1]["content"]
     assert note.startswith(RELAY_NOTE)
     assert f'- 1: alert "{REVIEW}"' in note
@@ -73,12 +79,12 @@ async def test_with_relays_on_the_report_relays_one_item_through_seti(fake_seti:
     assert "Told " in result["content"]
 
 
-async def test_a_refusal_from_seti_is_reported_and_never_retried(fake_seti: FakeSeti) -> None:
+async def test_a_refusal_from_seti_is_reported_and_never_retried(fake_seti: FakeSeti, llm_api: str) -> None:
     fake_seti.ea_settings = ON
     fake_seti.relay_refusal = (403, "This item is not about Billing export; report it or ask the user")
     again = {**RELAY, "text": "Billing export should look at this."}
     script, _tools, _turns = await report(
-        fake_seti, [("call-1", "post_team_chat", RELAY), ("call-2", "post_team_chat", again)]
+        fake_seti, [("call-1", "post_team_chat", RELAY), ("call-2", "post_team_chat", again)], llm_api=llm_api
     )
     results = [m["content"] for m in script.seen[1] if m["role"] == "tool"]
     assert "Seti refused the relay: This item is not about Billing export" in results[0]

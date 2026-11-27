@@ -19,6 +19,7 @@ import {
   type EaRequestData,
 } from '@seti/shared'
 import { withMicDefaults } from './audio-prefs'
+import { micHealth, sourceEnergy, type Hearing } from './away'
 import { QualityMeter } from './call-quality'
 import type { CallAction } from './call-state'
 import type { CallHandlers, LiveCall } from './call-store'
@@ -370,6 +371,13 @@ export function createCall(
     reroute: rerouter.reroute,
     send: (type: string) => {
       client.sendClientMessage(type)
+    },
+    hearing: async (): Promise<Hearing> => {
+      const stats = await (transport as unknown as TransportInternals).pc?.getStats().catch(() => undefined)
+      return {
+        mic: micHealth(manager.tracks().local.audio ?? null),
+        energy: stats === undefined ? null : sourceEnergy(stats),
+      }
     },
     failure: async (e: unknown) => recentReason() ?? connectError(e),
     quality: meter.quality,

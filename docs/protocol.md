@@ -376,6 +376,11 @@ between two steps; an interrupt; a hook at subagent start.
   quotes or headings, self-addressed questions and closing courtesies MUST NOT count.
 - TURN-19: An agent that asked (`notify_when_done`, await) MUST get one `agent` update when the
   other agent's turn ends.
+- TURN-20: A start without a title takes the planner's name for the work its message describes,
+  given the message as framed data (UPD-13). A title that is empty, speaks in the first person
+  where the message does not, or states a refusal, apology or status the message does not
+  mention MUST NOT be used: the title is the message's opening words and `fallback_reason` says
+  why, judged without a model call.
 
 ## 5. Updates and delivery
 
@@ -1258,7 +1263,12 @@ Why: an agent woken by its own actions or by news nobody waited for burns turns 
 - EA-4: A yes counts only for an ask from an earlier user turn or EA process, within `ask_ttl`. One
   ask takes one answer and runs once with the recorded arguments. The user MAY answer by text,
   voice or notification, except that an EA-17 action takes text or voice only; delegates MUST NOT.
-  Why: the model cannot ask and approve in the same breath.
+  A typed or spoken yes counts only when the user's turn is itself the yes: one line of at most 16
+  words that opens with an affirmation and holds no refusal, "but", quotation mark or question
+  mark. The EA's code checks this before it takes any ask; a yes inside pasted text, a quote or a
+  longer sentence takes nothing, and the EA asks again.
+  Why: the model cannot ask and approve in the same breath, and words the user did not mean as an
+  answer cannot approve for them.
 - EA-7: The EA reaches agents only by group chat. A direct message joins a running turn or starts
   one; it never interrupts.
 - EA-8: Inbox items are `followup`, `reminder`, `watch_event`, `channel_event`, `team_mention`; a
@@ -1324,6 +1334,22 @@ Why: an agent woken by its own actions or by news nobody waited for burns turns 
   user's request, asks first (EA-3) or acts only on the user's word (EA-17). The list is read only
   and holds no arguments or values. When the EA is not running the page says so.
   Why: the user decides what to ask the EA for, so they see what it can do and what waits for them.
+- EA-21: The EA's settings MUST show the whole prompt the running EA gives its model, read from
+  the EA itself and only by the user: the system prompt as built for the current settings and
+  linked packs, the note each channel (call, chat, inbox) adds to a turn, and the live context the
+  last turn was given with its age, each with its character count, and the commit the EA runs.
+  Showing it MUST NOT build a live context or call a model; every part passes the EA's secret
+  redaction. The view is read only. When the EA is not running the page says so.
+  Why: the user can read exactly what the EA is told, which changes only through code.
+- EA-22: Leaving Seti MUST NOT end a voice call: nothing in Seti hangs up, reloads or navigates
+  the page while a call connects or is live, and opening Seti again from its icon, a shortcut or a
+  widget routes inside the running page. The call stays media with Mute and Hang up on the lock
+  screen. On devices that silence a backgrounded browser's microphone (Android, iOS) the call
+  shows "The EA cannot hear you while Seti is in the background on this device". On return the
+  page reopens a microphone the system muted or ended, and when the EA heard nothing for 5 s or
+  more it says "You were away for <time>; the EA could not hear you".
+  Why: a call must survive a glance at another app, and a silenced microphone must never pass for
+  a live one.
 
 ## 15. Resilience
 
@@ -1629,10 +1655,9 @@ Optional and off by default: a maintenance session per agent that consolidates i
   it starts the mod; mod API 2.0.0 makes these MUST and refuses such a manifest.
 - MOD-28: A bundled mod MAY place a view at the bottom of the navigation (`navBottom`). In the menu
   drawer of a narrow screen the view takes the height the sections leave and keeps a minimum, the
-  sections scrolling first. In the icon rail of a wide screen it MAY open a panel beside the rail at
-  the rail's full height, which narrows the page rather than covering it, stays open on that device
-  until the view or Esc closes it, and is one at a time. A third-party mod MUST NOT place a view
-  there.
+  sections scrolling first. In the icon rail of a wide screen it has the rail's width and MAY float
+  a window over the page, above the page's own docks and panels and under the control room's
+  dialogs, menus and toasts. A third-party mod MUST NOT place a view there.
 
 ## 18. Public surfaces
 
@@ -1721,9 +1746,9 @@ Optional and off by default: a maintenance session per agent that consolidates i
   `build`. A client compares its own id with the server's on every poll, when it returns to the
   foreground and when it comes back online. When they differ it installs the new worker and reloads
   into the new build at a safe moment: at once while hidden or idle, never while the user types,
-  a composer holds text, a dialog is open, a file uploads or a form is unsaved; until then it
-  shows one Update control in the status bar that reloads on demand. A hidden page waits only for
-  uploads, unsaved forms and text no draft keeps. Composer drafts survive the reload. A failed
+  a composer holds text, a dialog is open, a file uploads, a form is unsaved or an EA call is live;
+  until then it shows one Update control in the status bar that reloads on demand. A hidden page
+  waits only for uploads, unsaved forms, text no draft keeps and a live EA call. Composer drafts survive the reload. A failed
   worker install is tried again after 5 s, doubling to 5 minutes; after two failures the page
   reloads without it. A client reloads by itself at most once per build. A client already on the
   server's build lets a waiting worker take over at once.

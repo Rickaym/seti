@@ -18,8 +18,10 @@ from openai.types.chat.chat_completion_chunk import (
     ChoiceDeltaToolCallFunction,
 )
 from openai.types.completion_usage import PromptTokensDetails
+from pipecat.adapters.llm.services.open_ai_adapter import OpenAILLMAdapter
 from pipecat.processors.aggregators.llm_context import LLMContext
 from pipecat.services.openai.llm import OpenAILLMService
+from responses_fake import Thought, play
 
 from seti_ea import server
 from seti_ea.announce import ACTION_LINES, PHRASES
@@ -28,6 +30,7 @@ from seti_ea.clock import parse_user_clock
 from seti_ea.config import Settings
 from seti_ea.conversation import Conversation
 from seti_ea.history import SUMMARY_PREFIX, HistorySync
+from seti_ea.llm import ModelLLM, ReasoningConfig, ResponsesLLM, ResponsesSettings
 from seti_ea.prompt import CHAT_NOTE_PREFIX, CONFIRM_QUESTION, SYSTEM_PROMPT
 from seti_ea.seti import SetiClient
 from seti_ea.tools import EaTools
@@ -50,6 +53,7 @@ class Script:
     models: list[str] = field(default_factory=list)
     fail: bool = False
     usage: CompletionUsage | None = None
+    inputs: list[list[Any]] = field(default_factory=list)
 
 
 def chunk(delta: ChoiceDelta) -> ChatCompletionChunk:
@@ -126,8 +130,54 @@ class ScriptedLLM(OpenAILLMService):
         return self._script.summary
 
 
+class ScriptedResponsesLLM(ResponsesLLM):
+    """The EA's Responses service with the network swapped for a script that reasons first."""
+
+    def __init__(self, script: Script, model: str, system: str = SYSTEM_PROMPT) -> None:
+        super().__init__(
+            api_key="test",
+            settings=ResponsesSettings(
+                model=model, system_instruction=system, reasoning=ReasoningConfig(effort="low")
+            ),
+        )
+        self._system = system
+        self._script = script
+        self._context = LLMContext()
+        script.models.append(model)
+
+    async def _process_context(self, context: LLMContext) -> None:
+        self._context = context
+        await super()._process_context(context)
+
+    async def _create_stream(self, params: dict[str, Any]) -> Any:
+        chat = await OpenAILLMAdapter().get_llm_invocation_params(
+            self._context, system_instruction=self._system, convert_developer_to_user=False
+        )
+        messages = [dict(m) for m in cast(list[Any], chat["messages"])]
+        self._script.systems.append(str(params["instructions"]))
+        self._script.seen.append(messages[1:])
+        self._script.inputs.append(list(params["input"]))
+        if self._script.fail:
+            raise RuntimeError("model unavailable")
+        steps = self._script.replies.pop(0)
+        return play([Thought(f"rs-{len(self._script.inputs)}"), *steps])
+
+    async def run_inference(
+        self,
+        context: LLMContext,
+        max_tokens: int | None = None,
+        system_instruction: str | None = None,
+        response_schema: dict[str, Any] | None = None,
+    ) -> str | None:
+        first = cast(dict[str, Any], context.messages[0])
+        self._script.summarised.append(str(first.get("content")))
+        return self._script.summary
+
+
 def factory(script: Script) -> Any:
-    def build(settings: Settings, system: str) -> OpenAILLMService:
+    def build(settings: Settings, system: str) -> ModelLLM:
+        if settings.llm_api == "responses":
+            return ScriptedResponsesLLM(script, settings.chat_model, system)
         return ScriptedLLM(script, settings.chat_model, system)
 
     return build
@@ -159,13 +209,15 @@ async def settle(chat: TextChat) -> None:
     chat._turn.release()  # pyright: ignore[reportPrivateUsage]
 
 
-async def test_a_typed_question_streams_tools_and_text_and_is_stored_as_chat(fake_seti: FakeSeti) -> None:
+async def test_a_typed_question_streams_tools_and_text_and_is_stored_as_chat(
+    fake_seti: FakeSeti, llm_api: str
+) -> None:
     fake_seti.ea_append("call", {"role": "developer", "content": "A new call started. Noon."})
     fake_seti.ea_append("message", {"role": "user", "content": "Anything on fire?"})
     fake_seti.ea_append("message", {"role": "assistant", "content": "Nothing on fire."})
     script = Script([[("call-1", "list_tasks", {"status": "running"})], ["One task ", "is running."]])
     conversation = Conversation()
-    chat = make_chat(fake_seti, script, conversation, text_model="gpt-planner")
+    chat = make_chat(fake_seti, script, conversation, text_model="gpt-planner", llm_api=llm_api)
 
     events = await events_of(chat, "What is running right now?")
 
@@ -252,7 +304,7 @@ async def test_voice_fillers_stay_out_of_the_chat(fake_seti: FakeSeti) -> None:
     assert all(event["type"] in {"tool", "tool_result", "text", "done"} for event in events)
 
 
-async def test_actions_wait_for_a_typed_yes(fake_seti: FakeSeti) -> None:
+async def test_actions_wait_for_a_typed_yes(fake_seti: FakeSeti, llm_api: str) -> None:
     script = Script(
         [
             [f"That stops Fix the login redirect bug mid-turn. {CONFIRM_QUESTION}"],
@@ -260,7 +312,7 @@ async def test_actions_wait_for_a_typed_yes(fake_seti: FakeSeti) -> None:
             ["Stopped."],
         ]
     )
-    chat = make_chat(fake_seti, script, Conversation())
+    chat = make_chat(fake_seti, script, Conversation(), llm_api=llm_api)
     stop = f"/api/tasks/{TASK_LOGIN}/stop"
 
     asked = await events_of(chat, "Stop the login task.")
@@ -282,7 +334,9 @@ async def test_actions_wait_for_a_typed_yes(fake_seti: FakeSeti) -> None:
     ]
 
 
-async def test_a_destructive_tool_acts_only_after_a_later_typed_yes(fake_seti: FakeSeti) -> None:
+async def test_a_destructive_tool_acts_only_after_a_later_typed_yes(
+    fake_seti: FakeSeti, llm_api: str
+) -> None:
     delete = ("delete_agent", {"task": "logout"})
     script = Script(
         [
@@ -293,7 +347,7 @@ async def test_a_destructive_tool_acts_only_after_a_later_typed_yes(fake_seti: F
             ["Deleted."],
         ]
     )
-    chat = make_chat(fake_seti, script, Conversation())
+    chat = make_chat(fake_seti, script, Conversation(), llm_api=llm_api)
 
     asked = await events_of(chat, "Delete the logout agent.")
     results = [event for event in asked if event["type"] == "tool_result"]
@@ -324,10 +378,12 @@ async def test_the_chat_note_comes_once_per_switch_to_typing(fake_seti: FakeSeti
     assert notes[-1]["content"].startswith(CHAT_NOTE_PREFIX)
 
 
-async def test_leaving_mid_reply_keeps_the_question_and_what_was_said(fake_seti: FakeSeti) -> None:
+async def test_leaving_mid_reply_keeps_the_question_and_what_was_said(
+    fake_seti: FakeSeti, llm_api: str
+) -> None:
     hold = asyncio.Event()
     script = Script([["Two tasks are ", hold, "running."]])
-    chat = make_chat(fake_seti, script, Conversation())
+    chat = make_chat(fake_seti, script, Conversation(), llm_api=llm_api)
 
     stream = chat.reply("How busy are we?", CLOCK)
     async for event in stream:
@@ -394,12 +450,12 @@ async def test_writes_wait_for_the_shared_history_lock(fake_seti: FakeSeti) -> N
     assert len(fake_seti.ea_history) == 3
 
 
-async def test_a_long_conversation_is_summarised_after_the_reply(fake_seti: FakeSeti) -> None:
+async def test_a_long_conversation_is_summarised_after_the_reply(fake_seti: FakeSeti, llm_api: str) -> None:
     for n in range(12):
         fake_seti.ea_append("message", {"role": "user", "content": f"Question {n} " + "x" * 200})
         fake_seti.ea_append("message", {"role": "assistant", "content": f"Answer {n} " + "y" * 200})
     script = Script([["Short answer."]])
-    chat = make_chat(fake_seti, script, Conversation(), history_max_tokens=200)
+    chat = make_chat(fake_seti, script, Conversation(), history_max_tokens=200, llm_api=llm_api)
 
     events = await events_of(chat, "And now?")
     assert events[-1]["type"] == "done"
