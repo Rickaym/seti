@@ -684,7 +684,7 @@ TOOL_SPECS: list[ToolSpec] = [
         {
             "text": {
                 "type": "string",
-                "description": "The message, short and self-contained. Leave out with fix_ci.",
+                "description": "The message, short. Leave out with fix_ci.",
             },
             "to": {
                 "type": "string",
