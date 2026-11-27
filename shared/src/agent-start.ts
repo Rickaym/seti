@@ -47,7 +47,7 @@ export type PlannerOutput = z.output<typeof plannerOutput>
 export interface TaskSetup {
   /** `model` when the planner answered; `fallback` when it failed and defaults were used. */
   planner: 'model' | 'fallback'
-  /** Why the planner fell back, such as a timeout. */
+  /** Why the planner fell back, such as a timeout, or why its title was not used. */
   fallback_reason: string | null
   /** Context packs linked beyond the defaults, and defaults left off. */
   packs_linked: string[]

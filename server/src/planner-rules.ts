@@ -1,4 +1,5 @@
-import { AWS_ACCESS_ID, PLANNED_TITLE_MAX, type AccessChoice, type PlannerOutput, type TaskSetup } from '@seti/shared'
+import { AWS_ACCESS_ID, type AccessChoice, type PlannerOutput, type TaskSetup } from '@seti/shared'
+import { titleFor } from './planner-title.js'
 
 export interface PlannerCatalog {
   packs: { id: string; name: string; description: string; linked_by_default: boolean; builtin: boolean }[]
@@ -26,49 +27,6 @@ export interface AgentPlan {
   /** SSH hosts and AWS granted beyond their defaults. */
   access: AccessChoice[]
   setup: TaskSetup
-}
-
-const QUOTE_MARKS = new Set(['"', "'", '`'])
-
-/** Drops quotes and spaces around a title, and a final period. */
-function unquote(text: string): string {
-  let start = 0
-  let end = text.length
-  while (start < end && (QUOTE_MARKS.has(text.charAt(start)) || text.charAt(start) === ' ')) {
-    start += 1
-  }
-  while (end > start && (QUOTE_MARKS.has(text.charAt(end - 1)) || ' .'.includes(text.charAt(end - 1)))) {
-    end -= 1
-  }
-  return text.slice(start, end)
-}
-
-/** Cuts at a word boundary so a clipped title never ends mid-word. */
-function clip(text: string, max: number): string {
-  if (text.length <= max) {
-    return text
-  }
-  const cut = text.slice(0, max + 1)
-  const space = cut.lastIndexOf(' ')
-  return (space > max / 2 ? cut.slice(0, space) : text.slice(0, max)).trimEnd()
-}
-
-const upperFirst = (text: string) => text.charAt(0).toUpperCase() + text.slice(1)
-
-/** A title from the message itself: its first line's opening words, the command sign dropped. */
-export function fallbackTitle(message: string): string {
-  const line =
-    message
-      .split('\n')
-      .map((part) => part.replace(/^[/!#>*\-\s]+/, '').trim())
-      .find((part) => part !== '') ?? ''
-  const title = clip(unquote(line.replace(/\s+/g, ' ')), PLANNED_TITLE_MAX)
-  return title === '' ? 'New agent' : upperFirst(title)
-}
-
-export function cleanTitle(raw: string, message: string): string {
-  const title = clip(unquote(raw.replace(/\s+/g, ' ')), PLANNED_TITLE_MAX)
-  return title === '' ? fallbackTitle(message) : upperFirst(title)
 }
 
 const escapeRegex = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
@@ -245,9 +203,10 @@ export function checkPlan(answer: PlannerAnswer, catalog: PlannerCatalog, pins: 
   const mcp = pickMcp(raw, catalog, { message, withheld })
   const access = pickAccess(raw, message, catalog, grantlessOf(pins))
   withheld.push(...access.withheld)
+  const titled = pins.title === undefined ? titleFor(raw.title, message) : { title: pins.title, problem: null }
   const setup: TaskSetup = {
     planner: answer.reason === null ? 'model' : 'fallback',
-    fallback_reason: answer.reason,
+    fallback_reason: answer.reason ?? titled.problem,
     packs_linked: packs.linked,
     packs_unlinked: packs.unlinked,
     mcp_enabled: mcp.enabled,
@@ -257,7 +216,7 @@ export function checkPlan(answer: PlannerAnswer, catalog: PlannerCatalog, pins: 
     ms: answer.ms,
   }
   return {
-    title: pins.title ?? cleanTitle(raw.title, message),
+    title: titled.title,
     context_pack_ids: packs.ids,
     mcp_enabled: mcp.enabled,
     mcp_disabled: mcp.disabled,
