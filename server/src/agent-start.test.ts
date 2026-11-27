@@ -83,15 +83,13 @@ describe('POST /api/tasks/start', () => {
     expect(path.dirname(task.cwd)).toBe(SCRATCH_ROOT)
     const packs = (await send<ContextPackSummary[]>('GET', `/tasks/${task.id}/context-packs`)).data
     expect(packs.filter((pack) => pack.kind === 'role')).toEqual([])
-    expect(task.setup).toMatchObject({
-      planner: 'model',
-      access: [],
-      withheld: ['AWS: not configured'],
-    })
+    expect(task.setup).toMatchObject({ planner: 'model', withheld: [] })
+    expect(task.setup).not.toHaveProperty('access')
     const [created] = (await auditEvents.page(auditQuery.parse({ kind: 'task.created', limit: 1 }))).events
     expect(created?.subject_id).toBe(task.id)
     expect(created?.summary).toContain('planned: fresh folder')
-    expect(created?.detail).toMatchObject({ planner: 'model', withheld: ['AWS: not configured'] })
+    expect(created?.detail).toMatchObject({ planner: 'model' })
+    expect(created?.detail).not.toHaveProperty('withheld')
   })
 
   it('starts outside the sandbox when the user turns it off, and refuses that to the EA', async () => {
@@ -119,28 +117,22 @@ describe('POST /api/tasks/start', () => {
     expect(task).toMatchObject({ title: 'Review PR 7', repo_id: null })
   })
 
-  it('grants an SSH host the message names through the agent access', async () => {
+  it('turns on no SSH host or AWS from the message, whoever starts the agent', async () => {
     const { data: key } = await send<{ id: string }>('POST', '/ssh/keys', { name: 'start' })
     const host = { alias: 'k8s', hostname: '192.0.2.9', user: 'ops', key_id: key.id }
     expect((await send('POST', '/ssh/hosts', host)).status).toBe(200)
-    answer({ title: 'Restart the pod', ssh_hosts: ['k8s'] })
-    const { data: task } = await send<Task>('POST', '/tasks/start', { prompt: 'ssh to k8s and restart the pod' })
-    expect(task.setup?.access).toEqual(['SSH k8s'])
-    const { data: view } = await send<TaskAccessView>('GET', `/tasks/${task.id}/access`)
-    expect(view.items.find((item) => item.kind === 'ssh' && item.id === 'k8s')).toMatchObject({
-      enabled: true,
-      override: true,
-      default_enabled: false,
-    })
-  })
-
-  it('never grants the EA SSH or AWS', async () => {
-    answer({ title: 'Check AWS', aws: true, ssh_hosts: ['k8s'] })
-    const { data: task } = await send<Task>('POST', '/tasks/start', { prompt: 'ssh to k8s and check aws' }, EA_AUTH)
-    expect(task.sandbox).toBe(true)
-    expect(task.setup?.withheld).toEqual(['SSH k8s: the EA cannot grant it', 'AWS: the EA cannot grant it'])
-    const { data: view } = await send<TaskAccessView>('GET', `/tasks/${task.id}/access`)
-    expect(view.items.filter((item) => item.enabled && (item.kind === 'ssh' || item.kind === 'aws'))).toEqual([])
+    for (const auth of [undefined, EA_AUTH]) {
+      answer({ title: 'Restart the pod', ssh_hosts: ['k8s'], aws: true })
+      const { data: task } = await send<Task>('POST', '/tasks/start', { prompt: 'ssh to k8s and check aws' }, auth)
+      expect(task.sandbox).toBe(true)
+      expect(task.setup?.withheld).toEqual([])
+      const { data: view } = await send<TaskAccessView>('GET', `/tasks/${task.id}/access`)
+      expect(view.items.find((item) => item.kind === 'ssh' && item.id === 'k8s')).toMatchObject({
+        enabled: false,
+        override: null,
+      })
+      expect(view.items.filter((item) => item.enabled && (item.kind === 'ssh' || item.kind === 'aws'))).toEqual([])
+    }
   })
 
   it('refuses an empty message', async () => {

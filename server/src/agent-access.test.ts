@@ -252,11 +252,15 @@ describe('ssh hosts, one by one', () => {
   it('restarts the session at the next turn and tells the agent only its hosts', async () => {
     const task = await newTask()
     const before = await setupKey(task)
+    const offK8s = /Off for you: SSH hosts [^.;]*\bk8s\b/
     expect(await sandboxPrompt(task.id)).not.toContain('SSH reaches')
+    expect(await sandboxPrompt(task.id)).toMatch(offK8s)
+    expect(await sandboxPrompt(task.id)).toContain('say in your message which one and why; the user turns it on')
     await setAccess(task, 'ssh', 'k8s', true)
     const withK8s = await setupKey(task)
     expect(withK8s).not.toBe(before)
     expect(await sandboxPrompt(task.id)).toContain('SSH reaches only these hosts: k8s (ssh <alias>)')
+    expect(await sandboxPrompt(task.id)).not.toMatch(offK8s)
     await setAccess(task, 'ssh', 'db', true)
     const withDb = await setupKey(task)
     expect(withDb).not.toBe(withK8s)

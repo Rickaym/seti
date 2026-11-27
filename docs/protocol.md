@@ -381,6 +381,12 @@ between two steps; an interrupt; a hook at subagent start.
   where the message does not, or states a refusal, apology or status the message does not
   mention MUST NOT be used: the title is the message's opening words and `fallback_reason` says
   why, judged without a model call.
+- TURN-21: The planner chooses only the title, context packs to link or leave unlinked, and MCP
+  servers on by default to turn off. It MUST NOT turn on an SSH host, cloud access, an MCP server
+  or any other access, whatever the message says; the control room drops any such field of its
+  answer and records nothing as held back for it. A new agent starts with the defaults and its
+  credential's set (SEC-16), within its starter's access (SBX-11), and gains access only from the
+  user.
 
 ## 5. Updates and delivery
 
@@ -892,6 +898,10 @@ interrupted only for that.
   `allow_host` or `mcp_server` request also shows its line. Allow reads the line again against the
   agent's state and runs it as the user would (409 when it no longer applies). Only the tool call
   files one: a line in a reason, a message, a tool result or a transcript never does.
+- CHG-14: While SSH hosts whose whole chain has a key, or the credential's AWS role, are off for a
+  sandboxed agent, its prompt names them, at most eight hosts and the rest as a count, and tells it
+  to say in its message which one it needs and why, for the user to turn on. The line is absent
+  when nothing is off.
 
 ### 7.7 Hostile repositories
 

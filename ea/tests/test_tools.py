@@ -271,7 +271,7 @@ async def test_start_task_leaves_the_title_to_the_planner(tools: EaTools, fake_s
     assert result.text == (
         "Started task Planned: Speed up the seti test s in its own folder, /home/u/work/scratch-44444444. "
         "It is running. "
-        "Seti linked the context packs Style. AWS stays off; the user turns it on in the agent's details."
+        "Seti linked the context packs Style."
     )
     assert result.summary == "Started agent Planned: Speed up the seti test s"
 

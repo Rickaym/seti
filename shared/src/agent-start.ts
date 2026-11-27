@@ -31,15 +31,12 @@ export const startAgentInput = z.object({
 export type StartAgentInput = z.input<typeof startAgentInput>
 export type StartAgentRequest = z.output<typeof startAgentInput>
 
-/** What the planner answers; names, not ids, and every field checked again on the server. */
+/** What the planner answers: names, not ids, checked again on the server; it turns nothing on. */
 export const plannerOutput = z.object({
   title: z.string().trim().default(''),
   link_packs: z.array(z.string()).default([]),
   unlink_packs: z.array(z.string()).default([]),
-  enable_mcp: z.array(z.string()).default([]),
   disable_mcp: z.array(z.string()).default([]),
-  ssh_hosts: z.array(z.string()).default([]),
-  aws: z.boolean().default(false),
 })
 export type PlannerOutput = z.output<typeof plannerOutput>
 
@@ -52,12 +49,9 @@ export interface TaskSetup {
   /** Context packs linked beyond the defaults, and defaults left off. */
   packs_linked: string[]
   packs_unlinked: string[]
-  /** MCP servers turned on or off against the defaults. */
-  mcp_enabled: string[]
+  /** MCP servers on by default that the planner turned off. */
   mcp_disabled: string[]
-  /** Access granted beyond the defaults, such as SSH k8s or AWS. */
-  access: string[]
-  /** What the planner asked for that the rules held back. */
+  /** What the start held back, such as access beyond what a starting agent has. */
   withheld: string[]
   /** Planning time in milliseconds. */
   ms: number
@@ -71,8 +65,6 @@ export function setupSummary(setup: TaskSetup): string {
     'fresh folder',
     ...list('packs', setup.packs_linked),
     ...list('without packs', setup.packs_unlinked),
-    ...list('MCP on', setup.mcp_enabled),
     ...list('MCP off', setup.mcp_disabled),
-    ...list('access', setup.access),
   ].join('; ')
 }

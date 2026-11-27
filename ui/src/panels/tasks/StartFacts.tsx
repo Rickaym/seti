@@ -1,6 +1,6 @@
 import { warmCacheSummary, type TaskSetup, type WarmCacheSeed } from '@seti/shared'
 
-/** What the planner asked for at the start that the rules held back, one note per line. */
+/** What the start held back, such as access beyond its starter's, one note per line. */
 export function HeldBack({ setup }: { setup: TaskSetup }) {
   return (
     <ul aria-label="Held back" className="flex min-w-0 flex-col">

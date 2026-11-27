@@ -3,6 +3,7 @@ import { taskSsh } from './agent-access.js'
 import { sharedMemoryLines } from './agent-memory.js'
 import { taskAws } from './aws-access.js'
 import { tasks } from './db.js'
+import type { SshReach } from './ssh-config.js'
 import { connectionRows } from './store/connections.js'
 import { profiles } from './store/credentials.js'
 import { sandboxPolicy } from './store/sandbox.js'
@@ -47,6 +48,26 @@ function sshLine(aliases: readonly string[]): string {
   )
 }
 
+const OFF_LIST_MAX = 8
+
+const ASK_USER =
+  'If your task needs one, say in your message which one and why; the user turns it on, ' +
+  'with /seti:access ssh <alias> on, /seti:access aws on or your access dialog.'
+
+/** SSH hosts with a login and the AWS role that are off for the agent, and how to get them. */
+async function offLines(task: Task, ssh: SshReach, aws: boolean): Promise<string[]> {
+  const hosts = [...ssh.missing].flatMap(([alias, gaps]) =>
+    gaps.length === 0 && !ssh.enabled.includes(alias) ? [alias] : [],
+  )
+  const role = !aws && ((await profiles.get(task.profile_id))?.aws.role_arn ?? null) !== null
+  const more = hosts.length > OFF_LIST_MAX ? [`${String(hosts.length - OFF_LIST_MAX)} more`] : []
+  const off = [
+    ...(hosts.length === 0 ? [] : [`SSH hosts ${[...hosts.slice(0, OFF_LIST_MAX), ...more].join(', ')}`]),
+    ...(role ? ['AWS'] : []),
+  ]
+  return off.length === 0 ? [] : [`Off for you: ${off.join('; ')}. ${ASK_USER}`]
+}
+
 /** Names the hosts Seti adds a connection's header on, so the agent calls them without a token. */
 async function headersLine(task: Task): Promise<string[]> {
   const rows = (await connectionRows.ofProfile(task.profile_id)).filter((row) => row.header !== null)
@@ -63,11 +84,13 @@ export async function sandboxPrompt(taskId: string): Promise<string | null> {
   if (task?.sandbox !== true || !(await sandboxPolicy.get()).enabled) {
     return null
   }
-  const ssh = (await taskSsh(task.id)).usable
+  const ssh = await taskSsh(task.id)
+  const aws = await taskAws(task.id)
   const extra = [
     ...(await headersLine(task)),
-    ...((await taskAws(task.id)) ? [await awsLine(task)] : []),
-    ...(ssh.length === 0 ? [] : [sshLine(ssh)]),
+    ...(aws ? [await awsLine(task)] : []),
+    ...(ssh.usable.length === 0 ? [] : [sshLine(ssh.usable)]),
+    ...(await offLines(task, ssh, aws)),
   ]
   return [...homeLines(task), ...SANDBOX_LINES, ...extra, ...sharedMemoryLines(task)].join('\n')
 }

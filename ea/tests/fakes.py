@@ -1504,16 +1504,13 @@ class FakeSeti:
         title = body.get("title") or f"Planned: {prompt[:24]}"
         task = make_task("44444444-aaaa-4bbb-8ccc-000000000004", title, "running")
         task.update(repo_id=None, repo_slug=None, repos=[], cwd="/home/u/work/scratch-44444444")
-        withheld = ["AWS: not asked for explicitly"] if "aws" in prompt.lower() else []
         task["setup"] = {
             "planner": "model",
             "fallback_reason": None,
             "packs_linked": ["Style"] if "title" not in body and "seti" in prompt.lower() else [],
             "packs_unlinked": [],
-            "mcp_enabled": [],
             "mcp_disabled": [],
-            "access": [],
-            "withheld": withheld,
+            "withheld": [],
             "ms": 2100,
         }
         return task
