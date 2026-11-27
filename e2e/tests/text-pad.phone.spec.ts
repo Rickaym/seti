@@ -58,3 +58,13 @@ test('with the keyboard open the pad stays in view and the sections scroll', asy
   const sections = drawer.getByRole('navigation', { name: 'Sections' })
   expect(await sections.evaluate((nav) => nav.scrollHeight > nav.clientHeight)).toBe(true)
 })
+
+test('a phone keeps the pad in the menu, never as a floating window', async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem('seti.text-pad.window', JSON.stringify({ open: true, frame: null }))
+  })
+  await page.goto('/')
+  await expect(page.getByRole('button', { name: 'Menu' })).toBeVisible()
+  await expect(page.getByRole('region', { name: 'Pad' })).toHaveCount(0)
+  await expect(pad(await openMenu(page))).toBeEditable()
+})

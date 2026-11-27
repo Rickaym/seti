@@ -24,46 +24,6 @@ export const usePlacedViews = (registry: Registry<PlacedView>): readonly PlacedV
 /** Whether an enabled mod places a view under the sidebar's sections, so the sections give way. */
 export const useNavBottomViews = () => usePlacedViews(navBottomViews).length > 0
 
-const NAV_PANEL_KEY = 'seti.nav-panel'
-const panelListeners = new Set<() => void>()
-
-function storedPanel(): string | null {
-  try {
-    return localStorage.getItem(NAV_PANEL_KEY)
-  } catch {
-    return null
-  }
-}
-
-let openPanel = storedPanel()
-
-/** Opens a `navBottom` view's panel beside the rail, or closes it with null; this device keeps it. */
-export function setNavPanel(key: string | null): void {
-  openPanel = key
-  try {
-    if (key === null) {
-      localStorage.removeItem(NAV_PANEL_KEY)
-    } else {
-      localStorage.setItem(NAV_PANEL_KEY, key)
-    }
-  } catch {
-    // Without storage the panel stays open for this page only.
-  }
-  for (const listener of panelListeners) {
-    listener()
-  }
-}
-
-const subscribePanel = (listener: () => void) => {
-  panelListeners.add(listener)
-  return () => {
-    panelListeners.delete(listener)
-  }
-}
-
-/** The key of the `navBottom` view whose panel is open beside the rail, or null. */
-export const useNavPanel = (): string | null => useSyncExternalStore(subscribePanel, () => openPanel)
-
 interface NewsEntry {
   key: string
   /** The settings page the news is on. */
