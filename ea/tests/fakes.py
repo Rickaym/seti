@@ -793,6 +793,9 @@ class FakeSeti:
     ssh_sets: dict[str, list[str]] = field(default_factory=dict)
     access_defaults: dict[str, bool] = field(default_factory=dict)
     processes: dict[str, dict[str, Any]] = field(default_factory=dict)
+    audit_chain: dict[str, Any] = field(
+        default_factory=lambda: {"ok": True, "checked": 42, "broken_at": None}
+    )
     access_catalog: list[dict[str, Any]] = field(default_factory=list)
     second_opinions: dict[str, dict[str, Any]] = field(default_factory=dict)
     recent_files: dict[str, dict[str, Any]] = field(default_factory=dict)
@@ -1347,6 +1350,8 @@ class FakeSeti:
                 return ok(self.repos)
             case ["workspaces"]:
                 return ok(self.workspaces)
+            case ["audit", "status"]:
+                return ok({"retention_days": 90, "chain": self.audit_chain})
             case ["audit"]:
                 return audit_page(self.audit, params)
             case ["ea", "context-packs"]:
