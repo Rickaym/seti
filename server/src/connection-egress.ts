@@ -63,12 +63,7 @@ export async function connectionContext(taskId: string): Promise<string | null> 
   }
   const list = rows.map((row) => `${row.env} (${row.hosts.join(', ')}${row.body ? '; bodies too' : ''})`).join(', ')
   const sandboxed = task.sandbox && (await sandboxPolicy.get()).enabled
-  const model = PROVIDERS[providerOf(task.runtime)].hosts
-  const swap = sandboxed
-    ? swapText(
-        rows.some((row) => row.body),
-        model,
-      )
-    : OUTSIDE
+  const bodies = rows.some((row) => row.body)
+  const swap = sandboxed ? swapText(bodies, PROVIDERS[providerOf(task.runtime)].hosts) : OUTSIDE
   return `Connections: ${list} hold Seti placeholders: ${swap}. Never print env values or ask for the keys.`
 }
