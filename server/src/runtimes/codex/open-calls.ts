@@ -1,6 +1,6 @@
 import { isCodexCall } from '@seti/shared'
 import { z } from 'zod'
-import type { CodexCall } from './rpc.js'
+import type { RpcCall } from '../json-rpc.js'
 
 const itemNote = z.looseObject({
   threadId: z.string().optional(),
@@ -23,7 +23,7 @@ export class OpenCalls {
   }
 
   /** Follows the calls Codex starts and completes. */
-  note(message: CodexCall): void {
+  note(message: RpcCall): void {
     const note = itemNote.safeParse(message.params).data
     if (note === undefined || !this.own(note.threadId) || !isCodexCall(note.item.type)) {
       return
@@ -39,7 +39,7 @@ export class OpenCalls {
    * At the end of one of the agent's own turns: the calls it leaves without an end, such as asks
    * an interrupt cut before they ran, other than commands that run on in the background.
    */
-  leftBy(message: CodexCall, inBackground: (id: string) => boolean): string[] {
+  leftBy(message: RpcCall, inBackground: (id: string) => boolean): string[] {
     if (message.method !== 'turn/completed' || !this.own(turnNote.safeParse(message.params).data?.threadId)) {
       return []
     }

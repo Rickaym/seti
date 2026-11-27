@@ -107,9 +107,9 @@ with another top-level folder.
   of any other runtime are filled when stored. A Codex message keeps the notification as Codex
   sent it beside the agent's own thread id. Codex reports tokens per model call, so at a turn's
   end ingest adds up the turn's calls and estimates their cost from OpenAI's public prices
-  (`server/src/codex-spend.ts`, `runtimes/codex/prices.ts`, dated); the turn end marks the cost
-  as estimated. Archives keep each row's runtime. Readers that filter on JSON text read such a
-  row by its event columns instead (`callText`, `callOrResultText` in `event-filters.ts`), and
+  (`server/src/codex-spend.ts`, `runtimes/prices.ts`), read from the provider registry's dated
+  table (`shared/src/providers.ts`); the turn end marks the cost as estimated. Archives keep
+  each row's runtime. Readers that filter on JSON text read such a row by its event columns instead (`callText`, `callOrResultText` in `event-filters.ts`), and
   search indexes it from its neutral events (`server/src/events/search-text.ts`) where the search
   trigger indexes Claude Code's rows from their JSON.
 - The evidence ledger (`source_item`) keeps one row per item an agent read: kind, container,
@@ -163,8 +163,9 @@ with another top-level folder.
   `git ls-files` and one `git check-ignore` per batch. `server/src/storage-clean.ts` refuses with
   409 while the agent runs, re-plans on confirm, removes only what both the plan and the request
   name, and records one `task.storage_cleaned` event (RES-16).
-- **Removal.** Every removal goes through `server/src/owned-dirs.ts`. A linked worktree goes
-  through its main checkout's `git worktree remove`; anything else is `fs.rm` on the checked path.
+- **Removal.** Every removal goes through `server/src/owned-dirs.ts`: `fs.rm` on the checked path,
+  then for a linked worktree its main checkout's record is dropped with a jailed
+  `git worktree remove` of the missing folder.
   `removeNestedDir` removes one rebuildable folder inside an agent folder that passes the same
   checks, and only when its real path is the agent folder's real path joined with the target's
   relative path, so no symlink on the way leads elsewhere.
@@ -292,10 +293,13 @@ the AppArmor profile for `bwrap` that the installer adds ([Setup](setup.md#sandb
   LibreOffice starts from a fresh profile with macros disabled and Java off.
 - **Agent-writable folders.** Seti runs git there only through `agentGit` in `server/src/git.ts`,
   which starts it in the jail of `server/src/git-jail.ts`: bwrap with its own user, process and
-  network namespaces, `/usr`, `/etc` and the repository's top and git folders mounted, nothing
-  else of the home or Seti's data, and an environment of git variables only (HST-2). Seti probes
-  capabilities through `server/src/runtimes/claude/probe-launch.ts` (HST-4), and
-  serves HTML previews under the policy in `server/src/html-preview.ts` (HST-5).
+  network namespaces, `/usr`, `/etc` and the repository's top (read-only) and git folders
+  mounted, nothing else of the home or Seti's data, and an environment of git variables only
+  (HST-2). Worktrees of a registered repository are made, listed and removed the same way, and
+  `server/src/warm-caches.ts` lists ignored files through `agentGitRaw`. `gitMounts` in
+  `server/src/sandbox-mounts.ts` makes the read-only covers of SBX-16, empty where missing. Seti
+  probes capabilities through `server/src/runtimes/claude/probe-launch.ts` (HST-4), and serves
+  HTML previews under the policy in `server/src/html-preview.ts` (HST-5).
 
 ## Writing a runtime adapter
 
@@ -472,7 +476,10 @@ the text, then the hourly limits, and claims the item in `ea_relay` before it po
 direct message through `postTeamMessage`. A channel alert records its `channel_id` on `ea_inbox`
 so the subscribed agents come from Seti's tables, not the payload. History pages attach each
 inbox entry's relays, and `POST /api/ea/relays/:id/take-back` dismisses the relay's update while
-it still waits for the agent.
+it still waits for the agent. In the EA, `ea/src/seti_ea/relays.py` reads the switch for each chat
+report, gives the model the relay rules and the report's item ids, and `RelayGuard` opens
+`post_team_chat` with `to` and `relay_of` once per report. A report never counts as the user's turn,
+so nothing in an item or a relay can answer an open ask. Reports on a call do not relay.
 
 ## Reference values
 

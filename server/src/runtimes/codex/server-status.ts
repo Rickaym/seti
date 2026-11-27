@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import type { ToolServerState } from '../adapter.js'
-import type { CodexCall } from './rpc.js'
+import type { RpcCall } from '../json-rpc.js'
 
 const startupNote = z.looseObject({
   name: z.string(),
@@ -35,7 +35,7 @@ export class ServerStatus {
   }
 
   /** Takes in one startup report; any other message is left alone. */
-  note(message: CodexCall): void {
+  note(message: RpcCall): void {
     if (message.method !== 'mcpServer/startupStatus/updated') {
       return
     }

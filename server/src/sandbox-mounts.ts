@@ -144,16 +144,38 @@ interface GitMounts {
   common: string | null
 }
 
-/** The shared .git a worktree writes commits into, and read-only covers for what runs code. */
+/** A read-only cover for a file or folder, made empty first where it does not exist yet. */
+function covered(target: string, folder: boolean): string {
+  if (folder) {
+    fs.mkdirSync(target, { recursive: true })
+  } else if (!exists(target)) {
+    fs.closeSync(fs.openSync(target, 'a'))
+  }
+  return target
+}
+
+/**
+ * The shared .git a worktree writes commits into, and read-only covers for what git reads as
+ * config or code there, made before the sandbox starts so that the agent cannot create them
+ * later: the config, the main checkout's config.worktree, the hooks and, for a worktree, the
+ * submodules' git folders, which hold their own config and hooks.
+ */
 function gitMounts(dir: string): GitMounts {
   const git = gitDirs(dir)
   if (git === null) {
     return { writable: [], guards: [], common: null }
   }
-  fs.mkdirSync(path.join(git.common, 'hooks'), { recursive: true })
-  const guards = [path.join(git.common, 'config'), path.join(git.common, 'hooks')]
+  const guards = [
+    path.join(git.common, 'config'),
+    covered(path.join(git.common, 'config.worktree'), false),
+    covered(path.join(git.common, 'hooks'), true),
+  ]
   if (git.linked) {
-    guards.push(path.join(dir, '.git'), path.join(git.own, 'config.worktree'))
+    guards.push(
+      path.join(dir, '.git'),
+      covered(path.join(git.own, 'config.worktree'), false),
+      covered(path.join(git.common, 'modules'), true),
+    )
   }
   return { writable: git.linked ? [git.common] : [], guards: guards.filter(exists), common: git.common }
 }

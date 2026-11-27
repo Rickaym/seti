@@ -107,13 +107,13 @@ between two steps; an interrupt; a hook at subagent start.
 
 ### 3.3 Requests
 
-| Entity                                                                | States                                                      | Holds agent | Settled by                    |
-| --------------------------------------------------------------------- | ----------------------------------------------------------- | ----------- | ----------------------------- |
-| Permission request (`tool`, `repeat`, `review`)                       | `pending`, `allowed`, `denied`, `cancelled`                 | yes         | user                          |
-| Question (`choice`, `yes_no`, `secret`)                               | `open`, `answered`, `dismissed`, `expired`                  | yes         | user; EA relays, not `secret` |
-| Change request (`allow_host`, `api_key`, `mcp_server`, `shared_tool`) | `pending`, `allowed`, `denied`, `expired`                   | yes         | user                          |
-| Knowledge note                                                        | `proposed`, `approved`, `rejected`, `stale`                 | no          | user                          |
-| Delegate ask (EA or mod)                                              | `pending`, `allowed`, `denied`, `expired`, `done`, `failed` | no          | user                          |
+| Entity                                                                           | States                                                      | Holds agent | Settled by                    |
+| -------------------------------------------------------------------------------- | ----------------------------------------------------------- | ----------- | ----------------------------- |
+| Permission request (`tool`, `repeat`, `review`)                                  | `pending`, `allowed`, `denied`, `cancelled`                 | yes         | user                          |
+| Question (`choice`, `yes_no`, `secret`)                                          | `open`, `answered`, `dismissed`, `expired`                  | yes         | user; EA relays, not `secret` |
+| Change request (`allow_host`, `api_key`, `mcp_server`, `shared_tool`, `command`) | `pending`, `allowed`, `denied`, `expired`                   | yes         | user                          |
+| Knowledge note                                                                   | `proposed`, `approved`, `rejected`, `stale`                 | no          | user                          |
+| Delegate ask (EA or mod)                                                         | `pending`, `allowed`, `denied`, `expired`, `done`, `failed` | no          | user                          |
 
 - ENT-20: One read MUST list every pending request by kind (`questions`, `access`, `plans`,
   `tools`, `notes`) and MUST offer no way to answer; each kind is answered on its own route.
@@ -526,6 +526,11 @@ interrupted only for that.
   control room's data MUST NOT be visible.
 - SBX-7: `home_access` adds the user's top-level non-dot home folders read-write, with their
   repository config and hooks read-only.
+- SBX-16: Where a sandbox mounts a repository's git folder writable, every file there that git
+  reads as config or code MUST be read-only to the agent whether or not it exists when the
+  sandbox starts: the config and the main checkout's `config.worktree`, the hooks folder and, for
+  a worktree, its own `config.worktree` and the submodules' git folders (`modules`).
+  Why: the user's own git reads them, and a new worktree copies `config.worktree`.
 - SBX-9: Every command the user runs for an agent (shell, terminal, side question, rewind helper)
   MUST run in its sandbox. An unsandboxed agent has the user's access to the host; credentials and
   the allowlist do not apply to it.
@@ -781,7 +786,8 @@ interrupted only for that.
 ### 7.6 Change requests
 
 - CHG-1: Kinds: `allow_host {host, port}`, `api_key {env, hosts[1..5], body?}`,
-  `mcp_server {server}`, `shared_tool` (section 9), each with a `reason` (10 to 500). The answer is
+  `mcp_server {server}`, `shared_tool` (section 9), `command {line}` (CHG-13), each with a `reason`
+  (10 to 500). The answer is
   `{decision: allow, scope: agent | all, value?}` (`value` for `api_key` only) or
   `{decision: deny}`.
 - CHG-2: MUST be refused: hosts on the machine or its networks; wildcards over a public suffix;
@@ -809,17 +815,31 @@ interrupted only for that.
   (UPD-5); a running turn still ends first. The turn that brings an allowed server starts a new
   session that has it once no background work holds the old one, and the update names the
   server's tool prefix and up to five of its tools.
+- CHG-13: A `command` request carries a Seti command line (CMD-4) for the asking agent alone; the
+  grammar has no word for another agent. The control room MUST read it with the reply box's grammar
+  for that agent. An agent MAY propose only MCP servers, plugins and context packs on, off or reset,
+  hosts added or removed, SSH or AWS off, home folders off, and its own memory and CPU caps; the
+  control room MUST refuse any other line, and names the agent's own Seti tool when it has one for
+  the setting. A host added or a server turned on is filed as `allow_host` or `mcp_server`. The
+  request stores the canonical line and the control room's own description of it, which the card,
+  the reason line, the update and the audit show beside the agent's reason; the card of an
+  `allow_host` or `mcp_server` request also shows its line. Allow reads the line again against the
+  agent's state and runs it as the user would (409 when it no longer applies). Only the tool call
+  files one: a line in a reason, a message, a tool result or a transcript never does.
 
 ### 7.7 Hostile repositories
 
 - HST-1: Everything in an agent's folder is input the agent wrote and MUST NOT run code on the
   host. Code-host text (titles, branches, checks, comments) is rendered as text and reaches agents
   only as an update or tool result.
-- HST-2: The control room runs version control in an agent-writable folder only in a jail with
-  no network, no home folder and none of its own data or environment, which sees the system
-  folders and that repository's own folders, read-only unless the command writes; hooks,
+- HST-2: The control room runs version control in an agent-writable folder, and in a registered
+  repository's own checkout whose git folder a sandbox can write (making, listing, removing and
+  restoring worktrees, warming caches), only in a jail with no network, no home folder and none
+  of its own data or environment, which sees the system folders and that repository's own
+  folders: its files read-only, and its git folder writable only when the command writes; hooks,
   external commands, helpers and transports are disabled too, and system and user config ignored.
-  A repository pointer file is followed only when the repository records that folder.
+  A repository pointer file is followed only when the repository records that folder. Making a
+  worktree fetches nothing; it checks out the base branch as the repository last fetched it.
   Why: a repository's config and attributes name programs, such as filter, diff and merge
   drivers, signing programs and its submodules' own config, that no fixed setting switches off.
 - HST-4: The capability probe of a sandboxed agent's folder MUST run in its sandbox; any other
@@ -1728,9 +1748,12 @@ treat every agent as holding the user's access.
 - An unsandboxed agent can read every secret on the host.
 - Where the sandbox cannot start on the host, no agent runs sandboxed and version control in an
   agent's folder runs on the host with only the settings of HST-2.
-- Version control in a registered repository's own checkout, such as making or restoring a
-  worktree Seti made, runs on the host with the user's config; the sandbox mounts that
-  repository's config and hooks read-only.
+- Version control in a registered repository's own checkout runs in the jail of HST-2 too, so a
+  worktree Seti makes runs none of the repository's hooks and only the filters its own config
+  names, in the jail; files tracked through a filter the user's global config defines, such as
+  Git LFS, are checked out as stored. The user's own git there reads only config an agent cannot
+  write (SBX-16), unless the user's config points `include.path` or `core.hooksPath` into the git
+  folder.
 - Approval is review, not proof: a shared tool, knowledge note or mod the user allows unread runs
   with each agent's access. Cards therefore show the whole artefact and only the difference on
   update.

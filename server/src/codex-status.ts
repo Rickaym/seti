@@ -1,5 +1,6 @@
 import {
   DEFAULT_PROFILE_ID,
+  PROVIDERS,
   type CodexSettings,
   type CodexSettingsInput,
   type CodexStatus,
@@ -13,7 +14,6 @@ import { CODEX_PIN } from './codex-pin.js'
 import { refuseAgent } from './ea-guard.js'
 import { HttpError } from './http.js'
 import { forgetVersions, programVersion } from './program-version.js'
-import { PRICES_AS_OF } from './runtimes/codex/prices.js'
 import { codexSettings } from './store/codex-settings.js'
 
 /** The Codex version this Seti is built and tested against. */
@@ -78,7 +78,7 @@ export async function codexStatus(): Promise<CodexStatus> {
     settings,
     keyed,
     keyElsewhere: keyed.includes(DEFAULT_PROFILE_ID) ? null : await keyOutsideDefault(),
-    pricesAsOf: PRICES_AS_OF,
+    pricesAsOf: PROVIDERS.openai.prices.asOf,
   }
 }
 

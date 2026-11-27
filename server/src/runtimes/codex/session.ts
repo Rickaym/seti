@@ -6,13 +6,14 @@ import type { Launcher } from '../../launcher.js'
 import type { StdioServer } from '../../tool-relay.js'
 import type { UserSkill } from '../../user-skills.js'
 import type { InputContent, RuntimeSession, SessionInput, SessionReport } from '../adapter.js'
+import { JsonRpc, RpcError, type RpcCall } from '../json-rpc.js'
+import { ReportQueue } from '../report-queue.js'
 import type { CodexDecide } from './approvals.js'
 import { Asks } from './asks.js'
 import { Background } from './background.js'
 import { OpenCalls } from './open-calls.js'
 import { OPTED_OUT } from './private.js'
-import { codexReport, ReportQueue } from './reports.js'
-import { CodexRpc, RpcError, type CodexCall } from './rpc.js'
+import { codexReport } from './reports.js'
 import { ServerStatus } from './server-status.js'
 
 /** What a Codex agent's spec carries for Codex alone: program, model, effort, skills, servers. */
@@ -92,7 +93,7 @@ class Driver {
   /** A resumed thread's start, held until its first turn: opening the session is not work. */
   private resumed: SessionReport | null = null
   private inbox: Promise<void> = Promise.resolve()
-  private readonly rpc: CodexRpc
+  private readonly rpc: JsonRpc
   private readonly realised: CodexRealised
   private readonly child: ChildProcess
 
@@ -100,7 +101,7 @@ class Driver {
     this.child = child
     this.realised = realised
     this.servers = new ServerStatus(realised.args)
-    this.rpc = new CodexRpc(child)
+    this.rpc = new JsonRpc(child)
     this.background = new Background(this.rpc, () => this.root)
     this.asks = new Asks({
       rpc: this.rpc,
@@ -280,7 +281,7 @@ class Driver {
     })
   }
 
-  private async notified(message: CodexCall): Promise<void> {
+  private async notified(message: RpcCall): Promise<void> {
     if (OPTED_OUT.includes(message.method)) {
       return
     }
@@ -307,7 +308,7 @@ class Driver {
   }
 
   /** Follows turns, calls and inputs; returns the inputs a turn's end reports taken. */
-  private track(message: CodexCall): string[] {
+  private track(message: RpcCall): string[] {
     if (message.method === 'thread/started' && this.root === '') {
       this.root = threadReply.safeParse(message.params).data?.thread.id ?? ''
       return []
@@ -332,7 +333,7 @@ class Driver {
     return []
   }
 
-  private trackItem(message: CodexCall): void {
+  private trackItem(message: RpcCall): void {
     const item = itemNote.safeParse(message.params).data?.item
     if (item === undefined) {
       return

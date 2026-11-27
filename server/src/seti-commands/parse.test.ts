@@ -146,7 +146,7 @@ describe('Seti command lines', () => {
     })
     expect(parsed('/seti:access host docs.example.org add').description).toBe('Let this agent reach docs.example.org')
     expect(parsed('/seti:access pack 5f0e4b1c on').description).toContain('Style guide')
-    expect(parsed('/seti:memory 12g').description).toBe("Set this agent's memory cap to 12 GB")
+    expect(parsed('/seti:memory 12g').description).toBe("Set this agent's memory cap to 12 GB, from 8 GB")
   })
 
   it.each([

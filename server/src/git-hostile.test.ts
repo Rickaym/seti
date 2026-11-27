@@ -3,18 +3,27 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
+import { binaryPath } from './binaries.js'
+import { CLAUDE_HOME, SETI_HOME, WORKTREE_ROOT } from './config.js'
 import { gitBadge, unsavedWork } from './git-state.js'
 import {
   agentGit,
   agentGitReading,
   agentGitWrite,
+  createWorktree,
   forgetWorktree,
   git,
   hasLocalChanges,
+  listWorktrees,
   mainCheckout,
+  recreateWorktree,
   saveUncommitted,
   worktreeState,
 } from './git.js'
+import { removeWorktree } from './owned-dirs.js'
+import { bwrapArgs } from './sandbox-bwrap.js'
+import { sandboxMounts } from './sandbox-mounts.js'
+import { seedCaches } from './warm-caches.js'
 
 const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'seti-hostile-git-')))
 const ran = path.join(root, 'ran')
@@ -264,6 +273,140 @@ describe('git in a repository an agent controls', () => {
     fs.rmSync(stray, { recursive: true })
     await forgetWorktree(repo, stray)
     expect(await git(repo, 'worktree', 'list', '--porcelain')).not.toContain(stray)
+    expect(sprung()).toEqual([])
+  })
+})
+
+/** A checkout of the user's with per-worktree config on, as sparse checkout leaves it. */
+function worktreeConfigRepo(name: string): string {
+  const repo = path.join(root, name)
+  fs.mkdirSync(repo)
+  plain(repo, 'init', '-q', '--initial-branch=main')
+  fs.writeFileSync(path.join(repo, 'notes.txt'), 'first\n')
+  fs.writeFileSync(path.join(repo, '.gitattributes'), '*.txt filter=planted\n')
+  fs.writeFileSync(path.join(repo, '.gitignore'), 'cache/\n')
+  plain(repo, 'add', '.')
+  plain(repo, 'commit', '-qm', 'seed')
+  plain(repo, 'remote', 'add', 'origin', repo)
+  plain(repo, 'update-ref', 'refs/remotes/origin/main', 'HEAD')
+  plain(repo, 'config', 'extensions.worktreeConfig', 'true')
+  return repo
+}
+
+/** Config a sandboxed agent would write where git reads it, naming programs that mark the host. */
+function plantedConfig(repo: string): string {
+  const hooks = path.join(repo, '.git', 'planted-hooks')
+  fs.mkdirSync(hooks, { recursive: true })
+  for (const hook of ['post-checkout', 'reference-transaction']) {
+    fs.copyFileSync(trap(repo, `planted-${hook}`), path.join(hooks, hook))
+  }
+  return [
+    '[filter "planted"]',
+    `\tsmudge = "${trap(repo, 'planted-smudge')} ; cat"`,
+    `\tclean = "${trap(repo, 'planted-clean')} ; cat"`,
+    '[core]',
+    `\tfsmonitor = ${trap(repo, 'planted-fsmonitor')}`,
+    `\thooksPath = ${hooks}`,
+    '',
+  ].join('\n')
+}
+
+/** Runs `script` in a sandbox with the mounts Seti builds for an agent working in `cwd`. */
+function inSandbox(cwd: string, script: string): string {
+  const taskDir = path.join(root, `task-${path.basename(cwd)}`)
+  for (const dir of ['tmp', 'home', 'run']) {
+    fs.mkdirSync(path.join(taskDir, dir), { recursive: true })
+  }
+  const caDir = fs.mkdtempSync(path.join(root, 'ca-'))
+  const mounts = sandboxMounts({
+    home: path.join(root, 'home'),
+    setiHome: SETI_HOME,
+    worktreeRoot: WORKTREE_ROOT,
+    claudeHome: CLAUDE_HOME,
+    taskDir,
+    cwd,
+    dirs: [],
+    homeAccess: false,
+    readOnly: [],
+    caDir,
+    systemBundle: null,
+    browserDb: null,
+    hidden: [],
+    pathEnv: '/usr/bin:/bin',
+    sessionId: null,
+  })
+  const args = [...bwrapArgs(mounts, cwd), 'sh', '-c', script]
+  const bwrap = binaryPath('bwrap')
+  if (bwrap === null) {
+    throw new Error('bwrap is not installed')
+  }
+  return execFileSync(bwrap, args, { encoding: 'utf8', stdio: 'pipe' }).trim()
+}
+
+describe('git over a checkout of the user that an agent works in through a worktree', () => {
+  it('lets the agent create no config, hooks or submodule folder git reads, before or after', async () => {
+    const repo = worktreeConfigRepo('covered')
+    const dir = await createWorktree(repo, 'main', 'covered-agent')
+    const common = path.join(repo, '.git')
+    const own = path.join(common, 'worktrees', 'covered-agent')
+    const targets = [
+      path.join(common, 'config.worktree'),
+      path.join(own, 'config.worktree'),
+      path.join(common, 'hooks', 'post-checkout'),
+      path.join(common, 'modules', 'sub', 'config'),
+    ]
+    const tries = targets.map(
+      (file) => `mkdir -p "${path.dirname(file)}" 2>/dev/null; echo x > "${file}" && echo "${file}"`,
+    )
+    const written = inSandbox(dir, [...tries, `git -C "${dir}" branch spare >/dev/null && echo branched`].join('\n'))
+    expect(written).toBe('branched')
+    expect(fs.readFileSync(path.join(common, 'config.worktree'), 'utf8')).toBe('')
+    expect(plain(repo, 'branch', '--list', 'spare')).toContain('spare')
+  })
+
+  it('runs nothing that config the agent planted names when Seti adds, lists or removes worktrees', async () => {
+    const repo = worktreeConfigRepo('planted')
+    const dir = await createWorktree(repo, 'main', 'planted-agent')
+    const own = path.join(repo, '.git', 'worktrees', 'planted-agent')
+    const planted = plantedConfig(repo)
+    fs.writeFileSync(path.join(repo, '.git', 'config.worktree'), planted)
+    fs.writeFileSync(path.join(own, 'config.worktree'), planted)
+    fs.mkdirSync(path.join(dir, 'cache'))
+    fs.writeFileSync(path.join(dir, 'notes.txt'), 'FIRST\n')
+    const control = path.join(root, 'planted-control')
+    attempt(() => plain(repo, 'worktree', 'add', '-q', '--detach', control, 'origin/main'))
+    attempt(() => plain(dir, 'ls-files', '--others', '--ignored', '--exclude-standard', '--directory'))
+    expect(sprung()).toEqual(expect.arrayContaining(['planted-fsmonitor', 'planted-post-checkout', 'planted-smudge']))
+    reset()
+
+    const added = await createWorktree(repo, 'main', 'planted-next')
+    expect(fs.readFileSync(path.join(added, 'notes.txt'), 'utf8')).toBe('first\n')
+    expect(await listWorktrees(repo)).toEqual(expect.arrayContaining([repo, dir, added]))
+    const settings = { enabled: true, patterns: ['cache'], max_mb: 10 }
+    const dest = await createWorktree(repo, 'main', 'planted-seeded')
+    await seedCaches({ repo: { slug: 'acme/planted', path: repo }, dest, settings })
+    await removeWorktree(repo, added)
+    expect(fs.existsSync(added)).toBe(false)
+    await recreateWorktree(repo, added, null, plain(repo, 'rev-parse', 'HEAD'))
+    expect(fs.existsSync(path.join(added, 'notes.txt'))).toBe(true)
+    expect(sprung()).toEqual([])
+  })
+
+  it("follows no shared folder that the agent's worktree record was pointed at", async () => {
+    const repo = worktreeConfigRepo('redirected')
+    const dir = await createWorktree(repo, 'main', 'redirected-agent')
+    const forged = path.join(root, 'redirected-forged')
+    fs.cpSync(path.join(repo, '.git'), forged, { recursive: true })
+    fs.writeFileSync(path.join(forged, 'config'), `[core]\n\tfsmonitor = ${trap(repo, 'redirect-fsmonitor')}\n`)
+    fs.writeFileSync(path.join(repo, '.git', 'worktrees', 'redirected-agent', 'commondir'), `${forged}\n`)
+    attempt(() => plain(dir, 'ls-files'))
+    expect(sprung()).toContain('redirect-fsmonitor')
+    reset()
+    await listWorktrees(dir)
+    await agentGit(dir, 'status', '--porcelain').catch(() => '')
+    const dest = await createWorktree(repo, 'main', 'redirected-seeded')
+    const settings = { enabled: true, patterns: ['cache'], max_mb: 10 }
+    await seedCaches({ repo: { slug: 'acme/redirected', path: repo }, dest, settings })
     expect(sprung()).toEqual([])
   })
 })

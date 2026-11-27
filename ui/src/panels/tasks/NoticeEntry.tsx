@@ -1,5 +1,6 @@
 import type { EaInboxKind, EaNotice, EaNoticeSeverity } from '@seti/shared'
 import { AlarmClock, BellRing, ExternalLink, Eye, MessagesSquare, RadioTower, type LucideIcon } from 'lucide-react'
+import { RelayLines } from '@/components/ea/RelayLines'
 import { LinkedText } from '@/components/links/LinkedText'
 import { cn } from '@/lib/utils'
 
@@ -51,6 +52,7 @@ export function NoticeEntry({ notice }: { notice: EaNotice }) {
           <LinkedText text={notice.body} />
         </div>
       )}
+      {notice.relays !== undefined && <RelayLines relays={notice.relays} />}
     </div>
   )
 }
