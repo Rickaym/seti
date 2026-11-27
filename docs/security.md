@@ -184,6 +184,16 @@ risk today, so Body widens the surface rather than opening a new kind of leak. T
 ones you chose for the connection, and the setting is per connection, so turn it on for a login
 endpoint you trust and leave it off elsewhere.
 
+Model calls are the exception. On the hosts of the provider an agent's runtime calls, such as
+`api.anthropic.com`, `api.openai.com` or `generativelanguage.googleapis.com`, the proxy never reads
+a request body and never swaps a value into one, whatever Body says, for the model key or any
+other connection on those hosts (EGR-17). A model request carries the whole conversation, so a
+placeholder the agent once printed would otherwise stop every later call, and Body there would
+write the real key into the prompt the model reads. A placeholder is harmless text outside the
+proxy, so it travels to the model as typed. The key still goes in the request's header. The model
+hosts come from the runtime you chose and the built-in provider list, never from the sandbox or a
+connection, so a connection you add on such a host for scripts gets the header swap only.
+
 What stays impossible with Body on:
 
 - The value going to any other host: a placeholder in a body toward a host its connection does not

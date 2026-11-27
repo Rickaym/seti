@@ -62,6 +62,7 @@ export function routeEgressForTests(egress: TestEgress | null): void {
 interface SessionAccess {
   rules: readonly EgressRule[]
   placeholders: readonly EgressPlaceholder[]
+  modelHosts: readonly string[]
   deniedConnectors: ReadonlySet<string>
   login: string | null
   anthropic: boolean
@@ -73,6 +74,7 @@ const grants = new Map<string, ProxyGrant>()
 const NO_ACCESS: SessionAccess = {
   rules: [],
   placeholders: [],
+  modelHosts: [],
   deniedConnectors: new Set(),
   login: null,
   anthropic: true,
@@ -103,6 +105,11 @@ async function anthropic(taskId: string, ask: NodeAsk<'secret.mint'>): Promise<s
   return accessOf(taskId).anthropic ? mint(taskId, ask) : null
 }
 
+/** Reports a request the proxy refused for carrying placeholders, which the control plane audits. */
+const journalBlocked = (taskId: string) => (host: string, names: readonly string[]) => {
+  void nodeLink.journal(taskId, { type: 'egress.blocked', host, names: [...names] }).catch(() => undefined)
+}
+
 async function taskProxy(taskId: string, authority: SandboxCa): Promise<EgressProxy> {
   const existing = proxies.get(taskId)
   if (existing !== undefined) {
@@ -122,9 +129,8 @@ async function taskProxy(taskId: string, authority: SandboxCa): Promise<EgressPr
     },
     rules: () => accessOf(taskId).rules,
     placeholders: () => accessOf(taskId).placeholders,
-    onBlocked: (host, names) => {
-      void nodeLink.journal(taskId, { type: 'egress.blocked', host, names: [...names] }).catch(() => undefined)
-    },
+    modelHosts: () => accessOf(taskId).modelHosts,
+    onBlocked: journalBlocked(taskId),
     connectorAllowed: (id) => !accessOf(taskId).deniedConnectors.has(id),
     ssh: async (target) => (await reach(taskId)).sshHops.includes(target),
     aws: {
@@ -151,6 +157,7 @@ function applyGrant(taskId: string, grant: ProxyGrant): void {
   access.set(taskId, {
     rules: [...connectionRules(grant.connections, value), ...mcpLoginRules(grant.mcp, mcp)],
     placeholders: connectionPlaceholders(grant.connections, value),
+    modelHosts: grant.modelHosts,
     deniedConnectors: new Set(grant.deniedConnectors),
     login: grant.login,
     anthropic: grant.anthropic,
@@ -223,6 +230,8 @@ export async function openModelProxy(taskId: string, model: ModelReach): Promise
     ...modelOnly(async () => mint(taskId, { kind: 'claude', login: modelReaches.get(taskId)?.login ?? null })),
     rules: () => keyRules(taskId).rules,
     placeholders: () => keyRules(taskId).placeholders,
+    modelHosts: () => modelReaches.get(taskId)?.modelHosts ?? [],
+    onBlocked: journalBlocked(taskId),
     ...(testEgress === null ? {} : { upstream: testEgress.upstream, onRefused: testEgress.refused }),
   })
   modelProxies.set(taskId, started)

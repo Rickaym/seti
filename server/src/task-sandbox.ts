@@ -306,7 +306,7 @@ async function grantedReach(task: Task, request: SandboxRequest, at: { dir: stri
 async function modelReach(task: Task, request: SandboxRequest): Promise<Reach> {
   const { grant, codex } = request.plan
   const key = codex === undefined ? null : (grant.connections.find((each) => each.env === codex.modelKey) ?? null)
-  const reach = { login: grant.login, key }
+  const reach = { login: grant.login, key, modelHosts: grant.modelHosts }
   await modelProxyHere(task.id, reach, async () => openModelProxy(task.id, reach))
   const own = { github: false, connectors: false, memory: request.memory ?? null }
   if (codex === undefined) {

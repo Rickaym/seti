@@ -8,6 +8,7 @@ type FailureKind =
   | 'api'
   | 'network'
   | 'sandbox'
+  | 'placeholder'
   | 'crash'
   | 'step_limit'
   | 'cost_limit'
@@ -32,6 +33,12 @@ const UNREACHABLE = /ECONNREFUSED|ENOTFOUND|EHOSTUNREACH|ECONNRESET|EAI_AGAIN|fe
 
 /** First match wins, so a rate limit that ended the process reads as a rate limit. */
 const RULES: readonly Rule[] = [
+  {
+    kind: 'placeholder',
+    test: /Seti sandbox proxy: (refused a (request|body)|.* takes connection values in request bodies)/i,
+    title: 'Seti held back a connection placeholder.',
+    hint: 'Seti sent nothing. Retry once the agent sends the connection only to its own hosts.',
+  },
   {
     kind: 'rate_limit',
     test: /rate[ _-]?limit|usage limit|too many requests|\b429\b|limit reached|quota/i,

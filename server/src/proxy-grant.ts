@@ -15,10 +15,11 @@ async function keyedConnections(task: Task, provider: ProviderId): Promise<Grant
 }
 
 /** The grant of an agent whose provider takes a connection's key: nothing of Claude's. */
-function keyedGrant(connections: GrantConnection[], denied: ReadonlySet<string>): ProxyGrant {
+function keyedGrant(provider: ProviderId, connections: GrantConnection[], denied: ReadonlySet<string>): ProxyGrant {
   return {
     login: null,
     anthropic: false,
+    modelHosts: [...PROVIDERS[provider].hosts],
     connections,
     mcp: mcpTargets(mcpTokens, denied),
     deniedConnectors: [],
@@ -27,10 +28,11 @@ function keyedGrant(connections: GrantConnection[], denied: ReadonlySet<string>)
 }
 
 /** The grant of an agent signed in with the host's Claude login: Anthropic and its connectors. */
-function loginGrant(connections: GrantConnection[], denied: ReadonlySet<string>): ProxyGrant {
+function loginGrant(provider: ProviderId, connections: GrantConnection[], denied: ReadonlySet<string>): ProxyGrant {
   return {
     login: hostLoginKey(),
     anthropic: true,
+    modelHosts: [...PROVIDERS[provider].hosts],
     connections,
     mcp: mcpTargets(mcpTokens, denied),
     deniedConnectors: connectorIds([...denied]),
@@ -53,6 +55,7 @@ export async function proxyGrant(
 ): Promise<{ grant: ProxyGrant; denied: Set<string> }> {
   const denied = new Set(await taskDeniedServers(task.id))
   const connections = await grantedConnections(task, runtime)
-  const login = PROVIDERS[providerOf(runtime)].key === 'login'
-  return { grant: login ? loginGrant(connections, denied) : keyedGrant(connections, denied), denied }
+  const provider = providerOf(runtime)
+  const grant = PROVIDERS[provider].key === 'login' ? loginGrant : keyedGrant
+  return { grant: grant(provider, connections, denied), denied }
 }

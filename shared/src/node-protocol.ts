@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { MEMORY_EVENTS } from './memory.js'
 import { policyShadowCount } from './policy-shadow.js'
 import { cpuScopeSchema, memoryScopeSchema } from './processes.js'
+import { isModelHost } from './providers.js'
 import { STORED_RUNTIMES } from './runtimes/stored.js'
 import { TASK_STATUSES } from './tasks.js'
 
@@ -98,12 +99,17 @@ const grantConnection = z.object({
 })
 export type GrantConnection = z.infer<typeof grantConnection>
 
+/** The runtime's model hosts, where bodies stream unread; never a host no provider serves. */
+const modelHosts = z.array(z.string().refine(isModelHost, 'not a model host')).default([])
+
 /** What an agent's egress proxy applies, as the control plane hands it, with no value in it. */
 export const proxyGrant = z.object({
   /** The Claude login the agent's session signs in with. */
   login: z.string().nullable(),
   /** Whether the agent's runtime talks to Anthropic, so its hosts and the login are in reach. */
   anthropic: z.boolean().default(true),
+  /** The hosts of the provider the agent's runtime calls, which bodies reach unread. */
+  modelHosts,
   connections: z.array(grantConnection),
   /** host:port of the MCP servers the host signed in to that the agent may use. */
   mcp: z.array(z.string()),
@@ -118,6 +124,7 @@ const modelReach = z.object({
   login: z.string().nullable(),
   /** The connection that carries the agent's OpenAI key, for a session on Codex. */
   key: grantConnection.nullable(),
+  modelHosts,
 })
 export type ModelReach = z.infer<typeof modelReach>
 
