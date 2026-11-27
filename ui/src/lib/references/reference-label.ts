@@ -47,6 +47,10 @@ export function sourceLabel(ref: Reference, names: ReadonlyMap<string, string>):
   return { ...info, label: clip(label, LABEL_LIMIT), host }
 }
 
+/** What a bare URL reads as inside a sentence: its label, or only the host for a plain web page. */
+export const inlineLabel = (label: SourceLabel): string =>
+  label.service === 'web' && label.host !== null ? label.host : label.label
+
 /** The label of a reference, named again once Seti learns the Slack channel it points into. */
 export function useSourceLabel(ref: Reference): SourceLabel {
   const channel = slackChannelOf(ref.href)

@@ -32,6 +32,25 @@ const REPLY = [
 export const seedReferences = async (title: string): Promise<string> =>
   seedReply(title, REPLY, 'Where did the release land?')
 
+export const SLACK_FILE = {
+  url: 'https://acme.slack.com/files/U08ABCDEF12/F08ABCDEF12/q3-release-evaluation.pdf',
+  label: 'Slack file q3 release evaluation',
+}
+
+/** A reply that pastes bare URLs into its sentences, as agents often do. */
+const BARE_REPLY = [
+  `Open it here: ${SLACK_FILE.url} and the fix is ${SOURCES.pr.url}, tracked in ${SOURCES.issue.url}.`,
+  `The [release review](${SOURCES.pr.url}) and [${SOURCES.runbook.url}](${SOURCES.runbook.url}) agree.`,
+  `Do not run \`${SOURCES.runbook.url}\` by hand.`,
+].join(' ')
+
+export const seedBareLinks = async (title: string): Promise<string> =>
+  seedReply(title, BARE_REPLY, 'Where is the evaluation?')
+
+/** The agent's reply with bare URLs in the transcript. */
+export const bareReply = (page: Page) =>
+  page.getByRole('region', { name: 'Transcript' }).locator('[data-find-text]').filter({ hasText: 'Open it here' })
+
 /** The agent's reply in the transcript. */
 export const referencedReply = (page: Page) =>
   page.getByRole('region', { name: 'Transcript' }).locator('[data-find-text]').filter({ hasText: 'The deploy moved' })

@@ -6,7 +6,7 @@ import { SourcesList } from '@/components/references/SourcesList'
 import { INLINE_LINK, ReferencesContext, useReferenceOf } from '@/components/references/reference-context'
 import { VerifiedMark } from '@/components/references/source-marks'
 import { sourceFacts, useSourceMatch } from '@/components/references/source-match'
-import { useSourceLabel } from '@/lib/references/reference-label'
+import { inlineLabel, useSourceLabel } from '@/lib/references/reference-label'
 import { isSourcesOf, SOURCES_PROPERTY, type Reference } from '@/lib/references/reference-set'
 
 const REF_ATTRIBUTE = 'data-seti-ref'
@@ -15,7 +15,7 @@ const REF_ATTRIBUTE = 'data-seti-ref'
 const withoutRef = <T extends object>(props: T): T =>
   Object.fromEntries(Object.entries(props).filter(([key]) => key !== REF_ATTRIBUTE)) as T
 
-/** A link inside a sentence: its text, or the label of a bare URL, then its mark. */
+/** A link inside a sentence: its text, or a short name for a bare URL, then its mark. */
 export function InlineReference({
   reference,
   bare,
@@ -29,7 +29,7 @@ export function InlineReference({
   return (
     <>
       <a href={reference.href ?? undefined} target="_blank" rel="noreferrer" className={INLINE_LINK}>
-        {bare ? label.label : children}
+        {bare ? inlineLabel(label) : children}
       </a>
       <RefMark reference={reference} />
     </>
