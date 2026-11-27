@@ -6,6 +6,7 @@ import { fileAsk, fileItems } from './files.js'
 import { githubRead } from './github.js'
 import type { FolderRead, FoundItem, ParseResult } from './item.js'
 import { isLinearCall, linearKeyIn, linearRead } from './linear.js'
+import { shellReadAsk, shellReadItems } from './shell-reads.js'
 import { isSlackCall, slackHostIn, slackRead } from './slack.js'
 
 /** A source whose answers state the workspace its permalinks are built on. */
@@ -34,7 +35,21 @@ const FOLDER_ADAPTERS: readonly ((call: ToolCall) => FolderRead | null)[] = [
     const ask = commitAsk(call)
     return ask === null ? null : async (taskId, text) => commitItems(taskId, ask, text)
   },
+  (call) => {
+    const ask = shellReadAsk(call)
+    return ask === null ? null : async (taskId, text) => shellReadItems(taskId, ask, text)
+  },
 ]
+
+/** One read that runs every folder adapter a call fits, since a shell line may fit several. */
+function folderRead(reads: readonly FolderRead[]): FolderRead | null {
+  const [only] = reads
+  if (reads.length < 2) {
+    return only ?? null
+  }
+  return async (taskId, text) =>
+    (await Promise.all(reads.map(async (read) => read(taskId, text).catch(() => [])))).flat()
+}
 
 /** Calls each task's agent started whose result the ledger will read, by call id. */
 const started = new Map<string, Map<string, Watched>>()
@@ -61,7 +76,7 @@ const OPEN_MAX = 200
 function watchedOf(call: ToolCall): Watched | null {
   const parse = ADAPTERS.reduce<ParseResult | null>((first, adapter) => first ?? adapter(call), null)
   const workspace = workspaceOf(call)
-  const folder = FOLDER_ADAPTERS.reduce<FolderRead | null>((first, adapter) => first ?? adapter(call), null)
+  const folder = folderRead(FOLDER_ADAPTERS.flatMap((adapter) => adapter(call) ?? []))
   return parse === null && workspace === null && folder === null ? null : { parse, workspace, folder }
 }
 
