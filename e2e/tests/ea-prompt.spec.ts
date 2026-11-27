@@ -5,7 +5,7 @@ test('the EA prompt starts closed, opens a part on a click, copies it and search
   await context.grantPermissions(['clipboard-read', 'clipboard-write'])
   await fakeEaPrompt(page)
   await page.goto('/#settings/ea')
-  const card = page.getByRole('main').getByRole('region', { name: 'Prompt' })
+  const card = page.getByRole('main').getByRole('region', { name: 'Prompt', exact: true })
   await expect(card.getByTestId('ea-prompt-size')).toHaveText(/^\d{2},\d{3} characters in 5 parts; build 0123456$/)
   await expect(card).toContainText('Read only: the prompt changes through code, measured in simulation.')
   for (const name of ['Base prompt', 'Call note', 'Chat note', 'Inbox note', 'Live context']) {
@@ -38,7 +38,7 @@ test('the EA prompt starts closed, opens a part on a click, copies it and search
 
 test('the EA prompt says plainly when the EA is not running', async ({ page }) => {
   await page.goto('/#settings/ea')
-  const card = page.getByRole('main').getByRole('region', { name: 'Prompt' })
+  const card = page.getByRole('main').getByRole('region', { name: 'Prompt', exact: true })
   await expect(card).toContainText('The EA is not running, so it cannot show its prompt.')
   await expect(card.getByRole('searchbox')).toHaveCount(0)
 })

@@ -5,7 +5,7 @@ import { expectFitsPhone } from './support/phone-layout.js'
 test('the EA prompt stays short on a phone and a long part scrolls inside its box', async ({ page }) => {
   await fakeEaPrompt(page)
   await page.goto('/#settings/ea')
-  const card = page.getByRole('main').getByRole('region', { name: 'Prompt' })
+  const card = page.getByRole('main').getByRole('region', { name: 'Prompt', exact: true })
   await expect(card.getByTestId('ea-prompt-size')).toContainText('in 5 parts; build 0123456')
   expect((await card.boundingBox())?.height).toBeLessThan(700)
   const baseButton = card.getByRole('button', { name: /^Base prompt/ })
