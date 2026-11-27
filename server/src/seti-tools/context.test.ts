@@ -44,7 +44,9 @@ describe('context pack tools', () => {
     expect((await contextPacks.get(id))?.body).toBe('# Steps\nRun the release script.\n\nThen tag it.\n')
     expect(await auditEvents.latest('seti.context_pack_updated')).toMatchObject({ actor: 'agent', subject_id: id })
 
-    expect((await call('get_context_pack', { pack: id, query: 'tag' })).json().matches).toEqual(['Then tag it.'])
+    const read = (await call('get_context_pack', { pack: id, query: 'tag' })).json()
+    expect(read.matches).toEqual(['Then tag it.'])
+    expect(read.used_by).toEqual({ agents: [], ea: false })
     expect((await revisions.unseen()).some((change) => change.object_id === id)).toBe(true)
     const changes = await call('list_changes', { pack: 'Deploy notes' })
     expect(changes.json()).toHaveLength(2)

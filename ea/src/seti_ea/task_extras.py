@@ -1,10 +1,10 @@
-"""Second opinions and recently changed files of one agent, for get_task."""
+"""Second opinions, rewinds and recently changed files of one agent, for get_task."""
 
 from collections.abc import Mapping
 from datetime import datetime
 from typing import Any
 
-from seti_ea.format import ago, and_list, money, plural
+from seti_ea.format import ago, and_list, clip, money, plural
 from seti_ea.question_tools import DATA_NOTE, data
 from seti_ea.seti import SetiClient, SetiError
 from seti_ea.toolkit import ToolResult, dicts, title_of
@@ -12,6 +12,8 @@ from seti_ea.toolkit import ToolResult, dicts, title_of
 REVIEWS_SHOWN = 3
 REVIEW_CHARS = 400
 FILES_SHOWN = 20
+REWINDS_SHOWN = 3
+PROMPT_CHARS = 120
 
 FILES_ARG = {
     "type": "boolean",
@@ -43,6 +45,25 @@ async def opinion_lines(seti: SetiClient, task_id: str, now: datetime) -> list[s
         )
     if reviews:
         lines.append(DATA_NOTE)
+    return lines
+
+
+async def rewind_lines(seti: SetiClient, task_id: str, now: datetime) -> list[str]:
+    """The agent's latest rewinds, newest first, so a new rewind is asked about knowing them."""
+    try:
+        found = dicts(await seti.get(f"/tasks/{task_id}/rewinds"))
+    except SetiError:
+        return []
+    if not found:
+        return []
+    lines = [f"It was rewound {plural(len(found), 'time')}; the latest:"]
+    for rewind in reversed(found[-REWINDS_SHOWN:]):
+        prompt = data(rewind.get("prompt_text", ""), "the prompt", PROMPT_CHARS)
+        state = str(rewind.get("state"))
+        why = f" ({clip(str(rewind.get('reason')), 120)})" if rewind.get("reason") else ""
+        when = ago(rewind.get("created_at"), now)
+        lines.append(f"- {when}, {rewind.get('restore')}, {state}{why}, to before {prompt}")
+    lines.append(DATA_NOTE)
     return lines
 
 

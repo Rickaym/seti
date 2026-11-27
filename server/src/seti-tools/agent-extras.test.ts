@@ -28,6 +28,7 @@ describe("an agent's extras for the other agents' tools", () => {
   it('reads what second opinions cost, and the files an agent changed', async () => {
     const detail = JSON.parse((await call('get_task', { task: target.id })).text) as Record<string, unknown>
     expect(detail.second_opinions).toEqual({ spend: [], reviews: [] })
+    expect(detail.rewinds).toEqual([])
     fs.writeFileSync(path.join(cwd, 'notes.md'), 'changed')
     const files = JSON.parse((await call('get_task', { task: target.id, files: true })).text) as {
       files: { path: string }[]
@@ -58,5 +59,15 @@ describe("agents' search_audit with chain", () => {
     }
     expect(result.chain.ok).toBe(true)
     expect(result.retention_days).toBeGreaterThan(0)
+  })
+})
+
+describe("agents' dreams without an agent", () => {
+  it('lists the agents and workspaces switched out of Dreaming', async () => {
+    const overview = JSON.parse((await call('dreams', {})).text) as {
+      switched_out: { tasks: unknown; workspaces: unknown }
+    }
+    expect(Array.isArray(overview.switched_out.tasks)).toBe(true)
+    expect(Array.isArray(overview.switched_out.workspaces)).toBe(true)
   })
 })

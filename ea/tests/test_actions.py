@@ -446,6 +446,14 @@ async def test_set_notifications_mutes_an_agent_and_changes_where_tiers_go(
     assert len(fake_seti.writes()) == 2
 
 
+async def test_set_notifications_sends_a_test_push_without_asking(
+    tools: EaTools, fake_seti: FakeSeti
+) -> None:
+    sent = await tools.call("set_notifications", {"test": True})
+    assert sent.text == "Sent a test notification to 2 devices. 1 device did not take it."
+    assert fake_seti.writes() == [("POST", "/api/notifications/test", {}, {})]
+
+
 async def test_link_pr_by_name_url_or_to_a_subagent(tools: EaTools, fake_seti: FakeSeti) -> None:
     linked = await tools.call("link_pr", {"task": "logout", "pr": "seti PR 28"})
     assert linked.text.startswith("Linked seti PR 28 to Fix the logout button.")

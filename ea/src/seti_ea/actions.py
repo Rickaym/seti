@@ -311,6 +311,10 @@ ACTION_SPECS: list[ToolSpec] = [
         "since-you-left brief) or off. What is left out stays as it is; the answer tells the tiers.",
         {
             "task": {**TASK_REF, "description": "The agent to mute or unmute."},
+            "test": {
+                "type": "boolean",
+                "description": "Instead, send a test push to every device that gets notifications.",
+            },
             "muted": {
                 "type": "boolean",
                 "description": "With task: true mutes its notifications, false unmutes.",
@@ -1051,7 +1055,22 @@ class AgentActions:
             clip(f"{summary} {title} in the group chat", 70),
         )
 
+    async def _test_notification(self) -> ToolResult:
+        try:
+            sent = await self._seti.post("/notifications/test", {})
+        except SetiError as e:
+            if e.status in (404, 409):
+                raise ToolError(f"No test was sent: {e.detail or e.title}.", "No test sent") from e
+            raise
+        fields = sent if isinstance(sent, dict) else {}
+        failed = int(fields.get("failed") or 0)
+        missed = f" {plural(failed, 'device')} did not take it." if failed else ""
+        text = f"Sent a test notification to {plural(int(fields.get('sent') or 0), 'device')}.{missed}"
+        return ToolResult(text, "Sent a test notification")
+
     async def set_notifications(self, args: Mapping[str, Any]) -> ToolResult:
+        if arg_bool(args, "test"):
+            return await self._test_notification()
         ref = arg_str(args, "task", required=False)
         has_muted = isinstance(args.get("muted"), bool | str)
         change = {tier: arg_str(args, tier) for tier in TIERS if isinstance(args.get(tier), str)}
