@@ -10,11 +10,11 @@ import unicodedata
 from collections.abc import Iterable, Mapping
 from contextvars import ContextVar
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Literal
 
 from loguru import logger
 
-from seti_ea.consent import said_yes
+from seti_ea.consent import said_no, said_yes
 from seti_ea.format import clip
 from seti_ea.seti import SetiClient, SetiError
 from seti_ea.toolkit import ToolError, ToolResult, arg_bool
@@ -44,6 +44,16 @@ class GateCall:
 
     asked_key: str | None = None
     taken: int | None = None
+
+
+Heard = Literal["yes", "word", "no"]
+
+
+def heard_it(said: str, agrees: Iterable[str], heard: Heard) -> bool:
+    """Whether the user's message gives the answer the question takes."""
+    if heard == "no":
+        return said_no(said)
+    return said_yes(said, agrees, only_agrees=heard == "word")
 
 
 ANSWER: ContextVar[UserAnswer | None] = ContextVar("ea_user_answer", default=None)
@@ -102,19 +112,23 @@ class Confirmations:
             call.asked_key = key
         return False
 
-    async def on_word(self, key: str, confirmed: bool, agrees: Iterable[str] = ()) -> int | None:
+    async def on_word(
+        self, key: str, confirmed: bool, agrees: Iterable[str] = (), heard: Heard = "yes"
+    ) -> int | None:
         """The question id once the user's own yes allowed this exact change; None asks first.
 
         For the actions only the user's word allows: a notification Allow never counts, and the
         user's latest message must say yes in so many words, whatever the model concluded. Seti
-        then checks the yes came in the turn right after the question and uses it once.
+        then checks the yes came in the turn right after the question and uses it once. `heard`
+        is what a question Seti announced on a call takes: a yes, the side's own word (`agrees`)
+        after an either-or question, or a no for the deny it recorded beside the allow.
         """
         answer = ANSWER.get()
         if answer is not None and not answer.used:
             answer.used = True
             if not answer.by_word:
                 raise ToolError(NOT_BY_TAP, "Needs the user's own yes")
-            if not said_yes(self.said, agrees):
+            if not heard_it(self.said, agrees, heard):
                 raise ToolError(NO_YES, "No yes from the user")
             return answer.ask_id
         call = GATE_CALL.get()

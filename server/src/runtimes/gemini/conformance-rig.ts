@@ -3,6 +3,7 @@ import path from 'node:path'
 import type { Launcher } from '../../launcher.js'
 import { FakeProcess, launcherOf } from '../conformance/process.js'
 import { RealProcess, type LineTap, type Outbound } from '../conformance/real-process.js'
+import { serveRigTools } from '../conformance/rig-tools.js'
 import type { Script, ScriptCall, Step } from '../conformance/script.js'
 import { SUITE_CWD } from '../conformance/subject.js'
 import type { Rig, SpawnRecord } from '../conformance/target.js'
@@ -65,7 +66,8 @@ export function geminiCall(call: ScriptCall): ModelCall {
       return { name: 'replace', args: { file_path: text('path'), instruction, old_string: before, new_string: after } }
     }
     default:
-      return { name: call.tool.replaceAll('.', '__'), args }
+      // Gemini CLI offers a tool server's tool to the model as mcp_<server>_<tool>.
+      return { name: `mcp_${call.tool.replace('.', '_')}`, args }
   }
 }
 
@@ -315,6 +317,7 @@ export function geminiRig(bench: RigBench, script: Script): Rig {
     { ...script, launcher: { ...script.launcher, env: script.launcher?.env ?? SANDBOX_ENV } },
     start,
   )
+  serveRigTools(launcher, script, { root, effects })
   const read = () => [
     ...readFileSync(effects, 'utf8')
       .split('\n')

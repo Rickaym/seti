@@ -49,7 +49,7 @@ from seti_ea.format import (
     until,
     zone_of,
 )
-from seti_ea.gate import ANSWER, GATE_CALL, ON_WORD_TOOLS, ONE_AT_A_TIME, GateCall, UserAnswer
+from seti_ea.gate import ANSWER, GATE_CALL, ON_WORD_TOOLS, ONE_AT_A_TIME, Confirmations, GateCall, UserAnswer
 from seti_ea.history_tools import HISTORY_WINDOW, activity_result, window_transcript
 from seti_ea.knowledge_tools import list_proposals, search_knowledge
 from seti_ea.location_tools import location_lines
@@ -1067,6 +1067,11 @@ class EaTools:
     def seti(self) -> SetiClient:
         """The Seti client the tools call through."""
         return self._seti
+
+    @property
+    def confirmations(self) -> Confirmations:
+        """The gate that records the user's turns and the questions their yes answers."""
+        return self._actions.confirmations
 
     def user_turn(self, said: str = "") -> None:
         """The user spoke or typed `said`, so a question a destructive tool asked may now be answered."""

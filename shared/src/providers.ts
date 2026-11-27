@@ -8,19 +8,25 @@ interface TokenRate {
   output: number
 }
 
-/** A model's rates at short context, and above its table's long-context line. */
-interface ModelPrice {
+/**
+ * A model's rates from a day on: at short context, and above a line of input tokens per call
+ * where the provider charges long-context rates.
+ */
+export interface PriceRow {
+  /** The first day the rates apply, or null for rates in force when the table was read. */
+  from: string | null
   short: TokenRate
-  long: TokenRate
+  long: { above: number; rate: TokenRate } | null
 }
 
-/** A provider's public prices as read on `asOf`; an estimate, since the bill is the provider's. */
+/**
+ * A provider's public prices as read on `asOf`, each model's rows oldest first, so a rise the
+ * provider announced applies on its day; an estimate, since the bill is the provider's.
+ */
 interface PriceTable {
   asOf: string
   source: string
-  /** Input tokens in one model call above which the long context rates apply. */
-  longContextAbove: number
-  models: Readonly<Record<string, ModelPrice>>
+  models: Readonly<Record<string, readonly PriceRow[]>>
 }
 
 /**
@@ -41,6 +47,11 @@ interface Provider {
 
 const rate = (input: number, cachedInput: number, output: number): TokenRate => ({ input, cachedInput, output })
 
+/** OpenAI's rates for a model at short context and above 272k input tokens per call. */
+const openai = (short: TokenRate, long: TokenRate): readonly PriceRow[] => [
+  { from: null, short, long: { above: 272_000, rate: long } },
+]
+
 /** Claude Code's provider; its agents sign in with the user's Claude login, which prices itself. */
 const ANTHROPIC = {
   label: 'Anthropic',
@@ -59,19 +70,18 @@ const OPENAI = {
   prices: {
     asOf: '2026-11-24',
     source: 'https://developers.openai.com/api/docs/pricing',
-    longContextAbove: 272_000,
     models: {
-      'gpt-5.5': { short: rate(5, 0.5, 30), long: rate(10, 1, 45) },
-      'gpt-5.6-luna': { short: rate(0.2, 0.02, 1.2), long: rate(0.4, 0.04, 1.8) },
-      'gpt-5.6-sol': { short: rate(4, 0.4, 20), long: rate(8, 0.8, 30) },
-      'gpt-5.6-terra': { short: rate(2, 0.2, 12), long: rate(4, 0.4, 18) },
-      'gpt-6-astra': { short: rate(10, 1, 50), long: rate(20, 2, 75) },
-      'gpt-6-luna': { short: rate(0.1, 0.01, 0.5), long: rate(0.2, 0.02, 0.75) },
-      'gpt-6-sol': { short: rate(2, 0.2, 10), long: rate(4, 0.4, 15) },
-      'gpt-6.1-sol': { short: rate(2, 0.1, 10), long: rate(4, 0.2, 15) },
-      'gpt-6.1-terra': { short: rate(1, 0.05, 5), long: rate(2, 0.1, 7.5) },
-      'gpt-6.2-astra': { short: rate(8, 0.4, 40), long: rate(16, 0.8, 60) },
-      'gpt-6.2-sol': { short: rate(2, 0.1, 10), long: rate(4, 0.2, 15) },
+      'gpt-5.5': openai(rate(5, 0.5, 30), rate(10, 1, 45)),
+      'gpt-5.6-luna': openai(rate(0.2, 0.02, 1.2), rate(0.4, 0.04, 1.8)),
+      'gpt-5.6-sol': openai(rate(4, 0.4, 20), rate(8, 0.8, 30)),
+      'gpt-5.6-terra': openai(rate(2, 0.2, 12), rate(4, 0.4, 18)),
+      'gpt-6-astra': openai(rate(10, 1, 50), rate(20, 2, 75)),
+      'gpt-6-luna': openai(rate(0.1, 0.01, 0.5), rate(0.2, 0.02, 0.75)),
+      'gpt-6-sol': openai(rate(2, 0.2, 10), rate(4, 0.4, 15)),
+      'gpt-6.1-sol': openai(rate(2, 0.1, 10), rate(4, 0.2, 15)),
+      'gpt-6.1-terra': openai(rate(1, 0.05, 5), rate(2, 0.1, 7.5)),
+      'gpt-6.2-astra': openai(rate(8, 0.4, 40), rate(16, 0.8, 60)),
+      'gpt-6.2-sol': openai(rate(2, 0.1, 10), rate(4, 0.2, 15)),
     },
   },
 } satisfies Provider

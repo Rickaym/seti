@@ -37,11 +37,11 @@ these. [Implementation](implementation.md#sandbox-mechanism) describes the sandb
 The EA can carry out a few reserved actions when you tell it to, by voice or in the chat, and then
 say yes to its read-back of that one change ([EA-17](protocol.md#14-the-assistant)):
 
-| Action                                      | What the EA reads back                                        | What stays yours, in Seti                                                                      |
-| ------------------------------------------- | ------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
-| Allow one held tool call once               | The command word for word, Seti's reason and the PRs it names | Always allow, a rule for every agent, editing the call, and a call too long to read back whole |
-| Approve a plan                              | The plan in one sentence                                      | Editing the plan                                                                               |
-| Deny a tool call or plan, with your message | The call and your message                                     | -                                                                                              |
+| Action                                      | What the EA reads back                                                                                                                                            | What stays yours, in Seti                                                                      |
+| ------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| Allow one held tool call once               | The command word for word, Seti's reason and the PRs it names; for a message going outward, where it goes and its text word for word; on a call, the announcement | Always allow, a rule for every agent, editing the call, and a call too long to read back whole |
+| Approve a plan                              | The plan in one sentence                                                                                                                                          | Editing the plan                                                                               |
+| Deny a tool call or plan, with your message | The call and your message                                                                                                                                         | -                                                                                              |
 
 The server, not the EA's prompt, holds the rule (`refuseUnlessOnWord` in `server/src/ea-guard.ts`):
 
@@ -52,6 +52,13 @@ The server, not the EA's prompt, holds the rule (`refuseUnlessOnWord` in `server
   you.
 - Seti recomputes the request's digest and refuses the action if the request changed after the
   read-back, or if the decision or message differs from what you heard.
+- On a call the EA announces a new request in one sentence it builds from Seti's own fields, never
+  the agent's words ([EA-10](protocol.md#14-the-assistant)). That sentence is the read-back: your
+  yes right after it allows that one request as it stood, and your no denies it, passing on your
+  own words from that turn as transcribed. A bare yes counts only when that sentence states the
+  whole effect: a plain push naming its repository and branch, an edit naming its file, or a read.
+  Anything else, such as another shell command, a tool of an MCP server, a plan or a message going
+  outward, the EA offers to read or summarise first, and then only "allow" or "approve" counts.
 - A notification Allow, an inbox report, a webhook and a transcript never count. Agents and mods
   get none of these actions, and a paired device reaches none of these routes.
 - The audit log records each one as the EA acting on your word, with the question and the

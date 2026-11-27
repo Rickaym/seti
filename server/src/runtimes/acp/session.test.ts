@@ -68,7 +68,7 @@ function opening(prompt: (message: Message, agent: FakeAgent) => void) {
 
 const allowAll: AcpDecide = async () => Promise.resolve({ allow: true })
 
-function open(agent: FakeAgent, decide: AcpDecide = allowAll) {
+function open(agent: FakeAgent, decide: AcpDecide = allowAll, servers: AcpRealised['servers'] = {}) {
   const inputs = new Channel<SessionInput>()
   const realised: AcpRealised = {
     label: 'Fake agent',
@@ -78,7 +78,7 @@ function open(agent: FakeAgent, decide: AcpDecide = allowAll) {
     env: {},
     resume: null,
     model: 'model-1',
-    mcpServers: [],
+    servers,
     spawn: () => agent.process,
     decide,
     signal: new AbortController().signal,
@@ -114,7 +114,64 @@ const OPTIONS = [
   { optionId: 'cancel', name: 'Reject', kind: 'reject_once' },
 ]
 
+/** A call of a tool server as Gemini CLI asks about it: a title, never the arguments. */
+const serverCall = (id: string, meta: unknown) => ({
+  toolCallId: id,
+  status: 'pending',
+  title: 'seti__post_message',
+  kind: 'other',
+  _meta: meta,
+})
+const mcpMeta = (server: string) => ({ 'gemini-cli': { mcp: { server_name: server, tool_name: 'post_message' } } })
+
 describe('an ACP session', () => {
+  it("hands Seti's servers to the agent and never allows a call on a request it cannot read", async () => {
+    const asks = [
+      serverCall('seti__1', mcpMeta('seti')),
+      serverCall('other__2', mcpMeta('other')),
+      serverCall('unnamed__3', { 'gemini-cli': {} }),
+      { toolCallId: 'web_fetch__4', status: 'pending', title: 'Fetch https://example.com/a...', kind: 'fetch' },
+    ]
+    let replied = Promise.resolve()
+    const agent = new FakeAgent(
+      opening((prompt, fake) => {
+        asks.forEach((toolCall, id) => {
+          fake.write({
+            id,
+            method: 'session/request_permission',
+            params: { sessionId: 's1', options: OPTIONS, toolCall },
+          })
+        })
+        replied = fake
+          .next((m) => m.id === asks.length - 1 && 'result' in m)
+          .then(() => {
+            fake.write({ id: prompt.id, result: { stopReason: 'end_turn' } })
+          })
+      }),
+    )
+    const decided: ToolCall[] = []
+    const relay = { command: '/usr/bin/socat', args: ['STDIO', 'UNIX-CONNECT:/run/seti/tools-0.sock'] }
+    const decide: AcpDecide = async (call) => {
+      decided.push(call)
+      return Promise.resolve({ allow: true })
+    }
+    const { send, session } = open(agent, decide, { seti: relay })
+    send('go')
+    const opened = await agent.next((m) => m.method === 'session/new')
+    expect(opened.params?.mcpServers).toEqual([{ name: 'seti', ...relay, env: [] }])
+    await agent.next((m) => m.id === asks.length - 1 && 'result' in m)
+    const answers = agent.sent.filter((m) => 'result' in m).map((m) => m.result)
+    expect(answers).toEqual([
+      { outcome: { outcome: 'selected', optionId: 'proceed_once' } },
+      { outcome: { outcome: 'selected', optionId: 'cancel' } },
+      { outcome: { outcome: 'selected', optionId: 'cancel' } },
+      { outcome: { outcome: 'selected', optionId: 'cancel' } },
+    ])
+    expect(decided).toEqual([])
+    await replied
+    session.close()
+  })
+
   it('answers a permission request for this call only, allowed or refused, never for the session', async () => {
     const decided: ToolCall[] = []
     const verdicts = [true, false]
@@ -284,7 +341,7 @@ describe('an ACP session', () => {
         env: {},
         resume: 's1',
         model: 'model-1',
-        mcpServers: [],
+        servers: {},
         spawn: () => agent.process,
         decide: allowAll,
         signal: new AbortController().signal,

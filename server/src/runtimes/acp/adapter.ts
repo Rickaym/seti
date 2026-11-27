@@ -32,6 +32,7 @@ function sandboxedSpawn(launch: AcpLaunch, launcher: Launcher) {
 }
 
 interface Session {
+  servers: AcpRealised['servers']
   cwd: string
   resume: string | null
   model: string
@@ -47,7 +48,6 @@ function realiseAcp(launch: AcpLaunch, launcher: Launcher, session: Session): Ac
     command: launch.command,
     args: launch.args(session.model),
     env: { ...launcher.env, ...launch.env },
-    mcpServers: [],
     spawn,
     ...session,
   }
@@ -59,6 +59,7 @@ const REFUSAL = 'This call offers no tools; answer from what you were given.'
 const acpOneShot = (launch: AcpLaunch): OneShot => ({
   open: async (request, launcher, abortController) => {
     const realised = realiseAcp(launch, launcher, {
+      servers: {},
       cwd: request.cwd,
       resume: null,
       model: request.model,
@@ -95,6 +96,7 @@ export const acpAdapterFor = <Id extends string>(id: Id, launch: AcpLaunch): Run
   realise: async (spec, launcher, host, abortController) =>
     Promise.resolve(
       realiseAcp(launch, launcher, {
+        servers: host.toolServers,
         cwd: spec.cwd,
         resume: spec.resume,
         model: launch.model,

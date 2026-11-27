@@ -976,12 +976,15 @@ class FakeSeti:
         if ask is None or not word or ask.get("used") or ask["tool"] != "answer_question":
             return err(403, "Forbidden", "The EA does this only on the user's own yes")
         ask["used"] = True
-        expected = {
+        expected: dict[str, Any] = {
             "request": held["id"],
             "digest": held["digest"],
             "decision": body["decision"],
-            "message": body.get("message", ""),
         }
+        if body["decision"] == "deny" and ask["args"].get("heard") == "no":
+            expected["heard"] = "no"
+        else:
+            expected["message"] = body.get("message", "")
         if any(ask["args"].get(k) != v for k, v in expected.items()):
             return err(403, "Forbidden", "What the user said yes to is not this request as it stands")
         self.permission_requests.remove(held)

@@ -1,6 +1,6 @@
 import { PROVIDERS, reachesProvider } from '@seti/shared'
 import { describe, expect, it } from 'vitest'
-import { callCost } from './prices.js'
+import { callCost, rowOn } from './prices.js'
 
 describe('the provider registry', () => {
   it("lists each provider's API host among the hosts its key is added on", () => {
@@ -31,5 +31,23 @@ describe("a model call's estimated cost", () => {
   it('is unknown for a model the table lacks and for a provider that prices its own calls', () => {
     expect(callCost('openai', 'gpt-0', { input: 1, output: 1 })).toBeNull()
     expect(callCost('anthropic', 'claude-opus-5-5', { input: 1, output: 1 })).toBeNull()
+  })
+})
+
+describe('a price table with an announced rise', () => {
+  const rows = [
+    { from: null, rate: 1 },
+    { from: '2026-12-01', rate: 2 },
+    { from: '2027-01-01', rate: 3 },
+  ]
+
+  it('applies the rates in force on the day of the call, in UTC', () => {
+    expect(rowOn(rows, new Date('2026-11-30T23:59:59Z'))?.rate).toBe(1)
+    expect(rowOn(rows, new Date('2026-12-01T00:00:00Z'))?.rate).toBe(2)
+    expect(rowOn(rows, new Date('2027-06-01T00:00:00Z'))?.rate).toBe(3)
+  })
+
+  it('has no rates before a table whose first row starts on a day', () => {
+    expect(rowOn([{ from: '2026-12-01' }], new Date('2026-11-01T00:00:00Z'))).toBeUndefined()
   })
 })
