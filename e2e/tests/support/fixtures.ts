@@ -12,6 +12,7 @@ import type { Envelope, Repo } from '@seti/shared'
 import { startCodexRegistry, stopCodexRegistry } from './codex-registry.js'
 import { openSeedDb } from './db.js'
 import { paths, USER_HEADERS } from './env.js'
+import { startGeminiRegistry, stopGeminiRegistry } from './gemini-registry.js'
 import { startDemoServer, startWorkerServer, type WorkerServer } from './server.js'
 
 const FAILED_RESOURCE = /^Failed to load resource: the server responded with a status of \d{3}/
@@ -91,11 +92,12 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
   setiServer: [
     async ({ serverEnv }, use) => {
       const demo = serverEnv.SETI_DEMO === '1'
-      const registry = demo ? {} : await startCodexRegistry()
+      const registry = demo ? {} : { ...(await startCodexRegistry()), ...(await startGeminiRegistry()) }
       const server = await (demo ? startDemoServer() : startWorkerServer({ ...registry, ...serverEnv }))
       await use(server)
       await server.close()
       await stopCodexRegistry()
+      await stopGeminiRegistry()
     },
     { scope: 'worker', auto: true, timeout: 90_000 },
   ],

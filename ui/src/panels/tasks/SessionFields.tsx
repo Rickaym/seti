@@ -1,8 +1,15 @@
-import { RUNTIME_NAMES, warmCacheNote, type AgentCapabilities, type Task } from '@seti/shared'
+import {
+  costEstimated,
+  DEFAULT_RUNTIME,
+  RUNTIME_NAMES,
+  warmCacheNote,
+  type AgentCapabilities,
+  type Task,
+} from '@seti/shared'
 import type { ReactNode } from 'react'
 import { Hint } from '@/components/Hint'
 import { compactionGaps } from '@/lib/compaction-gaps'
-import { NotOnRuntime } from '@/panels/tasks/NotOnCodex'
+import { NotOnRuntime } from '@/panels/tasks/NotOnRuntime'
 import { OpinionSpend } from '@/panels/tasks/OpinionSpend'
 import { Fields, Row } from '@/panels/tasks/SettingsFields'
 import { PlannerFallback, WarmCaches } from '@/panels/tasks/StartFacts'
@@ -10,12 +17,12 @@ import { TaskCompact } from '@/panels/tasks/TaskCompact'
 import { TaskCost } from '@/panels/tasks/TaskCost'
 import { TaskModel } from '@/panels/tasks/TaskModel'
 
-/** The runtime and what the agent was started with, shown for Codex and for a picked Claude model. */
+/** The runtime and what the agent started with, off the default runtime or with a picked model. */
 function runtimeLine(task: Task): string | null {
-  const model = task.runtime === 'codex' ? null : task.requested_model
-  const parts = [RUNTIME_NAMES[task.runtime], model, task.requested_effort]
+  const other = task.runtime !== DEFAULT_RUNTIME
+  const parts = [RUNTIME_NAMES[task.runtime], other ? null : task.requested_model, task.requested_effort]
   const picked = parts.filter((part) => part !== null)
-  return task.runtime === 'codex' || picked.length > 1 ? picked.join(', ') : null
+  return other || picked.length > 1 ? picked.join(', ') : null
 }
 
 /** The compaction rule of the agent, or why its runtime takes none. */
@@ -44,7 +51,7 @@ export function SessionFields({ task, running, children }: { task: Task; running
       )}
       {runtimeLine(task) !== null && <Row label="Runtime">{runtimeLine(task)}</Row>}
       <Row label="Cost">
-        <TaskCost cost={task.cost_usd} estimated={task.runtime === 'codex'} />
+        <TaskCost cost={task.cost_usd} estimated={costEstimated(task.runtime)} />
         <OpinionSpend taskId={task.id} />
       </Row>
       {children}

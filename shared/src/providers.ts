@@ -137,3 +137,6 @@ const RUNTIME_PROVIDERS: Record<StoredRuntime, ProviderId> = { claude: 'anthropi
 
 /** The provider an agent on the runtime sends its model calls to. */
 export const providerOf = (runtime: StoredRuntime): ProviderId => RUNTIME_PROVIDERS[runtime]
+
+/** Whether Seti estimates an agent's cost from the provider's prices, not the runtime's dollars. */
+export const costEstimated = (runtime: StoredRuntime): boolean => PROVIDERS[providerOf(runtime)].prices !== null

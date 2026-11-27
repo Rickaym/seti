@@ -40,6 +40,33 @@ export interface GeminiSettings {
 export const GEMINI_SETTINGS_DEFAULTS: GeminiSettings = { enabled: false, evaluator_decides: true, default_model: null }
 
 /**
+ * The models a Gemini agent may pick: those the pinned Gemini CLI knows and Google prices, and
+ * the Gemini 4 models it reaches by explicit id.
+ */
+export const GEMINI_MODELS = [
+  'gemini-3.8-flash',
+  'gemini-3.6-flash',
+  'gemini-3.5-flash-lite',
+  'gemini-3.1-flash-lite',
+  'gemini-3.1-pro-preview',
+  'gemini-4-carbon',
+  'gemini-4-argon',
+  'gemini-4-neon',
+  'gemini-4-hydrogen',
+] as const
+
+/** A Gemini model as lists show it; no run against Google's own API has shown Gemini 4 yet. */
+export const geminiModelLabel = (id: string): string => (id.startsWith('gemini-4-') ? `${id} (unproven)` : id)
+
+/** A change to the Gemini settings, which only the user makes; a field left out stays. */
+export const geminiSettingsInput = z.strictObject({
+  enabled: z.boolean().optional(),
+  evaluator_decides: z.boolean().optional(),
+  default_model: z.enum(GEMINI_MODELS).nullable().optional(),
+})
+export type GeminiSettingsInput = z.input<typeof geminiSettingsInput>
+
+/**
  * The models a Codex agent may pick. gpt-5.5 calls its tools directly; the newer ones call them
  * from scripts Codex's code mode host runs, and CI proves both shapes against a scripted model.
  */
@@ -108,7 +135,22 @@ export interface CodexStatus {
   pricesAsOf: string
 }
 
-/** Claude Code as Settings shows it: its program and version, the defaults it names, no value. */
+/** The Gemini runtime as Settings shows it, in Codex's states; the key's state is names only. */
+export interface GeminiStatus {
+  state: CodexState
+  failure: { reason: InstallFailure; message: string } | null
+  /** The pinned Gemini CLI version, which Seti installs and checks itself. */
+  pinned: string
+  settings: GeminiSettings
+  /** Credentials holding a connection with a header on Google's Gemini API. */
+  keyed: string[]
+  /** The one connection with a Gemini key that the default credential lacks, by name, if one. */
+  keyElsewhere: string | null
+  /** The date of the price table a Gemini agent's estimated cost comes from. */
+  pricesAsOf: string
+}
+
+/** Claude Code as Settings shows it:its program and version, the defaults it names, no value. */
 export interface ClaudeStatus {
   /** The program agents run: SETI_CLAUDE_BIN, a claude on the PATH, or the Agent SDK's own. */
   program: string
@@ -128,5 +170,6 @@ export interface ClaudeStatus {
 export interface RuntimesStatus {
   claude: ClaudeStatus
   codex: CodexStatus
+  gemini: GeminiStatus
   offers: RuntimeOffer[]
 }

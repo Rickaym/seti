@@ -1,6 +1,7 @@
 import {
   CODEX_EFFORTS,
   CODEX_MODELS,
+  GEMINI_MODELS,
   type ChannelInfo,
   type SettingsSectionPath,
   type SettingsSectionValue,
@@ -92,7 +93,7 @@ export const APP_AGENT_READERS: SectionReaders<Extract<SettingsSectionPath, `app
       gemini: {
         enabled: gemini.enabled,
         evaluator_decides: gemini.evaluator_decides,
-        default_model: gemini.default_model,
+        default_model: GEMINI_MODELS.find((known) => known === gemini.default_model) ?? null,
       },
     }
   },

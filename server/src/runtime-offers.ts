@@ -2,10 +2,12 @@ import os from 'node:os'
 import {
   claudeOffer,
   codexOffer,
+  geminiOffer,
   pickRefusal,
   startRuntime,
   type CapabilitiesSnapshot,
   type CodexStatus,
+  type GeminiStatus,
   type RuntimeOffer,
   type StoredRuntime,
 } from '@seti/shared'
@@ -21,14 +23,15 @@ function reportedClaudeModels() {
   return snapshot?.models ?? null
 }
 
-/** Claude Code always, and Codex only while a new agent may start on it. */
-export const runtimeOffers = (codex: CodexStatus): RuntimeOffer[] => [
+/** Claude Code always, and Codex and Gemini CLI only while a new agent may start on them. */
+export const runtimeOffers = (codex: CodexStatus, gemini: GeminiStatus): RuntimeOffer[] => [
   claudeOffer(reportedClaudeModels()),
   ...(codex.state === 'ready' ? [codexOffer()] : []),
+  ...(gemini.state === 'ready' ? [geminiOffer()] : []),
 ]
 
 /** Every runtime's offer, whether or not it can start an agent now, in the order Seti offers them. */
-export const everyOffer = (): RuntimeOffer[] => [claudeOffer(reportedClaudeModels()), codexOffer()]
+export const everyOffer = (): RuntimeOffer[] => [claudeOffer(reportedClaudeModels()), codexOffer(), geminiOffer()]
 
 interface Picks {
   runtime?: StoredRuntime | undefined

@@ -136,6 +136,8 @@ export const SECURITY_ROUTES: CoverageTable = {
   'GET /api/runtimes/capabilities': ea('list_plugins'),
   'PUT /api/runtimes/codex': user('security', 'Codex runtime settings and Rules decide. Security setting'),
   'POST /api/runtimes/codex/retry': user('installs', 'Install the Codex runtime again. Installs a binary'),
+  'PUT /api/runtimes/gemini': user('security', 'Gemini runtime settings and Rules decide. Security setting'),
+  'POST /api/runtimes/gemini/retry': user('installs', 'Install Gemini CLI again. Installs a program'),
   'GET /api/sandbox': ea('get_security_settings'),
   'PUT /api/sandbox': user('security', 'Change the sandbox. Security setting'),
   'GET /api/secrets': user('secrets', 'Secret names. Secrets'),

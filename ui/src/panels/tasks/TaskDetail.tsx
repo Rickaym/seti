@@ -15,6 +15,7 @@ import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { RuntimeBadge } from '@/components/RuntimeBadge'
 import { useCommands } from '@/components/palette/useCommands'
 import { useConfirm } from '@/components/ui/confirm-context'
+import { useCapabilities } from '@/hooks/useCapabilities'
 import { useChatFindIn } from '@/hooks/useChatFind'
 import { useDraft } from '@/hooks/useDraft'
 import { useEscapeKeys } from '@/hooks/useEscapeKeys'
@@ -103,7 +104,7 @@ export function TaskDetail({ task, onChanged, onSubtasks }: TaskDetailProps) {
   const liveStatus = stream.status
   const status = liveStatus ?? task.status
   const busy = status === 'running' || stream.shell !== null
-  const codex = task.runtime === 'codex'
+  const canRewind = useCapabilities(task)?.rewind !== false
   const root = useRef<HTMLDivElement>(null)
   const [draft, setDraft] = useDraft(taskDraftKey(task.id))
   const [rewinding, setRewinding] = useState(false)
@@ -178,8 +179,8 @@ export function TaskDetail({ task, onChanged, onSubtasks }: TaskDetailProps) {
     busy,
     onStop: stop,
     onRewind: useCallback(() => {
-      setRewinding(!codex)
-    }, [codex]),
+      setRewinding(canRewind)
+    }, [canRewind]),
   })
 
   useStopCommand(task, { busy, shell: shellRunning }, stop)

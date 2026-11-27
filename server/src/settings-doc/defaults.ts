@@ -2,13 +2,13 @@ import {
   AUTO_ARCHIVE_DEFAULTS,
   AWS_SETTINGS_DEFAULT,
   CODEX_SETTINGS_DEFAULTS,
+  GEMINI_SETTINGS_DEFAULTS,
   COMPACT_DEFAULTS,
   DEFAULT_PERMISSION_TIMEOUT_MINUTES,
   DEFAULT_PROFILE_ID,
   DEFAULT_TIERS,
   DREAM_SETTINGS_DEFAULTS,
   EA_SETTINGS_DEFAULT,
-  GEMINI_SETTINGS_DEFAULTS,
   SANDBOX_POLICY_DEFAULT,
   STORAGE_SCHEDULE_DEFAULTS,
   type SettingsSectionPath,
@@ -73,7 +73,7 @@ export const SECTION_DEFAULTS: SectionDefaults = {
     gemini: {
       enabled: GEMINI_SETTINGS_DEFAULTS.enabled,
       evaluator_decides: GEMINI_SETTINGS_DEFAULTS.evaluator_decides,
-      default_model: GEMINI_SETTINGS_DEFAULTS.default_model,
+      default_model: null,
     },
   }),
   'agents.storage': () => ({

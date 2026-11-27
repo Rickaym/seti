@@ -5,6 +5,7 @@ import { REBUILDABLE_DIRS, REBUILDABLE_IF_IGNORED, type Task } from '@seti/share
 import {
   ARCHIVE_ROOT,
   CODEX_ROOT,
+  GEMINI_ROOT,
   MOD_FETCH_ROOT,
   SANDBOX_ROOT,
   SCRATCH_ROOT,
@@ -26,6 +27,7 @@ export const OWNED_ROOTS = {
   sharedTools: SHARED_TOOLS_ROOT,
   trash: TRASH_ROOT,
   codex: CODEX_ROOT,
+  gemini: GEMINI_ROOT,
 } as const
 
 export type OwnedRoot = keyof typeof OWNED_ROOTS

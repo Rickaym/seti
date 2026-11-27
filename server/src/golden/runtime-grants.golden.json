@@ -551,7 +551,8 @@
       "dreams": true,
       "rewind": true,
       "bypass": true,
-      "slash_commands": true
+      "slash_commands": true,
+      "call_edits": true
     },
     "codex": {
       "label": "Codex",
@@ -571,10 +572,11 @@
       "dreams": false,
       "rewind": false,
       "bypass": false,
-      "slash_commands": false
+      "slash_commands": false,
+      "call_edits": false
     },
     "gemini": {
-      "label": "Gemini CLI",
+      "label": "Gemini",
       "mcp_servers": false,
       "mcp_transports": [],
       "plugins": false,
@@ -585,7 +587,8 @@
       "dreams": false,
       "rewind": false,
       "bypass": false,
-      "slash_commands": false
+      "slash_commands": false,
+      "call_edits": false
     }
   }
 }

@@ -106,7 +106,7 @@ const CORE_GROUPS: { group: SettingsGroup; pages: (Omit<SettingsPage, 'group'> &
         key: 'runtimes',
         label: 'Runtimes',
         icon: Cpu,
-        keywords: 'codex openai gpt claude code models account login usage plan subagents',
+        keywords: 'codex openai gpt gemini google claude code models account login usage plan subagents',
       },
       {
         key: 'storage',

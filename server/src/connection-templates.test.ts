@@ -3,6 +3,8 @@ import {
   connectionCreateInput,
   connectionTemplate,
   expandTemplate,
+  providerOf,
+  reachesProvider,
   templateMatches,
   templateValues,
   type Connection,
@@ -179,6 +181,15 @@ describe('the connection template catalog', () => {
     const [graph, arm] = expanded('microsoft_entra', ['graph', 'arm'], ENTRA_FIELDS, { taken })
     expect([graph?.name, graph?.env, arm?.name]).toEqual(['entra_graph_2', 'ENTRA_GRAPH_2', 'entra_arm'])
     expect(expanded('openai', [], {}, { taken })[0]).toMatchObject({ name: 'openai_2', env: 'OPENAI_API_KEY_2' })
+  })
+
+  it('makes the Gemini API key a connection Gemini agents take their key from', () => {
+    const [gemini] = expanded('gemini', [])
+    expect(gemini).toMatchObject({ header: { name: 'x-goog-api-key', template: '{{value}}' } })
+    expect(reachesProvider(providerOf('gemini'), gemini?.hosts ?? [])).toBe(true)
+    expect(CONNECTION_TEMPLATES.filter((entry) => templateMatches(entry, 'gemini')).map((entry) => entry.id)).toEqual([
+      'gemini',
+    ])
   })
 
   it('finds a template by its name, its hosts or one of its APIs', () => {

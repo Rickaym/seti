@@ -359,7 +359,7 @@ The EA reads its key files first, then its environment, then `SETI_EA_ENV`
 
 Development and tests also read `SETI_TEST_DATABASE_URL`, `SETI_TEST_REDIS_URL`,
 `SETI_POLLER_LOOPBACK`, `SETI_PUSH_LOOPBACK`, `SETI_MOD_TEST_UPSTREAM`, `SETI_PLANNER_MODULE`,
-`SETI_SDK_MODULE`, `SETI_TERMINAL_SHELL`, `SETI_CODEX_PIN`, `SETI_PROBE_DELAY_MS`,
+`SETI_SDK_MODULE`, `SETI_TERMINAL_SHELL`, `SETI_CODEX_PIN`, `SETI_GEMINI_PIN`, `SETI_PROBE_DELAY_MS`,
 `SETI_PR_POLL_MS`, `SETI_AWAY_MS` and the `SETI_E2E_*` variables; production ignores the loopback,
 upstream, module, terminal shell, Codex pin, probe, poll and away ones.
 
@@ -637,6 +637,33 @@ before, and its next message brings a brief of its work. Background work and Byp
 to Codex needs the agent sandboxed and an OpenAI key in its credential. The EA does the same with
 `restart_agent_session` and a `runtime` after your yes, and a moved agent's approvals are never
 looser than before when the EA or another agent moved it.
+
+### Gemini agents
+
+An agent can also run on Google's Gemini models through Gemini CLI. Gemini is off by default, and
+only you change that.
+
+1. In Google AI Studio, create an API key in a Google Cloud project with billing on. Keys on the
+   free tier let Google use your prompts to improve its products.
+2. In Settings, Connections, tap `+ Connection`, search "Gemini" and pick Gemini API (host
+   `generativelanguage.googleapis.com`, header `x-goog-api-key`). Paste the key into its field,
+   keep it in the default credential, and tap Add. Type the key into Seti only, never into a chat
+   with an agent or the EA.
+3. In Settings, Runtimes, turn Gemini on. Seti downloads the Gemini CLI version it is built for
+   into `~/.seti/gemini/<version>/`, checks the package's sha512 and the bundle's sha256 first
+   (RT-11), and the status reads Ready once the key is there. Turning Gemini off removes the copy.
+4. On the start page, pick a Gemini model in the Model selector. Gemini 4 models read
+   "(unproven)": Seti reaches them by their model id, and no run against Google's own API has
+   shown them working yet. The Gemini card sets the model new Gemini agents start with.
+
+A Gemini agent runs only in the sandbox, and Seti's rules answer its calls as they answer a Codex
+agent's, with Rules decide in the Gemini card. Gemini CLI itself runs a few read-only commands,
+such as `cat`, `ls` and `grep` in the agent's folder, without asking; the card and the start page
+say so, and the sandbox is what limits them. The agent's cost is an estimate from Google's prices
+as of the date the card shows. Gemini agents have no Auto mode, Bypass, dreams, side chat, rewind,
+plugins, claude.ai connectors, slash commands of Claude Code or model fallback, and a held call
+cannot be edited before you allow it; each such control reads "Not on Gemini". A message sent
+during a turn waits for the turn's end, and subagents run but do not show as threads.
 
 ### Access: defaults and per-agent choices
 

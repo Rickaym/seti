@@ -34,6 +34,8 @@ export interface AgentCapabilities {
   bypass: boolean
   /** It takes its own slash commands from the composer, beside Seti's. */
   slash_commands: boolean
+  /** An answer to a held call can carry more than yes or no: an edited input, a deny's note. */
+  call_edits: boolean
 }
 
 /** The capabilities a mod's command or view can need, each a field of AgentCapabilities. */

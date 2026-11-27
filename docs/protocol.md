@@ -178,7 +178,8 @@ between two steps; an interrupt; a hook at subagent start.
   pressing Retry and the control room's start while the runtime is on are the only other
   triggers, and the EA and agents can trigger none of them. The install contacts only the host
   the pin names, MUST check the downloaded package's sha512 integrity and then the sha256 of the
-  program and of each helper program the pin names (Codex's code mode host), all from the pin,
+  program and of each helper program the pin names (Codex's code mode host), or of the whole
+  program folder where the pin names one digest for it (Gemini CLI's bundle), all from the pin,
   and MUST discard what it fetched and never run it when any differs. The program and its
   helpers land alone in a folder of the control room's own data, one folder per version, read
   and run only, which a sandbox mounts read-only; a folder missing a helper is fetched again. The install resumes a cut
@@ -194,7 +195,8 @@ between two steps; an interrupt; a hook at subagent start.
 - RT-13: A runtime declares whether it loads the user's MCP servers and connectors, Seti's
   plugins and a compaction rule, and which parts of that rule it does not honour, whether it can
   run outside the sandbox, fork a side chat, dream, rewind, run background subagents of its
-  own, take Bypass and take slash commands of its own; `GET /api/runtimes/capabilities` serves each runtime's declaration. For an agent whose
+  own, take Bypass, take slash commands of its own, and take an answer to a held call that
+  carries more than yes or no (an edited input, a deny's note); `GET /api/runtimes/capabilities` serves each runtime's declaration. For an agent whose
   runtime lacks one, its settings show the control as not on that runtime instead of a working
   control, counts leave those items out, its `task.md` and system prompt do not offer them, and
   the server refuses the change with the reason. A control the runtime honours in part says which
@@ -217,6 +219,10 @@ between two steps; an interrupt; a hook at subagent start.
   it left (as DLG-3 holds a helper). The user's own move takes the new runtime's usual approvals.
   The brief arrives with the agent's next message; a move starts no turn by itself. Each move is
   audited as `task.runtime_changed` with the runtimes, the model and who moved it.
+- RT-16: A runtime that runs some calls without asking, before the control room's gate sees them,
+  MUST say so where the user turns it on and under the start box when it is picked: which calls,
+  and that the sandbox is what limits them. A model the control room offers that no run against
+  the provider's own API has shown working MUST read "(unproven)" in every list.
 
 ### 3.6 What an agent is given
 
