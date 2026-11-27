@@ -49,9 +49,15 @@ test('a review rule holds an MCP call until the user edits and allows it', async
     await card.getByRole('button', { name: 'Allow', exact: true }).click()
 
     await expect(page.getByRole('main').getByText(reviewSent('Deploy is done'), { exact: true })).toBeVisible()
-    await expect(page.getByRole('main').getByTestId('edited-mark')).toHaveText(
-      `You edited the text before ${rule.slice(5)}.send_message ran. Above is the agent's draft.`,
+    const main = page.getByRole('main')
+    await expect(main.getByTestId('edited-mark')).toHaveText(
+      `You edited the text before ${rule.slice(5)}.send_message ran.`,
     )
+    await expect(main.getByTestId('tool-edited')).toBeVisible()
+    const draft = main.getByRole('region', { name: "Agent's draft" })
+    await expect(draft).toBeHidden()
+    await main.getByTestId('tool-edited').click()
+    await expect(draft).toContainText(REVIEW_DRAFT)
     await expect.poll(async () => (await apiData<Task>(request, `/tasks/${id}`)).status).toBe('idle')
   } finally {
     const policy = await apiData<PermissionPolicy>(request, '/permissions')
@@ -85,6 +91,7 @@ test('a held call the user edits and then denies says so in plain words and tell
     await expect(page.getByRole('main').getByTestId('edited-mark')).toHaveText(
       `You edited the text, then denied ${rule.slice(5)}.send_message. Nothing ran.`,
     )
+    await expect(page.getByRole('main').getByTestId('tool-edited')).toHaveCount(0)
     const [held] = await apiData<PermissionRequest[]>(request, `/tasks/${id}/permission-requests`)
     expect(held).toMatchObject({ state: 'denied', edited: ['text'], message: 'Wait for QA' })
   } finally {
@@ -108,8 +115,11 @@ test('an edited Slack send says, under its row, that the message was sent', asyn
   await card.getByRole('button', { name: 'Allow', exact: true }).click()
   await expect(main.getByText(SLACK_POSTED, { exact: true })).toBeVisible()
   const mark = main.getByTestId('edited-mark')
-  await expect(mark).toHaveText("You edited the message before it was sent. Above is the agent's draft.")
+  await expect(mark).toHaveText('You edited the message before it was sent.')
   const row = main.getByTestId('tool-summary').filter({ hasText: 'Send to #deploys' })
+  await expect(row).toHaveText('Send to #deploys: Deploy is green')
   const [rowBox, markBox] = await Promise.all([row.boundingBox(), mark.boundingBox()])
   expect(markBox?.y ?? 0).toBeGreaterThan(rowBox?.y ?? Infinity)
+  await row.click()
+  await expect(main.getByRole('region', { name: "Agent's draft" })).toContainText('Deploy done')
 })

@@ -102,7 +102,7 @@ function reviewHook(taskId: string, session: AbortSignal): HookCallbackMatcher {
     if (input.hook_event_name !== 'PreToolUse') {
       return {}
     }
-    const call = { tool: input.tool_name, input: asRecord(input.tool_input) }
+    const call = { tool: input.tool_name, id: input.tool_use_id, input: asRecord(input.tool_input) }
     try {
       const { output } = await nodeLink.ask(taskId, 'review.ask', call, AbortSignal.any([signal, session]))
       // The control plane answered with what reviewCall decided.
@@ -124,7 +124,7 @@ function pushHook(taskId: string, session: AbortSignal): HookCallbackMatcher {
     if (input.hook_event_name !== 'PreToolUse') {
       return {}
     }
-    const call = { tool: input.tool_name, input: asRecord(input.tool_input), cwd: input.cwd }
+    const call = { tool: input.tool_name, id: input.tool_use_id, input: asRecord(input.tool_input), cwd: input.cwd }
     try {
       const { output } = await nodeLink.ask(taskId, 'push.ask', call, AbortSignal.any([signal, session]))
       // The control plane answered with what pushCall decided.

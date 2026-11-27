@@ -7,6 +7,8 @@ export interface EditMark {
   denied: boolean
   /** The call's tool; marks written before it was stored leave it out. */
   tool?: string
+  /** The runtime's id of the call, where it gave one, which links the mark to the call's row. */
+  call?: string
 }
 
 const SLACK_DONE = { send: 'sent', draft: 'saved as a draft', schedule: 'scheduled' } as const
@@ -28,17 +30,21 @@ function callWords(tool: string | undefined): string {
   return server === null ? name : `${server}.${name}`
 }
 
-/** One sentence that says what the user edited and whether the call then went out, for any screen. */
-export function editMarkText({ fields, denied, tool }: EditMark): string {
+/**
+ * One sentence that says what the user edited and whether the call then went out, for any screen.
+ * `sent` says the call's row above shows the call as it went out, not the agent's draft.
+ */
+export function editMarkText({ fields, denied, tool }: EditMark, sent = false): string {
   const what = fieldWords(fields)
+  const draft = sent ? '' : " Above is the agent's draft."
   const slack = tool === undefined ? null : slackSendKind(tool)
   if (slack !== null) {
     return denied
       ? `You edited ${what}, then denied it. Nothing was ${SLACK_DONE[slack]}.`
-      : `You edited ${what} before it was ${SLACK_DONE[slack]}. Above is the agent's draft.`
+      : `You edited ${what} before it was ${SLACK_DONE[slack]}.${draft}`
   }
   const call = callWords(tool)
   return denied
     ? `You edited ${what}, then denied ${call}. Nothing ran.`
-    : `You edited ${what} before ${call} ran. Above is the agent's draft.`
+    : `You edited ${what} before ${call} ran.${draft}`
 }

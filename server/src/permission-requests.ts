@@ -137,6 +137,8 @@ export const waitingInput = (requestId: string): Record<string, unknown> => inpu
 /** A call Seti asks the user about, why, and the rules Always allow would add. */
 interface Ask {
   tool: string
+  /** The runtime's id of the call, where it gives one. */
+  callId?: string | undefined
   input: Record<string, unknown>
   kind: PermissionRequestKind
   reason: string | null
@@ -196,6 +198,7 @@ async function askUser(taskId: string, ask: Ask, signals: readonly AbortSignal[]
       id,
       task_id: taskId,
       tool_name: ask.tool,
+      call_id: ask.callId ?? null,
       kind: ask.kind,
       summary: await summarize(ask.tool, ask.input),
       description: describe(ask),
@@ -263,6 +266,7 @@ export const canUseToolFor =
     const command = shellCommand(tool, input)
     const ask: Ask = {
       tool,
+      callId: options.toolUseID,
       input,
       kind: 'tool',
       reason: held ?? reasonOf(options, input),
@@ -284,7 +288,7 @@ export const askAboutRepeat = async (
 /** Asks the user about a command that pushes outside their organisations; Always adds `PushTo`. */
 export const askAboutPush = async (
   taskId: string,
-  call: Pick<Ask, 'tool' | 'input' | 'shell'> & { reason: string; owners: readonly string[] },
+  call: Pick<Ask, 'tool' | 'callId' | 'input' | 'shell'> & { reason: string; owners: readonly string[] },
   signals: readonly AbortSignal[],
 ): Promise<PermissionResult> => {
   const owners = [...new Set(call.owners)].map((owner) => `PushTo(${owner})`)
@@ -296,7 +300,7 @@ const REVIEW_REASON = 'A review rule holds this call for you to check, and edit,
 /** Asks the user about an MCP call a review rule holds; no rules, as review asks each time. */
 export const askForReview = async (
   taskId: string,
-  call: { tool: string; input: Record<string, unknown> },
+  call: Pick<Ask, 'tool' | 'callId' | 'input'>,
   signals: readonly AbortSignal[],
 ): Promise<Answer> => askUser(taskId, { ...call, kind: 'review', reason: REVIEW_REASON, suggestions: [] }, signals)
 
@@ -309,7 +313,7 @@ export type UserAnswer = { allow: true } | { allow: false; message: string; drop
  */
 export async function askCodexUser(
   taskId: string,
-  call: Pick<Ask, 'tool' | 'input' | 'reason' | 'opened' | 'shell' | 'description'> & { review: boolean },
+  call: Pick<Ask, 'tool' | 'callId' | 'input' | 'reason' | 'opened' | 'shell' | 'description'> & { review: boolean },
   signals: readonly AbortSignal[],
 ): Promise<UserAnswer> {
   const kind = call.review ? 'review' : 'tool'
