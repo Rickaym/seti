@@ -40,3 +40,12 @@ describe("an agent's extras for the other agents' tools", () => {
     expect((await call('list_processes', { task: target.id, shell: '../x' })).error).toBe(true)
   })
 })
+
+describe("agents' agent_access without an agent", () => {
+  it('lists what every agent gets by default at Full', async () => {
+    const result = await call('agent_access', {})
+    expect(result.error).toBe(false)
+    const items = JSON.parse(result.text) as { kind: string; default_enabled: boolean }[]
+    expect(items.every((entry) => typeof entry.default_enabled === 'boolean')).toBe(true)
+  })
+})
