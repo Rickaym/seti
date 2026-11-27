@@ -33,7 +33,7 @@ const SETTING_ICONS: Record<SettingNote, LucideIcon> = {
 /** A note from Seti: memory, restart, a setting, timeout, refused host, edit or failure. */
 export function SetiNote({ taskId, payload }: { taskId: string; payload: SetiPayload }) {
   if (payload.edited !== undefined) {
-    return <EditedLine fields={payload.edited.fields} denied={payload.edited.denied} />
+    return <EditedLine mark={payload.edited} />
   }
   if (payload.refused_host !== undefined) {
     return <RefusedHostLine taskId={taskId} host={payload.refused_host} count={payload.refused_count ?? 1} />

@@ -760,6 +760,8 @@ class FakeSeti:
     )
     file_texts: dict[str, str] = field(default_factory=dict)
     team_deliveries: list[dict[str, Any]] = field(default_factory=list)
+    relays: list[dict[str, Any]] = field(default_factory=list)
+    relay_refusal: tuple[int, str] | None = None
     fix_ci: dict[str, Any] = field(
         default_factory=lambda: {"nudges": [], "skipped": [], "unlinked": 0, "error": None}
     )
@@ -1635,6 +1637,15 @@ class FakeSeti:
                     return err(409, "No allowed question waits for its outcome")
                 row["outcome"] = body["outcome"]
                 return ok(row)
+            case ["ea", "relays"]:
+                if self.relay_refusal is not None:
+                    return err(self.relay_refusal[0], "Refused", self.relay_refusal[1])
+                task = next((t for t in self.tasks if self.handle_of(t["id"]) == body["to"]), None)
+                relay = {"id": len(self.relays) + 1, **body, "title": task["title"] if task else body["to"]}
+                self.relays.append(relay)
+                return ok({**relay, "mode": "held", "pending": True, "taken_back": False})
+            case ["ea", "relays", relay_id, "take-back"]:
+                return ok({"id": int(relay_id), "pending": False, "taken_back": True})
             case ["team", "messages"]:
                 to = {"to_kind": "task", "to_handle": body["to"]} if "to" in body else {}
                 message = team_message(len(self.team) + 1, "ea", body["text"], **to)

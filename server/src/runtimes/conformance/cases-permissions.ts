@@ -1,9 +1,12 @@
 import type { ToolCall } from '@seti/shared'
-import { expect } from 'vitest'
+import { expect, vi } from 'vitest'
 import { closed, ofType, turnEnd, type Case } from './case.js'
 import { settle } from './run.js'
 import type { ScriptCall } from './script.js'
 import type { NeutralHost } from './target.js'
+
+/** How long a call's decision may follow its start: over ACP they are two messages. */
+const DECISION_WAIT = { timeout: 5000, interval: 20 }
 
 /** A host that allows every call and notes each call and how many effects had run when asked. */
 function noting(effects: readonly string[]): { host: NeutralHost; asked: { call: ToolCall; before: number }[] } {
@@ -132,8 +135,9 @@ export const PERMISSIONS: Case[] = [
       const run = await subject.open(rig, { host })
       run.send('go')
       await run.until((event) => event.type === 'tool.started', 'the call')
-      await settle()
-      expect(signals).toHaveLength(1)
+      await vi.waitFor(() => {
+        expect(signals).toHaveLength(1)
+      }, DECISION_WAIT)
       expect(ofType(run, 'tool.ended')).toEqual([])
       await run.interrupt()
       await turnEnd(run, 1)

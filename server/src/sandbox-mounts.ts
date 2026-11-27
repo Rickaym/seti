@@ -1,7 +1,9 @@
 import fs from 'node:fs'
 import path from 'node:path'
+import { canonicalRoot, gitDirs } from './git-dirs.js'
 import { codexLocks } from './sandbox-codex.js'
 import { folderSettingsGuards } from './sandbox-folder-settings.js'
+import { geminiLocks } from './sandbox-gemini.js'
 import { readOnlyWork } from './sandbox-read-only.js'
 
 export type Mount =
@@ -52,6 +54,8 @@ export interface SandboxLayout {
   maintenance?: Maintenance
   /** A Codex agent: no Claude Code configuration, and Codex's own settings files read-only. */
   codex?: boolean
+  /** A Gemini CLI agent: no Claude Code configuration, and Gemini CLI's settings files covered. */
+  gemini?: boolean
 }
 
 /**
@@ -137,76 +141,44 @@ export function mountProblem(dir: string, layout: MountRules): string | null {
   return null
 }
 
-interface GitDirs {
-  common: string
-  own: string
-  linked: boolean
-}
-
-function gitDirs(dir: string): GitDirs | null {
-  const dotGit = path.join(dir, '.git')
-  const stat = fs.statSync(dotGit, { throwIfNoEntry: false })
-  if (stat?.isDirectory() === true) {
-    return { common: dotGit, own: dotGit, linked: false }
-  }
-  if (stat?.isFile() !== true) {
-    return null
-  }
-  const text = fs.readFileSync(dotGit, 'utf8').trim()
-  const pointer = text.startsWith('gitdir:') ? text.slice('gitdir:'.length).trim() : ''
-  if (pointer === '') {
-    return null
-  }
-  const own = path.resolve(dir, pointer)
-  const commonFile = path.join(own, 'commondir')
-  const common = exists(commonFile) ? path.resolve(own, fs.readFileSync(commonFile, 'utf8').trim()) : own
-  return recorded(dir, own, common) ? { common, own, linked: true } : null
-}
-
-const real = (file: string) => {
-  try {
-    return fs.realpathSync(file)
-  } catch {
-    return file
-  }
-}
-
-/**
- * Whether the repository a `.git` file names holds this folder as its own. Anyone who can write
- * the folder can write that file, so alone it proves nothing: a worktree counts when its admin
- * folder lies in the repository's `worktrees` and points back at it, and a submodule when its git
- * directory lies in the `.git/modules` of a checkout above it.
- */
-function recorded(dir: string, own: string, common: string): boolean {
-  if (own === common) {
-    const marker = `${path.sep}.git${path.sep}modules${path.sep}`
-    const at = own.indexOf(marker)
-    return at > 0 && dir.startsWith(own.slice(0, at) + path.sep)
-  }
-  const back = path.join(own, 'gitdir')
-  if (!within(own, path.join(common, 'worktrees')) || !exists(back)) {
-    return false
-  }
-  const claimed = path.resolve(own, fs.readFileSync(back, 'utf8').trim())
-  return real(claimed) === real(path.join(dir, '.git'))
-}
-
 interface GitMounts {
   writable: string[]
   guards: string[]
   common: string | null
 }
 
-/** The shared .git a worktree writes commits into, and read-only covers for what runs code. */
+/** A read-only cover for a file or folder, made empty first where it does not exist yet. */
+function covered(target: string, folder: boolean): string {
+  if (folder) {
+    fs.mkdirSync(target, { recursive: true })
+  } else if (!exists(target)) {
+    fs.closeSync(fs.openSync(target, 'a'))
+  }
+  return target
+}
+
+/**
+ * The shared .git a worktree writes commits into, and read-only covers for what git reads as
+ * config or code there, made before the sandbox starts so that the agent cannot create them
+ * later: the config, the main checkout's config.worktree, the hooks and, for a worktree, the
+ * submodules' git folders, which hold their own config and hooks.
+ */
 function gitMounts(dir: string): GitMounts {
   const git = gitDirs(dir)
   if (git === null) {
     return { writable: [], guards: [], common: null }
   }
-  fs.mkdirSync(path.join(git.common, 'hooks'), { recursive: true })
-  const guards = [path.join(git.common, 'config'), path.join(git.common, 'hooks')]
+  const guards = [
+    path.join(git.common, 'config'),
+    covered(path.join(git.common, 'config.worktree'), false),
+    covered(path.join(git.common, 'hooks'), true),
+  ]
   if (git.linked) {
-    guards.push(path.join(dir, '.git'), path.join(git.own, 'config.worktree'))
+    guards.push(
+      path.join(dir, '.git'),
+      covered(path.join(git.own, 'config.worktree'), false),
+      covered(path.join(git.common, 'modules'), true),
+    )
   }
   return { writable: git.linked ? [git.common] : [], guards: guards.filter(exists), common: git.common }
 }
@@ -243,23 +215,8 @@ function unseenWorktrees(commons: readonly string[], seen: (worktree: string) =>
   })
 }
 
-/** Whether `dir` tops a repository: a `.git` folder, or a `.git` file its repository records. */
-export const isRepoRoot = (dir: string): boolean => gitDirs(dir) !== null
-
-/** The repository Claude Code files a directory's memory under: a worktree's main checkout. */
-export function canonicalRoot(dir: string): string | null {
-  for (let current = dir; ; current = path.dirname(current)) {
-    const git = gitDirs(current)
-    if (git !== null) {
-      return git.linked && path.basename(git.common) === '.git' ? path.dirname(git.common) : current
-    }
-    if (path.dirname(current) === current) {
-      return null
-    }
-  }
-}
-
-function systemMounts(): Mount[] {
+/** The system folders every sandbox and the git jail read: /usr, /etc and the root links. */
+export function systemMounts(): Mount[] {
   const mounts: Mount[] = SYSTEM_DIRS.map((dir) => ({ kind: 'ro-bind', src: dir, dest: dir }))
   for (const link of ROOT_LINKS) {
     const stat = fs.lstatSync(link, { throwIfNoEntry: false })
@@ -445,10 +402,13 @@ function masks(layout: SandboxLayout, mounted: readonly string[]): Mount[] {
     })
 }
 
-/** Codex's locked settings files, or Claude Code's state unless the session is bare. */
+/** Codex's or Gemini CLI's locked settings, or Claude Code's state unless the session is bare. */
 function runtimeMounts(layout: SandboxLayout): Mount[] {
   if (layout.codex === true) {
     return codexLocks(layout)
+  }
+  if (layout.gemini === true) {
+    return geminiLocks(layout)
   }
   return layout.maintenance?.bare === true ? [] : claudeMounts(layout)
 }

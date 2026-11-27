@@ -1,6 +1,7 @@
 import {
   answerChangeInput,
   changeRequestsSchema,
+  commandLineOf,
   hostEntry,
   type AnswerChangeInput,
   type ChangeRequest,
@@ -13,6 +14,7 @@ import {
   Globe,
   KeyRound,
   Plug,
+  SlidersHorizontal,
   TriangleAlert,
   User,
   Users,
@@ -38,6 +40,7 @@ const KIND_ICONS: Record<ChangeRequest['change']['kind'], LucideIcon> = {
   api_key: KeyRound,
   mcp_server: Plug,
   shared_tool: Wrench,
+  command: SlidersHorizontal,
 }
 
 function title(request: ChangeRequest, scope: HostScope): string {
@@ -51,6 +54,8 @@ function title(request: ChangeRequest, scope: HostScope): string {
       return `Turn on the MCP server ${change.server}?`
     case 'shared_tool':
       return `${change.snapshot.replaces === null ? 'Publish' : 'Update'} the shared tool ${change.name}?`
+    case 'command':
+      return `${change.description}?`
   }
 }
 
@@ -68,16 +73,24 @@ function diffOf(change: ListChange, scope: HostScope): [string, string] {
       ]
     case 'mcp_server':
       return [change.server, 'MCP servers of this agent']
+    case 'command':
+      return [change.line, 'Seti command for this agent']
   }
 }
 
 /** The exact change, as a line added to the list it joins. */
 function Diff({ change, scope }: { change: ListChange; scope: HostScope }) {
   const [line, where] = diffOf(change, scope)
+  const command = change.kind === 'command' ? null : commandLineOf(change)
   return (
     <div className="flex flex-col gap-0.5">
       <code className="bg-muted px-1.5 py-1 font-mono text-2xs break-all whitespace-pre-wrap">+ {line}</code>
       <span className="text-2xs text-muted-foreground">{where}</span>
+      {command !== null && (
+        <code className="font-mono text-2xs break-all text-muted-foreground" aria-label="As a Seti command">
+          {command}
+        </code>
+      )}
     </div>
   )
 }

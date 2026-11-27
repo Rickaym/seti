@@ -1,5 +1,7 @@
 import {
   DEFAULT_PROFILE_ID,
+  PROVIDERS,
+  providerOf,
   type CodexSettings,
   type CodexSettingsInput,
   type CodexStatus,
@@ -8,12 +10,11 @@ import {
 import { audit } from './audit.js'
 import { redecideWaitingCodexCalls } from './codex-decide.js'
 import { copyState, followSettings, installCodex, type CodexInstallFailure } from './codex-install.js'
-import { codexKeyedCredentials, credentialHasKey, keyOutsideDefault } from './codex-key.js'
 import { CODEX_PIN } from './codex-pin.js'
 import { refuseAgent } from './ea-guard.js'
 import { HttpError } from './http.js'
 import { forgetVersions, programVersion } from './program-version.js'
-import { PRICES_AS_OF } from './runtimes/codex/prices.js'
+import { credentialHasKey, keyedCredentials, keyOutsideDefault } from './provider-key.js'
 import { codexSettings } from './store/codex-settings.js'
 
 /** The Codex version this Seti is built and tested against. */
@@ -67,7 +68,7 @@ export async function codexProgram(): Promise<string | null> {
 export async function codexStatus(): Promise<CodexStatus> {
   const settings = await codexSettings.get()
   const now = await programNow(settings)
-  const keyed = await codexKeyedCredentials()
+  const keyed = await keyedCredentials(providerOf('codex'))
   const ready = keyed.includes(DEFAULT_PROFILE_ID) ? 'ready' : 'no_key'
   return {
     state: now.state === 'runs' ? ready : now.state,
@@ -77,8 +78,8 @@ export async function codexStatus(): Promise<CodexStatus> {
     binary: now.program,
     settings,
     keyed,
-    keyElsewhere: keyed.includes(DEFAULT_PROFILE_ID) ? null : await keyOutsideDefault(),
-    pricesAsOf: PRICES_AS_OF,
+    keyElsewhere: keyed.includes(DEFAULT_PROFILE_ID) ? null : await keyOutsideDefault(providerOf('codex')),
+    pricesAsOf: PROVIDERS.openai.prices.asOf,
   }
 }
 
@@ -117,7 +118,7 @@ export async function requireRuntime(runtime: StoredRuntime, profileId: string):
   if (now.state !== 'runs') {
     throw new HttpError(409, whyNot(now))
   }
-  if (!(await credentialHasKey(profileId))) {
+  if (!(await credentialHasKey(providerOf('codex'), profileId))) {
     throw new HttpError(409, NO_KEY)
   }
 }

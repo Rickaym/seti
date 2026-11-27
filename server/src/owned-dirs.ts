@@ -12,7 +12,7 @@ import {
   TRASH_ROOT,
   WORKTREE_ROOT,
 } from './config.js'
-import { removeLinkedWorktree } from './git.js'
+import { forgetWorktree, mainCheckout } from './git.js'
 import { WORKSPACE_ROOT } from './workspace/dir.js'
 
 /** The roots Seti makes folders of its own in, each folder exactly one level below its root. */
@@ -196,21 +196,28 @@ export async function removeOwnedDir(dir: string, root: OwnedRoot, others: reado
   if (refusal !== null) {
     return refusal
   }
-  if (gitDirOf(dir) !== null && fs.lstatSync(path.join(dir, '.git')).isFile()) {
-    try {
-      if (await removeLinkedWorktree(dir)) {
-        return null
-      }
-    } catch {
-      // git could not remove it; the folder goes below and git prunes its record later
-    }
-  }
+  const linked = gitDirOf(dir) !== null && fs.lstatSync(path.join(dir, '.git')).isFile()
+  const main = linked ? mainCheckout(dir) : null
   const { mode } = await fs.promises.stat(dir)
   if ((mode & 0o200) === 0) {
     await fs.promises.chmod(dir, mode | 0o700)
   }
   await fs.promises.rm(dir, { recursive: true, maxRetries: 2 })
+  if (main !== null) {
+    await forgetWorktree(main, dir)
+  }
   return null
+}
+
+/** Removes a worktree Seti made and drops its record from the repository at `repoPath`. */
+export async function removeWorktree(repoPath: string, dir: string): Promise<void> {
+  if (fs.existsSync(dir)) {
+    const refusal = await removeOwnedDir(dir, 'worktrees', [])
+    if (refusal !== null) {
+      throw new Error(refusal)
+    }
+  }
+  await forgetWorktree(repoPath, dir)
 }
 
 const REBUILDABLE_NAMES = new Set<string>([...REBUILDABLE_DIRS, ...REBUILDABLE_IF_IGNORED])

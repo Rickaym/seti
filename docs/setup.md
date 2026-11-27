@@ -598,9 +598,9 @@ server it cannot use and says why. A Codex agent takes the compaction rule's ins
 its Compact at with a Context window as a token limit; it always compacts near its own limit, so
 Auto compact off and a Context window alone do not apply, and its settings say so. Codex agents
 have no side chat, rewind, Bypass or plugins.
-Their cost is an estimate from the price table in `server/src/runtimes/codex/prices.ts`, which
-names the day it was read; to update it, copy the standard rates from OpenAI's pricing page into
-that table, set `asOf` to the day, and run `pnpm check`.
+Their cost is an estimate from OpenAI's price table in `shared/src/providers.ts`, which names the
+day it was read; to update it, copy the standard rates from OpenAI's pricing page into that table,
+set `asOf` to the day, and run `pnpm check`.
 
 With both runtimes set up, any agent with Seti control can ask the other one for a second
 opinion with its `second_opinion` tool: a Claude agent asks Codex, a Codex agent asks Claude.
@@ -674,8 +674,9 @@ pnpm --filter @seti/server backup keygen /absolute/path/seti-backup.key
 
 After a restart Seti writes `~/.seti/backups/seti-<time>.pgdump.enc` every
 `SETI_BACKUP_INTERVAL_HOURS` and keeps the newest `SETI_BACKUP_KEEP`. `backup now --env-file
-~/.seti/seti.env` takes one on demand. A restore goes into a new database and verifies its audit
-chain; point `SETI_DATABASE_URL` at it, or rename it over `seti` while Seti is stopped:
+~/.seti/seti.env` takes one on demand. A restore goes into a new database in one transaction, so a
+failed one leaves that database empty, then verifies its audit chain; point `SETI_DATABASE_URL` at
+it, or rename it over `seti` while Seti is stopped:
 
 ```sh
 pnpm --filter @seti/server backup restore /abs/backup.pgdump.enc seti_restored --key /abs/seti-backup.key

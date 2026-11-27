@@ -159,6 +159,13 @@ jobs:
       - run: |
           bin="$(pnpm --silent --filter @seti/server run codex-binary "$HOME/.cache/seti-codex")"
           echo "SETI_CODEX_BIN=$bin" >> "$GITHUB_ENV"
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        with:
+          path: ~/.cache/seti-gemini
+          key: gemini-${{ hashFiles('server/src/runtimes/gemini/pin.json') }}
+      - run: |
+          entry="$(pnpm --silent --filter @seti/server run gemini-bundle "$HOME/.cache/seti-gemini")"
+          echo "SETI_GEMINI_BIN=$entry" >> "$GITHUB_ENV"
       - working-directory: server
         env:
           SHARD: ${{ matrix.shard }}
